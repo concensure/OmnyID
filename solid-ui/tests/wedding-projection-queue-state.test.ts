@@ -20,6 +20,7 @@ import {
 import { buildWeddingTemplateFollowUpState } from "@/lib/weddingTemplateFollowUpState";
 import type { WeddingBoundaryPolicy } from "@/lib/weddingBoundaryLedgerState";
 import { buildWeddingPreferenceConflictState } from "@/lib/weddingPreferenceConflictState";
+import { markWeddingPreferenceConflictAfpProjectionSent } from "@/lib/weddingPreferenceConflictAfpProjectionState";
 
 function memoryStorage(): Storage {
   const values = new Map<string, string>();
@@ -195,9 +196,38 @@ test("buildWeddingProjectionQueueState saves one existing preference-conflict pr
   assert.equal(state.pendingItems.length, 1);
   assert.equal(state.pendingItems[0]?.kind, "preference_conflict");
   assert.equal(state.pendingItems[0]?.sendInput?.subtype, "wedding_preference_conflict");
+  assert.match(state.pendingItems[0]?.sendInput?.id ?? "", /^afp-wedding_preference_conflict:/);
   assert.equal(state.pendingItems[0]?.semanticKind, "wedding_conflict");
   assert.equal(JSON.stringify(state.pendingItems[0]).includes("partner_0001"), true);
   assert.equal(JSON.stringify(state.pendingItems[0]).includes("exact_excerpt"), false);
+});
+
+test("a changed preference revision reopens projection after the prior revision was sent", () => {
+  const storage = memoryStorage();
+  const initial = buildWeddingPreferenceConflictState({
+    metadata,
+    decisionArea: "wedding style",
+    preferences: [
+      { sourceRef: "constraint-1", personId: "person:partner_0001", personLabel: "Partner 1", preferenceLabel: "Modern", underlyingValue: "modern" },
+      { sourceRef: "constraint-2", personId: "person:partner_0002", personLabel: "Partner 2", preferenceLabel: "Romantic", underlyingValue: "romantic" },
+    ],
+  });
+  const first = buildWeddingProjectionQueueState({ preferenceConflicts: [initial], storage });
+  markWeddingPreferenceConflictAfpProjectionSent(first.items[0]!.sourceId, storage);
+  const replay = buildWeddingProjectionQueueState({ preferenceConflicts: [initial], storage });
+  const changed = buildWeddingPreferenceConflictState({
+    metadata,
+    decisionArea: "wedding style",
+    preferences: [
+      { sourceRef: "constraint-1", personId: "person:partner_0001", personLabel: "Partner 1", preferenceLabel: "Modern", underlyingValue: "modern" },
+      { sourceRef: "constraint-3", personId: "person:partner_0002", personLabel: "Partner 2", preferenceLabel: "Industrial", underlyingValue: "industrial" },
+    ],
+  });
+  const successor = buildWeddingProjectionQueueState({ preferenceConflicts: [changed], storage });
+
+  assert.equal(replay.sentItems.length, 1);
+  assert.equal(successor.pendingItems.length, 1);
+  assert.notEqual(successor.pendingItems[0]?.sourceId, first.items[0]?.sourceId);
 });
 
 test("buildWeddingProjectionQueueState extracts semantic objects from view payloads", () => {

@@ -2788,7 +2788,7 @@ tasks:
       - all 77 planning and 33 quotation library tests, seven focused successor tests, the expanded real-Postgres acceptance test, typecheck, both line budgets, site smoke, all 1,899 wedding tests and production build pass; new/expanded focused files remain below 1000 lines and rollout flags remain off
   - id: WED-238
     title: Wire the existing preference-conflict builder
-    status: in_progress
+    status: review
     owner: codex
     branch: agent/codex/WED-215
     depends_on:
@@ -2798,8 +2798,12 @@ tasks:
       - solid-ui/src/lib/weddingPreferenceConflictState.ts
       - solid-ui/src/lib/weddingPreferenceConflictAfpProjectionState.ts
       - solid-ui/src/lib/weddingPreferenceConflictConstraintAdapter.ts
+      - solid-ui/src/lib/weddingPreferenceConflictLifecycleAfpState.ts
+      - solid-ui/src/lib/weddingPreferenceConflictLifecycleExecutionState.ts
       - solid-ui/src/lib/weddingResilienceLedgerState.ts
       - solid-ui/src/lib/weddingResilienceActionState.ts
+      - solid-ui/src/lib/weddingResilienceDisplayState.ts
+      - solid-ui/src/lib/weddingWorkspaceActionState.ts
       - solid-ui/src/lib/weddingResponseWorkspaceViewState.ts
       - solid-ui/src/lib/weddingProjectionQueueState.ts
       - solid-ui/src/lib/weddingProjectionQueueViewState.ts
@@ -2808,6 +2812,8 @@ tasks:
       - solid-ui/tests/wedding-preference-conflict*.test.ts
       - solid-ui/tests/wedding-response-workspace-resilience-state.test.ts
       - solid-ui/tests/wedding-projection-queue-state.test.ts
+      - solid-ui/src/components/WeddingResilienceCardList.tsx
+      - solid-ui/src/components/WeddingResponseWorkspaceView.tsx
       - .agent/**
     acceptance:
       - one production-owned path derives a preference conflict from current explicit partner preferences and projects it through the existing AFP queue
@@ -2822,5 +2828,6 @@ tasks:
       - generated conflict projections use pseudonymous Partner labels and never copy exact source excerpts, locators, free text or private rationale into the visible card or AFP conflict payload
       - derived conflicts reuse the existing resilience card, DecisionOS/A2UI payload and AFP projection queue; matching persisted constraint revisions deduplicate on replay while a constraint successor reopens review
       - Review Later now emits the existing durable decision-deferral event and replay suppresses only a matching, unexpired dependency fingerprint
-      - focused tests, typecheck, both line budgets, wedding site smoke, all 1906 wedding tests and the production build pass; the response-workspace file remains line-neutral at 1041 lines and the new adapter is 186 lines
-      - task remains in progress for explicit resolved and dismissed preference-conflict successor records plus replay coverage
+      - explicit Resolved together and Not a conflict controls now append couple-private exact-revision lifecycle successors; neither action creates a planning rule, and stale terminal records cannot hide a changed preference revision
+      - conflict projection ids now include the active revision so local sent markers deduplicate exact replay without blocking a changed revision from persistence
+      - focused tests, typecheck, both line budgets, wedding site smoke, all 1914 wedding tests and the production build pass; the large workspace files remain within their frozen budgets and all new files are below 1000 lines

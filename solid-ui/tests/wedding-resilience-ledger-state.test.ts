@@ -5,6 +5,7 @@ import type { AfpMessage } from "../src/lib/api.ts";
 import {
   weddingPreferenceConflictToAfpMessage,
 } from "../src/lib/weddingPreferenceConflictAfpProjectionState.ts";
+import { weddingPreferenceConflictLifecycleToAfpMessage } from "../src/lib/weddingPreferenceConflictLifecycleAfpState.ts";
 import { buildWeddingPreferenceConflictState } from "../src/lib/weddingPreferenceConflictState.ts";
 import {
   weddingRealityChangeRecoveryToAfpMessage,
@@ -14,7 +15,11 @@ import {
   buildWeddingResilienceLedgerState,
 } from "../src/lib/weddingResilienceLedgerState.ts";
 
-function conflictMessage(workspaceId = "response_workspace:harbour", timestamp = "2026-09-27T00:00:00.000Z"): AfpMessage {
+function conflictMessage(
+  workspaceId = "response_workspace:harbour",
+  timestamp = "2026-09-27T00:00:00.000Z",
+  revision = "v1",
+): AfpMessage {
   return weddingPreferenceConflictToAfpMessage(buildWeddingPreferenceConflictState({
     metadata: {
       weddingPlanId: "wedding_plan:harbour",
@@ -22,8 +27,8 @@ function conflictMessage(workspaceId = "response_workspace:harbour", timestamp =
     },
     decisionArea: "wedding scale",
     preferences: [
-      { personLabel: "Claire", preferenceLabel: "40 guests", underlyingValue: "meaningful interaction", strength: 0.91 },
-      { personLabel: "James", preferenceLabel: "120 guests", underlyingValue: "family inclusion", strength: 0.88 },
+      { sourceRef: `constraint-small-${revision}`, personLabel: "Claire", preferenceLabel: "40 guests", underlyingValue: "meaningful interaction", strength: 0.91 },
+      { sourceRef: `constraint-large-${revision}`, personLabel: "James", preferenceLabel: "120 guests", underlyingValue: "family inclusion", strength: 0.88 },
     ],
   }), timestamp);
 }
@@ -165,4 +170,28 @@ test("buildWeddingResilienceLedgerState keeps a saved deferral quiet until expir
   assert.equal(hidden.attentionItems.length, 0);
   assert.equal(hidden.preferenceConflicts.length, 1);
   assert.equal(resurfaced.attentionItems.length, 1);
+});
+
+test("resolved and dismissed conflict successors hide only the exact reviewed revision", () => {
+  const initialMessage = conflictMessage();
+  const initial = buildWeddingResilienceLedgerState({ messages: [initialMessage] });
+  const item = initial.attentionItems[0]!;
+  const lifecycle = item.preferenceConflictLifecycle!;
+  for (const outcome of ["resolved", "dismissed"] as const) {
+    const successor = weddingPreferenceConflictLifecycleToAfpMessage({
+      ...lifecycle,
+      sourceMessageId: item.sourceMessageId,
+      outcome,
+      metadata: initial.preferenceConflicts[0]?.metadata,
+      createdAt: "2026-09-27T00:01:00Z",
+    });
+    const hidden = buildWeddingResilienceLedgerState({ messages: [initialMessage, successor] });
+    const changed = conflictMessage("response_workspace:harbour", "2026-09-27T00:02:00Z", "v2");
+    const reopened = buildWeddingResilienceLedgerState({ messages: [initialMessage, successor, changed] });
+
+    assert.equal(hidden.attentionItems.length, 0);
+    assert.equal(hidden.preferenceConflicts.length, 1);
+    assert.equal(reopened.attentionItems.length, 1);
+    assert.notEqual(reopened.attentionItems[0]?.sourceMessageId, item.sourceMessageId);
+  }
 });

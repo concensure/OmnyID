@@ -219,6 +219,21 @@ export function WeddingResilienceCardList(props: {
                   >
                     {card.secondaryAction.label}
                   </button>
+                  <For each={card.lifecycleActions}>
+                    {(action, index) => (
+                      <button
+                        type="button"
+                        class={buttonClass(false)}
+                        data-magic-action="acknowledge"
+                        data-magic-icon={index() === 0 ? "check" : "close"}
+                        data-magic-label={action.label}
+                        data-magic-id={`wedding:resilience:${card.id}:lifecycle:${index()}`}
+                        onClick={() => props.onSidebarAction(action)}
+                      >
+                        {action.label}
+                      </button>
+                    )}
+                  </For>
                 </div>
               </article>
             )}

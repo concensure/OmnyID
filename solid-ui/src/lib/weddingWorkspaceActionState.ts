@@ -10,6 +10,7 @@ export type WeddingWorkspaceSidebarActionKind =
   | "export_bundle"
   | "approve_action"
   | "defer_decision"
+  | "record_resilience_lifecycle"
   | "assign_task";
 
 export type WeddingWorkspaceSidebarAction = {

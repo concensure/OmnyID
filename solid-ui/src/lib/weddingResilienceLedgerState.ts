@@ -6,7 +6,12 @@ import {
 } from "@/lib/weddingComparisonColumnState";
 import {
   weddingPreferenceConflictFromAfpMessage,
+  weddingPreferenceConflictRevisionFingerprint,
 } from "@/lib/weddingPreferenceConflictAfpProjectionState";
+import {
+  weddingPreferenceConflictLifecycleFromAfpMessage,
+  type WeddingPreferenceConflictLifecycleRecord,
+} from "@/lib/weddingPreferenceConflictLifecycleAfpState";
 import type { WeddingPreferenceConflictState } from "@/lib/weddingPreferenceConflictState";
 import {
   weddingRealityChangeRecoveryFromAfpMessage,
@@ -36,6 +41,10 @@ export type WeddingResilienceAttentionItem = {
   metadataLabels: string[];
   comparisonPreview: WeddingResilienceComparisonPreview | null;
   a2ui: Record<string, unknown>;
+  preferenceConflictLifecycle: {
+    conflictId: string;
+    revisionFingerprint: string;
+  } | null;
 };
 
 export type WeddingResilienceLedgerState = {
@@ -211,6 +220,10 @@ function attentionFromPreferenceConflict(item: ParsedPreferenceConflict): Weddin
     ]),
     comparisonPreview: preferenceComparisonPreview(state),
     a2ui: state.a2ui,
+    preferenceConflictLifecycle: state.conflictObject && message.metadata?.projection_pending !== true ? {
+      conflictId: state.conflictObject.id,
+      revisionFingerprint: weddingPreferenceConflictRevisionFingerprint(state),
+    } : null,
   };
 }
 
@@ -235,7 +248,24 @@ function attentionFromRecoveryPlan(item: ParsedRecoveryPlan): WeddingResilienceA
     ]),
     comparisonPreview: recoveryComparisonPreview(state),
     a2ui: state.a2ui,
+    preferenceConflictLifecycle: null,
   };
+}
+
+function hasTerminalLifecycle(
+  item: ParsedPreferenceConflict,
+  records: readonly WeddingPreferenceConflictLifecycleRecord[],
+): boolean {
+  const conflictId = item.state.conflictObject?.id;
+  const revisionFingerprint = weddingPreferenceConflictRevisionFingerprint(item.state);
+  if (!conflictId || !revisionFingerprint) return false;
+  return records.some((record) =>
+    record.conflictId === conflictId
+    && record.sourceMessageId === item.message.id
+    && record.revisionFingerprint === revisionFingerprint
+    && record.metadata.weddingPlanId === item.state.metadata.weddingPlanId
+    && record.metadata.responseWorkspaceId === item.state.metadata.responseWorkspaceId
+  );
 }
 
 function summaryFor(items: readonly WeddingResilienceAttentionItem[]): string {
@@ -275,8 +305,14 @@ export function buildWeddingResilienceLedgerState(
   const messages = input.messages ?? [];
   const preferenceItems: ParsedPreferenceConflict[] = [];
   const recoveryItems: ParsedRecoveryPlan[] = [];
+  const preferenceLifecycleRecords: WeddingPreferenceConflictLifecycleRecord[] = [];
 
   for (const message of messages) {
+    const lifecycle = weddingPreferenceConflictLifecycleFromAfpMessage(message);
+    if (lifecycle && sameWorkspace(workspaceId, lifecycle.metadata.responseWorkspaceId)) {
+      preferenceLifecycleRecords.push(lifecycle);
+      continue;
+    }
     const preferenceState = weddingPreferenceConflictFromAfpMessage(message);
     if (preferenceState && sameWorkspace(workspaceId, preferenceState.metadata.responseWorkspaceId)) {
       preferenceItems.push({ state: preferenceState, message });
@@ -292,6 +328,7 @@ export function buildWeddingResilienceLedgerState(
   const dedupedRecoveries = dedupeRecoveryPlans(recoveryItems);
   const attentionItems = [
     ...dedupedPreferences.flatMap((item) => {
+      if (hasTerminalLifecycle(item, preferenceLifecycleRecords)) return [];
       const attention = attentionFromPreferenceConflict(item);
       return attention ? [attention] : [];
     }),

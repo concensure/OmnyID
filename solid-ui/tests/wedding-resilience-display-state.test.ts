@@ -142,6 +142,8 @@ test("buildWeddingResilienceDisplayState explains preference conflicts without a
   assert.ok(conflictCard);
   assert.equal(conflictCard.tone, "review");
   assert.equal(conflictCard.primaryAction.label, "Review values");
+  assert.deepEqual(conflictCard.lifecycleActions.map((action) => action.label), ["Resolved together", "Not a conflict"]);
+  assert.ok(conflictCard.lifecycleActions.every((action) => action.kind === "record_resilience_lifecycle"));
   assert.match(conflictCard.statusLabel, /without averaging/i);
   assert.match(conflictCard.evidenceLabel, /meaningful interaction/);
   assert.equal(conflictCard.comparisonPreview?.title, "Ways through");

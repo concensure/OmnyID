@@ -1367,3 +1367,17 @@ constraint revisions suppresses a duplicate queue item. A changed constraint rev
 review work under the same decision area. The existing Review Later control now emits the standard
 wedding decision-deferral event, and replay suppresses the matching card only while the deferral and
 its dependency fingerprint remain current.
+
+## 2026-10-19: Preference-conflict closure is exact-revision acknowledgement
+
+Resolving or dismissing a partner preference conflict appends a couple-private lifecycle successor
+to the exact visible conflict projection. The record binds the logical conflict, source message and
+active preference-signal revision. It contains a closed outcome only and explicitly does not create
+a planning rule, infer consent, select a compromise or expose either partner's private rationale.
+
+Conflict projection IDs are revision-aware. Exact replay therefore remains idempotent in the local
+projection marker, while a changed constraint revision receives a new projection ID and reopens
+review. A terminal lifecycle successor hides only its exact source revision; a later preference
+successor cannot be suppressed by an older resolved or dismissed record. Deferral remains temporary
+and dependency-bound, while resolve and dismiss remain append-only terminal acknowledgements.
+Terminal controls appear only after the source conflict revision itself is durably persisted.

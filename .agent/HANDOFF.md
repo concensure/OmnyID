@@ -4085,6 +4085,38 @@ Next:
   No Oracle deployment ran. Quotation-normalisation/week-3-to-6 work remains paused for the user's
   human-judge review.
 
+## 2026-10-19 - WED-238 preference-conflict lifecycle completed (Codex, review)
+
+Changed:
+
+- Added explicit `Resolved together` and `Not a conflict` controls to the existing resilience card.
+  They persist append-only, couple-private AFP lifecycle successors tied to the exact conflict source
+  message and active preference-signal revision.
+- Terminal records contain closed outcomes only and set `creates_planning_rule: false`; they do not
+  infer partner consent, select a compromise or copy private rationale/source text.
+- Replay hides an exactly resolved or dismissed revision. A constraint successor changes the
+  revision, reopens the card and can be projected even when the prior revision has a local sent
+  marker. Review Later retains its separate temporary, dependency-bound deferral semantics.
+- Save orchestration lives in a small lifecycle owner; the already-large response workspace
+  component remains under its frozen line budget.
+
+Verification:
+
+- Focused lifecycle, action, display, ledger, queue and workspace replay tests pass, including both
+  terminal outcomes, malformed successor rejection, offline failure, exact replay and changed-
+  revision reopening.
+- Solid typecheck, both line-budget checks, wedding site smoke, all 1,914 wedding tests and the
+  production build pass. New lifecycle files are at most 246 lines; the response workspace component
+  is 1,107 lines against its frozen 1,108-line budget. Only the inherited Vite chunk advisories remain.
+
+Next:
+
+- Independently review WED-238, then begin WED-239's unified intervention projection through the
+  existing shared Decision Card/A2UI contracts. Do not add another card owner.
+- Keep all planning, quotation, vendor-mail, relay, provider and ranking-policy-V2 flags disabled.
+  No Oracle deployment ran. Quotation-normalisation/week-3-to-6 work remains paused for the user's
+  human-judge review.
+
 ## 2026-10-19 - WED-238 canonical preference-conflict production path (Codex, in progress)
 
 Changed:

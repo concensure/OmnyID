@@ -18,6 +18,7 @@ import { subscribeMagicActionEvent } from "@/lib/magicActionEvent";
 import { A2UI_CARD_STATS_REQUEST_EVENT, type A2uiCardStatsRequestEventDetail } from "@/lib/a2uiEvents";
 import { runWeddingArtifactBrowserExport, runWeddingBundleBrowserExport, selectWeddingBundleExportPayload, weddingProjectionMetadataId, type WeddingBundleExportFormat } from "@/lib/weddingBrowserExportActions";
 import { weddingDecisionDeferralActionToAfpSendInput } from "@/lib/weddingDecisionDeferralAfpState";
+import { runWeddingPreferenceConflictLifecycleAction } from "@/lib/weddingPreferenceConflictLifecycleExecutionState";
 import { decisionCardFromWeddingVendorComparison } from "@/lib/decisionCardState";
 import { approveWeddingApprovalRequestState, type WeddingApprovalRequestState } from "@/lib/weddingApprovalState";
 import type { WeddingApprovalExecutionState } from "@/lib/weddingApprovalExecutionState";
@@ -48,10 +49,7 @@ import { useWeddingPreferenceFeedbackOwner } from "@/lib/useWeddingPreferenceFee
 import { installMobileFocusViewportListener, isMobileFocusViewport } from "@/lib/mobileFocusHomeState";
 import { useWeddingApprovalExecution } from "@/lib/useWeddingApprovalExecution";
 import { buildWeddingHomeSections, WeddingHomeSectionRegistry } from "@/lib/weddingHomeSectionRegistry";
-
-function weddingHomeLayoutStorageKey(scope: string): string {
-  return `omnyid:wedding_home_card_order:${scope}`;
-}
+function weddingHomeLayoutStorageKey(scope: string): string { return `omnyid:wedding_home_card_order:${scope}`; }
 
 function loadWeddingHomeSectionOrder(scope: string): WeddingHomeSectionId[] {
   if (typeof localStorage === "undefined") return [...WEDDING_HOME_SECTION_IDS];
@@ -340,6 +338,7 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
         .catch(() => setExportNotice(`Could not save the assignment for ${task.title}.`));
       return;
     }
+    if (runWeddingPreferenceConflictLifecycleAction({ action, metadata: state().workspace.metadata, saveProjection: props.saveProjection, onNotice: setExportNotice, onSaved: props.onRefreshWorkspace })) return;
     if (action.kind === "defer_decision") {
       const sendInput = weddingDecisionDeferralActionToAfpSendInput(action, state().workspace.metadata);
       if (!sendInput) {

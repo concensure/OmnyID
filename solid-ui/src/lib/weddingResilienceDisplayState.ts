@@ -46,6 +46,7 @@ export type WeddingResilienceCard = {
   hasInlineAction: boolean;
   primaryAction: WeddingWorkspaceSidebarAction;
   secondaryAction: WeddingWorkspaceSidebarAction;
+  lifecycleActions: WeddingWorkspaceSidebarAction[];
 };
 
 export type WeddingResilienceDisplayState = {
@@ -191,6 +192,10 @@ export function buildWeddingResilienceCard(item: WeddingResilienceAttentionItem)
     hasInlineAction: item.comparisonPreview?.columns.some((column) => column.kind === "action") ?? false,
     primaryAction: buildWeddingResilienceSidebarAction(item),
     secondaryAction: buildWeddingResilienceSidebarAction(item, "defer_item"),
+    lifecycleActions: item.preferenceConflictLifecycle ? [
+      buildWeddingResilienceSidebarAction(item, "resolve_item"),
+      buildWeddingResilienceSidebarAction(item, "dismiss_item"),
+    ] : [],
   };
 }
 
@@ -216,6 +221,11 @@ function cardA2ui(card: WeddingResilienceCard): Record<string, unknown> {
         enabled: card.secondaryAction.enabled,
         kind: card.secondaryAction.kind,
       },
+      ...card.lifecycleActions.map((action) => ({
+        label: action.label,
+        enabled: action.enabled,
+        kind: action.kind,
+      })),
     ],
   };
 }

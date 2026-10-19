@@ -96,6 +96,24 @@ test("buildWeddingResilienceSidebarAction can defer a resilience item without lo
   assert.equal(weddingDecisionDeferralActionToAfpSendInput(action, conflictMessage().metadata, "2026-10-19T00:00:00Z")?.subtype, "wedding_decision_deferral");
 });
 
+test("preference conflict lifecycle actions bind the exact visible revision", () => {
+  const state = buildWeddingResilienceLedgerState({ messages: [conflictMessage()] });
+  const item = state.attentionItems[0]!;
+  const resolved = buildWeddingResilienceSidebarAction(item, "resolve_item");
+  const dismissed = buildWeddingResilienceSidebarAction(item, "dismiss_item");
+  const resolvedPacket = resolved.metadata?.preference_conflict_lifecycle as Record<string, unknown>;
+
+  assert.equal(resolved.kind, "record_resilience_lifecycle");
+  assert.equal(resolved.label, "Resolved together");
+  assert.equal(resolvedPacket.conflict_id, item.preferenceConflictLifecycle?.conflictId);
+  assert.equal(resolvedPacket.source_message_id, item.sourceMessageId);
+  assert.equal(resolvedPacket.revision_fingerprint, item.preferenceConflictLifecycle?.revisionFingerprint);
+  assert.equal(resolvedPacket.creates_planning_rule, false);
+  assert.equal(dismissed.kind, "record_resilience_lifecycle");
+  assert.equal(dismissed.label, "Not a conflict");
+  assert.equal((dismissed.metadata?.preference_conflict_lifecycle as Record<string, unknown>).outcome, "dismissed");
+});
+
 test("buildWeddingResilienceReviewAllAction summarizes all resilience work", () => {
   const state = buildWeddingResilienceLedgerState({ messages: [conflictMessage(), recoveryMessage()] });
   const action = buildWeddingResilienceReviewAllAction(state);

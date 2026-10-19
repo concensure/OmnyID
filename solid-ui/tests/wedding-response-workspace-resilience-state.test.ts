@@ -109,6 +109,7 @@ test("buildWeddingResponseWorkspaceViewState derives one conflict and queue item
 
   assert.equal(state.resilience.cards.length, 1);
   assert.equal(state.resilience.cards[0]?.primaryAction.label, "Review values");
+  assert.equal(state.resilience.cards[0]?.lifecycleActions.length, 0);
   const conflictItems = state.projectionQueue?.queue.items.filter((item) => item.kind === "preference_conflict") ?? [];
   assert.equal(conflictItems.length, 1);
   assert.equal(conflictItems[0]?.status, "pending");
@@ -134,6 +135,7 @@ test("persisted conflict revisions deduplicate until a constraint successor reop
     nowIso: "2026-10-19T00:01:00Z",
   });
   assert.equal(replayed.projectionQueue?.queue.items.filter((item) => item.kind === "preference_conflict").length, 0);
+  assert.equal(replayed.resilience.cards[0]?.lifecycleActions.length, 2);
 
   const changed = buildWeddingResponseWorkspaceViewState({
     metadata,
@@ -145,4 +147,5 @@ test("persisted conflict revisions deduplicate until a constraint successor reop
     nowIso: "2026-10-19T00:01:00Z",
   });
   assert.equal(changed.projectionQueue?.queue.items.filter((item) => item.kind === "preference_conflict").length, 1);
+  assert.equal(changed.resilience.cards[0]?.lifecycleActions.length, 0);
 });

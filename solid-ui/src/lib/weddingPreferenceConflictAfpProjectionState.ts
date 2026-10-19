@@ -35,6 +35,7 @@ function uniqueStrings(values: readonly unknown[], limit = 80): string[] {
 
 function messageToSendInput(message: AfpMessage): SendAfpMessageInput {
   return {
+    id: message.id,
     thread_id: message.thread_id,
     from: message.from,
     to: message.to ?? [],
@@ -52,10 +53,25 @@ function messageToSendInput(message: AfpMessage): SendAfpMessageInput {
   };
 }
 
+function stableHash(value: string): string {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(36);
+}
+
+export function weddingPreferenceConflictRevisionFingerprint(state: WeddingPreferenceConflictState): string {
+  return state.preferenceSignals.map((signal) => signal.id).filter(Boolean).sort().join("|");
+}
+
 export function weddingPreferenceConflictProjectionId(state: WeddingPreferenceConflictState): string {
   const metadata = normalizeWeddingPlanningMetadata(state.metadata);
-  return state.conflictObject?.id
+  const logicalId = state.conflictObject?.id
     ?? `wedding_preference_context:${safeWeddingLabel(metadata.responseWorkspaceId)}:${safeWeddingLabel(state.decisionArea)}`;
+  const revision = weddingPreferenceConflictRevisionFingerprint(state);
+  return revision ? `${logicalId}:revision:${stableHash(revision)}` : logicalId;
 }
 
 function record(value: unknown): Record<string, unknown> | null {
@@ -202,6 +218,7 @@ function referencesFor(state: WeddingPreferenceConflictState): AfpReference[] {
 export function weddingPreferenceConflictToAfpMessage(
   state: WeddingPreferenceConflictState,
   nowIso = new Date().toISOString(),
+  options?: { pendingProjection?: boolean },
 ): AfpMessage {
   const metadata = normalizeWeddingPlanningMetadata(state.metadata);
   const id = weddingPreferenceConflictProjectionId(state);
@@ -276,6 +293,7 @@ export function weddingPreferenceConflictToAfpMessage(
       semantic_tags: semanticObject.semanticTags,
       semantic_object: semanticObject,
       searchable_terms: searchableTerms,
+      ...(options?.pendingProjection ? { projection_pending: true } : {}),
     },
     views: [{
       format: "a2ui",
