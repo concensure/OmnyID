@@ -4287,6 +4287,11 @@ Verification:
 - `npm run build` passed. Only the inherited Tailwind screen-variant and Vite chunk-size advisories remain.
 - No Rust contract changed, so no Rust lane was required for this UI-only projection slice.
 - New files are at most 236 lines; `App.tsx` shrank by 118 lines and no oversized owner grew.
+- The first guarded Oracle build was stopped when concurrent build/restore-drill containers drove root
+  storage to 98%; stopping only those two transient containers restored it to 84% while production
+  homeserver, Caddy and backup containers stayed up. A scoped UI retry then proved the staging bundle
+  omitted Vite's required `quotation-response.html` entry. The staging manifest and its self-test now
+  include that entry (55 paths with simulated data, 54 without).
 
 Next:
 

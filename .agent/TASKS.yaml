@@ -3004,3 +3004,4 @@ tasks:
       - quote and contract actions now open the exact canonical artifact in Documents; no parallel contract or payment store was added
       - focused state tests, typecheck, both line-budget audits, wedding site smoke, all 1934 wedding tests, 320/1280 Playwright interaction and accessibility checks, and the production build pass
       - Oracle environment audit found every planning, quotation, vendor-mail and ranking-policy-V2 flag unset so the compose fail-closed defaults remain false; the guarded deployment of the committed UI slice is the next step
+      - guarded Oracle deployment exposed a missing quotation-response.html entry in the runtime staging manifest; the entry and its staged-path regression test are now repaired before final asset promotion
