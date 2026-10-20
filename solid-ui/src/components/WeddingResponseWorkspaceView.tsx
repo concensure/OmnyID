@@ -452,7 +452,7 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
 
   function openArtifactFromContext(artifactId: string) {
     props.onSelectArtifact?.(artifactId);
-    props.onSelectMenu?.("home");
+    props.onSelectMenu?.("documents");
     setShowPlanningFiles(true);
   }
 

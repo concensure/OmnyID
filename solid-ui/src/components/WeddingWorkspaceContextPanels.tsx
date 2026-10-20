@@ -15,6 +15,7 @@ import { WeddingAdvancedAuditPanels } from "@/components/WeddingAdvancedAuditPan
 import { WeddingBackgroundAutomationCard } from "@/components/WeddingBackgroundAutomationCard";
 import { WeddingBoundaryManagementCard } from "@/components/WeddingBoundaryManagementCard";
 import { WeddingBudgetTrackerCard } from "@/components/WeddingBudgetTrackerCard";
+import { WeddingBudgetEvidenceHub } from "@/components/WeddingBudgetEvidenceHub";
 import { WeddingCollaborationAccessCard } from "@/components/WeddingCollaborationAccessCard";
 import { WeddingCustomSurfaceTools } from "@/components/WeddingCustomSurfaceTools";
 import { WeddingDecisionFocusCard } from "@/components/WeddingDecisionFocusCard";
@@ -256,6 +257,10 @@ export function WeddingWorkspaceContextPanels(props: {
       </Show>
 
       <div hidden={activeMenu() !== "budget"}>
+        <WeddingBudgetEvidenceHub
+          state={props.state}
+          onOpenArtifact={props.onOpenArtifact}
+        />
         <WeddingBudgetTrackerCard
           state={props.state.budgetTracking}
           weddingPlanId={props.state.workspace.metadata.weddingPlanId}

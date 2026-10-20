@@ -11,6 +11,7 @@ import { ViewDispatcher } from "@/components/ViewDispatcher";
 import { AgentPersonaFAB } from "@/components/AgentPersonaFAB";
 import { WeddingNavigationArrivalBanner } from "@/components/WeddingNavigationArrivalBanner";
 import { WeddingReturnBanner } from "@/components/WeddingReturnBanner";
+import { ActiveTasksDecisionView } from "@/components/ActiveTasksDecisionView";
 import { PrimaryUseCasePrompt } from "@/components/PrimaryUseCasePrompt";
 import { collectKindCounts, objectKindLabel } from "@/lib/objectKinds";
 import { ToastContainer } from "@/components/Toast";
@@ -384,12 +385,6 @@ import {
   dashboardBootstrapSupportAccessHistory,
   dashboardBootstrapThreadSummaries,
 } from "@/lib/dashboardBootstrapState";
-import {
-  taskMessageDescriptionText,
-  taskMessageDueDate,
-  taskMessagePresentation,
-  taskMessageTitleText,
-} from "@/lib/taskPresentationState";
 import {
   runtimeDeploymentMonitorFeedback,
   runtimeDeploymentMonitorLines,
@@ -4416,120 +4411,7 @@ function TasksView(props: {
   onOpenThread: (threadId: string, messageId?: string | null) => void;
   onNavigate: (view: ViewName) => void;
 }) {
-  const now = new Date();
-  const draftSummary = createMemo(() => props.bootstrap?.task_runtime_summary ?? null);
-  const pending = createMemo(() =>
-    dashboardBootstrapMessages(props.bootstrap)
-      .filter((m) => taskMessagePresentation(m, now).isPending)
-      .sort((a, b) => {
-        const left = taskMessagePresentation(a, now).dueDateSortKey ?? "9999-12-31T23:59:59.999Z";
-        const right = taskMessagePresentation(b, now).dueDateSortKey ?? "9999-12-31T23:59:59.999Z";
-        return left.localeCompare(right);
-      })
-  );
-  const overdue = createMemo(() =>
-    dashboardBootstrapMessages(props.bootstrap).filter((m) => taskMessagePresentation(m, now).isOverdue)
-  );
-  return (
-    <div class="animate-fade-in space-y-5">
-      <div class="flex items-start justify-between gap-4">
-        <div>
-          <p class="font-mono text-[10px] uppercase tracking-[0.28em] text-outline">Tasks</p>
-          <h2 class="mt-1 text-xl font-bold text-on-surface">Active To-Dos</h2>
-          <p class="mt-0.5 text-sm text-on-surface-variant">AFP task messages not yet completed or overdue.</p>
-        </div>
-        <button type="button" onClick={props.onAddTask}
-          class="mt-2 flex-shrink-0 rounded-full bg-primary px-4 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-primary/80">
-          + Add Task
-        </button>
-      </div>
-
-      <Show when={overdue().length > 0}>
-        <div class="rounded-2xl border border-red-200/60 bg-red-50/60 p-4 space-y-2">
-          <p class="font-mono text-[9px] uppercase tracking-wider text-red-500">Overdue</p>
-          <For each={overdue()}>
-            {(m) => {
-              const state = taskMessagePresentation(m, now);
-              return (
-                <div class="flex items-center gap-2 rounded-xl bg-white/60 px-3 py-2 text-xs">
-                  <span class="h-2 w-2 rounded-full bg-red-400 flex-shrink-0" />
-                  <span class="flex-1 font-medium text-on-surface">{state.titleText}</span>
-                  <span class="text-red-400 text-[10px]">{state.dueDateLabel ?? ""}</span>
-                </div>
-              );
-            }}
-          </For>
-        </div>
-      </Show>
-
-      <Show when={draftSummary()?.total_draft_task_count}>
-        <div class="rounded-2xl border border-orange-200/60 bg-orange-50/70 p-4">
-          <div class="flex items-start justify-between gap-3">
-            <div>
-              <p class="font-mono text-[9px] uppercase tracking-wider text-orange-600">Reversible Draft Tasks</p>
-              <p class="mt-1 text-sm font-semibold text-on-surface">
-                {(draftSummary()?.active_draft_task_count ?? 0) > 0
-                  ? `${draftSummary()?.active_draft_task_count ?? 0} active draft task${(draftSummary()?.active_draft_task_count ?? 0) === 1 ? "" : "s"}`
-                  : `${draftSummary()?.cancelled_draft_task_count ?? 0} cancelled draft task${(draftSummary()?.cancelled_draft_task_count ?? 0) === 1 ? "" : "s"}`}
-              </p>
-              <p class="mt-1 text-xs text-on-surface-variant">
-                {draftSummary()?.latest_draft_task_title
-                  ? `${draftSummary()?.latest_draft_task_title} is tracked in the reversible runtime path.`
-                  : "Draft task creation is being tracked through the reversible runtime path."}
-              </p>
-            </div>
-            <Show when={draftSummary()?.latest_draft_task_thread_id}>
-              <button
-                type="button"
-                onClick={() => props.onOpenThread(
-                  draftSummary()!.latest_draft_task_thread_id!,
-                  draftSummary()?.latest_draft_task_action_message_id ?? null,
-                )}
-                class="rounded-full border border-orange-300/80 bg-white/80 px-3 py-1 text-[11px] font-medium text-orange-700 transition hover:bg-white"
-              >
-                Open source thread
-              </button>
-            </Show>
-          </div>
-        </div>
-      </Show>
-
-      <Show when={pending().length > 0} fallback={
-        <div class="rounded-2xl border border-white/40 bg-white/30 p-10 text-center">
-          <p class="text-3xl mb-2">✓</p>
-          <p class="text-sm font-medium text-on-surface">All caught up</p>
-          <p class="mt-1 text-xs text-on-surface-variant/60">No pending tasks. Add one via calendar or the + button above.</p>
-        </div>
-      }>
-        <div class="space-y-2">
-          <For each={pending()}>
-            {(m) => {
-              const due = taskMessageDueDate(m);
-              const titleText = taskMessageTitleText(m);
-              const descriptionText = taskMessageDescriptionText(m);
-              const dueDateLabel = taskMessagePresentation(m, now).dueDateLabel;
-              return (
-                <div class="flex items-start gap-3 rounded-2xl border border-white/50 bg-white/40 px-4 py-3 shadow-card">
-                  <span class="mt-0.5 h-3.5 w-3.5 flex-shrink-0 rounded border-2 border-primary/40" />
-                  <div class="flex-1 min-w-0">
-                    <p class="text-sm font-medium text-on-surface">{titleText}</p>
-                    <Show when={descriptionText}>
-                      <p class="text-xs text-on-surface-variant mt-0.5 line-clamp-1">{descriptionText}</p>
-                    </Show>
-                  </div>
-                  <Show when={due}>
-                    <span class="flex-shrink-0 rounded-full border border-primary/20 bg-primary/8 px-2 py-0.5 text-[10px] text-primary">
-                      {dueDateLabel}
-                    </span>
-                  </Show>
-                </div>
-              );
-            }}
-          </For>
-        </div>
-      </Show>
-    </div>
-  );
+  return <ActiveTasksDecisionView {...props} />;
 }
 
 function SovereigntyAuditView(props: { messages: AfpMessage[]; signedIn: boolean }) {

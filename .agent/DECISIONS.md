@@ -1440,3 +1440,22 @@ rail and stacks on mobile. Wedding Decision Cards and first-ranked vendor cards 
 retain checked facts and all valid alternatives, and separate amber unknowns from evidence-based Best
 fit wording. These are presentation changes only: AFP records, A2UI authority, outreach persistence,
 approval, booking, payment and feature-flag boundaries do not change.
+
+## 2026-10-21: Task and budget surfaces project existing wedding evidence
+
+The dedicated Tasks view is a read projection over existing AFP task and explicitly linked decision
+messages. It may merge task revisions and decision option/selection evidence for presentation, but it
+does not create another lifecycle ledger or infer a choice from prose. Missing, malformed or technical
+fields fail closed. A task can therefore remain in progress while showing a choice already made, and
+multiple explicitly attached decisions remain ordered and separately inspectable.
+
+The Budget evidence hub is likewise a projection. Quotes use existing selected-vendor budget lines
+and linked artifacts; contracts are classified from canonical Documents artifacts; deposits and
+payments use existing payment-review candidates; forecast uses current category rollups and the
+couple's saved allocations. Opening a quote or contract selects that artifact in Documents, which
+remains the only file owner. The current budget editor remains the authority for allocation and
+contribution changes.
+
+Both projections use semantic status text in addition to colour, contained horizontal tab lists,
+the wedding surface tokens and 8-12px radii. They add no send, signature, booking or payment authority
+and do not alter any planning, quotation, mail, relay, provider or ranking-policy rollout gate.

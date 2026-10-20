@@ -2966,3 +2966,41 @@ tasks:
       - computed-style browser assertions prove the exact brand colors and 8-12px radii at 320, 390 and 1280 pixels; the focusable horizontal journey fixes the Safari scroll-region Axe finding without introducing page overflow
       - typecheck, 39 focused wedding tests, three Playwright cases, both line-budget checks, all 1929 wedding tests and the production build pass; the largest touched focused file is 438 lines and only inherited Tailwind/Vite advisories remain
       - WED-225 evidence documentation now distinguishes successful local Postgres/ClamAV execution from the still-missing exact-commit external sign-offs; WED-225/WED-226 and all nine WED-240 human dimensions remain blocked
+  - id: WED-243
+    title: Project decision lifecycle into wedding tasks and budget evidence views
+    status: review
+    owner: codex
+    branch: agent/codex/WED-215
+    depends_on:
+      - WED-216
+      - WED-218
+      - WED-239
+      - WED-242
+    files:
+      - solid-ui/src/App.tsx
+      - solid-ui/src/components/ActiveTasksDecisionView.tsx
+      - solid-ui/src/components/WeddingWorkspaceContextPanels.tsx
+      - solid-ui/src/components/WeddingResponseWorkspaceView.tsx
+      - solid-ui/src/components/WeddingBudgetEvidenceHub.tsx
+      - solid-ui/src/lib/activeTaskDecisionViewState.ts
+      - solid-ui/src/lib/weddingBudgetEvidenceHubState.ts
+      - solid-ui/tests/wedding-task-decision-view.test.ts
+      - solid-ui/tests/wedding-budget-evidence-hub.test.ts
+      - solid-ui/tests/e2e/wedding-task-budget-hub.spec.ts
+      - .agent/**
+    acceptance:
+      - the dedicated task view derives pending, in-progress, decided and skipped presentation from existing task and decision projections rather than introducing a second workflow ledger
+      - each lifecycle status has distinct semantic styling plus a text label, and task disclosure exposes every ordered decision, its safe options and the chosen option when known
+      - decided and in-progress items retain their decision context while missing, private or malformed evidence fails closed without technical messages in the UI
+      - the Budget view provides responsive Overview, Quotes, Contracts, Deposits, Payments and Forecast tabs with concise at-a-glance status
+      - contract and quote entries are projections of canonical Documents artifacts, with Documents remaining the file owner and no duplicate contract store
+      - the wedding teal surface, 8-12px radii, accessible controls, mobile containment and existing five-item bottom navigation remain intact
+      - all rollout-sensitive planning, quotation, mail, relay, provider and ranking-policy-V2 flags remain disabled
+      - every new file remains below 1000 lines, oversized files do not grow, relevant tests and production build pass, and the committed dark-safe application is verified on Oracle
+    progress:
+      - registered from clean commit 1c4a2bd on the advanced WED-215 worktree; tracing canonical task, decision, document and budget projections before implementation
+      - replaced the empty Active To-Dos presentation with a decision-aware AFP projection that deduplicates task revisions, preserves ordered multi-decision context, shows selected options, suppresses technical text and exposes pending, in-progress, blocked, decided, completed and skipped filters
+      - added a responsive Budget evidence hub with Overview, Quotes, Contracts, Deposits, Payments and Forecast tabs while retaining the existing allocation, contribution and insight editor below it
+      - quote and contract actions now open the exact canonical artifact in Documents; no parallel contract or payment store was added
+      - focused state tests, typecheck, both line-budget audits, wedding site smoke, all 1934 wedding tests, 320/1280 Playwright interaction and accessibility checks, and the production build pass
+      - Oracle environment audit found every planning, quotation, vendor-mail and ranking-policy-V2 flag unset so the compose fail-closed defaults remain false; the guarded deployment of the committed UI slice is the next step

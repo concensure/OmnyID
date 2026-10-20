@@ -4260,3 +4260,37 @@ Unresolved / next:
   are still absent; a successful local ClamAV test is not the independent clean-scan sign-off.
 - WED-226, vendor mail, email reconciliation, quotation release, relay and ranking-policy V2 remain
   disabled. No Oracle deployment or live provider action is authorized.
+
+## 2026-10-21 - WED-243 decision-aware Tasks and Budget evidence hub (Codex, review)
+
+Changed:
+
+- Replaced the empty Active To-Dos body with a compact decision-aware Tasks surface. It reads existing
+  AFP task revisions and explicitly linked/nested decision evidence, provides distinct labelled status
+  filters and expands each task into its ordered decisions, available options and chosen option.
+- Added a fail-closed visible-copy boundary for task/decision details. Missing options remain stated as
+  missing; protocol, provider, database and identifier diagnostics are not rendered as user copy.
+- Added responsive Overview, Quotes, Contracts, Deposits, Payments and Forecast tabs above the existing
+  Budget tracker. Existing allocation, contribution and insight workflows remain mounted unchanged.
+- Contracts and quote files remain canonical in Documents. Budget rows only project their state and the
+  open action now selects the source artifact and navigates to Documents rather than Home.
+- No backend, AFP schema, A2UI authority or rollout flag changed. All planning, quotation, vendor-mail,
+  relay, provider and ranking-policy-V2 gates remain disabled by their fail-closed compose defaults.
+
+Verification:
+
+- `npm run test:wedding:ci` passed: typecheck, both line-budget audits, wedding site smoke and all 1,934
+  wedding tests. New focused state/source tests are included in that total.
+- Focused Playwright passed at 320 and 1280 CSS pixels with task disclosure, two sequential decisions,
+  chosen options, contract opening, no page overflow, no serious/critical Axe findings and all five
+  mobile navigation tabs intact.
+- `npm run build` passed. Only the inherited Tailwind screen-variant and Vite chunk-size advisories remain.
+- No Rust contract changed, so no Rust lane was required for this UI-only projection slice.
+- New files are at most 236 lines; `App.tsx` shrank by 118 lines and no oversized owner grew.
+
+Next:
+
+- Commit WED-243, then deploy that exact dark-safe commit through the guarded Oracle runtime script with
+  simulated/source data excluded. Record the post-deploy proof externally; do not enable any blocked
+  planning, quotation, vendor-mail, relay, provider or ranking-policy-V2 flag.
+- Independent WED-225/WED-240 human evidence remains outstanding and must not be inferred from this UI work.
