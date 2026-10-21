@@ -55,7 +55,9 @@ Rules:
 - Name at least one concrete thing the couple said (a priority, their location, their season) so the vendor can see this is not a mass mailout.
 - Ask a clear question: availability, package options, and an indicative quote.
 - Make no pricing promises and no claim that anything is booked or confirmed.
-- 120 to 180 words. Use exactly three short paragraphs separated by blank lines: a greeting and context, the request, then a brief thanks. Plain sentences, no headings, no emoji, no signature block — the app appends the sender identity separately.
+- Use short paragraphs separated by blank lines: greeting, wedding context, request, offer to share more, then thanks. Plain sentences, no headings or emoji. Do not add a signature — the app appends the onboarding name separately.
+- A budget must use `AUD $` plus a grouped number (for example `AUD $13,900`) and the word `budget` must never be repeated.
+- Summarise verification questions as plain topics. For capacity and price, use exactly: `We would also appreciate answers to capacity and price.`
 - Respond with ONLY valid JSON, no markdown code fences, no commentary before or after it, matching exactly this shape:
 {"subject": string, "body_markdown": string, "grounded_on": [string, ...]}
 
@@ -501,7 +503,7 @@ async fn wedding_vendor_outreach_draft_http(
         None
     };
 
-    let (payload, selected_provider, model) = generated
+    let (mut payload, selected_provider, model) = generated
         .map(|(payload, provider, model)| (payload, Some(provider), model))
         .unwrap_or_else(|| {
             (
@@ -510,6 +512,15 @@ async fn wedding_vendor_outreach_draft_http(
                 "deterministic_template".to_string(),
             )
         });
+    payload.body_markdown = finalize_outreach_body(&payload.body_markdown, &request.couple);
+    if capped(&request.couple.couple_names, MAX_COUPLE_FIELD_CHARS).is_some()
+        && !payload
+            .grounded_on
+            .iter()
+            .any(|field| field == "couple_names")
+    {
+        payload.grounded_on.push("couple_names".to_string());
+    }
 
     // Fail closed if the platform-funded call cannot be written to the shared
     // wedding usage ledger. This provides a durable, tenant-scoped audit receipt
@@ -557,9 +568,9 @@ fn deterministic_outreach_payload(
     let vendor_name = outreach_vendor_display_name(&vendor.name);
     let mut grounded_on = Vec::new();
     let intro = match capped(&couple.couple_names, MAX_COUPLE_FIELD_CHARS) {
-        Some(names) => {
+        Some(_) => {
             grounded_on.push("couple_names".to_string());
-            format!("We are {names} and are planning our wedding")
+            "We are planning our wedding".to_string()
         }
         None => "We are planning our wedding".to_string(),
     };
@@ -585,7 +596,12 @@ fn deterministic_outreach_payload(
         grounded_on.push("atmosphere_description".to_string());
     }
     if let Some(budget) = capped(&couple.budget_comfort, MAX_COUPLE_FIELD_CHARS) {
-        details.push(format!("within a {budget} budget"));
+        let amount = budget
+            .trim()
+            .trim_end_matches("total budget")
+            .trim_end_matches("budget")
+            .trim();
+        details.push(format!("with a total budget of {amount}"));
         grounded_on.push("budget_comfort".to_string());
     }
     let priorities = couple
@@ -612,20 +628,70 @@ fn deterministic_outreach_payload(
         .filter(|question| !question.is_empty())
         .take(MAX_VERIFY_QUESTIONS)
         .collect::<Vec<_>>();
-    let question_sentence = if questions.is_empty() {
+    let question_topics = outreach_question_topics(&questions);
+    let question_sentence = if question_topics.is_empty() {
         String::new()
     } else {
-        format!(" We would also appreciate answers to: {}", questions.join(" "))
+        format!(
+            " We would also appreciate answers to {}.",
+            question_topics.join(" and ")
+        )
     };
     ModelOutreachPayload {
         subject: format!("Wedding enquiry for {vendor_name}"),
         body_markdown: format!(
-            "Hello {} team,\n\n{}{detail_sentence}{priority_sentence} Could you please let us know whether you are available, the package options you offer, and an indicative quote?{question_sentence} We would be happy to share any other details you need.\n\nThank you.",
+            "Hello {} team,\n\n{}{detail_sentence}{priority_sentence}\n\nCould you please let us know whether you are available, the package options you offer, and an indicative quote?{question_sentence}\n\nWe would be happy to share any other details you need.\n\nThank you.",
             vendor_name,
             intro,
         ),
         grounded_on,
     }
+}
+
+fn outreach_question_topics(questions: &[&str]) -> Vec<String> {
+    let mut topics = Vec::new();
+    for question in questions {
+        let lower = question.to_ascii_lowercase();
+        let topic = if lower.contains("capacity") || lower.contains("guest") {
+            "capacity"
+        } else if lower.contains("price")
+            || lower.contains("quote")
+            || lower.contains("cost")
+            || lower.contains("budget")
+        {
+            "price"
+        } else if lower.contains("access") || lower.contains("wheelchair") {
+            "accessibility"
+        } else if lower.contains("availability") || lower.contains("available") {
+            "availability"
+        } else {
+            continue;
+        };
+        if !topics.iter().any(|value| value == topic) {
+            topics.push(topic.to_string());
+        }
+    }
+    topics
+}
+
+fn finalize_outreach_body(body: &str, couple: &WeddingVendorOutreachCoupleInput) -> String {
+    let cleaned = body
+        .replace("total budget budget", "total budget")
+        .replace("Total budget budget", "Total budget")
+        .replace("within a AUD ", "within AUD ")
+        .replace("within an AUD ", "within AUD ");
+    let mut result = normalized_outreach_paragraphs(&cleaned);
+    if let Some(names) = capped(&couple.couple_names, MAX_COUPLE_FIELD_CHARS) {
+        let signature = names.split_whitespace().collect::<Vec<_>>().join(" ");
+        if !signature.is_empty()
+            && !result
+                .to_ascii_lowercase()
+                .ends_with(&signature.to_ascii_lowercase())
+        {
+            result.push_str(&format!("\n\nKind regards,\n\n{signature}"));
+        }
+    }
+    result
 }
 
 /// Search/listing snippets sometimes append marketing prose to a business
@@ -861,8 +927,39 @@ mod tests {
         let questions = vec!["Could you confirm the seated capacity?".to_string()];
         let payload = deterministic_outreach_payload(&vendor, &sample_couple(), &questions);
 
-        assert!(payload.body_markdown.contains("Could you confirm the seated capacity?"));
+        assert!(payload.body_markdown.contains("answers to capacity"));
         assert_eq!(payload.grounded_on.len(), 3);
+    }
+
+    #[test]
+    fn deterministic_outreach_uses_currency_topics_paragraphs_and_onboarding_signature() {
+        let vendor = WeddingVendorOutreachVendorInput {
+            name: "Bondi Icebergs Club".to_string(),
+            category: Some("venue".to_string()),
+            website_url: None,
+            address: None,
+            source_url: None,
+            snippet: None,
+        };
+        let mut couple = sample_couple();
+        couple.budget_comfort = Some("AUD $13,900 total budget".to_string());
+        couple.couple_names = Some("Alex Morgan".to_string());
+        let payload = deterministic_outreach_payload(
+            &vendor,
+            &couple,
+            &[
+                "Could you confirm capacity?".to_string(),
+                "Could you confirm price?".to_string(),
+            ],
+        );
+        let body = finalize_outreach_body(&payload.body_markdown, &couple);
+        assert!(body.contains("total budget of AUD $13,900"));
+        assert!(!body.contains("budget budget"));
+        assert!(body.contains(
+            "We would also appreciate answers to capacity and price."
+        ));
+        assert!(body.contains("\n\nWe would be happy to share any other details you need.\n\n"));
+        assert!(body.ends_with("Kind regards,\n\nAlex Morgan"));
     }
 
     #[test]

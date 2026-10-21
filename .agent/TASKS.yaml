@@ -3005,3 +3005,49 @@ tasks:
       - focused state tests, typecheck, both line-budget audits, wedding site smoke, all 1934 wedding tests, 320/1280 Playwright interaction and accessibility checks, and the production build pass
       - Oracle environment audit found every planning, quotation, vendor-mail and ranking-policy-V2 flag unset so the compose fail-closed defaults remain false; the guarded deployment of the committed UI slice is the next step
       - guarded Oracle deployment exposed a missing quotation-response.html entry in the runtime staging manifest; the entry and its staged-path regression test are now repaired before final asset promotion
+  - id: WED-244
+    title: Correct vendor search relevance, ranking explanations, outreach editing, and follow-up dates
+    status: review
+    owner: codex
+    branch: agent/codex/WED-215
+    depends_on:
+      - WED-199
+      - WED-215
+      - WED-240
+      - WED-242
+    files:
+      - solid-ui/src/components/WeddingVendorChoiceCard.tsx
+      - solid-ui/src/components/WeddingVendorOutreachComposer.tsx
+      - solid-ui/src/components/WeddingVendorFollowUpPanel.tsx
+      - solid-ui/src/lib/useWeddingVendorOutreachOwner.ts
+      - solid-ui/src/lib/weddingVendorAnchorRowState.ts
+      - solid-ui/src/lib/weddingVendorChoiceActionState.ts
+      - solid-ui/src/lib/weddingVendorComparisonPresentationState.ts
+      - solid-ui/src/lib/weddingVendorRankingState.ts
+      - solid-ui/src/lib/weddingVendorSearchArtifactState.ts
+      - solid-ui/src/lib/weddingVendorSearchRequestState.ts
+      - solid-ui/src/lib/weddingVendorQueryIntentState.ts
+      - solid-ui/src/lib/weddingVendorFollowUpApi.ts
+      - solid-ui/tests/wedding-vendor-*.test.ts
+      - src/db/wedding_vendor_contact_schedule.rs
+      - src/server/user_management_routes/wedding_admin.rs
+      - src/server/wedding_vendor_outreach_routes.rs
+      - Documents/verification/**
+      - .agent/**
+    acceptance:
+      - an explicit venue query without a selected category infers venue intent and cannot surface photography candidates
+      - comparison anchors and verification questions derive from the current query, not unrelated stale profile labels, while user-facing ranking reasons name evidenced location, capacity, budget, priority, or atmosphere fit
+      - the primary comparison action says Reach out, demo recommendations do not leak into the live mobile projection, and rejection reasons appear only when supported by the current request
+      - outreach uses one canonical budget value with an AUD dollar sign, readable paragraphs, the requested capacity-and-price wording, and an onboarding-derived signature without inventing a name
+      - the outreach editor reuses the shared rich-text editor and offers headings, sizes, bold, italic, and list controls while preserving sanitized HTML and plain-text approval boundaries
+      - follow-up dates accept calendar and typed edits, persist through a schedule-only authenticated route, and expose honest success or error state
+      - the first three supplied ranking evaluations and the clarified 0-to-3 location/capacity/budget/priority rubric are recorded as partial human-ranking evidence without satisfying unrelated WED-240 gates or enabling ranking-policy V2
+      - focused tests, all wedding tests, typecheck, line budgets, and production build pass; every new file stays below 1000 lines and no blocked rollout flag changes
+    progress:
+      - registered from clean advanced-worktree commit f87ed47; auditing the live query, ranking, outreach, rich-editor, and follow-up owners before making a guarded correction slice
+      - freeform query intent now scopes category, location, guests, budget, atmosphere and priorities to the current request; venue searches exclude known photography records and reopened legacy venue comparisons discard category-mismatched A2Z cards
+      - removed the synthetic demo-workspace fallback, changed the comparison action to Reach out, derived rejection choices from the actual request, and expanded Why this ranking with the card's source-backed anchor rows
+      - outreach now normalizes AUD dollar formatting, uses one intake-first budget context, emits short paragraphs and capacity/price topic wording, appends the onboarding names as a signature, and preserves sanitized rich HTML from the shared email editor
+      - follow-up dates remain visible before their due date, accept typed/calendar edits with explicit save feedback, and use a schedule-only database update that preserves reply, contact-method and last-contact evidence
+      - recorded the first three private venue-ranking cases and the clarified ordered 0-to-3 rubric as partial human evidence only; WED-240 and WED-225/WED-226 remain blocked and ranking policy V2 remains disabled
+      - typecheck, both line-budget audits, wedding site smoke, 74 focused tests, all 1943 wedding tests, 4 Playwright cases at 360/1280, two focused Rust suites (34 tests) and production build pass; only inherited Rust/Tailwind/Vite advisories remain

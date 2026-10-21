@@ -4299,3 +4299,45 @@ Next:
   simulated/source data excluded. Record the post-deploy proof externally; do not enable any blocked
   planning, quotation, vendor-mail, relay, provider or ranking-policy-V2 flag.
 - Independent WED-225/WED-240 human evidence remains outstanding and must not be inferred from this UI work.
+
+## 2026-10-22 - WED-244 vendor relevance and outreach correction (Codex, review)
+
+Changed:
+
+- Changed the top-comparison primary action to `Reach out`; removed the live synthetic workspace
+  fallback; legacy venue comparisons now hide known photography cards such as A2Z Weddings.
+- Added current-query intent extraction for venue category, East Suburbs/beach location, guest count,
+  budget, priorities and atmosphere. Comparison anchors, questions and user-facing ranking reasons now
+  use that request instead of stale Photos/venue intake labels.
+- Limited `Not for us` reasons to supported context. `Too big` appears only when the couple actually
+  asks for an intimate, small, micro or boutique option.
+- Reused the shared TipTap email editor with headings, sizes, bold, italic, lists and sanitized HTML.
+  Drafts use readable paragraphs, `AUD $` currency, no duplicate `budget`, plain capacity/price topic
+  wording and an onboarding-derived sign-off without inventing a name.
+- Kept future vendor follow-ups visible and added controlled calendar/typed input, explicit save state
+  and an authenticated schedule-only database/API route. Rescheduling does not alter last-contact,
+  reply, contact-method or provider-receipt evidence.
+- Recorded the first three supplied venue-ranking reviews and the ordered location/capacity/budget/
+  priority rubric in `Documents/verification/wedding-vendor-ranking-human-review-partial.md`. This is
+  partial first-judge evidence, not the separate WED-240 nine-dimension review.
+
+Verification:
+
+- Solid typecheck, both line-budget checks, wedding website smoke, 74 focused UI tests and all 1,943
+  wedding tests pass. The production build passes with inherited Tailwind and Vite advisories.
+- Four Playwright comparison cases pass at 360 and 1280 CSS pixels with Axe/contrast checks.
+- Fourteen wedding-outreach Rust tests and twenty user-management route tests pass. The only compiler
+  warning is the inherited unused `user_id` in `email_group_routes.rs`.
+- `rustfmt --edition 2024 --check src/db/wedding_vendor_contact_schedule.rs` and `git diff --check`
+  pass. Repository-wide `cargo fmt --check` remains red on extensive pre-existing formatting drift;
+  no unrelated files were reformatted.
+- Every new file is below 1000 lines. The 2,136-line ResponseQueue owner shrank by 46 lines, the
+  1,001-line user-management route owner shrank by 13, and no oversized UI owner exceeds its line
+  budget. The outreach Rust owner is 997 lines.
+
+Unresolved / next:
+
+- The supplied first three ranking reviews still need the remaining corpus and an independent second
+  judge before ranking policy V2 can meet its existing rollout criteria.
+- The nine WED-240 ideal-agent human dimensions and WED-225/WED-226 gates remain independently blocked.
+  No feature flag was enabled and no Oracle or provider mutation was performed in this slice.

@@ -2,12 +2,14 @@
 import { createSignal, For, Show } from "solid-js";
 import type { WeddingVendorOutreachFlowState } from "@/lib/weddingVendorOutreachFlowState";
 import { weddingVendorOutreachSendGate } from "@/lib/weddingVendorOutreachFlowState";
+import { TiptapEditor } from "@/components/editor/TiptapEditor";
+import { renderMarkdown } from "@/lib/markdownRenderer";
 
 export function WeddingVendorOutreachComposer(props: {
   flow: WeddingVendorOutreachFlowState;
   busy: boolean;
   gmailConnected: boolean;
-  onBodyChange: (bodyMarkdown: string) => void;
+  onBodyChange: (bodyMarkdown: string, bodyHtml?: string) => void;
   onRecipientChange?: (email: string) => void;
   onSend: () => void;
   onCancel: () => void;
@@ -84,17 +86,24 @@ export function WeddingVendorOutreachComposer(props: {
             </div>
           </Show>
 
-          <label class="mt-3 block text-sm font-semibold text-wedding-text">
-            Suggested message
-            <textarea
-              value={props.flow.bodyMarkdown}
-              onInput={(event) => props.onBodyChange(event.currentTarget.value)}
+          <div class="mt-3 text-sm font-semibold text-wedding-text">
+            <p>Suggested message</p>
+            <p class="mt-1 text-xs font-normal leading-5 text-wedding-muted">Select text to use headings, sizes, bold, italic, or lists.</p>
+            <TiptapEditor
+              mode="email"
+              class="mt-2 overflow-hidden rounded-xl border border-wedding-muted/35 bg-white font-normal focus-within:border-wedding-cta focus-within:ring-2 focus-within:ring-wedding-surface-blush"
+              contentClass="min-h-44 px-3 py-2 text-sm leading-6"
+              initialContent={props.flow.bodyHtml ?? renderMarkdown(props.flow.bodyMarkdown)}
               disabled={props.busy}
               placeholder="Write the enquiry here."
-              class="mt-1 min-h-44 w-full resize-y select-text rounded-xl border border-wedding-muted/35 bg-white px-3 py-2 text-sm font-normal leading-6 text-wedding-text outline-none placeholder:text-wedding-muted focus:border-wedding-cta focus:ring-2 focus:ring-wedding-surface-blush disabled:cursor-wait disabled:opacity-70"
-              aria-label={`Suggested message for ${props.flow.vendorName}`}
+              showToolbar={true}
+              showFooter={false}
+              enableSlashCommands={false}
+              submitShortcut="none"
+              onChange={(_text, markdown, html) => props.onBodyChange(markdown, html)}
+              onSend={async () => {}}
             />
-          </label>
+          </div>
 
           <label class="mt-3 block text-sm font-semibold text-wedding-text">
             Vendor email

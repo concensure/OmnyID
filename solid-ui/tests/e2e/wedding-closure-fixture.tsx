@@ -21,7 +21,7 @@ const card = (rank: number, category = "venue"): WeddingVendorChoiceCardData => 
 });
 const comparisonItem = (category: string): FocusDeckItem => ({
   id: `comparison:${category}`, kind: "vendor_comparison", sourceSurface: "wedding_vendor_comparison", title: `Sydney ${category} comparison`,
-  recommendedActionLabel: "Check availability", whyNowLabel: "Three ranked choices are ready.", dueAt: null,
+  recommendedActionLabel: "Reach out", whyNowLabel: "Three ranked choices are ready.", dueAt: null,
   evidenceLabels: ["Controlled fixture"], deferCount: 0, returnedFromLater: false, external: false,
   vendorComparison: { artifactId: `artifact-fixture:${category}`, cards: [card(1, category), card(2, category), card(3, category)] },
 });

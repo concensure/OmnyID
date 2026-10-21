@@ -253,7 +253,6 @@ export function vendorContactCards(input: {
       });
       const contact = vendor.userContact ?? null;
       const dueAt = contact?.followUpDueAt ?? null;
-      if (dueAt && Date.parse(dueAt) > Date.parse(input.nowIso ?? new Date().toISOString())) return null;
       const lastContactLabel = shortDateLabel(contact?.lastContactAt);
       const followUpLabel = shortDateLabel(contact?.followUpDueAt);
       const replyLabel = shortDateLabel(contact?.responseReceivedAt);

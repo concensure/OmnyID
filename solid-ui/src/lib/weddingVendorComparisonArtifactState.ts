@@ -11,6 +11,27 @@ function stringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.map(clean).filter(Boolean) : [];
 }
 
+function canonicalCategory(value: unknown): string {
+  const key = clean(value).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  if (/\b(?:venue|reception|function room|event space)\b/.test(key)) return "venue";
+  if (/\b(?:photographer|photography|photo)\b/.test(key)) return "photographer";
+  if (/\b(?:videographer|videography|video)\b/.test(key)) return "videographer";
+  if (/\b(?:celebrant|officiant)\b/.test(key)) return "celebrant";
+  if (/\b(?:florist|floral|flowers)\b/.test(key)) return "florist";
+  if (/\b(?:caterer|catering)\b/.test(key)) return "caterer";
+  return key;
+}
+
+function cardCategory(record: Record<string, unknown>): string {
+  const explicit = canonicalCategory(record.category);
+  if (explicit) return explicit;
+  const vendorId = clean(record.vendor_id);
+  const prefix = canonicalCategory(vendorId.split("-")[0]);
+  return ["venue", "photographer", "videographer", "celebrant", "florist", "caterer"].includes(prefix)
+    ? prefix
+    : "";
+}
+
 function anchorRows(value: unknown): WeddingVendorAnchorRow[] {
   if (!Array.isArray(value)) return [];
   return value.flatMap((item): WeddingVendorAnchorRow[] => {
@@ -121,9 +142,12 @@ export function vendorComparisonCardsForArtifact(
   metadata: Record<string, unknown>,
 ): WeddingWorkspaceArtifactPreview["vendorComparisonCards"] {
   const rawCards = Array.isArray(metadata.topChoiceCards) ? metadata.topChoiceCards : [];
+  const requestedCategories = new Set(stringArray(metadata.vendorCategories).map(canonicalCategory).filter(Boolean));
   return rawCards.flatMap((item): WeddingWorkspaceArtifactPreview["vendorComparisonCards"] => {
     if (!item || typeof item !== "object" || Array.isArray(item)) return [];
     const record = item as Record<string, unknown>;
+    const knownCategory = cardCategory(record);
+    if (requestedCategories.size > 0 && knownCategory && !requestedCategories.has(knownCategory)) return [];
     const title = clean(record.title);
     if (!title || !isActionableVendorComparisonCard(record)) return [];
     const rank = typeof record.rank === "number" && Number.isFinite(record.rank) ? record.rank : 0;
@@ -151,7 +175,7 @@ export function vendorComparisonCardsForArtifact(
       checkedFactsCount: typeof record.checked_facts_count === "number" && Number.isFinite(record.checked_facts_count)
         ? Math.max(0, Math.floor(record.checked_facts_count)) : 0,
       anchorRows: anchorRows(record.anchor_rows),
-      verifyQuestions: stringArray(record.verify_questions).slice(0, 3), facetLabels: stringArray(record.facet_labels).slice(0, 2), vendorFacetIds: stringArray(record.vendor_facet_ids).slice(0, 16),
+      verifyQuestions: stringArray(record.verify_questions).slice(0, 3), facetLabels: stringArray(record.facet_labels).slice(0, 2), vendorFacetIds: stringArray(record.vendor_facet_ids).slice(0, 16), feedbackReasonIds: stringArray(record.feedback_reason_ids).slice(0, 5),
       worthKnowing: clean(record.worth_knowing) || null,
       fitWord: clean(record.fit_word) || null,
       ...weddingVendorRankingCardFieldsFromRecord(record),

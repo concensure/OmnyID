@@ -65,7 +65,10 @@ function firstString(...values: unknown[]): string | null {
 
 /** Make a provider's one-line reply read as a human email before it is shown or sent. */
 export function formatWeddingVendorOutreachParagraphs(value: string): string {
-  const normalized = value.replace(/\r\n?/g, "\n").trim();
+  const normalized = value.replace(/\r\n?/g, "\n")
+    .replace(/\btotal budget\s+budget\b/gi, "total budget")
+    .replace(/\bwithin an?\s+AUD\s*/gi, "within AUD ")
+    .trim();
   if (!normalized) return "";
   if (/\n\s*\n/.test(normalized)) return normalized;
   const prose = normalized.replace(/\s*\n\s*/g, " ").replace(/\s{2,}/g, " ").trim();
@@ -78,13 +81,22 @@ export function formatWeddingVendorOutreachParagraphs(value: string): string {
   return sentences.join("\n\n");
 }
 
+export function normalizeWeddingBudgetComfort(value: unknown): string | null {
+  const raw = nonEmptyString(value);
+  if (!raw) return null;
+  const simple = raw.match(/^(?:AUD\s*)?\$?\s*(\d[\d,]*(?:\.\d+)?)\s*(?:total\s+budget|budget)?$/i);
+  if (!simple) return raw;
+  const amount = Number(simple[1]?.replaceAll(",", ""));
+  return Number.isFinite(amount) ? `AUD $${Math.round(amount).toLocaleString("en-AU")} total budget` : raw;
+}
+
 function applyWeddingOutreachContext(couple: WeddingVendorOutreachCouple, value: Record<string, unknown> | null | undefined) {
   if (!value) return;
   couple.date_or_season ??= firstString(value.date_or_season, value.dateOrSeason);
   couple.location ??= firstString(value.location);
   const guestCount = value.guest_count ?? value.guestCount;
   couple.guest_count ??= typeof guestCount === "number" ? String(guestCount) : nonEmptyString(guestCount);
-  couple.budget_comfort ??= firstString(value.budget_comfort, value.budgetComfort);
+  couple.budget_comfort ??= normalizeWeddingBudgetComfort(firstString(value.budget_comfort, value.budgetComfort));
   if (couple.top_priorities.length === 0) {
     const priorities = value.top_priorities ?? value.topPriorities;
     couple.top_priorities = Array.isArray(priorities)
@@ -93,7 +105,14 @@ function applyWeddingOutreachContext(couple: WeddingVendorOutreachCouple, value:
   }
   couple.atmosphere_description ??= firstString(value.atmosphere_description, value.atmosphereDescription);
   couple.vendor_preferences ??= firstString(value.vendor_preferences, value.vendorPreferences);
-  couple.couple_names ??= firstString(value.couple_names, value.coupleNames, value.family_or_stakeholder_roles, value.familyOrStakeholderRoles);
+  // `familyOrStakeholderRoles` is the legacy planning-contract field behind
+  // the onboarding question labelled "Your names".
+  couple.couple_names ??= firstString(
+    value.couple_names,
+    value.coupleNames,
+    value.family_or_stakeholder_roles,
+    value.familyOrStakeholderRoles,
+  );
 }
 
 export function weddingVendorOutreachCoupleFromWorkspace(input: {
@@ -116,7 +135,7 @@ export function weddingVendorOutreachCoupleFromWorkspace(input: {
   applyWeddingOutreachContext(couple, input.persistedIntake);
   couple.date_or_season ??= nonEmptyString(input.weddingDateOrSeason);
   if (couple.budget_comfort === null && typeof input.budgetTargetAmount === "number" && Number.isFinite(input.budgetTargetAmount)) {
-    couple.budget_comfort = `AUD ${Math.round(input.budgetTargetAmount).toLocaleString()} total budget`;
+    couple.budget_comfort = `AUD $${Math.round(input.budgetTargetAmount).toLocaleString("en-AU")} total budget`;
   }
   return couple;
 }
@@ -169,7 +188,6 @@ export function useWeddingVendorOutreachOwner(input: {
 
     const couple = weddingVendorOutreachCoupleFromWorkspace({
       contextCards: input.state().contextCards,
-      budgetTargetAmount: input.state().budgetTracking.budgetTargetAmount,
     });
     try {
       const contextThreadId = `wedding_context:${metadata.responseWorkspaceId}`;
@@ -179,6 +197,9 @@ export function useWeddingVendorOutreachOwner(input: {
       const intakeMessage = contextMessages.find((message) => message.subtype === "wedding_intake_profile");
       const intake = (intakeMessage?.content ?? {}) as Record<string, unknown>;
       applyWeddingOutreachContext(couple, intake);
+      couple.budget_comfort ??= weddingVendorOutreachCoupleFromWorkspace({
+        contextCards: [], budgetTargetAmount: input.state().budgetTracking.budgetTargetAmount,
+      }).budget_comfort;
 
       const result = await requestWeddingVendorOutreachDraft({
         vendor: {
@@ -201,6 +222,7 @@ export function useWeddingVendorOutreachOwner(input: {
       const persistedFlow = weddingVendorOutreachDraftSucceeded(flow, {
         subject: result.subject,
         bodyMarkdown: formatWeddingVendorOutreachParagraphs(result.bodyMarkdown),
+        bodyHtml: null,
         groundedOnLabels,
       });
       const directoryVendor = outreachDirectoryVendorMatch(card.title);
@@ -209,7 +231,7 @@ export function useWeddingVendorOutreachOwner(input: {
         metadata,
         sourceArtifactId: vendorOutreachArtifactIds()[card.choiceId] ?? null,
         vendorId: directoryVendor?.vendorId ?? null,
-        editorHtml: renderMarkdown(persistedFlow.bodyMarkdown),
+        editorHtml: persistedFlow.bodyHtml ?? renderMarkdown(persistedFlow.bodyMarkdown),
         actionIntent: intent,
       });
       await persistWeddingVendorOutreachDraftBeforeDisplay({
@@ -234,11 +256,11 @@ export function useWeddingVendorOutreachOwner(input: {
     }
   }
 
-  function onOutreachBodyChange(choiceId: string, bodyMarkdown: string) {
+  function onOutreachBodyChange(choiceId: string, bodyMarkdown: string, bodyHtml?: string) {
     setVendorOutreachFlows((current) => {
       const flow = current[choiceId];
       if (!flow) return current;
-      return { ...current, [choiceId]: weddingVendorOutreachBodyChanged(flow, bodyMarkdown) };
+      return { ...current, [choiceId]: weddingVendorOutreachBodyChanged(flow, bodyMarkdown, bodyHtml) };
     });
   }
 
@@ -299,7 +321,7 @@ export function useWeddingVendorOutreachOwner(input: {
     try {
       const metadata = input.state().workspace.metadata;
       const directoryVendor = outreachDirectoryVendorMatch(flow.vendorName);
-      const html = renderMarkdown(flow.bodyMarkdown);
+      const html = flow.bodyHtml ?? renderMarkdown(flow.bodyMarkdown);
       const draftProjection = weddingVendorOutreachDraftAfpSendInput({
         flow,
         metadata,

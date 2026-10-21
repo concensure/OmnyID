@@ -47,7 +47,7 @@ export function WeddingVendorChoiceCard(props: {
   onReviewQuote?: (card: WeddingVendorChoiceCardData) => void;
   onReviewBooking?: (card: WeddingVendorChoiceCardData) => void;
   onViewEvidence?: (card: WeddingVendorChoiceCardData) => void;
-  onOutreachBodyChange?: (choiceId: string, bodyMarkdown: string) => void;
+  onOutreachBodyChange?: (choiceId: string, bodyMarkdown: string, bodyHtml?: string) => void;
   onSendOutreach?: (choiceId: string) => void;
   onCancelOutreach?: (choiceId: string) => void;
   onRetryOutreach?: (choiceId: string) => void;
@@ -130,6 +130,18 @@ export function WeddingVendorChoiceCard(props: {
   const anchorRows = () => Array.isArray(card.anchorRows) ? card.anchorRows : [];
   const verifyQuestions = () => Array.isArray(card.verifyQuestions) ? card.verifyQuestions : [];
   const rooms = () => Array.isArray(card.rooms) ? card.rooms : [];
+  const rankingReasons = () => {
+    const anchored = anchorRows().map((row) => `${row.anchor}: ${row.detail}`);
+    if (anchored.length > 0) return anchored;
+    const saved = [card.preferenceMatch, card.situationFit, ...(card.rationaleLabels ?? [])]
+      .filter((label): label is string => Boolean(label?.trim()) && !/review manually|requires source-page review/i.test(label));
+    return saved.length > 0 ? saved : ["No confirmed fit reason is available yet. Compare the source and open questions before contacting them."];
+  };
+  const feedbackReasons = () => {
+    const allowed = new Set(card.feedbackReasonIds ?? ["not_our_style", "too_far", "too_expensive", "other"]);
+    return ([ ["too_big", "Too big"], ["not_our_style", "Not our style"], ["too_far", "Too far"], ["too_expensive", "Too expensive"], ["other", "Other"] ] as const)
+      .filter(([reason]) => allowed.has(reason));
+  };
   const checkedFactsCount = () => typeof card.checkedFactsCount === "number" && Number.isFinite(card.checkedFactsCount)
     ? Math.max(0, card.checkedFactsCount)
     : Math.max(0, card.rationaleLabels?.length ?? 0);
@@ -268,7 +280,10 @@ export function WeddingVendorChoiceCard(props: {
         </Show>
         <details class="text-xs text-wedding-ink/70">
           <summary class="min-h-11 cursor-pointer py-2 font-semibold text-wedding-ink">Why this ranking</summary>
-          <p class="pb-2">{card.scoreLabel}</p>
+          <ul class="space-y-1 pb-2">
+            <For each={rankingReasons()}>{(reason) => <li>{reason}</li>}</For>
+          </ul>
+          <p class="pb-2 text-[11px]">{card.scoreLabel}</p>
         </details>
         <div class="flex flex-wrap gap-1.5">
           <Show when={props.onToggleFollowUp}>
@@ -330,7 +345,7 @@ export function WeddingVendorChoiceCard(props: {
           <section class="rounded-lg border border-wedding-border bg-wedding-slate p-2" aria-label={`Why ${card.title} is not for you`}>
             <p class="text-xs font-semibold text-wedding-ink">What made this one not for you?</p>
             <div class="mt-2 flex flex-wrap gap-2">
-              <For each={[["too_big", "Too big"], ["not_our_style", "Not our style"], ["too_far", "Too far"], ["too_expensive", "Too expensive"], ["other", "Other"]] as const}>
+              <For each={feedbackReasons()}>
                 {([reason, label]) => <button type="button" disabled={feedbackSaving()} class="min-h-11 rounded-lg border border-wedding-secondary bg-white px-3 text-xs font-semibold text-wedding-secondary disabled:opacity-60" onClick={() => void submitFeedback(reason)}>{label}</button>}
               </For>
             </div>
@@ -343,7 +358,7 @@ export function WeddingVendorChoiceCard(props: {
               flow={flow()}
               busy={flow().stage === "drafting" || flow().stage === "sending"}
               gmailConnected={Boolean(props.gmailConnected)}
-              onBodyChange={(bodyMarkdown) => props.onOutreachBodyChange?.(card.choiceId, bodyMarkdown)}
+              onBodyChange={(bodyMarkdown, bodyHtml) => props.onOutreachBodyChange?.(card.choiceId, bodyMarkdown, bodyHtml)}
               onSend={() => props.onSendOutreach?.(card.choiceId)}
               onCancel={() => props.onCancelOutreach?.(card.choiceId)}
               onRetryDraft={() => props.onRetryOutreach?.(card.choiceId)}

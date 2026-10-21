@@ -12,7 +12,7 @@ import { weddingVendorFollowUpOutreachCardData } from "@/lib/weddingVendorFollow
 import type { WeddingVendorChoiceSelectionSaveInput } from "@/components/WeddingArtifactDetailPanel";
 import type { WeddingResponseWorkspaceViewProps } from "@/components/WeddingResponseWorkspaceViewTypes";
 import { WeddingWorkspaceDocumentsPanel } from "@/components/WeddingWorkspaceDocumentsPanel";
-import { fetchThread, ingestAttachmentBatch, recordWeddingVendorContact, type AfpMessage, type SendAfpMessageInput } from "@/lib/api";
+import { fetchThread, ingestAttachmentBatch, type AfpMessage, type SendAfpMessageInput } from "@/lib/api";
 import type { EditorPayload } from "@/lib/editorPayload";
 import { subscribeMagicActionEvent } from "@/lib/magicActionEvent";
 import { A2UI_CARD_STATS_REQUEST_EVENT, type A2uiCardStatsRequestEventDetail } from "@/lib/a2uiEvents";
@@ -42,6 +42,7 @@ import { buildWeddingVendorQuoteThreadProofState, mergeWeddingVendorQuoteThreadP
 import { weddingVendorQuoteReceiptPersistenceNotice } from "@/lib/weddingVendorQuoteReceiptPersistenceState";
 import { buildWeddingProviderExecutorReadinessState } from "@/lib/weddingProviderExecutorReadinessState";
 import { weddingVendorContactReferenceToAfpSendInput } from "@/lib/weddingVendorContactReferenceAfpState";
+import { rescheduleWeddingVendorFollowUp } from "@/lib/weddingVendorFollowUpApi";
 import { useWeddingVendorOutreachOwner } from "@/lib/useWeddingVendorOutreachOwner";
 import { useWeddingVendorQuoteDecisionProjection } from "@/lib/useWeddingVendorQuoteDecisionProjection";
 import { useWeddingPreferenceProfileOwner } from "@/lib/useWeddingPreferenceProfileOwner";
@@ -897,13 +898,12 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
       onSendOutreach: (choiceId) => void vendorOutreach.onSendOutreach(choiceId),
       onCancelOutreach: vendorOutreach.onCancelOutreach,
       onConnectGmailForOutreach: () => void vendorOutreach.onConnectGmailForOutreach(),
-      onSetFollowUpDate: (card, date) => {
-        if (!card.vendorId || !date) return;
-        void recordWeddingVendorContact(card.vendorId, {
-          contact_method: "other",
-          follow_up_due_at: new Date(`${date}T12:00:00`).toISOString(),
-          notes: card.detailLabel,
-        }).then(() => props.onRefreshWorkspace?.()).catch(() => undefined);
+      onSetFollowUpDate: async (card, date) => {
+        if (!card.vendorId || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
+        try {
+          await rescheduleWeddingVendorFollowUp(card.vendorId, new Date(`${date}T12:00:00`).toISOString());
+          props.onRefreshWorkspace?.(); return true;
+        } catch { return false; }
       },
     },
   }));

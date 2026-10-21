@@ -29,6 +29,7 @@ pub use quotation_vendor_responses::{
 };
 mod wedding_newsletter;
 mod wedding_onboarding_state;
+mod wedding_vendor_contact_schedule;
 mod wedding_vendor_directory;
 pub mod wedding_vendor_evidence;
 mod wedding_vendor_rooms;

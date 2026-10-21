@@ -53,7 +53,7 @@ import {
   type WeddingProviderCapabilitiesResponse,
 } from "@/lib/api";
 import { decisionOsQueueCompanionState } from "@/lib/decisionOsQueueBootstrapState";
-import { normalizeWeddingArtifactSummaries, normalizeWeddingArtifactSummary } from "@/lib/weddingArtifactState";
+import { normalizeWeddingArtifactSummaries } from "@/lib/weddingArtifactState";
 import type { WeddingGeneratedArtifact } from "@/lib/weddingArtifactGenerationState";
 import { buildWeddingKnowledgeGraphState } from "@/lib/weddingKnowledgeGraphState";
 import { buildWeddingContinueContextPacket } from "@/lib/weddingContinueContextState";
@@ -105,7 +105,6 @@ import {
   weddingRecommendationRequestedOutput,
 } from "@/lib/weddingRecommendationGenerationActionState";
 import type { WeddingWorkspaceSidebarAction } from "@/lib/weddingWorkspaceActionState";
-import { buildWeddingTemplateDemoState } from "@/lib/weddingTemplateEntryState";
 import { shouldShowWeddingFirstRunIntake } from "@/lib/weddingFirstRunIntakeGateState";
 import {
   WEDDING_VENDOR_CHECKLIST,
@@ -143,6 +142,7 @@ import {
 } from "@/lib/weddingVendorSearchExecutorState";
 import { runWeddingVendorDirectoryFirstSearch } from "@/lib/weddingVendorDirectoryFirstSearchState";
 import { weddingVendorDirectorySearchPlans } from "@/lib/weddingVendorDirectorySearchPlanState";
+import { weddingVendorQueryGooglePlaceTypes, weddingVendorQueryIntent } from "@/lib/weddingVendorQueryIntentState";
 import { useWeddingVendorShortlistLaunch } from "@/lib/useWeddingVendorShortlistLaunch";
 import { weddingVendorRankingPolicyV2Enabled } from "@/lib/weddingVendorRankingV2State";
 import { buildWeddingVendorSearchReadinessState } from "@/lib/weddingVendorSearchReadinessState";
@@ -325,27 +325,6 @@ function weddingSetupChecklistItems(state: WeddingResponseWorkspaceViewState): A
       menu: "helpers",
     },
   ];
-}
-
-function rescopeWeddingArtifact(
-  artifact: WeddingGeneratedArtifact,
-  metadata: ReturnType<typeof normalizeWeddingPlanningMetadata>,
-): WeddingGeneratedArtifact | null {
-  const input = {
-    ...artifact.input,
-    metadata: {
-      ...(artifact.input.metadata && typeof artifact.input.metadata === "object" ? artifact.input.metadata : {}),
-      weddingPlanId: metadata.weddingPlanId,
-      responseWorkspaceId: metadata.responseWorkspaceId,
-      sourceResponseId: metadata.sourceResponseId,
-      artifactKind: artifact.summary.kind,
-      privacyScope: artifact.summary.metadata.privacyScope,
-      approvalState: artifact.summary.approvalState,
-      supertags: metadata.supertags,
-    },
-  };
-  const summary = normalizeWeddingArtifactSummary(input);
-  return summary ? { ...artifact, input, summary } : null;
 }
 
 function withWeddingAdminDataConsent(
@@ -900,55 +879,31 @@ export function ResponseQueueView(props: {
       }), weddingAdminDataConsentEnabled());
     }
 
-    const demo = buildWeddingTemplateDemoState();
     const metadata = normalizeWeddingPlanningMetadata({
-      ...demo.entry.metadata,
       weddingPlanId: intent.weddingPlanId,
       responseWorkspaceId: intent.responseWorkspaceId,
       sourceResponseId: intent.sourceResponseId,
-      supertags: [...demo.entry.metadata.supertags, "demo:wedding_workspace_bridge"],
+      supertags: ["wedding", "wedding_plan"],
     });
-    const generatedArtifacts = demo.artifactGeneration.artifacts
-      .map((artifact) => rescopeWeddingArtifact(artifact, metadata))
-      .filter((artifact): artifact is WeddingGeneratedArtifact => artifact !== null);
-    const artifacts = [...generatedArtifacts.map((artifact) => artifact.input), ...importedArtifactInputs];
-    const scheduleItems = demo.scheduleItems.map((item) => ({
-      ...item,
-      metadata,
-    }));
     const scheduleItemsWithLocalDate = withLocalWeddingDateSchedule(
-      scheduleItems,
+      [],
       metadata,
       intent.responseWorkspaceId,
     );
-    const taskItems = demo.taskItems.map((item) => ({
-      ...item,
-      metadata,
-    }));
-    const graph = buildWeddingRecommendationExplanationState(buildWeddingKnowledgeGraphState({
-      metadata,
-      artifacts: generatedArtifacts.map((artifact) => artifact.summary),
-      scheduleItems: scheduleItemsWithLocalDate,
-      taskItems,
-      decisions: [{ title: "Choose venue", status: "open", constrains: ["Budget allocation"], requiresApproval: true }],
-      risks: [{ title: "Sample availability is not verified", severity: "medium", evidence: "Demo vendors are synthetic." }],
-    }));
-
     return buildWeddingResponseWorkspaceViewState({
       metadata,
-      artifacts,
+      artifacts: importedArtifactInputs,
       adminDataConsentEnabled: weddingAdminDataConsentEnabled(),
       query: weddingWorkspaceQuery(),
       activeArtifactId: activeWeddingArtifactId() ?? intent.artifactId,
-      recommendations: graph,
       decisionDeferrals: persisted.decisionDeferrals,
       seatingConstraints: persisted.seatingConstraints,
       seatingOptimizations: persisted.seatingOptimizations,
       seatingDraftArchives: persisted.seatingDraftArchives,
       inspirationItems: persisted.inspirationItems,
-      generatedArtifacts: [...generatedArtifacts, ...importedArtifacts],
+      generatedArtifacts: importedArtifacts,
       scheduleItems: scheduleItemsWithLocalDate,
-      taskItems,
+      taskItems: [],
       weddingVendors: weddingVendorDirectory(),
       nowIso: new Date().toISOString(),
       projectionStorage: localStorage,
@@ -1665,11 +1620,9 @@ export function ResponseQueueView(props: {
         scopedCategoryIds && scopedCategoryIds.length > 0 ? scopedCategoryIds : weddingFollowUpVendorIds(),
       );
       const freeformQuery = options?.category ? "" : currentWeddingVendorSearchQuery();
-      // A couple may search for a named vendor before completing the optional
-      // live-search intake. That is a local directory lookup, not a request to
-      // spend a provider credit, and must retain the exact name.
-      const directoryLookupOnly = Boolean(freeformQuery);
-      const effectiveCategoryLabels = options?.category ? [options.category] : categoryLabels.length > 0
+      const queryIntent = weddingVendorQueryIntent(freeformQuery);
+      const directoryLookupOnly = Boolean(freeformQuery && queryIntent.exactNameLookup);
+      const effectiveCategoryLabels = options?.category ? [options.category] : queryIntent.categoryLabel ? [queryIntent.categoryLabel] : categoryLabels.length > 0
         ? categoryLabels
         : freeformQuery
           ? ["Custom vendor search"]
@@ -1722,9 +1675,9 @@ export function ResponseQueueView(props: {
       const freeformQueries = freeformQuery
         ? configuredProviderKinds.map((providerKind) => ({
           providerKind,
-          category: "custom_vendor_search",
+          category: queryIntent.category ?? "custom_vendor_search",
           query: vendorSearchQueryWithFallbackArea(freeformQuery, weddingVendorSearchServiceArea()),
-          googlePlaceTypes: providerKind === "google_places" ? ["point_of_interest"] : [],
+          googlePlaceTypes: providerKind === "google_places" ? weddingVendorQueryGooglePlaceTypes(queryIntent.category) : [],
           overpassTags: providerKind === "overpass" ? ["name~wedding"] : [],
           expectedFields: plannedQueries.find((query) => query.providerKind === providerKind)?.expectedFields
             ?? ["name", "website", "phone", "address", "rating", "review count", "source"],
@@ -1746,15 +1699,16 @@ export function ResponseQueueView(props: {
         setWeddingVendorSearchNotice("Vendor search needs at least one vendor category before it can run.");
         return false;
       }
+      const scopedQuery = Boolean(freeformQuery && !queryIntent.exactNameLookup);
       const comparisonInput = {
-        metadata, preferences: [weddingFollowUpPriorities(), weddingFollowUpAtmosphere()].filter(Boolean).join("; "),
-        location: weddingFollowUpLocation(), dateOrSeason: weddingFollowUpDate(), guestCount: weddingFollowUpGuests(),
-        budgetComfort: weddingFollowUpBudget(), atmosphereDescription: weddingFollowUpAtmosphere(),
-        inspirationImageUrls: linesFromText(weddingFollowUpImageLinks()), topPriorities: linesFromText(weddingFollowUpPriorities()),
+        metadata, preferences: scopedQuery ? queryIntent.preferences : [weddingFollowUpPriorities(), weddingFollowUpAtmosphere()].filter(Boolean).join("; "),
+        location: scopedQuery ? queryIntent.location : weddingFollowUpLocation(), dateOrSeason: weddingFollowUpDate(), guestCount: scopedQuery ? queryIntent.guestCount : weddingFollowUpGuests(),
+        budgetComfort: scopedQuery ? queryIntent.budgetComfort : weddingFollowUpBudget(), atmosphereDescription: scopedQuery ? queryIntent.atmosphere : weddingFollowUpAtmosphere(),
+        inspirationImageUrls: linesFromText(weddingFollowUpImageLinks()), topPriorities: scopedQuery ? queryIntent.priorities : linesFromText(weddingFollowUpPriorities()),
         vendorCategories: effectiveCategoryLabels,
         // A named directory lookup is not a category request. Treating it as
         // `Custom vendor search` filters out a real saved venue such as Mackay.
-        targetCategory: directoryLookupOnly ? null : effectiveCategoryLabels[0] ?? null,
+        targetCategory: directoryLookupOnly ? null : queryIntent.category ?? effectiveCategoryLabels[0] ?? null,
         requireExactlyThree: true,
         // An exact vendor-name lookup must be predictable and private: search
         // the existing directory only instead of turning a name into a broad

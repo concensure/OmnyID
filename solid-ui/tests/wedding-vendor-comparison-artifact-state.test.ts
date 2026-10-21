@@ -57,6 +57,18 @@ test("legacy generic recommendation is rebuilt from saved source evidence", () =
   assert.doesNotMatch(handoff?.recommendationLabel ?? "", /stronger fit|alternative/i);
 });
 
+test("reopened venue comparisons hide legacy photography cards", () => {
+  const cards = vendorComparisonCardsForArtifact({
+    vendorCategories: ["Venue"],
+    topChoiceCards: [
+      { rank: 1, title: "A2Z Weddings", vendor_id: "photographer-a2z-weddings", source_url: "https://a2z.example" },
+      { rank: 2, title: "Bondi Beach Venue", vendor_id: "venue-bondi-beach", source_url: "https://bondi.example" },
+    ],
+  });
+
+  assert.deepEqual(cards.map((card) => card.title), ["Bondi Beach Venue"]);
+});
+
 test("persisted compare-the-options copy is replaced with an evidence-specific lead", () => {
   const handoff = vendorComparisonHandoffForArtifact({
     vendorComparisonHandoff: { recommendationLabel: "Compare the 3 options below.", whyLabels: ["3 source-backed vendors"], confidenceLabel: "Confidence: developing" },

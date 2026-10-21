@@ -23,5 +23,5 @@ export function weddingVendorChoiceActionState(input: {
   if (["confirmed_unavailable", "booked"].includes(input.availabilityState)) {
     return { intent: "VIEW_EVIDENCE", label: "View evidence", startsOutreach: false };
   }
-  return { intent: "CHECK_AVAILABILITY_AND_REQUEST_QUOTE", label: "Check availability", startsOutreach: true };
+  return { intent: "CHECK_AVAILABILITY_AND_REQUEST_QUOTE", label: "Reach out", startsOutreach: true };
 }

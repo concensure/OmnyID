@@ -137,7 +137,7 @@ export function vendorChoiceActionRows(choices: readonly WeddingVendorRankedCand
     addLinkAction("open_vendor_source", "Open source", choice.url);
     actions.push({
       kind: "prepare_approval_gated_outreach",
-      label: choice.group === "verify" ? "Check availability" : "Prepare follow-up",
+      label: choice.group === "verify" ? "Reach out" : "Prepare follow-up",
       enabled: true,
       requires_user_confirmation: true,
       approval_required_before_outreach: true,
@@ -163,17 +163,26 @@ export function vendorChoiceActionRows(choices: readonly WeddingVendorRankedCand
 export function vendorChoiceCards(
   choices: readonly WeddingVendorRankedCandidate[],
   weddingPlanId: string | null = null,
-  context: Pick<WeddingVendorComparisonContext, "topPriorities" | "location" | "budgetComfort"> & { guestCount?: string | null } = {},
+  context: Pick<WeddingVendorComparisonContext, "preferences" | "atmosphereDescription" | "topPriorities" | "location" | "budgetComfort"> & { guestCount?: string | null } = {},
 ): Array<Record<string, unknown>> {
   return choices.map((choice) => {
     const media = weddingVendorShortlistMedia({ vendorName: choice.title, imageUrl: choice.imageUrl });
     const anchorRows = weddingVendorAnchorRows(choice, context);
     const verifyQuestions = weddingVendorVerifyQuestions(anchorRows, choice.reasons ? [] : choice.unknownHardConstraints);
+    const preferenceText = [context.preferences, context.atmosphereDescription, ...(context.topPriorities ?? [])].map(clean).join(" ");
+    const feedbackReasonIds = [
+      /\b(?:intimate|small|micro|boutique)\b/i.test(preferenceText) ? "too_big" : null,
+      preferenceText ? "not_our_style" : null,
+      clean(context.location) ? "too_far" : null,
+      clean(context.budgetComfort) ? "too_expensive" : null,
+      "other",
+    ].filter((reason): reason is string => Boolean(reason));
     return {
     choice_id: choice.id,
     rank: choice.rank,
     comparison_count: choices.length,
     title: choice.title,
+    category: choice.category,
     image_url: media.url,
     image_alt: media.alt,
     media_kind: media.kind,
@@ -213,6 +222,7 @@ export function vendorChoiceCards(
     vendor_id: choice.vendorId,
     wedding_plan_id: weddingPlanId,
     unknown_constraints: choice.unknownHardConstraints,
+    feedback_reason_ids: feedbackReasonIds,
     };
   });
 }

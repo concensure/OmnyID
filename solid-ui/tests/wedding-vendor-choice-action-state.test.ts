@@ -3,7 +3,9 @@ import assert from "node:assert/strict";
 import { weddingVendorChoiceActionState } from "../src/lib/weddingVendorChoiceActionState.ts";
 
 test("vendor choice action derives every semantic selection intent", () => {
-  assert.equal(weddingVendorChoiceActionState({ availabilityState: "unknown" }).intent, "CHECK_AVAILABILITY_AND_REQUEST_QUOTE");
+  const unknown = weddingVendorChoiceActionState({ availabilityState: "unknown" });
+  assert.equal(unknown.intent, "CHECK_AVAILABILITY_AND_REQUEST_QUOTE");
+  assert.equal(unknown.label, "Reach out");
   assert.equal(weddingVendorChoiceActionState({ availabilityState: "confirmed_available" }).intent, "REQUEST_QUOTE");
   assert.equal(weddingVendorChoiceActionState({ availabilityState: "unknown", quoteExists: true }).intent, "REVIEW_QUOTE");
   assert.equal(weddingVendorChoiceActionState({ availabilityState: "confirmed_available", bookingContractExists: true }).intent, "START_PURCHASE_OR_BOOKING");

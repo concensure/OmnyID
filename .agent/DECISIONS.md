@@ -1459,3 +1459,22 @@ contribution changes.
 Both projections use semantic status text in addition to colour, contained horizontal tab lists,
 the wedding surface tokens and 8-12px radii. They add no send, signature, booking or payment authority
 and do not alter any planning, quotation, mail, relay, provider or ranking-policy rollout gate.
+
+## 2026-10-22: Vendor intent and outreach remain query-scoped and evidence-preserving
+
+A freeform vendor request is classified before execution. An exploratory request supplies its own
+category, location, guest count, budget, priorities and atmosphere to search, ranking, anchor rows and
+verification questions; unrelated saved intake values are not blended into that comparison. A short
+vendor-name lookup remains a private exact directory lookup. Known category mismatches are excluded
+both during ranking and when reopening legacy comparison artifacts.
+
+Vendor outreach reuses the shared email rich-text editor and carries sanitized HTML alongside the
+plain-text approval record. Budget and sender names come from the same durable intake context used to
+explain the draft, with the current budget tracker only a missing-value fallback. The server remains
+the final normalization boundary for paragraph structure, AUD currency, verification topics and the
+onboarding-name signature; it does not invent a sender name.
+
+Changing a follow-up date is scheduling, not a new contact event. The authenticated schedule-only
+route updates `follow_up_due_at` while preserving contact method, last-contact timestamp, recorded
+reply and provider receipts. Future follow-ups remain visible so users can inspect and reschedule
+them. None of these changes expands send authority or changes any rollout flag.

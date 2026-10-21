@@ -108,12 +108,12 @@ export function WeddingVendorFollowUpPanel(props: {
   vendorOutreachFlows: Record<string, WeddingVendorOutreachFlowState>;
   gmailConnected: boolean;
   onOpenOutreachComposer: (card: WeddingVendorContactWorkspaceCard) => void;
-  onOutreachBodyChange: (choiceId: string, bodyMarkdown: string) => void;
+  onOutreachBodyChange: (choiceId: string, bodyMarkdown: string, bodyHtml?: string) => void;
   onOutreachRecipientChange: (choiceId: string, email: string) => void;
   onSendOutreach: (choiceId: string) => void;
   onCancelOutreach: (choiceId: string) => void;
   onConnectGmailForOutreach: () => void;
-  onSetFollowUpDate: (card: WeddingVendorContactWorkspaceCard, date: string) => void;
+  onSetFollowUpDate: (card: WeddingVendorContactWorkspaceCard, date: string) => Promise<boolean>;
 }) {
   const activeCards = () => props.state.vendorContactCards;
   const alertLabel = () => weddingVendorFollowUpAlertLabel(activeCards().length);
@@ -147,6 +147,15 @@ export function WeddingVendorFollowUpPanel(props: {
               const rationale = () => weddingVendorFollowUpCardRationale(card);
               const outreachChoiceId = () => weddingVendorFollowUpOutreachChoiceId(card);
               const outreachFlow = () => props.vendorOutreachFlows[outreachChoiceId()] ?? null;
+              const [followUpDate, setFollowUpDate] = createSignal(card.followUpDueAt?.slice(0, 10) ?? "");
+              const [dateSaving, setDateSaving] = createSignal(false);
+              const [dateNotice, setDateNotice] = createSignal<string | null>(null);
+              const saveFollowUpDate = async () => {
+                if (!followUpDate() || dateSaving()) return;
+                setDateSaving(true); setDateNotice(null);
+                const saved = await props.onSetFollowUpDate(card, followUpDate());
+                setDateSaving(false); setDateNotice(saved ? "Follow-up date saved." : "Couldn't save that date. Please try again.");
+              };
               return (
                 <article class="select-text rounded-2xl border border-wedding-muted/25 bg-white p-3 py-3 sm:p-4 sm:py-4">
                   <p class="inline-flex rounded-full border border-wedding-accent bg-wedding-surface-blush px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.12em] text-wedding-text shadow-sm">
@@ -170,8 +179,9 @@ export function WeddingVendorFollowUpPanel(props: {
                         <input
                           ref={(element) => { followUpDateInput = element; }}
                           type="date"
-                          value={card.followUpDueAt ? card.followUpDueAt.slice(0, 10) : ""}
-                          onChange={(event) => props.onSetFollowUpDate(card, event.currentTarget.value)}
+                          value={followUpDate()}
+                          onInput={(event) => { setFollowUpDate(event.currentTarget.value); setDateNotice(null); }}
+                          onChange={() => void saveFollowUpDate()}
                           class="block min-h-10 min-w-0 flex-1 cursor-text select-text rounded-lg border border-wedding-muted/35 bg-white px-2 text-xs font-semibold text-wedding-text outline-none focus:border-wedding-cta focus:ring-2 focus:ring-wedding-surface-blush"
                           aria-label={`Follow-up date for ${card.vendorName}`}
                         />
@@ -186,7 +196,9 @@ export function WeddingVendorFollowUpPanel(props: {
                         >
                           Calendar
                         </button>
+                        <button type="button" disabled={!followUpDate() || dateSaving()} onClick={() => void saveFollowUpDate()} class="min-h-10 shrink-0 rounded-lg bg-wedding-primary px-2 text-xs font-semibold text-wedding-page disabled:opacity-50">{dateSaving() ? "Saving…" : "Save"}</button>
                       </div>
+                      <Show when={dateNotice()}>{(notice) => <span class="mt-1 block text-[11px] text-wedding-ink" role="status">{notice()}</span>}</Show>
                     </label>
                   </div>
 
@@ -213,7 +225,7 @@ export function WeddingVendorFollowUpPanel(props: {
                           Reply to {card.vendorName}
                         </button>
                         <Show when={outreachFlow()}>
-                          {(flow) => <WeddingVendorOutreachComposer flow={flow()} busy={flow().stage === "drafting" || flow().stage === "sending"} gmailConnected={props.gmailConnected} vendorWebsiteUrl={card.websiteUrl} onBodyChange={(body) => props.onOutreachBodyChange(outreachChoiceId(), body)} onRecipientChange={(email) => props.onOutreachRecipientChange(outreachChoiceId(), email)} onSend={() => props.onSendOutreach(outreachChoiceId())} onCancel={() => props.onCancelOutreach(outreachChoiceId())} onConnectGmail={() => props.onConnectGmailForOutreach()} />}
+                          {(flow) => <WeddingVendorOutreachComposer flow={flow()} busy={flow().stage === "drafting" || flow().stage === "sending"} gmailConnected={props.gmailConnected} vendorWebsiteUrl={card.websiteUrl} onBodyChange={(body, html) => props.onOutreachBodyChange(outreachChoiceId(), body, html)} onRecipientChange={(email) => props.onOutreachRecipientChange(outreachChoiceId(), email)} onSend={() => props.onSendOutreach(outreachChoiceId())} onCancel={() => props.onCancelOutreach(outreachChoiceId())} onConnectGmail={() => props.onConnectGmailForOutreach()} />}
                         </Show>
                       </>
                     }
@@ -261,7 +273,7 @@ export function WeddingVendorFollowUpPanel(props: {
                             busy={flow().stage === "drafting" || flow().stage === "sending"}
                             gmailConnected={props.gmailConnected}
                             vendorWebsiteUrl={card.websiteUrl}
-                            onBodyChange={(bodyMarkdown) => props.onOutreachBodyChange(outreachChoiceId(), bodyMarkdown)}
+                            onBodyChange={(bodyMarkdown, bodyHtml) => props.onOutreachBodyChange(outreachChoiceId(), bodyMarkdown, bodyHtml)}
                             onRecipientChange={(email) => props.onOutreachRecipientChange(outreachChoiceId(), email)}
                             onSend={() => props.onSendOutreach(outreachChoiceId())}
                             onCancel={() => props.onCancelOutreach(outreachChoiceId())}

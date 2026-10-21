@@ -15,6 +15,10 @@ const helpersPanel = readFileSync(resolve(process.cwd(), "src/components/Wedding
 const helpersState = readFileSync(resolve(process.cwd(), "src/lib/weddingHelpersPanelState.ts"), "utf8");
 const budgetTracker = readFileSync(resolve(process.cwd(), "src/components/WeddingBudgetTrackerCard.tsx"), "utf8");
 const timelinePanel = readFileSync(resolve(process.cwd(), "src/components/WeddingTimelinePanel.tsx"), "utf8");
+const outreachComposer = readFileSync(resolve(process.cwd(), "src/components/WeddingVendorOutreachComposer.tsx"), "utf8");
+const followUpPanel = readFileSync(resolve(process.cwd(), "src/components/WeddingVendorFollowUpPanel.tsx"), "utf8");
+const responseQueue = readFileSync(resolve(process.cwd(), "src/components/ResponseQueueView.tsx"), "utf8");
+const followUpApi = readFileSync(resolve(process.cwd(), "src/lib/weddingVendorFollowUpApi.ts"), "utf8");
 
 test("Sprout performs its initial persona load before enabling template actions", () => {
   assert.match(personaFab, /reloadPersonas\(options\?: \{ initial\?: boolean \}\)/);
@@ -31,6 +35,26 @@ test("provider outreach drafts are displayed and sent as readable paragraphs", (
     formatWeddingVendorOutreachParagraphs("Hello River team.\n\nCould you share availability?"),
     "Hello River team.\n\nCould you share availability?",
   );
+});
+
+test("vendor outreach uses the shared rich editor with email formatting controls", () => {
+  assert.match(outreachComposer, /<TiptapEditor/);
+  assert.match(outreachComposer, /mode="email"/);
+  assert.match(outreachComposer, /showToolbar=\{true\}/);
+  assert.match(outreachComposer, /onBodyChange\(markdown, html\)/);
+});
+
+test("live wedding workspace does not manufacture demo artifacts", () => {
+  assert.doesNotMatch(responseQueue, /buildWeddingTemplateDemoState/);
+  assert.doesNotMatch(responseQueue, /demo:wedding_workspace_bridge/);
+});
+
+test("follow-up date edits have controlled input, an explicit save, and a schedule-only API", () => {
+  assert.match(followUpPanel, /type="date"/);
+  assert.match(followUpPanel, /onInput=.*setFollowUpDate/);
+  assert.match(followUpPanel, />\{dateSaving\(\) \? [^:]+ : "Save"\}<\/button>/);
+  assert.match(followUpApi, /method: "PATCH"/);
+  assert.match(followUpApi, /follow_up_due_at/);
 });
 
 test("a successful vendor delivery has a clear, encouraging confirmation", () => {

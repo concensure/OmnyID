@@ -71,10 +71,7 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
             "/api/public/wedding/vendor/room-photos/{room_id}/{slot}",
             get(public_wedding_vendor_room_photo_http),
         )
-        .route(
-            "/wedding/vendors/{vendor_id}/contact",
-            post(wedding_vendor_contact_record_http),
-        )
+        .merge(wedding_admin::contact_routes())
         .route("/wedding/vendors", get(wedding_vendors_list_http))
         .route(
             "/wedding/onboarding-state",
@@ -165,16 +162,6 @@ struct WeddingVendorAttributeRequest {
     status: String,
     confidence: Option<f32>,
     source_url: Option<String>,
-    notes: Option<String>,
-}
-
-#[derive(serde::Deserialize)]
-struct WeddingVendorContactRequest {
-    contact_method: String,
-    follow_up_due_at: Option<String>,
-    response_received_at: Option<String>,
-    thread_id: Option<String>,
-    receipt_ref: Option<String>,
     notes: Option<String>,
 }
 

@@ -399,8 +399,8 @@ test("buildWeddingResponseWorkspaceViewState exposes editable-vendor contact car
     ],
   });
 
-  assert.deepEqual(state.vendorContactCards.map((card) => card.vendorName), ["Due Caterer", "Closed Band"]);
-  // Waiting Venue has a follow-up date in the future, so it stays out of the queue until due.
+  assert.deepEqual(state.vendorContactCards.map((card) => card.vendorName), ["Due Caterer", "Waiting Venue", "Closed Band"]);
+  // Future follow-ups remain visible so the user can inspect and reschedule them.
   assert.equal(state.vendorContactCards[0]?.statusLabel, "Second attempt due");
   assert.equal(state.vendorContactCards[0]?.tone, "due");
   assert.equal(state.vendorContactCards[0]?.nextActionLabel, "Send one follow-up");
@@ -413,12 +413,14 @@ test("buildWeddingResponseWorkspaceViewState exposes editable-vendor contact car
     { kind: "email", label: "email", value: "hello@duecaterer.test" },
     { kind: "phone", label: "phone", value: "+61 2 5555 1111" },
   ]);
-  assert.equal(state.vendorContactCards[1]?.statusLabel, "Reply received");
-  assert.equal(state.vendorContactCards[1]?.tone, "closed");
-  assert.equal(state.vendorContactCards[1]?.actionMode, "reply_recorded");
-  assert.equal(state.vendorContactCards[1]?.primaryActionLabel, "View response");
-  assert.equal(state.vendorContactCards[1]?.replyLabel, "2026-09-10");
-  assert.match(state.vendorContactCards[1]?.detailLabel ?? "", /hold the date until Friday/i);
+  assert.equal(state.vendorContactCards[1]?.statusLabel, "Waiting for reply");
+  assert.equal(state.vendorContactCards[1]?.followUpDueLabel, "2026-09-18");
+  assert.equal(state.vendorContactCards[2]?.statusLabel, "Reply received");
+  assert.equal(state.vendorContactCards[2]?.tone, "closed");
+  assert.equal(state.vendorContactCards[2]?.actionMode, "reply_recorded");
+  assert.equal(state.vendorContactCards[2]?.primaryActionLabel, "View response");
+  assert.equal(state.vendorContactCards[2]?.replyLabel, "2026-09-10");
+  assert.match(state.vendorContactCards[2]?.detailLabel ?? "", /hold the date until Friday/i);
 });
 
 test("vendorContactCards keeps directory candidates out of active outreach until this user has contact evidence", () => {

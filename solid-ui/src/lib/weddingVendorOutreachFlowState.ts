@@ -18,6 +18,7 @@ export type WeddingVendorOutreachFlowState = {
   stage: WeddingVendorOutreachStage;
   subject: string;
   bodyMarkdown: string;
+  bodyHtml: string | null;
   groundedOnLabels: string[];
   sentAtIso: string | null;
   receiptRef: string | null;
@@ -102,6 +103,7 @@ export function weddingVendorOutreachIdleFlow(input: {
     stage: "idle",
     subject: "",
     bodyMarkdown: "",
+    bodyHtml: null,
     groundedOnLabels: [],
     sentAtIso: null,
     receiptRef: null,
@@ -118,13 +120,14 @@ export function weddingVendorOutreachStartDrafting(
 
 export function weddingVendorOutreachDraftSucceeded(
   flow: WeddingVendorOutreachFlowState,
-  draft: { subject: string; bodyMarkdown: string; groundedOnLabels: string[] },
+  draft: { subject: string; bodyMarkdown: string; bodyHtml?: string | null; groundedOnLabels: string[] },
 ): WeddingVendorOutreachFlowState {
   return {
     ...flow,
     stage: "draft_ready",
     subject: draft.subject,
     bodyMarkdown: draft.bodyMarkdown,
+    bodyHtml: draft.bodyHtml ?? null,
     groundedOnLabels: draft.groundedOnLabels,
     blockedReason: null,
   };
@@ -140,8 +143,9 @@ export function weddingVendorOutreachDraftFailed(
 export function weddingVendorOutreachBodyChanged(
   flow: WeddingVendorOutreachFlowState,
   bodyMarkdown: string,
+  bodyHtml?: string,
 ): WeddingVendorOutreachFlowState {
-  return { ...flow, bodyMarkdown };
+  return { ...flow, bodyMarkdown, bodyHtml: bodyHtml?.trim() || null };
 }
 
 export function weddingVendorOutreachStartSending(

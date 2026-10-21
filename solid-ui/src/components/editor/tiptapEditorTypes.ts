@@ -41,7 +41,7 @@ export type TiptapEditorProps = {
   placeholder?: string;
   submitLabel?: string;
   mentionSuggestions?: MentionSuggestion[];
-  onChange?: (text: string, markdown: string) => void;
+  onChange?: (text: string, markdown: string, html: string) => void;
   onSend: (payload: EditorPayload) => Promise<void>;
   onCancel?: () => void;
   clearOnSend?: boolean;

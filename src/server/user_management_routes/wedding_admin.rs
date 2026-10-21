@@ -798,7 +798,7 @@ pub(super) async fn admin_wedding_vendor_delete_http(
     ))
 }
 
-pub(super) async fn wedding_vendor_contact_record_http(
+async fn wedding_vendor_contact_record_http(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Path(vendor_id): Path<String>,
@@ -823,6 +823,27 @@ pub(super) async fn wedding_vendor_contact_record_http(
         )
         .await
         .map_err(readiness_error_to_http)?;
+    Ok(Json(serde_json::json!({ "contact": contact })))
+}
+
+async fn wedding_vendor_follow_up_reschedule_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(vendor_id): Path<String>,
+    Json(body): Json<WeddingVendorFollowUpRequest>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    let user = authenticated_user(&state.db, &headers).await?;
+    let follow_up_due_at = validate_optional_rfc3339(
+        Some(body.follow_up_due_at),
+        "follow_up_due_at",
+    )?
+    .ok_or_else(|| (StatusCode::BAD_REQUEST, "follow_up_due_at is required".to_string()))?;
+    let contact = state
+        .db
+        .reschedule_wedding_vendor_follow_up(&user.id, vendor_id.trim(), &follow_up_due_at)
+        .await
+        .map_err(readiness_error_to_http)?
+        .ok_or_else(|| (StatusCode::NOT_FOUND, "vendor contact was not found".to_string()))?;
     Ok(Json(serde_json::json!({ "contact": contact })))
 }
 
@@ -887,4 +908,30 @@ pub(super) async fn wedding_onboarding_state_upsert_http(
     Ok(Json(
         serde_json::json!({ "onboarding_state": onboarding_state }),
     ))
+}
+#[derive(serde::Deserialize)]
+struct WeddingVendorContactRequest {
+    contact_method: String,
+    follow_up_due_at: Option<String>,
+    response_received_at: Option<String>,
+    thread_id: Option<String>,
+    receipt_ref: Option<String>,
+    notes: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+struct WeddingVendorFollowUpRequest {
+    follow_up_due_at: String,
+}
+
+pub(super) fn contact_routes() -> Router<Arc<AppState>> {
+    Router::new()
+        .route(
+            "/wedding/vendors/{vendor_id}/contact",
+            post(wedding_vendor_contact_record_http),
+        )
+        .route(
+            "/wedding/vendors/{vendor_id}/follow-up",
+            axum::routing::patch(wedding_vendor_follow_up_reschedule_http),
+        )
 }

@@ -105,6 +105,7 @@ test("server evidence flows from search sources into ranked comparison cards", a
   assert.match(redleaf?.confidenceLabel ?? "", / confidence$/);
   assert.equal(redleaf?.weddingPlanId, "wedding_plan:harbour");
   assert.deepEqual(redleaf?.unknownConstraints, []);
+  assert.ok(!redleaf?.feedbackReasonIds?.includes("too_big"), "size feedback is hidden unless the couple asked for an intimate or small venue");
 
   assert.equal(peterson?.group, "verify");
   assert.equal(peterson?.availabilityLabel, "Awaiting reply");

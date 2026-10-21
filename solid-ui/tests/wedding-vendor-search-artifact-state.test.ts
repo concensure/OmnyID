@@ -276,7 +276,7 @@ test("buildWeddingVendorComparisonArtifactState ranks top three vendor choices w
     "Location context: Sydney",
   ]);
   assert.equal(recommendationHandoff.confidenceLabel, "Confidence: low");
-  assert.match(String(recommendationHandoff.nextActionLabel), /Check availability with Harbour Studio/i);
+  assert.match(String(recommendationHandoff.nextActionLabel), /Reach out to Harbour Studio/i);
   assert.deepEqual(
     (comparisonMetadata.vendorComparisonNextActions as Array<Record<string, unknown>>)[0]?.kind,
     "check_availability",

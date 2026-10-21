@@ -54,7 +54,7 @@ for (const viewport of [{ width: 360, height: 740 }, { width: 1280, height: 800 
   test(`vendor loop is durable, readable, and accessible at ${viewport.width}px`, async ({ page }) => {
     await page.setViewportSize(viewport);
     await openCleanFixture(page);
-    const primary = page.getByRole("button", { name: "Check availability" });
+    const primary = page.getByRole("button", { name: "Reach out" });
     const website = page.getByRole("link", { name: "Website", exact: true });
     await expect(primary).toBeVisible();
     await expect(website).toBeVisible();
@@ -63,7 +63,8 @@ for (const viewport of [{ width: 360, height: 740 }, { width: 1280, height: 800 
       primary.evaluate((element) => getComputedStyle(element).color),
       website.evaluate((element) => getComputedStyle(element).color),
     ]);
-    expect(primaryColor).toBe(websiteColor);
+    expect(primaryColor).toBe("rgb(250, 247, 242)");
+    expect(websiteColor).toBe("rgb(31, 26, 23)");
     await assertAccessible(page);
     await assertActionContrastAndTargets(page);
 

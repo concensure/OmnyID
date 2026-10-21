@@ -9,7 +9,8 @@ function read(path: string): string {
 
 test("named vendor lookups retain an exact local directory pass without intake or provider gating", () => {
   const source = read("src/components/ResponseQueueView.tsx");
-  assert.match(source, /const directoryLookupOnly = Boolean\(freeformQuery\)/);
+  assert.match(source, /const queryIntent = weddingVendorQueryIntent\(freeformQuery\)/);
+  assert.match(source, /const directoryLookupOnly = Boolean\(freeformQuery && queryIntent\.exactNameLookup\)/);
   assert.match(source, /if \(!directoryLookupOnly && liveWorkflowReadiness\.status === "blocked"\)/);
   assert.match(source, /if \(!directoryLookupOnly && readiness\.status === "blocked"\)/);
   assert.match(source, /canRunOnlineFallback: !directoryLookupOnly && configuredProviderKinds\.length > 0/);

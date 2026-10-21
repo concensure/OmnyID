@@ -135,6 +135,7 @@ export type WeddingVendorRankedCandidate = {
   id: string;
   rank: number;
   title: string;
+  category?: string | null;
   provider: string;
   url: string;
   websiteUrl: string | null;
@@ -523,6 +524,21 @@ function isVenue(source: WeddingVendorRankingSource, context: RankingContext): b
   return context.singleVenueSearch;
 }
 
+function categoryKey(value: string): string {
+  const category = clean(value).toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+  if (["venue", "venues", "wedding_venue"].includes(category)) return "venue";
+  if (["photographer", "photographers", "photography"].includes(category)) return "photographer";
+  if (["florist", "floral_designer", "flowers"].includes(category)) return "floral_designer";
+  if (["celebrant", "officiant"].includes(category)) return "officiant";
+  if (["dj", "music", "band"].includes(category)) return "band";
+  return category;
+}
+
+const KNOWN_CATEGORY_KEYS = new Set([
+  "venue", "photographer", "videographer", "floral_designer", "caterer", "officiant",
+  "band", "cake_baker", "hair_stylist", "makeup_artist", "planner",
+]);
+
 // ---------------------------------------------------------------------------------------------
 // Stage 1: eligibility
 // ---------------------------------------------------------------------------------------------
@@ -541,6 +557,12 @@ function evaluateEligibility(source: WeddingVendorRankingSource, venue: boolean,
   const failReasons: string[] = [];
   const unknownConstraints: HardConstraint[] = [];
   const riskFlags: string[] = [];
+
+  const requestedCategories = new Set((context.requirements.vendorCategories ?? []).map(categoryKey).filter(Boolean));
+  const sourceCategory = categoryKey(clean(source.category));
+  if (KNOWN_CATEGORY_KEYS.has(sourceCategory) && requestedCategories.size > 0 && !requestedCategories.has(sourceCategory)) {
+    failReasons.push(`category is ${sourceCategory.replaceAll("_", " ")}, not ${[...requestedCategories].join(" or ").replaceAll("_", " ")}`);
+  }
 
   if (source.source_kind === "listicle" || source.source_kind === "editorial") {
     failReasons.push("not a vendor page (directory or article)");
@@ -801,6 +823,7 @@ function rankCandidate(
     id: source.id,
     rank: 0,
     title: source.title,
+    category: clean(source.category) || null,
     provider: source.provider,
     url: source.url,
     websiteUrl: source.websiteUrl,
@@ -871,7 +894,7 @@ function buildNextActions(
       kind: "check_availability",
       vendorId: candidate.vendorId,
       choiceId: candidate.id,
-      label: `Check availability with ${candidate.title}`,
+      label: `Reach out to ${candidate.title}`,
       reason: `${candidate.fitLabel}; ${candidate.availabilityLabel.toLowerCase()}`,
     }));
   const confirm = live

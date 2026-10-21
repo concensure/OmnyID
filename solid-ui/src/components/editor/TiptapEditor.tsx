@@ -712,7 +712,7 @@ export function TiptapEditor(props: TiptapEditorProps) {
           const storage = editor.storage.characterCount;
           if (storage) setCharCount(storage.characters());
         }
-        props.onChange?.(editor.getText(), tiptapToMarkdown(editor.getJSON()));
+        props.onChange?.(editor.getText(), tiptapToMarkdown(editor.getJSON()), sanitizeEmailHtml(editor.getHTML()));
 
         // ── /persona slash command detection ──────────────────────────
         const nextSlashMenu = slashCommandsEnabled() ? detectSlashMenuState(editor) : null;
