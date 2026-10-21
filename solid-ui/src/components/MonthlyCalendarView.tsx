@@ -5,7 +5,6 @@ import {
   deleteCalendarEvent,
   disconnectGoogleCalendar,
   fetchBacklinksForMessage,
-  fetchGoogleCalendarOAuthConfig,
   fetchGoogleCalendarOAuthUrl,
   fetchGoogleCalendarStatus,
   listCalendarEvents,
@@ -14,7 +13,6 @@ import {
   type BacklinkItem,
   type CalendarEvent,
   type DashboardBootstrap,
-  type GoogleCalendarOAuthConfig,
 } from "@/lib/api";
 import { type GoogleCalendarConnectionStatus } from "@/lib/googleCalendarConnectionState";
 import { WeddingNavigationArrivalBanner } from "@/components/WeddingNavigationArrivalBanner";
@@ -485,7 +483,6 @@ export function MonthlyCalendarView(props: {
   const [addingDate, setAddingDate] = createSignal<Date | null>(null);
   const [weddingNavigationIntent, setWeddingNavigationIntent] = createSignal<ReturnType<typeof consumeWeddingNavigationIntent>>(null);
   const [googleCalendarStatus, setGoogleCalendarStatus] = createSignal<GoogleCalendarConnectionStatus | null>(null);
-  const [googleCalendarOAuthConfig, setGoogleCalendarOAuthConfig] = createSignal<GoogleCalendarOAuthConfig | null>(null);
   const [googleCalendarBusy, setGoogleCalendarBusy] = createSignal(false);
   const [googleCalendarNotice, setGoogleCalendarNotice] = createSignal<string | null>(null);
   const [compactViewport, setCompactViewport] = createSignal(false);
@@ -494,15 +491,6 @@ export function MonthlyCalendarView(props: {
   const weddingArrivalBanner = createMemo(() =>
     buildWeddingNavigationArrivalBannerState(weddingNavigationIntent()),
   );
-  const googleCalendarSetupMissing = createMemo(() => {
-    const config = googleCalendarOAuthConfig();
-    const missing: string[] = [];
-    if (config && !config.clientIdConfigured) missing.push("OAuth client ID");
-    if (config && !config.clientSecretConfigured) missing.push("OAuth client secret");
-    if (config && !config.homeserverUrlConfigured) missing.push("homeserver URL");
-    if (config && !config.csrfSecretConfigured) missing.push("OAuth state secret");
-    return missing;
-  });
 
   async function loadEvents() {
     setLoading(true);
@@ -525,14 +513,6 @@ export function MonthlyCalendarView(props: {
     }
   }
 
-  async function loadGoogleCalendarOAuthConfig() {
-    try {
-      setGoogleCalendarOAuthConfig(await fetchGoogleCalendarOAuthConfig());
-    } catch {
-      setGoogleCalendarOAuthConfig(null);
-    }
-  }
-
   async function connectGoogleCalendar() {
     if (googleCalendarBusy()) return;
     setGoogleCalendarBusy(true);
@@ -540,18 +520,8 @@ export function MonthlyCalendarView(props: {
     try {
       const url = await fetchGoogleCalendarOAuthUrl();
       window.location.assign(url);
-    } catch (err) {
-      try {
-        const config = await fetchGoogleCalendarOAuthConfig();
-        setGoogleCalendarOAuthConfig(config);
-        const redirect = config.requiredAuthorizedRedirectUri ?? config.redirectUri;
-        const setupHint = redirect
-          ? ` Google Cloud must authorize this redirect URI: ${redirect}.`
-          : "";
-        setGoogleCalendarNotice(`${err instanceof Error ? err.message : "Could not start Google Calendar connection."}${setupHint}`);
-      } catch {
-        setGoogleCalendarNotice(err instanceof Error ? err.message : "Could not start Google Calendar connection.");
-      }
+    } catch {
+      setGoogleCalendarNotice("Google Calendar couldn't connect just now. You can keep using the wedding calendar and try again later.");
       setGoogleCalendarBusy(false);
     }
   }
@@ -564,8 +534,8 @@ export function MonthlyCalendarView(props: {
       const result = await syncGoogleCalendar();
       setGoogleCalendarNotice(`Synced ${result.synced_count} event${result.synced_count === 1 ? "" : "s"} from Google Calendar.`);
       await loadEvents();
-    } catch (err) {
-      setGoogleCalendarNotice(err instanceof Error ? err.message : "Google Calendar sync failed.");
+    } catch {
+      setGoogleCalendarNotice("Google Calendar couldn't sync just now. Your saved wedding dates are still here.");
     } finally {
       setGoogleCalendarBusy(false);
     }
@@ -578,8 +548,8 @@ export function MonthlyCalendarView(props: {
     try {
       await disconnectGoogleCalendar();
       await loadGoogleCalendarStatus();
-    } catch (err) {
-      setGoogleCalendarNotice(err instanceof Error ? err.message : "Could not disconnect Google Calendar.");
+    } catch {
+      setGoogleCalendarNotice("Google Calendar couldn't disconnect just now. Try again in a moment.");
     } finally {
       setGoogleCalendarBusy(false);
     }
@@ -590,7 +560,6 @@ export function MonthlyCalendarView(props: {
     if (weddingIntent?.view === "calendar") setWeddingNavigationIntent(weddingIntent);
     void loadEvents();
     void loadGoogleCalendarStatus();
-    void loadGoogleCalendarOAuthConfig();
     const syncTimer = window.setInterval(() => {
       if (googleCalendarStatus()?.connected && !googleCalendarStatus()?.token_expired && !googleCalendarBusy()) {
         void syncGoogleCalendarNow();
@@ -960,21 +929,9 @@ export function MonthlyCalendarView(props: {
             <p style={{ margin: 0, "font-size": "0.85em", color: TOKEN.textSecondary }}>
               Google Calendar is not ready on this server yet.
             </p>
-            <Show when={googleCalendarSetupMissing().length > 0}>
-              <p style={{ margin: 0, "font-size": "0.72em", color: TOKEN.textSecondary }}>
-                Missing setup: {googleCalendarSetupMissing().join(", ")}.
-              </p>
-            </Show>
-            <Show when={googleCalendarOAuthConfig()?.requiredAuthorizedRedirectUri}>
-              {(redirectUri) => (
-                <p style={{ margin: 0, "font-size": "0.72em", color: TOKEN.textSecondary, "word-break": "break-word" }}>
-                  Authorized redirect URI: {redirectUri()}
-                  <Show when={googleCalendarOAuthConfig()?.oauthClientSource}>
-                    {(source) => <> | OAuth client: {source().replace(/_/g, " ")}</>}
-                  </Show>
-                </p>
-              )}
-            </Show>
+            <p style={{ margin: 0, "font-size": "0.72em", color: TOKEN.textSecondary }}>
+              You can still use this calendar without connecting Google Calendar.
+            </p>
           </div>
         </Show>
         <Show when={googleCalendarStatus()?.configured && !googleCalendarStatus()?.connected}>
@@ -995,16 +952,9 @@ export function MonthlyCalendarView(props: {
               <p style={{ margin: 0, "font-size": "0.85em", color: TOKEN.textSecondary }}>
                 Connect Google Calendar to see your Google events here.
               </p>
-              <Show when={googleCalendarOAuthConfig()?.requiredAuthorizedRedirectUri}>
-                {(redirectUri) => (
-                  <p style={{ margin: 0, "font-size": "0.72em", color: TOKEN.textSecondary, "word-break": "break-word" }}>
-                    Authorized redirect URI: {redirectUri()}
-                    <Show when={googleCalendarOAuthConfig()?.oauthClientSource}>
-                      {(source) => <> | OAuth client: {source().replace(/_/g, " ")}</>}
-                    </Show>
-                  </p>
-                )}
-              </Show>
+              <p style={{ margin: 0, "font-size": "0.72em", color: TOKEN.textSecondary }}>
+                Connecting is optional and can be changed later.
+              </p>
             </div>
             <button
               type="button"
@@ -1020,7 +970,8 @@ export function MonthlyCalendarView(props: {
                 "font-size": "0.8em",
                 "font-weight": 600,
                 opacity: googleCalendarBusy() ? 0.6 : 1,
-                "white-space": "nowrap",
+                "white-space": "normal",
+                "min-height": "44px",
               }}
             >
               {googleCalendarBusy() ? "Connecting…" : "Connect Google Calendar"}
@@ -1197,7 +1148,7 @@ export function MonthlyCalendarView(props: {
                 {viewMode() === "month" ? "Month grid" : `${viewMode()} preview`}
               </p>
               <p style={{ margin: "0.35em 0 0", "font-size": "0.92em", color: TOKEN.textSecondary }}>
-                Clean line items only. The Knowledge Curator keeps raw AFP threads in the context panel.
+                Review dates and tasks here. Open an item to see its saved details.
               </p>
             </div>
             <div style={{ display: "flex", gap: "0.5em", "flex-wrap": "wrap" }}>

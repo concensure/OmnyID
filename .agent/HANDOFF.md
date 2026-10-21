@@ -4341,3 +4341,40 @@ Unresolved / next:
   judge before ranking policy V2 can meet its existing rollout criteria.
 - The nine WED-240 ideal-agent human dimensions and WED-225/WED-226 gates remain independently blocked.
   No feature flag was enabled and no Oracle or provider mutation was performed in this slice.
+
+## 2026-10-22 - WED-245 current wedding UX walkthrough remediation (Codex, review)
+
+Changed:
+
+- Audited all observations in the 2026-10-21 mobile production walkthrough against the current
+  WED-215 implementation. The disposition record is
+  `Documents/verification/wedding-ux-walkthrough-current-implementation-audit.md`.
+- Kept the user's outreach-failure exclusion and did not alter session persistence from a scripted
+  reload observation that is not reproduced by the current same-tab storage contract.
+- Removed generic onboarding, persona/customizer and Response Queue leaks from wedding entry; reduced
+  the wedding More sheet to relevant pages while retaining the existing five-tab mobile navigation.
+- Made wizard navigation persist progress, made completion duplicate-safe, improved step hierarchy,
+  auth/session/verification/error copy, zero-result guidance, dismissal recovery, decision labels,
+  document filters/refresh state and Calendar diagnostics.
+- Migrated owned intake, timeline and leading budget surfaces to wedding brand tokens and 8-12px
+  radii, and prevented the dedicated wedding landing wordmark from shrinking at phone widths.
+- No AFP/A2UI contract, Rust API, provider authority, source data, Oracle runtime or rollout flag
+  changed. The shared generic Calendar palette remains unchanged pending an explicit theme input.
+
+Verification:
+
+- `npm run typecheck` passed.
+- 28 focused session, error, wedding copy, document-label and outreach/source tests passed.
+- `npm run test:line-budget` and `npm run test:wedding-site` passed.
+- `npm run test:wedding` passed all 1,945 tests after updating the decision-card source contract to
+  preserve its three-reason bound while filtering a duplicated explanation.
+- `npx playwright test tests/e2e/wedding-home-genz-ui.spec.ts --config playwright.config.ts` passed
+  at 320, 390 and 1280 CSS pixels.
+- `npm run build` passed. Only inherited Tailwind object-screen and Vite chunk-size advisories remain.
+
+Next:
+
+- Independent review should compare the current built UI, not the walkthrough's expected UI, with
+  special attention to wedding deep-link first-run state and a real mobile browser.
+- WED-225/WED-226 and policy-V2 remain blocked by their existing criteria. No deployment was requested
+  or performed for WED-245.

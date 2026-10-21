@@ -16,26 +16,21 @@ export function WeddingMobileMoreSheet(props: {
   open: boolean;
   onClose: () => void;
   onSelectMenu: (menu: WeddingWorkspaceMenuId) => void;
-  onOpenAllPages: () => void;
 }) {
   const groups: readonly { label: string; items: readonly MoreItem[] }[] = [
     { label: "Planning", items: [
       { label: "Guests", icon: "users", menu: "guests" },
       { label: "Seating", icon: "table-cells", menu: "seating" },
       { label: "Plan", icon: "calendar-days", menu: "plan" },
-      { label: "Helpers", icon: "user-plus", menu: "helpers" },
-      { label: "People", icon: "users", menu: "people" },
+      { label: "Helpers", icon: "check-circle", menu: "helpers" },
+      { label: "People", icon: "user-plus", menu: "people" },
     ] },
     { label: "Ideas", items: [
       { label: "Vision", icon: "shield-check", menu: "vision" },
-      { label: "Inspiration", icon: "shield-check", menu: "inspiration" },
+      { label: "Inspiration", icon: "search", menu: "inspiration" },
     ] },
     { label: "Files", items: [
       { label: "Documents", icon: "table-cells", menu: "documents" },
-    ] },
-    { label: "OmnyID", items: [
-      { label: "All pages", icon: "users", onSelect: props.onOpenAllPages },
-      { label: "Advanced", icon: "shield-check", menu: "advanced" },
     ] },
   ];
 

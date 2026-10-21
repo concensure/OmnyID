@@ -208,22 +208,22 @@ export function WeddingBudgetTrackerCard(props: {
   }
 
   return (
-    <div class="min-w-0 rounded-[24px] border border-emerald-100/80 bg-emerald-50/80 p-3 shadow-card phone:rounded-none phone:border-0 phone:bg-transparent phone:p-0 phone:shadow-none sm:rounded-[28px] sm:p-4">
+    <div class="min-w-0 rounded-xl border border-wedding-border bg-wedding-card p-3 text-wedding-ink shadow-wedding-card phone:rounded-none phone:border-0 phone:bg-transparent phone:p-0 phone:shadow-none sm:p-4">
       <div class="flex items-start justify-between gap-2">
         <div class="flex items-center gap-2">
           <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white" style="background-color: #B45309" aria-hidden="true">
             <WeddingDashboardIcon id="banknotes" class="h-4 w-4" />
           </span>
-          <p class="text-lg font-bold tracking-tight text-emerald-950">Budget</p>
-          <WeddingInfoTip title="Budget guide" tone="emerald">
+          <p class="font-display text-lg font-semibold tracking-tight text-wedding-ink">Budget</p>
+          <WeddingInfoTip title="Budget guide" tone="stone">
             These are planning ranges, not quotes. Costs change by location, season, guest count, venue rules, and whether tax, service fees, delivery, and gratuity are included.
           </WeddingInfoTip>
         </div>
-        <span class="max-w-full break-words rounded-full bg-white/80 px-2 py-1 text-xs font-semibold text-emerald-900">
+        <span class="max-w-full break-words rounded-lg bg-wedding-slate px-2 py-1 text-xs font-semibold text-wedding-ink/75">
           {props.state.lineItems.length} selected
         </span>
       </div>
-      <p class="mt-2 text-sm leading-6 text-emerald-900/75">{props.state.summaryLabel}</p>
+      <p class="mt-2 text-sm leading-6 text-wedding-ink/75">{props.state.summaryLabel}</p>
       <Show when={props.state.insights.missingContextLabels.length > 0}>
         <div class="mt-3 rounded-2xl border border-amber-100 bg-amber-50/80 px-3 py-2">
           <p class="text-xs font-semibold text-amber-950">Details needed</p>
@@ -232,21 +232,21 @@ export function WeddingBudgetTrackerCard(props: {
           </p>
         </div>
       </Show>
-      <div class="mt-3 rounded-2xl border border-slate-200 bg-white px-2.5 py-2">
-        <p class="text-xs font-semibold text-emerald-950/65">Budget target</p>
-        <p class="mt-1 text-sm leading-6 text-emerald-950/75">{props.state.budgetStatusLabel}</p>
+      <div class="mt-3 rounded-xl border border-wedding-border bg-white px-2.5 py-2">
+        <p class="text-xs font-semibold text-wedding-ink/65">Budget target</p>
+        <p class="mt-1 text-sm leading-6 text-wedding-ink/75">{props.state.budgetStatusLabel}</p>
         <Show when={props.state.budgetTargetAmount !== null}>
           <div class="mt-2">
-            <p class="text-xs leading-5 text-emerald-900/65">
+            <p class="text-xs leading-5 text-wedding-ink/65">
               Target {moneyLabel(props.state.budgetTargetAmount ?? 0, currency)}
               <Show when={props.state.budgetUtilizationPercent !== null}>
                 {" "}- {props.state.budgetUtilizationPercent}% used by selected vendors
               </Show>
             </p>
             <Show when={props.state.budgetUtilizationPercent !== null}>
-              <div class="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-emerald-100">
+              <div class="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-wedding-slate">
                 <div
-                  class={`h-full rounded-full transition-all ${(props.state.budgetUtilizationPercent ?? 0) > 100 ? "bg-rose-500" : "bg-emerald-600"}`}
+                  class={`h-full rounded-full transition-all ${(props.state.budgetUtilizationPercent ?? 0) > 100 ? "bg-rose-500" : "bg-wedding-primary"}`}
                   style={`width: ${Math.min(100, props.state.budgetUtilizationPercent ?? 0)}%`}
                 />
               </div>
@@ -256,21 +256,21 @@ export function WeddingBudgetTrackerCard(props: {
       </div>
 
       <div class="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-6">
-        <div class="rounded-2xl border border-slate-200 bg-white px-2.5 py-2">
-          <p class="text-xs font-semibold text-emerald-950/65">Committed</p>
-          <p class="mt-1 break-words text-lg font-semibold text-emerald-950">{moneyLabel(props.state.insights.committedAmount, currency)}</p>
+        <div class="rounded-xl border border-wedding-border bg-white px-2.5 py-2">
+          <p class="text-xs font-semibold text-wedding-ink/65">Committed</p>
+          <p class="mt-1 break-words text-lg font-semibold text-wedding-ink">{moneyLabel(props.state.insights.committedAmount, currency)}</p>
         </div>
-        <div class="rounded-2xl border border-slate-200 bg-white px-2.5 py-2">
-          <p class="text-xs font-semibold text-emerald-950/65">Estimated</p>
-          <p class="mt-1 break-words text-lg font-semibold text-emerald-950">{moneyLabel(props.state.insights.estimatedAmount, currency)}</p>
+        <div class="rounded-xl border border-wedding-border bg-white px-2.5 py-2">
+          <p class="text-xs font-semibold text-wedding-ink/65">Estimated</p>
+          <p class="mt-1 break-words text-lg font-semibold text-wedding-ink">{moneyLabel(props.state.insights.estimatedAmount, currency)}</p>
         </div>
-        <div class="rounded-2xl border border-slate-200 bg-white px-2.5 py-2">
-          <p class="text-xs font-semibold text-emerald-950/65">Paid</p>
-          <p class="mt-1 break-words text-lg font-semibold text-emerald-950">{moneyLabel(props.state.insights.paidAmount, currency)}</p>
+        <div class="rounded-xl border border-wedding-border bg-white px-2.5 py-2">
+          <p class="text-xs font-semibold text-wedding-ink/65">Paid</p>
+          <p class="mt-1 break-words text-lg font-semibold text-wedding-ink">{moneyLabel(props.state.insights.paidAmount, currency)}</p>
         </div>
-        <div class="rounded-2xl border border-slate-200 bg-white px-2.5 py-2">
-          <p class="text-xs font-semibold text-emerald-950/65">Remaining</p>
-          <p class="mt-1 break-words text-lg font-semibold text-emerald-950">
+        <div class="rounded-xl border border-wedding-border bg-white px-2.5 py-2">
+          <p class="text-xs font-semibold text-wedding-ink/65">Remaining</p>
+          <p class="mt-1 break-words text-lg font-semibold text-wedding-ink">
             {props.state.insights.remainingAmount === null ? "Set budget" : moneyLabel(props.state.insights.remainingAmount, currency)}
           </p>
         </div>
@@ -284,19 +284,19 @@ export function WeddingBudgetTrackerCard(props: {
         </div>
       </div>
 
-      <div class="mt-3 rounded-2xl border border-slate-200 bg-white p-3">
-        <p class="text-sm font-semibold text-emerald-950">Set your budget</p>
-        <p class="mt-1 text-xs leading-5 text-emerald-900/70">
+      <div class="mt-3 rounded-xl border border-wedding-border bg-white p-3">
+        <p class="text-sm font-semibold text-wedding-ink">Set your budget</p>
+        <p class="mt-1 text-xs leading-5 text-wedding-ink/70">
           Set an overall figure, then split it across categories. "Stationery, Transport & Other" automatically absorbs whatever's left, so the total always stays balanced.
         </p>
-        <label class="mt-3 block text-xs font-semibold text-emerald-950">
+        <label class="mt-3 block text-xs font-semibold text-wedding-ink">
           Total budget
           <input
             type="number"
             inputmode="numeric"
             min="0"
             step="100"
-            class="mt-1 w-full min-h-11 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-emerald-950 outline-none focus:border-emerald-300"
+            class="mt-1 min-h-11 w-full rounded-lg border border-wedding-border bg-white px-3 py-2 text-sm font-normal text-wedding-ink outline-none focus:border-wedding-primary"
             value={draft().totalAmount || ""}
             placeholder="0"
             onInput={(event) => setTotalAmount(Number(event.currentTarget.value))}
@@ -308,16 +308,16 @@ export function WeddingBudgetTrackerCard(props: {
               const amount = () => draft().categoryAmounts[category.id];
               const sliderMax = () => Math.max(draft().totalAmount, amount(), 1);
               return (
-                <div class="rounded-2xl border border-emerald-100 bg-emerald-50/50 px-3 py-2.5 phone:rounded-none phone:border-0 phone:border-t phone:bg-transparent phone:px-0">
+                <div class="rounded-xl border border-wedding-border bg-wedding-page px-3 py-2.5 phone:rounded-none phone:border-0 phone:border-t phone:bg-transparent phone:px-0">
                   <div class="flex items-center justify-between gap-2">
-                    <span class="flex min-w-0 items-center gap-1.5 text-xs font-semibold text-emerald-950">
+                    <span class="flex min-w-0 items-center gap-1.5 text-xs font-semibold text-wedding-ink">
                       <span class="min-w-0 break-words">
                         {category.label}
                         <Show when={category.id === "other_misc"}>
-                          {" "}<span class="font-normal text-emerald-900/60">(auto-balances)</span>
+                          {" "}<span class="font-normal text-wedding-ink/60">(auto-balances)</span>
                         </Show>
                       </span>
-                      <WeddingInfoTip title={`${category.label} guide`} tone="emerald">
+                      <WeddingInfoTip title={`${category.label} guide`} tone="stone">
                         {(() => {
                           const guidance = buildWeddingBudgetCategoryGuidanceLabel({
                             categoryId: category.id,
@@ -329,7 +329,7 @@ export function WeddingBudgetTrackerCard(props: {
                         })()}
                       </WeddingInfoTip>
                     </span>
-                    <span class="shrink-0 text-xs font-semibold text-emerald-950">{moneyLabel(amount(), draft().currency)}</span>
+                    <span class="shrink-0 text-xs font-semibold text-wedding-ink">{moneyLabel(amount(), draft().currency)}</span>
                   </div>
                   <input
                     type="range"
@@ -338,7 +338,7 @@ export function WeddingBudgetTrackerCard(props: {
                     step="100"
                     value={amount()}
                     aria-label={`${category.label} amount`}
-                    class="mt-2 w-full accent-emerald-700"
+                    class="mt-2 w-full accent-wedding-primary"
                     onInput={(event) => setCategoryAmount(category.id, Number(event.currentTarget.value))}
                   />
                   <input
@@ -349,7 +349,7 @@ export function WeddingBudgetTrackerCard(props: {
                     value={amount() || ""}
                     placeholder="0"
                     aria-label={`${category.label} exact amount`}
-                    class="mt-2 w-full min-h-11 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-normal text-emerald-950 outline-none focus:border-emerald-300"
+                    class="mt-2 min-h-11 w-full rounded-lg border border-wedding-border bg-white px-3 py-1.5 text-sm font-normal text-wedding-ink outline-none focus:border-wedding-primary"
                     onInput={(event) => setCategoryAmount(category.id, Number(event.currentTarget.value))}
                   />
                 </div>
@@ -375,7 +375,7 @@ export function WeddingBudgetTrackerCard(props: {
           type="button"
           disabled={!saveState().canSave}
           onClick={() => void saveAllocation()}
-          class="mt-3 w-full rounded-full bg-emerald-900 px-4 py-2.5 text-sm font-semibold text-white shadow-card transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-emerald-300 sm:w-auto sm:py-2 phone:min-h-12"
+          class="mt-3 min-h-11 w-full rounded-lg bg-wedding-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-wedding-primary/90 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:py-2"
         >
           {saving() ? "Saving..." : "Save budget"}
         </button>

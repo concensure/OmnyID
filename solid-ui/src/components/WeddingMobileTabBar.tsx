@@ -1,7 +1,6 @@
 import { For, createSignal, onCleanup, onMount } from "solid-js";
 import { WeddingDashboardIcon } from "@/components/WeddingDashboardIcons";
 import { WeddingMobileMoreSheet } from "@/components/WeddingMobileMoreSheet";
-import { setMobileFocusMenuOpen } from "@/lib/mobileFocusHomeState";
 import { WEDDING_MOBILE_TABS, weddingMobileTabForMenu } from "@/lib/weddingMobileTabState";
 import type { WeddingWorkspaceMenuId } from "@/lib/weddingWorkspaceMenuState";
 
@@ -66,7 +65,6 @@ export function WeddingMobileTabBar(props: {
         open={moreOpen()}
         onClose={() => setMoreOpen(false)}
         onSelectMenu={props.onSelectMenu}
-        onOpenAllPages={() => setMobileFocusMenuOpen(true)}
       />
     </>
   );

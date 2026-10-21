@@ -15,7 +15,7 @@ import {
   weddingTimelineSidebarAction,
 } from "@/lib/weddingWorkspaceSidebarActionState";
 
-const ROW_ACTION_CLASS = "min-h-11 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-indigo-950 transition hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-45";
+const ROW_ACTION_CLASS = "min-h-11 rounded-lg border border-wedding-border bg-white px-3 text-xs font-semibold text-wedding-secondary transition hover:bg-wedding-slate disabled:cursor-not-allowed disabled:opacity-45";
 
 export function WeddingTimelinePanel(props: {
   state: WeddingResponseWorkspaceViewState;
@@ -82,24 +82,24 @@ export function WeddingTimelinePanel(props: {
   }
 
   return (
-    <div class="min-w-0 rounded-[24px] border border-indigo-100/80 bg-indigo-50/80 p-3 shadow-card phone:rounded-none phone:border-0 phone:bg-transparent phone:p-0 phone:shadow-none sm:rounded-[28px] sm:p-4">
+    <div class="min-w-0 rounded-xl border border-wedding-border bg-wedding-card p-3 text-wedding-ink shadow-wedding-card phone:rounded-none phone:border-0 phone:bg-transparent phone:p-0 phone:shadow-none sm:p-4">
       <div class="flex items-start justify-between gap-2">
         <div class="min-w-0">
           <div class="flex items-center gap-2">
-            <p class="text-base font-semibold text-indigo-950">Timeline</p>
-            <WeddingInfoTip title="Timeline tip" tone="indigo">
+            <p class="text-base font-semibold text-wedding-ink">Timeline</p>
+            <WeddingInfoTip title="Timeline tip" tone="stone">
               Put legal deadlines, payment due dates, and vendor lock-in dates on the calendar. If a date is still uncertain, keep it as a task until it is confirmed.
             </WeddingInfoTip>
           </div>
         </div>
-        <span class="max-w-full break-words rounded-full bg-white/80 px-2 py-1 text-xs font-semibold text-indigo-900">
+        <span class="max-w-full break-words rounded-lg bg-wedding-slate px-2 py-1 text-xs font-semibold text-wedding-ink/75">
           {props.state.ganttTimeline.rows.length} dated item{props.state.ganttTimeline.rows.length === 1 ? "" : "s"}
         </span>
       </div>
       <div class="mt-3 flex flex-wrap gap-2">
         <button
           type="button"
-          class="min-h-11 flex-1 rounded-lg bg-indigo-900 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-950 sm:flex-none"
+          class="min-h-11 flex-1 rounded-lg bg-wedding-primary px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-wedding-primary/90 sm:flex-none"
           data-magic-action="open"
           data-magic-icon="calendar"
           data-magic-label={props.state.ganttTimeline.rows.length > 0 ? "Open wedding calendar" : "Add task dates"}
@@ -110,7 +110,7 @@ export function WeddingTimelinePanel(props: {
         </button>
         <button
           type="button"
-          class="min-h-11 flex-1 rounded-lg border border-indigo-200 bg-white px-4 text-sm font-semibold text-indigo-950 transition hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-45 sm:flex-none"
+          class="min-h-11 flex-1 rounded-lg border border-wedding-secondary bg-white px-4 text-sm font-semibold text-wedding-secondary transition hover:bg-wedding-slate disabled:cursor-not-allowed disabled:opacity-45 sm:flex-none"
           data-magic-action="open"
           data-magic-icon="tasks"
           data-magic-label="Open wedding tasks"
@@ -122,7 +122,7 @@ export function WeddingTimelinePanel(props: {
         <Show when={props.state.ganttTimeline.rows.length > 0}>
           <button
             type="button"
-            class="min-h-11 flex-1 rounded-lg border border-indigo-200 bg-white px-4 text-sm font-semibold text-indigo-950 transition hover:bg-indigo-50 sm:flex-none"
+            class="min-h-11 flex-1 rounded-lg border border-wedding-secondary bg-white px-4 text-sm font-semibold text-wedding-secondary transition hover:bg-wedding-slate sm:flex-none"
             aria-pressed={showGantt()}
             data-magic-action="toggle"
             data-magic-icon="timeline"
@@ -135,16 +135,16 @@ export function WeddingTimelinePanel(props: {
         </Show>
       </div>
       <div class="mt-3 flex gap-2 overflow-x-auto phone:flex sm:hidden">
-        <For each={["all", "upcoming", "completed"] as const}>{(filter) => <button type="button" onClick={() => setMobileFilter(filter)} class={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold ${mobileFilter() === filter ? "border-indigo-700 bg-indigo-700 text-white" : "border-indigo-200 bg-white text-indigo-950"}`}>{filter === "all" ? `All (${props.state.ganttTimeline.rows.length})` : filter[0].toUpperCase() + filter.slice(1)}</button>}</For>
+        <For each={["all", "upcoming", "completed"] as const}>{(filter) => <button type="button" onClick={() => setMobileFilter(filter)} class={`shrink-0 rounded-lg border px-3 py-1.5 text-xs font-semibold ${mobileFilter() === filter ? "border-wedding-primary bg-wedding-primary text-white" : "border-wedding-border bg-white text-wedding-ink"}`}>{filter === "all" ? `All (${props.state.ganttTimeline.rows.length})` : filter[0].toUpperCase() + filter.slice(1)}</button>}</For>
       </div>
       <Show when={visibleUndatedItems().length > 0}>
         <div class="mt-3 rounded-2xl border border-slate-200 bg-white p-3 phone:rounded-none phone:border-0 phone:bg-transparent phone:px-0">
           <div class="flex flex-wrap items-center justify-between gap-2">
-            <p class="text-xs font-semibold text-indigo-950/70">Done or no-date items</p>
+            <p class="text-xs font-semibold text-wedding-ink/70">Done or no-date items</p>
             <button
               type="button"
               disabled={!props.onOpenSavedOutputs}
-              class="min-h-11 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-indigo-950 transition hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-45"
+              class={ROW_ACTION_CLASS}
               onClick={() => props.onOpenSavedOutputs?.()}
             >
               All files
@@ -158,7 +158,7 @@ export function WeddingTimelinePanel(props: {
                   <li class="rounded-xl border border-slate-200 bg-white px-3 py-2 phone:rounded-none phone:border-0 phone:border-t phone:px-0">
                     <button
                       type="button"
-                      class="min-h-11 w-full text-left text-sm font-semibold text-indigo-950"
+                      class="min-h-11 w-full text-left text-sm font-semibold text-wedding-ink"
                       data-magic-action="open"
                       data-magic-icon={item.linkedArtifactId ? "source" : "task"}
                       data-magic-label={`Open ${item.title}`}
@@ -169,7 +169,7 @@ export function WeddingTimelinePanel(props: {
                     >
                       {item.title}
                     </button>
-                    <p class="text-xs text-indigo-950/65">{item.categoryLabel}</p>
+                    <p class="text-xs text-wedding-ink/65">{item.categoryLabel}</p>
                     <div class="mt-1 flex flex-wrap gap-2">
                       <button
                         type="button"
@@ -207,13 +207,13 @@ export function WeddingTimelinePanel(props: {
       </Show>
       <Show when={props.state.ganttTimeline.rows.length > 0} fallback={
         <div class="mt-3 rounded-2xl border border-slate-200 bg-white px-3 py-3">
-          <p class="text-sm font-semibold text-indigo-950">No dated timeline yet</p>
-          <p class="mt-1 text-sm leading-6 text-indigo-950/70">
+          <p class="text-sm font-semibold text-wedding-ink">No dated timeline yet</p>
+          <p class="mt-1 text-sm leading-6 text-wedding-ink/70">
             {props.state.ganttTimeline.blockerLabels[0] ?? "Add wedding tasks with dates, then they will appear here and in Calendar."}
           </p>
             <button
               type="button"
-              class="mt-3 min-h-11 w-full rounded-lg border border-indigo-200 bg-white px-4 text-sm font-semibold text-indigo-950 transition hover:bg-indigo-50 sm:w-auto"
+              class="mt-3 min-h-11 w-full rounded-lg border border-wedding-secondary bg-white px-4 text-sm font-semibold text-wedding-secondary transition hover:bg-wedding-slate sm:w-auto"
               data-magic-action="open"
               data-magic-icon="tasks"
               data-magic-label="Open Tasks"
@@ -227,15 +227,15 @@ export function WeddingTimelinePanel(props: {
         <div class="mt-3 rounded-2xl border border-slate-200 bg-white p-3 phone:rounded-none phone:border-0 phone:bg-transparent phone:px-0">
           <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
             <div class="min-w-0">
-              <p class="text-sm font-semibold text-indigo-950">Schedule chart</p>
-              <p class="text-xs leading-5 text-indigo-950/65">
+              <p class="text-sm font-semibold text-wedding-ink">Schedule chart</p>
+              <p class="text-xs leading-5 text-wedding-ink/65">
                 Each bar shows when the task starts and how long it lasts.
               </p>
             </div>
             <Show when={props.state.ganttTimeline.rows.length > 6}>
               <button
                 type="button"
-                class="min-h-11 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-indigo-950 transition hover:bg-indigo-50"
+                class={ROW_ACTION_CLASS}
                 data-magic-action="open"
                 data-magic-icon="expand"
                 data-magic-label={showAllRows() ? "Show less" : `Show all ${props.state.ganttTimeline.rows.length}`}
@@ -246,20 +246,20 @@ export function WeddingTimelinePanel(props: {
               </button>
             </Show>
           </div>
-          <Show when={showGantt()} fallback={<div class="relative space-y-2 before:absolute before:bottom-3 before:left-3 before:top-3 before:w-px before:bg-indigo-200">
+          <Show when={showGantt()} fallback={<div class="relative space-y-2 before:absolute before:bottom-3 before:left-3 before:top-3 before:w-px before:bg-wedding-border">
           <For each={visibleRows()}>
             {(row) => {
               const fileAction = fileActionFor(row.linkedArtifactId);
               return (
                 <article
-                  class="relative min-w-0 cursor-pointer pl-8 before:absolute before:left-1.5 before:top-2 before:h-3 before:w-3 before:rounded-full before:border-2 before:border-indigo-600 before:bg-white sm:cursor-default"
+                  class="relative min-w-0 cursor-pointer pl-8 before:absolute before:left-1.5 before:top-2 before:h-3 before:w-3 before:rounded-full before:border-2 before:border-wedding-primary before:bg-white sm:cursor-default"
                   onClick={(event) => openRowTaskOnMobile(event, row.id)}
                 >
                   <div class="mb-1 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
-                    <p class="min-w-0 break-words text-sm font-semibold text-indigo-950">{row.title}</p>
-                    <span class="shrink-0 text-xs font-semibold text-indigo-900/75">{row.startLabel}</span>
+                    <p class="min-w-0 break-words text-sm font-semibold text-wedding-ink">{row.title}</p>
+                    <span class="shrink-0 text-xs font-semibold text-wedding-ink/75">{row.startLabel}</span>
                   </div>
-                  <div class="h-3 rounded-full bg-indigo-100 ring-1 ring-inset ring-indigo-200/80">
+                  <div class="h-3 rounded-full bg-wedding-slate ring-1 ring-inset ring-wedding-border">
                     <div
                       class="h-3 rounded-full"
                       style={{
@@ -273,10 +273,10 @@ export function WeddingTimelinePanel(props: {
                       }}
                     />
                   </div>
-                  <p class="mt-1 break-words text-xs leading-5 text-indigo-950/65">
+                  <p class="mt-1 break-words text-xs leading-5 text-wedding-ink/65">
                     {row.categoryLabel} - {row.durationDays} day{row.durationDays === 1 ? "" : "s"} - {weddingTimelineStatusLabel(row.statusLabel)}
                   </p>
-                  <p class="mt-1 text-xs font-semibold text-indigo-900 sm:hidden">
+                  <p class="mt-1 text-xs font-semibold text-wedding-secondary sm:hidden">
                     {taskActionLabelFor(row.id, "Open task")}
                   </p>
                   <div class="mt-2 hidden flex-wrap gap-1.5 sm:flex">
@@ -323,13 +323,13 @@ export function WeddingTimelinePanel(props: {
             }}
           </For>
           </div>}>
-            <div class="overflow-x-auto rounded-xl border border-indigo-100 bg-white/80 p-3">
+            <div class="overflow-x-auto rounded-xl border border-wedding-border bg-white p-3">
               <div class="min-w-[600px] sm:min-w-[680px]">
-                <div class="grid grid-cols-[minmax(8rem,12rem)_1fr] gap-x-3 border-b border-indigo-100 pb-2 sm:grid-cols-[minmax(10rem,14rem)_1fr]">
-                  <p class="text-xs font-semibold uppercase tracking-wide text-indigo-950/65">All tasks</p>
+                <div class="grid grid-cols-[minmax(8rem,12rem)_1fr] gap-x-3 border-b border-wedding-border pb-2 sm:grid-cols-[minmax(10rem,14rem)_1fr]">
+                  <p class="text-xs font-semibold uppercase tracking-wide text-wedding-ink/65">All tasks</p>
                   <div class="relative h-8">
                     <For each={ganttAxisTicks()}>
-                      {(tick) => <span class="absolute top-0 text-xs font-semibold text-indigo-950/70" style={{ left: `${tick.offsetPercent}%`, transform: "translateX(-50%)" }}>{tick.label}</span>}
+                      {(tick) => <span class="absolute top-0 text-xs font-semibold text-wedding-ink/70" style={{ left: `${tick.offsetPercent}%`, transform: "translateX(-50%)" }}>{tick.label}</span>}
                     </For>
                   </div>
                 </div>
@@ -339,7 +339,7 @@ export function WeddingTimelinePanel(props: {
                       <div class="grid grid-cols-[minmax(8rem,12rem)_1fr] items-center gap-x-3 sm:grid-cols-[minmax(10rem,14rem)_1fr]">
                         <button
                           type="button"
-                          class="min-h-11 overflow-visible text-left text-xs font-semibold leading-4 text-indigo-950"
+                          class="min-h-11 overflow-visible text-left text-xs font-semibold leading-4 text-wedding-ink"
                           title={`View ${row.title} on the wedding calendar`}
                           onClick={() => props.onSidebarAction(weddingTimelineSidebarAction("open_calendar", props.state, row.id))}
                         >
@@ -347,7 +347,7 @@ export function WeddingTimelinePanel(props: {
                         </button>
                         <button
                           type="button"
-                          class="relative h-11 rounded bg-indigo-50/70 text-left"
+                          class="relative h-11 rounded-lg bg-wedding-slate text-left"
                           title={`${row.title}: ${row.startLabel} to ${row.endLabel}`}
                           onClick={() => props.onSidebarAction(weddingTimelineSidebarAction("open_calendar", props.state, row.id))}
                         >
@@ -361,7 +361,7 @@ export function WeddingTimelinePanel(props: {
             </div>
           </Show>
           <Show when={hiddenRowCount() > 0}>
-            <p class="mt-2 text-xs leading-5 text-indigo-950/60">
+            <p class="mt-2 text-xs leading-5 text-wedding-ink/60">
               {hiddenRowCount()} more timeline item{hiddenRowCount() === 1 ? "" : "s"} hidden to keep this view calm.
             </p>
           </Show>
@@ -369,7 +369,7 @@ export function WeddingTimelinePanel(props: {
         <div class="mt-3 flex flex-wrap gap-1.5">
           <For each={props.state.ganttTimeline.legend}>
             {(item) => (
-              <span class="inline-flex max-w-full items-center gap-1 break-words rounded-full border border-slate-200 bg-white px-2 py-1 text-xs text-indigo-900/80">
+              <span class="inline-flex max-w-full items-center gap-1 break-words rounded-lg border border-wedding-border bg-white px-2 py-1 text-xs text-wedding-ink/80">
                 <span class="h-2 w-2 rounded-full" style={{ "background-color": item.color }} />
                 {item.label}
               </span>

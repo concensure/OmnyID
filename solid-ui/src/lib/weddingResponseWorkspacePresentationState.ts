@@ -93,10 +93,11 @@ function privateImportSourceUrl(value: string): boolean {
 }
 
 function labelForKind(kind: WeddingWorkspaceFilterKind, value: string): string {
-  if (kind === "artifact_kind") return value.replace(/_/g, " ");
-  if (kind === "approval_state") return value.replace(/_/g, " ");
-  if (kind === "export_target") return value.replace(/_/g, " ");
-  if (kind === "evidence_status") return value.replace(/_/g, " ");
+  const normalized = value.trim().toLowerCase();
+  if (kind === "artifact_kind") return ({ research: "Research", vendor_table: "Vendor comparisons", budget_sheet: "Budgets", guest_list: "Guest lists", timeline: "Timelines", email_draft: "Email drafts", legal: "Legal", registry: "Registry", map_collection: "Maps", decision_log: "Decisions" } as Record<string, string>)[normalized] ?? "Wedding documents";
+  if (kind === "approval_state") return ({ draft: "Drafts", ready: "Ready to review", approved: "Approved", rejected: "Not approved", sent: "Sent" } as Record<string, string>)[normalized] ?? value.replace(/_/g, " ");
+  if (kind === "export_target") return ({ browser_pdf: "Printable", pdf: "PDF", html: "Web page", csv: "Spreadsheet", markdown: "Text file", word_doc: "Word document", image_planned: "Image", bundle_planned: "Download bundle" } as Record<string, string>)[normalized] ?? "Downloadable";
+  if (kind === "evidence_status") return ({ source_linked: "Sources attached", source_labelled: "Source notes attached", source_unverified: "Sources to check" } as Record<string, string>)[normalized] ?? "Source status";
   return value;
 }
 

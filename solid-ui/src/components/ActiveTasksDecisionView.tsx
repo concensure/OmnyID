@@ -96,7 +96,7 @@ export function ActiveTasksDecisionView(props: {
           <h2 class="mt-1 break-words font-display text-2xl font-semibold text-wedding-ink">Decisions and to-dos</h2>
           <p class="mt-1 max-w-2xl text-sm leading-6 text-wedding-ink/70">See what is pending, underway, decided, skipped or complete, with the options that informed each decision.</p>
         </div>
-        <button type="button" onClick={props.onAddTask} class="min-h-11 rounded-lg bg-wedding-primary px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-wedding-primary/90">+ Add task</button>
+        <button type="button" onClick={props.onAddTask} class="min-h-11 rounded-lg bg-wedding-primary px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-wedding-primary/90">Add task in calendar</button>
       </header>
 
       <Show when={draftCount() > 0}>

@@ -89,7 +89,7 @@ export function DecisionCard(props: {
             <p class="text-[10px] font-semibold uppercase tracking-[0.12em] opacity-70">Recommendation</p>
             <p class="mt-1 break-words text-sm font-semibold leading-5 [overflow-wrap:anywhere]">{text(recommendation().summary, "Review the best-fit option before choosing.")}</p>
             <ul class={`mt-2 grid gap-1 text-xs leading-5 ${muted()}`}>
-              <For each={recommendation().reasons.slice(0, 3)}>
+              <For each={recommendation().reasons.slice(0, 3).filter((reason) => reason.trim().toLowerCase() !== card().whyItMatters.trim().toLowerCase())}>
                 {(reason) => <li class="break-words [overflow-wrap:anywhere]">• {text(reason, "Current evidence supports this recommendation.")}</li>}
               </For>
             </ul>
@@ -99,7 +99,7 @@ export function DecisionCard(props: {
       <Show when={mode() === "standard" || mode() === "full"}>
         <div class="mt-3 flex flex-wrap gap-1.5">
           <For each={card().evidence.slice(0, 4)}>{(item) => <span class="max-w-full break-words rounded-lg border border-current/10 bg-white/70 px-2 py-1 text-[10px] opacity-75">{text(item.label, "Checked detail")}</span>}</For>
-          <span class="rounded-lg border border-current/10 px-2 py-1 text-[10px] opacity-75">{card().verification.label}</span>
+          <span class="rounded-lg border border-current/10 px-2 py-1 text-[10px] opacity-75">{text(card().verification.label, "Details checked")}</span>
         </div>
         <Show when={card().unknowns.length > 0}>
           <p class={`mt-2 break-words rounded-lg px-3 py-2 text-[11px] leading-4 [overflow-wrap:anywhere] ${wedding() ? "bg-wedding-status-progress-bg text-wedding-status-progress-ink" : muted()}`}><strong>Still to confirm:</strong> {text(card().unknowns.join(" "), "A few details")}</p>

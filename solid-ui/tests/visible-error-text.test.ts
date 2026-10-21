@@ -29,6 +29,7 @@ test("friendlyErrorText hides protocol wording from users", () => {
 
 test("friendlyErrorText explains lost connections and keeps readable messages", () => {
   assert.match(friendlyErrorText(new TypeError("Failed to fetch")), /^Connection lost\./);
+  assert.equal(friendlyErrorText("too many requests, please try again shortly"), "That was a little too quick. Wait a moment, then try again.");
   assert.equal(friendlyErrorText("Add a vendor category first."), "Add a vendor category first.");
   assert.equal(friendlyErrorText("", "Try again."), "Try again.");
 });

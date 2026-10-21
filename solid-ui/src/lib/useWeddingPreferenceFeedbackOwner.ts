@@ -108,6 +108,7 @@ export function useWeddingPreferenceFeedbackOwner(input: {
     }
     const nextSignals = [...signals().filter((signal) => signal.id !== prepared.signal.id), prepared.signal];
     setLocalSignals((existing) => [...existing.filter((signal) => signal.id !== prepared.signal.id), prepared.signal]);
+    let preferenceUpdateFailed = false;
     if (current) {
       const result = weddingPreferenceSignalResult({
         profile: current.profile,
@@ -128,9 +129,15 @@ export function useWeddingPreferenceFeedbackOwner(input: {
             unique([...result.derivedFromSignalIds, prepared.signal.id]),
           );
         } catch {
+          preferenceUpdateFailed = true;
           setNotice("Your feedback is saved. Its preference update will retry when the workspace reconnects.");
         }
       }
+    }
+    if (!preferenceUpdateFailed) {
+      setNotice(reason === "restored"
+        ? `${card.title} is back in your comparison.`
+        : `${card.title} is hidden. You can restore it below the comparison.`);
     }
     input.onRefreshWorkspace?.();
     return true;

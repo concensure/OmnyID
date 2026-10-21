@@ -70,7 +70,7 @@ test("buildSessionEndedNotice opens sign-in recovery for unauthorized session lo
   assert.deepEqual(buildSessionEndedNotice("unauthorized"), {
     showAuthModal: true,
     tone: "error",
-    text: "Your session expired or was revoked. Sign in again to reconnect to your homeserver.",
+    text: "Your session has expired. Sign in again to continue.",
   });
 });
 
@@ -78,7 +78,7 @@ test("buildSessionEndedNotice keeps manual sign-out distinct from expiry", () =>
   assert.deepEqual(buildSessionEndedNotice("manual_sign_out"), {
     showAuthModal: false,
     tone: "success",
-    text: "Signed out of your homeserver.",
+    text: "You have signed out.",
   });
 });
 

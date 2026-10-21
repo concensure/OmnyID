@@ -1262,6 +1262,7 @@ function App() {
     pendingAuthSource === "wedding" || pendingAuthSource === "marketing";
   function launchWeddingTemplateFromDeepLink() {
     saveWeddingEntrySource("wedding_site");
+    setShowTour(false); setShowOnboarding(false); setShowProfilingConsent(false);
     void savePrimaryUseCase("wedding_planning", "inferred").catch(() => {});
     void import("@/lib/weddingLeadMagnetImportRunnerState").then(({ requestWeddingLeadMagnetImport }) => requestWeddingLeadMagnetImport());
     void import("@/lib/weddingTemplateDeepLinkLaunchState").then(({ buildWeddingTemplateDeepLinkLaunch, dispatchWeddingTemplateDeepLinkLaunch }) => {
@@ -2867,7 +2868,7 @@ function App() {
       } catch { /* no key configured — messages shown in ciphertext-aware mode */ }
 
       // Check if onboarding wizard is needed (authenticated only, after tour)
-      if (!loadOnboardingDone()) {
+      if (!loadOnboardingDone() && loadWeddingEntrySource() !== "wedding_site" && !shouldLaunchWeddingTemplateFromDeepLink()) {
         setShowOnboarding(true);
       }
     }
@@ -2886,7 +2887,7 @@ function App() {
     // Ask for local profiling consent only once the user is authenticated.
     // Showing this in guest mode blocks the rail and makes working controls
     // feel broken before the user can even sign in.
-    if (session()?.token && !hasConsentBeenAsked()) {
+    if (session()?.token && !hasConsentBeenAsked() && loadWeddingEntrySource() !== "wedding_site" && !shouldLaunchWeddingTemplateFromDeepLink()) {
       setShowProfilingConsent(true);
     }
     if (session()?.token) {
@@ -3252,10 +3253,7 @@ function App() {
       {/* Homeserver offline banner */}
       <Show when={serverOffline()}>
         <div class="mx-auto mb-4 max-w-[1700px] flex items-center justify-between gap-4 rounded-2xl border border-red-200/50 bg-red-50/60 px-5 py-3 text-sm text-on-surface-variant backdrop-blur-sm animate-fade-in">
-          <span>
-            <strong class="text-on-surface">Homeserver offline</strong> — cannot reach the OmnyID backend.
-            Start it with <code class="font-mono text-xs">docker compose up</code> or <code class="font-mono text-xs">dev.ps1</code>.
-          </span>
+          <span><strong class="text-on-surface">OmnyID is temporarily unavailable.</strong> Check your connection, then try again.</span>
           <button
             type="button"
             disabled={retrying()}
@@ -3325,7 +3323,7 @@ function App() {
           advanced={advanced()}
           paraViewEnabled={paraViewEnabled()}
           studyLensEnabled={studyLensEnabled()}
-          hideTrigger={activeView() === "response_queue" && primaryUseCaseProfile()?.kind === "wedding_planning" && primaryUseCaseProfile()?.status === "active"}
+          hideTrigger={activeView() === "response_queue" && (loadWeddingEntrySource() === "wedding_site" || (primaryUseCaseProfile()?.kind === "wedding_planning" && primaryUseCaseProfile()?.status === "active"))}
           userId={userId()}
           onSelectApp={selectKnownView}
         />
@@ -4359,7 +4357,7 @@ function App() {
       </GlassPanel>
 
       {/* Floating agent persona FAB */}
-      <Show when={Boolean(session()?.token)}>
+      <Show when={Boolean(session()?.token) && !(activeView() === "response_queue" && loadWeddingEntrySource() === "wedding_site")}>
         <AgentPersonaFAB
           signedIn={Boolean(session()?.token)}
           activeCount={fleetActiveCount()}
@@ -4383,7 +4381,7 @@ function App() {
       </Show>
 
       {/* View customizer — floating + for image background and custom A2UI cards (non-home views only) */}
-      <Show when={activeView() !== "home"}>
+      <Show when={activeView() !== "home" && !(activeView() === "response_queue" && loadWeddingEntrySource() === "wedding_site")}>
         <Suspense>
           <LazyViewCustomizer viewId={activeView()} />
         </Suspense>
@@ -5200,7 +5198,10 @@ function AuthModal(props: {
         setTab("signin");
         setEmail(submittedEmail);
         setPassword("");
-        const message = data.message || "Check your email to verify your account before signing in.";
+        const serverMessage = data.message || "";
+        const message = /if this email can be registered|if that email can/i.test(serverMessage)
+          ? `Check ${submittedEmail} for a verification link, then sign in.`
+          : serverMessage || `Check ${submittedEmail} for a verification link, then sign in.`;
         // Do not tell someone to wait for an email when the server has already
         // reported that its delivery attempt failed.
         const deliveryUnavailable = /could not send a confirmation email/i.test(message);
@@ -5216,7 +5217,7 @@ function AuthModal(props: {
       const msg = visibleErrorText(err, "");
       const isNetwork = !msg || msg.toLowerCase().includes("networkerror") || msg.toLowerCase().includes("failed to fetch") || msg.toLowerCase().includes("load failed");
       setError(isNetwork
-        ? "Cannot reach the homeserver. Make sure the OmnyID backend is running (run dev.ps1 or docker compose up)."
+        ? "We couldn't connect to OmnyID. Check your connection and try again."
         : msg || "Authentication failed — check credentials");
     } finally {
       setLoading(false);
@@ -5232,7 +5233,9 @@ function AuthModal(props: {
     try {
       const data = await resendVerificationEmailRequest(targetEmail);
       setResendMessage(
-        data.message || "If that email can still be verified, a new verification link has been sent.",
+        data.message && !/if (?:this|that) email can/i.test(data.message)
+          ? data.message
+          : `A new verification link has been sent to ${targetEmail}.`,
       );
     } catch (err) {
       setError(visibleErrorText(err, "Could not resend verification email right now."));
@@ -5427,16 +5430,6 @@ function AuthModal(props: {
             onInput={(e) => setEmail(e.currentTarget.value)}
             class="w-full rounded-xl border border-white/40 bg-white/60 px-4 py-2.5 text-sm text-on-surface outline-none focus:border-primary/50 transition"
           />
-          <Show when={tab() === "signin" && passkeySupported()}>
-            <button
-              type="button"
-              onClick={() => void submitPasskey()}
-              disabled={loading() || passkeyLoading()}
-              class="w-full rounded-xl border border-primary/20 bg-primary/8 px-4 py-2.5 text-sm font-medium text-primary transition hover:border-primary/35 hover:bg-primary/12 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {passkeyLoading() ? "Waiting for passkey..." : "Sign in with passkey"}
-            </button>
-          </Show>
           <input
             type="password"
             id="auth-password"
@@ -5485,10 +5478,15 @@ function AuthModal(props: {
           >
             {loading() ? "Please wait…" : tab() === "signin" ? "Sign in" : "Create account"}
           </button>
+          <Show when={tab() === "signin" && passkeySupported()}>
+            <button type="button" onClick={() => void submitPasskey()} disabled={loading() || passkeyLoading()} class="w-full rounded-xl border border-primary/20 bg-primary/8 px-4 py-2.5 text-sm font-medium text-primary transition hover:border-primary/35 hover:bg-primary/12 disabled:cursor-not-allowed disabled:opacity-60">
+              {passkeyLoading() ? "Waiting for passkey..." : "Sign in with passkey"}
+            </button>
+          </Show>
         </form>
         </Show>
         <p class="mt-4 text-center text-[11px] text-on-surface-variant/50">
-          Your data stays on your homeserver — privacy-first.
+          Your account data stays private.
         </p>
       </div>
     </div>

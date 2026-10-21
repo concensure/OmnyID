@@ -1478,3 +1478,23 @@ Changing a follow-up date is scheduling, not a new contact event. The authentica
 route updates `follow_up_due_at` while preserving contact method, last-contact timestamp, recorded
 reply and provider receipts. Future follow-ups remain visible so users can inspect and reschedule
 them. None of these changes expands send authority or changes any rollout flag.
+
+## 2026-10-22: Production walkthroughs are evidence, not replacement specifications
+
+A scripted production walkthrough may identify a current user-facing defect, but its expected screen
+shape and timing assumptions do not supersede the current wedding implementation, AFP/A2UI ownership
+or security boundaries. Findings are first classified against the current commit as current,
+already corrected, non-reproduced automation timing, deliberately excluded or out of scope. Only a
+current defect authorizes a repair in that slice.
+
+Wedding entry context may suppress generic tours, persona controls, app-page menus and internal
+diagnostics because those surfaces compete with the dedicated planner. This does not create a second
+router or data model: the persistent five-tab wedding navigation, AFP projections, canonical
+Documents owner, approval gates and provider boundaries remain authoritative. Shared generic views,
+such as Calendar, require an explicit theme input before their palette can change for wedding use;
+they are not globally recoloured from a wedding-only report.
+
+Rapid browser automation is not sufficient evidence of a backend failure or lost session. User-
+directed exclusions and human reproduction results take precedence, while defensive UI copy may
+still convert real rate limits, refresh failures and session expiry into calm recovery steps. No
+walkthrough can satisfy or bypass the independent WED-225, WED-226 or policy-V2 rollout gates.

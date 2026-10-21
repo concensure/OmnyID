@@ -26,6 +26,15 @@ test("vendor-search UI copy never returns backend or protocol details", () => {
 test("wedding decision copy replaces technical content but preserves readable guidance", () => {
   assert.equal(safeWeddingUiText("Invalid AFP payload", "Review this choice."), "Review this choice.");
   assert.equal(safeWeddingUiText("Fits your relaxed garden style.", "Review this choice."), "Fits your relaxed garden style.");
+  assert.equal(safeWeddingUiText("This Smart Action is ready", "Review this choice."), "This planning check is ready");
+  assert.equal(safeWeddingUiText("4 evidence signals", "Review this choice."), "4 details checked");
+});
+
+test("an empty vendor search has an actionable, non-technical message", () => {
+  const copy = weddingVendorSearchNoticeCopy("Directory-only vendor search returned 0 sources");
+  assert.match(copy ?? "", /No matches yet/i);
+  assert.match(copy ?? "", /Blue Mountains venues/i);
+  assert.equal(containsTechnicalWeddingUiCopy(copy ?? ""), false);
 });
 
 test("planning needs are translated into couple-friendly labels", () => {

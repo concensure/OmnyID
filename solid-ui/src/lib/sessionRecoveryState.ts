@@ -43,14 +43,14 @@ export function buildSessionEndedNotice(reason: SessionEndReason | null): {
     return {
       showAuthModal: false,
       tone: "success",
-      text: "Signed out of your homeserver.",
+      text: "You have signed out.",
     };
   }
   if (reason === "unauthorized") {
     return {
       showAuthModal: true,
       tone: "error",
-      text: "Your session expired or was revoked. Sign in again to reconnect to your homeserver.",
+      text: "Your session has expired. Sign in again to continue.",
     };
   }
   if (reason === "account_disabled") {
@@ -63,6 +63,6 @@ export function buildSessionEndedNotice(reason: SessionEndReason | null): {
   return {
     showAuthModal: false,
     tone: "error",
-    text: "Your session ended. Sign in again when you want to reconnect to your homeserver.",
+    text: "Your session ended. Sign in again to continue.",
   };
 }

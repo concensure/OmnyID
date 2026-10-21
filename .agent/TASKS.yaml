@@ -3051,3 +3051,33 @@ tasks:
       - follow-up dates remain visible before their due date, accept typed/calendar edits with explicit save feedback, and use a schedule-only database update that preserves reply, contact-method and last-contact evidence
       - recorded the first three private venue-ranking cases and the clarified ordered 0-to-3 rubric as partial human evidence only; WED-240 and WED-225/WED-226 remain blocked and ranking policy V2 remains disabled
       - typecheck, both line-budget audits, wedding site smoke, 74 focused tests, all 1943 wedding tests, 4 Playwright cases at 360/1280, two focused Rust suites (34 tests) and production build pass; only inherited Rust/Tailwind/Vite advisories remain
+  - id: WED-245
+    title: Validate and repair production-observed wedding UX walkthrough issues
+    status: review
+    owner: codex
+    branch: agent/codex/WED-215
+    depends_on:
+      - WED-242
+      - WED-243
+      - WED-244
+    files:
+      - Documents/verification/wedding-ux-walkthrough-current-implementation-audit.md
+      - solid-ui/src/components/**
+      - solid-ui/src/lib/**
+      - solid-ui/tests/**
+      - .agent/**
+    acceptance:
+      - every walkthrough finding is checked against the current implementation and classified as a current defect, already corrected, non-reproducible automation timing observation, out of current scope, or intentionally excluded outreach-send report
+      - only genuine current defects are changed; the report's expected UI does not replace the current wedding implementation or its AFP/A2UI authority boundaries
+      - wedding entry, onboarding, navigation, task, document, budget, decision, vendor and empty-state surfaces expose plain user-facing copy without protocol, provider or developer diagnostics
+      - destructive or asynchronous controls provide honest state, recovery and mobile-accessible targets without treating browser automation speed as proof of a backend defect
+      - the current teal wedding brand, 8-12px radii, persistent five-item mobile navigation and existing quotation/planning feature gates remain intact
+      - every new file remains below 1000 lines, oversized owners do not grow, focused tests, full wedding checks and production build pass
+    progress:
+      - registered from clean commit 07f6c35 after reading the 291-line production walkthrough; beginning a finding-by-finding comparison against the current WED-215 implementation
+      - classified every walkthrough observation against the current implementation in Documents/verification/wedding-ux-walkthrough-current-implementation-audit.md; intentionally excluded the automation-only outreach failure claim and did not weaken same-tab session security from a non-reproduced scripted reload
+      - wedding entries now suppress generic tour, student/persona onboarding and profiling prompts; wedding pages hide generic persona/customizer controls and the unrelated Response Queue while retaining the five-item mobile tab bar
+      - repaired first-run continuity and copy: wizard progress saves on navigation, completion is duplicate-safe, headings are step-specific, NOIM is expanded, verification/session/network copy is plain, and the auth form keeps email/password together before the passkey alternative
+      - added honest no-match, dismiss/restore, rate-limit, document-refresh and document-filter copy; removed calendar OAuth/AFP diagnostics and sanitized Smart Action/evidence wording without changing AFP, A2UI, approval or provider authority
+      - migrated touched intake, timeline and budget shells to the wedding palette and 8-12px radii; fixed the 390px landing wordmark shrink and left the shared generic calendar theme scoped to a future explicit wedding-theme input
+      - typecheck, both line-budget checks, wedding website smoke, 28 focused tests, all 1945 wedding tests, three Playwright home checks at 320/390/1280 and the production build pass; no Rust contract, rollout flag, provider, Oracle or source-data state changed

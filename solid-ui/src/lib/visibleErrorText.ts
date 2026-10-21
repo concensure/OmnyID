@@ -4,6 +4,8 @@ const FRIENDLY_ERROR_RULES: ReadonlyArray<readonly [RegExp, string]> = [
     "Connection lost. Your changes haven't been saved yet. Check your connection and try again."],
   [/unauthenticated|unauthori[sz]ed|\bhttp:? ?401\b|session (?:has )?expired|invalid (?:or expired )?token/i,
     "Your session has expired. Sign in again, then retry."],
+  [/too many requests|rate limit|\b429\b/i,
+    "That was a little too quick. Wait a moment, then try again."],
   [/\bafp\b|invalid (?:signature|argument)|invalid_argument|\bgrpc\b|\b(?:status(?: code)?|http):? ?[45]\d\d\b|internal server/i,
     "Something went wrong on our side. Your changes haven't been saved yet. Try again in a moment."],
 ];

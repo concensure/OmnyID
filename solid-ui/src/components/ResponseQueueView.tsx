@@ -517,6 +517,11 @@ export function ResponseQueueView(props: {
     };
   }
 
+  function saveWeddingFollowUpProgress() {
+    const workspaceId = weddingNavigationIntent()?.responseWorkspaceId;
+    if (workspaceId) saveWeddingTemplateFollowUpDraft(currentWeddingFollowUpDraft(workspaceId), localStorage);
+  }
+
   function hydrateWeddingFollowUpDraftFromApprovedContext(draft: WeddingTemplateFollowUpDraft) {
     const merged = mergeWeddingTemplateFollowUpDraftWithApprovedContext({
       current: currentWeddingFollowUpDraft(draft.responseWorkspaceId),
@@ -1278,13 +1283,17 @@ export function ResponseQueueView(props: {
     if (state.status === "loaded" && state.pagination.hasMore) {
       return {
         label: "Some wedding documents refreshed",
-        detail: state.detail,
+        detail: "Your newest wedding documents are ready. More older items are still available.",
         tone: "warning" as const,
       };
     }
     return {
       label: state.status === "loaded" ? "Wedding documents refreshed" : state.status === "error" ? "Refresh failed" : "Starter documents",
-      detail: state.detail,
+      detail: state.status === "loaded"
+        ? "Your saved wedding documents are up to date."
+        : state.status === "error"
+          ? "We couldn't refresh saved documents just now. The documents already shown are still available."
+          : "Sign in to refresh saved wedding documents.",
       tone: state.status === "loaded" ? "success" as const : state.status === "error" ? "warning" as const : "idle" as const,
     };
   }
@@ -1526,7 +1535,7 @@ export function ResponseQueueView(props: {
     const captured = state.capturedSlots.length;
     const review = state.needsReviewLabels.length;
     setWeddingExtractionNotice(captured
-      ? `Captured ${captured} field${captured === 1 ? "" : "s"} from the message${review ? `; ${review} item${review === 1 ? "" : "s"} need review` : ""}. Review the fields before generating files.`
+      ? `Captured ${captured} field${captured === 1 ? "" : "s"} from the message.${review ? ` Please review: ${state.needsReviewLabels.join(", ")}.` : ""} Check the details before creating your plan.`
       : "No explicit planning fields were detected. Add details manually or paste a more specific answer.");
   }
 
@@ -2011,8 +2020,6 @@ export function ResponseQueueView(props: {
           onDismiss={() => setWeddingNavigationIntent(null)}
         />
       </Show>
-      {/* Retired inline wedding intake removed; all first-run wedding launches use WeddingSiteIntakeWizard. */}
-
       <Show when={activeWeddingLaunch()}>
         {(launch) => (
           <WeddingSiteIntakeWizard
@@ -2052,7 +2059,8 @@ export function ResponseQueueView(props: {
             onWeddingFollowUpNoimChange={setWeddingFollowUpNoim}
             weddingFollowUpCelebrant={weddingFollowUpCelebrant}
             onWeddingFollowUpCelebrantChange={setWeddingFollowUpCelebrant}
-            onGenerateFollowUp={(starterIntents) => void generateWeddingFollowUp({ starterIntents })}
+            onSaveProgress={saveWeddingFollowUpProgress}
+            onGenerateFollowUp={(starterIntents) => generateWeddingFollowUp({ starterIntents })}
             vendorSearchResultAction={currentWeddingVendorSearchResultAction()}
             onOpenVendorSearchResult={openWeddingVendorSearchResult}
             vendorSearchNotice={weddingVendorSearchNotice()}
@@ -2124,13 +2132,7 @@ export function ResponseQueueView(props: {
         )}
       </Show>
 
-      <Show when={!weddingWorkspace() || weddingWorkspaceMenu() === "response_queue"}>
-        <ResponseQueueSurface
-          queueCompanionState={viewState().responseSurfaceState}
-          titleTag={RESPONSE_QUEUE_VIEW_TITLE_TAG}
-          compact={viewState().responseSurfaceCompactMode}
-        />
-      </Show>
+      <Show when={!weddingWorkspace()}><ResponseQueueSurface queueCompanionState={viewState().responseSurfaceState} titleTag={RESPONSE_QUEUE_VIEW_TITLE_TAG} compact={viewState().responseSurfaceCompactMode} /></Show>
     </div>
   );
 }

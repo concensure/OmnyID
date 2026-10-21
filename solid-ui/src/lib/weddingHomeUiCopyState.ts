@@ -4,7 +4,11 @@ const TECHNICAL_COPY = /\b(?:afp|api|grpc|http|postgres|database|sql|smtp|provid
 
 export function weddingVendorSearchNoticeCopy(value: unknown): string | null {
   const text = typeof value === "string" ? value.trim() : "";
-  if (!text || /^Directory-only vendor search returned\b/i.test(text)) return null;
+  if (!text) return null;
+  if (/\b(?:returned|found|listed)\s+0\s+(?:live\s+)?(?:source|match|vendor)/i.test(text) || /no (?:live )?vendor sources|no vendor matches/i.test(text)) {
+    return "No matches yet. Try a shorter place name, then add the vendor type — for example, “Blue Mountains venues”.";
+  }
+  if (/^Directory-only vendor search returned\b/i.test(text)) return null;
   if (/offline|network|connect|timeout/i.test(text)) {
     return "We couldn't reach the vendor directory. Check your connection and try again.";
   }
@@ -42,5 +46,8 @@ export function containsTechnicalWeddingUiCopy(value: string): boolean {
 
 export function safeWeddingUiText(value: unknown, fallback: string): string {
   const text = typeof value === "string" ? value.trim() : "";
-  return !text || TECHNICAL_COPY.test(text) ? fallback : text;
+  if (!text || TECHNICAL_COPY.test(text)) return fallback;
+  return text
+    .replace(/\bSmart Action\b/gi, "planning check")
+    .replace(/\bevidence signals?\b/gi, (match) => /s$/i.test(match) ? "details checked" : "detail checked");
 }

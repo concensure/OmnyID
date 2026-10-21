@@ -157,7 +157,7 @@ section{ padding: 96px 0; }
 }
 .site-header.is-scrolled .header-inner{ padding-block: 14px; }
 
-.logo{ display:flex; align-items:center; gap:10px; font-family: var(--font-display); font-weight:600; font-size:20px; color: var(--ink); min-height:44px; }
+.logo{ display:flex; flex:none; align-items:center; gap:10px; white-space:nowrap; font-family: var(--font-display); font-weight:600; font-size:20px; color: var(--ink); min-height:44px; }
 .logo .mark{ width:34px; height:34px; flex:none; }
 .logo-img{ height:40px; width:auto; flex:none; }
 .logo span{ color: var(--rose-deep); font-weight:500; }
@@ -205,6 +205,13 @@ section{ padding: 96px 0; }
   .logo-img{ height:32px; }
   .logo{ font-size:16px; gap:6px; }
   .header-actions .btn{ padding-inline:16px; font-size:14px; }
+}
+
+@media (max-width: 440px){
+  .header-inner{ gap:6px; }
+  .logo-img{ height:32px; }
+  .logo{ gap:6px; font-size:16px; }
+  .header-actions .btn{ padding-inline:14px; font-size:14px; }
 }
 
 /* ---------- accessibility ---------- */

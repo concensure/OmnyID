@@ -80,13 +80,16 @@ export function WeddingSiteIntakeWizard(props: {
   onWeddingFollowUpNoimChange: (value: string) => void;
   weddingFollowUpCelebrant: () => string;
   onWeddingFollowUpCelebrantChange: (value: string) => void;
-  onGenerateFollowUp: (starterIntents?: WeddingTemplateStarterIntent[]) => void;
+  onSaveProgress: () => void;
+  onGenerateFollowUp: (starterIntents?: WeddingTemplateStarterIntent[]) => void | Promise<void>;
   vendorSearchResultAction?: WeddingVendorSearchResultAction | null;
   onOpenVendorSearchResult?: (action: WeddingVendorSearchResultAction) => void;
   vendorSearchNotice?: string | null;
   weddingTemplateFollowUp: () => WeddingTemplateFollowUpState | null;
 }) {
   const [step, setStep] = createSignal(0);
+  const [progressSaved, setProgressSaved] = createSignal(false);
+  const [finishing, setFinishing] = createSignal(false);
   const [dateCalendarOpen, setDateCalendarOpen] = createSignal(false);
   const [calendarMonth, setCalendarMonth] = createSignal(new Date().getMonth());
   const [calendarYear, setCalendarYear] = createSignal(new Date().getFullYear());
@@ -97,13 +100,13 @@ export function WeddingSiteIntakeWizard(props: {
   );
   const atLastStep = () => step() === LAST_STEP;
   const atFirstStep = () => step() === 0;
-  const goNext = () => setStep((current) => Math.min(LAST_STEP, current + 1));
+  const goNext = () => { props.onSaveProgress(); setProgressSaved(true); setStep((current) => Math.min(LAST_STEP, current + 1)); };
   const goBack = () => setStep((current) => Math.max(0, current - 1));
   const firstVendorCategories = weddingVendorMustDecideFirstCategories();
 
-  const inputClass = "w-full rounded-2xl border border-rose-100 bg-white px-3 py-2.5 text-sm font-normal text-on-surface outline-none focus:border-rose-300 sm:py-2";
-  const labelClass = "space-y-1 text-xs font-semibold text-on-surface";
-  const headerHint = () => step() === 1 ? "Research before you decide." : props.launch.nextQuestionLabel;
+  const inputClass = "w-full rounded-lg border border-wedding-border bg-white px-3 py-2.5 text-sm font-normal text-wedding-ink outline-none focus:border-wedding-primary focus:ring-2 focus:ring-wedding-primary/15 sm:py-2";
+  const labelClass = "space-y-1 text-xs font-semibold text-wedding-ink";
+  const headerHint = () => [props.launch.nextQuestionLabel, "Choose the first vendors you want help finding.", "Add optional ceremony details, or skip them for now.", "Review your choices, then create your plan."][step()] ?? props.launch.nextQuestionLabel;
   const monthFormatter = new Intl.DateTimeFormat("en", { month: "long", year: "numeric" });
   const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const calendarCells = createMemo(() => {
@@ -153,16 +156,24 @@ export function WeddingSiteIntakeWizard(props: {
         .filter((id) => set.has(id));
     });
   }
+  async function finishSetup() {
+    if (finishing()) return;
+    props.onSaveProgress(); setProgressSaved(true); setFinishing(true);
+    try { await props.onGenerateFollowUp(selectedStarterIntents()); }
+    finally { setFinishing(false); }
+  }
   return (
-    <section class="min-w-0 rounded-[24px] border border-rose-100/80 bg-[linear-gradient(135deg,rgba(255,241,242,0.96),rgba(255,251,235,0.94))] p-3 shadow-card sm:rounded-[28px] sm:p-4">
-      <p class="font-mono text-[10px] uppercase tracking-[0.18em] text-rose-700/70">
+    <section class="min-w-0 rounded-xl border border-wedding-border bg-wedding-card p-3 text-wedding-ink shadow-wedding-card sm:p-4">
+      <p class="text-[10px] font-semibold uppercase tracking-[0.18em] text-wedding-primary">
         Let's set up your wedding
       </p>
-      <h2 class="mt-1 break-words text-lg font-semibold text-on-surface">{props.launch.presentation.title}</h2>
-      <p class="mt-1 break-words text-sm leading-6 text-on-surface-variant">{headerHint()}</p>
-      <div class="mt-3 inline-flex max-w-full items-center rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[11px] font-semibold text-amber-950">
-        Draft - not saved to your account yet
-      </div>
+      <h2 class="mt-1 break-words font-display text-lg font-semibold text-wedding-ink">{STEP_LABELS[step()]}</h2>
+      <p class="mt-1 break-words text-sm leading-6 text-wedding-ink/70">{headerHint()}</p>
+      <Show when={!atLastStep()}>
+        <div class="mt-3 inline-flex max-w-full items-center rounded-lg border border-amber-200 bg-amber-50 px-3 py-1 text-[11px] font-semibold text-amber-950">
+          {progressSaved() ? "Progress saved on this device" : "Draft — continue to save your progress on this device"}
+        </div>
+      </Show>
 
       {/* Step progress */}
       <div class="mt-4 flex items-center gap-2">
@@ -172,7 +183,7 @@ export function WeddingSiteIntakeWizard(props: {
               <button
                 type="button"
                 disabled={index() > step() + 1}
-                onClick={() => index() <= step() + 1 && setStep(index())}
+                onClick={() => { if (index() <= step() + 1) { props.onSaveProgress(); setProgressSaved(true); setStep(index()); } }}
                 class={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold transition ${
                   index() < step()
                     ? "bg-rose-700 text-white"
@@ -191,20 +202,20 @@ export function WeddingSiteIntakeWizard(props: {
           )}
         </For>
       </div>
-      <p class="mt-2 text-xs font-semibold text-rose-950">
+      <p class="mt-2 text-xs font-semibold text-wedding-ink">
         Step {step() + 1} of {STEP_LABELS.length}: {STEP_LABELS[step()]}
       </p>
 
       {/* Step 0 — the basics, with the fast-path paste box first */}
       <Show when={step() === 0}>
-        <div class="mt-4 grid min-w-0 gap-3 rounded-[24px] border border-white/70 bg-white/65 p-3 md:grid-cols-2">
+        <div class="mt-4 grid min-w-0 gap-3 rounded-xl border border-wedding-border bg-wedding-page p-3 md:grid-cols-2">
           <label class={`${labelClass} md:col-span-2`}>
             Paste a planning message for the fastest start — or fill in the fields below. Everything here can be changed later.
             <textarea
-              class="min-h-28 w-full rounded-2xl border border-rose-100 bg-white px-3 py-2 text-sm font-normal text-on-surface outline-none focus:border-rose-300"
+              class="min-h-28 w-full rounded-lg border border-wedding-border bg-white px-3 py-2 text-sm font-normal text-wedding-ink outline-none focus:border-wedding-primary focus:ring-2 focus:ring-wedding-primary/15"
               value={props.weddingExtractionText()}
               onInput={(event) => props.onWeddingExtractionTextInput(event.currentTarget.value)}
-              placeholder="Example: We are planning for October 2027 in Sydney NSW, about 90 guests, mid-range budget, priorities are food and photos, NOIM not downloaded, need celebrant options."
+              placeholder="Example: We are planning for October 2027 in Sydney for about 90 guests. Our budget is around $40,000 and food and photos matter most."
             />
           </label>
           <div class="grid gap-2 sm:flex sm:flex-wrap sm:items-center md:col-span-2">
@@ -365,7 +376,7 @@ export function WeddingSiteIntakeWizard(props: {
 
       {/* Step 1 — vendors (optional) */}
       <Show when={step() === 1}>
-        <div class="mt-4 space-y-2 rounded-[24px] border border-white/70 bg-white/65 p-3">
+        <div class="mt-4 space-y-2 rounded-xl border border-wedding-border bg-wedding-page p-3">
           <div class="flex flex-wrap items-center justify-between gap-2">
             <div class="min-w-0">
               <p class="text-xs font-semibold text-on-surface">First vendor choices (optional)</p>
@@ -418,7 +429,7 @@ export function WeddingSiteIntakeWizard(props: {
 
       {/* Step 2 — legal & vows (optional) */}
       <Show when={step() === 2}>
-        <div class="mt-4 min-w-0 space-y-3 rounded-[24px] border border-white/70 bg-white/65 p-3">
+        <div class="mt-4 min-w-0 space-y-3 rounded-xl border border-wedding-border bg-wedding-page p-3">
           <div>
             <p class="text-xs font-semibold text-on-surface">Vow preparation (optional)</p>
             <p class="mt-0.5 break-words text-[11px] leading-5 text-on-surface-variant">
@@ -485,7 +496,7 @@ export function WeddingSiteIntakeWizard(props: {
           </div>
           <div class="grid gap-2 sm:grid-cols-2">
             <label class={labelClass}>
-              NOIM status for Australian couples
+              Notice of Intended Marriage status (Australia)
               <select
                 class={inputClass}
                 value={props.weddingFollowUpNoim()}
@@ -516,9 +527,9 @@ export function WeddingSiteIntakeWizard(props: {
 
       {/* Step 3 — review & generate */}
       <Show when={step() === 3}>
-        <div class="mt-4 space-y-3 rounded-[24px] border border-white/70 bg-white/65 p-3">
+        <div class="mt-4 space-y-3 rounded-xl border border-wedding-border bg-wedding-page p-3">
           <div class="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2">
-            <p class="text-xs font-semibold text-amber-950">Draft - not saved to your account yet</p>
+            <p class="text-xs font-semibold text-amber-950">Ready to create your plan</p>
             <p class="mt-0.5 text-[11px] leading-5 text-amber-900">
               Generate the starter files, then approve the planning outputs to save them and the structured intake profile.
             </p>
@@ -547,11 +558,12 @@ export function WeddingSiteIntakeWizard(props: {
           </div>
           <div>
             <button
-              class="w-full rounded-full bg-rose-900 px-4 py-2.5 text-sm font-semibold text-white shadow-card transition hover:bg-rose-800 sm:w-auto sm:py-2"
+              class="w-full rounded-lg bg-wedding-primary px-4 py-2.5 text-sm font-semibold text-wedding-page shadow-sm transition hover:bg-wedding-primary/90 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto sm:py-2"
               type="button"
-              onClick={() => props.onGenerateFollowUp(selectedStarterIntents())}
+              onClick={() => void finishSetup()}
+              disabled={finishing()}
             >
-              Make follow-up documents
+              {finishing() ? "Creating your wedding plan…" : "Create my wedding plan"}
             </button>
             <Show when={props.weddingTemplateFollowUp()}>
               {(followUp) => (
@@ -572,7 +584,7 @@ export function WeddingSiteIntakeWizard(props: {
               {(action) => (
                 <button
                   type="button"
-                  class="mt-2 w-full rounded-full bg-rose-900 px-4 py-2.5 text-sm font-semibold text-white shadow-card transition hover:bg-rose-800 sm:w-auto sm:py-2"
+                  class="mt-2 w-full rounded-lg border border-wedding-secondary bg-white px-4 py-2.5 text-sm font-semibold text-wedding-secondary transition hover:bg-wedding-slate sm:w-auto sm:py-2"
                   onClick={() => props.onOpenVendorSearchResult?.(action())}
                 >
                   {action().label}
@@ -589,7 +601,7 @@ export function WeddingSiteIntakeWizard(props: {
           type="button"
           disabled={atFirstStep()}
           onClick={goBack}
-          class="rounded-full border border-rose-200 bg-white/80 px-4 py-2 text-sm font-semibold text-rose-950 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
+          class="rounded-lg border border-wedding-secondary bg-white px-4 py-2 text-sm font-semibold text-wedding-secondary transition hover:bg-wedding-slate disabled:cursor-not-allowed disabled:opacity-40"
         >
           Back
         </button>
@@ -599,7 +611,7 @@ export function WeddingSiteIntakeWizard(props: {
               <button
                 type="button"
                 onClick={goNext}
-                class="rounded-full px-3 py-2 text-xs font-semibold text-rose-900/70 underline decoration-rose-300 underline-offset-2"
+                class="rounded-lg px-3 py-2 text-xs font-semibold text-wedding-secondary underline decoration-wedding-border underline-offset-2"
               >
                 Skip — decide later
               </button>
@@ -607,7 +619,7 @@ export function WeddingSiteIntakeWizard(props: {
             <button
               type="button"
               onClick={goNext}
-              class="rounded-full bg-rose-900 px-4 py-2 text-sm font-semibold text-white shadow-card transition hover:bg-rose-800"
+              class="rounded-lg bg-wedding-primary px-4 py-2 text-sm font-semibold text-wedding-page shadow-sm transition hover:bg-wedding-primary/90"
             >
               Next
             </button>
