@@ -38,3 +38,9 @@ test("policy-v2 anchor rows and outreach questions come from the evidence ledger
   assert.equal(rows.find((row) => row.anchor === "Intimacy")?.status, "unknown");
   assert.deepEqual(weddingVendorVerifyQuestions(rows, []), candidate.reasons?.filter((reason) => reason.polarity === "unknown").map((reason) => reason.verifyQuestion).filter((question): question is string => Boolean(question)).slice(0, 3));
 });
+
+test("guest count is couple context while the venue is asked only for space capacity", () => {
+  const questions = weddingVendorVerifyQuestions([], ["capacity", "guests"]);
+  assert.deepEqual(questions, ["Could you share the seated and standing capacity for each relevant space?"]);
+  assert.doesNotMatch(questions.join(" "), /confirm guests/i);
+});

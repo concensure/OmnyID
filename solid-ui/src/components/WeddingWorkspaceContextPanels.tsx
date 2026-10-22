@@ -443,6 +443,7 @@ export function WeddingWorkspaceContextPanels(props: {
           state={props.state}
           saveProjection={props.saveProjection}
           onRefreshWorkspace={props.onRefreshWorkspace}
+          contactUserId={props.contactUserId}
         />
       </div>
 

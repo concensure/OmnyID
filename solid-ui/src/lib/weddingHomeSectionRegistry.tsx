@@ -70,6 +70,7 @@ export function buildWeddingHomeSections(input: WeddingHomeSectionRegistryInput)
       title: "Live vendor search",
       visible: true,
       render: () => <WeddingVendorSearchHomeSection
+        stayOnHome
         workspace={workspace} result={input.searchResult} outreach={input.vendorOutreach} onDismiss={input.onDismissSearchResult}
         preferenceProfile={input.preferenceProfileOwner.preferenceProfile()?.profile ?? null}
         preferenceSaving={input.preferenceProfileOwner.preferenceSaving()}

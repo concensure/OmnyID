@@ -88,7 +88,7 @@ export function WeddingVendorOutreachComposer(props: {
 
           <div class="mt-3 text-sm font-semibold text-wedding-text">
             <p>Suggested message</p>
-            <p class="mt-1 text-xs font-normal leading-5 text-wedding-muted">Select text to use headings, sizes, bold, italic, or lists.</p>
+            <p class="mt-1 text-xs font-normal leading-5 text-wedding-muted">Formatting tools are directly above the message. Select text, then choose a heading, size, bold, italic, or list.</p>
             <TiptapEditor
               mode="email"
               class="mt-2 overflow-hidden rounded-xl border border-wedding-muted/35 bg-white font-normal focus-within:border-wedding-cta focus-within:ring-2 focus-within:ring-wedding-surface-blush"

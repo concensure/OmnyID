@@ -3123,3 +3123,36 @@ tasks:
       - wedding Tasks and People now use the same planningTaskItems, local completion state and AFP responsibility projection; task disclosure retains linked decision options and selected choices
       - typecheck, both line-budget audits, wedding-site smoke, 51 focused tests, all 1955 wedding tests, five 320/390/1280 Playwright checks, 125 focused Rust wedding-vendor tests and the production build pass
       - App shrank to 5493 lines and ResponseQueue shrank to 2086 lines; all new files are below 170 lines and no oversized owner grew
+  - id: WED-247
+    title: Keep wedding actions in context and add collaborative tasks and visual seating
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-215
+    depends_on:
+      - WED-240
+      - WED-244
+      - WED-246
+    files:
+      - solid-ui/src/components/WeddingVendorSearchHomeSections.tsx
+      - solid-ui/src/components/WeddingVendorChoiceCard.tsx
+      - solid-ui/src/components/WeddingVendorOutreachComposer.tsx
+      - solid-ui/src/components/WeddingPlanningTasksPanel.tsx
+      - solid-ui/src/components/WeddingVisionPanel.tsx
+      - solid-ui/src/components/WeddingSeatingPanel.tsx
+      - solid-ui/src/components/WeddingWorkspaceContextPanels.tsx
+      - solid-ui/src/lib/wedding*.ts
+      - solid-ui/tests/wedding-*.test.ts
+      - solid-ui/tests/e2e/wedding-*.spec.ts
+      - Documents/verification/**
+      - .agent/**
+    acceptance:
+      - searches and category shortcuts launched from wedding home remain on home and reveal the exact comparison in place; the dedicated vendor search submit control also reveals its result
+      - guest count remains couple-owned input while venues are asked only for room capacities, and ranking explanations state concrete user-facing reasons for shortlist inclusion
+      - task cards expose owner, consult and last-contact context from the shared task projection, and consult supports an accessible inline wedding-contact creation flow
+      - vision additions and preference tags persist across a fresh tab and parse coordinated adjectives without merging separate values
+      - vendor addresses reveal an interactive map, transport logistics produce source-labelled findings and actions in context, and outreach exposes a dependable formatting toolbar with paragraph and onboarding signature preservation
+      - Seating provides a mobile-safe 2D table canvas with table placement, guest reassignment and privacy-bounded person detail while retaining AFP-backed apply semantics
+      - WED-225 machine evidence that can be reproduced locally is refreshed, but independent human, external provider, hosted-shadow and cohort records are never fabricated
+      - every new file remains below 1000 lines, oversized owners do not grow, rollout flags remain disabled, relevant checks pass, and the committed result is deployed to Oracle without vendor source data
+    progress:
+      - registered from committed and deployed WED-246 revision db43dbd after reproducing the reported production interaction gaps

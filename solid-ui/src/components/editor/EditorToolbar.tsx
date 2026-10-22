@@ -174,7 +174,7 @@ export function EditorToolbar(props: {
   const s = () => props.state;
 
   return (
-    <div class="flex flex-wrap items-center gap-0.5 border-b border-black/[0.06] bg-black/[0.02] px-2 py-1.5">
+    <div class="flex flex-wrap items-center gap-0.5 border-b border-black/[0.06] bg-black/[0.02] px-2 py-1.5" role="toolbar" aria-label="Text formatting">
 
       {/* Compact + Full + Email: basic formatting */}
       <ToolBtn active={s().bold} title="Bold (Ctrl+B)" onClick={() => e().chain().focus().toggleBold().run()}>B</ToolBtn>

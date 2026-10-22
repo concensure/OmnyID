@@ -35,6 +35,21 @@ function rowForComponent(
   return { anchor, status: "unknown", detail: unknownDetail, componentId: item.id, verifyQuestion: `Could you confirm ${anchor.toLowerCase()}?` };
 }
 
+function capacityRow(
+  item: WeddingVendorUtilityComponent | undefined,
+  guestCount: string,
+): WeddingVendorAnchorRow {
+  const anchor = `Capacity for ${guestCount} guests`;
+  const verifyQuestion = "Could you share the seated and standing capacity for each relevant space?";
+  if (!item?.known || (item.value >= 0.4 && item.value < 0.6)) {
+    return { anchor, status: "unknown", detail: "Space capacities are not confirmed yet", componentId: item?.id ?? "capacity", verifyQuestion };
+  }
+  if (item.value >= 0.6) {
+    return { anchor, status: "met", detail: "The recorded capacity fits your planned guest count", componentId: item.id, verifyQuestion: null };
+  }
+  return { anchor, status: "not_met", detail: "The recorded capacity does not fit your planned guest count", componentId: item.id, verifyQuestion: null };
+}
+
 /**
  * Creates the deliberately conservative v1 rows. A missed keyword is unknown,
  * never a negative: only a later facet reason ledger may produce a style con.
@@ -67,13 +82,16 @@ export function weddingVendorAnchorRows(
   const location = clean(requirements.location);
   if (location) rows.push(rowForComponent(location, component(candidate, "location"), "Location match not confirmed"));
   if (clean(requirements.budgetComfort)) rows.push(rowForComponent("Budget", component(candidate, "cost"), "No price on record"));
-  if (clean(requirements.guestCount)) rows.push(rowForComponent("Guests", component(candidate, "capacity"), "Capacity not confirmed"));
+  const guestCount = clean(requirements.guestCount);
+  if (guestCount) rows.push(capacityRow(component(candidate, "capacity"), guestCount));
   return rows.slice(0, 4);
 }
 
 export function weddingVendorVerifyQuestions(rows: readonly WeddingVendorAnchorRow[], unknownConstraints: readonly string[]): string[] {
   const questions = [
-    ...unknownConstraints.map((constraint) => `Could you confirm ${constraint}?`),
+    ...unknownConstraints.map((constraint) => /guest|capacity/i.test(constraint)
+      ? "Could you share the seated and standing capacity for each relevant space?"
+      : `Could you confirm ${constraint}?`),
     ...rows.flatMap((row) => row.status === "unknown" && row.verifyQuestion ? [row.verifyQuestion] : []),
   ];
   return [...new Set(questions)].slice(0, 3);

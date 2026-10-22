@@ -1,5 +1,5 @@
 // @locs-version: 1.0
-import { For, Show } from "solid-js";
+import { createMemo, createSignal, For, Show } from "solid-js";
 
 import { WeddingDashboardIcon, type WeddingDashboardIconId } from "@/components/WeddingDashboardIcons";
 import { WeddingDateEntryControl } from "@/components/WeddingDateEntryControl";
@@ -91,6 +91,12 @@ export function WeddingHomeOverviewGrid(props: {
   const timeline = () => buildWeddingHomeTimelineOverview(props.state);
   const tiles = () => buildWeddingHomeOverviewActionTiles(props.state);
   const tile = (id: Domain) => tiles().find((item) => item.id === id);
+  const [transportOpen, setTransportOpen] = createSignal(false);
+  const transportTask = () => /transport|trackwork|guest logistics|access/i.test(timeline().detailLabel);
+  const destination = createMemo(() => props.state.workspace.artifacts
+    .flatMap((artifact) => artifact.locationLabels)
+    .find((label) => label.trim().length > 0) ?? "your selected wedding venue");
+  const encodedDestination = () => encodeURIComponent(destination());
   const openTile = (id: Domain) => {
     const selected = tile(id);
     if (selected?.menuId) props.onSelectMenu?.(selected.menuId);
@@ -99,6 +105,10 @@ export function WeddingHomeOverviewGrid(props: {
     }, 0);
   };
   const openTimeline = () => {
+    if (transportTask()) {
+      setTransportOpen((current) => !current);
+      return;
+    }
     props.onSelectMenu?.(timeline().menuId);
   };
 
@@ -124,6 +134,22 @@ export function WeddingHomeOverviewGrid(props: {
           </button>
         }>
           <div class="mt-4 rounded-lg border border-wedding-border bg-wedding-page p-3"><WeddingDateEntryControl onSave={props.onSaveWeddingDate!} locale="en-AU" compact /></div>
+        </Show>
+        <Show when={transportOpen()}>
+          <section class="mt-3 rounded-lg border border-wedding-border bg-wedding-page p-4" aria-label="Transport and access check">
+            <div class="flex flex-wrap items-start justify-between gap-2"><div><p class="text-sm font-semibold text-wedding-ink">Transport and access check</p><p class="mt-1 text-xs text-wedding-ink/65">For {destination()}</p></div><button type="button" class="min-h-10 rounded-lg border border-wedding-border bg-white px-3 text-xs font-semibold" onClick={() => setTransportOpen(false)}>Close</button></div>
+            <ul class="mt-3 list-disc space-y-2 pl-5 text-sm leading-6 text-wedding-ink/75">
+              <li>Destination from the wedding plan: <strong>{destination()}</strong>.</li>
+              <li>{weddingDate() ? `Wedding date on record: ${dateLabel(weddingDate())}.` : "Add the wedding date before relying on disruption or trackwork checks."}</li>
+              <li>Live disruptions change frequently. Open the official alert immediately before publishing guest travel advice.</li>
+            </ul>
+            <div class="mt-3 flex flex-wrap gap-2">
+              <a class="min-h-11 rounded-lg bg-wedding-primary px-3 py-3 text-xs font-semibold text-white" href="https://transportnsw.info/alerts" target="_blank" rel="noreferrer">Check official disruptions</a>
+              <a class="min-h-11 rounded-lg border border-wedding-secondary bg-white px-3 py-3 text-xs font-semibold text-wedding-secondary" href={`https://transportnsw.info/trip#/trip?to=${encodedDestination()}`} target="_blank" rel="noreferrer">Plan train and bus route</a>
+              <a class="min-h-11 rounded-lg border border-wedding-secondary bg-white px-3 py-3 text-xs font-semibold text-wedding-secondary" href={`https://www.google.com/maps/dir/?api=1&destination=${encodedDestination()}&travelmode=transit`} target="_blank" rel="noreferrer">Compare public transport</a>
+            </div>
+            <p class="mt-3 text-xs leading-5 text-wedding-ink/60">These links use the destination shown above. OmnyID does not mark a route or disruption as verified until the official source has been checked.</p>
+          </section>
         </Show>
       </article>
 

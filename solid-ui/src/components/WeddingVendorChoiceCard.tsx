@@ -11,6 +11,7 @@ import type { WeddingWorkspaceArtifactPreview } from "@/lib/weddingResponseWorks
 import type { WeddingVendorAvailabilityState } from "@/lib/weddingVendorRankingState";
 import { weddingVendorPhotoPlaceholder } from "@/lib/weddingVendorPhotoPlaceholderState";
 import { weddingVendorRoomPhotoSrc } from "@/lib/weddingVendorRoomState";
+import { WeddingVendorInlineMap } from "@/components/WeddingVendorInlineMap";
 import { weddingVendorChoiceActionState, type WeddingVendorChoiceIntent } from "@/lib/weddingVendorChoiceActionState";
 import type { WeddingPreferenceSignalReason } from "@/lib/weddingPreferenceSignalState";
 import {
@@ -58,6 +59,7 @@ export function WeddingVendorChoiceCard(props: {
 }) {
   const card = props.card;
   const [contactOpen, setContactOpen] = createSignal(false);
+  const [mapOpen, setMapOpen] = createSignal(false);
   const [feedbackOpen, setFeedbackOpen] = createSignal(false);
   const [feedbackSaving, setFeedbackSaving] = createSignal(false);
   const [feedbackError, setFeedbackError] = createSignal<string | null>(null);
@@ -131,11 +133,15 @@ export function WeddingVendorChoiceCard(props: {
   const verifyQuestions = () => Array.isArray(card.verifyQuestions) ? card.verifyQuestions : [];
   const rooms = () => Array.isArray(card.rooms) ? card.rooms : [];
   const rankingReasons = () => {
-    const anchored = anchorRows().map((row) => `${row.anchor}: ${row.detail}`);
+    const anchored = anchorRows()
+      .filter((row) => row.status === "met")
+      .map((row) => `${row.anchor} matches what you asked for: ${row.detail.toLowerCase()}.`);
     if (anchored.length > 0) return anchored;
     const saved = [card.preferenceMatch, card.situationFit, ...(card.rationaleLabels ?? [])]
       .filter((label): label is string => Boolean(label?.trim()) && !/review manually|requires source-page review/i.test(label));
-    return saved.length > 0 ? saved : ["No confirmed fit reason is available yet. Compare the source and open questions before contacting them."];
+    return saved.length > 0
+      ? saved
+      : ["This option is in the comparison because the search found source-backed vendor details to review. Capacity, price, and preference fit still need checking before treating it as a recommendation."];
   };
   const feedbackReasons = () => {
     const allowed = new Set(card.feedbackReasonIds ?? ["not_our_style", "too_far", "too_expensive", "other"]);
@@ -263,18 +269,27 @@ export function WeddingVendorChoiceCard(props: {
                     <div class="grid gap-1 text-[11px] sm:grid-cols-[4.5rem_1fr]">
                       <dt class="font-semibold text-wedding-ink/65">{row.label}</dt>
                       <dd class="min-w-0 break-words text-wedding-ink">
-                        <Show when={row.href} fallback={row.value}>
-                          {(href) => (
-                            <a href={href()} target={row.label === "Email" || row.label === "Phone" ? undefined : "_blank"} rel="noreferrer" class="text-wedding-secondary underline decoration-wedding-border underline-offset-2">
-                              {row.value}
-                            </a>
-                          )}
+                        <Show when={row.label === "Address"} fallback={
+                          <Show when={row.href} fallback={row.value}>
+                            {(href) => (
+                              <a href={href()} target={row.label === "Email" || row.label === "Phone" ? undefined : "_blank"} rel="noreferrer" class="text-wedding-secondary underline decoration-wedding-border underline-offset-2">
+                                {row.value}
+                              </a>
+                            )}
+                          </Show>
+                        }>
+                          <button type="button" class="text-left text-wedding-secondary underline decoration-wedding-border underline-offset-2" aria-expanded={mapOpen()} onClick={() => setMapOpen((value) => !value)}>
+                            {row.value}
+                          </button>
                         </Show>
                       </dd>
                     </div>
                   )}
                 </For>
               </dl>
+              <Show when={mapOpen() && card.address}>
+                {(address) => <WeddingVendorInlineMap address={address()} externalMapUrl={card.mapUrl} />}
+              </Show>
             </Show>
           </div>
         </Show>
@@ -283,7 +298,9 @@ export function WeddingVendorChoiceCard(props: {
           <ul class="space-y-1 pb-2">
             <For each={rankingReasons()}>{(reason) => <li>{reason}</li>}</For>
           </ul>
-          <p class="pb-2 text-[11px]">{card.scoreLabel}</p>
+          <Show when={!/fit not yet assessable/i.test(card.scoreLabel ?? "")}>
+            <p class="pb-2 text-[11px]">{card.scoreLabel}</p>
+          </Show>
         </details>
         <div class="flex flex-wrap gap-1.5">
           <Show when={props.onToggleFollowUp}>

@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   formatWeddingVendorOutreachParagraphs,
+  formatWeddingVendorOutreachForDisplay,
   weddingVendorOutreachCoupleFromWorkspace,
 } from "@/lib/useWeddingVendorOutreachOwner";
 
@@ -44,6 +45,12 @@ test("outreach falls back to the wedding date and budget tracker when intake mes
 
   assert.equal(couple.date_or_season, "12 October 2027");
   assert.equal(couple.budget_comfort, "AUD $45,000 total budget");
+});
+
+test("persisted outreach drafts are reformatted and signed with onboarding names", () => {
+  const body = formatWeddingVendorOutreachForDisplay("Hello team. Could you share availability? Thank you.", "Alex and Sam");
+  assert.match(body, /Hello team\.\n\nCould you share availability\?/);
+  assert.match(body, /Kind regards,\n\nAlex and Sam$/);
 });
 
 test("provider prose is split into readable paragraphs and duplicate budget wording is removed", () => {

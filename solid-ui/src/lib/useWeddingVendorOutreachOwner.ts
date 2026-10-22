@@ -81,6 +81,15 @@ export function formatWeddingVendorOutreachParagraphs(value: string): string {
   return sentences.join("\n\n");
 }
 
+export function formatWeddingVendorOutreachForDisplay(value: string, coupleNames?: string | null): string {
+  let result = formatWeddingVendorOutreachParagraphs(value);
+  const names = nonEmptyString(coupleNames)?.replace(/\s+/g, " ") ?? null;
+  if (names && !result.toLowerCase().endsWith(names.toLowerCase())) {
+    result = `${result}\n\nKind regards,\n\n${names}`;
+  }
+  return result;
+}
+
 export function normalizeWeddingBudgetComfort(value: unknown): string | null {
   const raw = nonEmptyString(value);
   if (!raw) return null;
@@ -156,11 +165,14 @@ export function useWeddingVendorOutreachOwner(input: {
   createEffect(() => {
     const persisted = projectWeddingVendorOutreachFlows(input.state().afpMessages);
     if (persisted.length === 0) return;
+    const couple = weddingVendorOutreachCoupleFromWorkspace({ contextCards: input.state().contextCards });
     setVendorOutreachFlows((current) => {
       const next = { ...current };
       for (const flow of persisted) {
+        const formattedBody = formatWeddingVendorOutreachForDisplay(flow.bodyMarkdown, couple.couple_names);
+        const normalizedFlow = formattedBody === flow.bodyMarkdown ? flow : { ...flow, bodyMarkdown: formattedBody, bodyHtml: null };
         const live = next[flow.choiceId];
-        if (!live || flow.stage === "sent" || live.stage === "idle") next[flow.choiceId] = flow;
+        if (!live || flow.stage === "sent" || live.stage === "idle") next[flow.choiceId] = normalizedFlow;
       }
       return next;
     });
@@ -221,7 +233,7 @@ export function useWeddingVendorOutreachOwner(input: {
       if (!saveProjection) throw new Error("Could not save the draft yet. Reconnect the wedding workspace and try again.");
       const persistedFlow = weddingVendorOutreachDraftSucceeded(flow, {
         subject: result.subject,
-        bodyMarkdown: formatWeddingVendorOutreachParagraphs(result.bodyMarkdown),
+        bodyMarkdown: formatWeddingVendorOutreachForDisplay(result.bodyMarkdown, couple.couple_names),
         bodyHtml: null,
         groundedOnLabels,
       });

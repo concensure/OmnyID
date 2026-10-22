@@ -1543,12 +1543,12 @@ export function ResponseQueueView(props: {
     input.value = "";
   }
 
-  async function runLiveWeddingVendorSearch(options?: { stayOnHome?: boolean; category?: string; materialFingerprint?: string }): Promise<boolean> {
+  async function runLiveWeddingVendorSearch(options?: { stayOnHome?: boolean; category?: string; materialFingerprint?: string; background?: boolean }): Promise<boolean> {
     const intent = weddingNavigationIntent();
     const workspace = weddingWorkspace();
     if (!intent || intent.surface !== "planning_files" || !workspace || weddingVendorSearchRunning()) return false;
     setWeddingVendorSearchRunning(true);
-    if (!options?.stayOnHome) {
+    if (!options?.background) {
       setWeddingVendorSearchResultAction(null);
       saveWeddingVendorSearchSession(workspace.workspace.metadata.responseWorkspaceId, editedWeddingVendorSearchSession(currentWeddingVendorSearchQuery()), localStorage, weddingStorageUserId());
     }
@@ -1741,7 +1741,7 @@ export function ResponseQueueView(props: {
       // home update, where they do not interrupt the person using another tab.
       setWeddingWorkspaceMenu(options?.stayOnHome ? "home" : "response_queue");
       setWeddingVendorSearchCategoryScope(null);
-      if (!options?.stayOnHome) {
+      if (!options?.background) {
         setWeddingVendorSearchResultAction(resultAction);
         saveWeddingVendorSearchSession(metadata.responseWorkspaceId, completedWeddingVendorSearchSession(freeformQuery || currentWeddingVendorSearchQuery(), resultAction), localStorage, weddingStorageUserId());
       }
@@ -1758,7 +1758,7 @@ export function ResponseQueueView(props: {
     }
   }
 
-  useWeddingVendorShortlistLaunch({ enabled: () => weddingAutomaticShortlistEnabled(import.meta.env.VITE_WEDDING_AUTOMATIC_SHORTLIST_ENABLED), coordinatorInput: () => ({ weddingPlanId: weddingWorkspace()?.workspace.metadata.weddingPlanId, location: weddingVendorSearchServiceArea(), onboardingPriorities: linesFromText(weddingFollowUpPriorities()), unbookedCategories: weddingVendorSelectionLabels(weddingFollowUpVendorIds()), guestCount: weddingFollowUpGuests(), budgetComfort: weddingFollowUpBudget(), dateOrSeason: weddingFollowUpDate(), preferences: [weddingFollowUpPriorities(), weddingFollowUpAtmosphere()].filter(Boolean).join("; "), rankingPolicyVersion: weddingVendorRankingPolicyV2Enabled(import.meta.env) ? "2" : "1" }), storage: localStorage, searchRunning: weddingVendorSearchRunning, run: (category, materialFingerprint) => runLiveWeddingVendorSearch({ stayOnHome: true, category, materialFingerprint }) });
+  useWeddingVendorShortlistLaunch({ enabled: () => weddingAutomaticShortlistEnabled(import.meta.env.VITE_WEDDING_AUTOMATIC_SHORTLIST_ENABLED), coordinatorInput: () => ({ weddingPlanId: weddingWorkspace()?.workspace.metadata.weddingPlanId, location: weddingVendorSearchServiceArea(), onboardingPriorities: linesFromText(weddingFollowUpPriorities()), unbookedCategories: weddingVendorSelectionLabels(weddingFollowUpVendorIds()), guestCount: weddingFollowUpGuests(), budgetComfort: weddingFollowUpBudget(), dateOrSeason: weddingFollowUpDate(), preferences: [weddingFollowUpPriorities(), weddingFollowUpAtmosphere()].filter(Boolean).join("; "), rankingPolicyVersion: weddingVendorRankingPolicyV2Enabled(import.meta.env) ? "2" : "1" }), storage: localStorage, searchRunning: weddingVendorSearchRunning, run: (category, materialFingerprint) => runLiveWeddingVendorSearch({ stayOnHome: true, category, materialFingerprint, background: true }) });
 
   function installWeddingVendorSmokeFixture() {
     const intent = weddingNavigationIntent();

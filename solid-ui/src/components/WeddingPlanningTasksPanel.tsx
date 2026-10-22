@@ -1,5 +1,6 @@
 // @locs-version: 1.0
 import { createMemo, createSignal, For, Show } from "solid-js";
+import { WeddingTaskResponsibilityFields } from "@/components/WeddingTaskResponsibilityFields";
 
 import type { SendAfpMessageInput } from "@/lib/api";
 import {
@@ -33,6 +34,7 @@ export function WeddingPlanningTasksPanel(props: {
   state: WeddingResponseWorkspaceViewState;
   saveProjection?: ((input: SendAfpMessageInput) => Promise<unknown>) | null;
   onRefreshWorkspace?: (() => void) | null;
+  contactUserId?: string | null;
 }) {
   const workspaceId = () => props.state.workspace.metadata.responseWorkspaceId;
   const initial = loadWeddingHelperLocalState(workspaceId());
@@ -128,6 +130,13 @@ export function WeddingPlanningTasksPanel(props: {
               </div>
               <Show when={expandedTaskIds()[task.id]}>
                 <div class="border-t border-wedding-border bg-white p-4">
+                  <WeddingTaskResponsibilityFields
+                    task={task}
+                    state={props.state}
+                    saveProjection={props.saveProjection}
+                    onRefreshWorkspace={props.onRefreshWorkspace}
+                    contactUserId={props.contactUserId}
+                  />
                   <Show when={decisionTask(task)?.decisions.length} fallback={<p class="text-sm text-wedding-ink/65">No decision options are attached to this task yet.</p>}>
                     <ol class="space-y-3">
                       <For each={decisionTask(task)?.decisions ?? []}>{(decision, index) => (

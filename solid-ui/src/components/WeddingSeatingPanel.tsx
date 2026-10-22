@@ -3,6 +3,7 @@ import { createMemo, createSignal, For, Show } from "solid-js";
 
 import { WeddingDashboardIcon } from "@/components/WeddingDashboardIcons";
 import { WeddingInfoTip } from "@/components/WeddingInfoTip";
+import { WeddingSeatingCanvas } from "@/components/WeddingSeatingCanvas";
 import type { SendAfpMessageInput } from "@/lib/api";
 import type { WeddingResponseWorkspaceViewState } from "@/lib/weddingResponseWorkspaceViewState";
 import {
@@ -495,6 +496,16 @@ export function WeddingSeatingPanel(props: {
             </div>
           </div>
         )}
+      </Show>
+      <Show when={props.state.seatingPlan.optimizationPeople.length > 0}>
+        <WeddingSeatingCanvas
+          workspaceId={props.state.workspace.metadata.responseWorkspaceId}
+          people={props.state.seatingPlan.optimizationPeople}
+          tables={props.state.seatingPlan.optimizationTables}
+          result={displayedPreview()}
+          saving={saving()}
+          onApply={(result) => void saveAlternativeDraft(result)}
+        />
       </Show>
       <Show when={props.state.seatingPlan.tableBriefs.length > 0}>
         <div class="mt-3 rounded-2xl border border-sky-100 bg-white/75 p-3">

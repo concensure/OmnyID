@@ -1,5 +1,5 @@
 // @locs-version: 1.0
-import { For, Show, createEffect, createMemo, createSignal } from "solid-js";
+import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount } from "solid-js";
 
 import type { SendAfpMessageInput } from "@/lib/api";
 import { buildWeddingVisionState } from "@/lib/weddingVisionState";
@@ -11,6 +11,7 @@ import { weddingVisionPreferenceToAfpSendInput } from "@/lib/weddingVisionPrefer
 import { buildWeddingVisionTagButtonState } from "@/lib/weddingVisionTagButtonState";
 import type { WeddingResponseWorkspaceViewState } from "@/lib/weddingResponseWorkspaceViewState";
 import type { WeddingWorkspaceMenuId } from "@/lib/weddingWorkspaceMenuState";
+import { parseWeddingFeelTagInput } from "@/lib/weddingVisionFeelTagState";
 
 function Rating(props: { count: number }) {
   return <span aria-label={`${props.count} out of 5`}>{props.count}/5</span>;
@@ -18,6 +19,7 @@ function Rating(props: { count: number }) {
 
 function noteFeelTags(note: string): string[] {
   const tags = [
+    ...parseWeddingFeelTagInput(note),
     /warm|candle|intimate/i.test(note) ? "Warm" : null,
     /relaxed|casual|informal/i.test(note) ? "Relaxed" : null,
     /guest|family|friend|social/i.test(note) ? "Social" : null,
@@ -61,6 +63,7 @@ export function WeddingVisionPanel(props: {
   const [localFeelTagActions, setLocalFeelTagActions] = createSignal<Record<string, "affirm" | "remove">>({});
   const [overrideRefresh, setOverrideRefresh] = createSignal(0);
   const workspaceId = () => props.state.workspace.metadata.responseWorkspaceId;
+  const notesStorageKey = () => `omnyid:wedding_vision_notes:v1:${workspaceId()}`;
   const storageKey = () => `omnyid:wedding_vision_override:${workspaceId()}`;
   const storedOverride = () => {
     overrideRefresh();
@@ -88,6 +91,26 @@ export function WeddingVisionPanel(props: {
   })) ?? vision().priorityRows;
   const avoidLabels = () => splitLines(overrides().avoidLabels) ?? vision().avoidLabels;
   const decisionRules = () => splitLines(overrides().decisionRules) ?? vision().decisionRules;
+
+  function readSavedNotes(): string[] {
+    try {
+      const value = JSON.parse(localStorage.getItem(notesStorageKey()) ?? "[]");
+      return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string" && item.trim().length > 0).slice(0, 8) : [];
+    } catch { return []; }
+  }
+
+  function persistSavedNotes(notes: readonly string[]): void {
+    try { localStorage.setItem(notesStorageKey(), JSON.stringify(notes.slice(0, 8))); } catch { /* AFP remains authoritative */ }
+  }
+
+  onMount(() => {
+    setSavedAgentNotes(readSavedNotes());
+    const sync = (event: StorageEvent) => {
+      if (event.key === notesStorageKey()) setSavedAgentNotes(readSavedNotes());
+    };
+    window.addEventListener("storage", sync);
+    onCleanup(() => window.removeEventListener("storage", sync));
+  });
 
   createEffect(() => {
     setFeelDraft(feelTags().join("\n"));
@@ -157,7 +180,11 @@ export function WeddingVisionPanel(props: {
     if (!note) return;
     try {
       const saved = await saveVisionNote(note, "Wedding vision note");
-      setSavedAgentNotes((notes) => [note, ...notes.filter((existing) => existing !== note)].slice(0, 4));
+      setSavedAgentNotes((notes) => {
+        const next = [note, ...notes.filter((existing) => existing !== note)].slice(0, 8);
+        persistSavedNotes(next);
+        return next;
+      });
       setAgentNote("");
       setSaveNotice(saved === "remote"
         ? "Note sent to OmnyID and added to the wedding compass."

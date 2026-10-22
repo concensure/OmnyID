@@ -172,6 +172,7 @@ export function WeddingVendorSearchHomeSection(props: {
   feedbackNotice?: string | null;
   onConfirmFeedbackSuggestion?: () => void;
   onDismissFeedbackSuggestion?: () => void;
+  stayOnHome?: boolean;
 }) {
   const workspace = () => props.workspace;
   const [fullResultExpanded, setFullResultExpanded] = createSignal(false);
@@ -212,10 +213,14 @@ export function WeddingVendorSearchHomeSection(props: {
     return weddingVendorSearchNoticeCopy(workspace().vendorSearchNotice);
   };
   const visibleBlockedReason = () => weddingVendorSearchBlockedCopy(workspace().vendorSearchBlockedReason);
+  function runSearch(): void {
+    if (props.stayOnHome) workspace().onRunLiveVendorSearch?.({ stayOnHome: true });
+    else workspace().onRunLiveVendorSearch?.();
+  }
   function runCategorySearch(query: string): void {
     if (searchDisabled()) return;
     workspace().onVendorSearchQueryChange?.(query);
-    queueMicrotask(() => workspace().onRunLiveVendorSearch?.());
+    queueMicrotask(runSearch);
   }
   const isSelectedCategory = (query: string) => workspace().vendorSearchQuery?.trim().toLowerCase() === query.toLowerCase();
   createEffect(() => {
@@ -239,7 +244,11 @@ export function WeddingVendorSearchHomeSection(props: {
           if (input instanceof HTMLInputElement) {
             workspace().onVendorSearchQueryChange?.(input.value);
           }
-          if (!searchDisabled()) workspace().onRunLiveVendorSearch?.();
+          if (!searchDisabled()) {
+            // The draft input commits to workspace state first. Defer the run
+            // so the search always sees the text visible in the field.
+            queueMicrotask(runSearch);
+          }
         }}
       >
       <div class="min-w-0">
