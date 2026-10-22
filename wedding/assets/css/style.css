@@ -476,6 +476,13 @@ main:focus{ outline:none; }
 .cta-band h2{ font-size: clamp(26px,4vw,36px); }
 .cta-band p{ margin-top:14px; color: var(--ink-soft); max-width:480px; margin-inline:auto; }
 .cta-band .hero-cta{ justify-content:center; margin-top:28px; }
+.cost-breakdown{ margin:24px auto; max-width:560px; text-align:left; background: var(--paper); border:1px solid var(--line); border-radius: var(--r-sm); padding:20px; }
+.cost-breakdown h4{ font-size:18px; }
+.cost-breakdown .cost-note{ margin:6px 0 12px; max-width:none; font-size:13px; }
+.cost-table{ width:100%; border-collapse:collapse; font-size:14.5px; }
+.cost-table td{ padding:8px 0; border-top:1px solid var(--line); vertical-align:top; }
+.cost-table td:last-child{ text-align:right; white-space:nowrap; }
+.cost-table tr.is-total td{ font-weight:600; border-top:2px solid var(--ink-soft); }
 
 /* ---------- footer ---------- */
 .site-footer{ border-top:1px solid var(--line); padding: 64px 0 32px; margin-top:40px; }

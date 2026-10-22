@@ -414,6 +414,71 @@
       understandingStatus.textContent = message;
       understandingStatus.className = 'newsletter-status' + (kind ? ' is-' + kind : '');
     }
+    var UNDERSTANDING_FALLBACK_ERROR = 'We could not reflect this right now. Please try again in a little while.';
+    // Rough Sydney ranges in AUD for orientation only; real quotes vary by vendor and date.
+    var COST_COMPONENTS = [
+      { label: 'Venue hire', flat: [3000, 10000] },
+      { label: 'Catering and drinks', perGuest: [120, 220] },
+      { label: 'Photography', flat: [3000, 6000] },
+      { label: 'Videography', flat: [2000, 4500] },
+      { label: 'Attire, hair and makeup', flat: [2500, 6000] },
+      { label: 'Flowers and styling', flat: [2000, 6000] },
+      { label: 'Music and entertainment', flat: [1500, 4500] },
+      { label: 'Celebrant and legal', flat: [600, 1200] },
+      { label: 'Stationery, cake and transport', flat: [1500, 4000] }
+    ];
+    var DEFAULT_GUESTS = 80;
+    function guestCountFrom(text) {
+      var match = /(\d{1,3})\s*(?:guests?|people|ppl|pax)\b/i.exec(text) || /\b(?:guests?|people)\s*(?:of|:|about|around)?\s*(\d{1,3})\b/i.exec(text);
+      var count = match ? parseInt(match[1], 10) : 0;
+      return count >= 10 && count <= 300 ? count : 0;
+    }
+    function money(value) {
+      return '$' + (Math.round(value / 100) * 100).toLocaleString('en-AU');
+    }
+    function renderCostBreakdown(text) {
+      var container = understandingResult.querySelector('[data-understanding-costs]');
+      var body = container.querySelector('[data-costs-body]');
+      var guests = guestCountFrom(text);
+      var count = guests || DEFAULT_GUESTS;
+      var lowTotal = 0;
+      var highTotal = 0;
+      body.textContent = '';
+      function addRow(label, low, high, isTotal) {
+        var row = document.createElement('tr');
+        if (isTotal) row.className = 'is-total';
+        var name = document.createElement('td');
+        name.textContent = label;
+        var range = document.createElement('td');
+        range.textContent = money(low) + ' – ' + money(high);
+        row.appendChild(name);
+        row.appendChild(range);
+        body.appendChild(row);
+      }
+      COST_COMPONENTS.forEach(function (item) {
+        var low = item.perGuest ? item.perGuest[0] * count : item.flat[0];
+        var high = item.perGuest ? item.perGuest[1] * count : item.flat[1];
+        lowTotal += low;
+        highTotal += high;
+        addRow(item.label, low, high, false);
+      });
+      addRow('Estimated total', lowTotal, highTotal, true);
+      container.querySelector('[data-costs-note]').textContent = (guests
+        ? 'Based on the ' + count + ' guests you mentioned. '
+        : 'You did not mention a guest count, so this assumes ' + count + ' guests. ') +
+        'Rough Sydney ranges in AUD for orientation only, not quotes.';
+      container.hidden = false;
+    }
+    function failureMessage(response) {
+      if (response.status === 429) return 'You have reached the limit for today. Please try again tomorrow.';
+      var type = response.headers.get('content-type') || '';
+      if (response.status === 400 && type.indexOf('text/plain') === 0) {
+        return response.text().then(function (body) {
+          return body && body.length < 200 ? body : UNDERSTANDING_FALLBACK_ERROR;
+        });
+      }
+      return UNDERSTANDING_FALLBACK_ERROR;
+    }
     function imagePayload(file) {
       return new Promise(function (resolve, reject) {
         if (!/^image\/(jpeg|png|webp)$/.test(file.type)) {
@@ -459,11 +524,13 @@
           });
         })
         .then(function (response) {
-          if (!response.ok) return response.text().then(function (body) { throw new Error(body || 'We could not reflect this yet.'); });
+          if (!response.ok) {
+            return Promise.resolve(failureMessage(response)).then(function (message) { throw new Error(message); });
+          }
           return response.json();
         })
         .then(function (result) {
-          if (!result.core_theme) throw new Error('We could not reflect this yet.');
+          if (!result || !result.core_theme) throw new Error(UNDERSTANDING_FALLBACK_ERROR);
           var record = {
             version: 1,
             created_at: new Date().toISOString(),
@@ -479,11 +546,15 @@
           understandingResult.querySelector('[data-understanding-theme]').textContent = record.core_theme;
           understandingResult.querySelector('[data-understanding-pairs]').textContent = record.preferences.map(function (pair) { return pair.a + ' over ' + pair.b; }).join(' · ');
           understandingResult.querySelector('[data-understanding-tension]').textContent = record.largest_tension || '';
+          renderCostBreakdown(text);
           understandingResult.hidden = false;
           understandingResult.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'nearest' });
           understandingMessage('Your result is ready.', 'success');
         })
-        .catch(function (error) { understandingMessage(error.message || 'We could not reflect this yet.', 'error'); })
+        .catch(function (error) {
+          var known = error instanceof Error && !(error instanceof SyntaxError) && !(error instanceof TypeError);
+          understandingMessage(known && error.message ? error.message : UNDERSTANDING_FALLBACK_ERROR, 'error');
+        })
         .then(function () { button.disabled = false; });
     });
   }
