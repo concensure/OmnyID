@@ -41,7 +41,6 @@ pub use wedding_vendor_rooms::{
     WeddingVendorRoomExternalPhoto, WeddingVendorRoomPhotoRecord, WeddingVendorRoomRecord,
     WeddingVendorRoomUpsertRecord,
 };
-
 const TENANT_PRIVATE_SCHEMA_REQUIRED_TABLES: &[&str] = &[
     "messages",
     "attachments",
