@@ -3125,7 +3125,7 @@ tasks:
       - App shrank to 5493 lines and ResponseQueue shrank to 2086 lines; all new files are below 170 lines and no oversized owner grew
   - id: WED-247
     title: Keep wedding actions in context and add collaborative tasks and visual seating
-    status: in_progress
+    status: complete
     owner: codex
     branch: agent/codex/WED-215
     depends_on:
@@ -3156,3 +3156,11 @@ tasks:
       - every new file remains below 1000 lines, oversized owners do not grow, rollout flags remain disabled, relevant checks pass, and the committed result is deployed to Oracle without vendor source data
     progress:
       - registered from committed and deployed WED-246 revision db43dbd after reproducing the reported production interaction gaps
+      - wedding-home freeform and category searches now retain the home route and attach the exact successful comparison; the dedicated search submit defers until the entered query is committed, while background shortlist runs remain non-navigating
+      - venue guest semantics now keep attendance couple-owned, ask vendors for seated and standing capacities by space, deduplicate legacy guest/capacity prompts, and explain shortlist inclusion from confirmed user-facing evidence instead of unknown fit scores
+      - expanded shared task cards now expose owner, consult, last contact and inline wedding-contact creation; persisted vision notes synchronise across tabs and coordinated descriptors are split and typo-normalised without treating planning instructions as mood tags
+      - vendor addresses reveal an explicit-load map with zoom controls, logistics tasks reveal plan-grounded official transport and route sources in place, and outreach drafts retain visible formatting controls, paragraph structure and onboarding-name signatures
+      - Seating now provides a mobile-safe visual floor with round/long tables, draggable or tap-to-assign guests, capacity feedback, privacy-bounded hover/focus details and the existing AFP-backed apply path
+      - the exact application revision 7fc7172 passed the WED-225 local deterministic, Rust, SDK, browser, migration, wedding, build and line-budget checks plus disposable Postgres and live clamd tests; the later commits change only Oracle staging and the ledger, while readiness remains blocked on named independent/provider/hosted/cohort records and all release, vendor-mail and ranking-policy-V2 flags stay off
+      - Oracle runtime staging now excludes postgres/data by construction and self-test; commits 245bcf5, 7fc7172 and c3d4f7e are committed, production source hashes match, the source-data path is absent remotely, workspace HTTP is 200 and the post-deploy health/backup-integrity proof passes
+      - the isolated Oracle restore drill failed after its bounded run under temporary disk pressure while backup verification passed; cleanup restored root usage from 96 percent to 79 percent, so application deployment is live but restore-drill operational readiness is not claimed

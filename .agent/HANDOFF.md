@@ -1,3 +1,39 @@
+## 2026-10-23 - WED-247 in-context wedding actions, collaborative tasks, seating canvas, and Oracle deployment (Codex, complete)
+
+Changed:
+
+- Kept home vendor queries and category shortcuts on Wedding Home, repaired the dedicated submit
+  timing, corrected venue guest/capacity semantics, and made ranking explanations cite confirmed
+  user-facing shortlist reasons.
+- Added shared task responsibility fields and inline wedding contacts, cross-tab vision persistence
+  and descriptor parsing, explicit-load vendor maps, in-place transport sources, dependable rich
+  message formatting/paragraph/signature preservation, and a mobile-safe 2D seating canvas.
+- Tightened Oracle staging so `postgres/data` is excluded from application bundles while
+  `postgres/init.sql` and migrations remain runtime inputs. No photographer source data or importer
+  was uploaded or rerun.
+
+Verification:
+
+- Typecheck, production build, 1,962 wedding tests, 20 focused frontend tests, seven SMTP routing
+  tests, seven quotation vendor-portal E2E tests, disposable-Postgres API suites, and live clamd
+  integration passed. Exact application revision `7fc7172` passed the WED-225 machine checks; the
+  later commits only tighten Oracle staging and record the ledger. Readiness remains blocked on
+  separately required external/human evidence.
+- Oracle deployed commits `245bcf5`, `7fc7172`, and `c3d4f7e`. Production workspace returned 200,
+  key application source hashes match the deployment, `postgres/data` is absent, quotation and
+  vendor-mail flags are off, and the non-restore production proof passed with backup integrity.
+- The bounded isolated restore drill failed after running under temporary disk pressure; its cleanup
+  reclaimed the temporary database. This does not invalidate the live application deployment, but
+  restore-drill readiness must not be represented as passing.
+
+Unresolved / next:
+
+- Keep WED-225/WED-226 and ranking policy V2 blocked. Independent accuracy/provider,
+  security/privacy/accessibility, couple/vendor usability, permission wording, hosted-shadow and
+  allowlisted cohort evidence is still required before broad release.
+- Diagnose Oracle restore-drill duration/space independently of this UI slice, then rerun the full
+  proof. Human reviewers can use the existing commit-bound review form; do not fabricate records.
+
 ## 2026-10-18 - WED-228/WED-229 zoom hardening, gap plan, and local service evidence (Codex, review)
 
 Changed:
