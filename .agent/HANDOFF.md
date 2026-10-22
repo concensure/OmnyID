@@ -4378,3 +4378,37 @@ Next:
   special attention to wedding deep-link first-run state and a real mobile browser.
 - WED-225/WED-226 and policy-V2 remain blocked by their existing criteria. No deployment was requested
   or performed for WED-245.
+
+## 2026-10-22 - WED-246 wedding continuity repairs (Codex, review)
+
+Changed:
+
+- Bound vendor-search results to the exact account, response workspace and current query. Editing or
+  retrying clears the prior result, successful manual searches restore their own comparison, and the
+  old newest-artifact fallback no longer revives unrelated seeded cards after navigation.
+- Let deliberate freeform search use its parsed category, location, guest and preference context while
+  preserving omitted date/budget facts as unknowns. Complete intake remains required for unattended
+  shortlist automation.
+- Added template-aware breadcrumbs and a wedding Tasks subpage. Wedding task actions remain inside the
+  planner, and Tasks plus People share `planningTaskItems`, completion storage and AFP responsibility
+  projection; linked decision options and chosen values remain inspectable.
+- Kept the home logistics prompt on Timeline. Seating apply now persists and confirms the suggested
+  assignment in place; no 2D seat-map editor exists in the repository, so none is implied.
+- Extracted the desktop wedding-menu configuration so the 2,138-line ResponseQueue owner shrank rather
+  than grew. App also shrank, and every new file remains below 170 lines.
+
+Verification:
+
+- `npm run typecheck`, both line-budget checks and wedding-site smoke passed.
+- All 1,955 wedding tests and 51 focused continuity/search/task tests passed.
+- Five Playwright checks passed at 320, 390 and 1280 CSS pixels with the existing Axe assertions.
+- `cargo test --lib wedding_vendor -- --nocapture` passed 125 tests; only the inherited unused
+  `user_id` warning remains.
+- `npm run build` passed with only inherited Tailwind object-screen and Vite chunk-size advisories.
+
+Next:
+
+- Commit and deploy this exact dark-safe application through the guarded Oracle path, excluding source
+  data and leaving planning, quotation, vendor-mail, relay, provider and ranking-policy-V2 flags off.
+- The nine WED-240 human dimensions plus WED-225/WED-226 remain release blockers; the HTML form is a
+  record generator, not a substitute for scenario execution by an independent reviewer.

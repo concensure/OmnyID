@@ -10,6 +10,7 @@ export type WeddingWorkspaceMenuId =
   | "home"
   | "people"
   | "plan"
+  | "tasks"
   | "vision"
   | "documents"
   | "budget"
@@ -25,6 +26,7 @@ const WEDDING_WORKSPACE_MENU_IDS: readonly WeddingWorkspaceMenuId[] = [
   "home",
   "people",
   "plan",
+  "tasks",
   "vision",
   "documents",
   "budget",
@@ -141,7 +143,7 @@ export function weddingWorkspaceMenuBadge(
     const urgent = state.vendorContactCards.filter((card) => card.tone === "urgent").length;
     return urgent > 0 ? { label: String(urgent), tone: "urgent" } : null;
   }
-  if (id === "plan") {
+  if (id === "plan" || id === "tasks") {
     const urgent = state.vendorContactCards.filter((card) => card.tone === "urgent").length;
     return urgent > 0 ? { label: String(urgent), tone: "urgent" } : null;
   }
@@ -167,7 +169,7 @@ export function weddingWorkspaceMenuHint(
   if (id === "timeline") {
     return state.ganttTimeline.rows.length === 0 && state.ganttTimeline.undatedItems.length === 0 ? "Start" : null;
   }
-  if (id === "plan") {
+  if (id === "plan" || id === "tasks") {
     return state.ganttTimeline.rows.length === 0 && state.vendorContactCards.length === 0 ? "Start" : null;
   }
   if (id === "documents") return null;

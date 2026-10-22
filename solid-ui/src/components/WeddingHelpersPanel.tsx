@@ -15,6 +15,7 @@ import {
   weddingHelperContactToAfpSendInput,
   weddingHelperResponsibilityToAfpSendInput,
   weddingHelperTaskDueLabel,
+  weddingHelperTaskIsDone,
   weddingHelperTaskPriorityLabel,
   weddingHelperWorkloadSuggestion,
   type WeddingHelperResponsibilityStatus,
@@ -43,7 +44,10 @@ export function WeddingHelpersPanel(props: {
 }) {
   const workspaceId = () => props.state.workspace.metadata.responseWorkspaceId;
   const initialState = loadWeddingHelperLocalState(workspaceId());
-  const [doneTaskIds, setDoneTaskIds] = createSignal<Record<string, true>>(initialState.doneTaskIds);
+  const projectedDoneTaskIds = Object.fromEntries(
+    props.state.planningTaskItems.filter((task) => weddingHelperTaskIsDone(task)).map((task) => [task.id, true]),
+  ) as Record<string, true>;
+  const [doneTaskIds, setDoneTaskIds] = createSignal<Record<string, true>>({ ...initialState.doneTaskIds, ...projectedDoneTaskIds });
   const [confirmedTaskIds, setConfirmedTaskIds] = createSignal<Record<string, true>>(initialState.confirmedTaskIds);
   const [taskAssignees, setTaskAssignees] = createSignal<Record<string, string>>(initialState.taskAssignees);
   const [taskConsultedPeople, setTaskConsultedPeople] = createSignal<Record<string, string>>(initialState.taskConsultedPeople);
@@ -75,8 +79,8 @@ export function WeddingHelpersPanel(props: {
   const taskAssignee = (task: WeddingPlanningTask) =>
     taskAssignees()[task.id] ?? task.assignee ?? helperPeople()[0] ?? "You";
   const taskAction = (task: WeddingPlanningTask) => weddingTaskSidebarAction(task, props.state);
-  const openHelperTasks = createMemo(() => helperTasks().filter((task) => !doneTaskIds()[task.id]));
-  const doneHelperTasks = createMemo(() => helperTasks().filter((task) => doneTaskIds()[task.id]));
+  const openHelperTasks = createMemo(() => helperTasks().filter((task) => !weddingHelperTaskIsDone(task, doneTaskIds())));
+  const doneHelperTasks = createMemo(() => helperTasks().filter((task) => weddingHelperTaskIsDone(task, doneTaskIds())));
   const workloadRows = createMemo(() => buildWeddingHelperWorkloadRows({
     people: helperPeople(),
     tasks: helperTasks(),

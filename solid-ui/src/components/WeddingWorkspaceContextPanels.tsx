@@ -25,6 +25,7 @@ import { WeddingHomeOverviewGrid } from "@/components/WeddingHomeOverviewGrid";
 import { WeddingImportantDetailsPanel } from "@/components/WeddingImportantDetailsPanel";
 import { WeddingInspirationPanel } from "@/components/WeddingInspirationPanel";
 import { WeddingNextStepCard } from "@/components/WeddingNextStepCard";
+import { WeddingPlanningTasksPanel } from "@/components/WeddingPlanningTasksPanel";
 import { WeddingProductionGateCard } from "@/components/WeddingProductionGateCard";
 import { WeddingProductionRemainingWorkCard } from "@/components/WeddingProductionRemainingWorkCard";
 import { WeddingSeatingPanel } from "@/components/WeddingSeatingPanel";
@@ -434,6 +435,14 @@ export function WeddingWorkspaceContextPanels(props: {
           onSidebarAction={props.onSidebarAction}
           onOpenArtifact={props.onOpenArtifact}
           onOpenSavedOutputs={props.onOpenSavedOutputs}
+        />
+      </div>
+
+      <div hidden={activeMenu() !== "tasks"}>
+        <WeddingPlanningTasksPanel
+          state={props.state}
+          saveProjection={props.saveProjection}
+          onRefreshWorkspace={props.onRefreshWorkspace}
         />
       </div>
 

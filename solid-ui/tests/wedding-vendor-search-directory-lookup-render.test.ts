@@ -11,7 +11,7 @@ test("named vendor lookups retain an exact local directory pass without intake o
   const source = read("src/components/ResponseQueueView.tsx");
   assert.match(source, /const queryIntent = weddingVendorQueryIntent\(freeformQuery\)/);
   assert.match(source, /const directoryLookupOnly = Boolean\(freeformQuery && queryIntent\.exactNameLookup\)/);
-  assert.match(source, /if \(!directoryLookupOnly && liveWorkflowReadiness\.status === "blocked"\)/);
+  assert.match(source, /if \(!directoryLookupOnly && !freeformQuery && liveWorkflowReadiness\.status === "blocked"\)/);
   assert.match(source, /if \(!directoryLookupOnly && readiness\.status === "blocked"\)/);
   assert.match(source, /canRunOnlineFallback: !directoryLookupOnly && configuredProviderKinds\.length > 0/);
   assert.match(source, /sourcePolicy === "directory_only" && directoryLookupOnly \? \[\] : providerPlansForExecution/);

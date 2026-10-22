@@ -7,6 +7,7 @@ const TITLE_BY_MENU: Record<WeddingWorkspaceMenuId, string> = {
   timeline: "Timeline",
   people: "People",
   plan: "Plan",
+  tasks: "Tasks",
   vision: "Vision",
   documents: "Documents",
   guests: "Guests",

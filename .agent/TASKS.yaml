@@ -3081,3 +3081,45 @@ tasks:
       - added honest no-match, dismiss/restore, rate-limit, document-refresh and document-filter copy; removed calendar OAuth/AFP diagnostics and sanitized Smart Action/evidence wording without changing AFP, A2UI, approval or provider authority
       - migrated touched intake, timeline and budget shells to the wedding palette and 8-12px radii; fixed the 390px landing wordmark shrink and left the shared generic calendar theme scoped to a future explicit wedding-theme input
       - typecheck, both line-budget checks, wedding website smoke, 28 focused tests, all 1945 wedding tests, three Playwright home checks at 320/390/1280 and the production build pass; no Rust contract, rollout flag, provider, Oracle or source-data state changed
+  - id: WED-246
+    title: Repair wedding search continuity, template navigation, seating actions, and shared tasks
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-215
+    depends_on:
+      - WED-243
+      - WED-244
+      - WED-245
+    files:
+      - solid-ui/src/App.tsx
+      - solid-ui/src/components/ResponseQueueView.tsx
+      - solid-ui/src/components/WeddingHomeOverviewGrid.tsx
+      - solid-ui/src/components/WeddingSeatingPanel.tsx
+      - solid-ui/src/components/WeddingWorkspaceContextPanels.tsx
+      - solid-ui/src/components/WeddingPlanningTasksPanel.tsx
+      - solid-ui/src/components/WorkspaceBreadcrumbTrail.tsx
+      - solid-ui/src/lib/weddingWorkspaceMenuState.ts
+      - solid-ui/src/lib/weddingVendorSearchSessionState.ts
+      - solid-ui/src/lib/weddingHelperState.ts
+      - solid-ui/tests/wedding-*.test.ts
+      - solid-ui/tests/e2e/wedding-*.spec.ts
+      - Documents/verification/**
+      - .agent/**
+    acceptance:
+      - each submitted vendor search renders only the comparison produced for that current query and returning to wedding home cannot reveal an unrelated seeded comparison
+      - the application breadcrumb follows wedding template navigation, including Plan, Timeline, Inspiration, People, Seating, Tasks, Budget and Documents, with usable ancestor links
+      - the home logistics prompt opens the wedding timeline that owns the items instead of the generic calendar
+      - applying a seating suggestion persists it and confirms success in place without redirecting to Tasks; no nonexistent 2D editor is implied
+      - People and wedding Tasks project the same planningTaskItems and completion state so an update made in either surface is reflected in the other
+      - technical messages remain hidden, mobile navigation and teal wedding-brand rules remain intact, and rollout-sensitive flags stay disabled
+      - every new file remains below 1000 lines, oversized owners do not grow, focused tests, full wedding checks and production build pass
+      - the exact committed application is deployed through the guarded Oracle path and production health is verified without uploading vendor source data
+    progress:
+      - registered from clean commit f85469f after reproducing the state and routing boundaries in the current advanced WED-215 architecture
+      - manual vendor searches now own an account-and-workspace-scoped session; editing or failing a query clears its prior result, successful searches restore only their exact comparison, and seeded artifacts are never selected as an implicit fallback
+      - explicit source-backed queries can search with omitted facts preserved as unknown verification gaps, while unattended shortlist automation retains the complete-intake gate and ranking policy V2 remains disabled
+      - the application breadcrumb now follows wedding Home, Plan, Tasks, Timeline, Vendors, People, Guests, Seating, Inspiration, Budget and Documents through the existing template menu event
+      - home logistics stays on Timeline, seating apply persists and confirms in place, and the repository contains no 2D seat-map editor to route to
+      - wedding Tasks and People now use the same planningTaskItems, local completion state and AFP responsibility projection; task disclosure retains linked decision options and selected choices
+      - typecheck, both line-budget audits, wedding-site smoke, 51 focused tests, all 1955 wedding tests, five 320/390/1280 Playwright checks, 125 focused Rust wedding-vendor tests and the production build pass
+      - App shrank to 5493 lines and ResponseQueue shrank to 2086 lines; all new files are below 170 lines and no oversized owner grew

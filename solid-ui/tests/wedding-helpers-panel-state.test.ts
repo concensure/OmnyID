@@ -19,6 +19,7 @@ import {
   weddingHelperResponsibilityToAfpSendInput,
   weddingHelperTaskDueLabel,
   weddingHelperTaskIsOverdue,
+  weddingHelperTaskIsDone,
   weddingHelperTaskPriorityLabel,
   weddingHelperWorkloadSuggestion,
   type WeddingHelperPlanningTask,
@@ -47,6 +48,12 @@ test("wedding helper overdue check ignores malformed dates", () => {
   assert.equal(weddingHelperTaskIsOverdue(task({ id: "old", dueAt: "2027-08-01T09:00:00.000Z" }), now), true);
   assert.equal(weddingHelperTaskIsOverdue(task({ id: "future", dueAt: "2027-08-20T09:00:00.000Z" }), now), false);
   assert.equal(weddingHelperTaskIsOverdue(task({ id: "bad", dueAt: "not a date" }), now), false);
+});
+
+test("wedding helper completion uses the shared local and AFP projection", () => {
+  assert.equal(weddingHelperTaskIsDone(task({ id: "local" }), { local: true }), true);
+  assert.equal(weddingHelperTaskIsDone(task({ id: "afp", semanticTags: ["wedding_task_status:done"] })), true);
+  assert.equal(weddingHelperTaskIsDone(task({ id: "open", semanticTags: ["wedding_task_status:open"] })), false);
 });
 
 test("wedding helper people dedupe contacts, custom helpers, and partner names calmly", () => {

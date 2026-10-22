@@ -270,6 +270,15 @@ export function weddingHelperTaskPriorityLabel(task: WeddingHelperPlanningTask):
   return "Normal";
 }
 
+export function weddingHelperTaskIsDone(
+  task: WeddingHelperPlanningTask,
+  doneTaskIds: Readonly<Record<string, true>> = {},
+): boolean {
+  return Boolean(doneTaskIds[task.id])
+    || task.semanticTags?.some((tag) => tag.toLowerCase() === "wedding_task_status:done") === true
+    || task.semanticObject?.stateLabel?.toLowerCase() === "done";
+}
+
 function weddingHelperEstimatedTaskPoints(task: WeddingHelperPlanningTask, now: number): number {
   const priorityPoints = task.priority === "urgent" ? 3 : task.priority === "high" ? 2 : task.priority === "low" ? 0.5 : 1;
   return priorityPoints + (weddingHelperTaskIsOverdue(task, now) ? 1 : 0);

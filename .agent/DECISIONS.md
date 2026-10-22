@@ -1498,3 +1498,24 @@ Rapid browser automation is not sufficient evidence of a backend failure or lost
 directed exclusions and human reproduction results take precedence, while defensive UI copy may
 still convert real rate limits, refresh failures and session expiry into calm recovery steps. No
 walkthrough can satisfy or bypass the independent WED-225, WED-226 or policy-V2 rollout gates.
+
+## 2026-10-22: Wedding navigation and transient search state stay template-scoped
+
+Wedding vendor results are restored only from a session keyed by authenticated account and response
+workspace. Editing or starting a manual query first records an empty result for that exact query;
+only successful source-backed execution may attach its comparison action. Arbitrary persisted or
+seeded artifacts are not a valid implicit current search result. A deliberate manual query may leave
+date, budget or other facts as visible verification gaps, while unattended automation keeps the full
+intake gate.
+
+Wedding subpages remain inside the existing response workspace router. Template menu changes emit the
+existing menu event so the application breadcrumb can represent Plan, Timeline, Tasks, People,
+Seating and other subpages without creating a second router. Wedding task actions open a template
+Tasks projection over the same `planningTaskItems`, AFP responsibility messages and local completion
+state already used by People. Linked decision evidence remains a read projection; no task or decision
+ledger is duplicated.
+
+Applying a seating suggestion persists the current constraint-based assignment and confirms it in
+place. The product has no 2D seat-map editor, so the action does not claim or route to one. None of
+these presentation and routing changes expands outreach, booking, payment, provider, mail, policy-V2
+or ideal-agent rollout authority.

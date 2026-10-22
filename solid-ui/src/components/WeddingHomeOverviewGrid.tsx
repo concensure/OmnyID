@@ -14,7 +14,7 @@ import { weddingTimelineWeddingDateLabel } from "@/lib/weddingTimelineWeddingDat
 import type { WeddingResponseWorkspaceViewState } from "@/lib/weddingResponseWorkspaceViewState";
 import type { WeddingWorkspaceSidebarAction } from "@/lib/weddingWorkspaceActionState";
 import type { WeddingWorkspaceMenuId } from "@/lib/weddingWorkspaceMenuState";
-import { weddingDayCountdownLabel, weddingTimelinePrimarySidebarAction } from "@/lib/weddingWorkspaceSidebarActionState";
+import { weddingDayCountdownLabel } from "@/lib/weddingWorkspaceSidebarActionState";
 
 type Domain = "budget" | "guests" | "seating" | "vendors";
 
@@ -100,7 +100,6 @@ export function WeddingHomeOverviewGrid(props: {
   };
   const openTimeline = () => {
     props.onSelectMenu?.(timeline().menuId);
-    props.onSidebarAction?.(weddingTimelinePrimarySidebarAction(props.state, timeline().selectedRowId));
   };
 
   return (

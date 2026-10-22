@@ -12,12 +12,13 @@ import { WeddingRichResponseView } from "@/components/WeddingRichResponseView";
 import { WorkspaceSetupBanner } from "@/components/WorkspaceSetupBanner";
 import { WeddingSiteIntakeWizard } from "@/components/WeddingSiteIntakeWizard";
 import { toast } from "@/components/Toast";
-import { RailIcon, type IconId } from "@/components/RailIcons";
+import { RailIcon } from "@/components/RailIcons";
 import {
   loadWeddingWorkspaceMenu,
   loadWeddingWorkspaceMenuFromUrl,
   isWeddingWorkspaceMenuId,
   canonicalWeddingWorkspaceMenuId,
+  dispatchWeddingWorkspaceMenuSelection,
   replaceWeddingWorkspaceMenuInUrl,
   saveWeddingWorkspaceMenu,
   weddingWorkspaceMenuIdFromEvent,
@@ -195,91 +196,18 @@ import type { WeddingPlanningScheduleItem } from "@/lib/weddingCalendarProjectio
 import {
   buildWeddingVendorSearchQueryEditState,
   buildWeddingVendorSearchResultAction,
-  buildWeddingVendorSearchResultActionFromArtifacts,
   hasWeddingVendorComparisonArtifactSummary,
   hasWeddingVendorSearchArtifactSummary,
   hasWeddingVendorTopFiveComparisonExpansion,
   type WeddingVendorSearchResultAction,
 } from "@/lib/weddingVendorSearchResultActionState";
+import { completedWeddingVendorSearchSession, editedWeddingVendorSearchSession, loadWeddingVendorSearchSession, saveWeddingVendorSearchSession } from "@/lib/weddingVendorSearchSessionState";
+import { WEDDING_WORKSPACE_MENU_ITEMS, weddingMenuKeyDownStep } from "@/lib/weddingWorkspaceDesktopMenuState";
 
 const RESPONSE_QUEUE_VIEW_CLASS =
   "view-enter min-w-0 space-y-4 rounded-[24px] border border-sky-100/80 bg-[linear-gradient(135deg,rgba(240,249,255,0.96),rgba(255,255,255,0.96))] p-3 shadow-[0_22px_70px_-36px_rgba(14,116,144,0.4)] backdrop-blur-sm sm:rounded-[32px] sm:p-5";
 const RESPONSE_QUEUE_VIEW_HEADER_CLASS = "flex min-w-0 flex-wrap items-center justify-end gap-3";
 const RESPONSE_QUEUE_VIEW_TITLE_TAG = "h1" as const;
-const WEDDING_WORKSPACE_MENU_ITEMS: Array<{
-  id: WeddingWorkspaceMenuId;
-  icon: IconId;
-  label: string;
-  title: string;
-  className: string;
-  activeClassName: string;
-}> = [
-  {
-    id: "home",
-    icon: "home",
-    label: "Home",
-    title: "Main decision queue, budget remaining, days left, and wedding documents.",
-    className: "border-pink-100 bg-pink-50/80 text-pink-950 hover:border-pink-200",
-    activeClassName: "border-pink-300 bg-pink-100 text-pink-950",
-  },
-  {
-    id: "people",
-    icon: "contacts",
-    label: "People",
-    title: "Guests, seating, and family decisions.",
-    className: "border-amber-100 bg-amber-50/80 text-amber-950 hover:border-amber-200",
-    activeClassName: "border-amber-300 bg-amber-100 text-amber-950",
-  },
-  {
-    id: "plan",
-    icon: "timeline",
-    label: "Plan",
-    title: "Follow-ups, timeline, sharing, and planning coordination.",
-    className: "border-indigo-100 bg-indigo-50/80 text-indigo-950 hover:border-indigo-200",
-    activeClassName: "border-indigo-300 bg-indigo-100 text-indigo-950",
-  },
-  {
-    id: "documents",
-    icon: "files",
-    label: "Documents",
-    title: "Open planning files, imports, exports, and wedding documents.",
-    className: "border-slate-200 bg-slate-50/80 text-slate-800 hover:border-slate-300",
-    activeClassName: "border-slate-400 bg-slate-100 text-slate-950",
-  },
-  {
-    id: "budget",
-    icon: "cost_dashboard",
-    label: "Budget",
-    title: "Track remaining budget, quotes, payments, and cost risks.",
-    className: "border-emerald-100 bg-emerald-50/80 text-emerald-950 hover:border-emerald-200",
-    activeClassName: "border-emerald-300 bg-emerald-100 text-emerald-950",
-  },
-  {
-    id: "inspiration",
-    icon: "discover",
-    label: "Inspiration",
-    title: "Add photos, screenshots, links, and thoughts so OmnyID can learn the wedding style.",
-    className: "border-rose-100 bg-rose-50/80 text-rose-950 hover:border-rose-200",
-    activeClassName: "border-rose-300 bg-rose-100 text-rose-950",
-  },
-  {
-    id: "advanced",
-    icon: "tools",
-    label: "Setup checks",
-    title: "Connection and safety checks. Most couples can leave this closed.",
-    className: "border-stone-200 bg-stone-50/80 text-stone-800 hover:border-stone-300",
-    activeClassName: "border-stone-400 bg-stone-100 text-stone-950",
-  },
-];
-
-function weddingMenuKeyDownStep(key: string, currentIndex: number, itemCount: number): number | null {
-  if (key === "ArrowRight") return (currentIndex + 1) % itemCount;
-  if (key === "ArrowLeft") return (currentIndex - 1 + itemCount) % itemCount;
-  if (key === "Home") return 0;
-  if (key === "End") return itemCount - 1;
-  return null;
-}
-
 function initialWeddingWorkspaceMenu(): WeddingWorkspaceMenuId {
   if (typeof window !== "undefined") {
     const urlMenu = loadWeddingWorkspaceMenuFromUrl(window.location.search, window.location.hash);
@@ -392,6 +320,7 @@ export function ResponseQueueView(props: {
     setWeddingWorkspaceMenuSignal(menuId);
     saveWeddingWorkspaceMenu(menuId);
     if (typeof window !== "undefined") replaceWeddingWorkspaceMenuInUrl(menuId);
+    if (menuChanged && typeof window !== "undefined") dispatchWeddingWorkspaceMenuSelection(menuId);
     if (menuChanged && typeof document !== "undefined") {
       document.getElementById("wedding-tabpanel")?.scrollIntoView({ behavior: "smooth", block: "start" });
     }
@@ -418,8 +347,8 @@ export function ResponseQueueView(props: {
   const [weddingVendorSearchRunning, setWeddingVendorSearchRunning] = createSignal(false);
   const [weddingVendorSearchNotice, setWeddingVendorSearchNotice] = createSignal<string | null>(null);
   const [weddingVendorSearchResultAction, setWeddingVendorSearchResultAction] = createSignal<WeddingVendorSearchResultAction | null>(null);
-  const [weddingVendorSearchResultActionSuppressed, setWeddingVendorSearchResultActionSuppressed] = createSignal(false);
   const [weddingVendorSearchQuery, setWeddingVendorSearchQuery] = createSignal("");
+  const [weddingVendorSearchSessionHydratedKey, setWeddingVendorSearchSessionHydratedKey] = createSignal("");
   const [weddingVendorSearchCategoryScope, setWeddingVendorSearchCategoryScope] = createSignal<string[] | null>(null);
   const [weddingProviderCapabilities, setWeddingProviderCapabilities] = createSignal<WeddingProviderCapabilitiesResponse | null>(null);
   const [weddingProviderCapabilitiesRequestKey, setWeddingProviderCapabilitiesRequestKey] = createSignal("");
@@ -466,8 +395,9 @@ export function ResponseQueueView(props: {
     if (!query) return;
     setWeddingVendorSearchQuery(query);
     setWeddingVendorSearchResultAction(null);
-    setWeddingVendorSearchResultActionSuppressed(true);
     setWeddingVendorSearchCategoryScope(null);
+    const responseWorkspaceId = weddingWorkspace()?.workspace.metadata.responseWorkspaceId ?? weddingNavigationIntent()?.responseWorkspaceId;
+    saveWeddingVendorSearchSession(responseWorkspaceId, editedWeddingVendorSearchSession(query), localStorage, weddingStorageUserId());
     // A vendor-search launch is an explicit request to work in the vendor
     // surface.  Sending it home hides the entered query and makes a first
     // search look as though it was lost until the user opens Vendors again.
@@ -480,8 +410,9 @@ export function ResponseQueueView(props: {
     setWeddingVendorSearchQuery(query);
     setWeddingVendorSearchCategoryScope(null);
     setWeddingVendorSearchResultAction(editState.resultAction);
-    setWeddingVendorSearchResultActionSuppressed(true);
     setWeddingVendorSearchNotice(editState.notice);
+    const responseWorkspaceId = weddingWorkspace()?.workspace.metadata.responseWorkspaceId ?? weddingNavigationIntent()?.responseWorkspaceId;
+    saveWeddingVendorSearchSession(responseWorkspaceId, editedWeddingVendorSearchSession(query), localStorage, weddingStorageUserId());
   }
 
   function currentWeddingFollowUpDraft(responseWorkspaceId: string): WeddingTemplateFollowUpDraft {
@@ -917,13 +848,17 @@ export function ResponseQueueView(props: {
   const standaloneWeddingRichResponse = createMemo(() =>
     weddingWorkspace() ? null : weddingRichResponse(),
   );
-
-  function currentWeddingVendorSearchResultAction(): WeddingVendorSearchResultAction | null {
-    const explicit = weddingVendorSearchResultAction();
-    if (explicit) return explicit;
-    if (weddingVendorSearchResultActionSuppressed()) return null;
-    return buildWeddingVendorSearchResultActionFromArtifacts(weddingWorkspace()?.workspace.results ?? []);
-  }
+  createEffect(() => {
+    const workspace = weddingWorkspace();
+    if (!workspace) return;
+    const responseWorkspaceId = workspace.workspace.metadata.responseWorkspaceId;
+    const hydrationKey = `${weddingStorageUserId() ?? "guest"}:${responseWorkspaceId}`;
+    if (weddingVendorSearchSessionHydratedKey() === hydrationKey) return;
+    setWeddingVendorSearchSessionHydratedKey(hydrationKey);
+    const session = loadWeddingVendorSearchSession(responseWorkspaceId, localStorage, weddingStorageUserId());
+    setWeddingVendorSearchQuery(session?.query ?? "");
+    setWeddingVendorSearchResultAction(session?.status === "completed" ? session.resultAction : null);
+  });
 
   function openWeddingVendorSearchResult(action: WeddingVendorSearchResultAction) {
     setActiveWeddingArtifactId(action.artifactId);
@@ -1052,7 +987,7 @@ export function ResponseQueueView(props: {
       vendorProviderConfigured: configuredProviderKinds.length > 0,
       liveVendorArtifactSaved,
       liveVendorComparisonSaved,
-      vendorSearchResultOpenTargetAvailable: Boolean(currentWeddingVendorSearchResultAction()),
+      vendorSearchResultOpenTargetAvailable: Boolean(weddingVendorSearchResultAction()),
       topFiveComparisonExpansionAvailable,
       selectedComparisonVendorsConfirmed,
       unselectedVendorQueueSuppressed,
@@ -1317,7 +1252,6 @@ export function ResponseQueueView(props: {
     if (action.metadata?.vendor_lead_time_research_task === true && scopedVendorCategoryId) {
       setWeddingVendorSearchCategoryScope([scopedVendorCategoryId]);
       setWeddingVendorSearchResultAction(null);
-      setWeddingVendorSearchResultActionSuppressed(true);
       const label = weddingVendorSelectionLabels([scopedVendorCategoryId])[0] ?? scopedVendorCategoryId;
       setWeddingVendorSearchNotice(`Ready to research ${label}. Search will use admin-configured providers and this user's wedding context.`);
     } else if (action.metadata?.vendor_search_scope !== "lead_time_category") {
@@ -1339,6 +1273,10 @@ export function ResponseQueueView(props: {
         }
         setWeddingWorkspaceMenu(menuId);
       }
+      return;
+    }
+    if (action.kind === "open_tasks") {
+      setWeddingWorkspaceMenu("tasks");
       return;
     }
     if (action.kind === "open_budget") setWeddingWorkspaceMenu("budget");
@@ -1610,8 +1548,10 @@ export function ResponseQueueView(props: {
     const workspace = weddingWorkspace();
     if (!intent || intent.surface !== "planning_files" || !workspace || weddingVendorSearchRunning()) return false;
     setWeddingVendorSearchRunning(true);
-    setWeddingVendorSearchResultAction(null);
-    setWeddingVendorSearchResultActionSuppressed(true);
+    if (!options?.stayOnHome) {
+      setWeddingVendorSearchResultAction(null);
+      saveWeddingVendorSearchSession(workspace.workspace.metadata.responseWorkspaceId, editedWeddingVendorSearchSession(currentWeddingVendorSearchQuery()), localStorage, weddingStorageUserId());
+    }
     setWeddingVendorSearchNotice("Running live vendor search with connected providers...");
     try {
       const metadata = workspace.workspace.metadata;
@@ -1639,13 +1579,15 @@ export function ResponseQueueView(props: {
       const liveWorkflowReadiness = buildWeddingLiveWorkflowReadinessState({
         workflow: "vendor_search",
         dateOrSeason: weddingFollowUpDate(),
-        location: weddingVendorSearchServiceArea(),
-        guestCount: weddingFollowUpGuests(),
-        budgetComfort: weddingFollowUpBudget(),
-        prioritiesCsv: weddingFollowUpPriorities(),
+        location: queryIntent.location ?? weddingVendorSearchServiceArea(),
+        guestCount: queryIntent.guestCount ?? weddingFollowUpGuests(),
+        budgetComfort: queryIntent.budgetComfort ?? weddingFollowUpBudget(),
+        prioritiesCsv: queryIntent.preferences ?? weddingFollowUpPriorities(),
         vendorCategories: effectiveCategoryLabels,
       });
-      if (!directoryLookupOnly && liveWorkflowReadiness.status === "blocked") {
+      // Manual source-backed search may keep omitted facts as verification gaps.
+      // Intake-driven automation remains blocked until all required context exists.
+      if (!directoryLookupOnly && !freeformQuery && liveWorkflowReadiness.status === "blocked") {
         setWeddingVendorSearchNotice(`Live vendor search needs ${liveWorkflowReadiness.missing.join(", ")}.`);
         return false;
       }
@@ -1654,10 +1596,14 @@ export function ResponseQueueView(props: {
         : await refreshWeddingProviderCapabilitiesNow();
       const configuredProviderKinds = weddingConfiguredVendorSearchProviderKinds(latestProviderCapabilities);
       const readiness = buildWeddingVendorSearchReadinessState({
-        location: weddingVendorSearchServiceArea(),
+        location: queryIntent.location ?? weddingVendorSearchServiceArea(),
         vendorCategories: effectiveCategoryLabels,
-        vendorPreferences: [weddingFollowUpPriorities(), weddingFollowUpAtmosphere()].filter(Boolean).join("; "),
-        photographyScope: [weddingFollowUpPriorities(), weddingFollowUpAtmosphere()].filter(Boolean).join("; "),
+        vendorPreferences: freeformQuery
+          ? queryIntent.preferences ?? freeformQuery
+          : [weddingFollowUpPriorities(), weddingFollowUpAtmosphere()].filter(Boolean).join("; "),
+        photographyScope: freeformQuery
+          ? queryIntent.preferences ?? freeformQuery
+          : [weddingFollowUpPriorities(), weddingFollowUpAtmosphere()].filter(Boolean).join("; "),
         musicOrBandNeeded: null,
         liveSearchProviderReady: configuredProviderKinds.length > 0,
       });
@@ -1795,8 +1741,10 @@ export function ResponseQueueView(props: {
       // home update, where they do not interrupt the person using another tab.
       setWeddingWorkspaceMenu(options?.stayOnHome ? "home" : "response_queue");
       setWeddingVendorSearchCategoryScope(null);
-      setWeddingVendorSearchResultAction(resultAction);
-      setWeddingVendorSearchResultActionSuppressed(false);
+      if (!options?.stayOnHome) {
+        setWeddingVendorSearchResultAction(resultAction);
+        saveWeddingVendorSearchSession(metadata.responseWorkspaceId, completedWeddingVendorSearchSession(freeformQuery || currentWeddingVendorSearchQuery(), resultAction), localStorage, weddingStorageUserId());
+      }
       setWeddingVendorSearchNotice(comparisonArtifact.status === "created"
         ? `${execution.message} Saved source-backed vendor notes and a top-${comparisonArtifact.topChoiceCount} comparison.`
         : `${execution.message} Saved source-backed vendor notes. ${comparisonArtifact.reason ?? ""}`.trim()
@@ -1867,7 +1815,7 @@ export function ResponseQueueView(props: {
                 const selected = () => {
                   const active = weddingWorkspaceMenu();
                   if (item.id === "people") return active === "people" || active === "guests" || active === "seating";
-                  if (item.id === "plan") return active === "plan" || active === "response_queue" || active === "timeline";
+                  if (item.id === "plan") return active === "plan" || active === "tasks" || active === "response_queue" || active === "timeline";
                   if (item.id === "documents") return active === "documents";
                   return active === item.id;
                 };
@@ -2061,7 +2009,7 @@ export function ResponseQueueView(props: {
             onWeddingFollowUpCelebrantChange={setWeddingFollowUpCelebrant}
             onSaveProgress={saveWeddingFollowUpProgress}
             onGenerateFollowUp={(starterIntents) => generateWeddingFollowUp({ starterIntents })}
-            vendorSearchResultAction={currentWeddingVendorSearchResultAction()}
+            vendorSearchResultAction={weddingVendorSearchResultAction()}
             onOpenVendorSearchResult={openWeddingVendorSearchResult}
             vendorSearchNotice={weddingVendorSearchNotice()}
             weddingTemplateFollowUp={weddingTemplateFollowUp}
@@ -2118,7 +2066,7 @@ export function ResponseQueueView(props: {
             vendorSearchNotice={weddingVendorSearchNotice()}
             vendorSearchQuery={weddingVendorSearchQuery() || currentWeddingVendorSearchQuery()}
             vendorSearchQuerySourceLabel={currentWeddingVendorSearchQueryState().sourceLabel}
-            vendorSearchResultAction={currentWeddingVendorSearchResultAction()}
+            vendorSearchResultAction={weddingVendorSearchResultAction()}
             onVendorSearchQueryChange={updateWeddingVendorSearchQueryFromInput}
             vendorSearchReadiness={weddingLiveVendorSearchReadiness()}
             vendorSearchBlockedReason={weddingVendorSearchBlockedReason()}

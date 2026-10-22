@@ -42,27 +42,6 @@ function seatingTaskSidebarAction(
   };
 }
 
-function seatingOptimizationSidebarAction(
-  state: WeddingResponseWorkspaceViewState,
-  preview: WeddingSeatingOptimizationResult | null = state.seatingPlan.optimizationPreview,
-): WeddingWorkspaceSidebarAction {
-  return {
-    kind: "open_tasks",
-    label: preview?.hardViolations.length ? "Review seating rules" : "Review seating draft",
-    enabled: Boolean(preview),
-    reason: preview ? null : "Add attending guests before making a draft.",
-    metadata: {
-      wedding_seating_optimization: {
-        version: 1,
-        assignment_count: preview?.assignments.length ?? 0,
-        hard_violation_count: preview?.hardViolations.length ?? 0,
-        proactive_issues: preview?.proactiveIssueLabels ?? [],
-      },
-    },
-    contextLabels: ["Seating draft", ...(preview?.explanationLabels.slice(0, 2) ?? [])],
-  };
-}
-
 export function WeddingSeatingPanel(props: {
   state: WeddingResponseWorkspaceViewState;
   saveProjection?: ((input: SendAfpMessageInput) => Promise<unknown>) | null;
@@ -80,14 +59,12 @@ export function WeddingSeatingPanel(props: {
 
   async function applySeatingDraft() {
     const preview = displayedPreview();
-    const action = seatingOptimizationSidebarAction(props.state, preview);
-    props.onSidebarAction(action);
     if (!preview) {
       setSaveNotice("Add attending guests before saving a seating draft.");
       return;
     }
     if (!props.saveProjection) {
-      setSaveNotice("Review opened. Saving this seating draft needs account saving to be connected.");
+      setSaveNotice("This seating plan is ready, but saving is not connected for this account yet.");
       return;
     }
     setSaving(true);
@@ -97,10 +74,10 @@ export function WeddingSeatingPanel(props: {
         result: preview,
         metadata: props.state.workspace.metadata,
       }));
-      setSaveNotice("Seating draft saved with this wedding.");
+      setSaveNotice(`Seating plan applied for ${preview.assignments.length} guest${preview.assignments.length === 1 ? "" : "s"}.`);
       props.onRefreshWorkspace?.();
     } catch {
-      setSaveNotice("Review opened, but the seating draft could not be saved.");
+      setSaveNotice("The seating plan could not be applied. Your current plan has not changed.");
     } finally {
       setSaving(false);
     }
@@ -113,7 +90,6 @@ export function WeddingSeatingPanel(props: {
       count: 2,
     });
     setAlternatives(nextAlternatives);
-    props.onSidebarAction(seatingOptimizationSidebarAction(props.state, nextAlternatives[0] ?? displayedPreview()));
     setSaveNotice(nextAlternatives.length > 0
       ? "Here are other ways to seat people without changing your saved guest list."
       : "Add more tables or attending guests before OmnyID can show a different option.");

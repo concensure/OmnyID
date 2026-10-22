@@ -22,6 +22,7 @@ export function WeddingMobileMoreSheet(props: {
       { label: "Guests", icon: "users", menu: "guests" },
       { label: "Seating", icon: "table-cells", menu: "seating" },
       { label: "Plan", icon: "calendar-days", menu: "plan" },
+      { label: "Tasks", icon: "check-circle", menu: "tasks" },
       { label: "Helpers", icon: "check-circle", menu: "helpers" },
       { label: "People", icon: "user-plus", menu: "people" },
     ] },

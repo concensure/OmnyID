@@ -52,3 +52,8 @@ test("a manual vendor search remains on the vendor surface when it launches and 
   assert.match(responseQueueSource, /setWeddingWorkspaceMenu\(options\?\.stayOnHome \? "home" : "response_queue"\)/);
   assert.doesNotMatch(responseQueueSource, /options\?\.stayOnHome === false \? "documents" : "home"/);
 });
+
+test("an explicit freeform search can return candidates while omitted facts remain verification gaps", () => {
+  assert.match(responseQueueSource, /!freeformQuery && liveWorkflowReadiness\.status === "blocked"/);
+  assert.match(responseQueueSource, /vendorPreferences: freeformQuery[\s\S]*queryIntent\.preferences \?\? freeformQuery/);
+});

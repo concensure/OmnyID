@@ -12,6 +12,7 @@ import {
   weddingWorkspaceMenuHint,
   type WeddingWorkspaceMenuBadgeInput,
 } from "../src/lib/weddingWorkspaceMenuState.ts";
+import { weddingMenuKeyDownStep } from "../src/lib/weddingWorkspaceDesktopMenuState.ts";
 
 function fakeStorage(): Storage {
   const state = new Map<string, string>();
@@ -46,6 +47,7 @@ test("isWeddingWorkspaceMenuId accepts only known menu ids", () => {
   assert.equal(isWeddingWorkspaceMenuId("budget"), true);
   assert.equal(isWeddingWorkspaceMenuId("people"), true);
   assert.equal(isWeddingWorkspaceMenuId("plan"), true);
+  assert.equal(isWeddingWorkspaceMenuId("tasks"), true);
   assert.equal(isWeddingWorkspaceMenuId("vision"), true);
   assert.equal(isWeddingWorkspaceMenuId("documents"), true);
   assert.equal(isWeddingWorkspaceMenuId("inspiration"), true);
@@ -53,6 +55,14 @@ test("isWeddingWorkspaceMenuId accepts only known menu ids", () => {
   assert.equal(isWeddingWorkspaceMenuId("advanced"), true);
   assert.equal(isWeddingWorkspaceMenuId("not-a-menu"), false);
   assert.equal(isWeddingWorkspaceMenuId(null), false);
+});
+
+test("desktop wedding menu keyboard navigation wraps predictably", () => {
+  assert.equal(weddingMenuKeyDownStep("ArrowRight", 6, 7), 0);
+  assert.equal(weddingMenuKeyDownStep("ArrowLeft", 0, 7), 6);
+  assert.equal(weddingMenuKeyDownStep("Home", 4, 7), 0);
+  assert.equal(weddingMenuKeyDownStep("End", 1, 7), 6);
+  assert.equal(weddingMenuKeyDownStep("Enter", 1, 7), null);
 });
 
 test("loadWeddingWorkspaceMenu defaults to home and round-trips a saved tab", () => {
@@ -84,6 +94,7 @@ test("loadWeddingWorkspaceMenuFromUrl accepts query or hash tabs", () => {
   assert.equal(loadWeddingWorkspaceMenuFromUrl("?weddingMenu=seating"), "seating");
   assert.equal(loadWeddingWorkspaceMenuFromUrl("?weddingMenu=people"), "people");
   assert.equal(loadWeddingWorkspaceMenuFromUrl("?weddingMenu=plan"), "plan");
+  assert.equal(loadWeddingWorkspaceMenuFromUrl("?weddingMenu=tasks"), "tasks");
   assert.equal(loadWeddingWorkspaceMenuFromUrl("?weddingMenu=documents"), "documents");
   assert.equal(loadWeddingWorkspaceMenuFromUrl("?weddingMenu=helpers"), "people");
   assert.equal(loadWeddingWorkspaceMenuFromUrl("?weddingMenu=inspiration"), "inspiration");

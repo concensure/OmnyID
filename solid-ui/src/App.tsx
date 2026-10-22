@@ -12,6 +12,7 @@ import { AgentPersonaFAB } from "@/components/AgentPersonaFAB";
 import { WeddingNavigationArrivalBanner } from "@/components/WeddingNavigationArrivalBanner";
 import { WeddingReturnBanner } from "@/components/WeddingReturnBanner";
 import { ActiveTasksDecisionView } from "@/components/ActiveTasksDecisionView";
+import { WorkspaceBreadcrumbTrail } from "@/components/WorkspaceBreadcrumbTrail";
 import { PrimaryUseCasePrompt } from "@/components/PrimaryUseCasePrompt";
 import { collectKindCounts, objectKindLabel } from "@/lib/objectKinds";
 import { ToastContainer } from "@/components/Toast";
@@ -3360,33 +3361,15 @@ function App() {
               Wedding Planner Home
             </button>
           </Show>
-          {/* Breadcrumb trail — shows navigation path, clickable to jump back */}
-          <Show when={navTrail().length > 1}>
-            <div class="mb-2.5 flex items-center gap-0.5 text-xs text-on-surface-variant/60 animate-fade-in">
-              <For each={navTrail()}>
-                {(view, idx) => (
-                  <span class="flex items-center gap-0.5">
-                    <Show when={idx() > 0}>
-                      <span class="px-0.5 text-outline/30 select-none">›</span>
-                    </Show>
-                    <Show when={idx() < navTrail().length - 1} fallback={
-                      <span class="rounded px-1.5 py-0.5 font-medium text-on-surface/70">
-                        {VIEW_LABELS[view] ?? view}
-                      </span>
-                    }>
-                      <button
-                        type="button"
-                        onClick={() => selectView(view)}
-                        class="rounded px-1.5 py-0.5 transition hover:bg-on-surface/5 hover:text-on-surface"
-                      >
-                        {VIEW_LABELS[view] ?? view}
-                      </button>
-                    </Show>
-                  </span>
-                )}
-              </For>
-            </div>
-          </Show>
+          <WorkspaceBreadcrumbTrail
+            trail={navTrail()}
+            labels={VIEW_LABELS}
+            weddingActive={activeView() === "response_queue" && (
+              loadWeddingEntrySource() === "wedding_site"
+              || (primaryUseCaseProfile()?.kind === "wedding_planning" && primaryUseCaseProfile()?.status === "active")
+            )}
+            onSelectView={selectView}
+          />
           <div data-search-host>
             <SearchBar
               onSubmit={handleSearch}
