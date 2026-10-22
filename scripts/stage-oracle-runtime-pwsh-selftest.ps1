@@ -59,6 +59,7 @@ try {
         "docker-compose.oracle.minimal.yml",
         "docker-compose.oracle.quic.yml",
         "docker-compose.oracle.yml",
+        "postgres/init.sql",
         "scripts/omnyid-backup-verify.sh",
         "scripts/omnyid-backup.sh",
         "scripts/omnyid-migrations-plan.sh",
@@ -98,7 +99,8 @@ try {
 
     foreach ($dir in @(
         "docs",
-        "postgres",
+        "postgres/migrations",
+        "postgres/data",
         "proto",
         "runtime-templates",
         "schemas",
@@ -118,6 +120,8 @@ try {
     }
 
     New-TestFile -RelativePath "docs/index.html"
+    New-TestFile -RelativePath "postgres/migrations/0001_init.sql"
+    New-TestFile -RelativePath "postgres/data/vendor-source.sql"
     New-TestFile -RelativePath "src/main.rs"
     New-TestFile -RelativePath "schemas/quotation/generic.v1.json" -Contents "{}"
     New-TestFile -RelativePath "wedding/index.html"
@@ -144,6 +148,7 @@ try {
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $stageWithData "target"))) "did not expect target in staged output"
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $stageWithData "training_data"))) "did not expect training_data in staged output"
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $stageWithData "artifacts"))) "did not expect artifacts in staged output"
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $stageWithData "postgres/data"))) "did not expect reviewed source data in staged output"
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $stageWithData ".git"))) "did not expect .git in staged output"
     Assert-True (Test-Path -LiteralPath (Join-Path $stageWithData "oracle-runtime-manifest.json")) "expected oracle runtime manifest"
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $stageWithoutData "benchmarks/sample.jsonl"))) "did not expect simulated sample data when IncludeSimulatedData is disabled"
@@ -151,8 +156,8 @@ try {
     $manifestWithData = Get-Content (Join-Path $stageWithData "oracle-runtime-manifest.json") -Raw | ConvertFrom-Json
     $manifestWithoutData = Get-Content (Join-Path $stageWithoutData "oracle-runtime-manifest.json") -Raw | ConvertFrom-Json
 
-    Assert-Equal $manifestWithData.copied_path_count 55 "expected copied path count with simulated data"
-    Assert-Equal $manifestWithoutData.copied_path_count 54 "expected copied path count without simulated data"
+    Assert-Equal $manifestWithData.copied_path_count 56 "expected copied path count with simulated data"
+    Assert-Equal $manifestWithoutData.copied_path_count 55 "expected copied path count without simulated data"
     Assert-True ($manifestWithData.total_staged_bytes -gt $manifestWithoutData.total_staged_bytes) "expected simulated-data stage to be larger"
     Assert-True ($manifestWithData.largest_paths.Count -gt 0) "expected largest paths list in manifest"
     Assert-Equal $manifestWithData.include_simulated_data $true "expected manifest to record simulated-data inclusion"
@@ -163,6 +168,7 @@ try {
     Assert-True (@($manifestWithData.notable_excluded_paths).Count -ge 4) "expected notable excluded path list in manifest"
     Assert-True ("target" -in @($manifestWithData.excluded_existing_paths)) "expected target to be recorded as intentionally excluded"
     Assert-True ("artifacts" -in @($manifestWithData.excluded_existing_paths)) "expected artifacts to be recorded as intentionally excluded"
+    Assert-True ("postgres/data" -in @($manifestWithData.excluded_existing_paths)) "expected reviewed source data to be recorded as intentionally excluded"
     Assert-True ($manifestWithData.excluded_existing_path_count -ge 4) "expected excluded existing path count in manifest"
     Assert-True ($manifestWithData.excluded_existing_bytes -gt 0) "expected excluded existing bytes in manifest"
     Assert-True ($manifestWithData.excluded_existing_gib -ge 0) "expected excluded existing gib in manifest"

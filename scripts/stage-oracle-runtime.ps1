@@ -23,12 +23,13 @@ $runtimeFiles = @(
     "Dockerfile.backup",
     "docker-compose.oracle.minimal.yml",
     "docker-compose.oracle.quic.yml",
-    "docker-compose.oracle.yml"
+    "docker-compose.oracle.yml",
+    "postgres/init.sql"
 )
 
 $runtimeDirectories = @(
     "docs",
-    "postgres",
+    "postgres/migrations",
     "proto",
     "runtime-templates",
     "schemas",
@@ -88,6 +89,10 @@ $notableExcludedPaths = @(
     @{
         path = "training_data"
         rationale = "Training corpora are not required for Oracle runtime deployment."
+    },
+    @{
+        path = "postgres/data"
+        rationale = "Reviewed source-data payloads are imported separately and must not be shipped with the application runtime."
     },
     @{
         path = ".git"
