@@ -21,7 +21,7 @@ module.exports = {
         "secondary-container": "#d4e8d3",
         "on-surface": "#1a1c1b",
         "on-surface-variant": "#434750",
-        outline: "#737781",
+        outline: "#5f636d",
         "outline-variant": "#c3c6d1",
         error: "#ba1a1a",
         ember: "#d96b39",

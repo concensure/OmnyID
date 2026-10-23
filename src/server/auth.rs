@@ -205,6 +205,19 @@ pub(super) async fn google_auth_config_http() -> Json<GoogleAuthConfigResponse> 
     })
 }
 
+pub(super) async fn apple_auth_config_http() -> Json<Value> {
+    let client_id = apple_client_id_configured();
+    let redirect_uri = std::env::var("OMNYID_APPLE_REDIRECT_URI")
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| value.starts_with("https://"));
+    Json(serde_json::json!({
+        "enabled": client_id.is_some() && redirect_uri.is_some(),
+        "client_id": client_id,
+        "redirect_uri": redirect_uri,
+    }))
+}
+
 pub(super) async fn google_auth_http(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -380,6 +393,8 @@ pub(super) struct AppleAuthRequest {
     /// The iOS client persists it in the Keychain and re-sends it on subsequent logins.
     #[serde(default)]
     pub email: String,
+    #[serde(default)]
+    pub nonce: Option<String>,
 }
 
 pub(super) async fn apple_auth_http(
@@ -397,10 +412,13 @@ pub(super) async fn apple_auth_http(
     )
     .await?;
 
-    let expected_audience = std::env::var("OMNYID_APPLE_CLIENT_ID").ok();
+    let expected_audience = apple_client_id_configured().ok_or_else(|| (
+        StatusCode::SERVICE_UNAVAILABLE,
+        "Apple sign-in is not configured".to_string(),
+    ))?;
     let token_claims = verify_apple_identity_token(
         &request.identity_token,
-        expected_audience.as_deref(),
+        Some(&expected_audience),
         chrono::Utc::now().timestamp(),
     )
     .await
@@ -408,6 +426,11 @@ pub(super) async fn apple_auth_http(
         warn!("apple sign-in rejected: {err}");
         external_sign_in_failed_error()
     })?;
+    if let Some(nonce) = request.nonce.as_deref().map(str::trim).filter(|value| !value.is_empty())
+        && token_claims.nonce.as_deref() != Some(nonce)
+    {
+        return Err(external_sign_in_failed_error());
+    }
     let apple_sub = format!("apple:{}", token_claims.sub);
 
     let email = if !request.email.is_empty() {
@@ -503,6 +526,7 @@ struct AppleJwtClaims {
     aud: Option<String>,
     exp: Option<i64>,
     iat: Option<i64>,
+    nonce: Option<String>,
 }
 
 #[derive(serde::Deserialize, Clone, Debug)]
@@ -1524,7 +1548,7 @@ pub(super) fn public_rate_limit_key(scope: &str, headers: &HeaderMap) -> String 
 }
 
 pub(super) fn authenticated_rate_limit_key(scope: &str, headers: &HeaderMap) -> String {
-    let identity = bearer_token_from_headers(headers)
+    let identity = session_token_from_headers(headers)
         .map(|token| format!("session:{}", super::runtime_token_preview(&token)))
         .unwrap_or_else(|| format!("ip:{}", request_ip_identity(headers)));
     format!("auth:{scope}:{identity}")
@@ -1568,7 +1592,7 @@ pub(super) fn forwarded_header_identity(headers: &HeaderMap, header_name: &str) 
         })
 }
 
-fn session_token_from_headers(headers: &HeaderMap) -> Option<String> {
+pub(super) fn session_token_from_headers(headers: &HeaderMap) -> Option<String> {
     bearer_token_from_headers(headers).or_else(|| session_cookie_token_from_headers(headers))
 }
 
@@ -1863,6 +1887,11 @@ fn google_client_id_configured() -> Option<String> {
         return None;
     }
     Some(trimmed.to_string())
+}
+
+fn apple_client_id_configured() -> Option<String> {
+    std::env::var("OMNYID_APPLE_CLIENT_ID").ok()
+        .map(|value| value.trim().to_string()).filter(|value| !value.is_empty())
 }
 
 async fn verify_google_id_token(id_token: &str) -> Result<GoogleTokenInfoResponse, String> {
@@ -2302,6 +2331,7 @@ aSnVsBzVGTmyju6PoBR7Yw==
             aud: Some("com.omnyid.app".to_string()),
             exp: Some(2_000_000_000i64),
             iat: Some(1_700_000_000i64),
+            nonce: None,
         });
 
         let result = validate_apple_identity_token_with_jwks(
@@ -2322,6 +2352,7 @@ aSnVsBzVGTmyju6PoBR7Yw==
             aud: Some("com.omnyid.app".to_string()),
             exp: Some(2_000_000_000i64),
             iat: None,
+            nonce: None,
         });
 
         let result = validate_apple_identity_token_with_jwks(
@@ -2342,6 +2373,7 @@ aSnVsBzVGTmyju6PoBR7Yw==
             aud: Some("com.other.app".to_string()),
             exp: Some(2_000_000_000i64),
             iat: None,
+            nonce: None,
         });
 
         let result = validate_apple_identity_token_with_jwks(
@@ -2362,6 +2394,7 @@ aSnVsBzVGTmyju6PoBR7Yw==
             aud: Some("com.omnyid.app".to_string()),
             exp: Some(100i64),
             iat: None,
+            nonce: None,
         });
 
         let result = validate_apple_identity_token_with_jwks(

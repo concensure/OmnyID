@@ -21,40 +21,7 @@
     href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400..800;1,400..800&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
     rel="stylesheet"
   >
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      darkMode: "class",
-      theme: {
-        extend: {
-          colors: {
-            surface: "#f9f9f7",
-            "surface-container-low": "#f4f4f2",
-            "surface-container-lowest": "#ffffff",
-            "surface-container-high": "#e8e8e6",
-            primary: "#31568e",
-            "primary-fixed": "#d6e3ff",
-            secondary: "#526352",
-            "secondary-container": "#d4e8d3",
-            "on-surface": "#1a1c1b",
-            "on-surface-variant": "#434750",
-            outline: "#737781",
-            "outline-variant": "#c3c6d1",
-            error: "#ba1a1a",
-            ember: "#d96b39"
-          },
-          fontFamily: {
-            display: ["EB Garamond", "serif"],
-            body: ["Inter", "sans-serif"],
-            mono: ["JetBrains Mono", "monospace"]
-          },
-          boxShadow: {
-            panel: "0 24px 80px rgba(0,0,0,0.08)"
-          }
-        }
-      }
-    };
-  </script>
+  <link rel="stylesheet" href="tailwind.css">
   <style>
     html {
       scroll-behavior: smooth;

@@ -1547,3 +1547,28 @@ independent WED-225 scanner sign-off. Likewise, running the full quotation verif
 Docker PostgreSQL and ClamAV with every consequential flag off is a dark rehearsal, not hosted
 shadow evidence. These labels must remain explicit so local success cannot accidentally authorize
 provider traffic, mail, payment, vendor permission, cohort advancement or production release.
+
+## 2026-10-24: Vendor claim intake is not ownership authority
+
+Starting a vendor claim creates a private, expiring proof attempt only. It cannot reserve the public
+listing, grant the vendor role, accept the photo licence, publish an AgentCard or expose owner assets.
+Multiple representatives may start proof so a squatter cannot lock out the real business. Ownership
+is granted atomically only after exact verified work-email proof, control of the listed HTTPS
+website through meta/well-known/DNS proof, or an operator decision with a recent high-risk session
+and a review note. The winning claim abandons competing attempts and emits a private AFP receipt.
+
+Social profile URLs are presentation data, not proof. Instagram/Facebook ownership stays unavailable
+until an official provider authorization can attest business-page authority. Apple web sign-in is
+likewise shown only with an explicitly configured Services ID and HTTPS return URL; state and nonce
+are checked, and the backend fails closed without an expected audience.
+
+The verified vendor dashboard is a projection over the existing listing, licensed asset and private
+quotation-response architecture. It may correct public contact/social data and show a couple-facing
+preview, but it creates no parallel inbox, ranking promise, booking authority or outbound-send
+permission. Welcome email remains default-off and its completion guidance is calculated from stored
+profile state.
+
+Browser session persistence contains no reusable bearer token. A fresh token may exist in volatile
+memory during the login transition, while reloads and WebSocket upgrades authenticate through the
+HttpOnly session cookie. Cloudflare-derived client identity is trusted only behind Caddy's strict
+proxy list; non-Cloudflare public origin requests are rejected at Caddy after deployment.

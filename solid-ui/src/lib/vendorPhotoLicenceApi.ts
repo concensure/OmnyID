@@ -3,7 +3,7 @@
 // @locs-version: 2.0
 // @stability: draft
 // @owner: omnyid
-import { API_BASE, apiFetch, readSession } from "@/lib/api";
+import { API_BASE, apiFetch, sessionBearerToken } from "@/lib/api";
 
 export interface VendorPhotoLicenceDocument {
   agreement_version: string;
@@ -50,7 +50,7 @@ export async function uploadLicensedVendorPhoto(input: {
   if (input.altText?.trim()) body.append("alt_text", input.altText.trim());
   body.append("is_cover", input.isCover ? "true" : "false");
   const headers = new Headers();
-  const token = readSession()?.token;
+  const token = sessionBearerToken();
   if (token) headers.set("Authorization", `Bearer ${token}`);
   const response = await fetch(`${API_BASE}/api/wedding/vendor/photos`, {
     method: "POST",

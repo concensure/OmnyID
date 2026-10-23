@@ -308,7 +308,7 @@ for (const file of pages) {
   if (!/<a [^>]*class="btn btn-primary"[^>]*data-signin-mode="signin">Sign in<\/a>/.test(header)) {
     failures.push(`${name}: header Sign in must use the primary button style`);
   }
-  if (!/href="(?:\.\.\/)+workspace\/\?auth=signin&amp;source=vendor_claim"[^>]*data-vendor-login>Vendor login<\/a>/.test(footer)) {
+  if (!/href="(?:\.\.\/)+workspace\/vendor\.html\?source=vendor_claim"[^>]*data-vendor-login>Vendor login<\/a>/.test(footer)) {
     failures.push(`${name}: footer must link Vendor login to the vendor-claim flow`);
   }
   if (!/assets\/logo\/omnyid-logo\.png/.test(header) || /class="mark"/.test(html)) {

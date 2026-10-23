@@ -3229,3 +3229,48 @@ tasks:
       - recorded the live disposable ClamAV clean scan and parser boundaries plus the full local Docker quotation rehearsal against PostgreSQL, explicitly classifying both as local machine evidence rather than independent or hosted sign-off
       - repaired the human-review form so radio changes update in place without dropping keyboard focus and package generation is synchronously locked against overlapping downloads; two Chromium regressions pass
       - corpus tests, form browser tests, typecheck, both line-budget assertions and the production build pass; all consequential flags remain off and WED-225/WED-226 remain blocked on their external and independent evidence
+  - id: WED-250
+    title: Repair audited security accessibility and vendor ownership proof
+    status: complete
+    owner: codex
+    branch: agent/codex/WED-215
+    depends_on:
+      - WED-213
+      - WED-225
+      - WED-249
+    files:
+      - Caddyfile
+      - Cargo.toml
+      - Cargo.lock
+      - solid-ui/package.json
+      - solid-ui/package-lock.json
+      - solid-ui/src/components/vendor/**
+      - solid-ui/src/components/auth/**
+      - solid-ui/src/components/editor/**
+      - solid-ui/src/lib/**
+      - solid-ui/src/App.tsx
+      - solid-ui/tests/**
+      - src/server/wedding_vendor_claim_routes.rs
+      - src/server/**
+      - postgres/migrations/**
+      - wedding/**
+      - Documents/verification/**
+      - .agent/**
+    acceptance:
+      - every audit item is checked against the current advanced worktree and classified; fixes address current defects without copying the older audited branch or weakening AFP, authentication, privacy or release gates
+      - vendor entry links reach the existing vendor portal with a preserved listing slug, and the portal honestly explains whether replies occur in-product or by email
+      - an unverified listing exposes an accessible claim invitation and a low-friction proof flow that reuses current identity, listing and vendor-portal architecture
+      - a claim cannot reserve a listing, grant the vendor role, accept a licence or publish changes before an approved ownership proof; stale claims expire and disputes/manual review have explicit safe states
+      - work-email-domain, website meta/DNS and connected-social proof are represented with challenge, expiry, attempt and audit boundaries; unsupported provider capabilities fail closed instead of simulating verification
+      - verified vendors reach a lightweight prefilled dashboard with contact/social edits, licensed photo upload, verified badge state and couple-facing preview; premium affordances are labelled without unsupported ranking promises
+      - current reproducible accessibility, dependency, response-header, proxy and session defects are fixed or recorded with bounded follow-up where a safe code-only repair is not possible
+      - new files stay below 1000 lines, oversized owners do not grow, consequential flags remain disabled, and focused security, Rust, browser, accessibility, typecheck, line-budget and production-build checks pass
+    progress:
+      - registered from committed WED-249 revision 180b24e; auditing each finding against the current branch before changing contracts
+      - linked every Wedding vendor entry to the existing vendor portal with listing context preserved across shared authentication; verified owners reuse the existing private quotation-response surface
+      - replaced intake-time ownership with expiring non-reserving attempts and proof-gated authority; exact verified work email, website meta/well-known/DNS, operator dispute/review, release, attempt bounds and private AFP receipts now fail closed
+      - added the verified prefilled dashboard, badge, contact/social edits, licensed gallery actions, couple preview, truthful completion nudge and default-off calculated welcome email without expanding ranking, send or booking authority
+      - updated browser sessions to HttpOnly-cookie persistence, added WebSocket cookie authentication, fail-closed conditional Apple web identity, Cloudflare trusted-proxy/origin enforcement, HSTS, hardened CSP and compiled docs CSS
+      - remediated the audited auth/tour dialog, labels, landmarks, editor naming, live region, target size and targeted contrast defects; recorded bounded residual hosted and dependency work in the WED-250 verification note
+      - disposable ownership API 2/2, ownership units 3/3, Apple-token units 5/5, relay units 9/9, cookie-auth unit 1/1, session tests 13/13, wedding tests 1962/1962, typecheck, SDK checks, line budgets, CSP/site smoke, Caddy validation, cargo check and production build pass
+      - npm audit now has zero high/critical findings; cargo audit retains only the unpatched RSA lock-resolution advisory and constrained AWS lru warning; policy V2, social proof and welcome email remain disabled

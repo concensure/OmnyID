@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 export const WorkflowSchemaVersionSchema = z.literal('omnyid-workflow.v1');
 export const WorkflowIrVersionSchema = z.literal('omnyid-workflow-ir.v1');

@@ -1,5 +1,5 @@
 ﻿// @locs-version: 1.0
-import { JSX, Show } from "solid-js";
+import { createEffect, JSX, onCleanup, Show } from "solid-js";
 import { getFocusableElements } from "@/lib/getFocusableElements";
 import { handleDialogTabNavigation } from "@/lib/handleDialogTabNavigation";
 import { useBodyScrollLock } from "@/lib/useBodyScrollLock";
@@ -21,6 +21,7 @@ type Props = {
 
 export function DialogShell(props: Props) {
   let dialogRef: HTMLDivElement | undefined;
+  let returnFocus: HTMLElement | null = null;
   const isOpen = () => props.open ?? true;
 
   function focusableDialogElements(): HTMLElement[] {
@@ -28,6 +29,12 @@ export function DialogShell(props: Props) {
   }
 
   useBodyScrollLock(isOpen);
+  createEffect(() => {
+    if (!isOpen()) return;
+    returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    queueMicrotask(() => (focusableDialogElements()[0] ?? dialogRef)?.focus());
+  });
+  onCleanup(() => returnFocus?.focus());
 
   return (
     <Show when={isOpen()}>

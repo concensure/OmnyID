@@ -39,6 +39,7 @@ export type TiptapEditorProps = {
   emailSubject?: string;
   initialContent?: string;
   placeholder?: string;
+  ariaLabel?: string;
   submitLabel?: string;
   mentionSuggestions?: MentionSuggestion[];
   onChange?: (text: string, markdown: string, html: string) => void;

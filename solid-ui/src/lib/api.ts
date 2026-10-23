@@ -128,8 +128,10 @@ export const API_BASE =
   envApiBase ||
   (typeof window !== "undefined" ? deriveDefaultApiBase(window.location.origin) : "");
 export const SESSION_STORAGE_KEY = "omnyid.preview.session";
+const COOKIE_SESSION_TOKEN = "__http_only_cookie__";
 const GUEST_FINGERPRINT_STORAGE_KEY = "omnyid.preview.guest_fingerprint";
 export const SESSION_CHANGED_EVENT = "omnyid:session-changed";
+let volatileBearerToken: string | null = null;
 
 export type Session = {
   token: string;
@@ -3429,28 +3431,36 @@ export function readSession(): Session | null {
   try {
     const raw = readSessionStorageValue(sessionStorage);
     if (!raw) {
+      volatileBearerToken = null;
       removeSessionStorageValue(window.localStorage);
       return null;
     }
     const parsed = parseJsonValue(raw);
     if (!parsed.ok) {
+      volatileBearerToken = null;
       removeSessionStorageValue(sessionStorage);
       removeSessionStorageValue(window.localStorage);
       return null;
     }
     const normalized = normalizeSession(parsed.value);
     if (!normalized) {
+      volatileBearerToken = null;
       removeSessionStorageValue(sessionStorage);
       removeSessionStorageValue(window.localStorage);
       return null;
     }
-    const serialized = JSON.stringify(normalized);
+    if (normalized.token !== COOKIE_SESSION_TOKEN) {
+      volatileBearerToken = normalized.token;
+    }
+    const persisted = { ...normalized, token: COOKIE_SESSION_TOKEN };
+    const serialized = JSON.stringify(persisted);
     if (serialized !== raw || readSessionStorageValue(sessionStorage) !== serialized) {
       writeSessionStorageValue(sessionStorage, serialized);
     }
     removeSessionStorageValue(window.localStorage);
-    return normalized;
+    return volatileBearerToken ? { ...persisted, token: volatileBearerToken } : persisted;
   } catch {
+    volatileBearerToken = null;
     removeSessionStorageValue(sessionStorage);
     removeSessionStorageValue(window.localStorage);
     return null;
@@ -3462,12 +3472,20 @@ export function writeSession(
   options?: { reason?: SessionEndReason | null },
 ): void {
   const normalizedSession = normalizeSession(session);
+  if (!normalizedSession) {
+    volatileBearerToken = null;
+  } else if (normalizedSession.token !== COOKIE_SESSION_TOKEN) {
+    volatileBearerToken = normalizedSession.token;
+  }
   try {
     if (!normalizedSession) {
       removeSessionStorageValue(window.sessionStorage);
       removeSessionStorageValue(window.localStorage);
     } else {
-      writeSessionStorageValue(window.sessionStorage, JSON.stringify(normalizedSession));
+      writeSessionStorageValue(
+        window.sessionStorage,
+        JSON.stringify({ ...normalizedSession, token: COOKIE_SESSION_TOKEN }),
+      );
       removeSessionStorageValue(window.localStorage);
     }
   } catch {
@@ -3478,6 +3496,12 @@ export function writeSession(
       reason: options?.reason ?? null,
     });
   }
+}
+
+export function sessionBearerToken(token?: string | null): string | null {
+  if (arguments.length === 0) token = readSession()?.token;
+  if (!token || token === COOKIE_SESSION_TOKEN) return volatileBearerToken;
+  return token;
 }
 
 export function clearSession(reason: SessionEndReason | null = null): void {
@@ -3500,7 +3524,7 @@ async function publicApiFetch<T>(
   const response = await fetch(`${API_BASE}${path}`, {
     ...options,
     headers,
-    credentials: options?.credentials ?? "same-origin",
+    credentials: options?.credentials ?? "include",
     body: options?.bodyJson !== undefined ? JSON.stringify(options.bodyJson) : options?.body,
   });
 
@@ -3523,14 +3547,9 @@ export async function apiFetch<T>(
   if (options?.bodyJson !== undefined) {
     headers.set("Content-Type", "application/json");
   }
-  const token = options?.authToken ?? readSession()?.token ?? null;
-  // The backend checks the Authorization header before falling back to the
-  // omnyid_session cookie (see authenticated_user in auth.rs). The cookie path
-  // needs credentialed cross-subdomain CORS *and* a Set-Cookie from a request
-  // that itself used credentials — neither of which the login call does — so
-  // Bearer must always be sent whenever a session token is available; it was
-  // previously gated behind an opt-in flag that essentially nothing passed,
-  // silently leaving almost every authenticated call unauthenticated.
+  const token = sessionBearerToken(options?.authToken ?? readSession()?.token);
+  // Newly issued credentials remain in memory for the login transition. After
+  // a reload, the HttpOnly session cookie is the browser's only credential.
   if (token) {
     headers.set("Authorization", `Bearer ${token}`);
   }
@@ -3580,7 +3599,7 @@ export async function fetchGoogleWeddingVendorPhoto(
   if (!isGoogleWeddingVendorPhotoPath(path)) {
     throw new Error("Invalid Google wedding vendor photo path.");
   }
-  const token = readSession()?.token ?? null;
+  const token = sessionBearerToken();
   const headers = new Headers({ Accept: "image/*" });
   if (token) headers.set("Authorization", `Bearer ${token}`);
 
@@ -3822,13 +3841,11 @@ export function subscribeThread(
   const socket = new WebSocket(`${wsBase}/relay/ws`);
 
   socket.addEventListener("open", () => {
-    const token = readSession()?.token ?? null;
     socket.send(
       JSON.stringify({
         op: "subscribe_thread",
         thread_id: threadId,
         include_snapshot: false,
-        ...(token ? { token } : {}),
       })
     );
   });
@@ -3859,8 +3876,7 @@ export function subscribeFleet(onUpdate: () => void): () => void {
   const socket = new WebSocket(`${wsBase}/relay/ws`);
 
   socket.addEventListener("open", () => {
-    const token = readSession()?.token ?? null;
-    socket.send(JSON.stringify({ op: "subscribe_fleet", ...(token ? { token } : {}) }));
+    socket.send(JSON.stringify({ op: "subscribe_fleet" }));
   });
 
   socket.addEventListener("message", (ev) => {
@@ -4749,7 +4765,7 @@ export const uploadFilePayload = async (
   const formData = new FormData();
   formData.append("file", file, options?.filename ?? undefined);
   const headers = new Headers();
-  const token = options?.token ?? null;
+  const token = sessionBearerToken(options?.token);
   if (token) {
     headers.set("Authorization", `Bearer ${token}`);
   }

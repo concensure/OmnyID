@@ -3,13 +3,16 @@
 // @locs-version: 1.0
 // @stability: beta
 // @owner: omnyid
-import { createSignal, Show } from "solid-js";
+import { createSignal, onMount, Show } from "solid-js";
 
-import { VendorPhotoUploadPanel } from "@/components/vendor/VendorPhotoUploadPanel";
-import { VendorQuotationResponsePanel } from "@/components/vendor/VendorQuotationResponsePanel";
+import { VendorOwnershipProofPanel } from "@/components/vendor/VendorOwnershipProofPanel";
+import { VendorProfileDashboard } from "@/components/vendor/VendorProfileDashboard";
 import { getVendorClaim, startVendorClaim, type VendorClaim } from "@/lib/vendorClaimApi";
 
-const slugFromUrl = () => new URLSearchParams(window.location.search).get("vendor_slug")?.trim().toLowerCase() ?? "";
+const slugFromUrl = () => {
+  const params = new URLSearchParams(window.location.search);
+  return (params.get("vendor_slug") ?? params.get("vendor") ?? "").trim().toLowerCase();
+};
 
 export function VendorClaimFlow() {
   const [vendorSlug, setVendorSlug] = createSignal(slugFromUrl());
@@ -48,6 +51,9 @@ export function VendorClaimFlow() {
       setBusy(false);
     }
   };
+  onMount(() => {
+    if (vendorSlug()) void loadExisting();
+  });
 
   return (
     <main class="mx-auto min-h-screen max-w-2xl bg-wedding-surface px-4 py-8 text-wedding-text sm:px-6">
@@ -55,7 +61,7 @@ export function VendorClaimFlow() {
       <header class="mt-6">
         <p class="text-xs font-bold uppercase tracking-[0.16em] text-wedding-accent">Vendor portal</p>
         <h1 class="mt-2 text-3xl font-bold">Claim and manage your listing</h1>
-        <p class="mt-2 text-sm leading-6 text-wedding-muted">Start a claim, then publish licensed photos from the same secure editor.</p>
+        <p class="mt-2 text-sm leading-6 text-wedding-muted">Prove ownership, correct your public details, manage licensed photos, and answer private quotation requests.</p>
       </header>
       <Show when={!claim()}>
         <section class="mt-6 rounded-2xl border border-wedding-muted bg-white p-5 shadow-sm">
@@ -70,18 +76,17 @@ export function VendorClaimFlow() {
           </label>
           <div class="mt-5 grid gap-2 sm:grid-cols-2">
             <button class="min-h-11 rounded-lg border border-wedding-accent px-4 font-bold text-wedding-accent" type="button" disabled={busy() || !vendorSlug()} onClick={() => void loadExisting()}>Check existing claim</button>
-            <button class="min-h-11 rounded-lg bg-wedding-accent px-4 font-bold text-white disabled:opacity-60" type="button" disabled={busy()} onClick={() => void begin()}>{busy() ? "Working…" : "Start claim"}</button>
+            <button class="min-h-11 rounded-lg bg-wedding-accent px-4 font-bold text-white disabled:opacity-60" type="button" disabled={busy()} onClick={() => void begin()}>{busy() ? "Working…" : "Start ownership proof"}</button>
           </div>
         </section>
       </Show>
       <Show when={claim()}>
         {(activeClaim) => <>
-          <section class="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
-            <h2 class="font-semibold">2. Claim received</h2>
-            <p class="mt-2 text-sm">Your listing claim is {activeClaim().status}. You can now manage its public photos.</p>
-          </section>
-          <section class="mt-6"><h2 class="mb-3 text-lg font-semibold">3. Photos</h2><VendorPhotoUploadPanel vendorSlug={activeClaim().vendor_slug} /></section>
-          <section class="mt-6"><VendorQuotationResponsePanel /></section>
+          <Show when={activeClaim().ownership_verified} fallback={
+            <VendorOwnershipProofPanel vendorSlug={activeClaim().vendor_slug} onVerified={() => void loadExisting()} onReleased={() => setClaim(null)} />
+          }>
+            <VendorProfileDashboard vendorSlug={activeClaim().vendor_slug} />
+          </Show>
         </>}
       </Show>
       <Show when={error()}>{(message) => <p class="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-800" role="alert">{message()}</p>}</Show>

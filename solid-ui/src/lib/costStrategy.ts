@@ -229,11 +229,9 @@ export function createCostStrategy(initialBudget?: Partial<BudgetSnapshot>) {
   // ── Budget loading ────────────────────────────────────────────────────────
 
   /** Fetch user's budget from the server and update signals. */
-  async function loadBudget(authToken: string) {
+  async function loadBudget(_authToken: string) {
     try {
-      const res = await fetch("/api/cost/budget", {
-        headers: { Authorization: `Bearer ${authToken}` },
-      });
+      const res = await fetch("/api/cost/budget", { credentials: "include" });
       if (!res.ok) return;
       setBudget(parseCostBudgetResponse(await res.json()));
     } catch {

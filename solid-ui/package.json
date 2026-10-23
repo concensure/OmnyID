@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit",
     "test:line-budget": "node --import ./tests/node-ts-specifier-hooks.mjs --experimental-strip-types --test tests/file-line-budget.test.ts",
     "test:wedding": "node --import ./tests/node-ts-specifier-hooks.mjs --experimental-strip-types --test \"tests/wedding-*.test.ts\"",
-    "test:wedding-site": "node ../wedding/tests/wedding-website-smoke.mjs",
+    "test:wedding-site": "node ../wedding/tests/wedding-website-smoke.mjs && node ../wedding/tests/security-csp-smoke.mjs",
     "test:wedding:ci": "npm run typecheck && npm run test:line-budget && npm run test:wedding-site && npm run test:wedding",
     "test:wedding:e2e": "playwright test --config playwright.config.ts",
     "verify:wedding-vendor-quote:gmail": "node scripts/verify-wedding-vendor-quote-gmail-provider.mjs",
@@ -55,8 +55,12 @@
     "marked": "^15.0.12",
     "pdfjs-dist": "^6.0.227",
     "pptxgenjs": "^4.0.1",
-    "solid-js": "^1.9.5",
+    "solid-js": "^1.9.17",
     "three": "^0.181.2"
+  },
+  "overrides": {
+    "image-size": "2.0.4",
+    "markdown-it": "14.3.3"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",

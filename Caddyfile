@@ -1,6 +1,25 @@
 {
     email {$ACME_EMAIL}
     acme_ca https://acme-v02.api.letsencrypt.org/directory
+    servers {
+        trusted_proxies static 173.245.48.0/20 103.21.244.0/22 103.22.200.0/22 103.31.4.0/22 141.101.64.0/18 108.162.192.0/18 190.93.240.0/20 188.114.96.0/20 197.234.240.0/22 198.41.128.0/17 162.158.0.0/15 104.16.0.0/13 104.24.0.0/14 172.64.0.0/13 131.0.72.0/22 2400:cb00::/32 2606:4700::/32 2803:f800::/32 2405:b500::/32 2405:8100::/32 2a06:98c0::/29 2c0f:f248::/32
+        trusted_proxies_strict
+        client_ip_headers CF-Connecting-IP X-Forwarded-For
+    }
+}
+
+(cloudflare_only) {
+    @not_cloudflare not remote_ip private_ranges 173.245.48.0/20 103.21.244.0/22 103.22.200.0/22 103.31.4.0/22 141.101.64.0/18 108.162.192.0/18 190.93.240.0/20 188.114.96.0/20 197.234.240.0/22 198.41.128.0/17 162.158.0.0/15 104.16.0.0/13 104.24.0.0/14 172.64.0.0/13 131.0.72.0/22 2400:cb00::/32 2606:4700::/32 2803:f800::/32 2405:b500::/32 2405:8100::/32 2a06:98c0::/29 2c0f:f248::/32
+    abort @not_cloudflare
+}
+
+(security_headers) {
+    header {
+        Strict-Transport-Security "max-age=15552000; includeSubDomains"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
 }
 
 (omnyid_proxy) {
@@ -24,6 +43,8 @@
 }
 
 {$OMNYID_DOMAIN} {
+    import cloudflare_only
+    import security_headers
     # Default body size limit for all routes (GAP-145).
     request_body {
         max_size 4MB
@@ -191,8 +212,8 @@
         header /sw.js Cache-Control "no-cache, must-revalidate"
         header /assets/* Cache-Control "public, max-age=31536000, immutable"
         # GAP-116: prevent XSS via a strict CSP.
-        # unsafe-inline is needed for SolidJS's runtime style injection.
-        header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://accounts.google.com/gsi/client https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com/gsi/style; style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com/gsi/style; img-src 'self' data: blob: https://images.unsplash.com https://lh3.googleusercontent.com https://*.googleusercontent.com; connect-src 'self' wss: https:; font-src 'self' data: https://fonts.gstatic.com; frame-src https://accounts.google.com/gsi/ https://www.google.com; frame-ancestors 'none'; object-src 'none'"
+        # Inline scripts are blocked; inline styles remain for SolidJS and editor rendering.
+        header Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://accounts.google.com/gsi/client https://appleid.cdn-apple.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com/gsi/style; style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com/gsi/style; img-src 'self' data: blob: https://images.unsplash.com https://lh3.googleusercontent.com https://*.googleusercontent.com; connect-src 'self' https://api.omnyid.com https://cloud.omnyid.com wss://api.omnyid.com wss://cloud.omnyid.com https://accounts.google.com https://appleid.apple.com https://static.cloudflareinsights.com https://api.open-meteo.com https://nominatim.openstreetmap.org https://api.frankfurter.app https://open.er-api.com; font-src 'self' data: https://fonts.gstatic.com; frame-src https://accounts.google.com/gsi/ https://appleid.apple.com https://www.google.com https://www.openstreetmap.org; frame-ancestors 'none'; object-src 'none'"
         header X-Content-Type-Options "nosniff"
         header X-Frame-Options "DENY"
         header Referrer-Policy "strict-origin-when-cross-origin"
@@ -210,7 +231,7 @@
         root * /srv/workspace
         try_files {path} /index.html
         file_server
-        header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://accounts.google.com/gsi/client https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com/gsi/style; style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com/gsi/style; img-src 'self' data: blob: https://images.unsplash.com https://lh3.googleusercontent.com https://*.googleusercontent.com; connect-src 'self' wss: https:; font-src 'self' data: https://fonts.gstatic.com; frame-src https://accounts.google.com/gsi/ https://www.google.com; frame-ancestors 'none'; object-src 'none'"
+        header Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://accounts.google.com/gsi/client https://appleid.cdn-apple.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com/gsi/style; style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com/gsi/style; img-src 'self' data: blob: https://images.unsplash.com https://lh3.googleusercontent.com https://*.googleusercontent.com; connect-src 'self' https://api.omnyid.com https://cloud.omnyid.com wss://api.omnyid.com wss://cloud.omnyid.com https://accounts.google.com https://appleid.apple.com https://static.cloudflareinsights.com https://api.open-meteo.com https://nominatim.openstreetmap.org https://api.frankfurter.app https://open.er-api.com; font-src 'self' data: https://fonts.gstatic.com; frame-src https://accounts.google.com/gsi/ https://appleid.apple.com https://www.google.com https://www.openstreetmap.org; frame-ancestors 'none'; object-src 'none'"
         header X-Content-Type-Options "nosniff"
         header X-Frame-Options "DENY"
         header Referrer-Policy "strict-origin-when-cross-origin"
@@ -290,7 +311,7 @@
         }
         rewrite @weddingdirindex /index.html
         file_server
-        header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://accounts.google.com/gsi/client https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https://images.unsplash.com https://lh3.googleusercontent.com https://*.googleusercontent.com; connect-src 'self' https:; font-src 'self' data: https://fonts.gstatic.com; frame-src https://accounts.google.com/gsi/; frame-ancestors 'none'; object-src 'none'"
+        header Content-Security-Policy "default-src 'self'; script-src 'self' 'sha256-SR9l2aM5D8u7/lfDfy6rn64kmM0ej8dys/tlvPEWTEQ=' 'sha256-vMN1UVgD4dWpvGDRo+dfMBqhZ+6T8/wYT8nVDbZoRkY=' 'sha256-CQzmGR6rG3FoBBOgnMsSG8YxyWbpkI+Q1vdlojigHfs=' https://accounts.google.com/gsi/client https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https://images.unsplash.com https://lh3.googleusercontent.com https://*.googleusercontent.com; connect-src 'self' https://api.omnyid.com https://static.cloudflareinsights.com; font-src 'self' data: https://fonts.gstatic.com; frame-src https://accounts.google.com/gsi/; frame-ancestors 'none'; object-src 'none'"
     }
 
     # `/srv/docs` is a deployment input, not a public-document repository.
@@ -319,7 +340,7 @@
         file_server
         header /index.html Cache-Control "no-cache, no-store, must-revalidate"
         header /app.js Cache-Control "no-cache, no-store, must-revalidate"
-        header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://accounts.google.com/gsi/client https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https://images.unsplash.com https://lh3.googleusercontent.com https://*.googleusercontent.com; connect-src 'self' https:; font-src 'self' data: https://fonts.gstatic.com; frame-src https://accounts.google.com/gsi/; frame-ancestors 'none'; object-src 'none'"
+        header Content-Security-Policy "default-src 'self'; script-src 'self' 'sha256-I09YcuWRc1WjUWRz71fClRsOoj/sG9rzYLTacm1adrg=' 'sha256-+TtZizzTI1w95JFUHKoSBQBkMcW73Ju4wKTkYgdZtTE=' 'sha256-xl/jzrGxWCaX9hNw19CWSya+urr1TdtPyFQD9Uo2Fkg=' https://accounts.google.com/gsi/client https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https://images.unsplash.com https://lh3.googleusercontent.com https://*.googleusercontent.com; connect-src 'self' https://api.omnyid.com https://static.cloudflareinsights.com; font-src 'self' data: https://fonts.gstatic.com; frame-src https://accounts.google.com/gsi/; frame-ancestors 'none'; object-src 'none'"
     }
 
     # No explicit Cache-Control here previously meant browsers could apply
@@ -333,7 +354,7 @@
         file_server
         header /index.html Cache-Control "no-cache, no-store, must-revalidate"
         header /app.js Cache-Control "no-cache, no-store, must-revalidate"
-        header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://accounts.google.com/gsi/client https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https://images.unsplash.com https://lh3.googleusercontent.com https://*.googleusercontent.com; connect-src 'self' https:; font-src 'self' data: https://fonts.gstatic.com; frame-src https://accounts.google.com/gsi/; frame-ancestors 'none'; object-src 'none'"
+        header Content-Security-Policy "default-src 'self'; script-src 'self' 'sha256-I09YcuWRc1WjUWRz71fClRsOoj/sG9rzYLTacm1adrg=' 'sha256-+TtZizzTI1w95JFUHKoSBQBkMcW73Ju4wKTkYgdZtTE=' 'sha256-xl/jzrGxWCaX9hNw19CWSya+urr1TdtPyFQD9Uo2Fkg=' https://accounts.google.com/gsi/client https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https://images.unsplash.com https://lh3.googleusercontent.com https://*.googleusercontent.com; connect-src 'self' https://api.omnyid.com https://static.cloudflareinsights.com; font-src 'self' data: https://fonts.gstatic.com; frame-src https://accounts.google.com/gsi/; frame-ancestors 'none'; object-src 'none'"
     }
 }
 
@@ -347,6 +368,8 @@
 }
 
 api.{$OMNYID_DOMAIN} {
+    import cloudflare_only
+    import security_headers
     request_body {
         max_size 4MB
     }
@@ -362,6 +385,8 @@ api.{$OMNYID_DOMAIN} {
 }
 
 cloud.{$OMNYID_DOMAIN} {
+    import cloudflare_only
+    import security_headers
     request_body {
         max_size 4MB
     }
@@ -374,11 +399,15 @@ cloud.{$OMNYID_DOMAIN} {
 }
 
 wt.{$OMNYID_DOMAIN} {
+    import cloudflare_only
+    import security_headers
     import omnyid_proxy
 }
 
 # Cloudflare proxies www; without a site here the origin handshake fails (525).
 www.{$OMNYID_DOMAIN} {
+    import cloudflare_only
+    import security_headers
     redir https://{$OMNYID_DOMAIN}{uri} permanent
 }
 

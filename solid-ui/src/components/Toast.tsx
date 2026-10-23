@@ -109,6 +109,8 @@ export function ToastContainer() {
   return (
     <div
       class="fixed bottom-6 right-5 z-[9998] flex flex-col-reverse gap-2 pointer-events-none"
+      role="region"
+      aria-live="polite"
       aria-label="Notifications"
     >
       <For each={toasts()}>

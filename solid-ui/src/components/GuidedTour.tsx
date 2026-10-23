@@ -1,4 +1,5 @@
 import { createSignal, Show } from "solid-js";
+import { DialogShell } from "@/components/DialogShell";
 import { loadShouldShowGuidedTour, saveGuidedTourSeen } from "@/lib/guidedTourLocalState";
 
 type InfoStep = { kind: "info"; icon: string; title: string; body: string };
@@ -47,8 +48,13 @@ export function GuidedTour(props: { onComplete: () => void; userId?: string }) {
   const current = () => STEPS[step()];
 
   return (
-    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div class="relative w-full max-w-md rounded-2xl border border-white/20 bg-surface p-8 shadow-2xl animate-fade-in">
+    <DialogShell
+      labelledBy="guided-tour-title"
+      focusableSelector="button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled])"
+      overlayClass="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+      dialogClass="relative w-full max-w-md rounded-2xl border border-white/20 bg-surface p-8 shadow-2xl animate-fade-in"
+      onClose={finish}
+    >
         <button
           type="button"
           aria-label="Close tour"
@@ -78,7 +84,7 @@ export function GuidedTour(props: { onComplete: () => void; userId?: string }) {
             return (
               <div class="text-center">
                 <div class="mb-4 text-5xl">{s.icon}</div>
-                <h2 class="mb-3 text-xl font-semibold text-on-surface">{s.title}</h2>
+                <h2 id="guided-tour-title" class="mb-3 text-xl font-semibold text-on-surface">{s.title}</h2>
                 <p class="text-sm leading-7 text-on-surface-variant">{s.body}</p>
               </div>
             );
@@ -90,7 +96,7 @@ export function GuidedTour(props: { onComplete: () => void; userId?: string }) {
           <div>
             <div class="mb-5 text-center">
               <div class="mb-3 text-4xl">🛠</div>
-              <h2 class="text-xl font-semibold text-on-surface">Set up your workspace</h2>
+              <h2 id="guided-tour-title" class="text-xl font-semibold text-on-surface">Set up your workspace</h2>
               <p class="mt-2 text-sm text-on-surface-variant">
                 A few quick connections unlock the most value. All optional — you can do them later.
               </p>
@@ -99,7 +105,7 @@ export function GuidedTour(props: { onComplete: () => void; userId?: string }) {
             {/* Borderless table */}
             <div class="mt-1">
               {/* Header */}
-              <div class="mb-1.5 grid grid-cols-[1fr_2fr_4rem] gap-x-3 px-1 text-[10px] font-medium uppercase tracking-widest text-on-surface-variant/50">
+              <div class="mb-1.5 grid grid-cols-[1fr_2fr_4rem] gap-x-3 px-1 text-xs font-medium uppercase tracking-widest text-on-surface-variant">
                 <span>Setup</span>
                 <span>What it enables</span>
                 <span class="text-right">Time</span>
@@ -109,13 +115,13 @@ export function GuidedTour(props: { onComplete: () => void; userId?: string }) {
                   <div class="grid grid-cols-[1fr_2fr_4rem] gap-x-3 rounded-lg px-1 py-2">
                     <span class="text-sm font-medium text-on-surface">{row.label}</span>
                     <span class="text-xs text-on-surface-variant">{row.description}</span>
-                    <span class="text-right text-xs text-on-surface-variant/50">~{row.minutes} min</span>
+                    <span class="text-right text-xs text-on-surface-variant">~{row.minutes} min</span>
                   </div>
                 ))}
               </div>
             </div>
 
-            <p class="mt-3 px-1 text-[10px] text-on-surface-variant/40">
+            <p class="mt-3 px-1 text-xs text-on-surface-variant">
               Weather and maps are active by default — no setup needed.
             </p>
           </div>
@@ -165,7 +171,6 @@ export function GuidedTour(props: { onComplete: () => void; userId?: string }) {
             </button>
           </Show>
         </div>
-      </div>
-    </div>
+    </DialogShell>
   );
 }

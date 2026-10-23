@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 export const QUOTATION_SCHEMA_VERSION = 'quotation.normalised.v1' as const;
 export const COMPARISON_SCHEMA_VERSION = 'quotation.comparison.v1' as const;

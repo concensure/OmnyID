@@ -289,6 +289,11 @@ test("apiFetch clears the local session when the backend reports a disabled acco
     },
   });
 
+  assert.equal(
+    JSON.parse(sessionStorageState.get("omnyid.preview.session") ?? "{}").token,
+    "__http_only_cookie__",
+  );
+
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async () =>
     new Response("account access is disabled: abuse review", {

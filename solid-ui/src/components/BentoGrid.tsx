@@ -1559,7 +1559,7 @@ function BentoTile(props: {
                 const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
                 props.onMenuToggle({ top: rect.bottom, right: window.innerWidth - rect.right });
               }}
-              class="flex h-5 w-5 items-center justify-center rounded-full text-[12px] leading-none text-outline/40 hover:bg-on-surface/8 hover:text-on-surface"
+              class="flex h-11 w-11 items-center justify-center rounded-full text-xs leading-none text-outline hover:bg-on-surface/8 hover:text-on-surface"
               aria-label="Tile options"
             >
               ...
@@ -1653,7 +1653,7 @@ function BentoTile(props: {
             const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
             props.onQuickAddToggle({ top: rect.top, buttonRight: rect.right });
           }}
-          class="flex h-6 w-6 items-center justify-center rounded-full bg-primary/15 text-primary text-sm font-light shadow-sm transition hover:bg-primary/30"
+          class="flex h-11 w-11 items-center justify-center rounded-full bg-primary/15 text-primary text-sm font-light shadow-sm transition hover:bg-primary/30"
           aria-label="Add content"
           title="Add content"
         >

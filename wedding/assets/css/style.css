@@ -353,7 +353,7 @@ main:focus{ outline:none; }
 
 .mock-grid{ display:grid; grid-template-columns: repeat(2, 1fr); gap:16px; }
 .mock-card{ background: var(--cream); border:1px solid var(--line); border-radius: var(--r-md); padding:18px; }
-.mock-card h4{ font-size:13px; text-transform:uppercase; letter-spacing:.04em; color: var(--ink-faint); margin-bottom:12px; font-family: var(--font-body); font-weight:600; }
+.mock-card h3{ font-size:13px; text-transform:uppercase; letter-spacing:.04em; color: var(--ink-faint); margin-bottom:12px; font-family: var(--font-body); font-weight:600; }
 .mock-card.full{ grid-column: 1 / -1; }
 
 .mock-timeline{ display:flex; flex-direction:column; gap:14px; }

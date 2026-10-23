@@ -14,7 +14,7 @@ use wtransport::{
     endpoint::IncomingSession as WebTransportIncomingSession,
 };
 
-use super::auth::{bearer_token_from_headers, merge_thread_messages, session_is_expired};
+use super::auth::{merge_thread_messages, session_is_expired, session_token_from_headers};
 use super::{
     AppState, app_to_proto, internal_http_error, load_webtransport_identity, proto_to_app,
     store_proto_message, webtransport_bind_addr,
@@ -35,8 +35,8 @@ fn relay_thread_access_error() -> String {
     "thread not found".to_string()
 }
 
-fn require_relay_bearer_token(headers: &HeaderMap) -> Result<String, (StatusCode, &'static str)> {
-    bearer_token_from_headers(headers).ok_or((StatusCode::UNAUTHORIZED, "missing bearer token"))
+fn require_relay_session_token(headers: &HeaderMap) -> Result<String, (StatusCode, &'static str)> {
+    session_token_from_headers(headers).ok_or((StatusCode::UNAUTHORIZED, "missing session"))
 }
 
 // ── WebSocket relay & WebTransport ────────────────────────────────────────────
@@ -60,7 +60,7 @@ pub(super) async fn relay_ws_http(
     if !origin_ok {
         return (StatusCode::FORBIDDEN, "origin not allowed").into_response();
     }
-    let token = match require_relay_bearer_token(&headers) {
+    let token = match require_relay_session_token(&headers) {
         Ok(token) => token,
         Err((status, message)) => {
             return (status, message).into_response();
@@ -365,19 +365,19 @@ async fn write_webtransport_event(
 mod tests {
     use super::{
         is_allowed_webtransport_origin, load_relay_thread_snapshot_for_owner,
-        relay_event_visible_to_subscriber, require_relay_bearer_token,
+        relay_event_visible_to_subscriber, require_relay_session_token,
     };
     use crate::afp::Message;
     use crate::db::{Db, UserRecord};
-    use axum::http::{HeaderMap, HeaderValue, StatusCode, header::AUTHORIZATION};
+    use axum::http::{HeaderMap, HeaderValue, StatusCode, header::{AUTHORIZATION, COOKIE}};
     use ulid::Ulid;
 
     #[test]
-    fn relay_websocket_requires_bearer_token_before_upgrade() {
+    fn relay_websocket_requires_session_before_upgrade() {
         let headers = HeaderMap::new();
-        let err = require_relay_bearer_token(&headers).expect_err("missing auth should fail");
+        let err = require_relay_session_token(&headers).expect_err("missing auth should fail");
         assert_eq!(err.0, StatusCode::UNAUTHORIZED);
-        assert_eq!(err.1, "missing bearer token");
+        assert_eq!(err.1, "missing session");
     }
 
     #[test]
@@ -387,8 +387,16 @@ mod tests {
             AUTHORIZATION,
             HeaderValue::from_static("Bearer test-session-token"),
         );
-        let token = require_relay_bearer_token(&headers).expect("bearer token");
+        let token = require_relay_session_token(&headers).expect("bearer token");
         assert_eq!(token, "test-session-token");
+    }
+
+    #[test]
+    fn relay_websocket_accepts_http_only_session_cookie() {
+        let mut headers = HeaderMap::new();
+        headers.insert(COOKIE, HeaderValue::from_static("omnyid_session=cookie-token"));
+        let token = require_relay_session_token(&headers).expect("session cookie");
+        assert_eq!(token, "cookie-token");
     }
 
     #[test]

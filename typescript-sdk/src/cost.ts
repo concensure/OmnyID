@@ -9,7 +9,7 @@
  *  - Card load strategies decouple UI rendering from data fetching cost
  */
 
-import { z } from "zod";
+import { z } from "zod/v3";
 
 // ── Budget ────────────────────────────────────────────────────────────────────
 

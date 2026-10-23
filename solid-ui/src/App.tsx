@@ -16,6 +16,8 @@ import { WorkspaceBreadcrumbTrail } from "@/components/WorkspaceBreadcrumbTrail"
 import { PrimaryUseCasePrompt } from "@/components/PrimaryUseCasePrompt";
 import { collectKindCounts, objectKindLabel } from "@/lib/objectKinds";
 import { ToastContainer } from "@/components/Toast";
+import { DialogShell } from "@/components/DialogShell";
+import { AppleSignInButton } from "@/components/auth/AppleSignInButton";
 import { normalizeViewName, VIEW_NAMES, type ViewName } from "@/lib/viewNames";
 import {
   appViewFromBrowserHistory,
@@ -1259,6 +1261,7 @@ function App() {
   // this same workspace sign-in form instead of a separate static one.
   const deepLinkParams = new URLSearchParams(window.location.search);
   const pendingAuthSource = deepLinkParams.get("source");
+  const pendingVendorSlug = (deepLinkParams.get("vendor_slug") ?? deepLinkParams.get("vendor") ?? "").trim().toLowerCase(), vendorPortalUrlFromDeepLink = () => `/workspace/vendor.html${pendingVendorSlug ? `?vendor_slug=${encodeURIComponent(pendingVendorSlug)}` : ""}`;
   const shouldLaunchWeddingTemplateFromDeepLink = () =>
     pendingAuthSource === "wedding" || pendingAuthSource === "marketing";
   function launchWeddingTemplateFromDeepLink() {
@@ -1455,10 +1458,9 @@ function App() {
     onCleanup(() => window.removeEventListener(STUDY_COURSE_SAVED_EVENT, onStudyCourseSaved));
   });
 
-  // Wedding-site visitors who are ALREADY signed in (existing session, so the
-  // auth modal never opens and onLogin never fires) still deep-link in with
-  // ?source=wedding. Handle that case here at boot, mirroring the onLogin path.
+  // Honour wedding and vendor deep links when a session is already active.
   onMount(() => {
+    if (pendingAuthSource === "vendor_claim" && readSession()?.token) return void window.location.replace(vendorPortalUrlFromDeepLink());
     if (!shouldLaunchWeddingTemplateFromDeepLink() || !readSession()?.token) return;
     launchWeddingTemplateFromDeepLink();
   });
@@ -3145,7 +3147,7 @@ function App() {
 
   return (
     <main id="main-content" tabindex="-1" class="min-h-screen p-4 md:p-6 text-on-surface">
-      <a href="#workspace-shell" class="skip-link">Skip to workspace content</a>
+      <a href="#workspace-shell" class="skip-link">Skip to workspace content</a><h1 class="sr-only">OmnyID workspace</h1>
       <Show when={showAuthModal()}>
         <AuthModal
           onClose={() => { setShowAuthModal(false); setAuthNotice(null); setResetToken(undefined); }}
@@ -3157,6 +3159,7 @@ function App() {
             setShowAuthModal(false);
             setAuthNotice(null);
             setServerOffline(false);
+            if (pendingAuthSource === "vendor_claim") return void window.location.assign(vendorPortalUrlFromDeepLink());
             const loginUserId = readSession()?.user?.id ?? "";
             if (loginUserId && loadShouldShowGuidedTour(loginUserId)) setShowTour(true);
             void loadDashboard();
@@ -3164,9 +3167,7 @@ function App() {
             void loadRuntimeLogs();
             startLoraPolling();
             void import("@/lib/weddingLeadMagnetImportRunnerState").then(({ requestWeddingLeadMagnetImport }) => requestWeddingLeadMagnetImport());
-            // Wedding-site visitors who deep-linked in with ?source=wedding
-            // land straight on the wedding template instead of the default
-            // chat view, matching what they came here to do.
+            // Preserve the wedding deep link after authentication.
             if (shouldLaunchWeddingTemplateFromDeepLink()) launchWeddingTemplateFromDeepLink();
           }}
         />
@@ -3178,7 +3179,7 @@ function App() {
       </Show>
 
       {/* U-01: Update-ready toast — hidden while fleet is active (CGAP-014) */}
-      <Show when={primaryUseCasePromptVisible()}>
+      <Show when={primaryUseCasePromptVisible() && !showTour() && !showOnboarding()}>
         <PrimaryUseCasePrompt
           current={primaryUseCaseProfile()}
           needsPrompt={primaryUseCaseNeedsPrompt()}
@@ -5063,7 +5064,6 @@ function AuthModal(props: {
   const [resetDone, setResetDone] = createSignal(false);
   let googleButtonHost: HTMLDivElement | undefined;
   const passkeySupported = () => browserSupportsPasskeyAuth();
-
   async function submitForgotPassword(e: SubmitEvent) {
     e.preventDefault();
     const submittedEmail = email().trim();
@@ -5258,18 +5258,18 @@ function AuthModal(props: {
   });
 
   return (
-    <div
-      class="fixed inset-0 z-[200] flex items-center justify-center bg-on-surface/30 backdrop-blur-sm animate-fade-in"
-      onClick={(e) => { if (e.target === e.currentTarget) props.onClose(); }}
+    <DialogShell
+      labelledBy="auth-modal-title" focusableSelector="button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])"
+      overlayClass="fixed inset-0 z-[200] flex items-center justify-center bg-on-surface/30 backdrop-blur-sm animate-fade-in" dialogClass="relative w-full max-w-sm rounded-3xl border border-white/45 bg-white/96 p-6 shadow-panel backdrop-blur-xl"
+      onClose={props.onClose}
     >
-      <div class="relative w-full max-w-sm rounded-3xl border border-white/45 bg-white/96 p-6 shadow-panel backdrop-blur-xl">
         <button
           type="button"
           onClick={props.onClose}
-          class="absolute right-4 top-4 text-on-surface-variant/40 transition hover:text-on-surface"
+          class="absolute right-2 top-2 flex min-h-11 min-w-11 items-center justify-center rounded-full text-on-surface-variant transition hover:bg-black/5 hover:text-on-surface focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           aria-label="Close"
         >×</button>
-        <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-outline mb-4">OmnyID Account</p>
+        <p id="auth-modal-title" class="font-mono text-xs font-semibold uppercase tracking-[0.2em] text-on-surface-variant mb-4">OmnyID account</p>
         <div class="mb-5 flex rounded-xl border border-white/40 bg-white/40 p-0.5">
           <button
             type="button"
@@ -5305,7 +5305,7 @@ function AuthModal(props: {
                 id="reset-new-password"
                 name="new_password"
                 required
-                autocomplete="new-password"
+                autocomplete="new-password" aria-label="New password"
                 placeholder="New password (8+ chars)"
                 value={resetNewPassword()}
                 onInput={(e) => setResetNewPassword(e.currentTarget.value)}
@@ -5334,7 +5334,7 @@ function AuthModal(props: {
               id="forgot-email"
               name="email"
               required
-              autocomplete="email"
+              autocomplete="email" aria-label="Account email"
               placeholder="Email"
               value={email()}
               onInput={(e) => setEmail(e.currentTarget.value)}
@@ -5365,6 +5365,7 @@ function AuthModal(props: {
             ref={(el) => { googleButtonHost = el; }}
             class={`min-h-[44px] rounded-2xl transition ${googleReady() ? "" : "border border-white/30 bg-white/45"}`}
           />
+          <AppleSignInButton onAuthenticated={completeAuth} />
           <Show when={googleLoading()}>
             <p class="text-center text-xs text-on-surface-variant/70">Loading Google sign-in...</p>
           </Show>
@@ -5395,7 +5396,7 @@ function AuthModal(props: {
             <input
               type="text"
               id="signup-display-name"
-              name="display_name"
+              name="display_name" aria-label="Display name (optional)"
               placeholder="Display name (optional)"
               value={displayName()}
               onInput={(e) => setDisplayName(e.currentTarget.value)}
@@ -5407,7 +5408,7 @@ function AuthModal(props: {
             id="auth-email"
             name="email"
             required
-            autocomplete="email"
+            autocomplete="email" aria-label="Account email"
             placeholder="Email"
             value={email()}
             onInput={(e) => setEmail(e.currentTarget.value)}
@@ -5418,7 +5419,7 @@ function AuthModal(props: {
             id="auth-password"
             name="password"
             required
-            autocomplete={tab() === "signin" ? "current-password" : "new-password"}
+            autocomplete={tab() === "signin" ? "current-password" : "new-password"} aria-label={tab() === "signin" ? "Password" : "Create a password"}
             placeholder="Password (8+ chars)"
             value={password()}
             onInput={(e) => setPassword(e.currentTarget.value)}
@@ -5471,8 +5472,7 @@ function AuthModal(props: {
         <p class="mt-4 text-center text-[11px] text-on-surface-variant/50">
           Your account data stays private.
         </p>
-      </div>
-    </div>
+    </DialogShell>
   );
 }
 

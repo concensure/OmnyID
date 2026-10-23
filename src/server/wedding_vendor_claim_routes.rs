@@ -99,6 +99,8 @@ struct VendorIntakeResponse {
     status: String,
     requires_agent_card: bool,
     expected_agent_id: String,
+    ownership_verified: bool,
+    expires_at: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -159,6 +161,7 @@ async fn public_directory_http(
             COALESCE(p.capacity_max, 0) AS capacity_max,
             COALESCE(p.styles, ARRAY[]::TEXT[]) AS styles,
             COALESCE(p.flags, ARRAY[]::TEXT[]) AS flags,
+            COALESCE(p.public_contact, '{}'::jsonb) AS public_contact,
             COALESCE((
                 SELECT jsonb_agg(jsonb_build_object(
                     'url', photo_url, 'alt_text', alt_text, 'source_label', source_label
@@ -221,6 +224,7 @@ async fn public_vendor_http(
             COALESCE(p.capacity_max, 0) AS capacity_max,
             COALESCE(p.styles, ARRAY[]::TEXT[]) AS styles,
             COALESCE(p.flags, ARRAY[]::TEXT[]) AS flags,
+            COALESCE(p.public_contact, '{}'::jsonb) AS public_contact,
             COALESCE((
                 SELECT jsonb_agg(jsonb_build_object(
                     'url', photo_url, 'alt_text', alt_text, 'source_label', source_label
@@ -264,9 +268,16 @@ async fn vendor_intake_status_http(
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let user = authenticated_user(&state.db, &headers).await?;
     let slug = valid_slug(&query.vendor_slug)?;
+    sqlx::query(
+        "UPDATE wedding_vendor_claims SET status = 'abandoned', updated_at = NOW() WHERE user_id = $1 AND status = 'started' AND expires_at <= NOW()",
+    )
+    .bind(&user.id)
+    .execute(&state.db.pool)
+    .await
+    .map_err(database_failure)?;
     let claim = sqlx::query(
         r#"
-        SELECT c.claim_id, c.status, v.vendor_slug
+        SELECT c.claim_id, c.status, c.expires_at::text AS expires_at, v.vendor_slug
         FROM wedding_vendor_claims c
         JOIN wedding_vendors v ON v.vendor_id = c.vendor_id
         WHERE c.user_id = $1 AND v.vendor_slug = $2
@@ -274,12 +285,12 @@ async fn vendor_intake_status_http(
         LIMIT 1
         "#,
     )
-    .bind(user.id)
+    .bind(&user.id)
     .bind(slug)
     .fetch_optional(&state.db.pool)
     .await
     .map_err(database_failure)?;
-    Ok(Json(json!({ "claim": claim.map(claim_status_from_row) })))
+    Ok(Json(json!({ "claim": claim.map(|row| claim_status_from_row(row, &user.id)) })))
 }
 
 async fn vendor_intake_start_http(
@@ -322,7 +333,9 @@ async fn vendor_intake_start_http(
     let claim_status: String = listing.get("claim_status");
     let owner: Option<String> = listing.get("claimed_by_user_id");
 
-    if claim_status != "unclaimed" && owner.as_deref() != Some(user.id.as_str()) {
+    if matches!(claim_status.as_str(), "claimed" | "verified" | "disputed")
+        && owner.as_deref() != Some(user.id.as_str())
+    {
         return Err((
             StatusCode::CONFLICT,
             "this listing is already being claimed".to_string(),
@@ -330,15 +343,16 @@ async fn vendor_intake_start_http(
     }
 
     sqlx::query(
-        "INSERT INTO user_roles (user_id, role) VALUES ($1, 'vendor') ON CONFLICT DO NOTHING",
+        "UPDATE wedding_vendor_claims SET status = 'abandoned', updated_at = NOW() WHERE vendor_id = $1 AND user_id = $2 AND status = 'started' AND expires_at <= NOW()",
     )
+    .bind(&vendor_id)
     .bind(&user.id)
     .execute(&mut *tx)
     .await
     .map_err(database_failure)?;
 
     if let Some(existing) = sqlx::query(
-        "SELECT claim_id, status FROM wedding_vendor_claims WHERE vendor_id = $1 AND user_id = $2 AND status = 'started' ORDER BY created_at DESC LIMIT 1",
+        "SELECT claim_id, status, expires_at::text AS expires_at FROM wedding_vendor_claims WHERE vendor_id = $1 AND user_id = $2 AND status = 'started' AND expires_at > NOW() ORDER BY created_at DESC LIMIT 1",
     )
     .bind(&vendor_id)
     .bind(&user.id)
@@ -351,29 +365,25 @@ async fn vendor_intake_start_http(
             expected_agent_id: expected_vendor_agent_id(&slug, &user.id),
             vendor_slug: slug,
             status: existing.get("status"),
-            requires_agent_card: true,
+            requires_agent_card: false,
+            ownership_verified: false,
+            expires_at: existing.get("expires_at"),
         }));
     }
 
     let claim_id = Ulid::new().to_string();
+    let expires_at = (chrono::Utc::now() + chrono::Duration::hours(72)).to_rfc3339();
     sqlx::query(
         r#"INSERT INTO wedding_vendor_claims
-            (claim_id, vendor_id, user_id, status, declared_role, step_state)
-           VALUES ($1, $2, $3, 'started', $4, jsonb_build_object('nominated_agent_id', $5::text))"#,
+            (claim_id, vendor_id, user_id, status, declared_role, step_state, expires_at)
+           VALUES ($1, $2, $3, 'started', $4, jsonb_build_object('nominated_agent_id', $5::text), $6::timestamptz)"#,
     )
     .bind(&claim_id)
     .bind(&vendor_id)
     .bind(&user.id)
     .bind(declared_role)
     .bind(nominated_agent_id)
-    .execute(&mut *tx)
-    .await
-    .map_err(database_failure)?;
-    sqlx::query(
-        "UPDATE wedding_vendors SET claim_status = 'claim_pending', claimed_by_user_id = $1, claimed_at = NOW(), updated_at = NOW() WHERE vendor_id = $2",
-    )
-    .bind(&user.id)
-    .bind(&vendor_id)
+    .bind(&expires_at)
     .execute(&mut *tx)
     .await
     .map_err(database_failure)?;
@@ -384,7 +394,9 @@ async fn vendor_intake_start_http(
         expected_agent_id: expected_vendor_agent_id(&slug, &user.id),
         vendor_slug: slug,
         status: "started".to_string(),
-        requires_agent_card: true,
+        requires_agent_card: false,
+        ownership_verified: false,
+        expires_at: Some(expires_at),
     }))
 }
 
@@ -429,10 +441,10 @@ async fn vendor_agent_card_publish_http(
     let vendor_name: String = listing.get("vendor_name");
     let claim_status: String = listing.get("claim_status");
     let owner: Option<String> = listing.get("claimed_by_user_id");
-    if claim_status == "unclaimed" || owner.as_deref() != Some(user.id.as_str()) {
+    if claim_status != "verified" || owner.as_deref() != Some(user.id.as_str()) {
         return Err((
             StatusCode::CONFLICT,
-            "start and retain the vendor claim before publishing an AgentCard".to_string(),
+            "verify ownership before publishing an AgentCard".to_string(),
         ));
     }
 
@@ -579,15 +591,10 @@ async fn photo_licence_accept_http(
     let vendor_id: String = listing.get("vendor_id");
     let claim_status: String = listing.get("claim_status");
     let owner: Option<String> = listing.get("claimed_by_user_id");
-    if owner.as_deref() != Some(user.id.as_str())
-        || !matches!(
-            claim_status.as_str(),
-            "claim_pending" | "claimed" | "verified"
-        )
-    {
+    if owner.as_deref() != Some(user.id.as_str()) || claim_status != "verified" {
         return Err((
             StatusCode::FORBIDDEN,
-            "only the active claimant can accept the photo licence".to_string(),
+            "verify ownership before accepting the photo licence".to_string(),
         ));
     }
 
@@ -634,7 +641,7 @@ async fn public_vendor_agent_card_http(
            JOIN wedding_vendors vendor ON vendor.vendor_id = link.vendor_id
            WHERE link.agent_id = $1
              AND vendor.status = 'active'
-             AND vendor.claim_status IN ('claimed', 'verified')"#,
+             AND vendor.claim_status = 'verified'"#,
     )
     .bind(agent_id)
     .fetch_optional(&state.db.pool)
@@ -652,7 +659,7 @@ async fn public_vendor_agent_card_http(
 
 fn public_vendor_from_row(row: sqlx::postgres::PgRow) -> Value {
     let claim_status: String = row.get("claim_status");
-    let has_public_agent_card = matches!(claim_status.as_str(), "claimed" | "verified");
+    let has_public_agent_card = claim_status == "verified";
     let agent_id = row
         .try_get::<Option<String>, _>("linked_agent_id")
         .ok()
@@ -671,7 +678,8 @@ fn public_vendor_from_row(row: sqlx::postgres::PgRow) -> Value {
         "address": row.try_get::<Option<String>, _>("address").ok().flatten(),
         "website_url": row.try_get::<Option<String>, _>("website_url").ok().flatten(),
         "claim_status": claim_status,
-        "claim_cta": row.get::<String, _>("claim_status") == "unclaimed",
+        "claim_cta": row.get::<String, _>("claim_status") != "verified",
+        "verified_badge": row.get::<String, _>("claim_status") == "verified",
         "agent_card_url": if has_public_agent_card {
             agent_id.as_deref().map(vendor_agent_card_url)
         } else {
@@ -683,15 +691,23 @@ fn public_vendor_from_row(row: sqlx::postgres::PgRow) -> Value {
         "capacity_max": row.get::<i32, _>("capacity_max"),
         "styles": row.get::<Vec<String>, _>("styles"),
         "flags": row.get::<Vec<String>, _>("flags"),
+        "public_contact": row.get::<Value, _>("public_contact"),
         "photos": display_photos,
     })
 }
 
-fn claim_status_from_row(row: sqlx::postgres::PgRow) -> Value {
+fn claim_status_from_row(row: sqlx::postgres::PgRow, user_id: &str) -> Value {
+    let status: String = row.get("status");
+    let vendor_slug: String = row.get("vendor_slug");
+    let expected_agent_id = expected_vendor_agent_id(&vendor_slug, user_id);
     json!({
         "claim_id": row.get::<String, _>("claim_id"),
-        "status": row.get::<String, _>("status"),
-        "vendor_slug": row.get::<String, _>("vendor_slug"),
+        "status": status,
+        "vendor_slug": vendor_slug,
+        "ownership_verified": status == "verified",
+        "requires_agent_card": status == "verified",
+        "expected_agent_id": expected_agent_id,
+        "expires_at": row.try_get::<Option<String>, _>("expires_at").ok().flatten(),
     })
 }
 
@@ -712,7 +728,7 @@ fn clean_optional(value: Option<String>) -> Result<Option<String>, (StatusCode, 
         .map(|value| value.filter(|value| !value.is_empty()))
 }
 
-fn valid_slug(raw: &str) -> Result<String, (StatusCode, String)> {
+pub(super) fn valid_slug(raw: &str) -> Result<String, (StatusCode, String)> {
     let value = raw.trim().to_ascii_lowercase();
     if value.is_empty()
         || value.len() > MAX_QUERY_LENGTH

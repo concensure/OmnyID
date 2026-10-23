@@ -140,7 +140,7 @@ async fn owned_vendor_id(
 ) -> Result<String, (StatusCode, String)> {
     let slug = valid_slug(vendor_slug)?;
     let row = sqlx::query(
-        "SELECT vendor_id FROM wedding_vendors WHERE vendor_slug = $1 AND status = 'active' AND claimed_by_user_id = $2 AND claim_status IN ('claim_pending', 'claimed', 'verified')",
+        "SELECT vendor_id FROM wedding_vendors WHERE vendor_slug = $1 AND status = 'active' AND claimed_by_user_id = $2 AND claim_status = 'verified'",
     )
     .bind(slug)
     .bind(user_id)
@@ -270,12 +270,7 @@ async fn upload_owner_photo_http(
     let vendor_id: String = listing.get("vendor_id");
     let claim_status: String = listing.get("claim_status");
     let owner: Option<String> = listing.get("claimed_by_user_id");
-    if owner.as_deref() != Some(user.id.as_str())
-        || !matches!(
-            claim_status.as_str(),
-            "claim_pending" | "claimed" | "verified"
-        )
-    {
+    if owner.as_deref() != Some(user.id.as_str()) || claim_status != "verified" {
         return Err((
             StatusCode::FORBIDDEN,
             "only the active claimant can publish vendor photos".to_string(),
@@ -383,7 +378,7 @@ async fn public_owner_photo_http(
         _ => return Err((StatusCode::NOT_FOUND, "photo not found".to_string())),
     };
     let query = format!(
-        "SELECT asset.{column} AS storage_key FROM wedding_vendor_owner_assets asset JOIN wedding_vendors vendor ON vendor.vendor_id = asset.vendor_id WHERE asset.asset_id = $1 AND asset.status = 'live' AND vendor.status = 'active' AND vendor.claim_status IN ('claimed', 'verified')"
+        "SELECT asset.{column} AS storage_key FROM wedding_vendor_owner_assets asset JOIN wedding_vendors vendor ON vendor.vendor_id = asset.vendor_id WHERE asset.asset_id = $1 AND asset.status = 'live' AND vendor.status = 'active' AND vendor.claim_status = 'verified'"
     );
     let row = sqlx::query(&query)
         .bind(&asset_id)

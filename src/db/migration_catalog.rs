@@ -579,4 +579,9 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Ciphertext-only claimed-vendor quotation response routing and durable content-free receipts",
         include_str!("../../postgres/migrations/0114_quotation_vendor_response_transport.sql"),
     ),
+    (
+        "0115_wedding_vendor_ownership_proofs",
+        "Expiring non-exclusive vendor claims and verified ownership proof receipts",
+        include_str!("../../postgres/migrations/0115_wedding_vendor_ownership_proofs.sql"),
+    ),
 ];

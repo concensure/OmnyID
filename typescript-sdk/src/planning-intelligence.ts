@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 export const PLANNING_CONSTRAINT_SCHEMA_VERSION = 'planning.constraint.v1' as const;
 export const PLANNING_EVALUATION_SCHEMA_VERSION = 'planning.constraint_evaluation.v1' as const;

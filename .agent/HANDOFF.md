@@ -4516,3 +4516,45 @@ Unresolved:
 - WED-225 still needs a quotation-specific reviewed accuracy corpus and its external, independent,
   hosted and cohort records. Local ClamAV and local dark rehearsal are not those sign-offs, so
   WED-225/WED-226 remain blocked and no feature flag changed.
+
+## 2026-10-24 - WED-250 audited surfaces and vendor ownership (Codex, complete)
+
+Changed:
+
+- Routed every Wedding vendor login/claim action to the existing vendor portal, preserving the
+  listing slug through shared authentication. Verified vendors reuse the existing private quotation
+  response UI.
+- Added migration 0115 and fail-closed ownership routes. Intake no longer reserves listings or
+  grants roles. Verified work email, HTTPS meta/well-known, DNS TXT and operator review are supported
+  with expiry, attempt, dispute, release and private AFP receipt boundaries. Social proof is disabled
+  until an official provider connection exists.
+- Added a verified prefilled profile dashboard with contact/social edits, preview, badge, licensed
+  photo management and calculated completion guidance. Welcome email is default-off.
+- Removed persisted browser bearer credentials, added cookie-authenticated WebSockets, and added a
+  conditional state/nonce-bound Apple web flow over the existing verified-token backend.
+- Added Cloudflare-only Caddy handling, strict trusted proxies, HSTS/common headers, narrowed CSP,
+  compiled docs CSS and deterministic inline-script hash regression coverage.
+- Upgraded actionable Rust, Solid, Markdown, PPTX/image and SDK dependencies. Repaired the audited
+  auth/tour dialogs, labels, landmarks, editor semantics, live region, target sizes and targeted
+  contrast. Detailed classification is in
+  `Documents/verification/security-privacy-accessibility-audit-remediation.md`.
+
+Verification:
+
+- Disposable PostgreSQL migration applied successfully; ownership API 2/2 passed.
+- Ownership units 3/3, Apple token units 5/5, relay units 9/9 and cookie-header unit 1/1 passed.
+- Wedding tests 1,962/1,962, session tests 13/13, both line-budget guards, typecheck, website/CSP
+  smoke, SDK typecheck/build, Caddy validation, cargo check and frontend production build passed.
+- `npm audit --omit=dev` has 0 high/critical findings. Cargo audit's actionable audited findings
+  are cleared; the no-fix RSA lock-resolution advisory and constrained AWS `lru` warning remain
+  documented. The inherited unrelated `email_group_routes.rs` unused-variable warning remains.
+
+Unresolved/operations:
+
+- This task was not deployed. After deployment, verify direct-origin rejection and distinct proxied
+  rate-limit identity, and add Oracle network-layer Cloudflare-only ingress as defence in depth.
+- Configure an Apple Services ID/registered HTTPS return URL before setting the new Apple variables.
+  Do not enable social ownership proof without provider-signed page authority.
+- TipTap's remaining moderate advisory requires a separately tested major editor migration.
+- Repeat hosted accessibility/security testing. WED-225's independent evidence and WED-226 release
+  gate remain unchanged; policy V2 and the vendor welcome-email flag remain disabled.

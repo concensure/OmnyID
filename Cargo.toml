@@ -33,6 +33,7 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "rus
 mail-parser = "0.10"
 tonic-prost = "0.14.5"
 futures-util = "0.3"
+hickory-resolver = "0.26.3"
 wtransport = "0.7"
 argon2 = "0.5"
 rand = "0.9"
@@ -43,8 +44,8 @@ async-trait = "0.1"
 subtle = "2.6"
 flate2 = "1.0"
 snow = "0.9"
-rust_xlsxwriter = "0"
-ammonia = "4"
+rust_xlsxwriter = "0.101"
+ammonia = "4.2.4"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }
 
 [features]
