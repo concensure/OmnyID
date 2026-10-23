@@ -7,14 +7,24 @@ export type WeddingWorkspaceAggregateAction = {
   title: string;
   detail: string;
   metaLabel: string;
+  metaItems?: string[];
+  ctaLabel?: string;
   targetMenu: WeddingWorkspaceMenuId | "share_plan";
   enabled: boolean;
+};
+
+export type WeddingWorkspaceSummaryItem = {
+  id: string;
+  label: string;
+  tone: "neutral" | "attention" | "positive";
+  targetMenu?: WeddingWorkspaceMenuId;
 };
 
 export type WeddingWorkspaceAggregateState = {
   title: string;
   detail: string;
   summaryPills: string[];
+  summaryItems?: WeddingWorkspaceSummaryItem[];
   actions: WeddingWorkspaceAggregateAction[];
   a2ui: Record<string, unknown>;
 };
@@ -44,13 +54,23 @@ function a2uiFor(state: Omit<WeddingWorkspaceAggregateState, "a2ui">): Record<st
     title: state.title,
     description: state.detail,
     sections: [
-      { title: "Current status", items: state.summaryPills },
+      {
+        title: "Current status",
+        items: state.summaryItems?.map((item) => ({
+          id: item.id,
+          label: item.label,
+          tone: item.tone,
+          target: item.targetMenu,
+        })) ?? state.summaryPills,
+      },
       {
         title: "Where to go next",
         items: state.actions.map((action) => ({
           label: action.title,
           detail: action.detail,
           meta: action.metaLabel,
+          meta_items: action.metaItems,
+          action_label: action.ctaLabel,
           target: action.targetMenu,
           enabled: action.enabled,
         })),
@@ -77,7 +97,7 @@ export function buildWeddingPeopleAggregateState(state: WeddingResponseWorkspace
   ].filter((label): label is string => Boolean(label));
   return make({
     title: "People",
-    detail: "Guests, seating, family rules, plus-ones, children, access needs, and people-sensitive decisions.",
+    detail: "Guests, family boundaries and seating in one place.",
     summaryPills: [
       countLabel(state.guestTracking.guestRowCount, "guest"),
       `${countLabel(state.guestTracking.pendingCount, "reply", "replies")} waiting`,
@@ -85,12 +105,46 @@ export function buildWeddingPeopleAggregateState(state: WeddingResponseWorkspace
       activeGuestRuleCount > 0 ? `${countLabel(activeGuestRuleCount, "rule")} active` : "No guest rules yet",
       pendingFamilyRequestCount > 0 ? `${countLabel(pendingFamilyRequestCount, "family request")} waiting` : "No family requests",
     ],
+    summaryItems: [
+      {
+        id: "guests",
+        label: countLabel(state.guestTracking.guestRowCount, "guest"),
+        tone: "neutral",
+        targetMenu: "guests",
+      },
+      {
+        id: "replies",
+        label: `${countLabel(state.guestTracking.pendingCount, "reply", "replies")} waiting`,
+        tone: state.guestTracking.pendingCount > 0 ? "attention" : "positive",
+        targetMenu: "guests",
+      },
+      {
+        id: "seats",
+        label: `${countLabel(state.seatingPlan.unassignedAttendingCount, "seat")} unassigned`,
+        tone: state.seatingPlan.unassignedAttendingCount > 0 ? "attention" : "positive",
+        targetMenu: "seating",
+      },
+      {
+        id: "rules",
+        label: activeGuestRuleCount > 0 ? `${countLabel(activeGuestRuleCount, "rule")} active` : "No guest rules yet",
+        tone: activeGuestRuleCount > 0 ? "positive" : "neutral",
+        targetMenu: "guests",
+      },
+      {
+        id: "family-requests",
+        label: pendingFamilyRequestCount > 0 ? `${countLabel(pendingFamilyRequestCount, "family request")} waiting` : "No family requests",
+        tone: pendingFamilyRequestCount > 0 ? "attention" : "positive",
+        targetMenu: "guests",
+      },
+    ],
     actions: [
       {
         id: "guests",
         title: "Guests and family boundaries",
         detail: "Add guests, manage plus-ones, review children rules, and approve family-sensitive changes.",
         metaLabel: familyMetaLabels.join(" - "),
+        metaItems: familyMetaLabels,
+        ctaLabel: "Manage Guests & Boundaries",
         targetMenu: "guests",
         enabled: true,
       },
@@ -99,6 +153,8 @@ export function buildWeddingPeopleAggregateState(state: WeddingResponseWorkspace
         title: "Seating Plan",
         detail: "Draft tables, keep conflicts apart, place access needs carefully, and prepare vendor-ready notes.",
         metaLabel: `${countLabel(state.seatingPlan.assignedSeatCount, "guest")} already seated`,
+        metaItems: [`${countLabel(state.seatingPlan.assignedSeatCount, "guest")} already seated`],
+        ctaLabel: "Open Seating Plan",
         targetMenu: "seating",
         enabled: true,
       },

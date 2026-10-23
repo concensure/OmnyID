@@ -4558,3 +4558,37 @@ Unresolved/operations:
 - TipTap's remaining moderate advisory requires a separately tested major editor migration.
 - Repeat hosted accessibility/security testing. WED-225's independent evidence and WED-226 release
   gate remain unchanged; policy V2 and the vendor welcome-email flag remain disabled.
+
+## 2026-10-24 - WED-251 People hub and review-candidate preparation (Codex, complete)
+
+Changed:
+
+- Replaced the old amber People summary with the section-11 wedding surface: a short page intro,
+  icon-and-label neutral/attention/resolved indicators and existing Guests/Seating destinations.
+- Extracted the hub into a focused component. Its two single-destination cards are equal-height,
+  whole-card keyboard/touch controls with bottom-aligned concise CTAs and list-form metadata.
+- Extended the existing aggregate A2UI projection with structured status targets, metadata items and
+  action labels. No guest, seating, task, AFP or navigation owner changed.
+- Added the reusable hierarchy, semantic status, card alignment, touch, mobile and WCAG contrast rules
+  to `docs/DESIGN_SYSTEM.md` section 11.
+
+Verification:
+
+- Seven focused aggregate/render tests pass.
+- Two Playwright cases pass at 320px and 1280px, covering shortcut navigation, brand values, desktop
+  CTA alignment, overflow, persistent mobile navigation and no serious/critical Axe findings.
+- Typecheck, both line-budget guards, Wedding site/CSP smoke, all 1,963 wedding tests and the Solid
+  production build pass. The build retains only its inherited large-chunk advisory.
+
+Operations and next:
+
+- The six new WED-225 review files are protocols only; the user explicitly reports that none has been
+  executed. Do not mark hosted accessibility, couple/vendor usability, permission wording, provider
+  smoke or the seven-day cohort verified from this machine evidence.
+- The exposed legacy Cloudflare token remains invalid (`401`, error `1000`), exists only in the local
+  original worktree and has no matching secret file or env binding on Oracle. Revoke it in Cloudflare,
+  create a least-privilege replacement, and install the replacement only through the documented
+  file-backed vendor-mail secret path before an authorised smoke test.
+- Commit this slice, tag that exact clean revision as the human-review candidate, rerun the readiness
+  verifier against local disposable PostgreSQL and ClamAV with all consequential flags off, and give
+  the user the frozen SHA plus machine manifest. WED-225/WED-226 and policy V2 remain blocked.

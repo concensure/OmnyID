@@ -48,13 +48,58 @@ test("people aggregate state summarizes guests seating and family-boundary actio
     "2 rules active",
     "3 family requests waiting",
   ]);
+  assert.deepEqual(people.summaryItems, [
+    { id: "guests", label: "82 guests", tone: "neutral", targetMenu: "guests" },
+    { id: "replies", label: "17 replies waiting", tone: "attention", targetMenu: "guests" },
+    { id: "seats", label: "12 seats unassigned", tone: "attention", targetMenu: "seating" },
+    { id: "rules", label: "2 rules active", tone: "positive", targetMenu: "guests" },
+    { id: "family-requests", label: "3 family requests waiting", tone: "attention", targetMenu: "guests" },
+  ]);
   assert.equal(people.actions[0]?.targetMenu, "guests");
   assert.equal(people.actions[0]?.title, "Guests and family boundaries");
   assert.equal(people.actions[0]?.metaLabel, "3 requests waiting for review - 2 rules active - 1 private note couple-only");
+  assert.deepEqual(people.actions[0]?.metaItems, [
+    "3 requests waiting for review",
+    "2 rules active",
+    "1 private note couple-only",
+  ]);
+  assert.equal(people.actions[0]?.ctaLabel, "Manage Guests & Boundaries");
   assert.equal(people.actions[1]?.targetMenu, "seating");
   assert.equal(people.actions[1]?.title, "Seating Plan");
   assert.equal(people.actions[1]?.metaLabel, "48 guests already seated");
+  assert.equal(people.actions[1]?.ctaLabel, "Open Seating Plan");
   assert.equal(people.a2ui.kind, "wedding_workspace_aggregate");
+  assert.deepEqual((people.a2ui.sections as Array<{ items: unknown }>)[0]?.items, people.summaryItems.map((item) => ({
+    id: item.id,
+    label: item.label,
+    tone: item.tone,
+    target: item.targetMenu,
+  })));
+});
+
+test("people aggregate marks resolved counts as positive without relying on colour alone", () => {
+  const people = buildWeddingPeopleAggregateState(state({
+    guestTracking: {
+      guestRowCount: 2,
+      pendingCount: 0,
+      boundaryRuleLabels: [],
+      invitationScopeLabels: [],
+    } as WeddingResponseWorkspaceViewState["guestTracking"],
+    seatingPlan: {
+      assignedSeatCount: 2,
+      unassignedAttendingCount: 0,
+    } as WeddingResponseWorkspaceViewState["seatingPlan"],
+    boundaryState: {
+      pendingApprovalCount: 0,
+      privateObjectCount: 0,
+    } as WeddingResponseWorkspaceViewState["boundaryState"],
+  }));
+
+  assert.equal(people.summaryItems?.find((item) => item.id === "replies")?.tone, "positive");
+  assert.equal(people.summaryItems?.find((item) => item.id === "seats")?.tone, "positive");
+  assert.equal(people.summaryItems?.find((item) => item.id === "family-requests")?.label, "No family requests");
+  assert.equal(people.summaryItems?.find((item) => item.id === "family-requests")?.tone, "positive");
+  assert.equal(people.summaryItems?.find((item) => item.id === "rules")?.tone, "neutral");
 });
 
 test("plan aggregate state summarizes follow-ups timeline and sharing", () => {

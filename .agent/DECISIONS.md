@@ -1572,3 +1572,16 @@ Browser session persistence contains no reusable bearer token. A fresh token may
 memory during the login transition, while reloads and WebSocket upgrades authenticate through the
 HttpOnly session cookie. Cloudflare-derived client identity is trusted only behind Caddy's strict
 proxy list; non-Cloudflare public origin requests are rejected at Caddy after deployment.
+
+## 2026-10-24: Wedding hub summaries are navigation, not a second workflow
+
+A wedding hub may structure its current counts as icon-and-label status shortcuts when each shortcut
+opens the existing surface that owns the work. The People hub therefore points replies, rules and
+family requests to Guests and points unassigned seats to Seating; it does not create another guest,
+task or seating state. The same structured status, metadata items and outcome-led action labels are
+available in its A2UI aggregate so alternate renderers do not have to infer meaning from punctuation.
+
+Hub cards with one destination use one whole-card button, stretch to equal height and bottom-align the
+visual CTA. Status uses wedding semantic tints plus explicit icons and words, and every interaction
+keeps a visible focus state, 44px target and mobile stacking. These presentation rules add no booking,
+mail, provider or release authority and do not satisfy any WED-225 external review gate.

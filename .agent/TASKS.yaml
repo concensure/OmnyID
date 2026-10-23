@@ -3274,3 +3274,34 @@ tasks:
       - remediated the audited auth/tour dialog, labels, landmarks, editor naming, live region, target size and targeted contrast defects; recorded bounded residual hosted and dependency work in the WED-250 verification note
       - disposable ownership API 2/2, ownership units 3/3, Apple-token units 5/5, relay units 9/9, cookie-auth unit 1/1, session tests 13/13, wedding tests 1962/1962, typecheck, SDK checks, line budgets, CSP/site smoke, Caddy validation, cargo check and production build pass
       - npm audit now has zero high/critical findings; cargo audit retains only the unpatched RSA lock-resolution advisory and constrained AWS lru warning; policy V2, social proof and welcome email remain disabled
+  - id: WED-251
+    title: Polish the People hub and freeze the human-review candidate
+    status: complete
+    owner: codex
+    branch: agent/codex/WED-215
+    depends_on:
+      - WED-246
+      - WED-250
+    files:
+      - solid-ui/src/components/WeddingWorkspaceContextPanels.tsx
+      - solid-ui/src/lib/weddingWorkspaceAggregateState.ts
+      - solid-ui/tests/wedding-people-mobile-layout-render.test.ts
+      - solid-ui/tests/wedding-workspace-aggregate-state.test.ts
+      - docs/DESIGN_SYSTEM.md
+      - Documents/verification/**
+      - .agent/**
+    acceptance:
+      - the People heading and summary avoid repeating the action-card descriptions
+      - status indicators use semantic icons, labels and wedding status tints, with actionable indicators opening the relevant Guests or Seating surface
+      - People action cards have equal-height layouts, whole-card keyboard and pointer affordance, bottom-aligned concise calls to action and WCAG-aware wedding-brand contrast
+      - action metadata is presented as scannable items rather than hyphen-joined copy and remains available in the A2UI projection
+      - the reusable People-hub hierarchy, status, interaction, mobile and contrast principles are recorded in the wedding design system
+      - focused tests, full wedding checks and the production build pass on a clean committed revision suitable for the six external WED-225 gate reviews
+      - the frozen revision and safe identifying metadata for the exposed Cloudflare credential are reported without copying any secret
+    progress:
+      - registered from committed WED-250 revision ed12336; the six user-authored WED-225 gate protocols are explicitly not yet executed or satisfied
+      - confirmed the legacy exposed Cloudflare bearer remains invalid and exists only in the local original worktree; no matching Cloudflare token file or environment binding is present on Oracle
+      - extracted a focused People hub with a concise introduction, semantic icon-and-label status shortcuts, equal-height whole-card controls, bottom-aligned outcome-led CTAs and list-form metadata using the wedding surface tokens
+      - preserved the existing Guests and Seating projections and template navigation; status shortcuts open the relevant existing surface and the A2UI aggregate now carries structured status, metadata and action labels without adding a parallel ledger
+      - added reusable hub hierarchy, status, interaction, mobile and WCAG contrast rules to DESIGN_SYSTEM section 11
+      - seven focused state/render checks, two 320/1280 browser checks with Axe and alignment assertions, typecheck, both line-budget checks, wedding site/CSP smoke, all 1963 wedding tests and the production build pass

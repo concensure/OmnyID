@@ -400,6 +400,27 @@ Status tints are reserved for status only: teal tint for "on track", amber for "
 - A right-hand rail holds "Up next" tasks and the saved-vendor count on desktop; it stacks on mobile.
 - Serif display face for page titles and the countdown number; sans for everything functional.
 
+#### Hub and summary surfaces
+
+- Keep the page heading and subtitle orienting and brief. Action-card descriptions carry the detailed
+  scope, so the page introduction must not repeat each card's feature list.
+- Summary status indicators use an icon and explicit label as well as colour. Neutral counts use Warm
+  Slate, attention or pending work uses the amber status tint, and resolved/non-issue states use the
+  soft green status tint. Use 8px-radius chips rather than pills.
+- A status indicator that describes work the user can address acts as a shortcut to that exact
+  surface. Its accessible name includes both the status and destination; passive indicators must not
+  look actionable.
+- Related action cards stretch to equal height in a row. Their action label sits at the bottom through
+  a column layout with flexible space, so variable copy never misaligns primary actions.
+- Prefer one whole-card button when the card has only one destination. Give it a visible hover,
+  pressed and keyboard-focus state, a minimum 44px touch target, and no nested interactive controls.
+- Keep action labels concise and outcome-led (for example, `Manage Guests & Boundaries`). Present
+  secondary metadata as a short list or compact labelled items, not a punctuation-joined sentence.
+- At phone widths, status indicators and cards stack without horizontal overflow. Primary actions
+  remain full-width and the persistent wedding bottom navigation remains unchanged.
+- Verify primary, secondary, status and muted text combinations against WCAG AA. Deep Teal with Warm
+  Porcelain is the preferred primary-action pairing; do not rely on colour alone to communicate state.
+
 ### Implementation notes
 
 - Add the values as `wedding-*` tokens in `solid-ui/tailwind.config.cjs`; do not inline hex values.
