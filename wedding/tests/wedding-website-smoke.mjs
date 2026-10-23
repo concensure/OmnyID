@@ -6,8 +6,11 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const projectRoot = resolve(root, '..');
 const docsIndex = resolve(projectRoot, 'docs', 'index.html');
 const docsApp = resolve(projectRoot, 'docs', 'app.js');
+const vendorAcquisitionPage = resolve(projectRoot, 'docs', 'vendors.html');
+const vendorAcquisitionCss = resolve(projectRoot, 'docs', 'vendors.css');
 const docsHtml = readFileSync(docsIndex, 'utf8');
 const docsJs = readFileSync(docsApp, 'utf8');
+const vendorAcquisitionHtml = readFileSync(vendorAcquisitionPage, 'utf8');
 const weddingJs = readFileSync(resolve(root, 'assets', 'js', 'main.js'), 'utf8');
 const expectedPages = [
   'blog.html',
@@ -16,6 +19,9 @@ const expectedPages = [
   'pricing.html',
   'privacy.html',
   'user-guide.html',
+  'get-wedding-vendors-to-reply/index.html',
+  'wedding-planning-relationship-stress/index.html',
+  'wedding-planning-without-decision-overload/index.html',
   'blog/australian-legal-checklist.html',
   'blog/budgeting-without-losing-the-joy.html',
   'blog/the-first-five-decisions.html',
@@ -106,7 +112,12 @@ function knownVirtualFragment(target, hash) {
 }
 
 // Pages that deliberately omit the site shell (no nav, sign-in modal or main.js).
-const standalonePages = new Set(['newsletter-unsubscribe.html']);
+const listiclePages = [
+  'get-wedding-vendors-to-reply/index.html',
+  'wedding-planning-relationship-stress/index.html',
+  'wedding-planning-without-decision-overload/index.html',
+];
+const standalonePages = new Set(['newsletter-unsubscribe.html', ...listiclePages]);
 const failures = [];
 const htmlByPath = new Map([[normalize(docsIndex), docsHtml]]);
 const pages = htmlFiles(root);
@@ -337,6 +348,31 @@ if (!(howIdx > -1 && flowIdx > howIdx && previewIdx > flowIdx)) {
 }
 if (!existsSync(resolve(root, 'assets', 'images', 'vendor-reply-flow.png'))) failures.push('assets/images/vendor-reply-flow.png is missing');
 if (!weddingJs.includes('/wedding/newsletter')) failures.push('main.js: newsletter form is not wired to the subscribe endpoint');
+
+const listicleExpectations = {
+  'wedding-planning-without-decision-overload/index.html': { items: 7, cta: 'Get my calm plan in 3 minutes' },
+  'wedding-planning-relationship-stress/index.html': { items: 5, cta: 'Start planning together in 3 minutes' },
+  'get-wedding-vendors-to-reply/index.html': { items: 6, cta: 'Get my vendor-response plan in 3 minutes' },
+};
+for (const [name, expected] of Object.entries(listicleExpectations)) {
+  const html = htmlByPath.get(normalize(resolve(root, name))) ?? '';
+  const itemCount = (html.match(/class="listicle-item"/g) ?? []).length;
+  const ctaCount = (html.match(new RegExp(expected.cta, 'g')) ?? []).length;
+  if (itemCount !== expected.items) failures.push(`${name}: expected ${expected.items} listicle items, found ${itemCount}`);
+  if (ctaCount < 3) failures.push(`${name}: primary CTA must appear at least three times`);
+  if (!html.includes('<link rel="canonical" href="https://omnyid.com/wedding/">')) failures.push(`${name}: canonical must point to /wedding/`);
+  if (!html.includes('name="description"')) failures.push(`${name}: meta description is missing`);
+  if (!html.includes('../assets/logo/omnyid-logo.png')) failures.push(`${name}: shared Wedding logo is missing`);
+  if (!html.includes('Privacy') || !html.includes('private')) failures.push(`${name}: privacy reassurance is missing`);
+}
+
+for (const required of ['19%', '16%', '53%', '51%', '80%', 'Easy Weddings', 'Marketing Mag', 'Join the vendor pilot']) {
+  if (!vendorAcquisitionHtml.includes(required)) failures.push(`docs/vendors.html: missing vendor acquisition proof or CTA "${required}"`);
+}
+if (!existsSync(vendorAcquisitionCss)) failures.push('docs/vendors.css: vendor acquisition stylesheet is missing');
+if (!vendorAcquisitionHtml.includes('/wedding/assets/logo/omnyid-logo.png')) failures.push('docs/vendors.html: shared Wedding logo is missing');
+if (/href=["']https?:\/\/(?:content\.easyweddings|www\.marketingmag)/i.test(vendorAcquisitionHtml)) failures.push('docs/vendors.html: publication source must be named without a backlink');
+if (!/calculation methodology/i.test(vendorAcquisitionHtml) || !/no booking, price or promise/i.test(vendorAcquisitionHtml)) failures.push('docs/vendors.html: private pricing and approval boundaries are missing');
 
 if (failures.length) {
   console.error('Wedding website smoke test failed:');

@@ -3164,3 +3164,36 @@ tasks:
       - the exact application revision 7fc7172 passed the WED-225 local deterministic, Rust, SDK, browser, migration, wedding, build and line-budget checks plus disposable Postgres and live clamd tests; the later commits change only Oracle staging and the ledger, while readiness remains blocked on named independent/provider/hosted/cohort records and all release, vendor-mail and ranking-policy-V2 flags stay off
       - Oracle runtime staging now excludes postgres/data by construction and self-test; commits 245bcf5, 7fc7172 and c3d4f7e are committed, production source hashes match, the source-data path is absent remotely, workspace HTTP is 200 and the post-deploy health/backup-integrity proof passes
       - the isolated Oracle restore drill failed after its bounded run under temporary disk pressure while backup verification passed; cleanup restored root usage from 96 percent to 79 percent, so application deployment is live but restore-drill operational readiness is not claimed
+  - id: WED-248
+    title: Publish vendor acquisition and Gen Z wedding listicle pages
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-215
+    depends_on:
+      - WED-247
+    files:
+      - docs/vendors.html
+      - docs/vendors.css
+      - wedding/index.html
+      - wedding/assets/css/style.css
+      - wedding/assets/js/main.js
+      - wedding/assets/css/listicle.css
+      - wedding/wedding-planning-without-decision-overload/**
+      - wedding/wedding-planning-relationship-stress/**
+      - wedding/get-wedding-vendors-to-reply/**
+      - wedding/tests/**
+      - solid-ui/tests/e2e/wedding-marketing-pages.spec.ts
+      - .agent/**
+    acceptance:
+      - /vendors is a responsive vendor-facing acquisition page using supplied, source-attributed statistics without outbound source backlinks or unsupported claims
+      - vendor copy explains faster high-intent lead response, transparent couple-facing price guidance without requiring publication of proprietary methodology, richer proof and controlled vendor context
+      - three persona-matched listicle pages use the required slugs, single conversion action, complete list/relief/objection/FAQ/final sections, canonical metadata and the existing Wedding logo and visual language
+      - only the three frontend files from a36e25b are selectively integrated so later WED-215 deployment preserves the already-live Wedding Understanding error and cost-breakdown changes
+      - static routing, deployment packaging, responsive accessibility, link integrity, CSP and smoke coverage include every new page without changing planner, backend, vendor data or release flags
+      - new files remain below 1000 lines, relevant checks pass, changes are committed and deployed to Oracle without postgres/data or photographer source payloads
+    progress:
+      - registered from WED-247 head after confirming a36e25b changes exactly three wedding static frontend files and is not yet an ancestor
+      - selectively cherry-picked a36e25b as 6b21a71; only wedding/index.html, wedding/assets/js/main.js and wedding/assets/css/style.css changed, preserving the plain Understanding error and indicative cost-breakdown frontend
+      - added the /vendors acquisition page under the existing docs catch-all and three canonical Wedding subpath listicles with the required persona-specific list counts, repeated single action, objections, FAQ, privacy/control copy and shared logo
+      - attributed supplied evidence to Easy Weddings and Marketing Mag without outbound source links, kept price methodology private and made vendor review authority explicit without guaranteed reply, booking or price claims
+      - static smoke, JavaScript syntax, TypeScript, line-budget and production-build checks pass; eight rendered Playwright cases pass at 390px and 1280px with overflow, CTA visibility and serious/critical Axe checks
