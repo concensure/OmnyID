@@ -70,6 +70,7 @@ function Get-ArtifactDigest {
 }
 
 function Test-Wed225LineBudget {
+    $generatedDependencyLockfiles = @("Cargo.lock", "package-lock.json")
     $changed = @(git -C $root diff --name-status $baselineCommit --)
     $changed += @(git -C $root ls-files --others --exclude-standard | ForEach-Object { "A`t$_" })
     foreach ($line in $changed) {
@@ -78,6 +79,7 @@ function Test-Wed225LineBudget {
         $status = $parts[0]
         $relative = $parts[-1]
         if ($relative.Replace("\", "/").StartsWith(".agent/")) { continue }
+        if ($generatedDependencyLockfiles -contains [System.IO.Path]::GetFileName($relative)) { continue }
         $absolute = Join-Path $root $relative
         if (-not (Test-Path -LiteralPath $absolute -PathType Leaf)) { continue }
         $current = [System.IO.File]::ReadAllLines($absolute).Count

@@ -4592,3 +4592,10 @@ Operations and next:
 - Commit this slice, tag that exact clean revision as the human-review candidate, rerun the readiness
   verifier against local disposable PostgreSQL and ClamAV with all consequential flags off, and give
   the user the frozen SHA plus machine manifest. WED-225/WED-226 and policy V2 remain blocked.
+
+Verifier follow-up:
+
+- The first frozen-commit run passed every functional lane but the WED-225 line-budget helper falsely
+  treated generated `Cargo.lock` growth from the WED-250 dependency upgrades as handwritten source
+  bloat. The helper now excludes only `Cargo.lock` and `package-lock.json`; a static regression test
+  protects those exact exclusions while Rust/TypeScript/TSX files remain covered.

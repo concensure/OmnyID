@@ -3305,3 +3305,4 @@ tasks:
       - preserved the existing Guests and Seating projections and template navigation; status shortcuts open the relevant existing surface and the A2UI aggregate now carries structured status, metadata and action labels without adding a parallel ledger
       - added reusable hub hierarchy, status, interaction, mobile and WCAG contrast rules to DESIGN_SYSTEM section 11
       - seven focused state/render checks, two 320/1280 browser checks with Axe and alignment assertions, typecheck, both line-budget checks, wedding site/CSP smoke, all 1963 wedding tests and the production build pass
+      - the first exact-commit readiness run exposed a verifier-only false failure on generated dependency lockfiles; the WED-225 source line-budget check now excludes Cargo.lock and package-lock.json with a regression contract while continuing to enforce handwritten source budgets
