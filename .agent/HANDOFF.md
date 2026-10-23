@@ -4448,3 +4448,39 @@ Next:
   data and leaving planning, quotation, vendor-mail, relay, provider and ranking-policy-V2 flags off.
 - The nine WED-240 human dimensions plus WED-225/WED-226 remain release blockers; the HTML form is a
   record generator, not a substitute for scenario execution by an independent reviewer.
+
+## 2026-10-23 - WED-248 vendor acquisition and persona landing pages (Codex, complete)
+
+Changed:
+
+- Selectively integrated only the three static Wedding frontend files from `a36e25b` as `6b21a71`,
+  preserving the plain Understanding error and indicative cost-breakdown changes without taking any
+  backend, workspace or worktree state.
+- Added `/vendors` with evidence-led copy for faster high-intent lead handling, authentic proof,
+  mobile planning, useful price clarity and vendor-private commercial methodology. Easy Weddings and
+  Marketing Mag are named in-page without source backlinks; vendor review and permission boundaries
+  are explicit.
+- Added the three requested Gen Z persona listicles beneath `/wedding/`, with the supplied titles,
+  7/5/6-item structures, persona-specific CTA, product relief, objections, FAQ, final conversion,
+  privacy/control reassurance and the existing Wedding logo.
+- Added shared responsive styling, static content/link contracts and rendered 390px/1280px browser
+  coverage. The browser checks found and fixed mobile CTA/grid overflow and two WCAG contrast misses.
+
+Verification:
+
+- `node --check wedding/assets/js/main.js`, `npm --prefix solid-ui run test:wedding-site`,
+  `test:line-budget`, `typecheck` and `build` pass. The build retains only the inherited Tailwind
+  object-screen and Vite chunk-size advisories.
+- Eight Playwright cases pass across all four new pages at 390px and 1280px, including overflow,
+  mobile CTA and serious/critical Axe checks. Every new file is below 1000 lines.
+- Commit `62a4813` contains the page slice. Six new static files were staged, SHA-256 checked and
+  atomically promoted on Oracle. The three pre-existing Wedding files match `6b21a71`; no rebuild was
+  required. All four public routes return HTTP 200 with expected content and the source names remain
+  unlinked as requested.
+- No workspace/backend container, database, mail setting, feature flag or vendor source record was
+  changed. Remote `postgres/data` is absent and the deployment staging directory was removed.
+
+Next:
+
+- Campaign analytics and experiment assignment were deliberately not added without an approved
+  consent, privacy and credential design. They can be introduced as a separate reviewed task.

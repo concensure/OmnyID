@@ -1519,3 +1519,17 @@ Applying a seating suggestion persists the current constraint-based assignment a
 place. The product has no 2D seat-map editor, so the action does not claim or route to one. None of
 these presentation and routing changes expands outreach, booking, payment, provider, mail, policy-V2
 or ideal-agent rollout authority.
+
+## 2026-10-23: Acquisition pages reuse the existing static marketing surfaces
+
+Vendor acquisition lives at `/vendors` in the existing root documentation/static surface. Persona
+listicles use descriptive paths below `/wedding/`, rather than separate subdomains, so they share the
+Wedding identity and can hand off to the same controlled workspace registration flow. Each listicle
+canonically points to `/wedding/` while retaining campaign-specific source parameters on its one
+repeated primary action.
+
+Publication evidence is named in page copy without outbound source links. Vendor-facing price
+transparency describes the customer-visible result while keeping margins, formulae, qualification
+rules and exception policy private. The pages do not promise replies, prices or bookings and do not
+expand outbound-message authority. No analytics provider, backend contract, application image,
+source dataset or rollout flag is introduced by this static acquisition slice.

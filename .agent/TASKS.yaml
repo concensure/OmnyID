@@ -3166,7 +3166,7 @@ tasks:
       - the isolated Oracle restore drill failed after its bounded run under temporary disk pressure while backup verification passed; cleanup restored root usage from 96 percent to 79 percent, so application deployment is live but restore-drill operational readiness is not claimed
   - id: WED-248
     title: Publish vendor acquisition and Gen Z wedding listicle pages
-    status: in_progress
+    status: complete
     owner: codex
     branch: agent/codex/WED-215
     depends_on:
@@ -3197,3 +3197,5 @@ tasks:
       - added the /vendors acquisition page under the existing docs catch-all and three canonical Wedding subpath listicles with the required persona-specific list counts, repeated single action, objections, FAQ, privacy/control copy and shared logo
       - attributed supplied evidence to Easy Weddings and Marketing Mag without outbound source links, kept price methodology private and made vendor review authority explicit without guaranteed reply, booking or price claims
       - static smoke, JavaScript syntax, TypeScript, line-budget and production-build checks pass; eight rendered Playwright cases pass at 390px and 1280px with overflow, CTA visibility and serious/critical Axe checks
+      - committed the acquisition and listicle slice as 62a4813 on top of selective frontend commit 6b21a71 and promoted only six new static files to Oracle after staged SHA-256 verification
+      - all four new public routes return HTTP 200 with the expected content, production hashes match local files, the pre-existing three Wedding frontend hashes match 6b21a71, temporary staging is removed and postgres/data remains absent
