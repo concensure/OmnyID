@@ -1,0 +1,394 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Planning review form</title>
+<style>
+  :root {
+    --bg: #FAF7F2; --card: #fff; --line: #E8E2D9; --ink: #1a1c1b; --muted: #5d625f;
+    --teal: #0F5F5A; --blue: #274B77; --bad: #9a2b2b; --ok: #1d6b3a;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 24px 16px 96px; }
+  h1 { font-size: 1.6rem; margin: 0 0 4px; }
+  h2 { font-size: 1.15rem; margin: 0 0 6px; }
+  p { margin: 0 0 10px; }
+  .muted { color: var(--muted); font-size: .92rem; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+    padding: 16px; margin: 16px 0; }
+  .step { color: var(--teal); font-weight: 600; font-size: .85rem; text-transform: uppercase;
+    letter-spacing: .04em; }
+  label { display: block; font-weight: 600; margin: 12px 0 4px; }
+  input[type=text], textarea { width: 100%; padding: 10px; border: 1px solid #c9c2b6;
+    border-radius: 8px; font: inherit; background: #fff; color: var(--ink); }
+  textarea { min-height: 96px; resize: vertical; }
+  input:focus, textarea:focus, button:focus-visible, summary:focus-visible {
+    outline: 3px solid var(--blue); outline-offset: 2px; }
+  .cmd { background: #1e2a2a; color: #e8f1ef; padding: 12px; border-radius: 8px;
+    font: .85rem/1.5 Consolas, monospace; white-space: pre-wrap; word-break: break-all;
+    position: relative; margin: 8px 0; }
+  .copy { position: absolute; top: 6px; right: 6px; font-size: .75rem; padding: 4px 8px;
+    min-height: 0; background: #fff; color: var(--ink); border: 0; border-radius: 6px; cursor: pointer; }
+  button.main { background: var(--teal); color: #FAF7F2; border: 0; border-radius: 8px;
+    padding: 12px 20px; font: inherit; font-weight: 600; cursor: pointer; min-height: 44px; }
+  button.main:disabled { opacity: .45; cursor: not-allowed; }
+  .choices { display: grid; gap: 8px; margin: 12px 0; }
+  .choice { display: flex; gap: 10px; align-items: flex-start; border: 1px solid var(--line);
+    border-radius: 8px; padding: 10px 12px; font-weight: 500; margin: 0; cursor: pointer;
+    min-height: 44px; }
+  .choice input { margin-top: 4px; }
+  .choice.sel-pass { border-color: var(--ok); background: #eef7f1; }
+  .choice.sel-fail { border-color: var(--bad); background: #fbefef; }
+  .choice.sel-skip { border-color: #8a8478; background: #f4f1ea; }
+  .watch { margin: 8px 0; padding-left: 18px; }
+  .watch li { margin-bottom: 6px; }
+  .badge { display: inline-block; font-size: .78rem; border-radius: 99px; padding: 2px 10px;
+    border: 1px solid var(--line); background: #fff; color: var(--muted); }
+  .badge.pass { color: var(--ok); border-color: var(--ok); }
+  .badge.fail { color: var(--bad); border-color: var(--bad); }
+  #bar { position: sticky; top: 0; background: var(--bg); padding: 10px 0; z-index: 2;
+    border-bottom: 1px solid var(--line); font-size: .9rem; }
+  #bar .track { height: 8px; background: var(--line); border-radius: 4px; margin-top: 6px; }
+  #bar .fill { height: 8px; background: var(--teal); border-radius: 4px; width: 0; }
+  .warn { background: #fff7e6; border: 1px solid #e6c97a; border-radius: 8px; padding: 10px 12px; }
+  details summary { cursor: pointer; font-weight: 600; }
+  #problems { color: var(--bad); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Planning agent: review form</h1>
+  <p class="muted">Answer in plain words. This page makes the nine review files for you, plus the
+    signed-off report they point to. Nothing leaves your computer. Your answers autosave in this browser.</p>
+
+  <div id="bar" aria-live="polite">
+    <span id="barText">0 of 9 dimensions answered</span>
+    <div class="track"><div class="fill" id="barFill"></div></div>
+  </div>
+
+  <section class="card" aria-labelledby="s1">
+    <div class="step">Step 1</div>
+    <h2 id="s1">Get a clean build to review</h2>
+    <p>The review is only valid for one exact version of the code. If the code changes afterwards, you
+      must review again, so freeze a version first. Run this in PowerShell. It copies the latest
+      version into a fresh folder, so nobody can change it while you review.</p>
+    <div class="cmd" id="cmd1">$src = "C:\Users\ozans\Desktop\projects\OmnyID-WED-215"
+$sha = (git -C $src rev-parse HEAD).Trim()
+git -C $src status --porcelain   # must print nothing
+git -C $src worktree add "C:\Users\ozans\Desktop\projects\OmnyID-review-$($sha.Substring(0,8))" $sha
+$sha   # paste this 40-character code into Step 2<button class="copy" data-copy="cmd1">Copy</button></div>
+    <p class="muted">If the status line prints anything, the version is not clean. Stop and ask for it
+      to be committed first.</p>
+    <p>Then build it and open it in your browser:</p>
+    <div class="cmd" id="cmd2">cd "C:\Users\ozans\Desktop\projects\OmnyID-review-XXXXXXXX\solid-ui"
+npm ci
+npm run build
+npm run preview<button class="copy" data-copy="cmd2">Copy</button></div>
+    <p class="muted">Replace XXXXXXXX with the first 8 characters of the code. The planning features
+      are switched off by default (the flags are "dark"). Ask whoever prepares the review environment to
+      turn them on for a test account, or the scenarios below will show nothing. The review must use a
+      test setup, never real couples' or vendors' data.</p>
+  </section>
+
+  <section class="card" aria-labelledby="s2">
+    <div class="step">Step 2</div>
+    <h2 id="s2">About you and the build</h2>
+    <label for="sha">Version code (40 characters, from Step 1)</label>
+    <input type="text" id="sha" autocomplete="off" spellcheck="false" placeholder="e.g. f85469f0a1b2c3...">
+    <div class="muted" id="shaHint"></div>
+    <label for="who">Your name</label>
+    <input type="text" id="who" autocomplete="name">
+    <label class="choice" for="indep" style="margin-top:12px">
+      <input type="checkbox" id="indep">
+      <span>I did not build this feature and I am reviewing it independently.</span>
+    </label>
+  </section>
+
+  <section aria-labelledby="s3">
+    <div class="step">Step 3</div>
+    <h2 id="s3">Answer the nine questions</h2>
+    <p class="muted">For each one, use the build to look at the listed situations, then choose an answer
+      and write what you saw. "Problem found" is an honest and useful answer. It simply means that
+      dimension is not signed off yet.</p>
+    <div id="dims"></div>
+  </section>
+
+  <section class="card" aria-labelledby="s4">
+    <div class="step">Step 4</div>
+    <h2 id="s4">Make the files</h2>
+    <p id="problems"></p>
+    <button class="main" id="make" disabled>Download review package (.zip)</button>
+    <div id="after" hidden>
+      <div class="warn" style="margin-top:14px">
+        <strong>Keep the report file unchanged.</strong> Each JSON file contains a fingerprint (SHA-256)
+        of it. Editing the report afterwards breaks that link.
+      </div>
+      <p style="margin-top:14px">1. Unzip. You get a <code>records</code> folder holding one JSON file per
+        passed dimension, and the report. 2. Run the check in the clean copy from Step 1:</p>
+      <div class="cmd" id="cmd3"><button class="copy" data-copy="cmd3">Copy</button></div>
+      <p class="muted">The check reports each dimension as verified, missing or invalid. Any dimension
+        marked "Problem found" or "Not reviewed" gets no file on purpose, so it stays missing.</p>
+    </div>
+  </section>
+</main>
+
+<script>
+const DIMS = [
+  { id: "memory_fidelity", title: "Does it remember things exactly?",
+    q: "Are limits the couple confirmed recalled exactly, are old facts not shown as current, and are private remarks not quietly widened?",
+    scenarios: ["remembered-centrepiece-limit", "accessibility-conflict"] },
+  { id: "cost_clarity", title: "Are the money words clear?",
+    q: "Can you tell paid, committed, estimated, forecast, at-risk and unknown amounts apart? Does any advice read as if money was moved or something was bought?",
+    scenarios: ["budget-offset"] },
+  { id: "critical_path_wording", title: "Are the dates and blockers understandable?",
+    q: "Without technical words, can you tell what depends on what, which dates matter, and what is uncertain? Is prepared work ever described as already done?",
+    scenarios: ["accommodation-critical-path"] },
+  { id: "vendor_context_minimisation", title: "Does the vendor only see what they should?",
+    q: "Does a vendor get only the requirements and questions that were approved? Check there is no partner reasoning, competitor info, scores, whole-plan details or private notes.",
+    scenarios: ["accessibility-conflict", "vendor-substitution", "stale-authority"] },
+  { id: "accessibility", title: "Is it usable for everyone?",
+    q: "Try the keyboard only, a screen reader, 200% zoom, the contrast, focus marks, big-enough tap targets, reduced motion, recovering from an error, and whether status is shown by more than colour.",
+    scenarios: ["accessibility-conflict"] },
+  { id: "couple_usability", title: "Could a couple use it?",
+    q: "Can a couple understand the next decision, the evidence, what is unknown, the alternatives and consequences, and how to put it off or undo it, with no help?",
+    scenarios: ["accommodation-critical-path", "partner-preference-conflict"] },
+  { id: "vendor_usability", title: "Could a vendor use it?",
+    q: "Can a vendor see what is being asked, reply or revise, tell a review from an acceptance or booking, and recover when a link has expired or is invalid?",
+    scenarios: ["vendor-substitution", "cross-channel-replay"] },
+  { id: "permission_wording", title: "Is it clear what will be shared or done?",
+    q: "Does the wording say what will be shared or done, with whom, and when? Are prepare, review, approve, send, book and pay always clearly different?",
+    scenarios: ["remembered-centrepiece-limit", "vendor-substitution", "cross-channel-replay", "stale-authority", "non-wedding-reuse"] },
+  { id: "alternative_preservation", title: "Are all sensible options still there?",
+    q: "Is every reasonable option still available? Is the recommendation based on evidence, not generic? Is putting it off, or picking a non-recommended option, never hidden?",
+    scenarios: ["budget-offset", "partner-preference-conflict", "non-wedding-reuse"] }
+];
+const SCEN = {
+  "remembered-centrepiece-limit": ["Remembered centrepiece limit", "A confirmed size limit stays separate from a prepared vendor question.", "Only the limit may be shared. The couple's original remark stays private."],
+  "accessibility-conflict": ["Accessibility conflict", "A real conflict can prompt a review. Missing accessibility info stays marked unknown.", "The vendor sees an overall requirement, never a named guest."],
+  "budget-offset": ["Budget offset", "Budget advice can be acknowledged but cannot move money, buy, book, pay or negotiate.", "Advice names only current, sourced categories and limited fee unknowns."],
+  "accommodation-critical-path": ["Accommodation critical path", "A prepared research or compare action cannot contact, book, pay or change dates.", "Wording uses saved dates and prerequisites, not internal identifiers."],
+  "vendor-substitution": ["Vendor substitution", "Preparation is review-only. A deliberate, guarded acceptance creates a new quote and never edits the old one.", "Only the exact replacement terms and limited fit labels reach the review."],
+  "partner-preference-conflict": ["Partner preference conflict", "Resolving it is an acknowledgement of that exact version, never a rule the system guesses.", "Each partner's values stay separate. Private reasons never reach the vendor."],
+  "cross-channel-replay": ["Cross-channel replay", "The same facts arriving by email, secure link or claimed profile merge into one. Receiving them is never proof of a booking.", "Duplicates are matched without exposing channel secrets."],
+  "stale-authority": ["Stale authority", "A newer quote, permission or constraint cancels old recommendations and unsent drafts.", "Old records stay as history but cannot widen or resend vendor context."],
+  "non-wedding-reuse": ["Non-wedding reuse", "Generic contracts keep their rules. Wedding vocabulary is only styling.", "Styling can never loosen privacy or evidence rules."]
+};
+const CHOICES = [
+  ["pass", "Passed: I checked it and found no problem", "sel-pass"],
+  ["fail", "Problem found: something was wrong or unclear", "sel-fail"],
+  ["skip", "Not reviewed yet", "sel-skip"]
+];
+const KEY = "planning-review-v1";
+let st = { sha: "", who: "", indep: false, ans: {} };
+try { st = Object.assign(st, JSON.parse(localStorage.getItem(KEY) || "{}")); } catch (e) {}
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} };
+const $ = (id) => document.getElementById(id);
+const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+function renderDims() {
+  $("dims").innerHTML = DIMS.map((d, i) => {
+    const a = st.ans[d.id] || { v: "skip", note: "" };
+    const watch = d.scenarios.map((s) => `<li><strong>${esc(SCEN[s][0])}.</strong> ${esc(SCEN[s][1])} ${esc(SCEN[s][2])}</li>`).join("");
+    const choices = CHOICES.map(([v, label, cls]) => `
+      <label class="choice ${a.v === v ? cls : ""}">
+        <input type="radio" name="r-${d.id}" value="${v}" ${a.v === v ? "checked" : ""}>
+        <span>${label}</span></label>`).join("");
+    return `<div class="card">
+      <div class="step">Question ${i + 1} of 9 <span class="badge" id="b-${d.id}"></span></div>
+      <h2>${esc(d.title)}</h2>
+      <p>${esc(d.q)}</p>
+      <details><summary>Situations to look at</summary><ul class="watch">${watch}</ul></details>
+      <div class="choices" role="radiogroup" aria-label="${esc(d.title)}">${choices}</div>
+      <label for="n-${d.id}">What did you look at, and what did you see? (required)</label>
+      <textarea id="n-${d.id}" data-d="${d.id}">${esc(a.note || "")}</textarea>
+    </div>`;
+  }).join("");
+  document.querySelectorAll("#dims input[type=radio]").forEach((el) => el.addEventListener("change", () => {
+    const id = el.name.slice(2);
+    st.ans[id] = Object.assign({ note: "" }, st.ans[id], { v: el.value });
+    el.closest(".choices").querySelectorAll(".choice").forEach((choice) => {
+      const value = choice.querySelector("input").value;
+      const selected = value === el.value;
+      choice.classList.toggle("sel-pass", selected && value === "pass");
+      choice.classList.toggle("sel-fail", selected && value === "fail");
+      choice.classList.toggle("sel-skip", selected && value === "skip");
+    });
+    save(); refresh();
+  }));
+  document.querySelectorAll("#dims textarea").forEach((el) => el.addEventListener("input", () => {
+    const id = el.dataset.d;
+    st.ans[id] = Object.assign({ v: "skip" }, st.ans[id], { note: el.value });
+    save(); refresh();
+  }));
+}
+
+const shaOk = () => /^[0-9a-f]{40}$/i.test(st.sha.trim());
+const noteOk = (id) => ((st.ans[id] || {}).note || "").trim().length >= 10;
+
+function refresh() {
+  let answered = 0, passed = 0, failed = 0;
+  DIMS.forEach((d) => {
+    const a = st.ans[d.id] || { v: "skip" };
+    const b = $("b-" + d.id);
+    const done = a.v !== "skip" && noteOk(d.id);
+    if (done) answered++;
+    if (done && a.v === "pass") passed++;
+    if (a.v === "fail") failed++;
+    b.className = "badge " + (done ? (a.v === "pass" ? "pass" : "fail") : "");
+    b.textContent = a.v !== "skip" && !noteOk(d.id) ? "add a note" : done ? (a.v === "pass" ? "passed" : "problem") : "open";
+  });
+  $("barText").textContent = `${answered} of 9 dimensions answered (${passed} passed, ${failed} with problems)`;
+  $("barFill").style.width = (answered / 9 * 100) + "%";
+  $("shaHint").textContent = st.sha && !shaOk() ? "This must be exactly 40 letters/digits (0-9, a-f)." : "";
+  const issues = [];
+  if (!shaOk()) issues.push("Enter the 40-character version code.");
+  if (!st.who.trim()) issues.push("Enter your name.");
+  if (!st.indep) issues.push("Confirm you are independent of the build.");
+  if (!passed && !failed) issues.push("Answer at least one question with a note.");
+  $("problems").textContent = issues.join(" ");
+  $("make").disabled = issues.length > 0 || makingPackage;
+}
+
+// SHA-256: native when available, small fallback otherwise.
+async function sha256(bytes) {
+  if (window.crypto && crypto.subtle) {
+    const h = await crypto.subtle.digest("SHA-256", bytes);
+    return [...new Uint8Array(h)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  }
+  const K = []; for (let n = 2, c = 0; c < 64; n++) { let p = true; for (let d = 2; d * d <= n; d++) if (n % d === 0) { p = false; break; }
+    if (p) { K[c++] = (Math.cbrt(n) % 1 * 4294967296) | 0; } }
+  let H = []; for (let n = 2, c = 0; c < 8; n++) { let p = true; for (let d = 2; d * d <= n; d++) if (n % d === 0) { p = false; break; }
+    if (p) { H[c++] = (Math.sqrt(n) % 1 * 4294967296) | 0; } }
+  const len = bytes.length, total = ((len + 9 + 63) >> 6) << 6, m = new Uint8Array(total);
+  m.set(bytes); m[len] = 0x80;
+  const dv = new DataView(m.buffer); dv.setUint32(total - 4, len * 8 >>> 0); dv.setUint32(total - 8, Math.floor(len / 536870912));
+  const rr = (x, n) => (x >>> n) | (x << (32 - n));
+  for (let o = 0; o < total; o += 64) {
+    const w = new Array(64);
+    for (let i = 0; i < 16; i++) w[i] = dv.getUint32(o + i * 4);
+    for (let i = 16; i < 64; i++) { const s0 = rr(w[i-15],7) ^ rr(w[i-15],18) ^ (w[i-15] >>> 3), s1 = rr(w[i-2],17) ^ rr(w[i-2],19) ^ (w[i-2] >>> 10); w[i] = (w[i-16] + s0 + w[i-7] + s1) | 0; }
+    let [a, b, c, d, e, f, g, h] = H;
+    for (let i = 0; i < 64; i++) {
+      const t1 = (h + (rr(e,6) ^ rr(e,11) ^ rr(e,25)) + ((e & f) ^ (~e & g)) + K[i] + w[i]) | 0;
+      const t2 = ((rr(a,2) ^ rr(a,13) ^ rr(a,22)) + ((a & b) ^ (a & c) ^ (b & c))) | 0;
+      h = g; g = f; f = e; e = (d + t1) | 0; d = c; c = b; b = a; a = (t1 + t2) | 0;
+    }
+    H = [a,b,c,d,e,f,g,h].map((v, i) => (H[i] + v) | 0);
+  }
+  return H.map((v) => (v >>> 0).toString(16).padStart(8, "0")).join("");
+}
+
+// Minimal uncompressed ZIP writer.
+const CRC = (() => { const t = []; for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+const crc32 = (b) => { let c = 0xFFFFFFFF; for (let i = 0; i < b.length; i++) c = CRC[(c ^ b[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
+function zip(files) {
+  const enc = new TextEncoder(), parts = [], central = [];
+  let offset = 0;
+  const now = new Date(), dt = ((now.getFullYear() - 1980) << 9 | (now.getMonth() + 1) << 5 | now.getDate()) & 0xFFFF,
+    tm = (now.getHours() << 11 | now.getMinutes() << 5 | (now.getSeconds() >> 1)) & 0xFFFF;
+  for (const f of files) {
+    const name = enc.encode(f.name), crc = crc32(f.data);
+    const lh = new DataView(new ArrayBuffer(30));
+    lh.setUint32(0, 0x04034b50, true); lh.setUint16(4, 20, true); lh.setUint16(6, 0x0800, true);
+    lh.setUint16(10, tm, true); lh.setUint16(12, dt, true); lh.setUint32(14, crc, true);
+    lh.setUint32(18, f.data.length, true); lh.setUint32(22, f.data.length, true); lh.setUint16(26, name.length, true);
+    parts.push(new Uint8Array(lh.buffer), name, f.data);
+    const ch = new DataView(new ArrayBuffer(46));
+    ch.setUint32(0, 0x02014b50, true); ch.setUint16(4, 20, true); ch.setUint16(6, 20, true); ch.setUint16(8, 0x0800, true);
+    ch.setUint16(12, tm, true); ch.setUint16(14, dt, true); ch.setUint32(16, crc, true);
+    ch.setUint32(20, f.data.length, true); ch.setUint32(24, f.data.length, true); ch.setUint16(28, name.length, true);
+    ch.setUint32(42, offset, true);
+    central.push(new Uint8Array(ch.buffer), name);
+    offset += 30 + name.length + f.data.length;
+  }
+  const cSize = central.reduce((n, p) => n + p.length, 0);
+  const end = new DataView(new ArrayBuffer(22));
+  end.setUint32(0, 0x06054b50, true); end.setUint16(8, files.length, true); end.setUint16(10, files.length, true);
+  end.setUint32(12, cSize, true); end.setUint32(16, offset, true);
+  return new Blob([...parts, ...central, new Uint8Array(end.buffer)], { type: "application/zip" });
+}
+
+function buildReport(sha, stamp) {
+  const L = ["# Planning ideal-agent human review", "",
+    `- Commit: ${sha}`, `- Reviewer: ${st.who.trim()} (confirmed independent of the implementation)`,
+    `- Recorded: ${stamp}`, "- Programme: WED-230..WED-240, schema planning.ideal_agent_human_review.v1", ""];
+  DIMS.forEach((d) => {
+    const a = st.ans[d.id] || { v: "skip", note: "" };
+    const res = a.v === "pass" ? "PASSED" : a.v === "fail" ? "PROBLEM FOUND" : "NOT REVIEWED";
+    L.push(`## ${d.id}: ${res}`, "", `Question: ${d.q}`, "",
+      `Situations: ${d.scenarios.map((s) => SCEN[s][0]).join("; ")}`, "",
+      `Reviewer notes: ${(a.note || "").trim() || "(none)"}`, "");
+  });
+  return L.join("\n");
+}
+
+let makingPackage = false;
+$("make").addEventListener("click", async () => {
+  if (makingPackage) return;
+  makingPackage = true;
+  const makeButton = $("make");
+  makeButton.disabled = true;
+  makeButton.setAttribute("aria-busy", "true");
+  makeButton.textContent = "Preparing review package…";
+  let completionMessage = "";
+  try {
+  const sha = st.sha.trim().toLowerCase(), stamp = new Date().toISOString();
+  const enc = new TextEncoder();
+  const reportName = `planning-human-review-${sha.slice(0, 12)}.md`;
+  const reportBytes = enc.encode(buildReport(sha, stamp));
+  const digest = await sha256(reportBytes);
+  const files = [{ name: reportName, data: reportBytes }];
+  let made = 0;
+  DIMS.forEach((d) => {
+    const a = st.ans[d.id] || { v: "skip" };
+    if (a.v !== "pass" || !noteOk(d.id)) return;
+    const rec = { schema_version: "planning.ideal_agent_human_review.v1", dimension: d.id, status: "verified",
+      commit_sha: sha, reviewer: st.who.trim(), recorded_at: stamp,
+      evidence_reference: reportName, evidence_sha256: digest };
+    files.push({ name: `records/${d.id}.json`, data: enc.encode(JSON.stringify(rec, null, 2) + "\n") });
+    made++;
+  });
+  const url = URL.createObjectURL(zip(files));
+  const a = document.createElement("a");
+  a.href = url; a.download = `planning-review-${sha.slice(0, 8)}.zip`; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+  $("after").hidden = false;
+  $("cmd3").innerHTML = `<button class="copy" data-copy="cmd3">Copy</button>`;
+  $("cmd3").insertAdjacentText("afterbegin",
+    `cd "C:\\Users\\ozans\\Desktop\\projects\\OmnyID-review-${sha.slice(0, 8)}"\n` +
+    `git rev-parse HEAD   # must equal ${sha}\n` +
+    `./scripts/verify-planning-ideal-agent-readiness.ps1 \`\n  -HumanReviewDirectory "<folder where you unzipped>\\records"`);
+  bindCopy();
+  completionMessage = `${made} of 9 record files created. The other ${9 - made} were left out on purpose.`;
+  } finally {
+    makingPackage = false;
+    makeButton.removeAttribute("aria-busy");
+    makeButton.textContent = "Download review package (.zip)";
+    refresh();
+    if (completionMessage) $("problems").textContent = completionMessage;
+  }
+});
+
+function bindCopy() {
+  document.querySelectorAll(".copy").forEach((b) => {
+    b.onclick = async () => {
+      const el = $(b.dataset.copy);
+      const text = [...el.childNodes].filter((n) => n.nodeType === 3).map((n) => n.textContent).join("");
+      try { await navigator.clipboard.writeText(text); b.textContent = "Copied"; }
+      catch (e) { b.textContent = "Select and copy by hand"; }
+      setTimeout(() => (b.textContent = "Copy"), 1800);
+    };
+  });
+}
+
+$("sha").value = st.sha; $("who").value = st.who; $("indep").checked = !!st.indep;
+$("sha").addEventListener("input", (e) => { st.sha = e.target.value; save(); refresh(); });
+$("who").addEventListener("input", (e) => { st.who = e.target.value; save(); refresh(); });
+$("indep").addEventListener("change", (e) => { st.indep = e.target.checked; save(); refresh(); });
+renderDims(); bindCopy(); refresh();
+</script>
+</body>
+</html>

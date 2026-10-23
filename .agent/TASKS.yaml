@@ -3199,3 +3199,33 @@ tasks:
       - static smoke, JavaScript syntax, TypeScript, line-budget and production-build checks pass; eight rendered Playwright cases pass at 390px and 1280px with overflow, CTA visibility and serious/critical Axe checks
       - committed the acquisition and listicle slice as 62a4813 on top of selective frontend commit 6b21a71 and promoted only six new static files to Oracle after staged SHA-256 verification
       - all four new public routes return HTTP 200 with the expected content, production hashes match local files, the pre-existing three Wedding frontend hashes match 6b21a71, temporary staging is removed and postgres/data remains absent
+  - id: WED-249
+    title: Build reviewed ranking corpus and dark evidence rehearsal
+    status: complete
+    owner: codex
+    branch: agent/codex/WED-215
+    depends_on:
+      - WED-240
+      - WED-225
+    files:
+      - solid-ui/scripts/build-reviewed-vendor-ranking-corpus.mjs
+      - solid-ui/tests/reviewed-vendor-ranking-corpus.test.mjs
+      - Documents/verification/wedding-vendor-ranking-reviewed-corpus-v1.jsonl
+      - Documents/verification/wedding-vendor-ranking-reviewed-corpus.md
+      - Documents/verification/quotation-local-shadow-rehearsal.md
+      - Documents/issues/wedding planner/human-review-form.html
+      - solid-ui/tests/e2e/wedding-human-review-form.spec.ts
+      - .agent/**
+    acceptance:
+      - both private judge workbooks are parsed reproducibly without copying source facts or private free-text comments into application assets
+      - the compact reviewed ranking corpus records source digests, every candidate score, exact agreement, unresolved disagreements and missing ordering or independence evidence without overstating rollout readiness
+      - disposable ClamAV evidence is recorded as local machine evidence and is not represented as the independent WED-225 clamav_clean_scan sign-off
+      - a local Docker shadow rehearsal runs with all release and consequential-action flags off, records runtime/source identity and side-effect boundaries, and is not mislabeled as hosted evidence
+      - the human-review form preserves focus after a choice and serialises package generation against overlapping downloads, with browser regression coverage
+      - new files stay below 1000 lines, relevant checks pass, ranking policy V2 and all quotation/provider/mail/payment flags remain disabled
+    progress:
+      - confirmed the source workbooks contain 40 cases and 480 scored candidates per judge; score agreement is 477 of 480, while three candidate labels disagree, Iris has no recorded ideal top-three ordering and judge independence is not attested in either workbook
+      - added a deterministic, private-data-minimised JSONL generator and contract tests; the checked-in 41-line corpus binds both source digests, preserves all scores and unresolved defects, and declares both ranking-policy-V2 and quotation-accuracy eligibility false
+      - recorded the live disposable ClamAV clean scan and parser boundaries plus the full local Docker quotation rehearsal against PostgreSQL, explicitly classifying both as local machine evidence rather than independent or hosted sign-off
+      - repaired the human-review form so radio changes update in place without dropping keyboard focus and package generation is synchronously locked against overlapping downloads; two Chromium regressions pass
+      - corpus tests, form browser tests, typecheck, both line-budget assertions and the production build pass; all consequential flags remain off and WED-225/WED-226 remain blocked on their external and independent evidence

@@ -1533,3 +1533,17 @@ transparency describes the customer-visible result while keeping margins, formul
 rules and exception policy private. The pages do not promise replies, prices or bookings and do not
 expand outbound-message authority. No analytics provider, backend contract, application image,
 source dataset or rollout flag is introduced by this static acquisition slice.
+
+## 2026-10-24: Ranking labels and quotation release evidence remain separate gates
+
+The Casper and Iris workbooks are suitable sources for a compact vendor-ranking relevance corpus,
+but not for WED-225's quotation-normalisation accuracy corpus. The generated ranking corpus retains
+numeric judgements and recorded ordering only; it excludes private source facts, links and free-text
+comments. Disagreements remain unresolved values, missing order reviews remain missing, and reviewer
+labels do not imply independent-review provenance. Ranking policy V2 therefore stays disabled.
+
+A real scan against a disposable local ClamAV daemon is machine integration evidence, not the
+independent WED-225 scanner sign-off. Likewise, running the full quotation verifier against local
+Docker PostgreSQL and ClamAV with every consequential flag off is a dark rehearsal, not hosted
+shadow evidence. These labels must remain explicit so local success cannot accidentally authorize
+provider traffic, mail, payment, vendor permission, cohort advancement or production release.

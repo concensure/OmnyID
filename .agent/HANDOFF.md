@@ -4484,3 +4484,35 @@ Next:
 
 - Campaign analytics and experiment assignment were deliberately not added without an approved
   consent, privacy and credential design. They can be introduced as a separate reviewed task.
+
+## 2026-10-24 - WED-249 reviewed ranking corpus and dark rehearsal (Codex, complete)
+
+Changed:
+
+- Added a deterministic generator and 41-line JSONL projection of both private ranking workbooks.
+  It records 40 cases, 480 scores per reviewer, 477 exact agreements, three unresolved score
+  disagreements and one invalid ideal-order reference without copying source facts or comments.
+- Documented that Iris has no ideal top-three records, judge independence is not attested, and the
+  corpus cannot satisfy the distinct quotation-normalisation accuracy gate. Policy V2 remains off.
+- Recorded a live clean scan against the disposable local ClamAV daemon and a full dark quotation
+  rehearsal against local Docker PostgreSQL/ClamAV. No hosted/provider/Oracle/mail/payment action ran.
+- Added the supplied human-review form to this isolated worktree and fixed focus loss after radio
+  selection plus overlapping async package downloads, with focused Chromium coverage.
+
+Verification:
+
+- Three corpus contract tests and two human-review-form Playwright tests pass.
+- The corpus regenerates byte-for-byte with SHA-256
+  `1845d1ecd74f139539918167e572fbe98937ff18ae87dfd34ffeb284344b2885`.
+- The local live ClamAV test passes 1/1, parser boundaries pass 3/3, and the full quotation readiness
+  verifier passes its Rust, disposable-Postgres, SDK, Solid and 11-browser-test lanes with flags off.
+- Solid typecheck, both line-budget checks and production build pass. Only inherited Tailwind and
+  bundle-size advisories remain.
+
+Unresolved:
+
+- Ranking rollout still requires resolution of three score disagreements, correction/confirmation
+  of the eval-01 order reference, complete ordering review and independent provenance.
+- WED-225 still needs a quotation-specific reviewed accuracy corpus and its external, independent,
+  hosted and cohort records. Local ClamAV and local dark rehearsal are not those sign-offs, so
+  WED-225/WED-226 remain blocked and no feature flag changed.
