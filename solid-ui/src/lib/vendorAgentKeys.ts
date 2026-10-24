@@ -42,6 +42,8 @@ interface StoredVendorAgentKeys extends VendorAgentPublicKeys {
 export interface VendorEncryptedEnvelope {
   scheme: "omnyid-envelope-v1";
   algorithm: "xchacha20poly1305-ietf";
+  mode?: "recipient-x25519-v1";
+  recipient_key_id?: string;
   ephemeral_public_key: string;
   nonce: string;
   ciphertext: string;
@@ -170,13 +172,25 @@ export async function decryptVendorAgentEnvelope(
   ));
   const sodium = (await import("libsodium-wrappers")).default;
   await sodium.ready;
+  let contentKey = sharedKey;
   try {
+    if (envelope.mode === "recipient-x25519-v1") {
+      if (envelope.recipient_key_id !== record.keyId) {
+        throw new Error("This encrypted message is addressed to a different key version.");
+      }
+      contentKey = await deriveRecipientAeadKey(
+        sharedKey,
+        fromBase64(envelope.ephemeral_public_key),
+        fromHex(record.encryptionPublicKeyHex),
+        record.keyId,
+      );
+    }
     const plaintext = sodium.crypto_aead_xchacha20poly1305_ietf_decrypt(
       null,
       fromBase64(envelope.ciphertext),
       fromBase64(envelope.aad),
       fromBase64(envelope.nonce),
-      sharedKey,
+      contentKey,
     );
     const parsed: unknown = JSON.parse(new TextDecoder().decode(plaintext));
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
@@ -185,7 +199,47 @@ export async function decryptVendorAgentEnvelope(
     return parsed as Record<string, unknown>;
   } finally {
     sharedKey.fill(0);
+    if (contentKey !== sharedKey) contentKey.fill(0);
   }
+}
+
+/** Derive the browser AEAD key for a server-created recipient X25519 envelope. */
+export async function deriveRecipientAeadKey(
+  sharedSecret: Uint8Array,
+  ephemeralPublicKey: Uint8Array,
+  recipientPublicKey: Uint8Array,
+  recipientKeyId: string,
+): Promise<Uint8Array<ArrayBuffer>> {
+  if (
+    sharedSecret.length !== 32 ||
+    ephemeralPublicKey.length !== 32 ||
+    recipientPublicKey.length !== 32 ||
+    !recipientKeyId ||
+    recipientKeyId.length > 180
+  ) {
+    throw new Error("Recipient key derivation inputs are invalid.");
+  }
+  const material = await crypto.subtle.importKey(
+    "raw",
+    arrayBuffer(sharedSecret),
+    "HKDF",
+    false,
+    ["deriveBits"],
+  );
+  const info = new Uint8Array(64 + new TextEncoder().encode(recipientKeyId).length);
+  info.set(ephemeralPublicKey, 0);
+  info.set(recipientPublicKey, 32);
+  info.set(new TextEncoder().encode(recipientKeyId), 64);
+  return new Uint8Array(await crypto.subtle.deriveBits(
+    {
+      name: "HKDF",
+      hash: "SHA-256",
+      salt: new TextEncoder().encode("omnyid-recipient-x25519-v1"),
+      info,
+    },
+    material,
+    256,
+  ));
 }
 
 /** Encrypt response material to the user-selected transaction recipient before upload. */

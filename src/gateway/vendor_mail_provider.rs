@@ -61,7 +61,7 @@ pub struct VendorMailConfig {
     has_cloudflare_account_id: bool,
     has_resend_api_key: bool,
     has_worker_shared_secret: bool,
-    has_ingress_encryption_key: bool,
+    has_clamav_endpoint: bool,
     has_resend_webhook_secret: bool,
 }
 
@@ -109,11 +109,8 @@ impl VendorMailConfig {
                 "OMNYID_VENDOR_MAIL_WORKER_SHARED_SECRET",
             )
             .is_some(),
-            has_ingress_encryption_key: read_process_secret_trimmed(
-                "OMNYID_VENDOR_MAIL_INGRESS_ENCRYPTION_KEY",
-            )
-            .and_then(|value| hex::decode(value).ok())
-            .is_some_and(|value| value.len() == 32),
+            has_clamav_endpoint: std::env::var("CLAMD_HOST")
+                .is_ok_and(|value| !value.trim().is_empty()),
             has_resend_webhook_secret: read_process_secret_trimmed(
                 "OMNYID_VENDOR_MAIL_RESEND_WEBHOOK_SECRET",
             )
@@ -141,7 +138,7 @@ impl VendorMailConfig {
                 if !self.has_cloudflare_token
                     || !self.has_cloudflare_account_id
                     || !self.has_worker_shared_secret
-                    || !self.has_ingress_encryption_key =>
+                    || !self.has_clamav_endpoint =>
             {
                 VendorMailReadiness {
                     enabled: true,
@@ -198,7 +195,7 @@ mod tests {
             "OMNYID_VENDOR_MAIL_CLOUDFLARE_ACCOUNT_ID",
             "OMNYID_VENDOR_MAIL_RESEND_API_KEY",
             "OMNYID_VENDOR_MAIL_WORKER_SHARED_SECRET",
-            "OMNYID_VENDOR_MAIL_INGRESS_ENCRYPTION_KEY",
+            "CLAMD_HOST",
             "OMNYID_VENDOR_MAIL_RESEND_WEBHOOK_SECRET",
         ] {
             unsafe { std::env::remove_var(key) };
@@ -243,7 +240,7 @@ mod tests {
     }
 
     #[test]
-    fn cloudflare_is_ready_only_with_account_token_ingress_secret_and_encryption_key() {
+    fn cloudflare_is_ready_only_with_account_token_ingress_secret_and_scanner() {
         let _guard = env_lock().lock().expect("env lock");
         clear_env();
         unsafe {
@@ -255,7 +252,7 @@ mod tests {
                 "0123456789abcdef0123456789abcdef",
             );
             std::env::set_var("OMNYID_VENDOR_MAIL_WORKER_SHARED_SECRET", "worker-secret");
-            std::env::set_var("OMNYID_VENDOR_MAIL_INGRESS_ENCRYPTION_KEY", "11".repeat(32));
+            std::env::set_var("CLAMD_HOST", "clamav:3310");
             std::env::set_var("OMNYID_VENDOR_MAIL_FROM_ADDRESS", "hello@omnyid.com");
         }
         let config = VendorMailConfig::from_env().expect("complete config");

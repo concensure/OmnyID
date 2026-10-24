@@ -57,6 +57,9 @@ struct RecipientRoute {
     identity_id: String,
     vendor_id: String,
     owner_user_id: String,
+    agent_id: String,
+    recipient_key_id: String,
+    recipient_public_key_hex: String,
 }
 
 #[derive(Debug)]
@@ -118,18 +121,46 @@ async fn cloudflare_email_inbound_http(
     )
     .map_err(IngressError::http)?;
     let route = resolve_recipient(&state, &envelope.to).await?;
-    let encryption_key = ingress_encryption_key().map_err(IngressError::http)?;
+    match crate::gateway::clamav::scan_bytes(&body).await {
+        Ok(Some(result)) if !result.is_infected => {}
+        Ok(Some(_)) => {
+            return Err((
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "malware_rejected".to_string(),
+            ));
+        }
+        Ok(None) | Err(_) => {
+            return Err((
+                StatusCode::SERVICE_UNAVAILABLE,
+                "scanner_unavailable".to_string(),
+            ));
+        }
+    }
     let aad = json!({
         "provider": PROVIDER,
         "event_id": envelope.event_id,
         "recipient_identity_id": route.identity_id,
+        "recipient_agent_id": route.agent_id,
+        "recipient_key_id": route.recipient_key_id,
+        "owner_user_id": route.owner_user_id,
         "payload_digest": envelope.body_digest,
     });
     let plaintext = json!({
         "schema": "omnyid.vendor_email_ingress.raw.v1",
         "raw_rfc822_base64": STANDARD.encode(&body),
     });
-    let ciphertext = crate::crypto::encrypt_content(&plaintext, &aad, &encryption_key);
+    let ciphertext = crate::crypto::encrypt_content_for_recipient(
+        &plaintext,
+        &aad,
+        &route.recipient_public_key_hex,
+        &route.recipient_key_id,
+    )
+    .map_err(|_| {
+        (
+            StatusCode::SERVICE_UNAVAILABLE,
+            "recipient_encryption_unavailable".to_string(),
+        )
+    })?;
     let duplicate = persist_quarantine(&state, &envelope, &route, &ciphertext).await?;
     if !duplicate {
         state.metrics.inc_gateway_inbound_emails();
@@ -242,9 +273,11 @@ async fn resolve_recipient(
         .filter(|(_, domain)| *domain == "omnyid.com")
         .ok_or_else(not_found)?;
     let row = sqlx::query(
-        r#"SELECT identity.identity_id, identity.vendor_id, identity.owner_user_id
+        r#"SELECT identity.identity_id, identity.vendor_id, identity.owner_user_id,
+                   link.agent_id, link.agent_card
              FROM wedding_vendor_sender_identities identity
              JOIN wedding_vendors vendor ON vendor.vendor_id = identity.vendor_id
+             JOIN wedding_vendor_agent_links link ON link.vendor_id = identity.vendor_id
             WHERE lower(identity.mask_local_part) = lower($1)
               AND identity.mask_domain = 'omnyid.com'
               AND identity.status = 'active'
@@ -258,10 +291,29 @@ async fn resolve_recipient(
     .await
     .map_err(database_failure)?
     .ok_or_else(not_found)?;
+    let agent_id: String = row.get("agent_id");
+    let card: crate::agentcard::AgentCard =
+        serde_json::from_value(row.get("agent_card")).map_err(|_| not_found())?;
+    let recipient_public_key_hex = card
+        .encryption_public_key_hex
+        .as_deref()
+        .filter(|value| {
+            hex::decode(value)
+                .ok()
+                .is_some_and(|decoded| decoded.len() == 32)
+        })
+        .ok_or_else(not_found)?
+        .to_string();
+    if !card.verify() || card.agent_id != agent_id {
+        return Err(not_found());
+    }
     Ok(RecipientRoute {
         identity_id: row.get("identity_id"),
         vendor_id: row.get("vendor_id"),
         owner_user_id: row.get("owner_user_id"),
+        agent_id,
+        recipient_key_id: card.key_id,
+        recipient_public_key_hex,
     })
 }
 
@@ -305,9 +357,9 @@ async fn persist_quarantine(
     sqlx::query(
         r#"INSERT INTO wedding_vendor_email_ingress_quarantine
              (quarantine_id, provider, provider_event_id, recipient_identity_id,
-              vendor_id, owner_user_id, payload_digest, raw_size_bytes,
-              ciphertext_envelope, processing_status)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'awaiting_scan')"#,
+              vendor_id, owner_user_id, recipient_agent_id, recipient_key_id,
+              payload_digest, raw_size_bytes, ciphertext_envelope, processing_status)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'awaiting_scan')"#,
     )
     .bind(format!("emailq_{}", Ulid::new().to_string().to_lowercase()))
     .bind(PROVIDER)
@@ -315,6 +367,8 @@ async fn persist_quarantine(
     .bind(&route.identity_id)
     .bind(&route.vendor_id)
     .bind(&route.owner_user_id)
+    .bind(&route.agent_id)
+    .bind(&route.recipient_key_id)
     .bind(&envelope.body_digest)
     .bind(
         i32::try_from(envelope.raw_size)
@@ -357,17 +411,6 @@ fn decode_address(encoded: &str) -> Result<String, IngressError> {
         ));
     }
     Ok(normalized)
-}
-
-fn ingress_encryption_key() -> Result<[u8; 32], IngressError> {
-    let encoded = crate::secret_manager::read_process_secret_trimmed(
-        "OMNYID_VENDOR_MAIL_INGRESS_ENCRYPTION_KEY",
-    )
-    .ok_or_else(|| IngressError::new(StatusCode::SERVICE_UNAVAILABLE, "encryption_unavailable"))?;
-    hex::decode(encoded)
-        .ok()
-        .and_then(|bytes| bytes.try_into().ok())
-        .ok_or_else(|| IngressError::new(StatusCode::SERVICE_UNAVAILABLE, "encryption_unavailable"))
 }
 
 fn safe_key_id(value: &str) -> bool {

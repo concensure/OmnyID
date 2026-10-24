@@ -13,47 +13,56 @@ services:
 
   seaweedfs:
     image: chrislusf/seaweedfs
-    command:
-      - server
-      - -dir=/data
-      - -ip=seaweedfs
-      - -s3
-      - -s3.config=/etc/seaweedfs/s3-config.json
+    entrypoint: ["/bin/sh", "/usr/local/bin/seaweedfs-secure-entrypoint.sh"]
+    environment:
+      OMNYID_SEAWEEDFS_ACCESS_KEY_FILE: /run/secrets/seaweedfs_app_access_key
+      OMNYID_SEAWEEDFS_SECRET_KEY_FILE: /run/secrets/seaweedfs_app_secret_key
+      OMNYID_SEAWEEDFS_BUCKET: ${OMNYID_SEAWEEDFS_BUCKET:-omnyid-attachments}
     ports:
-      - "8333:8333"
-      - "9333:9333"
+      - "127.0.0.1:8333:8333"
     volumes:
       - seaweedfs-data:/data
-      - ./infra/seaweedfs/s3-config.json:/etc/seaweedfs/s3-config.json:ro
+      - ./.secrets/seaweedfs_app_access_key:/run/secrets/seaweedfs_app_access_key:ro
+      - ./.secrets/seaweedfs_app_secret_key:/run/secrets/seaweedfs_app_secret_key:ro
+      - ./.seaweedfs-admin-secrets/access_key:/run/secrets/seaweedfs_admin_access_key:ro
+      - ./.seaweedfs-admin-secrets/secret_key:/run/secrets/seaweedfs_admin_secret_key:ro
+      - ./scripts/seaweedfs-secure-entrypoint.sh:/usr/local/bin/seaweedfs-secure-entrypoint.sh:ro
+    networks:
+      - storage
     restart: unless-stopped
 
   seaweedfs-init:
-    image: amazon/aws-cli:2
+    image: curlimages/curl:8.18.0
     depends_on:
       - seaweedfs
     environment:
-      AWS_ACCESS_KEY_ID: ${OMNYID_SEAWEEDFS_ACCESS_KEY:-omnyid}
-      AWS_SECRET_ACCESS_KEY: ${OMNYID_SEAWEEDFS_SECRET_KEY:-omnyid-dev-secret}
-      AWS_DEFAULT_REGION: ${OMNYID_SEAWEEDFS_REGION:-us-east-1}
-      AWS_EC2_METADATA_DISABLED: "true"
+      OMNYID_SEAWEEDFS_BUCKET: ${OMNYID_SEAWEEDFS_BUCKET:-omnyid-attachments}
+    volumes:
+      - ./.seaweedfs-admin-secrets/access_key:/run/secrets/seaweedfs_admin_access_key:ro
+      - ./.seaweedfs-admin-secrets/secret_key:/run/secrets/seaweedfs_admin_secret_key:ro
     entrypoint:
       - /bin/sh
       - -ec
     command: >
-      until aws --endpoint-url http://seaweedfs:8333 s3api list-buckets >/dev/null 2>&1; do sleep 2; done;
-      aws --endpoint-url http://seaweedfs:8333 s3api head-bucket --bucket ${OMNYID_SEAWEEDFS_BUCKET:-omnyid-attachments} >/dev/null 2>&1
-      || aws --endpoint-url http://seaweedfs:8333 s3api create-bucket --bucket ${OMNYID_SEAWEEDFS_BUCKET:-omnyid-attachments}
+      access="$$(tr -d '\r\n' < /run/secrets/seaweedfs_admin_access_key)";
+      secret="$$(tr -d '\r\n' < /run/secrets/seaweedfs_admin_secret_key)";
+      until code="$$(curl -sS -o /dev/null -w '%{http_code}'
+      --aws-sigv4 'aws:amz:us-east-1:s3' --user "$${access}:$${secret}"
+      -X PUT "http://seaweedfs:8333/$${OMNYID_SEAWEEDFS_BUCKET}")"
+      && { [ "$${code}" = 200 ] || [ "$${code}" = 409 ]; }; do sleep 2; done;
+      unset access secret
+    networks:
+      - storage
     restart: "no"
 
   homeserver:
     build: .
-    depends_on: [postgres, seaweedfs]
+    depends_on: [postgres, seaweedfs-init]
     environment:
       DATABASE_URL: postgres://afp:afp@postgres:5432/afp
-      SEAWEEDFS_MASTER_URL: http://seaweedfs:9333
       OMNYID_SEAWEEDFS_S3_ENDPOINT: http://seaweedfs:8333
-      OMNYID_SEAWEEDFS_ACCESS_KEY: ${OMNYID_SEAWEEDFS_ACCESS_KEY:-omnyid}
-      OMNYID_SEAWEEDFS_SECRET_KEY: ${OMNYID_SEAWEEDFS_SECRET_KEY:-omnyid-dev-secret}
+      OMNYID_SEAWEEDFS_ACCESS_KEY_FILE: /run/secrets/seaweedfs_app_access_key
+      OMNYID_SEAWEEDFS_SECRET_KEY_FILE: /run/secrets/seaweedfs_app_secret_key
       OMNYID_SEAWEEDFS_BUCKET: ${OMNYID_SEAWEEDFS_BUCKET:-omnyid-attachments}
       OMNYID_SEAWEEDFS_PREFIX: ${OMNYID_SEAWEEDFS_PREFIX:-archives}
       OMNYID_SEAWEEDFS_REGION: ${OMNYID_SEAWEEDFS_REGION:-us-east-1}
@@ -107,6 +116,11 @@ services:
       OMNYID_VENDOR_MAIL_FROM_ADDRESS: hello@omnyid.com
       OMNYID_VENDOR_SENDER_MASK_ENABLED: "false"
     restart: unless-stopped
+    volumes:
+      - ./.secrets:/run/secrets:ro
+    networks:
+      - default
+      - storage
 
   caddy:
     image: caddy:2
@@ -127,3 +141,7 @@ volumes:
   caddy-data:
   caddy-config:
   seaweedfs-data:
+
+networks:
+  storage:
+    internal: true

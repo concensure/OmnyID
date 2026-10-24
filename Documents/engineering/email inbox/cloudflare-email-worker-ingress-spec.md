@@ -195,25 +195,30 @@ The quarantine table stores:
 - provider and deterministic event ID;
 - recipient identity ID, vendor ID and owner user ID;
 - raw digest and size;
-- XChaCha20-Poly1305 envelope JSON only;
+- recipient-X25519/XChaCha20-Poly1305 envelope JSON only;
 - `awaiting_scan`, `processing`, `accepted`, `quarantined`, `rejected`,
   `failed` or `expired` status;
 - content-free error code;
 - received, expiry, processed and deleted timestamps.
 
-Associated data binds provider, event ID, recipient identity and raw digest.
-Ciphertext cannot be transplanted to another receipt. The initial quarantine
-retention is 24 hours; final retention awaits privacy approval.
+Associated data binds provider, event ID, recipient identity, owner, verified
+AgentCard identity/key version and raw digest. The server stores only the
+recipient public key; the private key remains non-extractable on the vendor's
+device. Ciphertext cannot be transplanted to another receipt or opened with a
+different vendor key. The initial quarantine retention is 24 hours; final
+retention awaits privacy approval.
 
 ## 9. Processing into AFP
 
-The later processor must:
+The gateway/client processing split must:
 
-1. atomically claim one `awaiting_scan` row;
-2. decrypt in short-lived memory;
-3. use existing MIME limits and ClamAV;
-4. reject active content, bombs and unsafe attachments using existing policy;
-5. parse with `smtp_in`;
+1. run ClamAV synchronously on the exact raw bytes before persistence and fail
+   closed when the scanner is absent or unavailable;
+2. retain only ciphertext addressed to the current verified recipient key;
+3. decrypt only on an authorised recipient device;
+4. use existing MIME limits and reject active content, bombs and unsafe
+   attachments using existing policy;
+5. parse with `smtp_in` before encryption or in the authorised client;
 6. resolve a thread from signed routing and exact reply headers, never prose;
 7. create a tenant-private encrypted AFP message with source/digest lineage;
 8. store safe attachments through the existing owner-scoped file path;
@@ -256,7 +261,7 @@ Application settings:
 - `OMNYID_VENDOR_MAIL_INGRESS_MAX_BYTES=10485760`
 - `OMNYID_VENDOR_MAIL_WORKER_KEY_ID=primary-v1`
 - `OMNYID_VENDOR_MAIL_WORKER_SHARED_SECRET_FILE=...`
-- `OMNYID_VENDOR_MAIL_INGRESS_ENCRYPTION_KEY_FILE=...`
+- `CLAMD_HOST=clamav:3310`
 - `OMNYID_VENDOR_SENDER_MASK_ENABLED=false`
 
 Worker settings:
@@ -266,9 +271,10 @@ Worker settings:
 - `MAX_RAW_BYTES=10485760`;
 - `INGRESS_SHARED_SECRET` as a Wrangler secret.
 
-Rotation supports an active key plus one time-bounded previous key at the
-gateway. Adding multi-key support is required before the first live rotation;
-the first dark slice intentionally accepts one configured key ID.
+Worker HMAC rotation supports an active key plus one time-bounded previous key
+at the gateway. Recipient encryption follows the verified AgentCard key ID;
+old ciphertext stays bound to its recorded recipient key and requires the
+recipient's encrypted recovery material during rotation.
 
 The Worker Wrangler file deliberately omits `addresses`. Deploying Worker code
 therefore cannot create, replace or enable any routing rule. Catch-all mutation

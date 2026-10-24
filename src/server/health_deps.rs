@@ -28,30 +28,15 @@ enum LlmProbeAuth {
     None,
 }
 
-/// Probe SeaweedFS readiness via either the master API or the S3 gateway.
-///
-/// Env vars:
-///   SEAWEEDFS_MASTER_URL            â€” e.g. "http://seaweedfs:9333"
-///   OMNYID_SEAWEEDFS_S3_ENDPOINT    â€” e.g. "http://seaweedfs:8333"
-///   SEAWEEDFS_ENDPOINT / AWS_ENDPOINT_URL â€” legacy fallback for older environments
-///
-/// SeaweedFS master returns 200 JSON on `/cluster/status` when healthy.
-/// When only the S3 gateway endpoint is configured, probing the endpoint root is
-/// sufficient for a lightweight readiness check.
-pub async fn check_object_store_readiness(client: &reqwest::Client) -> String {
-    if let Ok(master) = std::env::var("SEAWEEDFS_MASTER_URL") {
-        let url = format!("{}/cluster/status", master.trim_end_matches('/'));
-        return probe_http(client, &url, "seaweedfs").await;
+/// Probe the configured bucket with the same file-backed, least-privilege S3
+/// identity used by the application. The unauthenticated master API is not a
+/// readiness boundary and is deliberately never contacted here.
+pub async fn check_object_store_readiness(_client: &reqwest::Client) -> String {
+    match crate::daemon_runtime::check_seaweedfs_access().await {
+        None => "not_configured".to_string(),
+        Some(Ok(())) => "ok".to_string(),
+        Some(Err(error)) => format!("error: {error}"),
     }
-
-    let endpoint = match std::env::var("OMNYID_SEAWEEDFS_S3_ENDPOINT")
-        .or_else(|_| std::env::var("SEAWEEDFS_ENDPOINT"))
-        .or_else(|_| std::env::var("AWS_ENDPOINT_URL"))
-    {
-        Ok(e) => e,
-        Err(_) => return "not_configured".to_string(),
-    };
-    probe_http(client, endpoint.trim_end_matches('/'), "seaweedfs_s3").await
 }
 
 /// Probe SMTP outbound connectivity via a TCP handshake.

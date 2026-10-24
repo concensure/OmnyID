@@ -599,4 +599,9 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Created-at index for batched seven-day curator audit retention",
         include_str!("../../postgres/migrations/0118_curator_audit_retention.sql"),
     ),
+    (
+        "0119_recipient_held_email_envelopes",
+        "Recipient AgentCard key binding for user-only email ciphertext decryption",
+        include_str!("../../postgres/migrations/0119_recipient_held_email_envelopes.sql"),
+    ),
 ];

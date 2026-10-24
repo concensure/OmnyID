@@ -16,7 +16,7 @@ Resend, or production email changes.
 | Provider callbacks | forged delivery/bounce events | provider signature verification, event-ID dedupe, bounded error codes. Provider owner. |
 | Browser to relay API | tenant enumeration and unauthorized reads | session/CSRF protection, server-side owner resolution, indistinguishable not-found/forbidden results. Application owner. |
 | Gateway plaintext memory | compromise or accidental retention | short-lived buffers, no raw payload queues/traces, best-effort zeroization, incident rotation. Security owner. |
-| Encrypted objects and export | key loss or unintended disclosure | per-object encryption, owner-authorized streams, client-side export decrypt, deletion/key-destruction workflow. Privacy owner. |
+| Encrypted objects and export | key loss or unintended disclosure | per-object encryption to the verified recipient AgentCard key, client-side decrypt, encrypted recovery, deletion/key-destruction workflow. Privacy owner. |
 
 ## Threats that must fail closed
 
@@ -52,6 +52,13 @@ Do not call ordinary Internet email end-to-end encrypted. The sending
 provider, receiving vendor mail system, Cloudflare routing/Worker, and isolated
 gateway are plaintext processing boundaries before content is encrypted for
 the planner ledger.
+
+The gateway must not retain a symmetric decryption key for accepted vendor
+mail. It scans exact raw bytes while they are already transient plaintext,
+then stores a recipient-X25519 envelope bound to the verified vendor AgentCard
+key. This protects retained ciphertext from a later server-key compromise; it
+does not prevent a malicious live gateway operator from observing mail during
+delivery and therefore is not described as zero-knowledge email.
 
 ## Residual risks and release blockers
 

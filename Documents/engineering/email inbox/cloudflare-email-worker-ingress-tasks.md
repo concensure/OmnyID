@@ -73,7 +73,10 @@ Exit evidence:
 - [x] Add migration 0117 using the next free migration number.
 - [x] Register it in the migration catalog.
 - [x] Store only XChaCha20-Poly1305 envelope JSON plus allowlisted metadata.
-- [x] Bind associated data to provider, event ID, recipient identity and digest.
+- [x] Bind associated data to provider, event ID, recipient identity, owner,
+  verified AgentCard key and digest.
+- [x] Encrypt to the verified recipient's X25519 public key; retain no server
+  decryption key and fail closed when the recipient key is missing or invalid.
 - [x] Resolve only active `omnyid_mask` identities on active verified listings
   still owned by the identity owner.
 - [x] Claim provider event and quarantine record atomically.
@@ -91,9 +94,11 @@ Exit evidence:
 
 ## Slice 4 — scan and AFP processing
 
-- [ ] Implement a bounded claimant for `awaiting_scan` rows.
-- [ ] Decrypt only in short-lived process memory.
-- [ ] Run the existing ClamAV boundary; scanner unavailable fails closed.
+- [x] Run the existing ClamAV boundary before persistence; scanner unavailable
+  fails closed.
+- [ ] Parse and validate MIME during the same transient-plaintext ingress
+  boundary, before recipient encryption, or finish it on the recipient device.
+- [ ] Never add a server decryption wrapper merely to support background work.
 - [ ] Parse with `src/gateway/smtp_in.rs`.
 - [ ] Reuse existing file validation/storage for safe attachments.
 - [ ] Resolve recipient/thread from signed routing and exact reply headers.

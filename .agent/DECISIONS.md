@@ -1634,3 +1634,17 @@ retains normal audit semantics.
 maintenance removes stale rows in independently committed indexed batches with a per-pass ceiling.
 Large historic compaction remains an explicit maintenance-window action rather than an application
 startup side effect.
+
+## 2026-10-25: Recipient ciphertext has one public-key recipient; storage has separate app/admin identities
+
+New vendor-email quarantine content is encrypted only to the current signed vendor AgentCard X25519
+key. The homeserver stores the public key ID and ciphertext, never a private key or a server recovery
+recipient. ClamAV scans exact inbound bytes before persistence and fails closed. This protects stored
+mail from later server-key disclosure, but not plaintext while ordinary email is transiting the
+provider or live gateway. Legacy AFP still needs an explicit device-key, recovery and migration design.
+
+SeaweedFS is an internal object-store dependency. It has no production host port, uses file-backed
+random credentials, gives the application bucket-scoped object actions, and keeps the storage-admin
+identity out of the homeserver. Readiness uses authenticated bucket access. Root and Docker
+administrators remain trusted infrastructure operators; this boundary excludes the public, ordinary
+host users and unrelated containers rather than claiming protection from hostile root.

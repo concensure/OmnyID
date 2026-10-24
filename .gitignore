@@ -42,6 +42,7 @@ target/
 secrets/
 .secrets/
 .secrets-staging/
+.seaweedfs-admin-secrets/
 *.pem
 *.key
 *.crt

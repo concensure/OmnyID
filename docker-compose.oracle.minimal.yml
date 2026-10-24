@@ -75,12 +75,20 @@ services:
     mem_limit: ${OMNYID_SEAWEEDFS_MEM_LIMIT:-1536m}
     cpus: ${OMNYID_SEAWEEDFS_CPUS:-1.0}
     pids_limit: ${OMNYID_SEAWEEDFS_PIDS_LIMIT:-256}
-    command: server /data --console-address ":9001"
+    entrypoint: ["/bin/sh", "/usr/local/bin/seaweedfs-secure-entrypoint.sh"]
     environment:
-      SEAWEEDFS_ROOT_USER: ${SEAWEEDFS_ROOT_USER:-${MINIO_ROOT_USER:-omnyid}}
-      SEAWEEDFS_ROOT_PASSWORD: ${SEAWEEDFS_ROOT_PASSWORD:-${MINIO_ROOT_PASSWORD:-omnyid-dev-secret}}
+      OMNYID_SEAWEEDFS_ACCESS_KEY_FILE: /run/secrets/seaweedfs_app_access_key
+      OMNYID_SEAWEEDFS_SECRET_KEY_FILE: /run/secrets/seaweedfs_app_secret_key
+      OMNYID_SEAWEEDFS_BUCKET: ${OMNYID_SEAWEEDFS_BUCKET:-omnyid-attachments}
     volumes:
       - seaweedfs-data:/data
+      - ./.secrets/seaweedfs_app_access_key:/run/secrets/seaweedfs_app_access_key:ro
+      - ./.secrets/seaweedfs_app_secret_key:/run/secrets/seaweedfs_app_secret_key:ro
+      - ./.seaweedfs-admin-secrets/access_key:/run/secrets/seaweedfs_admin_access_key:ro
+      - ./.seaweedfs-admin-secrets/secret_key:/run/secrets/seaweedfs_admin_secret_key:ro
+      - ./scripts/seaweedfs-secure-entrypoint.sh:/usr/local/bin/seaweedfs-secure-entrypoint.sh:ro
+    networks:
+      - storage
     restart: unless-stopped
 
   homeserver:
@@ -176,7 +184,7 @@ services:
       OMNYID_VENDOR_MAIL_WORKER_KEY_ID: ${OMNYID_VENDOR_MAIL_WORKER_KEY_ID:-primary-v1}
       OMNYID_VENDOR_MAIL_INGRESS_ENABLED: ${OMNYID_VENDOR_MAIL_INGRESS_ENABLED:-false}
       OMNYID_VENDOR_MAIL_INGRESS_MAX_BYTES: ${OMNYID_VENDOR_MAIL_INGRESS_MAX_BYTES:-10485760}
-      OMNYID_VENDOR_MAIL_INGRESS_ENCRYPTION_KEY_FILE: ${OMNYID_VENDOR_MAIL_INGRESS_ENCRYPTION_KEY_FILE:-}
+      CLAMD_HOST: ${CLAMD_HOST:-}
       OMNYID_VENDOR_SENDER_MASK_ENABLED: ${OMNYID_VENDOR_SENDER_MASK_ENABLED:-false}
       OMNYID_VENDOR_MAIL_RESEND_WEBHOOK_SECRET_FILE: ${OMNYID_VENDOR_MAIL_RESEND_WEBHOOK_SECRET_FILE:-}
       OMNYID_CEREBRAS_API_KEY_FILE: ${OMNYID_CEREBRAS_API_KEY_FILE:-}
@@ -244,9 +252,10 @@ services:
       OMNYID_WEDDING_EXTERNAL_SEND_ENABLED: ${OMNYID_WEDDING_EXTERNAL_SEND_ENABLED:-true}
       OMNYID_WEDDING_ADMIN_AI_AUDIT_RECEIPTS_ENABLED: ${OMNYID_WEDDING_ADMIN_AI_AUDIT_RECEIPTS_ENABLED:-false}
       OMNYID_WEDDING_ADMIN_AI_DAILY_REQUEST_LIMIT: ${OMNYID_WEDDING_ADMIN_AI_DAILY_REQUEST_LIMIT:-}
-      SEAWEEDFS_URL: http://seaweedfs:9000
-      SEAWEEDFS_USER: ${SEAWEEDFS_ROOT_USER:-${MINIO_ROOT_USER:-omnyid}}
-      SEAWEEDFS_PASS: ${SEAWEEDFS_ROOT_PASSWORD:-${MINIO_ROOT_PASSWORD:-omnyid-dev-secret}}
+      OMNYID_SEAWEEDFS_S3_ENDPOINT: http://seaweedfs:8333
+      OMNYID_SEAWEEDFS_ACCESS_KEY_FILE: /run/secrets/seaweedfs_app_access_key
+      OMNYID_SEAWEEDFS_SECRET_KEY_FILE: /run/secrets/seaweedfs_app_secret_key
+      OMNYID_SEAWEEDFS_BUCKET: ${OMNYID_SEAWEEDFS_BUCKET:-omnyid-attachments}
       OMNYID_ELECTRIC_URL: ${OMNYID_ELECTRIC_URL:-http://electric:5133}
       OMNYID_ENABLE_PRIVATE_RUNTIMES: "false"
       OMNYID_ENABLE_WEBTRANSPORT: "true"
@@ -260,6 +269,9 @@ services:
       - ./.secrets:/run/secrets:ro
       - ./scripts/runtime-env-entrypoint.sh:/usr/local/bin/runtime-env-entrypoint.sh:ro
       - /home/ubuntu/letsencrypt:/letsencrypt:ro
+    networks:
+      - default
+      - storage
     restart: unless-stopped
 
   caddy:
@@ -340,3 +352,7 @@ volumes:
     name: omnyid-staging-workspace-assets
   caddy-data:
   caddy-config:
+
+networks:
+  storage:
+    internal: true

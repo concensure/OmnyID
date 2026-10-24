@@ -3430,3 +3430,39 @@ tasks:
       - Oracle containment paused only the affected account's curator/watcher/synthesizer registrations; the final observation recorded zero new rows over two minutes, and they remain paused until a reviewed release contains this fix
       - pruned 9.72 GB of build cache and reviewed obsolete tags while preserving running/current rollback images; retained three verified newest backups, capped the journal near 100 MB, and reduced root use from 87 to 52 percent
       - deleted 1942708 audit rows older than a fixed seven-day cutoff in 195 batches and compacted only curator_run_audit from 6.526 GB to 2.522 GB; exact before/after evidence is recorded in Documents/verification/wed-256-oracle-storage-cleanup-2026-10-25.md
+  - id: WED-257
+    title: Enforce recipient-held message keys and harden SeaweedFS credentials
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-215
+    depends_on:
+      - WED-255
+      - WED-256
+    files:
+      - src/crypto.rs
+      - src/server/agent_routes.rs
+      - src/server/vendor_email_worker_ingress.rs
+      - postgres/migrations/**
+      - solid-ui/src/lib/**
+      - docker-compose*.yml
+      - scripts/**
+      - Documents/security/**
+      - Documents/verification/**
+      - .agent/**
+    acceptance:
+      - no authenticated user can retrieve a server-wide encryption key or unwrap another user's message content
+      - new private stored-message envelopes identify the intended account and wrap the content key only to active recipient-held X25519 device keys
+      - inbound email processing documents and enforces its unavoidable transient plaintext boundary before retaining only recipient-wrapped content
+      - missing, revoked, cross-account or malformed recipient keys fail closed without falling back to a shared server key
+      - production SeaweedFS has no public host port, no checked-in/default credential, a dedicated least-privilege application identity, file-backed root/application secrets and an isolated internal network
+      - secrets are not printed into logs, verification artifacts, Compose interpolation output or repository history
+      - curator skip markers and seven-day audit retention remain intact, with regression coverage for the originally observed short, store-false, ephemeral and noise loop
+      - focused cryptographic, authorization, Compose and curator tests pass before any rollout; mail and policy V2 flags remain disabled
+    progress:
+      - registered after confirming the legacy agent-key endpoint already fails closed but server-generated AFP and email-quarantine envelopes still rely on server-held symmetric keys
+      - Oracle inspection found SeaweedFS has no published public port and its secret directory is root-owned 0700, but Compose still injects root credentials through environment variables with unsafe development fallbacks and does not isolate storage on a dedicated internal network
+      - vendor-email quarantine now scans before persistence and encrypts directly to the signed verified vendor AgentCard X25519 key; recipient agent/key IDs are persisted and no server-held fallback recipient exists
+      - the browser decryptor now verifies the addressed key version and matches the Rust HKDF-SHA-256 derivation through a shared fixed contract vector
+      - SeaweedFS Compose definitions now use file-backed random app/admin identities, bucket-scoped application actions, an internal storage-only network, no production host port and authenticated bucket readiness; a disposable Docker authorization rehearsal passed
+      - Oracle read-only checks confirmed storage is not publicly published and host secret permissions are already restrictive; production was not restarted because the existing 2 GB volume needs a reviewed migration window
+      - focused crypto, provider, ingress, migration and database-backed tests pass; general legacy AFP account/device key registration, recovery, revocation and migration remain open, so WED-257 is not complete

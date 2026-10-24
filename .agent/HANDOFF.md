@@ -4756,3 +4756,32 @@ Next:
 - Review and promote the committed WED-256 slice from the advanced branch before resuming the three
   paused registrations. The storage operation intentionally did not deploy unrelated in-progress
   WED-255 Email Worker work, and no mail, catch-all, sender-mask, policy-V2 or release flag changed.
+
+## 2026-10-25 - WED-257 recipient encryption and SeaweedFS boundary (Codex, in progress)
+
+Changed:
+
+- Replaced the server-held vendor-email quarantine key with recipient-only X25519 envelopes derived
+  from the signed verified vendor AgentCard. Added recipient agent/key database binding and fail-closed
+  ClamAV scanning before persistence.
+- Aligned browser and Rust envelope derivation on a fixed HKDF-SHA-256 vector and reject a mismatched
+  browser key version before decryption.
+- Replaced SeaweedFS credential defaults/environment injection with file-backed app/admin identities,
+  bucket-scoped application actions, an internal storage network and authenticated readiness.
+- Documented the important boundary: this slice protects newly retained vendor email, not all legacy
+  AFP, and cannot hide plaintext from a malicious live email/gateway operator.
+
+Verification:
+
+- Pass: recipient crypto 2/2; browser derivation 2/2 plus typecheck; vendor provider 4/4; ingress units
+  3/3; migration catalog 1/1; database-backed ingress 1/1; four Compose renders; entrypoint syntax;
+  disposable SeaweedFS access rehearsal. Evidence is in
+  `Documents/verification/wed-257-recipient-storage-security-2026-10-25.md`.
+- Oracle inspection was read-only. Current storage has no public port and restrictive host file modes,
+  but the running container remains on the broad default network with environment credentials.
+
+Next:
+
+- Design and implement account/device key registration, multi-device recovery, revocation and legacy
+  AFP migration before claiming product-wide operator-resistant messaging. Rehearse the existing 2 GB
+  SeaweedFS volume migration and rollback before any production restart. Keep mail and policy V2 off.

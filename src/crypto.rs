@@ -147,6 +147,137 @@ pub fn decrypt_content(
     serde_json::from_slice(&plaintext).ok()
 }
 
+fn recipient_aead_key(
+    shared_secret: &[u8; 32],
+    ephemeral_public_key: &[u8; 32],
+    recipient_public_key: &[u8; 32],
+    recipient_key_id: &str,
+) -> Result<[u8; 32], String> {
+    if recipient_key_id.is_empty() || recipient_key_id.len() > 180 {
+        return Err("recipient key id is invalid".to_string());
+    }
+    let mut key_context = Vec::with_capacity(64 + recipient_key_id.len());
+    key_context.extend_from_slice(ephemeral_public_key);
+    key_context.extend_from_slice(recipient_public_key);
+    key_context.extend_from_slice(recipient_key_id.as_bytes());
+    crate::post_quantum::hkdf_sha256(
+        shared_secret,
+        b"omnyid-recipient-x25519-v1",
+        &key_context,
+        32,
+    )
+    .try_into()
+    .map_err(|_| "recipient key derivation failed".to_string())
+}
+
+/// Encrypt content directly to one recipient-held X25519 key.
+///
+/// The server creates an ephemeral key for this object and never receives the
+/// recipient private key.  This is intentionally distinct from the legacy
+/// server-wide shared-key envelope: possession of the homeserver environment
+/// is not sufficient to decrypt the resulting ciphertext later.
+pub fn encrypt_content_for_recipient(
+    content: &Value,
+    aad: &Value,
+    recipient_public_key_hex: &str,
+    recipient_key_id: &str,
+) -> Result<Value, String> {
+    use x25519_dalek::{PublicKey, StaticSecret};
+
+    let recipient_bytes: [u8; 32] = hex::decode(recipient_public_key_hex.trim())
+        .map_err(|_| "recipient encryption key must be 32-byte hex".to_string())?
+        .try_into()
+        .map_err(|_| "recipient encryption key must be 32-byte hex".to_string())?;
+    let recipient_public = PublicKey::from(recipient_bytes);
+    let ephemeral_secret = StaticSecret::random_from_rng(OsRng);
+    let ephemeral_public = PublicKey::from(&ephemeral_secret);
+    let shared = ephemeral_secret.diffie_hellman(&recipient_public);
+    if !shared.was_contributory() {
+        return Err("recipient encryption key is not contributory".to_string());
+    }
+
+    let aead_key = recipient_aead_key(
+        shared.as_bytes(),
+        ephemeral_public.as_bytes(),
+        recipient_public.as_bytes(),
+        recipient_key_id,
+    )?;
+    let cipher = XChaCha20Poly1305::new_from_slice(&aead_key)
+        .map_err(|_| "recipient encryption setup failed".to_string())?;
+    let mut nonce_bytes = [0u8; 24];
+    OsRng.fill_bytes(&mut nonce_bytes);
+    let plaintext = canonical_json_string(content);
+    let associated_data = canonical_json_string(aad);
+    let ciphertext = cipher
+        .encrypt(
+            XNonce::from_slice(&nonce_bytes),
+            Payload {
+                msg: plaintext.as_bytes(),
+                aad: associated_data.as_bytes(),
+            },
+        )
+        .map_err(|_| "recipient encryption failed".to_string())?;
+
+    Ok(serde_json::json!({
+        "scheme": "omnyid-envelope-v1",
+        "algorithm": "xchacha20poly1305-ietf",
+        "mode": "recipient-x25519-v1",
+        "recipient_key_id": recipient_key_id,
+        "ephemeral_public_key": STANDARD.encode(ephemeral_public.as_bytes()),
+        "nonce": STANDARD.encode(nonce_bytes),
+        "ciphertext": STANDARD.encode(ciphertext),
+        "aad": STANDARD.encode(associated_data.as_bytes()),
+    }))
+}
+
+#[cfg(test)]
+fn decrypt_content_for_recipient(
+    encryption: &Value,
+    recipient_private_key: &[u8; 32],
+) -> Option<Value> {
+    use x25519_dalek::{PublicKey, StaticSecret};
+
+    let ephemeral_public: [u8; 32] = STANDARD
+        .decode(encryption.get("ephemeral_public_key")?.as_str()?)
+        .ok()?
+        .try_into()
+        .ok()?;
+    let nonce: [u8; 24] = STANDARD
+        .decode(encryption.get("nonce")?.as_str()?)
+        .ok()?
+        .try_into()
+        .ok()?;
+    let ciphertext = STANDARD
+        .decode(encryption.get("ciphertext")?.as_str()?)
+        .ok()?;
+    let aad = STANDARD.decode(encryption.get("aad")?.as_str()?).ok()?;
+    let secret = StaticSecret::from(*recipient_private_key);
+    let recipient_public = PublicKey::from(&secret);
+    let ephemeral_public = PublicKey::from(ephemeral_public);
+    let shared = secret.diffie_hellman(&ephemeral_public);
+    if !shared.was_contributory() {
+        return None;
+    }
+    let aead_key = recipient_aead_key(
+        shared.as_bytes(),
+        ephemeral_public.as_bytes(),
+        recipient_public.as_bytes(),
+        encryption.get("recipient_key_id")?.as_str()?,
+    )
+    .ok()?;
+    let plaintext = XChaCha20Poly1305::new_from_slice(&aead_key)
+        .ok()?
+        .decrypt(
+            XNonce::from_slice(&nonce),
+            Payload {
+                msg: &ciphertext,
+                aad: &aad,
+            },
+        )
+        .ok()?;
+    serde_json::from_slice(&plaintext).ok()
+}
+
 pub fn is_supported_encryption_envelope(encryption: &Value) -> bool {
     encryption
         .get("scheme")
@@ -313,10 +444,11 @@ fn parse_signature_parts(signature: &str) -> Option<(&str, &str)> {
 #[cfg(test)]
 mod tests {
     use super::{
-        STANDARD, SigningKey, canonical_json_string, decrypt_content, encrypt_content,
+        STANDARD, SigningKey, canonical_json_string, decrypt_content,
+        decrypt_content_for_recipient, encrypt_content, encrypt_content_for_recipient,
         has_verifiable_signature, is_supported_encryption_envelope, legacy_signable_payload,
-        sign_message, signable_payload, signature_matches_public_key, signature_public_key_hex,
-        verify_signature,
+        recipient_aead_key, sign_message, signable_payload, signature_matches_public_key,
+        signature_public_key_hex, verify_signature,
     };
     use crate::message::AFPMessage;
     use base64::Engine as _;
@@ -460,6 +592,47 @@ mod tests {
         let decrypted = decrypt_content(&envelope, &aad, &key).expect("decryption should succeed");
 
         assert_eq!(decrypted, content);
+    }
+
+    #[test]
+    fn recipient_envelope_only_opens_with_intended_private_key() {
+        use x25519_dalek::{PublicKey, StaticSecret};
+
+        let recipient_secret = StaticSecret::from([7_u8; 32]);
+        let recipient_public = PublicKey::from(&recipient_secret);
+        let content = serde_json::json!({"private": "for one account"});
+        let aad = serde_json::json!({"owner_user_id": "user_a", "message_id": "m1"});
+        let envelope = encrypt_content_for_recipient(
+            &content,
+            &aad,
+            &hex::encode(recipient_public.as_bytes()),
+            "key_a",
+        )
+        .expect("recipient envelope");
+
+        assert_eq!(
+            decrypt_content_for_recipient(&envelope, &recipient_secret.to_bytes()),
+            Some(content)
+        );
+        assert!(decrypt_content_for_recipient(&envelope, &[9_u8; 32]).is_none());
+        assert_eq!(
+            envelope.get("mode").and_then(serde_json::Value::as_str),
+            Some("recipient-x25519-v1")
+        );
+    }
+
+    #[test]
+    fn recipient_key_derivation_matches_browser_contract_vector() {
+        let shared = [1_u8; 32];
+        let ephemeral = [2_u8; 32];
+        let recipient = [3_u8; 32];
+        assert_eq!(
+            hex::encode(
+                recipient_aead_key(&shared, &ephemeral, &recipient, "vendor-test-key")
+                    .expect("derived key")
+            ),
+            "85b2b7b403145c1ed0eeecb51aa228472855d18d1cad9902ab6e99da78941eb0"
+        );
     }
 
     #[test]

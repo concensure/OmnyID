@@ -9,12 +9,18 @@ use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use chrono::Utc;
 use hmac::{Hmac, Mac};
 use http_body_util::BodyExt;
+use omnyid_homeserver::agentcard::{AgentCard, sign_agent_card};
 use omnyid_homeserver::db::{Db, UserRecord};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use sqlx::Row;
+use tokio::{
+    io::{AsyncReadExt, AsyncWriteExt},
+    net::TcpListener,
+};
 use tower::ServiceExt;
 use ulid::Ulid;
+use x25519_dalek::{PublicKey, StaticSecret};
 
 const SECRET: &str = "0123456789abcdef0123456789abcdef";
 
@@ -31,7 +37,7 @@ fn test_db_url() -> Option<String> {
         })
 }
 
-async fn seed_route(db: &Db) -> (String, String) {
+async fn seed_route(db: &Db) -> (String, String, StaticSecret, String) {
     let suffix = Ulid::new().to_string().to_lowercase();
     let user = UserRecord {
         id: Ulid::new().to_string(),
@@ -71,7 +77,80 @@ async fn seed_route(db: &Db) -> (String, String) {
     .execute(&db.pool)
     .await
     .expect("sender identity");
-    (vendor_id, format!("{local_part}@omnyid.com"))
+    let agent_id = format!("agent:vendor-{suffix}@example.test");
+    let encryption_secret = StaticSecret::from([7_u8; 32]);
+    let encryption_public = PublicKey::from(&encryption_secret);
+    let signing_seed = hex::encode([3_u8; 32]);
+    let signing_public = omnyid_homeserver::agentcard::derive_public_key_hex(&signing_seed)
+        .expect("signing public key");
+    let mut card = AgentCard::new(
+        agent_id.clone(),
+        format!("test-{suffix}"),
+        vec![],
+        signing_public,
+        "https://example.test".to_string(),
+    );
+    card.encryption_public_key_hex = Some(hex::encode(encryption_public.as_bytes()));
+    card.signature = sign_agent_card(&card, &signing_seed).expect("signed card");
+    sqlx::query(
+        r#"INSERT INTO managed_agents (id, owner_user_id, agent_id, label, email, kind)
+           VALUES ($1,$2,$3,'Worker Test Vendor',$4,'vendor')"#,
+    )
+    .bind(format!("managed-{suffix}"))
+    .bind(&user.id)
+    .bind(&agent_id)
+    .bind(&user.email)
+    .execute(&db.pool)
+    .await
+    .expect("managed vendor agent");
+    sqlx::query(
+        r#"INSERT INTO wedding_vendor_agent_links
+            (vendor_id, agent_id, agent_card, card_verified_at)
+           VALUES ($1,$2,$3,NOW())"#,
+    )
+    .bind(&vendor_id)
+    .bind(&agent_id)
+    .bind(serde_json::to_value(&card).expect("card json"))
+    .execute(&db.pool)
+    .await
+    .expect("vendor agent link");
+    (
+        vendor_id,
+        format!("{local_part}@omnyid.com"),
+        encryption_secret,
+        card.key_id,
+    )
+}
+
+async fn start_clean_clamd(expected_connections: usize) -> String {
+    let listener = TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("clamd listener");
+    let address = listener.local_addr().expect("clamd address");
+    tokio::spawn(async move {
+        for _ in 0..expected_connections {
+            let (mut stream, _) = listener.accept().await.expect("clamd connection");
+            let mut command = [0_u8; 10];
+            stream
+                .read_exact(&mut command)
+                .await
+                .expect("clamd command");
+            assert_eq!(&command, b"nINSTREAM\n");
+            loop {
+                let size = stream.read_u32().await.expect("clamd chunk size");
+                if size == 0 {
+                    break;
+                }
+                let mut chunk = vec![0_u8; size as usize];
+                stream.read_exact(&mut chunk).await.expect("clamd chunk");
+            }
+            stream
+                .write_all(b"stream: OK\n")
+                .await
+                .expect("clamd response");
+        }
+    });
+    address.to_string()
 }
 
 fn signed_headers(body: &[u8], to: &str, event_id: &str) -> HeaderMap {
@@ -141,16 +220,17 @@ async fn post(app: &Router, body: &[u8], headers: HeaderMap) -> (StatusCode, Val
 #[tokio::test]
 async fn valid_delivery_is_encrypted_and_exact_retry_is_idempotent() {
     let Some(db_url) = test_db_url() else { return };
+    let clamd = start_clean_clamd(3).await;
     unsafe {
         std::env::set_var("OMNYID_VENDOR_MAIL_INGRESS_ENABLED", "true");
         std::env::set_var("OMNYID_VENDOR_MAIL_ENABLED", "true");
         std::env::set_var("OMNYID_VENDOR_SENDER_MASK_ENABLED", "true");
         std::env::set_var("OMNYID_VENDOR_MAIL_WORKER_KEY_ID", "primary-v1");
         std::env::set_var("OMNYID_VENDOR_MAIL_WORKER_SHARED_SECRET", SECRET);
-        std::env::set_var("OMNYID_VENDOR_MAIL_INGRESS_ENCRYPTION_KEY", "11".repeat(32));
+        std::env::set_var("CLAMD_HOST", &clamd);
     }
     let db = Db::new(&db_url).await.expect("database");
-    let (_vendor_id, recipient) = seed_route(&db).await;
+    let (_vendor_id, recipient, _recipient_secret, recipient_key_id) = seed_route(&db).await;
     let app = omnyid_homeserver::server::build_test_router(&db_url).await;
     let body = b"Subject: Private test\r\nMessage-ID: <worker@example.test>\r\n\r\nSecret body";
     let event_id = hex::encode(Sha256::digest(format!("{}-{}", recipient, Ulid::new())));
@@ -163,7 +243,7 @@ async fn valid_delivery_is_encrypted_and_exact_retry_is_idempotent() {
     assert_eq!(duplicate["status"], "duplicate");
 
     let row = sqlx::query(
-        "SELECT ciphertext_envelope, processing_status FROM wedding_vendor_email_ingress_quarantine WHERE provider_event_id = $1",
+        "SELECT ciphertext_envelope, processing_status, recipient_key_id FROM wedding_vendor_email_ingress_quarantine WHERE provider_event_id = $1",
     )
     .bind(&event_id)
     .fetch_one(&db.pool)
@@ -171,6 +251,9 @@ async fn valid_delivery_is_encrypted_and_exact_retry_is_idempotent() {
     .expect("quarantine row");
     let ciphertext: Value = row.get("ciphertext_envelope");
     assert_eq!(ciphertext["scheme"], "omnyid-envelope-v1");
+    assert_eq!(ciphertext["mode"], "recipient-x25519-v1");
+    assert_eq!(ciphertext["recipient_key_id"], recipient_key_id);
+    assert_eq!(row.get::<String, _>("recipient_key_id"), recipient_key_id);
     assert!(!ciphertext.to_string().contains("Secret body"));
     assert_eq!(row.get::<String, _>("processing_status"), "awaiting_scan");
     let count: i64 = sqlx::query_scalar(
@@ -222,6 +305,6 @@ async fn valid_delivery_is_encrypted_and_exact_retry_is_idempotent() {
         std::env::remove_var("OMNYID_VENDOR_SENDER_MASK_ENABLED");
         std::env::remove_var("OMNYID_VENDOR_MAIL_WORKER_KEY_ID");
         std::env::remove_var("OMNYID_VENDOR_MAIL_WORKER_SHARED_SECRET");
-        std::env::remove_var("OMNYID_VENDOR_MAIL_INGRESS_ENCRYPTION_KEY");
+        std::env::remove_var("CLAMD_HOST");
     }
 }

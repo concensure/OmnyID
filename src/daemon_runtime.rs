@@ -903,26 +903,17 @@ pub async fn download_object_payload(
 }
 
 pub fn seaweedfs_client() -> Option<ObjectStoreClient> {
-    // Prefer OMNYID_SEAWEEDFS_* vars (SeaweedFS S3-compatible API).
-    // Fall back to OMNYID_SEAWEEDFS_* for compatibility with older environments.
     let endpoint = std::env::var("OMNYID_SEAWEEDFS_S3_ENDPOINT")
         .or_else(|_| std::env::var("OMNYID_SEAWEEDFS_ENDPOINT"))
         .ok()?;
-    let access_key = std::env::var("OMNYID_SEAWEEDFS_ACCESS_KEY")
-        .or_else(|_| std::env::var("OMNYID_SEAWEEDFS_ACCESS_KEY"))
-        .ok()?;
-    let secret_key = std::env::var("OMNYID_SEAWEEDFS_SECRET_KEY")
-        .or_else(|_| std::env::var("OMNYID_SEAWEEDFS_SECRET_KEY"))
-        .ok()?;
-    let bucket = std::env::var("OMNYID_SEAWEEDFS_BUCKET")
-        .or_else(|_| std::env::var("OMNYID_SEAWEEDFS_BUCKET"))
-        .ok()?;
-    let prefix = std::env::var("OMNYID_SEAWEEDFS_PREFIX")
-        .or_else(|_| std::env::var("OMNYID_SEAWEEDFS_PREFIX"))
-        .unwrap_or_default();
-    let region = std::env::var("OMNYID_SEAWEEDFS_REGION")
-        .or_else(|_| std::env::var("OMNYID_SEAWEEDFS_REGION"))
-        .unwrap_or_else(|_| "us-east-1".to_string());
+    let access_key =
+        crate::secret_manager::read_process_secret_trimmed("OMNYID_SEAWEEDFS_ACCESS_KEY")?;
+    let secret_key =
+        crate::secret_manager::read_process_secret_trimmed("OMNYID_SEAWEEDFS_SECRET_KEY")?;
+    let bucket = std::env::var("OMNYID_SEAWEEDFS_BUCKET").ok()?;
+    let prefix = std::env::var("OMNYID_SEAWEEDFS_PREFIX").unwrap_or_default();
+    let region =
+        std::env::var("OMNYID_SEAWEEDFS_REGION").unwrap_or_else(|_| "us-east-1".to_string());
     let config = S3Config::builder()
         .region(Region::new(region))
         .credentials_provider(Credentials::new(
@@ -936,6 +927,20 @@ pub fn seaweedfs_client() -> Option<ObjectStoreClient> {
         prefix,
         client: S3Client::from_conf(config),
     })
+}
+
+pub async fn check_seaweedfs_access() -> Option<Result<(), String>> {
+    let client = seaweedfs_client()?;
+    Some(
+        client
+            .client
+            .head_bucket()
+            .bucket(&client.bucket)
+            .send()
+            .await
+            .map(|_| ())
+            .map_err(|_| "authenticated object-store probe failed".to_string()),
+    )
 }
 
 fn archive_root_dir() -> PathBuf {
