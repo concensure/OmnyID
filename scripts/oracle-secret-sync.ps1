@@ -17,6 +17,7 @@ $script:OracleRemoteSecretFileNames = @{
     "OMNYID_VENDOR_MAIL_CLOUDFLARE_API_TOKEN_FILE" = "omnyid_vendor_mail_cloudflare_api_token"
     "OMNYID_VENDOR_MAIL_RESEND_API_KEY_FILE" = "omnyid_vendor_mail_resend_api_key"
     "OMNYID_VENDOR_MAIL_WORKER_SHARED_SECRET_FILE" = "omnyid_vendor_mail_worker_shared_secret"
+    "OMNYID_VENDOR_MAIL_INGRESS_ENCRYPTION_KEY_FILE" = "omnyid_vendor_mail_ingress_encryption_key"
     "OMNYID_VENDOR_MAIL_RESEND_WEBHOOK_SECRET_FILE" = "omnyid_vendor_mail_resend_webhook_secret"
     "OMNYID_CEREBRAS_API_KEY_FILE"       = "omnyid_cerebras_api_key"
     "OMNYID_MISTRAL_API_KEY_FILE"        = "omnyid_mistral_api_key"

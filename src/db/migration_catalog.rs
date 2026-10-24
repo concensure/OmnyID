@@ -589,4 +589,9 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Stable verified-vendor sender masks and response identity bindings",
         include_str!("../../postgres/migrations/0116_wedding_vendor_sender_identities.sql"),
     ),
+    (
+        "0117_vendor_email_worker_ingress",
+        "Authenticated replay-safe encrypted Cloudflare Email Worker quarantine",
+        include_str!("../../postgres/migrations/0117_vendor_email_worker_ingress.sql"),
+    ),
 ];

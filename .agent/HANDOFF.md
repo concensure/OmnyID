@@ -4679,3 +4679,37 @@ Next:
   verification, abuse/rate controls, DNS/security review and the remaining WED-225 human/provider gates.
 - Any WED-225 human review must freeze and host the new exact commit; the older 4a4712f evidence remains a
   non-gate preflight only.
+
+## 2026-10-25 - WED-255 Email Worker ingress foundation (Codex, in progress)
+
+Changed:
+
+- Wrote the Email Worker/ingress specification and task ledger under
+  `Documents/engineering/email inbox`, based on frozen candidate `0dc247f`.
+- Added a dependency-light Cloudflare Email Worker with exact-byte forwarding, deterministic event ID,
+  timestamp/nonce/digest-bound HMAC, fixed HTTPS target, bounded timeout and immutable 10 MiB ceiling.
+  `wrangler.jsonc` intentionally has no `addresses`, so code deployment cannot alter routing.
+- Added migration 0117 and authenticated gateway ingress. It resolves only active selected
+  `omnyid_mask` identities still attached to active verified owners, claims provider events atomically,
+  encrypts raw RFC 822 with a dedicated file-backed key and acknowledges only after quarantine commit.
+- Added file-backed secret packaging and three independent dark gates. No Cloudflare, Oracle, DNS,
+  catch-all, provider, mail, sender-mask, policy-V2 or production state was changed.
+
+Verification:
+
+- Worker 7/7; ingress units 3/3; provider readiness 4/4; migration catalog 1/1; SMTP inbound 5/5 and
+  outbound 7/7; clean throwaway PostgreSQL ingress 1/1 including full migration application,
+  encrypted storage, exact replay, conflict, unknown/connected identity and flags-off behavior.
+- Cargo check, Solid typecheck, both line budgets, Wedding site/CSP smoke, all 1,964 Wedding tests and
+  production UI build pass. Both Oracle compose files validate; minimal compose required its normal
+  placeholder staging password during config-only validation. The inherited unused `user_id` warning
+  and Vite chunk advisory remain.
+
+Next:
+
+- Implement the scanner/processor that claims quarantine, decrypts in short-lived memory, reuses
+  ClamAV and `smtp_in`, stores safe attachments through the existing path and appends one encrypted,
+  tenant-bound AFP message transactionally.
+- Then add the distinct `mail.omnyid.com` couple-thread resolver, bounce/complaint handling, expiry,
+  key rotation and operations packet. Do not enable routing or any three ingress flags before the
+  independent security/privacy, provider, hosted-shadow, usability, permission and cohort gates.

@@ -3368,3 +3368,34 @@ tasks:
       - installed the token on Oracle as a root-owned 0600 file and updated `.env.oracle` to hello@omnyid.com plus file-backed Cloudflare settings; vendor mail, sender masks and provider remain disabled, and no service was restarted or redeployed
       - focused Rust contracts, SMTP tests, TypeScript SDK tests, 1964 wedding tests, site/CSP smoke, typecheck, line budgets, two responsive Axe browser tests, database-backed identity/response suites and the production UI build pass
       - full `cargo test --lib` reached 2500 passing tests and three inherited source-text assertion failures in unchanged master-orchestrator, PDF conversion and alias-route test files; the changed Rust unit and integration suites all pass
+  - id: WED-255
+    title: Build the authenticated Cloudflare Email Worker ingress
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-215
+    depends_on:
+      - WED-253
+    files:
+      - cloudflare/vendor-email-ingress-worker/**
+      - postgres/migrations/**
+      - src/db/migration_catalog.rs
+      - src/server/vendor_email_worker_ingress.rs
+      - src/server/mod.rs
+      - .env.example
+      - docker-compose.oracle*.yml
+      - scripts/oracle-secret-sync.ps1
+      - Documents/engineering/email inbox/**
+      - .agent/**
+    acceptance:
+      - a versioned Email Worker forwards bounded RFC 822 bytes only to the reviewed HTTPS ingress using a timestamped HMAC envelope with deterministic event identity
+      - the gateway rejects disabled, stale, malformed, altered, oversized, replay-conflicting and unknown-recipient deliveries without logging message content
+      - an accepted delivery is durably encrypted before acknowledgement and maps only to a current verified vendor mask; AFP conversion remains a later explicit processing stage
+      - Worker deployment configuration contains no routing addresses, so a code deploy cannot enable or replace the disabled apex catch-all
+      - couple relay and vendor sender namespaces remain separate; explicit operational aliases retain priority and no provider, mail, mask, policy-V2 or catch-all flag is enabled
+      - focused Worker, Rust, migration and configuration tests pass with every new file below 1000 lines
+    progress:
+      - registered from frozen review candidate 0dc247fab163f0abc0a151a6a1352ec29841bebb after confirming the only worktree artifact is the pre-existing untracked Oracle proof directory
+      - reconciling the Worker with the existing SMTP parser, encrypted AFP boundary, migration 0108 relay receipts and migration 0116 verified vendor masks before implementation
+      - added a routing-neutral Email Worker with deterministic event IDs, timestamped HMAC envelopes, an immutable 10 MiB ceiling, fixed HTTPS ingress, generic permanent rejection and transient retry behavior; its Wrangler config has no addresses and cannot manage routing rules
+      - added migration 0117 and a three-flag-gated ingress that verifies exact raw bytes, resolves only current verified apex masks, atomically claims provider events and stores XChaCha20-Poly1305 quarantine before returning 202; no unscanned email becomes AFP
+      - seven Worker tests, three ingress units, four provider-readiness units, migration catalog, SMTP 5/5 and 7/7, disposable-Postgres encrypted/replay/conflict/identity tests, cargo check, typecheck, line budgets, site/CSP smoke, all 1964 wedding tests and production UI build pass; scan-to-AFP processing and every hosted/human/routing gate remain open

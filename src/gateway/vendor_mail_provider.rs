@@ -61,6 +61,7 @@ pub struct VendorMailConfig {
     has_cloudflare_account_id: bool,
     has_resend_api_key: bool,
     has_worker_shared_secret: bool,
+    has_ingress_encryption_key: bool,
     has_resend_webhook_secret: bool,
 }
 
@@ -108,6 +109,11 @@ impl VendorMailConfig {
                 "OMNYID_VENDOR_MAIL_WORKER_SHARED_SECRET",
             )
             .is_some(),
+            has_ingress_encryption_key: read_process_secret_trimmed(
+                "OMNYID_VENDOR_MAIL_INGRESS_ENCRYPTION_KEY",
+            )
+            .and_then(|value| hex::decode(value).ok())
+            .is_some_and(|value| value.len() == 32),
             has_resend_webhook_secret: read_process_secret_trimmed(
                 "OMNYID_VENDOR_MAIL_RESEND_WEBHOOK_SECRET",
             )
@@ -134,7 +140,8 @@ impl VendorMailConfig {
             VendorMailProvider::CloudflareEmailSending
                 if !self.has_cloudflare_token
                     || !self.has_cloudflare_account_id
-                    || !self.has_worker_shared_secret =>
+                    || !self.has_worker_shared_secret
+                    || !self.has_ingress_encryption_key =>
             {
                 VendorMailReadiness {
                     enabled: true,
@@ -191,6 +198,7 @@ mod tests {
             "OMNYID_VENDOR_MAIL_CLOUDFLARE_ACCOUNT_ID",
             "OMNYID_VENDOR_MAIL_RESEND_API_KEY",
             "OMNYID_VENDOR_MAIL_WORKER_SHARED_SECRET",
+            "OMNYID_VENDOR_MAIL_INGRESS_ENCRYPTION_KEY",
             "OMNYID_VENDOR_MAIL_RESEND_WEBHOOK_SECRET",
         ] {
             unsafe { std::env::remove_var(key) };
@@ -227,12 +235,15 @@ mod tests {
         assert_eq!(config.readiness().reason, "cloudflare_credentials_missing");
         unsafe { std::env::set_var("OMNYID_VENDOR_MAIL_CLOUDFLARE_API_TOKEN", "send-only-token") };
         let send_only = VendorMailConfig::from_env().expect("send-only config");
-        assert_eq!(send_only.readiness().reason, "cloudflare_credentials_missing");
+        assert_eq!(
+            send_only.readiness().reason,
+            "cloudflare_credentials_missing"
+        );
         clear_env();
     }
 
     #[test]
-    fn cloudflare_is_ready_only_with_account_token_and_ingress_secret() {
+    fn cloudflare_is_ready_only_with_account_token_ingress_secret_and_encryption_key() {
         let _guard = env_lock().lock().expect("env lock");
         clear_env();
         unsafe {
@@ -244,6 +255,7 @@ mod tests {
                 "0123456789abcdef0123456789abcdef",
             );
             std::env::set_var("OMNYID_VENDOR_MAIL_WORKER_SHARED_SECRET", "worker-secret");
+            std::env::set_var("OMNYID_VENDOR_MAIL_INGRESS_ENCRYPTION_KEY", "11".repeat(32));
             std::env::set_var("OMNYID_VENDOR_MAIL_FROM_ADDRESS", "hello@omnyid.com");
         }
         let config = VendorMailConfig::from_env().expect("complete config");

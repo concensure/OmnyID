@@ -1603,3 +1603,18 @@ Vendor apex identities and couple relay identities are separate namespaces. Coup
 `mail.omnyid.com`; existing apex operational aliases keep priority. External delivery for vendor masks
 requires a separately reviewed catch-all Worker and ingress secret. Provider, mask, policy-V2 and mail
 flags remain disabled until abuse, privacy, accessibility, provider-smoke and human rollout gates pass.
+
+## 2026-10-25: Email Worker acceptance means encrypted quarantine, not AFP authority
+
+The dedicated Email Worker sends exact bounded RFC 822 bytes to one fixed HTTPS endpoint under a
+versioned timestamped HMAC contract. Its source configuration deliberately has no Email Routing
+`addresses`; deploying Worker code cannot create, replace or enable the apex catch-all. Existing
+explicit operational aliases keep priority, vendor apex masks and couple `mail.omnyid.com` masks stay
+separate, and the first ingress slice resolves only a current verified selected vendor apex mask.
+
+HTTP 202 is permitted only after a deterministic provider event and XChaCha20-Poly1305 quarantine
+envelope commit atomically. Quarantine is not an AFP message, quotation fact, booking, contract,
+payment or send authority. Existing ClamAV, MIME, file and AFP owners must process it in the next
+slice before any user projection. Ingress remains indistinguishably unavailable unless vendor mail,
+vendor masks and ingress are all enabled; all three remain false pending the independent WED-225,
+security/privacy, hosted-shadow, provider, routing and cohort gates.
