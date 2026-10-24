@@ -39,6 +39,8 @@ fn metadata() -> VendorResponseRoutingMetadata {
         nonce: "nonce-1".to_string(),
         agent_card_key_id: "vendor-key-2".to_string(),
         expires_at: "2026-10-19T03:00:00Z".to_string(),
+        sender_identity_id: None,
+        sender_identity_kind: None,
     }
 }
 
