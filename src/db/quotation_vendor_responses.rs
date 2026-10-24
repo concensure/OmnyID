@@ -31,6 +31,8 @@ pub struct VendorTransportWrite {
     pub agent_card_key_id: String,
     pub request_id: String,
     pub request_digest: String,
+    pub sender_identity_id: Option<String>,
+    pub sender_identity_kind: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -291,8 +293,8 @@ impl Db {
                 (message_id, owner_user_id, grant_message_id, grant_id, vendor_id,
                  quotation_id, quotation_version_id, projection_fingerprint,
                  response_id, response_fingerprint, transport_nonce, agent_card_key_id,
-                 request_id, request_digest, direction)
-               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)"#,
+                 request_id, request_digest, direction, sender_identity_id, sender_identity_kind)
+               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)"#,
         )
         .bind(&write.message_id)
         .bind(&write.owner_user_id)
@@ -309,6 +311,8 @@ impl Db {
         .bind(&write.request_id)
         .bind(&write.request_digest)
         .bind(&write.direction)
+        .bind(&write.sender_identity_id)
+        .bind(&write.sender_identity_kind)
         .execute(&mut *transaction)
         .await?;
         Self::insert_vendor_transport_receipt(&mut transaction, write, receipt).await?;

@@ -6,6 +6,12 @@
 
 import { For, Show, createResource, createSignal } from "solid-js";
 
+import { VendorSenderIdentityPicker } from "@/components/vendor/VendorSenderIdentityPicker";
+import type {
+  SelectedVendorSenderIdentity,
+  VendorSenderIdentityState,
+  VendorSenderKind,
+} from "@/lib/vendorSenderIdentityState";
 import {
   loadVendorTransactionInbox,
   submitVendorTransactionResponse,
@@ -21,6 +27,8 @@ interface Props {
   loadTransactions?: () => Promise<VendorTransactionInboxItem[]>;
   unlockTransaction?: (item: VendorTransactionInboxItem) => Promise<VendorContextProjectionView>;
   submitResponse?: (input: SubmitInput) => Promise<{ status: "accepted" | "rejected"; receipt_id: string }>;
+  loadSenderIdentity?: (vendorId: string) => Promise<VendorSenderIdentityState>;
+  selectSenderIdentity?: (vendorId: string, kind: VendorSenderKind) => Promise<VendorSenderIdentityState>;
 }
 
 export function VendorQuotationResponsePanel(props: Props = {}) {
@@ -35,6 +43,7 @@ export function VendorQuotationResponsePanel(props: Props = {}) {
   const [busy, setBusy] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
   const [receipt, setReceipt] = createSignal<string | null>(null);
+  const [senderIdentity, setSenderIdentity] = createSignal<SelectedVendorSenderIdentity | null>(null);
 
   const unlock = async (item: VendorTransactionInboxItem) => {
     setBusy(true);
@@ -45,6 +54,7 @@ export function VendorQuotationResponsePanel(props: Props = {}) {
       setSelected(item);
       setProjection(view);
       setAnswers(Object.fromEntries(view.questions.map(({ id }) => [id, ""])));
+      setSenderIdentity(null);
       vendorResponseA2ui(view); // Keep the same field projection consumable by agent-native surfaces.
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not unlock this transaction.");
@@ -56,7 +66,11 @@ export function VendorQuotationResponsePanel(props: Props = {}) {
   const submit = async () => {
     const item = selected();
     const view = projection();
-    if (!item || !view) return;
+    const sender = senderIdentity();
+    if (!item || !view || !sender) {
+      setError("Choose how this response should appear before sending.");
+      return;
+    }
     setBusy(true);
     setError(null);
     setReceipt(null);
@@ -66,6 +80,7 @@ export function VendorQuotationResponsePanel(props: Props = {}) {
         projection: view,
         answers: answers(),
         attestedBy: attestedBy(),
+        senderIdentity: sender,
       });
       if (result.status !== "accepted") {
         throw new Error("The response was not accepted. Refresh the transaction before retrying.");
@@ -73,6 +88,7 @@ export function VendorQuotationResponsePanel(props: Props = {}) {
       setReceipt(result.receipt_id);
       setSelected(null);
       setProjection(null);
+      setSenderIdentity(null);
       await refetch();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not send this response.");
@@ -112,6 +128,12 @@ export function VendorQuotationResponsePanel(props: Props = {}) {
         <form class="mt-5 rounded-xl border border-wedding-accent/30 bg-wedding-surface p-4" onSubmit={(event) => { event.preventDefault(); void submit(); }}>
           <h3 class="font-semibold">Respond for the couple's review</h3>
           <p class="mt-1 text-sm text-wedding-muted">Sending does not accept a booking, contract, or payment.</p>
+          <VendorSenderIdentityPicker
+            vendorId={view().vendorId}
+            loadIdentity={props.loadSenderIdentity}
+            selectIdentity={props.selectSenderIdentity}
+            onIdentity={setSenderIdentity}
+          />
           <Show when={view().approvedFields.length > 0}>
             <dl class="mt-4 grid gap-2 rounded-lg bg-white p-3 text-sm">
               <For each={view().approvedFields}>{(field) => <div><dt class="font-medium">{field.key.replaceAll("_", " ")}</dt><dd class="text-wedding-muted">{typeof field.value === "string" || typeof field.value === "number" ? String(field.value) : "Approved context supplied"}</dd></div>}</For>
@@ -125,7 +147,7 @@ export function VendorQuotationResponsePanel(props: Props = {}) {
           <label class="mt-4 block text-sm font-medium">Authorised representative
             <input required maxLength={180} class="mt-1 min-h-11 w-full rounded-lg border border-wedding-muted px-3" value={attestedBy()} onInput={(event) => setAttestedBy(event.currentTarget.value)} />
           </label>
-          <button type="submit" class="mt-4 min-h-11 rounded-lg bg-wedding-accent px-4 font-bold text-white disabled:opacity-60" disabled={busy()}>{busy() ? "Encrypting and sending…" : "Send response for review"}</button>
+          <button type="submit" class="mt-4 min-h-11 rounded-lg bg-wedding-accent px-4 font-bold text-white disabled:opacity-60" disabled={busy() || !senderIdentity()}>{busy() ? "Encrypting and sending…" : "Send response for review"}</button>
         </form>
       )}</Show>
 

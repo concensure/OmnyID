@@ -584,4 +584,9 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Expiring non-exclusive vendor claims and verified ownership proof receipts",
         include_str!("../../postgres/migrations/0115_wedding_vendor_ownership_proofs.sql"),
     ),
+    (
+        "0116_wedding_vendor_sender_identities",
+        "Stable verified-vendor sender masks and response identity bindings",
+        include_str!("../../postgres/migrations/0116_wedding_vendor_sender_identities.sql"),
+    ),
 ];

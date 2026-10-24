@@ -56,7 +56,9 @@ pub struct VendorMailConfig {
     pub enabled: bool,
     pub provider: VendorMailProvider,
     pub mask_domain: String,
+    pub from_address: String,
     has_cloudflare_token: bool,
+    has_cloudflare_account_id: bool,
     has_resend_api_key: bool,
     has_worker_shared_secret: bool,
     has_resend_webhook_secret: bool,
@@ -80,14 +82,26 @@ impl VendorMailConfig {
         if mask_domain != "mail.omnyid.com" {
             return Err("OMNYID_VENDOR_MAIL_MASK_DOMAIN must be mail.omnyid.com".to_string());
         }
+        let from_address = std::env::var("OMNYID_VENDOR_MAIL_FROM_ADDRESS")
+            .unwrap_or_else(|_| "hello@omnyid.com".to_string())
+            .trim()
+            .to_ascii_lowercase();
+        if !valid_platform_sender(&from_address) {
+            return Err(
+                "OMNYID_VENDOR_MAIL_FROM_ADDRESS must be an omnyid.com sender address".to_string(),
+            );
+        }
         Ok(Self {
             enabled,
             provider,
             mask_domain,
+            from_address,
             has_cloudflare_token: read_process_secret_trimmed(
                 "OMNYID_VENDOR_MAIL_CLOUDFLARE_API_TOKEN",
             )
             .is_some(),
+            has_cloudflare_account_id: std::env::var("OMNYID_VENDOR_MAIL_CLOUDFLARE_ACCOUNT_ID")
+                .is_ok_and(|value| value.trim().len() == 32),
             has_resend_api_key: read_process_secret_trimmed("OMNYID_VENDOR_MAIL_RESEND_API_KEY")
                 .is_some(),
             has_worker_shared_secret: read_process_secret_trimmed(
@@ -118,7 +132,9 @@ impl VendorMailConfig {
                 reason: "provider_disabled",
             },
             VendorMailProvider::CloudflareEmailSending
-                if !self.has_cloudflare_token || !self.has_worker_shared_secret =>
+                if !self.has_cloudflare_token
+                    || !self.has_cloudflare_account_id
+                    || !self.has_worker_shared_secret =>
             {
                 VendorMailReadiness {
                     enabled: true,
@@ -147,6 +163,14 @@ impl VendorMailConfig {
     }
 }
 
+fn valid_platform_sender(value: &str) -> bool {
+    value.len() <= 254
+        && !value.contains(char::is_whitespace)
+        && value
+            .rsplit_once('@')
+            .is_some_and(|(local, domain)| !local.is_empty() && domain == "omnyid.com")
+}
+
 #[cfg(test)]
 mod tests {
     use super::{VendorMailConfig, VendorMailProvider};
@@ -162,7 +186,9 @@ mod tests {
             "OMNYID_VENDOR_MAIL_ENABLED",
             "OMNYID_VENDOR_MAIL_PROVIDER",
             "OMNYID_VENDOR_MAIL_MASK_DOMAIN",
+            "OMNYID_VENDOR_MAIL_FROM_ADDRESS",
             "OMNYID_VENDOR_MAIL_CLOUDFLARE_API_TOKEN",
+            "OMNYID_VENDOR_MAIL_CLOUDFLARE_ACCOUNT_ID",
             "OMNYID_VENDOR_MAIL_RESEND_API_KEY",
             "OMNYID_VENDOR_MAIL_WORKER_SHARED_SECRET",
             "OMNYID_VENDOR_MAIL_RESEND_WEBHOOK_SECRET",
@@ -202,6 +228,27 @@ mod tests {
         unsafe { std::env::set_var("OMNYID_VENDOR_MAIL_CLOUDFLARE_API_TOKEN", "send-only-token") };
         let send_only = VendorMailConfig::from_env().expect("send-only config");
         assert_eq!(send_only.readiness().reason, "cloudflare_credentials_missing");
+        clear_env();
+    }
+
+    #[test]
+    fn cloudflare_is_ready_only_with_account_token_and_ingress_secret() {
+        let _guard = env_lock().lock().expect("env lock");
+        clear_env();
+        unsafe {
+            std::env::set_var("OMNYID_VENDOR_MAIL_ENABLED", "true");
+            std::env::set_var("OMNYID_VENDOR_MAIL_PROVIDER", "cloudflare");
+            std::env::set_var("OMNYID_VENDOR_MAIL_CLOUDFLARE_API_TOKEN", "account-token");
+            std::env::set_var(
+                "OMNYID_VENDOR_MAIL_CLOUDFLARE_ACCOUNT_ID",
+                "0123456789abcdef0123456789abcdef",
+            );
+            std::env::set_var("OMNYID_VENDOR_MAIL_WORKER_SHARED_SECRET", "worker-secret");
+            std::env::set_var("OMNYID_VENDOR_MAIL_FROM_ADDRESS", "hello@omnyid.com");
+        }
+        let config = VendorMailConfig::from_env().expect("complete config");
+        assert_eq!(config.from_address, "hello@omnyid.com");
+        assert!(config.readiness().ready);
         clear_env();
     }
 }

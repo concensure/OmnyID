@@ -76,6 +76,7 @@ struct CreateInvitationRequest {
 struct SubmitResponseRequest {
     request_id: String,
     invitation_message_id: String,
+    sender_identity_id: String,
     message: AFPMessage,
 }
 
@@ -353,6 +354,8 @@ async fn create_invitation_http(
         agent_card_key_id: card.key_id,
         request_id: request.request_id,
         request_digest,
+        sender_identity_id: None,
+        sender_identity_kind: None,
     };
     let outcome = state
         .db
@@ -419,7 +422,10 @@ async fn submit_response_http(
     if !enabled() {
         return Err(service_unavailable());
     }
-    if !valid_id(&request.request_id) || !valid_id(&request.invitation_message_id) {
+    if !valid_id(&request.request_id)
+        || !valid_id(&request.invitation_message_id)
+        || !valid_id(&request.sender_identity_id)
+    {
         return Err((StatusCode::BAD_REQUEST, "invalid request".to_string()));
     }
     let user = authenticated_user(&state.db, &headers).await?;
@@ -430,6 +436,14 @@ async fn submit_response_http(
         .map_err(database_failure)?
         .ok_or_else(unavailable)?;
     let agent = vendor_agent_for_user(&state, &user.id, &invitation.vendor_id).await?;
+    let sender_identity =
+        super::wedding_vendor_sender_identity_routes::authorize_selected_sender_identity(
+            &state,
+            &user.id,
+            &invitation.vendor_id,
+            &request.sender_identity_id,
+        )
+        .await?;
     let messages = owner_messages(&state, &invitation.owner_user_id, &invitation.thread_id)
         .await
         .map_err(|_| unavailable())?;
@@ -505,7 +519,11 @@ async fn submit_response_http(
     let metadata =
         match validate_claimed_vendor_response(&request.message, &authority, &active_grant, now) {
             Ok(metadata)
-                if request.message.parent_id.as_deref() == Some(invitation.message_id.as_str()) =>
+                if request.message.parent_id.as_deref() == Some(invitation.message_id.as_str())
+                    && metadata.sender_identity_id.as_deref()
+                        == Some(sender_identity.identity_id.as_str())
+                    && metadata.sender_identity_kind.as_deref()
+                        == Some(sender_identity.kind.as_str()) =>
             {
                 metadata
             }
@@ -562,6 +580,8 @@ async fn submit_response_http(
         agent_card_key_id: agent.card.key_id,
         request_id: request.request_id,
         request_digest: digest,
+        sender_identity_id: Some(sender_identity.identity_id),
+        sender_identity_kind: Some(sender_identity.kind),
     };
     let outcome = state
         .db

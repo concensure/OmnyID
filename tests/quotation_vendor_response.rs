@@ -24,6 +24,30 @@ fn shared_fixture_round_trips_and_is_template_neutral() {
 }
 
 #[test]
+fn vendor_sender_identity_is_strict_and_not_commercial_fingerprint_material() {
+    let original = fixture();
+    let mut masked = original.clone();
+    masked.sender_identity = Some(VendorResponseSenderIdentity {
+        identity_id: "identity-random-internal".to_string(),
+        kind: "omnyid_mask".to_string(),
+        address: "bejewelled_jewellery_mosman@omnyid.com".to_string(),
+        display_name: "Bejewelled Jewellery".to_string(),
+    });
+    assert!(validate_vendor_response(&masked).is_empty());
+    assert_eq!(
+        vendor_response_fingerprint(&original).unwrap(),
+        vendor_response_fingerprint(&masked).unwrap()
+    );
+    masked.sender_identity.as_mut().unwrap().address =
+        "bejewelled_jewellery_mosman@example.com".to_string();
+    assert!(
+        validate_vendor_response(&masked)
+            .iter()
+            .any(|issue| issue.code == "invalid_sender_identity")
+    );
+}
+
+#[test]
 fn serde_denies_unknown_fields_at_every_material_boundary() {
     let mut response: Value =
         serde_json::from_str(include_str!("fixtures/quotation/vendor_response_v1.json")).unwrap();

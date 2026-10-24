@@ -7,6 +7,7 @@
 import { vendorResponseFingerprint, type QuotationVendorResponse } from "afp-ts/quotation";
 
 import { apiFetch } from "@/lib/api";
+import type { SelectedVendorSenderIdentity } from "@/lib/vendorSenderIdentityState";
 import {
   decryptVendorAgentEnvelope,
   encryptVendorAgentEnvelope,
@@ -191,6 +192,7 @@ export async function submitVendorTransactionResponse(input: {
   projection: VendorContextProjectionView;
   answers: Record<string, string>;
   attestedBy: string;
+  senderIdentity: SelectedVendorSenderIdentity;
 }): Promise<VendorTransportReceipt> {
   const agentId = identifier(input.item.envelope.to?.[0]);
   const keys = await loadVendorAgentPublicKeys(agentId);
@@ -214,6 +216,12 @@ export async function submitVendorTransactionResponse(input: {
     channel_receipt: { receipt_id: `local-${crypto.randomUUID()}`, received_at: now },
     status: "submitted",
     submitted_at: now,
+    sender_identity: {
+      identity_id: input.senderIdentity.identityId,
+      kind: input.senderIdentity.kind,
+      address: input.senderIdentity.address,
+      display_name: input.senderIdentity.displayName,
+    },
     question_answers: input.projection.questions.map(({ id }) => ({
       question_id: id,
       state: "proposed",
@@ -244,6 +252,8 @@ export async function submitVendorTransactionResponse(input: {
     nonce: `nonce-${crypto.randomUUID()}`,
     agent_card_key_id: keys.keyId,
     expires_at: input.item.expires_at,
+    sender_identity_id: input.senderIdentity.identityId,
+    sender_identity_kind: input.senderIdentity.kind,
   };
   const encryption = await encryptVendorAgentEnvelope(
     input.projection.responseRecipientEncryptionPublicKey,
@@ -275,6 +285,7 @@ export async function submitVendorTransactionResponse(input: {
     bodyJson: {
       request_id: `request-${crypto.randomUUID()}`,
       invitation_message_id: input.item.invitation_message_id,
+      sender_identity_id: input.senderIdentity.identityId,
       message,
     },
   });

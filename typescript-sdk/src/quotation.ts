@@ -299,6 +299,18 @@ export const VendorAttestationSchema = z.object({
   attested_at: ResponseTimestampSchema,
 }).strict();
 
+export const VendorResponseSenderIdentitySchema = z.object({
+  identity_id: ResponseIdSchema,
+  kind: z.enum(['connected_email', 'omnyid_mask']),
+  address: z.string().trim().email().max(254),
+  display_name: z.string().trim().min(1).max(180),
+}).strict().superRefine((identity, context) => {
+  if (identity.kind === 'omnyid_mask'
+      && !/^[a-z0-9]+(?:_[a-z0-9]+)*@omnyid\.com$/.test(identity.address)) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ['address'], message: 'invalid OmnyID vendor mask' });
+  }
+});
+
 export const QuotationVendorResponseSchema = z.object({
   schema_version: z.literal(VENDOR_RESPONSE_SCHEMA_VERSION),
   response_id: ResponseIdSchema,
@@ -313,6 +325,7 @@ export const QuotationVendorResponseSchema = z.object({
   channel_receipt: VendorResponseChannelReceiptSchema,
   status: VendorResponseStatusSchema,
   submitted_at: ResponseTimestampSchema,
+  sender_identity: VendorResponseSenderIdentitySchema.optional(),
   question_answers: z.array(VendorQuestionAnswerSchema).max(50).default([]),
   commercial_facts: z.array(VendorCommercialFactSchema).max(100).default([]),
   availability: VendorAvailabilitySchema.optional(),

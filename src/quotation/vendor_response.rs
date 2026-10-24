@@ -137,6 +137,15 @@ pub struct VendorAttestation {
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+pub struct VendorResponseSenderIdentity {
+    pub identity_id: String,
+    pub kind: String,
+    pub address: String,
+    pub display_name: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct QuotationVendorResponse {
     pub schema_version: String,
     pub response_id: String,
@@ -152,6 +161,8 @@ pub struct QuotationVendorResponse {
     pub channel_receipt: VendorResponseChannelReceipt,
     pub status: VendorResponseStatus,
     pub submitted_at: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sender_identity: Option<VendorResponseSenderIdentity>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub question_answers: Vec<VendorQuestionAnswer>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -267,6 +278,20 @@ fn fingerprint_valid(value: &str) -> bool {
     value.len() == 64 && value.chars().all(|character| character.is_ascii_hexdigit())
 }
 
+fn valid_vendor_mask(value: &str) -> bool {
+    let Some(local) = value.strip_suffix("@omnyid.com") else {
+        return false;
+    };
+    !local.is_empty()
+        && local.len() <= 64
+        && !local.starts_with('_')
+        && !local.ends_with('_')
+        && !local.contains("__")
+        && local
+            .chars()
+            .all(|character| character.is_ascii_lowercase() || character.is_ascii_digit() || character == '_')
+}
+
 fn anchor_valid(anchor: &SourceAnchor, sources: &BTreeSet<(&str, &str)>) -> bool {
     bounded(&anchor.source_id, 180)
         && bounded(&anchor.source_version_id, 180)
@@ -331,6 +356,16 @@ pub fn validate_vendor_response(
     let submitted_at = parsed_time(&response.submitted_at);
     if submitted_at.is_none() {
         push_issue(&mut issues, "submitted_at", "invalid_timestamp");
+    }
+    if response.sender_identity.as_ref().is_some_and(|identity| {
+        !bounded(&identity.identity_id, 180)
+            || !matches!(identity.kind.as_str(), "connected_email" | "omnyid_mask")
+            || !bounded(&identity.address, 254)
+            || !identity.address.contains('@')
+            || !bounded(&identity.display_name, 180)
+            || (identity.kind == "omnyid_mask" && !valid_vendor_mask(&identity.address))
+    }) {
+        push_issue(&mut issues, "sender_identity", "invalid_sender_identity");
     }
     let received_at = parsed_time(&response.channel_receipt.received_at);
     if !bounded(&response.channel_receipt.receipt_id, 180)

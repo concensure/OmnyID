@@ -23,6 +23,7 @@
     "channel_receipt": {"$ref": "#/$defs/channel_receipt"},
     "status": {"enum": ["draft", "submitted", "received", "reviewed", "rejected", "superseded"]},
     "submitted_at": {"type": "string", "format": "date-time"},
+    "sender_identity": {"$ref": "#/$defs/sender_identity"},
     "question_answers": {
       "type": "array", "maxItems": 50, "items": {"$ref": "#/$defs/question_answer"}
     },
@@ -72,6 +73,17 @@
         "receipt_id": {"$ref": "#/$defs/id"},
         "received_at": {"type": "string", "format": "date-time"},
         "transport_message_id": {"type": "string", "minLength": 1, "maxLength": 300}
+      }
+    },
+    "sender_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["identity_id", "kind", "address", "display_name"],
+      "properties": {
+        "identity_id": {"$ref": "#/$defs/id"},
+        "kind": {"enum": ["connected_email", "omnyid_mask"]},
+        "address": {"type": "string", "format": "email", "maxLength": 254},
+        "display_name": {"$ref": "#/$defs/bounded_180"}
       }
     },
     "question_answer": {

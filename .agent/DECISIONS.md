@@ -1585,3 +1585,21 @@ Hub cards with one destination use one whole-card button, stretch to equal heigh
 visual CTA. Status uses wedding semantic tints plus explicit icons and words, and every interaction
 keeps a visible focus state, 44px target and mobile stacking. These presentation rules add no booking,
 mail, provider or release authority and do not satisfy any WED-225 external review gate.
+
+## 2026-10-24: Vendor sender identity is verified presentation, not relay authority
+
+A vendor may choose a connected Gmail business address or a reserved OmnyID identity only after the
+existing listing-ownership boundary verifies the user/vendor relationship. The OmnyID form is derived
+from public vendor name and locality as `<vendor>_<locality>@omnyid.com`; it contains no user, account,
+claim or random database identifier. Operational aliases are reserved, collisions use a short neutral
+word, and ownership transfer archives the prior identity instead of silently reassigning it.
+
+The selected identity is signed inside encrypted response metadata and independently authorized at the
+submission boundary. It identifies how the response should appear to the couple; it does not modify the
+commercial fingerprint, send a separate email or grant booking/payment authority. A vendor cannot type
+an arbitrary From address: the external option must be the address from its current Gmail OAuth grant.
+
+Vendor apex identities and couple relay identities are separate namespaces. Couple relay remains at
+`mail.omnyid.com`; existing apex operational aliases keep priority. External delivery for vendor masks
+requires a separately reviewed catch-all Worker and ingress secret. Provider, mask, policy-V2 and mail
+flags remain disabled until abuse, privacy, accessibility, provider-smoke and human rollout gates pass.

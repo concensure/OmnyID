@@ -2,6 +2,7 @@ import { render } from "solid-js/web";
 
 import { VendorQuotationResponsePanel } from "../../src/components/vendor/VendorQuotationResponsePanel";
 import type { VendorContextProjectionView, VendorTransactionInboxItem } from "../../src/lib/vendorQuotationResponseState";
+import type { VendorSenderIdentityState } from "../../src/lib/vendorSenderIdentityState";
 import "../../src/index.css";
 
 const item: VendorTransactionInboxItem = {
@@ -47,6 +48,33 @@ const projection: VendorContextProjectionView = {
   approvedFields: [{ key: "guest_count", value: 85 }],
 };
 
+const senderState = (selected = false): VendorSenderIdentityState => ({
+  vendor_id: item.vendor_id,
+  vendor_name: "Synthetic Venue",
+  identity_id: selected ? "identity-synthetic-1" : null,
+  revision: selected ? 1 : null,
+  selected_kind: selected ? "omnyid_mask" : null,
+  relay_delivery_enabled: false,
+  options: [
+    {
+      kind: "connected_email",
+      label: "My connected business email",
+      address: null,
+      available: false,
+      selected: false,
+      detail: "Connect a business Gmail address before choosing this option.",
+    },
+    {
+      kind: "omnyid_mask",
+      label: "OmnyID business address",
+      address: "synthetic_venue_sydney@omnyid.com",
+      available: true,
+      selected,
+      detail: "Use this identity inside OmnyID.",
+    },
+  ],
+});
+
 render(() => (
   <div class="mx-auto min-h-screen max-w-2xl bg-slate-50 p-4 text-slate-950">
     <h1 class="mb-4 text-2xl font-bold">Synthetic claimed vendor</h1>
@@ -56,6 +84,8 @@ render(() => (
         if (!candidate.envelope.encryption?.ciphertext) throw new Error("Encrypted fixture required");
         return projection;
       }}
+      loadSenderIdentity={async () => senderState(false)}
+      selectSenderIdentity={async () => senderState(true)}
       submitResponse={async () => ({ status: "accepted", receipt_id: "receipt-synthetic-1" })}
     />
   </div>

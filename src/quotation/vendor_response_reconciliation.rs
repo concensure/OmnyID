@@ -143,6 +143,7 @@ pub fn build_email_vendor_response(
         },
         status: VendorResponseStatus::Received,
         submitted_at: submitted_at.clone(),
+        sender_identity: None,
         question_answers: input.question_answers,
         commercial_facts: input.commercial_facts,
         availability: None,
@@ -605,6 +606,8 @@ mod tests {
             nonce: "nonce-1".into(),
             agent_card_key_id: "key-1".into(),
             expires_at: "2026-10-19T00:00:00Z".into(),
+            sender_identity_id: None,
+            sender_identity_kind: None,
         };
         assert!(matches!(
             reconcile_verified_afp_response(&[email], afp.clone(), &routing),

@@ -23,6 +23,36 @@ Date: 2026-10-13
   security, webhook-verification, and provider-readiness gates in RELAY-14
   have passed.
 
+## Vendor response identity (WED-253)
+
+The vendor's response identity is separate from the couple relay identity:
+
+- A verified claimed vendor may select a Gmail address already connected to
+  that OmnyID account, or reserve
+  `<vendor_name>_<locality>@omnyid.com`. For example, Bejewelled Jewellery in
+  Mosman becomes `bejewelled_jewellery_mosman@omnyid.com`.
+- The application never accepts an arbitrary From address. A connected-email
+  choice is valid only while its OAuth mailbox remains connected. The OmnyID
+  mask uses lowercase ASCII letters, digits and underscores, contains no
+  internal account/listing identifier, and is stable once reserved.
+- Address collisions append an approved neutral word (`harbour`, `garden`,
+  `meadow`, `orchard`, `coast`, `fern`, `cedar`, or `willow`) rather than a
+  user/account identifier or random public number.
+- `hello`, `wedding`, `info`, `support`, `admin`, `noreply`, `privacy`,
+  `security`, `abuse`, `postmaster`, `webmaster`, `billing`, and operational
+  variants are reserved. Existing explicit apex routing rules retain priority.
+- Selecting an identity creates a private AFP audit receipt and binds that
+  identity to the signed, ciphertext-only response transport. It does not send
+  a separate email, accept a booking, or grant payment authority.
+- External delivery for the apex mask remains separately gated by
+  `OMNYID_VENDOR_SENDER_MASK_ENABLED` as well as vendor-provider readiness.
+  The current disabled/drop apex catch-all must not be enabled until the
+  dedicated Worker, lookup, replay, security/privacy and rollback gates pass.
+
+This does not change the accepted couple-facing mask at `@mail.omnyid.com`.
+The earlier proposed couple address built from first names and wedding year is
+therefore not reused for vendor identity and cannot collide with vendor masks.
+
 ## Temporary legacy Gmail transport
 
 On 2026-10-14 the owner directed that the existing Gmail wiring remain the
@@ -71,6 +101,14 @@ non-sending REST request reached `400/10001`
 That proves entitlement and send permission but does not send mail or prove a
 sender domain. A user-owned token is acceptable for Cloudflare SMTP/REST when
 it has Email Sending Edit permission and can act on the sender's account.
+
+On 2026-10-24 the revoked credential was replaced with an account-owned API
+token scoped to the relevant account and zone. Account-token verification
+reported active. It can read the `omnyid.com` zone, routing rules and exact
+catch-all; it cannot read destination-address inventory or DNS records. The
+`privacy@omnyid.com` rule targets `concensure+omnyid@gmail.com`, and the
+catch-all remains disabled with `drop`. This is valid least-privilege
+inventory evidence, not authorization to enable the relay or modify DNS.
 
 ## Provider-event endpoints (after authenticated gateway implementation)
 

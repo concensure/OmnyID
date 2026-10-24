@@ -147,6 +147,7 @@ pub fn prepare_secure_link_response_with_revision(
         },
         status: VendorResponseStatus::Received,
         submitted_at: timestamp.clone(),
+        sender_identity: None,
         question_answers: input.question_answers.clone(),
         commercial_facts: input.commercial_facts.clone(),
         availability: input.availability.clone(),

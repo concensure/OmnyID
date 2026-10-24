@@ -30,6 +30,10 @@ pub struct VendorResponseRoutingMetadata {
     pub nonce: String,
     pub agent_card_key_id: String,
     pub expires_at: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sender_identity_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sender_identity_kind: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -188,6 +192,12 @@ fn metadata_valid(metadata: &VendorResponseRoutingMetadata) -> bool {
         && bounded(&metadata.nonce, 180)
         && bounded(&metadata.agent_card_key_id, 180)
         && parsed_time(&metadata.expires_at).is_some()
+        && match (&metadata.sender_identity_id, &metadata.sender_identity_kind) {
+            (None, None) => true,
+            (Some(identity_id), Some(kind)) => bounded(identity_id, 180)
+                && matches!(kind.as_str(), "connected_email" | "omnyid_mask"),
+            _ => false,
+        }
 }
 
 pub fn validate_claimed_vendor_response(

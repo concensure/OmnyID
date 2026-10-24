@@ -56,6 +56,31 @@ test('unknown fields and unsupported confirmed facts fail closed', async () => {
   assert.equal(QuotationVendorResponseSchema.safeParse(proposed).success, true);
 });
 
+test('verified vendor sender identities are optional, strict, and not commercial material', async () => {
+  const original = QuotationVendorResponseSchema.parse(await fixture());
+  const masked = QuotationVendorResponseSchema.parse({
+    ...original,
+    sender_identity: {
+      identity_id: 'identity-random-internal',
+      kind: 'omnyid_mask',
+      address: 'bejewelled_jewellery_mosman@omnyid.com',
+      display_name: 'Bejewelled Jewellery',
+    },
+  });
+  assert.equal(masked.sender_identity.address, 'bejewelled_jewellery_mosman@omnyid.com');
+  assert.equal(
+    await vendorResponseFingerprint(original),
+    await vendorResponseFingerprint(masked),
+  );
+
+  const wrongDomain = structuredClone(masked);
+  wrongDomain.sender_identity.address = 'bejewelled_jewellery_mosman@example.com';
+  assert.equal(QuotationVendorResponseSchema.safeParse(wrongDomain).success, false);
+  const extra = structuredClone(masked);
+  extra.sender_identity.account_id = 'must-not-leak';
+  assert.equal(QuotationVendorResponseSchema.safeParse(extra).success, false);
+});
+
 test('equivalent channels and shuffled collections share canonical material and fingerprint', async () => {
   const first = QuotationVendorResponseSchema.parse(await fixture());
   const equivalent = structuredClone(first);

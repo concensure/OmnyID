@@ -34,6 +34,13 @@ Resend, or production email changes.
 - Partner access expiry, identity/mask confusion, deletion failure, provider
   credential compromise, and gateway-key loss require explicit incident and
   rotation procedures before launch.
+- A vendor cannot claim an arbitrary sender address. Connected-mailbox use is
+  bound to the authenticated vendor owner and current OAuth connection; an
+  OmnyID vendor mask is bound to one verified listing owner through an opaque
+  internal identity. Reclaiming a listing archives the previous identity.
+- Apex aliases such as `privacy`, `hello`, `support`, `admin`, `noreply`, and
+  `wedding` are reserved. The existing explicit routes must remain ahead of a
+  future catch-all, and an unknown or archived vendor mask must fail closed.
 
 ## Honest privacy language
 

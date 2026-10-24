@@ -133,6 +133,8 @@ async fn persistence_is_ciphertext_only_idor_safe_replay_safe_and_key_bound() {
         agent_card_key_id: "current-key".to_string(),
         request_id: request_id.clone(),
         request_digest: request_digest.clone(),
+        sender_identity_id: None,
+        sender_identity_kind: None,
     };
     let receipt = vendor_transport_receipt(
         &vendor_id,

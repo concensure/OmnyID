@@ -4605,3 +4605,77 @@ Verifier follow-up:
   are line-neutral. The targeted 21 frontend tests and 64 auth units pass, as do cargo check,
   all 1,964 wedding tests, site/CSP smoke, line budgets and the production build. Recreate the review
   tag on the resulting commit and use only the final exact-commit manifest for human review.
+
+## 2026-10-24 - WED-252 hosted gate preflight (Codex, blocked)
+
+Changed/evidence:
+
+- Read the hosted-accessibility and couple-usability protocols in full. The implementing agent cannot
+  supply either required independent judgment or a real/recruited couple session.
+- Oracle's release manifest reports `67c1559e0ad5b3760620674fed86a987d8bafc11`, not frozen candidate
+  `4a4712f76024705eb32c8e860b669860cd1a58ff`. Current production is therefore ineligible evidence.
+- Signed in with the supplied synthetic account while keeping its password in process memory only.
+  The older hosted surface reproduced serious auth naming/interaction, editor naming, ARIA and 2.52:1
+  contrast defects plus duplicate/nested main landmarks and no h1. It did reflow without page overflow
+  at 320px, exposed the skip link first, and kept the no-token vendor response generic and detail-free.
+- No required quotation fixture or secure links were present, no couple participated, and no outbound
+  vendor/payment action ran. Reports are
+  `Documents/verification/wed-225-hosted-accessibility-preflight-4a4712f76024.md` and
+  `Documents/verification/wed-225-couple-usability-preflight-4a4712f76024.md`; neither is gate evidence
+  and no pointer file was created.
+- The replacement Cloudflare value is present in the original repo's gitignored `.env`, but
+  `OMNYID_CLOUDFLARE_API_KEY` is not read by current mail code and its Bearer verification returned
+  HTTP 401. No secret value was printed, copied to Oracle or enabled.
+
+Blocked/next:
+
+- Host the exact candidate for allowlisted test accounts, seed the synthetic three-quote workspace,
+  issue disposable valid/expired/revoked links, and then give the accessibility protocol to an
+  independent reviewer and the usability protocol to a recruited couple with facilitator/observer.
+- For provider work, replace the unsupported generic env name with the reviewed file-backed vendor or
+  transactional token binding only after confirming whether the new Cloudflare credential is an API
+  token or a legacy global key. Do not enable vendor mail from the current 401 result.
+
+## 2026-10-24 - WED-253 verified vendor sender identities (Codex, complete)
+
+Changed:
+
+- Added migration 0116 and tenant-scoped APIs for a verified claimed vendor to reserve and select either
+  its connected Gmail business address or a stable `<vendor>_<locality>@omnyid.com` identity. Arbitrary
+  addresses, unverified claims, stale ownership and cross-tenant IDs fail closed. Reserved operational
+  aliases and sensitive/internal identifiers cannot enter a mask; neutral words resolve collisions.
+- Bound the selected identity into the encrypted quotation response transport and validated it again at
+  submission. Identity changes emit private replay-stable AFP audit receipts. They do not change the
+  commercial response fingerprint or imply a booking, payment, contract or separate email send.
+- Added the accessible response-form picker, A2UI state, schema/SDK support, database contracts and
+  responsive Axe coverage. Existing couple relay identities remain isolated at `mail.omnyid.com`.
+- Extended vendor-mail configuration to require a controlled From address, account ID, file-backed API
+  token and Worker secret before Cloudflare can report ready. Gmail/Outlook remain forbidden as the
+  platform relay provider and all rollout flags default off.
+
+Operational evidence:
+
+- The replacement `cfat_` credential is an active account-owned token (token ID suffix `07b5`). It can
+  read the `omnyid.com` zone and Email Routing rules and reach the Email Sending API; DNS record and
+  destination-address reads are denied. The exact token label/policy cannot be read with this token.
+- `privacy@omnyid.com` routes to `concensure+omnyid@gmail.com`. The apex catch-all remains disabled and
+  drops unmatched mail; existing explicit aliases therefore remain untouched.
+- Oracle now has a root-owned 0600 token file and `.env.oracle` uses `hello@omnyid.com`, a file-backed
+  token path and explicit disabled flags. Backup: `.env.oracle.bak.wed253-20261024T100803Z`. No process
+  was restarted, no code was deployed and no email was sent.
+
+Verification:
+
+- Pass: typecheck; TypeScript SDK build/tests; 1,964 wedding tests; wedding site/CSP smoke; line budgets;
+  production UI build; two 360/1280 Playwright+Axe checks; SMTP 7/7; sender/provider/reconciliation unit
+  tests; and disposable-Postgres response/identity integration suites (9/9, 2/2 and 2/2).
+- Full `cargo test --lib`: 2,500 passed and three inherited source-text assertions failed in unchanged
+  `master_orchestrator.rs`, `conversion_routes.rs` and `user_integrations/`. All changed Rust suites pass.
+
+Next:
+
+- Do not enable `OMNYID_VENDOR_MAIL_ENABLED`, `OMNYID_VENDOR_SENDER_MASK_ENABLED`, the Cloudflare provider,
+  an apex catch-all or policy V2 yet. External mask receive/reply needs the reviewed Worker, ingress-secret
+  verification, abuse/rate controls, DNS/security review and the remaining WED-225 human/provider gates.
+- Any WED-225 human review must freeze and host the new exact commit; the older 4a4712f evidence remains a
+  non-gate preflight only.

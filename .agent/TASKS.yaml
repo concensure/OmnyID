@@ -3308,3 +3308,63 @@ tasks:
       - seven focused state/render checks, two 320/1280 browser checks with Axe and alignment assertions, typecheck, both line-budget checks, wedding site/CSP smoke, all 1963 wedding tests and the production build pass
       - the first exact-commit readiness run exposed a verifier-only false failure on generated dependency lockfiles; the WED-225 source line-budget check now excludes Cargo.lock and package-lock.json with a regression contract while continuing to enforce handwritten source budgets
       - restored every changed oversized owner to its frozen line ceiling by extracting volatile session-credential and Apple configuration helpers; 21 focused frontend contracts, 64 auth units, cargo check, all 1964 wedding tests, site/CSP smoke, both line-budget checks and the production build pass before the final exact-commit evidence run
+  - id: WED-252
+    title: Preflight the hosted accessibility and couple usability gates
+    status: blocked
+    owner: codex
+    branch: agent/codex/WED-215
+    depends_on:
+      - WED-251
+    files:
+      - Documents/verification/wed-225-hosted-review-preflight-*.md
+      - artifacts/wed-225-hosted-preflight/**
+      - .agent/**
+    acceptance:
+      - compare the hosted Oracle revision with the frozen WED-225 review candidate before interpreting any result
+      - use only the supplied synthetic test account and never print or persist its password in evidence
+      - record objective hosted keyboard, landmark, reflow, contrast and task-discovery observations that are testable without impersonating an independent reviewer or recruited couple
+      - do not create verified gate pointers unless the protocol's independence, participant and exact-hosted-build requirements are genuinely met
+      - leave production data, feature flags, vendor communication and payment paths unchanged
+    progress:
+      - read both gate protocols completely and confirmed that independent reviewer and real/recruited-couple requirements cannot be satisfied by the implementing agent
+      - Oracle release manifest identifies source SHA 67c1559e0ad5b3760620674fed86a987d8bafc11, not frozen candidate 4a4712f76024705eb32c8e860b669860cd1a58ff, so current production cannot produce valid gate evidence for the candidate
+      - authenticated with the supplied synthetic test account without persisting or printing its password; no vendor message, booking, payment, provider or feature-flag action was performed
+      - production preflight found the older build still has no auth dialog role or Escape close, no accessible password label, duplicate/nested main landmarks, no h1, an unnamed TipTap field, prohibited ARIA and a 2.52:1 ten-pixel label; 320px reflow, skip-link order, minimum automated target sample and the no-token vendor fallback behaved safely
+      - the account has no seeded quotation review, clarification, evidence, contract/deposit or closure surfaces, so no couple task or comprehension question was scored; zero recruited couples participated and no gate pointer was created
+      - wrote separate clearly non-gate accessibility and couple preflight reports with redacted machine evidence; exact candidate hosting, disposable quote/link setup and independent human participants are the remaining blockers
+      - a later WED-253 account-scoped verification established that the replacement `cfat_` value is an active account-owned API token; the earlier 401 came from the wrong generic verification path, not an invalid credential
+  - id: WED-253
+    title: Add verified vendor sender choices and OmnyID vendor masks
+    status: complete
+    owner: codex
+    branch: agent/codex/WED-215
+    depends_on:
+      - WED-250
+    files:
+      - postgres/migrations/**
+      - src/gateway/**
+      - src/server/**
+      - solid-ui/src/components/vendor/**
+      - solid-ui/src/lib/**
+      - solid-ui/tests/**
+      - Documents/design/wedding planner/**
+      - Documents/security/**
+      - .agent/**
+    acceptance:
+      - a verified claimed vendor can choose its verified business email or a reserved vendor-name-and-locality OmnyID mask for an OmnyID Cloud response
+      - vendor masks are canonical lowercase underscore addresses at omnyid.com, exclude reserved operational aliases and sensitive identifiers, and handle collisions without exposing internal IDs
+      - arbitrary sender addresses, unverified claims and cross-tenant selections fail closed
+      - the vendor mask is distinct from the couple relay identity and does not weaken the disabled relay, provider or policy-V2 rollout gates
+      - sender choice and lifecycle changes have tenant-private AFP audit receipts and no email is sent merely by reserving or selecting an identity
+      - existing explicit Cloudflare routing aliases keep priority; enabling apex catch-all remains a separately reviewed operational change
+      - focused database, Rust and frontend tests plus required wedding checks pass before any production enablement
+    progress:
+      - registered after confirming migration 0108 already provides the disabled couple relay foundation at mail.omnyid.com; the vendor sender identity will extend, not replace, that architecture
+      - added a verified-owner sender identity registry and API with stable lowercase underscore masks, operational-alias exclusions, neutral collision suffixes, ownership-transfer archival and tenant-private deterministic AFP audit receipts
+      - the vendor response form now requires a selected connected Gmail business address or reserved OmnyID vendor mask; encrypted transport metadata is bound to that selection and the server rejects arbitrary, stale and cross-tenant identities
+      - kept couple relay identities on mail.omnyid.com and vendor identities at the omnyid.com apex; no catch-all, Cloudflare Worker, external relay, provider traffic, policy V2 or outbound message was enabled
+      - verified the replacement account-owned Cloudflare API token as active using its account token endpoint; zone and routing reads plus the non-sending Email Sending permission probe succeeded, while DNS records and destination-address reads remained denied
+      - confirmed privacy@omnyid.com routes to concensure+omnyid@gmail.com and the apex catch-all remains disabled with a drop action; explicit operational aliases retain priority
+      - installed the token on Oracle as a root-owned 0600 file and updated `.env.oracle` to hello@omnyid.com plus file-backed Cloudflare settings; vendor mail, sender masks and provider remain disabled, and no service was restarted or redeployed
+      - focused Rust contracts, SMTP tests, TypeScript SDK tests, 1964 wedding tests, site/CSP smoke, typecheck, line budgets, two responsive Axe browser tests, database-backed identity/response suites and the production UI build pass
+      - full `cargo test --lib` reached 2500 passing tests and three inherited source-text assertion failures in unchanged master-orchestrator, PDF conversion and alias-route test files; the changed Rust unit and integration suites all pass

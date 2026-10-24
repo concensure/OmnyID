@@ -14,6 +14,9 @@ for (const viewport of [{ width: 360, height: 740 }, { width: 1280, height: 800 
     await expect(page.getByText("guest count")).toBeVisible();
     await expect(page.getByText(/does not accept a booking, contract, or payment/i)).toBeVisible();
     await expect(page.getByRole("button", { name: /book|pay|accept contract/i })).toHaveCount(0);
+    await expect(page.getByText("synthetic_venue_sydney@omnyid.com")).toBeVisible();
+    await expect(page.getByText(/does not send a separate email/i)).toBeVisible();
+    await page.getByLabel(/OmnyID business address/).check();
     await page.getByLabel("Are you available on the requested date?").fill("Yes, the package is available.");
     await page.getByLabel("Authorised representative").fill("Synthetic Vendor");
     await page.getByRole("button", { name: "Send response for review" }).click();
