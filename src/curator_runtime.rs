@@ -331,6 +331,28 @@ fn poison_skip_knowledge_card(user_id: &str, source_id: &str) -> KnowledgeCard {
     }
 }
 
+fn ineligible_knowledge_card(
+    user_id: &str,
+    source_id: &str,
+    reason: &'static str,
+) -> KnowledgeCard {
+    KnowledgeCard {
+        card_id: stable_knowledge_card_id(user_id, source_id),
+        user_id: user_id.to_string(),
+        source_id: source_id.to_string(),
+        summary: None,
+        supertags: vec![],
+        entities: vec![],
+        model_version: "ineligible-skip-v1".to_string(),
+        created_at: Utc::now().to_rfc3339(),
+        curator_run_id: String::new(),
+        card_json: json!({
+            "skip": true,
+            "reason": reason,
+        }),
+    }
+}
+
 async fn process_source_message(
     db: &Db,
     user_id: &str,
@@ -346,25 +368,12 @@ async fn process_source_message(
     let metadata = row.try_get::<Option<Value>, _>("metadata").ok().flatten();
     if let Some(skip_reason) = curator_ineligible_reason(&message_type, &content, metadata.as_ref())
     {
-        record_curator_audit(
-            db,
-            &CuratorRunAudit {
-                run_id: Ulid::new().to_string(),
-                user_id: user_id.to_string(),
-                daemon_id: daemon_id.to_string(),
-                source_message_id: Some(source_id),
-                trigger_kind: CuratorTriggerKind::NewMessage,
-                backlinks_created: 0,
-                cards_created: 0,
-                insights_created: 0,
-                tokens_used: 0,
-                duration_ms: Some((Utc::now() - started_at).num_milliseconds().max(0) as u32),
-                status: CuratorRunStatus::Skipped,
-                error_message: Some(skip_reason.to_string()),
-                created_at: Utc::now().to_rfc3339(),
-            },
-        )
-        .await?;
+        // A durable internal marker keeps the source out of later queue scans.
+        // Do not append an audit row for policy-ineligible work: doing both on
+        // every pass previously retried the same source forever and grew the
+        // audit table without performing any useful work.
+        let skip_card = ineligible_knowledge_card(user_id, &source_id, skip_reason);
+        upsert_knowledge_card(db, &skip_card).await?;
         return Ok(1);
     }
     let refs = row
@@ -387,34 +396,18 @@ async fn process_source_message(
         .any(|tag| tag.eq_ignore_ascii_case("retention:keep_nothing"));
 
     // Phase A fast-skip: too short or recognised noise pattern.
-    let skip = metadata_ephemeral
-        || retention_ephemeral
-        || source_text.trim().len() < 24
-        || is_noise_message(source_text.trim(), &message_type);
-    if skip {
-        record_curator_audit(
-            db,
-            &CuratorRunAudit {
-                run_id,
-                user_id: user_id.to_string(),
-                daemon_id: daemon_id.to_string(),
-                source_message_id: Some(source_id),
-                trigger_kind: CuratorTriggerKind::NewMessage,
-                backlinks_created: 0,
-                cards_created: 0,
-                insights_created: 0,
-                tokens_used: 0,
-                duration_ms: Some((Utc::now() - started_at).num_milliseconds().max(0) as u32),
-                status: CuratorRunStatus::Skipped,
-                error_message: if metadata_ephemeral || retention_ephemeral {
-                    Some("ephemeral_ingest_output".to_string())
-                } else {
-                    None
-                },
-                created_at: Utc::now().to_rfc3339(),
-            },
-        )
-        .await?;
+    let skip_reason = if metadata_ephemeral || retention_ephemeral {
+        Some("ephemeral_ingest_output")
+    } else if source_text.trim().len() < 24 {
+        Some("non_substantive")
+    } else if is_noise_message(source_text.trim(), &message_type) {
+        Some("noise")
+    } else {
+        None
+    };
+    if let Some(skip_reason) = skip_reason {
+        let skip_card = ineligible_knowledge_card(user_id, &source_id, skip_reason);
+        upsert_knowledge_card(db, &skip_card).await?;
         return Ok(1);
     }
 

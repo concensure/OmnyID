@@ -594,4 +594,9 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Authenticated replay-safe encrypted Cloudflare Email Worker quarantine",
         include_str!("../../postgres/migrations/0117_vendor_email_worker_ingress.sql"),
     ),
+    (
+        "0118_curator_audit_retention",
+        "Created-at index for batched seven-day curator audit retention",
+        include_str!("../../postgres/migrations/0118_curator_audit_retention.sql"),
+    ),
 ];

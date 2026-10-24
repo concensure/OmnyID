@@ -30,11 +30,8 @@ pub fn shutdown_channel() -> (ShutdownTx, ShutdownRx) {
     tokio::sync::watch::channel(false)
 }
 
-/// Minimum wakeup floor for archive — it does heavy I/O so we don't lower it
-/// all the way to 2 s.  A wakeup from ingestion/watcher still usefully
-/// coalesces concurrent writes into one pass rather than the next 600 s poll.
+/// Archive wakeups coalesce writes rather than polling every 600 seconds.
 const ARCHIVE_MIN_IDLE_SECS: u64 = 30;
-/// Health is similarly I/O heavy; floor is 60 s.
 const HEALTH_MIN_IDLE_SECS: u64 = 60;
 const HEALTH_MAINTENANCE_AGENT: &str = "omnyid://daemon/health-maintenance";
 const HEALTH_MAINTENANCE_SUMMARY_TYPE: &str = "insight";
@@ -107,11 +104,13 @@ pub fn start_health_maintenance_daemon(db: Db, mut shutdown: ShutdownRx) -> Join
             } else {
                 (0, 0)
             };
-            match daemon_registry::prune_heartbeats(&db).await {
-                Ok(0) => {}
-                Ok(deleted) => info!(deleted, "Pruned old daemon heartbeats"),
+            match daemon_registry::prune_operational_daemon_history(&db).await {
+                Ok((0, 0)) => {}
+                Ok((heartbeats, curator_audits)) => {
+                    info!(heartbeats, curator_audits, "Pruned old daemon history")
+                }
                 Err(err) => {
-                    warn!(%err, "Failed to prune daemon heartbeats; check DB connectivity and the daemon_heartbeats table")
+                    warn!(%err, "Failed to prune daemon history; check DB connectivity and retention indexes")
                 }
             }
             emit_daemon_heartbeats(&db, DaemonKind::HealthMaintenance, processed, errors).await;

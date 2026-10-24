@@ -43,8 +43,9 @@ pub async fn ensure_system_daemons_registered(db: &Db) -> Result<(), sqlx::Error
     for row in existing_rows {
         let user_id: String = row.get("user_id");
         let kind_str: String = row.get("daemon_kind");
-        let kind = daemon_kind_from_str(&kind_str);
-        registered.entry(user_id).or_default().insert(kind);
+        if let Some(kind) = daemon_kind_from_str(&kind_str) {
+            registered.entry(user_id).or_default().insert(kind);
+        }
     }
 
     let user_ids = db.list_user_ids().await?;
@@ -91,7 +92,9 @@ fn missing_system_daemon_kinds(existing_kinds: &HashSet<DaemonKind>) -> Vec<Daem
 
 #[cfg(test)]
 mod tests {
-    use super::{missing_system_daemon_kinds, positive_limit, system_daemon_kinds};
+    use super::{
+        daemon_kind_from_str, missing_system_daemon_kinds, positive_limit, system_daemon_kinds,
+    };
     use crate::knowledge_curator::DaemonKind;
     use std::collections::HashSet;
 
@@ -103,6 +106,39 @@ mod tests {
         assert_eq!(positive_limit(Some("-5"), 48), 48);
         assert_eq!(positive_limit(Some("abc"), 48), 48);
         assert_eq!(positive_limit(None, 48), 48);
+    }
+
+    #[test]
+    fn curator_audit_retention_defaults_to_seven_days() {
+        assert_eq!(super::CURATOR_AUDIT_RETENTION_HOURS_DEFAULT, 168);
+        assert_eq!(positive_limit(Some("72"), 168), 72);
+        assert_eq!(positive_limit(Some("0"), 168), 168);
+    }
+
+    #[test]
+    fn legacy_daemon_kinds_are_not_misclassified_as_knowledge_curators() {
+        assert_eq!(
+            daemon_kind_from_str("knowledge_curator"),
+            Some(DaemonKind::KnowledgeCurator)
+        );
+        assert_eq!(daemon_kind_from_str("background_watcher"), None);
+        assert_eq!(daemon_kind_from_str("state_synthesizer"), None);
+    }
+
+    #[test]
+    fn active_kind_lookup_requires_the_exact_persisted_daemon_kind() {
+        let source = include_str!("daemon_registry.rs");
+        let start = source
+            .rfind("pub async fn get_active_daemon_for_kind")
+            .expect("lookup exists");
+        let end = source[start..]
+            .find("\npub async fn get_daemon_registration")
+            .map(|offset| start + offset)
+            .expect("registration lookup follows exact-kind lookup");
+        let function_source = &source[start..end];
+        assert!(function_source.contains("AND daemon_kind = $2"));
+        assert!(function_source.contains(".bind(daemon_kind_slug(&kind))"));
+        assert!(!function_source.contains("get_active_daemons(db"));
     }
 
     #[test]
@@ -247,6 +283,10 @@ pub async fn get_active_daemons(
         FROM daemon_registrations
         WHERE user_id = $1
           AND status = 'active'
+          AND daemon_kind IN (
+              'knowledge_curator', 'ledger_ingestion', 'email_gateway',
+              'relational_sync', 'archive_cold_storage', 'health_maintenance'
+          )
         ORDER BY created_at ASC
         "#,
     )
@@ -263,10 +303,32 @@ pub async fn get_active_daemon_for_kind(
     user_id: &str,
     kind: DaemonKind,
 ) -> Result<Option<DaemonRegistration>, sqlx::Error> {
-    let daemons = get_active_daemons(db, user_id).await?;
-    Ok(daemons
-        .into_iter()
-        .find(|daemon| daemon.daemon_kind == kind))
+    let row = sqlx::query(
+        r#"
+        SELECT
+            daemon_id,
+            user_id,
+            daemon_kind,
+            workflow_id,
+            delegated_key_id,
+            status,
+            policy_config,
+            last_heartbeat_at::text AS last_heartbeat_at,
+            created_at::text AS created_at,
+            revoked_at::text AS revoked_at
+        FROM daemon_registrations
+        WHERE user_id = $1
+          AND daemon_kind = $2
+          AND status = 'active'
+        ORDER BY created_at ASC
+        LIMIT 1
+        "#,
+    )
+    .bind(user_id)
+    .bind(daemon_kind_slug(&kind))
+    .fetch_optional(&db.pool)
+    .await?;
+    row.as_ref().map(registration_from_row).transpose()
 }
 
 pub async fn get_daemon_registration(
@@ -328,6 +390,10 @@ const HEARTBEAT_MAX_ROWS_DEFAULT: i64 = 500_000;
 const HEARTBEAT_PRUNE_BATCH: i64 = 10_000;
 // Bounds WAL growth and lock time; a large backlog drains over several passes.
 const HEARTBEAT_PRUNE_MAX_BATCHES_PER_PASS: u32 = 100;
+const CURATOR_AUDIT_RETENTION_HOURS_ENV: &str = "OMNYID_CURATOR_AUDIT_RETENTION_HOURS";
+const CURATOR_AUDIT_RETENTION_HOURS_DEFAULT: i64 = 7 * 24;
+const CURATOR_AUDIT_PRUNE_BATCH: i64 = 5_000;
+const CURATOR_AUDIT_PRUNE_MAX_BATCHES_PER_PASS: u32 = 20;
 
 fn positive_limit(raw: Option<&str>, default: i64) -> i64 {
     raw.and_then(|value| value.trim().parse::<i64>().ok())
@@ -393,6 +459,47 @@ pub async fn prune_heartbeats(db: &Db) -> Result<u64, sqlx::Error> {
     Ok(deleted_total)
 }
 
+async fn prune_curator_run_audits(db: &Db) -> Result<u64, sqlx::Error> {
+    let retention_hours = heartbeat_limit(
+        CURATOR_AUDIT_RETENTION_HOURS_ENV,
+        CURATOR_AUDIT_RETENTION_HOURS_DEFAULT,
+    );
+    let mut deleted_total = 0u64;
+    for _ in 0..CURATOR_AUDIT_PRUNE_MAX_BATCHES_PER_PASS {
+        let deleted = sqlx::query(
+            r#"
+            DELETE FROM curator_run_audit audit
+            USING (
+                SELECT run_id
+                FROM curator_run_audit
+                WHERE created_at < NOW() - make_interval(hours => $1::int)
+                ORDER BY created_at
+                LIMIT $2
+                FOR UPDATE SKIP LOCKED
+            ) stale
+            WHERE audit.run_id = stale.run_id
+            "#,
+        )
+        .bind(retention_hours)
+        .bind(CURATOR_AUDIT_PRUNE_BATCH)
+        .execute(&db.pool)
+        .await?
+        .rows_affected();
+        deleted_total += deleted;
+        if deleted < CURATOR_AUDIT_PRUNE_BATCH as u64 {
+            break;
+        }
+    }
+    Ok(deleted_total)
+}
+
+/// Bounds high-volume daemon observability using independently committed batches.
+pub async fn prune_operational_daemon_history(db: &Db) -> Result<(u64, u64), sqlx::Error> {
+    let heartbeats = prune_heartbeats(db).await?;
+    let curator_audits = prune_curator_run_audits(db).await?;
+    Ok((heartbeats, curator_audits))
+}
+
 /// Returns stale-heartbeat warnings for active daemons.
 /// Pass `Some(user_id)` to scope to one user (user-facing endpoint).
 /// Pass `None` to return all users' stale daemons (health/ops endpoint — GAP-130).
@@ -406,6 +513,10 @@ pub async fn daemon_health_check(
             SELECT daemon_id, user_id, daemon_kind, last_heartbeat_at::text AS last_heartbeat_at
             FROM daemon_registrations
             WHERE status = 'active' AND user_id = $1
+              AND daemon_kind IN (
+                  'knowledge_curator', 'ledger_ingestion', 'email_gateway',
+                  'relational_sync', 'archive_cold_storage', 'health_maintenance'
+              )
             "#,
         )
         .bind(uid)
@@ -417,6 +528,10 @@ pub async fn daemon_health_check(
             SELECT daemon_id, user_id, daemon_kind, last_heartbeat_at::text AS last_heartbeat_at
             FROM daemon_registrations
             WHERE status = 'active'
+              AND daemon_kind IN (
+                  'knowledge_curator', 'ledger_ingestion', 'email_gateway',
+                  'relational_sync', 'archive_cold_storage', 'health_maintenance'
+              )
             "#,
         )
         .fetch_all(&db.pool)
@@ -438,10 +553,13 @@ pub async fn daemon_health_check(
         if stale_minutes < 10 {
             continue;
         }
+        let Some(daemon_kind) = daemon_kind_from_str(&row.get::<String, _>("daemon_kind")) else {
+            continue;
+        };
         warnings.push(StaleHeartbeatWarning {
             daemon_id: row.get("daemon_id"),
             user_id: row.get("user_id"),
-            daemon_kind: daemon_kind_from_str(&row.get::<String, _>("daemon_kind")),
+            daemon_kind,
             last_heartbeat_at,
             stale_minutes,
         });
@@ -453,10 +571,17 @@ fn registration_from_row(row: &sqlx::postgres::PgRow) -> Result<DaemonRegistrati
     let policy_json = row
         .try_get::<Option<Value>, _>("policy_config")?
         .unwrap_or_else(|| json!({}));
+    let kind_label = row.get::<String, _>("daemon_kind");
+    let daemon_kind = daemon_kind_from_str(&kind_label).ok_or_else(|| {
+        sqlx::Error::Decode(Box::new(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            format!("unsupported system daemon kind: {kind_label}"),
+        )))
+    })?;
     Ok(DaemonRegistration {
         daemon_id: row.get("daemon_id"),
         user_id: row.get("user_id"),
-        daemon_kind: daemon_kind_from_str(&row.get::<String, _>("daemon_kind")),
+        daemon_kind,
         workflow_id: row.try_get("workflow_id").ok().flatten(),
         delegated_key_id: row.get("delegated_key_id"),
         status: daemon_status_from_str(&row.get::<String, _>("status")),
@@ -476,14 +601,15 @@ fn daemon_status_from_str(value: &str) -> DaemonStatus {
     }
 }
 
-fn daemon_kind_from_str(value: &str) -> DaemonKind {
+fn daemon_kind_from_str(value: &str) -> Option<DaemonKind> {
     match value {
-        "ledger_ingestion" => DaemonKind::LedgerIngestion,
-        "email_gateway" => DaemonKind::EmailGateway,
-        "relational_sync" => DaemonKind::RelationalSync,
-        "archive_cold_storage" => DaemonKind::ArchiveColdStorage,
-        "health_maintenance" => DaemonKind::HealthMaintenance,
-        _ => DaemonKind::KnowledgeCurator,
+        "knowledge_curator" => Some(DaemonKind::KnowledgeCurator),
+        "ledger_ingestion" => Some(DaemonKind::LedgerIngestion),
+        "email_gateway" => Some(DaemonKind::EmailGateway),
+        "relational_sync" => Some(DaemonKind::RelationalSync),
+        "archive_cold_storage" => Some(DaemonKind::ArchiveColdStorage),
+        "health_maintenance" => Some(DaemonKind::HealthMaintenance),
+        _ => None,
     }
 }
 

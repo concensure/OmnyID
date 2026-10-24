@@ -4713,3 +4713,46 @@ Next:
 - Then add the distinct `mail.omnyid.com` couple-thread resolver, bounce/complaint handling, expiry,
   key rotation and operations packet. Do not enable routing or any three ingress flags before the
   independent security/privacy, provider, hosted-shadow, usability, permission and cohort gates.
+
+## 2026-10-25 - WED-256 curator containment and Oracle storage recovery (Codex, in progress)
+
+Changed:
+
+- Fixed the curator retry contract: ineligible/noise/short/ephemeral sources now receive one private
+  content-free skip marker and do not emit repeated `skipped` audit rows.
+- Replaced the permissive daemon-kind fallback with an exact persisted-kind lookup. Legacy
+  `background_watcher` and `state_synthesizer` rows can no longer impersonate `knowledge_curator`.
+- Added indexed seven-day `curator_run_audit` retention to health maintenance with 5,000-row commits
+  and a 100,000-row per-pass ceiling, migration 0118, a focused operations script and regression tests.
+- Preserved line budgets: the already-large curator and daemon runtime owners have net line reductions;
+  every new file is below 1,000 lines.
+
+Oracle operations:
+
+- Paused the affected `concensure@gmail.com` curator, watcher and synthesizer registrations. This is
+  deliberate containment until a reviewed release includes WED-256; do not restart the current old
+  homeserver and assume the pause will survive its startup registration repair.
+- Pruned 9.72 GB of build cache and only the reviewed obsolete application tags. Running images,
+  staging `release-67c1559...`, `latest`, and `rollback-before-wed-179-180` were retained.
+- Deleted 1,942,708 audit rows older than a fixed seven-day cutoff in 195 committed batches and ran
+  `VACUUM (FULL, ANALYZE)` only on `curator_run_audit`. It fell from 6.526 GB to 2.522 GB.
+- Kept the newest three backup archives (2.6 GB), made three-day backup retention active, created and
+  verified a post-cleanup database backup, and reduced the journal from 479.9 MB to 98.7 MB.
+- Root disk moved from 87% used (6.1 GB free) to 52% used (22 GB free). The affected account produced
+  zero new audit rows in the final two-minute observation. Full evidence is in
+  `Documents/verification/wed-256-oracle-storage-cleanup-2026-10-25.md`.
+
+Verification:
+
+- Pass: 22 curator units, 9 daemon-registry units, migration-catalog contract, disposable-Postgres
+  exact-kind/one-time-marker/no-audit/no-retry regression, `cargo check`, targeted rustfmt, shell
+  syntax, operations-script dry-run, `git diff --check`, and new-file line budgets.
+- The inherited unused `user_id` warning in `email_group_routes.rs` remains unchanged.
+- Application containers remained running; Electric remained healthy. `/healthz` and `/readyz` are
+  intentionally session-protected in this deployed revision and returned unauthenticated 401.
+
+Next:
+
+- Review and promote the committed WED-256 slice from the advanced branch before resuming the three
+  paused registrations. The storage operation intentionally did not deploy unrelated in-progress
+  WED-255 Email Worker work, and no mail, catch-all, sender-mask, policy-V2 or release flag changed.

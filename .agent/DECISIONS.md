@@ -1618,3 +1618,19 @@ payment or send authority. Existing ClamAV, MIME, file and AFP owners must proce
 slice before any user projection. Ingress remains indistinguishably unavailable unless vendor mail,
 vendor masks and ingress are all enabled; all three remain false pending the independent WED-225,
 security/privacy, hosted-shadow, provider, routing and cohort gates.
+
+## 2026-10-25: Curator skips are durable markers, not per-pass audit events
+
+The Knowledge Curator resolves only a registration whose persisted kind is exactly
+`knowledge_curator`. Legacy and independently managed kinds such as `background_watcher` and
+`state_synthesizer` are not aliases and must never fall through to curator authority.
+
+Policy-ineligible, ephemeral, short and recognised-noise sources receive one content-free internal
+knowledge-card marker. The marker excludes the source from future queue scans; it is not a user-facing
+summary and it does not emit a `skipped` row on every pass. Completed, partial and failed useful work
+retains normal audit semantics.
+
+`curator_run_audit` is operational observability with a default seven-day retention window. Health
+maintenance removes stale rows in independently committed indexed batches with a per-pass ceiling.
+Large historic compaction remains an explicit maintenance-window action rather than an application
+startup side effect.

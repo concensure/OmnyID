@@ -3399,3 +3399,34 @@ tasks:
       - added a routing-neutral Email Worker with deterministic event IDs, timestamped HMAC envelopes, an immutable 10 MiB ceiling, fixed HTTPS ingress, generic permanent rejection and transient retry behavior; its Wrangler config has no addresses and cannot manage routing rules
       - added migration 0117 and a three-flag-gated ingress that verifies exact raw bytes, resolves only current verified apex masks, atomically claims provider events and stores XChaCha20-Poly1305 quarantine before returning 202; no unscanned email becomes AFP
       - seven Worker tests, three ingress units, four provider-readiness units, migration catalog, SMTP 5/5 and 7/7, disposable-Postgres encrypted/replay/conflict/identity tests, cargo check, typecheck, line budgets, site/CSP smoke, all 1964 wedding tests and production UI build pass; scan-to-AFP processing and every hosted/human/routing gate remain open
+  - id: WED-256
+    title: Stop curator audit growth and reclaim bounded Oracle storage
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-215
+    depends_on: []
+    files:
+      - src/curator_runtime.rs
+      - src/daemon_registry.rs
+      - src/daemon_runtime.rs
+      - src/db/migration_catalog.rs
+      - postgres/migrations/**
+      - tests/curator_skip_retention.rs
+      - scripts/**curator**
+      - Documents/verification/**
+      - .agent/**
+    acceptance:
+      - ineligible and noise messages are durably marked once without emitting repeated skipped audit rows or entering a tight curator loop
+      - curator audit and daemon heartbeat retention are bounded to seven days and operational deletion runs in small committed batches before analysis or compaction
+      - Oracle cleanup preserves every running image plus the current rollback-before-wed-179-180 tag while removing only reviewed obsolete tags and unused build cache
+      - only reviewed OmnyID backup archives are thinned to the newest few, journal storage is capped at 100 MB, and unrelated system or application data is untouched
+      - before and after database row counts, relation sizes, disk usage, image references, backup inventory and runtime health are captured without exposing secrets
+      - focused curator tests and relevant build checks pass before the curator fix is promoted
+    progress:
+      - registered after production inspection identified repeated skipped curator rows as the dominant 6.3 GB table growth and the operator authorised bounded Docker, database, backup and journal cleanup
+      - production evidence showed the latest 10000 skipped audits referenced only 24 sources and used a legacy background_watcher daemon ID; unknown persisted kinds were falling through to KnowledgeCurator
+      - curator lookup now requires the exact knowledge_curator label, fast-skip sources receive one durable content-free marker without an audit row, and health maintenance enforces indexed seven-day audit retention in bounded committed batches
+      - focused unit, migration and disposable-Postgres regression checks cover legacy-kind impersonation, one-time skip marking, no skipped audit growth and no second-pass retry; the new operations script also passes syntax and dry-run checks
+      - Oracle containment paused only the affected account's curator/watcher/synthesizer registrations; the final observation recorded zero new rows over two minutes, and they remain paused until a reviewed release contains this fix
+      - pruned 9.72 GB of build cache and reviewed obsolete tags while preserving running/current rollback images; retained three verified newest backups, capped the journal near 100 MB, and reduced root use from 87 to 52 percent
+      - deleted 1942708 audit rows older than a fixed seven-day cutoff in 195 batches and compacted only curator_run_audit from 6.526 GB to 2.522 GB; exact before/after evidence is recorded in Documents/verification/wed-256-oracle-storage-cleanup-2026-10-25.md
