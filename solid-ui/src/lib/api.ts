@@ -1,4 +1,5 @@
 import { customEventDetail, isRecord } from "./eventDetail";
+import { COOKIE_SESSION_TOKEN, forgetSessionBearerToken, rememberSessionBearerToken, resolveSessionBearerToken } from "./sessionCredentialState";
 import { normalizeWeddingVendorSourceEvidence, type WeddingVendorAvailabilityUpdate, type WeddingVendorSourceEvidence } from "./weddingVendorRankingState";
 import { normalizeAdminWeddingVendorRooms, type AdminWeddingVendorRoom } from "./adminWeddingVendorRoomState";
 import { normalizeWeddingVendorAttributeCatalogFields, normalizeWeddingVendorAttributeFields, type WeddingVendorAttributeCatalogFields, type WeddingVendorAttributeFields, type WeddingVendorAttributeWriteFields } from "./weddingVendorAttributeCatalogState";
@@ -128,11 +129,8 @@ export const API_BASE =
   envApiBase ||
   (typeof window !== "undefined" ? deriveDefaultApiBase(window.location.origin) : "");
 export const SESSION_STORAGE_KEY = "omnyid.preview.session";
-const COOKIE_SESSION_TOKEN = "__http_only_cookie__";
 const GUEST_FINGERPRINT_STORAGE_KEY = "omnyid.preview.guest_fingerprint";
 export const SESSION_CHANGED_EVENT = "omnyid:session-changed";
-let volatileBearerToken: string | null = null;
-
 export type Session = {
   token: string;
   user: {
@@ -3431,36 +3429,27 @@ export function readSession(): Session | null {
   try {
     const raw = readSessionStorageValue(sessionStorage);
     if (!raw) {
-      volatileBearerToken = null;
-      removeSessionStorageValue(window.localStorage);
-      return null;
+      forgetSessionBearerToken(); removeSessionStorageValue(window.localStorage); return null;
     }
     const parsed = parseJsonValue(raw);
     if (!parsed.ok) {
-      volatileBearerToken = null;
-      removeSessionStorageValue(sessionStorage);
-      removeSessionStorageValue(window.localStorage);
-      return null;
+      forgetSessionBearerToken(); removeSessionStorageValue(sessionStorage);
+      removeSessionStorageValue(window.localStorage); return null;
     }
     const normalized = normalizeSession(parsed.value);
     if (!normalized) {
-      volatileBearerToken = null;
-      removeSessionStorageValue(sessionStorage);
-      removeSessionStorageValue(window.localStorage);
-      return null;
+      forgetSessionBearerToken(); removeSessionStorageValue(sessionStorage);
+      removeSessionStorageValue(window.localStorage); return null;
     }
-    if (normalized.token !== COOKIE_SESSION_TOKEN) {
-      volatileBearerToken = normalized.token;
-    }
-    const persisted = { ...normalized, token: COOKIE_SESSION_TOKEN };
-    const serialized = JSON.stringify(persisted);
+    rememberSessionBearerToken(normalized.token);
+    const persisted = { ...normalized, token: COOKIE_SESSION_TOKEN }; const serialized = JSON.stringify(persisted);
     if (serialized !== raw || readSessionStorageValue(sessionStorage) !== serialized) {
       writeSessionStorageValue(sessionStorage, serialized);
     }
     removeSessionStorageValue(window.localStorage);
-    return volatileBearerToken ? { ...persisted, token: volatileBearerToken } : persisted;
+    return { ...persisted, token: resolveSessionBearerToken(persisted.token) ?? persisted.token };
   } catch {
-    volatileBearerToken = null;
+    forgetSessionBearerToken();
     removeSessionStorageValue(sessionStorage);
     removeSessionStorageValue(window.localStorage);
     return null;
@@ -3471,11 +3460,10 @@ export function writeSession(
   session: Session | null,
   options?: { reason?: SessionEndReason | null },
 ): void {
-  const normalizedSession = normalizeSession(session);
-  if (!normalizedSession) {
-    volatileBearerToken = null;
-  } else if (normalizedSession.token !== COOKIE_SESSION_TOKEN) {
-    volatileBearerToken = normalizedSession.token;
+  const normalizedSession = normalizeSession(session); if (!normalizedSession) {
+    forgetSessionBearerToken();
+  } else {
+    rememberSessionBearerToken(normalizedSession.token);
   }
   try {
     if (!normalizedSession) {
@@ -3498,11 +3486,7 @@ export function writeSession(
   }
 }
 
-export function sessionBearerToken(token?: string | null): string | null {
-  if (arguments.length === 0) token = readSession()?.token;
-  if (!token || token === COOKIE_SESSION_TOKEN) return volatileBearerToken;
-  return token;
-}
+export const sessionBearerToken = (token: string | null = readSession()?.token ?? null): string | null => resolveSessionBearerToken(token);
 
 export function clearSession(reason: SessionEndReason | null = null): void {
   writeSession(null, { reason });

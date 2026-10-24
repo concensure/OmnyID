@@ -172,8 +172,7 @@ mod wedding_preference_routes;
 mod wedding_understanding_routes;
 mod wedding_newsletter_routes;
 mod wedding_vendor_claim_routes;
-mod wedding_vendor_enrichment;
-mod wedding_vendor_outreach_routes;
+mod wedding_vendor_enrichment; mod wedding_vendor_outreach_routes;
 mod wedding_vendor_ownership_routes;
 mod wedding_vendor_photo_routes;
 mod wedding_vendor_production;
@@ -1167,8 +1166,7 @@ pub async fn run() {
         )
         .route("/auth/register", post(register_http))
         .route("/auth/login", post(login_http))
-        .route("/auth/google/config", get(google_auth_config_http))
-        .route("/auth/google", post(google_auth_http))
+        .route("/auth/google/config", get(google_auth_config_http)).route("/auth/google", post(google_auth_http))
         .route("/auth/apple/config", get(apple_auth_config_http))
         .route("/auth/apple", post(apple_auth_http))
         .route(
@@ -1392,8 +1390,7 @@ pub async fn run() {
         .merge(wedding_understanding_routes::routes())
         .merge(workspace_routes::routes())
         .merge(wedding_newsletter_routes::routes())
-        .merge(wedding_vendor_claim_routes::routes())
-        .merge(wedding_vendor_ownership_routes::routes())
+        .merge(wedding_vendor_claim_routes::routes()).merge(wedding_vendor_ownership_routes::routes())
         .merge(wedding_vendor_photo_routes::routes())
         .layer(cors_layer())
         .layer(axum::middleware::from_fn(request_id_middleware))
@@ -1525,16 +1522,9 @@ pub async fn build_test_router(database_url: &str) -> Router {
         .route("/thread/{thread_id}", get(get_thread_http))
         .route("/actions/decision", post(record_action_decision_http))
         .route("/gateway/email", post(handle_gateway_email))
-        .merge(quotation_normalisation_routes::routes())
-        .merge(quotation_routes::routes())
-        .merge(quotation_response_capability_routes::routes())
-        .merge(quotation_response_portal_routes::routes())
-        .merge(quotation_vendor_response_routes::routes())
-        .merge(quotation_vendor_revision_routes::routes())
-        .merge(quotation_source_routes::routes())
-        .merge(wedding_vendor_claim_routes::routes())
-        .merge(wedding_vendor_ownership_routes::routes())
-        .merge(wedding_vendor_photo_routes::routes())
+        .merge(quotation_normalisation_routes::routes()).merge(quotation_routes::routes()).merge(quotation_response_capability_routes::routes())
+        .merge(quotation_response_portal_routes::routes()).merge(quotation_vendor_response_routes::routes()).merge(quotation_vendor_revision_routes::routes()).merge(quotation_source_routes::routes())
+        .merge(wedding_vendor_claim_routes::routes()).merge(wedding_vendor_ownership_routes::routes()).merge(wedding_vendor_photo_routes::routes())
         .merge(planning_constraint_routes::routes()).merge(planning_constraint_capture_routes::routes()).merge(planning_constraint_evaluation_routes::routes()).merge(planning_constraint_intervention_routes::routes()).merge(planning_cost_tradeoff_routes::routes()).merge(planning_directory_evaluation_routes::routes()).merge(planning_milestone_routes::routes()).merge(planning_vendor_change_routes::routes())
         .layer(cors_layer())
         .layer(axum::middleware::from_fn(request_id_middleware))

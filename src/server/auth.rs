@@ -31,6 +31,7 @@ use crate::{
 use super::{
     AppState, RateLimitPolicy, internal_error, internal_http_error, status_to_http, types::*,
 };
+mod apple_config; pub(super) use apple_config::apple_auth_config_http; use apple_config::apple_client_id_configured;
 
 const APPLE_JWKS_URL: &str = "https://appleid.apple.com/auth/keys";
 const APPLE_JWKS_CACHE_TTL_SECS: u64 = 300;
@@ -203,19 +204,6 @@ pub(super) async fn google_auth_config_http() -> Json<GoogleAuthConfigResponse> 
         enabled: client_id.is_some(),
         client_id,
     })
-}
-
-pub(super) async fn apple_auth_config_http() -> Json<Value> {
-    let client_id = apple_client_id_configured();
-    let redirect_uri = std::env::var("OMNYID_APPLE_REDIRECT_URI")
-        .ok()
-        .map(|value| value.trim().to_string())
-        .filter(|value| value.starts_with("https://"));
-    Json(serde_json::json!({
-        "enabled": client_id.is_some() && redirect_uri.is_some(),
-        "client_id": client_id,
-        "redirect_uri": redirect_uri,
-    }))
 }
 
 pub(super) async fn google_auth_http(
@@ -393,8 +381,7 @@ pub(super) struct AppleAuthRequest {
     /// The iOS client persists it in the Keychain and re-sends it on subsequent logins.
     #[serde(default)]
     pub email: String,
-    #[serde(default)]
-    pub nonce: Option<String>,
+    #[serde(default)] pub nonce: Option<String>,
 }
 
 pub(super) async fn apple_auth_http(
@@ -412,10 +399,7 @@ pub(super) async fn apple_auth_http(
     )
     .await?;
 
-    let expected_audience = apple_client_id_configured().ok_or_else(|| (
-        StatusCode::SERVICE_UNAVAILABLE,
-        "Apple sign-in is not configured".to_string(),
-    ))?;
+    let expected_audience = apple_client_id_configured().ok_or_else(|| (StatusCode::SERVICE_UNAVAILABLE, "Apple sign-in is not configured".to_string()))?;
     let token_claims = verify_apple_identity_token(
         &request.identity_token,
         Some(&expected_audience),
@@ -426,11 +410,7 @@ pub(super) async fn apple_auth_http(
         warn!("apple sign-in rejected: {err}");
         external_sign_in_failed_error()
     })?;
-    if let Some(nonce) = request.nonce.as_deref().map(str::trim).filter(|value| !value.is_empty())
-        && token_claims.nonce.as_deref() != Some(nonce)
-    {
-        return Err(external_sign_in_failed_error());
-    }
+    if let Some(nonce) = request.nonce.as_deref().map(str::trim).filter(|value| !value.is_empty()) && token_claims.nonce.as_deref() != Some(nonce) { return Err(external_sign_in_failed_error()); }
     let apple_sub = format!("apple:{}", token_claims.sub);
 
     let email = if !request.email.is_empty() {
@@ -1646,8 +1626,7 @@ fn cookie_value(cookie_header: &str, name: &str) -> Option<String> {
 }
 
 fn auth_response_with_session_cookie(session: AuthSessionRecord, user: &UserRecord, account_created: bool) -> Response {
-    let token = session.token.clone();
-    json_response_with_session_cookie(&token, Json(session_auth_response(session, user, account_created)))
+    let token = session.token.clone(); json_response_with_session_cookie(&token, Json(session_auth_response(session, user, account_created)))
 }
 
 fn json_response_with_session_cookie(body_token: &str, body: impl IntoResponse) -> Response {
@@ -1887,11 +1866,6 @@ fn google_client_id_configured() -> Option<String> {
         return None;
     }
     Some(trimmed.to_string())
-}
-
-fn apple_client_id_configured() -> Option<String> {
-    std::env::var("OMNYID_APPLE_CLIENT_ID").ok()
-        .map(|value| value.trim().to_string()).filter(|value| !value.is_empty())
 }
 
 async fn verify_google_id_token(id_token: &str) -> Result<GoogleTokenInfoResponse, String> {
@@ -2330,8 +2304,7 @@ aSnVsBzVGTmyju6PoBR7Yw==
             iss: Some("https://appleid.apple.com".to_string()),
             aud: Some("com.omnyid.app".to_string()),
             exp: Some(2_000_000_000i64),
-            iat: Some(1_700_000_000i64),
-            nonce: None,
+            iat: Some(1_700_000_000i64), nonce: None,
         });
 
         let result = validate_apple_identity_token_with_jwks(
@@ -2351,8 +2324,7 @@ aSnVsBzVGTmyju6PoBR7Yw==
             iss: Some("https://evil.example".to_string()),
             aud: Some("com.omnyid.app".to_string()),
             exp: Some(2_000_000_000i64),
-            iat: None,
-            nonce: None,
+            iat: None, nonce: None,
         });
 
         let result = validate_apple_identity_token_with_jwks(
@@ -2372,8 +2344,7 @@ aSnVsBzVGTmyju6PoBR7Yw==
             iss: Some("https://appleid.apple.com".to_string()),
             aud: Some("com.other.app".to_string()),
             exp: Some(2_000_000_000i64),
-            iat: None,
-            nonce: None,
+            iat: None, nonce: None,
         });
 
         let result = validate_apple_identity_token_with_jwks(
@@ -2393,8 +2364,7 @@ aSnVsBzVGTmyju6PoBR7Yw==
             iss: Some("https://appleid.apple.com".to_string()),
             aud: Some("com.omnyid.app".to_string()),
             exp: Some(100i64),
-            iat: None,
-            nonce: None,
+            iat: None, nonce: None,
         });
 
         let result = validate_apple_identity_token_with_jwks(
@@ -3817,25 +3787,21 @@ pub(super) fn session_user_response(user: &UserRecord) -> SessionUserResponse {
     }
 }
 
-fn session_auth_response(session: AuthSessionRecord, user: &UserRecord, account_created: bool) -> AuthResponse {
-    AuthResponse {
+fn session_auth_response(session: AuthSessionRecord, user: &UserRecord, account_created: bool) -> AuthResponse { AuthResponse {
         token: Some(session.token),
         user: Some(session_user_response(user)),
         requires_2fa: false,
-        verification_required: false,
-        account_created,
+        verification_required: false, account_created,
         message: None,
         email: None,
     }
 }
 
-fn verification_required_response(email: &str, message: &str) -> AuthResponse {
-    AuthResponse {
+fn verification_required_response(email: &str, message: &str) -> AuthResponse { AuthResponse {
         token: None,
         user: None,
         requires_2fa: false,
-        verification_required: true,
-        account_created: true,
+        verification_required: true, account_created: true,
         message: Some(message.to_string()),
         email: Some(email.to_string()),
     }

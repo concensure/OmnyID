@@ -581,12 +581,7 @@ export function TiptapEditor(props: TiptapEditorProps) {
       extensions: buildExtensions(props.mode, placeholderText(), props.mentionSuggestions),
       content: props.initialContent ?? "",
       editable: isEditable(),
-      editorProps: {
-        attributes: {
-          role: "textbox",
-          "aria-multiline": "true",
-          "aria-label": props.ariaLabel ?? (props.mode === "email" ? "Email message" : "Rich text editor"),
-        },
+      editorProps: { attributes: { role: "textbox", "aria-multiline": "true", "aria-label": props.ariaLabel ?? (props.mode === "email" ? "Email message" : "Rich text editor") },
         handleDOMEvents: {
           focus: () => {
             props.onFocus?.();

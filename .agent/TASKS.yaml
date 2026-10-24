@@ -3284,6 +3284,7 @@ tasks:
       - WED-250
     files:
       - solid-ui/src/components/WeddingWorkspaceContextPanels.tsx
+      - solid-ui/src/lib/sessionCredentialState.ts
       - solid-ui/src/lib/weddingWorkspaceAggregateState.ts
       - solid-ui/tests/wedding-people-mobile-layout-render.test.ts
       - solid-ui/tests/wedding-workspace-aggregate-state.test.ts
@@ -3306,3 +3307,4 @@ tasks:
       - added reusable hub hierarchy, status, interaction, mobile and WCAG contrast rules to DESIGN_SYSTEM section 11
       - seven focused state/render checks, two 320/1280 browser checks with Axe and alignment assertions, typecheck, both line-budget checks, wedding site/CSP smoke, all 1963 wedding tests and the production build pass
       - the first exact-commit readiness run exposed a verifier-only false failure on generated dependency lockfiles; the WED-225 source line-budget check now excludes Cargo.lock and package-lock.json with a regression contract while continuing to enforce handwritten source budgets
+      - restored every changed oversized owner to its frozen line ceiling by extracting volatile session-credential and Apple configuration helpers; 21 focused frontend contracts, 64 auth units, cargo check, all 1964 wedding tests, site/CSP smoke, both line-budget checks and the production build pass before the final exact-commit evidence run

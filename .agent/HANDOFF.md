@@ -4599,3 +4599,9 @@ Verifier follow-up:
   treated generated `Cargo.lock` growth from the WED-250 dependency upgrades as handwritten source
   bloat. The helper now excludes only `Cargo.lock` and `package-lock.json`; a static regression test
   protects those exact exclusions while Rust/TypeScript/TSX files remain covered.
+- A second exact-commit audit found inherited WED-250 additions had taken `api.ts`, `auth.rs`,
+  `mod.rs` and `TiptapEditor.tsx` above their frozen owner ceilings. Session-credential state and
+  Apple configuration are now extracted into focused files, and repetitive registrations/attributes
+  are line-neutral. The targeted 21 frontend tests and 64 auth units pass, as do cargo check,
+  all 1,964 wedding tests, site/CSP smoke, line budgets and the production build. Recreate the review
+  tag on the resulting commit and use only the final exact-commit manifest for human review.
