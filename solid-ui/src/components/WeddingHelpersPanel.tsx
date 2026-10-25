@@ -21,6 +21,8 @@ import {
   type WeddingHelperResponsibilityStatus,
 } from "@/lib/weddingHelpersPanelState";
 import type { WeddingResponseWorkspaceViewState } from "@/lib/weddingResponseWorkspaceViewState";
+import { loadWeddingTaskCompletion, saveWeddingTaskCompletion, WEDDING_TASK_COMPLETION_EVENT, type WeddingTaskCompletionRecord } from "@/lib/weddingTaskCompletionLocalState";
+import { weddingTaskCompletionToAfpSendInput } from "@/lib/weddingTaskCompletionProjectionState";
 import type { WeddingWorkspaceSidebarAction } from "@/lib/weddingWorkspaceActionState";
 import {
   weddingTaskSidebarAction,
@@ -45,7 +47,7 @@ export function WeddingHelpersPanel(props: {
   const workspaceId = () => props.state.workspace.metadata.responseWorkspaceId;
   const initialState = loadWeddingHelperLocalState(workspaceId());
   const projectedDoneTaskIds = Object.fromEntries(
-    props.state.planningTaskItems.filter((task) => weddingHelperTaskIsDone(task)).map((task) => [task.id, true]),
+    props.state.planningTaskItems.filter((task) => loadWeddingTaskCompletion({ taskId: task.id, weddingPlanId: props.state.workspace.metadata.weddingPlanId, responseWorkspaceId: workspaceId() })?.completed ?? weddingHelperTaskIsDone(task)).map((task) => [task.id, true]),
   ) as Record<string, true>;
   const [doneTaskIds, setDoneTaskIds] = createSignal<Record<string, true>>({ ...initialState.doneTaskIds, ...projectedDoneTaskIds });
   const [confirmedTaskIds, setConfirmedTaskIds] = createSignal<Record<string, true>>(initialState.confirmedTaskIds);
@@ -101,7 +103,18 @@ export function WeddingHelpersPanel(props: {
       if (nextTab) setTaskTab(nextTab);
     };
     window.addEventListener(WEDDING_HELPER_TASK_TAB_EVENT, handler);
-    onCleanup(() => window.removeEventListener(WEDDING_HELPER_TASK_TAB_EVENT, handler));
+    const completionHandler = (event: Event) => {
+      const detail = (event as CustomEvent<WeddingTaskCompletionRecord>).detail;
+      if (!detail || typeof detail.taskId !== "string" || !detail.taskId || detail.responseWorkspaceId !== workspaceId()) return;
+      const taskId = detail.taskId;
+      setDoneTaskIds((current) => {
+        const next = { ...current };
+        if (detail.completed) next[taskId] = true; else delete next[taskId];
+        return next;
+      });
+    };
+    window.addEventListener(WEDDING_TASK_COMPLETION_EVENT, completionHandler);
+    onCleanup(() => { window.removeEventListener(WEDDING_HELPER_TASK_TAB_EVENT, handler); window.removeEventListener(WEDDING_TASK_COMPLETION_EVENT, completionHandler); });
   });
 
   createEffect(() => {
@@ -123,6 +136,10 @@ export function WeddingHelpersPanel(props: {
       else delete next[taskId];
       return next;
     });
+    const task = props.state.planningTaskItems.find((item) => item.id === taskId);
+    const record = saveWeddingTaskCompletion({ taskId, completed: done, weddingPlanId: props.state.workspace.metadata.weddingPlanId, responseWorkspaceId: workspaceId() });
+    const input = weddingTaskCompletionToAfpSendInput({ record, title: task?.title });
+    if (input && props.saveProjection) void props.saveProjection(input).then(() => props.onRefreshWorkspace?.()).catch(() => setSaveNotice("Updated on this device. Wedding memory will sync when saving is available."));
   }
 
   async function saveTaskResponsibility(task: WeddingPlanningTask, overrides?: {

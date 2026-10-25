@@ -4,6 +4,7 @@ import { createMemo, createSignal, For, Show } from "solid-js";
 import { WeddingDashboardIcon, type WeddingDashboardIconId } from "@/components/WeddingDashboardIcons";
 import { WeddingDateEntryControl } from "@/components/WeddingDateEntryControl";
 import { WeddingPlanningJourneyStepper } from "@/components/WeddingPlanningJourneyStepper";
+import type { SendAfpMessageInput } from "@/lib/api";
 import {
   buildWeddingHomeOverviewActionTiles,
   buildWeddingHomePlanningProgress,
@@ -82,6 +83,8 @@ export function WeddingHomeOverviewGrid(props: {
   onSidebarAction?: (action: WeddingWorkspaceSidebarAction) => void;
   onSelectMenu?: (menu: WeddingWorkspaceMenuId) => void;
   onSaveWeddingDate?: (date: string) => Promise<void> | void;
+  saveProjection?: ((input: SendAfpMessageInput) => Promise<unknown>) | null;
+  onRefreshWorkspace?: (() => void) | null;
   dense?: boolean;
 }) {
   const dense = () => props.dense === true;
@@ -127,7 +130,13 @@ export function WeddingHomeOverviewGrid(props: {
             Open timeline
           </button>
         </div>
-        <WeddingPlanningJourneyStepper completedCount={progress().completedCount} totalCount={progress().totalCount} />
+        <WeddingPlanningJourneyStepper
+          tasks={props.state.planningTaskItems}
+          weddingPlanId={props.state.workspace.metadata.weddingPlanId}
+          responseWorkspaceId={props.state.workspace.metadata.responseWorkspaceId}
+          saveProjection={props.saveProjection}
+          onRefreshWorkspace={props.onRefreshWorkspace}
+        />
         <Show when={!weddingDate() && props.onSaveWeddingDate} fallback={
           <button type="button" class="mt-5 flex min-h-12 w-full items-center justify-between gap-3 rounded-lg border border-wedding-border bg-wedding-page px-4 text-left text-sm font-semibold text-wedding-ink transition hover:border-wedding-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-primary" onClick={openTimeline}>
             <span class="min-w-0 truncate">Next · {timeline().detailLabel.replace(/^Next:\s*/i, "")}</span><WeddingDashboardIcon id="arrow-right" class="h-5 w-5 shrink-0" />

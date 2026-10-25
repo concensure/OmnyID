@@ -54,11 +54,14 @@ test("migrated home and decision surfaces use the teal brand without old rose or
 test("home uses task-bound journey and preserves the separate mobile navigation shell", () => {
   const overview = read("src/components/WeddingHomeOverviewGrid.tsx");
   const journey = read("src/components/WeddingPlanningJourneyStepper.tsx");
+  const journeyState = read("src/lib/weddingJourneyStageState.ts");
   const mobilePage = read("src/components/WeddingMobilePage.tsx");
   assert.match(overview, /WeddingPlanningJourneyStepper/);
   assert.match(overview, /aria-label="Wedding plan up next"/);
   assert.match(overview, /Saved vendors/);
-  assert.match(journey, /completed\(\).*planning tasks complete/);
+  assert.match(journeyState, /Plan & budget/);
+  assert.match(journeyState, /Wedding & after/);
+  assert.match(journey, /weddingJourneyGroups/);
   assert.match(mobilePage, /WeddingMobileTabBar/);
   assert.match(mobilePage, /bg-wedding-page/);
 });

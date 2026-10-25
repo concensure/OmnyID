@@ -360,7 +360,7 @@ export function WeddingMobileFocusHome(props: {
               />
             )}
           >
-            <WeddingHomeOverviewGrid dense state={props.state} onSidebarAction={props.onSidebarAction} onSelectMenu={props.onSelectMenu} />
+            <WeddingHomeOverviewGrid dense state={props.state} onSidebarAction={props.onSidebarAction} onSelectMenu={props.onSelectMenu} saveProjection={props.saveProjection} />
           </Show>
         )}
       >

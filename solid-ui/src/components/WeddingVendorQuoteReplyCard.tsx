@@ -3,6 +3,7 @@ import { createEffect, createSignal, For, onCleanup, onMount, Show } from "solid
 
 import { TiptapEditor } from "@/components/editor/TiptapEditor";
 import { AttachmentsRenderer } from "@/components/renderers/AttachmentsRenderer";
+import { WeddingNormalizedQuoteSummary } from "@/components/WeddingNormalizedQuoteSummary";
 import { fetchGmailOAuthConfig, fetchGmailOAuthUrl } from "@/lib/api";
 import type { EditorPayload } from "@/lib/editorPayload";
 import { gmailOAuthConfigFailureMessage } from "@/lib/gmailConnectionState";
@@ -250,22 +251,12 @@ export function WeddingVendorQuoteReplyCard(props: {
   const handleSecondaryAction = () => {
     const action = presentation().secondaryActionKind;
     if (action === "view_quote") {
-      const attachmentUrl = quoteAttachmentUrl();
-      if (attachmentUrl) {
-        window.open(attachmentUrl, "_blank", "noopener,noreferrer");
-        return;
-      }
       setQuoteDetailsOpen(true);
       return;
     }
     if (action === "edit_reply") setForceReplyEditorOpen(true);
   };
   const handleHomeQuoteAction = () => {
-    const attachmentUrl = quoteAttachmentUrl();
-    if (attachmentUrl) {
-      window.open(attachmentUrl, "_blank", "noopener,noreferrer");
-      return;
-    }
     setHomeExpanded(true);
     setQuoteDetailsOpen(true);
   };
@@ -411,7 +402,7 @@ export function WeddingVendorQuoteReplyCard(props: {
               onClick={handleHomeQuoteAction}
               data-magic-action="open"
               data-magic-icon="quote"
-              data-magic-label={homeSurface().quoteActionKind === "open_attachment" ? "Open quote file" : "See quote"}
+              data-magic-label="View normalized quote"
               data-magic-id={`wedding:quote-reply:${props.flow.id}:home-quote`}
               class="min-h-[44px] rounded-2xl border-2 border-wedding-accent bg-white px-5 py-3 text-sm font-bold text-wedding-text transition hover:bg-wedding-surface-blush focus:outline-none focus:ring-2 focus:ring-wedding-accent focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
             >
@@ -547,16 +538,7 @@ export function WeddingVendorQuoteReplyCard(props: {
             </Show>
             <Show when={quoteDetailsOpen()}>
               <div id={quoteDetailsId()} class="mt-3">
-                <Show when={quote().inclusions.length > 0}>
-                  <div class="rounded-xl bg-wedding-surface-muted/75 p-3">
-                    <p class="text-xs font-bold uppercase tracking-[0.08em] text-wedding-muted">Included</p>
-                    <ul class="mt-1 space-y-1">
-                      <For each={quote().inclusions}>
-                        {(item) => <li class="break-words text-sm leading-5 text-wedding-muted">{item}</li>}
-                      </For>
-                    </ul>
-                  </div>
-                </Show>
+                <WeddingNormalizedQuoteSummary quote={quote()} />
                 <Show when={quoteAttachmentMessage()}>
                   {(message) => (
                     <div class="mt-3 rounded-xl border border-wedding-surface-muted bg-white p-3">

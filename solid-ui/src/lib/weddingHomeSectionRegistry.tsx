@@ -96,7 +96,7 @@ export function buildWeddingHomeSections(input: WeddingHomeSectionRegistryInput)
       id: "overview",
       title: "Wedding overview",
       visible: true,
-      render: () => <WeddingHomeOverviewGrid state={state()} onSelectMenu={workspace.onSelectMenu} onSidebarAction={input.handleSidebarAction} onSaveWeddingDate={workspace.onSaveWeddingDate} />,
+      render: () => <WeddingHomeOverviewGrid state={state()} onSelectMenu={workspace.onSelectMenu} onSidebarAction={input.handleSidebarAction} onSaveWeddingDate={workspace.onSaveWeddingDate} saveProjection={workspace.saveProjection} onRefreshWorkspace={workspace.onRefreshWorkspace} />,
     },
     {
       id: "status",

@@ -3501,3 +3501,38 @@ tasks:
       - comparison actions now say Prepare enquiry, Review enquiry, Send enquiry, View conversation, Compare quote or Review booking terms according to represented state; suitability labels are derived from match evidence and hard-constraint confirmation, never source verification alone
       - the five supplied fictional quote sidecars run through the production comparison contract; every result remains conditional because availability is unknown, incomplete and estimated totals stay visibly non-comparable, and no vendor is recommended
       - pass: cargo check, 14 quotation tests, 7 vendor-response transport tests, 3 focused attachment/Gmail units, typecheck, 42 focused frontend tests, all 1968 wedding tests, production UI build and both line-budget guards; every new file is below 1000 lines
+  - id: WED-259
+    title: Surface normalized vendor quotes and make the six-stage wedding journey actionable
+    status: complete
+    owner: codex
+    branch: agent/codex/WED-215
+    depends_on:
+      - WED-242
+      - WED-243
+      - WED-258
+    files:
+      - solid-ui/src/components/WeddingPlanningJourneyStepper.tsx
+      - solid-ui/src/components/WeddingPlanningTasksPanel.tsx
+      - solid-ui/src/components/WeddingVendorFollowUpPanel.tsx
+      - solid-ui/src/components/WeddingWorkspaceDocumentsPanel.tsx
+      - solid-ui/src/lib/wedding*State.ts
+      - solid-ui/tests/wedding-*.test.ts
+      - src/quotation/**
+      - typescript-sdk/src/quotation.ts
+      - docs/DESIGN_SYSTEM.md
+      - .agent/**
+    acceptance:
+      - a received vendor quote produces an evidence-backed normalized summary and recommendation only after date, guest and relevant enquiry context are bound, with unknown or non-comparable terms explicit
+      - the vendor follow-up card opens the normalized quote in place without routing to Response Queue, while Documents retains the original quote and projects its normalized companion
+      - one shared six-stage taxonomy labels every prebuilt and user-created task as Plan & budget, Venue & date, Celebrant & suppliers, Details & invites, Final prep, or Wedding & after
+      - missing research-backed tasks and corrected late-stage deadlines are included without duplicating existing task records or dropping distinct templates that share a kind
+      - selecting a journey stage reveals its categorized tasks chronologically directly below the stepper, at home-card width, with stage-aware accessible labels and no route change
+      - couples can add a task with stage and deadline from Timeline and Tasks, edit the deadline there, and mark the same task done from every task projection
+      - AFP remains the task and document source of truth, technical details do not leak, rollout-sensitive flags remain unchanged, new files stay below 1000 lines and relevant tests/builds pass
+    progress:
+      - registered from committed WED-258 revision 588d5eb after reviewing the Australian planning, digital workflow and timeline-stage research; existing WED-242/WED-243 projections will be extended rather than replaced
+      - received quote artifacts now share one normalized projection across the inline home response workflow and Documents; original files remain separately visible, and recommendation readiness requires event date, guest count, availability, material terms and verified extraction where an attachment exists
+      - home quote actions always reveal the normalized quote in place rather than navigating to Response Queue or opening the attachment; reply drafts do not suggest a hold when the event basis or availability is missing
+      - all projected tasks receive one of the six research-backed journey stages; research gaps are added without kind-based deduplication and recognized prebuilt final-count, seating, run-sheet, supplier-confirmation, weather, fitting and rehearsal deadlines are recalculated from the wedding date
+      - the interactive home stepper reveals categorized chronological tasks in place, while Tasks and Timeline can create AFP wedding tasks with a stage and deadline, edit deadlines, and share one completion event/projection with People
+      - pass: typecheck, focused quote/journey/persistence tests, all 1974 wedding tests, production UI build, both line-budget guards and 33 Rust quotation tests; policy V2 and rollout flags are unchanged

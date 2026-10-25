@@ -1,6 +1,8 @@
 // @locs-version: 1.0
-import { createMemo, createSignal, For, Show } from "solid-js";
+import { createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { WeddingTaskResponsibilityFields } from "@/components/WeddingTaskResponsibilityFields";
+import { WeddingTaskComposer } from "@/components/WeddingTaskComposer";
+import { WeddingTaskCompletionButton } from "@/components/WeddingTaskCompletionButton";
 
 import type { SendAfpMessageInput } from "@/lib/api";
 import {
@@ -10,12 +12,12 @@ import {
 } from "@/lib/activeTaskDecisionViewState";
 import {
   loadWeddingHelperLocalState,
-  saveWeddingHelperLocalState,
-  weddingHelperResponsibilityToAfpSendInput,
   weddingHelperTaskDueLabel,
   weddingHelperTaskIsDone,
   weddingHelperTaskPriorityLabel,
 } from "@/lib/weddingHelpersPanelState";
+import { loadWeddingTaskCompletion, WEDDING_TASK_COMPLETION_EVENT } from "@/lib/weddingTaskCompletionLocalState";
+import { weddingTaskDateToAfpSendInput } from "@/lib/weddingTaskDateProjectionState";
 import type { WeddingResponseWorkspaceViewState } from "@/lib/weddingResponseWorkspaceViewState";
 
 type Filter = "open" | "done" | "all";
@@ -38,12 +40,16 @@ export function WeddingPlanningTasksPanel(props: {
 }) {
   const workspaceId = () => props.state.workspace.metadata.responseWorkspaceId;
   const initial = loadWeddingHelperLocalState(workspaceId());
-  const [doneTaskIds, setDoneTaskIds] = createSignal<Record<string, true>>(initial.doneTaskIds);
+  const [completionRevision, setCompletionRevision] = createSignal(0);
   const [filter, setFilter] = createSignal<Filter>("open");
   const [savingTaskId, setSavingTaskId] = createSignal<string | null>(null);
   const [expandedTaskIds, setExpandedTaskIds] = createSignal<Record<string, true>>({});
   const [notice, setNotice] = createSignal<string | null>(null);
-  const isDone = (task: Task) => weddingHelperTaskIsDone(task, doneTaskIds());
+  const isDone = (task: Task) => {
+    completionRevision();
+    return loadWeddingTaskCompletion({ taskId: task.id, weddingPlanId: props.state.workspace.metadata.weddingPlanId, responseWorkspaceId: workspaceId() })?.completed
+      ?? weddingHelperTaskIsDone(task, initial.doneTaskIds);
+  };
   const tasks = createMemo(() => props.state.planningTaskItems.filter((task) => (
     filter() === "all" || (filter() === "done" ? isDone(task) : !isDone(task))
   )));
@@ -64,33 +70,18 @@ export function WeddingPlanningTasksPanel(props: {
     return next;
   });
 
-  async function setDone(task: Task, done: boolean): Promise<void> {
-    const current = loadWeddingHelperLocalState(workspaceId());
-    const nextDoneTaskIds = { ...current.doneTaskIds };
-    if (done) nextDoneTaskIds[task.id] = true;
-    else delete nextDoneTaskIds[task.id];
-    saveWeddingHelperLocalState(workspaceId(), { ...current, doneTaskIds: nextDoneTaskIds });
-    setDoneTaskIds(nextDoneTaskIds);
-    setNotice(done ? "Task marked done. People has been updated too." : "Task reopened. People has been updated too.");
-    if (!props.saveProjection) return;
-    const sendInput = weddingHelperResponsibilityToAfpSendInput({
-      task,
-      metadata: props.state.workspace.metadata,
-      ownerLabel: current.taskAssignees[task.id] ?? task.assignee ?? "You",
-      consultedLabel: current.taskConsultedPeople[task.id],
-      lastContactDate: current.taskLastContactDates[task.id],
-      status: done ? "done" : "open",
-    });
-    if (!sendInput) return;
+  onMount(() => {
+    const listener = () => setCompletionRevision((value) => value + 1);
+    window.addEventListener(WEDDING_TASK_COMPLETION_EVENT, listener);
+    onCleanup(() => window.removeEventListener(WEDDING_TASK_COMPLETION_EVENT, listener));
+  });
+  async function saveDate(task: Task, dueDate: string): Promise<void> {
+    const input = weddingTaskDateToAfpSendInput({ taskId: task.id, title: task.title, dueDate, weddingPlanId: props.state.workspace.metadata.weddingPlanId, responseWorkspaceId: workspaceId() });
+    if (!input || !props.saveProjection) return;
     setSavingTaskId(task.id);
-    try {
-      await props.saveProjection(sendInput);
-      props.onRefreshWorkspace?.();
-    } catch {
-      setNotice("Updated on this device. Wedding memory will sync when saving is available.");
-    } finally {
-      setSavingTaskId(null);
-    }
+    try { await props.saveProjection(input); setNotice("Deadline updated."); props.onRefreshWorkspace?.(); }
+    catch { setNotice("The deadline could not be saved. Try again."); }
+    finally { setSavingTaskId(null); }
   }
 
   return (
@@ -109,6 +100,7 @@ export function WeddingPlanningTasksPanel(props: {
           </button>
         )}</For>
       </div>
+      <WeddingTaskComposer weddingPlanId={props.state.workspace.metadata.weddingPlanId} responseWorkspaceId={workspaceId()} saveProjection={props.saveProjection} onRefreshWorkspace={props.onRefreshWorkspace} />
       <Show when={notice()}>{(message) => <p class="mt-3 rounded-lg border border-wedding-border bg-wedding-slate px-3 py-2 text-sm text-wedding-ink" role="status">{message()}</p>}</Show>
       <Show when={tasks().length > 0} fallback={<p class="mt-4 rounded-lg border border-dashed border-wedding-border bg-wedding-page p-5 text-sm text-wedding-ink/70">No tasks in this view.</p>}>
         <ul class="mt-4 space-y-3">
@@ -124,9 +116,7 @@ export function WeddingPlanningTasksPanel(props: {
                   <p class="mt-1 text-sm text-wedding-ink/70">Due {weddingHelperTaskDueLabel(task)} · {task.assignee?.trim() || "You"}</p>
                   <p class="mt-2 text-xs font-semibold text-wedding-primary">{expandedTaskIds()[task.id] ? "Hide task details" : "View task details"}</p>
                 </button>
-                <button type="button" disabled={savingTaskId() === task.id} onClick={() => void setDone(task, !isDone(task))} class="min-h-11 shrink-0 rounded-lg border border-wedding-secondary bg-white px-4 text-sm font-semibold text-wedding-secondary disabled:opacity-50">
-                  {isDone(task) ? "Reopen" : "Mark done"}
-                </button>
+                <WeddingTaskCompletionButton task={task} weddingPlanId={props.state.workspace.metadata.weddingPlanId} responseWorkspaceId={workspaceId()} saveProjection={props.saveProjection} onRefreshWorkspace={props.onRefreshWorkspace} />
               </div>
               <Show when={expandedTaskIds()[task.id]}>
                 <div class="border-t border-wedding-border bg-white p-4">
@@ -137,6 +127,9 @@ export function WeddingPlanningTasksPanel(props: {
                     onRefreshWorkspace={props.onRefreshWorkspace}
                     contactUserId={props.contactUserId}
                   />
+                  <label class="mb-4 block text-sm font-semibold text-wedding-ink">Deadline
+                    <input type="date" disabled={savingTaskId() === task.id} value={task.dueAt?.slice(0, 10) ?? ""} onChange={(event) => void saveDate(task, event.currentTarget.value)} class="mt-1 min-h-11 w-full rounded-lg border border-wedding-border bg-white px-3 font-normal sm:max-w-xs" />
+                  </label>
                   <Show when={decisionTask(task)?.decisions.length} fallback={<p class="text-sm text-wedding-ink/65">No decision options are attached to this task yet.</p>}>
                     <ol class="space-y-3">
                       <For each={decisionTask(task)?.decisions ?? []}>{(decision, index) => (

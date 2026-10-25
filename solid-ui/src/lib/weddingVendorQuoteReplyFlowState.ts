@@ -1,6 +1,7 @@
 import { buildWeddingApprovalRequestState, type WeddingApprovalRequestState } from "@/lib/weddingApprovalState";
 import type { WeddingApprovalExecutionState } from "@/lib/weddingApprovalExecutionState";
 import type { WeddingArtifactQuotePreview } from "@/lib/weddingArtifactPreviewState";
+import { buildWeddingNormalizedQuoteState } from "@/lib/weddingNormalizedQuoteState";
 import {
   normalizeWeddingPlanningMetadata,
   safeWeddingLabel,
@@ -267,7 +268,6 @@ export function weddingVendorQuoteReplyPresentationState(input: {
 }): WeddingVendorQuoteReplyPresentationState {
   const vendorName = clean(input.flow.quote.vendorName) || "vendor";
   const budgetDelta = clean(input.flow.quote.budgetDeltaLabel);
-  const attachmentUrl = clean(input.flow.quote.attachmentUrl);
   const undoUntil = clean(input.flow.undoUntilIso);
   const dirty = input.dirtyState?.dirty === true;
   const draftPersistenceBlocksSend = input.draftPersistence?.blocksExternalSend === true;
@@ -350,9 +350,7 @@ export function weddingVendorQuoteReplyPresentationState(input: {
     secondaryActionLabel: input.flow.stage === "sent"
       ? null
       : showReplyEditor
-        ? attachmentUrl
-          ? "Open quote file"
-          : "Show quote details"
+        ? "View normalized quote"
         : "Edit reply",
     budgetAcknowledgementLabel: budgetDelta
       ? `I understand this is ${budgetDelta}, and I'm okay with that.`
@@ -381,7 +379,6 @@ export function weddingVendorQuoteReplyHomeSurfaceState(input: {
   flow: Pick<WeddingVendorQuoteReplyFlowState, "quote" | "stage" | "failureMessage" | "canSend" | "draftBody">;
   presentation?: Pick<WeddingVendorQuoteReplyPresentationState, "budgetAcknowledgementLabel"> | null;
 }): WeddingVendorQuoteReplyHomeSurfaceState {
-  const hasAttachment = Boolean(clean(input.flow.quote.attachmentUrl));
   const budgetImpact = clean(input.presentation?.budgetAcknowledgementLabel)
     || (clean(input.flow.quote.budgetDeltaLabel)
       ? `Budget impact: ${clean(input.flow.quote.budgetDeltaLabel)}`
@@ -404,8 +401,8 @@ export function weddingVendorQuoteReplyHomeSurfaceState(input: {
           ? "Open agent draft"
           : "Draft a reply";
   return {
-    quoteActionLabel: "See the quote",
-    quoteActionKind: hasAttachment ? "open_attachment" : "show_quote_details",
+    quoteActionLabel: "View normalized quote",
+    quoteActionKind: "show_quote_details",
     replyActionLabel,
     replyActionKind,
     budgetImpactLabel: budgetImpact,
@@ -735,6 +732,7 @@ export function weddingVendorQuoteRecommendationRationale(input: {
   recipient?: string | null;
   draftBody?: string | null;
 }): string {
+  const normalized = buildWeddingNormalizedQuoteState(input.quote);
   const reasons: string[] = [];
   const vendorName = clean(input.quote.vendorName) || "this vendor";
   const budgetDelta = clean(input.quote.budgetDeltaLabel);
@@ -748,17 +746,17 @@ export function weddingVendorQuoteRecommendationRationale(input: {
   const attachmentTextStatus = input.quote.attachmentTextStatus ?? (attachmentUrl ? "linked_unverified" : "none");
   const hasReplyTarget = Boolean(clean(input.recipient));
   const hasDraft = Boolean(clean(input.draftBody));
-
   if (input.quote.inclusions.length > 0) {
     const included = input.quote.inclusions.slice(0, 3).join(", ");
     reasons.push(`${vendorName} listed ${included}${input.quote.inclusions.length > 3 ? ", and more" : ""}.`);
   } else {
     reasons.push(`${vendorName} supplied a quote amount, but the inclusions still need confirmation.`);
   }
-
   if (budgetDelta) {
     if (appearsUnderBudget) {
-      reasons.push(`The quote is ${budgetDelta}; the suggested reply asks for a provisional hold while payment and exclusion terms are confirmed.`);
+      reasons.push(normalized.recommendationReady
+        ? `The quote is ${budgetDelta}; it can be shortlisted for contract review after the original terms are checked.`
+        : `The quote is ${budgetDelta}, but it stays conditional until its event basis, availability, payment terms, and exclusions are confirmed.`);
     } else if (appearsOverBudget) {
       reasons.push(`The quote is ${budgetDelta}; the suggested reply asks for package adjustments before approval.`);
     } else {
@@ -788,6 +786,7 @@ export function weddingVendorQuoteRecommendationHandoff(input: {
   whyLabels: string[];
   confidenceLabel: string;
 } {
+  const normalized = buildWeddingNormalizedQuoteState(input.quote);
   const budgetDelta = clean(input.quote.budgetDeltaLabel);
   const budgetDeltaAmount = typeof input.quote.budgetDeltaAmount === "number" ? input.quote.budgetDeltaAmount : null;
   const hasInclusions = input.quote.inclusions.length > 0;
@@ -804,6 +803,8 @@ export function weddingVendorQuoteRecommendationHandoff(input: {
 
   const recommendationLabel = !hasReplyTarget || !hasDraft
     ? "Complete the reply details before sending"
+    : !normalized.recommendationReady
+      ? normalized.recommendationLabel
     : appearsOverBudget
       ? "Ask for trade-offs before approving"
       : appearsUnderBudget
@@ -811,6 +812,7 @@ export function weddingVendorQuoteRecommendationHandoff(input: {
         : "Review terms before sending";
 
   const whyLabels = [
+    normalized.recommendationDetail,
     budgetDelta ? `Budget impact: ${budgetDelta}` : "Budget impact not measured yet",
     hasInclusions
       ? `Quote includes ${input.quote.inclusions.slice(0, 2).join(", ")}${input.quote.inclusions.length > 2 ? ", and more" : ""}`
@@ -834,7 +836,7 @@ export function weddingVendorQuoteRecommendationHandoff(input: {
     hasReplyTarget,
     hasDraft,
   ].filter(Boolean).length;
-  const confidenceLabel = evidenceCount >= 6
+  const confidenceLabel = normalized.recommendationReady && evidenceCount >= 6
     ? "Confidence: strong"
     : evidenceCount >= 4
       ? "Confidence: developing"

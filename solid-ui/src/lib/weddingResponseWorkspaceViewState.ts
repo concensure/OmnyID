@@ -106,6 +106,8 @@ import {
   type WeddingImportParserReadinessState,
 } from "@/lib/weddingImportParserReadinessState";
 import { buildWeddingWorkspaceGeneratedTaskItems } from "@/lib/weddingWorkspaceGeneratedTaskItemsState";
+import { addWeddingResearchTasks } from "@/lib/weddingJourneyStageState";
+import { bindWeddingQuoteContext } from "@/lib/weddingNormalizedQuoteState";
 import type {
   WeddingOutreachEscalationStage,
   WeddingVendorContactOutreachVendor,
@@ -361,17 +363,14 @@ export type WeddingResponseWorkspaceViewState = {
 function clean(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
-
 function record(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
-
 function exactIsoDate(value: unknown): string | null {
   const text = clean(value);
   const date = text.slice(0, 10);
   return /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : null;
 }
-
 function weddingPlanningWindow(scheduleItems: readonly WeddingPlanningScheduleItem[], metadata: unknown, nowIso: string | null | undefined): { startAt: string; weddingDate: string | null } {
   const metadataRecord = record(metadata);
   const weddingDate = scheduleItems
@@ -390,12 +389,10 @@ function weddingPlanningWindow(scheduleItems: readonly WeddingPlanningScheduleIt
     ?? exactIsoDate(metadataRecord.planning_started_at);
   return { startAt: persistedStart ?? exactIsoDate(nowIso) ?? new Date().toISOString().slice(0, 10), weddingDate };
 }
-
 function isSeededTimelineTask(task: WeddingPlanningTaskItem): boolean {
   const metadata = record(task.metadata);
   return metadata.vendor_seed_review_task === true || metadata.seed === true || metadata.demo === true;
 }
-
 function isUserFacingWeddingPlanningTask(task: WeddingPlanningTaskItem): boolean {
   const metadata = record(task.metadata);
   return !(
@@ -406,7 +403,6 @@ function isUserFacingWeddingPlanningTask(task: WeddingPlanningTaskItem): boolean
     || metadata.expected_behavior_gap === true
   );
 }
-
 function isClosedVendorPursuitTask(task: WeddingPlanningTaskItem): boolean {
   const metadata = record(task.metadata);
   return metadata.vendor_outreach_pursuit_status === "not_pursuing"
@@ -427,7 +423,6 @@ function closedVendorPursuitLineItemIds(taskItems: readonly WeddingPlanningTaskI
   }
   return ids;
 }
-
 function uniqueHelperNames(values: readonly unknown[]): string[] {
   const seen = new Set<string>();
   const result: string[] = [];
@@ -534,7 +529,7 @@ function privateImportSourceUrl(value: string): boolean {
 
 function firstWeddingPlanningContextValue(
   contexts: readonly WeddingNeedToKnowProjectionContext[] | null | undefined,
-  key: "dateOrSeason" | "vendorCategories",
+  key: "dateOrSeason" | "guestCount" | "vendorCategories",
 ): unknown {
   for (const context of contexts ?? []) {
     const value = context.planningContext?.[key];
@@ -669,9 +664,14 @@ export function buildWeddingResponseWorkspaceViewState(input: WeddingResponseWor
     submittedResponseCount: artifacts.length,
   });
   const delegation = buildWeddingDelegationState(input.delegatedResponsibilities ?? []);
-  const activePreview = previewForArtifact(workspace.activeArtifact, artifacts, input.decisionRecords);
+  const quoteContext = {
+    eventDate: firstWeddingPlanningContextValue(input.contextItems, "dateOrSeason"),
+    guestCount: firstWeddingPlanningContextValue(input.contextItems, "guestCount"),
+  };
+  const activePreview = bindWeddingQuoteContext(previewForArtifact(workspace.activeArtifact, artifacts, input.decisionRecords), quoteContext);
   const artifactPreviews = workspace.results
     .map((artifact) => previewForArtifact(artifact, artifacts, input.decisionRecords))
+    .map((item) => bindWeddingQuoteContext(item, quoteContext))
     .filter((preview): preview is WeddingWorkspaceArtifactPreview => preview !== null);
   const vendorQuoteReplyFlows = vendorQuoteReplyFlowsFromPreviews({
     previews: artifactPreviews,
@@ -844,10 +844,10 @@ export function buildWeddingResponseWorkspaceViewState(input: WeddingResponseWor
     now: input.nowIso,
     metadata: input.metadata ?? artifacts[0]?.metadata,
   });
-  const activeProjectionTaskItems = projectionTaskItems.filter((task) => (
+  const activeProjectionTaskItems = addWeddingResearchTasks(projectionTaskItems.filter((task) => (
     !isClosedVendorPursuitTask(task)
     && record(task.metadata).production_remaining_work_task !== true
-  ));
+  )), planningWindow.weddingDate);
   const userFacingProjectionTaskItems = activeProjectionTaskItems.filter(isUserFacingWeddingPlanningTask);
   // Use the complete generated task plan so the chart can apply the project lead-time
   // templates, but keep demo/seed review work out of a couple's timeline.

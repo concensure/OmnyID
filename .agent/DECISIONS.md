@@ -1664,3 +1664,18 @@ increasing preference and hard-constraint evidence, and Your preferred vendor is
 couple's selection. At equal requirement coverage, quote comparison orders complete totals before
 ambiguous estimates and incomplete starting prices rather than presenting a lower uncertain number as
 the better deal. Unknown availability prevents a booking recommendation.
+
+## 2026-10-25: Normalized quotes and wedding stages are shared projections
+
+A received quote has one normalized projection in the response workflow and Documents. The original
+attachment remains evidence and is opened separately; it is not the user-facing comparison itself.
+Date, guest count, availability, comparable total, inclusions, payment terms and verified attachment
+extraction (when applicable) are prerequisites for a decision-ready recommendation. A low amount alone
+must not produce a hold or booking recommendation.
+
+Wedding task urgency and journey stage are separate dimensions. Every existing and new task is mapped
+to one of Plan & budget, Venue & date, Celebrant & suppliers, Details & invites, Final prep, or Wedding
+& after. AFP remains canonical for task creation, dates and completion; local records provide immediate
+same-device feedback and broadcast one completion event so Home, Timeline, Tasks and People converge.
+Research-backed template tasks are de-duplicated by stable identity/title rather than broad kind, and
+only recognized prebuilt timing tasks have deadlines recalculated from the wedding date.

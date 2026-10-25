@@ -73,6 +73,16 @@ export type WeddingArtifactQuotePreview = {
   budgetDeltaAmount: number | null;
   budgetDeltaLabel: string | null;
   inclusions: string[];
+  exclusions?: string[];
+  mandatoryFees?: string[];
+  paymentSchedule?: string[];
+  assumptions?: string[];
+  eventDate?: string | null;
+  guestCount?: number | null;
+  availabilityLabel?: string | null;
+  packageLabel?: string | null;
+  depositLabel?: string | null;
+  taxLabel?: string | null;
   validUntil: string | null;
   attachmentUrl: string | null;
   attachmentTextStatus?: "none" | "linked_unverified" | "extracted";
@@ -389,6 +399,24 @@ function parseQuotePreview(body: string): WeddingArtifactQuotePreview | null {
   if (!vendorName || !amountLabel || !/\bquote|quoted|total|amount|invoice|proposal\b/i.test(body)) return null;
   const budgetDeltaLabel = labeledValue(body, ["Budget delta", "Budget impact", "Over budget", "Difference"]);
   const inclusionLines = sectionLines(body, "Inclusions", 8);
+  const exclusions = [
+    ...sectionLines(body, "Exclusions", 8),
+    ...sectionLines(body, "Not included", 8),
+  ];
+  const mandatoryFees = [
+    ...sectionLines(body, "Mandatory fees", 8),
+    ...sectionLines(body, "Required fees", 8),
+  ];
+  const paymentSchedule = [
+    ...sectionLines(body, "Payment schedule", 8),
+    ...sectionLines(body, "Payments", 8),
+  ];
+  const assumptions = [
+    ...sectionLines(body, "Assumptions", 8),
+    ...sectionLines(body, "Estimate basis", 8),
+  ];
+  const eventDate = labeledValue(body, ["Wedding date", "Event date", "Date"]);
+  const guestCountLabel = labeledValue(body, ["Guest count", "Guests", "Attendees"]);
   const validUntil = labeledValue(body, ["Valid until", "Quote valid until", "Expires"]);
   const attachmentRaw = labeledValue(body, [
     "Attachment",
@@ -413,6 +441,16 @@ function parseQuotePreview(body: string): WeddingArtifactQuotePreview | null {
     budgetDeltaAmount: budgetDeltaLabel ? numericMoney(budgetDeltaLabel) : null,
     budgetDeltaLabel: budgetDeltaLabel || null,
     inclusions: inclusionLines,
+    exclusions: [...new Set(exclusions)],
+    mandatoryFees: [...new Set(mandatoryFees)],
+    paymentSchedule: [...new Set(paymentSchedule)],
+    assumptions: [...new Set(assumptions)],
+    eventDate: eventDate || null,
+    guestCount: guestCountLabel ? numericMoney(guestCountLabel) : null,
+    availabilityLabel: labeledValue(body, ["Availability", "Date availability", "Hold status"]) || null,
+    packageLabel: labeledValue(body, ["Package", "Package name", "Option"]) || null,
+    depositLabel: labeledValue(body, ["Deposit", "Booking deposit", "Initial payment"]) || null,
+    taxLabel: labeledValue(body, ["GST", "Tax", "Taxes"]) || null,
     validUntil: validUntil || null,
     attachmentUrl,
     attachmentTextStatus,

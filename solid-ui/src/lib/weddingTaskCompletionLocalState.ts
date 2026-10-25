@@ -1,5 +1,6 @@
 // @locs-version: 2.0
 export const WEDDING_TASK_COMPLETION_KEY_PREFIX = "omnyid.wedding-task-completion";
+export const WEDDING_TASK_COMPLETION_EVENT = "omnyid:wedding-task-completion";
 
 export type WeddingTaskCompletionScope = {
   taskId?: string | null;
@@ -73,6 +74,7 @@ export function saveWeddingTaskCompletion(
   };
   try {
     target.setItem(key, JSON.stringify(record));
+    globalThis.window?.dispatchEvent(new CustomEvent(WEDDING_TASK_COMPLETION_EVENT, { detail: record }));
     return record;
   } catch {
     return null;

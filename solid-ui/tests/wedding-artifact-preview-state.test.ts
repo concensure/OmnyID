@@ -119,6 +119,10 @@ test("buildWeddingArtifactPreviewState creates structured quote previews before 
       "Quote amount: AUD $799",
       "Budget delta: $200 over budget",
       "Valid until: 2026-10-15",
+      "Wedding date: 20 November 2027",
+      "Guests: 90",
+      "Availability: Available for the date",
+      "Deposit: 25% on acceptance",
       "Original file: https://example.com/chloe-quote.docx",
       "",
       "## Inclusions",
@@ -135,6 +139,10 @@ test("buildWeddingArtifactPreviewState creates structured quote previews before 
   assert.equal(preview.currency, "AUD");
   assert.equal(preview.budgetDeltaAmount, 200);
   assert.equal(preview.validUntil, "2026-10-15");
+  assert.equal(preview.eventDate, "20 November 2027");
+  assert.equal(preview.guestCount, 90);
+  assert.equal(preview.availabilityLabel, "Available for the date");
+  assert.equal(preview.depositLabel, "25% on acceptance");
   assert.equal(preview.attachmentUrl, "https://example.com/chloe-quote.docx");
   assert.equal(preview.attachmentTextStatus, "linked_unverified");
   assert.ok(preview.attachmentEvidenceLabels?.includes("Original quote attachment is linked but text extraction is not verified"));

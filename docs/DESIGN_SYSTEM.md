@@ -394,8 +394,11 @@ Status tints are reserved for status only: teal tint for "on track", amber for "
 
 ### Layout patterns
 
-- Journey stepper (Budget, Venue, Key vendors, Guests, Seating, Booked) shows plan progress instead of
-  a decorative ring; completed steps are filled teal, the current step has a teal ring.
+- Journey stepper uses the shared planning stages: Plan & budget, Venue & date, Celebrant & suppliers,
+  Details & invites, Final prep, and Wedding & after. Each stage is a button that reveals its
+  chronological, categorised task projection directly below the stepper; it never changes route.
+  Completed stages are filled teal and the current stage has a teal ring. Every task projection uses
+  the same completion record, stage and deadline, so Home, Timeline, Tasks and People cannot drift.
 - Decision cards show a "Best fit" tag, checked facts, and a "Still to confirm" risk note.
 - A right-hand rail holds "Up next" tasks and the saved-vendor count on desktop; it stacks on mobile.
 - Serif display face for page titles and the countdown number; sans for everything functional.

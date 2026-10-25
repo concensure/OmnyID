@@ -10,6 +10,7 @@ import { weddingNeedToKnowContextToAfpMessage } from "@/lib/weddingNeedToKnowAfp
 import { buildWeddingPersistedWorkspaceState } from "@/lib/weddingPersistedWorkspaceState";
 import { normalizeWeddingPlanningMetadata } from "@/lib/weddingPlanningTemplateState";
 import { weddingTaskDateToAfpMessage } from "@/lib/weddingTaskDateProjectionState";
+import { weddingCustomTaskToAfpMessage } from "@/lib/weddingCustomTaskState";
 
 const metadata = {
   weddingPlanId: "wedding_plan:persisted",
@@ -36,6 +37,14 @@ function contextMessage() {
     readyForFirstRecommendations: true,
   }, "2026-09-11T00:00:00.000Z");
 }
+
+test("custom wedding tasks retain the selected journey stage after AFP reload", () => {
+  const message = weddingCustomTaskToAfpMessage({ title: "Choose ceremony music", stage: "details_invites", dueDate: "2027-08-01", weddingPlanId: metadata.weddingPlanId, responseWorkspaceId: metadata.responseWorkspaceId, nowIso: "2026-09-11T00:00:00.000Z" });
+  assert.ok(message);
+  const state = buildWeddingPersistedWorkspaceState({ messages: [message], weddingPlanId: metadata.weddingPlanId, responseWorkspaceId: metadata.responseWorkspaceId, sourceResponseId: metadata.sourceResponseId });
+  assert.equal((state.taskItems[0]?.metadata as Record<string, unknown>).wedding_journey_stage, "details_invites");
+  assert.equal(state.taskItems[0]?.dueAt, "2027-08-01T09:00:00.000Z");
+});
 
 test("buildWeddingPersistedWorkspaceState preserves second-order task metadata", () => {
   const message = weddingTaskItemToAfpTaskMessage({

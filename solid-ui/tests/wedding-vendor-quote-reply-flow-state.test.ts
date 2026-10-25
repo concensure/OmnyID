@@ -57,7 +57,7 @@ test("vendor quote reply flow separates wording approval from budget acknowledge
   assert.equal(flow.canSend, false);
   assert.equal(flow.approvalRequest.userApproved, false);
   assert.ok(flow.approvalRequest.disclosureLines.some((line) => /Budget impact/i.test(line)));
-  assert.equal(flow.recommendationLabel, "Ask for trade-offs before approving");
+  assert.equal(flow.recommendationLabel, "Confirm the event basis before comparing");
   assert.match(flow.recommendationRationale, /Bridal bouquet/);
   assert.match(flow.recommendationRationale, /\$200 over budget/);
   assert.ok(flow.recommendationWhyLabels.includes("Budget impact: $200 over budget"));
@@ -83,7 +83,7 @@ test("vendor quote reply contextual surface exposes status recommendation why an
   assert.equal(surface.lifecycleStage, "decision_surfaced");
   assert.equal(surface.surfaceWeight, "full_card");
   assert.equal(surface.statusLabel, "Chloe's Florals sent a quote.");
-  assert.equal(surface.recommendationLabel, "Ask for trade-offs before approving");
+  assert.equal(surface.recommendationLabel, "Confirm the event basis before comparing");
   assert.match(surface.rationaleLabel, /\$200 over budget/);
   assert.equal(surface.confidenceLabel, "Confidence: developing");
   assert.ok(surface.whyLabels.includes("Budget impact: $200 over budget"));
@@ -114,8 +114,8 @@ test("vendor quote reply home surface stays compact while preserving dynamic act
     presentation: weddingVendorQuoteReplyPresentationState({ flow }),
   });
 
-  assert.equal(surface.quoteActionLabel, "See the quote");
-  assert.equal(surface.quoteActionKind, "open_attachment");
+  assert.equal(surface.quoteActionLabel, "View normalized quote");
+  assert.equal(surface.quoteActionKind, "show_quote_details");
   assert.equal(surface.replyActionLabel, "Review and send");
   assert.equal(surface.replyActionKind, "review_send");
   assert.match(surface.budgetImpactLabel ?? "", /\$200 over budget/);
@@ -280,6 +280,10 @@ test("vendor quote reply confidence is strong when original attachment text was 
       ...quote,
       attachmentTextStatus: "extracted",
       attachmentEvidenceLabels: ["Original quote attachment text was extracted", "server document parser"],
+      eventDate: "20 November 2027",
+      guestCount: 90,
+      availabilityLabel: "Available for the date",
+      depositLabel: "25% on acceptance",
     },
     metadata,
     recipient: "hello@chloes.example",
@@ -361,10 +365,10 @@ test("vendor quote reply presentation only opens editor when wording work is req
   assert.equal(draftPresentation.primaryActionKind, "approve_wording");
   assert.equal(draftPresentation.primaryActionLabel, "Approve wording");
   assert.equal(draftPresentation.secondaryActionKind, "view_quote");
-  assert.equal(draftPresentation.secondaryActionLabel, "Open quote file");
+  assert.equal(draftPresentation.secondaryActionLabel, "View normalized quote");
   assert.equal(draftReady.semanticObject.actions[0]?.label, "Approve wording");
   assert.equal(draftReady.semanticObject.actions[0]?.kind, "approve_vendor_quote_reply_wording");
-  assert.equal(draftReady.semanticObject.actions[1]?.label, "Open quote file");
+  assert.equal(draftReady.semanticObject.actions[1]?.label, "View normalized quote");
   assert.equal(draftReady.semanticObject.actions[1]?.kind, "view_vendor_quote");
   assert.equal(draftPresentation.replySectionLabel, "Suggested reply - edit or send as-is");
   assert.match(draftPresentation.decisionPromptLabel, /Review the wording/i);
@@ -391,7 +395,7 @@ test("vendor quote reply presentation only opens editor when wording work is req
   assert.match(sendPresentation.decisionPromptLabel, /send this reply now/i);
 });
 
-test("vendor quote reply presentation distinguishes inline quote details from attached quote files", () => {
+test("vendor quote reply presentation always opens the normalized quote in place", () => {
   const inlineOnly = buildWeddingVendorQuoteReplyFlowState({
     quote: {
       ...quote,
@@ -407,8 +411,8 @@ test("vendor quote reply presentation distinguishes inline quote details from at
 
   const presentation = weddingVendorQuoteReplyPresentationState({ flow: inlineOnly });
   assert.equal(presentation.secondaryActionKind, "view_quote");
-  assert.equal(presentation.secondaryActionLabel, "Show quote details");
-  assert.equal(inlineOnly.semanticObject.actions[1]?.label, "Show quote details");
+  assert.equal(presentation.secondaryActionLabel, "View normalized quote");
+  assert.equal(inlineOnly.semanticObject.actions[1]?.label, "View normalized quote");
 });
 
 test("vendor quote reply flow fails closed when stale approval lacks email delivery details", () => {

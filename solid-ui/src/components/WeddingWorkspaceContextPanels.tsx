@@ -235,6 +235,8 @@ export function WeddingWorkspaceContextPanels(props: {
             onSelectMenu={props.onSelectMenu}
             onSidebarAction={props.onSidebarAction}
             onSaveWeddingDate={props.onSaveWeddingDate}
+            saveProjection={props.saveProjection}
+            onRefreshWorkspace={props.onRefreshWorkspace}
           />
         </div>
         <div class="mt-3">
@@ -401,6 +403,8 @@ export function WeddingWorkspaceContextPanels(props: {
           onSidebarAction={props.onSidebarAction}
           onOpenArtifact={props.onOpenArtifact}
           onOpenSavedOutputs={props.onOpenSavedOutputs}
+          saveProjection={props.saveProjection}
+          onRefreshWorkspace={props.onRefreshWorkspace}
         />
       </div>
 

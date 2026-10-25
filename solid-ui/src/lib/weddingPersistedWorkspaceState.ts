@@ -611,7 +611,10 @@ function messageToTaskItem(message: AfpMessage, fallback: WeddingPlanningMetadat
     source: "agent",
     reviewStatus: "accepted",
     approvalState: metadata.approvalState,
-    metadata: secondOrderTaskMetadata(message, metadata),
+    metadata: {
+      ...secondOrderTaskMetadata(message, metadata),
+      wedding_journey_stage: clean(contentValue(message, "wedding_journey_stage") ?? message.metadata?.wedding_journey_stage),
+    },
     linkedArtifactId: clean(contentValue(message, "linked_artifact_id")),
     notes: clean(contentValue(message, "description")),
     semanticKind,

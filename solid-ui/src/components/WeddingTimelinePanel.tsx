@@ -2,8 +2,12 @@
 import { For, Show, createMemo, createSignal } from "solid-js";
 
 import { WeddingInfoTip } from "@/components/WeddingInfoTip";
+import { WeddingTaskComposer } from "@/components/WeddingTaskComposer";
+import { WeddingTaskCompletionButton } from "@/components/WeddingTaskCompletionButton";
+import type { SendAfpMessageInput } from "@/lib/api";
 import { weddingGanttAxisTicks } from "@/lib/weddingGanttAxisState";
 import type { WeddingResponseWorkspaceViewState } from "@/lib/weddingResponseWorkspaceViewState";
+import { weddingTaskDateToAfpSendInput } from "@/lib/weddingTaskDateProjectionState";
 import {
   weddingTimelineBarWidthPercent,
   weddingTimelineFileActionState,
@@ -22,12 +26,15 @@ export function WeddingTimelinePanel(props: {
   onSidebarAction: (action: WeddingWorkspaceSidebarAction) => void;
   onOpenArtifact?: (artifactId: string) => void;
   onOpenSavedOutputs?: () => void;
+  saveProjection?: ((input: SendAfpMessageInput) => Promise<unknown>) | null;
+  onRefreshWorkspace?: (() => void) | null;
 }) {
   const [showAllRows, setShowAllRows] = createSignal(false);
   // The mobile timeline is a visual schedule, not only a list of coloured
   // dots. Start with the date-scaled chart visible there as well.
   const [showGantt, setShowGantt] = createSignal(typeof window !== "undefined" && window.matchMedia("(max-width: 39.99em)").matches);
   const [mobileFilter, setMobileFilter] = createSignal<"all" | "upcoming" | "completed">("all");
+  const [dateNotice, setDateNotice] = createSignal<string | null>(null);
   const isCompleted = (status: string | null | undefined) => /done|complete|accepted/i.test(status ?? "");
   // Filter before applying the compact mobile limit. Previously the first six
   // all-status rows hid completed tasks whenever they happened later in time.
@@ -79,6 +86,12 @@ export function WeddingTimelinePanel(props: {
     if (typeof window === "undefined" || !window.matchMedia("(max-width: 39.99em)").matches) return;
     if (event.target instanceof HTMLElement && event.target.closest("button")) return;
     props.onSidebarAction(taskActionFor(itemId));
+  }
+  async function saveTaskDate(itemId: string, title: string, dueDate: string): Promise<void> {
+    const input = weddingTaskDateToAfpSendInput({ taskId: itemId, title, dueDate, weddingPlanId: props.state.workspace.metadata.weddingPlanId, responseWorkspaceId: props.state.workspace.metadata.responseWorkspaceId });
+    if (!input || !props.saveProjection) { setDateNotice("Task date saving is unavailable in this view."); return; }
+    try { await props.saveProjection(input); setDateNotice("Deadline updated."); props.onRefreshWorkspace?.(); }
+    catch { setDateNotice("The deadline could not be saved. Try again."); }
   }
 
   return (
@@ -134,6 +147,8 @@ export function WeddingTimelinePanel(props: {
           </button>
         </Show>
       </div>
+      <WeddingTaskComposer weddingPlanId={props.state.workspace.metadata.weddingPlanId} responseWorkspaceId={props.state.workspace.metadata.responseWorkspaceId} saveProjection={props.saveProjection} onRefreshWorkspace={props.onRefreshWorkspace} />
+      <Show when={dateNotice()}>{(message) => <p class="mt-2 text-sm text-wedding-ink/70" role="status">{message()}</p>}</Show>
       <div class="mt-3 flex gap-2 overflow-x-auto phone:flex sm:hidden">
         <For each={["all", "upcoming", "completed"] as const}>{(filter) => <button type="button" onClick={() => setMobileFilter(filter)} class={`shrink-0 rounded-lg border px-3 py-1.5 text-xs font-semibold ${mobileFilter() === filter ? "border-wedding-primary bg-wedding-primary text-white" : "border-wedding-border bg-white text-wedding-ink"}`}>{filter === "all" ? `All (${props.state.ganttTimeline.rows.length})` : filter[0].toUpperCase() + filter.slice(1)}</button>}</For>
       </div>
@@ -171,6 +186,8 @@ export function WeddingTimelinePanel(props: {
                     </button>
                     <p class="text-xs text-wedding-ink/65">{item.categoryLabel}</p>
                     <div class="mt-1 flex flex-wrap gap-2">
+                      <Show when={props.state.planningTaskItems.find((task) => task.id === item.id)}>{(task) => <WeddingTaskCompletionButton task={task()} weddingPlanId={props.state.workspace.metadata.weddingPlanId} responseWorkspaceId={props.state.workspace.metadata.responseWorkspaceId} saveProjection={props.saveProjection} onRefreshWorkspace={props.onRefreshWorkspace} compact />}</Show>
+                      <Show when={props.state.planningTaskItems.find((task) => task.id === item.id)}>{(task) => <label class="text-xs font-semibold text-wedding-ink/70">Deadline <input type="date" value={task().dueAt?.slice(0, 10) ?? ""} onChange={(event) => void saveTaskDate(task().id, task().title, event.currentTarget.value)} class="ml-1 min-h-10 rounded-lg border border-wedding-border bg-white px-2" /></label>}</Show>
                       <button
                         type="button"
                         class={ROW_ACTION_CLASS}
@@ -280,6 +297,8 @@ export function WeddingTimelinePanel(props: {
                     {taskActionLabelFor(row.id, "Open task")}
                   </p>
                   <div class="mt-2 hidden flex-wrap gap-1.5 sm:flex">
+                    <Show when={props.state.planningTaskItems.find((task) => task.id === row.id)}>{(task) => <WeddingTaskCompletionButton task={task()} weddingPlanId={props.state.workspace.metadata.weddingPlanId} responseWorkspaceId={props.state.workspace.metadata.responseWorkspaceId} saveProjection={props.saveProjection} onRefreshWorkspace={props.onRefreshWorkspace} compact />}</Show>
+                    <Show when={props.state.planningTaskItems.find((task) => task.id === row.id)}>{(task) => <label class="text-xs font-semibold text-wedding-ink/70">Deadline <input type="date" value={task().dueAt?.slice(0, 10) ?? ""} onChange={(event) => void saveTaskDate(task().id, task().title, event.currentTarget.value)} class="ml-1 min-h-10 rounded-lg border border-wedding-border bg-white px-2" /></label>}</Show>
                     <button
                       type="button"
                       class={ROW_ACTION_CLASS}

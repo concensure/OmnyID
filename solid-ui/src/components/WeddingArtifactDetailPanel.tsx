@@ -3,6 +3,7 @@ import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
 
 import { AttachmentsRenderer } from "@/components/renderers/AttachmentsRenderer";
 import { WeddingApprovalPreviewPanel } from "@/components/WeddingApprovalPreviewPanel";
+import { WeddingNormalizedQuoteSummary } from "@/components/WeddingNormalizedQuoteSummary";
 import type { WeddingApprovalExecutionState } from "@/lib/weddingApprovalExecutionState";
 import type { WeddingApprovalRequestState } from "@/lib/weddingApprovalState";
 import type { AfpAttachment, WeddingVendor } from "@/lib/api";
@@ -195,39 +196,7 @@ function ArtifactPreviewCard(props: {
     }));
     return (
       <div class="min-w-0 rounded-2xl border border-emerald-100 bg-emerald-50/75 p-4">
-        <div class="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p class="text-xs font-semibold text-emerald-950">Vendor quote</p>
-            <h4 class="mt-1 break-words text-lg font-semibold text-emerald-950">{preview.vendorName}</h4>
-          </div>
-          <span class="max-w-full break-words rounded-full bg-white/85 px-3 py-1 text-sm font-semibold text-emerald-950">
-            {preview.amountLabel}
-          </span>
-        </div>
-        <div class="mt-3 grid gap-2 text-sm text-emerald-950 sm:grid-cols-3">
-          <div class="rounded-xl border border-emerald-100 bg-white/80 p-3">
-            <p class="text-xs font-semibold uppercase text-emerald-800/70">Budget impact</p>
-            <p class="mt-1 break-words font-semibold">{preview.budgetDeltaLabel ?? "Not measured yet"}</p>
-          </div>
-          <div class="rounded-xl border border-emerald-100 bg-white/80 p-3">
-            <p class="text-xs font-semibold uppercase text-emerald-800/70">Valid until</p>
-            <p class="mt-1 break-words font-semibold">{preview.validUntil ?? "Not stated"}</p>
-          </div>
-          <div class="rounded-xl border border-emerald-100 bg-white/80 p-3">
-            <p class="text-xs font-semibold uppercase text-emerald-800/70">Currency</p>
-            <p class="mt-1 break-words font-semibold">{preview.currency}</p>
-          </div>
-        </div>
-        <Show when={preview.inclusions.length > 0}>
-          <div class="mt-3 rounded-xl border border-emerald-100 bg-white/80 p-3">
-            <p class="text-sm font-semibold text-emerald-950">Included</p>
-            <ul class="mt-2 space-y-1">
-              <For each={preview.inclusions}>
-                {(item) => <li class="break-words text-sm leading-6 text-emerald-900/75">{item}</li>}
-              </For>
-            </ul>
-          </div>
-        </Show>
+        <WeddingNormalizedQuoteSummary quote={preview} />
         <Show when={attachmentMessage()}>
           {(message) => (
             <div class="mt-3 rounded-xl border border-emerald-100 bg-white/80 p-3">

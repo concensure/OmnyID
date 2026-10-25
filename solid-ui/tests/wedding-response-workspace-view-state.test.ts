@@ -759,11 +759,11 @@ test("buildWeddingResponseWorkspaceViewState creates contextual vendor quote rep
   assert.match(flow.draftBody, /AUD \$1,450/);
   assert.match(flow.draftBody, /Ceremony florals/);
   assert.match(flow.draftBody, /\$150 under budget/);
-  assert.match(flow.draftBody, /hold the date provisionally/i);
+  assert.match(flow.draftBody, /wedding date and expected guest count/i);
   assert.match(flow.draftBody, /deposit amount, payment milestones, cancellation terms/i);
   assert.match(flow.draftBody, /2026-11-01/);
   assert.match(flow.recommendationRationale, /Harbour Blooms/);
-  assert.match(flow.recommendationRationale, /provisional hold/i);
+  assert.match(flow.recommendationRationale, /stays conditional/i);
 });
 
 test("buildWeddingResponseWorkspaceViewState asks over-budget quote vendors for trade-offs", () => {

@@ -4814,3 +4814,35 @@ Next:
 - Review the committed WED-258 slice, then exercise real Gmail/Graph/SMTP sends with clean and infected
   fixtures in an authorized environment before rollout. Continue WED-257's broader device-key and
   legacy-AFP design separately; this slice does not claim product-wide operator-resistant messaging.
+
+## 2026-10-25 - WED-259 normalized quotes and actionable six-stage journey (Codex, complete)
+
+Changed:
+
+- Added one evidence-led normalized quote projection to the inline vendor response card and Documents,
+  while retaining the original quote attachment as separate evidence. A recommendation stays
+  conditional until the event basis, availability, comparable total and material terms are present.
+- Replaced the cosmetic stepper with the six requested stages and an in-place, categorized,
+  chronological task list. Stage selection does not navigate away from Wedding Home.
+- Classified existing tasks, added missing research-backed task templates, and corrected recognized
+  late-stage prebuilt deadlines relative to the wedding date without changing user-created deadlines.
+- Added AFP-backed task creation with stage/deadline to Tasks and Timeline, deadline editing in both,
+  and a shared completion projection/event used by Home, Timeline, Tasks and People.
+- Updated wedding design-system guidance and regression coverage. Policy V2 and rollout flags were not
+  changed; the pre-existing Oracle proof artifact directory and noisy Rust line-ending paths remain
+  untouched.
+
+Verification:
+
+- Pass: Solid typecheck; focused quote/journey/persistence tests; all 1,974 wedding tests; production Vite build;
+  both line-budget guards; 33 Rust quotation tests; `git diff --check` (line-ending notices only).
+- All new files are below 1,000 lines. The large existing response/quote state owners remain within
+  their enforced grandfathered budgets and were not expanded beyond them.
+
+Next:
+
+- Review the committed WED-259 UI in a real account with an extracted quote containing the wedding
+  date, 90-guest basis, confirmed availability, deposit/payment schedule and exclusions. Confirm that
+  Home and Documents show the same normalized facts and that the original file opens separately.
+- Exercise task create/date/complete from Home, Timeline, Tasks and People after a refresh to verify
+  server persistence in the target environment. No deployment was performed in this slice.

@@ -36,7 +36,8 @@ test("wedding task actions stay inside the template and share People completion 
   assert.match(queue, /action\.kind === "open_tasks"[\s\S]*setWeddingWorkspaceMenu\("tasks"\)/);
   assert.match(tasks, /props\.state\.planningTaskItems/);
   assert.match(tasks, /loadWeddingHelperLocalState/);
-  assert.match(tasks, /saveWeddingHelperLocalState/);
+  assert.match(tasks, /WeddingTaskCompletionButton/);
+  assert.match(tasks, /loadWeddingTaskCompletion/);
   assert.match(people, /props\.state\.planningTaskItems/);
   assert.match(people, /saveWeddingHelperLocalState/);
 });

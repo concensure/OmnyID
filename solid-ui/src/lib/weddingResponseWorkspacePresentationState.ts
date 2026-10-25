@@ -721,6 +721,8 @@ function fallbackVendorQuoteReplyDraft(quote: WeddingArtifactQuotePreview): stri
   const labelSaysOverBudget = /\bover budget|above budget|exceeds budget|higher than budget\b/i.test(budgetLabel);
   const appearsUnderBudget = labelSaysUnderBudget || (!labelSaysOverBudget && budgetDelta !== null && budgetDelta < 0);
   const appearsOverBudget = labelSaysOverBudget || (!labelSaysUnderBudget && budgetDelta !== null && budgetDelta > 0);
+  const eventBasisConfirmed = Boolean(clean(quote.eventDate)) && typeof quote.guestCount === "number" && quote.guestCount > 0;
+  const availabilityConfirmed = /available|held|reserved/i.test(clean(quote.availabilityLabel)) && !/not|unknown|unconfirmed/i.test(clean(quote.availabilityLabel));
   const bodyLines = [
     `Hi ${quote.vendorName},`,
     "",
@@ -731,7 +733,9 @@ function fallbackVendorQuoteReplyDraft(quote: WeddingArtifactQuotePreview): stri
   }
   if (budgetLabel) {
     if (appearsUnderBudget) {
-      bodyLines.push(`This appears to be ${budgetLabel}, so we are leaning positive subject to availability, deposit terms, and the inclusions staying as listed.`);
+      bodyLines.push(eventBasisConfirmed && availabilityConfirmed
+        ? `This appears to be ${budgetLabel}, so we are leaning positive subject to deposit terms and the inclusions staying as listed.`
+        : `The stated amount appears to be ${budgetLabel}, but we cannot compare it fairly until the event basis, availability, and material terms are confirmed.`);
     } else if (appearsOverBudget) {
       bodyLines.push(`This appears to be ${budgetLabel}, so before we can confirm, could you suggest any package adjustments or optional items that would reduce the total while keeping the core service?`);
     } else {
@@ -742,8 +746,10 @@ function fallbackVendorQuoteReplyDraft(quote: WeddingArtifactQuotePreview): stri
     bodyLines.push(`We also noted the quote is valid until ${quote.validUntil}.`);
   }
   bodyLines.push("");
-  if (appearsUnderBudget) {
+  if (appearsUnderBudget && eventBasisConfirmed && availabilityConfirmed) {
     bodyLines.push("Could you please confirm whether you can hold the date provisionally while we review the payment schedule?");
+  } else if (!eventBasisConfirmed) {
+    bodyLines.push("Before we compare this quote, could we confirm that it is based on our wedding date and expected guest count, together with the capacity of the proposed space?");
   } else {
     bodyLines.push("Could you please confirm your availability for the date before we make a decision?");
   }
