@@ -40,7 +40,12 @@ function gateFlow(overrides: Record<string, unknown> = {}) {
     recipientEmail: "a@b.com",
     bodyMarkdown: "Hello",
     groundedOnFields: [],
+    draftPermissionFingerprint: "date:yes|location:yes|guests:yes|style:yes|budget:no",
     permissions: {
+      shareDateOrSeason: true,
+      shareLocation: true,
+      shareGuestCount: true,
+      shareStylePriorities: true,
       shareApproximateBudget: false,
       allowPhoneContact: false,
       remindUnanswered: true,

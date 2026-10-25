@@ -221,6 +221,14 @@ export function useWeddingVendorOutreachOwner(input: {
       couple.budget_comfort ??= weddingVendorOutreachCoupleFromWorkspace({
         contextCards: [], budgetTargetAmount: input.state().budgetTracking.budgetTargetAmount,
       }).budget_comfort;
+      if (!existing.permissions.shareDateOrSeason) couple.date_or_season = null;
+      if (!existing.permissions.shareLocation) couple.location = null;
+      if (!existing.permissions.shareGuestCount) couple.guest_count = null;
+      if (!existing.permissions.shareStylePriorities) {
+        couple.top_priorities = [];
+        couple.atmosphere_description = null;
+        couple.vendor_preferences = null;
+      }
       if (!existing.permissions.shareApproximateBudget) couple.budget_comfort = null;
 
       const result = await requestWeddingVendorOutreachDraft({

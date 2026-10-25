@@ -2,6 +2,7 @@
 import { createEffect, createSignal, type Accessor } from "solid-js";
 
 import type { WeddingProjectionSaveFn } from "@/components/WeddingResponseWorkspaceViewTypes";
+import { importWeddingAnimalQuizHandoff } from "@/lib/weddingAnimalQuizImportState";
 import { importWeddingLeadMagnetRecord } from "@/lib/weddingLeadMagnetImportState";
 import {
   completeWeddingLeadMagnetImportRequest,
@@ -119,12 +120,18 @@ export function useWeddingPreferenceProfileOwner(input: {
       || typeof localStorage === "undefined"
       || !weddingLeadMagnetImportRequested()
     ) return;
-    void importWeddingLeadMagnetRecord({ storage: localStorage, metadata, saveProjection }).then((result) => {
+    void Promise.all([
+      importWeddingLeadMagnetRecord({ storage: localStorage, metadata, saveProjection }),
+      importWeddingAnimalQuizHandoff({ storage: localStorage, metadata, existingPlanning: requirements(), saveProjection }),
+    ]).then(([result, quizResult]) => {
       leadMagnetImportPlanId = metadata.weddingPlanId;
       completeWeddingLeadMagnetImportRequest();
-      if (result.status !== "imported") return;
-      setPreferenceProfile({ profile: result.profile, messageId: result.messageId, fingerprint: result.fingerprint });
-      setLeadMagnetImportNotice(`We brought over your Wedding Understanding results: you value ${result.summary}. They'll shape your vendor matches.`);
+      const imported = quizResult.status === "imported" ? quizResult : result.status === "imported" ? result : null;
+      if (!imported) return;
+      setPreferenceProfile({ profile: imported.profile, messageId: imported.messageId, fingerprint: imported.fingerprint });
+      setLeadMagnetImportNotice(quizResult.status === "imported"
+        ? `We added your Wedding Animal Quiz result: ${quizResult.summary}. Review it before it shapes vendor matches.`
+        : `We brought over your Wedding Understanding results: you value ${result.status === "imported" ? result.summary : "your saved preferences"}. They'll shape your vendor matches.`);
       input.onRefreshWorkspace?.();
     }).catch(() => {
       setLeadMagnetImportNotice("We could not add your Wedding Understanding result yet. It is still saved in this browser and will retry after you sign in again.");

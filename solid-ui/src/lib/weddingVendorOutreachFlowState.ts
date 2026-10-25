@@ -3,6 +3,7 @@ import type { WeddingVendorChoiceCardData } from "@/components/WeddingVendorChoi
 import type { AfpAttachment, WeddingVendor } from "@/lib/api";
 import {
   DEFAULT_WEDDING_VENDOR_ENQUIRY_PERMISSIONS,
+  weddingVendorDraftDisclosureFingerprint,
   type WeddingVendorEnquiryPermissions,
 } from "@/lib/weddingVendorEnquiryPermissionsState";
 
@@ -36,6 +37,7 @@ export type WeddingVendorOutreachFlowState = {
     servedFrom: "model" | "deterministic_template" | "afp_reuse";
   } | null;
   permissions: WeddingVendorEnquiryPermissions;
+  draftPermissionFingerprint: string;
   draftMessageId: string | null;
   revision: number;
   hasUnpersistedChanges: boolean;
@@ -95,7 +97,7 @@ export function weddingVendorOutreachRecipient(
 }
 
 export function weddingVendorOutreachSendGate(
-  flow: Pick<WeddingVendorOutreachFlowState, "vendorName" | "recipientEmail" | "bodyMarkdown" | "permissions" | "groundedOnFields">,
+  flow: Pick<WeddingVendorOutreachFlowState, "vendorName" | "recipientEmail" | "bodyMarkdown" | "permissions" | "groundedOnFields" | "draftPermissionFingerprint">,
   gate: { gmailConnected: boolean; protectedRepliesAvailable?: boolean },
 ): { canSend: boolean; reason: string | null } {
   if (!flow.recipientEmail) {
@@ -112,6 +114,9 @@ export function weddingVendorOutreachSendGate(
   }
   if (!flow.bodyMarkdown.trim()) {
     return { canSend: false, reason: "Add a message before sending." };
+  }
+  if (flow.draftPermissionFingerprint !== weddingVendorDraftDisclosureFingerprint(flow.permissions)) {
+    return { canSend: false, reason: "Update the draft so it matches the information you chose to share." };
   }
   if (flow.permissions.shareApproximateBudget !== flow.groundedOnFields.includes("budget_comfort")) {
     return { canSend: false, reason: "Update the draft so its budget wording matches your sharing choice." };
@@ -153,6 +158,7 @@ export function weddingVendorOutreachIdleFlow(input: {
     sourceReferences: [],
     generation: null,
     permissions: { ...DEFAULT_WEDDING_VENDOR_ENQUIRY_PERMISSIONS },
+    draftPermissionFingerprint: weddingVendorDraftDisclosureFingerprint(DEFAULT_WEDDING_VENDOR_ENQUIRY_PERMISSIONS),
     draftMessageId: null,
     revision: 0,
     hasUnpersistedChanges: false,
@@ -195,6 +201,7 @@ export function weddingVendorOutreachDraftSucceeded(
     revision: Math.max(1, flow.revision + 1),
     hasUnpersistedChanges: false,
     permissions: { ...flow.permissions, previewApproved: false },
+    draftPermissionFingerprint: weddingVendorDraftDisclosureFingerprint(flow.permissions),
     blockedReason: null,
   };
 }

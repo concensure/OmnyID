@@ -19,6 +19,7 @@ const expectedPages = [
   'pricing.html',
   'privacy.html',
   'user-guide.html',
+  'animal-quiz.html',
   'get-wedding-vendors-to-reply/index.html',
   'wedding-planning-relationship-stress/index.html',
   'wedding-planning-without-decision-overload/index.html',
@@ -30,6 +31,7 @@ const expectedPages = [
   'blog/personalised-wedding-favour-ideas.html',
   'blog/fake-wedding-exit-is-it-worth-it.html',
   'blog/fake-wedding-exit-what-can-go-wrong.html',
+  'blog/couples-barely-know-each-other.html',
 ];
 
 function htmlFiles(dir) {
@@ -373,6 +375,16 @@ if (!existsSync(vendorAcquisitionCss)) failures.push('docs/vendors.css: vendor a
 if (!vendorAcquisitionHtml.includes('/wedding/assets/logo/omnyid-logo.png')) failures.push('docs/vendors.html: shared Wedding logo is missing');
 if (/href=["']https?:\/\/(?:content\.easyweddings|www\.marketingmag)/i.test(vendorAcquisitionHtml)) failures.push('docs/vendors.html: publication source must be named without a backlink');
 if (!/calculation methodology/i.test(vendorAcquisitionHtml) || !/no booking, price or promise/i.test(vendorAcquisitionHtml)) failures.push('docs/vendors.html: private pricing and approval boundaries are missing');
+
+const quizHtml = htmlByPath.get(normalize(resolve(root, 'animal-quiz.html'))) ?? '';
+const quizUi = readFileSync(resolve(root, 'assets', 'js', 'quiz.js'), 'utf8');
+const quizEngine = readFileSync(resolve(root, 'assets', 'js', 'quiz-engine.js'), 'utf8');
+if (!quizHtml.includes('name="referrer" content="no-referrer"')) failures.push('animal-quiz.html: strict referrer policy is missing');
+if (!quizUi.includes('Create account with this result') || !quizUi.includes('Create an account without importing it')) failures.push('quiz.js: explicit import and no-import account choices are required');
+if (!quizUi.includes('omnyid.wedding.animal_quiz.handoff.v1') || !quizUi.includes('expires_at')) failures.push('quiz.js: bounded expiring workspace handoff is missing');
+if (/\bfetch\s*\(|XMLHttpRequest|WebSocket|EventSource/.test(quizUi + quizEngine)) failures.push('animal quiz: unexpected backend or streaming transport is present');
+if (/api[_-]?key|client[_-]?secret|bearer\s+[a-z0-9._-]{12,}|password\s*[:=]/i.test(quizUi + quizEngine)) failures.push('animal quiz: secret-like material is present');
+if (/encodeURIComponent\(cleanName\(|names\s*=\s*encodeURIComponent|members\.slice/.test(quizEngine)) failures.push('quiz-engine.js: names remain in public share hashes');
 
 if (failures.length) {
   console.error('Wedding website smoke test failed:');

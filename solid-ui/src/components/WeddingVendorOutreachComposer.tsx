@@ -7,6 +7,7 @@ import { TiptapEditor } from "@/components/editor/TiptapEditor";
 import { renderMarkdown } from "@/lib/markdownRenderer";
 import { WeddingTrustInfoTip } from "@/components/WeddingTrustInfoTip";
 import {
+  weddingVendorDraftDisclosureFingerprint,
   weddingVendorSharedInformationLabels,
   type WeddingVendorEnquiryPermissions,
 } from "@/lib/weddingVendorEnquiryPermissionsState";
@@ -40,9 +41,9 @@ export function WeddingVendorOutreachComposer(props: {
     ...patch,
     previewApproved: patch.previewApproved ?? false,
   });
-  const budgetChoiceOutOfSync = () => (
-    props.flow.permissions.shareApproximateBudget !== props.flow.groundedOnFields.includes("budget_comfort")
-  );
+  const informationChoiceOutOfSync = () => {
+    return props.flow.draftPermissionFingerprint !== weddingVendorDraftDisclosureFingerprint(props.flow.permissions);
+  };
   const sharedInformation = () => weddingVendorSharedInformationLabels({
     permissions: props.flow.permissions,
     groundedOnLabels: props.flow.groundedOnLabels,
@@ -157,6 +158,36 @@ export function WeddingVendorOutreachComposer(props: {
             />
           </div>
 
+          <section class="mt-3 rounded-xl border border-wedding-border bg-white p-3" aria-labelledby={`enquiry-information-${props.flow.choiceId}`}>
+            <h4 id={`enquiry-information-${props.flow.choiceId}`} class="text-sm font-bold text-wedding-text">Information to share with {props.flow.vendorName}</h4>
+            <p class="mt-1 text-xs leading-5 text-wedding-muted">These choices apply only to this vendor. Turn off anything you do not want included, then update the draft before sending.</p>
+            <div class="mt-3 grid gap-2 sm:grid-cols-2">
+              <label class="flex min-h-11 items-start gap-2 rounded-lg border border-wedding-border px-3 py-2 text-sm text-wedding-text">
+                <input type="checkbox" class="mt-1 h-4 w-4 shrink-0 accent-wedding-primary" checked={props.flow.permissions.shareDateOrSeason} onChange={(event) => updatePermissions({ shareDateOrSeason: event.currentTarget.checked })} />
+                <span><strong>Date or season</strong><span class="mt-0.5 block text-xs leading-5 text-wedding-muted">Useful for availability; shared only when known.</span></span>
+              </label>
+              <label class="flex min-h-11 items-start gap-2 rounded-lg border border-wedding-border px-3 py-2 text-sm text-wedding-text">
+                <input type="checkbox" class="mt-1 h-4 w-4 shrink-0 accent-wedding-primary" checked={props.flow.permissions.shareLocation} onChange={(event) => updatePermissions({ shareLocation: event.currentTarget.checked })} />
+                <span><strong>General location</strong><span class="mt-0.5 block text-xs leading-5 text-wedding-muted">The planning area, not a private home address.</span></span>
+              </label>
+              <label class="flex min-h-11 items-start gap-2 rounded-lg border border-wedding-border px-3 py-2 text-sm text-wedding-text">
+                <input type="checkbox" class="mt-1 h-4 w-4 shrink-0 accent-wedding-primary" checked={props.flow.permissions.shareGuestCount} onChange={(event) => updatePermissions({ shareGuestCount: event.currentTarget.checked })} />
+                <span><strong>Estimated guest count</strong><span class="mt-0.5 block text-xs leading-5 text-wedding-muted">Helps the vendor check capacity and package fit.</span></span>
+              </label>
+              <label class="flex min-h-11 items-start gap-2 rounded-lg border border-wedding-border px-3 py-2 text-sm text-wedding-text">
+                <input type="checkbox" class="mt-1 h-4 w-4 shrink-0 accent-wedding-primary" checked={props.flow.permissions.shareStylePriorities} onChange={(event) => updatePermissions({ shareStylePriorities: event.currentTarget.checked })} />
+                <span><strong>Style and priorities</strong><span class="mt-0.5 block text-xs leading-5 text-wedding-muted">Only the relevant preferences used in this enquiry.</span></span>
+              </label>
+              <label class="flex min-h-11 items-start gap-2 rounded-lg border border-wedding-border px-3 py-2 text-sm text-wedding-text sm:col-span-2">
+                <input type="checkbox" class="mt-1 h-4 w-4 shrink-0 accent-wedding-primary" checked={props.flow.permissions.shareApproximateBudget} onChange={(event) => updatePermissions({ shareApproximateBudget: event.currentTarget.checked })} />
+                <span><strong>Share my approximate category budget</strong><span class="mt-0.5 block text-xs leading-5 text-wedding-muted">Off by default. The draft uses it only after you choose this and update the message.</span></span>
+              </label>
+            </div>
+            <Show when={informationChoiceOutOfSync()}>
+              <button type="button" class="mt-3 min-h-11 w-full rounded-lg border border-wedding-primary bg-wedding-page px-3 py-2 text-sm font-bold text-wedding-primary" onClick={props.onRegenerateDraft} disabled={!props.onRegenerateDraft || props.busy}>Update draft with these choices</button>
+            </Show>
+          </section>
+
           <label class="mt-3 block text-sm font-semibold text-wedding-text">
             Recipient
             <input
@@ -170,13 +201,9 @@ export function WeddingVendorOutreachComposer(props: {
           </label>
 
           <section class="mt-3 rounded-xl border border-wedding-border bg-white p-3" aria-labelledby={`enquiry-permissions-${props.flow.choiceId}`}>
-            <h4 id={`enquiry-permissions-${props.flow.choiceId}`} class="text-sm font-bold text-wedding-text">Before this enquiry is sent</h4>
-            <p class="mt-1 text-xs leading-5 text-wedding-muted">Choose what this vendor may receive or do. Changing a control never sends anything.</p>
+            <h4 id={`enquiry-permissions-${props.flow.choiceId}`} class="text-sm font-bold text-wedding-text">Contact and reply preferences</h4>
+            <p class="mt-1 text-xs leading-5 text-wedding-muted">Before this enquiry is sent, choose what this vendor may receive or do. Changing a control never sends anything.</p>
             <div class="mt-3 space-y-2">
-              <label class="flex min-h-11 items-start gap-2 rounded-lg border border-wedding-border px-3 py-2 text-sm text-wedding-text">
-                <input type="checkbox" class="mt-1 h-4 w-4 accent-wedding-primary" checked={props.flow.permissions.shareApproximateBudget} onChange={(event) => updatePermissions({ shareApproximateBudget: event.currentTarget.checked })} />
-                <span><strong>Share my approximate category budget</strong><span class="mt-0.5 block text-xs leading-5 text-wedding-muted">Only include it in the message after you choose this and update the draft.</span></span>
-              </label>
               <label class="flex min-h-11 items-start gap-2 rounded-lg border border-wedding-border px-3 py-2 text-sm text-wedding-text">
                 <input type="checkbox" class="mt-1 h-4 w-4 accent-wedding-primary" checked={props.flow.permissions.allowPhoneContact} onChange={(event) => updatePermissions({ allowPhoneContact: event.currentTarget.checked })} />
                 <span><strong>Allow this vendor to contact me by phone</strong><span class="mt-0.5 block text-xs leading-5 text-wedding-muted">A phone number is never added automatically.</span></span>
@@ -197,9 +224,6 @@ export function WeddingVendorOutreachComposer(props: {
                 <span><strong>My connected email</strong><span class="mt-0.5 block text-xs leading-5 text-wedding-muted">The vendor can reply to the address exposed by your connected email provider.</span></span>
               </label>
             </fieldset>
-            <Show when={budgetChoiceOutOfSync()}>
-              <button type="button" class="mt-3 min-h-11 w-full rounded-lg border border-wedding-primary bg-wedding-page px-3 py-2 text-sm font-bold text-wedding-primary" onClick={props.onRegenerateDraft} disabled={!props.onRegenerateDraft || props.busy}>Update draft with this budget choice</button>
-            </Show>
           </section>
 
           <section class="mt-3 rounded-xl border border-wedding-primary/25 bg-wedding-page p-3" aria-labelledby={`vendor-preview-${props.flow.choiceId}`}>

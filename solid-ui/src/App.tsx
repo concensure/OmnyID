@@ -1263,7 +1263,7 @@ function App() {
   const pendingAuthSource = deepLinkParams.get("source");
   const pendingVendorSlug = (deepLinkParams.get("vendor_slug") ?? deepLinkParams.get("vendor") ?? "").trim().toLowerCase(), vendorPortalUrlFromDeepLink = () => `/workspace/vendor.html${pendingVendorSlug ? `?vendor_slug=${encodeURIComponent(pendingVendorSlug)}` : ""}`;
   const shouldLaunchWeddingTemplateFromDeepLink = () =>
-    pendingAuthSource === "wedding" || pendingAuthSource === "marketing";
+    pendingAuthSource === "wedding" || pendingAuthSource === "marketing" || pendingAuthSource === "wedding_quiz";
   function launchWeddingTemplateFromDeepLink() {
     saveWeddingEntrySource("wedding_site");
     setShowTour(false); setShowOnboarding(false); setShowProfilingConsent(false);

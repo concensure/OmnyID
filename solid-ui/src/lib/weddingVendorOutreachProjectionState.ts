@@ -2,7 +2,7 @@
 import type { AfpMessage } from "@/lib/api";
 import type { AfpAttachment } from "@/lib/api";
 import type { WeddingVendorOutreachFlowState } from "@/lib/weddingVendorOutreachFlowState";
-import { normalizeWeddingVendorEnquiryPermissions } from "@/lib/weddingVendorEnquiryPermissionsState";
+import { normalizeWeddingVendorEnquiryPermissions, weddingVendorDraftDisclosureFingerprint } from "@/lib/weddingVendorEnquiryPermissionsState";
 
 function record(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
@@ -63,6 +63,7 @@ export function projectWeddingVendorOutreachFlows(messages: readonly AfpMessage[
     const choiceId = clean(content.choice_id);
     if (!choiceId) continue;
     const previous = flows.get(choiceId);
+    const normalizedPermissions = normalizeWeddingVendorEnquiryPermissions(content.permissions);
     const base: WeddingVendorOutreachFlowState = previous ?? {
       choiceId,
       vendorName: clean(content.vendor_label) || "Wedding vendor",
@@ -75,7 +76,8 @@ export function projectWeddingVendorOutreachFlows(messages: readonly AfpMessage[
       groundedOnFields: strings(content.grounded_on_fields),
       sourceReferences: references(message.references),
       generation: generation(content.generation),
-      permissions: normalizeWeddingVendorEnquiryPermissions(content.permissions),
+      permissions: normalizedPermissions,
+      draftPermissionFingerprint: clean(content.permission_fingerprint) || weddingVendorDraftDisclosureFingerprint(normalizedPermissions),
       draftMessageId: clean(message.id) || null,
       revision: Math.max(1, finiteNumber(content.revision, 1)),
       hasUnpersistedChanges: false,
@@ -108,7 +110,8 @@ export function projectWeddingVendorOutreachFlows(messages: readonly AfpMessage[
       groundedOnFields: strings(content.grounded_on_fields),
       sourceReferences: references(message.references),
       generation: generation(content.generation),
-      permissions: normalizeWeddingVendorEnquiryPermissions(content.permissions),
+      permissions: normalizedPermissions,
+      draftPermissionFingerprint: clean(content.permission_fingerprint) || weddingVendorDraftDisclosureFingerprint(normalizedPermissions),
       draftMessageId: clean(message.id) || base.draftMessageId,
       revision: Math.max(base.revision, finiteNumber(content.revision, base.revision)),
       hasUnpersistedChanges: false,

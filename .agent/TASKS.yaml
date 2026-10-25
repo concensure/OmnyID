@@ -3612,3 +3612,33 @@ tasks:
       - the three root review workbooks now target product commit 7b754338fb1e6b777158e517733f028b5aa4d281 and include consent, bounded-AI, cost-audit and protected-reply evidence steps; the tracked human-review form carries the same candidate and scenarios
       - pass: typecheck, focused consent/outreach tests 26/26, all 1984 wedding tests, Wedding site and CSP smoke, production Vite build, both line-budget guards, Rust outreach tests 10/10, quotation tests 33/33, cargo check and HTML script syntax; human-review Playwright checks 2/2
       - policy V2 and mail/relay rollout flags remain unchanged; no deployment was performed
+  - id: WED-262
+    title: Make vendor disclosure consent granular and connect the Wedding animal quiz safely
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-215
+    depends_on:
+      - WED-261
+    files:
+      - solid-ui/src/components/WeddingVendorOutreachComposer.tsx
+      - solid-ui/src/lib/weddingVendor*.ts
+      - solid-ui/src/lib/weddingAnimalQuizImportState.ts
+      - solid-ui/src/App.tsx
+      - solid-ui/tests/wedding-*.test.ts
+      - wedding/animal-quiz.html
+      - wedding/blog/couples-barely-know-each-other.html
+      - wedding/assets/css/quiz.css
+      - wedding/assets/js/quiz*.js
+      - wedding/assets/images/quiz/**
+      - Documents/design/wedding planner/**
+      - .agent/**
+    acceptance:
+      - every vendor enquiry stores its own mobile-friendly choices for sharing the date or season, location, guest count, style priorities, approximate category budget and phone permission immediately below the editable message
+      - changing a disclosure choice invalidates the prior preview and any regenerated draft receives only the selected structured facts, while exact recipient, content and shared-information review remain mandatory before send
+      - the static animal quiz contains no secret or backend endpoint, excludes names from share links, bounds untrusted URL and stored input, and creates an expiring minimal profile handoff only after an explicit account action
+      - a signed-in user arriving from the quiz can consentingly import the bounded result into the canonical AFP wedding preference profile without importing raw answers or creating a parallel profile store
+      - the requested blog, quiz code and local assets are tracked in this worktree and the blog is verified live on Oracle
+      - vendor onboarding and value-discovery specification and implementation tasks use the supplied research as guidance, preserve AFP core and define a credible path from first owned enquiry to paid conversion
+      - focused frontend, quiz security/site, typecheck, production build and line-budget checks pass, with every new file below 1000 lines
+    progress:
+      - registered from committed WED-261 revision 5312d25 after confirming disclosure state is already vendor-scoped but only budget and phone are selectable, and the untracked quiz result is not consumed by the workspace

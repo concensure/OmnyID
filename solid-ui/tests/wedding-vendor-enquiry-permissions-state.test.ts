@@ -10,6 +10,10 @@ import {
 
 test("new enquiries default to protected replies without budget or phone sharing", () => {
   assert.deepEqual(DEFAULT_WEDDING_VENDOR_ENQUIRY_PERMISSIONS, {
+    shareDateOrSeason: true,
+    shareLocation: true,
+    shareGuestCount: true,
+    shareStylePriorities: true,
     shareApproximateBudget: false,
     allowPhoneContact: false,
     remindUnanswered: true,
@@ -25,6 +29,10 @@ test("shared-information preview removes budget grounding until permission is gr
   });
   assert.deepEqual(hidden, [
     "your wedding is in Sydney",
+    "date or season, when known",
+    "general wedding location, when known",
+    "estimated guest count, when known",
+    "selected style and priorities",
     "no budget figure",
     "no permission to contact you by phone",
   ]);
@@ -46,5 +54,9 @@ test("permission fingerprint changes only when a consequential sharing choice ch
   assert.notEqual(
     weddingVendorEnquiryPermissionFingerprint(base),
     weddingVendorEnquiryPermissionFingerprint({ ...base, allowPhoneContact: true }),
+  );
+  assert.notEqual(
+    weddingVendorEnquiryPermissionFingerprint(base),
+    weddingVendorEnquiryPermissionFingerprint({ ...base, shareGuestCount: false }),
   );
 });
