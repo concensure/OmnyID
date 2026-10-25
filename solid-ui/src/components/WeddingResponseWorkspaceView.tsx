@@ -18,6 +18,7 @@ import { subscribeMagicActionEvent } from "@/lib/magicActionEvent";
 import { A2UI_CARD_STATS_REQUEST_EVENT, type A2uiCardStatsRequestEventDetail } from "@/lib/a2uiEvents";
 import { runWeddingArtifactBrowserExport, runWeddingBundleBrowserExport, selectWeddingBundleExportPayload, weddingProjectionMetadataId, type WeddingBundleExportFormat } from "@/lib/weddingBrowserExportActions";
 import { weddingDecisionDeferralActionToAfpSendInput } from "@/lib/weddingDecisionDeferralAfpState";
+import { dispatchWeddingTaskResponsibilityChange, loadWeddingHelperLocalState, saveWeddingHelperLocalState, weddingHelperResponsibilityToAfpSendInput } from "@/lib/weddingHelpersPanelState";
 import { runWeddingPreferenceConflictLifecycleAction } from "@/lib/weddingPreferenceConflictLifecycleExecutionState";
 import { decisionCardFromWeddingVendorComparison } from "@/lib/decisionCardState";
 import { approveWeddingApprovalRequestState, type WeddingApprovalRequestState } from "@/lib/weddingApprovalState";
@@ -304,32 +305,19 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
         setExportNotice("Choose a person before assigning this task.");
         return;
       }
+      const helperState = loadWeddingHelperLocalState(state().workspace.metadata.responseWorkspaceId);
+      saveWeddingHelperLocalState(state().workspace.metadata.responseWorkspaceId, {
+        ...helperState,
+        taskAssignees: { ...helperState.taskAssignees, [task.id]: assignee },
+        customHelpers: assignee === "You" ? helperState.customHelpers : [...new Set([...helperState.customHelpers, assignee])],
+      });
+      dispatchWeddingTaskResponsibilityChange({ workspaceId: state().workspace.metadata.responseWorkspaceId, taskId: task.id, ownerLabel: assignee });
       if (!props.saveProjection) {
-        setExportNotice(`${task.title} is assigned to ${assignee} for this session. Connect account saving to keep the assignment.`);
+        setExportNotice(`${task.title} is assigned to ${assignee} on this device. Account sync is unavailable.`);
         return;
       }
-      const input: SendAfpMessageInput = {
-        thread_id: `task:${task.id}`,
-        parent_id: null,
-        from: "system://omnyid-ui",
-        to: [],
-        type: "task",
-        subtype: "update",
-        content: {
-          task_id: task.id,
-          title: task.title,
-          status: "pending",
-          priority: task.priority ?? "normal",
-          assigned_to: assignee,
-        },
-        metadata: {
-          task_update_source: "wedding_decision_focus",
-          updated_task_id: task.id,
-          assigned_to_changed: true,
-          wedding_plan_id: state().workspace.metadata.weddingPlanId,
-          response_workspace_id: state().workspace.metadata.responseWorkspaceId,
-        },
-      };
+      const input = weddingHelperResponsibilityToAfpSendInput({ task, metadata: state().workspace.metadata, ownerLabel: assignee, consultedLabel: helperState.taskConsultedPeople[task.id], lastContactDate: helperState.taskLastContactDates[task.id], status: "open" });
+      if (!input) { setExportNotice("This assignment could not be prepared."); return; }
       setExportNotice(`Assigning ${task.title} to ${assignee}...`);
       void props.saveProjection(input)
         .then(() => {
@@ -343,9 +331,9 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
     if (action.kind === "defer_decision") {
       const sendInput = weddingDecisionDeferralActionToAfpSendInput(action, state().workspace.metadata);
       if (!sendInput) {
-        setExportNotice("Moved out of the top three for now, but this could not be saved to your wedding record.");
+        setExportNotice("Moved out of the active queue for now, but this could not be saved to your wedding record.");
       } else if (!props.saveProjection) {
-        setExportNotice("Moved out of the top three for now. Account saving is not connected yet.");
+        setExportNotice("Moved out of the active queue for now. Account saving is not connected yet.");
       } else {
         setExportNotice("Saving this for later...");
         void props.saveProjection(sendInput)
@@ -354,7 +342,7 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
             props.onRefreshWorkspace?.();
           })
           .catch(() => {
-            setExportNotice("Moved out of the top three for now, but the save record could not be stored.");
+            setExportNotice("Moved out of the active queue for now, but the save record could not be stored.");
           });
       }
       // Deferring from the Wedding Home is a local queue action. It should not

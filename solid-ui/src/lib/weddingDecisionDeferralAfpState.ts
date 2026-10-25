@@ -197,7 +197,7 @@ export function weddingDecisionDeferralToAfpMessage(
         kind: "wedding_decision_deferral",
         title: item.title,
         summary: "Decide later",
-        detail: item.dueLabel ? `Bring this back around ${item.dueLabel}.` : "Keep this out of the top three until something changes.",
+        detail: item.dueLabel ? `Bring this back around ${item.dueLabel}.` : "Keep this out of the active queue until something changes.",
         rows: [
           { label: "Bring back", value: deferredUntilAt ? deferredUntilAt.slice(0, 10) : "When something changes" },
           { label: "Reason", value: item.explanation },

@@ -7,7 +7,7 @@ import {
 } from "../src/lib/weddingDecisionFocusActionState.ts";
 import {
   buildWeddingDecisionFocusDisplayState,
-  WEDDING_DAILY_DECISION_LIMIT,
+  WEDDING_VISIBLE_DECISION_LIMIT,
   weddingVendorResearchQueryForDecision,
 } from "../src/lib/weddingDecisionFocusDisplayState.ts";
 import { weddingDecisionDeferralActionToAfpSendInput } from "../src/lib/weddingDecisionDeferralAfpState.ts";
@@ -29,7 +29,7 @@ function item(input: Partial<WeddingPersonalOsRankedItem> & Pick<WeddingPersonal
   };
 }
 
-test("decision focus stays to the three most critical cards and routes ring choices into vendor research", () => {
+test("decision focus presents one card while retaining the complete ranked queue", () => {
   const rings = item({ title: "Choose, size, order, and insure wedding rings", sourceSurface: "tasks" });
   const display = buildWeddingDecisionFocusDisplayState({
     relief: {
@@ -41,7 +41,9 @@ test("decision focus stays to the three most critical cards and routes ring choi
     },
   });
 
-  assert.equal(display.visibleFocusItems.length, WEDDING_DAILY_DECISION_LIMIT);
+  assert.equal(display.visibleFocusItems.length, WEDDING_VISIBLE_DECISION_LIMIT);
+  assert.equal(display.queuedFocusItems.length, 4);
+  assert.equal(display.remainingCount, 3);
   assert.equal(display.itemCards[0]?.recommendedActionLabel, "Research wedding ring jewellers before choosing");
   assert.equal(display.itemCards[0]?.compareLabel, "Research vendors");
   assert.equal(weddingVendorResearchQueryForDecision(rings), "wedding ring jewellers");
@@ -279,10 +281,10 @@ test("buildWeddingDecisionFocusDisplayState uses destination-specific action wor
     },
   });
 
-  assert.deepEqual(state.itemCards.map((card) => card.compareLabel), ["Review approval", "Compare", "View date"]);
+  assert.deepEqual(state.queuedItemCards.map((card) => card.compareLabel), ["Review approval", "Compare", "View date"]);
   assert.match(state.itemCards[0]?.neededByLabel ?? "", /Before anything is sent/i);
-  assert.match(state.itemCards[1]?.recommendedActionLabel ?? "", /Compare the options/i);
-  assert.match(state.itemCards[2]?.recommendedActionLabel ?? "", /Open the date/i);
+  assert.match(state.queuedItemCards[1]?.recommendedActionLabel ?? "", /Compare the options/i);
+  assert.match(state.queuedItemCards[2]?.recommendedActionLabel ?? "", /Open the date/i);
 });
 
 test("buildWeddingDecisionFocusDisplayState disables review when all focus items are deferred", () => {

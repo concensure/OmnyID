@@ -237,7 +237,7 @@ export function buildContinuityPersonalOsProjectionState<TItem extends Continuit
 }): ContinuityPersonalOsProjectionState<TItem> {
   const limit = input.limit ?? 12;
   const subject = input.summarySubject?.trim() || "continuity";
-  const decisionFocusLimit = Math.max(1, Math.min(3, Math.trunc(input.decisionFocusLimit ?? 3)));
+  const decisionFocusLimit = Math.max(1, Math.trunc(input.decisionFocusLimit ?? 3));
   const rankedItems = dedupeRankedItems(input.items.filter((item) => item.rankWeight > 0))
     .sort((left, right) => right.rankWeight - left.rankWeight || left.title.localeCompare(right.title))
     .slice(0, limit);

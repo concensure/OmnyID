@@ -16,6 +16,7 @@ import {
   loadWeddingDecisionSelections,
 } from "@/lib/weddingDecisionSelectionState";
 import type { WeddingPlanningScheduleItem, WeddingPlanningTaskItem } from "@/lib/weddingCalendarProjectionState";
+import { applyWeddingTaskResponsibilityProjection, weddingHelperContactNamesFromAfpMessages, weddingTaskResponsibilityAssigneeNames } from "@/lib/weddingTaskResponsibilityProjectionState";
 import type { WeddingNeedToKnowProjectionContext } from "@/lib/weddingNeedToKnowAfpProjectionState";
 import type {
   WeddingPersistedApprovalReceipt,
@@ -436,24 +437,6 @@ function uniqueHelperNames(values: readonly unknown[]): string[] {
   return result.slice(0, 40);
 }
 
-function weddingHelperContactNamesFromAfpMessages(messages: readonly AfpMessage[] | null | undefined): string[] {
-  return uniqueHelperNames((messages ?? []).flatMap((message) => {
-    const content = record(message.content);
-    const metadata = record(message.metadata);
-    const supertags = message.supertags ?? [];
-    const isHelperContact = message.kind === "wedding_helper_contact"
-      || message.subtype === "wedding_helper_contact_upsert"
-      || supertags.includes("wedding_helper_contact");
-    if (!isHelperContact) return [];
-    return [
-      content.name,
-      content.helper_name,
-      metadata.helper_name,
-      metadata.contact_name,
-    ];
-  }));
-}
-
 function parsedDocumentAttachmentEvidenceFromAfpMessages(
   messages: readonly AfpMessage[] | null | undefined,
 ): Map<string, string[]> {
@@ -765,6 +748,7 @@ export function buildWeddingResponseWorkspaceViewState(input: WeddingResponseWor
     ...delegation.items.map((item) => item.personName),
     ...collaboration.invites.map((invite) => invite.displayName),
     ...weddingHelperContactNamesFromAfpMessages(input.afpMessages),
+    ...weddingTaskResponsibilityAssigneeNames(input.afpMessages),
     ...taskItems.map((item) => item.assignee),
     ...guestNamesFromArtifacts(artifacts),
   ]);
@@ -848,7 +832,10 @@ export function buildWeddingResponseWorkspaceViewState(input: WeddingResponseWor
     !isClosedVendorPursuitTask(task)
     && record(task.metadata).production_remaining_work_task !== true
   )), planningWindow.weddingDate);
-  const userFacingProjectionTaskItems = activeProjectionTaskItems.filter(isUserFacingWeddingPlanningTask);
+  const userFacingProjectionTaskItems = applyWeddingTaskResponsibilityProjection(
+    activeProjectionTaskItems.filter(isUserFacingWeddingPlanningTask),
+    input.afpMessages,
+  );
   // Use the complete generated task plan so the chart can apply the project lead-time
   // templates, but keep demo/seed review work out of a couple's timeline.
   const timelineTaskItems = userFacingProjectionTaskItems.filter((task) => !isSeededTimelineTask(task));
@@ -873,7 +860,7 @@ export function buildWeddingResponseWorkspaceViewState(input: WeddingResponseWor
         category: item.kind,
         dueDate: item.dueAt,
         dueLabel: item.dueLabel,
-        status: item.reviewStatus ?? item.approvalState ?? item.priority ?? null,
+        status: item.semanticTags?.includes("wedding_task_status:done") ? "done" : item.reviewStatus ?? item.approvalState ?? item.priority ?? null,
         linkedArtifactId: item.linkedArtifactId,
       })),
     ],
@@ -887,7 +874,6 @@ export function buildWeddingResponseWorkspaceViewState(input: WeddingResponseWor
     approvalReceipts: input.approvalReceipts,
     decisionDeferrals: input.decisionDeferrals,
     now: input.nowIso ? new Date(input.nowIso) : null,
-    limit: 40,
   });
   const derivedPreferenceConflicts = buildWeddingPreferenceConflictsFromConstraintMessages({ messages: input.afpMessages, metadata: workspace.metadata });
   const persistedConflictRevisions = new Map((input.afpMessages ?? []).flatMap((message) => { const state = weddingPreferenceConflictFromAfpMessage(message); return state?.conflictObject ? [[state.conflictObject.id, weddingPreferenceConflictRevisionFingerprint(state)] as const] : []; }));

@@ -4846,3 +4846,34 @@ Next:
   Home and Documents show the same normalized facts and that the original file opens separately.
 - Exercise task create/date/complete from Home, Timeline, Tasks and People after a refresh to verify
   server persistence in the target environment. No deployment was performed in this slice.
+
+## 2026-10-25 - WED-260 continuous wedding focus and responsibility (Codex, complete)
+
+Changed:
+
+- Added a compact owner control to task rows on the Home journey, Tasks, Timeline and the generic
+  wedding task board. It accepts saved people or a typed name, persists immediate local state and emits
+  the existing AFP wedding-helper responsibility record. The decision-focus assignment path now uses
+  the same contract.
+- Projected the latest AFP responsibility and task-completion records back into canonical task items,
+  so owner and done status survive refresh and completed tasks leave the decision queue.
+- Removed the wedding three-item cap and the vendor-response three-flow truncation. Desktop presents
+  one next card; the mobile deck is sequential and cannot browse to a false end state. Other pending
+  queue work and deferred items remain explicit before the true all-clear state.
+- Added `Documents/wedding research/wedding-planner-ux-value-opportunities-2026-10-25.md`. It recommends
+  a versioned, recipient-scoped, revocable run sheet as the next value/virality slice, followed by
+  critical-path, compressed-plan, RSVP and day-of exception improvements.
+
+Verification:
+
+- Pass: Solid typecheck; all 1,977 wedding tests; focused assignment, queue and mobile tests; production
+  Vite build; both line-budget guards; `git diff --check` except expected Windows line-ending notices.
+- New files are 82, 109, 73 and 40 lines. The already-large workspace state remains exactly its prior
+  line count, and the assignment refactor shrinks the large workspace component. Policy V2 and rollout
+  flags are unchanged.
+
+Next:
+
+- Review assignment and sequential focus with a real couple account across a reload and a second
+  browser/device. The next product slice should specify and prototype the controlled run-sheet share
+  flow before adding external delivery or vendor editing. No deployment was requested or performed.

@@ -4,12 +4,15 @@ import type {
   WeddingPersonalOsRankedItem,
 } from "@/lib/weddingPersonalOsProjectionState";
 
-/** The wedding home is a daily focus, not an endless decision queue. */
-export const WEDDING_DAILY_DECISION_LIMIT = 3;
+/** Only one card is presented, while the complete ranked queue remains available behind it. */
+export const WEDDING_VISIBLE_DECISION_LIMIT = 1;
 
 export type WeddingDecisionFocusDisplayState = {
   visibleFocusItems: WeddingPersonalOsRankedItem[];
   itemCards: WeddingDecisionFocusItemCard[];
+  queuedFocusItems: WeddingPersonalOsRankedItem[];
+  queuedItemCards: WeddingDecisionFocusItemCard[];
+  remainingCount: number;
   visibleCount: number;
   summaryLabel: string;
   savedForLaterLabel: string | null;
@@ -107,20 +110,23 @@ export function buildWeddingDecisionFocusItemCard(item: WeddingPersonalOsRankedI
 export function buildWeddingDecisionFocusDisplayState(input: {
   relief: WeddingDecisionLoadReliefState;
   locallyDeferredIds?: ReadonlySet<string> | null;
+  locallyHiddenIds?: ReadonlySet<string> | null;
 }): WeddingDecisionFocusDisplayState {
   const locallyDeferredIds = input.locallyDeferredIds ?? new Set<string>();
-  // Older saved projections could contain a larger focus limit.  Enforce the
-  // product limit at the presentation boundary too, so a refresh cannot turn
-  // the daily focus back into an endless stack of cards.
-  const visibleFocusItems = input.relief.focusItems
-    .filter((item) => !locallyDeferredIds.has(item.id))
-    .slice(0, WEDDING_DAILY_DECISION_LIMIT);
+  const locallyHiddenIds = input.locallyHiddenIds ?? new Set<string>();
+  const queuedFocusItems = input.relief.focusItems.filter((item) => !locallyDeferredIds.has(item.id) && !locallyHiddenIds.has(item.id));
+  const visibleFocusItems = queuedFocusItems.slice(0, WEDDING_VISIBLE_DECISION_LIMIT);
   return {
     visibleFocusItems,
     itemCards: visibleFocusItems.map(buildWeddingDecisionFocusItemCard),
+    queuedFocusItems,
+    queuedItemCards: queuedFocusItems.map(buildWeddingDecisionFocusItemCard),
+    remainingCount: Math.max(0, queuedFocusItems.length - visibleFocusItems.length),
     visibleCount: visibleFocusItems.length,
     summaryLabel: visibleFocusItems.length > 0
-      ? input.relief.summaryLabel
+      ? queuedFocusItems.length === 1
+        ? "One wedding action needs you now."
+        : `One wedding action needs you now; ${queuedFocusItems.length - 1} ${queuedFocusItems.length === 2 ? "is" : "are"} ready next.`
       : "No decision-heavy wedding items need focus right now.",
     savedForLaterLabel: locallyDeferredIds.size > 0
       ? "Saved for later. OmnyID will bring it back when the date gets close or something changes."

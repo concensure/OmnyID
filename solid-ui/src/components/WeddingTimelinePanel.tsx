@@ -4,6 +4,7 @@ import { For, Show, createMemo, createSignal } from "solid-js";
 import { WeddingInfoTip } from "@/components/WeddingInfoTip";
 import { WeddingTaskComposer } from "@/components/WeddingTaskComposer";
 import { WeddingTaskCompletionButton } from "@/components/WeddingTaskCompletionButton";
+import { WeddingTaskOwnerControl } from "@/components/WeddingTaskOwnerControl";
 import type { SendAfpMessageInput } from "@/lib/api";
 import { weddingGanttAxisTicks } from "@/lib/weddingGanttAxisState";
 import type { WeddingResponseWorkspaceViewState } from "@/lib/weddingResponseWorkspaceViewState";
@@ -84,7 +85,7 @@ export function WeddingTimelinePanel(props: {
   }
   function openRowTaskOnMobile(event: MouseEvent, itemId: string): void {
     if (typeof window === "undefined" || !window.matchMedia("(max-width: 39.99em)").matches) return;
-    if (event.target instanceof HTMLElement && event.target.closest("button")) return;
+    if (event.target instanceof HTMLElement && event.target.closest("button, input, select, label")) return;
     props.onSidebarAction(taskActionFor(itemId));
   }
   async function saveTaskDate(itemId: string, title: string, dueDate: string): Promise<void> {
@@ -187,6 +188,7 @@ export function WeddingTimelinePanel(props: {
                     <p class="text-xs text-wedding-ink/65">{item.categoryLabel}</p>
                     <div class="mt-1 flex flex-wrap gap-2">
                       <Show when={props.state.planningTaskItems.find((task) => task.id === item.id)}>{(task) => <WeddingTaskCompletionButton task={task()} weddingPlanId={props.state.workspace.metadata.weddingPlanId} responseWorkspaceId={props.state.workspace.metadata.responseWorkspaceId} saveProjection={props.saveProjection} onRefreshWorkspace={props.onRefreshWorkspace} compact />}</Show>
+                      <Show when={props.state.planningTaskItems.find((task) => task.id === item.id)}>{(task) => <WeddingTaskOwnerControl task={task()} weddingPlanId={props.state.workspace.metadata.weddingPlanId} responseWorkspaceId={props.state.workspace.metadata.responseWorkspaceId} people={props.state.helperContactNames} saveProjection={props.saveProjection} onRefreshWorkspace={props.onRefreshWorkspace} />}</Show>
                       <Show when={props.state.planningTaskItems.find((task) => task.id === item.id)}>{(task) => <label class="text-xs font-semibold text-wedding-ink/70">Deadline <input type="date" value={task().dueAt?.slice(0, 10) ?? ""} onChange={(event) => void saveTaskDate(task().id, task().title, event.currentTarget.value)} class="ml-1 min-h-10 rounded-lg border border-wedding-border bg-white px-2" /></label>}</Show>
                       <button
                         type="button"
@@ -298,6 +300,7 @@ export function WeddingTimelinePanel(props: {
                   </p>
                   <div class="mt-2 hidden flex-wrap gap-1.5 sm:flex">
                     <Show when={props.state.planningTaskItems.find((task) => task.id === row.id)}>{(task) => <WeddingTaskCompletionButton task={task()} weddingPlanId={props.state.workspace.metadata.weddingPlanId} responseWorkspaceId={props.state.workspace.metadata.responseWorkspaceId} saveProjection={props.saveProjection} onRefreshWorkspace={props.onRefreshWorkspace} compact />}</Show>
+                    <Show when={props.state.planningTaskItems.find((task) => task.id === row.id)}>{(task) => <WeddingTaskOwnerControl task={task()} weddingPlanId={props.state.workspace.metadata.weddingPlanId} responseWorkspaceId={props.state.workspace.metadata.responseWorkspaceId} people={props.state.helperContactNames} saveProjection={props.saveProjection} onRefreshWorkspace={props.onRefreshWorkspace} />}</Show>
                     <Show when={props.state.planningTaskItems.find((task) => task.id === row.id)}>{(task) => <label class="text-xs font-semibold text-wedding-ink/70">Deadline <input type="date" value={task().dueAt?.slice(0, 10) ?? ""} onChange={(event) => void saveTaskDate(task().id, task().title, event.currentTarget.value)} class="ml-1 min-h-10 rounded-lg border border-wedding-border bg-white px-2" /></label>}</Show>
                     <button
                       type="button"
@@ -343,19 +346,20 @@ export function WeddingTimelinePanel(props: {
           </For>
           </div>}>
             <div class="overflow-x-auto rounded-xl border border-wedding-border bg-white p-3">
-              <div class="min-w-[600px] sm:min-w-[680px]">
-                <div class="grid grid-cols-[minmax(8rem,12rem)_1fr] gap-x-3 border-b border-wedding-border pb-2 sm:grid-cols-[minmax(10rem,14rem)_1fr]">
+              <div class="min-w-[860px]">
+                <div class="grid grid-cols-[minmax(8rem,12rem)_1fr_minmax(11rem,14rem)] gap-x-3 border-b border-wedding-border pb-2 sm:grid-cols-[minmax(10rem,14rem)_1fr_minmax(11rem,14rem)]">
                   <p class="text-xs font-semibold uppercase tracking-wide text-wedding-ink/65">All tasks</p>
                   <div class="relative h-8">
                     <For each={ganttAxisTicks()}>
                       {(tick) => <span class="absolute top-0 text-xs font-semibold text-wedding-ink/70" style={{ left: `${tick.offsetPercent}%`, transform: "translateX(-50%)" }}>{tick.label}</span>}
                     </For>
                   </div>
+                  <p class="text-xs font-semibold uppercase tracking-wide text-wedding-ink/65">Owner</p>
                 </div>
                 <div class="mt-2 space-y-2">
                   <For each={filteredRows()}>
                     {(row) => (
-                      <div class="grid grid-cols-[minmax(8rem,12rem)_1fr] items-center gap-x-3 sm:grid-cols-[minmax(10rem,14rem)_1fr]">
+                      <div class="grid grid-cols-[minmax(8rem,12rem)_1fr_minmax(11rem,14rem)] items-center gap-x-3 sm:grid-cols-[minmax(10rem,14rem)_1fr_minmax(11rem,14rem)]">
                         <button
                           type="button"
                           class="min-h-11 overflow-visible text-left text-xs font-semibold leading-4 text-wedding-ink"
@@ -372,6 +376,7 @@ export function WeddingTimelinePanel(props: {
                         >
                           <span class="absolute inset-y-3 rounded" style={{ "margin-left": `${row.offsetPercent}%`, width: `${weddingTimelineBarWidthPercent({ widthPercent: row.widthPercent, offsetPercent: row.offsetPercent, durationDays: row.durationDays })}%`, "background-color": row.color }} />
                         </button>
+                        <Show when={props.state.planningTaskItems.find((task) => task.id === row.id)}>{(task) => <WeddingTaskOwnerControl task={task()} weddingPlanId={props.state.workspace.metadata.weddingPlanId} responseWorkspaceId={props.state.workspace.metadata.responseWorkspaceId} people={props.state.helperContactNames} saveProjection={props.saveProjection} onRefreshWorkspace={props.onRefreshWorkspace} />}</Show>
                       </div>
                     )}
                   </For>

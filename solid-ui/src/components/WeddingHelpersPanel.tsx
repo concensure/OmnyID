@@ -9,6 +9,7 @@ import {
   buildWeddingHelperPeople,
   buildWeddingHelperWeeklyAgendaRows,
   buildWeddingHelperWorkloadRows,
+  dispatchWeddingTaskResponsibilityChange,
   loadWeddingHelperLocalState,
   saveWeddingHelperLocalState,
   upsertWeddingHelperContact,
@@ -494,6 +495,7 @@ export function WeddingHelpersPanel(props: {
                         onChange={(event) => {
                           const ownerLabel = event.currentTarget.value;
                           setTaskAssignees((current) => ({ ...current, [task.id]: ownerLabel }));
+                          dispatchWeddingTaskResponsibilityChange({ workspaceId: workspaceId(), taskId: task.id, ownerLabel });
                           void saveTaskResponsibility(task, { ownerLabel });
                         }}
                         class="mt-1 w-full rounded-full border border-fuchsia-100 bg-white px-3 py-2 text-xs font-medium text-fuchsia-950 outline-none"

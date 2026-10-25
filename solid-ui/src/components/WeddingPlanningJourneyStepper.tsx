@@ -1,6 +1,7 @@
 import { createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 
 import { WeddingTaskCompletionButton } from "@/components/WeddingTaskCompletionButton";
+import { WeddingTaskOwnerControl } from "@/components/WeddingTaskOwnerControl";
 import type { SendAfpMessageInput } from "@/lib/api";
 import type { WeddingPlanningTaskItem } from "@/lib/weddingCalendarProjectionState";
 import { weddingJourneyGroups, weddingJourneyStageId, WEDDING_JOURNEY_STAGES, type WeddingJourneyStageId } from "@/lib/weddingJourneyStageState";
@@ -17,7 +18,8 @@ export function WeddingPlanningJourneyStepper(props: {
   const taskDone = (task: WeddingPlanningTaskItem) => {
     revision();
     return loadWeddingTaskCompletion({ taskId: task.id, weddingPlanId: props.weddingPlanId, responseWorkspaceId: props.responseWorkspaceId })?.completed
-      ?? /done|complete|accepted/i.test(`${task.reviewStatus ?? ""} ${task.approvalState ?? ""}`);
+      ?? task.semanticTags?.some((tag) => tag.toLowerCase() === "wedding_task_status:done")
+      ?? /done|complete/i.test(`${task.reviewStatus ?? ""} ${task.approvalState ?? ""}`);
   };
   const stageCounts = createMemo(() => WEDDING_JOURNEY_STAGES.map((stage) => {
     const tasks = props.tasks.filter((task) => weddingJourneyStageId(task) === stage.id);
@@ -62,8 +64,9 @@ export function WeddingPlanningJourneyStepper(props: {
                 <h4 class="text-xs font-bold uppercase tracking-[0.08em] text-wedding-ink/60">{group.category}</h4>
                 <ul class="mt-2 space-y-2">
                   <For each={group.tasks}>{(task) => (
-                    <li class="flex min-w-0 flex-col gap-2 rounded-lg border border-wedding-border bg-white p-3 sm:flex-row sm:items-center sm:justify-between">
+                    <li class="grid min-w-0 gap-3 rounded-lg border border-wedding-border bg-white p-3 sm:grid-cols-[minmax(0,1fr)_minmax(11rem,15rem)_auto] sm:items-end">
                       <div class="min-w-0"><p class={`break-words text-sm font-semibold ${taskDone(task) ? "text-wedding-ink/55 line-through" : "text-wedding-ink"}`}>{task.title}</p><p class="mt-1 text-xs text-wedding-ink/60">{task.dueAt?.slice(0, 10) || task.dueLabel || "Deadline not set"}</p></div>
+                      <WeddingTaskOwnerControl task={task} weddingPlanId={props.weddingPlanId} responseWorkspaceId={props.responseWorkspaceId} saveProjection={props.saveProjection} onRefreshWorkspace={props.onRefreshWorkspace} />
                       <WeddingTaskCompletionButton task={task} weddingPlanId={props.weddingPlanId} responseWorkspaceId={props.responseWorkspaceId} saveProjection={props.saveProjection} onRefreshWorkspace={props.onRefreshWorkspace} compact />
                     </li>
                   )}</For>

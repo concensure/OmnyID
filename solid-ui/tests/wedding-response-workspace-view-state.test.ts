@@ -116,7 +116,7 @@ test("buildWeddingResponseWorkspaceViewState creates category rail and active ar
   assert.ok(!state.personalOsProjection.rankedItems.some((item) => /Finish launch check/i.test(item.title)));
   assert.match(state.personalOsProjection.fieldEngineSummary ?? "", /Wedding .* pressure:/);
   assert.match(state.personalOsProjection.decisionLoadRelief.summaryLabel, /things need your attention|No decision-heavy wedding items/);
-  assert.match(state.bundleExportPayload.content, /## Three things worth your attention/);
+  assert.match(state.bundleExportPayload.content, /## Wedding action queue/);
   assert.match(state.bundleExportPayload.content, /Attention note:/);
   assert.equal(state.bundleExportPayload.filename, "wedding-planning-bundle.md");
   assert.equal(state.htmlBundleExportPayload.filename, "wedding-planning-bundle.html");
@@ -128,6 +128,7 @@ test("buildWeddingResponseWorkspaceViewState creates category rail and active ar
   assert.deepEqual(state.bundleExportPayload.includedArtifactIds, ["artifact:venue-research", "artifact:venue-shortlist"]);
   assert.deepEqual(state.sensitiveBundleExportPayload.includedArtifactIds, ["artifact:venue-research", "artifact:venue-shortlist"]);
 });
+
 test("buildWeddingResponseWorkspaceViewState exposes conservative artifact evidence summaries", () => {
   const labelled = buildWeddingResponseWorkspaceViewState({
     metadata,

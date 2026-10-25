@@ -22,6 +22,7 @@ import { decisionCardFromWeddingFocus, type DecisionCardModel } from "@/lib/deci
 import type { useWeddingVendorOutreachOwner } from "@/lib/useWeddingVendorOutreachOwner";
 import type { WeddingResponseWorkspaceViewState } from "@/lib/weddingResponseWorkspaceViewState";
 import type { WeddingWorkspaceSidebarAction } from "@/lib/weddingWorkspaceActionState";
+import { loadWeddingTaskCompletion, WEDDING_TASK_COMPLETION_EVENT } from "@/lib/weddingTaskCompletionLocalState";
 import {
   dispatchWeddingVendorSearchLaunch,
   saveWeddingVendorSearchLaunch,
@@ -54,6 +55,7 @@ export function WeddingDecisionFocusCard(props: {
     }
   };
   const [locallyDeferredIds, setLocallyDeferredIds] = createSignal<Set<string>>(readDeferredIds());
+  const [completionRevision, setCompletionRevision] = createSignal(0);
   const [expandedTaskId, setExpandedTaskId] = createSignal<string | null>(null);
   const [expandedWhyItemId, setExpandedWhyItemId] = createSignal<string | null>(null);
   const [showDecisionHistory, setShowDecisionHistory] = createSignal(false);
@@ -91,11 +93,23 @@ export function WeddingDecisionFocusCard(props: {
     const refresh = () => setContacts(loadContacts(userId));
     refresh();
     const unsubscribe = subscribeContactsChangedEvent(refresh);
-    onCleanup(unsubscribe);
+    const completionListener = () => setCompletionRevision((value) => value + 1);
+    window.addEventListener(WEDDING_TASK_COMPLETION_EVENT, completionListener);
+    onCleanup(() => {
+      unsubscribe();
+      window.removeEventListener(WEDDING_TASK_COMPLETION_EVENT, completionListener);
+    });
+  });
+  const completedFocusIds = createMemo(() => {
+    completionRevision();
+    return new Set(props.state.planningTaskItems
+      .filter((task) => loadWeddingTaskCompletion({ taskId: task.id, weddingPlanId: props.state.workspace.metadata.weddingPlanId, responseWorkspaceId: props.state.workspace.metadata.responseWorkspaceId })?.completed)
+      .map((task) => `task:${task.id}`));
   });
   const display = createMemo(() => buildWeddingDecisionFocusDisplayState({
     relief: props.state.personalOsProjection.decisionLoadRelief,
     locallyDeferredIds: locallyDeferredIds(),
+    locallyHiddenIds: completedFocusIds(),
   }));
   createEffect(() => {
     const sourceIds = new Set(props.state.personalOsProjection.decisionLoadRelief.focusItems.map((item) => item.id));
@@ -255,9 +269,12 @@ export function WeddingDecisionFocusCard(props: {
     <Show when={props.state.personalOsProjection.hasWeddingPersonalOsSignal}>
       <div class="min-w-0 rounded-[24px] border border-pink-100/80 bg-pink-50/80 p-3 shadow-card sm:rounded-[28px] sm:p-4">
         <div class="flex items-start justify-between gap-2">
-          <p class="text-base font-semibold text-pink-950">Three things worth your attention</p>
+          <div>
+            <p class="text-base font-semibold text-pink-950">Your next wedding decision</p>
+            <p class="mt-0.5 text-xs text-pink-950/70">{display().summaryLabel}</p>
+          </div>
           <span class="max-w-full break-words rounded-full bg-white/80 px-2 py-1 text-xs font-semibold text-pink-900">
-            {display().visibleCount} now
+            {display().remainingCount > 0 ? `${display().remainingCount} next` : "Last one"}
           </span>
         </div>
         <Show when={display().savedForLaterLabel}>
@@ -465,7 +482,7 @@ export function WeddingDecisionFocusCard(props: {
         </Show>
         <div class="mt-3 flex flex-wrap gap-2">
           <button type="button" disabled={display().reviewDisabled} aria-disabled={display().reviewDisabled} title={display().reviewDisabled ? "There are no decisions ready to review." : "Review the current decision focus."} class="w-full rounded-full border border-pink-200 bg-white/75 px-3 py-2 text-xs font-semibold text-pink-950 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-45 sm:w-auto sm:py-1.5" onClick={() => props.onSidebarAction(decisionFocusAction())}>
-            Review top decisions
+            Review this decision
           </button>
           <Show when={props.state.decisionRecordCards.length > 0}>
             <button type="button" class="w-full rounded-full border border-pink-200 bg-white/75 px-3 py-2 text-xs font-semibold text-pink-950 transition hover:bg-white sm:w-auto sm:py-1.5" onClick={() => setShowDecisionHistory((current) => !current)} aria-expanded={showDecisionHistory()}>

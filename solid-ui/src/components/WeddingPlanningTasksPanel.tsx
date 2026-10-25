@@ -3,6 +3,7 @@ import { createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-j
 import { WeddingTaskResponsibilityFields } from "@/components/WeddingTaskResponsibilityFields";
 import { WeddingTaskComposer } from "@/components/WeddingTaskComposer";
 import { WeddingTaskCompletionButton } from "@/components/WeddingTaskCompletionButton";
+import { WeddingTaskOwnerControl } from "@/components/WeddingTaskOwnerControl";
 
 import type { SendAfpMessageInput } from "@/lib/api";
 import {
@@ -113,10 +114,13 @@ export function WeddingPlanningTasksPanel(props: {
                     <span class="text-xs font-semibold text-wedding-ink/65">{weddingHelperTaskPriorityLabel(task)}</span>
                   </div>
                   <p class="mt-2 break-words text-base font-semibold text-wedding-ink">{task.title}</p>
-                  <p class="mt-1 text-sm text-wedding-ink/70">Due {weddingHelperTaskDueLabel(task)} · {task.assignee?.trim() || "You"}</p>
+                  <p class="mt-1 text-sm text-wedding-ink/70">Due {weddingHelperTaskDueLabel(task)}</p>
                   <p class="mt-2 text-xs font-semibold text-wedding-primary">{expandedTaskIds()[task.id] ? "Hide task details" : "View task details"}</p>
                 </button>
-                <WeddingTaskCompletionButton task={task} weddingPlanId={props.state.workspace.metadata.weddingPlanId} responseWorkspaceId={workspaceId()} saveProjection={props.saveProjection} onRefreshWorkspace={props.onRefreshWorkspace} />
+                <div class="grid min-w-0 gap-2 sm:w-[15rem]">
+                  <WeddingTaskOwnerControl task={task} weddingPlanId={props.state.workspace.metadata.weddingPlanId} responseWorkspaceId={workspaceId()} people={props.state.helperContactNames} contactUserId={props.contactUserId} saveProjection={props.saveProjection} onRefreshWorkspace={props.onRefreshWorkspace} />
+                  <WeddingTaskCompletionButton task={task} weddingPlanId={props.state.workspace.metadata.weddingPlanId} responseWorkspaceId={workspaceId()} saveProjection={props.saveProjection} onRefreshWorkspace={props.onRefreshWorkspace} />
+                </div>
               </div>
               <Show when={expandedTaskIds()[task.id]}>
                 <div class="border-t border-wedding-border bg-white p-4">

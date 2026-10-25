@@ -1,5 +1,5 @@
 // @locs-version: 1.1
-import { createEffect, createMemo, createSignal, onCleanup, Show, type JSX } from "solid-js";
+import { createEffect, createMemo, createSignal, onCleanup, onMount, Show, type JSX } from "solid-js";
 
 import { MobileFocusDeck } from "@/components/MobileFocusDeck";
 import { MobileFocusHome } from "@/components/MobileFocusHome";
@@ -13,7 +13,6 @@ import { buildDecisionTriageProjectionState } from "@/lib/decisionTriageProjecti
 import { decisionCardFromFocusDeckItem } from "@/lib/decisionCardState";
 import {
   buildWeddingDecisionFocusDisplayState,
-  WEDDING_DAILY_DECISION_LIMIT,
   weddingVendorResearchQueryForDecision,
 } from "@/lib/weddingDecisionFocusDisplayState";
 import { buildWeddingDecisionDeferSidebarAction } from "@/lib/weddingDecisionFocusActionState";
@@ -39,6 +38,7 @@ import type { AfpAttachment } from "@/lib/api";
 import type { WeddingVendorChoiceCardData } from "@/components/WeddingVendorChoiceCard";
 import type { WeddingVendorChoiceIntent } from "@/lib/weddingVendorChoiceActionState";
 import { friendlyErrorText } from "@/lib/visibleErrorText";
+import { loadWeddingTaskCompletion, WEDDING_TASK_COMPLETION_EVENT } from "@/lib/weddingTaskCompletionLocalState";
 import {
   dispatchWeddingVendorSearchLaunch,
   saveWeddingVendorSearchLaunch,
@@ -74,18 +74,26 @@ export function WeddingMobileFocusHome(props: {
   const [pendingApproval, setPendingApproval] = createSignal<PendingApproval | null>(null);
   const [pendingTriage, setPendingTriage] = createSignal<PendingTriage | null>(null);
   const [notice, setNotice] = createSignal<string | null>(null);
+  const [completionRevision, setCompletionRevision] = createSignal(0);
   const persistedTriage = createMemo(() => buildDecisionTriageProjectionState(props.state.afpMessages));
+  const completedFocusIds = createMemo(() => {
+    completionRevision();
+    return props.state.planningTaskItems
+      .filter((task) => loadWeddingTaskCompletion({ taskId: task.id, weddingPlanId: props.state.workspace.metadata.weddingPlanId, responseWorkspaceId: props.state.workspace.metadata.responseWorkspaceId })?.completed)
+      .map((task) => `task:${task.id}`);
+  });
   const hiddenIds = createMemo(() => new Set([
     ...persistedTriage().deferredIds,
     ...persistedTriage().resolvedIds,
     ...deferredIds(),
     ...resolvedIds(),
+    ...completedFocusIds(),
   ]));
   const display = createMemo(() => buildWeddingDecisionFocusDisplayState({
     relief: props.state.personalOsProjection.decisionLoadRelief,
     locallyDeferredIds: hiddenIds(),
   }));
-  const decisions = createMemo(() => rankFocusDeckItems(display().itemCards.map((card) => ({
+  const decisions = createMemo(() => rankFocusDeckItems(display().queuedItemCards.map((card) => ({
     id: card.id,
     kind: "decision" as const,
     sourceSurface: card.item.sourceSurface,
@@ -113,13 +121,17 @@ export function WeddingMobileFocusHome(props: {
       returnedFromLater: false,
       external: flow.stage === "ready_to_send",
     }))));
-  // The decision deck is deliberately finite. Vendor comparison work remains
-  // reachable from Overview instead of being appended after every decision.
   const items = () => mobileFocusMode() === "responses"
     ? responses()
     : mobileFocusMode() === "decisions"
-      ? decisions().slice(0, WEDDING_DAILY_DECISION_LIMIT)
+      ? decisions()
       : [];
+
+  onMount(() => {
+    const listener = () => setCompletionRevision((value) => value + 1);
+    window.addEventListener(WEDDING_TASK_COMPLETION_EVENT, listener);
+    onCleanup(() => window.removeEventListener(WEDDING_TASK_COMPLETION_EVENT, listener));
+  });
 
   createEffect(() => {
     publishMobileFocusHomeSections(props.homeSections.map((section) => ({
@@ -248,13 +260,16 @@ export function WeddingMobileFocusHome(props: {
   }
 
   async function defer(item: FocusDeckItem, method: InputMethod): Promise<boolean> {
-    return triage("defer", item, method, () => {
+    await triage("defer", item, method, () => {
       if (item.kind === "decision") {
         const decision = decisionItemFor(item.id);
         if (decision) props.onSidebarAction(buildWeddingDecisionDeferSidebarAction(decision));
       }
       rememberTriage("defer", item.id);
     });
+    // Removing the current item shifts the next queued item into the same deck
+    // position. Do not advance again or the first remaining item is skipped.
+    return false;
   }
 
   function openAgentDraft() {
@@ -281,6 +296,20 @@ export function WeddingMobileFocusHome(props: {
       return;
     }
     requestApproval(item, "button");
+  }
+
+  function bringBackLaterItem() {
+    const first = [...deferredIds()][0];
+    if (!first) return;
+    const next = new Set(deferredIds());
+    next.delete(first);
+    setDeferredIds(next);
+    saveMobileFocusTriageMemory(props.state.workspace.metadata.responseWorkspaceId, {
+      resolvedIds: [...resolvedIds()],
+      deferredIds: [...next],
+    });
+    setPosition(0);
+    setNotice("That item is back in your active queue.");
   }
 
   const currentTitle = () => "";
@@ -336,6 +365,7 @@ export function WeddingMobileFocusHome(props: {
                 onApprove={requestApproval}
                 onDefer={defer}
                 label={mobileFocusMode() === "responses" ? "Response" : "Decision"}
+                sequential
                 renderCard={(item) => item.kind.startsWith("vendor_")
                   ? <WeddingVendorDeckCard
                     item={item}
@@ -353,8 +383,13 @@ export function WeddingMobileFocusHome(props: {
                   <QueueClearedZenState
                     variant="wedding"
                     laterCount={deferredIds().size}
+                    pendingDecisionCount={mobileFocusMode() === "decisions" ? 0 : decisions().length}
+                    pendingResponseCount={mobileFocusMode() === "responses" ? 0 : responses().length}
                     onPrimary={() => props.onSelectMenu?.("plan")}
                     onDiary={() => props.onSelectMenu?.("timeline")}
+                    onBringBack={bringBackLaterItem}
+                    onReviewDecisions={() => { setMobileFocusMode("decisions"); setPosition(0); }}
+                    onReviewResponses={() => { setMobileFocusMode("responses"); setPosition(0); }}
                   />
                 )}
               />

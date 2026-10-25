@@ -151,7 +151,7 @@ export function decisionCardFromWeddingFocus(card: WeddingDecisionFocusItemCard)
     actions: [
       { id: "open", label: card.compareLabel, role: "primary", effect: "Opens the related wedding workflow", intent: "review" },
       { id: "why", label: "Show me why", role: "secondary", effect: "Shows the ranking evidence", intent: "explain" },
-      { id: "later", label: "Decide later", role: "dismiss", effect: "Records a deferral and removes this from the top three", intent: "defer" },
+      { id: "later", label: "Decide later", role: "dismiss", effect: "Records a deferral and brings forward the next item", intent: "defer" },
     ],
     evidence,
     timeSensitivity: { label: card.neededByLabel, at: item.dueAt },

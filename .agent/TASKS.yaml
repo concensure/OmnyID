@@ -3536,3 +3536,37 @@ tasks:
       - all projected tasks receive one of the six research-backed journey stages; research gaps are added without kind-based deduplication and recognized prebuilt final-count, seating, run-sheet, supplier-confirmation, weather, fitting and rehearsal deadlines are recalculated from the wedding date
       - the interactive home stepper reveals categorized chronological tasks in place, while Tasks and Timeline can create AFP wedding tasks with a stage and deadline, edit deadlines, and share one completion event/projection with People
       - pass: typecheck, focused quote/journey/persistence tests, all 1974 wedding tests, production UI build, both line-budget guards and 33 Rust quotation tests; policy V2 and rollout flags are unchanged
+  - id: WED-260
+    title: Make wedding responsibility and decision flow continuous across surfaces
+    status: complete
+    owner: codex
+    branch: agent/codex/WED-215
+    depends_on:
+      - WED-242
+      - WED-259
+    files:
+      - solid-ui/src/components/Wedding*Task*.tsx
+      - solid-ui/src/components/WeddingPlanningJourneyStepper.tsx
+      - solid-ui/src/components/WeddingTimelinePanel.tsx
+      - solid-ui/src/components/WeddingDecisionFocusCard.tsx
+      - solid-ui/src/components/QueueClearedZenState.tsx
+      - solid-ui/src/lib/continuityProjectionState.ts
+      - solid-ui/src/lib/wedding*State.ts
+      - solid-ui/tests/wedding-*.test.ts
+      - Documents/wedding research/**
+      - .agent/**
+    acceptance:
+      - every canonical wedding task projection lets the couple assign the same AFP-backed task to themselves or another wedding collaborator without creating a parallel task record
+      - an assignment made in one task surface is reflected in the other task surfaces and remains available after reload
+      - the wedding focus presents one actionable decision at a time and immediately advances after completion or deferral without a daily count cap
+      - the focus reaches a cleared state only when no planning task or vendor response requires the couple's attention, with user-facing copy that does not imply a three-per-day limit
+      - vendor response work is not silently truncated to three items and rollout-sensitive policy flags remain unchanged
+      - a concise research-backed UX and value-opportunity report assesses a permissioned shareable run sheet and other next improvements
+      - focused tests, all wedding tests, typecheck, production build and line-budget checks pass with new files below 1000 lines
+    progress:
+      - registered from committed WED-259 revision 00619f2 after locating the three-item cap in the shared continuity projection and responsibility controls only in expanded task detail
+      - Home journey, Tasks, Timeline and the generic wedding task board now expose one reusable owner control; decision-focus assignment uses the same local and AFP responsibility contract instead of a parallel task update
+      - latest AFP responsibility and completion records project back onto canonical task items, and same-tab responsibility/completion events keep mounted surfaces synchronized before refresh
+      - the wedding queue retains every open planning task and active vendor quote response, presents one decision at a time, advances after approval or deferral, and distinguishes other pending work, deferred work and a genuinely empty queue
+      - a research-backed opportunity report recommends a recipient-scoped, revocable and versioned wedding run sheet as the next high-value and naturally shareable product slice
+      - pass: typecheck, all 1977 wedding tests, focused continuous-queue/assignment/mobile tests, production build and both line-budget guards; policy V2 and rollout flags are unchanged

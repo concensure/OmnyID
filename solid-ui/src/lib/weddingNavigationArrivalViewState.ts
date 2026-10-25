@@ -167,7 +167,7 @@ function actionFor(
       return {
         kind: "review_tasks",
         label: "Show why it matters",
-        description: "Review the reason this wedding decision is in the top three before acting on it.",
+        description: "Review why this is the next wedding decision before acting on it.",
         disabled: false,
       };
     }

@@ -1,13 +1,16 @@
-import { createMemo, createSignal, For, Show } from "solid-js";
+import { createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 
 import type { SendAfpMessageInput } from "@/lib/api";
 import { loadContacts, saveContacts } from "@/lib/contactsLocalState";
 import {
   loadWeddingHelperLocalState,
+  dispatchWeddingTaskResponsibilityChange,
   saveWeddingHelperLocalState,
   upsertWeddingHelperContact,
   weddingHelperContactToAfpSendInput,
   weddingHelperResponsibilityToAfpSendInput,
+  WEDDING_TASK_RESPONSIBILITY_EVENT,
+  type WeddingTaskResponsibilityChange,
 } from "@/lib/weddingHelpersPanelState";
 import type { WeddingResponseWorkspaceViewState } from "@/lib/weddingResponseWorkspaceViewState";
 
@@ -36,6 +39,14 @@ export function WeddingTaskResponsibilityFields(props: {
     const contacts = loadContacts(props.contactUserId).map((contact) => contact.name);
     return [...new Set(["You", ...props.state.helperContactNames, ...initial.customHelpers, ...contacts].map((item) => item.trim()).filter(Boolean))];
   });
+  onMount(() => {
+    const listener = (event: Event) => {
+      const detail = (event as CustomEvent<WeddingTaskResponsibilityChange>).detail;
+      if (detail?.workspaceId === workspaceId() && detail.taskId === props.task.id) setOwner(detail.ownerLabel);
+    };
+    window.addEventListener(WEDDING_TASK_RESPONSIBILITY_EVENT, listener);
+    onCleanup(() => window.removeEventListener(WEDDING_TASK_RESPONSIBILITY_EVENT, listener));
+  });
 
   async function persist(next: { owner?: string; consult?: string; lastContact?: string }): Promise<void> {
     const current = loadWeddingHelperLocalState(workspaceId());
@@ -48,6 +59,7 @@ export function WeddingTaskResponsibilityFields(props: {
       taskConsultedPeople: { ...current.taskConsultedPeople, [props.task.id]: consultedLabel },
       taskLastContactDates: { ...current.taskLastContactDates, [props.task.id]: lastContactDate },
     });
+    dispatchWeddingTaskResponsibilityChange({ workspaceId: workspaceId(), taskId: props.task.id, ownerLabel });
     if (!props.saveProjection) return;
     const message = weddingHelperResponsibilityToAfpSendInput({
       task: props.task,

@@ -1,5 +1,7 @@
 // @locs-version: 2.0
-import { For, Show, createMemo, createSignal } from "solid-js";
+import { For, Show, createMemo, createSignal, onCleanup, onMount } from "solid-js";
+import { WeddingTaskOwnerControl } from "@/components/WeddingTaskOwnerControl";
+import type { WeddingPlanningTaskItem } from "@/lib/weddingCalendarProjectionState";
 import type { WeddingTaskHierarchyStage } from "@/lib/weddingTaskHierarchyState";
 import {
   loadWeddingTaskCompletion,
@@ -9,6 +11,7 @@ import {
 import { weddingTaskCompletionToAfpSendInput } from "@/lib/weddingTaskCompletionProjectionState";
 import { weddingTaskDateToAfpSendInput } from "@/lib/weddingTaskDateProjectionState";
 import { buildWeddingTaskCompletionSyncState } from "@/lib/weddingTaskCompletionSyncState";
+import { loadWeddingHelperLocalState, WEDDING_TASK_RESPONSIBILITY_EVENT } from "@/lib/weddingHelpersPanelState";
 import {
   dispatchWeddingTaskCompletionSync,
   type WeddingTaskCompletionSaveFn,
@@ -57,6 +60,7 @@ export function WeddingTaskStageView(props: {
   const [syncedTaskIds, setSyncedTaskIds] = createSignal<Record<string, boolean>>({});
   const [syncReceipt, setSyncReceipt] = createSignal<WeddingTaskCompletionSyncDispatchReceipt | null>(null);
   const [taskNotice, setTaskNotice] = createSignal<string | null>(null);
+  const [responsibilityRevision, setResponsibilityRevision] = createSignal(0);
   const syncState = createMemo(() => {
     syncRefreshKey();
     return buildWeddingTaskCompletionSyncState(props.stages, localStorage);
@@ -96,9 +100,25 @@ export function WeddingTaskStageView(props: {
   };
   const taskDate = (task: WeddingTaskStageViewTask) => savedTaskDate(task) || (typeof task.due_date === "string" ? task.due_date.slice(0, 10) : "");
   const taskOwner = (task: WeddingTaskStageViewTask) => {
-    const owner = typeof task.assignee === "string" ? task.assignee.trim() : "";
+    responsibilityRevision();
+    const owner = loadWeddingHelperLocalState(task.response_workspace_id).taskAssignees[task.task_id]
+      ?? (typeof task.assignee === "string" ? task.assignee.trim() : "");
     return owner || "You";
   };
+  const ownerTask = (task: WeddingTaskStageViewTask): WeddingPlanningTaskItem => ({
+    id: task.task_id,
+    title: task.title,
+    kind: "other",
+    dueAt: task.due_date ?? null,
+    dueLabel: task.due_label ?? null,
+    priority: task.priority === "low" || task.priority === "high" || task.priority === "urgent" ? task.priority : "normal",
+    assignee: task.assignee ?? null,
+  });
+  onMount(() => {
+    const listener = () => setResponsibilityRevision((value) => value + 1);
+    window.addEventListener(WEDDING_TASK_RESPONSIBILITY_EVENT, listener);
+    onCleanup(() => window.removeEventListener(WEDDING_TASK_RESPONSIBILITY_EVENT, listener));
+  });
   const displayDueText = (item: WeddingTaskHierarchyStage<WeddingTaskStageViewTask>["items"][number]) =>
     taskDate(item.task) || item.dueText || "Add date";
   const toggleExpanded = (taskId: string) => {
@@ -454,7 +474,7 @@ export function WeddingTaskStageView(props: {
                           <span class={`mt-4 h-2.5 w-2.5 flex-shrink-0 rounded-full ${completed() ? "bg-emerald-400" : item.statusClass}`} />
                         </div>
                         <Show when={expanded()}>
-                          <div class="mb-2 border-t border-slate-200 pt-2">
+                          <div class="mb-2 grid gap-3 border-t border-slate-200 pt-2 sm:grid-cols-2">
                             <label class="block text-xs font-semibold text-rose-950/75">
                               Due date
                               <input
@@ -464,6 +484,12 @@ export function WeddingTaskStageView(props: {
                                 onChange={(event) => saveTaskDate(item.task, event.currentTarget.value)}
                               />
                             </label>
+                            <WeddingTaskOwnerControl
+                              task={ownerTask(item.task)}
+                              weddingPlanId={item.task.wedding_plan_id}
+                              responseWorkspaceId={item.task.response_workspace_id ?? "wedding"}
+                              saveProjection={props.saveTaskStatus}
+                            />
                           </div>
                         </Show>
                         <div class="min-w-0 pb-2 pl-11">

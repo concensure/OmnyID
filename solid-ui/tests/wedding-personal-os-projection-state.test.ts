@@ -642,7 +642,7 @@ test("wedding PersonalOS projection ranks production remaining-work tasks", () =
   assert.match(state.rankedItems[0]?.explanation ?? "", /must clear before Oracle upload/i);
 });
 
-test("wedding PersonalOS projection narrows decision-heavy work into a bounded focus list", () => {
+test("wedding PersonalOS respects an explicit focus limit while retaining ordinary planning tasks", () => {
   const decision: WeddingDecisionProjectionInput = {
     id: "decision:venue",
     artifactId: "artifact:venue-shortlist",
@@ -695,9 +695,25 @@ test("wedding PersonalOS projection narrows decision-heavy work into a bounded f
 
   assert.equal(state.decisionLoadRelief.focusLimit, 2);
   assert.equal(state.decisionLoadRelief.focusItems.length, 2);
-  assert.equal(state.decisionLoadRelief.backlogCount, 1);
-  assert.match(state.decisionLoadRelief.summaryLabel, /2 things need your attention; 1 can wait/);
+  assert.equal(state.decisionLoadRelief.backlogCount, 2);
+  assert.match(state.decisionLoadRelief.summaryLabel, /2 things need your attention; 2 can wait/);
   assert.ok(state.decisionLoadRelief.focusItems.some((item) => /Decide final caterer headcount|Verify venue balance/i.test(item.title)));
   assert.equal(state.decisionLoadRelief.focusItems.some((item) => /Pack emergency kit/i.test(item.title)), false);
-  assert.ok(state.decisionLoadRelief.reliefLabels.some((label) => /unbounded checklist/i.test(label)));
+  assert.ok(state.rankedItems.some((item) => /Pack emergency kit/i.test(item.title)));
+  assert.ok(state.decisionLoadRelief.reliefLabels.some((label) => /one next action at a time/i.test(label)));
+});
+
+test("wedding PersonalOS queues every open planning task without a default three-item cap", () => {
+  const tasks = Array.from({ length: 7 }, (_, index) => ({
+    id: `task-${index + 1}`,
+    title: `Planning task ${index + 1}`,
+    kind: "other" as const,
+    priority: "normal" as const,
+    approvalState: "draft" as const,
+  }));
+  const state = buildWeddingPersonalOsProjectionState({ now, taskItems: tasks });
+
+  assert.equal(state.decisionLoadRelief.focusItems.length, 7);
+  assert.equal(state.decisionLoadRelief.backlogCount, 0);
+  assert.ok(state.decisionLoadRelief.focusLimit >= 7);
 });

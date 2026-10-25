@@ -289,7 +289,8 @@ function taskWeight(task: WeddingPlanningTaskItem, now: Date): number {
 
 function taskItem(task: WeddingPlanningTaskItem, now: Date): WeddingPersonalOsRankedItem | null {
   const title = clean(task.title);
-  if (!title || task.reviewStatus === "ignored" || task.approvalState === "archived") return null;
+  if (!title || task.reviewStatus === "ignored" || task.approvalState === "archived"
+    || task.semanticTags?.some((tag) => tag.toLowerCase() === "wedding_task_status:done")) return null;
   const family = familyForTask(task);
   const timing = dueExplanation(task.dueAt, clean(task.dueLabel) || null, now);
   const escalationStage = outreachEscalationStage(task.metadata);
@@ -508,6 +509,7 @@ function familySummary(family: WeddingPersonalOsPressureFamily | null, top: Wedd
 }
 
 function decisionLoadCandidate(item: WeddingPersonalOsRankedItem): boolean {
+  if (item.kind === "task") return true;
   if (item.kind === "decision" || item.pressureFamily === "knowledge" || item.pressureFamily === "opportunity") return true;
   if (/^(Confirm|Decide|Choose|Verify|Review)\b/i.test(item.title)) return true;
   return item.evidenceLabels.some((label) =>
@@ -522,8 +524,8 @@ function decisionLoadReliefLabels(
   _backlogCount: number,
 ): string[] {
   return [
-    focusItems.length > 0 ? `Limits active wedding choices to the top ${focusItems.length}.` : "No immediate decision pile-up.",
-    "Keeps vendor search, budget, guest, and logistics work as ranked next actions instead of an unbounded checklist.",
+    focusItems.length > 0 ? `${focusItems.length} wedding action${focusItems.length === 1 ? " is" : "s are"} queued by urgency.` : "No immediate decision pile-up.",
+    "Shows one next action at a time while keeping the rest ready behind it.",
   ];
 }
 
@@ -538,8 +540,6 @@ export function buildWeddingPersonalOsProjectionState(input: {
   decisionFocusLimit?: number | null;
 }): WeddingPersonalOsProjectionState {
   const now = input.now ?? new Date();
-  const limit = input.limit ?? 12;
-  const decisionFocusLimit = Math.max(1, Math.min(3, Math.trunc(input.decisionFocusLimit ?? 3)));
   const candidateItems = [
     ...(input.taskItems ?? []).map((item) => taskItem(item, now)),
     ...(input.scheduleItems ?? []).map((item) => scheduleItem(item, now)),
@@ -547,6 +547,8 @@ export function buildWeddingPersonalOsProjectionState(input: {
     ...(input.approvalReceipts ?? []).map(approvalItem),
   ]
     .filter((item): item is WeddingPersonalOsRankedItem => Boolean(item));
+  const limit = Math.max(1, Math.trunc(input.limit ?? Math.max(1, candidateItems.length)));
+  const decisionFocusLimit = Math.max(1, Math.trunc(input.decisionFocusLimit ?? limit));
   const candidateById = new Map(candidateItems.map((item) => [item.id, item]));
   const deferredIds = new Set((input.decisionDeferrals ?? [])
     .filter((deferral) => {

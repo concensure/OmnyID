@@ -89,7 +89,7 @@ test("buildWeddingVendorLeadTimeTaskItems creates research tasks for the existin
     : null, "vendor_lead_time");
 });
 
-test("buildWeddingResponseWorkspaceViewState surfaces lead-time vendor research in top-three decision focus", () => {
+test("buildWeddingResponseWorkspaceViewState keeps lead-time vendor research in the uncapped decision queue", () => {
   const state = buildWeddingResponseWorkspaceViewState({
     metadata,
     nowIso: "2026-10-14T00:00:00.000Z",
@@ -119,5 +119,6 @@ test("buildWeddingResponseWorkspaceViewState surfaces lead-time vendor research 
     /Search for venue/i.test(item.title)
     && item.evidenceLabels.includes("vendor research timing")
   ));
-  assert.ok(state.personalOsProjection.decisionLoadRelief.backlogCount > 0);
+  assert.ok(state.personalOsProjection.decisionLoadRelief.focusItems.length > 3);
+  assert.equal(state.personalOsProjection.decisionLoadRelief.backlogCount, 0);
 });

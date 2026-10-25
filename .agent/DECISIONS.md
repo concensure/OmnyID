@@ -1679,3 +1679,17 @@ to one of Plan & budget, Venue & date, Celebrant & suppliers, Details & invites,
 same-device feedback and broadcast one completion event so Home, Timeline, Tasks and People converge.
 Research-backed template tasks are de-duplicated by stable identity/title rather than broad kind, and
 only recognized prebuilt timing tasks have deadlines recalculated from the wedding date.
+
+## 2026-10-25: Wedding attention is one visible item over a complete queue
+
+The wedding focus queue retains every open user-facing planning task and active vendor quote response;
+it is not a three-item daily allowance. The interface presents one item at a time and advances only
+after an explicit completion, approval or deferral. A queue may claim completion only when there is no
+active decision, task, vendor response or deferred local item; finishing one mode must reveal work in
+the other rather than showing a false clear state.
+
+Task responsibility is one AFP-backed projection across Wedding Home, Tasks, Timeline, People and the
+generic task board. Local storage supplies immediate same-device continuity, while responsibility and
+completion events update mounted surfaces and the latest AFP records restore owner/done state after a
+refresh. Decision-card assignment must use this contract rather than emitting a parallel generic task
+update.

@@ -79,6 +79,18 @@ export type WeddingHelperContactUpsertResult = {
 };
 
 const WEDDING_HELPER_LOCAL_STATE_KEY = "omnyid.wedding.helpers.v1";
+export const WEDDING_TASK_RESPONSIBILITY_EVENT = "omnyid:wedding-task-responsibility-changed";
+
+export type WeddingTaskResponsibilityChange = {
+  workspaceId: string;
+  taskId: string;
+  ownerLabel: string;
+};
+
+export function dispatchWeddingTaskResponsibilityChange(detail: WeddingTaskResponsibilityChange): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent<WeddingTaskResponsibilityChange>(WEDDING_TASK_RESPONSIBILITY_EVENT, { detail }));
+}
 
 function clean(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";

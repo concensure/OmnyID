@@ -229,7 +229,7 @@ test("buildWeddingNavigationArrivalBannerState labels decision focus actions by 
   });
 
   assert.equal(explainState?.primaryAction.label, "Show why it matters");
-  assert.match(explainState?.primaryAction.description ?? "", /top three/i);
+  assert.match(explainState?.primaryAction.description ?? "", /next wedding decision/i);
   assert.equal(openState?.primaryAction.label, "Open this decision");
   assert.match(openState?.primaryAction.description ?? "", /approved, assigned, or deferred/i);
   assert.equal(reviewState?.primaryAction.label, "Review top decisions");

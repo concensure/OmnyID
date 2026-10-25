@@ -15,6 +15,11 @@ test("wedding-home searches attach their result without becoming background jobs
 
 test("tasks expose responsibility fields and seating exposes an interactive canvas", () => {
   const tasks = read("src/components/WeddingPlanningTasksPanel.tsx");
+  const timeline = read("src/components/WeddingTimelinePanel.tsx");
+  const journey = read("src/components/WeddingPlanningJourneyStepper.tsx");
+  const stageView = read("src/components/WeddingTaskStageView.tsx");
+  const ownerControl = read("src/components/WeddingTaskOwnerControl.tsx");
+  const workspace = read("src/components/WeddingResponseWorkspaceView.tsx");
   const responsibility = read("src/components/WeddingTaskResponsibilityFields.tsx");
   const seating = read("src/components/WeddingSeatingCanvas.tsx");
   assert.match(tasks, /WeddingTaskResponsibilityFields/);
@@ -22,6 +27,14 @@ test("tasks expose responsibility fields and seating exposes an interactive canv
   assert.match(responsibility, />Consult/);
   assert.match(responsibility, />Last contact/);
   assert.match(responsibility, /\+ Add a person/);
+  assert.match(tasks, /WeddingTaskOwnerControl/);
+  assert.match(timeline, /WeddingTaskOwnerControl/);
+  assert.match(journey, /WeddingTaskOwnerControl/);
+  assert.match(stageView, /WeddingTaskOwnerControl/);
+  assert.match(ownerControl, /weddingHelperResponsibilityToAfpSendInput/);
+  assert.match(ownerControl, /dispatchWeddingTaskResponsibilityChange/);
+  assert.match(workspace, /weddingHelperResponsibilityToAfpSendInput/);
+  assert.doesNotMatch(workspace, /task_update_source: "wedding_decision_focus"/);
   assert.match(seating, /draggable/);
   assert.match(seating, /Map|Reception floor canvas/);
 });

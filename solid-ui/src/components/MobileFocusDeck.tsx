@@ -23,6 +23,7 @@ export function MobileFocusDeck(props: {
   renderCard: (item: FocusDeckItem) => JSX.Element;
   renderEnd: () => JSX.Element;
   label: "Decision" | "Response";
+  sequential?: boolean;
 }) {
   const [drag, setDrag] = createSignal<{ x: number; y: number; startedAt: number; pointerId: number; width: number; height: number; axis: ReturnType<typeof decisionOsSwipeAxisLock> } | null>(null);
   const [exiting, setExiting] = createSignal(false);
@@ -33,7 +34,8 @@ export function MobileFocusDeck(props: {
   const action = createMemo(() => {
     const state = drag();
     if (!state) return null;
-    return decisionOsSwipeDirection({ dx: offset().x, dy: offset().y, elapsedMs: performance.now() - state.startedAt, cardWidth: state.width, cardHeight: state.height, mapping: FOCUS_DECK_HORIZONTAL_MAPPING });
+    const direction = decisionOsSwipeDirection({ dx: offset().x, dy: offset().y, elapsedMs: performance.now() - state.startedAt, cardWidth: state.width, cardHeight: state.height, mapping: FOCUS_DECK_HORIZONTAL_MAPPING });
+    return props.sequential && (direction === "prev" || direction === "next") ? null : direction;
   });
   const progress = createMemo(() => {
     const state = drag();
@@ -97,7 +99,8 @@ export function MobileFocusDeck(props: {
   function pointerEnd(event: PointerEvent & { currentTarget: HTMLDivElement }) {
     const current = drag();
     if (!current || current.pointerId !== event.pointerId) return;
-    const direction = decisionOsSwipeDirection({ dx: offset().x, dy: offset().y, elapsedMs: performance.now() - current.startedAt, cardWidth: current.width, cardHeight: current.height, mapping: FOCUS_DECK_HORIZONTAL_MAPPING });
+    const swipeDirection = decisionOsSwipeDirection({ dx: offset().x, dy: offset().y, elapsedMs: performance.now() - current.startedAt, cardWidth: current.width, cardHeight: current.height, mapping: FOCUS_DECK_HORIZONTAL_MAPPING });
+    const direction = props.sequential && (swipeDirection === "prev" || swipeDirection === "next") ? null : swipeDirection;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
     setDrag(null);
     if (!direction) {
@@ -124,8 +127,8 @@ export function MobileFocusDeck(props: {
     setOffset({ x: 0, y: 0 });
   }
   function keyDown(event: KeyboardEvent) {
-    if (event.key === "ArrowLeft") { event.preventDefault(); navigate(-1); }
-    if (event.key === "ArrowRight") { event.preventDefault(); navigate(1); }
+    if (!props.sequential && event.key === "ArrowLeft") { event.preventDefault(); navigate(-1); }
+    if (!props.sequential && event.key === "ArrowRight") { event.preventDefault(); navigate(1); }
     if (event.key.toLowerCase() === "l" && item()) { event.preventDefault(); void commit("defer", "keyboard"); }
     if (event.key.toLowerCase() === "a" && item()) { event.preventDefault(); void commit("approve", "keyboard"); }
   }
@@ -157,9 +160,9 @@ export function MobileFocusDeck(props: {
           </div>
         </div>
         <div class="flex items-center justify-between pt-2">
-          <button type="button" class={ICON_BUTTON_CLASS} aria-label={`Previous ${props.label.toLowerCase()}`} onClick={() => navigate(-1)}><DeckIcon d="M15 19l-7-7 7-7" /></button>
+          <Show when={!props.sequential} fallback={<span class="h-11 w-11" aria-hidden="true" />}><button type="button" class={ICON_BUTTON_CLASS} aria-label={`Previous ${props.label.toLowerCase()}`} onClick={() => navigate(-1)}><DeckIcon d="M15 19l-7-7 7-7" /></button></Show>
           <p class="text-xs text-wedding-muted" aria-hidden="true">Swipe up for later, down to approve</p>
-          <button type="button" class={ICON_BUTTON_CLASS} aria-label={`Next ${props.label.toLowerCase()}`} onClick={() => navigate(1)}><DeckIcon d="M9 5l7 7-7 7" /></button>
+          <Show when={!props.sequential} fallback={<span class="h-11 w-11" aria-hidden="true" />}><button type="button" class={ICON_BUTTON_CLASS} aria-label={`Next ${props.label.toLowerCase()}`} onClick={() => navigate(1)}><DeckIcon d="M9 5l7 7-7 7" /></button></Show>
         </div>
         <nav class="flex gap-2 pt-1 pb-[max(0.75rem,env(safe-area-inset-bottom))]" aria-label={`${props.label} actions`}>
           <button type="button" class="inline-flex min-h-12 items-center justify-center gap-1.5 rounded-lg border border-wedding-muted bg-white px-4 text-sm font-semibold text-wedding-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-accent focus-visible:ring-offset-2" onClick={() => commit("defer", "button")}><DeckIcon d="M12 6v6l4 2M12 21a9 9 0 100-18 9 9 0 000 18z" />Later</button>

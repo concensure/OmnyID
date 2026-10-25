@@ -229,7 +229,7 @@ function markdownBundleContent(input: {
     "",
     "Selected-scope note: follow-up reports should prefer selected rows first while keeping unticked alternatives available in the source files.",
     "",
-    "## Three things worth your attention",
+    "## Wedding action queue",
     "",
     input.decisionFocus?.summaryLabel ? `- ${input.decisionFocus.summaryLabel}` : "- No decision-focus summary is available.",
     typeof input.decisionFocus?.backlogCount === "number" && input.decisionFocus.backlogCount > 0
@@ -250,7 +250,7 @@ function markdownBundleContent(input: {
     }),
     ...(input.decisionFocus?.reliefLabels ?? []).map(clean).filter(Boolean).slice(0, 3).map((label) => `- ${label}`),
     "",
-    "Attention note: use these items to reduce planning overwhelm. Do not treat backlog items as cancelled unless the user explicitly archives them.",
+    "Attention note: show one ranked item at a time. Continue through the queue without a daily cap, and do not treat deferred items as cancelled.",
     "",
     "## Where this came from",
     "",

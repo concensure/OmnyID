@@ -858,7 +858,7 @@ export function vendorQuoteReplyFlowsFromPreviews(input: {
         : null,
     }));
   }
-  return flows.slice(0, 3);
+  return flows;
 }
 
 function graphMetadataForRecommendation(recommendation: WeddingRecommendationExplanation): Record<string, unknown> {
