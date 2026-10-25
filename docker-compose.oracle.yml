@@ -41,7 +41,8 @@ services:
     mem_limit: ${OMNYID_SEAWEEDFS_MEM_LIMIT:-1536m}
     cpus: ${OMNYID_SEAWEEDFS_CPUS:-1.0}
     pids_limit: ${OMNYID_SEAWEEDFS_PIDS_LIMIT:-256}
-    entrypoint: ["/bin/sh", "/usr/local/bin/seaweedfs-secure-entrypoint.sh"]
+    # Windows worktrees may materialize bind-mounted shell scripts with CRLF.
+    entrypoint: ["/bin/sh", "-c", "tr -d '\\r' < /usr/local/bin/seaweedfs-secure-entrypoint.sh > /tmp/seaweedfs-secure-entrypoint.sh && exec /bin/sh /tmp/seaweedfs-secure-entrypoint.sh"]
     environment:
       OMNYID_SEAWEEDFS_ACCESS_KEY_FILE: /run/secrets/seaweedfs_app_access_key
       OMNYID_SEAWEEDFS_SECRET_KEY_FILE: /run/secrets/seaweedfs_app_secret_key
