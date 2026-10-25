@@ -3572,7 +3572,7 @@ tasks:
       - pass: typecheck, all 1977 wedding tests, focused continuous-queue/assignment/mobile tests, production build and both line-budget guards; policy V2 and rollout flags are unchanged
   - id: WED-261
     title: Make wedding AI use bounded evidence and make vendor enquiries consent-first
-    status: in_progress
+    status: complete
     owner: codex
     branch: agent/codex/WED-215
     depends_on:
@@ -3604,3 +3604,11 @@ tasks:
       - focused Rust/frontend/site tests, typecheck, production build and line-budget checks pass; rollout-sensitive mail and policy flags remain unchanged
     progress:
       - registered from committed WED-260 revision ef73047 after confirming outreach already uses a bounded structured request and durable AFP draft, but lacks revision/cost metadata, input reuse, per-wedding budget enforcement and explicit share controls
+      - outreach generation now consumes bounded structured wedding/vendor facts, fingerprints the stable prompt prefix and meaningful inputs, reuses the saved AFP draft on reopen, and regenerates only after an explicit retry or permission-driven request
+      - every generated draft records source references, grounded fields, provider/model token and cost data, approval status, permission snapshot, input/prompt fingerprints and append-only revision lineage; sent events bind the approved revision and permission state
+      - account and wedding-plan monthly cost/token budgets use the existing budget configuration and append-only usage ledger; over-limit outreach falls back to the grounded deterministic template, while quote normalization requires manual review rather than weakening inference
+      - enquiry review defaults to protected OmnyID replies, budget and phone sharing off, unanswered reminders on, and shows recipient, exact editable content, attachments and shared information before a mandatory acknowledgement; protected delivery remains fail-closed until the reviewed relay is available
+      - contextual trust tips cover vendor source evidence, commercial influence, quote uncertainty, personal-data sharing, contact pressure, AI grounding and non-response at the relevant comparison/quote/follow-up surfaces; the public Wedding FAQ gives the expanded answers
+      - the three root review workbooks now target product commit 7b754338fb1e6b777158e517733f028b5aa4d281 and include consent, bounded-AI, cost-audit and protected-reply evidence steps; the tracked human-review form carries the same candidate and scenarios
+      - pass: typecheck, focused consent/outreach tests 26/26, all 1984 wedding tests, Wedding site and CSP smoke, production Vite build, both line-budget guards, Rust outreach tests 10/10, quotation tests 33/33, cargo check and HTML script syntax; human-review Playwright checks 2/2
+      - policy V2 and mail/relay rollout flags remain unchanged; no deployment was performed

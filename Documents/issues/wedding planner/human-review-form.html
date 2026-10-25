@@ -56,6 +56,10 @@
   .warn { background: #fff7e6; border: 1px solid #e6c97a; border-radius: 8px; padding: 10px 12px; }
   details summary { cursor: pointer; font-weight: 600; }
   #problems { color: var(--bad); }
+  .packet-nav { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 4px; }
+  .packet-nav a { display: inline-flex; align-items: center; min-height: 44px; padding: 8px 12px;
+    border: 1px solid var(--teal); border-radius: 8px; color: var(--teal); font-weight: 600;
+    text-decoration: none; }
 </style>
 </head>
 <body>
@@ -63,6 +67,14 @@
   <h1>Planning agent: review form</h1>
   <p class="muted">Answer in plain words. This page makes the nine review files for you, plus the
     signed-off report they point to. Nothing leaves your computer. Your answers autosave in this browser.</p>
+  <nav class="packet-nav" aria-label="Release review packet">
+    <a href="release-gate-control.html">Release gate control</a>
+    <a href="email-worker-security-review.html">Email Worker review</a>
+  </nav>
+  <div class="warn"><strong>Current candidate:</strong>
+    <code>7b754338fb1e6b777158e517733f028b5aa4d281</code>. Confirm the hosted runtime reports the
+    same full SHA. This form covers the nine planning dimensions; it does not replace the ten
+    WED-225 external gates in the release control page.</div>
 
   <div id="bar" aria-live="polite">
     <span id="barText">0 of 9 dimensions answered</span>
@@ -76,12 +88,14 @@
       must review again, so freeze a version first. Run this in PowerShell. It copies the latest
       version into a fresh folder, so nobody can change it while you review.</p>
     <div class="cmd" id="cmd1">$src = "C:\Users\ozans\Desktop\projects\OmnyID-WED-215"
-$sha = (git -C $src rev-parse HEAD).Trim()
-git -C $src status --porcelain   # must print nothing
-git -C $src worktree add "C:\Users\ozans\Desktop\projects\OmnyID-review-$($sha.Substring(0,8))" $sha
+$sha = "7b754338fb1e6b777158e517733f028b5aa4d281"
+git -C $src cat-file -e "$sha^{commit}"
+$review = "C:\Users\ozans\Desktop\projects\OmnyID-review-$($sha.Substring(0,8))"
+git -C $src worktree add --detach $review $sha
+git -C $review status --porcelain   # must print nothing
 $sha   # paste this 40-character code into Step 2<button class="copy" data-copy="cmd1">Copy</button></div>
-    <p class="muted">If the status line prints anything, the version is not clean. Stop and ask for it
-      to be committed first.</p>
+    <p class="muted">The shared development worktree may contain unrelated work. The newly created
+      review worktree is the one that must be clean and fixed at the candidate above.</p>
     <p>Then build it and open it in your browser:</p>
     <div class="cmd" id="cmd2">cd "C:\Users\ozans\Desktop\projects\OmnyID-review-XXXXXXXX\solid-ui"
 npm ci
@@ -139,28 +153,28 @@ npm run preview<button class="copy" data-copy="cmd2">Copy</button></div>
 const DIMS = [
   { id: "memory_fidelity", title: "Does it remember things exactly?",
     q: "Are limits the couple confirmed recalled exactly, are old facts not shown as current, and are private remarks not quietly widened?",
-    scenarios: ["remembered-centrepiece-limit", "accessibility-conflict"] },
+    scenarios: ["remembered-centrepiece-limit", "accessibility-conflict", "bounded-ai-audit"] },
   { id: "cost_clarity", title: "Are the money words clear?",
     q: "Can you tell paid, committed, estimated, forecast, at-risk and unknown amounts apart? Does any advice read as if money was moved or something was bought?",
-    scenarios: ["budget-offset"] },
+    scenarios: ["budget-offset", "bounded-ai-audit"] },
   { id: "critical_path_wording", title: "Are the dates and blockers understandable?",
     q: "Without technical words, can you tell what depends on what, which dates matter, and what is uncertain? Is prepared work ever described as already done?",
     scenarios: ["accommodation-critical-path"] },
   { id: "vendor_context_minimisation", title: "Does the vendor only see what they should?",
     q: "Does a vendor get only the requirements and questions that were approved? Check there is no partner reasoning, competitor info, scores, whole-plan details or private notes.",
-    scenarios: ["accessibility-conflict", "vendor-substitution", "stale-authority"] },
+    scenarios: ["accessibility-conflict", "vendor-substitution", "stale-authority", "consent-first-enquiry"] },
   { id: "accessibility", title: "Is it usable for everyone?",
     q: "Try the keyboard only, a screen reader, 200% zoom, the contrast, focus marks, big-enough tap targets, reduced motion, recovering from an error, and whether status is shown by more than colour.",
-    scenarios: ["accessibility-conflict"] },
+    scenarios: ["accessibility-conflict", "consent-first-enquiry", "trust-at-decision"] },
   { id: "couple_usability", title: "Could a couple use it?",
     q: "Can a couple understand the next decision, the evidence, what is unknown, the alternatives and consequences, and how to put it off or undo it, with no help?",
-    scenarios: ["accommodation-critical-path", "partner-preference-conflict"] },
+    scenarios: ["accommodation-critical-path", "partner-preference-conflict", "consent-first-enquiry", "trust-at-decision"] },
   { id: "vendor_usability", title: "Could a vendor use it?",
     q: "Can a vendor see what is being asked, reply or revise, tell a review from an acceptance or booking, and recover when a link has expired or is invalid?",
     scenarios: ["vendor-substitution", "cross-channel-replay"] },
   { id: "permission_wording", title: "Is it clear what will be shared or done?",
     q: "Does the wording say what will be shared or done, with whom, and when? Are prepare, review, approve, send, book and pay always clearly different?",
-    scenarios: ["remembered-centrepiece-limit", "vendor-substitution", "cross-channel-replay", "stale-authority", "non-wedding-reuse"] },
+    scenarios: ["remembered-centrepiece-limit", "vendor-substitution", "cross-channel-replay", "stale-authority", "non-wedding-reuse", "consent-first-enquiry"] },
   { id: "alternative_preservation", title: "Are all sensible options still there?",
     q: "Is every reasonable option still available? Is the recommendation based on evidence, not generic? Is putting it off, or picking a non-recommended option, never hidden?",
     scenarios: ["budget-offset", "partner-preference-conflict", "non-wedding-reuse"] }
@@ -174,7 +188,10 @@ const SCEN = {
   "partner-preference-conflict": ["Partner preference conflict", "Resolving it is an acknowledgement of that exact version, never a rule the system guesses.", "Each partner's values stay separate. Private reasons never reach the vendor."],
   "cross-channel-replay": ["Cross-channel replay", "The same facts arriving by email, secure link or claimed profile merge into one. Receiving them is never proof of a booking.", "Duplicates are matched without exposing channel secrets."],
   "stale-authority": ["Stale authority", "A newer quote, permission or constraint cancels old recommendations and unsent drafts.", "Old records stay as history but cannot widen or resend vendor context."],
-  "non-wedding-reuse": ["Non-wedding reuse", "Generic contracts keep their rules. Wedding vocabulary is only styling.", "Styling can never loosen privacy or evidence rules."]
+  "non-wedding-reuse": ["Non-wedding reuse", "Generic contracts keep their rules. Wedding vocabulary is only styling.", "Styling can never loosen privacy or evidence rules."],
+  "consent-first-enquiry": ["Consent-first enquiry", "Prepare an enquiry and verify protected OmnyID replies are the default; budget and phone sharing are off; reminders are on; changing a control never sends.", "The review shows the exact recipient, editable content, attachments and shared facts. Budget appears only after explicit selection and regeneration. Sending requires acknowledgement; protected delivery stays blocked while the reviewed relay is off, and connected email is a clearly labelled opt-in fallback."],
+  "trust-at-decision": ["Trust at the decision point", "Open the trust tips on a vendor comparison, a normalized quote and an unanswered follow-up, then use the public Wedding FAQ.", "The copy answers genuine-source evidence, paid influence, quote uncertainty, personal-data sharing, sales calls, AI grounding and no reply without promising verified suitability, availability or delivery that has not been proved."],
+  "bounded-ai-audit": ["Bounded AI and draft audit", "Open and reopen one prepared enquiry, edit its text, then explicitly request one meaningful regeneration. Inspect the AFP draft history and usage evidence with an authorised operator.", "Typing and reopening must not call the model. The draft records bounded source references, input fingerprint, prompt-prefix ID, model/tokens/cost, approval and revision lineage. Account and wedding caps fail safely; an unchanged quote is not extracted or compared again."]
 };
 const CHOICES = [
   ["pass", "Passed: I checked it and found no problem", "sel-pass"],
@@ -182,8 +199,10 @@ const CHOICES = [
   ["skip", "Not reviewed yet", "sel-skip"]
 ];
 const KEY = "planning-review-v1";
-let st = { sha: "", who: "", indep: false, ans: {} };
+const TARGET_SHA = "7b754338fb1e6b777158e517733f028b5aa4d281";
+let st = { sha: TARGET_SHA, who: "", indep: false, ans: {} };
 try { st = Object.assign(st, JSON.parse(localStorage.getItem(KEY) || "{}")); } catch (e) {}
+if (!st.sha || ["0dc247fab163f0abc0a151a6a1352ec29841bebb", "1cf6e8479b03ea987aaf9dadd1212647f4f3d886"].includes(st.sha)) st.sha = TARGET_SHA;
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} };
 const $ = (id) => document.getElementById(id);
 const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));

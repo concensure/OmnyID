@@ -4877,3 +4877,39 @@ Next:
 - Review assignment and sequential focus with a real couple account across a reload and a second
   browser/device. The next product slice should specify and prototype the controlled run-sheet share
   flow before adding external delivery or vendor editing. No deployment was requested or performed.
+
+## 2026-10-26 - WED-261 bounded wedding AI and consent-first enquiries (Codex, complete)
+
+Changed:
+
+- Added account and wedding-plan cost/token gates backed by existing budget configuration and the
+  append-only provider usage ledger. Outreach can fall back to a grounded deterministic draft; quote
+  normalization stops for manual review rather than using weaker inference.
+- Made saved AFP enquiry drafts the tenant-scoped generation cache. The draft stores bounded sources,
+  grounded fields, input/prompt fingerprints, model/tokens/cost, approval and revision lineage. Opening,
+  editing or reopening does not call the model; explicit meaningful regeneration creates a successor.
+- Added consent-first enquiry controls and exact preview. Protected replies default on; budget and phone
+  sharing default off; reminders default on. External send requires recipient/content/shared-information
+  acknowledgement, and protected delivery remains blocked while the reviewed relay is unavailable.
+- Added contextual trust disclosures at vendor selection, normalized quote and unanswered follow-up, plus
+  an expanded public Wedding FAQ. Updated the wedding quotation/booking design specification with the
+  five AI context and cost rules.
+- Froze the review instructions on product commit
+  `7b754338fb1e6b777158e517733f028b5aa4d281`. Updated all three workbooks in the user-requested root
+  Documents folder and the tracked human-review form with concrete consent, trust, bounded-AI and audit
+  scenarios. Existing browser answers for known stale candidates reset instead of being carried forward.
+
+Verification:
+
+- Pass: `cargo check --lib`; Rust outreach 10/10; quotation 33/33; Solid typecheck; focused consent and
+  outreach 26/26; all 1,984 wedding tests; Wedding site/CSP smoke; production Vite build; both line-budget
+  guards; review-page script syntax; tracked human-review Playwright 2/2.
+- New files are 30â€“111 lines; the expanded design specification is 723 lines and the extracted outreach
+  route is 790 lines. Policy V2 and all mail/relay rollout flags remain unchanged. No deployment occurred.
+
+Next:
+
+- Human reviewers can use the three HTML workbooks, but must test a hosted runtime whose SHA matches the
+  frozen candidate. The Email Worker/reply relay, provider smoke, independent security/privacy,
+  accessibility/usability/wording, hosted shadow and cohort evidence remain external gates; do not enable
+  protected external delivery based on local test success alone.

@@ -1693,3 +1693,22 @@ generic task board. Local storage supplies immediate same-device continuity, whi
 completion events update mounted surfaces and the latest AFP records restore owner/done state after a
 refresh. Decision-card assignment must use this contract rather than emitting a parallel generic task
 update.
+
+## 2026-10-26: Wedding inference is input-addressed and enquiry consent is revision-bound
+
+Wedding vendor outreach consumes a bounded structured fact packet rather than a conversation replay.
+The stable prompt-prefix identifier and meaningful-input fingerprint are audit/cache keys; the saved AFP
+draft is the tenant-scoped reusable result. Opening, typing in or reopening a prepared draft cannot invoke
+the model. An explicit retry or a meaningful permission change may create a successor revision.
+
+The existing account budget and append-only provider-usage ledger also enforce a per-wedding monthly
+share. Reaching either token or cost ceiling never relaxes source grounding: outreach falls back to the
+deterministic grounded template, while quotation normalization requires manual review. A configuration
+override is the controlled top-up mechanism; the product does not silently buy capacity or switch to a
+less trustworthy interpretation.
+
+An enquiry permission snapshot is part of each AFP draft revision. Approximate budget and phone contact
+default off; reminders default on; protected OmnyID replies are the default route. The couple must see
+the exact recipient, content, attachments and shared facts and acknowledge that preview. The protected
+route remains unsendable until the independently reviewed masked relay is available. Choosing connected
+email is explicit and discloses that provider address rather than implying masked delivery.
