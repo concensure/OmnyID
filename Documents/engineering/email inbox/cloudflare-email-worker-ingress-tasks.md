@@ -60,6 +60,10 @@ Exit evidence:
 - [x] Return indistinguishable not-found behavior for disabled and unavailable
   recipients.
 - [x] Add content-free rate limiting and metrics hooks.
+- [x] Require `message/rfc822` before accepting request bytes.
+- [x] Apply a per-recipient digest rate bucket after authenticated routing.
+- [x] Short-circuit exact authenticated provider retries before ClamAV while
+  retaining the transactional dedupe claim for races.
 - [x] Add unit tests for valid, stale, malformed, altered, oversized and wrong-key
   requests.
 
@@ -96,6 +100,8 @@ Exit evidence:
 
 - [x] Run the existing ClamAV boundary before persistence; scanner unavailable
   fails closed.
+- [x] Mark scanner-clean ciphertext `quarantined`, not `awaiting_scan`, while
+  MIME/AFP processing remains incomplete.
 - [ ] Parse and validate MIME during the same transient-plaintext ingress
   boundary, before recipient encryption, or finish it on the recipient device.
 - [ ] Never add a server decryption wrapper merely to support background work.

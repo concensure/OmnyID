@@ -4,6 +4,8 @@ import { createMemo, createSignal, For, Show } from "solid-js";
 import { WeddingDashboardIcon } from "@/components/WeddingDashboardIcons";
 import { WeddingInfoTip } from "@/components/WeddingInfoTip";
 import { WeddingSeatingCanvas } from "@/components/WeddingSeatingCanvas";
+import { WeddingConfirmDialog } from "@/components/WeddingConfirmDialog";
+import { WeddingInlineHelpNote } from "@/components/WeddingInlineHelpNote";
 import type { SendAfpMessageInput } from "@/lib/api";
 import type { WeddingResponseWorkspaceViewState } from "@/lib/weddingResponseWorkspaceViewState";
 import {
@@ -56,6 +58,10 @@ export function WeddingSeatingPanel(props: {
   const [constraintRun, setConstraintRun] = createSignal<WeddingSeatingConstraintRunResult | null>(null);
   const [alternatives, setAlternatives] = createSignal<WeddingSeatingOptimizationResult[]>([]);
   const [saving, setSaving] = createSignal(false);
+  const [confirmation, setConfirmation] = createSignal<{
+    kind: "apply" | "alternative" | "hide";
+    result?: WeddingSeatingOptimizationResult;
+  } | null>(null);
   const displayedPreview = createMemo(() => constraintRun()?.optimization ?? props.state.seatingPlan.optimizationPreview);
 
   async function applySeatingDraft() {
@@ -186,6 +192,15 @@ export function WeddingSeatingPanel(props: {
     }
   }
 
+  function confirmSeatingChange() {
+    const pending = confirmation();
+    if (!pending) return;
+    setConfirmation(null);
+    if (pending.kind === "apply") void applySeatingDraft();
+    else if (pending.kind === "alternative" && pending.result) void saveAlternativeDraft(pending.result);
+    else if (pending.kind === "hide" && pending.result) void hideSavedDraft(pending.result);
+  }
+
   return (
     <div class="min-w-0 rounded-[24px] border border-sky-100/80 bg-sky-50/80 p-3 shadow-card sm:rounded-[28px] sm:p-4">
       <div class="flex items-start justify-between gap-2">
@@ -205,6 +220,7 @@ export function WeddingSeatingPanel(props: {
       <p class="mt-2 text-sm leading-6 text-sky-900/75">
         {props.state.seatingPlan.summaryLabel}
       </p>
+      <WeddingInlineHelpNote class="mt-3">Click or tap a guest, then a table, or drag their name. Hover or focus a name to see dietary, access and relationship notes.</WeddingInlineHelpNote>
       <div class="mt-3 rounded-2xl border border-sky-100 bg-white/75 px-3 py-2">
         <p class="text-sm font-semibold text-sky-950">
           {props.state.seatingPlan.guestRowsConsidered > 0 ? "Seating draft can start from your guest list." : "Add attending guests to start a seating draft."}
@@ -334,7 +350,7 @@ export function WeddingSeatingPanel(props: {
                 data-magic-icon="save"
                 data-magic-label={saving() ? "Saving..." : preview().applyLabel}
                 data-magic-id="wedding:seating:apply-draft"
-                onClick={() => void applySeatingDraft()}
+                onClick={() => setConfirmation({ kind: "apply" })}
               >
                 {saving() ? "Saving..." : preview().applyLabel}
               </button>
@@ -384,7 +400,7 @@ export function WeddingSeatingPanel(props: {
                         data-magic-icon="save"
                         data-magic-label={`Save seating option ${index() + 1}`}
                         data-magic-id={`wedding:seating:alternative:${index() + 1}:save`}
-                        onClick={() => void saveAlternativeDraft(option)}
+                        onClick={() => setConfirmation({ kind: "alternative", result: option })}
                       >
                         Save this option
                       </button>
@@ -428,7 +444,7 @@ export function WeddingSeatingPanel(props: {
                               data-magic-icon="save"
                               data-magic-label={`Make current: ${draft.title}`}
                               data-magic-id={`wedding:seating:saved-draft:${draft.id}:make-current`}
-                              onClick={() => void saveAlternativeDraft(draft.result)}
+                              onClick={() => setConfirmation({ kind: "alternative", result: draft.result })}
                             >
                               Make current
                             </button>
@@ -440,7 +456,7 @@ export function WeddingSeatingPanel(props: {
                               data-magic-icon="hide"
                               data-magic-label={`Hide old draft: ${draft.title}`}
                               data-magic-id={`wedding:seating:saved-draft:${draft.id}:hide`}
-                              onClick={() => void hideSavedDraft(draft.result)}
+                              onClick={() => setConfirmation({ kind: "hide", result: draft.result })}
                             >
                               Hide old draft
                             </button>
@@ -504,7 +520,19 @@ export function WeddingSeatingPanel(props: {
           tables={props.state.seatingPlan.optimizationTables}
           result={displayedPreview()}
           saving={saving()}
-          onApply={(result) => void saveAlternativeDraft(result)}
+          onApply={(result) => setConfirmation({ kind: "alternative", result })}
+        />
+        <WeddingConfirmDialog
+          open={Boolean(confirmation())}
+          title={confirmation()?.kind === "hide" ? "Hide this seating draft?" : "Apply this seating change?"}
+          detail={confirmation()?.kind === "hide"
+            ? "The draft will leave the active saved-draft list. Your guest list and other seating drafts will not change."
+            : "This saves the displayed table assignments as the current seating draft. Review the people and table counts before confirming."}
+          confirmLabel={confirmation()?.kind === "hide" ? "Hide draft" : "Apply plan"}
+          destructive={confirmation()?.kind === "hide"}
+          busy={saving()}
+          onCancel={() => setConfirmation(null)}
+          onConfirm={confirmSeatingChange}
         />
       </Show>
       <Show when={props.state.seatingPlan.tableBriefs.length > 0}>

@@ -4,7 +4,7 @@ fn sample_couple() -> WeddingVendorOutreachCoupleInput {
     WeddingVendorOutreachCoupleInput {
         date_or_season: Some("March 2027".to_string()), location: Some("Sydney".to_string()), guest_count: None,
         budget_comfort: None, top_priorities: vec!["flowers".to_string(), "photography".to_string()],
-        atmosphere_description: None, vendor_preferences: None, couple_names: None,
+        atmosphere_description: None, vendor_preferences: None, couple_names: None, deal_breakers: vec![],
     }
 }
 
@@ -79,6 +79,16 @@ fn deterministic_outreach_draft_includes_user_reviewable_verify_questions() {
     let questions = vec!["Could you confirm the seated capacity?".to_string()];
     let payload = deterministic_outreach_payload(&sample_vendor("Mackay Family Estate"), &sample_couple(), &questions);
     assert!(payload.body_markdown.contains("answers to capacity")); assert_eq!(payload.grounded_on.len(), 3);
+}
+
+#[test]
+fn deterministic_outreach_asks_vendor_to_confirm_explicit_deal_breakers() {
+    let mut couple = sample_couple();
+    couple.deal_breakers = vec!["step-free access".to_string(), "an indoor wet-weather plan".to_string()];
+    let payload = deterministic_outreach_payload(&sample_vendor("Harbour Rooms"), &couple, &[]);
+    assert!(payload.body_markdown.contains("confirm that you can meet these requirements"));
+    assert!(payload.body_markdown.contains("step-free access; an indoor wet-weather plan"));
+    assert!(payload.grounded_on.contains(&"deal_breakers".to_string()));
 }
 
 #[test]

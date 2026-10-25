@@ -173,6 +173,7 @@ mod wedding_llm_ladder;
 mod wedding_preference_routes;
 mod wedding_understanding_routes;
 mod wedding_newsletter_routes;
+mod wedding_blog_routes;
 mod vendor_email_worker_ingress; mod wedding_message_attachment; mod wedding_outbound_attachment; mod wedding_vendor_claim_routes; mod wedding_vendor_sender_identity_routes;
 mod wedding_vendor_enrichment; mod wedding_vendor_outreach_routes;
 mod wedding_vendor_outreach_generation;
@@ -1393,6 +1394,7 @@ pub async fn run() {
         .merge(wedding_understanding_routes::routes())
         .merge(workspace_routes::routes())
         .merge(wedding_newsletter_routes::routes())
+        .merge(wedding_blog_routes::routes())
         .merge(vendor_email_worker_ingress::routes()).merge(wedding_vendor_claim_routes::routes()).merge(wedding_vendor_ownership_routes::routes()).merge(wedding_vendor_sender_identity_routes::routes())
         .merge(wedding_vendor_photo_routes::routes())
         .layer(cors_layer())

@@ -4953,3 +4953,34 @@ Next:
 - Implement WED-263 first from the nominated build base, then the value-first claim/onboarding slices in
   dependency order. Do not enable protected external replies or paid vendor features until their existing
   security, provider, usability and cohort gates pass.
+
+## 2026-10-26 - WED-271 onboarding, deal-breakers, durable publishing and relay hardening (Codex, complete)
+
+Changed:
+
+- Added eight sub-30-KiB local WebP choice cards to wedding onboarding, with dimensions, async decode,
+  first-row eager loading and later lazy loading. The chosen words remain editable.
+- Added one private AFP/A2UI deal-breaker ledger and editor to Vision, vendor enquiry preparation and
+  quote review. Enquiry drafting uses disclosed deal-breakers as questions to confirm, never as proven fit.
+- Added a reusable accessible large-action confirmation dialog and persistent inline help. Applied it to
+  clearing onboarding vendors, seating changes/draft hiding, deal-breaker removal and global vendor deletion.
+- Added migration 0120, a focused DB owner, sanitized admin HTML publishing, public DB-backed article/list
+  routes, static journal projection and Caddy precedence. Articles survive source tree/deployment changes.
+- Hardened Worker ingress with strict RFC822 media type, digest-keyed recipient throttling, pre-scan exact
+  replay short-circuit and accurate post-scan quarantine state. Flags and Cloudflare routing remain off.
+
+Verification:
+
+- Pass: `npm run typecheck`; all 1,996 wedding tests; Wedding site/CSP/quiz smoke; production build; both
+  line-budget checks; `cargo check`; migration catalog; focused sanitizer/blog, relay HMAC, deterministic
+  outreach, SMTP-in and SMTP-out tests; Worker 7/7; published-blog JS syntax; `git diff --check`.
+- Docker Desktop was unreachable, so migration 0120 was not applied to disposable Postgres. The catalog
+  embeds it and compiles, but a DB apply remains the first pre-deploy check.
+- No deployment, provider send, Cloudflare routing mutation or rollout-flag change occurred. Existing
+  unrelated line-ending-only dirty paths and the Oracle proof artifact directory were left unstaged.
+
+Next:
+
+- Start Docker and apply all migrations to disposable Postgres, then exercise admin draft/publish/update,
+  public list/article and sanitization rejection paths. Continue WED-263 vendor activation only after that
+  proof; do not enable relay or policy V2 before the existing human/hosted gates pass.

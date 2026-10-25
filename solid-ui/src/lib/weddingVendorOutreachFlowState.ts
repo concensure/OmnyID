@@ -274,6 +274,7 @@ export type WeddingVendorOutreachCoupleContext = {
   atmosphere_description?: string | null;
   vendor_preferences?: string | null;
   couple_names?: string | null;
+  deal_breakers?: string[];
 };
 
 // Translates the model's raw grounded_on field names (e.g. "top_priorities")
@@ -302,6 +303,8 @@ export function weddingVendorOutreachGroundedOnLabels(
       labels.push("you shared what you're looking for in a vendor");
     } else if (field === "couple_names" && couple.couple_names) {
       labels.push("we used your names");
+    } else if (field === "deal_breakers" && couple.deal_breakers?.length) {
+      labels.push(`you marked ${couple.deal_breakers.join(", ")} as deal-breakers`);
     }
   }
   return labels;

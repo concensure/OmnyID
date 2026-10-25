@@ -431,6 +431,22 @@ Status tints are reserved for status only: teal tint for "on track", amber for "
   predate this brand and should be migrated per component, not mass-replaced.
 - Keep this palette out of non-wedding views.
 
+#### Interaction safety and contextual guidance
+
+- Destructive actions and material plan changes use an accessible modal confirmation. State the
+  exact consequence, keep focus trapped and return it to the trigger, support Escape, and provide
+  separate `Cancel` and outcome-specific confirmation buttons with at least 48px touch height.
+  Do not use browser `confirm()` or an ambiguous `OK` label.
+- Do not interrupt harmless reversible edits with a dialog. Confirm deletion, clearing a group,
+  applying a replacement plan, publishing public content, sending externally, or changing a
+  booking-relevant commitment.
+- Put short, persistent helper notes beside unfamiliar interactions. Use a visible light-bulb cue
+  and direct wording such as “Click a guest, then a table”; do not rely on hover, a tooltip or an FAQ.
+  Instructions must also describe the touch/keyboard route when drag-and-drop is available.
+- Photographic choices use local, responsive WebP/AVIF assets with declared dimensions, a fixed
+  aspect-ratio container, async decoding and lazy loading below the first visible row. Photography
+  must remain a choice aid, not a blocking decoration or an unlabelled source of meaning.
+
 ---
 
 ## 12. Resources

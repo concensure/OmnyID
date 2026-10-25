@@ -6398,6 +6398,7 @@ export type WeddingVendorOutreachDraftCoupleInput = {
   atmosphere_description?: string | null;
   vendor_preferences?: string | null;
   couple_names?: string | null;
+  deal_breakers?: string[];
 };
 
 export type WeddingVendorOutreachDraftResult = {

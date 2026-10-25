@@ -50,7 +50,7 @@ export function weddingVendorSharedInformationLabels(input: {
     if (/date|season/i.test(label)) return input.permissions.shareDateOrSeason;
     if (/location|wedding is in/i.test(label)) return input.permissions.shareLocation;
     if (/guest/i.test(label)) return input.permissions.shareGuestCount;
-    if (/priority|atmosphere|looking for/i.test(label)) return input.permissions.shareStylePriorities;
+    if (/priority|atmosphere|looking for|deal-breaker/i.test(label)) return input.permissions.shareStylePriorities;
     return true;
   });
   return [
@@ -58,7 +58,7 @@ export function weddingVendorSharedInformationLabels(input: {
     input.permissions.shareDateOrSeason ? "date or season, when known" : "no date or season",
     input.permissions.shareLocation ? "general wedding location, when known" : "no wedding location",
     input.permissions.shareGuestCount ? "estimated guest count, when known" : "no guest count",
-    input.permissions.shareStylePriorities ? "selected style and priorities" : "no style or priority profile",
+    input.permissions.shareStylePriorities ? "selected style, priorities and relevant deal-breakers" : "no style, priority or deal-breaker profile",
     input.permissions.shareApproximateBudget ? "your approximate category budget" : "no budget figure",
     input.permissions.allowPhoneContact ? "permission to contact you by phone (no number is added automatically)" : "no permission to contact you by phone",
   ];

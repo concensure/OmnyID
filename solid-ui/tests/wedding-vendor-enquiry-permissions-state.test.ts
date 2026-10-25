@@ -32,7 +32,7 @@ test("shared-information preview removes budget grounding until permission is gr
     "date or season, when known",
     "general wedding location, when known",
     "estimated guest count, when known",
-    "selected style and priorities",
+    "selected style, priorities and relevant deal-breakers",
     "no budget figure",
     "no permission to contact you by phone",
   ]);

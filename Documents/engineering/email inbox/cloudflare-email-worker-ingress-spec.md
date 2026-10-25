@@ -165,8 +165,11 @@ rejected by the HTTP stack or normalized contract test.
 1. Unless ingress, vendor mail and vendor sender-mask flags are all enabled,
    return `404` without revealing configuration.
 2. Enforce transport and in-process rate limits before database work.
+   A second content-free recipient bucket applies after signature and exact
+   mask resolution; its key is a SHA-256 digest, never the address.
 3. Read no more than the configured 10 MiB limit.
-4. Validate header shapes, timestamp and configured key ID.
+4. Require `Content-Type: message/rfc822`, then validate header shapes,
+   timestamp and configured key ID.
 5. Recompute body digest and constant-time HMAC.
 6. Decode and normalize envelope addresses.
 7. Resolve exactly one current verified vendor identity where:
@@ -177,11 +180,15 @@ rejected by the HTTP stack or normalized contract test.
 8. Begin a database transaction.
 9. Claim `(provider, event_id)`. A prior matching digest is an idempotent
    success; a conflicting digest is rejected and alerted.
+   An authenticated matching event may return before ClamAV so provider
+   retries cannot consume scanner capacity; the transactional claim remains
+   authoritative for races.
 10. Encrypt the raw bytes immediately with the dedicated file-backed ingress
     key and metadata-only associated data.
 11. Store the encrypted envelope, mask identity, digest, size, receive time and
     quarantine expiry. Never store raw headers/body in receipt columns.
-12. Commit, then return `202` with only event ID and status.
+12. Commit the scanner-clean ciphertext as `quarantined` (awaiting MIME/AFP
+    processing), then return `202` with only event ID and status.
 
 No 2xx is returned before durable encrypted storage. The first slice marks the
 record `awaiting_scan`; it does not create an AFP message. This prevents an

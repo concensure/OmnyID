@@ -7,6 +7,7 @@ import { WeddingDashboardIcon, type WeddingDashboardIconId } from "@/components/
 import { renderMarkdown } from "@/lib/markdownRenderer";
 import { WeddingVendorChoiceCard } from "@/components/WeddingVendorChoiceCard";
 import { WeddingPreferenceConfirmationChips } from "@/components/WeddingPreferenceConfirmationChips";
+import { WeddingDealBreakerEditor } from "@/components/WeddingDealBreakerEditor";
 import type { WeddingVendorChoiceCardData } from "@/components/WeddingVendorChoiceCard";
 import type { WeddingResponseWorkspaceViewProps } from "@/components/WeddingResponseWorkspaceViewTypes";
 import { decisionCardFromWeddingVendorComparison } from "@/lib/decisionCardState";
@@ -318,6 +319,17 @@ export function WeddingVendorSearchHomeSection(props: {
       <Show when={props.result}>
         {(result) => (
           <div class="mt-5 border-t border-wedding-border pt-4">
+            <div class="mb-3">
+              <WeddingDealBreakerEditor
+                messages={workspace().state.afpMessages}
+                metadata={workspace().state.workspace.metadata}
+                saveProjection={workspace().saveProjection}
+                onRefreshWorkspace={workspace().onRefreshWorkspace}
+                surface="enquiry"
+                promptWhenEmpty
+                compact
+              />
+            </div>
             <Show when={props.preferenceProfile && props.onPreferenceChange && props.onPreferenceConfirm}>
               <div class="mb-3"><WeddingPreferenceConfirmationChips profile={props.preferenceProfile ?? null} saving={props.preferenceSaving} onChange={(change) => props.onPreferenceChange?.(change)} onConfirm={() => props.onPreferenceConfirm?.()} /></div>
             </Show>

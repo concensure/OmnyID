@@ -604,4 +604,9 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Recipient AgentCard key binding for user-only email ciphertext decryption",
         include_str!("../../postgres/migrations/0119_recipient_held_email_envelopes.sql"),
     ),
+    (
+        "0120_wedding_blog_publications",
+        "Durable sanitised wedding blog publications managed by operators",
+        include_str!("../../postgres/migrations/0120_wedding_blog_publications.sql"),
+    ),
 ];

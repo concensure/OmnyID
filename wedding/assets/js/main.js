@@ -226,6 +226,7 @@
     var searchStatus = document.querySelector('[data-blog-search-status]');
     var selectedCategory = 'all';
     function filterCards() {
+      cards = document.querySelectorAll('.blog-card');
       var query = (searchInput && searchInput.value || '').trim().toLowerCase();
       var visibleCount = 0;
       cards.forEach(function (card) {
@@ -247,6 +248,7 @@
       });
     });
     if (searchInput) searchInput.addEventListener('input', filterCards);
+    document.addEventListener('wedding:blog-publications-loaded', filterCards);
   }
 
   /* ---------- sign-in / register bridge modal ---------- */

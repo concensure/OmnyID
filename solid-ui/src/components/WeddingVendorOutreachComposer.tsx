@@ -176,7 +176,7 @@ export function WeddingVendorOutreachComposer(props: {
               </label>
               <label class="flex min-h-11 items-start gap-2 rounded-lg border border-wedding-border px-3 py-2 text-sm text-wedding-text">
                 <input type="checkbox" class="mt-1 h-4 w-4 shrink-0 accent-wedding-primary" checked={props.flow.permissions.shareStylePriorities} onChange={(event) => updatePermissions({ shareStylePriorities: event.currentTarget.checked })} />
-                <span><strong>Style and priorities</strong><span class="mt-0.5 block text-xs leading-5 text-wedding-muted">Only the relevant preferences used in this enquiry.</span></span>
+                <span><strong>Style, priorities and deal-breakers</strong><span class="mt-0.5 block text-xs leading-5 text-wedding-muted">Only the relevant preferences and explicit must-not-compromise requirements used in this enquiry.</span></span>
               </label>
               <label class="flex min-h-11 items-start gap-2 rounded-lg border border-wedding-border px-3 py-2 text-sm text-wedding-text sm:col-span-2">
                 <input type="checkbox" class="mt-1 h-4 w-4 shrink-0 accent-wedding-primary" checked={props.flow.permissions.shareApproximateBudget} onChange={(event) => updatePermissions({ shareApproximateBudget: event.currentTarget.checked })} />

@@ -255,7 +255,7 @@ async fn valid_delivery_is_encrypted_and_exact_retry_is_idempotent() {
     assert_eq!(ciphertext["recipient_key_id"], recipient_key_id);
     assert_eq!(row.get::<String, _>("recipient_key_id"), recipient_key_id);
     assert!(!ciphertext.to_string().contains("Secret body"));
-    assert_eq!(row.get::<String, _>("processing_status"), "awaiting_scan");
+    assert_eq!(row.get::<String, _>("processing_status"), "quarantined");
     let count: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM wedding_vendor_email_ingress_quarantine WHERE provider_event_id = $1",
     )

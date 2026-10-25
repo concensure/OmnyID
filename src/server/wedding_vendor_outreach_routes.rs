@@ -49,6 +49,7 @@ const MAX_VENDOR_SNIPPET_CHARS: usize = 800;
 const MAX_COUPLE_FIELD_CHARS: usize = 400;
 const MAX_VENDOR_FIELD_CHARS: usize = 400;
 const MAX_TOP_PRIORITIES: usize = 8;
+const MAX_DEAL_BREAKERS: usize = 8;
 const MAX_VERIFY_QUESTIONS: usize = 3;
 const MAX_VERIFY_QUESTION_CHARS: usize = 200;
 
@@ -62,6 +63,7 @@ Rules:
 - Use short paragraphs separated by blank lines: greeting, wedding context, request, offer to share more, then thanks. Plain sentences, no headings or emoji. Do not add a signature — the app appends the onboarding name separately.
 - A budget must use `AUD $` plus a grouped number (for example `AUD $13,900`) and the word `budget` must never be repeated.
 - Summarise verification questions as plain topics. For capacity and price, use exactly: `We would also appreciate answers to capacity and price.`
+- Treat supplied deal_breakers as explicit requirements. Ask the vendor to confirm them; do not imply they are already satisfied.
 - Respond with ONLY valid JSON, no markdown code fences, no commentary before or after it, matching exactly this shape:
 {"subject": string, "body_markdown": string, "grounded_on": [string, ...]}
 
@@ -247,6 +249,8 @@ pub(super) struct WeddingVendorOutreachCoupleInput {
     atmosphere_description: Option<String>,
     vendor_preferences: Option<String>,
     couple_names: Option<String>,
+    #[serde(default)]
+    deal_breakers: Vec<String>,
 }
 
 #[derive(Deserialize)]
@@ -315,6 +319,7 @@ fn couple_has_grounding(couple: &WeddingVendorOutreachCoupleInput) -> bool {
         || non_empty(&couple.atmosphere_description)
         || non_empty(&couple.vendor_preferences)
         || non_empty(&couple.couple_names)
+        || couple.deal_breakers.iter().any(|value| !value.trim().is_empty())
         || couple.top_priorities.iter().any(|p| !p.trim().is_empty())
 }
 
@@ -429,6 +434,21 @@ async fn wedding_vendor_outreach_draft_http(
         )?;
     }
     request.couple.top_priorities.truncate(MAX_TOP_PRIORITIES);
+    if request.couple.deal_breakers.len() > MAX_DEAL_BREAKERS {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            format!("couple.deal_breakers supports at most {MAX_DEAL_BREAKERS} entries"),
+        ));
+    }
+    for requirement in &request.couple.deal_breakers {
+        reject_if_over_length(
+            "couple.deal_breakers[]",
+            &Some(requirement.clone()),
+            MAX_COUPLE_FIELD_CHARS,
+        )?;
+    }
+    request.couple.deal_breakers.retain(|value| !value.trim().is_empty());
+    request.couple.deal_breakers.truncate(MAX_DEAL_BREAKERS);
     for question in &request.verify_questions {
         reject_if_over_length("verify_questions[]", &Some(question.clone()), MAX_VERIFY_QUESTION_CHARS)?;
     }
@@ -471,6 +491,8 @@ async fn wedding_vendor_outreach_draft_http(
         capped(&couple.vendor_preferences, MAX_COUPLE_FIELD_CHARS)
             .map(|v| format!("vendor_preferences: {v}")),
         capped(&couple.couple_names, MAX_COUPLE_FIELD_CHARS).map(|v| format!("couple_names: {v}")),
+        (!couple.deal_breakers.is_empty())
+            .then(|| format!("deal_breakers: {}", couple.deal_breakers.join("; "))),
     ]
     .into_iter()
     .flatten()
@@ -635,6 +657,19 @@ fn deterministic_outreach_payload(
         grounded_on.push("top_priorities".to_string());
         format!(" Our priorities include {}.", priorities.join(", "))
     };
+    let deal_breakers = couple
+        .deal_breakers
+        .iter()
+        .map(|value| value.trim())
+        .filter(|value| !value.is_empty())
+        .take(MAX_DEAL_BREAKERS)
+        .collect::<Vec<_>>();
+    let deal_breaker_sentence = if deal_breakers.is_empty() {
+        String::new()
+    } else {
+        grounded_on.push("deal_breakers".to_string());
+        format!(" Could you please confirm that you can meet these requirements: {}?", deal_breakers.join("; "))
+    };
     let detail_sentence = if details.is_empty() {
         String::new()
     } else {
@@ -658,9 +693,8 @@ fn deterministic_outreach_payload(
     ModelOutreachPayload {
         subject: format!("Wedding enquiry for {vendor_name}"),
         body_markdown: format!(
-            "Hello {} team,\n\n{}{detail_sentence}{priority_sentence}\n\nCould you please let us know whether you are available, the package options you offer, and an indicative quote?{question_sentence}\n\nWe would be happy to share any other details you need.\n\nThank you.",
-            vendor_name,
-            intro,
+            "Hello {} team,\n\n{}{detail_sentence}{priority_sentence}\n\nCould you please let us know whether you are available, the package options you offer, and an indicative quote?{deal_breaker_sentence}{question_sentence}\n\nWe would be happy to share any other details you need.\n\nThank you.",
+            vendor_name, intro,
         ),
         grounded_on,
     }

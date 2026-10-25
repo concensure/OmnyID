@@ -24,6 +24,7 @@ import {
   type WeddingVendorAttributeEdit,
 } from "@/lib/weddingVendorAttributeCatalogState";
 import type { WeddingVendorAttributeEvidence } from "@/lib/weddingVendorRankingState";
+import { WeddingConfirmDialog } from "@/components/WeddingConfirmDialog";
 
 export default function UsageAdminWeddingVendorsPanel() {
   const [query, setQuery] = createSignal("");
@@ -33,6 +34,7 @@ export default function UsageAdminWeddingVendorsPanel() {
   const [notice, setNotice] = createSignal<string | null>(null);
   const [error, setError] = createSignal<string | null>(null);
   const [validationErrors, setValidationErrors] = createSignal<string[]>([]);
+  const [pendingDelete, setPendingDelete] = createSignal<WeddingVendor | null>(null);
   const [attributeCatalog, setAttributeCatalog] = createSignal<WeddingVendorAttributeCatalogEntry[]>([]);
   const [attributeBaseline, setAttributeBaseline] = createSignal<Record<string, WeddingVendorAttributeEvidence>>({});
   const [attributeEdits, setAttributeEdits] = createSignal<Record<string, WeddingVendorAttributeEdit | undefined>>({});
@@ -92,9 +94,6 @@ export default function UsageAdminWeddingVendorsPanel() {
   }
 
   async function removeVendor(vendor: WeddingVendor) {
-    if (typeof window !== "undefined" && !window.confirm(`Delete ${vendor.vendorName}? This removes the vendor for all wedding users.`)) {
-      return;
-    }
     setBusy(true);
     setError(null);
     setNotice(null);
@@ -103,6 +102,7 @@ export default function UsageAdminWeddingVendorsPanel() {
       await deleteAdminWeddingVendor(vendor.vendorId);
       if (draft().vendorId === vendor.vendorId) selectVendorForEdit(null);
       setNotice("Vendor deleted.");
+      setPendingDelete(null);
       await refetch();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Vendor delete failed.");
@@ -177,7 +177,7 @@ export default function UsageAdminWeddingVendorsPanel() {
                           type="button"
                           class="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-800"
                           disabled={busy()}
-                          onClick={() => void removeVendor(vendor)}
+                          onClick={() => setPendingDelete(vendor)}
                         >
                           Delete
                         </button>
@@ -306,6 +306,16 @@ export default function UsageAdminWeddingVendorsPanel() {
         vendors={vendors() ?? []}
         disabled={busy()}
         onApplied={() => void refetch()}
+      />
+      <WeddingConfirmDialog
+        open={Boolean(pendingDelete())}
+        title={`Delete ${pendingDelete()?.vendorName ?? "this vendor"}?`}
+        detail="This removes the vendor for every wedding user. Existing private user messages and audit records are not silently rewritten."
+        confirmLabel="Delete vendor"
+        destructive
+        busy={busy()}
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={() => { const vendor = pendingDelete(); if (vendor) void removeVendor(vendor); }}
       />
     </section>
   );

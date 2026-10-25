@@ -3647,3 +3647,38 @@ tasks:
       - the requested article, quiz and local media are tracked and live on Oracle; the uncached quiz HTML uses versioned asset URLs so Cloudflare cannot serve the superseded quiz script even though the replacement token lacks cache-purge permission
       - vendor activation specification and dependency-ordered tasks WED-263 through WED-270 preserve AFP ownership, reuse the claim/portal/enquiry/quote/billing foundations, use A2UI where suitable and put paid conversion after demonstrated value without affecting organic suitability ranking
       - Oracle release f6b00e8a4dabf319ac7a8aefd7cece87cb9c89a9 uses file-backed root-owned SeaweedFS credentials and a CRLF-safe secure entrypoint; authenticated production proof, backup verification, public article/quiz/workspace checks and the focused storage regression pass, while policy V2 and mail rollout flags remain unchanged
+  - id: WED-271
+    title: Enrich wedding onboarding, persist deal-breakers, and harden publishing and relay boundaries
+    status: complete
+    owner: codex
+    branch: agent/codex/WED-215
+    depends_on:
+      - WED-255
+      - WED-257
+      - WED-262
+    files:
+      - solid-ui/src/components/Wedding*.tsx
+      - solid-ui/src/components/OnboardingWizard.tsx
+      - solid-ui/src/components/UsageAdminWedding*.tsx
+      - solid-ui/src/lib/wedding*.ts
+      - solid-ui/src/lib/api.ts
+      - solid-ui/tests/wedding-*.test.ts
+      - src/server/vendor_email_worker_ingress.rs
+      - src/server/user_management_routes*
+      - postgres/migrations/**
+      - wedding/**
+      - .agent/**
+    acceptance:
+      - wedding onboarding offers diverse photographic choices through responsive, lazy, locally hosted derivatives with explicit performance budgets and accessible text alternatives
+      - deal-breakers are visible and editable in Vision, persist as private source-linked AFP knowledge, and are requested inline before quote generation or booking when none are known
+      - destructive or material wedding changes use a reusable accessible confirmation dialog with large Cancel and Confirm actions; contextual helper notes remain visible at the point of action
+      - an authenticated administrator can validate and publish bounded standalone Wedding blog HTML without scripts, secrets, external active content or source-tree writes, and published pages survive application source deployments
+      - disabled email relay ingress adds replay-resistant authenticated request proof, strict bounded parsing and abuse controls without enabling relay, vendor-mail or policy-V2 flags
+      - relevant Rust/frontend/site tests, typecheck, production build and line budgets pass; new files remain below 1000 lines and unrelated dirty work is not staged
+    progress:
+      - wedding onboarding now offers eight locally hosted WebP atmosphere choices, all below 30 KiB, with fixed dimensions, async decode, lazy loading below the first row and editable text as the accessible source of meaning
+      - deal-breakers are private E2EE-required AFP ledger events with A2UI views; Vision, vendor shortlist/enquiry preparation and normalized quote review use one editor, removals require confirmation and enquiry generation consumes selected relevant requirements without asserting that a vendor satisfies them
+      - reusable focus-trapped confirmation and inline-help components protect vendor clearing/deletion and seating apply/archive actions; the Wedding design system records the material-change and persistent-help rules
+      - operator HTML publishing sanitizes on the server, uses a 256 KiB request boundary, stores versioned content in Postgres migration 0120 and projects public metadata/pages under the existing Wedding site so source deploys do not erase published articles
+      - email ingress now requires message/rfc822, applies a content-free recipient-digest rate bucket, avoids repeat ClamAV work for authenticated exact replays and records scanner-clean ciphertext as quarantined; all mail rollout flags remain unchanged
+      - pass: typecheck, all 1996 wedding tests, wedding site/CSP/quiz smoke, production build, line budget, migration catalog, cargo check, blog sanitizer, relay ingress, Worker, SMTP-in/out and deterministic outreach tests; disposable Postgres was unavailable because Docker Desktop was not reachable

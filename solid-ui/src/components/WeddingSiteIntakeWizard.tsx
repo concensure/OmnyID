@@ -6,6 +6,8 @@
 import { createMemo, createSignal, For, Show } from "solid-js";
 
 import { WeddingDashboardIcon } from "@/components/WeddingDashboardIcons";
+import { WeddingConfirmDialog } from "@/components/WeddingConfirmDialog";
+import { WeddingInlineHelpNote } from "@/components/WeddingInlineHelpNote";
 import type { WeddingTemplateLaunchState } from "@/lib/weddingTemplateLaunchState";
 import type { WeddingTemplateStarterIntent } from "@/lib/weddingTemplateEntryState";
 import type { WeddingTemplateFollowUpState } from "@/lib/weddingTemplateFollowUpState";
@@ -16,6 +18,16 @@ import { WEDDING_VOW_STYLE_OPTIONS } from "@/lib/weddingVowPlanningState";
 
 const STEP_LABELS = ["The basics", "Vendors", "Legal & vows", "Review"] as const;
 const LAST_STEP = STEP_LABELS.length - 1;
+const ATMOSPHERE_PHOTO_CHOICES = [
+  { id: "intimate-dinner", label: "Intimate dinner", detail: "Warm, abundant and conversational", image: "/wedding/assets/images/quiz/restaurant.webp" },
+  { id: "coastal", label: "Coastal ease", detail: "Natural, bright and close to the water", image: "/wedding/assets/images/quiz/beach.webp" },
+  { id: "long-table", label: "Long-table feast", detail: "Social, generous and relaxed", image: "/wedding/assets/images/quiz/longtable.webp" },
+  { id: "night", label: "After-dark energy", detail: "Lively, dramatic and celebratory", image: "/wedding/assets/images/quiz/night.webp" },
+  { id: "ballroom", label: "Modern formal", detail: "Polished, elegant and spacious", image: "/wedding/assets/images/quiz/ballroom.webp" },
+  { id: "cliff", label: "Open landscape", detail: "Airy, scenic and adventurous", image: "/wedding/assets/images/quiz/cliff.webp" },
+  { id: "family", label: "Family-centred", detail: "Welcoming, connected and joyful", image: "/wedding/assets/images/quiz/family.webp" },
+  { id: "pastel", label: "Soft colour", detail: "Playful, romantic and light", image: "/wedding/assets/images/quiz/pastel.webp" },
+] as const;
 const MONTH_INDEX_BY_NAME: Record<string, number> = {
   january: 0,
   jan: 0,
@@ -91,6 +103,7 @@ export function WeddingSiteIntakeWizard(props: {
   const [progressSaved, setProgressSaved] = createSignal(false);
   const [finishing, setFinishing] = createSignal(false);
   const [dateCalendarOpen, setDateCalendarOpen] = createSignal(false);
+  const [clearVendorsOpen, setClearVendorsOpen] = createSignal(false);
   const [calendarMonth, setCalendarMonth] = createSignal(new Date().getMonth());
   const [calendarYear, setCalendarYear] = createSignal(new Date().getFullYear());
   const [selectedStarterIntents, setSelectedStarterIntents] = createSignal<WeddingTemplateStarterIntent[]>(
@@ -155,6 +168,11 @@ export function WeddingSiteIntakeWizard(props: {
         .map((card) => card.intent)
         .filter((id) => set.has(id));
     });
+  }
+  function chooseAtmosphere(detail: string) {
+    const current = props.weddingFollowUpAtmosphere().trim();
+    if (current.toLowerCase().includes(detail.toLowerCase())) return;
+    props.onWeddingFollowUpAtmosphereInput(current ? `${current}; ${detail}` : detail);
   }
   async function finishSetup() {
     if (finishing()) return;
@@ -352,6 +370,34 @@ export function WeddingSiteIntakeWizard(props: {
           </label>
           <label class={`${labelClass} md:col-span-2`}>
             What should the day feel like?
+            <div class="mt-1 grid grid-cols-2 gap-2 sm:grid-cols-4" role="group" aria-label="Photographic atmosphere choices">
+              <For each={ATMOSPHERE_PHOTO_CHOICES}>
+                {(choice, index) => {
+                  const selected = () => props.weddingFollowUpAtmosphere().toLowerCase().includes(choice.detail.toLowerCase());
+                  return (
+                    <button
+                      type="button"
+                      aria-pressed={selected()}
+                      class={`group overflow-hidden rounded-xl border bg-white text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-primary ${selected() ? "border-wedding-primary ring-2 ring-wedding-primary/20" : "border-wedding-border hover:border-wedding-primary/50"}`}
+                      onClick={() => chooseAtmosphere(choice.detail)}
+                    >
+                      <img
+                        src={choice.image}
+                        alt=""
+                        width="480"
+                        height="320"
+                        loading={index() < 2 ? "eager" : "lazy"}
+                        decoding="async"
+                        class="aspect-[3/2] w-full bg-wedding-page object-cover transition duration-300 group-hover:scale-[1.02]"
+                      />
+                      <span class="block px-2 pt-2 text-xs font-bold text-wedding-ink">{choice.label}</span>
+                      <span class="block px-2 pb-2 text-[10px] leading-4 text-wedding-ink/65">{choice.detail}</span>
+                    </button>
+                  );
+                }}
+              </For>
+            </div>
+            <WeddingInlineHelpNote class="mt-2 font-normal">Choose any photographs that feel close, then add your own words below. The local WebP thumbnails are each under 30 KB so this step stays quick on mobile.</WeddingInlineHelpNote>
             <textarea
               class="min-h-24 w-full rounded-2xl border border-rose-100 bg-white px-3 py-2 text-sm font-normal text-on-surface outline-none focus:border-rose-300"
               value={props.weddingFollowUpAtmosphere()}
@@ -388,7 +434,7 @@ export function WeddingSiteIntakeWizard(props: {
               <button
                 type="button"
                 class="w-full rounded-full border border-rose-100 bg-white px-3 py-2 text-[11px] font-semibold text-rose-950 hover:bg-rose-50 sm:w-auto sm:py-1"
-                onClick={props.onClearVendors}
+                onClick={() => setClearVendorsOpen(true)}
               >
                 Clear vendors
               </button>
@@ -426,6 +472,16 @@ export function WeddingSiteIntakeWizard(props: {
           </Show>
         </div>
       </Show>
+
+      <WeddingConfirmDialog
+        open={clearVendorsOpen()}
+        title="Clear your first vendor choices?"
+        detail="This removes every vendor category selected in this onboarding step. You can add them again before creating your plan."
+        confirmLabel="Clear choices"
+        destructive
+        onCancel={() => setClearVendorsOpen(false)}
+        onConfirm={() => { props.onClearVendors(); setClearVendorsOpen(false); }}
+      />
 
       {/* Step 2 — legal & vows (optional) */}
       <Show when={step() === 2}>

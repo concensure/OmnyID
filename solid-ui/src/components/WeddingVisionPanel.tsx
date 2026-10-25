@@ -2,6 +2,7 @@
 import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount } from "solid-js";
 
 import type { SendAfpMessageInput } from "@/lib/api";
+import { WeddingDealBreakerEditor } from "@/components/WeddingDealBreakerEditor";
 import { buildWeddingVisionState } from "@/lib/weddingVisionState";
 import {
   weddingCustomSurfaceItemToAfpSendInput,
@@ -336,6 +337,16 @@ export function WeddingVisionPanel(props: {
             </For>
           </ul>
         </div>
+      </div>
+
+      <div class="mt-3">
+        <WeddingDealBreakerEditor
+          messages={props.state.afpMessages}
+          metadata={props.state.workspace.metadata}
+          saveProjection={props.saveProjection}
+          onRefreshWorkspace={props.onRefreshWorkspace}
+          surface="vision"
+        />
       </div>
 
       <div class="mt-3 rounded-2xl border border-rose-100 bg-white/70 p-3">

@@ -872,6 +872,12 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
         onViewSentThread: () => void viewQuoteReplyThread(baseFlow),
         onParseAttachment: () => void parseQuoteAttachment(baseFlow),
         onProviderSetup: props.onProviderSetup,
+        dealBreakerContext: {
+          messages: state().afpMessages,
+          metadata: state().workspace.metadata,
+          saveProjection: props.saveProjection,
+          onRefreshWorkspace: props.onRefreshWorkspace,
+        },
       };
     },
     followUpProps: {

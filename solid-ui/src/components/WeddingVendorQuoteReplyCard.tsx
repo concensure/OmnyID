@@ -4,6 +4,8 @@ import { createEffect, createSignal, For, onCleanup, onMount, Show } from "solid
 import { TiptapEditor } from "@/components/editor/TiptapEditor";
 import { AttachmentsRenderer } from "@/components/renderers/AttachmentsRenderer";
 import { WeddingNormalizedQuoteSummary } from "@/components/WeddingNormalizedQuoteSummary";
+import { WeddingDealBreakerEditor } from "@/components/WeddingDealBreakerEditor";
+import type { AfpMessage, SendAfpMessageInput } from "@/lib/api";
 import { fetchGmailOAuthConfig, fetchGmailOAuthUrl } from "@/lib/api";
 import type { EditorPayload } from "@/lib/editorPayload";
 import { gmailOAuthConfigFailureMessage } from "@/lib/gmailConnectionState";
@@ -60,6 +62,12 @@ export function WeddingVendorQuoteReplyCard(props: {
   onViewSentThread: () => void;
   onParseAttachment?: () => void;
   onProviderSetup?: (view: ViewName) => void;
+  dealBreakerContext?: {
+    messages: readonly AfpMessage[];
+    metadata: unknown;
+    saveProjection?: ((input: SendAfpMessageInput) => Promise<unknown>) | null;
+    onRefreshWorkspace?: () => void;
+  };
 }) {
   const [draft, setDraft] = createSignal(props.draftBody);
   const [syncedDraftBody, setSyncedDraftBody] = createSignal(props.draftBody);
@@ -539,6 +547,21 @@ export function WeddingVendorQuoteReplyCard(props: {
             <Show when={quoteDetailsOpen()}>
               <div id={quoteDetailsId()} class="mt-3">
                 <WeddingNormalizedQuoteSummary quote={quote()} />
+                <Show when={props.dealBreakerContext}>
+                  {(context) => (
+                    <div class="mt-3">
+                      <WeddingDealBreakerEditor
+                        messages={context().messages}
+                        metadata={context().metadata}
+                        saveProjection={context().saveProjection}
+                        onRefreshWorkspace={context().onRefreshWorkspace}
+                        surface="quote_review"
+                        promptWhenEmpty
+                        compact
+                      />
+                    </div>
+                  )}
+                </Show>
                 <Show when={quoteAttachmentMessage()}>
                   {(message) => (
                     <div class="mt-3 rounded-xl border border-wedding-surface-muted bg-white p-3">

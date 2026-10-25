@@ -1,4 +1,5 @@
 import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
+import { WeddingInlineHelpNote } from "@/components/WeddingInlineHelpNote";
 
 import type {
   WeddingSeatingOptimizationAssignment,
@@ -91,6 +92,7 @@ export function WeddingSeatingCanvas(props: {
         <div><h3 id="seating-canvas-title" class="text-sm font-semibold text-wedding-ink">Visual seating plan</h3><p class="mt-1 text-xs leading-5 text-wedding-ink/65">Drag a guest to a table, or select their name and then tap a table.</p></div>
         <div class="flex flex-wrap gap-2"><button type="button" class="min-h-10 rounded-lg border border-wedding-border bg-white px-3 text-xs font-semibold" onClick={() => addTable("round")}>+ Round table</button><button type="button" class="min-h-10 rounded-lg border border-wedding-border bg-white px-3 text-xs font-semibold" onClick={() => addTable("long")}>+ Long table</button></div>
       </div>
+      <WeddingInlineHelpNote class="mt-3">Click any guest and then a table to assign them. On a larger screen, you can drag names directly onto tables.</WeddingInlineHelpNote>
       <Show when={unassigned().length > 0}>
         <div class="mt-3 rounded-lg border border-dashed border-wedding-border bg-wedding-page p-2"><p class="mb-2 text-xs font-semibold text-wedding-ink/65">Unassigned guests</p><div class="flex flex-wrap gap-2"><For each={unassigned()}>{(person) => guestButton(person)}</For></div></div>
       </Show>

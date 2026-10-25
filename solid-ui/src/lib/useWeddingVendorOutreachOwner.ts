@@ -42,6 +42,7 @@ import {
 } from "@/lib/weddingVendorOutreachFlowState";
 import type { WeddingVendorEnquiryPermissions } from "@/lib/weddingVendorEnquiryPermissionsState";
 import { friendlyErrorText } from "@/lib/visibleErrorText";
+import { weddingDealBreakersFromAfpMessages } from "@/lib/weddingDealBreakerAfpState";
 
 type WeddingVendorOutreachCouple = {
   date_or_season: string | null;
@@ -52,6 +53,7 @@ type WeddingVendorOutreachCouple = {
   atmosphere_description: string | null;
   vendor_preferences: string | null;
   couple_names: string | null;
+  deal_breakers: string[];
 };
 
 function nonEmptyString(value: unknown): string | null {
@@ -142,6 +144,7 @@ export function weddingVendorOutreachCoupleFromWorkspace(input: {
     atmosphere_description: null,
     vendor_preferences: null,
     couple_names: null,
+    deal_breakers: [],
   };
   for (const card of input.contextCards) applyWeddingOutreachContext(couple, card.planningContext);
   applyWeddingOutreachContext(couple, input.persistedIntake);
@@ -210,6 +213,10 @@ export function useWeddingVendorOutreachOwner(input: {
     const couple = weddingVendorOutreachCoupleFromWorkspace({
       contextCards: input.state().contextCards,
     });
+    couple.deal_breakers = weddingDealBreakersFromAfpMessages({
+      messages: input.state().afpMessages,
+      metadata,
+    });
     try {
       const contextThreadId = `wedding_context:${metadata.responseWorkspaceId}`;
       // A context thread is helpful grounding, not a prerequisite for a user-selected
@@ -228,6 +235,7 @@ export function useWeddingVendorOutreachOwner(input: {
         couple.top_priorities = [];
         couple.atmosphere_description = null;
         couple.vendor_preferences = null;
+        couple.deal_breakers = [];
       }
       if (!existing.permissions.shareApproximateBudget) couple.budget_comfort = null;
 

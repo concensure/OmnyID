@@ -89,6 +89,12 @@ async fn cloudflare_email_inbound_http(
     {
         return Err((StatusCode::NOT_FOUND, "not_found".to_string()));
     }
+    if !valid_content_type(&headers) {
+        return Err((
+            StatusCode::UNSUPPORTED_MEDIA_TYPE,
+            "invalid_contract".to_string(),
+        ));
+    }
     enforce_rate_limit(
         &state,
         "vendor_email_worker_ingress".to_string(),
@@ -121,6 +127,22 @@ async fn cloudflare_email_inbound_http(
     )
     .map_err(IngressError::http)?;
     let route = resolve_recipient(&state, &envelope.to).await?;
+    let recipient_rate_key = hex::encode(Sha256::digest(envelope.to.as_bytes()));
+    enforce_rate_limit(
+        &state,
+        format!("vendor_email_worker_recipient:{recipient_rate_key}"),
+        RateLimitPolicy {
+            max_requests: 90,
+            window: Duration::from_secs(60),
+        },
+    )
+    .await?;
+    if prior_event_state(&state, &envelope).await? {
+        return Ok((
+            StatusCode::ACCEPTED,
+            Json(json!({ "status": "duplicate", "event_id": envelope.event_id })),
+        ));
+    }
     match crate::gateway::clamav::scan_bytes(&body).await {
         Ok(Some(result)) if !result.is_infected => {}
         Ok(Some(_)) => {
@@ -359,7 +381,7 @@ async fn persist_quarantine(
              (quarantine_id, provider, provider_event_id, recipient_identity_id,
               vendor_id, owner_user_id, recipient_agent_id, recipient_key_id,
               payload_digest, raw_size_bytes, ciphertext_envelope, processing_status)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'awaiting_scan')"#,
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'quarantined')"#,
     )
     .bind(format!("emailq_{}", Ulid::new().to_string().to_lowercase()))
     .bind(PROVIDER)
@@ -380,6 +402,35 @@ async fn persist_quarantine(
     .map_err(database_failure)?;
     tx.commit().await.map_err(database_failure)?;
     Ok(false)
+}
+
+/// Avoid spending scanner capacity on an authenticated exact replay. The
+/// transaction in `persist_quarantine` remains the race-safe authority.
+async fn prior_event_state(
+    state: &AppState,
+    envelope: &VerifiedEnvelope,
+) -> Result<bool, (StatusCode, String)> {
+    let existing = sqlx::query_scalar::<_, String>(
+        "SELECT payload_digest FROM wedding_vendor_email_provider_events WHERE provider = $1 AND provider_event_id = $2",
+    )
+    .bind(PROVIDER)
+    .bind(&envelope.event_id)
+    .fetch_optional(&state.db.pool)
+    .await
+    .map_err(database_failure)?;
+    match existing {
+        None => Ok(false),
+        Some(digest) if digest == envelope.body_digest => Ok(true),
+        Some(_) => Err((StatusCode::CONFLICT, "event_conflict".to_string())),
+    }
+}
+
+fn valid_content_type(headers: &HeaderMap) -> bool {
+    headers
+        .get(axum::http::header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.split(';').next())
+        .is_some_and(|value| value.trim().eq_ignore_ascii_case("message/rfc822"))
 }
 
 fn header<'a>(headers: &'a HeaderMap, name: &'static str) -> Result<&'a str, IngressError> {
@@ -586,5 +637,25 @@ mod tests {
             StatusCode::UNAUTHORIZED
         );
         assert!(decode_address(&URL_SAFE_NO_PAD.encode("Vendor@omnyid.com")).is_err());
+    }
+
+    #[test]
+    fn ingress_accepts_only_raw_email_content_type() {
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            axum::http::header::CONTENT_TYPE,
+            "message/rfc822".parse().unwrap(),
+        );
+        assert!(valid_content_type(&headers));
+        headers.insert(
+            axum::http::header::CONTENT_TYPE,
+            "message/rfc822; charset=binary".parse().unwrap(),
+        );
+        assert!(valid_content_type(&headers));
+        headers.insert(
+            axum::http::header::CONTENT_TYPE,
+            "application/json".parse().unwrap(),
+        );
+        assert!(!valid_content_type(&headers));
     }
 }

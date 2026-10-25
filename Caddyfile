@@ -256,6 +256,17 @@
         import omnyid_proxy
     }
 
+    # Operator-published articles are served from durable Postgres content.
+    # Keep these ahead of the static wedding file server so source deploys do
+    # not erase articles published through the admin surface.
+    handle /wedding/blog-publications {
+        import omnyid_proxy
+    }
+
+    handle /wedding/published/* {
+        import omnyid_proxy
+    }
+
     # Free "Wedding Understanding" lead-magnet tool (analyses text/photos via
     # a vision model). Same reasoning as the waitlist route above: must be
     # handled before the static /wedding/* file-server block below.

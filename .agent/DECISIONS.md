@@ -1733,3 +1733,23 @@ Vendor onboarding must converge on the existing claim, portal, enquiry, quote, a
 billing foundations. Its first commercial proof is one completed owned enquiry; payment follows value
 and cannot influence organic suitability ranking. AFP remains canonical and A2UI is used for portable
 read-only/decision projections where its allowlisted primitives fit.
+
+## 2026-10-26: Deal-breakers are private AFP requirements; operator articles are durable data
+
+A wedding deal-breaker is a private, E2EE-required AFP ledger event scoped to the wedding plan and
+response workspace. Vision, enquiry preparation and quote review project the same latest-action set;
+removal is another event rather than destructive history editing. Relevant deal-breakers may enter an
+enquiry only under the existing per-vendor style/priority disclosure choice, and generated copy asks
+the vendor to confirm them instead of treating them as verified suitability evidence.
+
+Operator-uploaded Wedding blog HTML is sanitized into a bounded content fragment and versioned in
+Postgres. The static Wedding journal fetches metadata and links to a server-rendered article route;
+application source deploys therefore cannot delete operator-published content. Scripts, forms,
+iframes, event handlers and unsafe URLs never enter the stored fragment. Publishing is a confirmed
+operator action, while drafts remain non-public.
+
+Cloudflare Email Worker ingress continues to be dark and recipient-key encrypted. Exact signed replay
+receipts can bypass repeat malware scanning only after authenticated envelope validation and active
+mask resolution; the transactional provider-event claim remains authoritative for races. Recipient
+abuse buckets use a SHA-256 address digest, and scanner-clean ciphertext remains quarantined until the
+separate MIME/AFP processing gate is complete.
