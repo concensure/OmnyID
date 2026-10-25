@@ -894,7 +894,7 @@ function buildNextActions(
       kind: "check_availability",
       vendorId: candidate.vendorId,
       choiceId: candidate.id,
-      label: `Reach out to ${candidate.title}`,
+      label: `Prepare an enquiry for ${candidate.title}`,
       reason: `${candidate.fitLabel}; ${candidate.availabilityLabel.toLowerCase()}`,
     }));
   const confirm = live

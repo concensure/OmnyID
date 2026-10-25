@@ -75,6 +75,14 @@ fn disposition_order(value: CandidateDisposition) -> u8 {
     }
 }
 
+fn total_status_order(value: TotalStatus) -> u8 {
+    match value {
+        TotalStatus::Complete => 0,
+        TotalStatus::Ambiguous => 1,
+        TotalStatus::Incomplete => 2,
+    }
+}
+
 pub fn compare_quotations(
     comparison_id: impl Into<String>,
     scenario_id: impl Into<String>,
@@ -127,6 +135,7 @@ pub fn compare_quotations(
                     .requirement_coverage_bps
                     .cmp(&left.requirement_coverage_bps)
             })
+            .then_with(|| total_status_order(left.total.status).cmp(&total_status_order(right.total.status)))
             .then_with(|| {
                 left.total
                     .total_minor

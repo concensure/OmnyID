@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{collections::BTreeSet, sync::Arc};
 
 use axum::{
     Json, Router,
@@ -111,7 +111,7 @@ struct VendorInboxResponse {
     transactions: Vec<VendorInboxItem>,
 }
 
-struct VendorAgentSnapshot {
+pub(super) struct VendorAgentSnapshot {
     vendor_id: String,
     claim_status: String,
     agent_id: String,
@@ -137,6 +137,10 @@ fn database_failure(_: sqlx::Error) -> (StatusCode, String) {
 fn valid_id(value: &str) -> bool {
     let value = value.trim();
     !value.is_empty() && value.chars().count() <= 180 && !value.chars().any(char::is_control)
+}
+
+fn valid_sha256(value: &str) -> bool {
+    value.len() == 64 && value.chars().all(|character| character.is_ascii_hexdigit())
 }
 
 fn parsed_time(value: &str) -> Option<DateTime<Utc>> {
@@ -171,7 +175,7 @@ fn response_capable(card: &AgentCard) -> bool {
             .is_some_and(|value| value.len() == 32)
 }
 
-async fn vendor_agent_for_user(
+pub(super) async fn vendor_agent_for_user(
     state: &AppState,
     user_id: &str,
     vendor_id: &str,
@@ -435,6 +439,23 @@ async fn submit_response_http(
         .await
         .map_err(database_failure)?
         .ok_or_else(unavailable)?;
+    let attachment_refs = request.message.attachments.iter().map(|attachment| {
+        let id = attachment.get("id").and_then(Value::as_str).map(str::trim).filter(|value| valid_id(value))?;
+        let sha256 = attachment.get("sha256").and_then(Value::as_str).map(str::trim).filter(|value| valid_sha256(value))?;
+        Some((id.to_string(), sha256.to_ascii_lowercase()))
+    }).collect::<Option<Vec<_>>>().ok_or((StatusCode::BAD_REQUEST, "invalid response attachments".to_string()))?;
+    let unique_attachment_ids = attachment_refs.iter().map(|(id, _)| id).collect::<BTreeSet<_>>();
+    if attachment_refs.len() > super::wedding_message_attachment::MAX_WEDDING_MESSAGE_ATTACHMENTS
+        || unique_attachment_ids.len() != attachment_refs.len()
+    {
+        return Err((StatusCode::BAD_REQUEST, "invalid response attachments".to_string()));
+    }
+    let stored_attachment_count = state.db.claimed_vendor_response_attachment_count(
+        &invitation.owner_user_id, &invitation.message_id, &attachment_refs,
+    ).await.map_err(database_failure)?;
+    if stored_attachment_count != attachment_refs.len() as i64 {
+        return Err((StatusCode::BAD_REQUEST, "invalid response attachments".to_string()));
+    }
     let agent = vendor_agent_for_user(&state, &user.id, &invitation.vendor_id).await?;
     let sender_identity =
         super::wedding_vendor_sender_identity_routes::authorize_selected_sender_identity(

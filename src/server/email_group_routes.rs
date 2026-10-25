@@ -280,7 +280,7 @@ async fn classify_contacts_http(
 
 // â”€â”€ Send composed email â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-#[derive(serde::Deserialize)]
+#[derive(Clone, serde::Deserialize)]
 struct GmailSendRequest {
     to: String,
     subject: String,
@@ -293,6 +293,8 @@ struct GmailSendRequest {
     references: Vec<String>,
     #[serde(default)]
     in_reply_to: Option<String>,
+    #[serde(default)]
+    attachment_ids: Vec<String>,
 }
 
 fn clean_optional(value: Option<String>) -> Option<String> {
@@ -334,7 +336,7 @@ fn clean_references(values: Vec<String>) -> Vec<String> {
 }
 
 fn outgoing_request_from_gmail_send_body(
-    user_id: &str,
+    _user_id: &str,
     body: GmailSendRequest,
 ) -> Result<crate::gateway::smtp_out::OutgoingEmailRequest, (StatusCode, String)> {
     let to = clean_email_recipient(body.to)?;
@@ -360,6 +362,7 @@ fn outgoing_request_from_gmail_send_body(
         body: message_body,
         in_reply_to: clean_optional(body.in_reply_to),
         references: clean_references(body.references),
+        attachments: vec![],
     })
 }
 
@@ -414,7 +417,9 @@ async fn gmail_send_http(
     Json(body): Json<GmailSendRequest>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let user = authenticated_user(&state.db, &headers).await?;
-    let request = outgoing_request_from_gmail_send_body(&user.id, body)?;
+    let attachment_ids = body.attachment_ids.clone();
+    let mut request = outgoing_request_from_gmail_send_body(&user.id, body)?;
+    request.attachments = super::wedding_outbound_attachment::resolve_wedding_message_attachments(&state, &user.id, attachment_ids).await?;
     let provider_message_id = send_gmail_outgoing_request(&state, &user.id, &request).await?;
 
     Ok(Json(serde_json::json!({
@@ -440,6 +445,8 @@ struct GmailSendDraftRequest {
     references: Vec<String>,
     #[serde(default)]
     in_reply_to: Option<String>,
+    #[serde(default)]
+    attachment_ids: Vec<String>,
 }
 
 async fn gmail_send_draft_http(
@@ -458,6 +465,7 @@ async fn gmail_send_draft_http(
             thread_id: body.thread_id,
             references: body.references,
             in_reply_to: body.in_reply_to,
+            attachment_ids: body.attachment_ids,
         }),
     )
     .await
@@ -598,6 +606,7 @@ fn outgoing_request_from_prepared_draft(
             .and_then(Value::as_str)
             .map(str::to_string),
         references,
+        attachments: vec![],
     })
 }
 
@@ -657,6 +666,7 @@ mod tests {
                 thread_id: Some("wedding_vendor_quote:workspace:vendor".to_string()),
                 references: vec!["<root@example.com>".to_string(), "\r\nbad".to_string()],
                 in_reply_to: Some("<parent@example.com>".to_string()),
+                attachment_ids: vec![],
             },
         )
         .expect("outgoing request");
@@ -683,6 +693,7 @@ mod tests {
                 thread_id: None,
                 references: vec![],
                 in_reply_to: None,
+                attachment_ids: vec![],
             },
         )
         .expect_err("invalid recipient rejected");

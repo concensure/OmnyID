@@ -54,7 +54,7 @@ for (const viewport of [{ width: 360, height: 740 }, { width: 1280, height: 800 
   test(`vendor loop is durable, readable, and accessible at ${viewport.width}px`, async ({ page }) => {
     await page.setViewportSize(viewport);
     await openCleanFixture(page);
-    const primary = page.getByRole("button", { name: "Reach out" });
+    const primary = page.getByRole("button", { name: "Prepare enquiry" });
     const website = page.getByRole("link", { name: "Website", exact: true });
     await expect(primary).toBeVisible();
     await expect(website).toBeVisible();

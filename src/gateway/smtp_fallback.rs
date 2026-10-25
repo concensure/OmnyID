@@ -1,6 +1,6 @@
 use lettre::{
     AsyncSmtpTransport, AsyncTransport, Tokio1Executor,
-    message::{Mailbox, Message, header::ContentType},
+    message::{Attachment, Mailbox, Message, MultiPart, SinglePart, header::ContentType},
     transport::smtp::authentication::Credentials,
 };
 
@@ -40,10 +40,20 @@ pub async fn send_via_smtp_fallback(
         builder = builder.references(request.references.join(" "));
     }
 
-    let message = builder
-        .header(ContentType::TEXT_PLAIN)
-        .body(request.body.clone())
-        .map_err(|err| format!("failed to build SMTP message: {err}"))?;
+    let message = if request.attachments.is_empty() {
+        builder.header(ContentType::TEXT_PLAIN).body(request.body.clone())
+            .map_err(|err| format!("failed to build SMTP message: {err}"))?
+    } else {
+        let mut mixed = MultiPart::mixed().singlepart(
+            SinglePart::builder().header(ContentType::TEXT_PLAIN).body(request.body.clone()),
+        );
+        for attachment in &request.attachments {
+            let content_type = ContentType::parse(&attachment.media_type)
+                .map_err(|err| format!("invalid attachment content type: {err}"))?;
+            mixed = mixed.singlepart(Attachment::new(attachment.file_name.clone()).body(attachment.bytes.clone(), content_type));
+        }
+        builder.multipart(mixed).map_err(|err| format!("failed to build SMTP message: {err}"))?
+    };
 
     let credentials = Credentials::new(config.username.clone(), config.password.clone());
     let transport = AsyncSmtpTransport::<Tokio1Executor>::starttls_relay(&config.host)

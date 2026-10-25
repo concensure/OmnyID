@@ -12,16 +12,16 @@ export function weddingVendorChoiceActionState(input: {
   quoteExists?: boolean | null;
   bookingContractExists?: boolean | null;
 }): WeddingVendorChoiceActionState {
-  if (input.bookingContractExists) return { intent: "START_PURCHASE_OR_BOOKING", label: "Review booking", startsOutreach: false };
-  if (input.quoteExists) return { intent: "REVIEW_QUOTE", label: "Review quote", startsOutreach: false };
+  if (input.bookingContractExists) return { intent: "START_PURCHASE_OR_BOOKING", label: "Review booking terms", startsOutreach: false };
+  if (input.quoteExists) return { intent: "REVIEW_QUOTE", label: "Compare quote", startsOutreach: false };
   if (input.outreachStage === "sent" || input.availabilityState === "enquiry_sent" || input.availabilityState === "awaiting_response") {
-    return { intent: "VIEW_EVIDENCE", label: "View follow-up", startsOutreach: false };
+    return { intent: "VIEW_EVIDENCE", label: "View conversation", startsOutreach: false };
   }
-  if (["confirmed_available", "likely_available", "temporary_hold"].includes(input.availabilityState)) {
-    return { intent: "REQUEST_QUOTE", label: "Request quote", startsOutreach: true };
+  if (input.outreachStage === "draft_ready" || input.outreachStage === "send_failed") {
+    return { intent: "REQUEST_QUOTE", label: "Review enquiry", startsOutreach: true };
   }
   if (["confirmed_unavailable", "booked"].includes(input.availabilityState)) {
     return { intent: "VIEW_EVIDENCE", label: "View evidence", startsOutreach: false };
   }
-  return { intent: "CHECK_AVAILABILITY_AND_REQUEST_QUOTE", label: "Reach out", startsOutreach: true };
+  return { intent: "CHECK_AVAILABILITY_AND_REQUEST_QUOTE", label: "Prepare enquiry", startsOutreach: true };
 }

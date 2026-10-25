@@ -362,6 +362,7 @@ export function WeddingVendorSearchHomeSection(props: {
                                 gmailConnected={Boolean(workspace().gmailStatus?.connected)}
                                 onContactVendor={(card, intent) => void props.outreach.onContactVendor(card, result().action.artifactId, intent)}
                                 onOutreachBodyChange={props.outreach.onOutreachBodyChange}
+                                onOutreachAttachmentsChange={props.outreach.onOutreachAttachmentsChange}
                                 onSendOutreach={(choiceId) => void props.outreach.onSendOutreach(choiceId)}
                                 onCancelOutreach={props.outreach.onCancelOutreach}
                                 onRetryOutreach={props.outreach.onRetryOutreach}

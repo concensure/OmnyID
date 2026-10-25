@@ -101,12 +101,13 @@ export function weddingVendorFacetLabels(choice: WeddingVendorRankedCandidate): 
   return fallback.sort((left, right) => right.confidence - left.confidence || left.facetId.localeCompare(right.facetId)).slice(0, 2).flatMap((facet) => weddingFacetById(facet.facetId)?.label ?? []);
 }
 
-export function weddingVendorFitWord(choice: WeddingVendorRankedCandidate): string | null {
-  if (choice.confidenceBucket === "low" || choice.fit === null) return null;
-  if (choice.fit >= 75) return "Strong match";
-  if (choice.fit >= 60) return "Good match";
-  if (choice.fit >= 45) return "Partial match";
-  return null;
+export function weddingVendorFitWord(choice: WeddingVendorRankedCandidate): string {
+  const confirmedCriteria = choice.components.filter((component) => component.known && component.confidence >= 0.7 && component.value >= 0.6).length;
+  const availabilityVerified = ["confirmed_available", "temporary_hold"].includes(choice.availabilityState);
+  if (availabilityVerified && choice.unknownHardConstraints.length === 0 && confirmedCriteria >= 2) return "Verified match";
+  if (choice.fit !== null && choice.fit >= 70 && confirmedCriteria >= 2 && choice.confidenceBucket !== "low") return "Strong match";
+  if ((choice.fit !== null && choice.fit >= 45) || confirmedCriteria > 0 || choice.matchedPreferenceTokens.length > 0) return "Potential match";
+  return "Suggested option";
 }
 
 export function weddingVendorWorthKnowing(choice: WeddingVendorRankedCandidate): string | null {
@@ -137,7 +138,7 @@ export function vendorChoiceActionRows(choices: readonly WeddingVendorRankedCand
     addLinkAction("open_vendor_source", "Open source", choice.url);
     actions.push({
       kind: "prepare_approval_gated_outreach",
-      label: choice.group === "verify" ? "Reach out" : "Prepare follow-up",
+      label: choice.group === "verify" ? "Prepare enquiry" : "Review enquiry",
       enabled: true,
       requires_user_confirmation: true,
       approval_required_before_outreach: true,

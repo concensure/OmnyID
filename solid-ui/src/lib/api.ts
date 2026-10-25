@@ -4314,6 +4314,7 @@ export type GmailApprovedDraftSendInput = {
   thread_id?: string | null;
   in_reply_to?: string | null;
   references?: string[];
+  attachment_ids?: string[];
 };
 export type GmailApprovedDraftSendResponse = {
   ok: boolean;
@@ -4744,9 +4745,10 @@ export const submitShellDecision = (body: ShellDecisionRequest) =>
   }).then(normalizeOkResponse);
 export const uploadFilePayload = async (
   file: Blob,
-  options?: { token?: string | null; filename?: string | null },
+  options?: { token?: string | null; filename?: string | null; purpose?: string | null },
 ): Promise<UploadedFilePayload> => {
   const formData = new FormData();
+  if (options?.purpose) formData.append("purpose", options.purpose);
   formData.append("file", file, options?.filename ?? undefined);
   const headers = new Headers();
   const token = sessionBearerToken(options?.token);
@@ -4770,7 +4772,7 @@ export const uploadFilePayload = async (
 };
 export const uploadAttachmentFile = async (
   file: Blob,
-  options?: { token?: string | null; filename?: string | null },
+  options?: { token?: string | null; filename?: string | null; purpose?: string | null },
 ): Promise<AfpAttachment> => {
   const uploaded = await uploadFilePayload(file, options);
   if (!uploaded.attachment) {
@@ -4779,6 +4781,29 @@ export const uploadAttachmentFile = async (
     );
   }
   return uploaded.attachment;
+};
+
+export const uploadVendorTransactionAttachment = async <TAttachment, TSource>(
+  invitationMessageId: string,
+  file: File,
+): Promise<{ attachment: TAttachment; source: TSource }> => {
+  const formData = new FormData();
+  formData.append("invitation_message_id", invitationMessageId);
+  formData.append("file", file, file.name);
+  const headers = new Headers();
+  const token = sessionBearerToken();
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  const response = await fetch(`${API_BASE}/api/quotation/vendor-transactions/attachments`, {
+    method: "POST",
+    headers,
+    credentials: "include",
+    body: formData,
+  });
+  const payload = await response.json().catch(() => null) as { attachment?: TAttachment; source?: TSource; detail?: string } | null;
+  if (!response.ok || !payload?.attachment || !payload.source) {
+    throw new Error(payload?.detail || `Upload failed for ${file.name}`);
+  }
+  return { attachment: payload.attachment, source: payload.source };
 };
 export const uploadMessageFile = async (
   file: Blob,

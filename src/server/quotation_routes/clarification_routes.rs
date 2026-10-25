@@ -213,6 +213,7 @@ fn outgoing_request(
         body: clarification_body(draft),
         in_reply_to: None,
         references: Vec::new(),
+        attachments: Vec::new(),
     }
 }
 

@@ -35,6 +35,7 @@ import {
 } from "@/lib/mobileFocusHomeState";
 import type { WeddingVendorQuoteReplyFlowState } from "@/lib/weddingVendorQuoteReplyFlowState";
 import type { WeddingVendorOutreachFlowState } from "@/lib/weddingVendorOutreachFlowState";
+import type { AfpAttachment } from "@/lib/api";
 import type { WeddingVendorChoiceCardData } from "@/components/WeddingVendorChoiceCard";
 import type { WeddingVendorChoiceIntent } from "@/lib/weddingVendorChoiceActionState";
 import { friendlyErrorText } from "@/lib/visibleErrorText";
@@ -61,6 +62,7 @@ export function WeddingMobileFocusHome(props: {
   gmailConnected?: boolean;
   onContactVendor?: (card: WeddingVendorChoiceCardData, artifactId: string, intent: WeddingVendorChoiceIntent) => void;
   onOutreachBodyChange?: (choiceId: string, bodyMarkdown: string) => void;
+  onOutreachAttachmentsChange?: (choiceId: string, attachments: AfpAttachment[]) => void;
   onSendOutreach?: (choiceId: string) => void;
   onCancelOutreach?: (choiceId: string) => void;
   onConnectGmailForOutreach?: () => void;
@@ -340,6 +342,7 @@ export function WeddingMobileFocusHome(props: {
                     gmailConnected={props.gmailConnected}
                     onContactVendor={(card, artifactId, intent) => contactVendor(item, card, artifactId, intent)}
                     onOutreachBodyChange={props.onOutreachBodyChange}
+                    onOutreachAttachmentsChange={props.onOutreachAttachmentsChange}
                     onSendOutreach={props.onSendOutreach}
                     onCancelOutreach={props.onCancelOutreach}
                     onConnectGmail={props.onConnectGmailForOutreach}

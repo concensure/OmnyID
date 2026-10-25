@@ -113,12 +113,13 @@ export function weddingVendorOutreachDraftAfpSendInput(input: {
       grounded_on: input.flow.groundedOnLabels,
       source_artifact_id: input.sourceArtifactId ?? null,
       action_intent: input.actionIntent ?? "CHECK_AVAILABILITY_AND_REQUEST_QUOTE",
+      attachment_count: input.flow.attachments.length,
     },
     views: [{
       format: "email",
       content: { to, subject, text, ...(html ? { html } : {}) },
     }],
-    attachments: [],
+    attachments: input.flow.attachments,
     references: input.sourceArtifactId
       ? [{ type: "wedding_vendor_search_artifact", target: input.sourceArtifactId, label: "Vendor search result" }]
       : [],
@@ -135,6 +136,7 @@ export function weddingVendorOutreachDraftAfpSendInput(input: {
       vendor_id: input.vendorId ?? null,
       vendor_label: input.flow.vendorName,
       action_intent: input.actionIntent ?? "CHECK_AVAILABILITY_AND_REQUEST_QUOTE",
+      attachment_count: input.flow.attachments.length,
     },
     store_in_relational: true,
   };
@@ -187,7 +189,7 @@ export function weddingVendorOutreachSentAfpSendInput(input: {
       format: "email",
       content: { to, subject, text },
     }],
-    attachments: [],
+    attachments: input.flow.attachments,
     references: [{ type: isResponse ? "wedding_vendor_response_draft" : "wedding_vendor_outreach_draft", target: input.draftMessageId, label: isResponse ? "Vendor response draft" : "Outreach draft" }],
     supertags: uniqueStrings([
       ...input.metadata.supertags,

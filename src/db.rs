@@ -21,6 +21,8 @@ use ulid::Ulid;
 
 mod migration_catalog;
 pub use migration_catalog::MIGRATIONS;
+mod message_attachments;
+pub use message_attachments::StoredMessageAttachment;
 mod quotation_response_capabilities;
 pub use quotation_response_capabilities::StoredQuotationResponseCapability;
 mod quotation_vendor_responses;

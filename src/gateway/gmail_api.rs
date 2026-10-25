@@ -295,7 +295,6 @@ pub fn build_gmail_raw_message(request: &OutgoingEmailRequest, from_address: &st
         outgoing_message_id_header(request)
     ));
     mime.push_str("MIME-Version: 1.0\r\n");
-    mime.push_str("Content-Type: text/plain; charset=UTF-8\r\n");
     if let Some(in_reply_to) = request.in_reply_to.as_ref() {
         mime.push_str(&format!(
             "In-Reply-To: {}\r\n",
@@ -310,8 +309,31 @@ pub fn build_gmail_raw_message(request: &OutgoingEmailRequest, from_address: &st
             .collect();
         mime.push_str(&format!("References: {}\r\n", refs_clean.join(" ")));
     }
-    mime.push_str("\r\n");
-    mime.push_str(&request.body);
+    if request.attachments.is_empty() {
+        mime.push_str("Content-Type: text/plain; charset=UTF-8\r\n\r\n");
+        mime.push_str(&request.body);
+    } else {
+        let boundary = format!("omnyid-{}", sanitize_header(&request.message_id));
+        mime.push_str(&format!("Content-Type: multipart/mixed; boundary=\"{boundary}\"\r\n\r\n"));
+        mime.push_str(&format!("--{boundary}\r\n"));
+        mime.push_str("Content-Type: text/plain; charset=UTF-8\r\n\r\n");
+        mime.push_str(&request.body);
+        mime.push_str("\r\n");
+        for attachment in &request.attachments {
+            let file_name = sanitize_header(&attachment.file_name).replace(['\"', '\\'], "_");
+            let media_type = sanitize_header(&attachment.media_type);
+            mime.push_str(&format!("--{boundary}\r\n"));
+            mime.push_str(&format!("Content-Type: {media_type}; name=\"{file_name}\"\r\n"));
+            mime.push_str("Content-Transfer-Encoding: base64\r\n");
+            mime.push_str(&format!("Content-Disposition: attachment; filename=\"{file_name}\"\r\n\r\n"));
+            let encoded = base64::engine::general_purpose::STANDARD.encode(&attachment.bytes);
+            for chunk in encoded.as_bytes().chunks(76) {
+                mime.push_str(std::str::from_utf8(chunk).unwrap_or_default());
+                mime.push_str("\r\n");
+            }
+        }
+        mime.push_str(&format!("--{boundary}--\r\n"));
+    }
 
     URL_SAFE_NO_PAD.encode(mime.as_bytes())
 }
@@ -325,7 +347,7 @@ mod tests {
         gmail_send_payload, gmail_upstream_status_error, validated_gmail_message_id,
         validated_gmail_search_result,
     };
-    use crate::gateway::smtp_out::OutgoingEmailRequest;
+    use crate::gateway::smtp_out::{OutgoingEmailAttachment, OutgoingEmailRequest};
 
     #[test]
     fn gmail_raw_message_contains_reply_headers_and_body() {
@@ -342,6 +364,7 @@ mod tests {
                     "<root@example.com>".to_string(),
                     "<parent@example.com>".to_string(),
                 ],
+                attachments: vec![],
             },
             "sender@example.com",
         );
@@ -360,6 +383,23 @@ mod tests {
         assert!(decoded.contains("In-Reply-To: <parent@example.com>\r\n"));
         assert!(decoded.contains("References: <root@example.com> <parent@example.com>\r\n"));
         assert!(decoded.ends_with("\r\nBody text"));
+    }
+
+    #[test]
+    fn gmail_raw_message_builds_multipart_attachments() {
+        let raw = build_gmail_raw_message(
+            &OutgoingEmailRequest {
+                thread_id: String::new(), message_id: "msg_attachment_01".to_string(), parent_id: None,
+                to: vec!["vendor@example.com".to_string()], subject: "Wedding enquiry".to_string(),
+                body: "Please see the brief.".to_string(), in_reply_to: None, references: vec![],
+                attachments: vec![OutgoingEmailAttachment { attachment_id: "attachment_01".to_string(), file_name: "brief.txt".to_string(), media_type: "text/plain".to_string(), bytes: b"ninety guests".to_vec() }],
+            },
+            "sender@example.com",
+        );
+        let decoded = String::from_utf8(base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(raw).unwrap()).unwrap();
+        assert!(decoded.contains("Content-Type: multipart/mixed"));
+        assert!(decoded.contains("filename=\"brief.txt\""));
+        assert!(decoded.contains(&base64::engine::general_purpose::STANDARD.encode(b"ninety guests")));
     }
 
     #[test]
@@ -383,6 +423,7 @@ mod tests {
             body: "Body text".to_string(),
             in_reply_to: None,
             references: vec![],
+            attachments: vec![],
         };
 
         let payload = gmail_send_payload(&request, "encoded".to_string());
@@ -402,6 +443,7 @@ mod tests {
             body: "Body text".to_string(),
             in_reply_to: None,
             references: vec![],
+            attachments: vec![],
         };
 
         let payload = gmail_send_payload(&request, "encoded".to_string());

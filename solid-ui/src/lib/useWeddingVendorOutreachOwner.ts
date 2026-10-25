@@ -9,6 +9,7 @@ import {
   requestWeddingVendorOutreachDraft,
   sendGmailApprovedDraft,
   type WeddingVendor,
+  type AfpAttachment,
 } from "@/lib/api";
 import type { WeddingVendorChoiceCardData } from "@/components/WeddingVendorChoiceCard";
 import type { WeddingVendorChoiceIntent } from "@/lib/weddingVendorChoiceActionState";
@@ -284,6 +285,14 @@ export function useWeddingVendorOutreachOwner(input: {
     });
   }
 
+  function onOutreachAttachmentsChange(choiceId: string, attachments: AfpAttachment[]) {
+    setVendorOutreachFlows((current) => {
+      const flow = current[choiceId];
+      if (!flow) return current;
+      return { ...current, [choiceId]: { ...flow, attachments } };
+    });
+  }
+
   function onCancelOutreach(choiceId: string) {
     setVendorOutreachFlows((current) => {
       const next = { ...current };
@@ -349,6 +358,7 @@ export function useWeddingVendorOutreachOwner(input: {
         subject: flow.subject,
         html,
         text: flow.bodyMarkdown,
+        attachment_ids: flow.attachments.map((attachment) => attachment.id),
       });
       const sentProjection = weddingVendorOutreachSentAfpSendInput({
         flow,
@@ -394,6 +404,7 @@ export function useWeddingVendorOutreachOwner(input: {
     onContactVendor,
     onOutreachBodyChange,
     onOutreachRecipientChange,
+    onOutreachAttachmentsChange,
     onCancelOutreach,
     onRetryOutreach,
     onConnectGmailForOutreach,

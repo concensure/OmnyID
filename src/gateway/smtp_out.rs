@@ -20,6 +20,15 @@ pub struct OutgoingEmailRequest {
     pub body: String,
     pub in_reply_to: Option<String>,
     pub references: Vec<String>,
+    pub attachments: Vec<OutgoingEmailAttachment>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct OutgoingEmailAttachment {
+    pub attachment_id: String,
+    pub file_name: String,
+    pub media_type: String,
+    pub bytes: Vec<u8>,
 }
 
 pub fn outgoing_message_id_header(request: &OutgoingEmailRequest) -> String {
@@ -60,6 +69,7 @@ pub fn build_outgoing_email_request(message: &AFPMessage) -> Option<OutgoingEmai
                 body,
                 in_reply_to: in_reply_to_from_content(&message.content),
                 references: references_from_content(&message.content),
+                attachments: vec![],
             })
         }
         Some("reply") => {
@@ -82,6 +92,7 @@ pub fn build_outgoing_email_request(message: &AFPMessage) -> Option<OutgoingEmai
                 body,
                 in_reply_to: in_reply_to_from_content(&message.content),
                 references: references_from_content(&message.content),
+                attachments: vec![],
             })
         }
         Some("forward") => {
@@ -104,6 +115,7 @@ pub fn build_outgoing_email_request(message: &AFPMessage) -> Option<OutgoingEmai
                 body,
                 in_reply_to: in_reply_to_from_content(&message.content),
                 references: references_from_content(&message.content),
+                attachments: vec![],
             })
         }
         _ => None,
@@ -172,6 +184,7 @@ pub async fn send_transactional_email(to: &str, subject: &str, body: &str) -> Re
         body: body.to_string(),
         in_reply_to: None,
         references: vec![],
+        attachments: vec![],
     };
     if let Some(result) = send_transactional_platform_email(to, subject, body).await {
         return result;

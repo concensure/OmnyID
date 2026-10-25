@@ -7,7 +7,7 @@ import {
   type WeddingVendorChoiceSelectionSaveInput,
 } from "@/components/WeddingArtifactDetailPanel";
 import type { WeddingVendorChoiceCardData } from "@/components/WeddingVendorChoiceCard";
-import type { WeddingVendor } from "@/lib/api";
+import type { AfpAttachment, WeddingVendor } from "@/lib/api";
 import type { WeddingVendorChoiceIntent } from "@/lib/weddingVendorChoiceActionState";
 import type { WeddingResponseWorkspaceViewProps } from "@/components/WeddingResponseWorkspaceViewTypes";
 import type { WeddingApprovalExecutionState } from "@/lib/weddingApprovalExecutionState";
@@ -58,6 +58,7 @@ type WeddingWorkspaceDocumentsPanelProps = {
   gmailConnected?: boolean;
   onContactVendor?: (card: WeddingVendorChoiceCardData, artifactId: string, intent: WeddingVendorChoiceIntent) => void;
   onOutreachBodyChange?: (choiceId: string, bodyMarkdown: string) => void;
+  onOutreachAttachmentsChange?: (choiceId: string, attachments: AfpAttachment[]) => void;
   onSendOutreach?: (choiceId: string) => void;
   onCancelOutreach?: (choiceId: string) => void;
   onConnectGmailForOutreach?: () => void;
@@ -329,6 +330,7 @@ export function WeddingWorkspaceDocumentsPanel(props: WeddingWorkspaceDocumentsP
               gmailConnected={props.gmailConnected}
               onContactVendor={props.onContactVendor}
               onOutreachBodyChange={props.onOutreachBodyChange}
+              onOutreachAttachmentsChange={props.onOutreachAttachmentsChange}
               onSendOutreach={props.onSendOutreach}
               onCancelOutreach={props.onCancelOutreach}
               onConnectGmailForOutreach={props.onConnectGmailForOutreach}

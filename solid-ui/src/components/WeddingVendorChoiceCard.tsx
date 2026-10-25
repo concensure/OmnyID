@@ -7,6 +7,7 @@ import {
   fetchGoogleWeddingVendorPhoto,
   isGoogleWeddingVendorPhotoPath,
 } from "@/lib/api";
+import type { AfpAttachment } from "@/lib/api";
 import type { WeddingWorkspaceArtifactPreview } from "@/lib/weddingResponseWorkspaceViewState";
 import type { WeddingVendorAvailabilityState } from "@/lib/weddingVendorRankingState";
 import { weddingVendorPhotoPlaceholder } from "@/lib/weddingVendorPhotoPlaceholderState";
@@ -14,10 +15,7 @@ import { weddingVendorRoomPhotoSrc } from "@/lib/weddingVendorRoomState";
 import { WeddingVendorInlineMap } from "@/components/WeddingVendorInlineMap";
 import { weddingVendorChoiceActionState, type WeddingVendorChoiceIntent } from "@/lib/weddingVendorChoiceActionState";
 import type { WeddingPreferenceSignalReason } from "@/lib/weddingPreferenceSignalState";
-import {
-  weddingVendorOutreachSentLabel,
-  type WeddingVendorOutreachFlowState,
-} from "@/lib/weddingVendorOutreachFlowState";
+import type { WeddingVendorOutreachFlowState } from "@/lib/weddingVendorOutreachFlowState";
 
 export type WeddingVendorChoiceCardData = WeddingWorkspaceArtifactPreview["vendorComparisonCards"][number];
 
@@ -49,6 +47,7 @@ export function WeddingVendorChoiceCard(props: {
   onReviewBooking?: (card: WeddingVendorChoiceCardData) => void;
   onViewEvidence?: (card: WeddingVendorChoiceCardData) => void;
   onOutreachBodyChange?: (choiceId: string, bodyMarkdown: string, bodyHtml?: string) => void;
+  onOutreachAttachmentsChange?: (choiceId: string, attachments: AfpAttachment[]) => void;
   onSendOutreach?: (choiceId: string) => void;
   onCancelOutreach?: (choiceId: string) => void;
   onRetryOutreach?: (choiceId: string) => void;
@@ -205,7 +204,7 @@ export function WeddingVendorChoiceCard(props: {
             </ul>
           </section>
         </Show>
-        <Show when={card.fitWord}><p class="text-xs font-semibold text-wedding-primary">{card.fitWord}</p></Show>
+        <p class="text-xs font-semibold text-wedding-primary">{props.selectedForFollowUp ? "Your preferred vendor" : (card.fitWord || "Suggested option")}</p>
         <Show when={(card.facetLabels?.length ?? 0) > 0}><p class="text-xs text-wedding-ink/70">{card.facetLabels?.join(" · ")}</p></Show>
         <Show when={verifyQuestions().length > 0}>
           <section aria-label="We'll ask them">
@@ -325,7 +324,9 @@ export function WeddingVendorChoiceCard(props: {
                 onClick={() => {
                   const action = primaryAction();
                   props.onToggleFollowUp?.(card);
-                  if (action.intent === "REVIEW_QUOTE") props.onReviewQuote?.(card);
+                  if (["draft_ready", "send_failed"].includes(props.outreachFlow?.stage ?? "")) {
+                    document.getElementById(`vendor-enquiry-${card.choiceId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+                  } else if (action.intent === "REVIEW_QUOTE") props.onReviewQuote?.(card);
                   else if (action.intent === "START_PURCHASE_OR_BOOKING") props.onReviewBooking?.(card);
                   else if (action.intent === "VIEW_EVIDENCE") props.onViewEvidence?.(card);
                   else props.onContactVendor?.(card, action.intent);
@@ -341,10 +342,7 @@ export function WeddingVendorChoiceCard(props: {
               </button>
             }
           >
-            <span class="rounded-lg border border-wedding-border bg-wedding-slate px-2.5 py-1.5 text-xs font-semibold text-wedding-primary">
-              {"✓ "}
-              {weddingVendorOutreachSentLabel({ sentAtIso: props.outreachFlow?.sentAtIso ?? null })}
-            </span>
+            <button type="button" onClick={() => props.onViewEvidence?.(card)} class="min-h-12 w-full rounded-lg bg-wedding-primary px-3 py-2 text-sm font-bold text-wedding-page transition hover:bg-wedding-primary/90">View conversation</button>
           </Show>
           <Show when={props.outreachFlow?.stage === "sent"}>
             <div class="w-full rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-emerald-950" role="status" aria-live="polite">
@@ -371,16 +369,17 @@ export function WeddingVendorChoiceCard(props: {
         </Show>
         <Show when={props.outreachFlow}>
           {(flow) => (
-            <WeddingVendorOutreachComposer
+            <div id={`vendor-enquiry-${card.choiceId}`}><WeddingVendorOutreachComposer
               flow={flow()}
               busy={flow().stage === "drafting" || flow().stage === "sending"}
               gmailConnected={Boolean(props.gmailConnected)}
               onBodyChange={(bodyMarkdown, bodyHtml) => props.onOutreachBodyChange?.(card.choiceId, bodyMarkdown, bodyHtml)}
+              onAttachmentsChange={(attachments) => props.onOutreachAttachmentsChange?.(card.choiceId, attachments)}
               onSend={() => props.onSendOutreach?.(card.choiceId)}
               onCancel={() => props.onCancelOutreach?.(card.choiceId)}
               onRetryDraft={() => props.onRetryOutreach?.(card.choiceId)}
               onConnectGmail={() => props.onConnectGmailForOutreach?.()}
-            />
+            /></div>
           )}
         </Show>
       </div>

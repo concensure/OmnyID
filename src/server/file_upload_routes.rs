@@ -136,6 +136,7 @@ async fn upload_file_http(
     let mut uploaded_name = None;
     let mut uploaded_mime = None;
     let mut uploaded_bytes = None;
+    let mut upload_purpose = None;
 
     while let Some(field) = multipart.next_field().await.map_err(|err| {
         tracing::error!(error = %err, "invalid multipart form");
@@ -144,6 +145,12 @@ async fn upload_file_http(
             "invalid multipart form".to_string(),
         )
     })? {
+        if field.name() == Some("purpose") {
+            upload_purpose = Some(field.text().await.map_err(|_| {
+                (StatusCode::BAD_REQUEST, "invalid upload purpose".to_string())
+            })?);
+            continue;
+        }
         if field.name() != Some("file") {
             continue;
         }
@@ -157,7 +164,6 @@ async fn upload_file_http(
             )
         })?;
         uploaded_bytes = Some(bytes.to_vec());
-        break;
     }
 
     let file_name = sanitize_upload_file_name(uploaded_name.as_deref().unwrap_or("upload.bin"));
@@ -176,6 +182,16 @@ async fn upload_file_http(
             "uploaded file is too large".to_string(),
         )
     })?;
+    let wedding_message_upload = upload_purpose.as_deref()
+        == Some(super::wedding_message_attachment::WEDDING_MESSAGE_UPLOAD_PURPOSE);
+    if wedding_message_upload {
+        super::wedding_message_attachment::validate_wedding_message_attachment(
+            &file_name,
+            &mime_type,
+            &bytes,
+        )?;
+        super::wedding_message_attachment::scan_wedding_message_attachment(&bytes).await?;
+    }
 
     match evaluate_upload_admission(
         archive_only_enabled,
@@ -260,7 +276,7 @@ async fn upload_file_http(
         updated_at: Some(now.clone()),
         checksum: Some(checksum.clone()),
         searchable_metadata: Some(json!({
-            "upload_source": "workspace_file_upload",
+            "upload_source": if wedding_message_upload { "wedding_vendor_message" } else { "workspace_file_upload" },
             "storage_backend": storage_backend,
             "supertags": upload_supertags.clone(),
         })),
@@ -287,7 +303,8 @@ async fn upload_file_http(
         content: serde_json::to_value(&ledger).unwrap_or_else(|_| json!({})),
         metadata: Some(json!({
             "store": true,
-            "upload_source": "workspace_file_upload",
+            "upload_source": if wedding_message_upload { "wedding_vendor_message" } else { "workspace_file_upload" },
+            "upload_purpose": upload_purpose,
             "owner_user_id": user.id,
             "supertags": upload_supertags.clone(),
         })),
@@ -548,6 +565,8 @@ fn guess_mime_from_name(file_name: &str) -> String {
     let lower = file_name.to_ascii_lowercase();
     if lower.ends_with(".pdf") {
         "application/pdf".to_string()
+    } else if lower.ends_with(".docx") {
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document".to_string()
     } else if lower.ends_with(".csv") {
         "text/csv".to_string()
     } else if lower.ends_with(".txt") || lower.ends_with(".md") {
@@ -558,12 +577,14 @@ fn guess_mime_from_name(file_name: &str) -> String {
         "image/png".to_string()
     } else if lower.ends_with(".jpg") || lower.ends_with(".jpeg") {
         "image/jpeg".to_string()
+    } else if lower.ends_with(".webp") {
+        "image/webp".to_string()
     } else {
         "application/octet-stream".to_string()
     }
 }
 
-fn normalize_upload_mime_type(uploaded_mime: Option<&str>, file_name: &str) -> String {
+pub(super) fn normalize_upload_mime_type(uploaded_mime: Option<&str>, file_name: &str) -> String {
     match uploaded_mime.map(str::trim) {
         Some(value) if is_safe_attachment_mime_type(value) => value.to_string(),
         _ => guess_mime_from_name(file_name),
@@ -676,6 +697,26 @@ pub(super) async fn persist_uploaded_file(
         "failed to persist upload bytes".to_string()
     })?;
     Ok(("filesystem".to_string(), storage_key.to_string()))
+}
+
+pub(super) async fn load_uploaded_file(
+    storage_backend: &str,
+    storage_key: &str,
+) -> Result<Vec<u8>, String> {
+    if !is_safe_storage_key(storage_key) {
+        return Err("invalid attachment storage key".to_string());
+    }
+    match storage_backend {
+        "seaweedfs" => {
+            let client = seaweedfs_client()
+                .ok_or_else(|| "object storage is unavailable".to_string())?;
+            download_object_payload(&client, storage_key).await
+        }
+        "filesystem" => fs::read(upload_root_dir().join(PathBuf::from(storage_key)))
+            .await
+            .map_err(|_| "attachment file is unavailable".to_string()),
+        _ => Err("unsupported attachment storage backend".to_string()),
+    }
 }
 
 pub(super) async fn delete_uploaded_file(

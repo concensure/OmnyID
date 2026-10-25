@@ -6,7 +6,7 @@
 
 import { vendorResponseFingerprint, type QuotationVendorResponse } from "afp-ts/quotation";
 
-import { apiFetch } from "@/lib/api";
+import { apiFetch, uploadVendorTransactionAttachment } from "@/lib/api";
 import type { SelectedVendorSenderIdentity } from "@/lib/vendorSenderIdentityState";
 import {
   decryptVendorAgentEnvelope,
@@ -193,6 +193,8 @@ export async function submitVendorTransactionResponse(input: {
   answers: Record<string, string>;
   attestedBy: string;
   senderIdentity: SelectedVendorSenderIdentity;
+  attachments?: QuotationVendorResponse["attachments"];
+  sources?: QuotationVendorResponse["sources"];
 }): Promise<VendorTransportReceipt> {
   const agentId = identifier(input.item.envelope.to?.[0]);
   const keys = await loadVendorAgentPublicKeys(agentId);
@@ -229,8 +231,8 @@ export async function submitVendorTransactionResponse(input: {
       anchors: [],
     })),
     commercial_facts: [],
-    sources: [],
-    attachments: [],
+    sources: input.sources ?? [],
+    attachments: input.attachments ?? [],
     attestation: {
       attested_by: input.attestedBy.trim(),
       authority: "vendor_representative",
@@ -276,7 +278,10 @@ export async function submitVendorTransactionResponse(input: {
     encryption,
     views: [],
     references: [],
-    attachments: [],
+    attachments: response.attachments.map((attachment) => ({
+      id: attachment.attachment_id,
+      sha256: attachment.content_hash.replace(/^sha256:/, ""),
+    })),
     signature: "",
   };
   const message = await signVendorAfpMessage(agentId, unsigned);
@@ -289,4 +294,14 @@ export async function submitVendorTransactionResponse(input: {
       message,
     },
   });
+}
+
+export async function uploadVendorResponseAttachment(
+  item: VendorTransactionInboxItem,
+  file: File,
+): Promise<{
+  attachment: QuotationVendorResponse["attachments"][number];
+  source: QuotationVendorResponse["sources"][number];
+}> {
+  return uploadVendorTransactionAttachment(item.invitation_message_id, file);
 }

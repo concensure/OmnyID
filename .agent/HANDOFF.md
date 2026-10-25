@@ -4785,3 +4785,32 @@ Next:
 - Design and implement account/device key registration, multi-device recovery, revocation and legacy
   AFP migration before claiming product-wide operator-resistant messaging. Rehearse the existing 2 GB
   SeaweedFS volume migration and rollback before any production restart. Keep mail and policy V2 off.
+
+## 2026-10-25 - WED-258 safe enquiry attachments and evidence-led labels (Codex, complete)
+
+Changed:
+
+- Added couple-enquiry and claimed-vendor-response attachments for PDF, DOCX, TXT, JPEG, PNG and WebP,
+  capped at five files. Uploads are purpose-bound and private; send/submit revalidates tenant or
+  invitation ownership, size, SHA-256 and type and rescans with ClamAV before use.
+- Added attachment delivery to Gmail, Graph and SMTP without accepting browser file paths or storage
+  credentials. Vendor response ciphertext carries only the corresponding IDs, hashes and source refs.
+- Replaced ambiguous comparison actions with consequence-led enquiry/conversation/quote/booking labels,
+  and separated suitability evidence from business-source verification.
+- Added a reproducible five-fixture quote comparison runner and user-facing fairness report. It keeps
+  all options conditional while availability is unknown, corrects a mandatory security charge, exposes
+  a deposit mismatch and does not equate estimated or "from" prices with complete totals.
+
+Verification:
+
+- Pass: `cargo check --lib`; quotation 14/14; vendor-response transport 7/7; wedding attachment 1/1;
+  Gmail MIME 2/2; frontend typecheck; focused frontend 42/42; full wedding 1968/1968; production Vite
+  build; both line-budget guards. New files range from 33 to 296 lines, except the 211-line example.
+- Policy V2 and all rollout flags remain unchanged. No deployment was performed. The pre-existing
+  untracked `artifacts/oracle-production-proof-deploy/` directory remains untouched.
+
+Next:
+
+- Review the committed WED-258 slice, then exercise real Gmail/Graph/SMTP sends with clean and infected
+  fixtures in an authorized environment before rollout. Continue WED-257's broader device-key and
+  legacy-AFP design separately; this slice does not claim product-wide operator-resistant messaging.

@@ -265,6 +265,25 @@ fn comparison_will_not_rank_across_currencies_or_recommend_one_quote() {
 }
 
 #[test]
+fn comparison_does_not_rank_a_cheaper_estimate_above_a_complete_total() {
+    let complete = quote("complete", "complete-v1");
+    let mut estimate = quote("estimate", "estimate-v1");
+    estimate.line_items[0].unit_price.as_mut().unwrap().amount_minor = 1;
+    estimate.line_items[0].evidence.state = EvidenceState::Inferred;
+    let comparison = compare_quotations(
+        "comparison-estimate",
+        scenario().scenario_id,
+        vec![
+            candidate(&estimate, RequirementStatus::Unknown),
+            candidate(&complete, RequirementStatus::Unknown),
+        ],
+    );
+    assert_eq!(comparison.candidates[0].quotation_id, "complete");
+    assert_eq!(comparison.candidates[0].total.status, TotalStatus::Complete);
+    assert_eq!(comparison.candidates[1].total.status, TotalStatus::Ambiguous);
+}
+
+#[test]
 fn optional_items_are_scenario_bound_and_cash_flow_terms_are_not_cost() {
     let mut quotation = quote("quote-options", "quote-options-v1");
     quotation.line_items.push(line(

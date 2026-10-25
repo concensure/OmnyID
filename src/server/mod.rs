@@ -146,6 +146,7 @@ mod quotation_routes;
 mod quotation_response_capability_routes;
 mod quotation_response_portal_routes;
 mod quotation_vendor_response_routes;
+mod quotation_vendor_attachment_routes;
 mod quotation_vendor_revision_routes;
 mod quotation_source_routes;
 mod runtime_routes;
@@ -171,7 +172,7 @@ mod wedding_llm_ladder;
 mod wedding_preference_routes;
 mod wedding_understanding_routes;
 mod wedding_newsletter_routes;
-mod vendor_email_worker_ingress; mod wedding_vendor_claim_routes; mod wedding_vendor_sender_identity_routes;
+mod vendor_email_worker_ingress; mod wedding_message_attachment; mod wedding_outbound_attachment; mod wedding_vendor_claim_routes; mod wedding_vendor_sender_identity_routes;
 mod wedding_vendor_enrichment; mod wedding_vendor_outreach_routes;
 mod wedding_vendor_ownership_routes;
 mod wedding_vendor_photo_routes;
@@ -1365,7 +1366,7 @@ pub async fn run() {
         .merge(conversion_routes::routes())
         .merge(ingest_routes::routes())
         .merge(quotation_normalisation_routes::routes()).merge(quotation_routes::routes()).merge(quotation_response_capability_routes::routes())
-        .merge(quotation_response_portal_routes::routes()).merge(quotation_vendor_response_routes::routes())
+        .merge(quotation_response_portal_routes::routes()).merge(quotation_vendor_response_routes::routes()).merge(quotation_vendor_attachment_routes::routes())
         .merge(quotation_vendor_revision_routes::routes()).merge(quotation_source_routes::routes())
         .merge(knowledge_routes::routes())
         .merge(para_routes::routes())
@@ -1523,7 +1524,7 @@ pub async fn build_test_router(database_url: &str) -> Router {
         .route("/actions/decision", post(record_action_decision_http))
         .route("/gateway/email", post(handle_gateway_email))
         .merge(quotation_normalisation_routes::routes()).merge(quotation_routes::routes()).merge(quotation_response_capability_routes::routes())
-        .merge(quotation_response_portal_routes::routes()).merge(quotation_vendor_response_routes::routes()).merge(quotation_vendor_revision_routes::routes()).merge(quotation_source_routes::routes())
+        .merge(quotation_response_portal_routes::routes()).merge(quotation_vendor_response_routes::routes()).merge(quotation_vendor_attachment_routes::routes()).merge(quotation_vendor_revision_routes::routes()).merge(quotation_source_routes::routes())
         .merge(vendor_email_worker_ingress::routes()).merge(wedding_vendor_claim_routes::routes()).merge(wedding_vendor_ownership_routes::routes()).merge(wedding_vendor_sender_identity_routes::routes()).merge(wedding_vendor_photo_routes::routes())
         .merge(planning_constraint_routes::routes()).merge(planning_constraint_capture_routes::routes()).merge(planning_constraint_evaluation_routes::routes()).merge(planning_constraint_intervention_routes::routes()).merge(planning_cost_tradeoff_routes::routes()).merge(planning_directory_evaluation_routes::routes()).merge(planning_milestone_routes::routes()).merge(planning_vendor_change_routes::routes())
         .layer(cors_layer())
@@ -1604,6 +1605,7 @@ async fn waitlist_http(
         body,
         in_reply_to: None,
         references: vec![],
+        attachments: vec![],
     };
 
     let delivery_result = send_outgoing_email(&request).await;
@@ -1627,6 +1629,7 @@ We'll email you as soon as private beta access opens up.\n"
             .to_string(),
         in_reply_to: None,
         references: vec![],
+        attachments: vec![],
     };
     if let Err(err) = send_outgoing_email(&confirmation_request).await {
         error!(email = %email, error = %err, "Waitlist confirmation email to requester failed to send");

@@ -893,8 +893,8 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
       vendorOutreachFlows: vendorOutreach.flows(),
       gmailConnected: Boolean(props.gmailStatus?.connected),
       onOpenOutreachComposer: (card) => void vendorOutreach.onContactVendor(weddingVendorFollowUpOutreachCardData(card), ""),
-      onOutreachBodyChange: vendorOutreach.onOutreachBodyChange,
-      onOutreachRecipientChange: vendorOutreach.onOutreachRecipientChange,
+      onOutreachBodyChange: vendorOutreach.onOutreachBodyChange, onOutreachRecipientChange: vendorOutreach.onOutreachRecipientChange,
+      onOutreachAttachmentsChange: vendorOutreach.onOutreachAttachmentsChange,
       onSendOutreach: (choiceId) => void vendorOutreach.onSendOutreach(choiceId),
       onCancelOutreach: vendorOutreach.onCancelOutreach,
       onConnectGmailForOutreach: () => void vendorOutreach.onConnectGmailForOutreach(),
@@ -971,7 +971,7 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
             onApproveQuoteReply={approveQuoteReplyWording}
             onAcknowledgeQuoteReply={acknowledgeQuoteReplyBudgetImpact}
             vendorOutreachFlows={Object.values(vendorOutreach.flows())} gmailConnected={Boolean(props.gmailStatus?.connected)}
-            onContactVendor={(card, artifactId, intent) => void vendorOutreach.onContactVendor(card, artifactId, intent)} onOutreachBodyChange={vendorOutreach.onOutreachBodyChange}
+            onContactVendor={(card, artifactId, intent) => void vendorOutreach.onContactVendor(card, artifactId, intent)} onOutreachBodyChange={vendorOutreach.onOutreachBodyChange} onOutreachAttachmentsChange={vendorOutreach.onOutreachAttachmentsChange}
             onSendOutreach={(choiceId) => void vendorOutreach.onSendOutreach(choiceId)} onCancelOutreach={vendorOutreach.onCancelOutreach} onConnectGmailForOutreach={() => void vendorOutreach.onConnectGmailForOutreach()}
           />}>
           <WeddingHomeSectionRegistry
@@ -1047,6 +1047,7 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
           gmailConnected={Boolean(props.gmailStatus?.connected)}
           onContactVendor={(card, artifactId, intent) => void vendorOutreach.onContactVendor(card, artifactId, intent)}
           onOutreachBodyChange={vendorOutreach.onOutreachBodyChange}
+          onOutreachAttachmentsChange={vendorOutreach.onOutreachAttachmentsChange}
           onSendOutreach={(choiceId) => void vendorOutreach.onSendOutreach(choiceId)}
           onCancelOutreach={vendorOutreach.onCancelOutreach}
           onConnectGmailForOutreach={() => void vendorOutreach.onConnectGmailForOutreach()}

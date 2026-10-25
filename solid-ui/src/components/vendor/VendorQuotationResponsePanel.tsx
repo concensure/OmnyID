@@ -15,6 +15,7 @@ import type {
 import {
   loadVendorTransactionInbox,
   submitVendorTransactionResponse,
+  uploadVendorResponseAttachment,
   unlockVendorTransaction,
   vendorResponseA2ui,
   type VendorContextProjectionView,
@@ -22,6 +23,7 @@ import {
 } from "@/lib/vendorQuotationResponseState";
 
 type SubmitInput = Parameters<typeof submitVendorTransactionResponse>[0];
+type VendorUpload = Awaited<ReturnType<typeof uploadVendorResponseAttachment>>;
 
 interface Props {
   loadTransactions?: () => Promise<VendorTransactionInboxItem[]>;
@@ -44,6 +46,8 @@ export function VendorQuotationResponsePanel(props: Props = {}) {
   const [error, setError] = createSignal<string | null>(null);
   const [receipt, setReceipt] = createSignal<string | null>(null);
   const [senderIdentity, setSenderIdentity] = createSignal<SelectedVendorSenderIdentity | null>(null);
+  const [uploads, setUploads] = createSignal<VendorUpload[]>([]);
+  const [uploadBusy, setUploadBusy] = createSignal(false);
 
   const unlock = async (item: VendorTransactionInboxItem) => {
     setBusy(true);
@@ -55,6 +59,7 @@ export function VendorQuotationResponsePanel(props: Props = {}) {
       setProjection(view);
       setAnswers(Object.fromEntries(view.questions.map(({ id }) => [id, ""])));
       setSenderIdentity(null);
+      setUploads([]);
       vendorResponseA2ui(view); // Keep the same field projection consumable by agent-native surfaces.
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not unlock this transaction.");
@@ -81,6 +86,8 @@ export function VendorQuotationResponsePanel(props: Props = {}) {
         answers: answers(),
         attestedBy: attestedBy(),
         senderIdentity: sender,
+        attachments: uploads().map((upload) => upload.attachment),
+        sources: uploads().map((upload) => upload.source),
       });
       if (result.status !== "accepted") {
         throw new Error("The response was not accepted. Refresh the transaction before retrying.");
@@ -89,11 +96,32 @@ export function VendorQuotationResponsePanel(props: Props = {}) {
       setSelected(null);
       setProjection(null);
       setSenderIdentity(null);
+      setUploads([]);
       await refetch();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not send this response.");
     } finally {
       setBusy(false);
+    }
+  };
+
+  const addFiles = async (files: FileList | null) => {
+    const item = selected();
+    if (!item || !files?.length || uploadBusy()) return;
+    if (files.length + uploads().length > 5) {
+      setError("Attach no more than five files to one response.");
+      return;
+    }
+    setUploadBusy(true);
+    setError(null);
+    try {
+      const added: VendorUpload[] = [];
+      for (const file of Array.from(files)) added.push(await uploadVendorResponseAttachment(item, file));
+      setUploads((current) => [...current, ...added]);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "The attachment could not be uploaded.");
+    } finally {
+      setUploadBusy(false);
     }
   };
 
@@ -144,10 +172,27 @@ export function VendorQuotationResponsePanel(props: Props = {}) {
               <textarea required maxLength={4000} rows={4} class="mt-1 w-full rounded-lg border border-wedding-muted p-3" value={answers()[question.id] ?? ""} onInput={(event) => setAnswers((current) => ({ ...current, [question.id]: event.currentTarget.value }))} />
             </label>
           )}</For>
+          <div class="mt-4 rounded-lg border border-wedding-muted bg-white p-3">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p class="text-sm font-medium">Attachments</p>
+                <p class="text-xs leading-5 text-wedding-muted">PDF, DOCX, TXT, JPG, PNG or WebP · up to 10 MB each</p>
+              </div>
+              <label class="inline-flex min-h-11 cursor-pointer items-center rounded-lg border border-wedding-accent px-3 text-sm font-semibold">
+                {uploadBusy() ? "Checking…" : "Add files"}
+                <input class="sr-only" type="file" multiple accept=".pdf,.docx,.txt,.jpg,.jpeg,.png,.webp" disabled={busy() || uploadBusy() || uploads().length >= 5} onChange={(event) => { void addFiles(event.currentTarget.files); event.currentTarget.value = ""; }} />
+              </label>
+            </div>
+            <Show when={uploads().length > 0}>
+              <ul class="mt-2 space-y-2">
+                <For each={uploads()}>{(upload) => <li class="flex items-center justify-between gap-2 rounded-lg bg-wedding-surface px-3 py-2 text-xs"><span class="min-w-0 truncate">{upload.attachment.file_name}</span><button type="button" class="font-semibold underline" onClick={() => setUploads((current) => current.filter((item) => item.attachment.attachment_id !== upload.attachment.attachment_id))}>Remove</button></li>}</For>
+              </ul>
+            </Show>
+          </div>
           <label class="mt-4 block text-sm font-medium">Authorised representative
             <input required maxLength={180} class="mt-1 min-h-11 w-full rounded-lg border border-wedding-muted px-3" value={attestedBy()} onInput={(event) => setAttestedBy(event.currentTarget.value)} />
           </label>
-          <button type="submit" class="mt-4 min-h-11 rounded-lg bg-wedding-accent px-4 font-bold text-white disabled:opacity-60" disabled={busy() || !senderIdentity()}>{busy() ? "Encrypting and sending…" : "Send response for review"}</button>
+          <button type="submit" class="mt-4 min-h-11 rounded-lg bg-wedding-accent px-4 font-bold text-white disabled:opacity-60" disabled={busy() || uploadBusy() || !senderIdentity()}>{busy() ? "Encrypting and sending…" : "Send response for review"}</button>
         </form>
       )}</Show>
 

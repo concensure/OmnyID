@@ -1,6 +1,6 @@
 // @locs-version: 2.0
 import type { WeddingVendorChoiceCardData } from "@/components/WeddingVendorChoiceCard";
-import type { WeddingVendor } from "@/lib/api";
+import type { AfpAttachment, WeddingVendor } from "@/lib/api";
 
 export type WeddingVendorOutreachStage =
   | "idle"
@@ -24,6 +24,7 @@ export type WeddingVendorOutreachFlowState = {
   receiptRef: string | null;
   threadId: string | null;
   blockedReason: string | null;
+  attachments: AfpAttachment[];
 };
 
 function normalizedVendorLabel(value: string): string {
@@ -109,6 +110,7 @@ export function weddingVendorOutreachIdleFlow(input: {
     receiptRef: null,
     threadId: null,
     blockedReason: null,
+    attachments: [],
   };
 }
 

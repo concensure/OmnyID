@@ -1,5 +1,6 @@
 // @locs-version: 1.0
 import type { AfpMessage } from "@/lib/api";
+import type { AfpAttachment } from "@/lib/api";
 import type { WeddingVendorOutreachFlowState } from "@/lib/weddingVendorOutreachFlowState";
 
 function record(value: unknown): Record<string, unknown> {
@@ -12,6 +13,12 @@ function clean(value: unknown): string {
 
 function strings(value: unknown): string[] {
   return Array.isArray(value) ? value.map(clean).filter(Boolean) : [];
+}
+
+function attachments(value: unknown): AfpAttachment[] {
+  return Array.isArray(value) ? value.filter((item): item is AfpAttachment => Boolean(
+    item && typeof item === "object" && typeof (item as { id?: unknown }).id === "string",
+  )) : [];
 }
 
 /** Rebuilds the latest outreach draft/receipt state from append-only AFP history. */
@@ -38,6 +45,7 @@ export function projectWeddingVendorOutreachFlows(messages: readonly AfpMessage[
       receiptRef: null,
       threadId: clean(message.thread_id) || null,
       blockedReason: null,
+      attachments: attachments(message.attachments),
     };
     flows.set(choiceId, kind === "wedding_vendor_outreach_sent" ? {
       ...base,
@@ -50,6 +58,7 @@ export function projectWeddingVendorOutreachFlows(messages: readonly AfpMessage[
       sentAtIso: clean(content.sent_at) || clean(message.timestamp) || base.sentAtIso,
       receiptRef: clean(content.client_message_id) || clean(content.provider_message_id) || base.receiptRef,
       threadId: clean(message.thread_id) || base.threadId,
+      attachments: attachments(message.attachments).length ? attachments(message.attachments) : base.attachments,
     } : {
       ...base,
       vendorName: clean(content.vendor_label) || base.vendorName,
@@ -60,6 +69,7 @@ export function projectWeddingVendorOutreachFlows(messages: readonly AfpMessage[
       groundedOnLabels: strings(content.grounded_on),
       stage: "draft_ready",
       threadId: clean(message.thread_id) || base.threadId,
+      attachments: attachments(message.attachments),
     });
   }
   return [...flows.values()];

@@ -1,5 +1,6 @@
 // @locs-version: 1.0
 import { createSignal, For, Show } from "solid-js";
+import { uploadAttachmentFile, type AfpAttachment } from "@/lib/api";
 import type { WeddingVendorOutreachFlowState } from "@/lib/weddingVendorOutreachFlowState";
 import { weddingVendorOutreachSendGate } from "@/lib/weddingVendorOutreachFlowState";
 import { TiptapEditor } from "@/components/editor/TiptapEditor";
@@ -11,6 +12,7 @@ export function WeddingVendorOutreachComposer(props: {
   gmailConnected: boolean;
   onBodyChange: (bodyMarkdown: string, bodyHtml?: string) => void;
   onRecipientChange?: (email: string) => void;
+  onAttachmentsChange?: (attachments: AfpAttachment[]) => void;
   onSend: () => void;
   onCancel: () => void;
   onRetryDraft?: () => void;
@@ -20,6 +22,33 @@ export function WeddingVendorOutreachComposer(props: {
 }) {
   const gate = () => weddingVendorOutreachSendGate(props.flow, { gmailConnected: props.gmailConnected });
   const [whyOpen, setWhyOpen] = createSignal(false);
+  const [attachmentBusy, setAttachmentBusy] = createSignal(false);
+  const [attachmentError, setAttachmentError] = createSignal<string | null>(null);
+  const updateAttachments = (attachments: AfpAttachment[]) => props.onAttachmentsChange?.(attachments);
+  const uploadAttachments = async (files: FileList | null) => {
+    if (!files?.length || attachmentBusy()) return;
+    const available = Math.max(0, 5 - props.flow.attachments.length);
+    if (files.length > available) {
+      setAttachmentError("Attach no more than five files to one enquiry.");
+      return;
+    }
+    setAttachmentBusy(true);
+    setAttachmentError(null);
+    try {
+      const added: AfpAttachment[] = [];
+      for (const file of Array.from(files)) {
+        added.push(await uploadAttachmentFile(file, {
+          filename: file.name,
+          purpose: "wedding_vendor_message",
+        }));
+      }
+      updateAttachments([...props.flow.attachments, ...added]);
+    } catch (error) {
+      setAttachmentError(error instanceof Error ? error.message : "The attachment could not be uploaded.");
+    } finally {
+      setAttachmentBusy(false);
+    }
+  };
   const officialWebsiteUrl = () => {
     const value = props.vendorWebsiteUrl?.trim();
     if (!value) return null;
@@ -117,6 +146,44 @@ export function WeddingVendorOutreachComposer(props: {
             />
           </label>
 
+          <div class="mt-3 rounded-xl border border-wedding-muted/25 bg-white p-3">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p class="text-sm font-semibold text-wedding-text">Attachments</p>
+                <p class="text-xs leading-5 text-wedding-muted">PDF, DOCX, TXT, JPG, PNG or WebP · up to 10 MB each</p>
+              </div>
+              <label class="inline-flex min-h-10 cursor-pointer items-center rounded-xl border border-wedding-cta px-3 py-2 text-sm font-semibold text-wedding-text hover:bg-wedding-surface-blush">
+                {attachmentBusy() ? "Checking…" : "Add files"}
+                <input
+                  class="sr-only"
+                  type="file"
+                  multiple
+                  accept=".pdf,.docx,.txt,.jpg,.jpeg,.png,.webp,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,image/jpeg,image/png,image/webp"
+                  disabled={props.busy || attachmentBusy() || props.flow.attachments.length >= 5}
+                  onChange={(event) => {
+                    void uploadAttachments(event.currentTarget.files);
+                    event.currentTarget.value = "";
+                  }}
+                />
+              </label>
+            </div>
+            <Show when={props.flow.attachments.length > 0}>
+              <ul class="mt-2 space-y-2">
+                <For each={props.flow.attachments}>{(attachment) => (
+                  <li class="flex items-center justify-between gap-2 rounded-lg bg-wedding-surface-muted px-3 py-2 text-xs text-wedding-text">
+                    <span class="min-w-0 truncate">{attachment.name}</span>
+                    <button
+                      type="button"
+                      class="shrink-0 font-semibold underline underline-offset-2"
+                      onClick={() => updateAttachments(props.flow.attachments.filter((item) => item.id !== attachment.id))}
+                    >Remove</button>
+                  </li>
+                )}</For>
+              </ul>
+            </Show>
+            <Show when={attachmentError()}>{(message) => <p role="alert" class="mt-2 text-xs leading-5 text-red-700">{message()}</p>}</Show>
+          </div>
+
           <Show when={!props.flow.recipientEmail}>
             <div class="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm leading-6 text-amber-950">
               <p class="font-semibold">No vendor email is available in the directory.</p>
@@ -147,12 +214,12 @@ export function WeddingVendorOutreachComposer(props: {
 
           <button
             type="button"
-            disabled={!gate().canSend || props.busy}
+            disabled={!gate().canSend || props.busy || attachmentBusy()}
             title={gate().reason ?? undefined}
             onClick={props.onSend}
             class="mt-3 min-h-[44px] w-full rounded-2xl border-2 border-wedding-cta bg-white px-5 py-3 text-sm font-bold text-wedding-text transition hover:bg-wedding-surface-blush focus:outline-none focus:ring-2 focus:ring-wedding-cta focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {props.flow.stage === "sending" ? "Sending…" : `Send to ${props.flow.vendorName}`}
+            {props.flow.stage === "sending" ? "Sending…" : "Send enquiry"}
           </button>
 
           <Show when={!props.gmailConnected}>

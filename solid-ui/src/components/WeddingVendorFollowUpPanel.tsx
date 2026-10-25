@@ -21,6 +21,7 @@ import {
 import type { WeddingVendorOutreachFlowState } from "@/lib/weddingVendorOutreachFlowState";
 import { weddingVendorOutreachSentLabel } from "@/lib/weddingVendorOutreachFlowState";
 import type { WeddingWorkspaceSidebarAction } from "@/lib/weddingWorkspaceActionState";
+import type { AfpAttachment } from "@/lib/api";
 
 function VendorContactChip(props: { label: string; value: string | null; kind: "address" | "email" | "phone" }) {
   const [open, setOpen] = createSignal(false);
@@ -110,6 +111,7 @@ export function WeddingVendorFollowUpPanel(props: {
   onOpenOutreachComposer: (card: WeddingVendorContactWorkspaceCard) => void;
   onOutreachBodyChange: (choiceId: string, bodyMarkdown: string, bodyHtml?: string) => void;
   onOutreachRecipientChange: (choiceId: string, email: string) => void;
+  onOutreachAttachmentsChange: (choiceId: string, attachments: AfpAttachment[]) => void;
   onSendOutreach: (choiceId: string) => void;
   onCancelOutreach: (choiceId: string) => void;
   onConnectGmailForOutreach: () => void;
@@ -225,7 +227,7 @@ export function WeddingVendorFollowUpPanel(props: {
                           Reply to {card.vendorName}
                         </button>
                         <Show when={outreachFlow()}>
-                          {(flow) => <WeddingVendorOutreachComposer flow={flow()} busy={flow().stage === "drafting" || flow().stage === "sending"} gmailConnected={props.gmailConnected} vendorWebsiteUrl={card.websiteUrl} onBodyChange={(body, html) => props.onOutreachBodyChange(outreachChoiceId(), body, html)} onRecipientChange={(email) => props.onOutreachRecipientChange(outreachChoiceId(), email)} onSend={() => props.onSendOutreach(outreachChoiceId())} onCancel={() => props.onCancelOutreach(outreachChoiceId())} onConnectGmail={() => props.onConnectGmailForOutreach()} />}
+                          {(flow) => <WeddingVendorOutreachComposer flow={flow()} busy={flow().stage === "drafting" || flow().stage === "sending"} gmailConnected={props.gmailConnected} vendorWebsiteUrl={card.websiteUrl} onBodyChange={(body, html) => props.onOutreachBodyChange(outreachChoiceId(), body, html)} onRecipientChange={(email) => props.onOutreachRecipientChange(outreachChoiceId(), email)} onAttachmentsChange={(attachments) => props.onOutreachAttachmentsChange(outreachChoiceId(), attachments)} onSend={() => props.onSendOutreach(outreachChoiceId())} onCancel={() => props.onCancelOutreach(outreachChoiceId())} onConnectGmail={() => props.onConnectGmailForOutreach()} />}
                         </Show>
                       </>
                     }
@@ -275,6 +277,7 @@ export function WeddingVendorFollowUpPanel(props: {
                             vendorWebsiteUrl={card.websiteUrl}
                             onBodyChange={(bodyMarkdown, bodyHtml) => props.onOutreachBodyChange(outreachChoiceId(), bodyMarkdown, bodyHtml)}
                             onRecipientChange={(email) => props.onOutreachRecipientChange(outreachChoiceId(), email)}
+                            onAttachmentsChange={(attachments) => props.onOutreachAttachmentsChange(outreachChoiceId(), attachments)}
                             onSend={() => props.onSendOutreach(outreachChoiceId())}
                             onCancel={() => props.onCancelOutreach(outreachChoiceId())}
                             onConnectGmail={() => props.onConnectGmailForOutreach()}

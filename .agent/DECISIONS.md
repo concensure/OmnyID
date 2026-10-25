@@ -1648,3 +1648,19 @@ random credentials, gives the application bucket-scoped object actions, and keep
 identity out of the homeserver. Readiness uses authenticated bucket access. Root and Docker
 administrators remain trusted infrastructure operators; this boundary excludes the public, ordinary
 host users and unrelated containers rather than claiming protection from hostile root.
+
+## 2026-10-25: Wedding message attachments are purpose-bound references, not client transport authority
+
+Wedding enquiry and claimed-vendor response attachments use the existing private file ledger and
+object store, but are admitted only under an explicit wedding-message purpose. The browser supplies
+opaque attachment IDs; the server re-resolves tenant ownership, invitation binding, declared type,
+size and SHA-256, then rescans the exact bytes with ClamAV before any provider send. Missing scanner,
+cross-tenant reference, unsupported PDF/DOCX/TXT/image type, duplicate ID or changed bytes fails
+closed. Vendor response envelopes expose only bounded IDs and hashes and keep the response encrypted.
+
+Vendor suitability labels are evidence states, independent of source identity. An official or
+verified business source alone remains a Suggested option; Potential, Strong and Verified match need
+increasing preference and hard-constraint evidence, and Your preferred vendor is reserved for the
+couple's selection. At equal requirement coverage, quote comparison orders complete totals before
+ambiguous estimates and incomplete starting prices rather than presenting a lower uncertain number as
+the better deal. Unknown availability prevents a booking recommendation.

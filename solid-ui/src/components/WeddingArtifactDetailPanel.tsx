@@ -5,7 +5,7 @@ import { AttachmentsRenderer } from "@/components/renderers/AttachmentsRenderer"
 import { WeddingApprovalPreviewPanel } from "@/components/WeddingApprovalPreviewPanel";
 import type { WeddingApprovalExecutionState } from "@/lib/weddingApprovalExecutionState";
 import type { WeddingApprovalRequestState } from "@/lib/weddingApprovalState";
-import type { WeddingVendor } from "@/lib/api";
+import type { AfpAttachment, WeddingVendor } from "@/lib/api";
 import { weddingVendorCardWithCurrentPhoto } from "@/lib/weddingVendorCardMediaState";
 import {
   buildWeddingComparisonColumns,
@@ -113,6 +113,7 @@ function ArtifactPreviewCard(props: {
   gmailConnected?: boolean;
   onContactVendor?: (card: WeddingVendorChoiceCardData, artifactId: string, intent: WeddingVendorChoiceIntent) => void;
   onOutreachBodyChange?: (choiceId: string, bodyMarkdown: string) => void;
+  onOutreachAttachmentsChange?: (choiceId: string, attachments: AfpAttachment[]) => void;
   onSendOutreach?: (choiceId: string) => void;
   onCancelOutreach?: (choiceId: string) => void;
   onConnectGmailForOutreach?: () => void;
@@ -335,6 +336,7 @@ function ArtifactPreviewCard(props: {
                   gmailConnected={props.gmailConnected}
                   onContactVendor={(selectedCard, intent) => props.onContactVendor?.(selectedCard, props.artifact.artifactId, intent)}
                   onOutreachBodyChange={props.onOutreachBodyChange}
+                  onOutreachAttachmentsChange={props.onOutreachAttachmentsChange}
                   onSendOutreach={props.onSendOutreach}
                   onCancelOutreach={props.onCancelOutreach}
                   onConnectGmailForOutreach={props.onConnectGmailForOutreach}
@@ -640,6 +642,7 @@ export function WeddingArtifactDetailPanel(props: {
   gmailConnected?: boolean;
   onContactVendor?: (card: WeddingVendorChoiceCardData, artifactId: string, intent: WeddingVendorChoiceIntent) => void;
   onOutreachBodyChange?: (choiceId: string, bodyMarkdown: string) => void;
+  onOutreachAttachmentsChange?: (choiceId: string, attachments: AfpAttachment[]) => void;
   onSendOutreach?: (choiceId: string) => void;
   onCancelOutreach?: (choiceId: string) => void;
   onConnectGmailForOutreach?: () => void;
@@ -767,6 +770,7 @@ export function WeddingArtifactDetailPanel(props: {
                         gmailConnected={props.gmailConnected}
                         onContactVendor={props.onContactVendor}
                         onOutreachBodyChange={props.onOutreachBodyChange}
+                        onOutreachAttachmentsChange={props.onOutreachAttachmentsChange}
                         onSendOutreach={props.onSendOutreach}
                         onCancelOutreach={props.onCancelOutreach}
                         onConnectGmailForOutreach={props.onConnectGmailForOutreach}

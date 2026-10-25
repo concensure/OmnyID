@@ -97,6 +97,19 @@ struct OutlookMessage {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "replyTo")]
     reply_to: Option<Vec<OutlookRecipient>>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    attachments: Vec<OutlookFileAttachment>,
+}
+
+#[derive(Serialize)]
+struct OutlookFileAttachment {
+    #[serde(rename = "@odata.type")]
+    odata_type: &'static str,
+    name: String,
+    #[serde(rename = "contentType")]
+    content_type: String,
+    #[serde(rename = "contentBytes")]
+    content_bytes: String,
 }
 
 #[derive(Serialize)]
@@ -175,6 +188,12 @@ pub async fn send_graph_message(
                 })
                 .collect(),
             reply_to: None,
+            attachments: request.attachments.iter().map(|attachment| OutlookFileAttachment {
+                odata_type: "#microsoft.graph.fileAttachment",
+                name: attachment.file_name.clone(),
+                content_type: attachment.media_type.clone(),
+                content_bytes: STANDARD.encode(&attachment.bytes),
+            }).collect(),
         },
     };
 

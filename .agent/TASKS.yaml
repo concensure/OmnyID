@@ -3466,3 +3466,38 @@ tasks:
       - SeaweedFS Compose definitions now use file-backed random app/admin identities, bucket-scoped application actions, an internal storage-only network, no production host port and authenticated bucket readiness; a disposable Docker authorization rehearsal passed
       - Oracle read-only checks confirmed storage is not publicly published and host secret permissions are already restrictive; production was not restarted because the existing 2 GB volume needs a reviewed migration window
       - focused crypto, provider, ingress, migration and database-backed tests pass; general legacy AFP account/device key registration, recovery, revocation and migration remain open, so WED-257 is not complete
+  - id: WED-258
+    title: Add safe enquiry attachments and evidence-led vendor workflow labels
+    status: completed
+    owner: codex
+    branch: agent/codex/WED-215
+    depends_on:
+      - WED-250
+      - WED-253
+      - WED-257
+    files:
+      - solid-ui/src/components/**
+      - solid-ui/src/lib/**
+      - solid-ui/tests/**
+      - src/quotation/**
+      - src/db/message_attachments.rs
+      - src/gateway/**
+      - src/server/file_upload_routes.rs
+      - src/server/quotation**
+      - tests/quotation**
+      - Documents/verification/**
+      - .agent/**
+    acceptance:
+      - couple enquiry drafts and vendor responses accept only image, PDF, DOCX and plain-text files through the existing bounded attachment and malware-scan path
+      - attachment names, media types, sizes, hashes and source bindings remain tenant-scoped and are included in encrypted AFP/message transport without exposing object-store credentials or plaintext to another account
+      - vendor-comparison actions describe the next consequence from prepare through booking review and never use the ambiguous Reach out label
+      - suitability badges distinguish suggested, potential, strong, verified and user-preferred evidence states without treating source identity verification as suitability evidence
+      - the five supplied fictional quotation fixtures are normalized through the existing quotation contracts, rendered as a representative comparison and reviewed for fairness with uncertainty and non-comparable terms visible
+      - focused frontend, quotation, attachment, typecheck, build and line-budget checks pass with new files below 1000 lines
+    progress:
+      - registered from recipient-security commit 2b26671; the pre-existing untracked Oracle proof artifact remains out of scope and untouched
+      - couple enquiries and claimed-vendor responses now accept at most five PDF, DOCX, TXT, JPEG, PNG or WebP files through purpose-bound, owner-scoped storage; upload and outbound delivery both fail closed on ClamAV, type, size, hash or tenant mismatch
+      - Gmail, Graph and SMTP transports carry resolved server-side attachment bytes; browser-provided file paths or object-store credentials never become transport authority, and encrypted vendor response envelopes disclose only bounded attachment IDs and hashes
+      - comparison actions now say Prepare enquiry, Review enquiry, Send enquiry, View conversation, Compare quote or Review booking terms according to represented state; suitability labels are derived from match evidence and hard-constraint confirmation, never source verification alone
+      - the five supplied fictional quote sidecars run through the production comparison contract; every result remains conditional because availability is unknown, incomplete and estimated totals stay visibly non-comparable, and no vendor is recommended
+      - pass: cargo check, 14 quotation tests, 7 vendor-response transport tests, 3 focused attachment/Gmail units, typecheck, 42 focused frontend tests, all 1968 wedding tests, production UI build and both line-budget guards; every new file is below 1000 lines

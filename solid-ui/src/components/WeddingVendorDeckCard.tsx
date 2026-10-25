@@ -4,12 +4,14 @@ import { WeddingVendorChoiceCard } from "@/components/WeddingVendorChoiceCard";
 import { WeddingVendorOutreachComposer } from "@/components/WeddingVendorOutreachComposer";
 import type { FocusDeckItem } from "@/lib/mobileFocusHomeState";
 import type { WeddingVendorChoiceIntent } from "@/lib/weddingVendorChoiceActionState";
+import type { AfpAttachment } from "@/lib/api";
 
 export function WeddingVendorDeckCard(props: {
   item: FocusDeckItem;
   gmailConnected?: boolean;
   onContactVendor: (card: NonNullable<FocusDeckItem["vendorComparison"]>["cards"][number], artifactId: string, intent: WeddingVendorChoiceIntent) => void;
   onOutreachBodyChange?: (choiceId: string, bodyMarkdown: string) => void;
+  onOutreachAttachmentsChange?: (choiceId: string, attachments: AfpAttachment[]) => void;
   onSendOutreach?: (choiceId: string) => void;
   onCancelOutreach?: (choiceId: string) => void;
   onRetryOutreach?: (choiceId: string) => void;
@@ -40,6 +42,7 @@ export function WeddingVendorDeckCard(props: {
                 busy={flow().stage === "drafting" || flow().stage === "sending"}
                 gmailConnected={Boolean(props.gmailConnected)}
                 onBodyChange={(body) => props.onOutreachBodyChange?.(flow().choiceId, body)}
+                onAttachmentsChange={(attachments) => props.onOutreachAttachmentsChange?.(flow().choiceId, attachments)}
                 onSend={() => props.onSendOutreach?.(flow().choiceId)}
                 onCancel={() => props.onCancelOutreach?.(flow().choiceId)}
                 onRetryDraft={() => props.onRetryOutreach?.(flow().choiceId)}
