@@ -4913,3 +4913,43 @@ Next:
   frozen candidate. The Email Worker/reply relay, provider smoke, independent security/privacy,
   accessibility/usability/wording, hosted shadow and cohort evidence remain external gates; do not enable
   protected external delivery based on local test success alone.
+
+## 2026-10-26 - WED-262 granular enquiry disclosure and quiz profile handoff (Codex, complete)
+
+Changed:
+
+- Added vendor-scoped, mobile-first disclosure choices directly below the editable enquiry message for
+  date/season, general location, estimated guest count, style/priorities and approximate category budget.
+  Phone, reminder and protected-reply choices remain explicit per vendor. A changed disclosure fingerprint
+  invalidates the reviewed draft until the user explicitly regenerates it from only the allowed facts.
+- Hardened the static Wedding Animal Quiz: no API transport or embedded backend/secret, bounded local and
+  hash input, no names/budget/full brief in public share hashes, and no silent profile import. The explicit
+  account action creates a minimal expiring handoff which the workspace validates, writes to the existing
+  private AFP preference/intake profiles without overwriting current facts, and then consumes.
+- Tracked and published the requested article, quiz and local assets. Versioned quiz asset URLs bypass the
+  superseded Cloudflare cache entry without broad cache invalidation.
+- Added the vendor onboarding/value-discovery specification and dependency-ordered WED-263-WED-270 task
+  plan. It builds on claim, ownership, enquiry, quote, attachment, sender and billing foundations; AFP stays
+  canonical, A2UI is used where its allowlist fits, and paid conversion follows demonstrated value.
+- During Oracle release, completed the previously reviewed file-backed SeaweedFS credential migration with
+  fresh root-owned mode-0600 app/admin credentials. Added a CRLF-safe launcher to all Compose profiles after
+  a Windows bind-mounted shell script exposed the missing guard. No credential value was logged or copied.
+
+Verification:
+
+- Pass before release: typecheck; 20 focused disclosure/quiz tests; all 1,987 Wedding tests; Wedding
+  site/CSP/quiz smoke; production Vite build; line-budget check. Final regression after the storage guard:
+  all 1,991 Wedding tests, typecheck and both line-budget checks.
+- Pass after hotfix: four Compose configurations; secure-entrypoint regression 4/4; authenticated Oracle
+  production proof with backup verification; public 200/CSP checks for the article and quiz; hardened quiz
+  asset cache MISS with explicit handoff/account source and no network APIs; live workspace chunk contains
+  vendor-scoped information, budget, phone, reminder, protected-reply and draft-update controls.
+- Production application/static commit: `f6b00e8a4dabf319ac7a8aefd7cece87cb9c89a9`. Policy V2 and all
+  mail/relay rollout flags remain unchanged. The Cloudflare token can read the zone but lacks cache-purge
+  permission; no token value was exposed.
+
+Next:
+
+- Implement WED-263 first from the nominated build base, then the value-first claim/onboarding slices in
+  dependency order. Do not enable protected external replies or paid vendor features until their existing
+  security, provider, usability and cohort gates pass.

@@ -1,10 +1,14 @@
 # Wedding Vendor Onboarding and Value Discovery Specification
 
-Status: proposed after WED-262  
-Owner: Wedding vendor experience  
-Implementation branch: `agent/codex/WED-215`  
-Implementation worktree: `C:\Users\ozans\Desktop\projects\OmnyID-WED-215`  
-Nominated build base: `a7b19bf785475799d4750b6dfcb4991a3dafeea1`  
+Status: proposed after WED-262
+
+Owner: Wedding vendor experience
+
+Implementation branch: `agent/codex/WED-215`
+
+Implementation worktree: `C:\Users\ozans\Desktop\projects\OmnyID-WED-215`
+
+Nominated build base: `f6b00e8a4dabf319ac7a8aefd7cece87cb9c89a9`
 
 ## 1. Purpose
 

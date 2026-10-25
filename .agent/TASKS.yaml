@@ -3614,7 +3614,7 @@ tasks:
       - policy V2 and mail/relay rollout flags remain unchanged; no deployment was performed
   - id: WED-262
     title: Make vendor disclosure consent granular and connect the Wedding animal quiz safely
-    status: in_progress
+    status: done
     owner: codex
     branch: agent/codex/WED-215
     depends_on:
@@ -3642,3 +3642,8 @@ tasks:
       - focused frontend, quiz security/site, typecheck, production build and line-budget checks pass, with every new file below 1000 lines
     progress:
       - registered from committed WED-261 revision 5312d25 after confirming disclosure state is already vendor-scoped but only budget and phone are selectable, and the untracked quiz result is not consumed by the workspace
+      - per-vendor disclosure choices for date or season, general location, estimated guest count, style and priorities, approximate category budget and phone contact are mobile-first, revision-bound and persisted in the AFP enquiry draft; changed choices require an explicit draft update before send
+      - the hardened quiz has no network transport, excludes names and full briefs from share links, creates only an explicit expiring minimal handoff, imports it into existing private AFP wedding profiles after account creation and removes the browser handoff after success
+      - the requested article, quiz and local media are tracked and live on Oracle; the uncached quiz HTML uses versioned asset URLs so Cloudflare cannot serve the superseded quiz script even though the replacement token lacks cache-purge permission
+      - vendor activation specification and dependency-ordered tasks WED-263 through WED-270 preserve AFP ownership, reuse the claim/portal/enquiry/quote/billing foundations, use A2UI where suitable and put paid conversion after demonstrated value without affecting organic suitability ranking
+      - Oracle release f6b00e8a4dabf319ac7a8aefd7cece87cb9c89a9 uses file-backed root-owned SeaweedFS credentials and a CRLF-safe secure entrypoint; authenticated production proof, backup verification, public article/quiz/workspace checks and the focused storage regression pass, while policy V2 and mail rollout flags remain unchanged

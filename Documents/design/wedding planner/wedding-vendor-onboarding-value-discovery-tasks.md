@@ -1,8 +1,10 @@
 # Wedding Vendor Onboarding and Value Discovery Tasks
 
-Companion spec: `wedding-vendor-onboarding-value-discovery-spec.md`  
-Branch/worktree: `agent/codex/WED-215` / `C:\Users\ozans\Desktop\projects\OmnyID-WED-215`  
-Build base: `a7b19bf785475799d4750b6dfcb4991a3dafeea1`  
+Companion spec: `wedding-vendor-onboarding-value-discovery-spec.md`
+
+Branch/worktree: `agent/codex/WED-215` / `C:\Users\ozans\Desktop\projects\OmnyID-WED-215`
+
+Build base: `f6b00e8a4dabf319ac7a8aefd7cece87cb9c89a9`
 
 ## 1. Programme rules
 
