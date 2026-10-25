@@ -1712,3 +1712,24 @@ default off; reminders default on; protected OmnyID replies are the default rout
 the exact recipient, content, attachments and shared facts and acknowledge that preview. The protected
 route remains unsendable until the independently reviewed masked relay is available. Choosing connected
 email is explicit and discloses that provider address rather than implying masked delivery.
+
+## 2026-10-26: Vendor disclosure is per enquiry; quiz import is explicit and minimal
+
+Each vendor enquiry owns its disclosure choices for date/season, general location, estimated guest
+count, style/priorities and approximate category budget. The structured drafting packet omits disabled
+facts, a changed disclosure fingerprint makes the prior draft unsendable, and a regenerated successor
+records the updated permission snapshot. Phone contact, reminder and reply-route choices remain
+separate because they do not change the generated factual content. Budget and phone remain off by
+default; ordinary planning context remains on but can be disabled independently for each vendor.
+
+The public Wedding Animal Quiz has no API transport and cannot silently populate an account. Quiz
+progress stays browser-local; public partner/zoo hashes omit names, budget and the full brief. Only an
+explicit “create account with this result” action writes a bounded 30-day handoff containing the budget
+band, guest range, general location/season, style and priorities. After authentication it becomes
+private AFP intake and preference events, preserves already-entered planning facts, then deletes the
+handoff. Raw answer codes, names and friction detail are never imported.
+
+Vendor onboarding must converge on the existing claim, portal, enquiry, quote, attachment, sender and
+billing foundations. Its first commercial proof is one completed owned enquiry; payment follows value
+and cannot influence organic suitability ranking. AFP remains canonical and A2UI is used for portable
+read-only/decision projections where its allowlisted primitives fit.
