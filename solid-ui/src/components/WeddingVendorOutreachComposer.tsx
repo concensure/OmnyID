@@ -5,6 +5,11 @@ import type { WeddingVendorOutreachFlowState } from "@/lib/weddingVendorOutreach
 import { weddingVendorOutreachSendGate } from "@/lib/weddingVendorOutreachFlowState";
 import { TiptapEditor } from "@/components/editor/TiptapEditor";
 import { renderMarkdown } from "@/lib/markdownRenderer";
+import { WeddingTrustInfoTip } from "@/components/WeddingTrustInfoTip";
+import {
+  weddingVendorSharedInformationLabels,
+  type WeddingVendorEnquiryPermissions,
+} from "@/lib/weddingVendorEnquiryPermissionsState";
 
 export function WeddingVendorOutreachComposer(props: {
   flow: WeddingVendorOutreachFlowState;
@@ -13,17 +18,35 @@ export function WeddingVendorOutreachComposer(props: {
   onBodyChange: (bodyMarkdown: string, bodyHtml?: string) => void;
   onRecipientChange?: (email: string) => void;
   onAttachmentsChange?: (attachments: AfpAttachment[]) => void;
+  onPermissionsChange?: (permissions: WeddingVendorEnquiryPermissions) => void;
+  onRegenerateDraft?: () => void;
   onSend: () => void;
   onCancel: () => void;
   onRetryDraft?: () => void;
   onConnectGmail: () => void;
   /** The directory's official vendor URL, when an email address is unavailable. */
   vendorWebsiteUrl?: string | null;
+  protectedRepliesAvailable?: boolean;
 }) {
-  const gate = () => weddingVendorOutreachSendGate(props.flow, { gmailConnected: props.gmailConnected });
+  const gate = () => weddingVendorOutreachSendGate(props.flow, {
+    gmailConnected: props.gmailConnected,
+    protectedRepliesAvailable: props.protectedRepliesAvailable,
+  });
   const [whyOpen, setWhyOpen] = createSignal(false);
   const [attachmentBusy, setAttachmentBusy] = createSignal(false);
   const [attachmentError, setAttachmentError] = createSignal<string | null>(null);
+  const updatePermissions = (patch: Partial<WeddingVendorEnquiryPermissions>) => props.onPermissionsChange?.({
+    ...props.flow.permissions,
+    ...patch,
+    previewApproved: patch.previewApproved ?? false,
+  });
+  const budgetChoiceOutOfSync = () => (
+    props.flow.permissions.shareApproximateBudget !== props.flow.groundedOnFields.includes("budget_comfort")
+  );
+  const sharedInformation = () => weddingVendorSharedInformationLabels({
+    permissions: props.flow.permissions,
+    groundedOnLabels: props.flow.groundedOnLabels,
+  });
   const updateAttachments = (attachments: AfpAttachment[]) => props.onAttachmentsChange?.(attachments);
   const uploadAttachments = async (files: FileList | null) => {
     if (!files?.length || attachmentBusy()) return;
@@ -135,7 +158,7 @@ export function WeddingVendorOutreachComposer(props: {
           </div>
 
           <label class="mt-3 block text-sm font-semibold text-wedding-text">
-            Vendor email
+            Recipient
             <input
               type="email"
               value={props.flow.recipientEmail ?? ""}
@@ -145,6 +168,64 @@ export function WeddingVendorOutreachComposer(props: {
               class="mt-1 min-h-11 w-full select-text rounded-xl border border-wedding-muted/35 bg-white px-3 py-2 text-sm font-normal text-wedding-text outline-none focus:border-wedding-cta focus:ring-2 focus:ring-wedding-surface-blush disabled:cursor-wait disabled:opacity-70"
             />
           </label>
+
+          <section class="mt-3 rounded-xl border border-wedding-border bg-white p-3" aria-labelledby={`enquiry-permissions-${props.flow.choiceId}`}>
+            <h4 id={`enquiry-permissions-${props.flow.choiceId}`} class="text-sm font-bold text-wedding-text">Before this enquiry is sent</h4>
+            <p class="mt-1 text-xs leading-5 text-wedding-muted">Choose what this vendor may receive or do. Changing a control never sends anything.</p>
+            <div class="mt-3 space-y-2">
+              <label class="flex min-h-11 items-start gap-2 rounded-lg border border-wedding-border px-3 py-2 text-sm text-wedding-text">
+                <input type="checkbox" class="mt-1 h-4 w-4 accent-wedding-primary" checked={props.flow.permissions.shareApproximateBudget} onChange={(event) => updatePermissions({ shareApproximateBudget: event.currentTarget.checked })} />
+                <span><strong>Share my approximate category budget</strong><span class="mt-0.5 block text-xs leading-5 text-wedding-muted">Only include it in the message after you choose this and update the draft.</span></span>
+              </label>
+              <label class="flex min-h-11 items-start gap-2 rounded-lg border border-wedding-border px-3 py-2 text-sm text-wedding-text">
+                <input type="checkbox" class="mt-1 h-4 w-4 accent-wedding-primary" checked={props.flow.permissions.allowPhoneContact} onChange={(event) => updatePermissions({ allowPhoneContact: event.currentTarget.checked })} />
+                <span><strong>Allow this vendor to contact me by phone</strong><span class="mt-0.5 block text-xs leading-5 text-wedding-muted">A phone number is never added automatically.</span></span>
+              </label>
+              <label class="flex min-h-11 items-start gap-2 rounded-lg border border-wedding-border px-3 py-2 text-sm text-wedding-text">
+                <input type="checkbox" class="mt-1 h-4 w-4 accent-wedding-primary" checked={props.flow.permissions.remindUnanswered} onChange={(event) => updatePermissions({ remindUnanswered: event.currentTarget.checked })} />
+                <span><strong>Remind me about unanswered enquiries</strong><span class="mt-0.5 block text-xs leading-5 text-wedding-muted">This creates an OmnyID reminder; it does not automatically chase the vendor.</span></span>
+              </label>
+            </div>
+            <fieldset class="mt-3">
+              <legend class="text-xs font-bold uppercase tracking-[0.08em] text-wedding-muted">Where replies should go</legend>
+              <label class="mt-2 flex min-h-11 items-start gap-2 rounded-lg border border-wedding-border px-3 py-2 text-sm text-wedding-text">
+                <input type="radio" name={`reply-route-${props.flow.choiceId}`} class="mt-1 h-4 w-4 accent-wedding-primary" checked={props.flow.permissions.replyRoute === "omnyid_protected"} onChange={() => updatePermissions({ replyRoute: "omnyid_protected" })} />
+                <span><strong>Protected OmnyID replies</strong><span class="mt-0.5 block text-xs leading-5 text-wedding-muted">Default privacy choice. Sending stays blocked until the reviewed masked-reply service is enabled.</span></span>
+              </label>
+              <label class="mt-2 flex min-h-11 items-start gap-2 rounded-lg border border-wedding-border px-3 py-2 text-sm text-wedding-text">
+                <input type="radio" name={`reply-route-${props.flow.choiceId}`} class="mt-1 h-4 w-4 accent-wedding-primary" checked={props.flow.permissions.replyRoute === "connected_email"} onChange={() => updatePermissions({ replyRoute: "connected_email" })} />
+                <span><strong>My connected email</strong><span class="mt-0.5 block text-xs leading-5 text-wedding-muted">The vendor can reply to the address exposed by your connected email provider.</span></span>
+              </label>
+            </fieldset>
+            <Show when={budgetChoiceOutOfSync()}>
+              <button type="button" class="mt-3 min-h-11 w-full rounded-lg border border-wedding-primary bg-wedding-page px-3 py-2 text-sm font-bold text-wedding-primary" onClick={props.onRegenerateDraft} disabled={!props.onRegenerateDraft || props.busy}>Update draft with this budget choice</button>
+            </Show>
+          </section>
+
+          <section class="mt-3 rounded-xl border border-wedding-primary/25 bg-wedding-page p-3" aria-labelledby={`vendor-preview-${props.flow.choiceId}`}>
+            <h4 id={`vendor-preview-${props.flow.choiceId}`} class="text-sm font-bold text-wedding-text">Preview what the vendor receives</h4>
+            <dl class="mt-2 grid gap-2 text-xs sm:grid-cols-2">
+              <div><dt class="font-bold text-wedding-muted">Recipient</dt><dd class="mt-1 break-words text-wedding-text">{props.flow.recipientEmail || "Add a vendor email above"}</dd></div>
+              <div><dt class="font-bold text-wedding-muted">Reply route</dt><dd class="mt-1 text-wedding-text">{props.flow.permissions.replyRoute === "omnyid_protected" ? "Protected OmnyID replies" : "Connected email"}</dd></div>
+            </dl>
+            <p class="mt-3 text-xs font-bold text-wedding-muted">Shared information</p>
+            <ul class="mt-1 list-disc space-y-1 pl-5 text-xs leading-5 text-wedding-text"><For each={sharedInformation()}>{(label) => <li>{label}</li>}</For></ul>
+            <p class="mt-2 text-xs leading-5 text-wedding-muted">The exact message is the editable content above. Attachments listed below are also included.</p>
+            <label class="mt-3 flex min-h-11 items-start gap-2 rounded-lg bg-white px-3 py-2 text-sm text-wedding-text">
+              <input type="checkbox" class="mt-1 h-4 w-4 accent-wedding-primary" checked={props.flow.permissions.previewApproved} onChange={(event) => updatePermissions({ previewApproved: event.currentTarget.checked })} />
+              <span><strong>I have reviewed the recipient, exact message and shared information.</strong></span>
+            </label>
+          </section>
+
+          <WeddingTrustInfoTip
+            class="mt-3"
+            label="How OmnyID protects this enquiry"
+            items={[
+              { question: "Will I be bombarded with sales calls?", answer: "Phone contact is off by default. A vendor receives only the contact details and permissions shown in this preview." },
+              { question: "Is the AI inventing details?", answer: "The draft uses the listed wedding facts and source references. Unknown information stays unknown, and you approve the exact wording." },
+              { question: "What if the vendor never replies?", answer: "OmnyID can remind you to follow up or move on. It does not send repeated chasers without your approval." },
+            ]}
+          />
 
           <div class="mt-3 rounded-xl border border-wedding-muted/25 bg-white p-3">
             <div class="flex flex-wrap items-center justify-between gap-2">

@@ -327,6 +327,7 @@ async fn upload_revision_http(
             parsed_text: prepared.parsed_text.clone(),
             parser_version: prepared.receipt.parser.as_str().to_string(),
             registry_id,
+            wedding_plan_id: None,
             page_count: prepared.receipt.page_count,
             section_names: vec![],
             structured_submission: None,

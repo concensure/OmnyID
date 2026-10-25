@@ -6405,6 +6405,12 @@ export type WeddingVendorOutreachDraftResult = {
   bodyMarkdown: string;
   groundedOn: string[];
   model: string;
+  inputTokens: number;
+  outputTokens: number;
+  estimatedCostUsd: number;
+  inputFingerprint: string;
+  promptPrefixId: string;
+  servedFrom: "model" | "deterministic_template" | "afp_reuse";
 };
 
 function normalizeWeddingVendorOutreachDraftResponse(value: unknown): WeddingVendorOutreachDraftResult {
@@ -6416,6 +6422,14 @@ function normalizeWeddingVendorOutreachDraftResponse(value: unknown): WeddingVen
       ? record.grounded_on.filter((entry): entry is string => typeof entry === "string")
       : [],
     model: typeof record.model === "string" ? record.model : "",
+    inputTokens: typeof record.input_tokens === "number" ? record.input_tokens : 0,
+    outputTokens: typeof record.output_tokens === "number" ? record.output_tokens : 0,
+    estimatedCostUsd: typeof record.estimated_cost_usd === "number" ? record.estimated_cost_usd : 0,
+    inputFingerprint: typeof record.input_fingerprint === "string" ? record.input_fingerprint : "",
+    promptPrefixId: typeof record.prompt_prefix_id === "string" ? record.prompt_prefix_id : "",
+    servedFrom: record.served_from === "model" || record.served_from === "afp_reuse"
+      ? record.served_from
+      : "deterministic_template",
   };
 }
 

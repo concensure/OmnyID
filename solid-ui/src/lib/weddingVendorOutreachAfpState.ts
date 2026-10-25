@@ -91,9 +91,12 @@ export function weddingVendorOutreachDraftAfpSendInput(input: {
   const text = clean(input.flow.bodyMarkdown);
   const html = clean(input.editorHtml ?? "");
   const metadataId = `afp-${safeWeddingLabel(threadId)}-draft-${safeWeddingLabel(timestamp)}`;
+  const revision = Math.max(1, input.flow.revision + (input.flow.hasUnpersistedChanges ? 1 : 0));
+  const sourceReferences = input.flow.sourceReferences.filter((reference) => clean(reference.type) && clean(reference.target));
   return {
     id: deterministicPseudoUlid(metadataId),
     thread_id: threadId,
+    ...(input.flow.draftMessageId ? { parent_id: input.flow.draftMessageId } : {}),
     from: "agent://wedding-planning",
     to: ["user://couple", "agent://decision-queue", "agent://knowledge-graph"],
     timestamp,
@@ -111,6 +114,20 @@ export function weddingVendorOutreachDraftAfpSendInput(input: {
       vendor_id: input.vendorId ?? null,
       choice_id: input.flow.choiceId,
       grounded_on: input.flow.groundedOnLabels,
+      grounded_on_fields: input.flow.groundedOnFields,
+      generation: input.flow.generation ? {
+        model: input.flow.generation.model,
+        input_tokens: input.flow.generation.inputTokens,
+        output_tokens: input.flow.generation.outputTokens,
+        estimated_cost_usd: input.flow.generation.estimatedCostUsd,
+        input_fingerprint: input.flow.generation.inputFingerprint,
+        prompt_prefix_id: input.flow.generation.promptPrefixId,
+        served_from: input.flow.generation.servedFrom,
+      } : null,
+      permissions: input.flow.permissions,
+      approval_status: "pending_user_approval",
+      revision,
+      supersedes_draft_message_id: input.flow.draftMessageId,
       source_artifact_id: input.sourceArtifactId ?? null,
       action_intent: input.actionIntent ?? "CHECK_AVAILABILITY_AND_REQUEST_QUOTE",
       attachment_count: input.flow.attachments.length,
@@ -120,9 +137,15 @@ export function weddingVendorOutreachDraftAfpSendInput(input: {
       content: { to, subject, text, ...(html ? { html } : {}) },
     }],
     attachments: input.flow.attachments,
-    references: input.sourceArtifactId
-      ? [{ type: "wedding_vendor_search_artifact", target: input.sourceArtifactId, label: "Vendor search result" }]
-      : [],
+    references: [
+      ...(input.sourceArtifactId
+        ? [{ type: "wedding_vendor_search_artifact", target: input.sourceArtifactId, label: "Vendor search result" }]
+        : []),
+      ...sourceReferences,
+      ...(input.flow.draftMessageId
+        ? [{ type: "supersedes_wedding_email_draft", target: input.flow.draftMessageId, label: "Previous draft revision" }]
+        : []),
+    ],
     supertags: uniqueStrings([
       ...input.metadata.supertags,
       isResponse ? "wedding_vendor_response" : "wedding_vendor_outreach",
@@ -137,6 +160,10 @@ export function weddingVendorOutreachDraftAfpSendInput(input: {
       vendor_label: input.flow.vendorName,
       action_intent: input.actionIntent ?? "CHECK_AVAILABILITY_AND_REQUEST_QUOTE",
       attachment_count: input.flow.attachments.length,
+      approval_status: "pending_user_approval",
+      revision,
+      model: input.flow.generation?.model ?? "not_generated",
+      estimated_cost_usd: input.flow.generation?.estimatedCostUsd ?? 0,
     },
     store_in_relational: true,
   };
@@ -184,6 +211,9 @@ export function weddingVendorOutreachSentAfpSendInput(input: {
       client_message_id: input.providerReceipt.clientMessageId,
       sent_at: timestamp,
       action_intent: input.actionIntent ?? "CHECK_AVAILABILITY_AND_REQUEST_QUOTE",
+      permissions: input.flow.permissions,
+      approval_status: "approved_and_sent",
+      approved_draft_revision: Math.max(1, input.flow.revision + (input.flow.hasUnpersistedChanges ? 1 : 0)),
     },
     views: [{
       format: "email",
@@ -202,6 +232,10 @@ export function weddingVendorOutreachSentAfpSendInput(input: {
       vendor_contact_thread_id: threadId,
       vendor_contact_receipt_ref: input.providerReceipt.clientMessageId,
       approval_mode: "explicit_user_send",
+      reply_route: input.flow.permissions.replyRoute,
+      share_approximate_budget: input.flow.permissions.shareApproximateBudget,
+      allow_phone_contact: input.flow.permissions.allowPhoneContact,
+      remind_unanswered: input.flow.permissions.remindUnanswered,
       action_intent: input.actionIntent ?? "CHECK_AVAILABILITY_AND_REQUEST_QUOTE",
     },
     store_in_relational: true,

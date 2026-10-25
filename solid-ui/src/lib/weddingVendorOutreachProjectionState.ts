@@ -2,6 +2,7 @@
 import type { AfpMessage } from "@/lib/api";
 import type { AfpAttachment } from "@/lib/api";
 import type { WeddingVendorOutreachFlowState } from "@/lib/weddingVendorOutreachFlowState";
+import { normalizeWeddingVendorEnquiryPermissions } from "@/lib/weddingVendorEnquiryPermissionsState";
 
 function record(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
@@ -13,6 +14,36 @@ function clean(value: unknown): string {
 
 function strings(value: unknown): string[] {
   return Array.isArray(value) ? value.map(clean).filter(Boolean) : [];
+}
+
+function finiteNumber(value: unknown, fallback = 0): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function generation(value: unknown): WeddingVendorOutreachFlowState["generation"] {
+  const item = record(value);
+  const model = clean(item.model);
+  const servedFrom = clean(item.served_from);
+  if (!model && !servedFrom) return null;
+  return {
+    model: model || "deterministic_template",
+    inputTokens: finiteNumber(item.input_tokens),
+    outputTokens: finiteNumber(item.output_tokens),
+    estimatedCostUsd: finiteNumber(item.estimated_cost_usd),
+    inputFingerprint: clean(item.input_fingerprint),
+    promptPrefixId: clean(item.prompt_prefix_id),
+    servedFrom: servedFrom === "model" || servedFrom === "afp_reuse" ? servedFrom : "deterministic_template",
+  };
+}
+
+function references(value: unknown): Array<{ type: string; target: string; label: string }> {
+  return Array.isArray(value) ? value.flatMap((entry) => {
+    const item = record(entry);
+    const type = clean(item.type);
+    const target = clean(item.target);
+    if (!type || !target) return [];
+    return [{ type, target, label: clean(item.label) || type }];
+  }) : [];
 }
 
 function attachments(value: unknown): AfpAttachment[] {
@@ -41,6 +72,13 @@ export function projectWeddingVendorOutreachFlows(messages: readonly AfpMessage[
       bodyMarkdown: clean(content.text),
       bodyHtml: clean(content.html) || null,
       groundedOnLabels: strings(content.grounded_on),
+      groundedOnFields: strings(content.grounded_on_fields),
+      sourceReferences: references(message.references),
+      generation: generation(content.generation),
+      permissions: normalizeWeddingVendorEnquiryPermissions(content.permissions),
+      draftMessageId: clean(message.id) || null,
+      revision: Math.max(1, finiteNumber(content.revision, 1)),
+      hasUnpersistedChanges: false,
       sentAtIso: null,
       receiptRef: null,
       threadId: clean(message.thread_id) || null,
@@ -67,6 +105,13 @@ export function projectWeddingVendorOutreachFlows(messages: readonly AfpMessage[
       bodyMarkdown: clean(content.text),
       bodyHtml: clean(content.html) || null,
       groundedOnLabels: strings(content.grounded_on),
+      groundedOnFields: strings(content.grounded_on_fields),
+      sourceReferences: references(message.references),
+      generation: generation(content.generation),
+      permissions: normalizeWeddingVendorEnquiryPermissions(content.permissions),
+      draftMessageId: clean(message.id) || base.draftMessageId,
+      revision: Math.max(base.revision, finiteNumber(content.revision, base.revision)),
+      hasUnpersistedChanges: false,
       stage: "draft_ready",
       threadId: clean(message.thread_id) || base.threadId,
       attachments: attachments(message.attachments),

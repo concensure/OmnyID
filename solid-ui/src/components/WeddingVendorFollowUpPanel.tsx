@@ -22,6 +22,8 @@ import type { WeddingVendorOutreachFlowState } from "@/lib/weddingVendorOutreach
 import { weddingVendorOutreachSentLabel } from "@/lib/weddingVendorOutreachFlowState";
 import type { WeddingWorkspaceSidebarAction } from "@/lib/weddingWorkspaceActionState";
 import type { AfpAttachment } from "@/lib/api";
+import type { WeddingVendorEnquiryPermissions } from "@/lib/weddingVendorEnquiryPermissionsState";
+import { WeddingTrustInfoTip } from "@/components/WeddingTrustInfoTip";
 
 function VendorContactChip(props: { label: string; value: string | null; kind: "address" | "email" | "phone" }) {
   const [open, setOpen] = createSignal(false);
@@ -112,6 +114,8 @@ export function WeddingVendorFollowUpPanel(props: {
   onOutreachBodyChange: (choiceId: string, bodyMarkdown: string, bodyHtml?: string) => void;
   onOutreachRecipientChange: (choiceId: string, email: string) => void;
   onOutreachAttachmentsChange: (choiceId: string, attachments: AfpAttachment[]) => void;
+  onOutreachPermissionsChange: (choiceId: string, permissions: WeddingVendorEnquiryPermissions) => void;
+  onRetryOutreach: (choiceId: string) => void;
   onSendOutreach: (choiceId: string) => void;
   onCancelOutreach: (choiceId: string) => void;
   onConnectGmailForOutreach: () => void;
@@ -227,7 +231,7 @@ export function WeddingVendorFollowUpPanel(props: {
                           Reply to {card.vendorName}
                         </button>
                         <Show when={outreachFlow()}>
-                          {(flow) => <WeddingVendorOutreachComposer flow={flow()} busy={flow().stage === "drafting" || flow().stage === "sending"} gmailConnected={props.gmailConnected} vendorWebsiteUrl={card.websiteUrl} onBodyChange={(body, html) => props.onOutreachBodyChange(outreachChoiceId(), body, html)} onRecipientChange={(email) => props.onOutreachRecipientChange(outreachChoiceId(), email)} onAttachmentsChange={(attachments) => props.onOutreachAttachmentsChange(outreachChoiceId(), attachments)} onSend={() => props.onSendOutreach(outreachChoiceId())} onCancel={() => props.onCancelOutreach(outreachChoiceId())} onConnectGmail={() => props.onConnectGmailForOutreach()} />}
+                          {(flow) => <WeddingVendorOutreachComposer flow={flow()} busy={flow().stage === "drafting" || flow().stage === "sending"} gmailConnected={props.gmailConnected} vendorWebsiteUrl={card.websiteUrl} onBodyChange={(body, html) => props.onOutreachBodyChange(outreachChoiceId(), body, html)} onRecipientChange={(email) => props.onOutreachRecipientChange(outreachChoiceId(), email)} onAttachmentsChange={(attachments) => props.onOutreachAttachmentsChange(outreachChoiceId(), attachments)} onPermissionsChange={(permissions) => props.onOutreachPermissionsChange(outreachChoiceId(), permissions)} onRegenerateDraft={() => props.onRetryOutreach(outreachChoiceId())} onSend={() => props.onSendOutreach(outreachChoiceId())} onCancel={() => props.onCancelOutreach(outreachChoiceId())} onConnectGmail={() => props.onConnectGmailForOutreach()} />}
                         </Show>
                       </>
                     }
@@ -278,11 +282,20 @@ export function WeddingVendorFollowUpPanel(props: {
                             onBodyChange={(bodyMarkdown, bodyHtml) => props.onOutreachBodyChange(outreachChoiceId(), bodyMarkdown, bodyHtml)}
                             onRecipientChange={(email) => props.onOutreachRecipientChange(outreachChoiceId(), email)}
                             onAttachmentsChange={(attachments) => props.onOutreachAttachmentsChange(outreachChoiceId(), attachments)}
+                            onPermissionsChange={(permissions) => props.onOutreachPermissionsChange(outreachChoiceId(), permissions)}
+                            onRegenerateDraft={() => props.onRetryOutreach(outreachChoiceId())}
                             onSend={() => props.onSendOutreach(outreachChoiceId())}
                             onCancel={() => props.onCancelOutreach(outreachChoiceId())}
                             onConnectGmail={() => props.onConnectGmailForOutreach()}
                           />
                         )}
+                      </Show>
+                      <Show when={card.actionMode === "waiting"}>
+                        <WeddingTrustInfoTip
+                          class="mt-3"
+                          label="If this vendor does not reply"
+                          items={[{ question: "What happens next?", answer: "Your reminder stays in OmnyID. You can send one reviewed follow-up, choose another shortlisted vendor, or close the enquiry. OmnyID does not repeatedly contact them on its own." }]}
+                        />
                       </Show>
                     </Show>
                     <div class="mt-2 flex flex-col gap-2 sm:flex-row">

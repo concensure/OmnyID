@@ -37,6 +37,7 @@ import type { WeddingVendorOutreachFlowState } from "@/lib/weddingVendorOutreach
 import type { AfpAttachment } from "@/lib/api";
 import type { WeddingVendorChoiceCardData } from "@/components/WeddingVendorChoiceCard";
 import type { WeddingVendorChoiceIntent } from "@/lib/weddingVendorChoiceActionState";
+import type { WeddingVendorEnquiryPermissions } from "@/lib/weddingVendorEnquiryPermissionsState";
 import { friendlyErrorText } from "@/lib/visibleErrorText";
 import { loadWeddingTaskCompletion, WEDDING_TASK_COMPLETION_EVENT } from "@/lib/weddingTaskCompletionLocalState";
 import {
@@ -62,7 +63,10 @@ export function WeddingMobileFocusHome(props: {
   gmailConnected?: boolean;
   onContactVendor?: (card: WeddingVendorChoiceCardData, artifactId: string, intent: WeddingVendorChoiceIntent) => void;
   onOutreachBodyChange?: (choiceId: string, bodyMarkdown: string) => void;
+  onOutreachRecipientChange?: (choiceId: string, email: string) => void;
   onOutreachAttachmentsChange?: (choiceId: string, attachments: AfpAttachment[]) => void;
+  onOutreachPermissionsChange?: (choiceId: string, permissions: WeddingVendorEnquiryPermissions) => void;
+  onRetryOutreach?: (choiceId: string) => void;
   onSendOutreach?: (choiceId: string) => void;
   onCancelOutreach?: (choiceId: string) => void;
   onConnectGmailForOutreach?: () => void;
@@ -372,7 +376,10 @@ export function WeddingMobileFocusHome(props: {
                     gmailConnected={props.gmailConnected}
                     onContactVendor={(card, artifactId, intent) => contactVendor(item, card, artifactId, intent)}
                     onOutreachBodyChange={props.onOutreachBodyChange}
+                    onOutreachRecipientChange={props.onOutreachRecipientChange}
                     onOutreachAttachmentsChange={props.onOutreachAttachmentsChange}
+                    onOutreachPermissionsChange={props.onOutreachPermissionsChange}
+                    onRetryOutreach={props.onRetryOutreach}
                     onSendOutreach={props.onSendOutreach}
                     onCancelOutreach={props.onCancelOutreach}
                     onConnectGmail={props.onConnectGmailForOutreach}

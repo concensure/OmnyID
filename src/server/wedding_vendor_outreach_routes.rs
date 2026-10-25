@@ -35,8 +35,12 @@ use crate::wedding_shared_tool_metering::{
 use super::{
     AppState, RateLimitPolicy,
     auth::{authenticated_rate_limit_key, authenticated_user, enforce_rate_limit},
+    wedding_ai_cost_policy::wedding_ai_budget_decision,
     wedding_llm_ladder::{LadderOutcome, WeddingLlmFeature, run_ladder},
     wedding_admin_ai_policy,
+    wedding_vendor_outreach_generation::{
+        OutreachGenerationMetadata, deterministic_generation, model_generation,
+    },
 };
 
 const MAX_OUTPUT_TOKENS: u32 = 600;
@@ -250,7 +254,6 @@ pub(super) struct WeddingVendorOutreachDraftRequest {
     vendor: WeddingVendorOutreachVendorInput,
     #[serde(default)]
     couple: WeddingVendorOutreachCoupleInput,
-    #[allow(dead_code)]
     wedding_plan_id: String,
     #[serde(default)]
     verify_questions: Vec<String>,
@@ -269,6 +272,8 @@ struct WeddingVendorOutreachDraftResponse {
     body_markdown: String,
     grounded_on: Vec<String>,
     model: String,
+    #[serde(flatten)]
+    generation: OutreachGenerationMetadata,
 }
 
 fn capped(value: &Option<String>, max_chars: usize) -> Option<String> {
@@ -488,7 +493,16 @@ async fn wedding_vendor_outreach_draft_http(
     // output. Provider failures deliberately cascade Cerebras -> Mistral ->
     // Anthropic; the final fallback uses only validated couple fields and
     // never sends. Do not log model output because it can contain email text.
-    let generated = if wedding_admin_ai_policy::execution_enabled() {
+    let budget_allows_model = wedding_ai_budget_decision(
+        &state.db,
+        &user.id,
+        request.wedding_plan_id.trim(),
+        i64::from(MAX_OUTPUT_TOKENS) + 1_200,
+    )
+    .await
+    .map(|decision| decision.allow_model)
+    .unwrap_or(false);
+    let generated = if wedding_admin_ai_policy::execution_enabled() && budget_allows_model {
         match run_ladder(
             WeddingLlmFeature::Outreach,
             WEDDING_VENDOR_OUTREACH_SYSTEM_PROMPT,
@@ -496,20 +510,23 @@ async fn wedding_vendor_outreach_draft_http(
             MAX_OUTPUT_TOKENS,
             parse_outreach_model_payload,
         ).await {
-            LadderOutcome::Success { value, provider, model, .. } => Some((value, provider, model)),
+            LadderOutcome::Success { value, provider, model, tokens_input, tokens_output, cost_cents, .. } => {
+                Some((value, provider, model, model_generation(&user_text, tokens_input, tokens_output, cost_cents)))
+            }
             LadderOutcome::Exhausted { .. } => None,
         }
     } else {
         None
     };
 
-    let (mut payload, selected_provider, model) = generated
-        .map(|(payload, provider, model)| (payload, Some(provider), model))
+    let (mut payload, selected_provider, model, generation) = generated
+        .map(|(payload, provider, model, generation)| (payload, Some(provider), model, generation))
         .unwrap_or_else(|| {
             (
                 deterministic_outreach_payload(vendor, couple, &request.verify_questions),
                 None,
                 "deterministic_template".to_string(),
+                deterministic_generation(&user_text),
             )
         });
     payload.body_markdown = finalize_outreach_body(&payload.body_markdown, &request.couple);
@@ -532,9 +549,9 @@ async fn wedding_vendor_outreach_draft_http(
                 user_id: user.id.clone(),
                 provider: provider.metering_provider(),
                 feature: WeddingSharedToolFeature::VendorOutreachDraft,
-                quantity: 1.0,
-                estimated_cost_usd: 0.0,
-                usage_unit: Some("requests".to_string()),
+                quantity: f64::from(generation.input_tokens + generation.output_tokens),
+                estimated_cost_usd: generation.estimated_cost_usd,
+                usage_unit: Some("tokens".to_string()),
                 wedding_plan_id: Some(request.wedding_plan_id.clone()),
                 operation: Some("vendor_outreach_draft".to_string()),
                 provider_request_id: None,
@@ -557,6 +574,7 @@ async fn wedding_vendor_outreach_draft_http(
         body_markdown: payload.body_markdown,
         grounded_on: payload.grounded_on,
         model,
+        generation,
     }))
 }
 
@@ -768,230 +786,5 @@ fn normalized_outreach_paragraphs(body: &str) -> String {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn sample_couple() -> WeddingVendorOutreachCoupleInput {
-        WeddingVendorOutreachCoupleInput {
-            date_or_season: Some("March 2027".to_string()),
-            location: Some("Sydney".to_string()),
-            guest_count: None,
-            budget_comfort: None,
-            top_priorities: vec!["flowers".to_string(), "photography".to_string()],
-            atmosphere_description: None,
-            vendor_preferences: None,
-            couple_names: None,
-        }
-    }
-
-    fn availability_request(state: &str) -> WeddingVendorAvailabilityRequest {
-        WeddingVendorAvailabilityRequest {
-            wedding_plan_id: "wp_1".to_string(),
-            state: state.to_string(),
-            date_from: Some("2027-03-20".to_string()),
-            date_to: None,
-            confidence: Some(0.9),
-            valid_until: None,
-            notes: Some("  Spoke to events manager  ".to_string()),
-            source_ref: None,
-        }
-    }
-
-    #[test]
-    fn availability_accepts_every_documented_state_and_forces_user_source() {
-        for state in VENDOR_AVAILABILITY_STATES {
-            let input = availability_input_from_request("u1", "v1", availability_request(state))
-                .expect("valid state");
-            assert_eq!(input.state, state);
-            assert_eq!(input.source, "user");
-            assert_eq!(input.notes.as_deref(), Some("Spoke to events manager"));
-        }
-    }
-
-    #[test]
-    fn availability_rejects_junk_state_dates_and_confidence() {
-        let err = availability_input_from_request("u1", "v1", availability_request("maybe"))
-            .err()
-            .expect("junk state rejected");
-        assert_eq!(err.0, StatusCode::BAD_REQUEST);
-        assert!(err.1.contains("maybe"));
-
-        let mut bad_date = availability_request("booked");
-        bad_date.date_from = Some("20/03/2027".to_string());
-        assert!(availability_input_from_request("u1", "v1", bad_date).is_err());
-
-        let mut inverted = availability_request("booked");
-        inverted.date_to = Some("2027-03-01".to_string());
-        assert!(availability_input_from_request("u1", "v1", inverted).is_err());
-
-        let mut confidence = availability_request("booked");
-        confidence.confidence = Some(2.0);
-        assert!(availability_input_from_request("u1", "v1", confidence).is_err());
-
-        let mut valid_until = availability_request("booked");
-        valid_until.valid_until = Some("tomorrow".to_string());
-        assert!(availability_input_from_request("u1", "v1", valid_until).is_err());
-
-        let mut no_plan = availability_request("booked");
-        no_plan.wedding_plan_id = "  ".to_string();
-        assert!(availability_input_from_request("u1", "v1", no_plan).is_err());
-    }
-
-    #[test]
-    fn vendor_name_is_required() {
-        let request = WeddingVendorOutreachDraftRequest {
-            vendor: WeddingVendorOutreachVendorInput {
-                name: "   ".to_string(),
-                category: None,
-                website_url: None,
-                address: None,
-                source_url: None,
-                snippet: None,
-            },
-            couple: sample_couple(),
-            wedding_plan_id: "wp_1".to_string(),
-            verify_questions: vec![],
-        };
-        assert!(request.vendor.name.trim().is_empty());
-    }
-
-    #[test]
-    fn over_length_field_is_rejected() {
-        let long = "x".repeat(MAX_COUPLE_FIELD_CHARS + 1);
-        let err = reject_if_over_length("couple.location", &Some(long), MAX_COUPLE_FIELD_CHARS)
-            .expect_err("expected rejection");
-        assert_eq!(err.0, StatusCode::BAD_REQUEST);
-        assert!(err.1.contains("too long"));
-    }
-
-    #[test]
-    fn within_length_field_is_accepted() {
-        let ok = "Sydney".to_string();
-        assert!(
-            reject_if_over_length("couple.location", &Some(ok), MAX_COUPLE_FIELD_CHARS).is_ok()
-        );
-    }
-
-    #[test]
-    fn ungrounded_couple_has_no_grounding() {
-        let empty = WeddingVendorOutreachCoupleInput::default();
-        assert!(!couple_has_grounding(&empty));
-    }
-
-    #[test]
-    fn couple_with_any_real_field_is_grounded() {
-        assert!(couple_has_grounding(&sample_couple()));
-
-        let mut only_priorities = WeddingVendorOutreachCoupleInput::default();
-        only_priorities.top_priorities = vec!["venue".to_string()];
-        assert!(couple_has_grounding(&only_priorities));
-    }
-
-    #[test]
-    fn deterministic_outreach_draft_uses_only_supplied_couple_fields() {
-        let vendor = WeddingVendorOutreachVendorInput {
-            name: "Mackay Family Estate".to_string(),
-            category: Some("venue".to_string()),
-            website_url: None,
-            address: None,
-            source_url: None,
-            snippet: None,
-        };
-        let payload = deterministic_outreach_payload(&vendor, &sample_couple(), &[]);
-
-        assert!(payload.subject.contains("Mackay Family Estate"));
-        assert!(payload.body_markdown.contains("March 2027"));
-        assert!(payload.body_markdown.contains("Sydney"));
-        assert!(payload.body_markdown.contains("flowers, photography"));
-        assert!(!payload.body_markdown.contains("120 guests"));
-        assert_eq!(
-            payload.grounded_on,
-            vec![
-                "date_or_season".to_string(),
-                "location".to_string(),
-                "top_priorities".to_string(),
-            ]
-        );
-    }
-
-    #[test]
-    fn deterministic_outreach_draft_includes_user_reviewable_verify_questions() {
-        let vendor = WeddingVendorOutreachVendorInput {
-            name: "Mackay Family Estate".to_string(),
-            category: Some("venue".to_string()),
-            website_url: None,
-            address: None,
-            source_url: None,
-            snippet: None,
-        };
-        let questions = vec!["Could you confirm the seated capacity?".to_string()];
-        let payload = deterministic_outreach_payload(&vendor, &sample_couple(), &questions);
-
-        assert!(payload.body_markdown.contains("answers to capacity"));
-        assert_eq!(payload.grounded_on.len(), 3);
-    }
-
-    #[test]
-    fn deterministic_outreach_uses_currency_topics_paragraphs_and_onboarding_signature() {
-        let vendor = WeddingVendorOutreachVendorInput {
-            name: "Bondi Icebergs Club".to_string(),
-            category: Some("venue".to_string()),
-            website_url: None,
-            address: None,
-            source_url: None,
-            snippet: None,
-        };
-        let mut couple = sample_couple();
-        couple.budget_comfort = Some("AUD $13,900 total budget".to_string());
-        couple.couple_names = Some("Alex Morgan".to_string());
-        let payload = deterministic_outreach_payload(
-            &vendor,
-            &couple,
-            &[
-                "Could you confirm capacity?".to_string(),
-                "Could you confirm price?".to_string(),
-            ],
-        );
-        let body = finalize_outreach_body(&payload.body_markdown, &couple);
-        assert!(body.contains("total budget of AUD $13,900"));
-        assert!(!body.contains("budget budget"));
-        assert!(body.contains(
-            "We would also appreciate answers to capacity and price."
-        ));
-        assert!(body.contains("\n\nWe would be happy to share any other details you need.\n\n"));
-        assert!(body.ends_with("Kind regards,\n\nAlex Morgan"));
-    }
-
-    #[test]
-    fn parses_fenced_json_response() {
-        let raw = "```json\n{\"subject\": \"Enquiry\", \"body_markdown\": \"Hello there. We are planning a Sydney wedding. Could you send availability?\", \"grounded_on\": [\"location\"]}\n```";
-        let payload = parse_outreach_model_payload(raw).expect("should parse");
-        assert_eq!(payload.subject, "Enquiry");
-        assert_eq!(
-            payload.body_markdown,
-            "Hello there.\n\nWe are planning a Sydney wedding.\n\nCould you send availability?"
-        );
-        assert_eq!(payload.grounded_on, vec!["location".to_string()]);
-    }
-
-    #[test]
-    fn preserves_model_paragraphs_for_outreach_email() {
-        let body = "Hello there team.\n\nWe are planning a Sydney wedding.\n\nCould you send availability and package options?";
-        assert_eq!(normalized_outreach_paragraphs(body), body);
-    }
-
-    #[test]
-    fn rejects_empty_grounded_on() {
-        let raw =
-            "{\"subject\": \"Enquiry\", \"body_markdown\": \"Hello there\", \"grounded_on\": []}";
-        let err = parse_outreach_model_payload(raw).expect_err("expected rejection");
-        assert!(err.contains("grounded_on"));
-    }
-
-    #[test]
-    fn rejects_empty_subject() {
-        let raw = "{\"subject\": \"\", \"body_markdown\": \"Hello there\", \"grounded_on\": [\"location\"]}";
-        let err = parse_outreach_model_payload(raw).expect_err("expected rejection");
-        assert!(err.contains("subject"));
-    }
-}
+#[path = "wedding_vendor_outreach_routes_tests.rs"]
+mod tests;

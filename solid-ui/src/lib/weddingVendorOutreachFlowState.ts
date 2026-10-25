@@ -1,6 +1,10 @@
 // @locs-version: 2.0
 import type { WeddingVendorChoiceCardData } from "@/components/WeddingVendorChoiceCard";
 import type { AfpAttachment, WeddingVendor } from "@/lib/api";
+import {
+  DEFAULT_WEDDING_VENDOR_ENQUIRY_PERMISSIONS,
+  type WeddingVendorEnquiryPermissions,
+} from "@/lib/weddingVendorEnquiryPermissionsState";
 
 export type WeddingVendorOutreachStage =
   | "idle"
@@ -20,12 +24,39 @@ export type WeddingVendorOutreachFlowState = {
   bodyMarkdown: string;
   bodyHtml: string | null;
   groundedOnLabels: string[];
+  groundedOnFields: string[];
+  sourceReferences: Array<{ type: string; target: string; label: string }>;
+  generation: {
+    model: string;
+    inputTokens: number;
+    outputTokens: number;
+    estimatedCostUsd: number;
+    inputFingerprint: string;
+    promptPrefixId: string;
+    servedFrom: "model" | "deterministic_template" | "afp_reuse";
+  } | null;
+  permissions: WeddingVendorEnquiryPermissions;
+  draftMessageId: string | null;
+  revision: number;
+  hasUnpersistedChanges: boolean;
   sentAtIso: string | null;
   receiptRef: string | null;
   threadId: string | null;
   blockedReason: string | null;
   attachments: AfpAttachment[];
 };
+
+/**
+ * Existing AFP-backed drafts are the cache for outreach generation. Opening a
+ * prepared enquiry must not spend tokens again; only a first attempt, a failed
+ * attempt, or an explicit meaningful regeneration may call the model route.
+ */
+export function weddingVendorOutreachNeedsGeneration(
+  flow: WeddingVendorOutreachFlowState,
+  forceRegeneration = false,
+): boolean {
+  return forceRegeneration || flow.stage === "idle" || flow.stage === "draft_failed";
+}
 
 function normalizedVendorLabel(value: string): string {
   return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
@@ -64,8 +95,8 @@ export function weddingVendorOutreachRecipient(
 }
 
 export function weddingVendorOutreachSendGate(
-  flow: Pick<WeddingVendorOutreachFlowState, "vendorName" | "recipientEmail" | "bodyMarkdown">,
-  gate: { gmailConnected: boolean },
+  flow: Pick<WeddingVendorOutreachFlowState, "vendorName" | "recipientEmail" | "bodyMarkdown" | "permissions" | "groundedOnFields">,
+  gate: { gmailConnected: boolean; protectedRepliesAvailable?: boolean },
 ): { canSend: boolean; reason: string | null } {
   if (!flow.recipientEmail) {
     return {
@@ -81,6 +112,18 @@ export function weddingVendorOutreachSendGate(
   }
   if (!flow.bodyMarkdown.trim()) {
     return { canSend: false, reason: "Add a message before sending." };
+  }
+  if (flow.permissions.shareApproximateBudget !== flow.groundedOnFields.includes("budget_comfort")) {
+    return { canSend: false, reason: "Update the draft so its budget wording matches your sharing choice." };
+  }
+  if (flow.permissions.replyRoute === "omnyid_protected" && !gate.protectedRepliesAvailable) {
+    return {
+      canSend: false,
+      reason: "Protected OmnyID replies are not enabled for this send yet. Choose your connected email to continue.",
+    };
+  }
+  if (!flow.permissions.previewApproved) {
+    return { canSend: false, reason: "Review the recipient, message and shared information before sending." };
   }
   return { canSend: true, reason: null };
 }
@@ -106,6 +149,13 @@ export function weddingVendorOutreachIdleFlow(input: {
     bodyMarkdown: "",
     bodyHtml: null,
     groundedOnLabels: [],
+    groundedOnFields: [],
+    sourceReferences: [],
+    generation: null,
+    permissions: { ...DEFAULT_WEDDING_VENDOR_ENQUIRY_PERMISSIONS },
+    draftMessageId: null,
+    revision: 0,
+    hasUnpersistedChanges: false,
     sentAtIso: null,
     receiptRef: null,
     threadId: null,
@@ -122,7 +172,15 @@ export function weddingVendorOutreachStartDrafting(
 
 export function weddingVendorOutreachDraftSucceeded(
   flow: WeddingVendorOutreachFlowState,
-  draft: { subject: string; bodyMarkdown: string; bodyHtml?: string | null; groundedOnLabels: string[] },
+  draft: {
+    subject: string;
+    bodyMarkdown: string;
+    bodyHtml?: string | null;
+    groundedOnLabels: string[];
+    groundedOnFields?: string[];
+    sourceReferences?: Array<{ type: string; target: string; label: string }>;
+    generation?: WeddingVendorOutreachFlowState["generation"];
+  },
 ): WeddingVendorOutreachFlowState {
   return {
     ...flow,
@@ -131,6 +189,12 @@ export function weddingVendorOutreachDraftSucceeded(
     bodyMarkdown: draft.bodyMarkdown,
     bodyHtml: draft.bodyHtml ?? null,
     groundedOnLabels: draft.groundedOnLabels,
+    groundedOnFields: draft.groundedOnFields ?? [],
+    sourceReferences: draft.sourceReferences ?? [],
+    generation: draft.generation ?? null,
+    revision: Math.max(1, flow.revision + 1),
+    hasUnpersistedChanges: false,
+    permissions: { ...flow.permissions, previewApproved: false },
     blockedReason: null,
   };
 }
@@ -147,7 +211,24 @@ export function weddingVendorOutreachBodyChanged(
   bodyMarkdown: string,
   bodyHtml?: string,
 ): WeddingVendorOutreachFlowState {
-  return { ...flow, bodyMarkdown, bodyHtml: bodyHtml?.trim() || null };
+  return {
+    ...flow,
+    bodyMarkdown,
+    bodyHtml: bodyHtml?.trim() || null,
+    hasUnpersistedChanges: true,
+    permissions: { ...flow.permissions, previewApproved: false },
+  };
+}
+
+export function weddingVendorOutreachPermissionsChanged(
+  flow: WeddingVendorOutreachFlowState,
+  permissions: WeddingVendorEnquiryPermissions,
+): WeddingVendorOutreachFlowState {
+  return {
+    ...flow,
+    permissions,
+    hasUnpersistedChanges: true,
+  };
 }
 
 export function weddingVendorOutreachStartSending(

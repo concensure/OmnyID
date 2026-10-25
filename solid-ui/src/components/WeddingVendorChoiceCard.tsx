@@ -16,6 +16,8 @@ import { WeddingVendorInlineMap } from "@/components/WeddingVendorInlineMap";
 import { weddingVendorChoiceActionState, type WeddingVendorChoiceIntent } from "@/lib/weddingVendorChoiceActionState";
 import type { WeddingPreferenceSignalReason } from "@/lib/weddingPreferenceSignalState";
 import type { WeddingVendorOutreachFlowState } from "@/lib/weddingVendorOutreachFlowState";
+import type { WeddingVendorEnquiryPermissions } from "@/lib/weddingVendorEnquiryPermissionsState";
+import { WeddingTrustInfoTip } from "@/components/WeddingTrustInfoTip";
 
 export type WeddingVendorChoiceCardData = WeddingWorkspaceArtifactPreview["vendorComparisonCards"][number];
 
@@ -47,7 +49,9 @@ export function WeddingVendorChoiceCard(props: {
   onReviewBooking?: (card: WeddingVendorChoiceCardData) => void;
   onViewEvidence?: (card: WeddingVendorChoiceCardData) => void;
   onOutreachBodyChange?: (choiceId: string, bodyMarkdown: string, bodyHtml?: string) => void;
+  onOutreachRecipientChange?: (choiceId: string, email: string) => void;
   onOutreachAttachmentsChange?: (choiceId: string, attachments: AfpAttachment[]) => void;
+  onOutreachPermissionsChange?: (choiceId: string, permissions: WeddingVendorEnquiryPermissions) => void;
   onSendOutreach?: (choiceId: string) => void;
   onCancelOutreach?: (choiceId: string) => void;
   onRetryOutreach?: (choiceId: string) => void;
@@ -301,6 +305,14 @@ export function WeddingVendorChoiceCard(props: {
             <p class="pb-2 text-[11px]">{card.scoreLabel}</p>
           </Show>
         </details>
+        <WeddingTrustInfoTip
+          label="How this shortlist works"
+          items={[
+            { question: "Are these vendors genuine?", answer: "OmnyID shows source-backed business details where available. A genuine source does not prove availability or that the vendor suits your wedding." },
+            { question: "Are recommendations influenced by payments?", answer: "Shortlist order is based on the fit and evidence shown here, not vendor payments. Commercial relationships are disclosed separately." },
+            { question: "Is the AI inventing details?", answer: "Unknown capacity, price, availability or preference fit stays marked as unconfirmed. Open the ranking reasons and source evidence before deciding." },
+          ]}
+        />
         <div class="flex flex-wrap gap-1.5">
           <Show when={props.onToggleFollowUp}>
             <button
@@ -374,7 +386,10 @@ export function WeddingVendorChoiceCard(props: {
               busy={flow().stage === "drafting" || flow().stage === "sending"}
               gmailConnected={Boolean(props.gmailConnected)}
               onBodyChange={(bodyMarkdown, bodyHtml) => props.onOutreachBodyChange?.(card.choiceId, bodyMarkdown, bodyHtml)}
+              onRecipientChange={(email) => props.onOutreachRecipientChange?.(card.choiceId, email)}
               onAttachmentsChange={(attachments) => props.onOutreachAttachmentsChange?.(card.choiceId, attachments)}
+              onPermissionsChange={(permissions) => props.onOutreachPermissionsChange?.(card.choiceId, permissions)}
+              onRegenerateDraft={() => props.onRetryOutreach?.(card.choiceId)}
               onSend={() => props.onSendOutreach?.(card.choiceId)}
               onCancel={() => props.onCancelOutreach?.(card.choiceId)}
               onRetryDraft={() => props.onRetryOutreach?.(card.choiceId)}

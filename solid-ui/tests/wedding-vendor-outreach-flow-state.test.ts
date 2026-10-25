@@ -7,6 +7,7 @@ import {
   weddingVendorOutreachDraftSucceeded,
   weddingVendorOutreachGroundedOnLabels,
   weddingVendorOutreachIdleFlow,
+  weddingVendorOutreachNeedsGeneration,
   weddingVendorOutreachRecipient,
   weddingVendorOutreachSendFailed,
   weddingVendorOutreachSendGate,
@@ -16,6 +17,39 @@ import {
   weddingVendorOutreachStartSending,
 } from "../src/lib/weddingVendorOutreachFlowState.ts";
 import type { WeddingVendor } from "../src/lib/api.ts";
+
+test("prepared AFP drafts are reused until the user explicitly regenerates", () => {
+  const idle = weddingVendorOutreachIdleFlow({
+    choiceId: "vendor-1",
+    vendorName: "Garden House",
+    recipientEmail: "hello@garden.example",
+  });
+  const prepared = weddingVendorOutreachDraftSucceeded(
+    weddingVendorOutreachStartDrafting(idle),
+    { subject: "Wedding enquiry", bodyMarkdown: "Hello", groundedOnLabels: [] },
+  );
+
+  assert.equal(weddingVendorOutreachNeedsGeneration(idle), true);
+  assert.equal(weddingVendorOutreachNeedsGeneration(prepared), false);
+  assert.equal(weddingVendorOutreachNeedsGeneration(prepared, true), true);
+});
+
+function gateFlow(overrides: Record<string, unknown> = {}) {
+  return {
+    vendorName: "Chloe's Florals",
+    recipientEmail: "a@b.com",
+    bodyMarkdown: "Hello",
+    groundedOnFields: [],
+    permissions: {
+      shareApproximateBudget: false,
+      allowPhoneContact: false,
+      remindUnanswered: true,
+      replyRoute: "connected_email" as const,
+      previewApproved: true,
+    },
+    ...overrides,
+  };
+}
 
 function vendor(overrides: Partial<WeddingVendor> = {}): WeddingVendor {
   return {
@@ -77,32 +111,51 @@ test("recipient is null when nothing matches", () => {
 
 test("send gate blocks with an actionable reason for each missing piece", () => {
   const noRecipient = weddingVendorOutreachSendGate(
-    { vendorName: "Chloe's Florals", recipientEmail: null, bodyMarkdown: "Hello" },
+    gateFlow({ recipientEmail: null }),
     { gmailConnected: true },
   );
   assert.equal(noRecipient.canSend, false);
   assert.match(noRecipient.reason ?? "", /No email address found for Chloe's Florals/);
 
   const noGmail = weddingVendorOutreachSendGate(
-    { vendorName: "Chloe's Florals", recipientEmail: "a@b.com", bodyMarkdown: "Hello" },
+    gateFlow(),
     { gmailConnected: false },
   );
   assert.equal(noGmail.canSend, false);
   assert.match(noGmail.reason ?? "", /Connect Gmail/);
 
   const emptyBody = weddingVendorOutreachSendGate(
-    { vendorName: "Chloe's Florals", recipientEmail: "a@b.com", bodyMarkdown: "   " },
+    gateFlow({ bodyMarkdown: "   " }),
     { gmailConnected: true },
   );
   assert.equal(emptyBody.canSend, false);
   assert.match(emptyBody.reason ?? "", /Add a message before sending/);
 
   const ready = weddingVendorOutreachSendGate(
-    { vendorName: "Chloe's Florals", recipientEmail: "a@b.com", bodyMarkdown: "Hello" },
+    gateFlow(),
     { gmailConnected: true },
   );
   assert.equal(ready.canSend, true);
   assert.equal(ready.reason, null);
+});
+
+test("send gate fails closed for protected replies and an unreviewed or stale sharing preview", () => {
+  const protectedRoute = weddingVendorOutreachSendGate(
+    gateFlow({ permissions: { ...gateFlow().permissions, replyRoute: "omnyid_protected" } }),
+    { gmailConnected: true, protectedRepliesAvailable: false },
+  );
+  assert.equal(protectedRoute.canSend, false);
+  assert.match(protectedRoute.reason ?? "", /not enabled/);
+  const unreviewed = weddingVendorOutreachSendGate(
+    gateFlow({ permissions: { ...gateFlow().permissions, previewApproved: false } }),
+    { gmailConnected: true },
+  );
+  assert.match(unreviewed.reason ?? "", /Review the recipient/);
+  const staleBudget = weddingVendorOutreachSendGate(
+    gateFlow({ permissions: { ...gateFlow().permissions, shareApproximateBudget: true } }),
+    { gmailConnected: true },
+  );
+  assert.match(staleBudget.reason ?? "", /Update the draft/);
 });
 
 test("sent label reflects whether a sent date is known", () => {

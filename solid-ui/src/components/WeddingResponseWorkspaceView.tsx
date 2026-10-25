@@ -883,6 +883,8 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
       onOpenOutreachComposer: (card) => void vendorOutreach.onContactVendor(weddingVendorFollowUpOutreachCardData(card), ""),
       onOutreachBodyChange: vendorOutreach.onOutreachBodyChange, onOutreachRecipientChange: vendorOutreach.onOutreachRecipientChange,
       onOutreachAttachmentsChange: vendorOutreach.onOutreachAttachmentsChange,
+      onOutreachPermissionsChange: vendorOutreach.onOutreachPermissionsChange,
+      onRetryOutreach: vendorOutreach.onRetryOutreach,
       onSendOutreach: (choiceId) => void vendorOutreach.onSendOutreach(choiceId),
       onCancelOutreach: vendorOutreach.onCancelOutreach,
       onConnectGmailForOutreach: () => void vendorOutreach.onConnectGmailForOutreach(),
@@ -960,6 +962,7 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
             onAcknowledgeQuoteReply={acknowledgeQuoteReplyBudgetImpact}
             vendorOutreachFlows={Object.values(vendorOutreach.flows())} gmailConnected={Boolean(props.gmailStatus?.connected)}
             onContactVendor={(card, artifactId, intent) => void vendorOutreach.onContactVendor(card, artifactId, intent)} onOutreachBodyChange={vendorOutreach.onOutreachBodyChange} onOutreachAttachmentsChange={vendorOutreach.onOutreachAttachmentsChange}
+            onOutreachRecipientChange={vendorOutreach.onOutreachRecipientChange} onOutreachPermissionsChange={vendorOutreach.onOutreachPermissionsChange} onRetryOutreach={vendorOutreach.onRetryOutreach}
             onSendOutreach={(choiceId) => void vendorOutreach.onSendOutreach(choiceId)} onCancelOutreach={vendorOutreach.onCancelOutreach} onConnectGmailForOutreach={() => void vendorOutreach.onConnectGmailForOutreach()}
           />}>
           <WeddingHomeSectionRegistry
@@ -1035,7 +1038,10 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
           gmailConnected={Boolean(props.gmailStatus?.connected)}
           onContactVendor={(card, artifactId, intent) => void vendorOutreach.onContactVendor(card, artifactId, intent)}
           onOutreachBodyChange={vendorOutreach.onOutreachBodyChange}
+          onOutreachRecipientChange={vendorOutreach.onOutreachRecipientChange}
           onOutreachAttachmentsChange={vendorOutreach.onOutreachAttachmentsChange}
+          onOutreachPermissionsChange={vendorOutreach.onOutreachPermissionsChange}
+          onRetryOutreach={vendorOutreach.onRetryOutreach}
           onSendOutreach={(choiceId) => void vendorOutreach.onSendOutreach(choiceId)}
           onCancelOutreach={vendorOutreach.onCancelOutreach}
           onConnectGmailForOutreach={() => void vendorOutreach.onConnectGmailForOutreach()}

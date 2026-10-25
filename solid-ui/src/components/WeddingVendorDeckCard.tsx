@@ -5,13 +5,16 @@ import { WeddingVendorOutreachComposer } from "@/components/WeddingVendorOutreac
 import type { FocusDeckItem } from "@/lib/mobileFocusHomeState";
 import type { WeddingVendorChoiceIntent } from "@/lib/weddingVendorChoiceActionState";
 import type { AfpAttachment } from "@/lib/api";
+import type { WeddingVendorEnquiryPermissions } from "@/lib/weddingVendorEnquiryPermissionsState";
 
 export function WeddingVendorDeckCard(props: {
   item: FocusDeckItem;
   gmailConnected?: boolean;
   onContactVendor: (card: NonNullable<FocusDeckItem["vendorComparison"]>["cards"][number], artifactId: string, intent: WeddingVendorChoiceIntent) => void;
   onOutreachBodyChange?: (choiceId: string, bodyMarkdown: string) => void;
+  onOutreachRecipientChange?: (choiceId: string, email: string) => void;
   onOutreachAttachmentsChange?: (choiceId: string, attachments: AfpAttachment[]) => void;
+  onOutreachPermissionsChange?: (choiceId: string, permissions: WeddingVendorEnquiryPermissions) => void;
   onSendOutreach?: (choiceId: string) => void;
   onCancelOutreach?: (choiceId: string) => void;
   onRetryOutreach?: (choiceId: string) => void;
@@ -42,7 +45,10 @@ export function WeddingVendorDeckCard(props: {
                 busy={flow().stage === "drafting" || flow().stage === "sending"}
                 gmailConnected={Boolean(props.gmailConnected)}
                 onBodyChange={(body) => props.onOutreachBodyChange?.(flow().choiceId, body)}
+                onRecipientChange={(email) => props.onOutreachRecipientChange?.(flow().choiceId, email)}
                 onAttachmentsChange={(attachments) => props.onOutreachAttachmentsChange?.(flow().choiceId, attachments)}
+                onPermissionsChange={(permissions) => props.onOutreachPermissionsChange?.(flow().choiceId, permissions)}
+                onRegenerateDraft={() => props.onRetryOutreach?.(flow().choiceId)}
                 onSend={() => props.onSendOutreach?.(flow().choiceId)}
                 onCancel={() => props.onCancelOutreach?.(flow().choiceId)}
                 onRetryDraft={() => props.onRetryOutreach?.(flow().choiceId)}

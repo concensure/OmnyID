@@ -28,6 +28,7 @@ use crate::{
 use super::{
     AppState, RateLimitPolicy,
     auth::{authenticated_rate_limit_key, authenticated_user, enforce_rate_limit},
+    wedding_ai_cost_policy::wedding_ai_budget_decision,
     wedding_admin_ai_policy,
     wedding_llm_ladder::{LadderOutcome, WeddingLlmFeature, run_ladder_with_temperature},
 };
@@ -45,6 +46,8 @@ pub(super) struct ProposeRequest {
     pub(super) parsed_text: String,
     pub(super) parser_version: String,
     pub(super) registry_id: String,
+    #[serde(default)]
+    pub(super) wedding_plan_id: Option<String>,
     #[serde(default)]
     pub(super) page_count: Option<u32>,
     #[serde(default)]
@@ -120,6 +123,8 @@ pub(super) async fn propose_for_owner(
         page_count: request.page_count,
         section_names: &request.section_names,
     };
+    let wedding_plan_id = request.wedding_plan_id.as_deref()
+        .map(str::trim).filter(|value| !value.is_empty()).unwrap_or(&source_id);
     let started = Instant::now();
 
     if !crate::quotation::QuotationFeatureFlags::from_env().extraction {
@@ -173,6 +178,15 @@ pub(super) async fn propose_for_owner(
             attempt_kinds: vec!["feature_disabled".to_string()],
         });
     }
+    let model_allowed = wedding_ai_budget_decision(
+        &state.db, owner_user_id, wedding_plan_id, i64::from(MAX_OUTPUT_TOKENS) + 8_000,
+    ).await.map(|decision| decision.allow_model).unwrap_or(false);
+    if !model_allowed {
+        return Ok(ProposeResponse {
+            status: "manual_review_required", extraction: None, receipt: None,
+            attempt_kinds: vec!["account_or_wedding_budget_exhausted".to_string()],
+        });
+    }
 
     let result = run_ladder_with_temperature(
         WeddingLlmFeature::QuoteNormalisation,
@@ -186,13 +200,16 @@ pub(super) async fn propose_for_owner(
         },
     )
     .await;
-    let (value, provider, model, attempts) = match result {
+    let (value, provider, model, tokens_input, tokens_output, cost_cents, attempts) = match result {
         LadderOutcome::Success {
             value,
             provider,
             model,
+            tokens_input,
+            tokens_output,
+            cost_cents,
             attempts,
-        } => (value, provider, model, attempts),
+        } => (value, provider, model, tokens_input, tokens_output, cost_cents, attempts),
         LadderOutcome::Exhausted { attempts } => {
             return Ok(ProposeResponse {
                 status: "manual_review_required",
@@ -225,10 +242,10 @@ pub(super) async fn propose_for_owner(
             user_id: owner_user_id.to_string(),
             provider: provider.metering_provider(),
             feature: WeddingSharedToolFeature::QuoteNormalisation,
-            quantity: 1.0,
-            estimated_cost_usd: 0.0,
-            usage_unit: Some("requests".to_string()),
-            wedding_plan_id: None,
+            quantity: f64::from(tokens_input + tokens_output),
+            estimated_cost_usd: f64::from(cost_cents.max(0)) / 100.0,
+            usage_unit: Some("tokens".to_string()),
+            wedding_plan_id: Some(wedding_plan_id.to_string()),
             operation: Some("quotation_normalisation_proposal".to_string()),
             provider_request_id: None,
             occurred_at: Some(chrono::Utc::now().to_rfc3339()),

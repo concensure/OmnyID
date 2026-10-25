@@ -2,6 +2,7 @@ import { For, Show } from "solid-js";
 
 import type { WeddingArtifactQuotePreview } from "@/lib/weddingArtifactPreviewState";
 import { buildWeddingNormalizedQuoteState } from "@/lib/weddingNormalizedQuoteState";
+import { WeddingTrustInfoTip } from "@/components/WeddingTrustInfoTip";
 
 export function WeddingNormalizedQuoteSummary(props: { quote: WeddingArtifactQuotePreview; compact?: boolean }) {
   const state = () => buildWeddingNormalizedQuoteState(props.quote);
@@ -61,6 +62,16 @@ export function WeddingNormalizedQuoteSummary(props: { quote: WeddingArtifactQuo
             <For each={state().questions}>{(item) => <li>{item}</li>}</For>
           </ul>
         </div>
+      </Show>
+      <Show when={!props.compact}>
+        <WeddingTrustInfoTip
+          class="mt-3"
+          label="How to read this quote"
+          items={[
+            { question: "Is the quoted price accurate?", answer: "This summary reflects the linked vendor quote and the event details shown above. Estimates, optional extras, missing tax and unclear inclusions are not treated as a confirmed comparable total." },
+            { question: "Could the AI have invented a detail?", answer: "Each extracted fact must remain tied to the original quote. Anything unsupported or unreadable stays unclear and should be confirmed with the vendor before booking." },
+          ]}
+        />
       </Show>
     </section>
   );

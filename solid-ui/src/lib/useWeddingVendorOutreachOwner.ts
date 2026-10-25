@@ -16,7 +16,6 @@ import type { WeddingVendorChoiceIntent } from "@/lib/weddingVendorChoiceActionS
 import type { GmailConnectionStatus } from "@/lib/gmailConnectionState";
 import { gmailOAuthConfigFailureMessage } from "@/lib/gmailConnectionState";
 import { renderMarkdown } from "@/lib/markdownRenderer";
-import { weddingProjectionMetadataId } from "@/lib/weddingBrowserExportActions";
 import type { WeddingResponseWorkspaceViewState } from "@/lib/weddingResponseWorkspaceViewState";
 import type { WeddingProjectionSaveFn } from "@/components/WeddingResponseWorkspaceViewTypes";
 import {
@@ -31,7 +30,9 @@ import {
   weddingVendorOutreachDraftSucceeded,
   weddingVendorOutreachGroundedOnLabels,
   weddingVendorOutreachIdleFlow,
+  weddingVendorOutreachNeedsGeneration,
   weddingVendorOutreachRecipient,
+  weddingVendorOutreachPermissionsChanged,
   weddingVendorOutreachSendFailed,
   weddingVendorOutreachSendGate,
   weddingVendorOutreachSendSucceeded,
@@ -39,6 +40,7 @@ import {
   weddingVendorOutreachStartSending,
   type WeddingVendorOutreachFlowState,
 } from "@/lib/weddingVendorOutreachFlowState";
+import type { WeddingVendorEnquiryPermissions } from "@/lib/weddingVendorEnquiryPermissionsState";
 import { friendlyErrorText } from "@/lib/visibleErrorText";
 
 type WeddingVendorOutreachCouple = {
@@ -186,7 +188,12 @@ export function useWeddingVendorOutreachOwner(input: {
     ) ?? null;
   }
 
-  async function onContactVendor(card: WeddingVendorChoiceCardData, artifactId: string, intent: WeddingVendorChoiceIntent = "CHECK_AVAILABILITY_AND_REQUEST_QUOTE") {
+  async function onContactVendor(
+    card: WeddingVendorChoiceCardData,
+    artifactId: string,
+    intent: WeddingVendorChoiceIntent = "CHECK_AVAILABILITY_AND_REQUEST_QUOTE",
+    forceRegeneration = false,
+  ) {
     setVendorOutreachArtifactIds((current) => ({ ...current, [card.choiceId]: artifactId }));
     setVendorOutreachIntents((current) => ({ ...current, [card.choiceId]: intent }));
     setVendorOutreachRetries((current) => ({ ...current, [card.choiceId]: { card, artifactId, intent } }));
@@ -194,6 +201,7 @@ export function useWeddingVendorOutreachOwner(input: {
     const recipientEmail = weddingVendorOutreachRecipient(card, input.weddingVendorDirectory() ?? []);
     const existing = vendorOutreachFlows()[card.choiceId]
       ?? weddingVendorOutreachIdleFlow({ choiceId: card.choiceId, vendorName: card.title, recipientEmail });
+    if (!weddingVendorOutreachNeedsGeneration(existing, forceRegeneration)) return;
     setVendorOutreachFlows((current) => ({
       ...current,
       [card.choiceId]: weddingVendorOutreachStartDrafting({ ...existing, recipientEmail }),
@@ -213,6 +221,7 @@ export function useWeddingVendorOutreachOwner(input: {
       couple.budget_comfort ??= weddingVendorOutreachCoupleFromWorkspace({
         contextCards: [], budgetTargetAmount: input.state().budgetTracking.budgetTargetAmount,
       }).budget_comfort;
+      if (!existing.permissions.shareApproximateBudget) couple.budget_comfort = null;
 
       const result = await requestWeddingVendorOutreachDraft({
         vendor: {
@@ -237,6 +246,19 @@ export function useWeddingVendorOutreachOwner(input: {
         bodyMarkdown: formatWeddingVendorOutreachForDisplay(result.bodyMarkdown, couple.couple_names),
         bodyHtml: null,
         groundedOnLabels,
+        groundedOnFields: result.groundedOn,
+        sourceReferences: intakeMessage?.id
+          ? [{ type: "wedding_intake_profile", target: intakeMessage.id, label: "Wedding details used for this draft" }]
+          : [{ type: "wedding_context_thread", target: contextThreadId, label: "Wedding details used for this draft" }],
+        generation: {
+          model: result.model,
+          inputTokens: result.inputTokens,
+          outputTokens: result.outputTokens,
+          estimatedCostUsd: result.estimatedCostUsd,
+          inputFingerprint: result.inputFingerprint,
+          promptPrefixId: result.promptPrefixId,
+          servedFrom: result.servedFrom,
+        },
       });
       const directoryVendor = outreachDirectoryVendorMatch(card.title);
       const draftProjection = weddingVendorOutreachDraftAfpSendInput({
@@ -255,7 +277,11 @@ export function useWeddingVendorOutreachOwner(input: {
           if (!currentFlow || currentFlow.stage !== "drafting") return current;
           return {
             ...current,
-            [card.choiceId]: savedFlow,
+            [card.choiceId]: {
+              ...savedFlow,
+              draftMessageId: draftProjection.id ?? null,
+              hasUnpersistedChanges: false,
+            },
           };
         }),
       });
@@ -281,7 +307,15 @@ export function useWeddingVendorOutreachOwner(input: {
     setVendorOutreachFlows((current) => {
       const flow = current[choiceId];
       if (!flow) return current;
-      return { ...current, [choiceId]: { ...flow, recipientEmail: recipientEmail.trim() || null } };
+      return {
+        ...current,
+        [choiceId]: {
+          ...flow,
+          recipientEmail: recipientEmail.trim() || null,
+          hasUnpersistedChanges: true,
+          permissions: { ...flow.permissions, previewApproved: false },
+        },
+      };
     });
   }
 
@@ -289,7 +323,21 @@ export function useWeddingVendorOutreachOwner(input: {
     setVendorOutreachFlows((current) => {
       const flow = current[choiceId];
       if (!flow) return current;
-      return { ...current, [choiceId]: { ...flow, attachments } };
+      return {
+        ...current,
+        [choiceId]: weddingVendorOutreachPermissionsChanged(
+          { ...flow, attachments, hasUnpersistedChanges: true },
+          { ...flow.permissions, previewApproved: false },
+        ),
+      };
+    });
+  }
+
+  function onOutreachPermissionsChange(choiceId: string, permissions: WeddingVendorEnquiryPermissions) {
+    setVendorOutreachFlows((current) => {
+      const flow = current[choiceId];
+      if (!flow) return current;
+      return { ...current, [choiceId]: weddingVendorOutreachPermissionsChanged(flow, permissions) };
     });
   }
 
@@ -308,7 +356,7 @@ export function useWeddingVendorOutreachOwner(input: {
 
   function onRetryOutreach(choiceId: string) {
     const retry = vendorOutreachRetries()[choiceId];
-    if (retry) void onContactVendor(retry.card, retry.artifactId, retry.intent);
+    if (retry) void onContactVendor(retry.card, retry.artifactId, retry.intent, true);
   }
 
   async function onConnectGmailForOutreach() {
@@ -328,7 +376,10 @@ export function useWeddingVendorOutreachOwner(input: {
   async function onSendOutreach(choiceId: string) {
     const flow = vendorOutreachFlows()[choiceId];
     if (!flow) return;
-    const gate = weddingVendorOutreachSendGate(flow, { gmailConnected: Boolean(input.gmailStatus()?.connected) });
+    const gate = weddingVendorOutreachSendGate(flow, {
+      gmailConnected: Boolean(input.gmailStatus()?.connected),
+      protectedRepliesAvailable: false,
+    });
     if (!gate.canSend) {
       input.setNotice(gate.reason);
       return;
@@ -352,7 +403,7 @@ export function useWeddingVendorOutreachOwner(input: {
         actionIntent: vendorOutreachIntents()[choiceId],
       });
       await saveProjection(draftProjection);
-      const draftMessageId = weddingProjectionMetadataId(draftProjection);
+      const draftMessageId = draftProjection.id;
       const sendResult = await sendGmailApprovedDraft({
         to: flow.recipientEmail ?? "",
         subject: flow.subject,
@@ -375,7 +426,9 @@ export function useWeddingVendorOutreachOwner(input: {
             contact_method: "agent_email_draft",
             thread_id: draftProjection.thread_id,
             receipt_ref: sendResult.clientMessageId,
-            follow_up_due_at: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
+            follow_up_due_at: flow.permissions.remindUnanswered
+              ? new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString()
+              : null,
           });
         } catch (error) {
           console.warn("wedding vendor outreach: recordWeddingVendorContact failed after a successful send", error);
@@ -405,6 +458,7 @@ export function useWeddingVendorOutreachOwner(input: {
     onOutreachBodyChange,
     onOutreachRecipientChange,
     onOutreachAttachmentsChange,
+    onOutreachPermissionsChange,
     onCancelOutreach,
     onRetryOutreach,
     onConnectGmailForOutreach,

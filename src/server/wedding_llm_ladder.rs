@@ -104,6 +104,9 @@ pub enum LadderOutcome<T> {
         value: T,
         provider: WeddingLlmProvider,
         model: String,
+        tokens_input: i32,
+        tokens_output: i32,
+        cost_cents: i32,
         attempts: Vec<WeddingLlmAttempt>,
     },
     Exhausted {
@@ -210,6 +213,9 @@ where
                         value,
                         provider,
                         model,
+                        tokens_input: response.tokens_input,
+                        tokens_output: response.tokens_output,
+                        cost_cents: response.cost_cents,
                         attempts,
                     };
                 }
@@ -256,6 +262,9 @@ mod tests {
                         value,
                         provider,
                         model,
+                        tokens_input: 0,
+                        tokens_output: 0,
+                        cost_cents: 0,
                         attempts,
                     };
                 }

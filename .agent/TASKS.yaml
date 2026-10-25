@@ -3570,3 +3570,37 @@ tasks:
       - the wedding queue retains every open planning task and active vendor quote response, presents one decision at a time, advances after approval or deferral, and distinguishes other pending work, deferred work and a genuinely empty queue
       - a research-backed opportunity report recommends a recipient-scoped, revocable and versioned wedding run sheet as the next high-value and naturally shareable product slice
       - pass: typecheck, all 1977 wedding tests, focused continuous-queue/assignment/mobile tests, production build and both line-budget guards; policy V2 and rollout flags are unchanged
+  - id: WED-261
+    title: Make wedding AI use bounded evidence and make vendor enquiries consent-first
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-215
+    depends_on:
+      - WED-253
+      - WED-258
+      - WED-259
+    files:
+      - src/server/wedding_vendor_outreach_routes.rs
+      - src/server/wedding_llm_ladder.rs
+      - src/wedding_shared_tool_metering.rs
+      - src/db/**
+      - postgres/migrations/**
+      - solid-ui/src/components/WeddingVendor*.tsx
+      - solid-ui/src/lib/weddingVendor*.ts
+      - solid-ui/tests/wedding-*.test.ts
+      - Documents/design/wedding planner/**
+      - wedding/**
+      - Documents/issues/wedding planner/*.html
+      - .agent/**
+    acceptance:
+      - wedding requirements and preferences are retrieved as bounded structured AFP facts rather than replaying unbounded wedding history into prompts
+      - stable reusable prompt prefixes contain no couple data, generation happens only on an explicit meaningful request, and unchanged draft inputs can reuse a tenant-scoped result
+      - each quote is extracted once per source fingerprint and comparisons invalidate only when a quote or comparison fact changes
+      - account and wedding-plan AI budgets are enforced before provider calls with an auditable deterministic or simpler-model fallback and no loss of source grounding
+      - every generated outreach draft is an AFP event with source references, model and cost metadata, approval state and append-only revision lineage
+      - enquiry review shows the exact recipient, message and shared information, defaults to protected replies, and makes budget, phone and reminder consent explicit before send
+      - contextual trust tips and the public Wedding FAQ answer authenticity, payment influence, quote accuracy, privacy, contact pressure, AI grounding and non-response concerns
+      - the three WED-225 review pages freeze the resulting commit and contain current checks for the new trust, cost and consent contracts
+      - focused Rust/frontend/site tests, typecheck, production build and line-budget checks pass; rollout-sensitive mail and policy flags remain unchanged
+    progress:
+      - registered from committed WED-260 revision ef73047 after confirming outreach already uses a bounded structured request and durable AFP draft, but lacks revision/cost metadata, input reuse, per-wedding budget enforcement and explicit share controls

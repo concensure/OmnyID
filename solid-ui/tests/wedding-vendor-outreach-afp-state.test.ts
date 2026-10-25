@@ -28,6 +28,12 @@ function sampleFlow() {
     subject: "Enquiry about your florals",
     bodyMarkdown: "Hello, we would love to hear about your availability.",
     groundedOnLabels: ["you mentioned Sydney as your location"],
+    groundedOnFields: ["location"],
+    sourceReferences: [{ type: "wedding_intake_profile", target: "intake-1", label: "Wedding details" }],
+    generation: {
+      model: "test-model", inputTokens: 120, outputTokens: 40, estimatedCostUsd: 0.002,
+      inputFingerprint: "a".repeat(64), promptPrefixId: "wedding.vendor_outreach.v2", servedFrom: "model",
+    },
   });
   return flow;
 }
@@ -68,6 +74,13 @@ test("draft message carries both wedding supertags required for reload", () => {
   assert.ok(input.supertags?.includes("event:wedding"));
   assert.ok(input.supertags?.includes("wedding_vendor_outreach"));
   assert.ok(input.supertags?.includes("wedding_email_draft"));
+  const content = input.content as Record<string, unknown>;
+  const generation = content.generation as Record<string, unknown>;
+  assert.equal(content.approval_status, "pending_user_approval");
+  assert.equal(content.revision, 1);
+  assert.equal(generation.model, "test-model");
+  assert.equal(generation.input_tokens, 120);
+  assert.ok(input.references?.some((reference) => reference.target === "intake-1"));
 });
 
 test("sent message carries both wedding supertags and a parent_id pointing at the draft", () => {

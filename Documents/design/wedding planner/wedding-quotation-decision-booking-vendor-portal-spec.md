@@ -627,7 +627,85 @@ A grant contains two approved requirements and three questions. The portal recei
 those fields. Attempts to request budget, score, private note, full plan, or competitor
 fields are rejected even if named in a tampered payload.
 
-## 20. Definition of done
+## 20. AI context, token and draft governance
+
+These rules apply to Wedding Planner and to later OmnyID templates that reuse the quotation and
+outreach engine. They reduce repeated inference without weakening grounding or silently substituting
+lower-quality commercial conclusions.
+
+### 20.1 Retrieve structured facts, not wedding transcripts
+
+- Couple requirements and preferences remain typed, versioned AFP facts (`wedding_intake_profile`,
+  planning constraints, confirmed preference profiles and explicit feedback signals).
+- Vendor requirements, directory attributes, availability and quotation facts remain separate AFP
+  objects with source references and authority state.
+- An inference request receives only the fields relevant to its declared purpose. It must not replay
+  an unbounded wedding thread or infer a private field from conversational history.
+- Relational indexes and caches are tenant-scoped, rebuildable projections. They never become a
+  second authority for a preference, price, approval or booking state.
+
+### 20.2 Reusable prompts and safe caching
+
+- Standard enquiry and extraction instructions use stable, versioned prompt-prefix IDs. Couple or
+  vendor-private values appear only in the variable suffix and must never enter a shared cache key.
+- Provider prompt caching may be used only where the provider supports it, the stable prefix meets
+  its cache threshold, and cache accounting is returned. Short prompts should not pay a cache-write
+  premium merely to claim caching.
+- Deterministic enquiry templates are the zero-token fallback. They use the same validated structured
+  facts and never reduce an unknown commercial fact to a confident statement.
+
+### 20.3 Generate only after meaningful action
+
+- A draft is generated when the couple explicitly chooses Prepare enquiry, Retry or Update draft.
+- Typing, formatting, toggling an accordion or moving focus never calls a model.
+- Changing a sharing decision invalidates the preview. A budget choice that changes message content
+  requires an explicit Update draft action before Send can become available.
+- An unchanged persisted AFP draft is reused after refresh. It is not regenerated to repaint a card.
+
+### 20.4 Incremental quotation processing
+
+- A quote source is extracted once per immutable `source_version_id`, parser version, registry
+  fingerprint and content hash. Corrections append a successor; they do not overwrite extraction.
+- Normalised quotations carry a material fingerprint. An unchanged fingerprint is a no-op.
+- A comparison AFP message is content-addressed from its candidates and material payload. It is
+  regenerated only when a quotation version, event basis, requirement or comparison policy changes.
+- The original file remains available beside the normalized projection so a couple can verify the
+  extraction without another model call.
+
+### 20.5 Account and wedding budgets
+
+- Platform-funded wedding inference checks both the existing per-account budget and a bounded
+  per-wedding share before a provider call. Usage receipts record actual input/output tokens and
+  estimated cost against both identities.
+- At a hard limit, outreach falls back to the evidence-safe deterministic template and quote
+  extraction returns manual review required. Neither path fabricates a cheaper inference result.
+- The provider ladder begins with the suitable lower-cost model. A paid top-up or operator-approved
+  budget override may raise the existing account limit, but cannot relax evidence, privacy,
+  validation or approval rules.
+
+### 20.6 Generated drafts are auditable AFP events
+
+Every user-visible generated draft is persisted before display and includes:
+
+- immutable source references and the exact structured fields used;
+- model name, versioned prompt-prefix ID, input fingerprint, input/output tokens and estimated cost;
+- `pending_user_approval`, `approved_and_sent` or a terminal/rejected approval state;
+- a monotonically increasing revision and a reference to the superseded draft; and
+- the recipient, exact content, attachments, reply route and permission snapshot.
+
+Edits are not model calls. A meaningful checkpoint or send appends a successor draft, and the send
+receipt references the exact approved revision.
+
+### 20.7 Trust and consent at the decision point
+
+Comparison, normalized-quote, enquiry-preview and unanswered-enquiry surfaces answer authenticity,
+payment influence, price accuracy, data sharing, phone pressure, AI grounding and non-response
+questions where each concern becomes relevant. Before send, the couple sees the recipient, exact
+message, attachments and shared facts. Approximate budget and phone contact are opt-in, reminders are
+explicit, and protected OmnyID replies are the default intent. If the reviewed masked-reply service
+is disabled, the send fails closed until the couple deliberately chooses a connected-email route.
+
+## 21. Definition of done
 
 - The implementation extends the generic quotation capability from a clean `052acc7`
   descendant and consumes reviewed WED-187 work rather than copying dirty files.
@@ -643,4 +721,3 @@ fields are rejected even if named in a tampered payload.
 - No new file exceeds 999 lines, and no existing oversized file gains new responsibilities.
 - `.agent/TASKS.yaml`, `.agent/DECISIONS.md`, and `.agent/HANDOFF.md` reflect the actual
   evidence rather than manually declaring deployment health.
-
