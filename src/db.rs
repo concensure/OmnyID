@@ -31,7 +31,7 @@ pub use quotation_vendor_responses::{
 };
 mod wedding_newsletter;
 mod wedding_blog_publications;
-pub use wedding_blog_publications::WeddingBlogPublicationRecord;
+pub use wedding_blog_publications::WeddingBlogPublicationRecord; mod wedding_quote_study; pub use wedding_quote_study::WeddingQuoteStudyRecord;
 mod wedding_onboarding_state;
 mod wedding_vendor_contact_schedule;
 mod wedding_vendor_directory;

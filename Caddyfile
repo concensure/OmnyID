@@ -267,6 +267,29 @@
         import omnyid_proxy
     }
 
+    # Consent-bound public quote-study analysis and its exact privacy notice.
+    # These API routes must win before the static wedding file server.
+    handle /wedding/quote-study {
+        request_body {
+            max_size 9MB
+        }
+        import omnyid_proxy
+    }
+
+    handle /wedding/quote-study/* {
+        import omnyid_proxy
+    }
+
+    # Operator-only consented originals. Authentication and the operator
+    # allowlist are enforced again by the homeserver route.
+    handle /admin/wedding/quote-study {
+        import omnyid_proxy
+    }
+
+    handle /admin/wedding/quote-study/* {
+        import omnyid_proxy
+    }
+
     # Free "Wedding Understanding" lead-magnet tool (analyses text/photos via
     # a vision model). Same reasoning as the waitlist route above: must be
     # handled before the static /wedding/* file-server block below.

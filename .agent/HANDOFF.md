@@ -4984,3 +4984,41 @@ Next:
 - Start Docker and apply all migrations to disposable Postgres, then exercise admin draft/publish/update,
   public list/article and sanitization rejection paths. Continue WED-263 vendor activation only after that
   proof; do not enable relay or policy V2 before the existing human/hosted gates pass.
+
+## 2026-10-27 - WED-272 public quote study and executable human gates (Codex, complete)
+
+Changed:
+
+- Added the public Wedding quote-intelligence article, upload/paste interface and blog index card. The
+  requested OpenRouter `openai/gpt-5-mini` editorial call succeeded using the root environment secret;
+  no credential entered source, output, browser code or logs.
+- Added migration 0121, a focused DB owner, a dark-by-default public submission/deletion route and an
+  operator-only admin panel. Submission requires current explicit consent and authority, strict file
+  verification, fail-closed malware scanning and SeaweedFS-only raw storage. Analysis reuses the existing
+  venue/generic registries and labels inferred content instead of presenting it as a confirmed quote fact.
+- Added per-client/global cost limits, hashed deletion receipts, source-metadata scrubbing on deletion,
+  Caddy body/routing rules, no-store authenticated downloads and server-only OpenRouter processing.
+- Rebuilt all three review workbooks around the supplied Human Gate Execution Protocol. Each has at most
+  three real human gates with objective evidence fields; signed export is impossible until autonomous
+  work is cleared. Mirrored the pages and shared assets to the exact root Documents folder.
+
+Verification:
+
+- Pass: `cargo check --lib`; quote-study Rust tests 3/3; embedded migration catalog 1/1; disposable
+  Postgres schema replay through 0121 with 15 quote-study constraints. The legacy `0092b` photo
+  enrichment was explicitly omitted because an empty DB lacks its production vendor seed rows.
+- Pass: Solid typecheck; all 1,999 Wedding tests; focused study tests 3/3; Wedding site/CSP/quiz smoke;
+  production build; source/Wedding line budgets; Caddy validation; review Playwright 3/3; JS syntax,
+  focused secret scan and `git diff --check`.
+- Docker had Postgres available but no running ClamAV or SeaweedFS service, so a real public-route upload
+  was not claimed. Direct GPT-5-mini access was verified, while the product study flag remains false.
+- No deployment, provider mutation, relay/mail enablement or policy-V2 change occurred. Unrelated dirty
+  source files and `artifacts/oracle-production-proof-deploy/` were left unstaged.
+
+Next:
+
+- Before enabling the study, configure server-side OpenRouter/SeaweedFS secrets, start ClamAV, apply 0121
+  to the target DB and run one consented disposable TXT plus PDF through submit, admin download and token
+  deletion. Keep the flag false if any scanner/storage/model/deletion step fails.
+- Continue autonomous evidence named in the review pages. Only after it is removed from `remaining` and
+  committed should a reviewer freeze that exact SHA and begin the grouped human gates.

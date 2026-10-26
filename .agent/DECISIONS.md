@@ -1753,3 +1753,30 @@ receipts can bypass repeat malware scanning only after authenticated envelope va
 mask resolution; the transactional provider-event claim remains authoritative for races. Recipient
 abuse buckets use a SHA-256 address digest, and scanner-clean ciphertext remains quarantined until the
 separate MIME/AFP processing gate is complete.
+
+## 2026-10-27: Public quote study requires specific consent and isolated raw storage
+
+The public Wedding quote-intelligence study is not a private-workspace document path. A submission is
+accepted only after separate affirmative study consent and uploader-authority confirmation against the
+exact server notice version. That notice names unencrypted private SeaweedFS storage, authorised
+operator access, OpenRouter processing with `openai/gpt-5-mini`, de-identified internal study use,
+residual re-identification risk and deletion. This is deliberately stricter than a passive warning.
+
+Raw source objects never use the encrypted user-document namespace or filesystem fallback. They are
+bounded, content-type/magic checked, ClamAV fail-closed, stored under random submission identifiers and
+downloadable only through the existing authenticated operator allowlist with `private, no-store`.
+Deletion authority is a one-time public token whose SHA-256 is stored; deletion removes the object,
+clears analysis/provider linkage and scrubs source-identifying metadata while retaining the minimum
+consent/deletion audit row.
+
+The existing `venue.v1` and `generic.v1` quotation registries remain the interpretation authority.
+The model transcribes PDFs/images and proposes schema-bound fields; deterministic validation and the
+study projection distinguish confirmed evidence, interpretation, missing material terms and unknowns.
+The public surface cannot send, accept, book or pay. It remains dark unless
+`OMNYID_WEDDING_QUOTE_STUDY_ENABLED=true`; the OpenRouter credential and SeaweedFS credentials stay
+server-side.
+
+Human release workbooks cannot convert unfinished machine work into sign-off. They expose no more than
+three grouped, authority-dependent gates and block signed export while any configured autonomous work
+remains. Each gate requires a matching frozen/hosted SHA, named authority, completed actions, stable
+evidence reference and SHA-256 digest.

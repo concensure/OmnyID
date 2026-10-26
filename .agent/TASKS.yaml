@@ -3682,3 +3682,39 @@ tasks:
       - operator HTML publishing sanitizes on the server, uses a 256 KiB request boundary, stores versioned content in Postgres migration 0120 and projects public metadata/pages under the existing Wedding site so source deploys do not erase published articles
       - email ingress now requires message/rfc822, applies a content-free recipient-digest rate bucket, avoids repeat ClamAV work for authenticated exact replays and records scanner-clean ciphertext as quarantined; all mail rollout flags remain unchanged
       - pass: typecheck, all 1996 wedding tests, wedding site/CSP/quiz smoke, production build, line budget, migration catalog, cargo check, blog sanitizer, relay ingress, Worker, SMTP-in/out and deterministic outreach tests; disposable Postgres was unavailable because Docker Desktop was not reachable
+  - id: WED-272
+    title: Publish a consent-first public quote intelligence study funnel and make release gates executable
+    status: done
+    owner: codex
+    branch: agent/codex/WED-215
+    depends_on:
+      - WED-259
+      - WED-271
+    files:
+      - wedding/blog/before-you-accept-that-wedding-quote.html
+      - wedding/blog.html
+      - wedding/assets/css/quote-study.css
+      - wedding/assets/js/quote-study.js
+      - solid-ui/src/components/UsageAdminWeddingQuoteStudyPanel.tsx
+      - solid-ui/src/lib/weddingQuoteStudyAdminApi.ts
+      - src/server/wedding_quote_study_routes.rs
+      - src/db/wedding_quote_study.rs
+      - postgres/migrations/0121_wedding_quote_study.sql
+      - Caddyfile
+      - Documents/issues/wedding planner/*.html
+      - .agent/**
+    acceptance:
+      - the public Wedding article accurately explains missing items, inclusions, escalation risks and the current venue/generic quote-engine boundary, and offers an accessible mobile upload/paste flow
+      - submission requires specific affirmative consent for unencrypted SeaweedFS storage, authorised administrator access, OpenRouter processing and a de-identified industry-study derivative, with authority, retention and deletion language visible before upload
+      - accepted uploads are bounded, type-verified, malware scanned, stored only in SeaweedFS, analysed server-side with openai/gpt-5-mini through OpenRouter and returned as evidence-grounded decision support without exposing credentials
+      - operator-only administration lists consented submissions and supplies authenticated no-store document downloads without making raw study files public
+      - the three review HTML workbooks distinguish completed autonomous evidence from at most three genuinely human-dependent gates, record objective evidence and preserve final sign-off without vague checklists
+      - disposable Postgres migration, focused Rust/frontend/site tests, typecheck, production build and line budgets pass; new files stay below 1000 lines and unrelated dirty work remains untouched
+    progress:
+      - registered from WED-271 commit 08364c0 after confirming the existing quote extractor supports venue.v1 and generic.v1, existing uploads can persist to SeaweedFS, and operator access is already centrally allowlisted
+      - published a mobile-first article and in-place upload/paste experience with two affirmative consent controls, exact server notice/versioning, deletion receipt, evidence-labelled results and conservative venue/generic capability wording; GPT-5-mini supplied the requested editorial pass through OpenRouter without exposing its credential
+      - added a dark-by-default public route with strict type/magic checks, 8 MiB bounds, fail-closed ClamAV, SeaweedFS-only unencrypted storage, hashed deletion authority, bounded OpenRouter extraction, per-client/global rate limits and explicit interpretation/unknown states
+      - added migration 0121 and an operator-allowlisted no-store view/download surface; public deletion removes the SeaweedFS object and scrubs the stored filename, MIME, size, hash, provider request and analysis
+      - replaced the three generic review workbooks with a shared evidence-bound protocol capped at three genuinely human gates; signed export remains blocked while autonomous work remains, and browser checks cover focus continuity, persisted evidence and confirmation focus return
+      - pass: disposable Postgres schema replay through 0121 with only the documented non-portable 0092b seed enrichment omitted; cargo check and focused quote-study/migration tests; typecheck; all 1999 Wedding tests; Wedding site/CSP/quiz tests; static quote-study tests; production build; Caddy validation; line budgets; review Playwright 3/3; secret scan and git diff check
+      - local Docker had Postgres but no running ClamAV or SeaweedFS service, so no public-route end-to-end upload was claimed; the study flag remains false and no deployment occurred

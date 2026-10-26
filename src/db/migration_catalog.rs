@@ -609,4 +609,9 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Durable sanitised wedding blog publications managed by operators",
         include_str!("../../postgres/migrations/0120_wedding_blog_publications.sql"),
     ),
+    (
+        "0121_wedding_quote_study",
+        "Consent-bound unencrypted SeaweedFS quote study submissions and analysis receipts",
+        include_str!("../../postgres/migrations/0121_wedding_quote_study.sql"),
+    ),
 ];
