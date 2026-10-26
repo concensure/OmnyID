@@ -35,7 +35,7 @@ use super::{
 
 const MAX_QUERY_LENGTH: usize = 120;
 const DIRECTORY_PAGE_SIZE: i64 = 24;
-const DIRECTORY_MAX_PAGE_SIZE: i64 = 200;
+const DIRECTORY_MAX_PAGE_SIZE: i64 = 500;
 const CLAIM_SUGGESTION_LIMIT: usize = 8;
 pub(super) const PHOTO_LICENCE_VERSION: &str = "vendor-image-licence-2026-10-09";
 pub(super) const PHOTO_LICENCE_SHA256: &str =

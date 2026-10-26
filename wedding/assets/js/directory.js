@@ -45,7 +45,7 @@
   }
   function load(query) {
     status.textContent = 'Loading vendors…';
-    var url = '/api/public/wedding/vendors?limit=200'; if (query) url += '&q=' + encodeURIComponent(query); if (selectedCategory) url += '&category=' + encodeURIComponent(selectedCategory);
+    var url = '/api/public/wedding/vendors?limit=500'; if (query) url += '&q=' + encodeURIComponent(query); if (selectedCategory) url += '&category=' + encodeURIComponent(selectedCategory);
     fetch(url, { headers: { Accept: 'application/json' } }).then(function (response) {
       if (!response.ok) throw new Error('Unable to load the vendor directory right now.'); return response.json();
     }).then(function (payload) {

@@ -34,7 +34,7 @@ test("public directory and claim flow expose database-backed discovery without e
     read("solid-ui/src/components/vendor/VendorClaimFlow.tsx"), read("solid-ui/src/lib/vendorClaimApi.ts"),
   ]);
   assert.match(directory, /vendorCategoryFilters/);
-  assert.match(directoryScript, /limit=200/);
+  assert.match(directoryScript, /limit=500/);
   assert.match(directoryScript, /category=/);
   assert.match(claimFlow, />Business name<\/label>/);
   assert.match(claimFlow, /role="combobox"/);
