@@ -3720,7 +3720,7 @@ tasks:
       - local Docker had Postgres but no running ClamAV or SeaweedFS service, so no public-route end-to-end upload was claimed; the study flag remains false and no deployment occurred
   - id: WED-273
     title: Unify public vendor discovery, claim matching, and AFP vendor follow-up states
-    status: in_progress
+    status: complete
     owner: codex
     branch: agent/codex/WED-215
     depends_on:
@@ -3759,3 +3759,5 @@ tasks:
       - one account-scoped AFP lifecycle projection derives enquired, favourited, quote-received, booked and reminder state; vendor filters consume it, booking explicitly excludes payment and future waiting cards remain off Wedding Home until due
       - the quote-study article renders the consent notice without JavaScript, keeps detailed privacy terms in an accessible disclosure and reports analysis availability accurately
       - pass: typecheck; focused lifecycle and static surface tests 8/8; all 2,004 Wedding tests; Wedding site/CSP/quiz checks; focused Rust vendor-claim tests 4/4; rustfmt; production build; line budget
+      - Oracle release bc1318d serves all 455 active vendors as 455 unique slugs across nine categories; read-only SQL reconfirmed the protected photographer slice at 93 vendor IDs and 441 attributes without running an importer
+      - live checks confirm first-person plain-text quiz sharing, the home quiz entry, category filters, Business name claim copy, authenticated suggestion routing, static quote consent/disclosure, Remind and lifecycle filter code; production proof passes and mail, quote-study, relay and ranking-policy-v2 rollout remain off

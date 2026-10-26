@@ -5022,3 +5022,42 @@ Next:
   deletion. Keep the flag false if any scanner/storage/model/deletion step fails.
 - Continue autonomous evidence named in the review pages. Only after it is removed from `remaining` and
   committed should a reviewer freeze that exact SHA and begin the grouped human gates.
+
+## 2026-10-27 - WED-273 vendor discovery, claim matching and lifecycle release (Codex, complete)
+
+Changed:
+
+- Corrected solo Wedding Animal Quiz sharing to say “my wedding” and removed emoji-dependent share
+  symbols; replaced the legacy Wedding Understanding home form with a distinct quiz entry.
+- Made the public vendor directory database-backed for the complete bounded active catalogue, with nine
+  category filters and canonical claim links. The authenticated claim flow now labels the field Business
+  name and offers at most eight rate-limited fuzzy matches before ownership proof begins.
+- Added one account-scoped AFP projection for enquired, favourited, quote-received, booked and reminder
+  status. Wedding Home and Response Queue consume it; quote-backed booking is explicit and records no
+  payment, while future reminders stay hidden from Home until due.
+- Made the public quote-study consent notice available without JavaScript and its detailed privacy text
+  expandable. Added `.seaweedfs-admin-secrets` to `.dockerignore` after the first build correctly refused
+  to read that root-owned runtime secret directory.
+
+Verification and release:
+
+- Pass: typecheck; focused lifecycle/static tests 8/8; all 2,004 Wedding tests; Wedding site/CSP/quiz
+  checks; vendor-claim Rust tests 4/4; rustfmt; production build and line budget. The catalogue-cap follow-up
+  reran all 2,004 Wedding tests and the four Rust tests successfully.
+- Deployed from an isolated detached worktree, ending at `bc1318d`. The first successful release completed
+  a full backup verification and restore drill with `STATUS=pass`; the final three-line catalogue-cap
+  release passed a fresh runtime/backup proof with restore skipped because no schema or storage changed.
+- Live HTTP checks confirm the corrected quiz copy with no replacement character, the home quiz entry,
+  category controls, static/expandable quote consent, Business name claim copy and authenticated 401 on
+  anonymous fuzzy-suggestion access. The built Response Queue chunk contains Remind plus Enquired,
+  Favourited and Quote received lifecycle controls.
+- Read-only Oracle SQL reports 455 active vendors. The public API returns exactly 455 unique slugs across
+  nine categories. The pre-existing photographer evidence remains exactly 93 distinct vendor IDs and 441
+  attributes; no source data or importer was uploaded or rerun.
+- `OMNYID_VENDOR_MAIL_ENABLED=false`; quote-study, Email Worker ingress and ranking-policy-v2 flags remain
+  absent/default-off. Unrelated dirty Rust work and existing proof artifacts were not committed.
+
+Next:
+
+- Human review may exercise the live reminder/booking flows with a signed-in couple and fuzzy claim lookup
+  with a signed-in vendor. Do not enable mail/relay, quote-study or ranking-policy-v2 from this release.
