@@ -5,4 +5,5 @@ typescript-sdk/dist
 target
 .git
 .secrets
+.seaweedfs-admin-secrets
 .env.oracle
