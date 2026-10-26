@@ -17,12 +17,41 @@ test("public quote study requires explicit consent and keeps analysis server-sid
   assert.match(page, /type="checkbox" required/i);
   assert.match(page, /authorised to upload/i);
   assert.match(page, /private deletion token/i);
+  assert.match(page, /<details class="quote-study-disclosure">/i);
+  assert.match(page, /Your consent matters:<\/strong>/i);
   assert.match(page, /venue quote — detailed venue checks/i);
   assert.match(page, /another wedding vendor — generic quote checks/i);
   assert.doesNotMatch(page + script, /OPENROUTER_API_KEY\s*=/i);
   assert.match(script, /fetch\("\/wedding\/quote-study"/);
   assert.match(script, /textContent/);
   assert.doesNotMatch(script, /resultBody\.innerHTML/);
+  assert.doesNotMatch(script, /privacy notice is unavailable/i);
+});
+
+test("public directory and claim flow expose database-backed discovery without exact handles", async () => {
+  const [directory, directoryScript, claimFlow, claimApi] = await Promise.all([
+    read("wedding/vendors.html"), read("wedding/assets/js/directory.js"),
+    read("solid-ui/src/components/vendor/VendorClaimFlow.tsx"), read("solid-ui/src/lib/vendorClaimApi.ts"),
+  ]);
+  assert.match(directory, /vendorCategoryFilters/);
+  assert.match(directoryScript, /limit=200/);
+  assert.match(directoryScript, /category=/);
+  assert.match(claimFlow, />Business name<\/label>/);
+  assert.match(claimFlow, /role="combobox"/);
+  assert.doesNotMatch(claimFlow, />Listing handle/);
+  assert.match(claimApi, /\/api\/wedding\/vendor\/suggestions/);
+});
+
+test("solo animal quiz sharing speaks for one person and avoids fragile emoji in message text", async () => {
+  const [page, home, script] = await Promise.all([read("wedding/animal-quiz.html"), read("wedding/index.html"), read("wedding/assets/js/quiz.js")]);
+  assert.match(page, /quiz\.js\?v=20261027-wed273/);
+  assert.match(script, /my wedding animal might be the/);
+  assert.doesNotMatch(script, /I just found out our wedding animal might be/);
+  assert.doesNotMatch(script, /might be the ' \+ a\.name \+ ' ' \+ a\.emoji/);
+  assert.doesNotMatch(script, /�/);
+  assert.match(home, /The Wedding Animal Quiz/);
+  assert.match(home, /Find my wedding animal/);
+  assert.doesNotMatch(home, /data-wedding-understanding-form/);
 });
 
 test("operator quote-study view is mounted and does not expose object keys", async () => {

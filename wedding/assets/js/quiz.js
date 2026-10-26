@@ -114,20 +114,20 @@
     if (kind === 'partner') {
       a = animal(E.summariseSolo(S.me.answers).rank[0]);
       url = baseUrl() + E.partnerHash(S.me.answers);
-      text = 'I just found out our wedding animal might be the ' + a.name + ' ' + a.emoji + '. Your turn: take the 3-minute Wedding Animal Quiz and we unlock our couple animal, how aligned we are, and what we’ll argue about.';
+      text = 'I just found out my wedding animal might be the ' + a.name + '. Your turn: take the 3-minute Wedding Animal Quiz, then we can unlock our couple result, see how aligned we are, and find out what we might disagree about.';
     } else if (kind === 'couple') {
       res = couple();
       url = baseUrl() + E.zooHash({ pair: pairOf(res), alignment: res.alignment });
-      text = 'We’re ' + res.animal.title + (res.alignment != null ? ' and ' + res.alignment + '% aligned' : '') +
-        (res.friction[0] ? ', and apparently we’ll argue about ' + res.friction[0].title.toLowerCase() : '') + '. What’s your wedding animal?';
+      text = 'We are ' + res.animal.title + (res.alignment != null ? ' and ' + res.alignment + '% aligned' : '') +
+        (res.friction[0] ? ', and we might disagree about ' + res.friction[0].title.toLowerCase() : '') + '. What is your wedding animal?';
     } else if (kind === 'friend') {
       url = baseUrl() + E.zooHash(S.zoo);
-      text = 'I’m a ' + animal(S.friend.animal.primary).name + ' ' + animal(S.friend.animal.primary).emoji + ' at the wedding zoo. Which animal are you?';
+      text = 'I am a ' + animal(S.friend.animal.primary).name + ' at the wedding zoo. Which animal are you?';
     } else {
       res = couple();
       var f = res.friction[Number(kind.split(':')[1])];
       url = baseUrl();
-      text = 'Settle this for us: “' + f.title + '”. We can’t agree. Which side are you on? Then find your own wedding animal:';
+      text = 'Settle this for us: "' + f.title + '". We cannot agree. Which side are you on? Then find your own wedding animal:';
     }
     return { text: text, url: url, title: 'The Wedding Animal Quiz' };
   }

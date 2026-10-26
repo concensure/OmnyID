@@ -121,7 +121,11 @@ export function WeddingVendorFollowUpPanel(props: {
   onConnectGmailForOutreach: () => void;
   onSetFollowUpDate: (card: WeddingVendorContactWorkspaceCard, date: string) => Promise<boolean>;
 }) {
-  const activeCards = () => props.state.vendorContactCards;
+  const activeCards = () => props.state.vendorContactCards.filter((card) => {
+    if (!card.followUpDueAt || card.actionMode !== "waiting") return true;
+    const dueAt = Date.parse(card.followUpDueAt);
+    return !Number.isFinite(dueAt) || dueAt <= Date.now();
+  });
   const alertLabel = () => weddingVendorFollowUpAlertLabel(activeCards().length);
   const hasHistory = () => props.state.vendorPursuitLogCards.length > 0 || props.state.vendorQuoteReplyLogFlows.length > 0;
 
@@ -198,9 +202,9 @@ export function WeddingVendorFollowUpPanel(props: {
                             followUpDateInput?.showPicker?.();
                           }}
                           class="min-h-10 shrink-0 rounded-lg border border-wedding-muted/35 bg-white px-2 text-xs font-semibold text-wedding-text hover:bg-wedding-surface-blush"
-                          aria-label={`Open calendar for ${card.vendorName}`}
+                          aria-label={`Set reminder for ${card.vendorName}`}
                         >
-                          Calendar
+                          Remind
                         </button>
                         <button type="button" disabled={!followUpDate() || dateSaving()} onClick={() => void saveFollowUpDate()} class="min-h-10 shrink-0 rounded-lg bg-wedding-primary px-2 text-xs font-semibold text-wedding-page disabled:opacity-50">{dateSaving() ? "Saving…" : "Save"}</button>
                       </div>

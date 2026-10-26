@@ -130,7 +130,7 @@
       setStatus(notice.enabled ? "Ready when you are. Nothing is uploaded until you select Analyse my quote." : "The research preview is not accepting quotes yet.", notice.enabled ? "success" : "");
     } catch (_) {
       submit.disabled = true;
-      setStatus("The quote-analysis privacy notice is unavailable, so uploads are disabled.", "error");
+      setStatus("Quote analysis is temporarily unavailable. The consent and storage notice remains above; no quote has been uploaded.", "error");
     }
   }
 

@@ -15,6 +15,13 @@ export interface VendorClaim {
   expires_at: string | null;
 }
 
+export interface VendorClaimSuggestion {
+  vendor_slug: string;
+  vendor_name: string;
+  category: string;
+  service_area: string;
+}
+
 export interface VendorOwnershipMethod {
   id: "email_domain" | "website_meta" | "social_business";
   label: string;
@@ -75,6 +82,11 @@ export async function startVendorClaim(input: { vendorSlug: string; declaredRole
 export async function getVendorClaim(vendorSlug: string): Promise<VendorClaim | null> {
   const response = await apiFetch<{ claim: VendorClaim | null }>(`/api/wedding/vendor/intake?vendor_slug=${encodeURIComponent(vendorSlug)}`);
   return response.claim ?? null;
+}
+
+export async function getVendorClaimSuggestions(query: string): Promise<VendorClaimSuggestion[]> {
+  const response = await apiFetch<{ items?: VendorClaimSuggestion[] }>(`/api/wedding/vendor/suggestions?q=${encodeURIComponent(query)}`);
+  return Array.isArray(response.items) ? response.items.slice(0, 8) : [];
 }
 
 export const getVendorOwnership = (vendorSlug: string) =>

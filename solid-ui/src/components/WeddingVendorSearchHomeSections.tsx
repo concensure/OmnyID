@@ -1,5 +1,5 @@
 // @locs-version: 1.0
-import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
 
 import { DecisionCard } from "@/components/DecisionCard";
 import { PlanningConstraintCaptureCard } from "@/components/PlanningConstraintCaptureCard";
@@ -8,6 +8,7 @@ import { renderMarkdown } from "@/lib/markdownRenderer";
 import { WeddingVendorChoiceCard } from "@/components/WeddingVendorChoiceCard";
 import { WeddingPreferenceConfirmationChips } from "@/components/WeddingPreferenceConfirmationChips";
 import { WeddingDealBreakerEditor } from "@/components/WeddingDealBreakerEditor";
+import { WeddingConfirmDialog } from "@/components/WeddingConfirmDialog";
 import type { WeddingVendorChoiceCardData } from "@/components/WeddingVendorChoiceCard";
 import type { WeddingResponseWorkspaceViewProps } from "@/components/WeddingResponseWorkspaceViewTypes";
 import { decisionCardFromWeddingVendorComparison } from "@/lib/decisionCardState";
@@ -27,6 +28,14 @@ import {
   weddingVendorSearchBlockedCopy,
   weddingVendorSearchNoticeCopy,
 } from "@/lib/weddingHomeUiCopyState";
+import {
+  findWeddingVendorLifecycle,
+  projectWeddingVendorLifecycle,
+  weddingVendorBookingToAfpSendInput,
+  weddingVendorLifecycleMatches,
+  type WeddingVendorLifecycleFilter,
+  type WeddingVendorLifecycleRecord,
+} from "@/lib/weddingVendorLifecycleState";
 
 type VendorSearchAction = NonNullable<WeddingResponseWorkspaceViewProps["vendorSearchResultAction"]>;
 type VendorOutreachOwner = ReturnType<typeof useWeddingVendorOutreachOwner>;
@@ -179,6 +188,14 @@ export function WeddingVendorSearchHomeSection(props: {
   const [fullResultExpanded, setFullResultExpanded] = createSignal(false);
   const [searchProgressIndex, setSearchProgressIndex] = createSignal(0);
   const [selectedChoiceIds, setSelectedChoiceIds] = createSignal<string[]>([]);
+  const [lifecycleFilter, setLifecycleFilter] = createSignal<WeddingVendorLifecycleFilter>("all");
+  const [bookingVendor, setBookingVendor] = createSignal<WeddingVendorLifecycleRecord | null>(null);
+  const [bookingBusy, setBookingBusy] = createSignal(false);
+  const lifecycleRecords = createMemo(() => projectWeddingVendorLifecycle(workspace().state.afpMessages));
+  const lifecycleFilters: ReadonlyArray<{ id: WeddingVendorLifecycleFilter; label: string }> = [
+    { id: "enquired", label: "Enquired" }, { id: "favourited", label: "Favourited" },
+    { id: "quote_received", label: "Quote received" }, { id: "booked", label: "Booked" },
+  ];
   let previousResultArtifactId: string | null = null;
   createEffect(() => {
     const artifactId = props.result?.action.artifactId ?? null;
@@ -205,6 +222,7 @@ export function WeddingVendorSearchHomeSection(props: {
   const cardVendorKey = (card: WeddingVendorChoiceCardData) => card.vendorId?.trim() || card.choiceId;
   const visibleCards = (artifact: WeddingWorkspaceArtifactPreview) => artifact.vendorComparisonCards
     .filter((card) => !props.hiddenVendorIds?.includes(cardVendorKey(card)))
+    .filter((card) => lifecycleFilter() === "all" || weddingVendorLifecycleMatches(findWeddingVendorLifecycle({ records: lifecycleRecords(), vendorId: card.vendorId, vendorName: card.title }) ?? { key: "", vendorId: card.vendorId ?? null, vendorName: card.title, enquired: false, favourited: selectedForFollowUp(artifact, card.choiceId), quoteReceived: false, booked: false, reminderAt: null, sourceMessageIds: [] }, lifecycleFilter()))
     .map((card) => weddingVendorCardWithCurrentPhoto(card, workspace().weddingVendorDirectory));
   const hiddenCards = (artifact: WeddingWorkspaceArtifactPreview) => artifact.vendorComparisonCards
     .filter((card) => props.hiddenVendorIds?.includes(cardVendorKey(card)));
@@ -224,6 +242,19 @@ export function WeddingVendorSearchHomeSection(props: {
     queueMicrotask(runSearch);
   }
   const isSelectedCategory = (query: string) => workspace().vendorSearchQuery?.trim().toLowerCase() === query.toLowerCase();
+  const lifecycleCount = (filter: WeddingVendorLifecycleFilter) => lifecycleRecords().filter((record) => weddingVendorLifecycleMatches(record, filter)).length;
+  const filteredLifecycleRecords = () => lifecycleRecords().filter((record) => weddingVendorLifecycleMatches(record, lifecycleFilter()));
+  async function confirmBooking(): Promise<void> {
+    const vendor = bookingVendor();
+    const saveProjection = workspace().saveProjection;
+    if (!vendor || !saveProjection) return;
+    setBookingBusy(true);
+    try {
+      await saveProjection(weddingVendorBookingToAfpSendInput({ metadata: workspace().state.workspace.metadata, vendorId: vendor.vendorId, vendorName: vendor.vendorName }));
+      setBookingVendor(null);
+      workspace().onRefreshWorkspace?.();
+    } finally { setBookingBusy(false); }
+  }
   createEffect(() => {
     if (!workspace().vendorSearchRunning) {
       setSearchProgressIndex(0);
@@ -253,8 +284,11 @@ export function WeddingVendorSearchHomeSection(props: {
         }}
       >
       <div class="min-w-0">
-        <div class="min-w-0">
+        <div class="flex min-w-0 flex-wrap items-center justify-between gap-2">
           <p class="font-display text-[22px] font-semibold leading-7 tracking-[-.01em] text-wedding-ink">Find vendors</p>
+          <div class="flex max-w-full gap-1 overflow-x-auto pb-1 text-xs" aria-label="Show vendors by wedding status">
+            <For each={lifecycleFilters}>{(filter) => <button type="button" class={`min-h-9 shrink-0 rounded-full border px-2.5 font-semibold ${lifecycleFilter() === filter.id ? "border-wedding-primary bg-wedding-page text-wedding-primary" : "border-wedding-border bg-white text-wedding-ink/65"}`} aria-pressed={lifecycleFilter() === filter.id} onClick={() => setLifecycleFilter(lifecycleFilter() === filter.id ? "all" : filter.id)}>{filter.label}{lifecycleCount(filter.id) ? ` ${lifecycleCount(filter.id)}` : ""}</button>}</For>
+          </div>
       </div>
       <label class="relative mt-4 block">
         <span class="pointer-events-none absolute inset-y-0 left-4 flex items-center text-wedding-ink/65" aria-hidden="true"><WeddingDashboardIcon id="search" class="h-5 w-5" /></span>
@@ -290,6 +324,16 @@ export function WeddingVendorSearchHomeSection(props: {
       </div>
       <Show when={!props.result && !workspace().vendorSearchRunning}>
         <p class="mt-2 text-[13px] leading-[18px] text-wedding-ink/70">Real vendors near you. We show where each result came from.</p>
+      </Show>
+      <Show when={lifecycleFilter() !== "all"}>
+        <div class="mt-3 grid gap-2" aria-live="polite">
+          <Show when={filteredLifecycleRecords().length > 0} fallback={<p class="rounded-lg border border-wedding-border bg-white p-3 text-sm text-wedding-ink/70">No vendors have this status yet.</p>}>
+            <For each={filteredLifecycleRecords()}>{(vendor) => <article class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-wedding-border bg-white p-3">
+              <div><p class="font-semibold text-wedding-ink">{vendor.vendorName}</p><p class="text-xs text-wedding-ink/65">{[vendor.enquired && "Enquired", vendor.favourited && "Favourited", vendor.quoteReceived && "Quote received", vendor.booked && "Booked"].filter(Boolean).join(" · ")}</p></div>
+              <Show when={vendor.quoteReceived && !vendor.booked}><button type="button" class="min-h-11 rounded-lg bg-wedding-primary px-3 text-sm font-bold text-white" onClick={() => setBookingVendor(vendor)}>Book</button></Show>
+            </article>}</For>
+          </Show>
+        </div>
       </Show>
       <Show
         when={workspace().vendorSearchRunning}
@@ -457,6 +501,7 @@ export function WeddingVendorSearchHomeSection(props: {
       <Show when={visibleBlockedReason()}>
         {(reason) => <p class="mt-2 break-words text-xs leading-5 text-wedding-ink/70">{reason()}</p>}
       </Show>
+      <WeddingConfirmDialog open={Boolean(bookingVendor())} title={`Book ${bookingVendor()?.vendorName ?? "this vendor"}?`} detail="This records your booking decision in the wedding ledger. It does not sign a contract, pay a deposit, or send a message." confirmLabel="Confirm booking" busy={bookingBusy()} onCancel={() => setBookingVendor(null)} onConfirm={() => void confirmBooking()} />
     </div>
   );
 }

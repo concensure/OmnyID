@@ -35,6 +35,8 @@ use super::{
 
 const MAX_QUERY_LENGTH: usize = 120;
 const DIRECTORY_PAGE_SIZE: i64 = 24;
+const DIRECTORY_MAX_PAGE_SIZE: i64 = 200;
+const CLAIM_SUGGESTION_LIMIT: usize = 8;
 pub(super) const PHOTO_LICENCE_VERSION: &str = "vendor-image-licence-2026-10-09";
 pub(super) const PHOTO_LICENCE_SHA256: &str =
     "fe8e9861793131444295de144dd8a20f5fe854dc9a91736de2598dccc7ebe8d8";
@@ -50,6 +52,10 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
         .route(
             "/api/wedding/vendor/intake",
             get(vendor_intake_status_http).post(vendor_intake_start_http),
+        )
+        .route(
+            "/api/wedding/vendor/suggestions",
+            get(vendor_claim_suggestions_http),
         )
         .route(
             "/api/wedding/vendor/agent-card",
@@ -81,6 +87,11 @@ struct VendorPath {
 #[derive(Debug, Deserialize)]
 struct IntakeStatusQuery {
     vendor_slug: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct VendorSuggestionQuery {
+    q: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -149,7 +160,10 @@ async fn public_directory_http(
     let q = clean_optional(query.q)?;
     let category = clean_optional(query.category)?;
     let location = clean_optional(query.location)?;
-    let limit = query.limit.unwrap_or(DIRECTORY_PAGE_SIZE).clamp(1, 48);
+    let limit = query
+        .limit
+        .unwrap_or(DIRECTORY_PAGE_SIZE)
+        .clamp(1, DIRECTORY_MAX_PAGE_SIZE);
     let rows = sqlx::query(
         r#"
         SELECT
@@ -206,6 +220,64 @@ async fn public_directory_http(
         .map(public_vendor_from_row)
         .collect::<Vec<_>>();
     Ok(Json(json!({ "items": items, "next_cursor": Value::Null })))
+}
+
+async fn vendor_claim_suggestions_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(query): Query<VendorSuggestionQuery>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    let _user = authenticated_user(&state.db, &headers).await?;
+    enforce_rate_limit(
+        &state,
+        authenticated_rate_limit_key("vendor_claim_suggestions", &headers),
+        RateLimitPolicy {
+            max_requests: 30,
+            window: std::time::Duration::from_secs(60),
+        },
+    )
+    .await?;
+    let query = clean_claim_search(&query.q)?;
+    if query.chars().count() < 2 {
+        return Ok(Json(json!({ "items": [] })));
+    }
+    let rows = sqlx::query(
+        r#"SELECT vendor_slug, vendor_name, category, service_area
+           FROM wedding_vendors
+           WHERE status = 'active'
+           ORDER BY vendor_name ASC
+           LIMIT 500"#,
+    )
+    .fetch_all(&state.db.pool)
+    .await
+    .map_err(database_failure)?;
+    let mut items = rows
+        .into_iter()
+        .filter_map(|row| {
+            let name: String = row.get("vendor_name");
+            fuzzy_claim_score(&query, &name).map(|score| {
+                (
+                    score,
+                    name.clone(),
+                    json!({
+                        "vendor_slug": row.get::<String, _>("vendor_slug"),
+                        "vendor_name": name,
+                        "category": row.get::<String, _>("category"),
+                        "service_area": row.get::<String, _>("service_area"),
+                    }),
+                )
+            })
+        })
+        .collect::<Vec<_>>();
+    items.sort_by(|left, right| {
+        right
+            .0
+            .cmp(&left.0)
+            .then_with(|| left.1.to_lowercase().cmp(&right.1.to_lowercase()))
+    });
+    Ok(Json(json!({
+        "items": items.into_iter().take(CLAIM_SUGGESTION_LIMIT).map(|(_, _, item)| item).collect::<Vec<_>>()
+    })))
 }
 
 async fn public_vendor_http(
@@ -290,7 +362,9 @@ async fn vendor_intake_status_http(
     .fetch_optional(&state.db.pool)
     .await
     .map_err(database_failure)?;
-    Ok(Json(json!({ "claim": claim.map(|row| claim_status_from_row(row, &user.id)) })))
+    Ok(Json(
+        json!({ "claim": claim.map(|row| claim_status_from_row(row, &user.id)) }),
+    ))
 }
 
 async fn vendor_intake_start_http(
@@ -711,6 +785,91 @@ fn claim_status_from_row(row: sqlx::postgres::PgRow, user_id: &str) -> Value {
     })
 }
 
+fn clean_claim_search(raw: &str) -> Result<String, (StatusCode, String)> {
+    let value = raw.trim();
+    if value.chars().count() > MAX_QUERY_LENGTH {
+        return Err((StatusCode::BAD_REQUEST, "search is too long".to_string()));
+    }
+    Ok(value.to_string())
+}
+
+fn claim_search_key(raw: &str) -> String {
+    raw.chars()
+        .flat_map(char::to_lowercase)
+        .map(|character| {
+            if character.is_alphanumeric() {
+                character
+            } else {
+                ' '
+            }
+        })
+        .collect::<String>()
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn bounded_levenshtein(left: &str, right: &str, maximum: usize) -> Option<usize> {
+    let left = left.chars().collect::<Vec<_>>();
+    let right = right.chars().collect::<Vec<_>>();
+    if left.len().abs_diff(right.len()) > maximum {
+        return None;
+    }
+    let mut previous = (0..=right.len()).collect::<Vec<_>>();
+    for (left_index, left_character) in left.iter().enumerate() {
+        let mut current = vec![left_index + 1];
+        let mut row_minimum = current[0];
+        for (right_index, right_character) in right.iter().enumerate() {
+            let substitution =
+                previous[right_index] + usize::from(left_character != right_character);
+            let value = (previous[right_index + 1] + 1)
+                .min(current[right_index] + 1)
+                .min(substitution);
+            row_minimum = row_minimum.min(value);
+            current.push(value);
+        }
+        if row_minimum > maximum {
+            return None;
+        }
+        previous = current;
+    }
+    (previous[right.len()] <= maximum).then_some(previous[right.len()])
+}
+
+fn fuzzy_claim_score(query: &str, vendor_name: &str) -> Option<u16> {
+    let query = claim_search_key(query);
+    let name = claim_search_key(vendor_name);
+    if query.is_empty() || name.is_empty() {
+        return None;
+    }
+    if query == name {
+        return Some(1_000);
+    }
+    if name.starts_with(&query) {
+        return Some(900_u16.saturating_sub((name.len() - query.len()) as u16));
+    }
+    if name.contains(&query) {
+        return Some(800_u16.saturating_sub((name.len() - query.len()) as u16));
+    }
+    let query_tokens = query.split_whitespace().collect::<Vec<_>>();
+    let name_tokens = name.split_whitespace().collect::<Vec<_>>();
+    let matched_tokens = query_tokens
+        .iter()
+        .filter(|query_token| {
+            name_tokens.iter().any(|name_token| {
+                name_token.starts_with(**query_token)
+                    || bounded_levenshtein(query_token, name_token, 1).is_some()
+            })
+        })
+        .count();
+    if matched_tokens == query_tokens.len() && matched_tokens > 0 {
+        return Some(700 + matched_tokens as u16);
+    }
+    let maximum = if query.chars().count() >= 8 { 2 } else { 1 };
+    bounded_levenshtein(&query, &name, maximum)
+        .map(|distance| 600_u16.saturating_sub(distance as u16 * 50))
+}
+
 fn clean_optional(value: Option<String>) -> Result<Option<String>, (StatusCode, String)> {
     value
         .map(|raw| {
@@ -839,8 +998,8 @@ fn database_failure(_: sqlx::Error) -> (StatusCode, String) {
 #[cfg(test)]
 mod tests {
     use super::{
-        PHOTO_LICENCE_CONSENT, PHOTO_LICENCE_SHA256, PHOTO_LICENCE_VERSION, valid_declared_role,
-        valid_slug,
+        PHOTO_LICENCE_CONSENT, PHOTO_LICENCE_SHA256, PHOTO_LICENCE_VERSION, fuzzy_claim_score,
+        valid_declared_role, valid_slug,
     };
     use axum::http::StatusCode;
 
@@ -860,6 +1019,13 @@ mod tests {
             valid_declared_role("administrator").unwrap_err().0,
             StatusCode::BAD_REQUEST
         );
+    }
+
+    #[test]
+    fn claim_suggestions_allow_small_business_name_typos_but_not_unrelated_names() {
+        assert!(fuzzy_claim_score("Bejewled Jewellery", "Bejewelled Jewellery").is_some());
+        assert!(fuzzy_claim_score("Bejewelled Mosman", "Bejewelled Jewellery").is_none());
+        assert!(fuzzy_claim_score("creek street photo", "Creek Street Photography").is_some());
     }
 
     #[test]

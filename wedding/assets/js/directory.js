@@ -4,7 +4,10 @@
   var input = document.getElementById('vendorSearch');
   var grid = document.getElementById('vendorGrid');
   var status = document.getElementById('directoryStatus');
-  if (!form || !input || !grid || !status) return;
+  var filters = document.getElementById('vendorCategoryFilters');
+  if (!form || !input || !grid || !status || !filters) return;
+  var selectedCategory = '';
+  var categories = [];
 
   function safeImageUrl(raw) {
     try { var url = new URL(raw, window.location.origin); return /^https?:$/.test(url.protocol) ? url.href : ''; } catch (_) { return ''; }
@@ -29,15 +32,29 @@
     if (!items.length) { var empty = document.createElement('p'); empty.className = 'vendor-empty'; empty.textContent = 'No vendors matched that search yet. Try a suburb or category.'; grid.appendChild(empty); return; }
     items.forEach(function (vendor) { grid.appendChild(card(vendor)); });
   }
+  function renderFilters() {
+    while (filters.firstChild) filters.removeChild(filters.firstChild);
+    [''].concat(categories).forEach(function (category) {
+      var button = document.createElement('button');
+      button.type = 'button'; button.className = 'directory-filter';
+      button.textContent = category || 'All vendors';
+      button.setAttribute('aria-pressed', selectedCategory === category ? 'true' : 'false');
+      button.addEventListener('click', function () { selectedCategory = category; renderFilters(); load((input.value || '').trim()); });
+      filters.appendChild(button);
+    });
+  }
   function load(query) {
     status.textContent = 'Loading vendors…';
-    var url = '/api/public/wedding/vendors?limit=24'; if (query) url += '&q=' + encodeURIComponent(query);
+    var url = '/api/public/wedding/vendors?limit=200'; if (query) url += '&q=' + encodeURIComponent(query); if (selectedCategory) url += '&category=' + encodeURIComponent(selectedCategory);
     fetch(url, { headers: { Accept: 'application/json' } }).then(function (response) {
       if (!response.ok) throw new Error('Unable to load the vendor directory right now.'); return response.json();
     }).then(function (payload) {
-      var items = Array.isArray(payload.items) ? payload.items : []; render(items); status.textContent = items.length ? items.length + ' vendor' + (items.length === 1 ? '' : 's') + ' found.' : 'No vendors found.';
+      var items = Array.isArray(payload.items) ? payload.items : [];
+      if (!selectedCategory && !query) { categories = Array.from(new Set(items.map(function (vendor) { return vendor.category; }).filter(Boolean))).sort(); renderFilters(); }
+      render(items); status.textContent = items.length ? items.length + ' vendor' + (items.length === 1 ? '' : 's') + ' found.' : 'No vendors found.';
     }).catch(function (error) { clearGrid(); status.textContent = error.message || 'Unable to load the vendor directory.'; });
   }
   form.addEventListener('submit', function (event) { event.preventDefault(); load((input.value || '').trim()); });
+  renderFilters();
   load('');
 })();

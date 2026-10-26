@@ -55,15 +55,19 @@
     <p>It does not decide that the cheapest quote is best, and it does not send an enquiry, accept a quote, book a vendor or move money. The output is decision support, not legal or financial advice, and it cannot guarantee a final price. A low-confidence result is a question list, not a verdict.</p>
     <h2>Start with one quote, then compare on the same basis</h2>
     <p>You do not need a perfect spreadsheet before this becomes useful. Upload the quote you are considering now. Look at what is confirmed and what remains open. If you receive a revised quote, compare the changed terms—not only the new total. When you later add another vendor, ask the same material questions so the comparison becomes fairer.</p>
-    <h2>A clear choice about your quote</h2>
-    <p>This public research preview is different from a private OmnyID workspace. To provide the analysis and support an internal study of wedding-pricing clarity, the original quote is stored <strong>unencrypted</strong> in private SeaweedFS storage and can be reviewed by authorised OmnyID administrators. Extracted content is sent to OpenRouter using <strong>openai/gpt-5-mini</strong>. A de-identified derivative may be used for the industry study.</p>
-    <p>Wedding quotes can contain names, contact details, signatures, addresses and commercially sensitive terms. De-identification reduces risk but cannot promise that a rich document could never be linked back to a person or business. Redact anything you do not want reviewed. You must actively consent before upload and confirm that you are allowed to provide the document. You will receive a private deletion token; you can also contact <strong>privacy@omnyid.com</strong>. The raw quote is retained until you use that deletion token, request deletion, or OmnyID closes the study—there is no promised automatic deletion date.</p>
+    <details class="quote-study-disclosure">
+      <summary><span>A clear choice about your quote</span><small>Read storage, administrator access, AI processing and deletion details</small></summary>
+      <div>
+        <p>This public research preview is different from a private OmnyID workspace. To provide the analysis and support an internal study of wedding-pricing clarity, the original quote is stored <strong>unencrypted</strong> in private SeaweedFS storage and can be reviewed by authorised OmnyID administrators. Extracted content is sent to OpenRouter using <strong>openai/gpt-5-mini</strong>. A de-identified derivative may be used for the industry study.</p>
+        <p>Wedding quotes can contain names, contact details, signatures, addresses and commercially sensitive terms. De-identification reduces risk but cannot promise that a rich document could never be linked back to a person or business. Redact anything you do not want reviewed. You must actively consent before upload and confirm that you are allowed to provide the document. You will receive a private deletion token; you can also contact <strong>privacy@omnyid.com</strong>. The raw quote is retained until you use that deletion token, request deletion, or OmnyID closes the study—there is no promised automatic deletion date.</p>
+      </div>
+    </details>
   </div>
 
   <section class="quote-study-shell" aria-labelledby="quoteStudyHeading">
     <h2 id="quoteStudyHeading">Understand one quote before you compare another</h2>
     <p class="quote-study-lede">Paste the wording or upload one supported quote. You will see evidence-backed facts, missing material terms and possible escalation points on this page.</p>
-    <div class="quote-study-privacy"><strong>Your consent matters</strong><span id="quoteStudyConsentCopy">Loading the exact storage and study notice…</span></div>
+    <div class="quote-study-privacy"><strong>Your consent matters:</strong> <span id="quoteStudyConsentCopy">Your quote is stored unencrypted in private SeaweedFS storage, may be reviewed by authorised OmnyID administrators, is processed through OpenRouter with openai/gpt-5-mini, and may contribute to a de-identified internal industry study. You can delete it with the private deletion token.</span></div>
     <form class="quote-study-form" data-quote-study-form novalidate>
       <input id="quoteStudyConsentVersion" name="consent_version" type="hidden">
       <label class="quote-study-label" for="quoteStudyCategory">What kind of quote is this?

@@ -3718,3 +3718,44 @@ tasks:
       - replaced the three generic review workbooks with a shared evidence-bound protocol capped at three genuinely human gates; signed export remains blocked while autonomous work remains, and browser checks cover focus continuity, persisted evidence and confirmation focus return
       - pass: disposable Postgres schema replay through 0121 with only the documented non-portable 0092b seed enrichment omitted; cargo check and focused quote-study/migration tests; typecheck; all 1999 Wedding tests; Wedding site/CSP/quiz tests; static quote-study tests; production build; Caddy validation; line budgets; review Playwright 3/3; secret scan and git diff check
       - local Docker had Postgres but no running ClamAV or SeaweedFS service, so no public-route end-to-end upload was claimed; the study flag remains false and no deployment occurred
+  - id: WED-273
+    title: Unify public vendor discovery, claim matching, and AFP vendor follow-up states
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-215
+    depends_on:
+      - WED-169
+      - WED-179
+      - WED-258
+      - WED-262
+      - WED-272
+    files:
+      - wedding/index.html
+      - wedding/animal-quiz.html
+      - wedding/vendors.html
+      - wedding/assets/js/quiz*.js
+      - wedding/assets/js/vendor*.js
+      - wedding/blog/before-you-accept-that-wedding-quote.html
+      - wedding/assets/js/quote-study.js
+      - solid-ui/src/components/VendorPortalApp.tsx
+      - solid-ui/src/components/WeddingVendor*.tsx
+      - solid-ui/src/components/ResponseQueueView.tsx
+      - solid-ui/src/lib/weddingVendor*.ts
+      - src/server/wedding_vendor_*routes.rs
+      - solid-ui/tests/wedding-*.test.ts
+      - .agent/**
+    acceptance:
+      - solo animal-quiz sharing uses first-person wording and valid Unicode, and the Wedding home has a distinct quiz entry instead of the legacy Wedding Understanding form
+      - the public vendor directory is populated from the live vendor database with bounded category filtering and claim links, without publishing the private source dataset
+      - the claim portal labels the selector Business name and provides capped, tenant-safe fuzzy suggestions without requiring an exact database spelling
+      - reminder, enquired, favourited, quote-received and booked states project from one account-scoped AFP history across Response Queue, Wedding Home and Vendors
+      - a quote-received vendor can be explicitly booked without implying payment, and reminders surface on Wedding Home only when due
+      - quote-study disclosure content remains available when the analysis endpoint is dark, and its detailed privacy explanation is expandable and accessible
+      - focused Rust and frontend tests, all Wedding tests, typecheck, production build, site checks and line budgets pass before a selective Oracle deployment
+    progress:
+      - registered from committed WED-272 revision 03a30bf; unrelated dirty Rust paths and Oracle proof artifacts remain out of scope and must not be staged
+      - solo quiz sharing now uses first-person, plain-text-safe wording; the Wedding home replaces the legacy understanding form with a distinct quiz entry
+      - the public directory loads the complete bounded active vendor catalogue, exposes category filters and canonical claim links, while authenticated claim matching returns at most eight rate-limited fuzzy suggestions
+      - one account-scoped AFP lifecycle projection derives enquired, favourited, quote-received, booked and reminder state; vendor filters consume it, booking explicitly excludes payment and future waiting cards remain off Wedding Home until due
+      - the quote-study article renders the consent notice without JavaScript, keeps detailed privacy terms in an accessible disclosure and reports analysis availability accurately
+      - pass: typecheck; focused lifecycle and static surface tests 8/8; all 2,004 Wedding tests; Wedding site/CSP/quiz checks; focused Rust vendor-claim tests 4/4; rustfmt; production build; line budget

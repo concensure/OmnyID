@@ -1780,3 +1780,20 @@ Human release workbooks cannot convert unfinished machine work into sign-off. Th
 three grouped, authority-dependent gates and block signed export while any configured autonomous work
 remains. Each gate requires a matching frozen/hosted SHA, named authority, completed actions, stable
 evidence reference and SHA-256 digest.
+
+## 2026-10-27: Vendor lifecycle is an account-scoped AFP projection
+
+Enquired, favourited, quote-received, booked and reminder are not independent UI flags. They project
+from signed-in wedding-account AFP messages and use vendor ID first, with normalized business name as
+a legacy fallback. Filter selection is disposable view state; underlying status is not copied into
+browser storage.
+
+Booking is an explicit confirmed ledger decision available only after quote evidence. It records
+`payment_executed: false` and does not sign a contract, take a deposit or message a vendor. A reminder
+appends its AFP event before updating the existing relational contact projection, and future waiting
+cards remain off Wedding Home until they become due.
+
+The public vendor directory reads bounded active public fields from Postgres and never embeds or
+deploys the source dataset. Claim suggestions are authenticated, rate-limited, capped at eight and
+fuzzy-match active business names; choosing one supplies the canonical listing slug to the existing
+ownership-proof flow.

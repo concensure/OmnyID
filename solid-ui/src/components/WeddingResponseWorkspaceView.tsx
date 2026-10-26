@@ -43,7 +43,7 @@ import { buildWeddingVendorQuoteThreadProofState, mergeWeddingVendorQuoteThreadP
 import { weddingVendorQuoteReceiptPersistenceNotice } from "@/lib/weddingVendorQuoteReceiptPersistenceState";
 import { buildWeddingProviderExecutorReadinessState } from "@/lib/weddingProviderExecutorReadinessState";
 import { weddingVendorContactReferenceToAfpSendInput } from "@/lib/weddingVendorContactReferenceAfpState";
-import { rescheduleWeddingVendorFollowUp } from "@/lib/weddingVendorFollowUpApi";
+import { rescheduleWeddingVendorFollowUp, weddingVendorReminderToAfpSendInput } from "@/lib/weddingVendorFollowUpApi";
 import { useWeddingVendorOutreachOwner } from "@/lib/useWeddingVendorOutreachOwner";
 import { useWeddingVendorQuoteDecisionProjection } from "@/lib/useWeddingVendorQuoteDecisionProjection";
 import { useWeddingPreferenceProfileOwner } from "@/lib/useWeddingPreferenceProfileOwner";
@@ -52,7 +52,6 @@ import { installMobileFocusViewportListener, isMobileFocusViewport } from "@/lib
 import { useWeddingApprovalExecution } from "@/lib/useWeddingApprovalExecution";
 import { buildWeddingHomeSections, WeddingHomeSectionRegistry } from "@/lib/weddingHomeSectionRegistry";
 function weddingHomeLayoutStorageKey(scope: string): string { return `omnyid:wedding_home_card_order:${scope}`; }
-
 function loadWeddingHomeSectionOrder(scope: string): WeddingHomeSectionId[] {
   if (typeof localStorage === "undefined") return [...WEDDING_HOME_SECTION_IDS];
   try {
@@ -895,9 +894,10 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
       onCancelOutreach: vendorOutreach.onCancelOutreach,
       onConnectGmailForOutreach: () => void vendorOutreach.onConnectGmailForOutreach(),
       onSetFollowUpDate: async (card, date) => {
-        if (!card.vendorId || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
+        if (!card.vendorId || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !props.saveProjection) return false;
         try {
-          await rescheduleWeddingVendorFollowUp(card.vendorId, new Date(`${date}T12:00:00`).toISOString());
+          const reminderAt = new Date(`${date}T12:00:00`).toISOString(); await props.saveProjection(weddingVendorReminderToAfpSendInput({ metadata: state().workspace.metadata, vendorId: card.vendorId, vendorName: card.vendorName, reminderAt }));
+          await rescheduleWeddingVendorFollowUp(card.vendorId, reminderAt);
           props.onRefreshWorkspace?.(); return true;
         } catch { return false; }
       },
@@ -987,7 +987,7 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
         </Show>
 
         <Show when={activeMenu() === "response_queue"}>
-          <WeddingVendorSearchHomeSection
+          <div class="space-y-3"><WeddingVendorSearchHomeSection
             workspace={props}
             result={inlineVendorSearchPreview()}
             outreach={vendorOutreach}
@@ -1000,7 +1000,7 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
             hiddenVendorIds={preferenceFeedback.hiddenVendorIds()} onNotForUs={preferenceFeedback.recordVendorFeedback} onRestoreVendor={preferenceFeedback.restoreVendor}
             feedbackConfirmationPrompt={preferenceFeedback.feedbackConfirmation()?.prompt ?? null} feedbackConfirmationActionLabel={preferenceFeedback.feedbackConfirmation()?.kind === "intimate" ? "Make it a must-have" : "Review preferences"} feedbackNotice={preferenceFeedback.feedbackNotice()}
             onConfirmFeedbackSuggestion={preferenceFeedback.confirmFeedbackSuggestion} onDismissFeedbackSuggestion={preferenceFeedback.dismissFeedbackSuggestion}
-          />
+          />{homeSections().find((section) => section.id === "vendor_follow_up")?.render()}</div>
         </Show>
 
         <WeddingWorkspaceDocumentsPanel
