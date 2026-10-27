@@ -2,6 +2,7 @@ import { createServer, type Server } from "node:http";
 import { readFile } from "node:fs/promises";
 import { extname, resolve } from "node:path";
 import { expect, test } from "@playwright/test";
+import type { Locator } from "@playwright/test";
 
 const reviewRoot = resolve(import.meta.dirname, "../../../Documents/issues/wedding planner");
 const port = 4193;
@@ -72,4 +73,67 @@ test("clear confirmation is keyboard reachable and cancel restores focus", async
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).toBeHidden();
   await expect(open).toBeFocused();
+});
+
+async function completeReport(card: Locator, commit: string, hosted: string) {
+  for (const checkbox of await card.locator("input[type=checkbox]").all()) await checkbox.check();
+  await card.getByLabel("Named person / authority").fill("Independent reviewer");
+  await card.getByLabel("Recorded at (RFC 3339)").fill("2026-10-27T12:00:00Z");
+  await card.getByLabel("Evidence reference").fill("controlled/report.json");
+  await card.getByLabel("Evidence SHA-256").fill("c".repeat(64));
+  await card.getByLabel("Reviewed source commit (from report)").fill(commit);
+  await card.getByLabel("Reviewed hosted URL (from report)").fill(hosted);
+  await card.getByLabel("Gate status").selectOption("passed");
+}
+
+for (const [filename, gate] of [
+  ["human-review-form.html", "HUM-ACCESS-01"],
+  ["email-worker-security-review.html", "MAIL-EXT-01"],
+  ["release-gate-control.html", "REL-EXT-01"],
+]) {
+  test(`${filename} rejects evidence from another source or hosted environment`, async ({ page }) => {
+    const commit = "a".repeat(40), successor = "b".repeat(40), hosted = "https://review.example.test/workspace/";
+    await page.goto(`http://127.0.0.1:${port}/${filename}?commit=${commit}`);
+    await expect(page.locator("#sourceCommit")).toHaveValue(commit);
+    await page.locator("#runtimeCommit").fill(commit); await page.locator("#hostedUrl").fill(hosted);
+    const card = page.locator(`#gate-${gate}`);
+    await completeReport(card, commit, hosted);
+    await expect(page.locator("#gateProgress")).toContainText("1/3 human gates passed");
+    await page.locator("#sourceCommit").fill(successor); await page.locator("#runtimeCommit").fill(successor);
+    await expect(page.locator("#gateProgress")).toContainText("0/3 human gates passed");
+    await expect(card.locator(".muted")).toContainText("Not valid for this candidate");
+    await expect(page.locator("#exportFinal")).toBeDisabled();
+    await expect(page.locator(".nav a[href*='.html']").first()).toHaveAttribute("href", new RegExp(`commit=${successor}`));
+    await page.reload(); await expect(card.getByLabel("Reviewed source commit (from report)")).toHaveValue(commit);
+    await page.locator("#sourceCommit").fill(commit); await page.locator("#runtimeCommit").fill(commit);
+    await page.locator("#hostedUrl").fill("https://other.example.test/workspace/");
+    await expect(page.locator("#gateProgress")).toContainText("0/3 human gates passed");
+  });
+}
+
+test("signed export requires report bindings, completed automation and matching sign-off context", async ({ page }) => {
+  // Substitute completed machine evidence only in this test; shipped blockers remain open.
+  await page.route("**/gate-execution-configs.js", async route => {
+    const response = await route.fetch();
+    await route.fulfill({ response, body: `${await response.text()}\nwindow.GATE_PROTOCOL_CONFIG.remaining = [];` });
+  });
+  await page.reload();
+  const commit = "d".repeat(40), hosted = "https://review.example.test/";
+  await page.locator("#sourceCommit").fill(commit); await page.locator("#runtimeCommit").fill(commit);
+  await page.locator("#hostedUrl").fill(hosted); await page.locator("#packetOwner").fill("Owner");
+  for (const card of await page.locator(".gate").all()) await completeReport(card, commit, hosted);
+  await page.locator("#decision").selectOption("approve"); await page.locator("#signedBy").fill("Approver");
+  await page.locator("#signedAt").fill("2026-10-27T13:00:00Z");
+  await expect(page.locator("#exportFinal")).toBeEnabled();
+  await page.locator("#runtimeCommit").fill("f".repeat(40));
+  await expect(page.locator("#exportFinal")).toBeDisabled();
+  await page.locator("#runtimeCommit").fill(commit);
+  await page.locator("#hostedUrl").fill("javascript:alert(1)");
+  await expect(page.locator("#exportFinal")).toBeDisabled();
+});
+
+test("clear confirmation traps keyboard focus until dismissed", async ({ page }) => {
+  await page.locator("#clearOpen").click();
+  await page.keyboard.press("Shift+Tab"); await expect(page.locator("#clearConfirm")).toBeFocused();
+  await page.keyboard.press("Tab"); await expect(page.locator("#clearCancel")).toBeFocused();
 });

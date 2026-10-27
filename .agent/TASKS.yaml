@@ -15,6 +15,37 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-285
+    title: Freeze and publish human-gate candidate with commit-bound evidence
+    status: review
+    owner: codex
+    branch: agent/codex/WED-285
+    depends_on: [WED-272, WED-276, WED-225]
+    files:
+      - Documents/issues/wedding planner/gate-execution*
+      - Documents/issues/wedding planner/*review*.html
+      - Documents/issues/wedding planner/release-gate-control.html
+      - Documents/verification/human-gate-candidate.md
+      - solid-ui/tests/e2e/wedding-human-review-form.spec.ts
+      - tests/clamav_live.rs
+      - scripts/prepare-human-gate-candidate.ps1
+      - scripts/prepare-human-gate-candidate-selftest.ps1
+      - .agent/**
+    acceptance:
+      - all three workbooks bind each evidence record to the frozen source and hosted identity
+      - changing candidate or runtime never silently carries previous approvals forward
+      - candidate preparation records exact source and artifact digests without fabricating hosted or human evidence
+      - relevant automated checks run and remaining hosted or human blockers stay explicit
+      - selective commit is pushed and remote SHA is verified for the user
+    progress:
+      - candidate continues from 06b4a0f and includes WED-275/276; WED-277 remains unimplemented
+      - user explicitly requested commit and push for the three existing human-gate workbooks and confirmed existing-release preparation rather than WED-277
+      - reports bind exact source and hosted URL; stale reports cannot pass after a candidate change; v3 export preserves older drafts without fabricating missing bindings
+      - candidate packager checks clean expected HEAD and immutable artifact hashes; its negative tests passed
+      - eight workbook and eleven quotation browser cases, seven SDK tests, 2010 Wedding tests, typecheck, SDK/UI builds and line budgets passed
+      - seven Worker tests, four ingress units, twelve SMTP units, one disposable PostgreSQL HTTP case and two live ClamAV clean/EICAR cases passed
+      - hosted runtime proof, complete release verifiers and existing machine/human rollout gates remain outstanding; no deployment or live mail action occurred
+
   - id: WED-276
     title: Dark professional practice bootstrap, shell and explicit context switching
     status: review

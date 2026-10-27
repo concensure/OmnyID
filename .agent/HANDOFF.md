@@ -290,6 +290,68 @@ Next:
 - The signing secret was not read, copied, logged, or committed; the release used the existing Oracle `.env.oracle`.
 # Handoff
 
+## 2026-10-27 - WED-285 existing-release human-gate candidate (Codex)
+
+The user explicitly selected preparation of the existing email/quotation release for its three
+human-gate workbooks, and requested commit/push plus the full final SHA. This continuation is on
+`agent/codex/WED-285` in `C:/Users/ozans/Desktop/projects/OmnyID-WED-275`, based on `06b4a0f`.
+WED-275/276 remain included and dark; WED-277 is not implemented. Eight professional slices remain.
+
+Changed and why:
+
+- The three pages in `Documents/issues/wedding planner/` and their shared `gate-execution.js` now
+  require each report's source commit and hosted URL. Changing the candidate/environment cannot
+  silently reuse prior passing answers. Earlier drafts remain accessible; v3 exports include the
+  new bindings. Sign-off binds the current context and requires an owner and valid hosted URL.
+- Candidate query links propagate the full source SHA between all three pages. The clear dialog
+  traps keyboard focus and returns it on cancellation. None of these controls constitutes a
+  cryptographic signature or automatic deployment verification.
+- `scripts/prepare-human-gate-candidate.ps1` creates an immutable source archive, six workbook
+  assets, manifest digests and candidate-linked START-HERE page from a clean expected commit. It
+  refuses dirty/wrong source and overwrite. Evidence attachments are hashed without inventing
+  pass results. Its isolated self-test exercises those boundaries and verifies artifact hashes.
+- `tests/clamav_live.rs` adds the standard harmless EICAR fixture in memory beside the clean scan.
+  `solid-ui/tests/e2e/wedding-human-review-form.spec.ts` covers all three workbooks, source/host
+  changes, final export, persistent drafts and focus. The new candidate guide documents exact
+  paths, package creation, hosted prerequisites, evidence boundaries and rollback.
+
+Local evidence:
+
+- Candidate packager self-test passed. Eight workbook browser cases passed; all eleven existing
+  quotation browser cases passed. Seven SDK quotation tests, SDK typecheck/build, Solid typecheck,
+  both line budgets, all 2,010 Wedding tests and production UI build passed. Existing Vite chunk
+  advisories remain. Browser workflows are synthetic; no real vendor or mail delivery was used.
+- Worker tests passed 7/7, ingress unit tests 4/4 and SMTP unit tests 12/12. The disposable pgvector
+  PostgreSQL 18 HTTP test passed 1/1 after applying the embedded migration catalog. It exercises
+  encrypted quarantine, exact retry, changed-content conflict, unknown mask, connected-email and
+  disabled-mask rejection. Its scanner is mocked, not proof of live provider receipt or full malware
+  handling. Logs are under `artifacts/wed285/` and remain external to source.
+
+- Both live ClamAV cases passed against disposable localhost:33310, using the actual ClamAV daemon
+  for clean text and the standard harmless EICAR fixture. This verifies the shared INSTREAM boundary,
+  not a complete live-ingress attachment corpus. The disposable test services are removed on closeout.
+
+Outstanding gates and release limits:
+
+- No hosted deployment, runtime identity/config verification, flags-off hosted shadow, representative
+  production accuracy corpus, complete adversarial/provider matrix, live provider smoke, independent
+  security/privacy/accessibility acceptance or cohort approval is claimed. The broad readiness
+  verifiers were not rerun as complete exact-commit release evaluations in this slice. The focused
+  checks above must not be represented as those full reports. Workbook autonomous blockers remain
+  active; working evidence is usable, final signed release export remains blocked.
+- The desired human test must use a separately authorised hosted review deployment of the final
+  pushed SHA. Do not copy the source SHA into the runtime field without independent runtime proof.
+  Build/Worker/gateway versions, flags and configuration inventory need separate evidence.
+- GitHub's latest prior runs are older failed commits and Deployments API returned no records.
+  A push to the task branch alone does not trigger this repository's main/master-only CI workflow.
+  Publish the WED-276 base and WED-285 candidate, then use a draft PR for the focused review delta;
+  a narrow PR to that task base likewise has no configured hosted CI. No CI pass is inferred.
+- The requested primary path had an extra separator before `.html`; all three actual pages are
+  directly in `Documents/issues/wedding planner/`. Mirror only the four changed workbook files and
+  the guide after comparing the primary files with the starting checkpoint. Preserve other work.
+- Next: use the final candidate package/full SHA, complete outstanding machine/hosted evidence,
+  then let the named authorities perform their gates. No routing/provider/cohort flags were changed.
+
 ## 2026-10-27 - WED-276 dark practice shell and bootstrap (Codex)
 
 Branch: `agent/codex/WED-276`, at `C:/Users/ozans/Desktop/projects/OmnyID-WED-275`, continued from

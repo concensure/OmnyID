@@ -1,3 +1,17 @@
+## 2026-10-27: Human evidence belongs to a source and hosted environment
+
+WED-285 prepares the existing email/quotation release, per the user's explicit choice. It does not
+start WED-277 or authorise deployment. Every workbook report now names its reviewed commit and hosted
+URL. Both must match the current frozen candidate; old local records remain visible but cannot pass
+by changing the top-level SHA. Final sign-off also binds source, runtime and hosted context. New
+exports use v3 while retaining the v2 browser storage key to preserve earlier draft evidence.
+
+The candidate packager requires clean source and an expected full SHA. Git supplies the archive and
+workbook assets; the manifest records their hashes and attached evidence hashes. It does not promote
+logs into test results, infer a deployed version or supply human approval. Frozen source packaging
+happens after the final commit and creates external artifacts so it does not change the reviewed SHA.
+A published source candidate is distinct from hosted review readiness and release eligibility.
+
 ## 2026-10-27: Dark practice shell reads scoped, rebuildable indexes
 
 WED-276 consumes the WED-275 contracts through an authenticated read-only bootstrap. An exact account

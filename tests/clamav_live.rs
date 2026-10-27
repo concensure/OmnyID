@@ -3,6 +3,7 @@
 //! Set `CLAMD_HOST` to a disposable scanner endpoint. An unset endpoint skips
 //! locally so ordinary unit runs never acquire an external service dependency.
 
+use base64::Engine as _;
 use omnyid_homeserver::gateway::clamav::scan_bytes;
 
 #[tokio::test]
@@ -29,5 +30,32 @@ async fn configured_clamd_marks_bounded_plain_text_clean() {
     assert!(
         result.virus_name.is_none(),
         "clean fixture must not have a virus label"
+    );
+}
+
+#[tokio::test]
+async fn configured_clamd_detects_standard_harmless_eicar_fixture() {
+    if std::env::var("CLAMD_HOST")
+        .ok()
+        .is_none_or(|v| v.trim().is_empty())
+    {
+        eprintln!("CLAMD_HOST unset; skipping live EICAR evidence");
+        return;
+    }
+    // Standard harmless antivirus test string; decode in memory and never persist it.
+    let fixture = base64::engine::general_purpose::STANDARD
+        .decode("WDVPIVAlQEFQWzRcUFpYNTQoUF4pN0NDKTd9JEVJQ0FSLVNUQU5EQVJELUFOVElWSVJVUy1URVNULUZJTEUhJEgrSCo=")
+        .unwrap();
+    let result = scan_bytes(&fixture)
+        .await
+        .expect("live INSTREAM scan")
+        .expect("configured scanner must return a result");
+    assert!(
+        result.is_infected,
+        "live scanner must detect the EICAR test fixture"
+    );
+    assert!(
+        result.virus_name.is_some(),
+        "detection must carry a signature label"
     );
 }
