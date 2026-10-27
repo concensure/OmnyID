@@ -210,6 +210,21 @@ struct CloudflareSendEnvelope {
     result: Option<CloudflareSendResult>,
 }
 
+#[derive(Debug, Deserialize)]
+struct CloudflareSuppressionEnvelope {
+    success: bool,
+    #[serde(default)]
+    result: Vec<CloudflareSuppressionRecord>,
+    #[serde(default)]
+    result_info: Option<CloudflareSuppressionResultInfo>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct CloudflareSuppressionResultInfo {
+    #[serde(default)]
+    next_cursor: Option<String>,
+}
+
 #[derive(Debug, Default, Deserialize)]
 struct CloudflareSendResult {
     #[serde(default)]
@@ -338,6 +353,107 @@ pub async fn cloudflare_recipient_is_suppressed(db: &Db, recipient: &str) -> Res
     .fetch_one(&db.pool)
     .await
     .map_err(|_| "database_failure".to_string())
+}
+
+pub fn start_cloudflare_suppression_sync(
+    db: Db,
+    mut shutdown: crate::daemon_runtime::ShutdownRx,
+) -> Option<tokio::task::JoinHandle<()>> {
+    let config = VendorMailConfig::from_env().ok()?;
+    if !config.readiness().ready || config.provider != VendorMailProvider::CloudflareEmailSending {
+        return None;
+    }
+    Some(tokio::spawn(async move {
+        loop {
+            match sync_cloudflare_suppressions_once(&db).await {
+                Ok((observed, inserted)) => tracing::info!(
+                    observed,
+                    inserted,
+                    "Cloudflare vendor-mail suppressions synchronized"
+                ),
+                Err(error) => tracing::warn!(
+                    error,
+                    "Cloudflare vendor-mail suppression synchronization failed"
+                ),
+            }
+            tokio::select! {
+                _ = tokio::time::sleep(std::time::Duration::from_secs(300)) => {}
+                changed = shutdown.changed() => {
+                    if changed.is_err() || *shutdown.borrow() {
+                        break;
+                    }
+                }
+            }
+        }
+    }))
+}
+
+pub async fn sync_cloudflare_suppressions_once(db: &Db) -> Result<(usize, usize), String> {
+    let config = VendorMailConfig::from_env()?;
+    if !config.readiness().ready || config.provider != VendorMailProvider::CloudflareEmailSending {
+        return Err("vendor_mail_not_ready".to_string());
+    }
+    let token = read_process_secret_trimmed("OMNYID_VENDOR_MAIL_CLOUDFLARE_API_TOKEN")
+        .ok_or_else(|| "vendor_mail_not_ready".to_string())?;
+    let account_id = std::env::var("OMNYID_VENDOR_MAIL_CLOUDFLARE_ACCOUNT_ID")
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| value.len() == 32)
+        .ok_or_else(|| "vendor_mail_not_ready".to_string())?;
+    let endpoint = format!(
+        "{CLOUDFLARE_SEND_URL_PREFIX}/{}/email/sending/suppressions",
+        urlencoding::encode(&account_id)
+    );
+    sync_cloudflare_suppressions_from_endpoint(db, &endpoint, &token).await
+}
+
+async fn sync_cloudflare_suppressions_from_endpoint(
+    db: &Db,
+    endpoint: &str,
+    token: &str,
+) -> Result<(usize, usize), String> {
+    let client = reqwest::Client::new();
+    let mut cursor = None;
+    let mut observed = 0;
+    let mut inserted = 0;
+    for _ in 0..100 {
+        let mut url = reqwest::Url::parse(endpoint)
+            .map_err(|_| "provider_configuration_invalid".to_string())?;
+        url.query_pairs_mut().append_pair("per_page", "100");
+        if let Some(cursor) = cursor.as_deref() {
+            url.query_pairs_mut().append_pair("cursor", cursor);
+        }
+        let response = client
+            .get(url)
+            .bearer_auth(token)
+            .send()
+            .await
+            .map_err(|_| "provider_request_failed".to_string())?;
+        if !response.status().is_success() {
+            return Err("provider_rejected".to_string());
+        }
+        let envelope = response
+            .json::<CloudflareSuppressionEnvelope>()
+            .await
+            .map_err(|_| "provider_receipt_invalid".to_string())?;
+        if !envelope.success {
+            return Err("provider_rejected".to_string());
+        }
+        observed += envelope.result.len();
+        for record in envelope.result {
+            if record_cloudflare_suppression(db, &record).await? {
+                inserted += 1;
+            }
+        }
+        cursor = envelope
+            .result_info
+            .and_then(|info| info.next_cursor)
+            .filter(|value| !value.trim().is_empty());
+        if cursor.is_none() {
+            return Ok((observed, inserted));
+        }
+    }
+    Err("provider_pagination_limit_exceeded".to_string())
 }
 
 pub fn recipient_is_allowlisted(recipient: &str) -> bool {

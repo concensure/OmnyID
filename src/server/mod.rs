@@ -65,6 +65,7 @@ use crate::{
         provider::MailGatewayConfig,
         smtp_in::handle_incoming_email,
         smtp_out::{OutgoingEmailRequest, dispatch_outgoing_message, send_outgoing_email},
+        vendor_mail_provider::start_cloudflare_suppression_sync,
     },
     integration::{ActionIntent, ActionResult, ActionStatus, IntegrationCapability},
     knowledge_curator::{BacklinkRecord, KnowledgeCuratorState},
@@ -1088,6 +1089,9 @@ pub async fn run() {
         app_state.relay_tx.clone(),
         shutdown_rx.clone(),
     ));
+    if let Some(handle) = start_cloudflare_suppression_sync(db.clone(), shutdown_rx.clone()) {
+        daemon_handles.push(handle);
+    }
 
     // Listen for SIGTERM/Ctrl-C and broadcast shutdown to all daemons.
     tokio::spawn(async move {
