@@ -1,6 +1,6 @@
 # Professional Wedding Planner Workspace — Detailed Task Plan
 
-Status: proposed implementation plan
+Status: implementation started; WED-275 contract foundation
 
 Parent: WED-274
 
@@ -9,6 +9,19 @@ Specification: `wedding-planner-professional-workspace-spec.md`
 Build base: `6af9203` on `agent/codex/WED-215`
 
 Implementation model: `gpt-6-astra`, high reasoning
+
+## Implementation checkpoint — 2026-10-27
+
+WED-275 is implemented on `agent/codex/WED-275`, based on `f1f9c82` (a documentation-only descendant
+of the required `6af9203`). See the [reuse inventory and authority contract](wedding-planner-professional-workspace-contracts.md)
+and `src/practice/` for the strict versioned schemas, role/capability matrix, current-grant checks,
+permission-safe index projection and command revision/idempotency helpers. Verification outcomes
+and review status are recorded in `.agent/TASKS.yaml` and `.agent/HANDOFF.md`.
+
+This is the contract slice only. Persistent grants, atomic command append/receipts, actual cache and
+websocket invalidation, practice routes, UI and the WED-276–284 runtime/release slices remain pending.
+The pure guard's revocation tests do not constitute end-to-end revocation evidence. No migration,
+deployment, external email, hold, booking or payment action is introduced.
 
 ## 1. Delivery rules
 

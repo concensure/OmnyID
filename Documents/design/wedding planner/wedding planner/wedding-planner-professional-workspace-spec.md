@@ -1,6 +1,6 @@
 # Professional Wedding Planner Workspace Specification
 
-Status: proposed implementation specification
+Status: implementation started; WED-275 contract foundation, professional runtime still dark
 
 Program: WED-274
 
@@ -9,6 +9,10 @@ Prepared: 2026-10-27
 Build base: `6af9203` on `agent/codex/WED-215`
 
 Recommended implementation model: `gpt-6-astra`, high reasoning
+
+Implementation contract: [WED-275 reuse inventory and authority model](wedding-planner-professional-workspace-contracts.md).
+The executable registry reconciles the illustrative names below with existing AFP kinds and reuses
+canonical quotation and booking evidence. No professional routes or UI are enabled by this foundation.
 
 ## 1. Purpose
 

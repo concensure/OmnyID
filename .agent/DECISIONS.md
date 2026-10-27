@@ -1,3 +1,26 @@
+## 2026-10-27: Practice authority intersects membership and client grants
+
+WED-275 adds template-neutral strict contracts under `src/practice/`, without routes or persistence.
+Each client remains an ordinary Wedding plan. `PlanRef` explicitly names owner account, logical plan
+and existing AFP thread; current owner-only thread access must not be broadened to accept a caller's
+owner ID. WED-277 must resolve that tuple and the current grant state server-side.
+
+Practice roles are ceilings, not grants. Client access intersects current membership capabilities,
+current plan collaboration capabilities, exact context, expiry/revocation and both authority
+revisions. Vendor authority is bound to the exact addressed resource. Sensitive resources are
+separate capabilities. Every read surface, including a cached summary, must reauthorise; a generic
+index count or approval prompt cannot disclose hidden activity.
+
+Existing quotation, money, immutable revision and validated closure contracts remain canonical.
+New practice links refer to those events rather than introducing another quote or booking model.
+Payment tracking additions stay in the source plan and execute no payment. The executable registry
+uses the repository's snake_case AFP kind convention plus `practice.event.v1`; the original dotted
+names in the product specification remain illustrative.
+
+No schema migration or runtime flag is added in this slice. Pure contract checks are not evidence
+that transactional grant persistence, websocket invalidation, expiry jobs or reference resolution
+already exist. Their integration remains required before any professional route is exposed.
+
 ## 2026-10-18: AFP signatures survive PostgreSQL timestamp normalisation
 
 AFP signing canonicalises parseable timestamps to UTC at PostgreSQL-compatible microsecond

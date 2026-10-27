@@ -82,6 +82,7 @@ pub mod planning_intelligence;
 pub mod planning_session;
 pub mod policy_engine;
 pub mod post_quantum;
+pub mod practice;
 pub mod prepared_context_packet;
 pub mod prepared_draft_packet;
 pub mod prepared_draft_semantics;

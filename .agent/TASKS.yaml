@@ -15,6 +15,30 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-275
+    title: Professional practice contracts, reuse inventory and authority model
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-275
+    depends_on: [WED-274, WED-262, WED-271, WED-273]
+    files:
+      - src/practice/**
+      - src/lib.rs
+      - schemas/practice/**
+      - tests/practice_*.rs
+      - Documents/design/wedding planner/wedding planner/wedding-planner-professional-workspace-*.md
+      - .agent/**
+    acceptance:
+      - path-and-test reuse inventory preserves ordinary Wedding plans and existing quotation truth
+      - versioned strict contracts reject unsupported versions and unallowlisted index fields
+      - authority matrix intersects current practice membership and explicit client scopes
+      - revoked or expired grants deny all read surfaces including cached access
+      - command validation binds authenticated actor, tenant, plan, revisions and idempotency
+      - focused Rust tests, typecheck, build and line-budget evidence is recorded
+    progress:
+      - isolated worktree from f1f9c82, the documentation-only descendant of required base 6af9203; dirty WED-215 and Claude checkouts remain untouched
+      - no practice routes, UI, migrations or runtime flags are enabled in this contract slice
+
   - id: WED-184
     title: Restore wedding navigation, directory search, and task contact assignment
     status: in_progress
@@ -1105,34 +1129,34 @@ tasks:
       - latest Cloudflare capture saved routing rules, exact catch-all rollback, and destination addresses; routing-status and DNS-export reads remain blocked by 403/10000, while a content-free Email Sending check confirms the account is entitled
       - Vendor Follow-up now uses native editable/selectable message, email, and date controls; its rationale is collapsed by default, missing directory email is explicit, and an official vendor website link is offered when available
       - legacy AFP rows with an empty encryption marker render as plaintext, while real encrypted envelopes remain protected; daemon heartbeats are excluded from chat at both the API and render layers
-      - `da42505` was released to Oracle on 2026-10-14 with scoped `homeserver` and `ui` services; Mistral's file-backed secret is mounted, `/wedding/` returns 200, and Caddy was not reloaded
+      - '`da42505` was released to Oracle on 2026-10-14 with scoped `homeserver` and `ui` services; Mistral''s file-backed secret is mounted, `/wedding/` returns 200, and Caddy was not reloaded'
       - email view now keeps only user-facing mailbox copy and retains the temporary Gmail connect action while Cloudflare relay control-plane work remains gated
       - vendor follow-up uses the stored vendor response excerpt where available, while Decision Focus exposes saved past decisions and background-agent records on demand
       - comparison documents identify their vendor category, comparison rendering uses readable light contrast, and Master Agent result sources are displayed when returned
       - vendor photos accept only direct Unsplash images or the authenticated, narrowly validated first-party Google Places proxy; exact directory queries continue to include Mackay Family Estate
-      - `aca37c1` was released to Oracle on 2026-10-14 with scoped `homeserver` and `ui` services; production `/wedding/` returned 200, the Mackay Family Estate row is present, and Caddy was not reloaded
+      - '`aca37c1` was released to Oracle on 2026-10-14 with scoped `homeserver` and `ui` services; production `/wedding/` returned 200, the Mackay Family Estate row is present, and Caddy was not reloaded'
       - guest RSVP actions now persist immediately, household records are written alongside guest profiles, internal household identifiers are never rendered, and helper workload defaults new work to the account owner
       - vendor follow-up suppresses raw email subjects, vendor categories normalize comparable labels (with A2Z Weddings classified as `photographer`), and tooltips render above the wedding navigation surface
-      - `8bd182f` was released to Oracle on 2026-10-14 with scoped `homeserver` and `ui` services; production shows A2Z Weddings as `photographer`, `/wedding/` returned 200, and Caddy was not reloaded
+      - '`8bd182f` was released to Oracle on 2026-10-14 with scoped `homeserver` and `ui` services; production shows A2Z Weddings as `photographer`, `/wedding/` returned 200, and Caddy was not reloaded'
       - mobile Wedding Home now gives the clear-decision state the full available view above the persistent tab bar; the Timeline has one mobile title, an edge-free mobile surface, visible chart rails, working completed filtering, and touch actions that open the linked task surface
       - the mobile Vendors tab once again renders the existing live vendor-search surface; legacy vendor-research tasks infer that same surface when their older projection lacks a menu target
-      - `2dce677` was released to Oracle on 2026-10-14 with scoped `homeserver` and `ui` services; the Google Places credential is a mounted file-backed secret in the running homeserver process, `/wedding/` returned 200, and Caddy was not reloaded
-      - `4254dce` was released to Oracle on 2026-10-14 as a scoped `ui` asset update; the clear-decision state now also removes the empty mobile header, so it fills the complete content area above the tab bar
+      - '`2dce677` was released to Oracle on 2026-10-14 with scoped `homeserver` and `ui` services; the Google Places credential is a mounted file-backed secret in the running homeserver process, `/wedding/` returned 200, and Caddy was not reloaded'
+      - '`4254dce` was released to Oracle on 2026-10-14 as a scoped `ui` asset update; the clear-decision state now also removes the empty mobile header, so it fills the complete content area above the tab bar'
       - Inspiration now uses its combined saved and in-page evidence immediately: two visual uploads produce a visual-direction working model, and every saved note appears as a current planning instruction; the mobile duplicate Inspiration title is suppressed and the panel uses the full available width
       - Important details no longer renders metadata/status tag pills; a Generate recommendations action now runs from saved context instead of being rejected by an older incomplete browser intake draft
       - Vision notes have a visible local compass update and truthful remote/local save receipt; sprout persona templates retain the installed active persona through a briefly stale list response and show an explicit installed-and-active confirmation
-      - `cb2ef81` was released to Oracle on 2026-10-14 as a scoped `ui` asset update; the UI job exited 0, `/wedding/` returned 200, homeserver was not restarted, and Caddy was not reloaded
+      - '`cb2ef81` was released to Oracle on 2026-10-14 as a scoped `ui` asset update; the UI job exited 0, `/wedding/` returned 200, homeserver was not restarted, and Caddy was not reloaded'
       - named vendor searches now select their existing request on focus, run a private exact directory lookup even when optional live-provider intake is incomplete, and render source-only packets safely without crashing Planner
       - mobile decision triage now derives a valid deterministic AFP transport thread ID (with the logical triage scope retained as metadata), resolving the authenticated AFP rejection that produced the misleading local-only sync state; this path does not call an LLM
       - legacy plural vendor-research tasks now route to the vendor search surface as well as singular task titles
-      - `e4fa5f9` was released to Oracle on 2026-10-14 as a scoped `ui` asset update; the one-shot UI job exited 0, homeserver remained running, `/wedding/` returned 200, and Caddy was not reloaded
+      - '`e4fa5f9` was released to Oracle on 2026-10-14 as a scoped `ui` asset update; the one-shot UI job exited 0, homeserver remained running, `/wedding/` returned 200, and Caddy was not reloaded'
       - new vendor enquiries no longer send the internal AFP tracking thread ID as a Gmail thread ID; Gmail now creates its own conversation while the existing AFP draft/sent record preserves wedding tracking, fixing the rejected approved-enquiry send path
       - comparison views allow one or several vendor choices to be explicitly added to follow-up, photo placeholders no longer contain internal evidence wording, and the transient search `Done` control has been removed
       - the sprout template row activates an already-installed persona instead of being inert; custom cards persist their chosen text/callout/stats/table layout, and local image cards are compressed, saved, and movable
-      - `0973aab` was released to Oracle on 2026-10-14 as a scoped `ui` asset update; the UI build completed, `/wedding/` returned 200, homeserver remained running, and Caddy was not reloaded
-      - `9eb57aa` was released to Oracle on 2026-10-14 with the scoped `homeserver` service after its release build completed; a new Gmail enquiry now has no local thread ID in the provider payload, `/wedding/` returned 200, and Caddy was not reloaded
+      - '`0973aab` was released to Oracle on 2026-10-14 as a scoped `ui` asset update; the UI build completed, `/wedding/` returned 200, homeserver remained running, and Caddy was not reloaded'
+      - '`9eb57aa` was released to Oracle on 2026-10-14 with the scoped `homeserver` service after its release build completed; a new Gmail enquiry now has no local thread ID in the provider payload, `/wedding/` returned 200, and Caddy was not reloaded'
       - a Sprout RSVP stat request now reads aggregate-only guest and RSVP counts from the open Wedding workspace before it renders, so invitation-versus-response cards show the current recorded values rather than a generic text field
-      - `00fcc19` was released to Oracle on 2026-10-14 as a scoped `ui` asset update; the UI build completed, `/wedding/` returned 200, homeserver remained running, and Caddy was not reloaded
+      - '`00fcc19` was released to Oracle on 2026-10-14 as a scoped `ui` asset update; the UI build completed, `/wedding/` returned 200, homeserver remained running, and Caddy was not reloaded'
       - Master Agent commands now fail closed with a visible Connect AI model first action when no usable user model is configured; deterministic travel or other route cards are not presented as agent-generated plans, and natural-language prompts retain their original wording
       - the Soul/LoRA prompt editor uses a native focusable textarea, voice input explicitly requests microphone permission before browser recognition and writes only a transcript into the command field, and Decision Focus gives Follow-Up an immediate visible draft/search result
       - migration `0110` removes only the exact synthetic A2Z outreach-draft row that an older projection falsely recorded as a vendor reply; reply projection now accepts explicit gateway replies or authenticated Gmail imports, never its own drafts
@@ -1145,7 +1169,7 @@ tasks:
       - vendor-dependent decisions, including wedding rings, now show an inline research surface and open the vendor tab with a concrete category query before any selection or outreach
       - Enter in a native vendor-search field is isolated from the armed global Magic Pointer action, preventing the observed jump back to Wedding Home; the mobile timeline starts in its date-scaled schedule chart and respects completed filtering there
       - restored the Artifact Detail vendor-directory prop contract, returning the full UI typecheck to clean status
-      - `fdcceea` was released to Oracle on 2026-10-15 as a scoped `ui` asset update; `/workspace/` and `/wedding/` returned 200, the production ResponseQueue bundle contains the ring-research action, homeserver remained running, and Caddy was not reloaded
+      - '`fdcceea` was released to Oracle on 2026-10-15 as a scoped `ui` asset update; `/workspace/` and `/wedding/` returned 200, the production ResponseQueue bundle contains the ring-research action, homeserver remained running, and Caddy was not reloaded'
       - manual vendor searches now stay on the Vendors surface from launch through completed comparison rendering; only automatic background shortlists return to Wedding Home
       - People mobile cards now use one-column status badges, larger internal spacing, independent stacked action cards, and full-width bottom CTAs; mobile content reserves clear space above the persistent tab bar and Sprout control
       - Sprout persona templates now complete their initial authenticated load instead of remaining permanently disabled; new vendor drafts retain provider wording but are formatted into editable email paragraphs, and provider-confirmed sends show an encouraging success state
@@ -1156,8 +1180,8 @@ tasks:
       - mobile Documents now uses a unified upload/research/visibility toolbar, a neutral consent setting, a grouped export panel, accessible search treatment, and additional safe-area clearance for Sprout
       - provider-only vendor-search readiness no longer creates a couple-facing task; remaining blocked intake is phrased as a practical research prerequisite, and budget contributions no longer render synthetic contributor or vendor-condition copy
       - timeline lead-time tasks use short user-facing actions such as `Search for planner`
-      - `255f99a` was released to Oracle on 2026-10-15 as a scoped `ui` asset update; `/workspace/` and `/wedding/` returned 200, the public ResponseQueue bundle contains the Documents export and upload controls, homeserver remained running, and Caddy was not reloaded
-      - `d8f3541` was released to Oracle on 2026-10-15 as a scoped UI asset update; `/workspace/` and `/wedding/` returned 200, the deployed ResponseQueue bundle contains the quiet selection, agenda, and contact-picker paths, and Caddy was not reloaded
+      - '`255f99a` was released to Oracle on 2026-10-15 as a scoped `ui` asset update; `/workspace/` and `/wedding/` returned 200, the public ResponseQueue bundle contains the Documents export and upload controls, homeserver remained running, and Caddy was not reloaded'
+      - '`d8f3541` was released to Oracle on 2026-10-15 as a scoped UI asset update; `/workspace/` and `/wedding/` returned 200, the deployed ResponseQueue bundle contains the quiet selection, agenda, and contact-picker paths, and Caddy was not reloaded'
 
   - id: WED-187
     title: Wedding vendor personalised recommendation baseline
@@ -1234,7 +1258,7 @@ tasks:
       - the outreach route is below 900 lines
     progress:
       - shared ladder extraction is implemented; outreach now calls it and remains below 900 lines
-      - `cargo check`, six focused ladder tests, and 148 library wedding tests pass with only the existing email_group_routes unused-variable warning
+      - '`cargo check`, six focused ladder tests, and 148 library wedding tests pass with only the existing email_group_routes unused-variable warning'
       - authenticated Anthropic model listing could not run because no hosted key is configured locally
       - solid-ui typecheck passes; the production UI build needs a clean completion result outside the command window
   - id: WED-190
@@ -1259,7 +1283,7 @@ tasks:
       - the ranking orchestrator remains below 900 lines
     progress:
       - v1 components are split out and policy-v2 selection is wired behind the disabled-by-default build flag
-      - `npm run typecheck`, the focused policy/baseline/coordinator tests, and the complete wedding test suite pass
+      - '`npm run typecheck`, the focused policy/baseline/coordinator tests, and the complete wedding test suite pass'
       - Vite production build began but did not yield a final result in the interactive command window; retain this as a release gate
   - id: WED-191
     title: Facet vocabulary and style facets attribute key
@@ -1282,7 +1306,7 @@ tasks:
       - experience-trait synonym mapping has no duplicate regex source
     progress:
       - shared `wedding_facets.v1` JSON is imported by TypeScript and compile-time included by Rust; Docker copies the build input
-      - `style_facets` validates ids against the vocabulary and the admin editor uses label-based multi-select input
+      - '`style_facets` validates ids against the vocabulary and the admin editor uses label-based multi-select input'
       - catalog tests moved to a sibling module; the production catalog is 860 lines
       - experience traits and decision-fit matching consume vocabulary synonyms; focused TypeScript and Rust tests pass
   - id: WED-192
