@@ -1,5 +1,5 @@
 version: 1
-updated: 2026-10-10
+updated: 2026-10-27
 
 lifecycle:
   allowed_statuses:
@@ -17,15 +17,13 @@ lifecycle:
 tasks:
   - id: WED-275
     title: Professional practice contracts, reuse inventory and authority model
-    status: in_progress
+    status: review
     owner: codex
     branch: agent/codex/WED-275
     depends_on: [WED-274, WED-262, WED-271, WED-273]
     files:
       - src/practice/**
       - src/lib.rs
-      - schemas/practice/**
-      - tests/practice_*.rs
       - Documents/design/wedding planner/wedding planner/wedding-planner-professional-workspace-*.md
       - .agent/**
     acceptance:
@@ -38,6 +36,11 @@ tasks:
     progress:
       - isolated worktree from f1f9c82, the documentation-only descendant of required base 6af9203; dirty WED-215 and Claude checkouts remain untouched
       - no practice routes, UI, migrations or runtime flags are enabled in this contract slice
+      - c46e506 adds 15 strict event payloads, the complete role/resource/action ceiling matrix, current grant checks on every access surface and a permission-redacted client summary
+      - command digest binds actor, context, capabilities, expected revisions and payload; retry helpers distinguish exact replay, stale projection and changed-payload reuse
+      - local final verification passed 12 Rust contract tests, cargo check --lib, SDK build, UI typecheck, 2004 Wedding tests, both line-budget tests and production UI build
+      - repaired 16 pre-existing unquoted backtick-leading YAML scalars without changing their text; task ledger parses with unique IDs and all new files remain below 1000 lines
+      - canonical live-grant persistence, transactional receipts, cache/websocket invalidation and WED-276 through WED-284 remain separate integration work; no hosted verification or deployment is claimed
 
   - id: WED-184
     title: Restore wedding navigation, directory search, and task contact assignment

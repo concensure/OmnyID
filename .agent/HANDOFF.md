@@ -290,6 +290,58 @@ Next:
 - The signing secret was not read, copied, logged, or committed; the release used the existing Oracle `.env.oracle`.
 # Handoff
 
+## 2026-10-27 - WED-275 professional practice contract foundation (Codex)
+
+Implementation: `c46e506` on `agent/codex/WED-275`, isolated at
+`C:/Users/ozans/Desktop/projects/OmnyID-WED-275`. Base `f1f9c82` contains required ancestor `6af9203`.
+The dirty Claude and WED-215 checkouts were not copied or modified for implementation.
+
+Changed and why:
+
+- Added `src/practice/` and its `src/lib.rs` registration: strict versioned contracts for identity,
+  membership/collaboration, the client index, assignment, availability, holds, quote/booking links
+  and payment tracking. Existing quotation Money, itemisation, revision and closure evidence remain
+  canonical. No professional route, UI, persistence, migration or runtime flag is introduced.
+- Added server-side pure authority checks that intersect role ceilings, explicit membership and
+  plan grants, subject/context binding, validity and current authority revisions. Vendor proofs
+  are resource-bound. Every read surface uses the same policy, including cached index projection.
+- Index projection removes inaccessible counts, next actions and finance summaries. Typed command
+  hashing binds actor/context/revisions/payload; revision and retry helpers distinguish stale
+  writes, exact retry and conflicting reuse of a key. Transactional storage is later work.
+- Added the path/test reuse inventory and integration contract beside the two requested design
+  documents; updated both documents with an explicit first-slice checkpoint. Mirrored those three
+  documents to the exact requested primary-checkout folder after comparing it to the base.
+- Registered WED-275 and the architecture decision. Repaired 16 existing unquoted backtick-leading
+  YAML scalar entries in this branch's task ledger, preserving their text. The committed baseline
+  failed PyYAML parsing at line 1108; the repaired ledger parses and has unique task IDs.
+
+Verification:
+
+- First `cargo test --lib practice:: -j 1`: 10 passed, including all 8 roles x 18 resources x 8
+  actions and negative cases for revocation, expiry, cross-plan access, schema/version rejection,
+  unallowlisted index fields, money bounds and hold confirmation references.
+- Final `cargo test --lib practice:: -j 1`: 12 passed, including added digest-binding and
+  vendor/couple proof-isolation cases. `cargo check --lib -j 1` passed on the final implementation.
+- SDK build, UI typecheck, both line-budget tests, all 2,004 Wedding tests and production UI build
+  passed locally. Vite reports its existing large-chunk advisory. No UI source changed.
+- Scoped rustfmt, diff whitespace, task YAML/unique IDs, document fences/links and every new file's
+  strict sub-1,000-line limit passed. No migration or browser test applies to this route-free slice.
+
+Limits and next action:
+
+- The contract tests do not prove live revocation, websocket cancellation or cache purging. WED-277
+  must resolve owner/plan/thread mapping server-side, replay grants, store revisions and receipts
+  atomically, and reauthorise every delivery/download/export. Existing owner-only thread reads must
+  remain intact. Structural reference validation is not proof of quote/booking/evidence ownership.
+- WED-276 through WED-284 remain pending: shell, live grants, inbox, calendar, supplier/quote flows,
+  booking/payment tracking, integrated security/release evidence and the allowlisted cohort.
+- GitHub Checks for the base returned 422 because that local commit is absent remotely. Recent CI
+  entries were older failed commits; the Deployments API returned no records. No hosted result or
+  deployed SHA is asserted. No deployment occurred. The task branch is local; a PR against the
+  intended advanced base awaits publishing/review of that base, rather than targeting unrelated main.
+- Review `c46e506` using the companion contracts document, then implement WED-276/277 on this lineage
+  with new flags dark and the transaction/invalidation requirements intact.
+
 ## 2026-10-15 - WED-185 account-verification delivery and exact vendor lookup (Codex)
 
 - Registration no longer presents a contradictory waiting-for-email state after a known delivery failure. The server retries verification/password-reset delivery through a separately mounted Resend credential when the legacy gateway fails; the vendor relay remains disabled and still rejects Gmail/SMTP as a provider.
