@@ -1797,3 +1797,23 @@ The public vendor directory reads bounded active public fields from Postgres and
 deploys the source dataset. Claim suggestions are authenticated, rate-limited, capped at eight and
 fuzzy-match active business names; choosing one supplies the canonical listing slug to the existing
 ownership-proof flow.
+
+## 2026-10-27: Professional planners use a portfolio layer over ordinary Wedding plans
+
+A professional wedding planner is an ordinary OmnyID account with an opt-in practice capability, not
+a second wedding-planning product. Every client remains one ordinary Wedding template instance with
+its own account- and plan-scoped AFP ledger. A practice coordination ledger may hold membership,
+authority grants, assignments and a strictly allowlisted operational index, but it must not copy
+messages, documents, guest lists, quote contents or other client histories into a parallel CRM.
+
+The selected-client experience reuses Wedding Home, Tasks, Timeline, Vendors, Budget, People and
+Documents. A thin practice shell adds Home, Clients, Inbox, Calendar, Suppliers and Settings, with an
+explicit practice/client switcher and persistent mobile bottom navigation. Contextual A2UI cards may
+project the next action, approvals, holds and quote summaries; deterministic server logic owns state
+transitions, permissions, calendar conflicts and money arithmetic.
+
+Supplier workflow states remain deliberately distinct. A temporary date hold is neither availability
+proof nor a booking. Quote acceptance creates booking pending; configured confirmation evidence is
+required before booking confirmed. Deposits and balances are evidence-backed tracking states and do
+not execute payments. This preserves clear consequences while adapting useful competitive workflow
+ideas without copying a competitor screen-for-screen.

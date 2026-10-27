@@ -5061,3 +5061,35 @@ Next:
 
 - Human review may exercise the live reminder/booking flows with a signed-in couple and fuzzy claim lookup
   with a signed-in vendor. Do not enable mail/relay, quote-study or ranking-policy-v2 from this release.
+
+## 2026-10-27 - WED-274 professional planner workspace specification (Codex, complete)
+
+Changed:
+
+- Added a professional wedding planner workspace specification based on an inspection of the live Weddly
+  PWA and the supplied supplier promises. It adapts the useful workflow concepts to OmnyID rather than
+  copying pages or introducing a parallel CRM.
+- Defined an opt-in practice shell over ordinary Wedding templates: one AFP ledger per client, explicit
+  collaboration grants, a permission-safe practice index, role-appropriate projections and A2UI only for
+  allowlisted contextual surfaces.
+- Defined cohesive mobile/desktop navigation and enquiry, capacity, hold, supplier profile, itemised quote,
+  booking, deposit and balance journeys. Quote acceptance, booking confirmation and payment evidence remain
+  separate authoritative states.
+- Added a detailed dependency-ordered WED-275 through WED-284 task plan covering contracts, practice mode,
+  client grants, inbox, calendar/holds, suppliers, quotes, closure, hardening and an allowlisted cohort.
+- Mirrored both documents to the exact requested root `Documents/design/wedding planner/wedding planner`
+  folder while keeping the committed copies in this advanced isolated worktree.
+
+Verification:
+
+- Both documents are below the 1,000-line limit (545 and 619 lines).
+- Root and worktree copies match after newline normalization.
+- `git diff --check` passes for the WED-274 scoped paths.
+- This documentation-only slice did not alter executable code, run an application build or deploy.
+- Unrelated dirty Rust/test files and Oracle proof artifacts remain unstaged and out of scope.
+
+Next:
+
+- Begin WED-275 with a repository-level reuse and authority inventory before adding any migration or UI.
+  Reserve WED-275 through WED-284 in the canonical task ledger as each slice starts and keep all new flags
+  dark until the WED-283 evidence gates and WED-284 allowlisted cohort are complete.

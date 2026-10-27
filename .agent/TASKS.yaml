@@ -3761,3 +3761,29 @@ tasks:
       - pass: typecheck; focused lifecycle and static surface tests 8/8; all 2,004 Wedding tests; Wedding site/CSP/quiz checks; focused Rust vendor-claim tests 4/4; rustfmt; production build; line budget
       - Oracle release bc1318d serves all 455 active vendors as 455 unique slugs across nine categories; read-only SQL reconfirmed the protected photographer slice at 93 vendor IDs and 441 attributes without running an importer
       - live checks confirm first-person plain-text quiz sharing, the home quiz entry, category filters, Business name claim copy, authenticated suggestion routing, static quote consent/disclosure, Remind and lifecycle filter code; production proof passes and mail, quote-study, relay and ranking-policy-v2 rollout remain off
+  - id: WED-274
+    title: Specify a unified professional wedding planner and supplier operations workspace
+    status: complete
+    owner: codex
+    branch: agent/codex/WED-215
+    depends_on:
+      - WED-262
+      - WED-271
+      - WED-273
+    files:
+      - Documents/design/wedding planner/wedding planner/wedding-planner-professional-workspace-spec.md
+      - Documents/design/wedding planner/wedding planner/wedding-planner-professional-workspace-tasks.md
+      - .agent/**
+    acceptance:
+      - competitive inspiration from the live Weddly supplier experience is translated into OmnyID workflows rather than copied screen-for-screen
+      - a professional planner reuses the ordinary Wedding template, AFP ledger, A2UI, vendor claim, enquiry, quote, document, booking, task, budget and payment projections instead of creating a parallel CRM or planner
+      - information architecture defines an obvious mobile-first home, client switcher, enquiry next actions, calendar capacity, date holds, supplier profile, quote, acceptance, deposit and balance journeys with no orphaned pages or ambiguous buttons
+      - couple, planner, team and supplier authority boundaries, selective context sharing, tenancy, audit, security and rollout gates are explicit
+      - the companion task plan is dependency ordered, identifies reuse before new work, keeps new files below 1000 lines and defines focused and full verification after each slice
+    progress:
+      - registered from committed WED-273 revision 6af9203; existing unrelated dirty Rust and Oracle proof paths remain out of scope
+      - inspected the live Weddly PWA shell and translated the supplied supplier promises into OmnyID workflows without copying its screens or treating competitor copy as an implementation contract
+      - specified an opt-in professional practice shell over ordinary Wedding plans, one AFP ledger per client, explicit collaboration grants, a permission-safe practice index and role-specific A2UI projections
+      - separated enquiry, hold, quotation, booking and payment evidence state; defined obvious mobile/desktop navigation, authority boundaries, security, accessibility, AI limits and dark rollout gates
+      - produced a dependency-ordered WED-275 through WED-284 task plan with reuse-first slices, scenario coverage, verification after each slice and new-file line limits; mirrored both documents to the exact requested root Documents path
+      - documentation validation passes: both new files are below 1000 lines, root/worktree content matches after newline normalization and git diff --check passes for the scoped changes
