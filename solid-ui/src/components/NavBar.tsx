@@ -1,5 +1,6 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { Portal } from "solid-js/web";
+import { PracticeEntryLink } from "@/components/practice/PracticeEntryLink";
 import { useViewport } from "@/context/ViewportContext";
 import { clearSession, fetchLlmConfig, fetchNavBarWeather, probeApiReachability, readSession, signOut } from "@/lib/api";
 import { OPERATOR_RUNTIME_REMEDIATION_SHORTCUTS } from "@/lib/operatorRuntimeRemediationKeyboard";
@@ -1291,6 +1292,7 @@ export function NavBar(props: {
                     </p>
                   </Show>
                   <Show when={props.signedIn}>
+                    <PracticeEntryLink />
                     <button
                       type="button"
                       onClick={() => { setShowSessionMenu(false); props.onEditProfile?.(); }}

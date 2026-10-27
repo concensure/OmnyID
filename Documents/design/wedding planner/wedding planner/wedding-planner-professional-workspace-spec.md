@@ -1,6 +1,6 @@
 # Professional Wedding Planner Workspace Specification
 
-Status: implementation started; WED-275 contract foundation, professional runtime still dark
+Status: WED-275/276 implemented locally for review; professional runtime remains dark
 
 Program: WED-274
 
@@ -12,7 +12,12 @@ Recommended implementation model: `gpt-6-astra`, high reasoning
 
 Implementation contract: [WED-275 reuse inventory and authority model](wedding-planner-professional-workspace-contracts.md).
 The executable registry reconciles the illustrative names below with existing AFP kinds and reuses
-canonical quotation and booking evidence. No professional routes or UI are enabled by this foundation.
+canonical quotation and booking evidence. WED-276 adds a dark practice shell and authenticated bootstrap;
+its empty projection tables await WED-277's authoritative grant/event writers. The shell presents
+permission-safe summaries, explicit context switching and server-selected next actions. Client editing,
+full enquiry/calendar/supplier flows and release gates remain pending. See the
+[task checkpoint and remaining count](wedding-planner-professional-workspace-tasks.md#implementation-checkpoint--2026-10-27):
+eight major implementation slices remain, with WED-275/276 awaiting review. No deployment is claimed.
 
 ## 1. Purpose
 

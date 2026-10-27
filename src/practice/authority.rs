@@ -98,7 +98,7 @@ pub fn role_allows(role: Role, capability: Capability) -> bool {
     }
 }
 
-fn live(grant: &Grant, actor: &str, now: DateTime<Utc>) -> bool {
+pub(super) fn live(grant: &Grant, actor: &str, now: DateTime<Utc>) -> bool {
     let parse = |value: &str| DateTime::parse_from_rfc3339(value).map(|v| v.with_timezone(&Utc));
     grant.subject_account_id == actor
         && !grant.grant_id.trim().is_empty()

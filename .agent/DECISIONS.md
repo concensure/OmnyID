@@ -1,3 +1,24 @@
+## 2026-10-27: Dark practice shell reads scoped, rebuildable indexes
+
+WED-276 consumes the WED-275 contracts through an authenticated read-only bootstrap. An exact account
+allowlist and the practice flag are both required. A repeatable-read transaction loads current
+membership and selected-practice client grants; the pure projector applies role/capability ceilings,
+expiry, revocation and the full owner/plan/thread identity before exposing summaries or priorities.
+Responses are private/no-store. Over-limit portfolios fail closed rather than silently miscounting.
+
+Migration 0122 adds empty directory, membership and per-subject client indexes. They contain source
+event references and strict summary fields, not Wedding messages or a second event history. WED-277
+must implement authoritative AFP writers and source-reference resolution before any live allowlist.
+The SQL rows alone are not evidence of an owner-authorised source event. There is no public write API
+or inferred grant backfill. Rollback disables the flag and retains these additive rebuildable tables.
+
+The isolated `/workspace/practice.html` entry reuses A2UI for a typed server-selected card. Navigation
+is conventional HTML. Existing couple navigation gains only an entitlement-gated entry. Personal,
+personal Wedding and practice contexts are explicit; client links bind the full plan tuple. No
+summaries persist to local storage. Access rechecks precede Back restoration, errors clear detail,
+and abort generations reject obsolete requests. Thirty-second revalidation is not push revocation;
+source-event and websocket invalidation remain required by WED-277/WED-283.
+
 ## 2026-10-27: Practice authority intersects membership and client grants
 
 WED-275 adds template-neutral strict contracts under `src/practice/`, without routes or persistence.

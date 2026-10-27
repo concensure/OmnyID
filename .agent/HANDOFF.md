@@ -290,6 +290,67 @@ Next:
 - The signing secret was not read, copied, logged, or committed; the release used the existing Oracle `.env.oracle`.
 # Handoff
 
+## 2026-10-27 - WED-276 dark practice shell and bootstrap (Codex)
+
+Branch: `agent/codex/WED-276`, at `C:/Users/ozans/Desktop/projects/OmnyID-WED-275`, continued from
+`11740c5` and the WED-275 contract implementation `c46e506`. Implementation remains isolated from the
+dirty primary and WED-215 checkouts. The latter's Cargo target cache was reused, not its source.
+
+Changed and why:
+
+- `src/practice/bootstrap*.rs` and the authority/module wiring add exact-account dark entitlement,
+  current-membership/client projection, scoped summaries and deterministic priority ordering.
+- `src/server/practice_routes*.rs`, minimal server registration, migration 0122 and catalog entry
+  add authenticated `/practice/bootstrap`, a repeatable-read snapshot and private/no-store responses.
+  Empty rebuildable indexes have positive revisions and strict summary keys. No grant write API exists.
+- `solid-ui/src/components/practice/`, `weddingPractice*.ts`, practice HTML/main/CSS, Vite entry and
+  two NavBar lines add responsive navigation, explicit personal/Wedding/practice selection, Home,
+  typed A2UI next action, agenda/count source links, scoped client summaries and empty/error recovery.
+- URL filters and full owner/plan/thread deep links survive refresh. Abort generations discard old
+  requests. Hidden tabs clear detail; active tabs revalidate every 30 seconds. Back rechecks authority
+  before restoring scroll. Fixed a real race where loading could overwrite saved scroll with zero.
+- Fixtures, state tests and browser cases cover scope, stale requests, recovery and navigation.
+  Both requested design documents now show the remaining count; the contract inventory adds the
+  integration boundary and corrects the vendor UI source path.
+
+Verification evidence (local only):
+
+- `cargo test --lib practice:: -j1`: 17 tests passed, including WED-275 contracts and five new
+  entitlement/projection tests. Focused HTTP test, run alone with `--include-ignored --test-threads=1`,
+  passed against disposable pgvector PostgreSQL 18 at localhost:55433. It applies the registered
+  migrations, reruns 0122, rejects forbidden summary keys, exercises authentication/allowlist,
+  redaction, forged practice selection and immediate denial on subsequent reads after revocation.
+  The first DB attempt lacked the vector extension; replacing only the disposable DB resolved it.
+- Final `cargo check --lib -j1` passed. The disposable test container was removed after verification.
+- All 2,010 Wedding tests passed, including six new practice state cases. Typecheck, both line-budget
+  checks and production UI build passed. Vite retains its existing large-chunk advisory.
+- Seven Playwright cases passed: 1280/360/320 CSS-pixel layouts (320px reflow equivalent to 1280px at
+  400% zoom), linked counts, context switching, deep-link refresh/denial, revoked/error recovery,
+  keyboard entry and Back search/scroll restoration. Axe found no serious/critical violations in
+  the checked workspace states. Mobile screenshot was inspected. This does not claim native browser
+  zoom controls, screen-reader review or production integration coverage.
+- Local logs: `artifacts/wed276/wedding-tests.log`, `artifacts/wed276/ui-build.log`; Playwright artifacts
+  are under `solid-ui/test-results/`. These generated files are intentionally uncommitted.
+
+Limits, rollout and next action:
+
+- Keep `OMNYID_WEDDING_PRO_PRACTICE_ENABLED` and `OMNYID_WEDDING_PRO_ACCOUNT_ALLOWLIST` unset. The
+  migration creates no practice or grant. WED-277 must resolve source ownership and transactionally
+  project authorised AFP grants/revocations before any real account is enabled. Never seed live grants
+  manually. Browser tests use fixtures; the HTTP test inserts synthetic rows only in its disposable DB.
+- Rollback disables the flag and reverts consumers; retain the additive tables. No AFP history is
+  rewritten. No external email, hold conversion, booking, payment or deployment occurred.
+- Client destinations currently display authorised summaries; normal Wedding editing is WED-277.
+  Inbox/calendar/supplier destinations are summary entry points for WED-278/279/280. Live source
+  writers, push revocation and broader security/release evidence remain later work.
+- Eight major implementation slices remain: WED-277 through WED-284. WED-275/276 are ready for review,
+  not marked done. Next implement WED-277 on this lineage and preserve existing owner-only routes
+  until explicit plan-bound collaboration is enforced.
+- Latest GitHub runs remain older failed commits (509dc31 and 69fbc2b); no CI result covers this local
+  branch. The advanced base is unpublished, so a useful PR awaits publication/review of that base.
+  No deployment status is inferred from local checks. See the prior handoff for the empty Deployments
+  API and base Checks API 422. No hosted runtime/version verification was attempted for this dark slice.
+
 ## 2026-10-27 - WED-275 professional practice contract foundation (Codex)
 
 Implementation: `c46e506` on `agent/codex/WED-275`, isolated at

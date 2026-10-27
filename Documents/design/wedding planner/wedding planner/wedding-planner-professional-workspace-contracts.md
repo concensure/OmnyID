@@ -17,7 +17,7 @@ Existing AFP kinds use snake_case with an independent version in metadata/conten
 | Calendar | Extend | `solid-ui/src/lib/weddingCalendarProjectionState.ts`, `src/calendar_event_profile.rs`; calendar projection tests | Add resource policy, exception and hold events. WED-279 must resolve IANA zones and evaluate DST, recurrence and overlaps; structural validation here does not prove availability. |
 | Vendor lifecycle | Reuse | `solid-ui/src/lib/weddingVendorLifecycleState.ts`; `solid-ui/tests/wedding-vendor-lifecycle-state.test.ts` | Consume `wedding_vendor_outreach_sent`, `wedding_vendor_quote_received`, `wedding_vendor_booking_confirmed`, `wedding_vendor_booking_cancelled`, `wedding_vendor_follow_up_reminder`, `wedding_vendor_contact_reference`. Portfolio entries retain source event IDs. |
 | Enquiries and relay | Extend | `src/server/wedding_vendor_outreach_routes.rs`, `src/server/vendor_email_worker_ingress.rs`, `src/wedding_vendor_email_contract.rs`; `tests/vendor_email_worker_ingress_api.rs` | Aggregate permitted existing conversations. Sending still requires exact draft/content authority and existing relay gates. |
-| Vendor identity and profile | Reuse | `src/server/wedding_vendor_claim_routes.rs`, `src/server/wedding_vendor_ownership_routes.rs`, `solid-ui/src/components/VendorPortalApp.tsx`; `tests/wedding_vendor_ownership_api.rs` | Vendor proof is bound to a claimed identity and exact addressed resource, not membership of a practice. |
+| Vendor identity and profile | Reuse | `src/server/wedding_vendor_claim_routes.rs`, `src/server/wedding_vendor_ownership_routes.rs`, `solid-ui/src/components/vendor/VendorClaimFlow.tsx`; `tests/wedding_vendor_ownership_api.rs` | Vendor proof is bound to a claimed identity and exact addressed resource, not membership of a practice. |
 | Secure attachments | Reuse | `src/server/quotation_vendor_attachment_routes.rs`, `src/server/file_upload_routes.rs`, `src/quotation/response_capability.rs`; `tests/quotation_response_capability.rs` | Existing capability, scanner and content controls remain. Add current plan/grant checks before every download; a URL is not continuing authority. |
 | Itemised quotations | Reuse/extend | `src/quotation/contracts.rs`, `vendor_response.rs`, `vendor_revision.rs`, `validation.rs`; `tests/quotation_contracts.rs`, `quotation_vendor_response.rs` | Reuse `NormalisedQuotation`, `LineItem`, `Money`, `ScaledQuantity`, `TaxRule`, `CommercialTerm`, source/version lineage and expiry. A practice quotation link references a canonical revision; it does not define another vendor quote object. WED-281 adds authored package lineage and presentation if needed. |
 | Quotation AFP and replay | Reuse | `src/quotation/afp.rs`, `replay.rs`; `tests/quotation_afp.rs` | Preserve normalisation, correction, comparison, review, vendor selection and closure kinds. Do not rename existing events to match the illustrative spec. |
@@ -163,3 +163,31 @@ quote/closure/evidence references and enforce revisions, currencies, evidence an
 The base commit was absent from GitHub's Checks API (422 on this session); recent remote CI runs
 were older failed commits. The Deployments API returned no entries. No hosted-health assertion
 follows from local checks, and this work does not change the existing release gates.
+
+## WED-276 integration checkpoint
+
+The WED-275 compatibility statements above describe that contract-only slice. WED-276 now adds
+`src/practice/bootstrap.rs`, `src/server/practice_routes.rs`, migration 0122 and the Solid practice
+entry point. Bootstrap uses current stored grants in one repeatable-read transaction, intersects
+membership and per-client authority before serialising counts or actions, and responds with
+`Cache-Control: no-store, private`. Unknown/malformed index content fails closed. Priority order is
+permission, approval, reply/quote, hold, payment evidence, follow-up, task; deadline and full plan tuple
+break ties deterministically.
+
+The SQL tables are rebuildable indexes, not a second Wedding history. They are initially empty and
+have no public write API. WED-277 must resolve plan ownership and transactionally project authorised
+source events and revocations into them before any real account is allowlisted. `source_event_id`
+is a provenance reference, not proof validated by this read-only slice. Do not manually seed live grants.
+
+UI responses are held only in memory. Switching, hidden tabs and errors clear private detail; every
+refresh and Back navigation rechecks the server. Abort generations reject late responses. URLs retain
+explicit practice/owner/plan/thread and filters; browser history retains scroll and authority identity,
+not client summaries. Scroll is reused only when account, practice and grant revisions still match.
+Visible tabs recheck every 30 seconds; this is not push revocation. Websocket cancellation and live
+source-event integration remain WED-277/WED-283 requirements.
+
+Rollback disables the practice flag and removes consumers while retaining the additive empty/index
+tables. No source AFP history is rewritten or deleted. Full thread reads remain owner-only until
+WED-277 adds explicitly scoped access. Existing couple/vendor workflows are unchanged apart from the
+capability-guarded navigation link. Browser evidence uses fixtures; the disposable PostgreSQL HTTP
+check exercises authentication, current index grants and immediate denial on subsequent reads.

@@ -15,6 +15,48 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-276
+    title: Dark professional practice bootstrap, shell and explicit context switching
+    status: review
+    owner: codex
+    branch: agent/codex/WED-276
+    depends_on: [WED-275]
+    files:
+      - src/practice/bootstrap*.rs
+      - src/practice/authority.rs
+      - src/practice/mod.rs
+      - src/server/practice_routes.rs
+      - src/server/practice_routes_tests.rs
+      - src/server/mod.rs
+      - src/db/migration_catalog.rs
+      - postgres/migrations/0122_practice_projections.sql
+      - solid-ui/src/components/practice/**
+      - solid-ui/src/components/NavBar.tsx
+      - solid-ui/src/lib/weddingPractice*.ts
+      - solid-ui/src/practice-main.tsx
+      - solid-ui/src/practice.css
+      - solid-ui/practice.html
+      - solid-ui/vite.config.mjs
+      - solid-ui/e2e/wedding-practice-fixture.html
+      - solid-ui/tests/wedding-practice*.test.ts
+      - solid-ui/tests/e2e/wedding-practice*
+      - solid-ui/tests/fixtures/wedding-practice.ts
+      - .agent/**
+      - Documents/design/wedding planner/wedding planner/wedding-planner-professional-workspace-*.md
+    acceptance:
+      - practice bootstrap is authenticated, capability gated and dark by default
+      - current grants filter selected-practice summaries before counts and deterministic priorities
+      - explicit context switching clears details and rejects stale in-flight results
+      - responsive navigation, client deep links, Back restoration and empty/error states are usable
+      - focused Rust, migration, browser, frontend, typecheck, build and line-budget checks are recorded
+    progress:
+      - continued in the clean isolated WED-275 worktree on a new WED-276 branch; consumes c46e506 contracts without changing unrelated checkouts
+      - added exact-account dark entitlement, authenticated no-store bootstrap, current-grant filtering and deterministic typed next actions
+      - migration 0122 adds empty rebuildable indexes with strict summary keys; authoritative AFP writers and live plan mapping remain WED-277 prerequisites
+      - responsive practice shell reuses A2UI, binds full client identity, clears stale details, restores Back search/scroll only after renewed authority and guards the existing personal navigation entry
+      - cargo check --lib passed on the final implementation; local evidence includes 17 practice tests, a disposable PostgreSQL HTTP and migration test, 2010 Wedding tests, 7 Playwright cases, typecheck, line-budget checks and production UI build
+      - eight major implementation items remain WED-277 through WED-284, with WED-275 and WED-276 awaiting review; no deployment or cohort activation occurred
+
   - id: WED-275
     title: Professional practice contracts, reuse inventory and authority model
     status: review

@@ -614,4 +614,9 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Consent-bound unencrypted SeaweedFS quote study submissions and analysis receipts",
         include_str!("../../postgres/migrations/0121_wedding_quote_study.sql"),
     ),
+    (
+        "0122_practice_projections",
+        "Rebuildable permission-scoped professional practice indexes",
+        include_str!("../../postgres/migrations/0122_practice_projections.sql"),
+    ),
 ];

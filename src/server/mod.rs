@@ -137,6 +137,7 @@ mod news_routes;
 mod para_routes;
 mod planning_constraint_capture_routes; mod planning_constraint_evaluation_routes; mod planning_constraint_intervention_routes; mod planning_constraint_routes; mod planning_cost_tradeoff_routes; mod planning_directory_evaluation_routes; mod planning_milestone_routes; mod planning_vendor_change_routes;
 mod privacy_routes;
+mod practice_routes;
 mod proactive_ranking_helpers;
 mod proactive_routes;
 mod protocol_routes;
@@ -1368,6 +1369,7 @@ pub async fn run() {
         .merge(goal_routes::routes())
         .merge(conversion_routes::routes())
         .merge(ingest_routes::routes())
+        .merge(practice_routes::routes())
         .merge(quotation_normalisation_routes::routes()).merge(quotation_routes::routes()).merge(quotation_response_capability_routes::routes())
         .merge(quotation_response_portal_routes::routes()).merge(quotation_vendor_response_routes::routes()).merge(quotation_vendor_attachment_routes::routes())
         .merge(quotation_vendor_revision_routes::routes()).merge(quotation_source_routes::routes())
@@ -1527,6 +1529,7 @@ pub async fn build_test_router(database_url: &str) -> Router {
         .route("/thread/{thread_id}", get(get_thread_http))
         .route("/actions/decision", post(record_action_decision_http))
         .route("/gateway/email", post(handle_gateway_email))
+        .merge(practice_routes::routes())
         .merge(quotation_normalisation_routes::routes()).merge(quotation_routes::routes()).merge(quotation_response_capability_routes::routes())
         .merge(quotation_response_portal_routes::routes()).merge(quotation_vendor_response_routes::routes()).merge(quotation_vendor_attachment_routes::routes()).merge(quotation_vendor_revision_routes::routes()).merge(quotation_source_routes::routes())
         .merge(wedding_quote_study_routes::routes()).merge(vendor_email_worker_ingress::routes()).merge(wedding_vendor_claim_routes::routes()).merge(wedding_vendor_ownership_routes::routes()).merge(wedding_vendor_sender_identity_routes::routes()).merge(wedding_vendor_photo_routes::routes())

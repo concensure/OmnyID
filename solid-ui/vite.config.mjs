@@ -44,6 +44,7 @@ export default defineConfig({
       "/healthz": { target: "http://127.0.0.1:8080", changeOrigin: true },
       "/relay": { target: "http://127.0.0.1:8080", changeOrigin: true, ws: true },
       "/billing": { target: "http://127.0.0.1:8080", changeOrigin: true },
+      "/practice": { target: "http://127.0.0.1:8080", changeOrigin: true },
       "/key-bundle": { target: "http://127.0.0.1:8080", changeOrigin: true },
       "/send": { target: "http://127.0.0.1:8080", changeOrigin: true },
       "/query": { target: "http://127.0.0.1:8080", changeOrigin: true },
@@ -63,6 +64,7 @@ export default defineConfig({
         main: resolve(import.meta.dirname, "index.html"),
         dashboard: resolve(import.meta.dirname, "dashboard.html"),
         vendor: resolve(import.meta.dirname, "vendor.html"),
+        practice: resolve(import.meta.dirname, "practice.html"),
         quotationResponse: resolve(import.meta.dirname, "quotation-response.html"),
       },
       onwarn(warning, warn) {

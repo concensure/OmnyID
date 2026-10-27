@@ -1,6 +1,6 @@
 # Professional Wedding Planner Workspace — Detailed Task Plan
 
-Status: implementation started; WED-275 contract foundation
+Status: WED-275 and WED-276 implemented locally; review pending; eight implementation slices remain
 
 Parent: WED-274
 
@@ -12,16 +12,36 @@ Implementation model: `gpt-6-astra`, high reasoning
 
 ## Implementation checkpoint — 2026-10-27
 
-WED-275 is implemented on `agent/codex/WED-275`, based on `f1f9c82` (a documentation-only descendant
-of the required `6af9203`). See the [reuse inventory and authority contract](wedding-planner-professional-workspace-contracts.md)
-and `src/practice/` for the strict versioned schemas, role/capability matrix, current-grant checks,
-permission-safe index projection and command revision/idempotency helpers. Verification outcomes
-and review status are recorded in `.agent/TASKS.yaml` and `.agent/HANDOFF.md`.
+WED-275 provides the contract foundation. WED-276 adds the dark, authenticated practice bootstrap,
+permission-filtered Home, responsive shell, explicit context switcher and scoped client summaries.
+Work is on `agent/codex/WED-276` in the isolated `OmnyID-WED-275` worktree, descended from the required
+`6af9203` base. See the [reuse inventory and authority contract](wedding-planner-professional-workspace-contracts.md).
+Verification and review state are recorded in `.agent/TASKS.yaml` and `.agent/HANDOFF.md`.
 
-This is the contract slice only. Persistent grants, atomic command append/receipts, actual cache and
-websocket invalidation, practice routes, UI and the WED-276–284 runtime/release slices remain pending.
-The pure guard's revocation tests do not constitute end-to-end revocation evidence. No migration,
-deployment, external email, hold, booking or payment action is introduced.
+| Item | Local implementation state |
+| --- | --- |
+| WED-275 Contracts and authority model | Implemented; awaiting review |
+| WED-276 Practice shell and mode switching | Implemented; awaiting review |
+| WED-277 Client onboarding, grants and template adaptation | Remaining; next |
+| WED-278 Unified enquiry pipeline | Remaining |
+| WED-279 Calendar, capacity and date holds | Remaining |
+| WED-280 Supplier profile and package consolidation | Remaining |
+| WED-281 Itemised quote and normalised client view | Remaining |
+| WED-282 Booking and payment tracking | Remaining |
+| WED-283 Hardening and dark release | Remaining |
+| WED-284 Allowlisted cohort | Remaining |
+
+**Remaining count: eight major implementation items (WED-277–284), plus review of WED-275/276.**
+This counts the ten delivery slices, not their individual work bullets. Neither implemented slice is
+marked `done`, and no professional deployment or cohort activation is claimed.
+
+The shell is `/workspace/practice.html`. It requires both
+`OMNYID_WEDDING_PRO_PRACTICE_ENABLED=true` and an exact account ID in
+`OMNYID_WEDDING_PRO_ACCOUNT_ALLOWLIST`. Both default closed. Migration 0122 creates empty rebuildable
+indexes; WED-277 must populate them from owner-authorised AFP events transactionally. There is no
+browser grant writer or migration backfill. Client destinations currently show scoped summaries;
+opening the ordinary Wedding template belongs to WED-277. Inbox, calendar and supplier destinations
+are summary entry points for their later slices. No external send, hold, booking or payment executes.
 
 ## 1. Delivery rules
 
