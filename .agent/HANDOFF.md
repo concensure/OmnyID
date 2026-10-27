@@ -1,3 +1,38 @@
+## 2026-10-28 - WED-286 Email Worker operational evidence (Codex, blocked)
+
+Changed:
+
+- Added strict outbound recipient allowlisting, truthful accepted/delivered/
+  bounced receipt states, digest-only delivery suppressions and disabled
+  Cloudflare bounce/complaint polling with no automatic retry.
+- Added authenticated plain-text Worker ingress that appends one encrypted,
+  signed, tenant-private AFP event and suppresses exact replay. Attachments stay
+  quarantined pending the reviewed processing boundary.
+- Added explicit false-defaulted Oracle staging controls and a controlled
+  provider evidence plan. Policy V2 remains false.
+
+Evidence:
+
+- Disposable ClamAV clean, harmless EICAR and unavailable fail-closed cases,
+  focused provider/migration/ingress database tests and Worker tests passed on
+  the implementation candidate. Oracle staging flags-off shadow created no
+  provider, quarantine or suppression rows.
+- Cloudflare accepted a controlled send into its queue. Mailbox delivery and
+  headers were not verified. An invalid-domain send also remained queued; it
+  proves no application retry, not a live provider bounce.
+- Worker deploy was refused before upload because the replacement token lacks
+  Workers Scripts write permission. No literal route was created. Eight rules
+  and the disabled Drop catch-all matched exactly before and after.
+
+Next:
+
+- Reverify the final clean documentation-bound candidate and redeploy that exact
+  image to staging with every relay flag false.
+- Resume only after a narrowly scoped Workers Scripts write token and an
+  inspectable controlled mailbox are available. Deploy the exact Worker before
+  adding the one literal route, then prove mailbox headers, one correlated AFP
+  event, replay suppression and a real provider bounce before restoring again.
+
 ## 2026-10-23 - WED-247 in-context wedding actions, collaborative tasks, seating canvas, and Oracle deployment (Codex, complete)
 
 Changed:

@@ -1,3 +1,19 @@
+## 2026-10-28: Provider acceptance, delivery and tenant persistence are separate evidence
+
+WED-286 never treats an accepted or queued Email Sending response as mailbox
+delivery. Provider acceptance, controlled-mailbox receipt with headers and the
+single tenant AFP event are three independently recorded observations. A
+literal Email Routing rule must not be created until the exact Worker deploys
+successfully. If deployment is denied, restoration means making no route
+mutation and proving the before/after inventories are identical.
+
+Provider complaint and bounce synchronisation is disabled until the complete
+outbound configuration is ready. It stores only SHA-256 digests of recipients
+and provider record identifiers, is idempotent and blocks automated resend.
+Ingress creates recipient-X25519-encrypted, signed tenant AFP events; it does
+not add a server-held decryption wrapper. Policy V2 and all relay flags remain
+false until the existing review criteria pass.
+
 ## 2026-10-27: Human evidence belongs to a source and hosted environment
 
 WED-285 prepares the existing email/quotation release, per the user's explicit choice. It does not

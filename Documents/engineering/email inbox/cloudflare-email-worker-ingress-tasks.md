@@ -116,7 +116,7 @@ Exit evidence:
 
 Exit evidence:
 
-- [ ] live disposable ClamAV clean/infected/unavailable tests;
+- [x] live disposable ClamAV clean/infected/unavailable tests;
 - [ ] exact-replay and transaction-failure tests;
 - [ ] existing wedding response-queue projection tests.
 
@@ -127,7 +127,7 @@ Exit evidence:
 - [ ] Reject sender/thread mismatches and legacy plaintext guessing.
 - [ ] Make inbound vendor replies project through the existing response queue.
 - [ ] Bind outbound idempotency to AFP approval and provider receipt.
-- [ ] Add bounce/complaint state and retry suppression.
+- [x] Add bounce/complaint state and retry suppression.
 - [ ] Preserve connected Gmail as the separate existing path until explicit
   cutover; never use it as silent relay fallback.
 
@@ -140,7 +140,7 @@ Exit evidence:
 - [ ] Dry-run Worker deploy and prove no routing mutation.
 - [ ] Run independent security/privacy review.
 - [ ] Run authorized provider smoke with disposable addresses.
-- [ ] Run hosted shadow with all routing/send flags off.
+- [x] Run hosted shadow with all routing/send flags off.
 - [ ] Complete the applicable WED-225 review records against the exact commit.
 - [ ] Obtain permission-copy and production-owner sign-off.
 
@@ -175,3 +175,26 @@ These cannot be checked by implementation alone:
 
 Until those boxes are evidenced, the correct verifier result is `blocked`, not
 `failed`, and all live relay flags remain false.
+
+## WED-286 operational evidence, 2026-10-28
+
+- A disposable local `clamd` accepted a clean fixture, detected the harmless
+  EICAR fixture and proved unavailable-scanner fail-closed behaviour.
+- Cloudflare suppression polling is disabled unless the complete outbound
+  provider configuration is ready. Complaint and bounce records are
+  idempotent, persist only recipient/provider digests and suppress automated
+  resend. Plaintext recipient addresses and provider record IDs are not stored.
+- Oracle staging ran the exact candidate image with vendor mail, sender masks,
+  ingress and policy V2 false. The ingress endpoint stayed unavailable and the
+  provider-event, quarantine and suppression counts remained `0,0,0`.
+- The controlled provider request was accepted into Cloudflare's queue. That is
+  not mailbox delivery evidence: controlled mailbox authentication could not be
+  completed, so the authorized-provider-smoke item remains open.
+- Cloudflare refused the Worker deployment before upload because the
+  replacement token has no Workers Scripts write capability. No literal route
+  was added and no Worker or DNS setting was changed.
+- A deliberate invalid-domain message was queued without an immediate
+  permanent-bounce or suppression record. The application made no retry, but a
+  live provider bounce remains unproved.
+- The restored Email Routing inventory exactly matched the before inventory;
+  the catch-all remained Drop/Disabled and the runtime flags remained false.
