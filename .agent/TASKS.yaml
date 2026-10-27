@@ -16,7 +16,7 @@ lifecycle:
 
 tasks:
   - id: WED-285
-    title: Freeze and publish human-gate candidate with commit-bound evidence
+    title: Freeze and deploy Oracle human-gate candidate with commit-bound evidence
     status: review
     owner: codex
     branch: agent/codex/WED-285
@@ -28,6 +28,8 @@ tasks:
       - Documents/verification/human-gate-candidate.md
       - solid-ui/tests/e2e/wedding-human-review-form.spec.ts
       - tests/clamav_live.rs
+      - scripts/stage-oracle-runtime.ps1
+      - scripts/stage-oracle-runtime-pwsh-selftest.ps1
       - scripts/prepare-human-gate-candidate.ps1
       - scripts/prepare-human-gate-candidate-selftest.ps1
       - .agent/**
@@ -36,8 +38,10 @@ tasks:
       - changing candidate or runtime never silently carries previous approvals forward
       - candidate preparation records exact source and artifact digests without fabricating hosted or human evidence
       - relevant automated checks run and remaining hosted or human blockers stay explicit
-      - selective commit is pushed and remote SHA is verified for the user
+      - committed candidate is deployed directly to Oracle with source and running artifact evidence; no GitHub publication
     progress:
+      - user superseded GitHub publication with Oracle deployment; existing remote configuration and disabled release flags must be preserved
+      - added the missing practice HTML entry to the runtime staging allowlist; its no-simulated-data regression self-test passed
       - candidate continues from 06b4a0f and includes WED-275/276; WED-277 remains unimplemented
       - user explicitly requested commit and push for the three existing human-gate workbooks and confirmed existing-release preparation rather than WED-277
       - reports bind exact source and hosted URL; stale reports cannot pass after a candidate change; v3 export preserves older drafts without fabricating missing bindings

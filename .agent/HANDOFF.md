@@ -290,6 +290,29 @@ Next:
 - The signing secret was not read, copied, logged, or committed; the release used the existing Oracle `.env.oracle`.
 # Handoff
 
+## 2026-10-27 - WED-285 Oracle deployment continuation (Codex)
+
+The user superseded the earlier GitHub request: deploy this candidate directly to Oracle for human
+gate testing. GitHub rejected both branch publications because the OAuth credential lacked workflow
+scope; no branch or PR was created. The device authorization flow was cancelled. No further GitHub
+publication is planned. Existing unreferenced uploaded Git objects do not constitute publication.
+
+Oracle preflight evidence is in the primary checkout's ignored
+`artifacts/oracle-wed285-6c7454e842a0/preflight`: backup integrity and service checks passed; the
+restore drill was intentionally deferred until after the build. The existing release-manifest SHA
+is stale relative to the last deployed source, so it cannot prove runtime identity for this review.
+
+Fixed the Oracle runtime staging allowlist to include `solid-ui/practice.html`, required by the
+WED-276 Vite entry. The staging regression self-test passed, including this entry without simulated
+data. The deployment must use the clean committed task checkout, existing remote environment, no
+simulated/source dataset, and unchanged disabled release flags. Collect source hashes, running
+image and UI evidence, and the full post-deployment proof before claiming the candidate is hosted.
+No human approvals, provider receipt, full accuracy corpus or cohort approval are implied.
+
+This section supersedes the earlier GitHub publication and deployment-not-authorised next steps
+below. Final deployment evidence and full SHA belong in the external candidate bundle and primary
+coordination handoff, preserving the frozen deployed commit.
+
 ## 2026-10-27 - WED-285 existing-release human-gate candidate (Codex)
 
 The user explicitly selected preparation of the existing email/quotation release for its three

@@ -45,6 +45,7 @@ $solidUiFiles = @(
     "solid-ui/Dockerfile",
     "solid-ui/dashboard.html",
     "solid-ui/index.html",
+    "solid-ui/practice.html",
     "solid-ui/quotation-response.html",
     "solid-ui/vendor.html",
     "solid-ui/package-lock.json",
