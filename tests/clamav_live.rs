@@ -5,9 +5,16 @@
 
 use base64::Engine as _;
 use omnyid_homeserver::gateway::clamav::scan_bytes;
+use std::sync::{Mutex, OnceLock};
+
+fn env_lock() -> &'static Mutex<()> {
+    static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+    LOCK.get_or_init(|| Mutex::new(()))
+}
 
 #[tokio::test]
 async fn configured_clamd_marks_bounded_plain_text_clean() {
+    let _guard = env_lock().lock().expect("ClamAV environment lock");
     let endpoint = std::env::var("CLAMD_HOST")
         .ok()
         .map(|value| value.trim().to_string())
@@ -35,6 +42,7 @@ async fn configured_clamd_marks_bounded_plain_text_clean() {
 
 #[tokio::test]
 async fn configured_clamd_detects_standard_harmless_eicar_fixture() {
+    let _guard = env_lock().lock().expect("ClamAV environment lock");
     if std::env::var("CLAMD_HOST")
         .ok()
         .is_none_or(|v| v.trim().is_empty())
@@ -57,5 +65,27 @@ async fn configured_clamd_detects_standard_harmless_eicar_fixture() {
     assert!(
         result.virus_name.is_some(),
         "detection must carry a signature label"
+    );
+}
+
+#[tokio::test]
+async fn configured_but_unavailable_clamd_fails_closed() {
+    let _guard = env_lock().lock().expect("ClamAV environment lock");
+    let listener = std::net::TcpListener::bind("127.0.0.1:0")
+        .expect("reserve an unavailable local scanner endpoint");
+    let address = listener.local_addr().expect("reserved endpoint address");
+    drop(listener);
+
+    let prior = std::env::var_os("CLAMD_HOST");
+    unsafe { std::env::set_var("CLAMD_HOST", address.to_string()) };
+    let result = scan_bytes(b"bounded unavailable-scanner fixture").await;
+    match prior {
+        Some(value) => unsafe { std::env::set_var("CLAMD_HOST", value) },
+        None => unsafe { std::env::remove_var("CLAMD_HOST") },
+    }
+
+    assert!(
+        result.is_err(),
+        "an unavailable configured scanner must fail closed"
     );
 }

@@ -37,7 +37,7 @@ fn test_db_url() -> Option<String> {
         })
 }
 
-async fn seed_route(db: &Db) -> (String, String, StaticSecret, String) {
+async fn seed_route(db: &Db) -> (String, String, String, StaticSecret, String) {
     let suffix = Ulid::new().to_string().to_lowercase();
     let user = UserRecord {
         id: Ulid::new().to_string(),
@@ -115,6 +115,7 @@ async fn seed_route(db: &Db) -> (String, String, StaticSecret, String) {
     .await
     .expect("vendor agent link");
     (
+        user.id,
         vendor_id,
         format!("{local_part}@omnyid.com"),
         encryption_secret,
@@ -228,16 +229,22 @@ async fn valid_delivery_is_encrypted_and_exact_retry_is_idempotent() {
         std::env::set_var("OMNYID_VENDOR_MAIL_WORKER_KEY_ID", "primary-v1");
         std::env::set_var("OMNYID_VENDOR_MAIL_WORKER_SHARED_SECRET", SECRET);
         std::env::set_var("CLAMD_HOST", &clamd);
+        std::env::set_var("OMNYID_SIGNING_KEY_HEX", hex::encode([9_u8; 32]));
     }
     let db = Db::new(&db_url).await.expect("database");
-    let (_vendor_id, recipient, _recipient_secret, recipient_key_id) = seed_route(&db).await;
+    let (owner_user_id, _vendor_id, recipient, _recipient_secret, recipient_key_id) =
+        seed_route(&db).await;
     let app = omnyid_homeserver::server::build_test_router(&db_url).await;
     let body = b"Subject: Private test\r\nMessage-ID: <worker@example.test>\r\n\r\nSecret body";
     let event_id = hex::encode(Sha256::digest(format!("{}-{}", recipient, Ulid::new())));
 
     let (status, accepted) = post(&app, body, signed_headers(body, &recipient, &event_id)).await;
     assert_eq!(status, StatusCode::ACCEPTED, "accepted: {accepted}");
-    assert_eq!(accepted["status"], "quarantined");
+    assert_eq!(accepted["status"], "accepted");
+    let afp_message_id = accepted["afp_message_id"]
+        .as_str()
+        .expect("AFP message id")
+        .to_string();
     let (status, duplicate) = post(&app, body, signed_headers(body, &recipient, &event_id)).await;
     assert_eq!(status, StatusCode::ACCEPTED, "duplicate: {duplicate}");
     assert_eq!(duplicate["status"], "duplicate");
@@ -255,7 +262,7 @@ async fn valid_delivery_is_encrypted_and_exact_retry_is_idempotent() {
     assert_eq!(ciphertext["recipient_key_id"], recipient_key_id);
     assert_eq!(row.get::<String, _>("recipient_key_id"), recipient_key_id);
     assert!(!ciphertext.to_string().contains("Secret body"));
-    assert_eq!(row.get::<String, _>("processing_status"), "quarantined");
+    assert_eq!(row.get::<String, _>("processing_status"), "accepted");
     let count: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM wedding_vendor_email_ingress_quarantine WHERE provider_event_id = $1",
     )
@@ -264,6 +271,55 @@ async fn valid_delivery_is_encrypted_and_exact_retry_is_idempotent() {
     .await
     .expect("quarantine count");
     assert_eq!(count, 1);
+    let provider = sqlx::query(
+        "SELECT processing_status, afp_message_id FROM wedding_vendor_email_provider_events WHERE provider = 'cloudflare_email_worker' AND provider_event_id = $1",
+    )
+    .bind(&event_id)
+    .fetch_one(&db.pool)
+    .await
+    .expect("provider event");
+    assert_eq!(provider.get::<String, _>("processing_status"), "completed");
+    assert_eq!(
+        provider
+            .get::<Option<String>, _>("afp_message_id")
+            .as_deref(),
+        Some(afp_message_id.as_str())
+    );
+    let private_table = format!("\"user_{}\".messages", owner_user_id.to_ascii_lowercase());
+    let private_count: i64 = sqlx::query_scalar(&format!(
+        "SELECT COUNT(*) FROM {private_table} WHERE id = $1 AND subtype = 'wedding_vendor_email_received'"
+    ))
+    .bind(&afp_message_id)
+    .fetch_one(&db.pool)
+    .await
+    .expect("private AFP count");
+    assert_eq!(
+        private_count, 1,
+        "exact retry must not append a second AFP event"
+    );
+    let persisted = sqlx::query(&format!(
+        "SELECT content, encryption, metadata FROM {private_table} WHERE id = $1"
+    ))
+    .bind(&afp_message_id)
+    .fetch_one(&db.pool)
+    .await
+    .expect("private AFP event");
+    assert!(
+        !persisted
+            .get::<Value, _>("content")
+            .to_string()
+            .contains("Secret body")
+    );
+    assert!(
+        !persisted
+            .get::<Value, _>("metadata")
+            .to_string()
+            .contains("couple@example.test")
+    );
+    assert_eq!(
+        persisted.get::<Value, _>("encryption")["mode"],
+        "recipient-x25519-v1"
+    );
 
     let changed = b"Subject: Private test\r\n\r\nChanged body";
     let (status, _) = post(
@@ -306,5 +362,6 @@ async fn valid_delivery_is_encrypted_and_exact_retry_is_idempotent() {
         std::env::remove_var("OMNYID_VENDOR_MAIL_WORKER_KEY_ID");
         std::env::remove_var("OMNYID_VENDOR_MAIL_WORKER_SHARED_SECRET");
         std::env::remove_var("CLAMD_HOST");
+        std::env::remove_var("OMNYID_SIGNING_KEY_HEX");
     }
 }

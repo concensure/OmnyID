@@ -33,6 +33,7 @@ const MAX_CLOCK_SKEW_SECS: i64 = 300;
 const PROVIDER: &str = "cloudflare_email_worker";
 const CONTRACT_VERSION: &str = "1";
 const CONTRACT_DOMAIN: &str = "omnyid-email-worker-v1";
+const CROCKFORD_BASE32_ALPHABET: &[u8; 32] = b"0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 
 pub(super) fn routes() -> Router<Arc<AppState>> {
     Router::new()
@@ -137,7 +138,7 @@ async fn cloudflare_email_inbound_http(
         },
     )
     .await?;
-    if prior_event_state(&state, &envelope).await? {
+    if prior_event_is_complete(&state, &envelope).await? {
         return Ok((
             StatusCode::ACCEPTED,
             Json(json!({ "status": "duplicate", "event_id": envelope.event_id })),
@@ -183,18 +184,145 @@ async fn cloudflare_email_inbound_http(
             "recipient_encryption_unavailable".to_string(),
         )
     })?;
-    let duplicate = persist_quarantine(&state, &envelope, &route, &ciphertext).await?;
-    if !duplicate {
+    let existing_quarantine = persist_quarantine(&state, &envelope, &route, &ciphertext).await?;
+    let parsed = crate::gateway::smtp_in::parse_incoming_email_source(&body);
+    if parsed.attachments_blocked || !parsed.attachments.is_empty() {
+        mark_quarantined(&state, &envelope, "attachment_processing_pending").await?;
+        return Ok((
+            StatusCode::ACCEPTED,
+            Json(json!({ "status": "quarantined", "event_id": envelope.event_id })),
+        ));
+    }
+    let message = build_recipient_afp_message(&envelope, &route, &parsed).map_err(|_| {
+        (
+            StatusCode::SERVICE_UNAVAILABLE,
+            "recipient_encryption_unavailable".to_string(),
+        )
+    })?;
+    let message_id = message.id.clone();
+    let inserted = super::auth::store_private_app_message(
+        &state.db,
+        &state.metrics,
+        &state.relay_tx,
+        &route.owner_user_id,
+        message,
+    )
+    .await
+    .map_err(|_| {
+        (
+            StatusCode::SERVICE_UNAVAILABLE,
+            "afp_persistence_unavailable".to_string(),
+        )
+    })?;
+    complete_processing(&state, &envelope, &message_id).await?;
+    if inserted {
         state.metrics.inc_gateway_inbound_emails();
     }
 
     Ok((
         StatusCode::ACCEPTED,
         Json(json!({
-            "status": if duplicate { "duplicate" } else { "quarantined" },
+            "status": if existing_quarantine && !inserted { "duplicate" } else { "accepted" },
             "event_id": envelope.event_id,
+            "afp_message_id": message_id,
         })),
     ))
+}
+
+fn deterministic_pseudo_ulid(label: &str) -> String {
+    Sha256::digest(label.as_bytes())
+        .iter()
+        .take(26)
+        .map(|byte| CROCKFORD_BASE32_ALPHABET[(*byte % 32) as usize] as char)
+        .collect()
+}
+
+fn build_recipient_afp_message(
+    envelope: &VerifiedEnvelope,
+    route: &RecipientRoute,
+    parsed: &crate::gateway::smtp_in::IncomingEmailSource,
+) -> Result<crate::message::AFPMessage, String> {
+    let message_id = deterministic_pseudo_ulid(&format!("{PROVIDER}:{}", envelope.event_id));
+    let thread_id = deterministic_pseudo_ulid(&format!(
+        "{PROVIDER}:{}:{}",
+        route.identity_id, parsed.summary.external_conversation_key
+    ));
+    let timestamp = Utc::now().to_rfc3339();
+    let metadata = json!({
+        "schema": "wedding_vendor_email/v1",
+        "channel": "email",
+        "transport": PROVIDER,
+        "provider_event_id": envelope.event_id,
+        "source_digest": envelope.body_digest,
+        "vendor_id": route.vendor_id,
+        "recipient_identity_id": route.identity_id,
+        "recipient_agent_id": route.agent_id,
+        "recipient_key_id": route.recipient_key_id,
+        "idempotency_key": format!("{PROVIDER}:{}", envelope.event_id),
+    });
+    let plaintext = json!({
+        "schema": "wedding_vendor_email/v1",
+        "subject": parsed.summary.subject,
+        "body": parsed.body,
+        "body_media_type": parsed.body_media_type,
+        "from": envelope.from,
+        "to": envelope.to,
+        "smtp_message_id": parsed.summary.smtp_message_id,
+        "in_reply_to": parsed.summary.in_reply_to,
+        "smtp_references": parsed.summary.reference_targets,
+        "external_conversation_key": parsed.summary.external_conversation_key,
+    });
+    let from = "agent://cloudflare-email-worker".to_string();
+    let to = vec![route.agent_id.clone()];
+    let aad = json!({
+        "protocol": "afp-v1",
+        "id": message_id,
+        "thread_id": thread_id,
+        "from": from,
+        "to": to,
+        "timestamp": timestamp,
+        "type": "email",
+        "subtype": "wedding_vendor_email_received",
+        "metadata": metadata,
+    });
+    let encryption = crate::crypto::encrypt_content_for_recipient(
+        &plaintext,
+        &aad,
+        &route.recipient_public_key_hex,
+        &route.recipient_key_id,
+    )?;
+    let mut message = crate::message::AFPMessage {
+        protocol: "afp-v1".to_string(),
+        id: message_id,
+        thread_id,
+        parent_id: None,
+        from,
+        to,
+        timestamp,
+        r#type: "email".to_string(),
+        kind: Some("wedding_vendor_email_received".to_string()),
+        supertags: vec![
+            "template:wedding_planning".to_string(),
+            "wedding_vendor_email".to_string(),
+        ],
+        subtype: Some("wedding_vendor_email_received".to_string()),
+        content: json!({
+            "omnyid_encrypted": true,
+            "scheme": "omnyid-envelope-v1",
+            "source": PROVIDER,
+        }),
+        metadata: Some(metadata),
+        signature: String::new(),
+        encryption: Some(encryption),
+        views: vec![],
+        references: vec![],
+        typed_refs: vec![],
+        attachments: vec![],
+        store_in_relational: false,
+        prev_hash: None,
+    };
+    super::sign_server_generated_message(&mut message)?;
+    Ok(message)
 }
 
 fn verify_envelope(
@@ -362,18 +490,31 @@ async fn persist_quarantine(
     .rows_affected();
     if inserted == 0 {
         let existing = sqlx::query_scalar::<_, String>(
-            "SELECT payload_digest FROM wedding_vendor_email_provider_events WHERE provider = $1 AND provider_event_id = $2",
+            "SELECT payload_digest FROM wedding_vendor_email_provider_events WHERE provider = $1 AND provider_event_id = $2 FOR UPDATE",
         )
         .bind(PROVIDER)
         .bind(&envelope.event_id)
         .fetch_optional(&mut *tx)
         .await
         .map_err(database_failure)?;
-        tx.rollback().await.map_err(database_failure)?;
-        return match existing.as_deref() {
-            Some(digest) if digest == envelope.body_digest => Ok(true),
-            _ => Err((StatusCode::CONFLICT, "event_conflict".to_string())),
-        };
+        match existing.as_deref() {
+            Some(digest) if digest == envelope.body_digest => {
+                sqlx::query(
+                    "UPDATE wedding_vendor_email_provider_events SET attempt_count = attempt_count + 1 WHERE provider = $1 AND provider_event_id = $2",
+                )
+                .bind(PROVIDER)
+                .bind(&envelope.event_id)
+                .execute(&mut *tx)
+                .await
+                .map_err(database_failure)?;
+                tx.commit().await.map_err(database_failure)?;
+                return Ok(true);
+            }
+            _ => {
+                tx.rollback().await.map_err(database_failure)?;
+                return Err((StatusCode::CONFLICT, "event_conflict".to_string()));
+            }
+        }
     }
 
     sqlx::query(
@@ -404,14 +545,81 @@ async fn persist_quarantine(
     Ok(false)
 }
 
-/// Avoid spending scanner capacity on an authenticated exact replay. The
-/// transaction in `persist_quarantine` remains the race-safe authority.
-async fn prior_event_state(
+async fn mark_quarantined(
+    state: &AppState,
+    envelope: &VerifiedEnvelope,
+    reason: &str,
+) -> Result<(), (StatusCode, String)> {
+    let mut tx = state.db.pool.begin().await.map_err(database_failure)?;
+    sqlx::query(
+        "UPDATE wedding_vendor_email_provider_events SET processing_status = 'quarantined', error_code = $3, processed_at = NOW() WHERE provider = $1 AND provider_event_id = $2 AND payload_digest = $4",
+    )
+    .bind(PROVIDER)
+    .bind(&envelope.event_id)
+    .bind(reason)
+    .bind(&envelope.body_digest)
+    .execute(&mut *tx)
+    .await
+    .map_err(database_failure)?;
+    sqlx::query(
+        "UPDATE wedding_vendor_email_ingress_quarantine SET processing_status = 'quarantined', error_code = $3, processed_at = NOW() WHERE provider = $1 AND provider_event_id = $2 AND payload_digest = $4",
+    )
+    .bind(PROVIDER)
+    .bind(&envelope.event_id)
+    .bind(reason)
+    .bind(&envelope.body_digest)
+    .execute(&mut *tx)
+    .await
+    .map_err(database_failure)?;
+    tx.commit().await.map_err(database_failure)
+}
+
+async fn complete_processing(
+    state: &AppState,
+    envelope: &VerifiedEnvelope,
+    afp_message_id: &str,
+) -> Result<(), (StatusCode, String)> {
+    let mut tx = state.db.pool.begin().await.map_err(database_failure)?;
+    let provider_rows = sqlx::query(
+        "UPDATE wedding_vendor_email_provider_events SET processing_status = 'completed', afp_message_id = $3, error_code = NULL, processed_at = NOW() WHERE provider = $1 AND provider_event_id = $2 AND payload_digest = $4",
+    )
+    .bind(PROVIDER)
+    .bind(&envelope.event_id)
+    .bind(afp_message_id)
+    .bind(&envelope.body_digest)
+    .execute(&mut *tx)
+    .await
+    .map_err(database_failure)?
+    .rows_affected();
+    let quarantine_rows = sqlx::query(
+        "UPDATE wedding_vendor_email_ingress_quarantine SET processing_status = 'accepted', error_code = NULL, processed_at = NOW() WHERE provider = $1 AND provider_event_id = $2 AND payload_digest = $3",
+    )
+    .bind(PROVIDER)
+    .bind(&envelope.event_id)
+    .bind(&envelope.body_digest)
+    .execute(&mut *tx)
+    .await
+    .map_err(database_failure)?
+    .rows_affected();
+    if provider_rows != 1 || quarantine_rows != 1 {
+        tx.rollback().await.map_err(database_failure)?;
+        return Err((
+            StatusCode::SERVICE_UNAVAILABLE,
+            "afp_persistence_unavailable".to_string(),
+        ));
+    }
+    tx.commit().await.map_err(database_failure)
+}
+
+/// Avoid spending scanner capacity on a completed authenticated replay. A
+/// matching unfinished event is retried so an interrupted AFP/finalize step is
+/// repairable; `persist_quarantine` remains the race-safe authority.
+async fn prior_event_is_complete(
     state: &AppState,
     envelope: &VerifiedEnvelope,
 ) -> Result<bool, (StatusCode, String)> {
-    let existing = sqlx::query_scalar::<_, String>(
-        "SELECT payload_digest FROM wedding_vendor_email_provider_events WHERE provider = $1 AND provider_event_id = $2",
+    let existing = sqlx::query(
+        "SELECT payload_digest, processing_status, afp_message_id FROM wedding_vendor_email_provider_events WHERE provider = $1 AND provider_event_id = $2",
     )
     .bind(PROVIDER)
     .bind(&envelope.event_id)
@@ -420,7 +628,10 @@ async fn prior_event_state(
     .map_err(database_failure)?;
     match existing {
         None => Ok(false),
-        Some(digest) if digest == envelope.body_digest => Ok(true),
+        Some(row) if row.get::<String, _>("payload_digest") == envelope.body_digest => {
+            Ok(row.get::<String, _>("processing_status") == "completed"
+                && row.get::<Option<String>, _>("afp_message_id").is_some())
+        }
         Some(_) => Err((StatusCode::CONFLICT, "event_conflict".to_string())),
     }
 }

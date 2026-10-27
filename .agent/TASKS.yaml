@@ -15,6 +15,38 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-286
+    title: Complete Email Worker operational evidence and controlled provider receipt rehearsal
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-286
+    depends_on: [WED-255, WED-257, WED-285]
+    files:
+      - cloudflare/vendor-email-ingress-worker/**
+      - postgres/migrations/**
+      - src/db/migration_catalog.rs
+      - src/gateway/vendor_mail_provider.rs
+      - src/server/vendor_email_worker_ingress.rs
+      - src/server/mod.rs
+      - tests/clamav_live.rs
+      - tests/vendor_email_worker_ingress_api.rs
+      - scripts/capture-cloudflare-email-routing-inventory.ps1
+      - scripts/**email*provider*
+      - Documents/engineering/email inbox/**
+      - Documents/verification/**email*
+      - .agent/**
+    acceptance:
+      - live disposable ClamAV evidence covers clean, harmless EICAR and unavailable fail-closed behavior against the frozen candidate
+      - authenticated Cloudflare bounce and complaint records are idempotent, persist privacy-safe provider state and suppress automated retry without storing plaintext recipients
+      - a hosted shadow run proves every mail, ingress, sender-mask and policy-V2 flag remains false and creates no provider or AFP side effect
+      - the controlled provider rehearsal records a before inventory, rejects a recipient outside the one-address allowlist, deploys the exact frozen Worker, uses one temporary literal route, distinguishes provider acceptance from mailbox receipt and AFP persistence, proves reply correlation and duplicate suppression, then restores and diffs the inventory
+      - catch-all remains Drop/Disabled, temporary rules and allowlists are removed, flags return false and no secret, plaintext correspondence or full private address enters committed evidence
+      - build, test, deployment and provider evidence names the full source SHA and is produced only from a clean checkout of that SHA
+    progress:
+      - registered from deployed human-gate candidate 2dca8ed2089562e93432c740d66a425a0fc78f1c in clean isolated worktree C:/Users/ozans/Desktop/projects/OmnyID-WED-286
+      - reconciliation found the live ClamAV clean/EICAR evidence already passed for 2dca8ed but the ingress task checklist was not updated; unavailable fail-closed evidence remains to be bound to the new candidate
+      - reconciliation also found Worker ingress currently ends at recipient-encrypted quarantine and vendor-mail configuration is readiness-only, so AFP correlation and a truthful provider round trip must be completed before any live route is enabled
+
   - id: WED-285
     title: Freeze and deploy Oracle human-gate candidate with commit-bound evidence
     status: review

@@ -619,4 +619,11 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Rebuildable permission-scoped professional practice indexes",
         include_str!("../../postgres/migrations/0122_practice_projections.sql"),
     ),
+    (
+        "0123_wedding_vendor_email_delivery_suppressions",
+        "Hashed vendor-mail bounce and complaint retry suppressions",
+        include_str!(
+            "../../postgres/migrations/0123_wedding_vendor_email_delivery_suppressions.sql"
+        ),
+    ),
 ];
