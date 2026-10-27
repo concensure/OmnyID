@@ -23,6 +23,7 @@ tasks:
     depends_on: [WED-255, WED-257, WED-285]
     files:
       - cloudflare/vendor-email-ingress-worker/**
+      - docker-compose.oracle.staging.yml
       - postgres/migrations/**
       - src/db/migration_catalog.rs
       - src/gateway/vendor_mail_provider.rs
