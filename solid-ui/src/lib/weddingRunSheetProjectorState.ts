@@ -222,7 +222,7 @@ function rowData(packet: RunSheetFactPacket): Record<string, unknown> {
     start_at: packet.startAt,
     end_at: packet.endAt,
     duration_minutes: packet.durationMinutes,
-    time_status: packet.startAt ? "proposed" : "unknown",
+    time_status: packet.startAt ? (packet.status === "confirmed" ? "confirmed" : "proposed") : "unknown",
     location: packet.location,
     time_zone: packet.timeZone,
     owner_refs: packet.ownerRefs,

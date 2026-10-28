@@ -92,6 +92,9 @@ export function WeddingRunSheetMobileCards(props: {
             <p><span class="font-semibold text-wedding-text">Owner:</span> {Array.isArray(item.record.data.owner_refs) && item.record.data.owner_refs.length ? item.record.data.owner_refs.join(", ") : "Not assigned"}</p>
             <p><span class="font-semibold text-wedding-text">Shared:</span> {Array.isArray(item.record.data.visibility) ? item.record.data.visibility.join(", ") : "Master only"}</p>
             <p><span class="font-semibold text-wedding-text">Source:</span> {item.overrideState === "runsheet_only" ? "Run-sheet override" : item.sourceLinked ? "Wedding plan" : "Manual item"}</p>
+            <Show when={Array.isArray(item.record.data.dependency_refs) && item.record.data.dependency_refs.length}><p><span class="font-semibold text-wedding-text">Depends on:</span> {(item.record.data.dependency_refs as unknown[]).join(", ")}</p></Show>
+            <Show when={item.record.data.buffer_before_minutes || item.record.data.buffer_after_minutes}><p><span class="font-semibold text-wedding-text">Buffer:</span> {String(item.record.data.buffer_before_minutes || 0)} min before · {String(item.record.data.buffer_after_minutes || 0)} min after</p></Show>
+            <Show when={item.record.data.anchor_record_id}><p><span class="font-semibold text-wedding-text">Relative to:</span> {String(item.record.data.anchor_record_id)} ({String(item.record.data.anchor_offset_minutes || 0)} min)</p></Show>
           </div>
           <Show when={item.conflictCodes.length > 0}>
             <p class="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900">Needs attention: {item.conflictCodes.join(", ").replaceAll("_", " ")}</p>

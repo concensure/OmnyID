@@ -206,8 +206,9 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
         activeTable(),
         selectedDatabaseId(),
       ),
+      selectedProfilePlugin()?.toolbarKind === "wedding_run_sheet" ? 32 : 8,
     );
-    return databaseProfileColumns({ profileId: selectedDefinition()?.profileId, discovered }).slice(0, 8);
+    return databaseProfileColumns({ profileId: selectedDefinition()?.profileId, discovered }).slice(0, selectedProfilePlugin() ? 12 : 8);
   });
 
   // These computations read visibleRecords()/columns(), whose createMemos run
@@ -807,10 +808,12 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
                           <td class={`${cellPad()} text-on-surface max-w-[12rem]`} title={str}>
                             <Show when={isEditing()}
                               fallback={
-                                <span class="block truncate cursor-pointer hover:text-primary transition"
-                                  onDblClick={() => beginEditingCell(row, col.key)}>
-                                  {str || <span class="text-outline/30 italic text-[10px]">—</span>}
-                                </span>
+                                <div class="cursor-pointer hover:text-primary transition" onDblClick={() => beginEditingCell(row, col.key)}>
+                                  <span class="block truncate">{str || <span class="text-outline/30 italic text-[10px]">—</span>}</span>
+                                  <Show when={col.key === "title" && runSheetRow()}>{(item) => <span class="mt-1 block text-[9px] font-medium text-on-surface-variant/65">
+                                    {item().overrideState === "runsheet_only" ? "Run-sheet override · source unchanged" : item().sourceLinked ? "Linked to wedding plan" : "Manual item"}
+                                  </span>}</Show>
+                                </div>
                               }
                             >
                               <Show

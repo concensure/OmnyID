@@ -168,6 +168,7 @@ export function databaseColumnDefs(
   records: DatabaseViewRecord[],
   ghostHeaders: string[],
   declaredColumns: DatabaseViewColumnDef[] = [],
+  maxColumns = 8,
 ): DatabaseViewColumnDef[] {
   const columns = new Map<string, DatabaseViewColumnDef>();
   for (const column of declaredColumns) columns.set(column.key, column);
@@ -177,7 +178,7 @@ export function databaseColumnDefs(
     }
   }
   if (columns.size === 0) return ghostHeaders.map((header) => ({ key: header.toLowerCase(), label: header }));
-  return Array.from(columns.values()).slice(0, 8);
+  return Array.from(columns.values()).slice(0, Math.max(1, maxColumns));
 }
 
 export function formatDatabaseEditableValue(value: unknown): string {

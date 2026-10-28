@@ -15,9 +15,16 @@ test("wedding run sheet profile orders required fields and preserves custom fiel
   assert.equal(plugin?.toolbarKind, "wedding_run_sheet");
   const columns = databaseProfileColumns({
     profileId: "wedding_runsheet.v1",
-    discovered: [{ key: "private_note", label: "Private note" }, { key: "title", label: "Custom title" }],
+    discovered: [
+      { key: "source_refs", label: "Source refs" },
+      { key: "private_note", label: "Private note" },
+      { key: "anchor_offset_minutes", label: "Anchor offset" },
+      { key: "title", label: "Custom title" },
+    ],
   });
   assert.equal(columns[0].key, "title");
   assert.equal(columns[0].label, "Custom title");
   assert.ok(columns.some((column) => column.key === "private_note"));
+  assert.equal(columns.some((column) => column.key === "source_refs"), false);
+  assert.ok(columns.findIndex((column) => column.key === "anchor_offset_minutes") < columns.findIndex((column) => column.key === "private_note"));
 });

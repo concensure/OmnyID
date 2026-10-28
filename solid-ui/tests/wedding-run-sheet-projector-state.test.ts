@@ -112,6 +112,7 @@ test("selectors cover milestone, supplier, logistics, and circulation evidence",
   assert.equal(plan.records.length, 4);
   assert.equal(plan.records.find((record) => record.record_id.includes("ceremony"))?.data.location, "Garden lawn");
   assert.equal(plan.records.find((record) => record.record_id.includes("ceremony"))?.data.status, "confirmed");
+  assert.equal(plan.records.find((record) => record.record_id.includes("ceremony"))?.data.time_status, "confirmed");
   assert.equal(plan.records.find((record) => record.record_id.includes("bus-1"))?.data.due_at, "2027-11-01T00:00:00.000Z");
 });
 
