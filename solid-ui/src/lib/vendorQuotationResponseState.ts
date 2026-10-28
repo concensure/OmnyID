@@ -6,7 +6,8 @@
 
 import { vendorResponseFingerprint, type QuotationVendorResponse } from "afp-ts/quotation";
 
-import { apiFetch, uploadVendorTransactionAttachment } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
+import { uploadVendorTransactionAttachment } from "@/lib/vendorTransactionAttachmentApi";
 import type { SelectedVendorSenderIdentity } from "@/lib/vendorSenderIdentityState";
 import {
   decryptVendorAgentEnvelope,

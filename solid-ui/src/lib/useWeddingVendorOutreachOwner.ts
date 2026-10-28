@@ -6,11 +6,11 @@ import {
   fetchGmailOAuthUrl,
   fetchThread,
   recordWeddingVendorContact,
-  requestWeddingVendorOutreachDraft,
   sendGmailApprovedDraft,
   type WeddingVendor,
   type AfpAttachment,
 } from "@/lib/api";
+import { requestWeddingVendorOutreachDraft } from "@/lib/weddingVendorOutreachApi";
 import type { WeddingVendorChoiceCardData } from "@/components/WeddingVendorChoiceCard";
 import type { WeddingVendorChoiceIntent } from "@/lib/weddingVendorChoiceActionState";
 import type { GmailConnectionStatus } from "@/lib/gmailConnectionState";
