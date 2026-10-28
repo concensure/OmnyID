@@ -41,8 +41,14 @@ type RunSheetFactPacket = {
   title: string;
   category: string;
   startAt: string | null;
+  endAt: string | null;
   dueAt: string | null;
+  durationMinutes: number | null;
+  location: string | null;
   ownerRefs: string[];
+  participantRefs: string[];
+  status: "confirmed" | "proposed" | "needs-confirmation";
+  visibility: string[];
   updatedAt: string;
   sourceRefs: DatabaseSourceReference[];
   sourceFingerprint: string;
@@ -101,8 +107,24 @@ function scopedSources(messages: CompatibleDatabaseMessage[], weddingPlanId: str
   });
 }
 
+export function weddingRunSheetSourceMessageIds(
+  messages: CompatibleDatabaseMessage[],
+  weddingPlanId: string,
+): string[] {
+  return scopedSources(messages, weddingPlanId)
+    .filter((source) => packetForSource(source) !== null)
+    .map((source) => source.id);
+}
+
 function sourceText(source: Source): string {
-  return [source.type, source.contentObject.kind, source.contentObject.title, source.contentObject.name, source.contentObject.category, source.contentObject.wedding_task_kind, source.metadataObject.wedding_task_kind]
+  return [
+    source.type, source.contentObject.kind, source.contentObject.title, source.contentObject.name,
+    source.contentObject.label, source.contentObject.category, source.contentObject.stage,
+    source.contentObject.milestone_kind, source.contentObject.wedding_task_kind,
+    source.contentObject.vendor_category, source.contentObject.decision_type,
+    source.metadataObject.wedding_task_kind, source.metadataObject.projection,
+    source.metadataObject.category, source.metadataObject.stage,
+  ]
     .map(clean).join(" ").toLocaleLowerCase();
 }
 
@@ -139,9 +161,32 @@ function sourceTitle(source: Source, category: string): string {
 
 function exactDateTime(value: unknown): string | null {
   const raw = clean(value);
-  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(raw)) return null;
-  const parsed = new Date(raw);
+  if (!/^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2})?/.test(raw)) return null;
+  const parsed = new Date(/^\d{4}-\d{2}-\d{2}$/.test(raw) ? `${raw}T00:00:00Z` : raw);
   return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+}
+
+function boundedMinutes(value: unknown): number | null {
+  const parsed = typeof value === "number" ? value : Number(clean(value));
+  return Number.isFinite(parsed) && parsed > 0 && parsed <= 24 * 60 ? Math.round(parsed) : null;
+}
+
+function sourceLocation(source: Source): string | null {
+  const venue = objectValue(source.contentObject.venue);
+  return clean(source.contentObject.location)
+    || clean(source.contentObject.location_name)
+    || clean(source.contentObject.venue_name)
+    || clean(source.contentObject.address)
+    || clean(venue.name)
+    || clean(venue.address)
+    || null;
+}
+
+function sourceStatus(source: Source): RunSheetFactPacket["status"] {
+  const value = clean(source.contentObject.status || source.contentObject.time_status || source.metadataObject.status).toLocaleLowerCase();
+  if (/confirmed|booked|accepted|complete|done/.test(value)) return "confirmed";
+  if (/proposed|draft|suggested|tentative/.test(value)) return "proposed";
+  return "needs-confirmation";
 }
 
 function packetForSource(source: Source): RunSheetFactPacket | null {
@@ -154,8 +199,14 @@ function packetForSource(source: Source): RunSheetFactPacket | null {
     title: sourceTitle(source, category),
     category,
     startAt: exactDateTime(source.contentObject.start_at ?? source.contentObject.starts_at ?? source.contentObject.event_at),
+    endAt: exactDateTime(source.contentObject.end_at ?? source.contentObject.ends_at),
     dueAt: exactDateTime(source.contentObject.due_at ?? source.contentObject.due_date),
+    durationMinutes: boundedMinutes(source.contentObject.duration_minutes ?? source.contentObject.duration),
+    location: sourceLocation(source),
     ownerRefs: strings(source.contentObject.owner_refs ?? source.contentObject.owner ?? source.metadataObject.owner_refs),
+    participantRefs: strings(source.contentObject.participant_refs ?? source.contentObject.participants),
+    status: sourceStatus(source),
+    visibility: strings(source.contentObject.visibility).length ? strings(source.contentObject.visibility) : ["master"],
     updatedAt: source.timestamp ?? new Date(0).toISOString(),
     sourceRefs,
   };
@@ -167,15 +218,15 @@ function rowData(packet: RunSheetFactPacket): Record<string, unknown> {
     runsheet_item_id: packet.itemId,
     title: packet.title,
     start_at: packet.startAt,
-    end_at: null,
-    duration_minutes: null,
+    end_at: packet.endAt,
+    duration_minutes: packet.durationMinutes,
     time_status: packet.startAt ? "proposed" : "unknown",
-    location: null,
+    location: packet.location,
     owner_refs: packet.ownerRefs,
-    participant_refs: [],
+    participant_refs: packet.participantRefs,
     category: packet.category,
-    status: "needs-confirmation",
-    visibility: ["master"],
+    status: packet.status,
+    visibility: packet.visibility,
     source_refs: packet.sourceRefs,
     source_fingerprint: packet.sourceFingerprint,
     projection_state: "projected",
@@ -206,6 +257,7 @@ export function buildWeddingRunSheetProjectionPlan(input: {
   checkpoint?: WeddingRunSheetProjectionCheckpoint | null;
 }): WeddingRunSheetProjectionPlan {
   const sources = scopedSources(input.messages, input.weddingPlanId);
+  const resolvableSourceIds = new Set(sources.filter((source) => packetForSource(source) !== null).map((source) => source.id));
   const changed = new Set(input.changedMessageIds);
   const affectedPackets = sources.filter((source) => changed.has(source.id)).map(packetForSource).filter((packet): packet is RunSheetFactPacket => !!packet);
   const existingByItem = projectedRowByItemId(input.currentRows.filter((row) => row.databaseId === input.databaseId));
@@ -224,7 +276,7 @@ export function buildWeddingRunSheetProjectionPlan(input: {
   }
   for (const row of existingByItem.values()) {
     const refs = Array.isArray(row.data.source_refs) ? row.data.source_refs.map(objectValue).map((ref) => clean(ref.message_id)).filter(Boolean) : [];
-    if (refs.length === 0 || refs.some((id) => !changed.has(id)) || refs.some((id) => sources.some((source) => source.id === id))) continue;
+    if (refs.length === 0 || refs.some((id) => !changed.has(id)) || refs.some((id) => resolvableSourceIds.has(id))) continue;
     if (clean(row.data.projection_state) === "stale") continue;
     revisions.push(buildCanonicalDatabaseRevision({ databaseId: input.databaseId, targetRecordId: row.id, baseRevision: row.revision, table: row.table, patch: { projection_state: "stale", status: "needs-confirmation" }, idempotencyKey: `runsheet-stale:${safeId(row.id)}:${row.revision + 1}` }));
   }

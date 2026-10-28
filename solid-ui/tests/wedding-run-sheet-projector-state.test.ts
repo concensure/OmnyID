@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildWeddingRunSheetProjectionPlan } from "../src/lib/weddingRunSheetProjectorState.ts";
+import { buildWeddingRunSheetProjectionPlan, weddingRunSheetSourceMessageIds } from "../src/lib/weddingRunSheetProjectorState.ts";
 
 function taskMessage(id: string, title: string, planId = "plan-1") {
   return {
@@ -98,4 +98,28 @@ test("a removed source marks its projected row stale instead of deleting it", ()
   assert.equal(stale.revisions.length, 1);
   assert.equal(stale.revisions[0].operation, "upsert");
   assert.equal(stale.revisions[0].patch.projection_state, "stale");
+});
+
+test("selectors cover milestone, supplier, logistics, and circulation evidence", () => {
+  const messages = [
+    { id: "ceremony", type: "wedding_milestone", content: { wedding_plan_id: "plan-1", milestone_kind: "ceremony", title: "Ceremony", start_at: "2027-11-20T15:00:00+11:00", end_at: "2027-11-20T15:30:00+11:00", location: "Garden lawn", status: "confirmed" } },
+    { id: "supplier", type: "vendor_booking", content: { wedding_plan_id: "plan-1", vendor_id: "venue-1", vendor_category: "venue", title: "Venue access", start_at: "2027-11-20T10:00:00+11:00", duration_minutes: 90 } },
+    { id: "transport", type: "wedding_task", content: { wedding_plan_id: "plan-1", task_id: "bus-1", title: "Confirm bus pickup", due_date: "2027-11-01", participants: ["person:partner"] } },
+    { id: "circulation", type: "wedding_task", content: { wedding_plan_id: "plan-1", task_id: "run-sheet-final", title: "Send Final Master Run Sheet to all vendors", wedding_task_kind: "run_sheet", visibility: ["master", "vendor"] } },
+  ];
+  assert.deepEqual(weddingRunSheetSourceMessageIds(messages, "plan-1").sort(), messages.map((message) => message.id).sort());
+  const plan = buildWeddingRunSheetProjectionPlan({ databaseId: "database:runsheet", weddingPlanId: "plan-1", messages, changedMessageIds: messages.map((message) => message.id), currentRows: [] });
+  assert.equal(plan.records.length, 4);
+  assert.equal(plan.records.find((record) => record.record_id.includes("ceremony"))?.data.location, "Garden lawn");
+  assert.equal(plan.records.find((record) => record.record_id.includes("ceremony"))?.data.status, "confirmed");
+  assert.equal(plan.records.find((record) => record.record_id.includes("bus-1"))?.data.due_at, "2027-11-01T00:00:00.000Z");
+});
+
+test("a source that loses its resolvable meaning marks its row stale", () => {
+  const message = taskMessage("task-1", "Confirm transport pickup");
+  const first = buildWeddingRunSheetProjectionPlan({ databaseId: "database:runsheet", weddingPlanId: "plan-1", messages: [message], changedMessageIds: [message.id], currentRows: [] });
+  const unresolved = { ...message, type: "note", content: { wedding_plan_id: "plan-1", task_id: "task-1", title: "Unclassified note" } };
+  const changed = buildWeddingRunSheetProjectionPlan({ databaseId: "database:runsheet", weddingPlanId: "plan-1", messages: [unresolved], changedMessageIds: [message.id], currentRows: [projectedRow(first.records[0])] });
+  assert.equal(changed.revisions.length, 1);
+  assert.equal(changed.revisions[0].patch.projection_state, "stale");
 });

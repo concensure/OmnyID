@@ -43,6 +43,7 @@ import { dashboardBootstrapMessages } from "@/lib/dashboardBootstrapState";
 import { isRecord } from "@/lib/eventDetail";
 import { recordShortcutUse } from "@/lib/shortcutRecency";
 import { surfaceShortDateLabel } from "@/lib/surfaceTimestampPresentation";
+import { WeddingRunSheetProjectionStatus } from "@/components/WeddingRunSheetProjectionStatus";
 
 function GhostGrid(props: {
   readonly?: boolean;
@@ -362,6 +363,15 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
     setEditingValue(formatEditableValue(row.data[col]));
   }
 
+  function recordLocalMessages(messages: DatabaseMessage[]) {
+    setLocalMessages((current) => {
+      const merged = new Map(current.map((message) => [message.id, message]));
+      for (const message of messages) merged.set(message.id, message);
+      return Array.from(merged.values());
+    });
+    setRefreshKey((value) => value + 1);
+  }
+
   function selectDatabase(databaseId: string) {
     const definition = definitions().find((item) => item.databaseId === databaseId);
     setSelectedDatabaseId(databaseId);
@@ -567,6 +577,18 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
         onImport={() => setShowImport(true)}
         onArchiveToggle={() => setShowLifecycleConfirm(true)}
       />
+
+      <Show when={selectedDefinition()?.profileId === "wedding_runsheet.v1" && selectedDefinition()?.weddingPlanId}>
+        {(weddingPlanId) => (
+          <WeddingRunSheetProjectionStatus
+            databaseId={selectedDefinition()!.databaseId}
+            weddingPlanId={weddingPlanId()!}
+            messages={allMessages()}
+            archived={selectedDefinition()!.archived}
+            onMessages={(messages) => recordLocalMessages(messages as DatabaseMessage[])}
+          />
+        )}
+      </Show>
 
       {/* Table filter pills */}
       <div class="flex flex-wrap items-center gap-2">

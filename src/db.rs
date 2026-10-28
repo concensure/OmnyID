@@ -32,6 +32,12 @@ mod wedding_newsletter;
 mod wedding_blog_publications;
 pub use wedding_blog_publications::WeddingBlogPublicationRecord; mod wedding_quote_study; pub use wedding_quote_study::WeddingQuoteStudyRecord;
 mod wedding_onboarding_state;
+mod wedding_runsheet_projection;
+pub use wedding_runsheet_projection::{
+    WeddingRunSheetProjectionBatch, WeddingRunSheetProjectionCommit,
+    WeddingRunSheetProjectionLedgerMessage, WeddingRunSheetProjectionState,
+    WeddingRunSheetProjectionStoreError, WeddingRunSheetProjectionWrite,
+};
 mod wedding_vendor_contact_schedule;
 mod wedding_vendor_directory;
 pub mod wedding_vendor_evidence;
