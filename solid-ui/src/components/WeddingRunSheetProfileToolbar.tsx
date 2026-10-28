@@ -126,10 +126,12 @@ export function WeddingRunSheetItemDialog(props: {
   const [ownerRef, setOwnerRef] = createSignal("");
   const [vendorVisible, setVendorVisible] = createSignal(false);
   const [inputError, setInputError] = createSignal("");
+  let titleInput: HTMLInputElement | undefined;
   let wasOpen = false;
   createEffect(() => {
     if (props.open && !wasOpen) {
       setTitle(""); setStartAt(""); setLocation(""); setOwnerRef(""); setVendorVisible(false); setInputError("");
+      queueMicrotask(() => titleInput?.focus());
     }
     wasOpen = props.open;
   });
@@ -138,7 +140,7 @@ export function WeddingRunSheetItemDialog(props: {
       <h2 id="runsheet-add-title" class="text-lg font-bold text-wedding-text">Add run-sheet item</h2>
       <p class="mt-1 text-sm text-wedding-muted">Manual items stay yours and are not overwritten by automatic updates.</p>
       <div class="mt-4 space-y-3">
-        <label class="block text-sm font-medium text-wedding-text">Item name<input autofocus value={title()} onInput={(event) => setTitle(event.currentTarget.value)} class="mt-1 min-h-11 w-full rounded-lg border border-wedding-border px-3" /></label>
+        <label class="block text-sm font-medium text-wedding-text">Item name<input ref={titleInput} value={title()} onInput={(event) => setTitle(event.currentTarget.value)} class="mt-1 min-h-11 w-full rounded-lg border border-wedding-border px-3" /></label>
         <label class="block text-sm font-medium text-wedding-text">Start time<input type="datetime-local" value={startAt()} onInput={(event) => setStartAt(event.currentTarget.value)} class="mt-1 min-h-11 w-full rounded-lg border border-wedding-border px-3" /></label>
         <label class="block text-sm font-medium text-wedding-text">Place<input value={location()} onInput={(event) => setLocation(event.currentTarget.value)} class="mt-1 min-h-11 w-full rounded-lg border border-wedding-border px-3" /></label>
         <label class="block text-sm font-medium text-wedding-text">Owner or contact<input value={ownerRef()} onInput={(event) => setOwnerRef(event.currentTarget.value)} class="mt-1 min-h-11 w-full rounded-lg border border-wedding-border px-3" /></label>
