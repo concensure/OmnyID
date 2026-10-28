@@ -72,6 +72,7 @@ export type DatabaseSavedViewContent = {
   view_id: string;
   name: string;
   revision: number;
+  profile_revision: number;
   columns: string[];
   sort: Array<{ field: string; direction: "ascending" | "descending" }>;
   filters: Array<{
@@ -79,6 +80,11 @@ export type DatabaseSavedViewContent = {
     operator: "equals" | "not_equals" | "contains" | "is_empty" | "is_not_empty" | "before" | "after";
     value: unknown;
   }>;
+  field_policy: {
+    include_fields: string[];
+    exclude_fields: string[];
+    resolve_contact_fields: boolean;
+  };
   idempotency_key: string;
 };
 
@@ -196,6 +202,54 @@ export function buildCanonicalDatabaseArchive(input: {
       input.idempotencyKey ?? `database-archive:${databaseId}:revision:${revision}`,
       "idempotency key",
     ),
+  };
+}
+
+export function buildCanonicalDatabaseSavedView(input: {
+  databaseId: string;
+  viewId: string;
+  name: string;
+  revision?: number;
+  profileRevision?: number;
+  columns: string[];
+  sort?: DatabaseSavedViewContent["sort"];
+  filters?: DatabaseSavedViewContent["filters"];
+  fieldPolicy: DatabaseSavedViewContent["field_policy"];
+  idempotencyKey?: string;
+}): DatabaseSavedViewContent {
+  const databaseId = requireIdentifier(input.databaseId, "database ID");
+  const viewId = requireIdentifier(input.viewId, "saved view ID");
+  const name = input.name.trim();
+  if (!name || name.length > 120) throw new Error("Invalid saved view name");
+  const revision = requireRevision(input.revision ?? 1, "saved view revision");
+  const profileRevision = requireRevision(input.profileRevision ?? 1, "profile revision");
+  const field = (value: string) => requireIdentifier(value, "saved view field");
+  const columns = Array.from(new Set(input.columns.map(field)));
+  const sort = (input.sort ?? []).map((rule) => ({ field: field(rule.field), direction: rule.direction }));
+  const filters = (input.filters ?? []).map((rule) => ({ ...rule, field: field(rule.field) }));
+  const includeFields = Array.from(new Set(input.fieldPolicy.include_fields.map(field)));
+  const excludeFields = Array.from(new Set(input.fieldPolicy.exclude_fields.map(field)));
+  if (columns.length > 100 || sort.length > 12 || filters.length > 24 || includeFields.length > 100 || excludeFields.length > 100) {
+    throw new Error("Saved view exceeds its bounded field policy");
+  }
+  if (excludeFields.some((value) => includeFields.includes(value))) throw new Error("Saved view field policy overlaps");
+  return {
+    kind: "database_saved_view",
+    contract_version: DATABASE_CONTRACT_VERSION,
+    database_id: databaseId,
+    view_id: viewId,
+    name,
+    revision,
+    profile_revision: profileRevision,
+    columns,
+    sort,
+    filters,
+    field_policy: {
+      include_fields: includeFields,
+      exclude_fields: excludeFields,
+      resolve_contact_fields: input.fieldPolicy.resolve_contact_fields,
+    },
+    idempotency_key: requireIdentifier(input.idempotencyKey ?? `database-view:${databaseId}:${viewId}:revision:${revision}`, "idempotency key"),
   };
 }
 

@@ -7,8 +7,33 @@ import {
   buildCanonicalDatabaseProjectionReceipt,
   buildCanonicalDatabaseRecord,
   buildCanonicalDatabaseRevision,
+  buildCanonicalDatabaseSavedView,
   buildCanonicalDatabaseSchema,
 } from "../src/lib/databaseContract.ts";
+
+test("saved view builder binds a non-overlapping field policy and profile revision", () => {
+  const view = buildCanonicalDatabaseSavedView({
+    databaseId: "database:runsheet",
+    viewId: "vendor",
+    name: "Vendor",
+    profileRevision: 2,
+    columns: ["title", "start_at"],
+    fieldPolicy: {
+      include_fields: ["title", "start_at"],
+      exclude_fields: ["private_notes", "couple_phone"],
+      resolve_contact_fields: false,
+    },
+  });
+  assert.equal(view.profile_revision, 2);
+  assert.equal(view.field_policy.resolve_contact_fields, false);
+  assert.throws(() => buildCanonicalDatabaseSavedView({
+    databaseId: "database:runsheet",
+    viewId: "unsafe",
+    name: "Unsafe",
+    columns: ["title"],
+    fieldPolicy: { include_fields: ["title"], exclude_fields: ["title"], resolve_contact_fields: false },
+  }), /overlaps/);
+});
 
 test("definition and archive builders preserve scope and lifecycle revisions", () => {
   const definition = buildCanonicalDatabaseDefinition({

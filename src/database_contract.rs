@@ -152,13 +152,42 @@ pub struct DatabaseSavedViewContract {
     pub view_id: String,
     pub name: String,
     pub revision: u64,
+    #[serde(default = "default_database_profile_revision")]
+    pub profile_revision: u32,
     #[serde(default)]
     pub columns: Vec<String>,
     #[serde(default)]
     pub sort: Vec<DatabaseSortRule>,
     #[serde(default)]
     pub filters: Vec<DatabaseFilterRule>,
+    #[serde(default)]
+    pub field_policy: DatabaseSavedViewFieldPolicy,
     pub idempotency_key: String,
+}
+
+fn default_database_profile_revision() -> u32 {
+    1
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DatabaseSavedViewFieldPolicy {
+    #[serde(default)]
+    pub include_fields: Vec<String>,
+    #[serde(default)]
+    pub exclude_fields: Vec<String>,
+    #[serde(default)]
+    pub resolve_contact_fields: bool,
+}
+
+impl Default for DatabaseSavedViewFieldPolicy {
+    fn default() -> Self {
+        Self {
+            include_fields: Vec::new(),
+            exclude_fields: Vec::new(),
+            resolve_contact_fields: false,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -301,11 +330,19 @@ pub fn validate_saved_view(view: &DatabaseSavedViewContract) -> Result<(), Datab
     validate_common_identifier(&view.database_id, "database_id")?;
     validate_common_identifier(&view.view_id, "view_id")?;
     validate_revision(view.revision)?;
+    if view.profile_revision == 0 {
+        return Err(DatabaseContractError::Malformed("profile_revision"));
+    }
     validate_idempotency_key(&view.idempotency_key)?;
     if view.name.trim().is_empty() || view.name.chars().count() > 120 {
         return Err(DatabaseContractError::Malformed("view_name"));
     }
-    if view.columns.len() > 100 || view.sort.len() > 12 || view.filters.len() > 24 {
+    if view.columns.len() > 100
+        || view.sort.len() > 12
+        || view.filters.len() > 24
+        || view.field_policy.include_fields.len() > 100
+        || view.field_policy.exclude_fields.len() > 100
+    {
         return Err(DatabaseContractError::Malformed("view_bounds"));
     }
     for field in view
@@ -315,6 +352,17 @@ pub fn validate_saved_view(view: &DatabaseSavedViewContract) -> Result<(), Datab
         .chain(view.filters.iter().map(|rule| &rule.field))
     {
         validate_field_name(field)?;
+    }
+    for field in view
+        .field_policy
+        .include_fields
+        .iter()
+        .chain(view.field_policy.exclude_fields.iter())
+    {
+        validate_field_name(field)?;
+    }
+    if view.field_policy.include_fields.iter().any(|field| view.field_policy.exclude_fields.contains(field)) {
+        return Err(DatabaseContractError::Malformed("field_policy_overlap"));
     }
     Ok(())
 }
@@ -748,9 +796,11 @@ mod tests {
             view_id: "view-active".to_string(),
             name: "Active".to_string(),
             revision: 1,
+            profile_revision: 1,
             columns: vec!["name".to_string()],
             sort: vec![],
             filters: vec![],
+            field_policy: DatabaseSavedViewFieldPolicy::default(),
             idempotency_key: "view-active-revision-1".to_string(),
         };
         assert_eq!(validate_saved_view(&view), Ok(()));
