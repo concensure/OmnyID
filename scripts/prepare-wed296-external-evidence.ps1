@@ -34,7 +34,7 @@ $support = @{
     allowlisted_cohort = 'Documents/verification/wed-296-owner-human-gate-authorization.md'
 }
 
-$recordedAt = [DateTimeOffset]::Now.ToString('o')
+$recordedAt = [DateTimeOffset]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ssZ')
 $index = [ordered]@{
     schema_version = 'quotation.external_evidence.index.v1'
     commit_sha = $head

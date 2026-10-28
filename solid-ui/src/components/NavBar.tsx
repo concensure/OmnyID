@@ -36,7 +36,6 @@ import type { ViewName } from "@/lib/viewNames";
 import { RailIcon, type IconId } from "@/components/RailIcons";
 
 export type { ViewName } from "@/lib/viewNames";
-
 export const CORE_ITEMS: Array<{ id: ViewName; label: string; icon: string; shortcut: string }> = [
   { id: "search",    label: "Chat",      icon: "💬", shortcut: "Ctrl+1" },
   { id: "threads",   label: "Threads",   icon: "🗂", shortcut: "Ctrl+2" },
@@ -48,7 +47,6 @@ export const CORE_ITEMS: Array<{ id: ViewName; label: string; icon: string; shor
   { id: "templates", label: "Templates", icon: "📋", shortcut: "Ctrl+8" },
   { id: "reports",   label: "Study Reports", icon: "📊", shortcut: "Reports" },
 ];
-
 const STUDY_VIEW_ITEM: { id: ViewName; label: string; icon: IconId } = {
   id: "study",
   label: "Study",
