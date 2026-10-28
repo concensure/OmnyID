@@ -28,7 +28,7 @@ export function WeddingRunSheetProfileToolbar(props: {
             {props.visibleRows.length} of {props.rows.length} items, ordered by effective time.
           </p>
         </div>
-        <button type="button" disabled={props.archived} onClick={props.onAddItem} class="min-h-11 rounded-lg bg-wedding-action px-4 text-sm font-semibold text-white disabled:opacity-50">
+        <button id="wedding-runsheet-add-item" type="button" disabled={props.archived} onClick={props.onAddItem} class="min-h-11 rounded-lg bg-wedding-action px-4 text-sm font-semibold text-white disabled:opacity-50">
           Add run-sheet item
         </button>
       </div>
@@ -134,11 +134,11 @@ export function WeddingRunSheetItemDialog(props: {
     wasOpen = props.open;
   });
   return <Show when={props.open}><div class="fixed inset-0 z-[210] flex items-end bg-on-surface/30 p-0 backdrop-blur-sm sm:items-center sm:justify-center sm:p-3" onClick={(event) => { if (event.target === event.currentTarget && !props.busy) props.onClose(); }}>
-    <div class="max-h-[92vh] w-full overflow-y-auto rounded-t-2xl bg-white p-5 shadow-panel sm:max-w-md sm:rounded-2xl sm:p-6">
-      <h2 class="text-lg font-bold text-wedding-text">Add run-sheet item</h2>
+    <div role="dialog" aria-modal="true" aria-labelledby="runsheet-add-title" class="max-h-[92vh] w-full overflow-y-auto rounded-t-2xl bg-white p-5 shadow-panel sm:max-w-md sm:rounded-2xl sm:p-6" onKeyDown={(event) => { if (event.key === "Escape" && !props.busy) props.onClose(); }}>
+      <h2 id="runsheet-add-title" class="text-lg font-bold text-wedding-text">Add run-sheet item</h2>
       <p class="mt-1 text-sm text-wedding-muted">Manual items stay yours and are not overwritten by automatic updates.</p>
       <div class="mt-4 space-y-3">
-        <label class="block text-sm font-medium text-wedding-text">Item name<input value={title()} onInput={(event) => setTitle(event.currentTarget.value)} class="mt-1 min-h-11 w-full rounded-lg border border-wedding-border px-3" /></label>
+        <label class="block text-sm font-medium text-wedding-text">Item name<input autofocus value={title()} onInput={(event) => setTitle(event.currentTarget.value)} class="mt-1 min-h-11 w-full rounded-lg border border-wedding-border px-3" /></label>
         <label class="block text-sm font-medium text-wedding-text">Start time<input type="datetime-local" value={startAt()} onInput={(event) => setStartAt(event.currentTarget.value)} class="mt-1 min-h-11 w-full rounded-lg border border-wedding-border px-3" /></label>
         <label class="block text-sm font-medium text-wedding-text">Place<input value={location()} onInput={(event) => setLocation(event.currentTarget.value)} class="mt-1 min-h-11 w-full rounded-lg border border-wedding-border px-3" /></label>
         <label class="block text-sm font-medium text-wedding-text">Owner or contact<input value={ownerRef()} onInput={(event) => setOwnerRef(event.currentTarget.value)} class="mt-1 min-h-11 w-full rounded-lg border border-wedding-border px-3" /></label>

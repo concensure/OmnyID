@@ -924,7 +924,12 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
         open={showRunSheetAdd()}
         busy={runSheetActionBusy()}
         error={runSheetActionError()}
-        onClose={() => { if (!runSheetActionBusy()) setShowRunSheetAdd(false); }}
+        onClose={() => {
+          if (!runSheetActionBusy()) {
+            setShowRunSheetAdd(false);
+            queueMicrotask(() => document.getElementById("wedding-runsheet-add-item")?.focus());
+          }
+        }}
         onSave={(input) => void addManualRunSheetItem(input)}
       />
 
