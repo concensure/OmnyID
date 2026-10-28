@@ -269,6 +269,12 @@ Generate role-specific variants from one master record set.
 - Role variants are saved projections, not copied databases.
 - No outbound message is sent by merely creating or previewing a view.
 
+### Implementation status — 2026-10-29
+
+In progress in WED-293. The first committed slice extends the existing V1 saved-view contract with a bounded profile revision and field policy, then seeds Master, Vendor, Photo/video, VIP, Guest and Print projections over the same source record IDs. Non-master policies deny contact resolution and exclude private notes, couple contact fields and projector internals. Database now offers an exact-content preview and accessible print path; the print action records only view ID, source record IDs and visible columns in private AFP before opening the browser print dialog. Previewing or saving does not contact a recipient, and hosted links remain unavailable.
+
+Still open: an independently reviewed false-default hosted grant transport with expiry/revocation/view events, the 7–10 day vendor sign-off acknowledgement projection, and visual PDF pagination evidence. These remain WED-293 work and are not implied by the local preview/print implementation.
+
 ## 8. WED-294 — Conflict rules, buffers, and contextual A2UI
 
 ### Goal

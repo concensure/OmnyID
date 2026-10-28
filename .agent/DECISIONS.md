@@ -2001,3 +2001,10 @@ The Policy V2 browser flag is `VITE_WEDDING_VENDOR_RANKING_POLICY_V2`, matching 
 - Proposed relative rows may recompute deterministically from an anchor. Confirmed rows never move silently: drift becomes a conflict, and a direct confirmed-time edit requires an explicit confirmation.
 - A run-sheet-only change is stored as a labelled override with the authoritative source unchanged. When a linked Wedding task exposes enough context, the user may update that task instead through its canonical AFP command. Unsupported source changes fail closed to the visible override path rather than synthesizing a second authority.
 - Manual rows are detached user records. Keyboard alternatives, focus restoration, mobile reflow and colour-independent status text are part of the editing contract, not deferred decoration.
+
+# 2026-10-29 — Run-sheet role views are field-policy projections; preview is not delivery
+
+- Master, Vendor, Photo/video, VIP, Guest and Print use one `database_saved_view` contract and retain the source run-sheet record IDs. A role variant is never copied into a second database.
+- Every saved view binds a profile revision and explicit field policy. Non-master presets deny contact resolution and exclude private notes, couple phone/email fields and projector internals by default.
+- Previewing has no AFP or external side effect. Saving a view records only its definition. Printing is available from exact-content preview and records a private export intent containing record IDs and visible columns before opening the browser print dialog.
+- Hosted sharing is a different transport boundary. It remains unavailable until a false-default grant implementation, expiry/revocation enforcement and independent security/privacy evidence exist; local preview or print success cannot activate or imply it.

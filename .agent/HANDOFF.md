@@ -1,3 +1,24 @@
+## 2026-10-29 - WED-293 saved views and safe print preview (Codex, in progress)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch `agent/codex/WED-293`; exact clean code candidate `65eeda8573de6c8686512259dab1f2397d409c41`.
+
+Changed:
+
+- Extended V1 saved views with bounded profile revision and field policy in Rust/TypeScript, retaining compatibility defaults.
+- Seeded Master, Vendor, Photo/video, VIP, Guest and Print projections over the same source run-sheet record IDs. Non-master views exclude private/contact/internal fields and do not resolve contact refs.
+- Added responsive exact-content preview, page-one owner labels and colour-independent browser print styling. Print records only the view, visible columns and source record IDs in private AFP before opening the print dialog.
+- Preview/save has no recipient side effect. Hosted links remain unavailable and no sharing flag or route changed.
+
+Evidence:
+
+- Exact candidate passed six Rust contract tests, TypeScript, 17 focused tests, both line budgets, all 2,036 Wedding tests and production build.
+- Playwright/Axe passed at 320px, 375px and 1280px with no serious/critical findings; vendor preview retained two explicitly visible source IDs and excluded the private fixture note.
+- Evidence: `Documents/verification/WED-293-SAVED-VIEW-PREVIEW-2026-10-29.md`.
+
+Remaining:
+
+- WED-293 stays in progress. Add the false-default expiring/revocable hosted grant boundary and its AFP lifecycle events, the 7–10 day vendor sign-off acknowledgement projection, and visual PDF pagination proof. Do not treat local preview/print as hosted-sharing approval.
+
 ## 2026-10-29 - WED-292 run-sheet profile editing (Codex, complete)
 
 Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch `agent/codex/WED-292`; exact clean code candidate `8c9923361eac1cca0396c68803b2e2a5e601fe3f`.
