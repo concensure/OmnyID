@@ -5427,3 +5427,12 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch `agent/codex/W
 - No production deployment, data migration, wedding row projection or email-relay change occurred. Oracle still runs the WED-296 source candidate; this WED-290 slice is local and committed only.
 
 Next: begin WED-291 incremental Wedding run-sheet projection from this contract, keeping generic databases unchanged and projecting from the existing wedding ledger rather than copying it.
+## 2026-10-29 - WED-291 deterministic run-sheet projector core (Codex, in progress)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch `agent/codex/WED-291`, based on WED-290 commit `7746d988ba9b44f1908331aa77c66130ca8bf2c3`.
+
+- Added a pure, zero-model-call Wedding run-sheet projection planner. It selects only sources for the requested wedding plan, maps changed AFP message IDs to stable logical items, builds bounded source-linked rows, fingerprints fact packets, skips identical replays and proposes a versioned checkpoint receipt.
+- Changed structured sources append a canonical create or revision; an explicitly detached user row is never overwritten. When a changed source disappears, its projected row becomes stale and needs confirmation rather than being deleted.
+- Added a canonical projection-receipt builder and focused coverage for source scope, replay idempotency, one-source isolation, detached rows, stale handling and zero model calls.
+- WED-291 intentionally remains open. The next slice must add one authenticated server command that locks the definition/checkpoint, validates account and plan scope, writes the record batch plus receipt in one Postgres transaction, and returns the saved explanation. Only that command may advance the durable cursor.
+- Focused verification passed: TypeScript, 11 projector/contract tests and both line budgets. No server, schema, UI invocation, production deployment or model call changed in this first slice.

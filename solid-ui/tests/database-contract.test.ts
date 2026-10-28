@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   buildCanonicalDatabaseArchive,
   buildCanonicalDatabaseDefinition,
+  buildCanonicalDatabaseProjectionReceipt,
   buildCanonicalDatabaseRecord,
   buildCanonicalDatabaseRevision,
   buildCanonicalDatabaseSchema,
@@ -26,6 +27,19 @@ test("definition and archive builders preserve scope and lifecycle revisions", (
   assert.equal(definition.revision, 2);
   assert.equal(archive.database_id, definition.database_id);
   assert.equal(archive.archived, true);
+});
+
+test("projection receipt builder binds a checkpoint to affected records", () => {
+  const receipt = buildCanonicalDatabaseProjectionReceipt({
+    databaseId: "database:runsheet",
+    projectorId: "wedding-runsheet",
+    projectorVersion: 1,
+    sourceCursor: "cursor-1",
+    sourceFingerprint: "fnv1a-12345678",
+    affectedRecordIds: ["runsheet:item-1", "runsheet:item-1"],
+  });
+  assert.deepEqual(receipt.affected_record_ids, ["runsheet:item-1"]);
+  assert.equal(receipt.source_cursor, "cursor-1");
 });
 
 test("canonical database builders preserve stable identity and revision metadata", () => {

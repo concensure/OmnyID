@@ -199,6 +199,38 @@ export function buildCanonicalDatabaseArchive(input: {
   };
 }
 
+export function buildCanonicalDatabaseProjectionReceipt(input: {
+  databaseId: string;
+  projectorId: string;
+  projectorVersion: number;
+  sourceCursor: string;
+  sourceFingerprint: string;
+  affectedRecordIds: string[];
+  idempotencyKey?: string;
+}): DatabaseProjectionReceiptContent {
+  const databaseId = requireIdentifier(input.databaseId, "database ID");
+  const projectorId = requireIdentifier(input.projectorId, "projector ID");
+  const projectorVersion = requireRevision(input.projectorVersion, "projector version");
+  const sourceCursor = requireIdentifier(input.sourceCursor, "source cursor");
+  const sourceFingerprint = requireIdentifier(input.sourceFingerprint, "source fingerprint");
+  const affectedRecordIds = Array.from(new Set(input.affectedRecordIds.map((id) => requireIdentifier(id, "record ID"))));
+  if (affectedRecordIds.length > 500) throw new Error("Too many affected database records");
+  return {
+    kind: "database_projection_receipt",
+    contract_version: DATABASE_CONTRACT_VERSION,
+    database_id: databaseId,
+    projector_id: projectorId,
+    projector_version: projectorVersion,
+    source_cursor: sourceCursor,
+    source_fingerprint: sourceFingerprint,
+    affected_record_ids: affectedRecordIds,
+    idempotency_key: requireIdentifier(
+      input.idempotencyKey ?? `database-projection:${databaseId}:${projectorId}:${sourceCursor}`,
+      "idempotency key",
+    ),
+  };
+}
+
 export function buildCanonicalDatabaseRecord(input: {
   databaseId?: string;
   recordId?: string;

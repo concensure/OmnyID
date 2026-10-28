@@ -185,6 +185,10 @@ Seed only when evidence exists, otherwise create a `needs-confirmation` suggesti
 - The profile opens with a deterministic, source-linked schedule.
 - Projection metrics and receipts are inspectable without content leakage.
 
+### Implementation status — 2026-10-29
+
+In progress. The deterministic client-side projection-plan layer now covers plan scoping, stable items, source references, fingerprints, replay suppression, stale handling, detached user rows, checkpoint receipts and change explanations with zero model calls. The server-side atomic batch/checkpoint command, expanded selectors, UI invocation and disposable-Postgres concurrency proof remain open.
+
 ## 6. WED-292 — Add run-sheet profile controls and time editing
 
 ### Goal

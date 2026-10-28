@@ -1974,3 +1974,9 @@ The Policy V2 browser flag is `VITE_WEDDING_VENDOR_RANKING_POLICY_V2`, matching 
 - The Database surface always filters rows and schema by the selected stable `database_id`. Tables with the same label in different databases cannot merge.
 - `database:legacy` is a synthesized visible definition only when legacy rows exist or no canonical definition exists. It remains editable for record compatibility but cannot be renamed or archived as if it were a canonical definition.
 - `wedding_runsheet.v1` is a registered profile choice only when the account's accessible messages expose a wedding-plan reference. WED-290 creates the definition hook but does not populate wedding rows or add a parallel run-sheet store.
+# 2026-10-29 — Run-sheet projection plans are deterministic before they are transactional
+
+- Structured wedding AFP facts map to bounded `wedding_runsheet.v1` fact packets without an LLM. Opening Database, switching databases or editing a cell never invokes a model.
+- A pure projection-plan layer owns plan scoping, stable item IDs, source fingerprints, unchanged replay suppression, stale marking and human-readable change explanations. It cannot advance the durable checkpoint by itself.
+- WED-291 remains open until a server command commits all record revisions and the projection receipt/checkpoint atomically. A failed server batch must leave the prior checkpoint authoritative.
+- User-created or explicitly detached rows are outside projector overwrite authority.
