@@ -5436,3 +5436,18 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch `agent/codex/W
 - Added a canonical projection-receipt builder and focused coverage for source scope, replay idempotency, one-source isolation, detached rows, stale handling and zero model calls.
 - WED-291 intentionally remains open. The next slice must add one authenticated server command that locks the definition/checkpoint, validates account and plan scope, writes the record batch plus receipt in one Postgres transaction, and returns the saved explanation. Only that command may advance the durable cursor.
 - Focused verification passed: TypeScript, 11 projector/contract tests and both line budgets. No server, schema, UI invocation, production deployment or model call changed in this first slice.
+
+## 2026-10-29 - WED-297 Wedding Animal Quiz AFP handoff and run-sheet promotion (Codex, complete)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch `agent/codex/WED-297`, released source SHA `e668e4b92ede40d68d2141696001e16405303e87` from detached checkout `C:\Users\ozans\AppData\Local\Temp\omnyid-wed297-release-e668e4b`.
+
+- Extended the existing explicit quiz handoff instead of creating a parallel backend. The authenticated Wedding planner now persists validated quiz facts through its canonical `/send` AFP path as private preference, intake and deal-breaker events. Budget comfort/stretch, guests, location/timeframe, venue/style, priorities, values, family context and deal-breakers are bounded; names and raw answers never leave the browser through this path.
+- Added compatibility for the stated `omnyid.wedding.coupleBrief.v1` payload, reducing the full object to the same minimal schema. Existing planner facts are not overwritten. All emitted messages have deterministic logical IDs, partial failures retain the source payload, and replay is safe because message insertion is ID-idempotent.
+- Made the mounted Wedding profile owner react to an import request fired after it mounted, closing the signed-in deep-link race.
+- Added a responsive, approval-first run-sheet preview to the Wedding marketing home. WED-291 remains in progress for the atomic server batch/checkpoint command and UI invocation; the public copy is deliberately labelled preview.
+- Verification passed on candidate `e668e4b`: TypeScript; 10 focused import/static tests; Wedding site, CSP and quiz-engine smoke; both line budgets; all 2,023 Wedding tests; and the production UI build. The build emitted only the existing large-chunk warning.
+- Deployed the exact clean candidate with simulated data excluded and the existing Oracle environment preserved. Five changed source/static files match Oracle byte-for-byte. Public Wedding home, quiz and versioned quiz asset return HTTP 200 and expose the new run-sheet/handoff markers.
+- The guarded deployment's full detached audit completed remotely with exit 0, backup verification pass, restore drill pass, runtime-script integrity pass and no failure step. Its local polling wrapper stalled after completion and was stopped; a fresh read-only collector produced the committed `status=pass` proof with restore deliberately skipped rather than repeated.
+- The designated `casper.wu01@gmail.com` test-account password file now receives HTTP 401 `credentials`; no secret was printed and no password/account mutation was attempted. Authenticated browser acceptance is therefore not claimed, while unit, integration-contract, production build, source hash and live route evidence pass.
+
+Next: resume WED-291 with the authenticated transactional run-sheet projection endpoint. Do not treat the marketing preview or the pure projector as proof that automatic row population is complete.

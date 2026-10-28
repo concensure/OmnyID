@@ -1980,3 +1980,10 @@ The Policy V2 browser flag is `VITE_WEDDING_VENDOR_RANKING_POLICY_V2`, matching 
 - A pure projection-plan layer owns plan scoping, stable item IDs, source fingerprints, unchanged replay suppression, stale marking and human-readable change explanations. It cannot advance the durable checkpoint by itself.
 - WED-291 remains open until a server command commits all record revisions and the projection receipt/checkpoint atomically. A failed server batch must leave the prior checkpoint authoritative.
 - User-created or explicitly detached rows are outside projector overwrite authority.
+
+# 2026-10-29 — Quiz account handoff is a bounded AFP import, not a second profile store
+
+- The public quiz keeps raw answers, names and partner-link payloads in the browser. Only the explicit account action may create a 30-day bounded handoff containing planning facts.
+- The workspace accepts both that handoff and the earlier `omnyid.wedding.coupleBrief.v1` result, but a compatibility adapter extracts only known fields and discards names, raw answers and unknown structure before any backend call.
+- After authentication, quiz facts become deterministic private AFP preference, intake and deal-breaker events. Existing user facts take precedence, every event has a stable retry identity, and the browser payload is removed only after all writes succeed.
+- The run-sheet marketing surface is labelled as a preview while WED-291's atomic server projection command remains open. It may explain the source-linked, approval-first direction but must not imply that vendor sharing occurs automatically.

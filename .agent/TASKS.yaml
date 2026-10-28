@@ -17,13 +17,13 @@ lifecycle:
 tasks:
   - id: WED-297
     title: Connect Wedding Animal Quiz results to the canonical planner profile and promote run sheets
-    status: in_progress
+    status: done
     owner: codex
     branch: agent/codex/WED-297
     depends_on: [WED-262, WED-290, WED-291, WED-296]
     files: [solid-ui/src/lib/weddingAnimalQuizImportState.ts, solid-ui/src/lib/weddingLeadMagnetImportRunnerState.ts, solid-ui/src/lib/useWeddingPreferenceProfileOwner.ts, solid-ui/tests/wedding-animal-quiz-import-state.test.ts, wedding/index.html, wedding/assets/css/style.css, solid-ui/tests/wedding-quote-study-surface.test.ts, Documents/verification/**, .agent/**]
     acceptance: [the explicit quiz account handoff accepts both the deployed coupleBrief.v1 payload and the bounded v1 handoff without raw answers or names, validated quiz facts persist through canonical private AFP preference and intake events only after authentication, retries are idempotent and the browser payload is consumed only after all writes succeed, vision budget guest venue style priority value dealbreaker date and location signals populate the wedding plan without overwriting existing user facts, the Wedding marketing home promotes the ledger-backed shareable run-sheet workflow truthfully and responsively, focused tests typecheck all Wedding tests production build site smoke and line-budget checks pass, one exact clean committed candidate is deployed and verified on Oracle]
-    progress: "Registered from clean WED-291 projector commit 40c315b45e856c0993e55f05ab37f6a8d656ff80 after confirming the current workspace importer persists a minimal handoff through AFP but does not accept the live coupleBrief.v1 shape and its mounted import trigger is not reactive."
+    progress: "Completed and released from exact clean SHA e668e4b92ede40d68d2141696001e16405303e87. The explicit minimal handoff and legacy coupleBrief.v1 are schema/size/expiry checked, reduced without names or raw answers, and persisted after authentication as deterministic private AFP preference, intake and deal-breaker events; existing facts win and failed batches retain the browser handoff for an idempotent retry. The mounted planner now reacts to late import requests. The public Wedding home has a mobile run-sheet preview linked to the existing planner. Pass: typecheck, 10 focused tests, site/CSP/quiz smoke, line budgets, all 2,023 Wedding tests and production build. Oracle was deployed from a detached clean checkout with simulated data excluded and the existing remote environment preserved; source hashes match, public routes return 200 and machine proof passes. The designated test-account password now receives HTTP 401, so no password reset was attempted and authenticated browser acceptance was not falsely claimed."
 
   - id: WED-291
     title: Implement the incremental wedding run-sheet projector
