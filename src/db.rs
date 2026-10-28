@@ -18,7 +18,6 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
 use std::time::Duration;
 use ulid::Ulid;
-
 mod migration_catalog;
 pub use migration_catalog::MIGRATIONS;
 mod message_attachments;
@@ -65,7 +64,6 @@ const TENANT_PRIVATE_SCHEMA_REQUIRED_TABLES: &[&str] = &[
     "workflow_trigger_registrations",
     "workflow_trigger_observations",
 ];
-
 const TENANT_PRIVATE_SCHEMA_REQUIRED_MESSAGE_COLUMNS: &[&str] = &[
     "kind",
     "supertags",
@@ -76,7 +74,6 @@ const TENANT_PRIVATE_SCHEMA_REQUIRED_MESSAGE_COLUMNS: &[&str] = &[
     "metadata_values",
     "metadata_terms",
 ];
-
 const TENANT_PRIVATE_SCHEMA_REQUIRED_INDEXES: &[&str] = &[
     "idx_thread",
     "idx_embedding",
