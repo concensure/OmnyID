@@ -5358,3 +5358,11 @@ Next:
 - Begin WED-275 with a repository-level reuse and authority inventory before adding any migration or UI.
   Reserve WED-275 through WED-284 in the canonical task ledger as each slice starts and keep all new flags
   dark until the WED-283 evidence gates and WED-284 allowlisted cohort are complete.
+## 2026-10-28 - WED-287 task interaction and category-budget reconciliation (Codex, complete)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch `agent/codex/WED-287`; implementation SHA `83cb8d02aed5fd2bb8850bb7e38c84b7d2d0e473`.
+
+- Seeded five early-bound run-sheet handoffs, added in-stage AFP task creation with owner/deadline, dropdown assignment, shared completion behavior and labelled status rails. Assign/Reopen no longer force the full refresh that moved focus or made Home appear frozen.
+- A successful deal-breaker save hides the Home prompt immediately while the Inspiration editor remains available. Vendor drafts now use the matching category allocation, keep total-budget fallback only when necessary, and clear every budget field on opt-out.
+- Evidence-backed booking reconciliation now carries a visible explanation for linked booking, budget, task and decision projections; quote acceptance alone still cannot confirm booking. Policy V2 remains disabled and nothing was deployed.
+- Pre-freeze evidence: 2,012 Wedding tests, 13 focused frontend tests, five focused Rust outreach tests, TypeScript typecheck, production UI build and both line-budget guards passed. Final clean-SHA verification follows the coordination commit.
