@@ -29,6 +29,7 @@ import {
   type DatabaseCreateInput,
 } from "@/components/DatabaseCreateDialog";
 import {
+  existingDatabaseDefinitionForProfile,
   projectDatabaseDefinitions,
   reconcileSelectedDatabaseId,
   registeredDatabaseProfiles,
@@ -383,6 +384,15 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
 
   async function createDatabase(input: DatabaseCreateInput) {
     if (databaseCreateBusy()) return;
+    const existingProfileDatabase = existingDatabaseDefinitionForProfile(
+      definitions(), input.profileId, input.weddingPlanId,
+    );
+    if (existingProfileDatabase) {
+      selectDatabase(existingProfileDatabase.databaseId);
+      setShowDatabaseCreate(false);
+      if (existingProfileDatabase.archived) setShowLifecycleConfirm(true);
+      return;
+    }
     const accountId = props.bootstrap?.user.id?.trim();
     if (!accountId) { setDatabaseCreateError("Sign in again before creating a database."); return; }
     setDatabaseCreateBusy(true);

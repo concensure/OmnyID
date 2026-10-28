@@ -225,7 +225,7 @@ export function buildCanonicalDatabaseProjectionReceipt(input: {
     source_fingerprint: sourceFingerprint,
     affected_record_ids: affectedRecordIds,
     idempotency_key: requireIdentifier(
-      input.idempotencyKey ?? `database-projection:${databaseId}:${projectorId}:${sourceCursor}`,
+      input.idempotencyKey ?? `database-projection:${databaseId}:${projectorId}:${sourceCursor}:${sourceFingerprint}`,
       "idempotency key",
     ),
   };

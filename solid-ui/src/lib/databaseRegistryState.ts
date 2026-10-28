@@ -211,3 +211,15 @@ export function reconcileSelectedDatabaseId(
     ?? definitions[0]?.databaseId
     ?? null;
 }
+
+export function existingDatabaseDefinitionForProfile(
+  definitions: DatabaseDefinitionProjection[],
+  profileId: string | null | undefined,
+  weddingPlanId: string | null | undefined,
+): DatabaseDefinitionProjection | null {
+  if (!profileId) return null;
+  return definitions.find((definition) => (
+    definition.profileId === profileId
+    && definition.weddingPlanId === (weddingPlanId ?? null)
+  )) ?? null;
+}

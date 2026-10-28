@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  existingDatabaseDefinitionForProfile,
   projectDatabaseDefinitions,
   reconcileSelectedDatabaseId,
   registeredDatabaseProfiles,
@@ -50,6 +51,24 @@ test("database registry applies account-scoped sequential definitions and archiv
   assert.equal(projected[0].revision, 2);
   assert.equal(projected[0].archived, true);
   assert.equal(projected[0].archiveRevision, 1);
+});
+
+test("a profile resolves to one definition per wedding plan", () => {
+  const definitions = projectDatabaseDefinitions({
+    messages: [{
+      ...definition("database:runsheet", 1, "Wedding run sheet"),
+      content: {
+        ...definition("database:runsheet", 1, "Wedding run sheet").content,
+        profile_id: "wedding_runsheet.v1",
+        scope: { account_id: "account-1", wedding_plan_id: "plan-2027" },
+      },
+    }],
+    accountId: "account-1",
+    hasLegacyRecords: false,
+  });
+  assert.equal(existingDatabaseDefinitionForProfile(definitions, "wedding_runsheet.v1", "plan-2027")?.databaseId, "database:runsheet");
+  assert.equal(existingDatabaseDefinitionForProfile(definitions, "wedding_runsheet.v1", "plan-other"), null);
+  assert.equal(existingDatabaseDefinitionForProfile(definitions, null, null), null);
 });
 
 test("legacy records stay visible and archived databases remain selectable for restore", () => {
