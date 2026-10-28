@@ -7,6 +7,7 @@ import {
 } from "@/lib/databaseViewFailureState";
 import {
   databaseColumnDefs,
+  databaseCellFocusId,
   databaseRecordsForDatabase,
   databaseRecordsFromMessages,
   databaseSchemaColumnsFromMessages,
@@ -432,6 +433,8 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
       });
       setEditingCell(null);
       setEditingValue("");
+      const focusColumn = Object.keys(patch).find((key) => ["start_at", "end_at", "due_at"].includes(key)) ?? Object.keys(patch)[0];
+      if (focusColumn) queueMicrotask(() => document.getElementById(databaseCellFocusId(row.id, focusColumn))?.focus());
       return true;
     } catch (error) {
       setEditError(
@@ -525,9 +528,11 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
   }
 
   function cancelEditingCell() {
+    const active = editingCell();
     setEditingCell(null);
     setEditingValue("");
     setEditError(null);
+    if (active) queueMicrotask(() => document.getElementById(databaseCellFocusId(active.rowId, active.col))?.focus());
   }
 
   function toggleRowSelection(rowId: string) {
@@ -808,12 +813,12 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
                           <td class={`${cellPad()} text-on-surface max-w-[12rem]`} title={str}>
                             <Show when={isEditing()}
                               fallback={
-                                <div class="cursor-pointer hover:text-primary transition" onDblClick={() => beginEditingCell(row, col.key)}>
+                                <button id={databaseCellFocusId(row.id, col.key)} type="button" disabled={selectedDefinition()?.archived} class="w-full cursor-pointer text-left hover:text-primary transition disabled:cursor-default" onClick={() => beginEditingCell(row, col.key)} aria-label={`Edit ${col.label} for ${String(row.data.title || row.id)}`}>
                                   <span class="block truncate">{str || <span class="text-outline/30 italic text-[10px]">—</span>}</span>
                                   <Show when={col.key === "title" && runSheetRow()}>{(item) => <span class="mt-1 block text-[9px] font-medium text-on-surface-variant/65">
                                     {item().overrideState === "runsheet_only" ? "Run-sheet override · source unchanged" : item().sourceLinked ? "Linked to wedding plan" : "Manual item"}
                                   </span>}</Show>
-                                </div>
+                                </button>
                               }
                             >
                               <Show
@@ -927,7 +932,13 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
         review={pendingRunSheetTimeChange()?.review ?? null}
         busy={runSheetActionBusy()}
         error={runSheetActionError()}
-        onCancel={() => { if (!runSheetActionBusy()) setPendingRunSheetTimeChange(null); }}
+        onCancel={() => {
+          const pending = pendingRunSheetTimeChange();
+          if (!runSheetActionBusy()) {
+            setPendingRunSheetTimeChange(null);
+            if (pending) queueMicrotask(() => document.getElementById(databaseCellFocusId(pending.row.id, pending.review.field))?.focus());
+          }
+        }}
         onOverride={() => void confirmRunSheetOverride()}
         onAuthoritativeUpdate={() => void updateAuthoritativeTaskDate()}
       />

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  databaseCellFocusId,
   databaseColumnDefs,
   databaseImportPreviewRows,
   databaseImportRows,
@@ -14,6 +15,14 @@ import {
   formatDatabaseEditableValue,
   parseDatabaseEditedValue,
 } from "../src/lib/databaseViewState.ts";
+
+test("database view state creates stable keyboard focus targets", () => {
+  assert.equal(
+    databaseCellFocusId("runsheet:task:Venue walkthrough", "start_at"),
+    "database-cell-runsheet-task-venue-walkthrough-start-at",
+  );
+  assert.equal(databaseCellFocusId("***", ""), "database-cell-cell-cell");
+});
 
 test("database view state normalizes base records and record updates from unknown messages", () => {
   assert.deepEqual(

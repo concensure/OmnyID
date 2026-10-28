@@ -42,6 +42,11 @@ export type DatabaseViewSchemaUpdate = {
   column: DatabaseViewColumnDef;
 };
 
+export function databaseCellFocusId(recordId: string, column: string): string {
+  const safe = (value: string) => value.toLocaleLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80) || "cell";
+  return `database-cell-${safe(recordId)}-${safe(column)}`;
+}
+
 export function databaseScalarString(value: unknown, fallback = ""): string {
   return typeof value === "string" || typeof value === "number" ? String(value) : fallback;
 }
