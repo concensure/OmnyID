@@ -4,7 +4,8 @@ import { weddingVendorConfidenceV2, weddingVendorPriorShrunkFit, weddingVendorRa
 
 test("v2 stays off by default and prior shrink prevents sparse keyword echo from scoring 100", () => {
   assert.equal(weddingVendorRankingPolicyV2Enabled(), false);
-  assert.equal(weddingVendorRankingPolicyV2Enabled({ WEDDING_VENDOR_RANKING_POLICY_V2: "true" }), true);
+  assert.equal(weddingVendorRankingPolicyV2Enabled({ VITE_WEDDING_VENDOR_RANKING_POLICY_V2: "true" }), true);
+  assert.equal(weddingVendorRankingPolicyV2Enabled({ WEDDING_VENDOR_RANKING_POLICY_V2: "true" }), false);
   assert.equal(weddingVendorPriorShrunkFit([{ weight: 0.2, value: 1, confidence: 0.1 }, { weight: 0.8, value: null, confidence: 0 }]), 51);
 });
 test("style synonyms expand deterministically and thin snippets do not become a zero", () => {

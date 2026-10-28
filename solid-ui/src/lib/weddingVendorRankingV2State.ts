@@ -1,6 +1,6 @@
 // @locs-version: 1.0
 export const WEDDING_VENDOR_RANKING_POLICY_VERSION = "2" as const;
-export const WEDDING_VENDOR_RANKING_POLICY_V2_FLAG = "WEDDING_VENDOR_RANKING_POLICY_V2" as const;
+export const WEDDING_VENDOR_RANKING_POLICY_V2_FLAG = "VITE_WEDDING_VENDOR_RANKING_POLICY_V2" as const;
 export type WeddingVendorV2Component = { weight: number; value: number | null; confidence: number; prior?: number; sentimentReviewCount?: number };
 function clamp(value: number): number { return Math.max(0, Math.min(1, value)); }
 

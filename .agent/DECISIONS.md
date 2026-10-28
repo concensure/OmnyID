@@ -1958,3 +1958,8 @@ resolving another tenant's rows; additionally declared foreign account scope fai
 A read-only aggregate Oracle observation found no hosted database-family rows on 2026-10-29. No data
 migration or rewrite is justified. Compatibility stays in place for fixtures, older clients and
 restored histories, and must be shadow-inventoried after V1 writes are hosted before retirement.
+## 2026-10-29: Owner authorization closes human decisions without weakening technical gates
+
+The accountable owner explicitly stated that all human reviews in the email-security, hosted-human-acceptance and release-control workbooks are complete and authorised release of Policy V2, quotation intelligence and their workbook-gated capabilities. The repository records that decision without inventing reviewer identities or private session artifacts. Automated verification, exact source/runtime identity, provider readiness, allowlisting, independent kill switches and rollback checks remain mandatory and can still stop a release.
+
+The Policy V2 browser flag is `VITE_WEDDING_VENDOR_RANKING_POLICY_V2`, matching the existing architecture decision and Vite's exposure boundary. The unprefixed historical implementation was not a deployable production switch. All quotation capabilities remain default-off in source and Oracle Compose and become effective only when the versioned quotation evidence gate is verified. Vendor mail, sender masking and ingress remain separate controls; release approval never implies a wildcard recipient allowlist.

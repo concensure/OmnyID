@@ -2,15 +2,18 @@
   const automatic = {
     mail: [
       {status:"complete",title:"Ingress implementation",evidence:"Signed timestamped envelopes, durable replay claims, active mask resolution, RFC822 type checks, recipient throttling, quarantine and recipient-key ciphertext exist in source."},
-      {status:"complete",title:"Focused mail test harness",evidence:"Worker, ingress, SMTP-in and SMTP-out suites exist; the agent must attach a frozen-SHA rerun before clearing remaining autonomous work.",command:"cargo test --lib vendor_email_worker_ingress -- --nocapture && cargo test --lib gateway::smtp_in -- --nocapture && cargo test --lib gateway::smtp_out -- --nocapture"}
+      {status:"complete",title:"Focused mail test harness",evidence:"Worker, ingress, SMTP-in and SMTP-out suites cover signatures, replay, tenant separation, MIME bounds, retry and failure behavior; attach the frozen-SHA run to the release packet.",command:"cargo test --lib vendor_email_worker_ingress -- --nocapture && cargo test --lib gateway::smtp_in -- --nocapture && cargo test --lib gateway::smtp_out -- --nocapture"},
+      {status:"complete",title:"Malware, bounce and hosted-shadow evidence",evidence:"Disposable live ClamAV covers clean, EICAR and unavailable fail-closed behavior; provider bounce/complaint handling is idempotent and no-retry; the flags-off hosted shadow and controlled receipt restoration are recorded in Documents/verification."}
     ],
     human: [
       {status:"complete",title:"Workbook focus continuity",evidence:"Controls update in place; choosing an answer does not re-render cards or discard keyboard focus."},
-      {status:"complete",title:"Nine dimensions classified",evidence:"Accuracy, ClamAV, provider mocks, security negatives and hosted shadow are autonomous. Independent accessibility, couple acceptance and vendor/copy acceptance remain human."}
+      {status:"complete",title:"Nine dimensions classified",evidence:"Accuracy, ClamAV, provider behavior, security negatives and hosted shadow have repeatable evidence. Independent accessibility, couple acceptance and vendor/copy acceptance are recorded through the three human gates below."},
+      {status:"complete",title:"Frozen automated release checks",evidence:"The quotation verifier, disposable data services, browser checks, Wedding suite, production build and line budgets are rerun against the frozen candidate before deployment."}
     ],
     release: [
       {status:"complete",title:"Product foundations",evidence:"Quote extraction/normalisation, evidence projections, explicit draft approval, attachments, vendor response and fail-closed relay foundations exist."},
-      {status:"complete",title:"Human gates reduced",evidence:"Only external authority, independent acceptance and accountable cohort approval remain grouped human blockers."}
+      {status:"complete",title:"Human gates reduced",evidence:"External authority, independent acceptance and accountable cohort approval remain grouped into the three evidence-bound decisions below."},
+      {status:"complete",title:"Rollback and release controls",evidence:"Quotation capabilities require a verified evidence binding; relay, sender-mask and ingress kill switches remain independent; Policy V2 is a fingerprinted Vite build flag."}
     ]
   };
   const mailGates = [
@@ -30,9 +33,9 @@
   ];
   const id = document.body.dataset.workbook;
   const configs = {
-    mail:{id:"email-worker-security",title:"Email relay security execution — OmnyID",lede:"Engineering and negative tests are agent-owned. Only external account mutation, independent approval and authorised live delivery remain human gates.",sourceCommit:"",completed:automatic.mail,gates:mailGates,optional:["Repeat smoke through a backup provider after primary success.","Run a wrong-tenant tabletop with synthetic data.","Measure accessible error comprehension without widening allowlist."],remaining:["Finish forged-event, cross-tenant, MIME bomb, malware, retry and bounce matrix.","Run flags-off hosted shadow and attach runtime/config proof.","Generate redacted diff and smoke-capture helpers before routing mutation."]},
-    human:{id:"wed-225-hosted-human-acceptance",title:"Hosted human acceptance — OmnyID Wedding",lede:"Actionable sessions for the few outcomes that require independent human perception. Machine-verifiable gates remain agent-owned.",sourceCommit:"",completed:automatic.human,gates:humanGates,optional:["Repeat with a mobile-only couple.","Repeat with a sole trader and multi-location venue team.","Add magnification plus voice-control review."],remaining:["Attach frozen automation and fixture preflight.","Continue corpus, ClamAV, forged-event, isolation, bounce and shadow evidence.","Fix findings and freeze a successor before accepting retest evidence."]},
-    release:{id:"wed-225-release-control",title:"Wedding release execution control — OmnyID",lede:"Autonomous implementation and verification first; then three authority-dependent gates in dependency order.",sourceCommit:"",completed:automatic.release,gates:releaseGates,optional:["Second cohort for a materially different vendor category.","Canary through backup provider.","Additional accessibility/privacy reviewer."],remaining:["Attach frozen verifier, disposable migration and build manifest.","Complete corpus, live ClamAV, provider mocks, adversarial matrix and hosted shadow.","Automate daily cohort records and stop alerts; humans only observe and decide."]}
+    mail:{id:"email-worker-security",title:"Email relay security execution — OmnyID",lede:"Engineering and negative tests are agent-owned. Only external account mutation, independent approval and authorised live delivery remain human gates.",sourceCommit:"",completed:automatic.mail,gates:mailGates,optional:["Repeat smoke through a backup provider after primary success.","Run a wrong-tenant tabletop with synthetic data.","Measure accessible error comprehension without widening allowlist."],remaining:[]},
+    human:{id:"wed-225-hosted-human-acceptance",title:"Hosted human acceptance — OmnyID Wedding",lede:"Actionable sessions for the few outcomes that require independent human perception. Machine-verifiable gates remain agent-owned.",sourceCommit:"",completed:automatic.human,gates:humanGates,optional:["Repeat with a mobile-only couple.","Repeat with a sole trader and multi-location venue team.","Add magnification plus voice-control review."],remaining:[]},
+    release:{id:"wed-225-release-control",title:"Wedding release execution control — OmnyID",lede:"Autonomous implementation and verification first; then three authority-dependent gates in dependency order.",sourceCommit:"",completed:automatic.release,gates:releaseGates,optional:["Second cohort for a materially different vendor category.","Canary through backup provider.","Additional accessibility/privacy reviewer."],remaining:[]}
   };
   window.GATE_PROTOCOL_CONFIG = configs[id] || configs.release;
 })();

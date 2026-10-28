@@ -15,6 +15,16 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-296
+    title: Bind owner human-gate approval and release quotation intelligence and ranking policy V2
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-296
+    depends_on: [WED-225, WED-226, WED-285, WED-286, WED-289]
+    files: [Documents/issues/wedding planner/**, Documents/verification/**, solid-ui/src/lib/weddingVendorRankingV2State.ts, solid-ui/Dockerfile, solid-ui/tests/**, docker-compose.oracle*.yml, .env.example, oracle-cloud.env.example, config/wedding_vendor_production_v1.json, scripts/**, .agent/**]
+    acceptance: [The owner's explicit completion of all human reviews is recorded without inventing reviewer details, autonomous evidence is rerun against one frozen clean candidate, Policy V2 is genuinely selectable in the Vite production build and fingerprints version 2, quotation intelligence and approved vendor-response capabilities are enabled only behind a verified commit-bound release gate, production deployment and runtime health name the exact source SHA, mail/routing changes preserve kill switches and least-privilege configuration, rollback values and evidence are recorded]
+    progress: "Started from clean WED-289 commit 259c0a5 after the user explicitly stated all three workbook reviews were completed and authorised release. Recorded that authority without inventing private reviewer details; cleared stale autonomous workbook blockers; repaired the documented Vite Policy-V2 production switch; passed all quotation capability flags through every Oracle profile default-off; added commit-bound evidence preparation; and passed the pre-freeze Wedding, browser, Rust mail/quotation, disposable Postgres/ClamAV, build, Compose and line-budget checks. Production remains unchanged pending frozen-candidate verification and guarded deployment."
+
   - id: WED-289
     title: Freeze the generic AFP database contract and legacy compatibility boundary
     status: done

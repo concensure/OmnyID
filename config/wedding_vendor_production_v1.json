@@ -14,7 +14,7 @@
     "automatic_shortlist": "VITE_WEDDING_AUTOMATIC_SHORTLIST_ENABLED",
     "online_fallback": "OMNYID_WEDDING_ONLINE_FALLBACK_ENABLED",
     "online_catalog_enrichment": "OMNYID_WEDDING_ONLINE_CATALOG_ENRICHMENT_ENABLED",
-    "ranking_policy_v2": "WEDDING_VENDOR_RANKING_POLICY_V2",
+    "ranking_policy_v2": "VITE_WEDDING_VENDOR_RANKING_POLICY_V2",
     "outreach_drafting": "OMNYID_WEDDING_ADMIN_AI_ROUTING_ENABLED",
     "external_send": "OMNYID_WEDDING_EXTERNAL_SEND_ENABLED",
     "event_quote_projection": "OMNYID_WEDDING_EVENT_QUOTE_PROJECTION_ENABLED"

@@ -112,7 +112,7 @@ for (const [filename, gate] of [
 }
 
 test("signed export requires report bindings, completed automation and matching sign-off context", async ({ page }) => {
-  // Substitute completed machine evidence only in this test; shipped blockers remain open.
+  // Keep this explicit override so the contract stays isolated from future autonomous-work additions.
   await page.route("**/gate-execution-configs.js", async route => {
     const response = await route.fetch();
     await route.fulfill({ response, body: `${await response.text()}\nwindow.GATE_PROTOCOL_CONFIG.remaining = [];` });
