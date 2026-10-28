@@ -1,4 +1,5 @@
 import type { SendAfpMessageInput } from "@/lib/api";
+import type { WeddingPlanningMetadata } from "@/lib/weddingPlanningTemplateState";
 import type { WeddingVendorContactWorkspaceCard } from "@/lib/weddingResponseWorkspaceViewState";
 import { rescheduleWeddingVendorFollowUp } from "@/lib/weddingVendorFollowUpApi";
 import {
@@ -8,7 +9,7 @@ import {
 
 type FollowUpActionInput = {
   card: WeddingVendorContactWorkspaceCard;
-  metadata: unknown;
+  metadata: WeddingPlanningMetadata;
   saveProjection?: ((input: SendAfpMessageInput) => Promise<unknown>) | null;
   onSaved?: () => void;
 };
