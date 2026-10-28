@@ -1,5 +1,5 @@
 version: 1
-updated: 2026-10-28
+updated: 2026-10-29
 
 lifecycle:
   allowed_statuses:
@@ -15,6 +15,16 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-288
+    title: Repair Master Agent provider conversation and design the ledger-backed run-sheet database
+    status: done
+    owner: codex
+    branch: agent/codex/WED-288
+    depends_on: [WED-181, WED-182, WED-287]
+    files: [solid-ui/src/**, solid-ui/tests/**, src/server/*agent*.rs, src/agent*.rs, Documents/design/database/**, .agent/**]
+    acceptance: [A configured supported LLM provider can be called through the existing Master Agent contract, user and assistant turns render in the correct order and format including provider failures, focused tests and build checks pass, the run-sheet spec extends the generic Database view rather than creating a parallel store or surface, any user can still create non-wedding databases, automatic run-sheet population is incremental token-efficient and projects from the wedding AFP ledger, dependency-ordered implementation tasks and authority boundaries are documented]
+    progress: "Implemented provider-consistent Master Agent dispatch and a safe two-turn conversation projection; added truthful small-request connection testing and provider-change key handling; documented the generic Database wedding_runsheet.v1 profile plus WED-289 through WED-295 implementation slices. Focused frontend/Rust verification and production build pass; no live provider credential was exercised and no deployment occurred."
+
   - id: WED-287
     title: Reconcile wedding run-sheet tasks, task interactions and vendor category budgets
     status: done

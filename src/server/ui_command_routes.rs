@@ -198,26 +198,11 @@ pub(super) async fn ui_command_http(
         return Ok(Json(finalize_response(base)));
     }
 
-    // For authenticated users with an LLM configured, use the model to classify
-    // intent and act accordingly — tasks, research, notes, or orchestration.
-    // Unauthenticated / no-LLM calls fall through to the keyword-based base result.
+    // Use the configured model to classify and perform the requested route.
     {
-        let backend_name = resolved_llm.backend_name;
         let model = resolved_llm.model;
         let backend = resolved_llm.backend;
-        let backend_api_key = match &backend {
-            crate::inference::InferenceBackend::Anthropic { api_key }
-            | crate::inference::InferenceBackend::OpenAICompat { api_key, .. } => {
-                Some(api_key.clone())
-            }
-            crate::inference::InferenceBackend::RunPod { api_key, .. } => Some(api_key.clone()),
-            crate::inference::InferenceBackend::Ollama { .. } => None,
-        };
-        let orchestration_supported = matches!(
-            &backend,
-            crate::inference::InferenceBackend::Anthropic { .. }
-                | crate::inference::InferenceBackend::RunPod { .. }
-        );
+        let orchestration_supported = true;
 
         {
             // Single LLM call: classify intent AND generate structured content.
@@ -246,6 +231,12 @@ pub(super) async fn ui_command_http(
 
             let infer_result = crate::inference::dispatch_infer(&backend, &model, &infer_req).await;
 
+            if let Err(error) = &infer_result {
+                tracing::warn!(%error, "configured Master Agent model call failed");
+                return Ok(Json(finalize_response(
+                    super::ui_command_model_response::configured_model_failure_response(engine),
+                )));
+            }
             if let Ok(infer_resp) = infer_result {
                 let raw = infer_resp.content.trim();
 
@@ -870,9 +861,8 @@ pub(super) async fn ui_command_http(
                                 spawn_orchestration_run(
                                     state.clone(),
                                     user.id.clone(),
-                                    backend_api_key.clone().unwrap_or_default(),
+                                    backend.clone(),
                                     model.clone(),
-                                    backend_name.clone(),
                                     objective.clone(),
                                     crate::response_queue_policy::AgentExecutionProfile::from_mode(
                                         "balanced",
@@ -1023,6 +1013,16 @@ pub(super) async fn ui_command_http(
                             })));
                         }
                     }
+                }
+                if let Some(response) =
+                    super::ui_command_model_response::unstructured_model_response(raw, engine.clone())
+                {
+                    return Ok(Json(finalize_response(response)));
+                }
+                if !raw.is_empty() {
+                    return Ok(Json(finalize_response(
+                        super::ui_command_model_response::configured_model_failure_response(engine),
+                    )));
                 }
             }
         }

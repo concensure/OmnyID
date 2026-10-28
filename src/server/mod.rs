@@ -161,6 +161,7 @@ pub(crate) mod summary_helpers;
 pub(crate) mod thread_discovery;
 mod tool_connection_routes;
 mod ui_command_browser_fallback;
+mod ui_command_model_response;
 mod ui_command_research;
 mod ui_command_response_enricher;
 mod ui_command_router_core;
@@ -8350,9 +8351,8 @@ fn spawn_session_dispatcher(_state: Arc<AppState>, _user_id: String, _session_id
 fn spawn_orchestration_run(
     state: Arc<AppState>,
     user_id: String,
-    api_key: String,
+    backend: crate::inference::InferenceBackend,
     model: String,
-    backend_name: String,
     objective: String,
     _execution_profile: crate::response_queue_policy::AgentExecutionProfile,
     lora_active: bool,
@@ -8379,23 +8379,17 @@ fn spawn_orchestration_run(
             let output_persona_prompt = active_persona
                 .as_ref()
                 .map(crate::agent_personas::build_user_facing_persona_prompt);
-            let runpod_ep = if backend_name == "runpod" {
-                std::env::var("OMNYID_RUNPOD_ENDPOINT_ID").ok()
-            } else {
-                None
-            };
             let orch =
                 crate::master_orchestrator::MasterOrchestrator::new(instance_id, user_id.clone());
             let result = orch
-                .run(
+                .run_with_backend(
                     &objective,
                     &state.db,
-                    &api_key,
+                    &backend,
                     &model,
                     soul_opt,
                     output_persona_prompt.as_deref(),
                     lora_active,
-                    runpod_ep.as_deref(),
                     Some(state.cost_oracle.as_ref()),
                     None,
                 )
@@ -25455,17 +25449,21 @@ async fn llm_config_set_http(
         other => return Err((StatusCode::BAD_REQUEST, format!("unknown backend: {other}"))),
     };
     let provider = body.provider.unwrap_or_else(|| "anthropic".to_string());
-    let default_model = if matches!(backend, LlmBackend::RunPod) {
-        "Qwen/Qwen3.5-35B-A3B".to_string()
-    } else {
-        "claude-haiku-4-5-20251001".to_string()
+    let default_model = match backend {
+        LlmBackend::RunPod => "Qwen/Qwen3.5-35B-A3B".to_string(),
+        LlmBackend::Ollama => "llama3.2".to_string(),
+        LlmBackend::Byok => llm_resolution::default_model_for_provider(&provider).to_string(),
+        LlmBackend::Hosted => "claude-haiku-4-5-20251001".to_string(),
     };
     let cfg = LlmConfig {
         id: Ulid::new().to_string(),
         owner_user_id: user.id.clone(),
         backend,
         provider: provider.clone(),
-        model: body.model.unwrap_or(default_model),
+        model: body
+            .model
+            .filter(|value| !value.trim().is_empty())
+            .unwrap_or(default_model),
         encrypted_api_key: body.api_key,
         ollama_url: body.ollama_url,
         monthly_budget_cents: monthly_budget,
@@ -25547,144 +25545,68 @@ async fn llm_config_ping_http(
         .map_err(status_to_http)?
         .ok_or_else(|| (StatusCode::NOT_FOUND, "no LLM config saved yet".to_string()))?;
 
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(10))
-        .build()
-        .map_err(internal_http_error)?;
-
-    match cfg
+    let backend_label = cfg
         .get("backend")
-        .and_then(|b| b.as_str())
-        .unwrap_or("byok")
+        .and_then(Value::as_str)
+        .unwrap_or("byok");
+    let provider = cfg
+        .get("provider")
+        .and_then(Value::as_str)
+        .unwrap_or("anthropic");
+    let Some(resolved) = llm_resolution::resolve_user_inference_backend(&state.db, &user.id)
+        .await
+        .map_err(internal_error)
+        .map_err(status_to_http)?
+    else {
+        return Ok(Json(serde_json::json!({
+            "ok": false,
+            "backend": backend_label,
+            "provider": provider,
+            "reason": "The saved model settings are incomplete. Check the key, endpoint, and account access.",
+        })));
+    };
+    let request = crate::inference::InferenceRequest {
+        system: "This is a connection check. Follow the user instruction exactly.".to_string(),
+        messages: vec![crate::inference::InferenceMessage {
+            role: "user".to_string(),
+            content: "Reply with only OK.".to_string(),
+        }],
+        max_tokens: 8,
+        temperature: 0.0,
+    };
+    match tokio::time::timeout(
+        std::time::Duration::from_secs(15),
+        crate::inference::dispatch_infer(&resolved.backend, &resolved.model, &request),
+    )
+    .await
     {
-        "runpod" => {
-            let ep = std::env::var("OMNYID_RUNPOD_ENDPOINT_ID").unwrap_or_default();
-            let api_key = cfg
-                .get("encrypted_api_key")
-                .and_then(|k| k.as_str())
-                .filter(|k| !k.is_empty())
-                .map(|k| k.to_string())
-                .unwrap_or_else(|| std::env::var("OMNYID_RUNPOD_API_KEY").unwrap_or_default());
-            if ep.is_empty() {
-                return Ok(Json(
-                    serde_json::json!({ "ok": false, "reason": "RunPod endpoint ID not configured on server" }),
-                ));
-            }
-            let url = format!("https://api.runpod.ai/v2/{ep}/openai/v1/models");
-            let resp = client
-                .get(&url)
-                .bearer_auth(&api_key)
-                .send()
-                .await
-                .map_err(|err| {
-                    tracing::error!(error = %err, "llm ping: RunPod unreachable");
-                    (
-                        StatusCode::BAD_GATEWAY,
-                        "RunPod is unreachable right now.".to_string(),
-                    )
-                })?;
-            let status = resp.status();
-            if status.is_success() {
-                Ok(Json(
-                    serde_json::json!({ "ok": true, "backend": "runpod", "http_status": status.as_u16() }),
-                ))
-            } else {
-                Ok(Json(serde_json::json!({
-                    "ok": false,
-                    "backend": "runpod",
-                    "http_status": status.as_u16(),
-                    "reason": llm_ping_failure_reason("runpod", status)
-                })))
-            }
+        Ok(Ok(response)) if !response.content.trim().is_empty() => Ok(Json(serde_json::json!({
+            "ok": true,
+            "backend": backend_label,
+            "provider": provider,
+            "model": resolved.model,
+        }))),
+        Ok(Ok(_)) => Ok(Json(serde_json::json!({
+            "ok": false,
+            "backend": backend_label,
+            "provider": provider,
+            "reason": "The model connected but returned no text.",
+        }))),
+        Ok(Err(error)) => {
+            tracing::warn!(%error, backend = backend_label, provider, "LLM connection inference failed");
+            Ok(Json(serde_json::json!({
+                "ok": false,
+                "backend": backend_label,
+                "provider": provider,
+                "reason": "The model could not complete a small test request. Check the saved key, model name, and provider access.",
+            })))
         }
-        "ollama" => {
-            let base = cfg
-                .get("ollama_url")
-                .and_then(|u| u.as_str())
-                .unwrap_or("http://localhost:11434");
-            let url = format!("{base}/api/tags");
-            let resp = client.get(&url).send().await.map_err(|err| {
-                tracing::error!(error = %err, "llm ping: Ollama unreachable");
-                (
-                    StatusCode::BAD_GATEWAY,
-                    "Ollama is unreachable right now.".to_string(),
-                )
-            })?;
-            let status = resp.status();
-            if status.is_success() {
-                Ok(Json(
-                    serde_json::json!({ "ok": true, "backend": "ollama", "http_status": status.as_u16() }),
-                ))
-            } else {
-                Ok(Json(
-                    serde_json::json!({ "ok": false, "backend": "ollama", "http_status": status.as_u16(), "reason": "Ollama responded with an error" }),
-                ))
-            }
-        }
-        "byok" => {
-            // For BYOK (Anthropic/OpenAI), list models — no tokens consumed
-            let provider = cfg
-                .get("provider")
-                .and_then(|p| p.as_str())
-                .unwrap_or("anthropic");
-            let api_key = state
-                .db
-                .get_byok_api_key(&user.id)
-                .await
-                .map_err(internal_error)
-                .map_err(status_to_http)?
-                .unwrap_or_default();
-            if api_key.trim().is_empty() {
-                return Ok(Json(serde_json::json!({
-                    "ok": false,
-                    "backend": "byok",
-                    "provider": provider,
-                    "reason": "No API key is currently saved for this provider",
-                })));
-            }
-            let request = match provider {
-                "openai" => client
-                    .get("https://api.openai.com/v1/models")
-                    .bearer_auth(api_key),
-                "openrouter" => client
-                    .get("https://openrouter.ai/api/v1/models")
-                    .bearer_auth(api_key),
-                "cerebras" => client
-                    .get("https://api.cerebras.ai/v1/models")
-                    .bearer_auth(api_key),
-                "together_ai" => client
-                    .get("https://api.together.xyz/v1/models")
-                    .bearer_auth(api_key),
-                _ => client
-                    .get("https://api.anthropic.com/v1/models")
-                    .header("x-api-key", api_key)
-                    .header("anthropic-version", "2023-06-01"),
-            };
-            let resp = request.send().await.map_err(|err| {
-                tracing::error!(error = %err, provider, "llm ping: BYOK provider unreachable");
-                (
-                    StatusCode::BAD_GATEWAY,
-                    "The configured AI provider is unreachable right now.".to_string(),
-                )
-            })?;
-            let status = resp.status();
-            if status.is_success() {
-                Ok(Json(
-                    serde_json::json!({ "ok": true, "backend": "byok", "provider": provider, "http_status": status.as_u16() }),
-                ))
-            } else {
-                Ok(Json(serde_json::json!({
-                    "ok": false,
-                    "backend": "byok",
-                    "provider": provider,
-                    "http_status": status.as_u16(),
-                    "reason": llm_ping_failure_reason(provider, status)
-                })))
-            }
-        }
-        other => Ok(Json(
-            serde_json::json!({ "ok": false, "reason": format!("unsupported backend: {other}") }),
-        )),
+        Err(_) => Ok(Json(serde_json::json!({
+            "ok": false,
+            "backend": backend_label,
+            "provider": provider,
+            "reason": "The model connection test timed out.",
+        }))),
     }
 }
 
@@ -25773,38 +25695,21 @@ async fn ui_decision_http(
                 && clarification_instruction.is_some();
 
             if (is_approval_confirm || is_clarification_proceed) && !objective.is_empty() {
-                let llm_cfg = state
-                    .db
-                    .get_llm_config(&user.id)
-                    .await
-                    .map_err(internal_error)
-                    .map_err(status_to_http)?
-                    .ok_or_else(|| {
-                        (
-                            StatusCode::BAD_REQUEST,
-                            "no LLM config; call POST /user/llm-config".to_string(),
-                        )
-                    })?;
-                let backend_name = llm_cfg["backend"].as_str().unwrap_or("hosted").to_string();
-                let (api_key, model) = if backend_name == "runpod" {
+                let resolved_llm = llm_resolution::resolve_user_inference_backend(
+                    &state.db,
+                    &user.id,
+                )
+                .await
+                .map_err(internal_error)
+                .map_err(status_to_http)?
+                .ok_or_else(|| {
                     (
-                        std::env::var("OMNYID_RUNPOD_API_KEY").unwrap_or_default(),
-                        llm_cfg["model"]
-                            .as_str()
-                            .unwrap_or("Qwen/Qwen3.5-35B-A3B")
-                            .to_string(),
+                        StatusCode::BAD_REQUEST,
+                        "no usable LLM backend is configured".to_string(),
                     )
-                } else {
-                    (
-                        std::env::var("OMNYID_ANTHROPIC_KEY")
-                            .or_else(|_| std::env::var("ANTHROPIC_API_KEY"))
-                            .unwrap_or_default(),
-                        llm_cfg["model"]
-                            .as_str()
-                            .unwrap_or("claude-haiku-4-5-20251001")
-                            .to_string(),
-                    )
-                };
+                })?;
+                let model = resolved_llm.model;
+                let backend = resolved_llm.backend;
                 let master_instance = state
                     .db
                     .get_master_agent_instance(&user.id)
@@ -25916,9 +25821,8 @@ async fn ui_decision_http(
                 spawn_orchestration_run(
                     state.clone(),
                     user.id.clone(),
-                    api_key,
+                    backend,
                     model,
-                    backend_name,
                     orchestration_objective,
                     crate::response_queue_policy::AgentExecutionProfile::from_mode("balanced"),
                     lora_active,
@@ -28893,27 +28797,7 @@ async fn agent_orchestrate_http(
             )
         })?;
     let model = resolved_llm.model;
-    let (api_key, runpod_ep) = match resolved_llm.backend {
-        crate::inference::InferenceBackend::Anthropic { api_key } => (api_key, None),
-        crate::inference::InferenceBackend::RunPod {
-            endpoint_id,
-            api_key,
-        } => (api_key, Some(endpoint_id)),
-        crate::inference::InferenceBackend::OpenAICompat { .. } => {
-            return Err((
-                StatusCode::BAD_REQUEST,
-                "agent orchestration does not yet support this BYOK provider on the mounted planning path."
-                    .to_string(),
-            ));
-        }
-        crate::inference::InferenceBackend::Ollama { .. } => {
-            return Err((
-                StatusCode::BAD_REQUEST,
-                "agent orchestration does not yet support Ollama-backed planning on this mounted path."
-                    .to_string(),
-            ));
-        }
-    };
+    let backend = resolved_llm.backend;
 
     let orchestrator =
         crate::master_orchestrator::MasterOrchestrator::new(instance_id, user.id.clone());
@@ -28932,15 +28816,14 @@ async fn agent_orchestrate_http(
         .map_err(internal_error)
         .map_err(status_to_http)?;
     let result = orchestrator
-        .run(
+        .run_with_backend(
             &body.objective,
             &state.db,
-            &api_key,
+            &backend,
             &model,
             soul_opt,
             output_persona_prompt.as_deref(),
             lora_active,
-            runpod_ep.as_deref(),
             Some(state.cost_oracle.as_ref()),
             trace_context.as_deref(),
         )
@@ -29770,7 +29653,7 @@ mod tests {
     }
 
     #[test]
-    fn llm_ping_uses_decrypted_byok_api_key_lookup() {
+    fn llm_ping_uses_the_shared_provider_resolution_and_real_inference_path() {
         let source = std::fs::read_to_string("src/server/mod.rs").expect("read mod.rs");
         let ping_start = source
             .find("async fn llm_config_ping_http")
@@ -29780,22 +29663,17 @@ mod tests {
             .map(|offset| ping_start + offset)
             .expect("llm ping handler terminator present");
         let handler_source = &source[ping_start..ping_end];
-        assert!(handler_source.contains(".get_byok_api_key(&user.id)"));
+        assert!(handler_source.contains("resolve_user_inference_backend(&state.db, &user.id)"));
+        assert!(handler_source.contains("crate::inference::dispatch_infer("));
+        assert!(handler_source.contains("max_tokens: 8"));
     }
 
     #[test]
-    fn llm_ping_reports_missing_saved_key_and_provider_specific_failure_reason() {
+    fn llm_ping_reports_bounded_user_facing_failures() {
         let source = std::fs::read_to_string("src/server/mod.rs").expect("read mod.rs");
-        assert!(source.contains("No API key is currently saved for this provider"));
-        assert!(source.contains("llm_ping_failure_reason(provider, status)"));
-        assert!(source.contains("llm_ping_failure_reason(\"runpod\", status)"));
-        assert!(!source.contains(concat!("resp.text().await", ".unwrap_or_default()")));
-        assert!(source.contains("\"RunPod is unreachable right now.\""));
-        assert!(source.contains("\"Ollama is unreachable right now.\""));
-        assert!(source.contains("\"The configured AI provider is unreachable right now.\""));
-        assert!(!source.contains("format!(\"RunPod unreachable: {e}\")"));
-        assert!(!source.contains("format!(\"Ollama unreachable: {e}\")"));
-        assert!(!source.contains("format!(\"API unreachable: {e}\")"));
+        assert!(source.contains("The saved model settings are incomplete."));
+        assert!(source.contains("The model could not complete a small test request."));
+        assert!(source.contains("The model connection test timed out."));
     }
 
     #[test]
@@ -30142,7 +30020,7 @@ mod tests {
         let function_source = &source[start..end];
 
         assert!(function_source.contains("crate::master_orchestrator::MasterOrchestrator::new"));
-        assert!(function_source.contains(".run("));
+        assert!(function_source.contains(".run_with_backend("));
         assert!(function_source.contains(".map_err(internal_http_error)?;"));
         assert!(function_source.contains(
             "let payload = serde_json::to_value(&result).map_err(internal_http_error)?;"
@@ -30279,7 +30157,7 @@ mod tests {
     }
 
     #[test]
-    fn spawn_orchestration_run_uses_passed_api_key_instead_of_forcing_anthropic_env() {
+    fn spawn_orchestration_run_uses_the_resolved_backend_without_forcing_an_env_provider() {
         let source = include_str!("mod.rs");
         let start = source
             .find("fn spawn_orchestration_run(")
@@ -30290,8 +30168,9 @@ mod tests {
             .expect("runtime compose helpers follow spawn_orchestration_run");
         let function_source = &source[start..end];
 
-        assert!(function_source.contains("&api_key,"));
-        assert!(function_source.contains("let runpod_ep = if backend_name == \"runpod\" {"));
+        assert!(function_source.contains("backend: crate::inference::InferenceBackend"));
+        assert!(function_source.contains(".run_with_backend("));
+        assert!(function_source.contains("&backend,"));
         assert!(!function_source.contains("OMNYID_ANTHROPIC_KEY"));
     }
 

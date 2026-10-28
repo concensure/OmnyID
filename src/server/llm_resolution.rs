@@ -15,6 +15,10 @@ const DEFAULT_RUNPOD_MODEL: &str = "Qwen/Qwen3.5-35B-A3B";
 const DEFAULT_NVIDIA_MODEL: &str = "meta/llama-3.3-70b-instruct";
 const DEFAULT_MISTRAL_MODEL: &str = "mistral-small-latest";
 const DEFAULT_HUGGINGFACE_MODEL: &str = "meta-llama/Llama-3.1-8B-Instruct";
+const DEFAULT_OPENAI_MODEL: &str = "gpt-4o-mini";
+const DEFAULT_OPENROUTER_MODEL: &str = "openai/gpt-4o-mini";
+const DEFAULT_CEREBRAS_MODEL: &str = "llama3.1-70b";
+const DEFAULT_TOGETHER_MODEL: &str = "meta-llama/Llama-3-8b-hf";
 const NVIDIA_NIM_BASE_URL: &str = "https://integrate.api.nvidia.com/v1";
 const DEFAULT_OLLAMA_URL: &str = "http://localhost:11434";
 
@@ -156,8 +160,12 @@ fn read_runpod_api_key() -> Option<String> {
         .or_else(|| read_process_secret_trimmed("OMNYID_RUNPOD_API_KEY"))
 }
 
-fn default_model_for_provider(provider: &str) -> &'static str {
+pub(super) fn default_model_for_provider(provider: &str) -> &'static str {
     match provider {
+        "openai" => DEFAULT_OPENAI_MODEL,
+        "openrouter" => DEFAULT_OPENROUTER_MODEL,
+        "cerebras" => DEFAULT_CEREBRAS_MODEL,
+        "together_ai" => DEFAULT_TOGETHER_MODEL,
         "nvidia" | "nvidia_nim" => DEFAULT_NVIDIA_MODEL,
         "mistral" => DEFAULT_MISTRAL_MODEL,
         "huggingface" | "hugging_face" => DEFAULT_HUGGINGFACE_MODEL,
@@ -221,6 +229,22 @@ mod tests {
                 assert_eq!(base_url, "https://openrouter.ai/api/v1");
             }
             other => panic!("expected openai compat backend, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn provider_defaults_match_their_api_model_names_when_the_model_is_omitted() {
+        for (provider, expected) in [
+            ("openai", DEFAULT_OPENAI_MODEL),
+            ("openrouter", DEFAULT_OPENROUTER_MODEL),
+            ("cerebras", DEFAULT_CEREBRAS_MODEL),
+            ("together_ai", DEFAULT_TOGETHER_MODEL),
+        ] {
+            let cfg = serde_json::json!({ "backend": "byok", "provider": provider });
+            let resolved =
+                resolve_user_inference_backend_from_config(&cfg, Some("test-key".to_string()))
+                    .expect("provider should resolve");
+            assert_eq!(resolved.model, expected);
         }
     }
 

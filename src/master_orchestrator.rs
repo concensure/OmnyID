@@ -28,7 +28,7 @@ use crate::{
     },
     audit_chain::message_hash,
     db::Db,
-    inference::{InferenceMessage, InferenceRequest, anthropic_infer, runpod_infer},
+    inference::{InferenceBackend, InferenceMessage, InferenceRequest, dispatch_infer},
     policy_engine::PolicyEngine,
     prompt_guidance::append_reasoning_guidance,
 };
@@ -261,16 +261,17 @@ impl MasterOrchestrator {
     ///    30-second timeout. Delegation carries `allowed_capabilities`,
     ///    `outbound_allowlist`, and a `context_snapshot` (item 27).
     /// 4. Log an audit-chain entry and return aggregated results.
-    pub async fn run(
+    /// Run with the exact user-selected BYOK, Ollama, RunPod, or hosted backend.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn run_with_backend(
         &self,
         objective: &str,
         db: &Db,
-        api_key: &str,
+        backend: &InferenceBackend,
         model: &str,
         operational_soul_md: Option<&str>,
         output_persona_md: Option<&str>,
         lora_active: bool,
-        runpod_endpoint: Option<&str>,
         _cost_oracle: Option<&crate::cost_oracle::CostOracle>,
         trace_context: Option<&str>,
     ) -> Result<OrchestratorResult, OrchestratorError> {
@@ -286,11 +287,10 @@ impl MasterOrchestrator {
         let tasks = self
             .plan_objective(
                 objective,
-                api_key,
+                backend,
                 model,
                 operational_soul_md,
                 lora_active,
-                runpod_endpoint,
                 trace_context_owned.as_deref(),
                 &reasoning_guidance,
             )
@@ -310,14 +310,13 @@ impl MasterOrchestrator {
         for task in tasks {
             let sem = semaphore.clone();
             let db = db.clone();
-            let api_key = api_key.to_string();
+            let backend = backend.clone();
             let model = model.to_string();
             let agent_instance_id = self.agent_instance_id.clone();
             let owner_user_id = self.owner_user_id.clone();
             let operational_soul = operational_soul_md.map(str::to_string);
             let output_persona = output_persona_md.map(str::to_string);
             let lora = lora_active;
-            let runpod_ep = runpod_endpoint.map(str::to_string);
             let manifests = node_manifests.clone();
             let prior = prior_results.clone();
             let task_trace_context = trace_context_owned.clone();
@@ -471,12 +470,11 @@ impl MasterOrchestrator {
                     std::time::Duration::from_secs(30),
                     execute_task_llm(
                         &task,
-                        &api_key,
+                        &backend,
                         &model,
                         operational_soul_ref,
                         output_persona_ref,
                         lora,
-                        runpod_ep.as_deref(),
                         system_prompt.as_deref(),
                         instruction_prompt.as_deref(),
                         &task_reasoning_guidance,
@@ -588,11 +586,10 @@ impl MasterOrchestrator {
     async fn plan_objective(
         &self,
         objective: &str,
-        api_key: &str,
+        backend: &InferenceBackend,
         model: &str,
         soul_md: Option<&str>,
         lora_active: bool,
-        runpod_endpoint: Option<&str>,
         trace_context: Option<&str>,
         reasoning_guidance: &[String],
     ) -> Result<Vec<PlannedTask>, OrchestratorError> {
@@ -636,15 +633,9 @@ impl MasterOrchestrator {
             temperature: 0.2,
         };
 
-        let resp = if let Some(ep) = runpod_endpoint {
-            runpod_infer(ep, api_key, model, &req)
-                .await
-                .map_err(|e| OrchestratorError::PlanningFailed(e.to_string()))?
-        } else {
-            anthropic_infer(api_key, model, &req)
-                .await
-                .map_err(|e| OrchestratorError::PlanningFailed(e.to_string()))?
-        };
+        let resp = dispatch_infer(backend, model, &req)
+            .await
+            .map_err(|e| OrchestratorError::PlanningFailed(e.to_string()))?;
 
         // Parse JSON from response
         let text = resp.content.trim();
@@ -679,12 +670,11 @@ fn planning_system_prompt(soul_md: Option<&str>, reasoning_guidance: &[String]) 
 #[allow(clippy::too_many_arguments)]
 async fn execute_task_llm(
     task: &PlannedTask,
-    api_key: &str,
+    backend: &InferenceBackend,
     model: &str,
     operational_soul_md: Option<&str>,
     output_persona_md: Option<&str>,
     lora_active: bool,
-    runpod_endpoint: Option<&str>,
     system_prompt_override: Option<&str>,
     instruction_prompt: Option<&str>,
     reasoning_guidance: &[String],
@@ -742,15 +732,9 @@ async fn execute_task_llm(
         temperature: 0.3,
     };
 
-    let response = if let Some(ep) = runpod_endpoint {
-        runpod_infer(ep, api_key, model, &req)
-            .await
-            .map_err(|e| e.to_string())?
-    } else {
-        anthropic_infer(api_key, model, &req)
-            .await
-            .map_err(|e| e.to_string())?
-    };
+    let response = dispatch_infer(backend, model, &req)
+        .await
+        .map_err(|e| e.to_string())?;
 
     Ok(preserve_useful_travel_answer(
         &task.content,
@@ -850,8 +834,7 @@ mod tests {
             .expect("planning_system_prompt follows plan_objective");
         let function_source = &tail[..end];
 
-        assert!(function_source.contains("runpod_infer(ep, api_key, model, &req)"));
-        assert!(function_source.contains("anthropic_infer(api_key, model, &req)"));
+        assert!(function_source.contains("dispatch_infer(backend, model, &req)"));
         assert!(function_source.contains("serde_json::from_value(parsed[\"tasks\"].clone())"));
     }
 
@@ -867,9 +850,8 @@ mod tests {
             .expect("tests follow execute_task_llm");
         let function_source = &tail[..end];
 
-        assert!(function_source.contains("runpod_infer(ep, api_key, model, &req)"));
-        assert!(function_source.contains("anthropic_infer(api_key, model, &req)"));
-        assert!(function_source.contains(".map(|r| r.content)"));
+        assert!(function_source.contains("dispatch_infer(backend, model, &req)"));
+        assert!(function_source.contains("response.content"));
     }
 
     // ── Item 25: per-node capability validation ───────────────────────────────

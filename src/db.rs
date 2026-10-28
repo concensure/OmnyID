@@ -8197,7 +8197,7 @@ impl Db {
                 backend = EXCLUDED.backend,
                 provider = EXCLUDED.provider,
                 model = EXCLUDED.model,
-                encrypted_api_key = COALESCE(EXCLUDED.encrypted_api_key, {table}.encrypted_api_key),
+                encrypted_api_key = CASE WHEN EXCLUDED.encrypted_api_key IS NOT NULL THEN EXCLUDED.encrypted_api_key WHEN {table}.provider = EXCLUDED.provider THEN {table}.encrypted_api_key ELSE NULL END,
                 ollama_url = EXCLUDED.ollama_url,
                 monthly_budget_cents = EXCLUDED.monthly_budget_cents,
                 updated_at = NOW()
@@ -16135,12 +16135,10 @@ mod tests {
     }
 
     #[test]
-    fn llm_config_upsert_preserves_existing_encrypted_key_when_no_replacement_is_provided() {
+    fn llm_config_upsert_preserves_a_key_only_for_the_same_provider() {
         let source = include_str!("db.rs");
-        assert!(
-            source.contains("encrypted_api_key = COALESCE(EXCLUDED.encrypted_api_key, {table}.encrypted_api_key)"),
-            "LLM config upsert should preserve the stored encrypted key when the user saves settings without supplying a new API key",
-        );
+        assert!(source.contains("WHEN {table}.provider = EXCLUDED.provider THEN {table}.encrypted_api_key"));
+        assert!(source.contains("ELSE NULL"));
     }
 
     #[test]

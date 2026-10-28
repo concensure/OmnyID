@@ -5366,3 +5366,15 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch `agent/codex/W
 - A successful deal-breaker save hides the Home prompt immediately while the Inspiration editor remains available. Vendor drafts now use the matching category allocation, keep total-budget fallback only when necessary, and clear every budget field on opt-out.
 - Evidence-backed booking reconciliation now carries a visible explanation for linked booking, budget, task and decision projections; quote acceptance alone still cannot confirm booking. Policy V2 remains disabled and nothing was deployed.
 - Pre-freeze evidence: 2,012 Wedding tests, 13 focused frontend tests, five focused Rust outreach tests, TypeScript typecheck, production UI build and both line-budget guards passed. Final clean-SHA verification follows the coordination commit.
+
+## 2026-10-29 - WED-288 Master Agent conversation and run-sheet database design (Codex, complete)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch `agent/codex/WED-288`, based on `cddee82000ae344b057d7d7fdca84addc281403a`.
+
+- Master Agent commands now dispatch planning and delegated calls through the account's exact resolved backend and model, including supported OpenAI-compatible and Ollama configurations. Continuity, approval and direct orchestration use the same contract.
+- The visible result is a safe two-turn conversation surface that preserves paragraphs, bounded bullets and safe links. Plain provider output remains visible; malformed output and provider failures use non-technical UI copy and do not expose response bodies or credentials.
+- The Settings connection test now makes a bounded eight-token request against the selected model. Provider-specific defaults are shared with config persistence, and a provider change without a new key no longer reuses the previous provider's encrypted key.
+- Added `Documents/design/database/wedding-runsheet-database-spec.md` and `wedding-runsheet-database-tasks.md`. They define `wedding_runsheet.v1` as a profile of the existing generic Database surface, preserve arbitrary user-created databases, project incrementally from the wedding AFP ledger, and split implementation into WED-289 through WED-295.
+- Verification passed: two conversation-state tests, two focused Master Agent render guards, TypeScript typecheck, production UI build, source and Wedding line budgets, `git diff --check`, and the focused Rust provider/orchestrator suites recorded in the final handoff commit evidence.
+- No live provider key was called during development, no production configuration changed, policy V2 remains disabled and nothing was deployed. The run-sheet implementation itself remains future work under WED-289 through WED-295.
+- The full `master-agent-render-guard.test.ts` still contains an unrelated pre-existing `Show guide` expectation for the current Response Queue; only the WED-288 Master Agent cases were selected here.

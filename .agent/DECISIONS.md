@@ -1922,3 +1922,20 @@ total wedding budget being presented as one vendor's allowance; opt-out clears a
 Connected quote/booking effects remain evidence-aware. A single approved AFP transition fans
 out idempotently to linked booking, budget, task and decision projections with a visible
 explanation, but quote acceptance cannot masquerade as booking confirmation.
+
+## 2026-10-29: Master Agent dispatch follows the resolved provider; run sheets remain Database projections
+
+The Master Agent planning, execution, continuity and approval paths use the same resolved inference
+backend and selected model as the signed-in account. OpenAI-compatible, Ollama, RunPod and hosted
+backends are not translated into an Anthropic-only call. A connection test sends one bounded real
+request because listing models does not prove that the chosen model can answer. Changing provider
+without a replacement key clears the old provider credential rather than misusing it. Provider
+failures are logged server-side and projected as bounded non-technical UI copy; plain model text is
+preserved as a safe conversational response.
+
+The wedding run sheet is a registered `wedding_runsheet.v1` profile inside the existing generic
+Database surface, not another database screen or source of truth. Its rows and saved role views are
+incremental projections of the wedding AFP ledger with checkpoints, source references and explicit
+overrides. Users retain the ability to create blank and unrelated databases. Deterministic projectors
+handle normal updates; an LLM may resolve only bounded ambiguity and must record source references,
+cost, approval and revision history.

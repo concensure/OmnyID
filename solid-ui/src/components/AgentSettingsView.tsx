@@ -1949,7 +1949,7 @@ export function AgentSettingsView(props: {
                     />
                     <p class="mt-0.5 text-[10px] text-on-surface-variant">
                       Stored encrypted on your homeserver. Never transmitted in plaintext.
-                      Leave blank to keep the existing key.
+                      Leave blank to keep the existing key only when the provider stays the same; changing provider requires a matching key.
                     </p>
                   </div>
                 </Show>
@@ -2008,12 +2008,12 @@ export function AgentSettingsView(props: {
                         disabled={llmPinging() || llmSaving()}
                         aria-busy={llmPinging() || llmSaving()}
                         aria-disabled={llmPinging() || llmSaving()}
-                        title={llmDirty() ? "Will save current values then test connection" : "Ping the saved LLM config"}
+                        title={llmDirty() ? "Will save current values then test connection" : "Test the saved model with a small request"}
                         class="rounded-lg border border-white/20 bg-white/10 px-4 py-2 text-xs font-medium text-on-surface-variant disabled:opacity-40 transition hover:bg-white/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                       >
                         {llmPinging() ? "Testing..." : llmDirty() ? "Save & Test" : "Test connection"}
                       </button>
-                      <InfoHint text="Runs a provider-specific reachability check using the saved model settings. If you have unsaved edits, the app saves them first, then tests the active provider, model, and key path." />
+                      <InfoHint text="Sends a very small real response request using the saved provider, model, and key path, so it may use a few tokens. Unsaved edits are saved first." />
                     </div>
                     <Show when={lastPingAt() !== null && !llmPinging()}>
                       <span class="font-mono text-[10px] text-on-surface-variant/40">

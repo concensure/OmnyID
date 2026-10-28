@@ -217,47 +217,22 @@ async fn api_fetch_internal(state: &Arc<AppState>, user_id: &str, objective: &st
                 return;
             }
         };
-        let llm_cfg = match state.db.get_llm_config(&user_id).await {
-            Ok(Some(c)) => c,
+        let resolved_llm = match super::llm_resolution::resolve_user_inference_backend(
+            &state.db, &user_id,
+        )
+        .await
+        {
+            Ok(Some(config)) => config,
             _ => {
-                tracing::warn!(%user_id, "continuity: no LLM config, skipping orchestrate");
+                tracing::warn!(%user_id, "continuity: no usable LLM config, skipping orchestrate");
                 return;
             }
         };
         let instance_id = instance["id"].as_str().unwrap_or("").to_string();
         let soul_md = instance["soul_md"].as_str().unwrap_or("").to_string();
         let lora_active = instance["lora_genome_active"].as_bool().unwrap_or(false);
-        let backend = llm_cfg["backend"].as_str().unwrap_or("hosted");
-        let (api_key, model) = if backend == "runpod" {
-            (
-                crate::secret_manager::read_process_secret_trimmed("OMNYID_RUNPOD_API_KEY")
-                    .unwrap_or_default(),
-                llm_cfg["model"]
-                    .as_str()
-                    .unwrap_or("Qwen/Qwen3.5-35B-A3B")
-                    .to_string(),
-            )
-        } else {
-            (
-                crate::secret_manager::read_process_secret_trimmed("OMNYID_ANTHROPIC_KEY")
-                    .or_else(|| {
-                        crate::secret_manager::read_process_secret_trimmed("ANTHROPIC_API_KEY")
-                    })
-                    .unwrap_or_default(),
-                llm_cfg["model"]
-                    .as_str()
-                    .unwrap_or("claude-haiku-4-5-20251001")
-                    .to_string(),
-            )
-        };
-        let runpod_ep = if backend == "runpod" {
-            Some(
-                std::env::var("OMNYID_RUNPOD_ENDPOINT_ID")
-                    .unwrap_or_else(|_| "sdr11n90qjwjy2".to_string()),
-            )
-        } else {
-            None
-        };
+        let model = resolved_llm.model;
+        let backend = resolved_llm.backend;
         let soul_opt = if soul_md.is_empty() {
             None
         } else {
@@ -278,15 +253,14 @@ async fn api_fetch_internal(state: &Arc<AppState>, user_id: &str, objective: &st
         let orchestrator =
             crate::master_orchestrator::MasterOrchestrator::new(instance_id, user_id.clone());
         match orchestrator
-            .run(
+            .run_with_backend(
                 &objective,
                 &state.db,
-                &api_key,
+                &backend,
                 &model,
                 soul_opt,
                 output_persona_prompt.as_deref(),
                 lora_active,
-                runpod_ep.as_deref(),
                 Some(state.cost_oracle.as_ref()),
                 trace_context.as_deref(),
             )

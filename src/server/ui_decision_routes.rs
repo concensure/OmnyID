@@ -1,4 +1,4 @@
-﻿/*
+/*
  * @module-id: rust.server.ui-decision-routes
  * @primary-capability: rust.source-module
  * @locs-version: 2.0
@@ -164,43 +164,19 @@ pub(super) async fn ui_decision_http(
                 && clarification_instruction.is_some();
 
             if (is_approval_confirm || is_clarification_proceed) && !objective.is_empty() {
-                let llm_cfg = state
-                    .db
-                    .get_llm_config(&user.id)
-                    .await
-                    .map_err(internal_error)
-                    .map_err(status_to_http)?
-                    .ok_or_else(|| {
-                        (
-                            StatusCode::BAD_REQUEST,
-                            "no LLM config; call POST /user/llm-config".to_string(),
-                        )
-                    })?;
-                let backend_name = llm_cfg["backend"].as_str().unwrap_or("hosted").to_string();
-                let (api_key, model) = if backend_name == "runpod" {
-                    (
-                        crate::secret_manager::read_process_secret_trimmed("OMNYID_RUNPOD_API_KEY")
-                            .unwrap_or_default(),
-                        llm_cfg["model"]
-                            .as_str()
-                            .unwrap_or("Qwen/Qwen3.5-35B-A3B")
-                            .to_string(),
-                    )
-                } else {
-                    (
-                        crate::secret_manager::read_process_secret_trimmed("OMNYID_ANTHROPIC_KEY")
-                            .or_else(|| {
-                                crate::secret_manager::read_process_secret_trimmed(
-                                    "ANTHROPIC_API_KEY",
-                                )
-                            })
-                            .unwrap_or_default(),
-                        llm_cfg["model"]
-                            .as_str()
-                            .unwrap_or("claude-haiku-4-5-20251001")
-                            .to_string(),
-                    )
-                };
+                let resolved_llm =
+                    super::llm_resolution::resolve_user_inference_backend(&state.db, &user.id)
+                        .await
+                        .map_err(internal_error)
+                        .map_err(status_to_http)?
+                        .ok_or_else(|| {
+                            (
+                                StatusCode::BAD_REQUEST,
+                                "no usable LLM backend is configured".to_string(),
+                            )
+                        })?;
+                let model = resolved_llm.model;
+                let backend = resolved_llm.backend;
                 let master_instance = state
                     .db
                     .get_master_agent_instance(&user.id)
@@ -353,9 +329,8 @@ pub(super) async fn ui_decision_http(
                 spawn_orchestration_run(
                     state.clone(),
                     user.id.clone(),
-                    api_key,
+                    backend,
                     model,
-                    backend_name,
                     orchestration_objective,
                     execution_profile,
                     lora_active,

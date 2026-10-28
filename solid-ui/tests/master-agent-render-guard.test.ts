@@ -19,13 +19,15 @@ test("master agent preview conversion falls back instead of crashing the workspa
 
 test("every completed master agent command has a plain visible response before enhanced rendering", () => {
   const appSource = read("src/App.tsx");
-  const plainResponse = appSource.indexOf('data-testid="master-agent-visible-response"');
+  const conversationSource = read("src/components/MasterAgentConversationResponse.tsx");
+  const plainResponse = appSource.indexOf("<MasterAgentConversationResponse");
   const enhancedPreview = appSource.indexOf("<Show when={commandPreviewMessage()}>");
 
   assert.ok(plainResponse >= 0);
   assert.ok(enhancedPreview > plainResponse);
-  assert.match(appSource, /Master Agent response/);
-  assert.match(appSource, /result\(\)\.summary\?\.trim\(\)/);
+  assert.match(conversationSource, /data-testid="master-agent-visible-response"/);
+  assert.match(conversationSource, /aria-label="Master Agent conversation"/);
+  assert.match(conversationSource, /renderMarkdown/);
 });
 
 test("dynamic AFP renderer failures are contained inside the result card", () => {

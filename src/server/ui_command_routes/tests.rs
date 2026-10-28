@@ -54,6 +54,18 @@ fn ui_command_requires_a_usable_model_before_deterministic_planning_routes() {
         .find("if base.intent == \"travel\"")
         .expect("missing travel route");
 
-    assert!(gate < travel_route, "travel must not create a plan before model setup");
+    assert!(
+        gate < travel_route,
+        "travel must not create a plan before model setup"
+    );
     assert!(source.contains("Connect AI model first"));
+}
+
+#[test]
+fn configured_orchestration_passes_the_resolved_backend_to_the_runner() {
+    let source = include_str!("../ui_command_routes.rs");
+    assert!(
+        source.contains("backend.clone(),\n                                    model.clone(),")
+    );
+    assert!(!source.contains("backend_api_key.clone().unwrap_or_default()"));
 }

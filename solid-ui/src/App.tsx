@@ -10,6 +10,7 @@ import { ThreadDiscoveryStateSummary } from "@/components/ThreadDiscoveryStateSu
 import { ViewDispatcher } from "@/components/ViewDispatcher";
 import { AgentPersonaFAB } from "@/components/AgentPersonaFAB";
 import { WeddingNavigationArrivalBanner } from "@/components/WeddingNavigationArrivalBanner";
+import { MasterAgentConversationResponse } from "@/components/MasterAgentConversationResponse";
 import { WeddingReturnBanner } from "@/components/WeddingReturnBanner";
 import { ActiveTasksDecisionView } from "@/components/ActiveTasksDecisionView";
 import { WorkspaceBreadcrumbTrail } from "@/components/WorkspaceBreadcrumbTrail";
@@ -2769,6 +2770,7 @@ function App() {
   const commandPreviewMessage = createMemo(() => {
     const result = commandResult();
     if (!result) return null;
+    if (result.intent === "chat" || result.intent === "model_unavailable") return null;
     try {
       const generatedPreview = commandResponseToPreviewMessage(
         result,
@@ -3721,45 +3723,7 @@ function App() {
                 </Show>
                 <Show when={commandResult()}>
                   {(result) => (
-                    <section
-                      class="rounded-3xl border border-primary/30 bg-white px-5 py-4 text-on-surface shadow-card"
-                      aria-live="polite"
-                      aria-atomic="true"
-                      data-testid="master-agent-visible-response"
-                    >
-                      <p class="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">
-                        Master Agent response
-                      </p>
-                      <p class="mt-2 text-sm leading-6 text-on-surface">
-                        {result().summary?.trim() || "The Master Agent completed the request."}
-                      </p>
-                      <Show when={(result().bullets?.length ?? 0) > 0}>
-                        <ul class="mt-3 list-disc space-y-1 pl-5 text-sm leading-6 text-on-surface-variant">
-                          <For each={(result().bullets ?? []).slice(0, 4)}>
-                            {(bullet) => <li>{bullet}</li>}
-                          </For>
-                        </ul>
-                      </Show>
-                      <Show when={(result().links?.length ?? 0) > 0}>
-                        <div class="mt-3 border-t border-outline-variant/40 pt-3">
-                          <p class="text-xs font-semibold uppercase tracking-[0.12em] text-on-surface-variant">Sources and results</p>
-                          <div class="mt-2 flex flex-wrap gap-2">
-                            <For each={(result().links ?? []).slice(0, 6)}>
-                              {(link) => (
-                                <a
-                                  href={link.url}
-                                  target="_blank"
-                                  rel="noreferrer noopener"
-                                  class="max-w-full break-words rounded-full border border-primary/20 bg-primary/5 px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary/10"
-                                >
-                                  {link.title || link.url}
-                                </a>
-                              )}
-                            </For>
-                          </div>
-                        </div>
-                      </Show>
-                    </section>
+                    <MasterAgentConversationResponse query={lastQuery()} response={result()} />
                   )}
                 </Show>
                 {/* Search result card — shown when a command has been run */}
