@@ -35,3 +35,16 @@ test("all quotation capability flags reach every Oracle homeserver profile defau
     }
   }
 });
+
+test("minimal Oracle profile passes protected Cloudflare account mail configuration", () => {
+  const compose = read("docker-compose.oracle.minimal.yml");
+  for (const variable of [
+    "OMNYID_TRANSACTIONAL_CLOUDFLARE_API_TOKEN_FILE",
+    "OMNYID_TRANSACTIONAL_CLOUDFLARE_ACCOUNT_ID",
+    "OMNYID_TRANSACTIONAL_FROM_ADDRESS",
+    "OMNYID_VENDOR_MAIL_CLOUDFLARE_API_TOKEN_FILE",
+    "OMNYID_VENDOR_MAIL_CLOUDFLARE_ACCOUNT_ID",
+  ]) {
+    assert.ok(compose.includes(`${variable}: \${${variable}:-}`), `${variable} must reach the homeserver`);
+  }
+});

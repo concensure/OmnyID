@@ -44,6 +44,12 @@ test("weddingVendorFollowUpPrimaryAction opens tasks for waiting vendors", () =>
   assert.deepEqual(action.contextLabels, ["Harbour View Venue", "Venue", "Waiting for reply"]);
 });
 
+test("review alternatives opens the vendor surface in place", () => {
+  const action = weddingVendorFollowUpPrimaryAction({ ...baseCard, stage: "mark_unresponsive", primaryActionLabel: "Review alternatives" });
+  assert.equal(action.kind, "open_workspace_menu");
+  assert.equal(action.metadata?.wedding_workspace_menu, "vendors");
+});
+
 test("weddingVendorFollowUpPrimaryAction keeps follow-up sends approval gated", () => {
   const action = weddingVendorFollowUpPrimaryAction({
     ...baseCard,

@@ -76,6 +76,16 @@ function vendorDraftRequest(card: WeddingVendorContactWorkspaceCard): Record<str
 
 export function weddingVendorFollowUpPrimaryAction(card: WeddingVendorContactWorkspaceCard): WeddingWorkspaceSidebarAction {
   if (card.actionMode === "waiting") {
+    if (card.stage === "mark_unresponsive") {
+      return {
+        kind: "open_workspace_menu",
+        label: "Review alternatives",
+        enabled: true,
+        reason: null,
+        metadata: { wedding_workspace_menu: "vendors", vendor_id: card.vendorId, vendor_name: card.vendorName },
+        contextLabels: vendorContextLabels(card),
+      };
+    }
     return {
       kind: "open_tasks",
       label: card.primaryActionLabel,

@@ -70,8 +70,14 @@ type WeddingWorkspaceDocumentsPanelProps = {
 };
 
 export function WeddingWorkspaceDocumentsPanel(props: WeddingWorkspaceDocumentsPanelProps) {
+  let documentDetail: HTMLDivElement | undefined;
   const documentTitle = (artifact: WeddingWorkspaceDocumentsPanelProps["state"]["workspace"]["results"][number]) => {
     if (artifact.kind !== "vendor_table") return artifact.title;
+    const vendors = artifact.vendorLabels.map((label) => label.trim()).filter(Boolean).slice(0, 3);
+    if (vendors.length > 0) {
+      const prefix = /comparison/i.test(artifact.title) ? "Vendor comparison" : "Vendor search";
+      return `${prefix} — ${vendors.join(", ")}${artifact.vendorLabels.length > vendors.length ? ` +${artifact.vendorLabels.length - vendors.length}` : ""}`;
+    }
     const category = artifact.sourceLabels.find((label) =>
       /^(?:venue|celebrant|photograph(?:er|y)|florist|cater(?:er|ing)|music|band|dj|transport|cake|styling|stationery|wedding vendor)s?$/i.test(label.trim()),
     );
@@ -294,7 +300,13 @@ export function WeddingWorkspaceDocumentsPanel(props: WeddingWorkspaceDocumentsP
                     data-magic-icon="document"
                     data-magic-label={`Open ${documentTitle(artifact)}`}
                     data-magic-id={`wedding:document:${artifact.id}:open`}
-                    onClick={() => props.onSelectArtifact?.(artifact.id)}
+                    onClick={() => {
+                      props.onSelectArtifact?.(artifact.id);
+                      window.setTimeout(() => {
+                        documentDetail?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+                        documentDetail?.focus({ preventScroll: true });
+                      }, 0);
+                    }}
                     class={`w-full rounded-2xl border px-3 py-3 text-left transition ${
                       artifact.id === visiblePreview()?.artifactId
                         ? "border-rose-200 bg-rose-50/90"
@@ -311,7 +323,7 @@ export function WeddingWorkspaceDocumentsPanel(props: WeddingWorkspaceDocumentsP
             </Show>
           </aside>
 
-          <div class="mt-4">
+          <div ref={(element) => { documentDetail = element; }} class="mt-4" tabIndex={-1}>
             <WeddingArtifactDetailPanel
               preview={visiblePreview()}
               vendorDirectory={props.weddingVendorDirectory}

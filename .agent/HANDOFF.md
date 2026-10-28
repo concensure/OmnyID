@@ -5511,3 +5511,18 @@ Evidence:
 Next:
 
 - Continue WED-292 from this completed dependency: define a generic Database profile toolbar plug-in and pure time/override rules, then mount day/status/conflict controls and safe mobile editing without special-casing ordinary databases.
+
+## 2026-10-29 - WED-298 public home and Wedding production regression repair (Codex, candidate prepared)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch `agent/codex/WED-298`, based on `f078dc99cef0b920d4982e75cf5458cd093341d7`.
+
+- The public-root HTML on Oracle matched the repository. The apparent homepage replacement was a reset-only `docs/tailwind.css`: Tailwind was invoked from `solid-ui` while the config scanned `./*.html`. The config now resolves from its own directory, the complete static stylesheet is rebuilt and cache-versioned, and CSP smoke asserts representative responsive utilities and a non-trivial build size.
+- Add-task and task-row ownership now share one contact-backed picker. `+ Add contact` reveals a compact wedding-role/contact form, updates the same local contact/helper projections, and writes the canonical private AFP contact event when account persistence is available.
+- Vendor reminders reject and grey past dates, persist today/future dates to AFP even for legacy cards without relational IDs, and treat the relational PATCH as compatibility-only. `Close follow-up` has an explicit permanent-removal warning, writes an AFP dismissal lifecycle event and removes the card from Today and Response Queue. Review alternatives opens Vendors in place.
+- Wedding import feedback explains review/parser status, links to Documents, can be dismissed and expires after ten seconds. Documents use vendor-specific comparison/search titles, selection scrolls and focuses the detail, and full Markdown is rendered through the existing sanitizer with table styling.
+- The existing sprout persona and view customizer are visible in Wedding again. Wedding Home labels are Today, navigation-card hover no longer moves or scales at boundaries, and the upload tooltip has an unclipped high stacking context.
+- Production signup diagnosis found legacy Gmail OAuth returning HTTP 400 and SMTP auth failing. The existing protected Oracle Cloudflare token returned HTTP 200 from the Email Sending suppressions API. Transactional delivery now prefers the platform provider, can use independently configured SMTP before Resend, and never reports success without provider acceptance. The minimal Oracle compose profile now passes the missing vendor-mail Cloudflare account ID.
+- Pre-freeze checks passed: TypeScript, source/Wedding line budgets, focused lifecycle/action/release tests, seven SMTP-out Rust tests, CSP/home static smoke and the production UI build. One full Wedding run had 2,039/2,040 pass; the sole failure was the newly added test expecting `_reminder_set` instead of the established `_reminder` event, and the corrected focused test passes. The exact clean candidate must rerun the complete suite before deployment.
+- Generated local screenshots remain untracked under `solid-ui/artifacts/` and must not be staged. No secret value was printed or committed. Policy V2 remains at its existing production setting; this task does not alter rollout criteria.
+
+Next: commit the candidate, verify from a clean detached checkout, bind the existing protected Cloudflare token/account/from address to the transactional variables in `.env.oracle`, deploy that exact SHA with the existing remote environment, then test provider acceptance and hosted surfaces before closing WED-298.

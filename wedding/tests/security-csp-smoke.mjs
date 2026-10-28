@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 const weddingRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const projectRoot = resolve(weddingRoot, '..');
 const docsRoot = resolve(projectRoot, 'docs');
+const docsTailwind = readFileSync(resolve(docsRoot, 'tailwind.css'), 'utf8');
 const caddy = readFileSync(resolve(projectRoot, 'Caddyfile'), 'utf8');
 const failures = [];
 const pageScriptHashes = new Set();
@@ -35,6 +36,10 @@ if (!caddy.includes('Strict-Transport-Security "max-age=15552000; includeSubDoma
 if (!caddy.includes('import cloudflare_only')) {
   failures.push('public sites must import the Cloudflare-origin allowlist');
 }
+for (const requiredClass of ['.fixed', '.grid', '.h-8', '.w-full', '.md\\:grid-cols-2']) {
+  if (!docsTailwind.includes(requiredClass)) failures.push(`docs/tailwind.css is missing ${requiredClass}; rebuild it with docs/tailwind.config.cjs`);
+}
+if (docsTailwind.length < 20_000) failures.push('docs/tailwind.css is unexpectedly small and likely contains only the Tailwind reset');
 
 for (const root of [weddingRoot, docsRoot]) {
   for (const path of htmlFiles(root)) {

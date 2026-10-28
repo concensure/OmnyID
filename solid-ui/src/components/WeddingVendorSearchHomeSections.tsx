@@ -222,7 +222,7 @@ export function WeddingVendorSearchHomeSection(props: {
   const cardVendorKey = (card: WeddingVendorChoiceCardData) => card.vendorId?.trim() || card.choiceId;
   const visibleCards = (artifact: WeddingWorkspaceArtifactPreview) => artifact.vendorComparisonCards
     .filter((card) => !props.hiddenVendorIds?.includes(cardVendorKey(card)))
-    .filter((card) => lifecycleFilter() === "all" || weddingVendorLifecycleMatches(findWeddingVendorLifecycle({ records: lifecycleRecords(), vendorId: card.vendorId, vendorName: card.title }) ?? { key: "", vendorId: card.vendorId ?? null, vendorName: card.title, enquired: false, favourited: selectedForFollowUp(artifact, card.choiceId), quoteReceived: false, booked: false, reminderAt: null, sourceMessageIds: [] }, lifecycleFilter()))
+    .filter((card) => lifecycleFilter() === "all" || weddingVendorLifecycleMatches(findWeddingVendorLifecycle({ records: lifecycleRecords(), vendorId: card.vendorId, vendorName: card.title }) ?? { key: "", vendorId: card.vendorId ?? null, vendorName: card.title, enquired: false, favourited: selectedForFollowUp(artifact, card.choiceId), quoteReceived: false, booked: false, reminderAt: null, followUpDismissed: false, followUpDismissedAt: null, sourceMessageIds: [] }, lifecycleFilter()))
     .map((card) => weddingVendorCardWithCurrentPhoto(card, workspace().weddingVendorDirectory));
   const hiddenCards = (artifact: WeddingWorkspaceArtifactPreview) => artifact.vendorComparisonCards
     .filter((card) => props.hiddenVendorIds?.includes(cardVendorKey(card)));

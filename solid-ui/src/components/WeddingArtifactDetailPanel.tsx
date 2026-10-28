@@ -16,6 +16,7 @@ import type { WeddingExportManifestEntry } from "@/lib/weddingExportState";
 import type { WeddingWorkspaceArtifactPreview } from "@/lib/weddingResponseWorkspaceViewState";
 import type { WeddingArtifactPreviewState } from "@/lib/weddingArtifactPreviewState";
 import type { WeddingWorkspaceSidebarAction } from "@/lib/weddingWorkspaceActionState";
+import { renderMarkdown } from "@/lib/markdownRenderer";
 import { weddingQuoteAttachmentMessageState } from "@/lib/weddingQuoteAttachmentMessageState";
 import type { ViewName } from "@/lib/viewNames";
 import { buildWeddingVendorComparisonUiState } from "@/lib/weddingVendorComparisonUiState";
@@ -761,9 +762,10 @@ export function WeddingArtifactDetailPanel(props: {
                   </Show>
                   <details class="rounded-2xl border border-slate-200/80 bg-white/80 px-4 py-3 text-slate-800">
                     <summary class="cursor-pointer text-sm font-semibold text-slate-950">Show full document text</summary>
-                    <pre class="mt-3 max-h-[22rem] overflow-auto whitespace-pre-wrap break-words rounded-xl bg-slate-50 p-3 text-xs leading-5 text-slate-700">
-                      {body()}
-                    </pre>
+                    <div
+                      class="md-prose mt-3 max-h-[32rem] overflow-auto rounded-xl bg-slate-50 p-3 text-sm leading-6 text-slate-700 [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-slate-200 [&_td]:p-2 [&_th]:border [&_th]:border-slate-300 [&_th]:bg-slate-100 [&_th]:p-2 [&_th]:text-left"
+                      innerHTML={renderMarkdown(body())}
+                    />
                   </details>
                 </div>
               )}

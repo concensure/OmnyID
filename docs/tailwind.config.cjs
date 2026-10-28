@@ -1,5 +1,9 @@
+const path = require("path");
+
 module.exports = {
-  content: ["./*.html"],
+  // Resolve from this config, not the caller's working directory. Release
+  // builds invoke Tailwind from solid-ui and previously emitted only a reset.
+  content: [path.join(__dirname, "*.html")],
   darkMode: "class",
   theme: {
     extend: {

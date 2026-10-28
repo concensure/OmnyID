@@ -5,7 +5,7 @@ import { WEDDING_MOBILE_TABS, weddingMobileTabForMenu } from "../src/lib/wedding
 import type { WeddingWorkspaceMenuId } from "../src/lib/weddingWorkspaceMenuState.ts";
 
 test("wedding mobile navigation exposes exactly five stable destinations", () => {
-  assert.deepEqual(WEDDING_MOBILE_TABS.map((tab) => tab.label), ["Home", "Vendors", "Budget", "Timeline", "More"]);
+  assert.deepEqual(WEDDING_MOBILE_TABS.map((tab) => tab.label), ["Today", "Vendors", "Budget", "Timeline", "More"]);
 });
 
 test("wedding mobile navigation maps every workspace menu into one destination", () => {

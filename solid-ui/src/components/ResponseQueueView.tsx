@@ -390,6 +390,12 @@ export function ResponseQueueView(props: {
   const [weddingImportNotice, setWeddingImportNotice] = createSignal("");
   const [weddingImportRunning, setWeddingImportRunning] = createSignal(false);
 
+  createEffect(() => {
+    if (!weddingImportNotice()) return;
+    const timer = window.setTimeout(() => setWeddingImportNotice(""), 10_000);
+    onCleanup(() => window.clearTimeout(timer));
+  });
+
   function applyWeddingVendorSearchLaunch(launch: WeddingVendorSearchLaunchState | null) {
     const query = launch?.query.trim();
     if (!query) return;
@@ -1522,8 +1528,13 @@ export function ResponseQueueView(props: {
         const savedCount = saveResults.filter((result) => result.status === "fulfilled").length;
         setWeddingImportRefreshKey((value) => value + 1);
         setActiveWeddingArtifactId(synthesis.generatedArtifacts[0]?.summary.id ?? null);
+        const processingDetail = synthesis.reviewCount > 0
+          ? `${synthesis.reviewCount} need review because no clear structured rows were detected; the original stays available until you review it or run a supported parser.`
+          : synthesis.parserNeededCount > 0
+            ? `${synthesis.parserNeededCount} need a supported document parser before structured rows can be created.`
+            : "Structured content was synthesized during this upload.";
         setWeddingImportNotice(savedCount > 0
-          ? `${synthesis.summaryLabel}. ${savedCount} import${savedCount === 1 ? "" : "s"} saved to Files.`
+          ? `${synthesis.summaryLabel}. ${processingDetail} ${savedCount} import${savedCount === 1 ? "" : "s"} saved to Documents.`
           : `${synthesis.summaryLabel}. Imports are saved locally and queued for Files.`
         );
         return;
@@ -1808,7 +1819,7 @@ export function ResponseQueueView(props: {
   return (
     <div class={RESPONSE_QUEUE_VIEW_CLASS}>
       <Show when={weddingWorkspace()}>
-        <div class="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 phone:hidden sm:flex-wrap sm:overflow-visible sm:pb-0">
+        <div class="relative z-[200] -mx-1 flex flex-wrap gap-2 overflow-visible px-1 pb-1 phone:hidden sm:pb-0">
           <div role="tablist" aria-label="Wedding planner sections" class="flex shrink-0 gap-2">
             <For each={WEDDING_WORKSPACE_MENU_ITEMS}>
               {(item, index) => {
@@ -1881,7 +1892,7 @@ export function ResponseQueueView(props: {
                 disabled={weddingImportRunning()}
                 onChange={importWeddingFilesFromHeader}
               />
-              <span class="pointer-events-none absolute right-0 top-[calc(100%+0.5rem)] z-[1001] w-72 rounded-2xl border border-teal-100 bg-white px-3 py-2 text-left text-xs font-normal leading-5 text-teal-950 opacity-0 shadow-xl transition group-hover:opacity-100 group-focus-within:opacity-100">
+              <span class="pointer-events-none absolute bottom-[calc(100%+0.5rem)] right-0 z-[5000] w-72 rounded-2xl border border-teal-100 bg-white px-3 py-2 text-left text-xs font-normal leading-5 text-teal-950 opacity-0 shadow-2xl transition group-hover:opacity-100 group-focus-within:opacity-100">
                 <span class="block font-semibold">Bring in your existing lists</span>
                 <span class="mt-1 block">
                   Upload guest lists, budgets, spreadsheets, vendor quotes, contracts, Google Sheets exports, or The Knot exports. OmnyID will organize what it can and keep the original files for later.
@@ -1907,9 +1918,13 @@ export function ResponseQueueView(props: {
       </div>
       <Show when={weddingWorkspace() && weddingImportNotice()}>
         {(notice) => (
-          <p class="ml-auto max-w-2xl rounded-2xl border border-teal-100 bg-white/85 px-3 py-2 text-xs leading-5 text-teal-950 shadow-sm">
-            {notice()}
-          </p>
+          <div class="ml-auto flex max-w-2xl flex-col gap-2 rounded-2xl border border-teal-100 bg-white/95 px-3 py-2 text-xs leading-5 text-teal-950 shadow-sm sm:flex-row sm:items-center" role="status">
+            <p class="min-w-0 flex-1">{notice()}</p>
+            <div class="flex shrink-0 gap-2">
+              <button type="button" class="min-h-10 rounded-lg border border-teal-300 bg-white px-3 font-semibold" onClick={() => { setWeddingWorkspaceMenu("documents"); setWeddingImportNotice(""); }}>View document</button>
+              <button type="button" class="min-h-10 rounded-lg px-3 font-semibold text-teal-900 underline" onClick={() => setWeddingImportNotice("")} aria-label="Dismiss import message">Dismiss</button>
+            </div>
+          </div>
         )}
       </Show>
 

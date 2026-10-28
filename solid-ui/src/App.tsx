@@ -4305,7 +4305,7 @@ function App() {
       </GlassPanel>
 
       {/* Floating agent persona FAB */}
-      <Show when={Boolean(session()?.token) && !(activeView() === "response_queue" && loadWeddingEntrySource() === "wedding_site")}>
+      <Show when={Boolean(session()?.token)}>
         <AgentPersonaFAB
           signedIn={Boolean(session()?.token)}
           activeCount={fleetActiveCount()}
@@ -4329,7 +4329,7 @@ function App() {
       </Show>
 
       {/* View customizer — floating + for image background and custom A2UI cards (non-home views only) */}
-      <Show when={activeView() !== "home" && !(activeView() === "response_queue" && loadWeddingEntrySource() === "wedding_site")}>
+      <Show when={activeView() !== "home"}>
         <Suspense>
           <LazyViewCustomizer viewId={activeView()} />
         </Suspense>

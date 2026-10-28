@@ -5,6 +5,7 @@ import type { AfpMessage } from "../src/lib/api";
 import {
   projectWeddingVendorLifecycle,
   weddingVendorBookingToAfpSendInput,
+  weddingVendorFollowUpDismissalToAfpSendInput,
   weddingVendorLifecycleMatches,
   weddingVendorReminderToAfpSendInput,
 } from "../src/lib/weddingVendorLifecycleState";
@@ -42,6 +43,17 @@ test("vendor lifecycle keeps the latest AFP follow-up reminder", () => {
       message("reminder-2", second.kind ?? "", "2026-01-04T00:00:00Z", second.content),
     ]);
     assert.equal(records[0].reminderAt, "2027-02-03T12:00:00Z");
+});
+
+test("closing a follow-up is a durable AFP lifecycle state", () => {
+    const dismissal = weddingVendorFollowUpDismissalToAfpSendInput({ metadata, vendorId: "vendor-1", vendorName: "Harbour House" });
+    const records = projectWeddingVendorLifecycle([
+      message("sent", "wedding_vendor_outreach_sent", "2026-01-02T00:00:00Z", { vendor_id: "vendor-1", vendor_label: "Harbour House" }),
+      message("dismiss", dismissal.kind ?? "", dismissal.timestamp ?? "2026-01-03T00:00:00Z", dismissal.content),
+    ]);
+    assert.equal(dismissal.kind, "wedding_vendor_follow_up_dismissed");
+    assert.equal(records[0].followUpDismissed, true);
+    assert.ok(records[0].followUpDismissedAt);
 });
 
 test("vendor booking records a decision without pretending to pay", () => {

@@ -13,7 +13,7 @@ export type WeddingWorkspaceDesktopMenuItem = {
 
 export const WEDDING_WORKSPACE_MENU_ITEMS: readonly WeddingWorkspaceDesktopMenuItem[] = [
   {
-    id: "home", icon: "home", label: "Home",
+    id: "home", icon: "home", label: "Today",
     title: "Main decision queue, budget remaining, days left, and wedding documents.",
     className: "border-pink-100 bg-pink-50/80 text-pink-950 hover:border-pink-200",
     activeClassName: "border-pink-300 bg-pink-100 text-pink-950",

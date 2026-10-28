@@ -51,7 +51,7 @@ function DomainTile(props: { tile?: WeddingHomeOverviewActionTile; domain: Domai
   return (
     <button
       type="button"
-      class={`group min-h-[10.5rem] min-w-0 rounded-xl border border-wedding-border bg-wedding-card p-4 text-left text-wedding-ink shadow-wedding-card transition duration-200 ease-out hover:-translate-y-0.5 hover:border-wedding-primary/40 active:scale-[.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-primary focus-visible:ring-offset-2 motion-reduce:transform-none sm:p-5 ${props.desktopSpan ?? ""} ${props.dense ? "min-h-[9rem] p-3 sm:p-3" : ""}`}
+      class={`group min-h-[10.5rem] min-w-0 rounded-xl border border-wedding-border bg-wedding-card p-4 text-left text-wedding-ink shadow-wedding-card transition-colors duration-150 hover:border-wedding-primary/40 hover:bg-wedding-page focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-primary focus-visible:ring-offset-2 sm:p-5 ${props.desktopSpan ?? ""} ${props.dense ? "min-h-[9rem] p-3 sm:p-3" : ""}`}
       title={props.tile?.actionLabel}
       onClick={props.onOpen}
     >
@@ -72,7 +72,7 @@ function DomainTile(props: { tile?: WeddingHomeOverviewActionTile; domain: Domai
       <p class="mt-4 break-words text-[2.125rem] font-extrabold leading-9 tracking-[-.02em] tabular-nums">{displayValue(props.tile)}</p>
       <p class="mt-1 line-clamp-2 text-sm leading-5 text-wedding-ink/70">{props.tile?.detailLabel}</p>
       <span class="mt-3 inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-wedding-secondary">
-        {props.tile?.actionLabel}<WeddingDashboardIcon id="arrow-right" class="h-4 w-4 transition-transform group-hover:translate-x-0.5 motion-reduce:transform-none" />
+        {props.tile?.actionLabel}<WeddingDashboardIcon id="arrow-right" class="h-4 w-4" />
       </span>
     </button>
   );

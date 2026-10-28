@@ -24,6 +24,13 @@ import type { WeddingWorkspaceSidebarAction } from "@/lib/weddingWorkspaceAction
 import type { AfpAttachment } from "@/lib/api";
 import type { WeddingVendorEnquiryPermissions } from "@/lib/weddingVendorEnquiryPermissionsState";
 import { WeddingTrustInfoTip } from "@/components/WeddingTrustInfoTip";
+import { WeddingConfirmDialog } from "@/components/WeddingConfirmDialog";
+
+function localToday(): string {
+  const now = new Date();
+  const offset = now.getTimezoneOffset() * 60_000;
+  return new Date(now.getTime() - offset).toISOString().slice(0, 10);
+}
 
 function VendorContactChip(props: { label: string; value: string | null; kind: "address" | "email" | "phone" }) {
   const [open, setOpen] = createSignal(false);
@@ -120,6 +127,7 @@ export function WeddingVendorFollowUpPanel(props: {
   onCancelOutreach: (choiceId: string) => void;
   onConnectGmailForOutreach: () => void;
   onSetFollowUpDate: (card: WeddingVendorContactWorkspaceCard, date: string) => Promise<boolean>;
+  onDismissFollowUp: (card: WeddingVendorContactWorkspaceCard) => Promise<boolean>;
 }) {
   const activeCards = () => props.state.vendorContactCards.filter((card) => {
     if (!card.followUpDueAt || card.actionMode !== "waiting") return true;
@@ -160,6 +168,8 @@ export function WeddingVendorFollowUpPanel(props: {
               const [followUpDate, setFollowUpDate] = createSignal(card.followUpDueAt?.slice(0, 10) ?? "");
               const [dateSaving, setDateSaving] = createSignal(false);
               const [dateNotice, setDateNotice] = createSignal<string | null>(null);
+              const [dismissOpen, setDismissOpen] = createSignal(false);
+              const [dismissBusy, setDismissBusy] = createSignal(false);
               const saveFollowUpDate = async () => {
                 if (!followUpDate() || dateSaving()) return;
                 setDateSaving(true); setDateNotice(null);
@@ -189,6 +199,7 @@ export function WeddingVendorFollowUpPanel(props: {
                         <input
                           ref={(element) => { followUpDateInput = element; }}
                           type="date"
+                          min={localToday()}
                           value={followUpDate()}
                           onInput={(event) => { setFollowUpDate(event.currentTarget.value); setDateNotice(null); }}
                           onChange={() => void saveFollowUpDate()}
@@ -327,7 +338,30 @@ export function WeddingVendorFollowUpPanel(props: {
                       >
                         Open follow-up tasks
                       </button>
+                      <button
+                        type="button"
+                        class="min-h-[44px] w-full rounded-2xl border-2 border-wedding-muted/60 bg-white px-4 py-3 text-sm font-bold text-wedding-text shadow-sm transition hover:bg-wedding-surface-muted focus:outline-none focus:ring-2 focus:ring-wedding-muted sm:w-auto sm:flex-1"
+                        onClick={() => setDismissOpen(true)}
+                      >
+                        Close follow-up
+                      </button>
                     </div>
+                    <WeddingConfirmDialog
+                      open={dismissOpen()}
+                      title={`Close the ${card.vendorName} follow-up?`}
+                      detail="This removes the message from Today and the response queue permanently. The closure stays in your private wedding record, but OmnyID will not bring this follow-up back."
+                      confirmLabel="Close permanently"
+                      destructive
+                      busy={dismissBusy()}
+                      onCancel={() => setDismissOpen(false)}
+                      onConfirm={() => {
+                        setDismissBusy(true);
+                        void props.onDismissFollowUp(card).then((saved) => {
+                          setDismissBusy(false);
+                          if (saved) setDismissOpen(false);
+                        });
+                      }}
+                    />
                   </Show>
                 </article>
               );

@@ -11,7 +11,7 @@ export type WeddingMobileTab = {
 };
 
 export const WEDDING_MOBILE_TABS: readonly WeddingMobileTab[] = [
-  { id: "home", label: "Home", icon: "users", menu: "home" },
+  { id: "home", label: "Today", icon: "users", menu: "home" },
   { id: "vendors", label: "Vendors", icon: "user-plus", menu: "response_queue" },
   { id: "budget", label: "Budget", icon: "banknotes", menu: "budget" },
   { id: "timeline", label: "Timeline", icon: "calendar-days", menu: "timeline" },

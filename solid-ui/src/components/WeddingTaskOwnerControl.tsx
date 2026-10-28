@@ -1,7 +1,7 @@
-import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
+import { createEffect, createSignal, onCleanup, onMount, Show } from "solid-js";
 
-import { readSession, type SendAfpMessageInput } from "@/lib/api";
-import { loadContacts } from "@/lib/contactsLocalState";
+import { type SendAfpMessageInput } from "@/lib/api";
+import { WeddingTaskOwnerPicker } from "@/components/WeddingTaskOwnerPicker";
 import type { WeddingPlanningTaskItem } from "@/lib/weddingCalendarProjectionState";
 import {
   dispatchWeddingTaskResponsibilityChange,
@@ -27,12 +27,6 @@ export function WeddingTaskOwnerControl(props: {
   const [draft, setDraft] = createSignal(savedOwner());
   const [saving, setSaving] = createSignal(false);
   const [notice, setNotice] = createSignal<string | null>(null);
-  const people = createMemo(() => {
-    const local = loadWeddingHelperLocalState(props.responseWorkspaceId);
-    const contacts = loadContacts(props.contactUserId ?? readSession()?.user?.id ?? null).map((contact) => contact.name);
-    return [...new Set(["You", savedOwner(), ...(props.people ?? []), ...local.customHelpers, ...contacts]
-      .map((name) => name.trim()).filter(Boolean))];
-  });
   createEffect(() => {
     props.task.assignee;
     props.responseWorkspaceId;
@@ -86,13 +80,7 @@ export function WeddingTaskOwnerControl(props: {
       <div class="flex min-w-0 items-end gap-1.5">
         <label class="min-w-0 flex-1 text-xs font-semibold text-wedding-ink/70">
           Owner
-          <select
-            value={draft()}
-            onChange={(event) => { setDraft(event.currentTarget.value); setNotice(null); }}
-            class="mt-1 min-h-10 w-full rounded-lg border border-wedding-border bg-white px-2 text-sm font-normal text-wedding-ink"
-          >
-            <For each={people()}>{(person) => <option value={person}>{person}</option>}</For>
-          </select>
+          <div class="mt-1"><WeddingTaskOwnerPicker compact value={draft()} onChange={(value) => { setDraft(value); setNotice(null); }} people={props.people} weddingPlanId={props.weddingPlanId ?? ""} responseWorkspaceId={props.responseWorkspaceId} contactUserId={props.contactUserId} saveProjection={props.saveProjection} /></div>
         </label>
         <button type="button" disabled={!draft().trim() || saving()} class="min-h-10 rounded-lg border border-wedding-secondary bg-white px-3 text-xs font-semibold text-wedding-secondary disabled:opacity-45" onClick={() => void saveOwner()}>
           {saving() ? "Saving" : "Assign"}

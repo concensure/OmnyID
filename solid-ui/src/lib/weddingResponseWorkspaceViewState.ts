@@ -155,6 +155,7 @@ import {
   type WeddingVendorPursuitLogCard,
 } from "@/lib/weddingVendorPursuitLogPresentationState";
 import type { WeddingTemplateDeepLinkLaunchState } from "@/lib/weddingTemplateDeepLinkLaunchState";
+import { projectWeddingVendorLifecycle } from "@/lib/weddingVendorLifecycleState";
 import type { WeddingTemplateLaunchState } from "@/lib/weddingTemplateLaunchState";
 import { shouldShowWeddingFirstRunIntake } from "@/lib/weddingFirstRunIntakeGateState";
 import { buildWeddingTemplateProductionReadinessState } from "@/lib/weddingTemplateProductionReadinessState";
@@ -875,6 +876,20 @@ export function buildWeddingResponseWorkspaceViewState(input: WeddingResponseWor
     decisionDeferrals: input.decisionDeferrals,
     now: input.nowIso ? new Date(input.nowIso) : null,
   });
+  const vendorLifecycle = projectWeddingVendorLifecycle(input.afpMessages ?? []);
+  const activeVendorContacts = vendorContactCards({
+    metadata: input.metadata ?? artifacts[0]?.metadata,
+    vendors: input.weddingVendors,
+    nowIso: input.nowIso,
+  }).flatMap((card) => {
+    const lifecycle = vendorLifecycle.find((record) =>
+      (card.vendorId && record.vendorId === card.vendorId)
+      || record.vendorName.toLowerCase() === card.vendorName.toLowerCase()
+    );
+    if (lifecycle?.followUpDismissed) return [];
+    if (!lifecycle?.reminderAt) return [card];
+    return [{ ...card, followUpDueAt: lifecycle.reminderAt }];
+  });
   const derivedPreferenceConflicts = buildWeddingPreferenceConflictsFromConstraintMessages({ messages: input.afpMessages, metadata: workspace.metadata });
   const persistedConflictRevisions = new Map((input.afpMessages ?? []).flatMap((message) => { const state = weddingPreferenceConflictFromAfpMessage(message); return state?.conflictObject ? [[state.conflictObject.id, weddingPreferenceConflictRevisionFingerprint(state)] as const] : []; }));
   const pendingPreferenceConflicts = derivedPreferenceConflicts.filter((state) => persistedConflictRevisions.get(state.conflictObject!.id) !== weddingPreferenceConflictRevisionFingerprint(state));
@@ -972,11 +987,7 @@ export function buildWeddingResponseWorkspaceViewState(input: WeddingResponseWor
     packetExportCapability,
     contextCards: contextCards(input.contextItems),
     approvalReceiptCards: approvalReceiptCards(input.approvalReceipts),
-    vendorContactCards: vendorContactCards({
-      metadata: input.metadata ?? artifacts[0]?.metadata,
-      vendors: input.weddingVendors,
-      nowIso: input.nowIso,
-    }),
+    vendorContactCards: activeVendorContacts,
     vendorQuoteReplyFlows,
     activeVendorQuoteReplyFlows,
     vendorQuoteReplyLogFlows,

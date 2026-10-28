@@ -16,6 +16,8 @@ export type WeddingVendorLifecycleRecord = {
   favourited: boolean;
   quoteReceived: boolean;
   booked: boolean;
+  followUpDismissed: boolean;
+  followUpDismissedAt: string | null;
   reminderAt: string | null;
   sourceMessageIds: string[];
 };
@@ -56,7 +58,8 @@ export function projectWeddingVendorLifecycle(messages: readonly AfpMessage[]): 
     const key = existingByName?.key || idKey || nameKey;
     const current = records.get(key) ?? {
       key, vendorId: vendor.vendorId, vendorName: vendor.vendorName, enquired: false, favourited: false,
-      quoteReceived: false, booked: false, reminderAt: null, sourceMessageIds: [], favouriteChangedAt: 0,
+      quoteReceived: false, booked: false, followUpDismissed: false, followUpDismissedAt: null,
+      reminderAt: null, sourceMessageIds: [], favouriteChangedAt: 0,
     };
     const kind = clean(message.kind) || clean(message.subtype) || clean(message.type);
     if (kind === "wedding_vendor_outreach_sent") current.enquired = true;
@@ -64,6 +67,10 @@ export function projectWeddingVendorLifecycle(messages: readonly AfpMessage[]): 
     if (kind === "wedding_vendor_booking_confirmed") current.booked = true;
     if (kind === "wedding_vendor_booking_cancelled") current.booked = false;
     if (kind === "wedding_vendor_follow_up_reminder") current.reminderAt = clean(message.content.reminder_at) || null;
+    if (kind === "wedding_vendor_follow_up_dismissed") {
+      current.followUpDismissed = true;
+      current.followUpDismissedAt = clean(message.content.dismissed_at) || message.timestamp;
+    }
     if (kind === "wedding_vendor_contact_reference" && timestamp(message) >= current.favouriteChangedAt) {
       current.favourited = message.content.selected_for_follow_up === true;
       current.favouriteChangedAt = timestamp(message);
@@ -75,7 +82,14 @@ export function projectWeddingVendorLifecycle(messages: readonly AfpMessage[]): 
   });
   return [...records.values()]
     .map(({ favouriteChangedAt: _, ...record }) => record)
-    .filter((record) => record.enquired || record.favourited || record.quoteReceived || record.booked)
+    .filter((record) =>
+      record.enquired
+      || record.favourited
+      || record.quoteReceived
+      || record.booked
+      || record.followUpDismissed
+      || Boolean(record.reminderAt)
+    )
     .sort((left, right) => left.vendorName.localeCompare(right.vendorName));
 }
 
@@ -103,14 +117,16 @@ function lifecycleInput(input: {
   metadata: WeddingPlanningMetadata;
   vendorId?: string | null;
   vendorName: string;
-  kind: "wedding_vendor_booking_confirmed" | "wedding_vendor_follow_up_reminder";
+  kind: "wedding_vendor_booking_confirmed" | "wedding_vendor_follow_up_reminder" | "wedding_vendor_follow_up_dismissed";
   reminderAt?: string | null;
 }): SendAfpMessageInput {
   const vendorKey = keyPart(input.vendorId || input.vendorName) || "vendor";
   const timestamp = new Date().toISOString();
   const title = input.kind === "wedding_vendor_booking_confirmed"
     ? `${input.vendorName} marked as booked`
-    : `Reminder set for ${input.vendorName}`;
+    : input.kind === "wedding_vendor_follow_up_dismissed"
+      ? `${input.vendorName} follow-up dismissed`
+      : `Reminder set for ${input.vendorName}`;
   return {
     thread_id: `wedding-vendor-lifecycle:${input.metadata.responseWorkspaceId}:${vendorKey}`,
     from: "omnyid:wedding",
@@ -124,6 +140,7 @@ function lifecycleInput(input: {
       vendor_id: input.vendorId ?? null,
       vendor_name: input.vendorName,
       reminder_at: input.reminderAt ?? null,
+      dismissed_at: input.kind === "wedding_vendor_follow_up_dismissed" ? timestamp : null,
       payment_executed: false,
     },
     metadata: {
@@ -147,3 +164,6 @@ export const weddingVendorBookingToAfpSendInput = (input: { metadata: WeddingPla
 
 export const weddingVendorReminderToAfpSendInput = (input: { metadata: WeddingPlanningMetadata; vendorId?: string | null; vendorName: string; reminderAt: string }) =>
   lifecycleInput({ ...input, kind: "wedding_vendor_follow_up_reminder", reminderAt: input.reminderAt });
+
+export const weddingVendorFollowUpDismissalToAfpSendInput = (input: { metadata: WeddingPlanningMetadata; vendorId?: string | null; vendorName: string }) =>
+  lifecycleInput({ ...input, kind: "wedding_vendor_follow_up_dismissed" });

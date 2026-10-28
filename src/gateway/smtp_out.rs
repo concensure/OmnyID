@@ -172,8 +172,10 @@ pub async fn send_outgoing_email(request: &OutgoingEmailRequest) -> Result<(), S
 }
 
 /// Send a transactional email (verification, password reset, etc.) without an AFP message context.
-/// Falls through to the same configured outbound provider. Returns Ok(()) if provider is
-/// unconfigured and logs a warning — callers should still proceed (token was created, link logged).
+/// Uses a platform transactional provider first, then the selected mailbox
+/// provider, then an independently configured SMTP transport, and finally
+/// Resend. A provider acceptance is required; token creation alone is not
+/// reported to the caller as delivery.
 pub async fn send_transactional_email(to: &str, subject: &str, body: &str) -> Result<(), String> {
     let request = OutgoingEmailRequest {
         thread_id: format!("transactional-{}", ulid::Ulid::new()),
@@ -192,10 +194,25 @@ pub async fn send_transactional_email(to: &str, subject: &str, body: &str) -> Re
     match send_outgoing_email(&request).await {
         Ok(()) => Ok(()),
         Err(primary_error) => {
+            let config = MailGatewayConfig::from_env();
+            let smtp_error = if matches!(config.outbound_auth_mode, OutboundAuthMode::DirectSmtpFallback) {
+                None
+            } else {
+                match smtp_fallback_config_from_env(&config) {
+                    Ok(smtp_config) => match send_via_smtp_fallback(&request, &smtp_config).await {
+                        Ok(()) => return Ok(()),
+                        Err(error) => Some(error),
+                    },
+                    Err(_) => None,
+                }
+            };
             let Some(resend_api_key) = crate::secret_manager::read_process_secret_trimmed(
                 "OMNYID_TRANSACTIONAL_RESEND_API_KEY",
             ) else {
-                return Err(primary_error);
+                return Err(match smtp_error {
+                    Some(smtp_error) => format!("Primary transactional delivery failed: {primary_error}; SMTP fallback failed: {smtp_error}"),
+                    None => primary_error,
+                });
             };
 
             let from_address = std::env::var("OMNYID_TRANSACTIONAL_FROM_ADDRESS")
@@ -224,7 +241,8 @@ pub async fn send_transactional_email(to: &str, subject: &str, body: &str) -> Re
             .await
             .map_err(|resend_error| {
                 format!(
-                    "Primary transactional delivery failed: {primary_error}; Resend fallback failed: {resend_error}"
+                    "Primary transactional delivery failed: {primary_error};{} Resend fallback failed: {resend_error}",
+                    smtp_error.as_ref().map(|error| format!(" SMTP fallback failed: {error};")).unwrap_or_default(),
                 )
             })
         }

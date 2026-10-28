@@ -43,7 +43,7 @@ import { buildWeddingVendorQuoteThreadProofState, mergeWeddingVendorQuoteThreadP
 import { weddingVendorQuoteReceiptPersistenceNotice } from "@/lib/weddingVendorQuoteReceiptPersistenceState";
 import { buildWeddingProviderExecutorReadinessState } from "@/lib/weddingProviderExecutorReadinessState";
 import { weddingVendorContactReferenceToAfpSendInput } from "@/lib/weddingVendorContactReferenceAfpState";
-import { rescheduleWeddingVendorFollowUp, weddingVendorReminderToAfpSendInput } from "@/lib/weddingVendorFollowUpApi";
+import { dismissWeddingVendorFollowUp, saveWeddingVendorFollowUpDate } from "@/lib/weddingVendorFollowUpActions";
 import { useWeddingVendorOutreachOwner } from "@/lib/useWeddingVendorOutreachOwner";
 import { useWeddingVendorQuoteDecisionProjection } from "@/lib/useWeddingVendorQuoteDecisionProjection";
 import { useWeddingPreferenceProfileOwner } from "@/lib/useWeddingPreferenceProfileOwner";
@@ -893,14 +893,8 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
       onSendOutreach: (choiceId) => void vendorOutreach.onSendOutreach(choiceId),
       onCancelOutreach: vendorOutreach.onCancelOutreach,
       onConnectGmailForOutreach: () => void vendorOutreach.onConnectGmailForOutreach(),
-      onSetFollowUpDate: async (card, date) => {
-        if (!card.vendorId || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !props.saveProjection) return false;
-        try {
-          const reminderAt = new Date(`${date}T12:00:00`).toISOString(); await props.saveProjection(weddingVendorReminderToAfpSendInput({ metadata: state().workspace.metadata, vendorId: card.vendorId, vendorName: card.vendorName, reminderAt }));
-          await rescheduleWeddingVendorFollowUp(card.vendorId, reminderAt);
-          props.onRefreshWorkspace?.(); return true;
-        } catch { return false; }
-      },
+      onSetFollowUpDate: (card, date) => saveWeddingVendorFollowUpDate({ card, date, metadata: state().workspace.metadata, saveProjection: props.saveProjection, onSaved: props.onRefreshWorkspace }),
+      onDismissFollowUp: (card) => dismissWeddingVendorFollowUp({ card, metadata: state().workspace.metadata, saveProjection: props.saveProjection, onSaved: props.onRefreshWorkspace }),
     },
   }));
 

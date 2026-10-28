@@ -1,5 +1,6 @@
 import { createEffect, createSignal, For, Show } from "solid-js";
 
+import { WeddingTaskOwnerPicker } from "@/components/WeddingTaskOwnerPicker";
 import type { SendAfpMessageInput } from "@/lib/api";
 import { weddingCustomTaskToAfpSendInput } from "@/lib/weddingCustomTaskState";
 import { WEDDING_JOURNEY_STAGES, type WeddingJourneyStageId } from "@/lib/weddingJourneyStageState";
@@ -11,6 +12,7 @@ export function WeddingTaskComposer(props: {
   onRefreshWorkspace?: (() => void) | null;
   initialStage?: WeddingJourneyStageId | null;
   people?: readonly string[] | null;
+  contactUserId?: string | null;
   compact?: boolean;
 }) {
   const [open, setOpen] = createSignal(false);
@@ -62,9 +64,7 @@ export function WeddingTaskComposer(props: {
             <input type="date" class="mt-1 min-h-11 w-full rounded-lg border border-wedding-border bg-white px-3 font-normal" value={dueDate()} onInput={(event) => setDueDate(event.currentTarget.value)} />
           </label>
           <label class="text-sm font-semibold text-wedding-ink sm:col-span-3">Owner
-            <select class="mt-1 min-h-11 w-full rounded-lg border border-wedding-border bg-white px-3 font-normal" value={owner()} onChange={(event) => setOwner(event.currentTarget.value)}>
-              <For each={[...new Set(["You", ...(props.people ?? [])].map((person) => person.trim()).filter(Boolean))]}>{(person) => <option value={person}>{person}</option>}</For>
-            </select>
+            <div class="mt-1"><WeddingTaskOwnerPicker value={owner()} onChange={setOwner} people={props.people} weddingPlanId={props.weddingPlanId} responseWorkspaceId={props.responseWorkspaceId} contactUserId={props.contactUserId} saveProjection={props.saveProjection} /></div>
           </label>
           <button type="button" disabled={busy() || !title().trim()} onClick={() => void save()} class="min-h-11 rounded-lg bg-wedding-secondary px-4 text-sm font-semibold text-white disabled:opacity-50 sm:col-span-3">{busy() ? "Saving…" : "Save task"}</button>
         </div>
