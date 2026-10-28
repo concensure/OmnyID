@@ -207,6 +207,7 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
         selectedDatabaseId(),
       ),
     );
+    return databaseProfileColumns({ profileId: selectedDefinition()?.profileId, discovered }).slice(0, 8);
   });
 
   // These computations read visibleRecords()/columns(), whose createMemos run
@@ -305,7 +306,6 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
     const existingProfileDatabase = existingDatabaseDefinitionForProfile(
       definitions(), input.profileId, input.weddingPlanId,
     );
-    return databaseProfileColumns({ profileId: selectedDefinition()?.profileId, discovered }).slice(0, 8);
     if (existingProfileDatabase) {
       selectDatabase(existingProfileDatabase.databaseId);
       setShowDatabaseCreate(false);
@@ -393,7 +393,7 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
       return;
     }
     if (selectedProfilePlugin()?.toolbarKind === "wedding_run_sheet" && ["start_at", "end_at", "due_at"].includes(col)) {
-      const review = buildWeddingRunSheetTimeChangeReview({ row, field: col as "start_at" | "end_at" | "due_at", nextValue: String(nextValue) });
+      const review = buildWeddingRunSheetTimeChangeReview({ record: row, field: col as "start_at" | "end_at" | "due_at", nextValue: String(nextValue) });
       if (!review) {
         setEditError(buildDatabaseViewFailureReceipt("Change run-sheet time", "Enter a valid date and time."));
         return;
@@ -446,7 +446,7 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
   }
 
   function proposeRunSheetTimeChange(row: DbRecord, nextValue: string) {
-    const review = buildWeddingRunSheetTimeChangeReview({ row, field: "start_at", nextValue });
+    const review = buildWeddingRunSheetTimeChangeReview({ record: row, field: "start_at", nextValue });
     if (!review) { setEditError(buildDatabaseViewFailureReceipt("Change run-sheet time", "Enter a valid date and time.")); return; }
     if (review.requiresConfirmation) {
       setPendingRunSheetTimeChange({ row, review });
@@ -485,8 +485,9 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
     const definition = selectedDefinition();
     if (!pending || !definition?.weddingPlanId || runSheetActionBusy()) return;
     const source = allMessages().find((message) => message.id === pending.review.sourceMessageId);
-    const content = isRecord(source?.content) ? source.content : {};
-    const metadata = isRecord(source?.metadata) ? source.metadata : {};
+    const sourceShape = source as { content?: unknown; metadata?: unknown } | undefined;
+    const content = isRecord(sourceShape?.content) ? sourceShape.content : {};
+    const metadata = isRecord(sourceShape?.metadata) ? sourceShape.metadata : {};
     const taskId = String(content.task_id ?? metadata.wedding_task_id ?? "").trim();
     const responseWorkspaceId = String(content.response_workspace_id ?? metadata.response_workspace_id ?? "").trim();
     const sendInput = weddingTaskDateToAfpSendInput({
