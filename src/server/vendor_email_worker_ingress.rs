@@ -106,18 +106,18 @@ async fn cloudflare_email_inbound_http(
     )
     .await?;
 
-    let secret = crate::secret_manager::read_process_secret_trimmed(
-        "OMNYID_VENDOR_MAIL_WORKER_SHARED_SECRET",
-    )
-    .filter(|value| value.as_bytes().len() >= 32)
-    .ok_or_else(|| {
-        (
-            StatusCode::SERVICE_UNAVAILABLE,
-            "ingress_auth_unavailable".to_string(),
-        )
-    })?;
-    let key_id = std::env::var("OMNYID_VENDOR_MAIL_WORKER_KEY_ID")
-        .unwrap_or_else(|_| "primary-v1".to_string());
+    let requested_key_id = header(&headers, "x-omnyid-email-key-id").map_err(IngressError::http)?;
+    let (key_id, secret) =
+        super::vendor_email_worker_auth::configured_worker_secret(requested_key_id)
+            .map_err(|error| match error {
+                super::vendor_email_worker_auth::WorkerSecretError::Unavailable => {
+                    IngressError::new(StatusCode::SERVICE_UNAVAILABLE, "ingress_auth_unavailable")
+                }
+                super::vendor_email_worker_auth::WorkerSecretError::Invalid => {
+                    IngressError::new(StatusCode::UNAUTHORIZED, "invalid_auth")
+                }
+            })
+            .map_err(IngressError::http)?;
     let envelope = verify_envelope(
         &headers,
         &body,

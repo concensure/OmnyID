@@ -1,5 +1,5 @@
 version: 1
-updated: 2026-10-27
+updated: 2026-10-28
 
 lifecycle:
   allowed_statuses:
@@ -24,11 +24,16 @@ tasks:
     files:
       - cloudflare/vendor-email-ingress-worker/**
       - docker-compose.oracle.staging.yml
+      - docker-compose.oracle.yml
+      - docker-compose.oracle.minimal.yml
       - postgres/migrations/**
       - src/db/migration_catalog.rs
       - src/gateway/vendor_mail_provider.rs
+      - src/lib.rs
+      - src/server/vendor_email_worker_auth.rs
       - src/server/vendor_email_worker_ingress.rs
       - src/server/mod.rs
+      - src/vendor_email_quarantine_retention.rs
       - tests/clamav_live.rs
       - tests/vendor_email_worker_ingress_api.rs
       - scripts/capture-cloudflare-email-routing-inventory.ps1
@@ -50,7 +55,10 @@ tasks:
       - implemented recipient-encrypted tenant AFP persistence with exact-replay suppression, provider allowlisting, digest-only bounce/complaint suppression and disabled-by-default Cloudflare suppression polling
       - disposable ClamAV clean/EICAR/unavailable checks, focused Rust/database tests, Worker tests and an Oracle staging flags-off shadow passed on the implementation candidate; the final documentation-bound candidate must be reverified
       - Cloudflare accepted one controlled send as queued, but controlled-mailbox delivery/headers were not verified and the deliberate invalid-domain send had not produced a provider bounce at observation time
-      - replacement token can read routing and send email but cannot deploy Workers; wrangler was refused before upload, no temporary route was created, and the after inventory exactly matched the eight-rule disabled-catch-all before inventory
+      - replacement routing token deployed the exact 9e1be33 Worker; one temporary literal rule delivered a synthetic staging message, exact replay preserved one AFP event, and restoration returned routing to the same eight-rule disabled-catch-all inventory with all flags false
+      - created and verified the requested concensure+testing@gmail.com account only in Oracle staging; its random password remains server-side and is not committed
+      - controlled Gmail send reached provider queue but mailbox headers and a human reply remain unobserved; the deliberate invalid-domain send produced no observable provider bounce, so authorized receipt/reply and live bounce gates remain open
+      - added bounded quarantine ciphertext destruction, active/previous ingress key rotation with rollback coverage, lifecycle/cross-tenant/database-failure integration cases and kept mail.omnyid.com couple-relay projection open rather than misclassifying vendor-mask inbound enquiries
 
   - id: WED-285
     title: Freeze and deploy Oracle human-gate candidate with commit-bound evidence

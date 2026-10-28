@@ -1,4 +1,4 @@
-## 2026-10-28 - WED-286 Email Worker operational evidence (Codex, blocked)
+## 2026-10-28 - WED-286 Email Worker operational evidence (Codex, in progress)
 
 Changed:
 
@@ -10,6 +10,10 @@ Changed:
   quarantined pending the reviewed processing boundary.
 - Added explicit false-defaulted Oracle staging controls and a controlled
   provider evidence plan. Policy V2 remains false.
+- Added active/previous ingress HMAC rotation, bounded expiry destruction for
+  recipient-encrypted quarantine ciphertext, and expanded PostgreSQL coverage
+  for disabled/archived/transferred/cross-tenant routes, scanner failure and
+  AFP persistence recovery.
 
 Evidence:
 
@@ -17,21 +21,44 @@ Evidence:
   focused provider/migration/ingress database tests and Worker tests passed on
   the implementation candidate. Oracle staging flags-off shadow created no
   provider, quarantine or suppression rows.
-- Cloudflare accepted a controlled send into its queue. Mailbox delivery and
-  headers were not verified. An invalid-domain send also remained queued; it
-  proves no application retry, not a live provider bounce.
-- Worker deploy was refused before upload because the replacement token lacks
-  Workers Scripts write permission. No literal route was created. Eight rules
-  and the disabled Drop catch-all matched exactly before and after.
+- Current pre-freeze local verification passed five Worker-auth/ingress unit
+  cases, the expanded ingress PostgreSQL case, the hashed idempotent complaint
+  suppression case, three live ClamAV cases, seven Worker cases, all 2,010
+  Wedding tests, TypeScript typecheck, both line-budget guards and the
+  production UI build. `cargo check --lib` and all three Oracle Compose
+  profiles also render when their required validation-only inputs are supplied.
+  Final commit-bound verification still follows the commit; these local results
+  do not change the hosted `9e1be33` identity.
+- The requested `concensure+testing@gmail.com` account was created and verified
+  only in Oracle staging. Its random password remains in a restricted staging
+  secret file and was not printed or committed.
+- The replacement account-scoped routing token deployed Worker version
+  `30e3e00e-fd04-449a-9f82-b199d3f6932c` from clean exact source `9e1be33`.
+  One temporary literal route delivered a synthetic platform message to
+  staging; provider event, encrypted quarantine and private AFP counts were one.
+  Hosted exact replay produced no second AFP event.
+- Restoration removed the literal route and allowlist, returned all staging
+  flags false, and left the same eight routing rules plus disabled Drop
+  catch-all. The Worker remains deployed but unrouted. Production application
+  and database state were not changed.
+- A separate send to the controlled Gmail account was accepted into the
+  provider queue, but received headers and a human reply were not observed. An
+  invalid-domain send also remained queued; this proves no application retry,
+  not a live provider bounce.
 
 Next:
 
-- Reverify the final clean documentation-bound candidate and redeploy that exact
-  image to staging with every relay flag false.
-- Resume only after a narrowly scoped Workers Scripts write token and an
-  inspectable controlled mailbox are available. Deploy the exact Worker before
-  adding the one literal route, then prove mailbox headers, one correlated AFP
-  event, replay suppression and a real provider bounce before restoring again.
+- Freeze and reverify the final documentation-bound source after the current
+  retention/rotation changes; do not reuse the `9e1be33` runtime evidence as
+  evidence for a later implementation candidate.
+- The owner should inspect the already-sent Gmail message and provide a short
+  reply window. Re-add only the literal route for that window, record headers,
+  prove one correlated AFP event and restore again. A separate real provider
+  bounce/complaint remains required.
+- Do not misclassify vendor-mask inbound enquiries as couple-side vendor
+  replies. Implement exact `mail.omnyid.com` mask/thread binding before enabling
+  that Response Queue projection. Attachment reuse and the remaining human
+  review/cohort gates are still open.
 
 ## 2026-10-23 - WED-247 in-context wedding actions, collaborative tasks, seating canvas, and Oracle deployment (Codex, complete)
 

@@ -138,6 +138,7 @@ pub mod topology_retrieval;
 pub mod ui_command_intent_contract;
 pub mod ui_command_preview_surfaces;
 pub mod ui_surface_messages;
+pub mod vendor_email_quarantine_retention;
 pub mod webauthn;
 pub mod wedding_shared_tool_metering;
 pub mod wedding_vendor_decision_patterns;

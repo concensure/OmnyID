@@ -11,6 +11,7 @@ use hmac::{Hmac, Mac};
 use http_body_util::BodyExt;
 use omnyid_homeserver::agentcard::{AgentCard, sign_agent_card};
 use omnyid_homeserver::db::{Db, UserRecord};
+use omnyid_homeserver::vendor_email_quarantine_retention::destroy_expired_vendor_email_quarantine;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use sqlx::Row;
@@ -232,7 +233,7 @@ async fn valid_delivery_is_encrypted_and_exact_retry_is_idempotent() {
         std::env::set_var("OMNYID_SIGNING_KEY_HEX", hex::encode([9_u8; 32]));
     }
     let db = Db::new(&db_url).await.expect("database");
-    let (owner_user_id, _vendor_id, recipient, _recipient_secret, recipient_key_id) =
+    let (owner_user_id, vendor_id, recipient, _recipient_secret, recipient_key_id) =
         seed_route(&db).await;
     let app = omnyid_homeserver::server::build_test_router(&db_url).await;
     let body = b"Subject: Private test\r\nMessage-ID: <worker@example.test>\r\n\r\nSecret body";
@@ -338,6 +339,218 @@ async fn valid_delivery_is_encrypted_and_exact_retry_is_idempotent() {
     )
     .await;
     assert_eq!(status, StatusCode::NOT_FOUND);
+
+    sqlx::query(
+        "UPDATE wedding_vendor_sender_identities SET status = 'disabled' WHERE mask_local_part = $1",
+    )
+    .bind(recipient.trim_end_matches("@omnyid.com"))
+    .execute(&db.pool)
+    .await
+    .expect("disable identity");
+    let disabled_route_id = hex::encode(Sha256::digest(format!("disabled-route-{}", Ulid::new())));
+    let (status, _) = post(
+        &app,
+        body,
+        signed_headers(body, &recipient, &disabled_route_id),
+    )
+    .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    sqlx::query(
+        "UPDATE wedding_vendor_sender_identities SET status = 'active' WHERE mask_local_part = $1",
+    )
+    .bind(recipient.trim_end_matches("@omnyid.com"))
+    .execute(&db.pool)
+    .await
+    .expect("restore identity");
+
+    let transferred_owner = UserRecord {
+        id: Ulid::new().to_string(),
+        email: format!("transferred-{}@example.test", Ulid::new()),
+        password_hash: Some("integration-test".into()),
+        auth_provider: "password".into(),
+        google_sub: None,
+        display_name: "Transferred owner".into(),
+        created_at: Utc::now().to_rfc3339(),
+    };
+    db.create_user(&transferred_owner)
+        .await
+        .expect("transferred owner");
+    sqlx::query("UPDATE wedding_vendors SET claimed_by_user_id = $1 WHERE vendor_id = $2")
+        .bind(&transferred_owner.id)
+        .bind(&vendor_id)
+        .execute(&db.pool)
+        .await
+        .expect("transfer listing");
+    let transferred_id = hex::encode(Sha256::digest(format!("transferred-{}", Ulid::new())));
+    let (status, _) = post(
+        &app,
+        body,
+        signed_headers(body, &recipient, &transferred_id),
+    )
+    .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    sqlx::query("UPDATE wedding_vendors SET claimed_by_user_id = $1 WHERE vendor_id = $2")
+        .bind(&owner_user_id)
+        .bind(&vendor_id)
+        .execute(&db.pool)
+        .await
+        .expect("restore listing owner");
+
+    sqlx::query("UPDATE wedding_vendors SET status = 'archived' WHERE vendor_id = $1")
+        .bind(&vendor_id)
+        .execute(&db.pool)
+        .await
+        .expect("archive listing");
+    let archived_id = hex::encode(Sha256::digest(format!("archived-{}", Ulid::new())));
+    let (status, _) = post(&app, body, signed_headers(body, &recipient, &archived_id)).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    sqlx::query("UPDATE wedding_vendors SET status = 'active' WHERE vendor_id = $1")
+        .bind(&vendor_id)
+        .execute(&db.pool)
+        .await
+        .expect("restore listing");
+
+    sqlx::query(
+        "UPDATE wedding_vendor_sender_identities SET owner_user_id = $1 WHERE mask_local_part = $2",
+    )
+    .bind(&transferred_owner.id)
+    .bind(recipient.trim_end_matches("@omnyid.com"))
+    .execute(&db.pool)
+    .await
+    .expect("cross-tenant identity");
+    let cross_tenant_id = hex::encode(Sha256::digest(format!("cross-tenant-{}", Ulid::new())));
+    let (status, _) = post(
+        &app,
+        body,
+        signed_headers(body, &recipient, &cross_tenant_id),
+    )
+    .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    sqlx::query(
+        "UPDATE wedding_vendor_sender_identities SET owner_user_id = $1 WHERE mask_local_part = $2",
+    )
+    .bind(&owner_user_id)
+    .bind(recipient.trim_end_matches("@omnyid.com"))
+    .execute(&db.pool)
+    .await
+    .expect("restore identity owner");
+
+    let private_table = format!("\"user_{}\".messages", owner_user_id.to_ascii_lowercase());
+    sqlx::query(&format!(
+        "ALTER TABLE {private_table} ADD CONSTRAINT wed286_reject_vendor_email CHECK (subtype IS DISTINCT FROM 'wedding_vendor_email_received') NOT VALID"
+    ))
+    .execute(&db.pool)
+    .await
+    .expect("install persistence failure fixture");
+    let interrupted_id = hex::encode(Sha256::digest(format!("interrupted-{}", Ulid::new())));
+    let interrupted =
+        b"Subject: Interrupted test\r\nMessage-ID: <interrupted@example.test>\r\n\r\nRetry body";
+    let (status, _) = post(
+        &app,
+        interrupted,
+        signed_headers(interrupted, &recipient, &interrupted_id),
+    )
+    .await;
+    assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+    let interrupted_state = sqlx::query(
+        "SELECT processing_status, afp_message_id FROM wedding_vendor_email_provider_events WHERE provider = 'cloudflare_email_worker' AND provider_event_id = $1",
+    )
+    .bind(&interrupted_id)
+    .fetch_one(&db.pool)
+    .await
+    .expect("interrupted provider event");
+    assert_eq!(
+        interrupted_state.get::<String, _>("processing_status"),
+        "accepted"
+    );
+    assert!(
+        interrupted_state
+            .get::<Option<String>, _>("afp_message_id")
+            .is_none()
+    );
+    sqlx::query(&format!(
+        "ALTER TABLE {private_table} DROP CONSTRAINT wed286_reject_vendor_email"
+    ))
+    .execute(&db.pool)
+    .await
+    .expect("remove persistence failure fixture");
+    let (status, repaired) = post(
+        &app,
+        interrupted,
+        signed_headers(interrupted, &recipient, &interrupted_id),
+    )
+    .await;
+    assert_eq!(status, StatusCode::ACCEPTED, "repaired: {repaired}");
+    assert_eq!(repaired["status"], "accepted");
+    let repaired_afp_id = repaired["afp_message_id"]
+        .as_str()
+        .expect("repaired AFP id");
+    let repaired_count: i64 = sqlx::query_scalar(&format!(
+        "SELECT COUNT(*) FROM {private_table} WHERE id = $1 AND subtype = 'wedding_vendor_email_received'"
+    ))
+    .bind(repaired_afp_id)
+    .fetch_one(&db.pool)
+    .await
+    .expect("repaired private AFP count");
+    assert_eq!(repaired_count, 1);
+
+    let unavailable = std::net::TcpListener::bind("127.0.0.1:0")
+        .expect("reserve unavailable scanner endpoint")
+        .local_addr()
+        .expect("unavailable scanner address");
+    unsafe { std::env::set_var("CLAMD_HOST", unavailable.to_string()) };
+    let scanner_failure_id =
+        hex::encode(Sha256::digest(format!("scanner-failure-{}", Ulid::new())));
+    let (status, _) = post(
+        &app,
+        body,
+        signed_headers(body, &recipient, &scanner_failure_id),
+    )
+    .await;
+    assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+    let scanner_failure_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM wedding_vendor_email_provider_events WHERE provider = 'cloudflare_email_worker' AND provider_event_id = $1",
+    )
+    .bind(&scanner_failure_id)
+    .fetch_one(&db.pool)
+    .await
+    .expect("scanner failure provider count");
+    assert_eq!(
+        scanner_failure_count, 0,
+        "scanner failure must not claim delivery"
+    );
+    unsafe { std::env::set_var("CLAMD_HOST", &clamd) };
+
+    sqlx::query(
+        "UPDATE wedding_vendor_email_ingress_quarantine SET expires_at = NOW() - INTERVAL '1 minute' WHERE provider_event_id = $1",
+    )
+    .bind(&event_id)
+    .execute(&db.pool)
+    .await
+    .expect("expire accepted quarantine");
+    assert_eq!(
+        destroy_expired_vendor_email_quarantine(&db, 25)
+            .await
+            .expect("retention pass"),
+        1
+    );
+    let expired = sqlx::query(
+        "SELECT ciphertext_envelope, processing_status, deleted_at FROM wedding_vendor_email_ingress_quarantine WHERE provider_event_id = $1",
+    )
+    .bind(&event_id)
+    .fetch_one(&db.pool)
+    .await
+    .expect("expired quarantine tombstone");
+    assert_eq!(
+        expired.get::<Value, _>("ciphertext_envelope")["scheme"],
+        "destroyed"
+    );
+    assert_eq!(expired.get::<String, _>("processing_status"), "expired");
+    assert!(
+        expired
+            .get::<Option<chrono::DateTime<Utc>>, _>("deleted_at")
+            .is_some()
+    );
 
     sqlx::query(
         "UPDATE wedding_vendor_sender_identities SET selected_kind = 'connected_email' WHERE mask_local_part = $1",

@@ -14,6 +14,23 @@ Ingress creates recipient-X25519-encrypted, signed tenant AFP events; it does
 not add a server-held decryption wrapper. Policy V2 and all relay flags remain
 false until the existing review criteria pass.
 
+Worker deployment and Email Routing are separate control-plane mutations. The
+account-scoped routing token may deploy the reviewed Worker, but a literal
+address rule is added only for a registered window and removed during
+restoration; catch-all stays Drop/Disabled. The deployed but unrouted Worker is
+not evidence of an enabled relay. Staging fixtures may remain for the unfinished
+controlled-mailbox reply, but their password and recipient private key never
+enter source or committed evidence.
+
+An inbound event addressed to a vendor's `omnyid.com` mask is the couple's
+enquiry in the vendor tenant. It must not be projected as a vendor reply in the
+couple's Response Queue. That projection remains blocked until exact
+`mail.omnyid.com` couple-mask and active relay-thread correlation exist.
+Expired raw-envelope quarantine ciphertext is destroyed in bounded batches;
+the recipient-encrypted AFP event remains canonical. Gateway HMAC rotation
+accepts one active and one previous key, rejects every other key ID, and keeps
+the prior pair only for the reviewed overlap/rollback window.
+
 ## 2026-10-27: Human evidence belongs to a source and hosted environment
 
 WED-285 prepares the existing email/quotation release, per the user's explicit choice. It does not

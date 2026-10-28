@@ -91,6 +91,7 @@ use crate::{
     },
     rollback::{build_revert_request_afp, build_revert_result_afp, decode_rollback_token},
     sync_worker::start_sync_worker,
+    vendor_email_quarantine_retention::start_vendor_email_quarantine_retention,
 };
 
 pub(crate) mod auth;
@@ -176,7 +177,7 @@ mod wedding_preference_routes; mod wedding_quote_study_routes;
 mod wedding_understanding_routes;
 mod wedding_newsletter_routes;
 mod wedding_blog_routes;
-mod vendor_email_worker_ingress; mod wedding_message_attachment; mod wedding_outbound_attachment; mod wedding_vendor_claim_routes; mod wedding_vendor_sender_identity_routes;
+mod vendor_email_worker_auth; mod vendor_email_worker_ingress; mod wedding_message_attachment; mod wedding_outbound_attachment; mod wedding_vendor_claim_routes; mod wedding_vendor_sender_identity_routes;
 mod wedding_vendor_enrichment; mod wedding_vendor_outreach_routes;
 mod wedding_vendor_outreach_generation;
 mod wedding_vendor_ownership_routes;
@@ -1068,6 +1069,7 @@ pub async fn run() {
         start_ledger_ingestion_daemon(db.clone(), shutdown_rx.clone()),
         start_archive_daemon(db.clone(), shutdown_rx.clone()),
         start_health_maintenance_daemon(db.clone(), shutdown_rx.clone()),
+        start_vendor_email_quarantine_retention(db.clone(), shutdown_rx.clone()),
     ];
     match start_sync_worker(db.pool.clone(), shutdown_rx.clone()).await {
         Ok(handle) => daemon_handles.push(handle),

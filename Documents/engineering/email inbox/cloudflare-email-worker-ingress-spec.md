@@ -183,16 +183,20 @@ rejected by the HTTP stack or normalized contract test.
    An authenticated matching event may return before ClamAV so provider
    retries cannot consume scanner capacity; the transactional claim remains
    authoritative for races.
-10. Encrypt the raw bytes immediately with the dedicated file-backed ingress
-    key and metadata-only associated data.
+10. Encrypt the raw bytes immediately to the verified recipient AgentCard's
+    X25519 public key with metadata-only associated data. The gateway retains
+    no corresponding private key or server decryption wrapper.
 11. Store the encrypted envelope, mask identity, digest, size, receive time and
     quarantine expiry. Never store raw headers/body in receipt columns.
-12. Commit the scanner-clean ciphertext as `quarantined` (awaiting MIME/AFP
-    processing), then return `202` with only event ID and status.
+12. Scan and parse during the same transient-plaintext request boundary. For a
+    safe body-only message, append the recipient-encrypted tenant AFP event and
+    mark accepted only after that write succeeds. Keep attachments or unsafe/
+    ambiguous content quarantined under a bounded content-free reason code.
 
-No 2xx is returned before durable encrypted storage. The first slice marks the
-record `awaiting_scan`; it does not create an AFP message. This prevents an
-unscanned or unparsed email from entering the canonical ledger.
+No 2xx is returned before durable encrypted storage. A safe body-only message
+does not report accepted before its AFP write succeeds. An authenticated exact
+retry repairs an interrupted AFP/finalisation step and cannot append a second
+message; attachment processing remains a separate reviewed slice.
 
 ## 8. Persistence
 
@@ -222,10 +226,12 @@ The gateway/client processing split must:
 1. run ClamAV synchronously on the exact raw bytes before persistence and fail
    closed when the scanner is absent or unavailable;
 2. retain only ciphertext addressed to the current verified recipient key;
-3. decrypt only on an authorised recipient device;
+3. never decrypt stored ciphertext on the server; transient bytes may be parsed
+   only inside the authenticated request that received and scanned them;
 4. use existing MIME limits and reject active content, bombs and unsafe
    attachments using existing policy;
-5. parse with `smtp_in` before encryption or in the authorised client;
+5. parse with `smtp_in` during that transient boundary or in the authorised
+   client;
 6. resolve a thread from signed routing and exact reply headers, never prose;
 7. create a tenant-private encrypted AFP message with source/digest lineage;
 8. store safe attachments through the existing owner-scoped file path;
