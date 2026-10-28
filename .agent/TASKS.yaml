@@ -59,6 +59,8 @@ tasks:
       - created and verified the requested concensure+testing@gmail.com account only in Oracle staging; its random password remains server-side and is not committed
       - controlled Gmail send reached provider queue but mailbox headers and a human reply remain unobserved; the deliberate invalid-domain send produced no observable provider bounce, so authorized receipt/reply and live bounce gates remain open
       - added bounded quarantine ciphertext destruction, active/previous ingress key rotation with rollback coverage, lifecycle/cross-tenant/database-failure integration cases and kept mail.omnyid.com couple-relay projection open rather than misclassifying vendor-mask inbound enquiries
+      - controlled mailbox receipt and one human reply are now observed: provider, encrypted-quarantine and recipient-private AFP counts each advanced exactly once from two to three, with one completed attempt and matching provider/AFP identifiers
+      - reply-window restoration removed the only literal synthetic rule, preserved the eight-rule disabled Drop catch-all inventory, returned all three staging flags false, shredded the shared secret and removed the disposable scanner; a provider-observed live bounce or complaint remains open
 
   - id: WED-285
     title: Freeze and deploy Oracle human-gate candidate with commit-bound evidence

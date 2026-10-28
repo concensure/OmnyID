@@ -42,19 +42,24 @@ Evidence:
   catch-all. The Worker remains deployed but unrouted. Production application
   and database state were not changed.
 - A separate send to the controlled Gmail account was accepted into the
-  provider queue, but received headers and a human reply were not observed. An
-  invalid-domain send also remained queued; this proves no application retry,
-  not a live provider bounce.
+  provider queue and reached the controlled mailbox. A human reply advanced
+  provider, encrypted-quarantine and recipient-private AFP counts exactly once
+  from two to three; the event completed in one attempt without error and the
+  provider and AFP identifiers cross-reference. No content or full private
+  sender address was recorded.
+- The reply window was restored immediately: the literal synthetic route was
+  removed, the eight-rule inventory and disabled Drop catch-all were preserved,
+  all three staging flags returned false, the shared secret was shredded and
+  the disposable scanner was removed. The invalid-domain send still yielded no
+  provider-observed bounce or complaint, so that part of the smoke gate is open.
 
 Next:
 
 - Freeze and reverify the final documentation-bound source after the current
   retention/rotation changes; do not reuse the `9e1be33` runtime evidence as
   evidence for a later implementation candidate.
-- The owner should inspect the already-sent Gmail message and provide a short
-  reply window. Re-add only the literal route for that window, record headers,
-  prove one correlated AFP event and restore again. A separate real provider
-  bounce/complaint remains required.
+- A separate real provider bounce/complaint remains required; do not infer it
+  from provider acceptance or the absence of application retry.
 - Do not misclassify vendor-mask inbound enquiries as couple-side vendor
   replies. Implement exact `mail.omnyid.com` mask/thread binding before enabling
   that Response Queue projection. Attachment reuse and the remaining human

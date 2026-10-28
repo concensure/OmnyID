@@ -144,7 +144,9 @@ Exit evidence:
 - [x] Prove Worker deployment cannot mutate Email Routing, then separately add
   and remove the one authorised literal-address rule.
 - [ ] Run independent security/privacy review.
-- [ ] Run authorized provider smoke with disposable addresses.
+- [ ] Complete authorized provider smoke with disposable addresses. Controlled
+  receipt and reply persistence have passed; a provider-observed live bounce or
+  complaint remains outstanding.
 - [x] Run hosted shadow with all routing/send flags off.
 - [ ] Complete the applicable WED-225 review records against the exact commit.
 - [ ] Obtain permission-copy and production-owner sign-off.
@@ -174,7 +176,8 @@ These cannot be checked by implementation alone:
 - [ ] authorized owner approves Cloudflare routing/DNS changes;
 - [ ] hosted accessibility, couple usability and vendor usability records pass;
 - [ ] permission wording is approved;
-- [ ] authorized provider smoke passes;
+- [ ] authorized provider smoke passes, including a provider-observed live
+  bounce or complaint;
 - [ ] allowlisted cohort completes seven days within thresholds;
 - [ ] named production approver signs the frozen release.
 
@@ -210,12 +213,21 @@ Until those boxes are evidenced, the correct verifier result is `blocked`, not
   with a content-free destruction tombstone. The integration case proves the
   raw envelope is gone while the recipient-encrypted AFP message remains the
   canonical record.
-- A separate controlled-mailbox request was accepted into Cloudflare's queue.
-  That is not mailbox delivery evidence: received headers and a human reply are
-  not yet observed, so the authorized-provider-smoke item remains open.
+- The controlled mailbox received the synthetic enquiry. During a separately
+  registered reply window, one human reply moved the staging counts from two
+  to three provider events, two to three encrypted quarantine records and two
+  to three recipient-private AFP messages. The new provider event completed in
+  one attempt without an error and cross-referenced the same AFP message ID as
+  the encrypted tenant record. No correspondence content or private sender
+  address is retained in this evidence.
 - A deliberate invalid-domain message was queued without an immediate
   permanent-bounce or suppression record. The application made no retry, but a
   live provider bounce remains unproved.
 - The restored Email Routing inventory again contained the same eight rules and
   disabled Drop catch-all as before; the temporary route/allowlist were empty
   and all runtime flags were false. Production application state was untouched.
+- After the human reply, restoration again removed the only literal synthetic
+  rule, returned the inventory to eight rules with disabled Drop catch-all,
+  set vendor mail, sender-mask and ingress flags false, shredded the staging
+  shared secret and removed the disposable scanner. The live provider-bounce
+  part of the smoke gate remains open.
