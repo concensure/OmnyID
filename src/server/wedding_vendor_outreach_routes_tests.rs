@@ -3,9 +3,23 @@ use super::*;
 fn sample_couple() -> WeddingVendorOutreachCoupleInput {
     WeddingVendorOutreachCoupleInput {
         date_or_season: Some("March 2027".to_string()), location: Some("Sydney".to_string()), guest_count: None,
-        budget_comfort: None, top_priorities: vec!["flowers".to_string(), "photography".to_string()],
+        budget_comfort: None, budget_category_label: None, budget_category_amount: None, budget_currency: None,
+        top_priorities: vec!["flowers".to_string(), "photography".to_string()],
         atmosphere_description: None, vendor_preferences: None, couple_names: None, deal_breakers: vec![],
     }
+}
+
+#[test]
+fn deterministic_outreach_uses_vendor_category_allocation_instead_of_total_budget() {
+    let mut couple = sample_couple();
+    couple.budget_comfort = Some("AUD $13,900 total budget".to_string());
+    couple.budget_category_label = Some("Venue & Ceremony".to_string());
+    couple.budget_category_amount = Some(8_500.0);
+    couple.budget_currency = Some("AUD".to_string());
+    let payload = deterministic_outreach_payload(&sample_vendor("Harbour Rooms"), &couple, &[]);
+    assert!(payload.body_markdown.contains("Venue & Ceremony budget of AUD $8,500"));
+    assert!(!payload.body_markdown.contains("13,900"));
+    assert_eq!(payload.grounded_on.iter().filter(|field| field.as_str() == "budget_comfort").count(), 1);
 }
 
 fn availability_request(state: &str) -> WeddingVendorAvailabilityRequest {

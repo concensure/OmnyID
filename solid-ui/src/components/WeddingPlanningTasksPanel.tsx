@@ -32,6 +32,14 @@ const STATUS_CLASS: Record<ActiveTaskLifecycle, string> = {
   completed: "bg-teal-100 text-teal-900",
   skipped: "bg-slate-200 text-slate-700",
 };
+const STATUS_RAIL_CLASS: Record<ActiveTaskLifecycle, string> = {
+  pending: "bg-wedding-ink/45",
+  in_progress: "bg-amber-500",
+  blocked: "bg-red-700",
+  decided: "bg-wedding-primary",
+  completed: "bg-teal-600",
+  skipped: "bg-slate-400",
+};
 
 export function WeddingPlanningTasksPanel(props: {
   state: WeddingResponseWorkspaceViewState;
@@ -101,13 +109,14 @@ export function WeddingPlanningTasksPanel(props: {
           </button>
         )}</For>
       </div>
-      <WeddingTaskComposer weddingPlanId={props.state.workspace.metadata.weddingPlanId} responseWorkspaceId={workspaceId()} saveProjection={props.saveProjection} onRefreshWorkspace={props.onRefreshWorkspace} />
+      <WeddingTaskComposer weddingPlanId={props.state.workspace.metadata.weddingPlanId} responseWorkspaceId={workspaceId()} saveProjection={props.saveProjection} onRefreshWorkspace={props.onRefreshWorkspace} people={props.state.helperContactNames} />
       <Show when={notice()}>{(message) => <p class="mt-3 rounded-lg border border-wedding-border bg-wedding-slate px-3 py-2 text-sm text-wedding-ink" role="status">{message()}</p>}</Show>
       <Show when={tasks().length > 0} fallback={<p class="mt-4 rounded-lg border border-dashed border-wedding-border bg-wedding-page p-5 text-sm text-wedding-ink/70">No tasks in this view.</p>}>
         <ul class="mt-4 space-y-3">
           <For each={tasks()}>{(task) => (
-            <li class="overflow-hidden rounded-xl border border-wedding-border bg-wedding-page">
-              <div class="flex min-w-0 flex-col gap-3 p-4 sm:flex-row sm:items-start sm:justify-between">
+            <li class="relative overflow-hidden rounded-xl border border-wedding-border bg-wedding-page">
+              <span class={`absolute inset-y-0 left-0 w-1 ${STATUS_RAIL_CLASS[status(task).id]}`} aria-hidden="true" />
+              <div class="flex min-w-0 flex-col gap-3 py-4 pl-5 pr-4 sm:flex-row sm:items-start sm:justify-between">
                 <button type="button" aria-expanded={expandedTaskIds()[task.id] === true} onClick={() => toggleExpanded(task.id)} class="min-w-0 flex-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-primary">
                   <div class="flex flex-wrap items-center gap-2">
                     <span class={`rounded-lg px-2 py-1 text-[11px] font-bold ${STATUS_CLASS[status(task).id]}`}>{status(task).label}</span>

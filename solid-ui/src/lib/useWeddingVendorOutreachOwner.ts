@@ -49,6 +49,9 @@ type WeddingVendorOutreachCouple = {
   location: string | null;
   guest_count: string | null;
   budget_comfort: string | null;
+  budget_category_label: string | null;
+  budget_category_amount: number | null;
+  budget_currency: string | null;
   top_priorities: string[];
   atmosphere_description: string | null;
   vendor_preferences: string | null;
@@ -104,6 +107,24 @@ export function normalizeWeddingBudgetComfort(value: unknown): string | null {
   return Number.isFinite(amount) ? `AUD $${Math.round(amount).toLocaleString("en-AU")} total budget` : raw;
 }
 
+type WeddingOutreachBudgetAllocation = { categoryId: string; categoryLabel: string; amount: number };
+
+export function weddingVendorCategoryBudget(
+  category: string | null | undefined,
+  allocations: readonly WeddingOutreachBudgetAllocation[],
+): WeddingOutreachBudgetAllocation | null {
+  const key = (category ?? "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  const categoryId = /venue|ceremony|celebrant|officiant/.test(key) ? "venue_ceremony"
+    : /cater|food|drink|bar/.test(key) ? "catering_drinks"
+      : /photo|video/.test(key) ? "photo_video"
+        : /attire|dress|suit|beauty|hair|makeup/.test(key) ? "attire_beauty"
+          : /flower|flor|decor|styling/.test(key) ? "flowers_decor"
+            : /music|entertain|band|\bdj\b/.test(key) ? "entertainment_music"
+              : key ? "other_misc" : null;
+  const match = categoryId ? allocations.find((item) => item.categoryId === categoryId) : null;
+  return match && Number.isFinite(match.amount) && match.amount > 0 ? match : null;
+}
+
 function applyWeddingOutreachContext(couple: WeddingVendorOutreachCouple, value: Record<string, unknown> | null | undefined) {
   if (!value) return;
   couple.date_or_season ??= firstString(value.date_or_season, value.dateOrSeason);
@@ -140,6 +161,9 @@ export function weddingVendorOutreachCoupleFromWorkspace(input: {
     location: null,
     guest_count: null,
     budget_comfort: null,
+    budget_category_label: null,
+    budget_category_amount: null,
+    budget_currency: null,
     top_priorities: [],
     atmosphere_description: null,
     vendor_preferences: null,
@@ -228,6 +252,13 @@ export function useWeddingVendorOutreachOwner(input: {
       couple.budget_comfort ??= weddingVendorOutreachCoupleFromWorkspace({
         contextCards: [], budgetTargetAmount: input.state().budgetTracking.budgetTargetAmount,
       }).budget_comfort;
+      const categoryBudget = weddingVendorCategoryBudget(card.category, input.state().budgetTracking.budgetAllocation);
+      if (categoryBudget) {
+        couple.budget_comfort = `AUD $${Math.round(categoryBudget.amount).toLocaleString("en-AU")} budget for ${categoryBudget.categoryLabel}`;
+        couple.budget_category_label = categoryBudget.categoryLabel;
+        couple.budget_category_amount = categoryBudget.amount;
+        couple.budget_currency = "AUD";
+      }
       if (!existing.permissions.shareDateOrSeason) couple.date_or_season = null;
       if (!existing.permissions.shareLocation) couple.location = null;
       if (!existing.permissions.shareGuestCount) couple.guest_count = null;
@@ -237,12 +268,17 @@ export function useWeddingVendorOutreachOwner(input: {
         couple.vendor_preferences = null;
         couple.deal_breakers = [];
       }
-      if (!existing.permissions.shareApproximateBudget) couple.budget_comfort = null;
+      if (!existing.permissions.shareApproximateBudget) {
+        couple.budget_comfort = null;
+        couple.budget_category_label = null;
+        couple.budget_category_amount = null;
+        couple.budget_currency = null;
+      }
 
       const result = await requestWeddingVendorOutreachDraft({
         vendor: {
           name: card.title,
-          category: null,
+          category: card.category,
           website_url: card.websiteUrl,
           address: card.address,
           source_url: card.sourceUrl,

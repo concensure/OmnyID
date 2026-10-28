@@ -1908,3 +1908,17 @@ proof nor a booking. Quote acceptance creates booking pending; configured confir
 required before booking confirmed. Deposits and balances are evidence-backed tracking states and do
 not execute payments. This preserves clear consequences while adapting useful competitive workflow
 ideas without copying a competitor screen-for-screen.
+## 2026-10-28: Wedding task controls update locally before background projection refresh
+
+WED-287 treats the task-completion and task-responsibility browser events as the immediate
+projection after the AFP save is requested. Assign and Reopen do not force a whole-workspace
+refresh, because it moved focus, reset scroll and could leave Wedding Home inert. The durable
+AFP event remains authoritative; deal-breakers become optimistic only after their AFP write succeeds.
+
+Vendor outreach selects the matching couple-approved category allocation when a comparison
+card has a known category and budget sharing is enabled. Structured category fields prevent the
+total wedding budget being presented as one vendor's allowance; opt-out clears all budget fields.
+
+Connected quote/booking effects remain evidence-aware. A single approved AFP transition fans
+out idempotently to linked booking, budget, task and decision projections with a visible
+explanation, but quote acceptance cannot masquerade as booking confirmation.

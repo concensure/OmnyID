@@ -372,6 +372,7 @@ export function WeddingVendorSearchHomeSection(props: {
                 surface="enquiry"
                 promptWhenEmpty
                 compact
+                hideWhenPopulated
               />
             </div>
             <Show when={props.preferenceProfile && props.onPreferenceChange && props.onPreferenceConfirm}>

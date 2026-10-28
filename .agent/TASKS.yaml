@@ -15,6 +15,15 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-287
+    title: Reconcile wedding run-sheet tasks, task interactions and vendor category budgets
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-287
+    depends_on: [WED-184, WED-247, WED-286]
+    files: [solid-ui/src/components/WeddingPlanningJourneyStepper.tsx, solid-ui/src/components/WeddingTaskComposer.tsx, solid-ui/src/components/WeddingTaskOwnerControl.tsx, solid-ui/src/components/WeddingTaskCompletionButton.tsx, solid-ui/src/components/WeddingDealBreakerEditor.tsx, solid-ui/src/components/WeddingPlanningTasksPanel.tsx, solid-ui/src/components/WeddingTaskStageView.tsx, solid-ui/src/components/WeddingTimelinePanel.tsx, solid-ui/src/components/WeddingVendorSearchHomeSections.tsx, solid-ui/src/lib/weddingCustomTaskState.ts, solid-ui/src/lib/weddingJourneyStageState.ts, solid-ui/src/lib/weddingTaskVisualStatusState.ts, solid-ui/src/lib/useWeddingVendorOutreachOwner.ts, solid-ui/src/lib/weddingVendorComparisonArtifactState.ts, solid-ui/src/lib/quotationWeddingClosureAdapter.ts, src/server/wedding_vendor_outreach_routes.rs, src/server/wedding_vendor_outreach_routes_tests.rs, solid-ui/tests/wedding-*.test.ts, docs/DESIGN_SYSTEM.md, Documents/design/wedding planner/wedding-quotation-decision-booking-vendor-portal-spec.md, .agent/**]
+    acceptance: [Five earliest-bound run-sheet tasks are seeded in the proper stages, stage expansion adds an AFP task with owner and deadline, Assign and Reopen remain in place without a full refresh, touched task rows pair status rail and text, saved home deal-breaker prompt disappears while Inspiration remains editable, outreach uses the matching category allocation rather than total budget, evidence-aware booking reconciliation is idempotent and explained, focused and full required checks pass]
+
   - id: WED-286
     title: Complete Email Worker operational evidence and controlled provider receipt rehearsal
     status: in_progress

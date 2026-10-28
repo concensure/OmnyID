@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, createUniqueId, For, onCleanup, onMount, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 
 import { readSession, type SendAfpMessageInput } from "@/lib/api";
 import { loadContacts } from "@/lib/contactsLocalState";
@@ -27,12 +27,10 @@ export function WeddingTaskOwnerControl(props: {
   const [draft, setDraft] = createSignal(savedOwner());
   const [saving, setSaving] = createSignal(false);
   const [notice, setNotice] = createSignal<string | null>(null);
-  const controlId = createUniqueId();
-  const listId = () => `wedding-owner-${controlId}`;
   const people = createMemo(() => {
     const local = loadWeddingHelperLocalState(props.responseWorkspaceId);
     const contacts = loadContacts(props.contactUserId ?? readSession()?.user?.id ?? null).map((contact) => contact.name);
-    return [...new Set(["You", ...(props.people ?? []), ...local.customHelpers, ...contacts]
+    return [...new Set(["You", savedOwner(), ...(props.people ?? []), ...local.customHelpers, ...contacts]
       .map((name) => name.trim()).filter(Boolean))];
   });
   createEffect(() => {
@@ -76,7 +74,6 @@ export function WeddingTaskOwnerControl(props: {
     try {
       await props.saveProjection(input);
       setNotice(`${ownerLabel} is assigned.`);
-      props.onRefreshWorkspace?.();
     } catch {
       setNotice("Owner saved here. Account sync will retry when available.");
     } finally {
@@ -89,15 +86,13 @@ export function WeddingTaskOwnerControl(props: {
       <div class="flex min-w-0 items-end gap-1.5">
         <label class="min-w-0 flex-1 text-xs font-semibold text-wedding-ink/70">
           Owner
-          <input
-            type="text"
-            list={listId()}
+          <select
             value={draft()}
-            onInput={(event) => { setDraft(event.currentTarget.value); setNotice(null); }}
-            onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void saveOwner(); } }}
+            onChange={(event) => { setDraft(event.currentTarget.value); setNotice(null); }}
             class="mt-1 min-h-10 w-full rounded-lg border border-wedding-border bg-white px-2 text-sm font-normal text-wedding-ink"
-          />
-          <datalist id={listId()}><For each={people()}>{(person) => <option value={person} />}</For></datalist>
+          >
+            <For each={people()}>{(person) => <option value={person}>{person}</option>}</For>
+          </select>
         </label>
         <button type="button" disabled={!draft().trim() || saving()} class="min-h-10 rounded-lg border border-wedding-secondary bg-white px-3 text-xs font-semibold text-wedding-secondary disabled:opacity-45" onClick={() => void saveOwner()}>
           {saving() ? "Saving" : "Assign"}

@@ -17,8 +17,15 @@ export function WeddingDealBreakerEditor(props: {
   surface?: "vision" | "enquiry" | "quote_review";
   promptWhenEmpty?: boolean;
   compact?: boolean;
+  hideWhenPopulated?: boolean;
 }) {
-  const saved = createMemo(() => weddingDealBreakersFromAfpMessages({ messages: props.messages, metadata: props.metadata }));
+  const [optimisticAdded, setOptimisticAdded] = createSignal<string[]>([]);
+  const [optimisticRemoved, setOptimisticRemoved] = createSignal<string[]>([]);
+  const saved = createMemo(() => [...new Set([
+    ...weddingDealBreakersFromAfpMessages({ messages: props.messages, metadata: props.metadata })
+      .filter((label) => !optimisticRemoved().includes(label)),
+    ...optimisticAdded(),
+  ])]);
   const [draft, setDraft] = createSignal("");
   const [saving, setSaving] = createSignal(false);
   const [notice, setNotice] = createSignal<string | null>(null);
@@ -38,10 +45,16 @@ export function WeddingDealBreakerEditor(props: {
         action,
         sourceSurface: props.surface,
       }));
-      if (action === "add") setDraft("");
+      if (action === "add") {
+        setDraft("");
+        setOptimisticAdded((current) => [...new Set([...current, label])]);
+        setOptimisticRemoved((current) => current.filter((item) => item !== label));
+      } else {
+        setOptimisticAdded((current) => current.filter((item) => item !== label));
+        setOptimisticRemoved((current) => [...new Set([...current, label])]);
+      }
       setPendingRemoval(null);
       setNotice(action === "add" ? "Deal-breaker saved to your wedding knowledge." : "Deal-breaker removed.");
-      props.onRefreshWorkspace?.();
     } catch {
       setNotice("This change could not be saved. Try again without re-entering anything.");
     } finally {
@@ -50,6 +63,7 @@ export function WeddingDealBreakerEditor(props: {
   }
 
   return (
+    <Show when={!props.hideWhenPopulated || saved().length === 0}>
     <section class={`rounded-xl border p-3 ${props.promptWhenEmpty && saved().length === 0 ? "border-amber-300 bg-amber-50" : "border-wedding-border bg-white/80"}`}>
       <h4 class="text-sm font-bold text-wedding-ink">Deal-breakers</h4>
       <p class="mt-1 text-xs leading-5 text-wedding-ink/70">
@@ -101,5 +115,6 @@ export function WeddingDealBreakerEditor(props: {
         onConfirm={() => { const label = pendingRemoval(); if (label) void persist(label, "remove"); }}
       />
     </section>
+    </Show>
   );
 }

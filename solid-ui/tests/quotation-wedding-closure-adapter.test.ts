@@ -67,6 +67,8 @@ test("budget projection is stable, source-linked, and cannot execute payment", (
   assert.equal(message.id, "afp-qbudget-1");
   assert.equal(message.metadata?.payment_execution, false);
   assert.equal(message.metadata?.projection, "quotation_booking_to_wedding_budget");
+  assert.match(String(message.metadata?.reconciliation_summary), /budget commitment recorded/i);
+  assert.deepEqual(message.metadata?.reconciliation_projection_kinds, ["booking", "budget_commitment", "task_status", "decision_record"]);
   assert.equal(message.references?.some((ref) => (
     (ref as { type?: string }).type === "quotation_closure_source_version"
   )), true);
@@ -87,4 +89,5 @@ test("active deadlines open one stable task and terminal successors archive it",
   assert.equal(terminal?.content.task_id, task?.content.task_id);
   assert.notEqual(terminal?.id, task?.id);
   assert.equal(terminal?.metadata?.quotation_closure_deadline_lifecycle, "closed");
+  assert.match(String(terminal?.metadata?.reconciliation_summary), /deadline closed/i);
 });

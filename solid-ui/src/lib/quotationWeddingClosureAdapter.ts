@@ -98,7 +98,7 @@ export function quotationBudgetCommitmentDecisionInput(
       id: `quotation-version:${commitment.quotation_version_id}`,
       rowIndex: 0,
       label: vendorName,
-      detail: `Confirmed booking. Final quoted price ${amount}.`,
+      detail: `Confirmed booking. Final quoted price ${amount}. This confirmation updates the booking, budget commitment, linked deadline task and decision record together.`,
       cells: [vendorName, categoryLabel, `Confirmed quote ${amount}`],
       columnCells: [
         { header: "Vendor", label: "Vendor", kind: "option", value: vendorName },
@@ -141,6 +141,8 @@ export function quotationBudgetCommitmentToWeddingAfp(
       quotation_id: commitment.quotation_id,
       quotation_version_id: commitment.quotation_version_id,
       booking_evidence_count: commitment.source_refs.length,
+      reconciliation_summary: "Booking confirmed; budget commitment recorded; linked deadline task closed; decision record updated.",
+      reconciliation_projection_kinds: ["booking", "budget_commitment", "task_status", "decision_record"],
       payment_execution: false,
     },
   };
@@ -216,6 +218,9 @@ export function quotationClosureDeadlineToWeddingTaskAfp(
         metadata: {
           ...(message.metadata ?? {}),
           quotation_closure_deadline_lifecycle: projection.lifecycle,
+          reconciliation_summary: projection.lifecycle === "closed"
+            ? "The linked quotation deadline closed when the evidence-backed booking reached a terminal state."
+            : "The linked quotation deadline is active and shared with Timeline and Tasks.",
           payment_execution: false,
         },
         references: [

@@ -62,6 +62,7 @@ Rules:
 - Make no pricing promises and no claim that anything is booked or confirmed.
 - Use short paragraphs separated by blank lines: greeting, wedding context, request, offer to share more, then thanks. Plain sentences, no headings or emoji. Do not add a signature — the app appends the onboarding name separately.
 - A budget must use `AUD $` plus a grouped number (for example `AUD $13,900`) and the word `budget` must never be repeated.
+- When budget_category_label and budget_category_amount are supplied, use that category allocation as this vendor's budget, never the total wedding budget, and record it in grounded_on as `budget_comfort`.
 - Summarise verification questions as plain topics. For capacity and price, use exactly: `We would also appreciate answers to capacity and price.`
 - Treat supplied deal_breakers as explicit requirements. Ask the vendor to confirm them; do not imply they are already satisfied.
 - Respond with ONLY valid JSON, no markdown code fences, no commentary before or after it, matching exactly this shape:
@@ -244,6 +245,9 @@ pub(super) struct WeddingVendorOutreachCoupleInput {
     location: Option<String>,
     guest_count: Option<String>,
     budget_comfort: Option<String>,
+    budget_category_label: Option<String>,
+    budget_category_amount: Option<f64>,
+    budget_currency: Option<String>,
     #[serde(default)]
     top_priorities: Vec<String>,
     atmosphere_description: Option<String>,
@@ -406,6 +410,22 @@ async fn wedding_vendor_outreach_draft_http(
         MAX_COUPLE_FIELD_CHARS,
     )?;
     reject_if_over_length(
+        "couple.budget_category_label",
+        &request.couple.budget_category_label,
+        MAX_COUPLE_FIELD_CHARS,
+    )?;
+    reject_if_over_length(
+        "couple.budget_currency",
+        &request.couple.budget_currency,
+        8,
+    )?;
+    if request.couple.budget_category_amount.is_some_and(|amount| !amount.is_finite() || amount <= 0.0) {
+        return Err((StatusCode::BAD_REQUEST, "couple.budget_category_amount must be a finite positive amount".to_string()));
+    }
+    if request.couple.budget_currency.as_ref().is_some_and(|currency| currency.trim().to_uppercase() != "AUD") {
+        return Err((StatusCode::BAD_REQUEST, "couple.budget_currency must be AUD".to_string()));
+    }
+    reject_if_over_length(
         "couple.atmosphere_description",
         &request.couple.atmosphere_description,
         MAX_COUPLE_FIELD_CHARS,
@@ -484,6 +504,10 @@ async fn wedding_vendor_outreach_draft_http(
         capped(&couple.guest_count, MAX_COUPLE_FIELD_CHARS).map(|v| format!("guest_count: {v}")),
         capped(&couple.budget_comfort, MAX_COUPLE_FIELD_CHARS)
             .map(|v| format!("budget_comfort: {v}")),
+        capped(&couple.budget_category_label, MAX_COUPLE_FIELD_CHARS)
+            .map(|v| format!("budget_category_label: {v}")),
+        couple.budget_category_amount.map(|v| format!("budget_category_amount: {v:.2}")),
+        capped(&couple.budget_currency, 8).map(|v| format!("budget_currency: {v}")),
         (!couple.top_priorities.is_empty())
             .then(|| format!("top_priorities: {}", couple.top_priorities.join(", "))),
         capped(&couple.atmosphere_description, MAX_COUPLE_FIELD_CHARS)
@@ -635,7 +659,14 @@ fn deterministic_outreach_payload(
         details.push(format!("and a {atmosphere} atmosphere"));
         grounded_on.push("atmosphere_description".to_string());
     }
-    if let Some(budget) = capped(&couple.budget_comfort, MAX_COUPLE_FIELD_CHARS) {
+    if let (Some(label), Some(amount)) = (
+        capped(&couple.budget_category_label, MAX_COUPLE_FIELD_CHARS),
+        couple.budget_category_amount.filter(|value| value.is_finite() && *value > 0.0),
+    ) {
+        let currency = capped(&couple.budget_currency, 8).unwrap_or_else(|| "AUD".to_string());
+        details.push(format!("with a {label} budget of {currency} ${}", format_budget_amount(amount)));
+        grounded_on.push("budget_comfort".to_string());
+    } else if let Some(budget) = capped(&couple.budget_comfort, MAX_COUPLE_FIELD_CHARS) {
         let amount = budget
             .trim()
             .trim_end_matches("total budget")
@@ -698,6 +729,18 @@ fn deterministic_outreach_payload(
         ),
         grounded_on,
     }
+}
+
+fn format_budget_amount(amount: f64) -> String {
+    let rounded = amount.round() as i64;
+    let digits = rounded.abs().to_string();
+    let mut grouped = String::new();
+    for (index, ch) in digits.chars().rev().enumerate() {
+        if index > 0 && index % 3 == 0 { grouped.push(','); }
+        grouped.push(ch);
+    }
+    let value = grouped.chars().rev().collect::<String>();
+    if rounded < 0 { format!("-{value}") } else { value }
 }
 
 fn outreach_question_topics(questions: &[&str]) -> Vec<String> {

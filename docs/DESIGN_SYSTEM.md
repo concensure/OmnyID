@@ -399,6 +399,9 @@ Status tints are reserved for status only: teal tint for "on track", amber for "
   chronological, categorised task projection directly below the stepper; it never changes route.
   Completed stages are filled teal and the current stage has a teal ring. Every task projection uses
   the same completion record, stage and deadline, so Home, Timeline, Tasks and People cannot drift.
+  Each task row has a 3–4px leading status rail plus an explicit text label: Warm Slate for pending,
+  amber for in progress, Deep Teal for completed, and red only for genuinely blocked work. Colour is
+  supplementary; it never replaces the label, icon, or accessible state.
 - Decision cards show a "Best fit" tag, checked facts, and a "Still to confirm" risk note.
 - A right-hand rail holds "Up next" tasks and the saved-vendor count on desktop; it stacks on mobile.
 - Serif display face for page titles and the countdown number; sans for everything functional.
@@ -446,6 +449,11 @@ Status tints are reserved for status only: teal tint for "on track", amber for "
 - Photographic choices use local, responsive WebP/AVIF assets with declared dimensions, a fixed
   aspect-ratio container, async decoding and lazy loading below the first visible row. Photography
   must remain a choice aid, not a blocking decoration or an unlabelled source of meaning.
+- Never make a person manually reconcile connected wedding information. One approved AFP transition
+  fans out idempotently to its linked projections and explains the changes in user-facing language.
+  For example, evidence-backed venue booking confirmation updates the booking, budget commitment,
+  relevant task status and decision record together. Quote acceptance alone remains distinct from
+  booking confirmation and may only advance a pending-booking state until the required evidence exists.
 
 ---
 

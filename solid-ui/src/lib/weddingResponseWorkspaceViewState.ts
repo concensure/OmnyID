@@ -206,7 +206,7 @@ export type WeddingWorkspaceArtifactPreview = {
     choiceId: string;
     rank: number;
     comparisonCount: number;
-    title: string;
+    title: string; category?: string | null;
     imageUrl: string | null;
     imageAlt: string | null;
     scoreLabel: string;

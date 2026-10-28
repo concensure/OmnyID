@@ -222,6 +222,7 @@ export function WeddingTaskStageView(props: {
   };
   const toggleTask = (task: WeddingTaskStageViewTask, fallback: boolean) => {
     const completed = !itemCompleted(task, fallback);
+    if (!completed) setActiveTab("open");
     setCompletedOverrides((current) => ({ ...current, [task.task_id]: completed }));
     const record = saveWeddingTaskCompletion({
       taskId: task.task_id,
@@ -430,7 +431,8 @@ export function WeddingTaskStageView(props: {
                     const completed = () => itemCompleted(item.task, item.completed);
                     const expanded = () => expandedTaskIds()[item.task.task_id] === true;
                     return (
-                      <article class={`min-w-0 rounded-xl border border-slate-200 bg-white px-3 py-1 transition ${completed() ? "opacity-60" : "shadow-sm"}`}>
+                      <article class={`relative min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 pl-4 pr-3 transition ${completed() ? "opacity-60" : "shadow-sm"}`}>
+                        <span class={`absolute inset-y-0 left-0 w-1 ${completed() ? "bg-teal-600" : "bg-wedding-ink/45"}`} aria-hidden="true" />
                         <div class="flex min-w-0 items-start gap-2">
                           <button
                             type="button"
@@ -471,7 +473,9 @@ export function WeddingTaskStageView(props: {
                               </Show>
                             </span>
                           </button>
-                          <span class={`mt-4 h-2.5 w-2.5 flex-shrink-0 rounded-full ${completed() ? "bg-emerald-400" : item.statusClass}`} />
+                          <span class={`mt-3 shrink-0 rounded-lg px-2 py-1 text-[11px] font-bold ${completed() ? "bg-teal-100 text-teal-900" : "bg-wedding-slate text-wedding-ink"}`}>
+                            {completed() ? "Completed" : "Pending"}
+                          </span>
                         </div>
                         <Show when={expanded()}>
                           <div class="mb-2 grid gap-3 border-t border-slate-200 pt-2 sm:grid-cols-2">

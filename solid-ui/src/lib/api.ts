@@ -6393,7 +6393,7 @@ export type WeddingVendorOutreachDraftCoupleInput = {
   date_or_season?: string | null;
   location?: string | null;
   guest_count?: string | null;
-  budget_comfort?: string | null;
+  budget_comfort?: string | null; budget_category_label?: string | null; budget_category_amount?: number | null; budget_currency?: string | null;
   top_priorities?: string[];
   atmosphere_description?: string | null;
   vendor_preferences?: string | null;

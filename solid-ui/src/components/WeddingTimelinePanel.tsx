@@ -148,7 +148,7 @@ export function WeddingTimelinePanel(props: {
           </button>
         </Show>
       </div>
-      <WeddingTaskComposer weddingPlanId={props.state.workspace.metadata.weddingPlanId} responseWorkspaceId={props.state.workspace.metadata.responseWorkspaceId} saveProjection={props.saveProjection} onRefreshWorkspace={props.onRefreshWorkspace} />
+      <WeddingTaskComposer weddingPlanId={props.state.workspace.metadata.weddingPlanId} responseWorkspaceId={props.state.workspace.metadata.responseWorkspaceId} saveProjection={props.saveProjection} onRefreshWorkspace={props.onRefreshWorkspace} people={props.state.helperContactNames} />
       <Show when={dateNotice()}>{(message) => <p class="mt-2 text-sm text-wedding-ink/70" role="status">{message()}</p>}</Show>
       <div class="mt-3 flex gap-2 overflow-x-auto phone:flex sm:hidden">
         <For each={["all", "upcoming", "completed"] as const}>{(filter) => <button type="button" onClick={() => setMobileFilter(filter)} class={`shrink-0 rounded-lg border px-3 py-1.5 text-xs font-semibold ${mobileFilter() === filter ? "border-wedding-primary bg-wedding-primary text-white" : "border-wedding-border bg-white text-wedding-ink"}`}>{filter === "all" ? `All (${props.state.ganttTimeline.rows.length})` : filter[0].toUpperCase() + filter.slice(1)}</button>}</For>

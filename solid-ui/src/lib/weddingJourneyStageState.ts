@@ -93,7 +93,7 @@ function correctedPrebuiltDeadline(task: WeddingPlanningTaskItem, weddingDate?: 
   return corrected ? { ...task, dueAt: corrected, dueLabel: corrected.slice(0, 10) } : task;
 }
 
-const RESEARCH_TASKS: Array<{ id: string; title: string; stage: WeddingJourneyStageId; days: number }> = [
+const RESEARCH_TASKS: Array<{ id: string; title: string; stage: WeddingJourneyStageId; days: number; notes?: string }> = [
   { id: "save-the-dates", title: "Send save-the-dates", stage: "details_invites", days: -240 },
   { id: "wedding-website", title: "Publish wedding website and guest information", stage: "details_invites", days: -210 },
   { id: "invitations", title: "Send wedding invitations", stage: "details_invites", days: -120 },
@@ -109,6 +109,41 @@ const RESEARCH_TASKS: Array<{ id: string; title: string; stage: WeddingJourneySt
   { id: "thank-yous", title: "Send thank-you messages", stage: "wedding_after", days: 14 },
   { id: "supplier-reviews", title: "Review wedding suppliers", stage: "wedding_after", days: 21 },
   { id: "return-hire", title: "Return hired items", stage: "wedding_after", days: 2 },
+  {
+    id: "run-sheet-initial-vendor-draft",
+    title: "Send the initial run-sheet draft to key vendors",
+    stage: "final_prep",
+    days: -42,
+    notes: "Send the working run sheet to the photographer, caterer, venue manager and hair and makeup lead to confirm feasibility and timing.",
+  },
+  {
+    id: "run-sheet-finalise-logistics",
+    title: "Finalise run-sheet catering, speeches and transport times",
+    stage: "final_prep",
+    days: -21,
+    notes: "Confirm catering drop times, speech durations and transport pickup schedules.",
+  },
+  {
+    id: "run-sheet-master-signoff",
+    title: "Send the Final Master Run Sheet for vendor sign-off",
+    stage: "final_prep",
+    days: -10,
+    notes: "Send the final master version to every third-party vendor and ask them to confirm it.",
+  },
+  {
+    id: "run-sheet-vip-version",
+    title: "Send the tailored VIP and wedding-party run sheet",
+    stage: "final_prep",
+    days: -5,
+    notes: "Share only getting-ready times, photo locations, transport and responsibilities with the wedding party and parents.",
+  },
+  {
+    id: "run-sheet-day-of-copies",
+    title: "Prepare printed run-sheet copies for day-of leads",
+    stage: "wedding_after",
+    days: 0,
+    notes: "Provide printed copies to the venue manager, coordinator, photographer, DJ or MC and catering manager on the wedding day.",
+  },
 ];
 
 export function addWeddingResearchTasks(
@@ -129,7 +164,7 @@ export function addWeddingResearchTasks(
       source: "agent",
       reviewStatus: "needs_review",
       metadata: { wedding_journey_stage: template.stage, research_backed_template: true },
-      notes: "Suggested from the wedding planning timeline research; edit the date to suit your plans.",
+      notes: template.notes ?? "Suggested from the wedding planning timeline research; edit the date to suit your plans.",
     }));
   }
   return result;

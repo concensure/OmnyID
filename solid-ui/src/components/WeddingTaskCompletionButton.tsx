@@ -38,7 +38,7 @@ export function WeddingTaskCompletionButton(props: {
     const input = weddingTaskCompletionToAfpSendInput({ record, title: props.task.title });
     if (!input || !props.saveProjection) return;
     setBusy(true);
-    try { await props.saveProjection(input); props.onRefreshWorkspace?.(); } finally { setBusy(false); }
+    try { await props.saveProjection(input); } finally { setBusy(false); }
   }
-  return <button type="button" disabled={busy()} onClick={() => void toggle()} class={`${props.compact ? "min-h-10 px-3 text-xs" : "min-h-11 px-4 text-sm"} shrink-0 rounded-lg border border-wedding-secondary bg-white font-semibold text-wedding-secondary disabled:opacity-50`}>{done() ? "Reopen" : "Mark done"}</button>;
+  return <button type="button" aria-pressed={done()} disabled={busy()} onClick={() => void toggle()} class={`${props.compact ? "min-h-10 px-3 text-xs" : "min-h-11 px-4 text-sm"} shrink-0 rounded-lg border border-wedding-secondary bg-white font-semibold text-wedding-secondary disabled:opacity-50`}>{done() ? "Reopen" : "Mark done"}</button>;
 }

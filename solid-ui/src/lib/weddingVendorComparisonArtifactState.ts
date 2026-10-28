@@ -157,6 +157,7 @@ export function vendorComparisonCardsForArtifact(
       comparisonCount: typeof record.comparison_count === "number" && Number.isFinite(record.comparison_count)
         ? Math.max(1, Math.floor(record.comparison_count)) : 1,
       title,
+      category: knownCategory || null,
       imageUrl: unsplashImageUrl(record.image_url),
       imageAlt: clean(record.image_alt) || `${title} venue image`,
       scoreLabel: clean(record.score_label) || "Ranked source-backed option",

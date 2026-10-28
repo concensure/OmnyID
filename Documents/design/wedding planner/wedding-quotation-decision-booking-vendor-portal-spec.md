@@ -621,6 +621,12 @@ Evidence-backed confirmation creates one budget commitment and required wedding 
 A retry creates neither duplicate spend nor duplicate tasks. Cancellation/refund creates
 successors and does not erase the history.
 
+The couple must never reconcile these connected facts by hand. The authoritative AFP
+transition updates the booking projection, category budget commitment, related task status,
+and decision record in one idempotent fan-out, then shows a concise explanation of every
+projection changed. Accepting a quote is not itself proof of a confirmed booking: without
+the configured confirmation evidence it creates or advances only `booking_pending`.
+
 ### Scenario G: permission minimisation
 
 A grant contains two approved requirements and three questions. The portal receives only

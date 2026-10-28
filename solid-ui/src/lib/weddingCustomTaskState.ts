@@ -6,6 +6,7 @@ export type WeddingCustomTaskInput = {
   title: string;
   stage: WeddingJourneyStageId;
   dueDate?: string | null;
+  assignee?: string | null;
   weddingPlanId?: string | null;
   responseWorkspaceId?: string | null;
   nowIso?: string | null;
@@ -20,6 +21,7 @@ export function weddingCustomTaskToAfpMessage(input: WeddingCustomTaskInput): Af
   const weddingPlanId = clean(input.weddingPlanId);
   const responseWorkspaceId = clean(input.responseWorkspaceId);
   const dueDate = clean(input.dueDate);
+  const assignee = clean(input.assignee);
   if (!title || !weddingPlanId || !responseWorkspaceId) return null;
   if (dueDate && !/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) return null;
   const nowIso = clean(input.nowIso) || new Date().toISOString();
@@ -52,6 +54,7 @@ export function weddingCustomTaskToAfpMessage(input: WeddingCustomTaskInput): Af
       status: "pending",
       wedding_plan_id: weddingPlanId,
       response_workspace_id: responseWorkspaceId,
+      assignee: assignee || null,
     },
     metadata: {
       origin: "wedding_planning",
@@ -61,9 +64,10 @@ export function weddingCustomTaskToAfpMessage(input: WeddingCustomTaskInput): Af
       wedding_journey_stage: input.stage,
       wedding_plan_id: weddingPlanId,
       response_workspace_id: responseWorkspaceId,
-      searchable_terms: [title, input.stage, dueDate].filter(Boolean),
+      assignee: assignee || null,
+      searchable_terms: [title, input.stage, dueDate, assignee].filter(Boolean),
     },
-    views: [{ format: "task_card", content: { task_id: taskId, title, due_date: dueDate || null, stage: input.stage } }],
+    views: [{ format: "task_card", content: { task_id: taskId, title, due_date: dueDate || null, stage: input.stage, assignee: assignee || null } }],
     attachments: [],
     references: [
       { type: "wedding_plan", target: weddingPlanId, label: "Wedding plan" },

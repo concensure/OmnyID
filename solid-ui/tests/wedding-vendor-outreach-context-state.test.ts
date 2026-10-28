@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   formatWeddingVendorOutreachParagraphs,
   formatWeddingVendorOutreachForDisplay,
+  weddingVendorCategoryBudget,
   weddingVendorOutreachCoupleFromWorkspace,
 } from "@/lib/useWeddingVendorOutreachOwner";
 
@@ -23,6 +24,16 @@ test("outreach drafts use date and budget already persisted in the wedding works
   assert.equal(couple.budget_comfort, "$35,000 to $45,000");
   assert.equal(couple.location, "Sydney");
   assert.equal(couple.couple_names, "Alex and Sam");
+});
+
+test("vendor category budgets select the matching allocation, not the total wedding budget", () => {
+  const allocations = [
+    { categoryId: "venue_ceremony", categoryLabel: "Venue & Ceremony", amount: 8500 },
+    { categoryId: "photo_video", categoryLabel: "Photography & Video", amount: 3200 },
+  ];
+  assert.deepEqual(weddingVendorCategoryBudget("venue", allocations), allocations[0]);
+  assert.deepEqual(weddingVendorCategoryBudget("photographer", allocations), allocations[1]);
+  assert.equal(weddingVendorCategoryBudget(null, allocations), null);
 });
 
 test("a durable intake profile supplements workspace context without erasing it", () => {
