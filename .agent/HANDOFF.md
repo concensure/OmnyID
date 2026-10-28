@@ -5378,3 +5378,17 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch `agent/codex/W
 - Verification passed: two conversation-state tests, two focused Master Agent render guards, TypeScript typecheck, production UI build, source and Wedding line budgets, `git diff --check`, and the focused Rust provider/orchestrator suites recorded in the final handoff commit evidence.
 - No live provider key was called during development, no production configuration changed, policy V2 remains disabled and nothing was deployed. The run-sheet implementation itself remains future work under WED-289 through WED-295.
 - The full `master-agent-render-guard.test.ts` still contains an unrelated pre-existing `Show guide` expectation for the current Response Queue; only the WED-288 Master Agent cases were selected here.
+
+## 2026-10-29 - WED-289 database contract freeze and email-gate simulation audit (Codex, complete)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch `agent/codex/WED-289`, based on WED-288 commit `5b51eeb724303b49e914e3623789c61bfb8f633d`.
+
+- Added a versioned Rust and TypeScript contract registry for database records, revisions, schema, definitions, profiles, saved views, archive events and projection receipts. Canonical rows carry database/record identity, revisions, action idempotency and source references.
+- Extracted canonical AFP commands from the oversized Database view. Database create/import/edit/schema and Bento Data Quick Add now use one writer; the old neutral `database` family remains read compatibility only.
+- Added deterministic compatibility projection for legacy/mounted records, out-of-order revisions, exact retry deduplication, tombstones, orphan/conflicting revisions and cross-database denial. Unsupported or incomplete canonical versions fail closed.
+- The Database view is 60 physical lines smaller than its starting version; all new files are below 1,000 lines. No run-sheet page, relational row store or dual-write was introduced.
+- A read-only aggregate Oracle query inspected only database-family type/kind/version counts across public and account message stores and observed zero rows. No production record content or identity was exported and no migration/rewrite was created.
+- Gate audit: Gate 2 is not passable by implementing-agent simulation because it requires independent security/privacy authority. Gate 3 has real prior route/receipt/reply/replay/restoration evidence at `9e1be33`, but still lacks a provider-observed bounce, saved SPF/DKIM/DMARC original, couple-facing identity-separation confirmation and one operator-signed digest-bound report for the frozen candidate.
+- Safe reruns passed: 7 Worker tests, 7 provider units, 4 ingress units, 7 SMTP-out units, one disposable-Postgres complaint/no-retry integration and 3 live disposable ClamAV cases. These remain autonomous evidence, not substitutes for the missing external/human proof.
+- WED-289 verification passed 6 Rust contract tests, 13 frontend database tests, TypeScript typecheck, all 2,012 Wedding tests, production UI build and both line-budget checks. The build reports only the existing large-chunk warning.
+- No Cloudflare/provider/routing/allowlist/Oracle write, production flag change, deployment or policy-V2 enablement occurred. Next dependency-ready slice is WED-290 generic database definitions, creation and switching.

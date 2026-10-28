@@ -26,6 +26,7 @@ import {
   workspaceAssistNavigationView,
 } from "@/lib/workspaceAssist";
 import { TiptapEditor } from "@/components/editor/TiptapEditor";
+import { sendDatabaseRecord } from "@/lib/databaseMessageCommands";
 
 function sendAfp(
   type: string,
@@ -239,16 +240,7 @@ export function DataQuickAdd(props: { onClose: () => void }) {
     setBusy(true);
     setSubmitError(null);
     try {
-      await sendAfp("database_record", ["agent://database"], {
-        kind: "database_record", table: table() || "default", data: content(),
-      }, mergeMemoryScopeMetadata({
-        origin: "quickadd:data",
-      }, {
-        memory_space: "personal",
-        author_mask: "private",
-        author_type: "human",
-        human_only: true,
-      }));
+      await sendDatabaseRecord(table() || "default", content(), undefined, "quickadd:data");
       props.onClose();
     } catch (error) {
       setSubmitError(

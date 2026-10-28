@@ -15,6 +15,16 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-289
+    title: Freeze the generic AFP database contract and legacy compatibility boundary
+    status: done
+    owner: codex
+    branch: agent/codex/WED-289
+    depends_on: [WED-181, WED-288]
+    files: [src/database_contract.rs, src/lib.rs, solid-ui/src/lib/databaseContract.ts, solid-ui/src/lib/databaseMessageCompatibility.ts, solid-ui/src/lib/databaseMessageCommands.ts, solid-ui/src/lib/databaseViewState.ts, solid-ui/src/components/DatabaseView.tsx, solid-ui/tests/database-*.test.ts, Documents/verification/**, .agent/**]
+    acceptance: [One versioned canonical database record and revision contract is defined, mounted database_record and neutral legacy database messages normalize without duplicate effective rows, stable database and record identifiers plus source and revision metadata are preserved, malformed/cross-account references and revision conflicts fail closed, current Database fixtures remain readable, no parallel run-sheet store or view is introduced, relevant Rust/frontend/build/line-budget checks pass]
+    progress: "Completed the V1 Rust/TypeScript contracts, canonical DatabaseView/BentoQuickAdd writer, legacy neutral/mounted compatibility projection, deterministic revision/conflict/tombstone rules and hosted read-only shape inventory. Zero hosted database-family rows were observed, so no rewrite was added. Local gate simulation evidence was recorded without claiming independent Gate 2 approval or the missing live Gate 3 bounce/header proof."
+
   - id: WED-288
     title: Repair Master Agent provider conversation and design the ledger-backed run-sheet database
     status: done

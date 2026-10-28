@@ -1,5 +1,11 @@
 ﻿// @locs-version: 1.0
 import { parseJsonValue } from "@/lib/jsonParseState";
+import {
+  compatibleDatabaseRecordFromMessage,
+  compatibleDatabaseRevisionFromMessage,
+  projectCompatibleDatabaseMessages,
+  type CompatibleDatabaseMessage,
+} from "@/lib/databaseMessageCompatibility";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -7,15 +13,21 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 export type DatabaseViewRecord = {
   id: string;
+  databaseId: string;
   table: string;
   data: Record<string, unknown>;
+  revision: number;
   timestamp: string;
 };
 
 export type DatabaseViewRecordUpdate = {
+  databaseId: string;
   targetRecordId: string;
   table: string;
   patch: Record<string, unknown>;
+  baseRevision: number | null;
+  revision: number | null;
+  operation: "upsert" | "tombstone";
   timestamp: string;
 };
 
@@ -25,6 +37,7 @@ export type DatabaseViewColumnDef = {
 };
 
 export type DatabaseViewSchemaUpdate = {
+  databaseId: string;
   table: string;
   column: DatabaseViewColumnDef;
 };
@@ -35,51 +48,54 @@ export function databaseScalarString(value: unknown, fallback = ""): string {
 
 export function databaseRecordFromMessage(msg: {
   id: string;
+  type?: string;
   content: unknown;
+  metadata?: unknown;
   timestamp?: string;
 }): DatabaseViewRecord | null {
-  if (!isRecord(msg.content)) return null;
-  const content = msg.content;
-  if (content.kind === "database_record_update") return null;
-  const table = databaseScalarString(content.table ?? content.database, "default");
-  const rawDataCandidate = content.data ?? content.fields ?? content.record ?? content;
-  const rawData = isRecord(rawDataCandidate) ? rawDataCandidate : content;
-  const data: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(rawData)) {
-    if (key === "kind" || key === "table" || key === "database") continue;
-    data[key] = value;
-  }
-  return { id: msg.id, table, data, timestamp: msg.timestamp ?? "" };
+  const record = compatibleDatabaseRecordFromMessage(msg);
+  if (!record) return null;
+  return {
+    id: record.id,
+    databaseId: record.databaseId,
+    table: record.table,
+    data: record.data,
+    revision: record.revision,
+    timestamp: record.timestamp,
+  };
 }
 
 export function databaseRecordUpdateFromMessage(msg: {
+  id?: string;
+  type?: string;
   content: unknown;
+  metadata?: unknown;
   timestamp?: string;
 }): DatabaseViewRecordUpdate | null {
-  if (!isRecord(msg.content)) return null;
-  const content = msg.content;
-  if (content.kind !== "database_record_update") return null;
-  const targetRecordId = typeof content.target_record_id === "string" ? content.target_record_id : "";
-  if (!targetRecordId) return null;
-  const table = databaseScalarString(content.table ?? content.database, "default");
-  const rawPatch = content.patch ?? content.data ?? {};
-  if (!isRecord(rawPatch)) return null;
+  const update = compatibleDatabaseRevisionFromMessage({ ...msg, id: msg.id ?? "legacy-update" });
+  if (!update) return null;
   return {
-    targetRecordId,
-    table,
-    patch: rawPatch,
-    timestamp: msg.timestamp ?? "",
+    databaseId: update.databaseId,
+    targetRecordId: update.targetRecordId,
+    table: update.table,
+    patch: update.patch,
+    baseRevision: update.baseRevision,
+    revision: update.revision,
+    operation: update.operation,
+    timestamp: update.timestamp,
   };
 }
 
 export function databaseSchemaUpdateFromMessage(msg: { content: unknown }): DatabaseViewSchemaUpdate | null {
   if (!isRecord(msg.content) || msg.content.kind !== "database_schema_update") return null;
+  if (msg.content.contract_version !== undefined && msg.content.contract_version !== 1) return null;
+  const databaseId = databaseScalarString(msg.content.database_id, "database:legacy");
   const table = databaseScalarString(msg.content.table ?? msg.content.database, "default");
   const column = isRecord(msg.content.column) ? msg.content.column : null;
   const key = databaseScalarString(column?.key, "").trim();
   const label = databaseScalarString(column?.label, key).trim();
   if (!key || !label) return null;
-  return { table, column: { key, label } };
+  return { databaseId, table, column: { key, label } };
 }
 
 export function databaseSchemaColumnsFromMessages(
@@ -96,32 +112,16 @@ export function databaseSchemaColumnsFromMessages(
 }
 
 export function databaseRecordsFromMessages(
-  messages: Array<{ id: string; content: unknown; timestamp?: string }>,
+  messages: CompatibleDatabaseMessage[],
 ): DatabaseViewRecord[] {
-  const orderedMessages = messages
-    .slice()
-    .sort((a, b) => ((a.timestamp ?? "") > (b.timestamp ?? "") ? 1 : -1));
-
-  const baseRows = new Map<string, DatabaseViewRecord>();
-  for (const message of orderedMessages) {
-    const parsedBase = databaseRecordFromMessage(message);
-    if (parsedBase) {
-      baseRows.set(parsedBase.id, parsedBase);
-      continue;
-    }
-    const parsedUpdate = databaseRecordUpdateFromMessage(message);
-    if (!parsedUpdate) continue;
-    const existing = baseRows.get(parsedUpdate.targetRecordId);
-    if (!existing) continue;
-    baseRows.set(parsedUpdate.targetRecordId, {
-      ...existing,
-      table: parsedUpdate.table || existing.table,
-      data: { ...existing.data, ...parsedUpdate.patch },
-      timestamp: parsedUpdate.timestamp || existing.timestamp,
-    });
-  }
-
-  return Array.from(baseRows.values()).sort((a, b) => (b.timestamp > a.timestamp ? 1 : -1));
+  return projectCompatibleDatabaseMessages(messages).records.map((record) => ({
+    id: record.id,
+    databaseId: record.databaseId,
+    table: record.table,
+    data: record.data,
+    revision: record.revision,
+    timestamp: record.timestamp,
+  }));
 }
 
 export function databaseImportRows(text: string): Record<string, unknown>[] {

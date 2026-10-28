@@ -33,6 +33,8 @@ WED-289 contract freeze and compatibility
 
 ## 3. WED-289 — Freeze the generic database contract
 
+Implementation status (2026-10-29): complete on `agent/codex/WED-289`, pending final clean-commit verification. The mounted and neutral shapes now share one compatibility boundary and all runtime Database writers use the versioned canonical commands. A read-only hosted inventory observed zero database-family rows, so no production rewrite was introduced.
+
 ### Goal
 
 Reconcile the older `database` design contract with the mounted `database_record`, `database_schema_update`, and `note:ledger_update` implementation before run-sheet records are added.

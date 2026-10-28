@@ -1,6 +1,5 @@
 ﻿// @locs-version: 1.0
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
-import { sendAfpMessage } from "@/lib/api";
 import type { DashboardBootstrap } from "@/lib/api";
 import {
   buildDatabaseViewFailureReceipt,
@@ -17,6 +16,11 @@ import {
   type DatabaseViewColumnDef as ColDef,
   type DatabaseViewRecord as DbRecord,
 } from "@/lib/databaseViewState";
+import {
+  sendDatabaseRecord,
+  sendDatabaseRecordRevision,
+  sendDatabaseSchema,
+} from "@/lib/databaseMessageCommands";
 import { TiptapEditor } from "@/components/editor/TiptapEditor";
 import { dashboardBootstrapMessages } from "@/lib/dashboardBootstrapState";
 import { isRecord } from "@/lib/eventDetail";
@@ -34,71 +38,6 @@ type DatabaseMessage = {
   content: unknown;
   timestamp: string;
 };
-
-function sendRecord(table: string, data: unknown) {
-  const threadId = `db_${table}_${Date.now()}`;
-  return sendAfpMessage({
-    thread_id: threadId,
-    from: "user@omnyid.local",
-    to: ["agent://database"],
-    type: "database_record",
-    content: { kind: "database_record", table, data },
-    metadata: {
-      origin: "database_view",
-      database_table: table,
-    },
-    memory_scope: {
-      memory_space: "personal",
-      author_mask: "private",
-      author_type: "human",
-      human_only: true,
-    },
-  });
-}
-
-function sendRecordUpdate(table: string, targetRecordId: string, patch: Record<string, unknown>) {
-  const threadId = `db_${table}_${targetRecordId}`;
-  return sendAfpMessage({
-    thread_id: threadId,
-    from: "user@omnyid.local",
-    to: ["agent://database"],
-    type: "note:ledger_update",
-    content: {
-      kind: "database_record_update",
-      table,
-      target_record_id: targetRecordId,
-      patch,
-    },
-    metadata: {
-      origin: "database_view",
-      database_table: table,
-      target_record_id: targetRecordId,
-    },
-    memory_scope: {
-      memory_space: "personal",
-      author_mask: "private",
-      author_type: "human",
-      human_only: true,
-    },
-  });
-}
-
-function sendSchemaUpdate(table: string, column: ColDef) {
-  return sendAfpMessage({
-    thread_id: `db_${table}_schema`,
-    from: "user@omnyid.local",
-    to: ["agent://database"],
-    type: "database_schema_update",
-    content: { kind: "database_schema_update", table, column },
-    metadata: { origin: "database_view", database_table: table },
-    memory_scope: {
-      memory_space: "personal",
-      author_mask: "private",
-      author_type: "human",
-      human_only: true,
-    },
-  });
-}
 
 function GhostGrid(props: {
   headers: string[];
@@ -250,12 +189,12 @@ function ImportModal(props: {
       const timestamp = new Date().toISOString();
       const messages: DatabaseMessage[] = [];
       for (const row of rows) {
-        const result = await sendRecord(table(), row);
+        const result = await sendDatabaseRecord(table(), row);
         messages.push({
           id: result.message_id,
           type: "database_record",
           timestamp,
-          content: { kind: "database_record", table: table(), data: row },
+          content: result.content,
         });
       }
       props.onCreated(messages);
@@ -379,12 +318,12 @@ function AddRecordModal(props: {
       let data: unknown = content();
       const parsed = parseJsonValue(content());
       if (parsed.ok) data = parsed.value;
-      const result = await sendRecord(targetTable, data);
+      const result = await sendDatabaseRecord(targetTable, data);
       props.onCreated({
         id: result.message_id,
         type: "database_record",
         timestamp: new Date().toISOString(),
-        content: { kind: "database_record", table: targetTable, data },
+        content: result.content,
       });
       props.onClose();
     } catch (err) {
@@ -619,12 +558,12 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
   }
 
   async function createFirstRecord(table: string, data: Record<string, string>) {
-    const result = await sendRecord(table, data);
+    const result = await sendDatabaseRecord(table, data);
     recordLocalMessage({
       id: result.message_id,
       type: "database_record",
       timestamp: new Date().toISOString(),
-      content: { kind: "database_record", table, data },
+      content: result.content,
     });
     setActiveTable(table);
   }
@@ -662,17 +601,18 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
     setSavingCell({ rowId: row.id, col });
     setEditError(null);
     try {
-      const result = await sendRecordUpdate(row.table, row.id, { [col]: nextValue });
+      const result = await sendDatabaseRecordRevision({
+        databaseId: row.databaseId,
+        table: row.table,
+        targetRecordId: row.id,
+        baseRevision: row.revision,
+        patch: { [col]: nextValue },
+      });
       recordLocalMessage({
         id: result.message_id,
         type: "note:ledger_update",
         timestamp: new Date().toISOString(),
-        content: {
-          kind: "database_record_update",
-          table: row.table,
-          target_record_id: row.id,
-          patch: { [col]: nextValue },
-        },
+        content: result.content,
       });
       setEditingCell(null);
       setEditingValue("");
@@ -800,12 +740,12 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
                     const key = label.toLocaleLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") || `field_${Date.now()}`;
                     void (async () => {
                       try {
-                        const result = await sendSchemaUpdate(table, { key, label });
+                        const result = await sendDatabaseSchema(table, { key, label });
                         recordLocalMessage({
                           id: result.message_id,
                           type: "database_schema_update",
                           timestamp: new Date().toISOString(),
-                          content: { kind: "database_schema_update", table, column: { key, label } },
+                          content: result.content,
                         });
                       } catch (error) {
                         setEditError(buildDatabaseViewFailureReceipt("Add field", error instanceof Error ? error.message : "Could not add this field."));

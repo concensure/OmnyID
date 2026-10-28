@@ -27,8 +27,10 @@ test("database view state normalizes base records and record updates from unknow
     }),
     {
       id: "row-1",
+      databaseId: "database:legacy",
       table: "clients",
       data: { name: "Acme", seats: 3 },
+      revision: 1,
       timestamp: "2026-09-01T08:00:00.000Z",
     },
   );
@@ -44,9 +46,13 @@ test("database view state normalizes base records and record updates from unknow
       },
     }),
     {
+      databaseId: "database:legacy",
       targetRecordId: "row-1",
       table: "clients",
       patch: { seats: 4 },
+      baseRevision: null,
+      revision: null,
+      operation: "upsert",
       timestamp: "2026-09-01T09:00:00.000Z",
     },
   );
@@ -88,8 +94,10 @@ test("database view state folds updates over base rows and ignores orphan update
   assert.deepEqual(rows, [
     {
       id: "row-1",
+      databaseId: "database:legacy",
       table: "clients",
       data: { name: "Acme", seats: 4, stage: "active" },
+      revision: 2,
       timestamp: "2026-09-01T09:00:00.000Z",
     },
   ]);
@@ -134,6 +142,7 @@ test("database view state keeps durable user-created column definitions", () => 
     },
   };
   assert.deepEqual(databaseSchemaUpdateFromMessage(message), {
+    databaseId: "database:legacy",
     table: "clients",
     column: { key: "follow_up", label: "Follow-up" },
   });

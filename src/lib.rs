@@ -30,6 +30,7 @@ pub mod coordination_listener;
 pub mod cost_oracle;
 pub mod crypto;
 pub mod curator_runtime;
+pub mod database_contract;
 pub mod daemon_registry;
 pub mod daemon_runtime;
 pub mod db;

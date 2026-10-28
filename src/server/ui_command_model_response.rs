@@ -3,7 +3,10 @@
 // @primary-capability: master-agent-model-response-boundary
 // @stability: beta
 
-use super::{UiCommandResponse, Value};
+use super::UiCommandResponse;
+
+#[cfg(test)]
+use super::Value;
 
 fn bounded_model_text(text: &str, max_chars: usize) -> String {
     let normalized = text.trim();

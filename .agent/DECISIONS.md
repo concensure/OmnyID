@@ -1939,3 +1939,22 @@ incremental projections of the wedding AFP ledger with checkpoints, source refer
 overrides. Users retain the ability to create blank and unrelated databases. Deterministic projectors
 handle normal updates; an LLM may resolve only bounded ambiguity and must record source references,
 cost, approval and revision history.
+
+## 2026-10-29: Database contract V1 uses mounted writes with neutral-shape read compatibility
+
+The canonical forward Database record remains `database_record`; append-only changes remain
+`note:ledger_update` with `kind: database_record_update`. Both carry `contract_version: 1`, stable
+database/record identity, monotonic revision metadata, an action idempotency key and bounded source
+references. Schema writes use the same database identity. The older neutral `type: database` shape is
+read-compatible only and is not dual-written.
+
+The effective projection is deterministic: exact action retries have one effect, canonical revisions
+must follow the current revision, cross-database targets and orphan revisions become conflicts, and a
+tombstone removes only the effective row while AFP history remains. Until WED-290 creates durable
+definitions, generic rows belong to the visible `database:legacy` definition rather than treating a
+table label as database authority. Account-scoped AFP retrieval prevents a foreign database ID from
+resolving another tenant's rows; additionally declared foreign account scope fails the Rust contract.
+
+A read-only aggregate Oracle observation found no hosted database-family rows on 2026-10-29. No data
+migration or rewrite is justified. Compatibility stays in place for fixtures, older clients and
+restored histories, and must be shadow-inventoried after V1 writes are hosted before retirement.
