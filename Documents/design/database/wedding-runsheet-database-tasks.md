@@ -187,7 +187,7 @@ Seed only when evidence exists, otherwise create a `needs-confirmation` suggesti
 
 ### Implementation status — 2026-10-29
 
-In progress. The deterministic client-side projection-plan layer now covers plan scoping, stable items, source references, fingerprints, replay suppression, stale handling, detached user rows, checkpoint receipts and change explanations with zero model calls. The server-side atomic batch/checkpoint command, expanded selectors, UI invocation and disposable-Postgres concurrency proof remain open.
+Complete in WED-291. The selected Wedding run-sheet profile now loads its durable projection state and incrementally maps plan-scoped milestones, tasks, supplier evidence, logistics and circulation work into source-linked rows with zero model calls. An authenticated server command validates account and plan authority, locks the checkpoint, protects user-created rows, and commits row changes, the AFP receipt and checkpoint atomically. Exact retries replay the prior result; competing stale writers fail closed. A disposable pgvector/Postgres test proves rollback, one-winner concurrency and retry behaviour. No hosted sharing or outbound delivery was enabled.
 
 ## 6. WED-292 — Add run-sheet profile controls and time editing
 

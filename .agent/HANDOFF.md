@@ -5451,3 +5451,20 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch `agent/codex/W
 - The designated `casper.wu01@gmail.com` test-account password file now receives HTTP 401 `credentials`; no secret was printed and no password/account mutation was attempted. Authenticated browser acceptance is therefore not claimed, while unit, integration-contract, production build, source hash and live route evidence pass.
 
 Next: resume WED-291 with the authenticated transactional run-sheet projection endpoint. Do not treat the marketing preview or the pure projector as proof that automatic row population is complete.
+## 2026-10-29 - WED-291 atomic wedding run-sheet projector (Codex, complete)
+
+Changed:
+
+- Added the authenticated, account/plan-scoped run-sheet projection load and commit API plus content-light checkpoint/idempotency tables.
+- Mounted automatic zero-model structured projection in the existing Database view, expanded milestone/supplier/logistics/circulation selectors, preserved detached rows, marked unresolved sources stale, and made profile creation idempotent per wedding plan.
+- Kept implementation bodies in focused files under the line budget; `DatabaseView.tsx`, `src/db.rs` and `src/server/mod.rs` received thin integration only.
+
+Evidence:
+
+- Exact clean code candidate `c1ee49a03a50507080f2172f431b49847169ed58` passed six focused Rust tests, a live disposable pgvector/Postgres rollback/concurrency/retry test, 19 focused frontend tests, typecheck, both line budgets, all 2,027 Wedding tests and the production UI build.
+- Detailed evidence: `Documents/verification/WED-291-ATOMIC-RUNSHEET-PROJECTION-2026-10-29.md`.
+- No deployment or hosted sharing/transport flag change occurred.
+
+Next:
+
+- Continue WED-292 from this completed dependency: define a generic Database profile toolbar plug-in and pure time/override rules, then mount day/status/conflict controls and safe mobile editing without special-casing ordinary databases.

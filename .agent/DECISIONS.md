@@ -1981,6 +1981,13 @@ The Policy V2 browser flag is `VITE_WEDDING_VENDOR_RANKING_POLICY_V2`, matching 
 - WED-291 remains open until a server command commits all record revisions and the projection receipt/checkpoint atomically. A failed server batch must leave the prior checkpoint authoritative.
 - User-created or explicitly detached rows are outside projector overwrite authority.
 
+# 2026-10-29 — Run-sheet checkpoint coordination is content-light; AFP remains record authority
+
+- Wedding run-sheet rows, revisions and projection receipts remain account-private AFP messages. The relational projection tables hold only owner/database/plan identifiers, fingerprints, cursors, affected record IDs and deterministic message IDs needed to serialize retries; they are not a second run-sheet store.
+- The authenticated commit command verifies the selected `wedding_runsheet.v1` definition and every source message inside the account's private schema, locks one database/projector checkpoint, and writes the AFP batch plus checkpoint in a single PostgreSQL transaction.
+- The browser may prepare a deterministic bounded batch but cannot advance authority. A failed or stale batch leaves the previous checkpoint unchanged, exact retries return the stored commit, and a projector cannot revise a row whose original projection state is not `projected`.
+- One profile definition is reused per wedding plan. Reopening an archived definition offers restore instead of creating a duplicate database.
+
 # 2026-10-29 — Quiz account handoff is a bounded AFP import, not a second profile store
 
 - The public quiz keeps raw answers, names and partner-link payloads in the browser. Only the explicit account action may create a 30-day bounded handoff containing planning facts.

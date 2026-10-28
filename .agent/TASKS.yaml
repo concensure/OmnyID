@@ -27,13 +27,23 @@ tasks:
 
   - id: WED-291
     title: Implement the incremental wedding run-sheet projector
-    status: in_progress
+    status: done
     owner: codex
     branch: agent/codex/WED-291-atomic
     depends_on: [WED-290]
     files: [solid-ui/src/components/DatabaseView.tsx, solid-ui/src/components/WeddingRunSheetProjectionStatus.tsx, solid-ui/src/lib/weddingRunSheetProjectorState.ts, solid-ui/src/lib/weddingRunSheetProjectionApi.ts, solid-ui/src/lib/databaseRegistryState.ts, solid-ui/src/lib/databaseContract.ts, solid-ui/src/lib/databaseMessageCommands.ts, solid-ui/tests/wedding-run-sheet-projector-state.test.ts, solid-ui/tests/wedding-run-sheet-projection-api.test.ts, solid-ui/tests/database-registry-state.test.ts, src/server/**runsheet**, src/db/**runsheet**, src/db.rs, src/server/mod.rs, src/db/migration_catalog.rs, postgres/migrations/**, Documents/design/database/wedding-runsheet-database-tasks.md, Documents/verification/**, .agent/**]
     acceptance: [wedding_runsheet.v1 is created idempotently per selected plan, scoped source selectors cover structured wedding milestones/tasks/vendors/logistics and circulation tasks, changed AFP ids map to bounded logical items, fingerprints skip unchanged facts, record revisions and checkpoint receipts commit atomically, user rows survive and unresolved sources become stale rather than deleted, connected changes have user-facing explanations, structured projection makes zero model calls, retry/concurrency/disposable-Postgres tests pass]
-    progress: "Started from clean WED-290 commit 7746d988ba9b44f1908331aa77c66130ca8bf2c3. Implemented the first deterministic slice: plan-scoped source selection, stable logical item mapping, bounded fact packets, source fingerprints, create/revision planning, unchanged replay suppression, detached-user-row preservation, stale marking, checkpoint receipts, user-facing explanations and an explicit zero-model-call result. Focused TypeScript, 11 projector/contract tests and line budgets pass. Still open: one server-side atomic batch/checkpoint command, full selector expansion, failure/concurrency retry proof against disposable Postgres, and UI invocation."
+    progress: "Completed on exact clean code candidate c1ee49a03a50507080f2172f431b49847169ed58. Database automatically loads and incrementally projects account/plan-scoped wedding milestones, tasks, supplier evidence, logistics and run-sheet circulation facts with zero model calls. The authenticated server validates definition and source authority, locks the checkpoint, protects detached rows, commits record/revision/receipt AFP messages and the checkpoint in one transaction, returns exact retries as replays and rejects concurrent stale writers. Profile creation reuses one definition per wedding plan. Pass: 19 focused frontend tests, six focused Rust tests, disposable pgvector/Postgres rollback/concurrency/retry proof, TypeScript typecheck, both line budgets, all 2,027 Wedding tests and production UI build. Evidence: Documents/verification/WED-291-ATOMIC-RUNSHEET-PROJECTION-2026-10-29.md. No deployment or sharing flag activation occurred."
+
+  - id: WED-292
+    title: Add run-sheet profile controls and safe time editing inside Database
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-292
+    depends_on: [WED-291]
+    files: [solid-ui/src/components/DatabaseView.tsx, solid-ui/src/components/DatabaseProfileToolbar.tsx, solid-ui/src/components/WeddingRunSheetProfileToolbar.tsx, solid-ui/src/components/DatabaseGrid.tsx, solid-ui/src/lib/databaseProfilePluginState.ts, solid-ui/src/lib/weddingRunSheetEditingState.ts, solid-ui/src/lib/databaseMessageCommands.ts, solid-ui/tests/database-profile-plugin-state.test.ts, solid-ui/tests/wedding-run-sheet-editing-state.test.ts, Documents/design/database/wedding-runsheet-database-tasks.md, Documents/verification/**, .agent/**]
+    acceptance: [Run-sheet-only controls are registered through a generic profile plug-in boundary, day status and conflict filters plus chronological ordering and a time rail work without affecting ordinary databases, zoned time status place owner participant visibility dependency and buffer fields render clearly, users can add and edit run-sheet items on desktop and mobile, confirmed connected time changes require confirmation and distinguish run-sheet override from authoritative-source update, source and override state are visible, keyboard earlier/later alternatives exist, custom database fields survive, focused tests typecheck Wedding tests build and line budgets pass]
+    progress: "Started after WED-291 exact code candidate c1ee49a03a50507080f2172f431b49847169ed58. First slice will establish the generic profile plug-in boundary and pure run-sheet time/editing rules before mounting profile UI."
 
   - id: WED-290
     title: Add generic database definitions, switching, creation and archive lifecycle
