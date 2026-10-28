@@ -30,7 +30,6 @@ pub fn shutdown_channel() -> (ShutdownTx, ShutdownRx) {
     tokio::sync::watch::channel(false)
 }
 
-/// Archive wakeups coalesce writes rather than polling every 600 seconds.
 const ARCHIVE_MIN_IDLE_SECS: u64 = 30;
 const HEALTH_MIN_IDLE_SECS: u64 = 60;
 const HEALTH_MAINTENANCE_AGENT: &str = "omnyid://daemon/health-maintenance";
@@ -121,8 +120,7 @@ pub fn start_health_maintenance_daemon(db: Db, mut shutdown: ShutdownRx) -> Join
                 _ = tokio::time::sleep(Duration::from_secs(idle_secs)) => {
                     idle_secs = 900;
                 }
-                // Bridge A: new ingestion/watcher activity may create backlink or
-                // duplicate-detection work.
+                // Bridge A: new ingestion/watcher activity may create backlink or duplicate-detection work.
                 res = wake.recv() => {
                     use tokio::sync::broadcast::error::RecvError;
                     match res {
@@ -931,16 +929,14 @@ pub fn seaweedfs_client() -> Option<ObjectStoreClient> {
 
 pub async fn check_seaweedfs_access() -> Option<Result<(), String>> {
     let client = seaweedfs_client()?;
-    Some(
-        client
-            .client
-            .head_bucket()
-            .bucket(&client.bucket)
-            .send()
-            .await
-            .map(|_| ())
-            .map_err(|_| "authenticated object-store probe failed".to_string()),
-    )
+    let probe = client
+        .client
+        .head_bucket()
+        .bucket(&client.bucket)
+        .send()
+        .await;
+    let failure = |_| "authenticated object-store probe failed".to_string();
+    Some(probe.map(|_| ()).map_err(failure))
 }
 
 fn archive_root_dir() -> PathBuf {
