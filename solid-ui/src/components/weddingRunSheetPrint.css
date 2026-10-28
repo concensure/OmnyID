@@ -1,0 +1,28 @@
+@media print {
+  body.omnyid-runsheet-printing * {
+    visibility: hidden !important;
+  }
+
+  body.omnyid-runsheet-printing [data-runsheet-print],
+  body.omnyid-runsheet-printing [data-runsheet-print] * {
+    visibility: visible !important;
+  }
+
+  body.omnyid-runsheet-printing [data-runsheet-print] {
+    position: absolute !important;
+    inset: 0 auto auto 0 !important;
+    width: 100% !important;
+    max-height: none !important;
+    overflow: visible !important;
+    border: 0 !important;
+    box-shadow: none !important;
+  }
+
+  body.omnyid-runsheet-printing [data-runsheet-print] tr {
+    break-inside: avoid;
+  }
+
+  body.omnyid-runsheet-printing [data-runsheet-no-print] {
+    display: none !important;
+  }
+}

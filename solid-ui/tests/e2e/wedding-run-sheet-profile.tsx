@@ -7,6 +7,7 @@ import {
   WeddingRunSheetMobileCards,
   WeddingRunSheetProfileToolbar,
 } from "../../src/components/WeddingRunSheetProfileToolbar";
+import { WeddingRunSheetSavedViews } from "../../src/components/WeddingRunSheetSavedViews";
 import {
   filterWeddingRunSheetRows,
   projectWeddingRunSheetRows,
@@ -29,6 +30,7 @@ const records: DatabaseViewRecord[] = [
       location: "Harbour garden",
       owner_refs: ["Priya"],
       visibility: ["master", "vendor"],
+      private_notes: "alarm code",
       source_refs: [{ message_id: "decision-ceremony", kind: "wedding_decision" }],
     },
   },
@@ -78,6 +80,7 @@ function Fixture() {
       onTimeChange={() => setStatus("Time changed")}
       onShift={(_record, minutes) => setStatus(minutes < 0 ? "Moved earlier" : "Moved later")}
     />
+    <WeddingRunSheetSavedViews databaseId="database:runsheet" rows={rows} archived={false} onMessage={() => undefined} />
     <p role="status" class="sr-only">{status()}</p>
     <WeddingRunSheetItemDialog
       open={dialogOpen()}

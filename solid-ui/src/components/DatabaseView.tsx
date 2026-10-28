@@ -65,6 +65,7 @@ import {
 } from "@/lib/weddingRunSheetEditingState";
 import { weddingTaskDateToAfpSendInput } from "@/lib/weddingTaskDateProjectionState";
 import { DatabaseGhostGrid } from "@/components/DatabaseGrid";
+import { WeddingRunSheetSavedViews } from "@/components/WeddingRunSheetSavedViews";
 
 type DensityBucket = "compact" | "comfortable" | "spacious";
 
@@ -635,6 +636,15 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
         onRunSheetFilters={setRunSheetFilters}
         onAddRunSheetItem={() => { setRunSheetActionError(""); setShowRunSheetAdd(true); }}
       />
+
+      <Show when={selectedProfilePlugin()?.toolbarKind === "wedding_run_sheet" && selectedDatabaseId()}>{(databaseId) =>
+        <WeddingRunSheetSavedViews
+          databaseId={databaseId()}
+          rows={runSheetRows()}
+          archived={selectedDefinition()?.archived ?? false}
+          onMessage={(message) => recordLocalMessage(message as DatabaseMessage)}
+        />
+      }</Show>
 
       {/* Table filter pills */}
       <div class="flex flex-wrap items-center gap-2">

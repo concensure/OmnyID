@@ -26,6 +26,15 @@ for (const viewport of [{ width: 320, height: 720 }, { width: 375, height: 812 }
     await expect(page.getByRole("dialog")).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Add run-sheet item" })).toBeFocused();
 
+    await page.getByLabel("Role view").selectOption("vendor");
+    await page.getByRole("button", { name: "Preview" }).click();
+    await expect(page.getByRole("dialog", { name: "Vendor run sheet" })).toBeVisible();
+    await expect(page.getByText("Exact preview · 1 item")).toBeVisible();
+    await expect(page.getByText(/private notes/i)).toBeVisible();
+    await expect(page.getByText("alarm code", { exact: true })).toHaveCount(0);
+    await page.getByRole("button", { name: "Close" }).click();
+    await expect(page.getByRole("button", { name: "Preview" })).toBeFocused();
+
     const accessibility = await new AxeBuilder({ page }).analyze();
     expect(accessibility.violations.filter(({ impact }) => impact === "serious" || impact === "critical")).toEqual([]);
   });

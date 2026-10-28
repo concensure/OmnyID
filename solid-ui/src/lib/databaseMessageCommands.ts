@@ -6,12 +6,14 @@ import {
   buildCanonicalDatabaseDefinition,
   buildCanonicalDatabaseRecord,
   buildCanonicalDatabaseRevision,
+  buildCanonicalDatabaseSavedView,
   buildCanonicalDatabaseSchema,
   type CanonicalDatabaseRecordContent,
   type CanonicalDatabaseRevisionContent,
   type CanonicalDatabaseSchemaContent,
   type DatabaseArchiveContent,
   type DatabaseDefinitionContent,
+  type DatabaseSavedViewContent,
 } from "@/lib/databaseContract";
 
 type SendResult<T> = {
@@ -71,6 +73,53 @@ export async function sendDatabaseArchive(input: {
       database_id: content.database_id,
       idempotency_key: content.idempotency_key,
     },
+    memory_scope: privateDatabaseMemoryScope,
+  });
+  return { ...result, content };
+}
+
+export async function sendDatabaseSavedView(input: Parameters<typeof buildCanonicalDatabaseSavedView>[0]): Promise<SendResult<DatabaseSavedViewContent>> {
+  const content = buildCanonicalDatabaseSavedView(input);
+  const result = await sendAfpMessage({
+    thread_id: `db_${content.database_id}_views`,
+    from: "user@omnyid.local",
+    to: ["agent://database"],
+    type: "database_saved_view",
+    content,
+    metadata: {
+      origin: "database_view",
+      database_id: content.database_id,
+      saved_view_id: content.view_id,
+      idempotency_key: content.idempotency_key,
+    },
+    memory_scope: privateDatabaseMemoryScope,
+  });
+  return { ...result, content };
+}
+
+export async function sendDatabaseViewExportIntent(input: {
+  databaseId: string;
+  viewId: string;
+  recordIds: string[];
+  columns: string[];
+}): Promise<SendResult<Record<string, unknown>>> {
+  const exportedAt = new Date().toISOString();
+  const content = {
+    kind: "database_saved_view_export",
+    contract_version: 1,
+    database_id: input.databaseId,
+    view_id: input.viewId,
+    record_ids: Array.from(new Set(input.recordIds)).slice(0, 500),
+    columns: Array.from(new Set(input.columns)).slice(0, 100),
+    exported_at: exportedAt,
+  };
+  const result = await sendAfpMessage({
+    thread_id: `db_${input.databaseId}_views`,
+    from: "user@omnyid.local",
+    to: ["agent://database"],
+    type: "database_saved_view_export",
+    content,
+    metadata: { origin: "database_view", database_id: input.databaseId, saved_view_id: input.viewId },
     memory_scope: privateDatabaseMemoryScope,
   });
   return { ...result, content };
