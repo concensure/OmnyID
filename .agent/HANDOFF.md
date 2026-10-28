@@ -5392,7 +5392,7 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch `agent/codex/W
 - Safe reruns passed: 7 Worker tests, 7 provider units, 4 ingress units, 7 SMTP-out units, one disposable-Postgres complaint/no-retry integration and 3 live disposable ClamAV cases. These remain autonomous evidence, not substitutes for the missing external/human proof.
 - WED-289 verification passed 6 Rust contract tests, 13 frontend database tests, TypeScript typecheck, all 2,012 Wedding tests, production UI build and both line-budget checks. The build reports only the existing large-chunk warning.
 - No Cloudflare/provider/routing/allowlist/Oracle write, production flag change, deployment or policy-V2 enablement occurred. Next dependency-ready slice is WED-290 generic database definitions, creation and switching.
-## 2026-10-29 - WED-296 owner-authorized Wedding release candidate (Codex, in progress)
+## 2026-10-29 - WED-296 owner-authorized Wedding release (Codex, complete)
 
 Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch `agent/codex/WED-296`, based on WED-289 commit `259c0a5e0175a30131d95eea841fafb2b51abd3c`.
 
@@ -5406,4 +5406,11 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch `agent/codex/W
 - The next exact verifier passed those same checks but surfaced four physical lines of unrelated historical growth in `daemon_runtime.rs`; its existing retention logging match was compacted without changing behavior so the global guard remains authoritative.
 - The subsequent exact verifier again passed all functional/evidence checks and exposed the final two-line historical overage in `db.rs`; two separator-only blank lines were removed, with no executable change.
 
-Next: freeze the candidate commit, generate commit-bound evidence, run the full WED-225 verifier, inspect non-secret production provider readiness, then deploy and enable only controls whose runtime prerequisites are present. Exact-recipient allowlisting remains mandatory. After production health/identity proof, begin WED-290.
+Release outcome:
+
+- The exact clean candidate `518a106fdf2c8253144175d7ab591e51e47db1a7` passed the full readiness verifier with digest `656705c72756eadbe221d624c0726fb513f391c978a562cc8607b8a7a950d5d8` and was deployed to Oracle.
+- Policy V2 and the quotation extraction, recommendation, clarification, closure and approved vendor-response capabilities are enabled. Vendor mail, sender-mask and ingress remain false; a provider-observed live bounce/complaint remains an independent WED-286 prerequisite.
+- Synchronous post-deploy machine proof passed homeserver/backup service checks, backup verification and a restore drill at 78% disk use. `https://omnyid.com/workspace/` returned HTTP 200. Anonymous `/healthz` requires a session token and was not misreported as a public 200.
+- Evidence and rollback boundaries are recorded in `Documents/verification/wed-296-oracle-release-2026-10-29.md`; its post-release commit is not the deployed application SHA.
+
+Next: begin WED-290 generic database definitions, switching and creation from the post-release audit commit. Preserve the existing Database compatibility contract and do not introduce a parallel run-sheet store.
