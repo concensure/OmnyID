@@ -29,7 +29,7 @@ for (const viewport of [{ width: 320, height: 720 }, { width: 375, height: 812 }
     await page.getByLabel("Role view").selectOption("vendor");
     await page.getByRole("button", { name: "Preview" }).click();
     await expect(page.getByRole("dialog", { name: "Vendor run sheet" })).toBeVisible();
-    await expect(page.getByText("Exact preview · 1 item")).toBeVisible();
+    await expect(page.getByText("Exact preview · 2 items")).toBeVisible();
     await expect(page.getByText(/private notes/i)).toBeVisible();
     await expect(page.getByText("alarm code", { exact: true })).toHaveCount(0);
     await page.getByRole("button", { name: "Close" }).click();
