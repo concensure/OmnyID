@@ -55,7 +55,7 @@ export function WeddingRunSheetProfileToolbar(props: {
         </label>
       </div>
       <Show when={props.visibleRows.length > 0}>
-        <div class="overflow-x-auto pb-1" aria-label="Run-sheet time rail">
+        <div role="region" tabIndex={0} class="overflow-x-auto pb-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-wedding-action" aria-label="Run-sheet time rail; scroll horizontally for more items">
           <ol class="flex min-w-max items-start gap-2">
             <For each={props.visibleRows.slice(0, 12)}>{(item) => (
               <li class={`w-36 rounded-lg border px-3 py-2 ${item.conflictCodes.length ? "border-amber-300 bg-amber-50" : "border-wedding-border bg-white"}`}>
