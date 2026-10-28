@@ -1994,3 +1994,10 @@ The Policy V2 browser flag is `VITE_WEDDING_VENDOR_RANKING_POLICY_V2`, matching 
 - The workspace accepts both that handoff and the earlier `omnyid.wedding.coupleBrief.v1` result, but a compatibility adapter extracts only known fields and discards names, raw answers and unknown structure before any backend call.
 - After authentication, quiz facts become deterministic private AFP preference, intake and deal-breaker events. Existing user facts take precedence, every event has a stable retry identity, and the browser payload is removed only after all writes succeed.
 - The run-sheet marketing surface is labelled as a preview while WED-291's atomic server projection command remains open. It may explain the source-linked, approval-first direction but must not imply that vendor sharing occurs automatically.
+
+# 2026-10-29 — Run-sheet editing is a Database profile plug-in with explicit source authority
+
+- Wedding-specific filters, field order, mobile cards and time controls attach through the `wedding_runsheet.v1` profile registry. Ordinary databases do not import Wedding controls, and discovered custom fields remain available.
+- Proposed relative rows may recompute deterministically from an anchor. Confirmed rows never move silently: drift becomes a conflict, and a direct confirmed-time edit requires an explicit confirmation.
+- A run-sheet-only change is stored as a labelled override with the authoritative source unchanged. When a linked Wedding task exposes enough context, the user may update that task instead through its canonical AFP command. Unsupported source changes fail closed to the visible override path rather than synthesizing a second authority.
+- Manual rows are detached user records. Keyboard alternatives, focus restoration, mobile reflow and colour-independent status text are part of the editing contract, not deferred decoration.

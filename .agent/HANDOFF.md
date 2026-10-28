@@ -1,3 +1,25 @@
+## 2026-10-29 - WED-292 run-sheet profile editing (Codex, complete)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch `agent/codex/WED-292`; exact clean code candidate `8c9923361eac1cca0396c68803b2e2a5e601fe3f`.
+
+Changed:
+
+- Added a generic Database profile plug-in and Wedding run-sheet day/status/attention controls, chronological time rail, desktop grid integration, and mobile cards.
+- Added DST-aware time parsing, relative-anchor recomputation, confirmed-drift conflicts, explicit connected-time confirmation, labelled run-sheet overrides, and safe canonical linked-task date updates.
+- Added detached manual items with place, owner, participants and visibility. Owners, participants, dependencies, buffers and source/override state remain visible.
+- Made desktop cells keyboard-editable with focus restoration; dialogs restore their trigger; the horizontal rail is keyboard-scrollable; earlier/later actions avoid drag-only operation.
+
+Evidence:
+
+- Exact candidate passed TypeScript, 29 focused database/run-sheet tests, both line budgets, all 2,033 Wedding tests and the production UI build.
+- Three Playwright/Axe checks passed at 320px, 375px and 1280px with no serious/critical violations. The 320px case covers 400% equivalent reflow from 1280 CSS pixels.
+- Evidence: `Documents/verification/WED-292-RUNSHEET-PROFILE-EDITING-2026-10-29.md`.
+- No deployment, provider action, hosted share or rollout flag change occurred.
+
+Next:
+
+- Begin WED-293 saved role views, exact-content preview and accessible print. Keep hosted grants false-default and do not send anything merely by creating or previewing a view.
+
 ## 2026-10-28 - WED-286 Email Worker operational evidence (Codex, in progress)
 
 Changed:

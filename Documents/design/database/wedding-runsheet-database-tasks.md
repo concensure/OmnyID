@@ -230,6 +230,12 @@ Apply run-sheet editing needs to the generic Database view while keeping shared 
 - The run sheet is fully editable inside Database on desktop and mobile.
 - No source update requires manual reconciliation.
 
+### Implementation status — 2026-10-29
+
+Complete in WED-292 on exact clean code candidate `8c9923361eac1cca0396c68803b2e2a5e601fe3f`. The generic profile plug-in adds run-sheet-only day, status and attention filters, chronological presentation, time rail, mobile cards and manual-item entry without changing ordinary databases. Zoned times fail closed across daylight-saving gaps; proposed relative rows follow their anchors while confirmed drift becomes a visible conflict. Confirmed source-linked time edits require an explicit choice between a labelled run-sheet override and an authoritative linked-task update when that update can be made safely. Owners, participants, visibility, dependencies, buffers and source/override state remain visible. Keyboard cell editing restores focus, shift controls avoid drag-only interaction, dialogs restore their trigger, and the horizontal time rail is keyboard-scrollable.
+
+Verification on that candidate passed TypeScript, 29 focused tests, both line budgets, all 2,033 Wedding tests, the production build, and Playwright/Axe checks at 320px, 375px and 1280px. The 320px reflow is the 400% equivalent for a 1280 CSS-pixel layout. No deployment or hosted sharing activation occurred.
+
 ## 7. WED-293 — Saved views, print, and permissioned sharing
 
 ### Goal
