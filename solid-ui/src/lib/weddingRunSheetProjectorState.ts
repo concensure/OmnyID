@@ -45,6 +45,7 @@ type RunSheetFactPacket = {
   dueAt: string | null;
   durationMinutes: number | null;
   location: string | null;
+  timeZone: string;
   ownerRefs: string[];
   participantRefs: string[];
   status: "confirmed" | "proposed" | "needs-confirmation";
@@ -203,6 +204,7 @@ function packetForSource(source: Source): RunSheetFactPacket | null {
     dueAt: exactDateTime(source.contentObject.due_at ?? source.contentObject.due_date),
     durationMinutes: boundedMinutes(source.contentObject.duration_minutes ?? source.contentObject.duration),
     location: sourceLocation(source),
+    timeZone: clean(source.contentObject.time_zone ?? source.contentObject.timezone ?? source.metadataObject.time_zone) || "Australia/Sydney",
     ownerRefs: strings(source.contentObject.owner_refs ?? source.contentObject.owner ?? source.metadataObject.owner_refs),
     participantRefs: strings(source.contentObject.participant_refs ?? source.contentObject.participants),
     status: sourceStatus(source),
@@ -222,6 +224,7 @@ function rowData(packet: RunSheetFactPacket): Record<string, unknown> {
     duration_minutes: packet.durationMinutes,
     time_status: packet.startAt ? "proposed" : "unknown",
     location: packet.location,
+    time_zone: packet.timeZone,
     owner_refs: packet.ownerRefs,
     participant_refs: packet.participantRefs,
     category: packet.category,

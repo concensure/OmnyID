@@ -13,6 +13,7 @@ export type WeddingRunSheetPresentedRow = {
   record: DatabaseViewRecord;
   effectiveStartAt: string | null;
   effectiveEndAt: string | null;
+  timeZone: string;
   day: string;
   status: string;
   conflictCodes: string[];
@@ -61,6 +62,49 @@ function shiftedIso(value: string, minutes: number): string | null {
   return parsed.toISOString();
 }
 
+function zonedParts(value: string, timeZone: string): Record<string, string> | null {
+  try {
+    return Object.fromEntries(new Intl.DateTimeFormat("en-CA", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    }).formatToParts(new Date(value)).filter((part) => part.type !== "literal").map((part) => [part.type, part.value]));
+  } catch { return null; }
+}
+
+export function weddingRunSheetDayKey(value: string | null, timeZone: string): string {
+  if (!value) return "unscheduled";
+  const parts = zonedParts(value, timeZone);
+  return parts ? `${parts.year}-${parts.month}-${parts.day}` : "unscheduled";
+}
+
+export function weddingRunSheetInputValue(value: string | null, timeZone: string): string {
+  if (!value) return "";
+  const parts = zonedParts(value, timeZone);
+  return parts ? `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}` : "";
+}
+
+export function weddingRunSheetInputToIso(value: string, timeZone: string): string | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value.trim());
+  if (!match) return null;
+  const target = Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]), Number(match[4]), Number(match[5]));
+  let guess = target;
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const parts = zonedParts(new Date(guess).toISOString(), timeZone);
+    if (!parts) return null;
+    const represented = Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day), Number(parts.hour), Number(parts.minute));
+    const difference = target - represented;
+    if (difference === 0) break;
+    guess += difference;
+  }
+  const result = new Date(guess).toISOString();
+  return weddingRunSheetInputValue(result, timeZone) === value ? result : null;
+}
+
 function sourceReferences(record: DatabaseViewRecord): Array<{ messageId: string; kind: string }> {
   const sourceRefs = Array.isArray(record.data.source_refs) ? record.data.source_refs : [];
   return sourceRefs.flatMap((value) => {
@@ -88,6 +132,7 @@ export function projectWeddingRunSheetRows(
   const byId = new Map(runSheetRows.map((record) => [record.id, record]));
   const projected = runSheetRows.map((record) => {
     const status = text(record.data.status) || "needs-confirmation";
+    const timeZone = text(record.data.time_zone ?? record.data.timezone) || "Australia/Sydney";
     const storedStart = iso(record.data.start_at);
     const storedEnd = iso(record.data.end_at);
     const anchorId = text(record.data.anchor_record_id);
@@ -108,11 +153,12 @@ export function projectWeddingRunSheetRows(
     if (text(record.data.projection_state) === "stale") conflicts.add("stale_source");
     if (!effectiveStartAt) conflicts.add("missing_time");
     if (!text(record.data.owner_refs) && strings(record.data.owner_refs).length === 0) conflicts.add("missing_owner");
-    const day = effectiveStartAt?.slice(0, 10) ?? iso(record.data.due_at)?.slice(0, 10) ?? "unscheduled";
+    const day = weddingRunSheetDayKey(effectiveStartAt ?? iso(record.data.due_at), timeZone);
     return {
       record,
       effectiveStartAt,
       effectiveEndAt,
+      timeZone,
       day,
       status,
       conflictCodes: Array.from(conflicts),

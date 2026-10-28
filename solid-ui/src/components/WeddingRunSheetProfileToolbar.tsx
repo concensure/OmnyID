@@ -1,8 +1,10 @@
 // @locs-version: 1.0
-import { createSignal, For, Show } from "solid-js";
+import { createEffect, createSignal, For, Show } from "solid-js";
 import type { DatabaseViewRecord } from "@/lib/databaseViewState";
 import {
   weddingRunSheetDays,
+  weddingRunSheetInputToIso,
+  weddingRunSheetInputValue,
   weddingRunSheetTimeLabel,
   type WeddingRunSheetFilters,
   type WeddingRunSheetPresentedRow,
@@ -57,7 +59,7 @@ export function WeddingRunSheetProfileToolbar(props: {
           <ol class="flex min-w-max items-start gap-2">
             <For each={props.visibleRows.slice(0, 12)}>{(item) => (
               <li class={`w-36 rounded-lg border px-3 py-2 ${item.conflictCodes.length ? "border-amber-300 bg-amber-50" : "border-wedding-border bg-white"}`}>
-                <p class="text-[10px] font-semibold uppercase tracking-wide text-wedding-muted">{weddingRunSheetTimeLabel(item.effectiveStartAt)}</p>
+                <p class="text-[10px] font-semibold uppercase tracking-wide text-wedding-muted">{weddingRunSheetTimeLabel(item.effectiveStartAt, item.timeZone)}</p>
                 <p class="mt-1 line-clamp-2 text-xs font-semibold text-wedding-text">{String(item.record.data.title || "Run-sheet item")}</p>
               </li>
             )}</For>
@@ -66,13 +68,6 @@ export function WeddingRunSheetProfileToolbar(props: {
       </Show>
     </section>
   );
-}
-
-function localDateTimeValue(value: unknown): string {
-  const parsed = new Date(String(value ?? ""));
-  if (Number.isNaN(parsed.getTime())) return "";
-  const offset = parsed.getTimezoneOffset() * 60_000;
-  return new Date(parsed.getTime() - offset).toISOString().slice(0, 16);
 }
 
 export function WeddingRunSheetMobileCards(props: {
@@ -88,7 +83,7 @@ export function WeddingRunSheetMobileCards(props: {
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">
               <p class="font-semibold text-wedding-text">{String(item.record.data.title || "Run-sheet item")}</p>
-              <p class="mt-1 text-xs text-wedding-muted">{weddingRunSheetTimeLabel(item.effectiveStartAt)}</p>
+              <p class="mt-1 text-xs text-wedding-muted">{weddingRunSheetTimeLabel(item.effectiveStartAt, item.timeZone)} · {item.timeZone}</p>
             </div>
             <span class="rounded-full border border-wedding-border px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-wedding-muted">{item.status}</span>
           </div>
@@ -103,7 +98,7 @@ export function WeddingRunSheetMobileCards(props: {
           </Show>
           <label class="mt-3 block text-xs font-medium text-wedding-muted">
             Start time
-            <input type="datetime-local" disabled={props.archived} value={localDateTimeValue(item.effectiveStartAt)} onChange={(event) => { if (event.currentTarget.value) props.onTimeChange(item.record, new Date(event.currentTarget.value).toISOString()); }} class="mt-1 min-h-11 w-full rounded-lg border border-wedding-border px-3 text-sm text-wedding-text disabled:opacity-60" />
+            <input type="datetime-local" disabled={props.archived} value={weddingRunSheetInputValue(item.effectiveStartAt, item.timeZone)} onChange={(event) => { const next = weddingRunSheetInputToIso(event.currentTarget.value, item.timeZone); if (next) props.onTimeChange(item.record, next); }} class="mt-1 min-h-11 w-full rounded-lg border border-wedding-border px-3 text-sm text-wedding-text disabled:opacity-60" />
           </label>
           <div class="mt-3 grid grid-cols-2 gap-3">
             <button type="button" disabled={props.archived || !item.effectiveStartAt} onClick={() => props.onShift(item.record, -15)} class="min-h-11 rounded-lg border border-wedding-action px-3 text-sm font-semibold text-wedding-action disabled:opacity-45">15 min earlier</button>
@@ -127,6 +122,14 @@ export function WeddingRunSheetItemDialog(props: {
   const [location, setLocation] = createSignal("");
   const [ownerRef, setOwnerRef] = createSignal("");
   const [vendorVisible, setVendorVisible] = createSignal(false);
+  const [inputError, setInputError] = createSignal("");
+  let wasOpen = false;
+  createEffect(() => {
+    if (props.open && !wasOpen) {
+      setTitle(""); setStartAt(""); setLocation(""); setOwnerRef(""); setVendorVisible(false); setInputError("");
+    }
+    wasOpen = props.open;
+  });
   return <Show when={props.open}><div class="fixed inset-0 z-[210] flex items-end bg-on-surface/30 p-0 backdrop-blur-sm sm:items-center sm:justify-center sm:p-3" onClick={(event) => { if (event.target === event.currentTarget && !props.busy) props.onClose(); }}>
     <div class="max-h-[92vh] w-full overflow-y-auto rounded-t-2xl bg-white p-5 shadow-panel sm:max-w-md sm:rounded-2xl sm:p-6">
       <h2 class="text-lg font-bold text-wedding-text">Add run-sheet item</h2>
@@ -138,10 +141,15 @@ export function WeddingRunSheetItemDialog(props: {
         <label class="block text-sm font-medium text-wedding-text">Owner or contact<input value={ownerRef()} onInput={(event) => setOwnerRef(event.currentTarget.value)} class="mt-1 min-h-11 w-full rounded-lg border border-wedding-border px-3" /></label>
         <label class="flex min-h-11 items-center gap-3 rounded-lg border border-wedding-border px-3 text-sm text-wedding-text"><input type="checkbox" checked={vendorVisible()} onChange={(event) => setVendorVisible(event.currentTarget.checked)} /> Include in vendor view</label>
       </div>
-      <Show when={props.error}><p class="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{props.error}</p></Show>
+      <Show when={props.error || inputError()}><p class="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{props.error || inputError()}</p></Show>
       <div class="mt-5 grid grid-cols-2 gap-3">
         <button type="button" disabled={props.busy} onClick={props.onClose} class="min-h-12 rounded-lg border-2 border-wedding-action text-base font-bold text-wedding-action">Cancel</button>
-        <button type="button" disabled={props.busy || !title().trim()} onClick={() => props.onSave({ title: title(), startAt: startAt() ? new Date(startAt()).toISOString() : null, location: location(), ownerRef: ownerRef(), visibility: vendorVisible() ? ["master", "vendor"] : ["master"] })} class="min-h-12 rounded-lg bg-wedding-action text-base font-bold text-white disabled:opacity-50">{props.busy ? "Saving…" : "Add item"}</button>
+        <button type="button" disabled={props.busy || !title().trim()} onClick={() => {
+          const parsedStart = startAt() ? weddingRunSheetInputToIso(startAt(), "Australia/Sydney") : null;
+          if (startAt() && !parsedStart) { setInputError("Choose a valid Sydney date and time. This time may not exist because of daylight saving."); return; }
+          setInputError("");
+          props.onSave({ title: title(), startAt: parsedStart, location: location(), ownerRef: ownerRef(), visibility: vendorVisible() ? ["master", "vendor"] : ["master"] });
+        }} class="min-h-12 rounded-lg bg-wedding-action text-base font-bold text-white disabled:opacity-50">{props.busy ? "Saving…" : "Add item"}</button>
       </div>
     </div>
   </div></Show>;
@@ -156,7 +164,7 @@ export function WeddingRunSheetTimeChangeDialog(props: {
   onAuthoritativeUpdate: () => void;
 }) {
   return <Show when={props.review}>{(review) => <div class="fixed inset-0 z-[220] flex items-end bg-on-surface/30 p-0 backdrop-blur-sm sm:items-center sm:justify-center sm:p-3">
-    <div role="dialog" aria-modal="true" aria-labelledby="runsheet-time-review-title" class="w-full rounded-t-2xl bg-white p-5 shadow-panel sm:max-w-lg sm:rounded-2xl sm:p-6">
+    <div role="dialog" aria-modal="true" aria-labelledby="runsheet-time-review-title" class="w-full rounded-t-2xl bg-white p-5 shadow-panel sm:max-w-lg sm:rounded-2xl sm:p-6" onKeyDown={(event) => { if (event.key === "Escape" && !props.busy) props.onCancel(); }}>
       <h2 id="runsheet-time-review-title" class="text-lg font-bold text-wedding-text">Change this confirmed time?</h2>
       <p class="mt-2 text-sm leading-6 text-wedding-muted">{review().summary}</p>
       <div class="mt-3 rounded-lg border border-wedding-border bg-wedding-card p-3 text-sm text-wedding-text">
@@ -165,7 +173,7 @@ export function WeddingRunSheetTimeChangeDialog(props: {
       </div>
       <Show when={props.error}><p class="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{props.error}</p></Show>
       <div class="mt-5 grid gap-3 sm:grid-cols-2">
-        <button type="button" disabled={props.busy} onClick={props.onCancel} class="min-h-12 rounded-lg border-2 border-wedding-action text-base font-bold text-wedding-action">Cancel</button>
+        <button autofocus type="button" disabled={props.busy} onClick={props.onCancel} class="min-h-12 rounded-lg border-2 border-wedding-action text-base font-bold text-wedding-action">Cancel</button>
         <button type="button" disabled={props.busy} onClick={props.onOverride} class="min-h-12 rounded-lg bg-wedding-action text-base font-bold text-white">Change run sheet only</button>
         <Show when={review().authoritativeUpdateAvailable}><button type="button" disabled={props.busy} onClick={props.onAuthoritativeUpdate} class="min-h-12 rounded-lg border border-wedding-action bg-wedding-card px-3 text-sm font-bold text-wedding-action sm:col-span-2">Update the linked task instead</button></Show>
       </div>

@@ -9,6 +9,9 @@ import {
   weddingRunSheetManualRecord,
   weddingRunSheetOverridePatch,
   weddingRunSheetShiftReview,
+  weddingRunSheetDayKey,
+  weddingRunSheetInputToIso,
+  weddingRunSheetInputValue,
 } from "../src/lib/weddingRunSheetEditingState.ts";
 
 function row(id: string, data: Record<string, unknown>) {
@@ -60,4 +63,14 @@ test("manual run-sheet records are detached from projector overwrite authority",
   assert.equal(data.projection_state, "detached");
   assert.equal(data.override_state, "user_created");
   assert.deepEqual(data.visibility, ["master", "vip"]);
+});
+
+test("Sydney day filtering and datetime inputs survive UTC boundaries and daylight saving", () => {
+  const utc = "2027-11-19T14:30:00.000Z";
+  assert.equal(weddingRunSheetDayKey(utc, "Australia/Sydney"), "2027-11-20");
+  assert.equal(weddingRunSheetInputValue(utc, "Australia/Sydney"), "2027-11-20T01:30");
+  assert.equal(weddingRunSheetInputToIso("2027-11-20T01:30", "Australia/Sydney"), utc);
+  assert.equal(weddingRunSheetInputToIso("2027-10-03T02:30", "Australia/Sydney"), null, "nonexistent DST wall time fails closed");
+  const validAfterJump = weddingRunSheetInputToIso("2027-10-03T03:30", "Australia/Sydney");
+  assert.equal(weddingRunSheetInputValue(validAfterJump, "Australia/Sydney"), "2027-10-03T03:30");
 });
