@@ -44,14 +44,25 @@ test("public directory and claim flow expose database-backed discovery without e
 
 test("solo animal quiz sharing speaks for one person and avoids fragile emoji in message text", async () => {
   const [page, home, script] = await Promise.all([read("wedding/animal-quiz.html"), read("wedding/index.html"), read("wedding/assets/js/quiz.js")]);
-  assert.match(page, /quiz\.js\?v=20261027-wed273/);
+  assert.match(page, /quiz\.js\?v=20261029-wed297/);
   assert.match(script, /my wedding animal might be the/);
   assert.doesNotMatch(script, /I just found out our wedding animal might be/);
   assert.doesNotMatch(script, /might be the ' \+ a\.name \+ ' ' \+ a\.emoji/);
+  assert.match(script, /budget_stretch:/);
+  assert.match(script, /deal_breakers:/);
   assert.doesNotMatch(script, /�/);
   assert.match(home, /The Wedding Animal Quiz/);
   assert.match(home, /Find my wedding animal/);
   assert.doesNotMatch(home, /data-wedding-understanding-form/);
+});
+
+test("Wedding home promotes a source-linked approval-first run sheet", async () => {
+  const [home, style] = await Promise.all([read("wedding/index.html"), read("wedding/assets/css/style.css")]);
+  assert.match(home, /id="wedding-run-sheet"/);
+  assert.match(home, /same wedding plan—not a second checklist to reconcile/);
+  assert.match(home, /Nothing shared until you choose the audience and approve it/);
+  assert.match(style, /\.run-sheet-band/);
+  assert.match(style, /@media \(max-width: 480px\).*\.run-sheet-preview li/s);
 });
 
 test("operator quote-study view is mounted and does not expose object keys", async () => {

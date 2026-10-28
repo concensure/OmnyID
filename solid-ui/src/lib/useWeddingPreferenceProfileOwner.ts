@@ -1,5 +1,5 @@
 // @locs-version: 1.0
-import { createEffect, createSignal, type Accessor } from "solid-js";
+import { createEffect, createSignal, onCleanup, onMount, type Accessor } from "solid-js";
 
 import type { WeddingProjectionSaveFn } from "@/components/WeddingResponseWorkspaceViewTypes";
 import { importWeddingAnimalQuizHandoff } from "@/lib/weddingAnimalQuizImportState";
@@ -32,8 +32,15 @@ export function useWeddingPreferenceProfileOwner(input: {
   const [preferenceProfile, setPreferenceProfile] = createSignal<WeddingPreferenceProfileRecord | null>(null);
   const [preferenceSaving, setPreferenceSaving] = createSignal(false);
   const [leadMagnetImportNotice, setLeadMagnetImportNotice] = createSignal<string | null>(null);
+  const [importRequestRevision, setImportRequestRevision] = createSignal(0);
   let interpretedPreferenceFingerprint = "";
   let leadMagnetImportPlanId = "";
+
+  onMount(() => {
+    const onImportRequested = () => setImportRequestRevision((current) => current + 1);
+    window.addEventListener("omnyid:wedding-lead-magnet-import-requested", onImportRequested);
+    onCleanup(() => window.removeEventListener("omnyid:wedding-lead-magnet-import-requested", onImportRequested));
+  });
 
   function requirements() {
     const planning = input.state().contextCards.find((card) => card.planningContext)?.planningContext;
@@ -111,6 +118,7 @@ export function useWeddingPreferenceProfileOwner(input: {
   });
 
   createEffect(() => {
+    importRequestRevision();
     const metadata = input.state().workspace.metadata;
     const saveProjection = input.saveProjection;
     if (

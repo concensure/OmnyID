@@ -15,6 +15,16 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-297
+    title: Connect Wedding Animal Quiz results to the canonical planner profile and promote run sheets
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-297
+    depends_on: [WED-262, WED-290, WED-291, WED-296]
+    files: [solid-ui/src/lib/weddingAnimalQuizImportState.ts, solid-ui/src/lib/weddingLeadMagnetImportRunnerState.ts, solid-ui/src/lib/useWeddingPreferenceProfileOwner.ts, solid-ui/tests/wedding-animal-quiz-import-state.test.ts, wedding/index.html, wedding/assets/css/style.css, solid-ui/tests/wedding-quote-study-surface.test.ts, Documents/verification/**, .agent/**]
+    acceptance: [the explicit quiz account handoff accepts both the deployed coupleBrief.v1 payload and the bounded v1 handoff without raw answers or names, validated quiz facts persist through canonical private AFP preference and intake events only after authentication, retries are idempotent and the browser payload is consumed only after all writes succeed, vision budget guest venue style priority value dealbreaker date and location signals populate the wedding plan without overwriting existing user facts, the Wedding marketing home promotes the ledger-backed shareable run-sheet workflow truthfully and responsively, focused tests typecheck all Wedding tests production build site smoke and line-budget checks pass, one exact clean committed candidate is deployed and verified on Oracle]
+    progress: "Registered from clean WED-291 projector commit 40c315b45e856c0993e55f05ab37f6a8d656ff80 after confirming the current workspace importer persists a minimal handoff through AFP but does not accept the live coupleBrief.v1 shape and its mounted import trigger is not reactive."
+
   - id: WED-291
     title: Implement the incremental wedding run-sheet projector
     status: in_progress

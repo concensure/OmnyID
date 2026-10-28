@@ -9,6 +9,8 @@
   var STORE_KEY = 'omnyid.wedding.quiz.v1';
   var LEGACY_BRIEF_KEY = 'omnyid.wedding.coupleBrief.v1';
   var HANDOFF_KEY = 'omnyid.wedding.animal_quiz.handoff.v1';
+  var DEAL_BREAKER_LABELS = { debt: 'Going into debt', conflict: 'Family conflict', nophotos: 'No photos of the day',
+    boring: 'A boring party', generic: 'Feeling generic', stress: 'Planning stress' };
   var IMG = 'assets/images/quiz/';
   var S = { stage: 'intro', list: D.SOLO, phase: 'solo', qi: 0, me: { name: '', answers: {}, done: false },
     partner: null, joint: {}, jointDone: false, zoo: null, friend: null };
@@ -81,6 +83,9 @@
   }
   function writeProfileHandoff(res) {
     var b = res.brief, now = new Date();
+    var familyQuestion = E.byId(D.JOINT, 'family');
+    var familyChoice = familyQuestion && b.family_involvement
+      ? E.byId(familyQuestion.opts, b.family_involvement) : null;
     var handoff = {
       version: 1,
       created_at: now.toISOString(),
@@ -88,12 +93,15 @@
       animal_title: String(res.animal.title || '').slice(0, 120) || null,
       guest_range: b.guests.range ? { min: b.guests.range.min, max: b.guests.range.max } : null,
       budget_comfort: b.budget.comfort ? String(b.budget.comfort.label || '').slice(0, 120) : null,
+      budget_stretch: b.budget.stretch ? String(b.budget.stretch.label || '').slice(0, 120) : null,
       location: String(b.location.region_label || '').slice(0, 120) || null,
       date_or_season: String(b.timeframe.label || '').slice(0, 120) || null,
       top_priorities: b.priorities.top3.slice(0, 3).map(priorityLabel),
       atmosphere_keywords: b.style.keywords.slice(0, 6),
       venue_vibes: b.location.venue_vibe_labels.slice(0, 4),
-      values: b.values.slice(0, 5)
+      values: b.values.slice(0, 5),
+      deal_breakers: b.dealbreakers.slice(0, 3).map(function (id) { return DEAL_BREAKER_LABELS[id] || id; }),
+      family_involvement: familyChoice ? familyChoice.label : null
     };
     try {
       localStorage.setItem(HANDOFF_KEY, JSON.stringify(handoff));
