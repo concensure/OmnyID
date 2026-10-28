@@ -111,7 +111,17 @@ function Read-SignoffGate {
     try {
         $record = Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json
         $recordedAt = [DateTimeOffset]::MinValue
-        $timestampValid = [DateTimeOffset]::TryParse([string]$record.recorded_at, [ref]$recordedAt)
+        $timestampValid = $false
+        try {
+            # PowerShell 7 converts ISO JSON strings to DateTime before this
+            # verifier sees them. Casting the value directly supports that
+            # representation and the string representation used by 5.1.
+            $recordedAt = [DateTimeOffset]$record.recorded_at
+            $timestampValid = $recordedAt -gt [DateTimeOffset]::MinValue
+        }
+        catch {
+            $timestampValid = $false
+        }
         $valid = $record.schema_version -eq "quotation.external_evidence.v1" -and
             $record.gate -eq $Gate -and $record.status -eq "verified" -and
             $record.commit_sha -eq $Head -and
