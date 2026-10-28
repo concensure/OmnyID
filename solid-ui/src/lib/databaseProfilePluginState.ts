@@ -22,9 +22,10 @@ const weddingRunSheetPlugin: DatabaseProfilePlugin = {
     { key: "status", label: "Status" },
     { key: "location", label: "Place" },
     { key: "owner_refs", label: "Owner" },
+    { key: "participant_refs", label: "Participants" },
     { key: "visibility", label: "Shared with" },
   ],
-  mobileCardFields: ["title", "start_at", "status", "location", "owner_refs", "visibility"],
+  mobileCardFields: ["title", "start_at", "status", "location", "owner_refs", "participant_refs", "visibility"],
 };
 
 const plugins = new Map([[weddingRunSheetPlugin.profileId, weddingRunSheetPlugin]]);

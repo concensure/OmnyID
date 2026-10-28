@@ -513,7 +513,7 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
     } finally { setRunSheetActionBusy(false); }
   }
 
-  async function addManualRunSheetItem(input: { title: string; startAt: string | null; location: string; ownerRef: string; visibility: string[] }) {
+  async function addManualRunSheetItem(input: { title: string; startAt: string | null; location: string; ownerRef: string; participantRefs: string[]; visibility: string[] }) {
     const databaseId = selectedDatabaseId();
     if (!databaseId || runSheetActionBusy()) return;
     setRunSheetActionBusy(true); setRunSheetActionError("");

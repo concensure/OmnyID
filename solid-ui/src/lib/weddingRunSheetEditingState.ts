@@ -263,6 +263,7 @@ export function weddingRunSheetManualRecord(input: {
   startAt?: string | null;
   location?: string | null;
   ownerRef?: string | null;
+  participantRefs?: string[];
   visibility?: string[];
 }): Record<string, unknown> {
   const title = input.title.trim();
@@ -277,7 +278,7 @@ export function weddingRunSheetManualRecord(input: {
     time_status: startAt ? "proposed" : "unknown",
     location: input.location?.trim() || null,
     owner_refs: input.ownerRef?.trim() ? [input.ownerRef.trim()] : [],
-    participant_refs: [],
+    participant_refs: Array.from(new Set((input.participantRefs ?? []).map((value) => value.trim()).filter(Boolean))),
     category: "custom",
     status: "proposed",
     visibility: input.visibility?.length ? Array.from(new Set(input.visibility)) : ["master"],

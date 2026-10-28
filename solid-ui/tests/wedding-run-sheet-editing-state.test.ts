@@ -58,11 +58,12 @@ test("keyboard shift alternatives move unconfirmed rows by exact minutes", () =>
   assert.equal(review?.requiresConfirmation, false);
 });
 
-test("manual run-sheet records are detached from projector overwrite authority", () => {
-  const data = weddingRunSheetManualRecord({ title: "Pack emergency kit", startAt: "2027-11-20T01:00:00Z", visibility: ["master", "vip"] });
+test("manual run-sheet records retain participants and stay detached from projector authority", () => {
+  const data = weddingRunSheetManualRecord({ title: "Pack emergency kit", startAt: "2027-11-20T01:00:00Z", participantRefs: ["Priya", " Priya ", "Daniel"], visibility: ["master", "vip"] });
   assert.equal(data.projection_state, "detached");
   assert.equal(data.override_state, "user_created");
   assert.deepEqual(data.visibility, ["master", "vip"]);
+  assert.deepEqual(data.participant_refs, ["Priya", "Daniel"]);
 });
 
 test("Sydney day filtering and datetime inputs survive UTC boundaries and daylight saving", () => {

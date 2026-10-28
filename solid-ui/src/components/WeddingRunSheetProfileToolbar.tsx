@@ -90,6 +90,7 @@ export function WeddingRunSheetMobileCards(props: {
           <div class="mt-3 grid grid-cols-2 gap-2 text-xs text-wedding-muted">
             <p><span class="font-semibold text-wedding-text">Place:</span> {String(item.record.data.location || "Not set")}</p>
             <p><span class="font-semibold text-wedding-text">Owner:</span> {Array.isArray(item.record.data.owner_refs) && item.record.data.owner_refs.length ? item.record.data.owner_refs.join(", ") : "Not assigned"}</p>
+            <p><span class="font-semibold text-wedding-text">Participants:</span> {Array.isArray(item.record.data.participant_refs) && item.record.data.participant_refs.length ? item.record.data.participant_refs.join(", ") : "Not set"}</p>
             <p><span class="font-semibold text-wedding-text">Shared:</span> {Array.isArray(item.record.data.visibility) ? item.record.data.visibility.join(", ") : "Master only"}</p>
             <p><span class="font-semibold text-wedding-text">Source:</span> {item.overrideState === "runsheet_only" ? "Run-sheet override" : item.sourceLinked ? "Wedding plan" : "Manual item"}</p>
             <Show when={Array.isArray(item.record.data.dependency_refs) && item.record.data.dependency_refs.length}><p><span class="font-semibold text-wedding-text">Depends on:</span> {(item.record.data.dependency_refs as unknown[]).join(", ")}</p></Show>
@@ -118,19 +119,20 @@ export function WeddingRunSheetItemDialog(props: {
   busy: boolean;
   error: string;
   onClose: () => void;
-  onSave: (input: { title: string; startAt: string | null; location: string; ownerRef: string; visibility: string[] }) => void;
+  onSave: (input: { title: string; startAt: string | null; location: string; ownerRef: string; participantRefs: string[]; visibility: string[] }) => void;
 }) {
   const [title, setTitle] = createSignal("");
   const [startAt, setStartAt] = createSignal("");
   const [location, setLocation] = createSignal("");
   const [ownerRef, setOwnerRef] = createSignal("");
+  const [participants, setParticipants] = createSignal("");
   const [vendorVisible, setVendorVisible] = createSignal(false);
   const [inputError, setInputError] = createSignal("");
   let titleInput: HTMLInputElement | undefined;
   let wasOpen = false;
   createEffect(() => {
     if (props.open && !wasOpen) {
-      setTitle(""); setStartAt(""); setLocation(""); setOwnerRef(""); setVendorVisible(false); setInputError("");
+      setTitle(""); setStartAt(""); setLocation(""); setOwnerRef(""); setParticipants(""); setVendorVisible(false); setInputError("");
       queueMicrotask(() => titleInput?.focus());
     }
     wasOpen = props.open;
@@ -144,6 +146,7 @@ export function WeddingRunSheetItemDialog(props: {
         <label class="block text-sm font-medium text-wedding-text">Start time<input type="datetime-local" value={startAt()} onInput={(event) => setStartAt(event.currentTarget.value)} class="mt-1 min-h-11 w-full rounded-lg border border-wedding-border px-3" /></label>
         <label class="block text-sm font-medium text-wedding-text">Place<input value={location()} onInput={(event) => setLocation(event.currentTarget.value)} class="mt-1 min-h-11 w-full rounded-lg border border-wedding-border px-3" /></label>
         <label class="block text-sm font-medium text-wedding-text">Owner or contact<input value={ownerRef()} onInput={(event) => setOwnerRef(event.currentTarget.value)} class="mt-1 min-h-11 w-full rounded-lg border border-wedding-border px-3" /></label>
+        <label class="block text-sm font-medium text-wedding-text">Participants<input value={participants()} onInput={(event) => setParticipants(event.currentTarget.value)} placeholder="Names separated by commas" class="mt-1 min-h-11 w-full rounded-lg border border-wedding-border px-3" /></label>
         <label class="flex min-h-11 items-center gap-3 rounded-lg border border-wedding-border px-3 text-sm text-wedding-text"><input type="checkbox" checked={vendorVisible()} onChange={(event) => setVendorVisible(event.currentTarget.checked)} /> Include in vendor view</label>
       </div>
       <Show when={props.error || inputError()}><p class="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{props.error || inputError()}</p></Show>
@@ -153,7 +156,7 @@ export function WeddingRunSheetItemDialog(props: {
           const parsedStart = startAt() ? weddingRunSheetInputToIso(startAt(), "Australia/Sydney") : null;
           if (startAt() && !parsedStart) { setInputError("Choose a valid Sydney date and time. This time may not exist because of daylight saving."); return; }
           setInputError("");
-          props.onSave({ title: title(), startAt: parsedStart, location: location(), ownerRef: ownerRef(), visibility: vendorVisible() ? ["master", "vendor"] : ["master"] });
+          props.onSave({ title: title(), startAt: parsedStart, location: location(), ownerRef: ownerRef(), participantRefs: participants().split(",").map((value) => value.trim()).filter(Boolean), visibility: vendorVisible() ? ["master", "vendor"] : ["master"] });
         }} class="min-h-12 rounded-lg bg-wedding-action text-base font-bold text-white disabled:opacity-50">{props.busy ? "Saving…" : "Add item"}</button>
       </div>
     </div>
