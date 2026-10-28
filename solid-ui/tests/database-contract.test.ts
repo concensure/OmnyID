@@ -2,10 +2,31 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  buildCanonicalDatabaseArchive,
+  buildCanonicalDatabaseDefinition,
   buildCanonicalDatabaseRecord,
   buildCanonicalDatabaseRevision,
   buildCanonicalDatabaseSchema,
 } from "../src/lib/databaseContract.ts";
+
+test("definition and archive builders preserve scope and lifecycle revisions", () => {
+  const definition = buildCanonicalDatabaseDefinition({
+    databaseId: "database:clients",
+    accountId: "account-1",
+    name: "Client work",
+    defaultTable: "clients",
+    revision: 2,
+  });
+  const archive = buildCanonicalDatabaseArchive({
+    databaseId: definition.database_id,
+    archived: true,
+    revision: 1,
+  });
+  assert.equal(definition.scope.account_id, "account-1");
+  assert.equal(definition.revision, 2);
+  assert.equal(archive.database_id, definition.database_id);
+  assert.equal(archive.archived, true);
+});
 
 test("canonical database builders preserve stable identity and revision metadata", () => {
   const record = buildCanonicalDatabaseRecord({

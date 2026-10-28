@@ -139,6 +139,66 @@ function randomContractId(prefix: string): string {
   return `${prefix}:${random}`;
 }
 
+export function createDatabaseId(): string {
+  return randomContractId("database");
+}
+
+export function buildCanonicalDatabaseDefinition(input: {
+  databaseId?: string;
+  accountId: string;
+  name: string;
+  defaultTable?: string;
+  profileId?: string | null;
+  weddingPlanId?: string | null;
+  revision?: number;
+  idempotencyKey?: string;
+}): DatabaseDefinitionContent {
+  const databaseId = requireIdentifier(input.databaseId ?? createDatabaseId(), "database ID");
+  const accountId = requireIdentifier(input.accountId, "account ID");
+  const name = input.name.trim();
+  if (!name || name.length > 120) throw new Error("Invalid database name");
+  const profileId = input.profileId ? requireIdentifier(input.profileId, "profile ID") : undefined;
+  const weddingPlanId = input.weddingPlanId
+    ? requireIdentifier(input.weddingPlanId, "wedding plan ID")
+    : undefined;
+  const revision = requireRevision(input.revision ?? 1, "definition revision");
+  return {
+    kind: "database_definition",
+    contract_version: DATABASE_CONTRACT_VERSION,
+    database_id: databaseId,
+    name,
+    default_table: requireTable(input.defaultTable ?? DEFAULT_DATABASE_TABLE),
+    ...(profileId ? { profile_id: profileId } : {}),
+    scope: { account_id: accountId, ...(weddingPlanId ? { wedding_plan_id: weddingPlanId } : {}) },
+    revision,
+    idempotency_key: requireIdentifier(
+      input.idempotencyKey ?? `database-definition:${databaseId}:revision:${revision}`,
+      "idempotency key",
+    ),
+  };
+}
+
+export function buildCanonicalDatabaseArchive(input: {
+  databaseId: string;
+  archived: boolean;
+  revision: number;
+  idempotencyKey?: string;
+}): DatabaseArchiveContent {
+  const databaseId = requireIdentifier(input.databaseId, "database ID");
+  const revision = requireRevision(input.revision, "archive revision");
+  return {
+    kind: "database_archive",
+    contract_version: DATABASE_CONTRACT_VERSION,
+    database_id: databaseId,
+    archived: input.archived,
+    revision,
+    idempotency_key: requireIdentifier(
+      input.idempotencyKey ?? `database-archive:${databaseId}:revision:${revision}`,
+      "idempotency key",
+    ),
+  };
+}
+
 export function buildCanonicalDatabaseRecord(input: {
   databaseId?: string;
   recordId?: string;

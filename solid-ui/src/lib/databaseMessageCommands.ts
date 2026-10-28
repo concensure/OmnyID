@@ -2,12 +2,16 @@
 import { sendAfpMessage } from "@/lib/api";
 import {
   LEGACY_DATABASE_ID,
+  buildCanonicalDatabaseArchive,
+  buildCanonicalDatabaseDefinition,
   buildCanonicalDatabaseRecord,
   buildCanonicalDatabaseRevision,
   buildCanonicalDatabaseSchema,
   type CanonicalDatabaseRecordContent,
   type CanonicalDatabaseRevisionContent,
   type CanonicalDatabaseSchemaContent,
+  type DatabaseArchiveContent,
+  type DatabaseDefinitionContent,
 } from "@/lib/databaseContract";
 
 type SendResult<T> = {
@@ -22,6 +26,55 @@ const privateDatabaseMemoryScope = {
   author_type: "human",
   human_only: true,
 } as const;
+
+export async function sendDatabaseDefinition(input: {
+  accountId: string;
+  name: string;
+  defaultTable?: string;
+  databaseId?: string;
+  profileId?: string | null;
+  weddingPlanId?: string | null;
+  revision?: number;
+}): Promise<SendResult<DatabaseDefinitionContent>> {
+  const content = buildCanonicalDatabaseDefinition(input);
+  const result = await sendAfpMessage({
+    thread_id: `db_${content.database_id}_definition`,
+    from: "user@omnyid.local",
+    to: ["agent://database"],
+    type: "database_definition",
+    content,
+    metadata: {
+      origin: "database_view",
+      database_id: content.database_id,
+      database_profile_id: content.profile_id ?? null,
+      idempotency_key: content.idempotency_key,
+    },
+    memory_scope: privateDatabaseMemoryScope,
+  });
+  return { ...result, content };
+}
+
+export async function sendDatabaseArchive(input: {
+  databaseId: string;
+  archived: boolean;
+  revision: number;
+}): Promise<SendResult<DatabaseArchiveContent>> {
+  const content = buildCanonicalDatabaseArchive(input);
+  const result = await sendAfpMessage({
+    thread_id: `db_${content.database_id}_definition`,
+    from: "user@omnyid.local",
+    to: ["agent://database"],
+    type: "database_archive",
+    content,
+    metadata: {
+      origin: "database_view",
+      database_id: content.database_id,
+      idempotency_key: content.idempotency_key,
+    },
+    memory_scope: privateDatabaseMemoryScope,
+  });
+  return { ...result, content };
+}
 
 export async function sendDatabaseRecord(
   table: string,

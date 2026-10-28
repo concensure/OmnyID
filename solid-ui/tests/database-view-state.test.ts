@@ -6,6 +6,7 @@ import {
   databaseImportPreviewRows,
   databaseImportRows,
   databaseRecordFromMessage,
+  databaseRecordsForDatabase,
   databaseRecordUpdateFromMessage,
   databaseRecordsFromMessages,
   databaseSchemaColumnsFromMessages,
@@ -152,4 +153,13 @@ test("database view state keeps durable user-created column definitions", () => 
   assert.deepEqual(databaseColumnDefs([], [], databaseSchemaColumnsFromMessages([message], "clients")), [
     { key: "follow_up", label: "Follow-up" },
   ]);
+});
+
+test("database selection cannot leak rows from another logical database", () => {
+  const rows = [
+    { id: "row-a", databaseId: "database:a", table: "items", data: { name: "A" }, revision: 1, timestamp: "" },
+    { id: "row-b", databaseId: "database:b", table: "items", data: { name: "B" }, revision: 1, timestamp: "" },
+  ];
+  assert.deepEqual(databaseRecordsForDatabase(rows, "database:a").map((row) => row.id), ["row-a"]);
+  assert.deepEqual(databaseRecordsForDatabase(rows, null), []);
 });

@@ -7,8 +7,7 @@ import {
 } from "@/lib/databaseViewFailureState";
 import {
   databaseColumnDefs,
-  databaseImportPreviewRows,
-  databaseImportRows,
+  databaseRecordsForDatabase,
   databaseRecordsFromMessages,
   databaseSchemaColumnsFromMessages,
   formatDatabaseEditableValue,
@@ -17,29 +16,36 @@ import {
   type DatabaseViewRecord as DbRecord,
 } from "@/lib/databaseViewState";
 import {
+  sendDatabaseArchive,
+  sendDatabaseDefinition,
   sendDatabaseRecord,
   sendDatabaseRecordRevision,
   sendDatabaseSchema,
 } from "@/lib/databaseMessageCommands";
+import { DatabaseHeader, type DatabaseDensityMode } from "@/components/DatabaseHeader";
+import {
+  DatabaseCreateDialog,
+  DatabaseLifecycleDialog,
+  type DatabaseCreateInput,
+} from "@/components/DatabaseCreateDialog";
+import {
+  projectDatabaseDefinitions,
+  reconcileSelectedDatabaseId,
+  registeredDatabaseProfiles,
+} from "@/lib/databaseRegistryState";
 import { TiptapEditor } from "@/components/editor/TiptapEditor";
+import {
+  DatabaseAddRecordDialog,
+  DatabaseImportDialog,
+  type DatabaseEditorMessage as DatabaseMessage,
+} from "@/components/DatabaseRecordEditor";
 import { dashboardBootstrapMessages } from "@/lib/dashboardBootstrapState";
 import { isRecord } from "@/lib/eventDetail";
-import { parseJsonValue } from "@/lib/jsonParseState";
 import { recordShortcutUse } from "@/lib/shortcutRecency";
 import { surfaceShortDateLabel } from "@/lib/surfaceTimestampPresentation";
-import {
-  analyzeDatabaseImportInput,
-  analyzeDatabaseRecordContent,
-} from "@/lib/structuredTextInputState";
-
-type DatabaseMessage = {
-  id: string;
-  type: string;
-  content: unknown;
-  timestamp: string;
-};
 
 function GhostGrid(props: {
+  readonly?: boolean;
   headers: string[];
   tableName: string;
   onHeaderEdit: (idx: number, val: string) => void;
@@ -51,6 +57,7 @@ function GhostGrid(props: {
   const [saving, setSaving] = createSignal(false);
   const [error, setError] = createSignal("");
   const createRow = async () => {
+    if (props.readonly) return;
     const table = props.tableName.trim();
     const data = props.headers.reduce<Record<string, string>>((result, header, index) => {
       const value = draft()[`${index}`]?.trim();
@@ -75,6 +82,7 @@ function GhostGrid(props: {
       <div class="mb-3 flex items-center gap-2">
         <input
           value={props.tableName || ""}
+          disabled={props.readonly}
           onInput={(e) => props.onTableNameEdit(e.currentTarget.value)}
           placeholder="Unnamed Table"
           class="rounded-lg border border-transparent bg-transparent px-2 py-1 text-sm font-semibold text-on-surface/60 outline-none placeholder:text-on-surface-variant/35 focus:border-primary/25 focus:bg-white/30 focus:text-on-surface transition"
@@ -91,6 +99,7 @@ function GhostGrid(props: {
                   <th class="px-3 py-2 text-left">
                     <input
                       value={h}
+                      disabled={props.readonly}
                       onBlur={(e) => props.onHeaderEdit(i(), e.currentTarget.value)}
                       onKeyDown={(e) => {
                         if (e.key === "Enter") {
@@ -116,6 +125,7 @@ function GhostGrid(props: {
                   <td class="px-3 py-2">
                     <input
                       value={draft()[`${index()}`] ?? ""}
+                      disabled={props.readonly}
                       onInput={(event) => setDraft((current) => ({ ...current, [`${index()}`]: event.currentTarget.value }))}
                       onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void createRow(); } }}
                       placeholder="Enter value"
@@ -128,7 +138,7 @@ function GhostGrid(props: {
             <tr class="border-b border-white/20">
               <td colSpan={props.headers.length} class="px-3 py-2">
                 <div class="flex items-center gap-3">
-                  <button type="button" disabled={saving()} onClick={() => void createRow()} class="rounded-full bg-primary px-3 py-1.5 text-xs font-medium text-white transition hover:bg-primary/80 disabled:opacity-60">
+                  <button type="button" disabled={saving() || props.readonly} onClick={() => void createRow()} class="rounded-full bg-primary px-3 py-1.5 text-xs font-medium text-white transition hover:bg-primary/80 disabled:opacity-60">
                     {saving() ? "Saving…" : "Save row"}
                   </button>
                   <Show when={error()}><span class="text-xs text-red-600">{error()}</span></Show>
@@ -153,291 +163,13 @@ function GhostGrid(props: {
   );
 }
 
-function ImportModal(props: {
-  defaultTable: string;
-  onClose: () => void;
-  onCreated: (messages: DatabaseMessage[]) => void;
-}) {
-  const [raw, setRaw] = createSignal("");
-  const [table, setTable] = createSignal(props.defaultTable || "imported");
-  const [busy, setBusy] = createSignal(false);
-  const [error, setError] = createSignal<string | DatabaseViewFailureReceipt>("");
-  const [preview, setPreview] = createSignal<string[][]>([]);
-  const importState = createMemo(() => analyzeDatabaseImportInput(raw()));
-
-  function handlePaste(text: string) {
-    setError("");
-    setRaw(text);
-    try {
-      const rows = databaseImportRows(text);
-      if (rows.length > 0) {
-        setPreview(databaseImportPreviewRows(rows));
-      } else { setPreview([]); }
-    } catch { setPreview([]); }
-  }
-
-  async function doImport() {
-    if (busy()) return;
-    if (importState().format === "invalid-json") {
-      setError(importState().error ?? "Fix the JSON syntax before importing.");
-      return;
-    }
-    const rows = databaseImportRows(raw());
-    if (rows.length === 0) { setError("No records found — paste CSV or JSON."); return; }
-    setBusy(true);
-    try {
-      const timestamp = new Date().toISOString();
-      const messages: DatabaseMessage[] = [];
-      for (const row of rows) {
-        const result = await sendDatabaseRecord(table(), row);
-        messages.push({
-          id: result.message_id,
-          type: "database_record",
-          timestamp,
-          content: result.content,
-        });
-      }
-      props.onCreated(messages);
-      props.onClose();
-    } catch (err) {
-      setError(
-        buildDatabaseViewFailureReceipt(
-          "Import records",
-          err instanceof Error ? err.message : "Import failed.",
-        ),
-      );
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  function requestClose() {
-    if (busy()) return;
-    props.onClose();
-  }
-
-  return (
-    <div class="fixed inset-0 z-[200] flex items-center justify-center bg-on-surface/30 backdrop-blur-sm animate-fade-in"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) {
-          recordShortcutUse("form_cancel");
-          requestClose();
-        }
-      }}>
-      <div class="w-full max-w-lg rounded-3xl border border-white/45 bg-white/96 p-6 shadow-panel backdrop-blur-xl">
-        <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-outline mb-4">Import Data</p>
-        <input type="text" placeholder="Table name" value={table()} onInput={(e) => { setError(""); setTable(e.currentTarget.value); }}
-            class="mb-3 w-full rounded-xl border border-white/40 bg-white/60 px-3 py-2 text-sm outline-none focus:border-primary/50 transition" />
-        <textarea rows={6} placeholder={"Paste CSV (first row = headers) or JSON array:\nName, Status, Date\nAlice, Active, 2024-01-01"}
-          value={raw()} onInput={(e) => handlePaste(e.currentTarget.value)}
-          onKeyDown={(e) => {
-            if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && !busy() && importState().format !== "invalid-json" && raw().trim()) {
-              e.preventDefault();
-              recordShortcutUse("form_submit");
-              void doImport();
-              return;
-            }
-            if (e.key === "Escape" && !busy()) {
-              e.preventDefault();
-              recordShortcutUse("form_cancel");
-              requestClose();
-            }
-          }}
-          class={`w-full rounded-xl bg-white/60 px-3 py-2 text-xs text-on-surface font-mono outline-none transition resize-none ${
-            importState().format === "invalid-json"
-              ? "border border-error/50 focus:border-error/70"
-              : "border border-white/40 focus:border-primary/50"
-          }`} />
-        <p class={`mt-1 text-[10px] ${
-          importState().format === "invalid-json" ? "text-error" : "text-on-surface-variant/60"
-        }`}>
-          {importState().summary}
-          {importState().error ? ` - ${importState().error}` : " - Press Ctrl/Cmd+Enter to import."}
-        </p>
-        <Show when={preview().length > 1}>
-          <div class="mt-2 overflow-x-auto rounded-xl border border-primary/15 bg-primary/4">
-            <table class="w-full text-[11px]">
-              <thead><tr class="border-b border-primary/10">{preview()[0].map((h) => <th class="px-2 py-1 text-left font-mono text-primary/60 uppercase text-[9px]">{h}</th>)}</tr></thead>
-              <tbody>{preview().slice(1).map((row) => <tr class="border-b border-white/20 last:border-0">{row.map((c) => <td class="px-2 py-1 text-on-surface-variant">{c || "—"}</td>)}</tr>)}</tbody>
-            </table>
-          </div>
-          <p class="mt-1 text-[10px] text-on-surface-variant/50">Preview — first 3 rows</p>
-        </Show>
-        <Show when={error()}>
-          {(() => {
-            const currentError = error();
-            return typeof currentError === "string" ? (
-              <p class="mt-2 text-xs text-error">{currentError}</p>
-            ) : (
-              <div class="mt-2 rounded-xl border border-amber-200/60 bg-amber-50/80 px-3 py-2 text-xs text-amber-900">
-                <p class="font-medium">{currentError.title}</p>
-                <p class="mt-0.5">{currentError.summary}</p>
-                <p class="mt-0.5 opacity-80">{currentError.nextStep}</p>
-              </div>
-            );
-          })()}
-        </Show>
-        <div class="mt-4 flex gap-2">
-          <button type="button" onClick={() => {
-            recordShortcutUse("form_cancel");
-            requestClose();
-          }}
-            class="flex-1 rounded-xl border border-outline/20 py-2 text-xs text-on-surface-variant transition hover:bg-on-surface/5">Cancel</button>
-          <button type="button" onClick={doImport} disabled={busy() || !raw().trim() || importState().format === "invalid-json"}
-            class="flex-1 rounded-xl bg-primary py-2 text-xs font-medium text-white transition hover:bg-primary/80 disabled:opacity-50">
-            {busy() ? "Importing..." : `Import ${importState().rowCount || ""} row${importState().rowCount === 1 ? "" : "s"}`}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function AddRecordModal(props: {
-  tables: string[];
-  onClose: () => void;
-  onCreated: (message: DatabaseMessage) => void;
-}) {
-  const [table, setTable] = createSignal(props.tables[0] ?? "");
-  const [newTable, setNewTable] = createSignal("");
-  const [content, setContent] = createSignal("");
-  const [busy, setBusy] = createSignal(false);
-  const [error, setError] = createSignal<string | DatabaseViewFailureReceipt>("");
-  const contentState = createMemo(() => analyzeDatabaseRecordContent(content()));
-
-  async function save() {
-    if (busy()) return;
-    const targetTable = newTable().trim() || table();
-    if (!targetTable) { setError("Table name required."); return; }
-    if (contentState().format === "invalid-json") {
-      setError(contentState().error ?? "Fix the JSON syntax before saving.");
-      return;
-    }
-    setBusy(true);
-    try {
-      let data: unknown = content();
-      const parsed = parseJsonValue(content());
-      if (parsed.ok) data = parsed.value;
-      const result = await sendDatabaseRecord(targetTable, data);
-      props.onCreated({
-        id: result.message_id,
-        type: "database_record",
-        timestamp: new Date().toISOString(),
-        content: result.content,
-      });
-      props.onClose();
-    } catch (err) {
-      setError(
-        buildDatabaseViewFailureReceipt(
-          "Save record",
-          err instanceof Error ? err.message : "Failed to save record.",
-        ),
-      );
-    } finally { setBusy(false); }
-  }
-
-  function requestClose() {
-    if (busy()) return;
-    props.onClose();
-  }
-
-  return (
-    <div class="fixed inset-0 z-[200] flex items-center justify-center bg-on-surface/30 backdrop-blur-sm animate-fade-in"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) {
-          recordShortcutUse("form_cancel");
-          requestClose();
-        }
-      }}>
-      <div class="w-full max-w-sm rounded-3xl border border-white/45 bg-white/96 p-6 shadow-panel backdrop-blur-xl">
-        <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-outline mb-4">New Record</p>
-        <div class="space-y-3">
-          <Show when={props.tables.length > 0}>
-            <select value={table()} onChange={(e) => { setError(""); setTable(e.currentTarget.value); }}
-              class="w-full rounded-xl border border-white/40 bg-white/60 px-3 py-2 text-sm text-on-surface outline-none focus:border-primary/50 transition">
-              <For each={props.tables}>{(t) => <option value={t}>{t}</option>}</For>
-            </select>
-          </Show>
-          <input type="text" placeholder={props.tables.length > 0 ? "Or create new table…" : "Table / collection name *"}
-            value={newTable()} onInput={(e) => { setError(""); setNewTable(e.currentTarget.value); }}
-            class="w-full rounded-xl border border-white/40 bg-white/60 px-3 py-2 text-sm text-on-surface outline-none focus:border-primary/50 transition" />
-          <textarea rows={4} placeholder={'Record data (JSON or plain text)\n{"name": "Alice", "status": "active"}'}
-            value={content()} onInput={(e) => { setError(""); setContent(e.currentTarget.value); }}
-            onKeyDown={(e) => {
-              if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && !busy() && contentState().format !== "invalid-json") {
-                e.preventDefault();
-                recordShortcutUse("form_submit");
-                void save();
-                return;
-              }
-              if (e.key === "Escape" && !busy()) {
-                e.preventDefault();
-                recordShortcutUse("form_cancel");
-                requestClose();
-              }
-            }}
-            class={`w-full rounded-xl bg-white/60 px-3 py-2 text-sm text-on-surface outline-none transition resize-none font-mono ${
-              contentState().format === "invalid-json"
-                ? "border border-error/50 focus:border-error/70"
-                : "border border-white/40 focus:border-primary/50"
-            }`} />
-          <p class={`text-[10px] ${
-            contentState().format === "invalid-json" ? "text-error" : "text-on-surface-variant/60"
-          }`}>
-            {contentState().summary}
-            {contentState().error ? ` - ${contentState().error}` : " - Press Ctrl/Cmd+Enter to save."}
-          </p>
-          <Show when={error()}>
-            {(() => {
-              const currentError = error();
-              return typeof currentError === "string" ? (
-                <p class="text-xs text-error">{currentError}</p>
-              ) : (
-                <div class="rounded-xl border border-amber-200/60 bg-amber-50/80 px-3 py-2 text-xs text-amber-900">
-                  <p class="font-medium">{currentError.title}</p>
-                  <p class="mt-0.5">{currentError.summary}</p>
-                  <p class="mt-0.5 opacity-80">{currentError.nextStep}</p>
-                </div>
-              );
-            })()}
-          </Show>
-          <div class="flex gap-2">
-            <button type="button" onClick={() => {
-              recordShortcutUse("form_cancel");
-              requestClose();
-            }}
-              class="flex-1 rounded-xl border border-outline/20 py-2 text-xs text-on-surface-variant transition hover:bg-on-surface/5">Cancel</button>
-            <button type="button" onClick={save} disabled={busy() || contentState().format === "invalid-json"}
-              class="flex-1 rounded-xl bg-primary py-2 text-xs font-medium text-white transition hover:bg-primary/80 disabled:opacity-50">
-              {busy() ? "Saving…" : "Save Record"}</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-type DensityMode = "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "10";
 type DensityBucket = "compact" | "comfortable" | "spacious";
-const DENSITY_MODES = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"] as const;
 
-function densityBucket(mode: DensityMode): DensityBucket {
+function densityBucket(mode: DatabaseDensityMode): DensityBucket {
   const level = Number(mode);
   if (level <= 4) return "compact";
   if (level >= 9) return "spacious";
   return "comfortable";
-}
-
-function densityScaleLabel(mode: DensityMode): string {
-  if (mode === "1") return "A";
-  if (mode === "10") return "A";
-  return "";
-}
-
-function densityScaleLabelClass(mode: DensityMode): string {
-  if (mode === "1") return "text-[9px] leading-none";
-  if (mode === "10") return "text-[15px] leading-none";
-  return "h-1.5 w-1.5 rounded-full bg-current opacity-70";
 }
 
 export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
@@ -448,19 +180,29 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
   const [fullscreen, setFullscreen] = createSignal(false);
   const [ghostHeaders, setGhostHeaders] = createSignal([...DEFAULT_HEADERS]);
   const [tableName, setTableName] = createSignal("");
-  const [dbName, setDbName] = createSignal("Unnamed Database");
-  const [showNamePrompt, setShowNamePrompt] = createSignal(false);
+  const [selectedDatabaseId, setSelectedDatabaseId] = createSignal<string | null>(null);
+  const [databaseName, setDatabaseName] = createSignal("");
+  const [showDatabaseCreate, setShowDatabaseCreate] = createSignal(false);
+  const [databaseCreateBusy, setDatabaseCreateBusy] = createSignal(false);
+  const [databaseCreateError, setDatabaseCreateError] = createSignal("");
+  const [showLifecycleConfirm, setShowLifecycleConfirm] = createSignal(false);
+  const [lifecycleBusy, setLifecycleBusy] = createSignal(false);
   const [editingCell, setEditingCell] = createSignal<{ rowId: string; col: string } | null>(null);
   const [editingValue, setEditingValue] = createSignal("");
   const [savingCell, setSavingCell] = createSignal<{ rowId: string; col: string } | null>(null);
   const [editError, setEditError] = createSignal<DatabaseViewFailureReceipt | null>(null);
-  const [densityMode, setDensityMode] = createSignal<DensityMode>("7");
-  const [showPlusMenu, setShowPlusMenu] = createSignal(false);
+  const [densityMode, setDensityMode] = createSignal<DatabaseDensityMode>("7");
   const [showImport, setShowImport] = createSignal(false);
   const [tableScrollTop, setTableScrollTop] = createSignal(0);
   const [selectedRowIds, setSelectedRowIds] = createSignal<string[]>([]);
   const [localMessages, setLocalMessages] = createSignal<DatabaseMessage[]>([]);
   let tableScrollRef: HTMLDivElement | undefined;
+  let lastSelectedDatabaseId: string | null = null;
+
+  const allMessages = createMemo(() => [
+    ...dashboardBootstrapMessages(props.bootstrap),
+    ...localMessages(),
+  ]);
 
   const headPad = createMemo(() => ({
     compact: "px-2 py-1",
@@ -480,7 +222,7 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
   }[densityBucket(densityMode())]));
   const records = createMemo(() => {
     void refreshKey();
-    const messages = [...dashboardBootstrapMessages(props.bootstrap), ...localMessages()]
+    const messages = allMessages()
       .filter((m) =>
         m.type.includes("database") ||
         m.type === "database_record" ||
@@ -493,14 +235,43 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
     return databaseRecordsFromMessages(messages);
   });
 
+  const definitions = createMemo(() => projectDatabaseDefinitions({
+    messages: allMessages(),
+    accountId: props.bootstrap?.user.id ?? "",
+    hasLegacyRecords: records().some((record) => record.databaseId === "database:legacy"),
+  }));
+  const profiles = createMemo(() => registeredDatabaseProfiles(allMessages()));
+  const selectedDefinition = createMemo(() =>
+    definitions().find((definition) => definition.databaseId === selectedDatabaseId()) ?? null,
+  );
+
+  createEffect(() => {
+    const next = reconcileSelectedDatabaseId(definitions(), selectedDatabaseId());
+    if (next !== selectedDatabaseId()) setSelectedDatabaseId(next);
+  });
+
+  createEffect(() => {
+    const definition = selectedDefinition();
+    setDatabaseName(definition?.name ?? "");
+    if (definition && definition.databaseId !== lastSelectedDatabaseId) {
+      lastSelectedDatabaseId = definition.databaseId;
+      setTableName(definition.defaultTable);
+      setActiveTable(null);
+      setSelectedRowIds([]);
+    }
+  });
+
   const tables = createMemo(() => {
     const seen = new Set<string>();
-    return records().map((r) => r.table).filter((t) => { if (seen.has(t)) return false; seen.add(t); return true; });
+    return databaseRecordsForDatabase(records(), selectedDatabaseId())
+      .map((record) => record.table)
+      .filter((table) => { if (seen.has(table)) return false; seen.add(table); return true; });
   });
 
   const visibleRecords = createMemo(() => {
     const t = activeTable();
-    return t ? records().filter((r) => r.table === t) : records();
+    const selectedRecords = databaseRecordsForDatabase(records(), selectedDatabaseId());
+    return t ? selectedRecords.filter((record) => record.table === t) : selectedRecords;
   });
   const allVisibleSelected = createMemo(() =>
     visibleRecords().length > 0 && visibleRecords().every((row) => selectedRowIds().includes(row.id)),
@@ -511,8 +282,9 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
       visibleRecords(),
       ghostHeaders(),
       databaseSchemaColumnsFromMessages(
-        [...dashboardBootstrapMessages(props.bootstrap), ...localMessages()],
+        allMessages(),
         activeTable(),
+        selectedDatabaseId(),
       ),
     );
   });
@@ -558,7 +330,9 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
   }
 
   async function createFirstRecord(table: string, data: Record<string, string>) {
-    const result = await sendDatabaseRecord(table, data);
+    const databaseId = selectedDatabaseId();
+    if (!databaseId || selectedDefinition()?.archived) throw new Error("Select an active database first.");
+    const result = await sendDatabaseRecord(table, data, databaseId);
     recordLocalMessage({
       id: result.message_id,
       type: "database_record",
@@ -582,9 +356,90 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
   }
 
   function beginEditingCell(row: DbRecord, col: string) {
+    if (selectedDefinition()?.archived) return;
     setEditError(null);
     setEditingCell({ rowId: row.id, col });
     setEditingValue(formatEditableValue(row.data[col]));
+  }
+
+  function selectDatabase(databaseId: string) {
+    const definition = definitions().find((item) => item.databaseId === databaseId);
+    setSelectedDatabaseId(databaseId);
+    setActiveTable(null);
+    setTableName(definition?.defaultTable ?? "");
+    setSelectedRowIds([]);
+    cancelEditingCell();
+  }
+
+  async function createDatabase(input: DatabaseCreateInput) {
+    if (databaseCreateBusy()) return;
+    const accountId = props.bootstrap?.user.id?.trim();
+    if (!accountId) { setDatabaseCreateError("Sign in again before creating a database."); return; }
+    setDatabaseCreateBusy(true);
+    setDatabaseCreateError("");
+    try {
+      const result = await sendDatabaseDefinition({
+        accountId,
+        name: input.name,
+        defaultTable: input.defaultTable,
+        profileId: input.profileId,
+        weddingPlanId: input.weddingPlanId,
+      });
+      recordLocalMessage({ id: result.message_id, type: "database_definition", timestamp: new Date().toISOString(), content: result.content });
+      setSelectedDatabaseId(result.content.database_id);
+      setActiveTable(null);
+      setTableName(result.content.default_table);
+      setShowDatabaseCreate(false);
+    } catch (error) {
+      setDatabaseCreateError(error instanceof Error ? error.message : "This database could not be created.");
+    } finally {
+      setDatabaseCreateBusy(false);
+    }
+  }
+
+  async function commitDatabaseName() {
+    const definition = selectedDefinition();
+    const nextName = databaseName().trim();
+    if (!definition || definition.legacy || definition.archived || !nextName || nextName === definition.name) {
+      setDatabaseName(definition?.name ?? "");
+      return;
+    }
+    const accountId = props.bootstrap?.user.id?.trim();
+    if (!accountId) return;
+    try {
+      const result = await sendDatabaseDefinition({
+        accountId,
+        databaseId: definition.databaseId,
+        name: nextName,
+        defaultTable: definition.defaultTable,
+        profileId: definition.profileId,
+        weddingPlanId: definition.weddingPlanId,
+        revision: definition.revision + 1,
+      });
+      recordLocalMessage({ id: result.message_id, type: "database_definition", timestamp: new Date().toISOString(), content: result.content });
+    } catch (error) {
+      setDatabaseName(definition.name);
+      setEditError(buildDatabaseViewFailureReceipt("Rename database", error instanceof Error ? error.message : "Could not rename this database."));
+    }
+  }
+
+  async function confirmLifecycleChange() {
+    const definition = selectedDefinition();
+    if (!definition || definition.legacy || lifecycleBusy()) return;
+    setLifecycleBusy(true);
+    try {
+      const result = await sendDatabaseArchive({
+        databaseId: definition.databaseId,
+        archived: !definition.archived,
+        revision: definition.archiveRevision + 1,
+      });
+      recordLocalMessage({ id: result.message_id, type: "database_archive", timestamp: new Date().toISOString(), content: result.content });
+      setShowLifecycleConfirm(false);
+    } catch (error) {
+      setEditError(buildDatabaseViewFailureReceipt(definition.archived ? "Restore database" : "Archive database", error instanceof Error ? error.message : "Could not change this database."));
+    } finally {
+      setLifecycleBusy(false);
+    }
   }
 
   async function commitEditingCell(row: DbRecord, col: string) {
@@ -684,88 +539,34 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
 
   return (
     <div class={containerClass()}>
-      {/* Header */}
-      <div class="flex items-start justify-between gap-4">
-        <div class="min-w-0">
-          <p class="font-mono text-[10px] uppercase tracking-[0.28em] text-outline">Database</p>
-          <input
-            value={dbName()}
-            onInput={(e) => setDbName(e.currentTarget.value)}
-            class="mt-1 block w-full bg-transparent text-xl font-bold text-on-surface outline-none border-b border-transparent focus:border-primary/30 transition placeholder:text-on-surface/30"
-            placeholder="Unnamed Database"
-          />
-          <p class="mt-0.5 text-sm text-on-surface-variant">Add rows and fields, then save your changes to this private table.</p>
-        </div>
-        <div class="flex items-center gap-2 mt-2 flex-shrink-0">
-          {/* Density mode */}
-          <div class="inline-flex items-center gap-1 rounded-full border border-outline/15 bg-white/30 p-1 text-[10px] text-on-surface-variant">
-            <span class="px-1.5 font-mono uppercase tracking-[0.16em] text-outline/70">Density</span>
-            {DENSITY_MODES.map((mode) => (
-              <button type="button" onClick={() => setDensityMode(mode)}
-                class={`inline-flex min-h-8 min-w-7 items-center justify-center rounded-full border font-semibold transition ${densityMode() === mode ? "border-primary/25 bg-primary/15 text-primary shadow-sm" : "border-transparent text-on-surface-variant/60 hover:bg-white/55"}`}
-                aria-pressed={densityMode() === mode}
-                aria-label={`Text density ${mode} of 10`}
-                title={`Text density ${mode} of 10`}>
-                <span class={densityScaleLabelClass(mode)}>{densityScaleLabel(mode)}</span>
-              </button>
-            ))}
-          </div>
-          <button type="button" onClick={() => setFullscreen((v) => !v)}
-            class="rounded-full border border-outline/20 bg-white/40 px-3 py-1.5 text-xs font-medium text-on-surface-variant transition hover:bg-white/60"
-            title={fullscreen() ? "Exit fullscreen" : "Fullscreen mode"}>
-            {fullscreen() ? "⊠ Exit" : "⊞ Fullscreen"}
-          </button>
-          {/* Plus menu */}
-          <div class="relative">
-            <button type="button" onClick={() => setShowPlusMenu((v) => !v)}
-              class="rounded-full bg-primary px-4 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-primary/80 flex items-center gap-1">
-              + New
-              <span class={`text-[8px] opacity-70 transition-transform ${showPlusMenu() ? "rotate-180" : ""}`}>▼</span>
-            </button>
-            <Show when={showPlusMenu()}>
-              <div class="absolute right-0 top-full z-50 mt-1 min-w-[168px] rounded-2xl border border-white/45 bg-white/96 p-1.5 shadow-panel backdrop-blur-xl animate-fade-in"
-                onPointerDown={(e) => e.stopPropagation()}>
-                {([
-                  { icon: "◈", label: "New Record", action: () => { setShowAdd(true); setShowPlusMenu(false); } },
-                  { icon: "▦", label: "New Table", action: () => { setActiveTable(null); setTableName(""); setGhostHeaders([...DEFAULT_HEADERS]); setShowPlusMenu(false); } },
-                  { icon: "⊞", label: "New Field", action: () => {
-                    const label = prompt("Field name:")?.trim();
-                    const table = activeTable() ?? tableName().trim() ?? tables()[0];
-                    if (!label) { setShowPlusMenu(false); return; }
-                    if (!table) {
-                      setGhostHeaders((headers) => [...headers, label]);
-                      setShowPlusMenu(false);
-                      return;
-                    }
-                    const key = label.toLocaleLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") || `field_${Date.now()}`;
-                    void (async () => {
-                      try {
-                        const result = await sendDatabaseSchema(table, { key, label });
-                        recordLocalMessage({
-                          id: result.message_id,
-                          type: "database_schema_update",
-                          timestamp: new Date().toISOString(),
-                          content: result.content,
-                        });
-                      } catch (error) {
-                        setEditError(buildDatabaseViewFailureReceipt("Add field", error instanceof Error ? error.message : "Could not add this field."));
-                      }
-                    })();
-                    setShowPlusMenu(false);
-                  }},
-                  { icon: "↑", label: "Import CSV / JSON", action: () => { setShowImport(true); setShowPlusMenu(false); } },
-                ] as const).map((item) => (
-                  <button type="button" onClick={item.action}
-                    class="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm text-on-surface hover:bg-primary/6 transition">
-                    <span class="text-base text-primary/50">{item.icon}</span>
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-            </Show>
-          </div>
-        </div>
-      </div>
+      <DatabaseHeader
+        definitions={definitions()}
+        selectedDatabaseId={selectedDatabaseId()}
+        name={databaseName()}
+        densityMode={densityMode()}
+        fullscreen={fullscreen()}
+        onSelect={selectDatabase}
+        onNameInput={setDatabaseName}
+        onNameCommit={() => void commitDatabaseName()}
+        onDensityChange={setDensityMode}
+        onToggleFullscreen={() => setFullscreen((value) => !value)}
+        onNewDatabase={() => { setDatabaseCreateError(""); setShowDatabaseCreate(true); }}
+        onNewRecord={() => setShowAdd(true)}
+        onNewTable={() => { setActiveTable(null); setTableName(""); setGhostHeaders([...DEFAULT_HEADERS]); }}
+        onNewField={() => {
+          const label = prompt("Field name:")?.trim();
+          const table = activeTable() ?? tableName().trim() ?? tables()[0];
+          const databaseId = selectedDatabaseId();
+          if (!label || !databaseId) return;
+          if (!table) { setGhostHeaders((headers) => [...headers, label]); return; }
+          const key = label.toLocaleLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") || `field_${Date.now()}`;
+          void sendDatabaseSchema(table, { key, label }, databaseId)
+            .then((result) => recordLocalMessage({ id: result.message_id, type: "database_schema_update", timestamp: new Date().toISOString(), content: result.content }))
+            .catch((error) => setEditError(buildDatabaseViewFailureReceipt("Add field", error instanceof Error ? error.message : "Could not add this field.")));
+        }}
+        onImport={() => setShowImport(true)}
+        onArchiveToggle={() => setShowLifecycleConfirm(true)}
+      />
 
       {/* Table filter pills */}
       <div class="flex flex-wrap items-center gap-2">
@@ -782,7 +583,7 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
               </button>
             )}
           </For>
-          <button type="button" onClick={() => { setActiveTable(null); setTableName(""); setGhostHeaders([...DEFAULT_HEADERS]); }} class="rounded-full border border-dashed border-primary/35 bg-primary/5 px-3 py-1 text-xs font-medium text-primary transition hover:bg-primary/10">
+          <button type="button" disabled={selectedDefinition()?.archived} onClick={() => { setActiveTable(null); setTableName(""); setGhostHeaders([...DEFAULT_HEADERS]); }} class="rounded-full border border-dashed border-primary/35 bg-primary/5 px-3 py-1 text-xs font-medium text-primary transition hover:bg-primary/10 disabled:opacity-45">
             + New table
           </button>
       </div>
@@ -792,6 +593,7 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
         when={visibleRecords().length > 0}
         fallback={
           <GhostGrid
+            readonly={selectedDefinition()?.archived}
             headers={ghostHeaders()}
             tableName={tableName()}
             onHeaderEdit={(i, val) => setGhostHeaders((prev) => prev.map((h, idx) => idx === i ? (val || h) : h))}
@@ -869,6 +671,7 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
                     <th class={`${headPad()} text-left`}>
                       <input
                         value={col.label}
+                        disabled={selectedDefinition()?.archived}
                         onBlur={(e) => { void e; }}
                         class="w-full bg-transparent font-mono text-[9px] uppercase tracking-wider text-outline/60 outline-none focus:text-primary focus:border-b focus:border-primary/40 transition capitalize cursor-pointer"
                         title="Click to rename column"
@@ -1003,25 +806,9 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
         </div>
       </Show>
 
-      {/* Table name prompt — shown inline when records exist but no named table */}
-      <Show when={showNamePrompt()}>
-        <div class="fixed inset-0 z-[200] flex items-center justify-center bg-on-surface/20 backdrop-blur-sm animate-fade-in"
-          onClick={(e) => { if (e.target === e.currentTarget) setShowNamePrompt(false); }}>
-          <div class="w-full max-w-xs rounded-3xl border border-white/45 bg-white/96 p-5 shadow-panel backdrop-blur-xl">
-            <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-outline mb-3">Name your database</p>
-            <input type="text" placeholder="e.g. Contacts, Projects…" value={tableName()}
-              onInput={(e) => setTableName(e.currentTarget.value)}
-              class="w-full rounded-xl border border-white/40 bg-white/60 px-3 py-2 text-sm outline-none focus:border-primary/50 transition mb-3" />
-            <button type="button" onClick={() => setShowNamePrompt(false)}
-              class="w-full rounded-xl bg-primary py-2 text-xs font-medium text-white transition hover:bg-primary/80">
-              Done
-            </button>
-          </div>
-        </div>
-      </Show>
-
       <Show when={showAdd()}>
-        <AddRecordModal
+        <DatabaseAddRecordDialog
+          databaseId={selectedDatabaseId() ?? "database:legacy"}
           tables={tables()}
           onClose={() => setShowAdd(false)}
           onCreated={recordLocalMessage}
@@ -1029,17 +816,30 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
       </Show>
 
       <Show when={showImport()}>
-        <ImportModal
-          defaultTable={activeTable() ?? tableName() ?? "imported"}
+        <DatabaseImportDialog
+          databaseId={selectedDatabaseId() ?? "database:legacy"}
+          defaultTable={(activeTable() ?? tableName()) || selectedDefinition()?.defaultTable || "imported"}
           onClose={() => setShowImport(false)}
           onCreated={(messages) => messages.forEach(recordLocalMessage)}
         />
       </Show>
 
-      {/* Click-outside to close plus menu */}
-      <Show when={showPlusMenu()}>
-        <div class="fixed inset-0 z-40" onClick={() => setShowPlusMenu(false)} />
-      </Show>
+      <DatabaseCreateDialog
+        open={showDatabaseCreate()}
+        profiles={profiles()}
+        busy={databaseCreateBusy()}
+        error={databaseCreateError()}
+        onCancel={() => setShowDatabaseCreate(false)}
+        onCreate={(input) => void createDatabase(input)}
+      />
+      <DatabaseLifecycleDialog
+        open={showLifecycleConfirm()}
+        databaseName={selectedDefinition()?.name ?? "this database"}
+        restoring={selectedDefinition()?.archived ?? false}
+        busy={lifecycleBusy()}
+        onCancel={() => setShowLifecycleConfirm(false)}
+        onConfirm={() => void confirmLifecycleChange()}
+      />
     </div>
   );
 }

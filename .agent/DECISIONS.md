@@ -1968,3 +1968,9 @@ The Policy V2 browser flag is `VITE_WEDDING_VENDOR_RANKING_POLICY_V2`, matching 
 - The owner-confirmed Wedding human reviews authorize Policy V2 and quotation-intelligence release from exact source SHA `518a106fdf2c8253144175d7ab591e51e47db1a7` with evidence digest `656705c72756eadbe221d624c0726fb513f391c978a562cc8607b8a7a950d5d8`.
 - This authorization does not erase a technical transport prerequisite. `OMNYID_VENDOR_MAIL_ENABLED`, `OMNYID_VENDOR_SENDER_MASK_ENABLED` and `OMNYID_VENDOR_MAIL_INGRESS_ENABLED` remain false until WED-286 has provider-observed bounce or complaint evidence and its own release boundary.
 - A human-workbook completion statement is recorded as owner authority, not transformed into invented reviewer names, signatures or unobserved evidence.
+# 2026-10-29 — Database definitions are AFP authority; Legacy is compatibility only
+
+- A database name, default table, profile and archive lifecycle are append-only `database_definition` and `database_archive` events scoped to the signed-in account. Component-local labels are not authority.
+- The Database surface always filters rows and schema by the selected stable `database_id`. Tables with the same label in different databases cannot merge.
+- `database:legacy` is a synthesized visible definition only when legacy rows exist or no canonical definition exists. It remains editable for record compatibility but cannot be renamed or archived as if it were a canonical definition.
+- `wedding_runsheet.v1` is a registered profile choice only when the account's accessible messages expose a wedding-plan reference. WED-290 creates the definition hook but does not populate wedding rows or add a parallel run-sheet store.

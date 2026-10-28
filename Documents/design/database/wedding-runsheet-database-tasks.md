@@ -119,6 +119,10 @@ Make Database a real multi-database surface before adding the wedding profile.
 - A non-wedding user can manage multiple databases.
 - Wedding profile hooks exist but no wedding-specific projection has landed.
 
+### Implementation status — 2026-10-29
+
+Complete in WED-290. Database definitions, switching, blank/profile creation, durable rename, selected-database scoping, Legacy compatibility, and confirmed archive/restore are implemented. The `wedding_runsheet.v1` registry hook is available only when an accessible wedding plan is present; no wedding-specific row projection is included in this slice.
+
 ## 5. WED-291 — Implement the incremental wedding run-sheet projector
 
 ### Goal

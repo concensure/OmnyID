@@ -5414,3 +5414,16 @@ Release outcome:
 - Evidence and rollback boundaries are recorded in `Documents/verification/wed-296-oracle-release-2026-10-29.md`; its post-release commit is not the deployed application SHA.
 
 Next: begin WED-290 generic database definitions, switching and creation from the post-release audit commit. Preserve the existing Database compatibility contract and do not introduce a parallel run-sheet store.
+## 2026-10-29 - WED-290 generic database registry and lifecycle (Codex, complete)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch `agent/codex/WED-290`, based on post-release audit commit `9ca731d3755437d077e98f58b96298536f75735e`.
+
+- Added account-scoped deterministic projection for canonical database definitions and archive/restore events, plus AFP writers and contract builders for create, rename and lifecycle changes.
+- Database now has a mobile-friendly switcher and New database flow. Blank creation works without a wedding plan; `wedding_runsheet.v1` appears only with an accessible plan reference and creates only a profile definition at this stage.
+- Every row, revision, schema update, import and first-row write uses the selected stable `database_id`. Legacy records remain available under a visible Legacy database and are not rewritten.
+- Archive and restore use large explicit confirmation actions. Archived databases remain selectable, read-only and restorable. Rename is durable through a new definition revision.
+- Extracted header, creation/lifecycle dialogs and record/import editors; `DatabaseView.tsx` is under 800 lines and every new file is under 999 lines.
+- Verification passed: TypeScript, 18 focused database tests, source/Wedding line budgets, all 2,014 Wedding tests and the production UI build. The build emitted only the existing large-chunk warning.
+- No production deployment, data migration, wedding row projection or email-relay change occurred. Oracle still runs the WED-296 source candidate; this WED-290 slice is local and committed only.
+
+Next: begin WED-291 incremental Wedding run-sheet projection from this contract, keeping generic databases unchanged and projecting from the existing wedding ledger rather than copying it.

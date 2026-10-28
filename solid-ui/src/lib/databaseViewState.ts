@@ -101,11 +101,12 @@ export function databaseSchemaUpdateFromMessage(msg: { content: unknown }): Data
 export function databaseSchemaColumnsFromMessages(
   messages: Array<{ content: unknown }>,
   table: string | null,
+  databaseId?: string | null,
 ): DatabaseViewColumnDef[] {
   const columns = new Map<string, DatabaseViewColumnDef>();
   for (const message of messages) {
     const schema = databaseSchemaUpdateFromMessage(message);
-    if (!schema || (table && schema.table !== table)) continue;
+    if (!schema || (table && schema.table !== table) || (databaseId && schema.databaseId !== databaseId)) continue;
     columns.set(schema.column.key, schema.column);
   }
   return Array.from(columns.values());
@@ -122,6 +123,14 @@ export function databaseRecordsFromMessages(
     revision: record.revision,
     timestamp: record.timestamp,
   }));
+}
+
+export function databaseRecordsForDatabase(
+  records: DatabaseViewRecord[],
+  databaseId: string | null,
+): DatabaseViewRecord[] {
+  if (!databaseId) return [];
+  return records.filter((record) => record.databaseId === databaseId);
 }
 
 export function databaseImportRows(text: string): Record<string, unknown>[] {
