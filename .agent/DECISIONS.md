@@ -2051,3 +2051,17 @@ and retains only bounded schedule data. Its timestamp is always visible and the 
 read-only until a server refresh succeeds. Projection telemetry contains counts plus explicit zero
 model/token/cost fields and no titles, contacts or source identifiers. Hosted links remain controlled
 by the independent false-default server flag; offline availability cannot create a share grant.
+
+## 2026-10-30: RSVP extends the Wedding guest graph and has one shared response projection
+
+RSVP responses are not a separate application, table or Home counter. Existing AFP guest profiles,
+households and per-event invitations remain the canonical graph. Guest View, People, Wedding Home,
+Seating, catering and follow-up tasks consume one deterministic response projection. A person may
+have several event invitations; projection may never collapse them by `person_id` alone.
+
+Attendance and operational completion are distinct. Pending, incomplete, changed and locked remain
+visible, and an attending guest with a required missing answer is not treated as complete. Manual,
+imported and future guest-submitted answers keep provenance. New guest profiles containing contact,
+dietary or accessibility logistics are couple-only by default; vendor sharing remains a separate,
+minimum-necessary preview and approval boundary. Public invitation capabilities remain false-default
+until random-token, expiry, revocation, isolation and idempotency work is implemented and evidenced.

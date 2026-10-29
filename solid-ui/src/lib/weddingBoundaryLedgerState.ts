@@ -99,6 +99,12 @@ export type WeddingBoundaryEventInvitation = WeddingBoundaryLedgerObjectBase & {
   eventId: string;
   personId: string;
   invitationStatus: "not_invited" | "invited" | "rsvp_yes" | "rsvp_no" | "waitlist" | "declined_by_couple";
+  responseSource?: "guest" | "couple_manual" | "import" | "system_correction" | null;
+  viewedAt?: string | null;
+  respondedAt?: string | null;
+  lockedAt?: string | null;
+  previousInvitationStatus?: WeddingBoundaryEventInvitation["invitationStatus"] | null;
+  responseRevision?: number | null;
   plusOneAllowed?: boolean | null;
   childrenInvited?: boolean | null;
   visibleToGuest?: boolean | null;
@@ -414,6 +420,12 @@ function publicContentFor(object: WeddingBoundaryLedgerObject): Record<string, u
       event_id: object.eventId,
       person_id: object.personId,
       invitation_status: object.invitationStatus,
+      response_source: object.responseSource ?? null,
+      viewed_at: object.viewedAt ?? null,
+      responded_at: object.respondedAt ?? null,
+      locked_at: object.lockedAt ?? null,
+      previous_invitation_status: object.previousInvitationStatus ?? null,
+      response_revision: object.responseRevision ?? null,
       plus_one_allowed: object.plusOneAllowed === true,
       children_invited: object.childrenInvited === true,
       visible_to_guest: object.visibleToGuest !== false,

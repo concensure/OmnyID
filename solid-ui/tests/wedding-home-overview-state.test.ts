@@ -296,6 +296,34 @@ test("home overview tiles reflect populated guests and seating", () => {
   assert.equal(firstActionTarget(seating!), "seating");
 });
 
+test("home guest tile uses the shared RSVP summary for incomplete and changed responses", () => {
+  const tiles = buildWeddingHomeOverviewActionTiles(state({
+    guestTracking: {
+      guestRowCount: 4,
+      attendingCount: 2,
+      declinedCount: 1,
+      pendingCount: 1,
+      rsvpResponseSummary: {
+        guestCount: 4,
+        repliedCount: 3,
+        awaitingCount: 1,
+        completeCount: 2,
+        incompleteCount: 1,
+        changedCount: 1,
+        lockedCount: 0,
+        privateRequirementCount: 0,
+        rows: [],
+        summaryLabel: "3 of 4 replied; 1 awaiting; 1 need details.",
+      },
+    } as WeddingResponseWorkspaceViewState["guestTracking"],
+  }));
+  const guest = tiles.find((tile) => tile.id === "guests");
+
+  assert.equal(guest?.detailLabel, "3 replied - 1 awaiting - 1 need details");
+  assert.equal(guest?.supportLabel, "2 attending - 1 changed");
+  assert.equal(guest?.tone, "attention");
+});
+
 test("home timeline overview is actionable when no dated items exist", () => {
   const timeline = buildWeddingHomeTimelineOverview(state());
   const nodes = timeline.a2ui.nodes as Array<Record<string, unknown>>;

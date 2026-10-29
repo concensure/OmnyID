@@ -212,6 +212,58 @@ test("buildWeddingGuestTrackingState ignores inactive boundary rules and not-inv
   assert.deepEqual(state.invitationScopeLabels, []);
 });
 
+test("buildWeddingGuestTrackingState preserves multiple event responses for one guest", () => {
+  const state = buildWeddingGuestTrackingState({
+    boundaryObjects: [{
+      id: "person:alex",
+      kind: "wedding_boundary_guest_profile",
+      title: "Alex",
+      personId: "person:alex",
+      displayName: "Alex",
+      householdId: "household:chen",
+      mealPreference: "Vegetarian",
+    }, {
+      id: "household:chen",
+      kind: "wedding_boundary_household",
+      title: "Chen household",
+      householdId: "household:chen",
+      displayName: "Chen household",
+    }, {
+      id: "invite:alex:ceremony",
+      kind: "wedding_boundary_event_invitation",
+      title: "Alex ceremony invitation",
+      invitationId: "invite:alex:ceremony",
+      eventId: "ceremony",
+      personId: "person:alex",
+      invitationStatus: "rsvp_yes",
+      responseSource: "guest",
+      respondedAt: "2027-01-01T00:00:00Z",
+    }, {
+      id: "invite:alex:reception",
+      kind: "wedding_boundary_event_invitation",
+      title: "Alex reception invitation",
+      invitationId: "invite:alex:reception",
+      eventId: "reception",
+      personId: "person:alex",
+      invitationStatus: "rsvp_no",
+      responseSource: "guest",
+      respondedAt: "2027-01-01T00:00:00Z",
+    }],
+  });
+
+  assert.equal(state.guestRowCount, 1);
+  assert.equal(state.attendingCount, 1);
+  assert.equal(state.declinedCount, 0);
+  assert.equal(state.pendingCount, 0);
+  assert.equal(state.guestRows?.[0]?.eventResponses.length, 2);
+  assert.deepEqual(state.guestRows?.[0]?.eventResponses.map((event) => [event.eventId, event.attendance]), [
+    ["ceremony", "Attending"],
+    ["reception", "Not attending"],
+  ]);
+  assert.equal(state.rsvpResponseSummary.repliedCount, 1);
+  assert.equal(state.rsvpResponseSummary.awaitingCount, 0);
+});
+
 test("buildWeddingGuestFinalCountDecisionTaskItems creates a searchable DecisionOS task", () => {
   const guestTracking = buildWeddingGuestTrackingState({
     estimatedCostPerGuest: 200,

@@ -30,6 +30,7 @@ export function WeddingGuestOperationsCard(props: {
     displayName: string;
     householdLabel: string;
     rsvpStatus: string;
+    previousRsvpStatus?: string;
     plusOneAllowed: boolean;
     childrenInvited: boolean;
     contactLabel: string;
@@ -64,10 +65,14 @@ export function WeddingGuestOperationsCard(props: {
   const [editingDraftIndex, setEditingDraftIndex] = createSignal<number | null>(null);
   const [guestFilter, setGuestFilter] = createSignal<GuestRsvpStatus | "Needs" | null>(null);
   const displayCounts = createMemo(() => weddingGuestOperationsDisplayCounts(props.state, draftGuests()));
+  const responseRowsByGuestId = createMemo(() => new Map(
+    props.state.rsvpResponseSummary.rows.map((row) => [row.guestId, row]),
+  ));
   const guestRows = createMemo(() => (props.state.guestRows ?? []).slice(0, 8).map((row) => ({
     ...row,
     rsvpStatus: rsvpOverrides()[row.id] ?? row.rsvpStatus,
     locallyChanged: Boolean(rsvpOverrides()[row.id]),
+    responseDetail: responseRowsByGuestId().get(row.id) ?? null,
   })));
   const saveLocalState = (next: {
     guests?: WeddingGuestOperationsLocalDraftGuest[];
@@ -92,6 +97,7 @@ export function WeddingGuestOperationsCard(props: {
         displayName: guest.displayName,
         householdLabel: guest.householdLabel,
         rsvpStatus: status,
+        previousRsvpStatus: original,
         plusOneAllowed: false,
         childrenInvited: false,
         contactLabel: guest.contactLabel ?? "",
@@ -193,6 +199,20 @@ export function WeddingGuestOperationsCard(props: {
         </span>
       </div>
       <p class="mt-2 text-sm leading-6 text-sky-900/75">{props.state.summaryLabel}</p>
+      <div class="mt-3 grid grid-cols-3 gap-2" aria-label="RSVP response summary">
+        <div class="min-w-0 rounded-xl border border-sky-100 bg-white/80 px-2.5 py-2">
+          <p class="text-xs font-semibold text-sky-950/65">Replied</p>
+          <p class="mt-1 text-xl font-semibold text-sky-950">{props.state.rsvpResponseSummary.repliedCount}</p>
+        </div>
+        <div class="min-w-0 rounded-xl border border-amber-100 bg-amber-50/80 px-2.5 py-2">
+          <p class="text-xs font-semibold text-amber-950/70">Awaiting</p>
+          <p class="mt-1 text-xl font-semibold text-amber-950">{props.state.rsvpResponseSummary.awaitingCount}</p>
+        </div>
+        <div class="min-w-0 rounded-xl border border-rose-100 bg-rose-50/80 px-2.5 py-2">
+          <p class="text-xs font-semibold text-rose-950/70">Need details</p>
+          <p class="mt-1 text-xl font-semibold text-rose-950">{props.state.rsvpResponseSummary.incompleteCount}</p>
+        </div>
+      </div>
       <Show when={saveNotice()}>
         {(notice) => (
           <p class="mt-3 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs leading-5 text-sky-950/75">
@@ -402,7 +422,7 @@ export function WeddingGuestOperationsCard(props: {
             </Show>
           </div>
           <div class="mt-2 space-y-2">
-            <For each={guestRows().filter((guest) => guestFilter() === null || (guestFilter() === "Needs" ? guest.rsvpStatus === "Pending" || !guest.contactLabel || !guest.mealPreference : guest.rsvpStatus === guestFilter()))}>
+            <For each={guestRows().filter((guest) => guestFilter() === null || (guestFilter() === "Needs" ? guest.rsvpStatus === "Pending" || !guest.contactLabel || (guest.responseDetail?.missingDetailLabels.length ?? 0) > 0 : guest.rsvpStatus === guestFilter()))}>
               {(guest) => (
                 <article class="rounded-xl border border-sky-100 bg-sky-50/60 px-2.5 py-2 phone:rounded-none phone:border-0 phone:border-t phone:border-slate-200 phone:bg-transparent phone:px-0 phone:py-3">
                   <div class="flex flex-wrap items-start justify-between gap-2">
@@ -411,6 +431,14 @@ export function WeddingGuestOperationsCard(props: {
                       <p class="mt-0.5 break-words text-xs leading-4 text-sky-950/60">
                         {guest.householdLabel} - {guest.sourceLabel}
                       </p>
+                      <Show when={guest.responseDetail}>
+                        {(detail) => (
+                          <p class="mt-1 break-words text-xs font-semibold leading-4 text-sky-950/70">
+                            {detail().statusLabel} · {detail().provenanceLabel}
+                            {detail().eventCount > 1 ? ` · ${detail().eventCount} events` : ""}
+                          </p>
+                        )}
+                      </Show>
                     </div>
                     <span class={`max-w-full break-words rounded-full border px-2 py-1 text-xs font-semibold ${rsvpToneClass(guest.rsvpStatus)}`}>
                       {guest.rsvpStatus}{guest.locallyChanged ? " (local)" : ""}
@@ -439,6 +467,16 @@ export function WeddingGuestOperationsCard(props: {
                   <Show when={[guest.mealPreference, guest.dietaryNote, guest.accessibilityNote].some(Boolean)}>
                     <p class="mt-2 break-words text-xs leading-4 text-sky-950/60">
                       {[guest.mealPreference, guest.dietaryNote, guest.accessibilityNote].filter(Boolean).join(" - ")}
+                    </p>
+                  </Show>
+                  <Show when={(guest.responseDetail?.missingDetailLabels.length ?? 0) > 0}>
+                    <p class="mt-2 break-words text-xs font-semibold leading-4 text-amber-900">
+                      {guest.responseDetail?.missingDetailLabels.join(" · ")}
+                    </p>
+                  </Show>
+                  <Show when={guest.responseDetail?.privacyLabel}>
+                    <p class="mt-1 break-words text-xs leading-4 text-sky-950/60">
+                      {guest.responseDetail?.privacyLabel}
                     </p>
                   </Show>
                 </article>

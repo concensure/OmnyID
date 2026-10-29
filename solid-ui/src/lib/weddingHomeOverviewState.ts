@@ -345,19 +345,25 @@ export function buildWeddingHomeOverviewActionTiles(state: WeddingResponseWorksp
 
   const guestTracking = state.guestTracking;
   const intakeGuestCount = firstPlanningContextText(state, "guestCount");
-  const respondedCount = guestTracking.attendingCount + guestTracking.declinedCount;
+  const responseSummary = guestTracking.rsvpResponseSummary;
+  const respondedCount = responseSummary?.repliedCount ?? guestTracking.attendingCount + guestTracking.declinedCount;
+  const awaitingCount = responseSummary?.awaitingCount ?? guestTracking.pendingCount;
+  const incompleteCount = responseSummary?.incompleteCount ?? 0;
+  const changedCount = responseSummary?.changedCount ?? 0;
   const hasGuests = guestTracking.guestRowCount > 0;
   const guestTile = {
     id: "guests" as const,
     valueLabel: hasGuests ? `${guestTracking.guestRowCount}` : intakeGuestCount ? `${intakeGuestCount}` : "—",
     detailLabel: hasGuests
-      ? `${respondedCount} replied - ${guestTracking.pendingCount} awaiting`
+      ? `${respondedCount} replied - ${awaitingCount} awaiting${incompleteCount > 0 ? ` - ${incompleteCount} need details` : ""}`
       : intakeGuestCount
         ? "Guest count captured from intake; make the guest list next."
         : "Add guests to unlock catering and seating.",
-    supportLabel: hasGuests ? `${guestTracking.attendingCount} attending` : intakeGuestCount ? "Open guests to build list" : "Open guests",
-    tone: !hasGuests ? intakeGuestCount ? "attention" as const : "needs_input" as const : guestTracking.pendingCount > 0 ? "attention" as const : "ready" as const,
-    toneLabel: !hasGuests ? intakeGuestCount ? "In progress" : "Action needed" : guestTracking.pendingCount > 0 ? "In progress" : "On track",
+    supportLabel: hasGuests
+      ? `${guestTracking.attendingCount} attending${changedCount > 0 ? ` - ${changedCount} changed` : ""}`
+      : intakeGuestCount ? "Open guests to build list" : "Open guests",
+    tone: !hasGuests ? intakeGuestCount ? "attention" as const : "needs_input" as const : awaitingCount > 0 || incompleteCount > 0 || changedCount > 0 ? "attention" as const : "ready" as const,
+    toneLabel: !hasGuests ? intakeGuestCount ? "In progress" : "Action needed" : awaitingCount > 0 || incompleteCount > 0 || changedCount > 0 ? "In progress" : "On track",
     menuId: "guests" as const,
     actionLabel: hasGuests ? "Open guests" : "Add guests",
   };

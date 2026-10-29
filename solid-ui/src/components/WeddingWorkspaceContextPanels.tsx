@@ -141,6 +141,7 @@ export function WeddingWorkspaceContextPanels(props: {
     displayName: string;
     householdLabel: string;
     rsvpStatus: string;
+    previousRsvpStatus?: string;
     plusOneAllowed: boolean;
     childrenInvited: boolean;
     contactLabel: string;
@@ -153,6 +154,7 @@ export function WeddingWorkspaceContextPanels(props: {
       displayName: input.displayName,
       householdLabel: input.householdLabel,
       rsvpStatus: input.rsvpStatus === "Attending" || input.rsvpStatus === "Not attending" ? input.rsvpStatus : "Pending",
+      previousRsvpStatus: input.previousRsvpStatus === "Attending" || input.previousRsvpStatus === "Not attending" ? input.previousRsvpStatus : input.previousRsvpStatus === "Pending" ? "Pending" : null,
       plusOneAllowed: input.plusOneAllowed,
       childrenInvited: input.childrenInvited,
       contactLabel: input.contactLabel,

@@ -21,6 +21,7 @@ export type WeddingGuestBoundaryDraftInput = {
   displayName: string;
   householdLabel?: string | null;
   rsvpStatus?: WeddingGuestDraftRsvpStatus | null;
+  previousRsvpStatus?: WeddingGuestDraftRsvpStatus | null;
   plusOneAllowed?: boolean | null;
   childrenInvited?: boolean | null;
   contactLabel?: string | null;
@@ -73,6 +74,9 @@ export function buildWeddingGuestBoundaryDraftObjects(
   const householdId = `wedding_household:${safeWeddingLabel(metadata.responseWorkspaceId)}:${guestSlug(householdLabel)}`;
   const eventId = `wedding_event:${safeWeddingLabel(metadata.responseWorkspaceId)}:main_wedding`;
   const invitationId = `wedding_invitation:${safeWeddingLabel(metadata.responseWorkspaceId)}:${guestSlug(displayName)}:main_wedding`;
+  const nextInvitationStatus = invitationStatus(input.rsvpStatus);
+  const previousInvitation = input.previousRsvpStatus ? invitationStatus(input.previousRsvpStatus) : null;
+  const responseRecorded = nextInvitationStatus === "rsvp_yes" || nextInvitationStatus === "rsvp_no";
   const commonMetadata = {
     wedding_guest_draft: true,
     source_surface: "wedding_guest_operations",
@@ -81,7 +85,7 @@ export function buildWeddingGuestBoundaryDraftObjects(
     id: personId,
     kind: "wedding_boundary_guest_profile",
     title: displayName,
-    visibility: "approved_shared",
+    visibility: "couple_only",
     createdBy: "couple",
     createdAt: nowIso,
     personId,
@@ -119,7 +123,11 @@ export function buildWeddingGuestBoundaryDraftObjects(
     invitationId,
     eventId,
     personId,
-    invitationStatus: invitationStatus(input.rsvpStatus),
+    invitationStatus: nextInvitationStatus,
+    responseSource: responseRecorded ? "couple_manual" : null,
+    respondedAt: responseRecorded ? nowIso : null,
+    previousInvitationStatus: previousInvitation && previousInvitation !== nextInvitationStatus ? previousInvitation : null,
+    responseRevision: previousInvitation && previousInvitation !== nextInvitationStatus ? 2 : 1,
     plusOneAllowed: input.plusOneAllowed === true,
     childrenInvited: input.childrenInvited === true,
     visibleToGuest: true,

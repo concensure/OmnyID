@@ -3,6 +3,11 @@ import type { WeddingArtifactInput } from "@/lib/weddingArtifactState";
 import type { WeddingBoundaryLedgerObject } from "@/lib/weddingBoundaryLedgerState";
 import type { WeddingPlanningTaskItem } from "@/lib/weddingCalendarProjectionState";
 import { normalizeWeddingPlanningMetadata } from "@/lib/weddingPlanningTemplateState";
+import {
+  buildWeddingRsvpResponseSummary,
+  type WeddingRsvpEventSnapshot,
+  type WeddingRsvpResponseSummaryState,
+} from "@/lib/weddingRsvpResponseState";
 
 export type WeddingGuestTrackingState = {
   guestFileCount: number;
@@ -23,6 +28,7 @@ export type WeddingGuestTrackingState = {
   summaryLabel: string;
   warningLabels: string[];
   sourceLabels: string[];
+  rsvpResponseSummary: WeddingRsvpResponseSummaryState;
 };
 
 export type WeddingGuestTrackingRow = {
@@ -34,6 +40,8 @@ export type WeddingGuestTrackingRow = {
   mealPreference: string | null;
   dietaryNote: string | null;
   accessibilityNote: string | null;
+  mealRequired: boolean;
+  eventResponses: WeddingRsvpEventSnapshot[];
   sourceLabel: string;
 };
 
@@ -149,6 +157,14 @@ function rsvpStatusLabel(value: string): WeddingGuestTrackingRow["rsvpStatus"] {
   const status = rsvpStatus(value);
   if (status === "attending") return "Attending";
   if (status === "declined") return "Not attending";
+  return "Pending";
+}
+
+function invitationAttendance(
+  value: Extract<WeddingBoundaryLedgerObject, { kind: "wedding_boundary_event_invitation" }>["invitationStatus"],
+): WeddingGuestTrackingRow["rsvpStatus"] {
+  if (value === "rsvp_yes") return "Attending";
+  if (value === "rsvp_no" || value === "declined_by_couple") return "Not attending";
   return "Pending";
 }
 
@@ -436,47 +452,82 @@ export function buildWeddingGuestTrackingState(input: {
         mealPreference: hasUsefulValue(mealPreference) ? mealPreference : null,
         dietaryNote: hasUsefulValue(dietaryNote) ? dietaryNote : null,
         accessibilityNote: hasUsefulValue(accessibilityNote) ? accessibilityNote : null,
+        mealRequired: mealIndex >= 0,
+        eventResponses: [],
         sourceLabel,
       });
     }
   }
 
   const boundaryProfiles = new Map<string, Extract<WeddingBoundaryLedgerObject, { kind: "wedding_boundary_guest_profile" }>>();
-  const boundaryInvitations = new Map<string, Extract<WeddingBoundaryLedgerObject, { kind: "wedding_boundary_event_invitation" }>>();
+  const boundaryInvitations = new Map<string, Array<Extract<WeddingBoundaryLedgerObject, { kind: "wedding_boundary_event_invitation" }>>>();
   const boundaryHouseholds = new Map<string, Extract<WeddingBoundaryLedgerObject, { kind: "wedding_boundary_household" }>>();
   for (const object of input.boundaryObjects ?? []) {
     if (object.kind === "wedding_boundary_guest_profile") boundaryProfiles.set(object.personId, object);
-    if (object.kind === "wedding_boundary_event_invitation") boundaryInvitations.set(object.personId, object);
+    if (object.kind === "wedding_boundary_event_invitation") {
+      const invitations = boundaryInvitations.get(object.personId) ?? [];
+      invitations.push(object);
+      boundaryInvitations.set(object.personId, invitations);
+    }
     if (object.kind === "wedding_boundary_household") boundaryHouseholds.set(object.householdId, object);
   }
   if (boundaryProfiles.size > 0) sourceLabels.push("Saved guest records");
   for (const profile of boundaryProfiles.values()) {
-    const invitation = boundaryInvitations.get(profile.personId);
+    const invitations = (boundaryInvitations.get(profile.personId) ?? [])
+      .filter((invitation) => invitation.invitationStatus !== "not_invited");
     guestRowCount += 1;
     const householdLabel = (boundaryHouseholds.get(profile.householdId ?? "")?.displayName
       ?? clean(profile.householdId)
       ?? "Ungrouped");
     householdKeys.add(uniqueHouseholdKey(profile.displayName, householdLabel));
-    const status = invitation?.invitationStatus;
-    if (status === "rsvp_yes") attendingCount += 1;
-    else if (status === "rsvp_no" || status === "declined_by_couple") declinedCount += 1;
+    const attendance = invitations.some((invitation) => invitation.invitationStatus === "rsvp_yes")
+      ? "Attending"
+      : invitations.length > 0 && invitations.every((invitation) => ["rsvp_no", "declined_by_couple"].includes(invitation.invitationStatus))
+        ? "Not attending"
+        : "Pending";
+    if (attendance === "Attending") attendingCount += 1;
+    else if (attendance === "Not attending") declinedCount += 1;
     else pendingCount += 1;
     if (hasUsefulValue(profile.dietaryNote ?? "")) dietaryCount += 1;
     if (hasUsefulValue(profile.accessibilityNote ?? "")) accessibilityCount += 1;
     if (!hasUsefulValue(profile.contactLabel ?? "")) missingContactCount += 1;
-    if (status === "rsvp_yes" && !hasUsefulValue(profile.mealPreference ?? "")) missingMealCount += 1;
+    if (attendance === "Attending" && !hasUsefulValue(profile.mealPreference ?? "")) missingMealCount += 1;
     guestRows.push({
       id: `boundary:${profile.personId}`,
       displayName: profile.displayName,
       householdLabel,
-      rsvpStatus: status === "rsvp_yes" ? "Attending" : status === "rsvp_no" || status === "declined_by_couple" ? "Not attending" : "Pending",
+      rsvpStatus: attendance,
       contactLabel: hasUsefulValue(profile.contactLabel ?? "") ? profile.contactLabel ?? null : null,
       mealPreference: hasUsefulValue(profile.mealPreference ?? "") ? profile.mealPreference ?? null : null,
       dietaryNote: hasUsefulValue(profile.dietaryNote ?? "") ? profile.dietaryNote ?? null : null,
       accessibilityNote: hasUsefulValue(profile.accessibilityNote ?? "") ? profile.accessibilityNote ?? null : null,
+      mealRequired: true,
+      eventResponses: invitations.map((invitation) => ({
+        invitationId: invitation.invitationId,
+        eventId: invitation.eventId,
+        attendance: invitationAttendance(invitation.invitationStatus),
+        responseSource: invitation.responseSource ?? null,
+        viewedAt: invitation.viewedAt ?? null,
+        respondedAt: invitation.respondedAt ?? null,
+        lockedAt: invitation.lockedAt ?? null,
+        changed: Boolean(invitation.previousInvitationStatus && invitation.previousInvitationStatus !== invitation.invitationStatus),
+        revision: invitation.responseRevision ?? null,
+      })),
       sourceLabel: "Saved in your guest list",
     });
   }
+
+  const rsvpResponseSummary = buildWeddingRsvpResponseSummary(guestRows.map((row) => ({
+    id: row.id,
+    displayName: row.displayName,
+    attendance: row.rsvpStatus,
+    mealPreference: row.mealPreference,
+    mealRequired: row.mealRequired,
+    dietaryNote: row.dietaryNote,
+    accessibilityNote: row.accessibilityNote,
+    sourceLabel: row.sourceLabel,
+    eventResponses: row.eventResponses,
+  })));
 
   const warningLabels = [
     pendingCount > 0 ? `${pendingCount} RSVP${pendingCount === 1 ? "" : "s"} still pending` : null,
@@ -512,5 +563,6 @@ export function buildWeddingGuestTrackingState(input: {
       : `${guestRowCount} guest row${guestRowCount === 1 ? "" : "s"} tracked across ${householdKeys.size} household${householdKeys.size === 1 ? "" : "s"}; ${attendingCount} attending, ${pendingCount} pending.`,
     warningLabels,
     sourceLabels,
+    rsvpResponseSummary,
   };
 }

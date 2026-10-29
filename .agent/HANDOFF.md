@@ -5650,3 +5650,15 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch `agent/codex/W
 - Full evidence: `Documents/verification/wed-302-response-payload-release-2026-10-30.md`.
 
 Next: measure and split the remaining approximately 750 KB Wedding workspace by menu-owned secondary surfaces, or return to WED-286 for provider-observed bounce/complaint evidence. Do not enable vendor mail until that evidence is complete.
+
+## 2026-10-30 - WED-303 Wedding RSVP specification and shared projection slice (Codex, in progress)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch `agent/codex/WED-303`, based on `f119f48ee96a44117b52eba3c60966af86cf794f`.
+
+- Converted the user's RSVP feature direction into `Documents/design/wedding planner/RSVP/wedding-rsvp-spec.md` and a dependency-ordered `wedding-rsvp-tasks.md` covering canonical response events, secure capabilities, controlled setup, public mobile response, reconciliation, reminders, exports and rollout evidence.
+- Implemented WED-303A on the current AFP guest graph. Event invitations now round-trip response source, viewed/responded/locked time, prior status and revision. Persisted guest profiles now rehydrate contact, meal, dietary and accessibility values that were previously dropped.
+- Guest tracking preserves multiple event invitations per person and derives one deterministic lifecycle/provenance/privacy summary. The existing Guests card and Wedding Home guest tile consume that summary; manual changes remain on the existing AFP writer and are labelled couple-entered.
+- New guest profiles containing private logistics default to couple-only. No public RSVP route, capability, provider send or production flag was added or enabled.
+- Focused result before candidate freeze: 37 RSVP/guest/home tests pass, TypeScript passes and `git diff --check` is clean. The public guest flow and WED-303B onward remain open.
+
+Next: freeze and run the full clean-candidate Wedding/build/line-budget checks, then continue WED-303B with a versioned canonical response event and server-side scope/idempotency validation. Do not build a second guest store.

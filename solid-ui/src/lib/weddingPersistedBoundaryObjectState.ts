@@ -100,6 +100,11 @@ function bool(value: unknown): boolean {
   return value === true;
 }
 
+function positiveInteger(value: unknown): number | null {
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
 function contentValue(message: AfpMessage, key: string): unknown {
   return decryptedDisplayContent(message)[key] ?? message.metadata?.[key];
 }
@@ -277,6 +282,10 @@ export function weddingPersistedBoundaryObjectFromAfpMessage(
       householdId: clean(contentValue(message, "household_id")),
       ageBand: clean(contentValue(message, "age_band")) as WeddingBoundaryGuestProfile["ageBand"],
       relationshipLabel: clean(contentValue(message, "relationship_label")),
+      contactLabel: clean(contentValue(message, "contact_label")),
+      mealPreference: clean(contentValue(message, "meal_preference")),
+      dietaryNote: clean(contentValue(message, "dietary_note")),
+      accessibilityNote: clean(contentValue(message, "accessibility_note")),
       familySide: clean(contentValue(message, "family_side")) as WeddingBoundaryGuestProfile["familySide"],
     };
   }
@@ -292,6 +301,12 @@ export function weddingPersistedBoundaryObjectFromAfpMessage(
       eventId,
       personId,
       invitationStatus: clean(contentValue(message, "invitation_status")) as WeddingBoundaryEventInvitation["invitationStatus"] ?? "invited",
+      responseSource: clean(contentValue(message, "response_source")) as WeddingBoundaryEventInvitation["responseSource"],
+      viewedAt: clean(contentValue(message, "viewed_at")),
+      respondedAt: clean(contentValue(message, "responded_at")),
+      lockedAt: clean(contentValue(message, "locked_at")),
+      previousInvitationStatus: clean(contentValue(message, "previous_invitation_status")) as WeddingBoundaryEventInvitation["previousInvitationStatus"],
+      responseRevision: positiveInteger(contentValue(message, "response_revision")),
       plusOneAllowed: bool(contentValue(message, "plus_one_allowed")),
       childrenInvited: bool(contentValue(message, "children_invited")),
       visibleToGuest: contentValue(message, "visible_to_guest") !== false,
