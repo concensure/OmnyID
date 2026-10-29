@@ -10,6 +10,7 @@ pub(super) mod attribute_catalog;
 mod canonical_resolution;
 mod directory;
 mod entity_merge;
+mod photo_proxy;
 mod providers;
 mod receipt;
 mod source_classification;
@@ -29,16 +30,11 @@ use crate::wedding_shared_tool_metering::{
 use attribute_catalog::PendingAttribute;
 use canonical_resolution::{EnrichInput, enrich_vendor_sources, write_pending_attributes};
 use directory::search_wedding_vendor_directory;
+use photo_proxy::wedding_google_place_photo_http;
 use providers::{search_brave, search_exa, search_google_places};
 use receipt::merge_receipt;
 use serde_json::Value;
 use source_policy::WeddingVendorSourcePolicy;
-
-#[derive(serde::Deserialize)]
-struct GooglePlacePhotoProxyQuery {
-    name: String,
-    max_width_px: Option<u16>,
-}
 
 #[derive(serde::Deserialize)]
 struct WeddingVendorSearchRequest {
@@ -135,119 +131,6 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
             "/wedding/provider-capabilities",
             get(wedding_provider_capabilities_http),
         )
-}
-
-async fn wedding_google_place_photo_http(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-    Query(query): Query<GooglePlacePhotoProxyQuery>,
-) -> Result<axum::response::Response, (StatusCode, String)> {
-    enforce_rate_limit(
-        &state,
-        public_rate_limit_key("wedding_google_place_photo", &headers),
-        RateLimitPolicy {
-            max_requests: 120,
-            window: Duration::from_secs(60),
-        },
-    )
-    .await?;
-    let photo_name = clean_google_place_photo_name(&query.name).ok_or_else(|| {
-        (
-            StatusCode::BAD_REQUEST,
-            "Invalid Google Places photo name.".to_string(),
-        )
-    })?;
-    let max_width = query.max_width_px.unwrap_or(720).clamp(120, 1200);
-    let proxy_url =
-        google_place_photo_proxy_url_at_width(&photo_name, max_width).ok_or_else(|| {
-            (
-                StatusCode::BAD_REQUEST,
-                "Invalid Google Places photo name.".to_string(),
-            )
-        })?;
-    let listed = sqlx::query_scalar::<_, bool>(
-        r#"SELECT EXISTS (
-            SELECT 1 FROM wedding_vendor_photos WHERE photo_url = $1
-            UNION ALL
-            SELECT 1 FROM wedding_vendor_room_photos WHERE photo_url = $1
-        )"#,
-    )
-    .bind(&proxy_url)
-    .fetch_one(&state.db.pool)
-    .await
-    .map_err(|err| {
-        tracing::warn!(%err, "wedding vendor photo allowlist lookup failed");
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "Could not verify this vendor photo.".to_string(),
-        )
-    })?;
-    if !listed {
-        return Err((StatusCode::NOT_FOUND, "Vendor photo not found.".to_string()));
-    }
-    if !admin_shared_tool_policy_enabled("google-places-api") {
-        return Err((
-            StatusCode::FORBIDDEN,
-            "Google Places shared wedding-template access is not enabled.".to_string(),
-        ));
-    }
-    let key = resolve_admin_tool_secret(GOOGLE_PLACES_SPEC)
-        .map(|secret| secret.secret)
-        .ok_or_else(|| {
-            (
-                StatusCode::SERVICE_UNAVAILABLE,
-                "Google Places API key is not configured.".to_string(),
-            )
-        })?;
-    let max_width_string = max_width.to_string();
-    let media_url = format!("https://places.googleapis.com/v1/{photo_name}/media");
-    let response = reqwest::Client::new()
-        .get(media_url)
-        .query(&[
-            ("key", key.as_str()),
-            ("maxWidthPx", max_width_string.as_str()),
-        ])
-        .send()
-        .await
-        .map_err(|err| {
-            (
-                StatusCode::BAD_GATEWAY,
-                format!("Google Places photo request failed: {err}"),
-            )
-        })?;
-    if !response.status().is_success() {
-        return Err((
-            StatusCode::BAD_GATEWAY,
-            vendor_provider_http_error("Google Places photo", response).await,
-        ));
-    }
-    let content_type = response
-        .headers()
-        .get(axum::http::header::CONTENT_TYPE)
-        .cloned()
-        .unwrap_or_else(|| axum::http::HeaderValue::from_static("image/jpeg"));
-    let bytes = response.bytes().await.map_err(|err| {
-        (
-            StatusCode::BAD_GATEWAY,
-            format!("Google Places photo response read failed: {err}"),
-        )
-    })?;
-    axum::response::Response::builder()
-        .status(StatusCode::OK)
-        .header(axum::http::header::CONTENT_TYPE, content_type)
-        .header(
-            axum::http::header::CACHE_CONTROL,
-            axum::http::HeaderValue::from_static(
-                "public, max-age=86400, stale-while-revalidate=604800",
-            ),
-        )
-        .body(axum::body::Body::from(bytes))
-        .map_err(|err| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Could not build photo response: {err}"),
-            )
-        })
 }
 
 async fn wedding_provider_capabilities_http(
