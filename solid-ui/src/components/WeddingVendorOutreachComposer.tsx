@@ -36,6 +36,7 @@ export function WeddingVendorOutreachComposer(props: {
   const [whyOpen, setWhyOpen] = createSignal(false);
   const [attachmentBusy, setAttachmentBusy] = createSignal(false);
   const [attachmentError, setAttachmentError] = createSignal<string | null>(null);
+  const [attachmentNotice, setAttachmentNotice] = createSignal<string | null>(null);
   const updatePermissions = (patch: Partial<WeddingVendorEnquiryPermissions>) => props.onPermissionsChange?.({
     ...props.flow.permissions,
     ...patch,
@@ -49,8 +50,8 @@ export function WeddingVendorOutreachComposer(props: {
     groundedOnLabels: props.flow.groundedOnLabels,
   });
   const updateAttachments = (attachments: AfpAttachment[]) => props.onAttachmentsChange?.(attachments);
-  const uploadAttachments = async (files: FileList | null) => {
-    if (!files?.length || attachmentBusy()) return;
+  const uploadAttachments = async (files: readonly File[]) => {
+    if (files.length === 0 || attachmentBusy()) return;
     const available = Math.max(0, 5 - props.flow.attachments.length);
     if (files.length > available) {
       setAttachmentError("Attach no more than five files to one enquiry.");
@@ -58,6 +59,7 @@ export function WeddingVendorOutreachComposer(props: {
     }
     setAttachmentBusy(true);
     setAttachmentError(null);
+    setAttachmentNotice(null);
     try {
       const added: AfpAttachment[] = [];
       for (const file of Array.from(files)) {
@@ -67,6 +69,7 @@ export function WeddingVendorOutreachComposer(props: {
         }));
       }
       updateAttachments([...props.flow.attachments, ...added]);
+      setAttachmentNotice(`${added.length} ${added.length === 1 ? "file" : "files"} added. ${added.length === 1 ? "It" : "They"} will be sent with this enquiry after you approve it.`);
     } catch (error) {
       setAttachmentError(error instanceof Error ? error.message : "The attachment could not be uploaded.");
     } finally {
@@ -266,8 +269,9 @@ export function WeddingVendorOutreachComposer(props: {
                   accept=".pdf,.docx,.txt,.jpg,.jpeg,.png,.webp,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,image/jpeg,image/png,image/webp"
                   disabled={props.busy || attachmentBusy() || props.flow.attachments.length >= 5}
                   onChange={(event) => {
-                    void uploadAttachments(event.currentTarget.files);
+                    const selectedFiles = Array.from(event.currentTarget.files ?? []);
                     event.currentTarget.value = "";
+                    void uploadAttachments(selectedFiles);
                   }}
                 />
               </label>
@@ -287,6 +291,7 @@ export function WeddingVendorOutreachComposer(props: {
               </ul>
             </Show>
             <Show when={attachmentError()}>{(message) => <p role="alert" class="mt-2 text-xs leading-5 text-red-700">{message()}</p>}</Show>
+            <Show when={attachmentNotice()}>{(message) => <p role="status" class="mt-2 text-xs leading-5 text-emerald-800">{message()}</p>}</Show>
           </div>
 
           <Show when={!props.flow.recipientEmail}>

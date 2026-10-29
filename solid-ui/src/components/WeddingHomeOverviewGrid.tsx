@@ -17,13 +17,12 @@ import type { WeddingWorkspaceSidebarAction } from "@/lib/weddingWorkspaceAction
 import type { WeddingWorkspaceMenuId } from "@/lib/weddingWorkspaceMenuState";
 import { weddingDayCountdownLabel } from "@/lib/weddingWorkspaceSidebarActionState";
 
-type Domain = "budget" | "guests" | "seating" | "vendors";
+type Domain = "budget" | "guests" | "seating";
 
 const DOMAIN_STYLE: Record<Domain, { icon: WeddingDashboardIconId; label: string }> = {
   budget: { icon: "banknotes", label: "Budget" },
   guests: { icon: "users", label: "Guests" },
   seating: { icon: "table-cells", label: "Seating" },
-  vendors: { icon: "user-plus", label: "Vendors" },
 };
 
 function dateLabel(value: string | null): string {
@@ -93,6 +92,7 @@ export function WeddingHomeOverviewGrid(props: {
   const progress = () => buildWeddingHomePlanningProgress(props.state);
   const timeline = () => buildWeddingHomeTimelineOverview(props.state);
   const tiles = () => buildWeddingHomeOverviewActionTiles(props.state);
+  const visibleTiles = () => tiles().filter((item): item is WeddingHomeOverviewActionTile & { id: Domain } => item.id !== "vendors");
   const tile = (id: Domain) => tiles().find((item) => item.id === id);
   const [transportOpen, setTransportOpen] = createSignal(false);
   const transportTask = () => /transport|trackwork|guest logistics|access/i.test(timeline().detailLabel);
@@ -103,9 +103,6 @@ export function WeddingHomeOverviewGrid(props: {
   const openTile = (id: Domain) => {
     const selected = tile(id);
     if (selected?.menuId) props.onSelectMenu?.(selected.menuId);
-    if (id === "vendors" && typeof window !== "undefined") window.setTimeout(() => {
-      document.querySelector("[data-wedding-home-section='vendor_follow_up']")?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 0);
   };
   const openTimeline = () => {
     if (transportTask()) {
@@ -170,24 +167,18 @@ export function WeddingHomeOverviewGrid(props: {
           <span class="min-w-0"><span class="block text-sm font-semibold">{timeline().detailLabel.replace(/^Next:\s*/i, "")}</span><span class="mt-0.5 block text-xs text-wedding-ink/65">Open the timeline</span></span>
         </button>
         <div class="mt-3 grid gap-1 border-t border-wedding-border pt-3">
-          <For each={tiles().slice(0, 3)}>{(item) => (
+          <For each={visibleTiles()}>{(item) => (
             <button type="button" class="flex min-h-11 items-center justify-between gap-2 rounded-lg px-1 text-left hover:bg-wedding-page focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-primary" onClick={() => openTile(item.id)}>
               <span class="min-w-0 truncate text-xs font-medium">{DOMAIN_STYLE[item.id].label}</span>
               <span class="shrink-0 text-[11px] text-wedding-ink/65">{item.toneLabel}</span>
             </button>
           )}</For>
         </div>
-        <div class="mt-3 border-t border-wedding-border pt-3">
-          <p class="text-xs font-semibold uppercase tracking-[0.08em] text-wedding-ink/65">Saved vendors</p>
-          <p class="mt-1 font-display text-3xl font-bold text-wedding-primary tabular-nums">{props.state.vendorContactCards?.length ?? 0}</p>
-          <button type="button" class="mt-1 min-h-11 text-left text-xs font-semibold text-wedding-secondary" onClick={() => openTile("vendors")}>Open saved vendors →</button>
-        </div>
       </aside>
 
       <DomainTile domain="budget" tile={tile("budget")} dense={dense()} desktopSpan="lg:col-span-3" onOpen={() => openTile("budget")} />
       <DomainTile domain="guests" tile={tile("guests")} dense={dense()} desktopSpan="lg:col-span-3" onOpen={() => openTile("guests")} />
       <DomainTile domain="seating" tile={tile("seating")} dense={dense()} desktopSpan="lg:col-span-3" onOpen={() => openTile("seating")} />
-      <DomainTile domain="vendors" tile={tile("vendors")} dense={dense()} desktopSpan="lg:col-span-9 lg:min-h-[9rem]" onOpen={() => openTile("vendors")} />
     </section>
   );
 }

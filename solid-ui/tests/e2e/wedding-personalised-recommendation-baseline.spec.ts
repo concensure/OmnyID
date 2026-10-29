@@ -15,7 +15,7 @@ for (const viewport of [{ width: 320, height: 720 }, { width: 360, height: 740 }
     const vendorHeading = page.getByRole("heading", { name: PRIMARY_VENDOR });
     const photo = page.getByRole("img", { name: `${PRIMARY_VENDOR} waterfront reception` });
     const recommendation = page.getByText(/currently ranks first on \d+ checked factors; compare its open questions/i);
-    const evidenceChip = page.getByText(/^Based on \d+ checked facts? · \d+ to confirm$/).first();
+    const evidenceChip = page.getByText(/^(Matches:|No preference matches confirmed yet)/).first();
     await expect(vendorHeading).toBeVisible();
     await expect(photo).toBeVisible();
     await expect(recommendation).toBeVisible();

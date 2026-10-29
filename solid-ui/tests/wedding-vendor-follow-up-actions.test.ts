@@ -31,6 +31,19 @@ test("follow-up reminder rejects past dates and persists a future AFP reminder",
   assert.equal(inputs[0]?.type, "wedding_vendor_follow_up_reminder");
 });
 
+test("follow-up reminder accepts the user's local calendar date", async () => {
+  const now = new Date();
+  const today = new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
+  const inputs: Array<{ type: string }> = [];
+  assert.equal(await saveWeddingVendorFollowUpDate({
+    card,
+    date: today,
+    metadata: {},
+    saveProjection: async (input) => inputs.push(input),
+  }), true);
+  assert.equal(inputs[0]?.type, "wedding_vendor_follow_up_reminder");
+});
+
 test("closing a follow-up writes the account-scoped AFP dismissal event", async () => {
   const inputs: Array<{ type: string; subtype?: string | null }> = [];
   let refreshed = false;

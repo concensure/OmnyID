@@ -520,13 +520,10 @@ function decisionLoadCandidate(item: WeddingPersonalOsRankedItem): boolean {
 }
 
 function decisionLoadReliefLabels(
-  focusItems: readonly WeddingPersonalOsRankedItem[],
+  _focusItems: readonly WeddingPersonalOsRankedItem[],
   _backlogCount: number,
 ): string[] {
-  return [
-    focusItems.length > 0 ? `${focusItems.length} wedding action${focusItems.length === 1 ? " is" : "s are"} queued by urgency.` : "No immediate decision pile-up.",
-    "Shows one next action at a time while keeping the rest ready behind it.",
-  ];
+  return [];
 }
 
 export function buildWeddingPersonalOsProjectionState(input: {

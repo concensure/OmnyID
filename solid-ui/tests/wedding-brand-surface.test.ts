@@ -58,7 +58,8 @@ test("home uses task-bound journey and preserves the separate mobile navigation 
   const mobilePage = read("src/components/WeddingMobilePage.tsx");
   assert.match(overview, /WeddingPlanningJourneyStepper/);
   assert.match(overview, /aria-label="Wedding plan up next"/);
-  assert.match(overview, /Saved vendors/);
+  assert.doesNotMatch(overview, /Saved vendors/);
+  assert.doesNotMatch(overview, /domain="vendors"/);
   assert.match(journeyState, /Plan & budget/);
   assert.match(journeyState, /Wedding & after/);
   assert.match(journey, /weddingJourneyGroups/);

@@ -1,4 +1,4 @@
-import { createEffect, createSignal, onCleanup, onMount, Show } from "solid-js";
+import { createEffect, createSignal, on, onCleanup, onMount, Show } from "solid-js";
 
 import { type SendAfpMessageInput } from "@/lib/api";
 import { WeddingTaskOwnerPicker } from "@/components/WeddingTaskOwnerPicker";
@@ -27,11 +27,10 @@ export function WeddingTaskOwnerControl(props: {
   const [draft, setDraft] = createSignal(savedOwner());
   const [saving, setSaving] = createSignal(false);
   const [notice, setNotice] = createSignal<string | null>(null);
-  createEffect(() => {
-    props.task.assignee;
-    props.responseWorkspaceId;
-    setDraft(savedOwner());
-  });
+  createEffect(on(
+    () => `${props.responseWorkspaceId}:${props.task.id}:${props.task.assignee ?? ""}`,
+    () => setDraft(savedOwner()),
+  ));
 
   onMount(() => {
     const listener = (event: Event) => {

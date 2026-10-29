@@ -879,7 +879,7 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
         },
       };
     },
-    followUpProps: {
+    followUpProps: () => ({
       state: state(),
       onSidebarAction: handleSidebarAction,
       onViewQuoteReplyProof: (flow) => void viewQuoteReplyThread(flow),
@@ -895,7 +895,7 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
       onConnectGmailForOutreach: () => void vendorOutreach.onConnectGmailForOutreach(),
       onSetFollowUpDate: (card, date) => saveWeddingVendorFollowUpDate({ card, date, metadata: state().workspace.metadata, saveProjection: props.saveProjection, onSaved: props.onRefreshWorkspace }),
       onDismissFollowUp: (card) => dismissWeddingVendorFollowUp({ card, metadata: state().workspace.metadata, saveProjection: props.saveProjection, onSaved: props.onRefreshWorkspace }),
-    },
+    }),
   }));
 
   const orderedHomeSections = createMemo(() => {
@@ -956,6 +956,7 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
             homeSections={orderedHomeSections()}
             onSidebarAction={handleSidebarAction}
             saveProjection={props.saveProjection}
+            onRefreshWorkspace={props.onRefreshWorkspace}
             userId={props.contactUserId}
             onSelectMenu={props.onSelectMenu}
             onApproveQuoteReply={approveQuoteReplyWording}

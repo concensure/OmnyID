@@ -173,8 +173,14 @@ export function WeddingVendorFollowUpPanel(props: {
               const saveFollowUpDate = async () => {
                 if (!followUpDate() || dateSaving()) return;
                 setDateSaving(true); setDateNotice(null);
-                const saved = await props.onSetFollowUpDate(card, followUpDate());
-                setDateSaving(false); setDateNotice(saved ? "Follow-up date saved." : "Couldn't save that date. Please try again.");
+                try {
+                  const saved = await props.onSetFollowUpDate(card, followUpDate());
+                  setDateNotice(saved ? "Follow-up date saved." : "Couldn't save that date. Please try again.");
+                } catch {
+                  setDateNotice("Couldn't save that date. Please try again.");
+                } finally {
+                  setDateSaving(false);
+                }
               };
               return (
                 <article class="select-text rounded-2xl border border-wedding-muted/25 bg-white p-3 py-3 sm:p-4 sm:py-4">
@@ -202,7 +208,6 @@ export function WeddingVendorFollowUpPanel(props: {
                           min={localToday()}
                           value={followUpDate()}
                           onInput={(event) => { setFollowUpDate(event.currentTarget.value); setDateNotice(null); }}
-                          onChange={() => void saveFollowUpDate()}
                           class="block min-h-10 min-w-0 flex-1 cursor-text select-text rounded-lg border border-wedding-muted/35 bg-white px-2 text-xs font-semibold text-wedding-text outline-none focus:border-wedding-cta focus:ring-2 focus:ring-wedding-surface-blush"
                           aria-label={`Follow-up date for ${card.vendorName}`}
                         />

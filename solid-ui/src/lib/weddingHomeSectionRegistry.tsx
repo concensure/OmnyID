@@ -46,7 +46,7 @@ export type WeddingHomeSectionRegistryInput = {
   preferenceProfileOwner: Pick<ReturnType<typeof useWeddingPreferenceProfileOwner>, "preferenceProfile" | "preferenceSaving" | "updatePreferenceProfile" | "confirmPreferenceProfile">;
   preferenceFeedback: ReturnType<typeof useWeddingPreferenceFeedbackOwner>;
   quoteCardProps: (flow: WeddingVendorQuoteReplyFlowState) => ComponentProps<typeof WeddingVendorQuoteReplyCard>;
-  followUpProps: ComponentProps<typeof WeddingVendorFollowUpPanel>;
+  followUpProps: () => ComponentProps<typeof WeddingVendorFollowUpPanel>;
 };
 
 export function buildWeddingHomeSections(input: WeddingHomeSectionRegistryInput): WeddingHomeSection[] {
@@ -120,7 +120,7 @@ export function buildWeddingHomeSections(input: WeddingHomeSectionRegistryInput)
       id: "vendor_follow_up",
       title: "Vendor follow-ups",
       visible: state().vendorContactCards.length > 0 || state().vendorPursuitLogCards.length > 0 || state().vendorQuoteReplyLogFlows.length > 0,
-      render: () => <WeddingVendorFollowUpPanel {...input.followUpProps} />,
+      render: () => <WeddingVendorFollowUpPanel {...input.followUpProps()} />,
     },
     {
       id: "decision_focus",

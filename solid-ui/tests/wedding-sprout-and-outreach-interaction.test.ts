@@ -19,6 +19,8 @@ const outreachComposer = readFileSync(resolve(process.cwd(), "src/components/Wed
 const followUpPanel = readFileSync(resolve(process.cwd(), "src/components/WeddingVendorFollowUpPanel.tsx"), "utf8");
 const responseQueue = readFileSync(resolve(process.cwd(), "src/components/ResponseQueueView.tsx"), "utf8");
 const followUpApi = readFileSync(resolve(process.cwd(), "src/lib/weddingVendorFollowUpApi.ts"), "utf8");
+const editor = readFileSync(resolve(process.cwd(), "src/components/editor/TiptapEditor.tsx"), "utf8");
+const taskHelp = readFileSync(resolve(process.cwd(), "src/components/WeddingTaskContextHelp.tsx"), "utf8");
 
 test("Sprout performs its initial persona load before enabling template actions", () => {
   assert.match(personaFab, /reloadPersonas\(options\?: \{ initial\?: boolean \}\)/);
@@ -42,6 +44,16 @@ test("vendor outreach uses the shared rich editor with email formatting controls
   assert.match(outreachComposer, /mode="email"/);
   assert.match(outreachComposer, /showToolbar=\{true\}/);
   assert.match(outreachComposer, /onBodyChange\(markdown, html\)/);
+  assert.match(editor, /editorReady\(\) && showToolbar\(\)/);
+  assert.match(outreachComposer, /Array\.from\(event\.currentTarget\.files \?\? \[\]\)/);
+  assert.match(outreachComposer, /will be sent with this enquiry after you approve it/);
+});
+
+test("unknown wedding costs expose a focused hover and keyboard help tip", () => {
+  assert.match(taskHelp, /verify unknown wedding costs/i);
+  assert.match(taskHelp, /minimum spend/);
+  assert.match(taskHelp, /cancellation terms/);
+  assert.match(taskHelp, /WeddingInfoTip/);
 });
 
 test("live wedding workspace does not manufacture demo artifacts", () => {

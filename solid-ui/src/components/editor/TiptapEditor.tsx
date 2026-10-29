@@ -494,6 +494,7 @@ function filterSlashCommands(commands: SlashCommandEntry[], query: string) {
 
 export function TiptapEditor(props: TiptapEditorProps) {
   let containerRef: HTMLDivElement | undefined;
+  const [editorReady, setEditorReady] = createSignal(false);
   let editorInstance: Editor | undefined;
 
   const [state, setState] = createSignal<EditorState>(DEFAULT_STATE);
@@ -727,6 +728,7 @@ export function TiptapEditor(props: TiptapEditorProps) {
         });
       },
     });
+    setEditorReady(true);
 
     // Hydrate initial state
     setState(snapshotState(editorInstance));
@@ -742,6 +744,7 @@ export function TiptapEditor(props: TiptapEditorProps) {
   });
 
   onCleanup(() => {
+    setEditorReady(false);
     editorInstance?.destroy();
     editorInstance = undefined;
   });
@@ -840,7 +843,7 @@ export function TiptapEditor(props: TiptapEditorProps) {
     >
 
       {/* Toolbar — shown in all modes */}
-      <Show when={editorInstance && showToolbar()}>
+      <Show when={editorReady() && showToolbar()}>
         <EditorToolbar
           editor={editorInstance!}
           state={state()}

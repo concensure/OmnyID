@@ -631,4 +631,11 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Atomic content-light checkpoints and idempotency receipts for AFP-backed wedding run-sheet projection",
         include_str!("../../postgres/migrations/0124_wedding_runsheet_projection_commits.sql"),
     ),
+    (
+        "0125_remove_operator_wedding_follow_up_fixtures",
+        "Surgical cleanup of receipt-bound operator wedding follow-up fixtures",
+        include_str!(
+            "../../postgres/migrations/0125_remove_operator_wedding_follow_up_fixtures.sql"
+        ),
+    ),
 ];

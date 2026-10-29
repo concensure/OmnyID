@@ -343,6 +343,7 @@ export function ResponseQueueView(props: {
   const [weddingLocalBudgetRefreshKey, setWeddingLocalBudgetRefreshKey] = createSignal(0);
   const [weddingImportRefreshKey, setWeddingImportRefreshKey] = createSignal(0);
   const [weddingRefreshRunning, setWeddingRefreshRunning] = createSignal(false);
+  const [weddingRefreshQueued, setWeddingRefreshQueued] = createSignal(false);
   const [weddingRefreshState, setWeddingRefreshState] = createSignal<WeddingWorkspaceRefreshState | null>(null);
   const [weddingVendorSearchRunning, setWeddingVendorSearchRunning] = createSignal(false);
   const [weddingVendorSearchNotice, setWeddingVendorSearchNotice] = createSignal<string | null>(null);
@@ -1191,17 +1192,28 @@ export function ResponseQueueView(props: {
   async function refreshWeddingWorkspaceMessages(
     intent = weddingNavigationIntent(),
   ) {
-    if (!intent || intent.surface !== "planning_files" || weddingRefreshRunning()) return;
+    if (!intent || intent.surface !== "planning_files") return;
+    if (weddingRefreshRunning()) {
+      setWeddingRefreshQueued(true);
+      return;
+    }
     setWeddingRefreshRunning(true);
-    const state = await loadWeddingWorkspaceRefreshState({
-      signedIn: weddingSignedIn(),
-      weddingPlanId: intent.weddingPlanId,
-      responseWorkspaceId: intent.responseWorkspaceId,
-      sourceResponseId: intent.sourceResponseId,
-      fallbackMessages: bootstrap()?.messages ?? [],
-    });
-    setWeddingRefreshState(state);
-    setWeddingRefreshRunning(false);
+    try {
+      const state = await loadWeddingWorkspaceRefreshState({
+        signedIn: weddingSignedIn(),
+        weddingPlanId: intent.weddingPlanId,
+        responseWorkspaceId: intent.responseWorkspaceId,
+        sourceResponseId: intent.sourceResponseId,
+        fallbackMessages: bootstrap()?.messages ?? [],
+      });
+      setWeddingRefreshState(state);
+    } finally {
+      setWeddingRefreshRunning(false);
+      if (weddingRefreshQueued()) {
+        setWeddingRefreshQueued(false);
+        void refreshWeddingWorkspaceMessages(intent);
+      }
+    }
   }
 
   function weddingWorkspaceRefreshBanner() {

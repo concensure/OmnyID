@@ -55,6 +55,7 @@ export function WeddingMobileFocusHome(props: {
   homeSections: HomeSection[];
   onSidebarAction: (action: WeddingWorkspaceSidebarAction) => void;
   saveProjection?: ((input: SendAfpMessageInput) => Promise<unknown>) | null;
+  onRefreshWorkspace?: (() => void) | null;
   userId?: string | null;
   onSelectMenu?: (menu: WeddingWorkspaceMenuId) => void;
   onApproveQuoteReply?: (flow: WeddingVendorQuoteReplyFlowState) => void;
@@ -402,7 +403,7 @@ export function WeddingMobileFocusHome(props: {
               />
             )}
           >
-            <WeddingHomeOverviewGrid dense state={props.state} onSidebarAction={props.onSidebarAction} onSelectMenu={props.onSelectMenu} saveProjection={props.saveProjection} />
+            <WeddingHomeOverviewGrid dense state={props.state} onSidebarAction={props.onSidebarAction} onSelectMenu={props.onSelectMenu} saveProjection={props.saveProjection} onRefreshWorkspace={props.onRefreshWorkspace} />
           </Show>
         )}
       >

@@ -111,6 +111,17 @@ Before finishing substantive work:
 If a test, build, CI query, deployment query, or commit cannot be completed,
 record why in `.agent/HANDOFF.md` and in the final response.
 
+## Wedding Blog Publication Catalogue
+
+Every new or updated post published under `wedding/blog/` must be reconciled
+with `Documents/marketing/wedding planning/posts/blog/blog-publication-catalogue.csv`
+in the same change. Record the canonical URL, publication state and the
+relevant searchable tags: stakeholder, one of the six wedding-planning stages,
+location when applicable, and emotion. Keep only the intentionally featured
+tag visible on the blog card; the richer catalogue tags remain available to
+article metadata and blog search. Run `scripts/reconcile-wedding-blog.ps1`
+when practical rather than editing generated catalogue fields by hand.
+
 ## Future Project Control Plane
 
 The desired long-term shape is a project MCP or AFP-backed development ledger

@@ -1,4 +1,4 @@
-import { createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 
 import { readSession, type SendAfpMessageInput } from "@/lib/api";
 import { loadContacts, saveContacts, subscribeContactsChangedEvent } from "@/lib/contactsLocalState";
@@ -31,6 +31,8 @@ export function WeddingTaskOwnerPicker(props: {
   const [role, setRole] = createSignal("Wedding party");
   const [busy, setBusy] = createSignal(false);
   const [notice, setNotice] = createSignal<string | null>(null);
+  const [selection, setSelection] = createSignal(props.value);
+  createEffect(() => setSelection(props.value));
   const people = createMemo(() => {
     revision();
     const local = loadWeddingHelperLocalState(props.responseWorkspaceId);
@@ -86,13 +88,14 @@ export function WeddingTaskOwnerPicker(props: {
   return (
     <div class="min-w-0">
       <select
-        class={`${props.compact ? "min-h-10" : "min-h-11"} w-full rounded-lg border border-wedding-border bg-white px-2 text-sm font-normal text-wedding-ink`}
-        value={props.value}
+        class={`${props.compact ? "min-h-10" : "min-h-11"} block w-full appearance-auto rounded-lg border border-wedding-border bg-white px-2 text-sm font-normal text-wedding-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-primary`}
+        value={selection()}
         onChange={(event) => {
           if (event.currentTarget.value === ADD_CONTACT_VALUE) {
             setAdding(true);
-            event.currentTarget.value = props.value;
+            setSelection(props.value);
           } else {
+            setSelection(event.currentTarget.value);
             props.onChange(event.currentTarget.value);
           }
         }}

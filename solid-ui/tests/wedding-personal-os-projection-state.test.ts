@@ -700,7 +700,7 @@ test("wedding PersonalOS respects an explicit focus limit while retaining ordina
   assert.ok(state.decisionLoadRelief.focusItems.some((item) => /Decide final caterer headcount|Verify venue balance/i.test(item.title)));
   assert.equal(state.decisionLoadRelief.focusItems.some((item) => /Pack emergency kit/i.test(item.title)), false);
   assert.ok(state.rankedItems.some((item) => /Pack emergency kit/i.test(item.title)));
-  assert.ok(state.decisionLoadRelief.reliefLabels.some((label) => /one next action at a time/i.test(label)));
+  assert.deepEqual(state.decisionLoadRelief.reliefLabels, []);
 });
 
 test("wedding PersonalOS queues every open planning task without a default three-item cap", () => {

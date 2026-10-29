@@ -38,6 +38,7 @@ test("custom tasks persist stage and deadline through AFP", () => {
   assert.equal((message?.content as Record<string, unknown>).wedding_journey_stage, "details_invites");
   assert.equal((message?.content as Record<string, unknown>).due_at, "2027-08-01T09:00:00.000Z");
   assert.equal((message?.content as Record<string, unknown>).assignee, "Sam");
+  assert.ok(message?.supertags?.includes("event:wedding"));
 });
 
 test("task visual status never relies on colour alone", () => {

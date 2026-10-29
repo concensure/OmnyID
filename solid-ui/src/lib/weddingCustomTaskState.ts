@@ -37,6 +37,7 @@ export function weddingCustomTaskToAfpMessage(input: WeddingCustomTaskInput): Af
     subtype: "wedding_task",
     supertags: [
       "template:wedding_planning",
+      "event:wedding",
       "wedding_task",
       "wedding_custom_task",
       `wedding_journey_stage:${input.stage}`,

@@ -342,6 +342,12 @@ if (!weddingHome.includes('<p>Subscribe to our newsletter</p>') || !/<button cla
   failures.push('index.html: newsletter prompt and Subscribe button are required');
 }
 if (/waitlist/i.test(weddingHome)) failures.push('index.html: waitlist wording must be removed');
+if (!weddingHome.includes('<ol class="steps process-stepper') || (weddingHome.match(/<li class="step-card">/g) || []).length !== 4) {
+  failures.push('index.html: How it works must use the four-step vertical process stepper');
+}
+if (!weddingHome.includes('Are wedding tasks and the next-decision card the same thing?')) {
+  failures.push('index.html: task-versus-decision architecture FAQ is missing');
+}
 const howIdx = weddingHome.indexOf('id="how-it-works"');
 const flowIdx = weddingHome.indexOf('id="vendor-flow"');
 const previewIdx = weddingHome.indexOf('id="preview"');

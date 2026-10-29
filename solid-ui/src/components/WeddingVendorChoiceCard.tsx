@@ -151,10 +151,14 @@ export function WeddingVendorChoiceCard(props: {
     return ([ ["too_big", "Too big"], ["not_our_style", "Not our style"], ["too_far", "Too far"], ["too_expensive", "Too expensive"], ["other", "Other"] ] as const)
       .filter(([reason]) => allowed.has(reason));
   };
-  const checkedFactsCount = () => typeof card.checkedFactsCount === "number" && Number.isFinite(card.checkedFactsCount)
-    ? Math.max(0, card.checkedFactsCount)
-    : Math.max(0, card.rationaleLabels?.length ?? 0);
-  const factSummary = () => `Based on ${checkedFactsCount()} checked fact${checkedFactsCount() === 1 ? "" : "s"} · ${anchorRows().filter((row) => row.status === "unknown").length} to confirm`;
+  const matchedLabels = () => {
+    const anchors = anchorRows().filter((row) => row.status === "met").map((row) => row.anchor.trim()).filter(Boolean);
+    if (anchors.length > 0) return anchors;
+    return (card.facetLabels ?? []).map((label) => label.trim()).filter(Boolean);
+  };
+  const factSummary = () => matchedLabels().length > 0
+    ? `Matches: ${matchedLabels().slice(0, 2).join(" · ")}${matchedLabels().length > 2 ? ` +${matchedLabels().length - 2}` : ""}`
+    : "No preference matches confirmed yet";
   return (
     <article data-wedding-surface="vendor-choice" class={`w-full min-w-0 max-w-full overflow-hidden rounded-xl border border-wedding-border bg-wedding-card ${card.rank === 1 ? "border-l-4 border-l-wedding-primary" : ""}`}>
       <Show

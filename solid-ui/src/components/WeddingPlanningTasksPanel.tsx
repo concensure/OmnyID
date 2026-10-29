@@ -4,6 +4,7 @@ import { WeddingTaskResponsibilityFields } from "@/components/WeddingTaskRespons
 import { WeddingTaskComposer } from "@/components/WeddingTaskComposer";
 import { WeddingTaskCompletionButton } from "@/components/WeddingTaskCompletionButton";
 import { WeddingTaskOwnerControl } from "@/components/WeddingTaskOwnerControl";
+import { WeddingTaskContextHelp } from "@/components/WeddingTaskContextHelp";
 
 import type { SendAfpMessageInput } from "@/lib/api";
 import {
@@ -122,7 +123,7 @@ export function WeddingPlanningTasksPanel(props: {
                     <span class={`rounded-lg px-2 py-1 text-[11px] font-bold ${STATUS_CLASS[status(task).id]}`}>{status(task).label}</span>
                     <span class="text-xs font-semibold text-wedding-ink/65">{weddingHelperTaskPriorityLabel(task)}</span>
                   </div>
-                  <p class="mt-2 break-words text-base font-semibold text-wedding-ink">{task.title}</p>
+                  <div class="mt-2 flex min-w-0 items-start gap-2"><p class="min-w-0 break-words text-base font-semibold text-wedding-ink">{task.title}</p><WeddingTaskContextHelp title={task.title} /></div>
                   <p class="mt-1 text-sm text-wedding-ink/70">Due {weddingHelperTaskDueLabel(task)}</p>
                   <p class="mt-2 text-xs font-semibold text-wedding-primary">{expandedTaskIds()[task.id] ? "Hide task details" : "View task details"}</p>
                 </button>

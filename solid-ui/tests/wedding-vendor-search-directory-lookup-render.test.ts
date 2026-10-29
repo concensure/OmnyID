@@ -28,7 +28,8 @@ test("an older vendor card without personalised evidence rows remains renderable
   assert.match(source, /Array\.isArray\(card\.anchorRows\)/);
   assert.match(source, /Array\.isArray\(card\.verifyQuestions\)/);
   assert.match(source, /Array\.isArray\(card\.rooms\)/);
-  assert.match(source, /typeof card\.checkedFactsCount === "number"/);
+  assert.match(source, /card\.facetLabels \?\? \[\]/);
+  assert.match(source, /No preference matches confirmed yet/);
 });
 
 test("mobile decision saves receive the authenticated wedding account identity", () => {
