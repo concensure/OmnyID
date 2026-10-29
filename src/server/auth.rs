@@ -32,6 +32,7 @@ use super::{
     AppState, RateLimitPolicy, internal_error, internal_http_error, status_to_http, types::*,
 };
 mod apple_config; pub(super) use apple_config::apple_auth_config_http; use apple_config::apple_client_id_configured;
+mod verification_source;
 
 const APPLE_JWKS_URL: &str = "https://appleid.apple.com/auth/keys";
 const APPLE_JWKS_CACHE_TTL_SECS: u64 = 300;
@@ -56,6 +57,7 @@ pub(super) async fn register_http(
     .await?;
     let email = request.email.trim().to_lowercase();
     let password = request.password.trim().to_string();
+    let verification_source = request.source.clone();
     let display_name = request
         .display_name
         .unwrap_or_else(|| email.split('@').next().unwrap_or("Omnyid User").to_string())
@@ -78,7 +80,7 @@ pub(super) async fn register_http(
             .map_err(internal_error)
             .map_err(status_to_http)?;
         if !email_verified && existing_user.auth_provider == "password" {
-            if let Err(err) = issue_and_send_verification_email(&state, &existing_user).await {
+            if let Err(err) = issue_and_send_verification_email(&state, &existing_user, verification_source.as_deref()).await {
                 warn!(
                     user_id = %existing_user.id,
                     error = %err.1,
@@ -109,7 +111,7 @@ pub(super) async fn register_http(
     ensure_user_agents_and_demo_seed(&state, &user)
         .await
         .map_err(internal_http_error)?;
-    if let Err(err) = issue_and_send_verification_email(&state, &user).await {
+    if let Err(err) = issue_and_send_verification_email(&state, &user, verification_source.as_deref()).await {
         warn!(
             user_id = %user.id,
             error = %err.1,
@@ -190,7 +192,7 @@ pub(super) async fn login_http(
         .map_err(internal_error)
         .map_err(status_to_http)?;
     if !email_verified {
-        let _ = issue_and_send_verification_email(&state, &user).await;
+        let _ = issue_and_send_verification_email(&state, &user, None).await;
         return Err(login_invalid_credentials_error());
     }
 
@@ -783,7 +785,7 @@ pub(super) async fn send_verification_email_http(
     .await?;
 
     let user = authenticated_user(&state.db, &headers).await?;
-    issue_and_send_verification_email(&state, &user).await?;
+    issue_and_send_verification_email(&state, &user, None).await?;
     Ok(Json(
         serde_json::json!({ "ok": true, "message": "verification email sent" }),
     ))
@@ -830,7 +832,7 @@ pub(super) async fn resend_verification_email_http(
         return Ok(resend_verification_public_response());
     }
 
-    if let Err((status, err)) = issue_and_send_verification_email(&state, &user).await {
+    if let Err((status, err)) = issue_and_send_verification_email(&state, &user, request.source.as_deref()).await {
         tracing::warn!(
             %status,
             %err,
@@ -1122,6 +1124,7 @@ fn auth_base_url_configured() -> Result<String, (StatusCode, String)> {
 async fn issue_and_send_verification_email(
     state: &super::AppState,
     user: &crate::db::UserRecord,
+    source: Option<&str>,
 ) -> Result<(), (StatusCode, String)> {
     let raw_token = generate_secure_token();
     let token_hash = crate::db::sha256_token(&raw_token);
@@ -1142,7 +1145,7 @@ async fn issue_and_send_verification_email(
         .map_err(status_to_http)?;
 
     let base_url = auth_base_url_configured()?;
-    let verify_url = format!("{base_url}/verify-email?token={raw_token}");
+    let verify_url = verification_source::verification_url(&base_url, &raw_token, source);
 
     let body = format!(
         "Hi {name},\n\nVerify your OmnyID email address by visiting the link below:\n\n{url}\n\nThis link expires in 24 hours.\n\nIf you did not create an OmnyID account, ignore this email.\n",

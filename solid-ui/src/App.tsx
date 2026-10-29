@@ -3155,6 +3155,7 @@ function App() {
           onClose={() => { setShowAuthModal(false); setAuthNotice(null); setResetToken(undefined); }}
           notice={authNotice()}
           onClearNotice={() => setAuthNotice(null)}
+          signupSource={pendingAuthSource ?? undefined}
           resetToken={resetToken()}
           onResetTokenConsumed={() => setResetToken(undefined)}
           onLogin={() => {
@@ -5003,6 +5004,7 @@ function AuthModal(props: {
   onLogin?: () => void;
   notice?: AuthModalFeedback | null;
   onClearNotice?: () => void;
+  signupSource?: string;
   resetToken?: string;
   onResetTokenConsumed?: () => void;
 }) {
@@ -5128,6 +5130,7 @@ function AuthModal(props: {
         email: submittedEmail,
         password: submittedPassword,
         display_name: tab() === "signup" ? submittedDisplayName : undefined,
+        source: tab() === "signup" ? props.signupSource : undefined,
       });
       if (data.requires_2fa) {
         setError(
@@ -5178,7 +5181,7 @@ function AuthModal(props: {
     setResendMessage("");
     setError("");
     try {
-      const data = await resendVerificationEmailRequest(targetEmail);
+      const data = await resendVerificationEmailRequest(targetEmail, props.signupSource);
       setResendMessage(
         data.message && !/if (?:this|that) email can/i.test(data.message)
           ? data.message

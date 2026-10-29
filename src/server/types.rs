@@ -121,6 +121,7 @@ pub(super) struct RegisterRequest {
     pub(super) email: String,
     pub(super) password: String,
     pub(super) display_name: Option<String>,
+    pub(super) source: Option<String>,
 }
 
 #[derive(serde::Deserialize)]
@@ -150,6 +151,7 @@ pub(super) struct ChangePasswordRequest {
 #[derive(serde::Deserialize)]
 pub(super) struct ForgotPasswordRequest {
     pub(super) email: String,
+    pub(super) source: Option<String>,
 }
 
 #[derive(serde::Deserialize)]

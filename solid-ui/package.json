@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit",
     "test:line-budget": "node --import ./tests/node-ts-specifier-hooks.mjs --experimental-strip-types --test tests/file-line-budget.test.ts",
     "test:wedding": "node --import ./tests/node-ts-specifier-hooks.mjs --experimental-strip-types --test \"tests/wedding-*.test.ts\"",
-    "test:wedding-site": "node ../wedding/tests/wedding-website-smoke.mjs && node ../wedding/tests/security-csp-smoke.mjs && node ../wedding/tests/animal-quiz-engine-smoke.mjs",
+    "test:wedding-site": "node ../wedding/tests/wedding-website-smoke.mjs && node ../wedding/tests/security-csp-smoke.mjs && node ../wedding/tests/animal-quiz-engine-smoke.mjs && node ../wedding/tests/account-confirmation-smoke.mjs && node ../wedding/tests/blog-catalogue-smoke.mjs",
     "test:wedding:ci": "npm run typecheck && npm run test:line-budget && npm run test:wedding-site && npm run test:wedding",
     "test:wedding:e2e": "playwright test --config playwright.config.ts",
     "verify:wedding-vendor-quote:gmail": "node scripts/verify-wedding-vendor-quote-gmail-provider.mjs",

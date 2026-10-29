@@ -1,97 +1,45 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Verify your email - OmnyID</title>
-  <meta name="robots" content="noindex">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Confirm your OmnyID account</title>
+  <meta name="robots" content="noindex,nofollow">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link
-    href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400..800;1,400..800&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
-    rel="stylesheet"
-  >
-  <link rel="stylesheet" href="tailwind.css">
-  <style>
-    body {
-      background:
-        radial-gradient(circle at top left, rgba(217, 107, 57, 0.08), transparent 30%),
-        radial-gradient(circle at top right, rgba(82, 99, 82, 0.08), transparent 28%),
-        #f9f9f7;
-      color: #1a1c1b;
-    }
-  </style>
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@500;600;700&amp;family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="verify-email.css?v=wed299-1">
 </head>
-<body class="font-body text-on-surface min-h-screen">
-  <main class="mx-auto flex min-h-screen max-w-xl flex-col items-center justify-center px-6 py-16 text-center">
-    <a href="./index.html" class="font-mono text-xs uppercase tracking-[0.2em] text-outline transition hover:text-primary">← Back to OmnyID</a>
-
-    <div class="mt-8 w-full rounded-[1.75rem] border border-outline-variant/10 bg-surface-container-lowest p-8 shadow-sm sm:p-10">
-      <div id="verify-email-icon" class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-surface-container-high text-outline">
-        <svg class="h-7 w-7 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-        </svg>
-      </div>
-      <h1 id="verify-email-title" class="mt-6 font-display text-3xl">Verifying your email...</h1>
-      <p id="verify-email-message" class="mt-3 text-sm leading-relaxed text-on-surface-variant">
-        Hold on while we confirm your verification link.
-      </p>
-      <div id="verify-email-actions" class="mt-6 hidden">
-        <a href="./index.html" class="inline-flex rounded-lg bg-primary px-6 py-3 text-sm font-medium text-white transition hover:opacity-90">
-          Sign in to OmnyID
+<body>
+  <main class="confirmation-shell" id="main">
+    <section class="confirmation-card" aria-labelledby="confirmation-title">
+      <div class="confirmation-copy">
+        <a class="brand" href="/" aria-label="OmnyID home">
+          <span class="brand-mark" aria-hidden="true">O</span>
+          <span>OmnyID</span>
         </a>
+        <div class="status-mark" id="confirmation-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 8l7.9 5.3a2 2 0 002.2 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+          </svg>
+        </div>
+        <p class="eyebrow" id="confirmation-eyebrow">Account confirmation</p>
+        <h1 id="confirmation-title">Confirming your place…</h1>
+        <p class="promise" id="confirmation-promise">We are checking the secure link from your email.</p>
+        <p class="community-message" id="confirmation-message" role="status" aria-live="polite">This usually takes only a moment.</p>
+        <p class="wish" id="confirmation-wish" hidden></p>
+        <div class="confirmation-actions" id="confirmation-actions" hidden>
+          <a class="primary-action" id="confirmation-destination" href="/workspace/">Continue to OmnyID</a>
+          <button class="quiet-action" id="pause-redirect" type="button">Stay on this page</button>
+        </div>
+        <p class="redirect-note" id="redirect-note" aria-live="polite" hidden></p>
       </div>
-    </div>
+      <figure class="confirmation-photo" id="confirmation-photo" hidden>
+        <img id="confirmation-image" src="assets/images/omnyid-community-confirmation.webp" width="960" height="644" alt="">
+        <figcaption id="confirmation-credit"></figcaption>
+      </figure>
+    </section>
   </main>
-
-  <script>
-    (function () {
-      const API_BASE = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
-        ? "http://127.0.0.1:8080"
-        : "https://api.omnyid.com";
-
-      const iconEl = document.getElementById("verify-email-icon");
-      const titleEl = document.getElementById("verify-email-title");
-      const messageEl = document.getElementById("verify-email-message");
-      const actionsEl = document.getElementById("verify-email-actions");
-
-      function showResult(ok, title, message) {
-        iconEl.className = "mx-auto flex h-14 w-14 items-center justify-center rounded-full " +
-          (ok ? "bg-secondary-container text-secondary" : "bg-error/10 text-error");
-        iconEl.innerHTML = ok
-          ? '<svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>'
-          : '<svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>';
-        titleEl.textContent = title;
-        messageEl.textContent = message;
-        actionsEl.classList.remove("hidden");
-      }
-
-      const token = new URLSearchParams(window.location.search).get("token");
-      if (!token) {
-        showResult(false, "Missing verification link", "This page needs a verification token in the URL. Use the link from your email, or request a new one from the sign-in screen.");
-        return;
-      }
-
-      fetch(API_BASE + "/auth/verify-email", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: token })
-      })
-        .then(function (response) {
-          if (!response.ok) {
-            return response.text().then(function (text) {
-              throw new Error(text || "This link is invalid or has expired.");
-            });
-          }
-          return response.json();
-        })
-        .then(function () {
-          showResult(true, "Email verified", "Your account is fully set up. You can sign in whenever you're ready.");
-        })
-        .catch(function (error) {
-          showResult(false, "Verification failed", error.message || "This link is invalid or has expired. Request a new one from the sign-in screen.");
-        });
-    })();
-  </script>
+  <script src="verify-email.js?v=wed299-1" defer></script>
 </body>
 </html>

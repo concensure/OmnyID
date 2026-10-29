@@ -15,6 +15,16 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-299
+    title: Add source-aware account confirmation and reconcile the Wedding blog catalogue
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-299
+    depends_on: [WED-298]
+    files: [solid-ui/src/**, solid-ui/public/**, solid-ui/tests/**, src/server/auth.rs, src/gateway/**, wedding/blog.html, wedding/blog/**, wedding/assets/**, Documents/marketing/wedding planning/posts/blog/**, Documents/verification/**, .agent/**]
+    acceptance: [wedding and generic signup verification show distinct accessible mobile-friendly confirmation experiences with truthful community and product promises, optimized local imagery and a readable timed destination transition, the signup source survives the email-link boundary without becoming an open redirect, working transactional delivery and protected credentials remain unchanged, local and hosted Wedding blog inventories are reconciled without losing production-only posts, a CSV records publication state and taxonomy, every published article has searchable stakeholder stage location-when-relevant and emotion metadata while cards retain their existing featured tags, focused tests typecheck Wedding tests build line budgets clean-candidate deployment hosted verification and Oracle disk inspection pass]
+    progress: "Started from post-WED-298 audit commit 06c57fe7e086bd72dd84a788592744a8ce77316d. The user independently confirmed receipt of the controlled confirmation email, so this task preserves the protected transactional-mail configuration and limits mail changes to source-aware verification presentation unless evidence identifies a delivery regression."
+
   - id: WED-298
     title: Restore the public home and repair Wedding planner production regressions
     status: done

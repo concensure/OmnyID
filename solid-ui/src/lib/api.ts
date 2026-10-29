@@ -4088,6 +4088,7 @@ export const authenticateWithPassword = (args: {
   email: string;
   password: string;
   display_name?: string;
+  source?: string;
 }): Promise<AuthApiResponse> =>
   publicApiFetch<unknown>(args.mode === "login" ? "/auth/login" : "/auth/register", {
     method: "POST",
@@ -4095,6 +4096,7 @@ export const authenticateWithPassword = (args: {
       email: args.email,
       password: args.password,
       ...(args.mode === "register" && args.display_name ? { display_name: args.display_name } : {}),
+      ...(args.mode === "register" && args.source ? { source: args.source } : {}),
     },
   }).then(parseAuthApiResponse);
 
@@ -4159,10 +4161,10 @@ export const finishPasskeyAuthentication = (body: {
     method: "POST",
     bodyJson: body,
   }).then(parseAuthApiResponse);
-export const resendVerificationEmail = (email: string) =>
+export const resendVerificationEmail = (email: string, source?: string) =>
   publicApiFetch<unknown>("/auth/verify-email/resend", {
     method: "POST",
-    bodyJson: { email },
+    bodyJson: { email, ...(source ? { source } : {}) },
   }).then(parseAuthMessageResponse);
 export const requestPasswordReset = (email: string) =>
   publicApiFetch<unknown>("/auth/forgot-password", {
