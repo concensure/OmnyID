@@ -2008,3 +2008,9 @@ The Policy V2 browser flag is `VITE_WEDDING_VENDOR_RANKING_POLICY_V2`, matching 
 - Every saved view binds a profile revision and explicit field policy. Non-master presets deny contact resolution and exclude private notes, couple phone/email fields and projector internals by default.
 - Previewing has no AFP or external side effect. Saving a view records only its definition. Printing is available from exact-content preview and records a private export intent containing record IDs and visible columns before opening the browser print dialog.
 - Hosted sharing is a different transport boundary. It remains unavailable until a false-default grant implementation, expiry/revocation enforcement and independent security/privacy evidence exist; local preview or print success cannot activate or imply it.
+
+# 2026-10-29 — Signup source selects presentation only; Wedding article taxonomy is additive
+
+- The account-registration source is reduced server-side to `wedding` or `generic`. It may select verification-page copy, imagery and a fixed post-confirmation destination, but it never supplies an arbitrary redirect or changes authentication authority.
+- Verification images are optimized local assets with attribution, so confirmation is not dependent on a third-party image request. The timed transition is visible, announced and pausable; an invalid or expired token does not redirect.
+- A Wedding blog card keeps its existing featured category. Rich stakeholder, six-stage, location-when-relevant and emotion tags are additive article metadata and in-article context, and are included in the existing client-side search without crowding the catalogue cards.
