@@ -80,7 +80,7 @@ function Fixture() {
       onTimeChange={() => setStatus("Time changed")}
       onShift={(_record, minutes) => setStatus(minutes < 0 ? "Moved earlier" : "Moved later")}
     />
-    <WeddingRunSheetSavedViews databaseId="database:runsheet" rows={rows} archived={false} onMessage={() => undefined} />
+    <WeddingRunSheetSavedViews databaseId="database:runsheet" weddingPlanId="plan-e2e" rows={rows} archived={false} onMessage={() => undefined} />
     <p role="status" class="sr-only">{status()}</p>
     <WeddingRunSheetItemDialog
       open={dialogOpen()}

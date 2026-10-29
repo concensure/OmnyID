@@ -112,6 +112,7 @@ services:
       SMTP_PORT: 587
       FROM_ADDRESS: you@yourdomain.com
       OMNYID_VENDOR_MAIL_ENABLED: "false"
+      OMNYID_WEDDING_RUNSHEET_SHARING_ENABLED: "false"
       OMNYID_VENDOR_MAIL_PROVIDER: disabled
       OMNYID_VENDOR_MAIL_MASK_DOMAIN: mail.omnyid.com
       OMNYID_VENDOR_MAIL_FROM_ADDRESS: hello@omnyid.com

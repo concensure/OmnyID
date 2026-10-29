@@ -271,9 +271,11 @@ Generate role-specific variants from one master record set.
 
 ### Implementation status — 2026-10-29
 
-In progress in WED-293. The first committed slice extends the existing V1 saved-view contract with a bounded profile revision and field policy, then seeds Master, Vendor, Photo/video, VIP, Guest and Print projections over the same source record IDs. Non-master policies deny contact resolution and exclude private notes, couple contact fields and projector internals. Database now offers an exact-content preview and accessible print path; the print action records only view ID, source record IDs and visible columns in private AFP before opening the browser print dialog. Previewing or saving does not contact a recipient, and hosted links remain unavailable.
+Complete in WED-293. The saved-view contract seeds Master, Vendor, Photo/video, VIP, Guest and Print projections over the same source record IDs. Non-master policies deny contact resolution and exclude private notes, couple contact fields and projector internals. Database offers exact-content preview and an accessible A4 landscape print path; print records only view ID, source record IDs and visible columns in private AFP. A generated multi-page PDF fixture proves that key contacts stay on page one, table headers repeat, and each time/title row stays together.
 
-Still open: an independently reviewed false-default hosted grant transport with expiry/revocation/view events, the 7–10 day vendor sign-off acknowledgement projection, and visual PDF pagination evidence. These remain WED-293 work and are not implied by the local preview/print implementation.
+Hosted access is a separate, false-default server capability. When explicitly enabled, an authenticated owner can create a 256-bit fragment-only protected link for the exact saved-view revision and record IDs they previewed. PostgreSQL stores only the token digest and content-light grant metadata; rows remain live AFP projections. Expired and revoked links fail with the same unavailable response, owners retain revoke access while the creation flag is off, and grant/view/expiry/revocation events are written to the tenant AFP ledger. Vendor links may request a bounded final sign-off; acknowledgement or change-request responses are idempotent and projected back to the owner. Creating a link never sends it, and the UI warns that downloaded or printed copies cannot be recalled.
+
+The production rollout flag remains `false`. WED-295 must complete adversarial authorization, hosted accessibility/privacy/usability and shadow evidence before activation.
 
 ## 8. WED-294 — Conflict rules, buffers, and contextual A2UI
 

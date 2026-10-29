@@ -640,6 +640,7 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
       <Show when={selectedProfilePlugin()?.toolbarKind === "wedding_run_sheet" && selectedDatabaseId()}>{(databaseId) =>
         <WeddingRunSheetSavedViews
           databaseId={databaseId()}
+          weddingPlanId={selectedDefinition()?.weddingPlanId ?? ""}
           rows={runSheetRows()}
           archived={selectedDefinition()?.archived ?? false}
           onMessage={(message) => recordLocalMessage(message as DatabaseMessage)}

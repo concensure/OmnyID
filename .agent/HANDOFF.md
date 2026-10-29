@@ -5570,3 +5570,14 @@ Remaining:
 
 - Authenticated reminder/task/editor/attachment mutations were not replayed against a real couple merely for release evidence; use ordinary user acceptance if desired.
 - The initial isolated restore process exited and removed its temporary containers, but its local proof wrapper stalled afterward. Do not treat that stalled wrapper as a recorded restore pass; the read-only proof rerun passed with the duplicate restore step skipped.
+
+## 2026-10-29 - WED-293 hosted run-sheet grant lifecycle (Codex, implementation complete)
+
+- Added a false-default hosted-sharing capability over the existing saved-view and AFP record authority. Grants store only a token digest plus bounded owner/view/role/record metadata; the 256-bit token remains in the browser fragment until exchanged in a no-credentials request body.
+- Added authenticated create/list/revoke controls, indistinguishable unavailable responses for invalid/expired/revoked links, owner revocation while creation is disabled, read-time deny-by-default projection, and tenant-private AFP grant/view/expiry/revocation audit events.
+- Added vendor final-run-sheet acknowledgement and change-request responses with expiry bounds and idempotency, plus an accessible public mobile surface and owner-side state projection.
+- Fixed print clipping by moving the preview into normal print flow. A generated multi-page PDF assertion verifies page-one key contacts, repeating headers and unsplit time/title rows.
+- The Oracle runtime was not deployed or reconfigured. `OMNYID_WEDDING_RUNSHEET_SHARING_ENABLED` remains false in every checked Compose/environment default.
+- Verification passed: disposable-Postgres lifecycle proof; two route-policy and one migration-catalog Rust tests; TypeScript; both line budgets; all 2,047 Wedding tests; production build; four Playwright/Axe/PDF cases at 320px, 375px and 1280px; and all four Compose parses with local placeholder values supplied only for staging's required secrets. The build retains the existing `ResponseQueueView` large-chunk warning.
+- WED-286 remains independently open where provider-observed bounce/complaint evidence and the remaining attachment/thread/response-queue work require a dedicated candidate; no mail flag was enabled here.
+- Completed a reviewed Oracle cleanup after a fresh inventory. Removed 9.409 GB of build cache, four exact unused homeserver image tags, six explicitly named older backup generations and journal history above 100 MB. Retained all running images, both rollback generations, all named/attached volumes and the newest three backups (`20261029T001242Z`, `20261029T015204Z`, `20261029T030536Z`). Root use fell from 83% (7.8 GB free) to 52% (22 GB free); all nine application containers remained up and `/workspace/` returned HTTP 200. Deleted cache/images can be rebuilt or pulled; deleted old backup generations are not recoverable, with three newer generations retained.

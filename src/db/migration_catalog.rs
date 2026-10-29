@@ -638,4 +638,9 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
             "../../postgres/migrations/0125_remove_operator_wedding_follow_up_fixtures.sql"
         ),
     ),
+    (
+        "0126_wedding_runsheet_share_grants",
+        "Content-light expiring grants and vendor acknowledgements for hosted Wedding run-sheet views",
+        include_str!("../../postgres/migrations/0126_wedding_runsheet_share_grants.sql"),
+    ),
 ];

@@ -51,6 +51,7 @@ export default defineConfig({
       "/llm": { target: "http://127.0.0.1:8080", changeOrigin: true },
       "/api/files": { target: "http://127.0.0.1:8080", changeOrigin: true },
       "/attachments": { target: "http://127.0.0.1:8080", changeOrigin: true },
+      "/database": { target: "http://127.0.0.1:8080", changeOrigin: true },
     },
   },
   optimizeDeps: {
@@ -66,6 +67,7 @@ export default defineConfig({
         vendor: resolve(import.meta.dirname, "vendor.html"),
         practice: resolve(import.meta.dirname, "practice.html"),
         quotationResponse: resolve(import.meta.dirname, "quotation-response.html"),
+        runsheetShare: resolve(import.meta.dirname, "runsheet-share.html"),
       },
       onwarn(warning, warn) {
         const message = typeof warning === "string" ? warning : warning.message ?? "";

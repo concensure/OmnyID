@@ -38,6 +38,8 @@ pub use wedding_runsheet_projection::{
     WeddingRunSheetProjectionLedgerMessage, WeddingRunSheetProjectionState,
     WeddingRunSheetProjectionStoreError, WeddingRunSheetProjectionWrite,
 };
+mod wedding_runsheet_sharing;
+pub use wedding_runsheet_sharing::{WeddingRunSheetHostedView, WeddingRunSheetShareAcknowledgement, WeddingRunSheetShareGrantCreate, WeddingRunSheetShareGrantSummary};
 mod wedding_vendor_contact_schedule;
 mod wedding_vendor_directory;
 pub mod wedding_vendor_evidence;

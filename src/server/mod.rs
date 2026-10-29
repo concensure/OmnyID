@@ -174,7 +174,7 @@ mod value_signal_helpers;
 mod wedding_admin_ai_policy;
 mod wedding_ai_cost_policy;
 mod wedding_llm_ladder;
-mod wedding_preference_routes; mod wedding_quote_study_routes; mod wedding_runsheet_projection_routes;
+mod wedding_preference_routes; mod wedding_quote_study_routes; mod wedding_runsheet_projection_routes; mod wedding_runsheet_share_routes;
 mod wedding_understanding_routes;
 mod wedding_newsletter_routes;
 mod wedding_blog_routes;
@@ -1401,6 +1401,7 @@ pub async fn run() {
         .merge(wedding_vendor_outreach_routes::routes())
         .merge(wedding_preference_routes::routes())
         .merge(wedding_runsheet_projection_routes::routes())
+        .merge(wedding_runsheet_share_routes::routes())
         .merge(wedding_understanding_routes::routes())
         .merge(workspace_routes::routes())
         .merge(wedding_newsletter_routes::routes())
@@ -1542,6 +1543,7 @@ pub async fn build_test_router(database_url: &str) -> Router {
         .merge(quotation_response_portal_routes::routes()).merge(quotation_vendor_response_routes::routes()).merge(quotation_vendor_attachment_routes::routes()).merge(quotation_vendor_revision_routes::routes()).merge(quotation_source_routes::routes())
         .merge(wedding_quote_study_routes::routes()).merge(vendor_email_worker_ingress::routes()).merge(wedding_vendor_claim_routes::routes()).merge(wedding_vendor_ownership_routes::routes()).merge(wedding_vendor_sender_identity_routes::routes()).merge(wedding_vendor_photo_routes::routes())
         .merge(wedding_runsheet_projection_routes::routes())
+        .merge(wedding_runsheet_share_routes::routes())
         .merge(planning_constraint_routes::routes()).merge(planning_constraint_capture_routes::routes()).merge(planning_constraint_evaluation_routes::routes()).merge(planning_constraint_intervention_routes::routes()).merge(planning_cost_tradeoff_routes::routes()).merge(planning_directory_evaluation_routes::routes()).merge(planning_milestone_routes::routes()).merge(planning_vendor_change_routes::routes())
         .layer(cors_layer())
         .layer(axum::middleware::from_fn(request_id_middleware))

@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
+import { readFile } from "node:fs/promises";
 
 for (const viewport of [{ width: 320, height: 720 }, { width: 375, height: 812 }, { width: 1280, height: 800 }]) {
   test(`run-sheet profile reflows and remains operable at ${viewport.width}px`, async ({ page }) => {
@@ -39,3 +40,50 @@ for (const viewport of [{ width: 320, height: 720 }, { width: 375, height: 812 }
     expect(accessibility.violations.filter(({ impact }) => impact === "serious" || impact === "critical")).toEqual([]);
   });
 }
+
+test("print preview paginates without splitting time and title rows", async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("/workspace/e2e/wedding-run-sheet-profile.html", { waitUntil: "networkidle" });
+  await page.getByLabel("Role view").selectOption("vendor");
+  await page.getByRole("button", { name: "Preview" }).click();
+  await page.evaluate(() => {
+    const table = document.querySelector<HTMLElement>("[data-runsheet-print] table");
+    const body = table?.querySelector("tbody");
+    const source = body?.querySelector("tr");
+    if (!body || !source) throw new Error("print table fixture unavailable");
+    body.replaceChildren();
+    for (let index = 1; index <= 120; index += 1) {
+      const row = source.cloneNode(true) as HTMLTableRowElement;
+      const cells = Array.from(row.cells);
+      cells[0]!.textContent = `08:${String(index).padStart(2, "0")}`;
+      cells[2]!.textContent = `Pagination item ${String(index).padStart(2, "0")}`;
+      body.append(row);
+    }
+    document.body.classList.add("omnyid-runsheet-printing");
+  });
+  await page.emulateMedia({ media: "print" });
+  const pdfPath = testInfo.outputPath("vendor-run-sheet-pagination.pdf");
+  await page.pdf({ path: pdfPath, landscape: true, printBackground: true, preferCSSPageSize: true });
+
+  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const document = await pdfjs.getDocument({ data: new Uint8Array(await readFile(pdfPath)) }).promise;
+  expect(document.numPages).toBeGreaterThan(1);
+  const pageText: string[] = [];
+  for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
+    const pdfPage = await document.getPage(pageNumber);
+    const text = await pdfPage.getTextContent();
+    pageText.push(text.items.map((item) => "str" in item ? item.str : "").join(" "));
+  }
+  expect(pageText[0]).toContain("KEY CONTACTS");
+  for (const text of pageText.filter((value) => value.includes("Pagination item"))) {
+    expect(text).toContain("Start");
+    expect(text).toContain("Item");
+  }
+  for (let index = 1; index <= 120; index += 1) {
+    const title = `Pagination item ${String(index).padStart(2, "0")}`;
+    const time = `08:${String(index).padStart(2, "0")}`;
+    const containingPage = pageText.find((text) => text.includes(title));
+    expect(containingPage, `${title} should be present`).toBeDefined();
+    expect(containingPage).toContain(time);
+  }
+});

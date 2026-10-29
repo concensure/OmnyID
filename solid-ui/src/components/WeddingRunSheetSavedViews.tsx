@@ -10,6 +10,7 @@ import {
   weddingRunSheetSavedViewValue,
 } from "@/lib/weddingRunSheetSavedViewState";
 import "@/components/weddingRunSheetPrint.css";
+import { WeddingRunSheetShareControls } from "@/components/WeddingRunSheetShareControls";
 
 type SavedViewMessage = {
   id: string;
@@ -27,6 +28,7 @@ const labels: Record<string, string> = {
 
 export function WeddingRunSheetSavedViews(props: {
   databaseId: string;
+  weddingPlanId: string;
   rows: WeddingRunSheetPresentedRow[];
   archived: boolean;
   onMessage: (message: SavedViewMessage) => void;
@@ -103,10 +105,10 @@ export function WeddingRunSheetSavedViews(props: {
       </div>
     </div>
     <p class="mt-2 text-xs leading-5 text-wedding-muted">{preset().description} Previewing or saving a view does not send it to anyone.</p>
-    <p class="mt-1 text-xs text-wedding-muted">Share links are not available yet. You can preview or print this view safely.</p>
+    <p class="mt-1 text-xs text-wedding-muted">Hosted links remain off unless the reviewed server flag is enabled. You can always preview or print safely.</p>
     <Show when={notice()}><p role="status" class="mt-2 rounded-lg bg-white px-3 py-2 text-xs text-wedding-text">{notice()}</p></Show>
 
-    <Show when={previewOpen()}><div class="fixed inset-0 z-[230] flex items-end bg-on-surface/30 sm:items-center sm:justify-center sm:p-4">
+    <Show when={previewOpen()}><div data-runsheet-print-shell class="fixed inset-0 z-[230] flex items-end bg-on-surface/30 sm:items-center sm:justify-center sm:p-4">
       <div data-runsheet-print role="dialog" aria-modal="true" aria-labelledby="runsheet-preview-title" onKeyDown={(event) => { if (event.key === "Escape" && !busy()) closePreview(); }} class="max-h-[94vh] w-full overflow-auto rounded-t-2xl bg-white p-5 shadow-panel sm:max-w-5xl sm:rounded-2xl sm:p-6">
         <div class="flex items-start justify-between gap-4">
           <div>
@@ -126,6 +128,7 @@ export function WeddingRunSheetSavedViews(props: {
           </table>
         </div>
         <p class="mt-4 text-xs leading-5 text-wedding-muted">Private notes and couple contact details are excluded from non-master views. Printed or downloaded copies cannot be recalled.</p>
+        <div data-runsheet-no-print><WeddingRunSheetShareControls databaseId={props.databaseId} weddingPlanId={props.weddingPlanId} preset={preset()} recordIds={projected().map((row) => row.sourceRecordId)} archived={props.archived} /></div>
         <div data-runsheet-no-print class="mt-5 grid grid-cols-2 gap-3">
           <button type="button" onClick={closePreview} class="min-h-12 rounded-lg border-2 border-wedding-action font-bold text-wedding-action">Cancel</button>
           <button type="button" disabled={busy()} onClick={() => void printPreview()} class="min-h-12 rounded-lg bg-wedding-action font-bold text-white disabled:opacity-50">Print this preview</button>
