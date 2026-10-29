@@ -15,6 +15,16 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-302
+    title: Split the Wedding response workflow payload without changing AFP authority
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-302
+    depends_on: [WED-295, WED-300, WED-301]
+    files: [solid-ui/src/components/ResponseQueueView.tsx, solid-ui/src/components/WeddingResponseWorkspaceView.tsx, solid-ui/src/components/WeddingRichResponseView.tsx, solid-ui/src/components/WeddingSiteIntakeWizard.tsx, solid-ui/src/lib/**, solid-ui/tests/**, solid-ui/vite.config.mjs, Documents/verification/**, .agent/**]
+    acceptance: [the response queue route no longer ships a monolithic approximately 1.66 MB feature chunk, optional Wedding intake and rich response code load only when their surfaces are needed, Wedding Today and response workflows preserve the same AFP-backed state and user actions, loading fallbacks are accessible and mobile-safe, focused tests typecheck Wedding tests build and line budgets pass, exact bundle evidence records initial and deferred payload sizes]
+    progress: "Implementation is ready to freeze. ResponseQueueView remains route-lazy and now defers the Wedding workspace, rich-response and intake surfaces behind explicit Solid lazy boundaries with mobile-safe status fallbacks and a local recovery boundary. The core feature chunk fell from 1,660,630 bytes / about 452 KB gzip to 876,101 bytes / about 249 KB gzip; the workspace, intake and rich-response surfaces are separate 749,544-, 26,481- and 5,549-byte chunks. AFP-backed state, handlers and backend contracts are unchanged. Typecheck, two boundary tests, all 2,065 Wedding tests, both line budgets and the production build pass. Exact clean-SHA verification and deployment evidence are next."
+
   - id: WED-295
     title: Harden run-sheet migration offline operation authorization and rollout evidence
     status: done

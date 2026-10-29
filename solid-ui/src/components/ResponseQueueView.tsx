@@ -7,10 +7,13 @@ import type { DashboardBootstrap } from "@/lib/api";
 import { QueueDensityToggle } from "@/components/QueueDensityToggle";
 import { ResponseQueueSurface } from "@/components/ResponseQueueSurface";
 import { WeddingNavigationArrivalBanner } from "@/components/WeddingNavigationArrivalBanner";
-import { WeddingResponseWorkspaceView } from "@/components/WeddingResponseWorkspaceView";
-import { WeddingRichResponseView } from "@/components/WeddingRichResponseView";
 import { WorkspaceSetupBanner } from "@/components/WorkspaceSetupBanner";
-import { WeddingSiteIntakeWizard } from "@/components/WeddingSiteIntakeWizard";
+import {
+  LazyWeddingResponseWorkspaceView,
+  LazyWeddingRichResponseView,
+  LazyWeddingSiteIntakeWizard,
+  WeddingResponseFeatureBoundary,
+} from "@/components/WeddingResponseQueueFeatureSurfaces";
 import { toast } from "@/components/Toast";
 import { RailIcon } from "@/components/RailIcons";
 import {
@@ -1997,8 +2000,9 @@ export function ResponseQueueView(props: {
       </Show>
       <Show when={activeWeddingLaunch()}>
         {(launch) => (
-          <WeddingSiteIntakeWizard
-            launch={launch()}
+          <WeddingResponseFeatureBoundary label="Preparing your wedding questions">
+            <LazyWeddingSiteIntakeWizard
+              launch={launch()}
             weddingExtractionText={weddingExtractionText}
             onWeddingExtractionTextInput={setWeddingExtractionText}
             onExtractFromMessage={extractWeddingFollowUpFromMessage}
@@ -2039,24 +2043,28 @@ export function ResponseQueueView(props: {
             vendorSearchResultAction={weddingVendorSearchResultAction()}
             onOpenVendorSearchResult={openWeddingVendorSearchResult}
             vendorSearchNotice={weddingVendorSearchNotice()}
-            weddingTemplateFollowUp={weddingTemplateFollowUp}
-          />
+              weddingTemplateFollowUp={weddingTemplateFollowUp}
+            />
+          </WeddingResponseFeatureBoundary>
         )}
       </Show>
 
       <Show when={standaloneWeddingRichResponse()}>
         {(richResponse) => (
-          <WeddingRichResponseView
-            state={richResponse()}
-            onAction={runWeddingRichResponseAction}
-          />
+          <WeddingResponseFeatureBoundary label="Preparing this wedding update">
+            <LazyWeddingRichResponseView
+              state={richResponse()}
+              onAction={runWeddingRichResponseAction}
+            />
+          </WeddingResponseFeatureBoundary>
         )}
       </Show>
 
       <Show when={weddingWorkspace()}>
         {(workspace) => (
-          <WeddingResponseWorkspaceView
-            state={workspace()}
+          <WeddingResponseFeatureBoundary label="Opening your wedding planner">
+            <LazyWeddingResponseWorkspaceView
+              state={workspace()}
             query={weddingWorkspaceQuery()}
             refreshState={weddingWorkspaceRefreshBanner()}
             saveProjection={sendAfpMessage}
@@ -2102,8 +2110,9 @@ export function ResponseQueueView(props: {
             onSaveWeddingDate={saveWeddingDate}
             richResponse={weddingWorkspaceMenu() === "home" ? weddingRichResponse() : null}
             onRichResponseAction={runWeddingRichResponseAction}
-            compact={viewState().responseSurfaceCompactMode}
-          />
+              compact={viewState().responseSurfaceCompactMode}
+            />
+          </WeddingResponseFeatureBoundary>
         )}
       </Show>
 
