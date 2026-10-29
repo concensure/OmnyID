@@ -5659,6 +5659,6 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch `agent/codex/W
 - Implemented WED-303A on the current AFP guest graph. Event invitations now round-trip response source, viewed/responded/locked time, prior status and revision. Persisted guest profiles now rehydrate contact, meal, dietary and accessibility values that were previously dropped.
 - Guest tracking preserves multiple event invitations per person and derives one deterministic lifecycle/provenance/privacy summary. The existing Guests card and Wedding Home guest tile consume that summary; manual changes remain on the existing AFP writer and are labelled couple-entered.
 - New guest profiles containing private logistics default to couple-only. No public RSVP route, capability, provider send or production flag was added or enabled.
-- Focused result before candidate freeze: 37 RSVP/guest/home tests pass, TypeScript passes and `git diff --check` is clean. The public guest flow and WED-303B onward remain open.
+- Exact clean code commit `5f9a3409c03ec6bf1086f4ebd3412fe7c9f131ab` passed TypeScript, both line budgets, all 2,069 Wedding tests and the production build. The verification worktree is `C:\Users\ozans\AppData\Local\Temp\omnyid-wed303-verify-5f9a340`. The public guest flow and WED-303B onward remain open.
 
-Next: freeze and run the full clean-candidate Wedding/build/line-budget checks, then continue WED-303B with a versioned canonical response event and server-side scope/idempotency validation. Do not build a second guest store.
+Next: continue WED-303B with a versioned canonical response event and server-side scope/idempotency validation. Do not build a second guest store, and do not enable a public RSVP capability until WED-303C security evidence exists.
