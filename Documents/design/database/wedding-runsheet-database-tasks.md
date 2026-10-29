@@ -358,6 +358,17 @@ Prove the feature is safe and reliable on a frozen candidate before any hosted s
 - Generic databases remain regression-free.
 - Hosted sharing remains disabled until its independent security/privacy and usability gates pass.
 
+Implementation status: the WED-295 candidate adapts legacy and replayed projector rows into one
+deterministic effective row, executes rebuilds in checkpoint-chained batches of at most 80 writes,
+and exposes a no-write rebuild review. A failed network refresh can use a 72-hour account/database/
+plan-scoped local copy containing only day-of schedule fields; the surface states the exact last
+synchronization time and disables edits until reconnection. Content-free telemetry records counts and
+explicit zero model/token/cost values. Disposable-Postgres tests cover wrong-plan, cross-tenant,
+rollback, concurrency, replay, share revocation, expiry and sign-off. Responsive browser tests cover
+keyboard focus, Axe, 320/375/1280 layouts, 200% text zoom, forced colours and multi-page PDF output.
+Hosted sharing remains false; exact-SHA hosted shadow and release evidence remain the final rollout
+boundary rather than being inferred from these local checks.
+
 ## 10. Cross-slice test matrix
 
 | Scenario | Expected result |

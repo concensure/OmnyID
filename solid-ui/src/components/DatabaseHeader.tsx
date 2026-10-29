@@ -25,6 +25,8 @@ export function DatabaseHeader(props: {
   name: string;
   densityMode: DatabaseDensityMode;
   fullscreen: boolean;
+  readOnly?: boolean;
+  readOnlyReason?: string;
   onSelect: (databaseId: string) => void;
   onNameInput: (name: string) => void;
   onNameCommit: () => void;
@@ -61,7 +63,7 @@ export function DatabaseHeader(props: {
             </select>
             <input
               value={props.name}
-              disabled={selected()?.legacy || selected()?.archived}
+              disabled={selected()?.legacy || selected()?.archived || props.readOnly}
               onInput={(event) => props.onNameInput(event.currentTarget.value)}
               onBlur={props.onNameCommit}
               onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }}
@@ -71,9 +73,9 @@ export function DatabaseHeader(props: {
             />
           </div>
           <p class="mt-1 text-sm text-on-surface-variant">
-            {selected()?.archived
+            {props.readOnlyReason || (selected()?.archived
               ? "This database is archived and read-only until you restore it."
-              : "Add rows and fields to this private, account-scoped database."}
+              : "Add rows and fields to this private, account-scoped database.")}
           </p>
         </div>
 
@@ -95,14 +97,14 @@ export function DatabaseHeader(props: {
           <button type="button" onClick={props.onToggleFullscreen} class="min-h-11 rounded-full border border-outline/20 bg-white/40 px-3 text-xs font-medium text-on-surface-variant transition hover:bg-white/60">
             {props.fullscreen ? "Exit fullscreen" : "Fullscreen"}
           </button>
-          <button type="button" onClick={props.onArchiveToggle} disabled={selected()?.legacy} class="min-h-11 rounded-full border border-outline/20 bg-white/40 px-3 text-xs font-medium text-on-surface-variant transition hover:bg-white/60 disabled:opacity-45">
+          <button type="button" onClick={props.onArchiveToggle} disabled={selected()?.legacy || (props.readOnly && !selected()?.archived)} class="min-h-11 rounded-full border border-outline/20 bg-white/40 px-3 text-xs font-medium text-on-surface-variant transition hover:bg-white/60 disabled:opacity-45">
             {selected()?.archived ? "Restore" : "Archive"}
           </button>
           <button type="button" onClick={props.onNewDatabase} class="min-h-11 rounded-full border border-primary/30 bg-primary/5 px-4 text-xs font-semibold text-primary transition hover:bg-primary/10">
             New database
           </button>
           <div class="relative">
-            <button type="button" disabled={selected()?.archived} onClick={() => setShowNewMenu((value) => !value)} class="flex min-h-11 items-center gap-1 rounded-full bg-primary px-4 text-xs font-semibold text-white shadow-sm transition hover:bg-primary/80 disabled:opacity-50">
+            <button type="button" disabled={selected()?.archived || props.readOnly} onClick={() => setShowNewMenu((value) => !value)} class="flex min-h-11 items-center gap-1 rounded-full bg-primary px-4 text-xs font-semibold text-white shadow-sm transition hover:bg-primary/80 disabled:opacity-50">
               Add <span aria-hidden="true" class={`text-[8px] opacity-70 transition-transform ${showNewMenu() ? "rotate-180" : ""}`}>▼</span>
             </button>
             <Show when={showNewMenu()}>

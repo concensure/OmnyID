@@ -31,6 +31,18 @@ export type WeddingRunSheetProjectionPlan = {
   explanation: string;
 };
 
+export type WeddingRunSheetProjectionBatch = {
+  expectedCheckpoint: WeddingRunSheetProjectionCheckpoint | null;
+  plan: WeddingRunSheetProjectionPlan;
+};
+
+export type WeddingRunSheetProjectionBatchSeries = {
+  batches: WeddingRunSheetProjectionBatch[];
+  writeCount: number;
+  sourceCount: number;
+  modelCalls: 0;
+};
+
 type Source = CompatibleDatabaseMessage & {
   contentObject: Record<string, unknown>;
   metadataObject: Record<string, unknown>;
@@ -238,12 +250,41 @@ function rowData(packet: RunSheetFactPacket): Record<string, unknown> {
   };
 }
 
+function isProjectorOwnedRow(row: DatabaseViewRecord): boolean {
+  const state = clean(row.data.projection_state);
+  const sourceRefs = Array.isArray(row.data.source_refs) ? row.data.source_refs : [];
+  return state !== "detached" && (
+    state === "projected"
+    || state === "stale"
+    || clean(row.data.source_fingerprint).length > 0
+    || sourceRefs.length > 0
+  );
+}
+
+function newerRow(left: DatabaseViewRecord, right: DatabaseViewRecord): DatabaseViewRecord {
+  if (left.revision !== right.revision) return left.revision > right.revision ? left : right;
+  const timestampOrder = left.timestamp.localeCompare(right.timestamp);
+  if (timestampOrder !== 0) return timestampOrder > 0 ? left : right;
+  return left.id.localeCompare(right.id) >= 0 ? left : right;
+}
+
 function projectedRowByItemId(rows: DatabaseViewRecord[]): Map<string, DatabaseViewRecord> {
-  return new Map(rows.flatMap((row) => {
+  const effective = new Map<string, DatabaseViewRecord>();
+  for (const row of rows) {
     const itemId = clean(row.data.runsheet_item_id);
-    const state = clean(row.data.projection_state);
-    return itemId && state !== "detached" ? [[itemId, row] as const] : [];
-  }));
+    if (!itemId || !isProjectorOwnedRow(row)) continue;
+    const current = effective.get(itemId);
+    effective.set(itemId, current ? newerRow(current, row) : row);
+  }
+  return effective;
+}
+
+export function weddingRunSheetEffectiveRows(rows: DatabaseViewRecord[]): DatabaseViewRecord[] {
+  const effectiveProjected = projectedRowByItemId(rows);
+  return rows.filter((row) => {
+    const itemId = clean(row.data.runsheet_item_id);
+    return !itemId || !isProjectorOwnedRow(row) || effectiveProjected.get(itemId)?.id === row.id;
+  });
 }
 
 function cursorForSources(sources: Source[]): string {
@@ -262,7 +303,12 @@ export function buildWeddingRunSheetProjectionPlan(input: {
   const sources = scopedSources(input.messages, input.weddingPlanId);
   const resolvableSourceIds = new Set(sources.filter((source) => packetForSource(source) !== null).map((source) => source.id));
   const changed = new Set(input.changedMessageIds);
-  const affectedPackets = sources.filter((source) => changed.has(source.id)).map(packetForSource).filter((packet): packet is RunSheetFactPacket => !!packet);
+  const affectedPacketMap = new Map<string, RunSheetFactPacket>();
+  for (const packet of sources.filter((source) => changed.has(source.id)).map(packetForSource).filter((value): value is RunSheetFactPacket => !!value)) {
+    const current = affectedPacketMap.get(packet.itemId);
+    if (!current || packet.updatedAt.localeCompare(current.updatedAt) >= 0) affectedPacketMap.set(packet.itemId, packet);
+  }
+  const affectedPackets = Array.from(affectedPacketMap.values()).sort((left, right) => left.itemId.localeCompare(right.itemId));
   const existingByItem = projectedRowByItemId(input.currentRows.filter((row) => row.databaseId === input.databaseId));
   const records: CanonicalDatabaseRecordContent[] = [];
   const revisions: CanonicalDatabaseRevisionContent[] = [];
@@ -299,5 +345,66 @@ export function buildWeddingRunSheetProjectionPlan(input: {
     skippedUnchanged,
     modelCalls: 0,
     explanation: `${records.length} run-sheet item${records.length === 1 ? " was" : "s were"} added and ${revisions.length} updated from changed wedding facts. Review any proposed or missing times before sharing.`,
+  };
+}
+
+function rowsAfterPlan(rows: DatabaseViewRecord[], plan: WeddingRunSheetProjectionPlan): DatabaseViewRecord[] {
+  const next = new Map(rows.map((row) => [row.id, row]));
+  for (const record of plan.records) {
+    next.set(record.record_id, {
+      id: record.record_id,
+      databaseId: record.database_id,
+      table: record.table,
+      data: record.data,
+      revision: record.revision,
+      timestamp: plan.nextCheckpoint?.sourceCursor ?? "",
+    });
+  }
+  for (const revision of plan.revisions) {
+    const current = next.get(revision.target_record_id);
+    if (!current) continue;
+    next.set(current.id, {
+      ...current,
+      data: revision.operation === "tombstone" ? current.data : { ...current.data, ...revision.patch },
+      revision: revision.revision,
+      timestamp: plan.nextCheckpoint?.sourceCursor ?? current.timestamp,
+    });
+  }
+  return Array.from(next.values());
+}
+
+export function buildWeddingRunSheetProjectionBatchSeries(input: {
+  databaseId: string;
+  weddingPlanId: string;
+  messages: CompatibleDatabaseMessage[];
+  changedMessageIds: string[];
+  currentRows: DatabaseViewRecord[];
+  checkpoint?: WeddingRunSheetProjectionCheckpoint | null;
+  maxWritesPerBatch?: number;
+}): WeddingRunSheetProjectionBatchSeries {
+  const maxWrites = Math.max(1, Math.min(100, Math.floor(input.maxWritesPerBatch ?? 80)));
+  const sourceIds = Array.from(new Set(input.changedMessageIds)).sort();
+  let rows = weddingRunSheetEffectiveRows(input.currentRows);
+  let checkpoint = input.checkpoint ?? null;
+  const batches: WeddingRunSheetProjectionBatch[] = [];
+  for (let offset = 0; offset < sourceIds.length; offset += maxWrites) {
+    const plan = buildWeddingRunSheetProjectionPlan({
+      ...input,
+      changedMessageIds: sourceIds.slice(offset, offset + maxWrites),
+      currentRows: rows,
+      checkpoint,
+    });
+    const writes = plan.records.length + plan.revisions.length;
+    if (!plan.receipt || !plan.nextCheckpoint || writes === 0) continue;
+    if (writes > maxWrites) throw new Error("The run-sheet rebuild exceeded its bounded batch size.");
+    batches.push({ expectedCheckpoint: checkpoint, plan });
+    rows = rowsAfterPlan(rows, plan);
+    checkpoint = plan.nextCheckpoint;
+  }
+  return {
+    batches,
+    writeCount: batches.reduce((total, batch) => total + batch.plan.records.length + batch.plan.revisions.length, 0),
+    sourceCount: sourceIds.length,
+    modelCalls: 0,
   };
 }

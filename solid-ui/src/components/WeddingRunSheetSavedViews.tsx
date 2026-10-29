@@ -92,14 +92,14 @@ export function WeddingRunSheetSavedViews(props: {
   }
 
   return <section class="rounded-xl border border-wedding-border bg-wedding-card p-4" aria-label="Run-sheet saved views">
-    <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+    <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
       <label class="text-xs font-medium text-wedding-muted">
         Role view
-        <select value={selectedId()} onChange={(event) => { setSelectedId(event.currentTarget.value); setNotice(""); }} class="mt-1 min-h-11 w-full rounded-lg border border-wedding-border bg-white px-3 text-sm text-wedding-text sm:w-52">
+        <select value={selectedId()} onChange={(event) => { setSelectedId(event.currentTarget.value); setNotice(""); }} class="mt-1 min-h-11 w-full rounded-lg border border-wedding-border bg-white px-3 text-sm text-wedding-text lg:w-52">
           <For each={weddingRunSheetSavedViewPresets}>{(item) => <option value={item.id}>{item.name}</option>}</For>
         </select>
       </label>
-      <div class="grid grid-cols-2 gap-2 sm:flex">
+      <div class="grid grid-cols-2 gap-2">
         <button id="wedding-runsheet-preview-view" type="button" onClick={() => setPreviewOpen(true)} class="min-h-11 rounded-lg border border-wedding-action px-4 text-sm font-semibold text-wedding-action">Preview</button>
         <button type="button" disabled={busy() || props.archived} onClick={() => void saveView()} class="min-h-11 rounded-lg bg-wedding-action px-4 text-sm font-semibold text-white disabled:opacity-50">{busy() ? "Saving…" : "Save view"}</button>
       </div>

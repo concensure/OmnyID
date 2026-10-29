@@ -47,6 +47,33 @@ for (const viewport of [{ width: 320, height: 720 }, { width: 375, height: 812 }
   });
 }
 
+test("run-sheet controls preserve names, focus, and reflow at 200 percent zoom", async ({ page }) => {
+  await page.setViewportSize({ width: 640, height: 800 });
+  await page.goto("/workspace/e2e/wedding-run-sheet-profile.html", { waitUntil: "networkidle" });
+  await page.evaluate(() => { document.documentElement.style.fontSize = "200%"; });
+
+  await expect(page.getByRole("button", { name: "Add run-sheet item" })).toBeVisible();
+  await page.getByRole("button", { name: "Add run-sheet item" }).focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByLabel("Item name")).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("button", { name: "Add run-sheet item" })).toBeFocused();
+  const pageOverflow = await page.evaluate(() => Array.from(document.querySelectorAll<HTMLElement>("body *"))
+    .filter((element) => {
+      const style = getComputedStyle(element);
+      const rect = element.getBoundingClientRect();
+      const insideHorizontalScroller = element.closest(".overflow-x-auto") !== null;
+      return style.position !== "fixed" && !insideHorizontalScroller && rect.right > document.documentElement.clientWidth + 1;
+    })
+    .slice(0, 8)
+    .map((element) => ({ tag: element.tagName, text: element.textContent?.trim().slice(0, 60), className: element.className })));
+  expect(pageOverflow).toEqual([]);
+
+  await page.emulateMedia({ forcedColors: "active" });
+  await expect(page.getByRole("checkbox", { name: "Needs attention only" })).toBeVisible();
+  await expect(page.getByLabel("Status").getByRole("option", { name: "Needs confirmation" })).toHaveCount(1);
+});
+
 test("print preview paginates without splitting time and title rows", async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto("/workspace/e2e/wedding-run-sheet-profile.html", { waitUntil: "networkidle" });

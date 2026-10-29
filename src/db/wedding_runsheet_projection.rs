@@ -1,7 +1,7 @@
-use super::{Db, tenant_schema_name};
+use super::{tenant_schema_name, Db};
 use chrono::{Duration, Utc};
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use sqlx::{Postgres, Row, Transaction};
 use std::{collections::HashSet, fmt};
@@ -557,6 +557,41 @@ mod tests {
             .await
             .expect("source");
 
+        let outsider = format!("runsheet_outsider_{unique}");
+        sqlx::query("INSERT INTO users (id,email,auth_provider,display_name) VALUES ($1,$2,'password','Run-sheet outsider')")
+            .bind(&outsider).bind(format!("{outsider}@example.invalid")).execute(&db.pool).await.expect("create outsider");
+        let outsider_schema = db
+            .ensure_user_private_schema(&outsider)
+            .await
+            .expect("outsider schema");
+        let outsider_table = format!("\"{outsider_schema}\".messages");
+        let outsider_insert = format!(
+            "INSERT INTO {outsider_table} (id,thread_id,from_agent,to_agents,timestamp,type,content,signature,store_in_relational,metadata) VALUES ($1,'test','test','[]'::jsonb,NOW(),$2,$3,'test',TRUE,$4)"
+        );
+        sqlx::query(&outsider_insert).bind("definition").bind("database_definition")
+            .bind(json!({"kind":"database_definition","database_id":"database:test-runsheet","profile_id":"wedding_runsheet.v1","scope":{"account_id":outsider.clone(),"wedding_plan_id":"plan-test"}}))
+            .bind(json!({})).execute(&db.pool).await.expect("outsider definition");
+        let cross_tenant = db
+            .commit_wedding_runsheet_projection(&outsider, test_batch("outsider", "source"))
+            .await;
+        assert!(matches!(
+            cross_tenant,
+            Err(WeddingRunSheetProjectionStoreError::Scope(_))
+        ));
+        assert!(db
+            .wedding_runsheet_checkpoint(&outsider, "database:test-runsheet")
+            .await
+            .expect("outsider checkpoint")
+            .is_none());
+
+        let mut wrong_plan = test_batch("wrong-plan", "source");
+        wrong_plan.wedding_plan_id = "plan-other".into();
+        assert!(matches!(
+            db.commit_wedding_runsheet_projection(&owner, wrong_plan)
+                .await,
+            Err(WeddingRunSheetProjectionStoreError::Scope(_))
+        ));
+
         let failed = db
             .commit_wedding_runsheet_projection(&owner, test_batch("bad", "missing-source"))
             .await;
@@ -564,12 +599,11 @@ mod tests {
             failed,
             Err(WeddingRunSheetProjectionStoreError::Scope(_))
         ));
-        assert!(
-            db.wedding_runsheet_checkpoint(&owner, "database:test-runsheet")
-                .await
-                .expect("checkpoint lookup")
-                .is_none()
-        );
+        assert!(db
+            .wedding_runsheet_checkpoint(&owner, "database:test-runsheet")
+            .await
+            .expect("checkpoint lookup")
+            .is_none());
 
         let left = test_batch("left", "source");
         let right = test_batch("right", "source");
@@ -602,9 +636,20 @@ mod tests {
             .execute(&db.pool)
             .await
             .expect("remove test user");
+        sqlx::query("DELETE FROM users WHERE id=$1")
+            .bind(&outsider)
+            .execute(&db.pool)
+            .await
+            .expect("remove outsider");
         sqlx::raw_sql(&format!("DROP SCHEMA IF EXISTS \"{schema}\" CASCADE"))
             .execute(&db.pool)
             .await
             .expect("drop test schema");
+        sqlx::raw_sql(&format!(
+            "DROP SCHEMA IF EXISTS \"{outsider_schema}\" CASCADE"
+        ))
+        .execute(&db.pool)
+        .await
+        .expect("drop outsider schema");
     }
 }

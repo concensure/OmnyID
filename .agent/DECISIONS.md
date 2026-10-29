@@ -2036,3 +2036,18 @@ Contextual guidance is represented as `a2ui.v1` card data, but card actions carr
 A couple-facing comparison may render only an approved first-party asset, an existing bounded owner-photo route, or a Google media reference already present in the vendor photo catalogue. The public media endpoint never accepts an arbitrary provider reference merely because its syntax is valid.
 
 Google photo references can expire independently of the vendor record. On a provider `400`, the server may derive the bounded place ID from the already-catalogued reference, request current photo metadata with the server-held provider credential, and retry one current reference. It replaces the stale catalogue URL transactionally only after current media succeeds. This refresh changes media provenance only; it does not create suitability evidence, alter ranking, or expose the provider credential.
+
+## 2026-10-30: Run-sheet recovery is bounded, visibly stale, and never a second authority
+
+The deterministic projector may split a rebuild into sequential batches of at most 80 record writes.
+Each batch carries the preceding durable checkpoint, and a checkpoint conflict causes one fresh reload
+and recomputation rather than replaying a stale prepared batch. Legacy or replayed projector rows with
+the same logical item resolve by revision, timestamp and stable ID; detached user rows remain outside
+projector authority. The review command calculates the same batch series without writing it.
+
+The day-of offline copy is a 72-hour browser convenience, not AFP authority. It is scoped by account,
+database and wedding plan, excludes source references, fingerprints, private notes and contact fields,
+and retains only bounded schedule data. Its timestamp is always visible and the Database surface is
+read-only until a server refresh succeeds. Projection telemetry contains counts plus explicit zero
+model/token/cost fields and no titles, contacts or source identifiers. Hosted links remain controlled
+by the independent false-default server flag; offline availability cannot create a share grant.

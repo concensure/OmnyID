@@ -1,7 +1,7 @@
-use super::{Db, tenant_schema_name};
+use super::{tenant_schema_name, Db};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use serde_json::{Map, Value, json};
+use serde_json::{json, Map, Value};
 use sqlx::{Postgres, Row, Transaction};
 use std::collections::{BTreeMap, HashSet};
 
@@ -668,7 +668,10 @@ mod tests {
         )
         .await;
 
-        let token_digest = "a".repeat(64);
+        let token_digest = format!("a{unique}{unique}{unique}")
+            .chars()
+            .take(64)
+            .collect::<String>();
         let grant = db
             .create_wedding_runsheet_share_grant(
                 &owner,
@@ -703,14 +706,17 @@ mod tests {
         assert!(!hosted.rows[0].values.contains_key("private_notes"));
         assert!(!hosted.rows[0].values.contains_key("couple_phone"));
 
+        let acknowledgement_id = format!("ack-{unique}");
+        let acknowledgement_replay_id = format!("ack-replay-{unique}");
+        let reply_idempotency_key = format!("reply-{unique}");
         let first_ack = db
             .acknowledge_wedding_runsheet_share(
                 &token_digest,
-                "ack-first",
+                &acknowledgement_id,
                 "acknowledged",
                 "Venue manager",
                 Some("Times confirmed"),
-                "reply-1",
+                &reply_idempotency_key,
             )
             .await
             .expect("acknowledge")
@@ -718,29 +724,36 @@ mod tests {
         let replay = db
             .acknowledge_wedding_runsheet_share(
                 &token_digest,
-                "ack-duplicate",
+                &acknowledgement_replay_id,
                 "changes_requested",
                 "Different actor",
                 None,
-                "reply-1",
+                &reply_idempotency_key,
             )
             .await
             .expect("replay acknowledgement")
             .expect("existing acknowledgement");
         assert_eq!(replay, first_ack);
 
+        assert!(db
+            .revoke_wedding_runsheet_share_grant("different-owner", &grant.grant_id)
+            .await
+            .expect("cross-tenant revoke is refused")
+            .is_none());
         db.revoke_wedding_runsheet_share_grant(&owner, &grant.grant_id)
             .await
             .expect("revoke grant")
             .expect("owned grant");
-        assert!(
-            db.open_wedding_runsheet_share(&token_digest)
-                .await
-                .expect("revoked lookup")
-                .is_none()
-        );
+        assert!(db
+            .open_wedding_runsheet_share(&token_digest)
+            .await
+            .expect("revoked lookup")
+            .is_none());
 
-        let expiry_digest = "b".repeat(64);
+        let expiry_digest = format!("b{unique}{unique}{unique}")
+            .chars()
+            .take(64)
+            .collect::<String>();
         let expiry_grant = db
             .create_wedding_runsheet_share_grant(
                 &owner,
@@ -769,12 +782,11 @@ mod tests {
         .execute(&db.pool)
         .await
         .expect("advance expiry");
-        assert!(
-            db.open_wedding_runsheet_share(&expiry_digest)
-                .await
-                .expect("expired lookup")
-                .is_none()
-        );
+        assert!(db
+            .open_wedding_runsheet_share(&expiry_digest)
+            .await
+            .expect("expired lookup")
+            .is_none());
         db.list_wedding_runsheet_share_grants(&owner, &database_id)
             .await
             .expect("project expiry event");

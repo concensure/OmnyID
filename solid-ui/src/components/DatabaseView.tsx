@@ -46,6 +46,7 @@ import { isRecord } from "@/lib/eventDetail";
 import { recordShortcutUse } from "@/lib/shortcutRecency";
 import { surfaceShortDateLabel } from "@/lib/surfaceTimestampPresentation";
 import { WeddingRunSheetProjectionStatus } from "@/components/WeddingRunSheetProjectionStatus";
+import { weddingRunSheetEffectiveRows } from "@/lib/weddingRunSheetProjectorState";
 import { DatabaseProfileToolbar } from "@/components/DatabaseProfileToolbar";
 import {
   WeddingRunSheetItemDialog,
@@ -110,6 +111,7 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
   const [showRunSheetAdd, setShowRunSheetAdd] = createSignal(false);
   const [runSheetActionBusy, setRunSheetActionBusy] = createSignal(false);
   const [runSheetActionError, setRunSheetActionError] = createSignal("");
+  const [runSheetOffline, setRunSheetOffline] = createSignal(false);
   const [pendingRunSheetTimeChange, setPendingRunSheetTimeChange] = createSignal<{
     row: DbRecord;
     review: WeddingRunSheetTimeChangeReview;
@@ -187,7 +189,15 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
       .filter((table) => { if (seen.has(table)) return false; seen.add(table); return true; });
   });
 
-  const selectedDatabaseRecords = createMemo(() => databaseRecordsForDatabase(records(), selectedDatabaseId()));
+  const selectedDatabaseRecords = createMemo(() => {
+    const selected = databaseRecordsForDatabase(records(), selectedDatabaseId());
+    return selectedProfilePlugin()?.toolbarKind === "wedding_run_sheet"
+      ? weddingRunSheetEffectiveRows(selected)
+      : selected;
+  });
+  const databaseReadOnly = createMemo(() => Boolean(selectedDefinition()?.archived || (
+    selectedProfilePlugin()?.toolbarKind === "wedding_run_sheet" && runSheetOffline()
+  )));
   const rawRunSheetRows = createMemo(() => selectedProfilePlugin()?.toolbarKind === "wedding_run_sheet"
     ? projectWeddingRunSheetRows(selectedDatabaseRecords())
     : []);
@@ -266,7 +276,7 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
 
   async function createFirstRecord(table: string, data: Record<string, string>) {
     const databaseId = selectedDatabaseId();
-    if (!databaseId || selectedDefinition()?.archived) throw new Error("Select an active database first.");
+    if (!databaseId || databaseReadOnly()) throw new Error("Select an active database first.");
     const result = await sendDatabaseRecord(table, data, databaseId);
     recordLocalMessage({
       id: result.message_id,
@@ -291,7 +301,7 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
   }
 
   function beginEditingCell(row: DbRecord, col: string) {
-    if (selectedDefinition()?.archived) return;
+    if (databaseReadOnly()) return;
     setEditError(null);
     setEditingCell({ rowId: row.id, col });
     setEditingValue(formatEditableValue(row.data[col]));
@@ -353,7 +363,7 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
   async function commitDatabaseName() {
     const definition = selectedDefinition();
     const nextName = databaseName().trim();
-    if (!definition || definition.legacy || definition.archived || !nextName || nextName === definition.name) {
+    if (!definition || definition.legacy || databaseReadOnly() || !nextName || nextName === definition.name) {
       setDatabaseName(definition?.name ?? "");
       return;
     }
@@ -426,7 +436,7 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
   }
 
   async function saveDatabaseRowPatch(row: DbRecord, patch: Record<string, unknown>, action: string): Promise<boolean> {
-    if (savingCell()?.rowId === row.id) return false;
+    if (databaseReadOnly() || savingCell()?.rowId === row.id) return false;
     setSavingCell({ rowId: row.id, col: Object.keys(patch)[0] ?? "record" });
     setEditError(null);
     try {
@@ -485,7 +495,7 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
 
   async function approveRunSheetBuffer(suggestion: WeddingRunSheetBufferSuggestion): Promise<boolean> {
     const row = runSheetPresentationById().get(suggestion.targetRecordId)?.record;
-    return !!row && !selectedDefinition()?.archived
+    return !!row && !databaseReadOnly()
       && saveDatabaseRowPatch(row, weddingRunSheetApprovedBufferPatch(suggestion, new Date().toISOString()), "Add run-sheet buffer");
   }
 
@@ -533,7 +543,7 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
 
   async function addManualRunSheetItem(input: { title: string; startAt: string | null; location: string; ownerRef: string; participantRefs: string[]; visibility: string[] }) {
     const databaseId = selectedDatabaseId();
-    if (!databaseId || runSheetActionBusy()) return;
+    if (!databaseId || databaseReadOnly() || runSheetActionBusy()) return;
     setRunSheetActionBusy(true); setRunSheetActionError("");
     try {
       const data = weddingRunSheetManualRecord(input);
@@ -609,6 +619,8 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
         name={databaseName()}
         densityMode={densityMode()}
         fullscreen={fullscreen()}
+        readOnly={databaseReadOnly()}
+        readOnlyReason={runSheetOffline() ? "This offline copy is read-only until OmnyID reconnects." : undefined}
         onSelect={selectDatabase}
         onNameInput={setDatabaseName}
         onNameCommit={() => void commitDatabaseName()}
@@ -637,9 +649,11 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
           <WeddingRunSheetProjectionStatus
             databaseId={selectedDefinition()!.databaseId}
             weddingPlanId={weddingPlanId()!}
+            accountId={props.bootstrap?.user.id ?? ""}
             messages={allMessages()}
             archived={selectedDefinition()!.archived}
             onMessages={(messages) => recordLocalMessages(messages as DatabaseMessage[])}
+            onOfflineChange={setRunSheetOffline}
           />
         )}
       </Show>
@@ -649,7 +663,7 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
         runSheetRows={runSheetRows()}
         visibleRunSheetRows={visibleRunSheetRows()}
         runSheetFilters={runSheetFilters()}
-        archived={selectedDefinition()?.archived ?? false}
+        archived={databaseReadOnly()}
         onRunSheetFilters={setRunSheetFilters}
         onAddRunSheetItem={() => { setRunSheetActionError(""); setShowRunSheetAdd(true); }}
       />
@@ -657,7 +671,7 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
       <Show when={selectedProfilePlugin()?.toolbarKind === "wedding_run_sheet"}>
         <WeddingRunSheetIntelligencePanel
           rows={runSheetRows()}
-          archived={selectedDefinition()?.archived ?? false}
+          archived={databaseReadOnly()}
           onFocusRecords={(recordIds) => { setRunSheetFilters(weddingRunSheetDefaultFilters()); setSelectedRowIds(recordIds); queueMicrotask(() => tableScrollRef?.scrollIntoView({ behavior: "smooth", block: "nearest" })); }}
           onShowAttention={() => setRunSheetFilters({ day: "all", status: "all", conflictsOnly: true })}
           onShowAll={() => setRunSheetFilters(weddingRunSheetDefaultFilters())}
@@ -670,7 +684,7 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
           databaseId={databaseId()}
           weddingPlanId={selectedDefinition()?.weddingPlanId ?? ""}
           rows={runSheetRows()}
-          archived={selectedDefinition()?.archived ?? false}
+          archived={databaseReadOnly()}
           onMessage={(message) => recordLocalMessage(message as DatabaseMessage)}
         />
       }</Show>
@@ -690,7 +704,7 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
               </button>
             )}
           </For>
-          <button type="button" disabled={selectedDefinition()?.archived} onClick={() => { setActiveTable(null); setTableName(""); setGhostHeaders([...DEFAULT_HEADERS]); }} class="rounded-full border border-dashed border-primary/35 bg-primary/5 px-3 py-1 text-xs font-medium text-primary transition hover:bg-primary/10 disabled:opacity-45">
+          <button type="button" disabled={databaseReadOnly()} onClick={() => { setActiveTable(null); setTableName(""); setGhostHeaders([...DEFAULT_HEADERS]); }} class="rounded-full border border-dashed border-primary/35 bg-primary/5 px-3 py-1 text-xs font-medium text-primary transition hover:bg-primary/10 disabled:opacity-45">
             + New table
           </button>
       </div>
@@ -699,7 +713,7 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
       <Show when={selectedProfilePlugin()?.toolbarKind === "wedding_run_sheet" && visibleRecords().length > 0}>
         <WeddingRunSheetMobileCards
           rows={visibleRunSheetRows()}
-          archived={selectedDefinition()?.archived ?? false}
+          archived={databaseReadOnly()}
           onTimeChange={proposeRunSheetTimeChange}
           onShift={shiftRunSheetTime}
         />
@@ -714,7 +728,7 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
             </div>
           }>
             <DatabaseGhostGrid
-              readonly={selectedDefinition()?.archived}
+              readonly={databaseReadOnly()}
               headers={ghostHeaders()}
               tableName={tableName()}
               onHeaderEdit={(i, val) => setGhostHeaders((prev) => prev.map((h, idx) => idx === i ? (val || h) : h))}
@@ -793,7 +807,7 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
                     <th class={`${headPad()} text-left`}>
                       <input
                         value={col.label}
-                        disabled={selectedDefinition()?.archived}
+                        disabled={databaseReadOnly()}
                         onBlur={(e) => { void e; }}
                         class="w-full bg-transparent font-mono text-[9px] uppercase tracking-wider text-outline/60 outline-none focus:text-primary focus:border-b focus:border-primary/40 transition capitalize cursor-pointer"
                         title="Click to rename column"
@@ -852,7 +866,7 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
                           <td class={`${cellPad()} text-on-surface max-w-[12rem]`} title={str}>
                             <Show when={isEditing()}
                               fallback={
-                                <button id={databaseCellFocusId(row.id, col.key)} type="button" disabled={selectedDefinition()?.archived} class="w-full cursor-pointer text-left hover:text-primary transition disabled:cursor-default" onClick={() => beginEditingCell(row, col.key)} aria-label={`Edit ${col.label} for ${String(row.data.title || row.id)}`}>
+                                <button id={databaseCellFocusId(row.id, col.key)} type="button" disabled={databaseReadOnly()} class="w-full cursor-pointer text-left hover:text-primary transition disabled:cursor-default" onClick={() => beginEditingCell(row, col.key)} aria-label={`Edit ${col.label} for ${String(row.data.title || row.id)}`}>
                                   <span class="block truncate">{str || <span class="text-outline/30 italic text-[10px]">—</span>}</span>
                                   <Show when={col.key === "title" && runSheetRow()}>{(item) => <span class="mt-1 block text-[9px] font-medium text-on-surface-variant/65">
                                     {item().overrideState === "runsheet_only" ? "Run-sheet override · source unchanged" : item().sourceLinked ? "Linked to wedding plan" : "Manual item"}

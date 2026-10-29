@@ -15,6 +15,16 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-295
+    title: Harden run-sheet migration offline operation authorization and rollout evidence
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-295
+    depends_on: [WED-291, WED-292, WED-293, WED-294]
+    files: [src/db/wedding_runsheet_projection.rs, src/db/wedding_runsheet_sharing.rs, scripts/*runsheet*, solid-ui/src/components/DatabaseHeader.tsx, solid-ui/src/components/DatabaseView.tsx, solid-ui/src/components/WeddingRunSheet*.tsx, solid-ui/src/lib/database*State.ts, solid-ui/src/lib/weddingRunSheet*State.ts, solid-ui/tests/database-*.test.ts, solid-ui/tests/wedding-run-sheet-*.test.ts, solid-ui/tests/e2e/wedding-run-sheet-profile.spec.ts, Documents/design/database/wedding-runsheet-database-tasks.md, Documents/verification/**, .agent/**]
+    acceptance: [legacy and replayed run-sheet data produce one effective row through bounded dry-run and rebuild commands, stale checkpoints recover with idempotent retries, day-of data remains read-only offline with an explicit last-synchronized timestamp and no false freshness, keyboard screen-reader focus zoom colour-independent and print checks pass, adversarial tenant plan and share tests prevent cross-scope disclosure, large generic-database and run-sheet fixtures stay within measured budgets with telemetry redaction and zero model calls, a hosted flags-off shadow proves no grant or outbound side effect, exact clean-SHA tests and evidence are recorded without enabling hosted sharing]
+    progress: "Implementation is ready to freeze from post-release coordination commit d48d1b20de7e585d8269694d4be31787ae5eb4b5. Added deterministic legacy/replay collapse, 80-write checkpoint-chained rebuild batches and a no-write review, one conflict retry, a 72-hour sanitized account-scoped offline snapshot with visible sync time and read-only controls, redacted zero-cost telemetry, 205-source/500-generic-row performance fixtures, wrong-plan/cross-tenant projection and share tests, 200% text zoom/forced-colour coverage, and a flags-off shadow verifier. Pre-freeze typecheck, 27 generic Database tests, 2,063 Wedding tests, line budgets, production build, five Playwright/Axe/PDF cases and real disposable-Postgres projection/share tests pass. Hosted sharing and vendor-mail flags remain false; exact clean-SHA and hosted shadow evidence are next."
+
   - id: WED-301
     title: Repair Wedding vendor media, master-search dismissal and task-row alignment
     status: done
