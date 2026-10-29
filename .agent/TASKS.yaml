@@ -17,13 +17,13 @@ lifecycle:
 tasks:
   - id: WED-300
     title: Stabilize Wedding Today interactions, task projection and enquiry evidence
-    status: in_progress
+    status: done
     owner: codex
     branch: agent/codex/WED-300
     depends_on: [WED-299, WED-298, WED-287]
     files: [AGENTS.md, wedding/index.html, wedding/assets/**, wedding/tests/**, solid-ui/src/components/WeddingPlanningJourneyStepper.tsx, solid-ui/src/components/WeddingTask*.tsx, solid-ui/src/components/WeddingVendor*.tsx, solid-ui/src/components/ResponseQueueView.tsx, solid-ui/src/lib/wedding*State.ts, solid-ui/tests/wedding-*.test.ts, Documents/marketing/wedding planning/posts/blog/blog-publication-catalogue.csv, Documents/verification/**, .agent/**]
     acceptance: [future blog publication policy requires catalogue registration and rich taxonomy, the Wedding marketing process is a responsive vertical stepper, task help ownership completion labels creation and counts are stable and project from one AFP task model, redundant vendor tile and demonstrably seeded follow-ups are absent, today-or-future reminder changes persist, decision queue copy is concise, vendor comparisons state matched and unknown evidence in user language, enquiry rich-text and attachment interactions do not flicker and provide confirmation, Wedding FAQ explains task and decision architecture without duplication, focused tests full Wedding tests typecheck build line budgets clean-candidate deployment and hosted verification pass]
-    progress: "Implementation candidate adds the blog catalogue rule, public vertical stepper and FAQ, event:wedding custom-task projection and queued refresh, stable owner/editor section identity, contextual cost help, concise decision copy, matched-evidence vendor labels, attachment receipts, explicit reminder save and receipt-bound cleanup of two operator test follow-ups. Local typecheck, 2,043 Wedding tests, site smoke, line budget and 63 db tests pass; clean build/deploy and hosted verification remain."
+    progress: "Completed and live from exact clean application SHA 9d7543cce53808d4a9cedcd2ae2707bfba19e03c. Added the blog catalogue rule, public vertical stepper and architecture FAQ, event:wedding custom-task projection and queued refresh, stable contact-backed ownership, contextual cost help, concise Today copy, matched-evidence vendor labels, stable rich-text editing, attachment receipts, explicit reminder save and receipt-bound cleanup of two operator test follow-ups. Exact-SHA pass: typecheck, 2,044 Wedding tests, site smoke, line budget, production build and 63 db/migration tests. Oracle preflight, build/restart, Caddy smoke and post-deploy proof passed; hosted marketing and workspace assets match the release and the two exact fixture rows are absent. External health URLs remain authenticated. Settled disk was 83% used with 7.8 GB free. Evidence: Documents/verification/wed-300-wedding-interaction-release-2026-10-29.md."
 
   - id: WED-299
     title: Add source-aware account confirmation and reconcile the Wedding blog catalogue

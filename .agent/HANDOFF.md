@@ -5547,3 +5547,26 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch `agent/codex/W
 - Hosted confirmation assets, both images, blog index, new celebrant pages and workspace return HTTP 200. Mobile Chromium found no overflow or console errors and `celebrants` search returned seven cards. Oracle settled at 82% used with 8.2 GB free; 11.47 GB of image data and 6.681 GB of build cache are reclaimable, while `/var/backups/omnyid` is 6.4 GB.
 
 Next: finish WED-293's false-default hosted run-sheet grant lifecycle, expiry/revocation and sign-off acknowledgement boundary. Operationally, schedule reviewed Docker/cache and backup retention because Oracle has adequate headroom now but still carries substantial reclaimable data. WED-286's provider-observed live bounce/complaint evidence remains open and independent of this release.
+## 2026-10-29 - WED-300 Wedding interaction stability (Codex, complete and live)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch `agent/codex/WED-300`; exact deployed application commit `9d7543cce53808d4a9cedcd2ae2707bfba19e03c`.
+
+Changed:
+
+- Added the blog catalogue/tagging rule, responsive public Wedding vertical stepper, and task-versus-focus FAQ.
+- Repaired custom-task supertags/refresh, contact-backed owner selection, task cost help and user-facing completion copy; removed the redundant Vendors tile.
+- Made reminder saving explicit and removed only two exact receipt-bound operator-test follow-ups.
+- Replaced zero-fact comparison badges with matched-preference language and removed internal Today queue copy.
+- Stopped editor remounts, made the rich-text toolbar react to editor readiness, and added stable attachment capture and confirmation.
+
+Evidence:
+
+- Exact candidate passed typecheck, 2,044 Wedding tests, site smoke, line budget, production build, and 63 Rust database/migration tests.
+- Oracle preflight, image build/restart, Caddy smoke, backup verification and post-deploy proof passed. Hosted assets carry the new strings and omit the old internal strings; the exact fixture count is zero.
+- Root disk settled at 83% used with 7.8 GB free. External health URLs are authentication-protected; runtime status came from production proof/container evidence.
+- Full record: `Documents/verification/wed-300-wedding-interaction-release-2026-10-29.md`.
+
+Remaining:
+
+- Authenticated reminder/task/editor/attachment mutations were not replayed against a real couple merely for release evidence; use ordinary user acceptance if desired.
+- The initial isolated restore process exited and removed its temporary containers, but its local proof wrapper stalled afterward. Do not treat that stalled wrapper as a recorded restore pass; the read-only proof rerun passed with the duplicate restore step skipped.
