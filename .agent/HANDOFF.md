@@ -5512,7 +5512,7 @@ Next:
 
 - Continue WED-292 from this completed dependency: define a generic Database profile toolbar plug-in and pure time/override rules, then mount day/status/conflict controls and safe mobile editing without special-casing ordinary databases.
 
-## 2026-10-29 - WED-298 public home and Wedding production regression repair (Codex, candidate prepared)
+## 2026-10-29 - WED-298 public home and Wedding production regression repair (Codex, complete)
 
 Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch `agent/codex/WED-298`, based on `f078dc99cef0b920d4982e75cf5458cd093341d7`.
 
@@ -5525,4 +5525,12 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch `agent/codex/W
 - Pre-freeze checks passed: TypeScript, source/Wedding line budgets, focused lifecycle/action/release tests, seven SMTP-out Rust tests, CSP/home static smoke and the production UI build. One full Wedding run had 2,039/2,040 pass; the sole failure was the newly added test expecting `_reminder_set` instead of the established `_reminder` event, and the corrected focused test passes. The exact clean candidate must rerun the complete suite before deployment.
 - Generated local screenshots remain untracked under `solid-ui/artifacts/` and must not be staged. No secret value was printed or committed. Policy V2 remains at its existing production setting; this task does not alter rollout criteria.
 
-Next: commit the candidate, verify from a clean detached checkout, bind the existing protected Cloudflare token/account/from address to the transactional variables in `.env.oracle`, deploy that exact SHA with the existing remote environment, then test provider acceptance and hosted surfaces before closing WED-298.
+Release outcome:
+
+- Exact clean application SHA `fb1eb49d3e06ccc77ac7d499cf76c591f6538740` passed TypeScript, 2,041 Wedding tests, source/Wedding line budgets, CSP/static-home smoke, Compose parse, the production UI build and seven SMTP-out Rust tests.
+- Oracle preflight and post-deploy machine proof passed, including the isolated restore drill. Root disk returned from the drill's temporary high-water mark to 81%. Eight representative source hashes match the release checkout.
+- `https://omnyid.com/`, the versioned 26,730-byte Tailwind stylesheet and `/workspace/` return HTTP 200. Headless Chromium rendered the restored desktop homepage at exactly viewport width with the intended typography, navigation and briefing card.
+- The protected Cloudflare credential/account/from address is now mapped to transactional mail in `.env.oracle`; a timestamped server-side environment backup was made first. The existing unverified controlled account returned the successful check-inbox registration response rather than delivery-unavailable. That proves provider acceptance; independent Gmail receipt was not inspected. Vendor mail, ingress and sender-mask flags remain `false`.
+- Detailed release evidence is in `Documents/verification/wed-298-oracle-release-2026-10-29.md`. The following coordination/evidence commit is documentation-only; Oracle runs the application SHA above.
+
+Next: have the user confirm the message arrived in `concensure+testing@gmail.com`, then continue the next dependency-ready wedding/run-sheet task from the post-release audit commit rather than from a stale worktree.
