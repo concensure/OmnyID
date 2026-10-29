@@ -1444,6 +1444,25 @@ pub(super) fn is_google_wedding_vendor_photo_proxy_url(url: &str) -> bool {
     }
 }
 
+pub(super) fn is_public_wedding_vendor_owner_photo_url(url: &str) -> bool {
+    let Some(path) = url
+        .trim()
+        .strip_prefix("/api/public/wedding/vendor/photos/")
+    else {
+        return false;
+    };
+    let mut parts = path.split('/');
+    let Some(asset_id) = parts.next() else {
+        return false;
+    };
+    let Some(variant) = parts.next() else {
+        return false;
+    };
+    parts.next().is_none()
+        && ulid::Ulid::from_string(asset_id).is_ok()
+        && matches!(variant, "full" | "medium" | "thumb")
+}
+
 fn infer_email_from_text(text: &str) -> Option<String> {
     text.split_whitespace()
         .map(|part| {
@@ -2558,6 +2577,12 @@ mod tests {
         ));
         assert!(!is_omnyid_wedding_vendor_asset_url(
             "https://omnyid.com/wedding/assets/venue-photos/curzon-hall.jpg?tracking=1"
+        ));
+        assert!(is_public_wedding_vendor_owner_photo_url(
+            "/api/public/wedding/vendor/photos/01ARZ3NDEKTSV4RRFFQ69G5FAV/medium"
+        ));
+        assert!(!is_public_wedding_vendor_owner_photo_url(
+            "/api/public/wedding/vendor/photos/not-an-id/medium"
         ));
         assert!(!is_omnyid_wedding_vendor_asset_url(
             "https://omnyid.com.evil/wedding/assets/venue-photos/curzon-hall.jpg"

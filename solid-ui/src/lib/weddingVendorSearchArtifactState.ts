@@ -318,6 +318,7 @@ function publicImageUrl(value: unknown): string | null {
   // Do not render arbitrary third-party image URLs in couple-facing cards.
   // Google Places media stays behind our authenticated, narrowly shaped proxy.
   if (/^\/wedding\/vendor-photo\/google\?name=places%2f[^&]+(?:&max_width_px=\d{1,4})?$/i.test(url)) return url;
+  if (/^\/api\/public\/wedding\/vendor\/photos\/[0-9a-hjkmnp-tv-z]{26}\/(?:full|medium|thumb)$/i.test(url)) return url;
   try {
     const parsed = new URL(url);
     const hostname = parsed.hostname.toLowerCase();

@@ -18,3 +18,11 @@ test("vendor card media rejects unapproved external and malformed proxy URLs", (
   assert.equal(safeWeddingVendorImageUrl("https://cdn.example/photo.jpg"), null);
   assert.equal(safeWeddingVendorImageUrl("/wedding/vendor-photo/google?name=places%2Fone&key=secret"), null);
 });
+
+test("vendor card media accepts the verified public owner-photo route", () => {
+  assert.equal(
+    safeWeddingVendorImageUrl("/api/public/wedding/vendor/photos/01ARZ3NDEKTSV4RRFFQ69G5FAV/medium"),
+    "/api/public/wedding/vendor/photos/01ARZ3NDEKTSV4RRFFQ69G5FAV/medium",
+  );
+  assert.equal(safeWeddingVendorImageUrl("/api/public/wedding/vendor/photos/not-an-id/medium"), null);
+});

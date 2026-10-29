@@ -3,6 +3,7 @@ import { VoiceInput } from "../lib/voiceInput";
 import { accountScopedStorageKey } from "@/lib/accountScopedStorage";
 import { recordShortcutUse } from "@/lib/shortcutRecency";
 import { searchSubmissionText, type SearchBooleanMode } from "@/lib/searchBooleanMode";
+import { masterSearchSuggestionsVisible } from "@/lib/masterSearchSuggestionState";
 import {
   clearRecentSearchQueries,
   clearSessionSearchHistory,
@@ -181,6 +182,7 @@ export function SearchBar(props: {
   const [placeholderIdx, setPlaceholderIdx] = createSignal(0);
   const [focused, setFocused] = createSignal(false);
   const [showDropdown, setShowDropdown] = createSignal(false);
+  const [dismissedSuggestionQuery, setDismissedSuggestionQuery] = createSignal<string | null>(null);
   const [showSearchTools, setShowSearchTools] = createSignal(false);
   const [suppressNextFocusDropdown, setSuppressNextFocusDropdown] = createSignal(false);
   const [recentQueries, setRecentQueries] = createSignal<string[]>(loadRecentSearchQueries(rKey()));
@@ -851,6 +853,7 @@ export function SearchBar(props: {
     setHistoryRecallIdx(-1);
     setHistoryRecallDraft("");
     setEditorQuery(text);
+    setDismissedSuggestionQuery(text);
     setShowDropdown(false);
     setShowOperators(false);
   }
@@ -903,6 +906,7 @@ export function SearchBar(props: {
     setHistoryRecallIdx(-1);
     setHistoryRecallDraft("");
     setShowDropdown(false);
+    setDismissedSuggestionQuery(q);
     setShowOperators(false);
     try {
       await props.onSubmit({
@@ -1005,7 +1009,7 @@ export function SearchBar(props: {
   }
 
   const dropdownVisible = () =>
-    showDropdown() && (
+    masterSearchSuggestionsVisible({ requested: showDropdown(), query: query(), dismissedForQuery: dismissedSuggestionQuery() }) && (
       isSlashMode() ||
       savedSearchSlashTerm() !== null ||
       smartSuggestions().length > 0 ||
@@ -3098,6 +3102,7 @@ export function SearchBar(props: {
             }}
             onChange={(text) => {
               setQuery(text);
+              if (text.trim() !== dismissedSuggestionQuery()?.trim()) setDismissedSuggestionQuery(null);
               setHistoryRecallIdx(-1);
               setHistoryRecallDraft("");
               setArrowNavIdx(-1);

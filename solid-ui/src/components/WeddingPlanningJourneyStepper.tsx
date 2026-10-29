@@ -71,11 +71,11 @@ export function WeddingPlanningJourneyStepper(props: {
                 <h4 class="text-xs font-bold uppercase tracking-[0.08em] text-wedding-ink/60">{group.category}</h4>
                 <ul class="mt-2 space-y-2">
                   <For each={group.tasks}>{(task) => (
-                    <li class="relative grid min-w-0 gap-3 overflow-hidden rounded-lg border border-wedding-border bg-white py-3 pl-5 pr-3 sm:grid-cols-[minmax(0,1fr)_minmax(11rem,15rem)_auto] sm:items-end">
+                    <li class="relative grid min-w-0 gap-3 overflow-hidden rounded-lg border border-wedding-border bg-white py-3 pl-5 pr-3 sm:grid-cols-[minmax(0,1fr)_minmax(11rem,15rem)_minmax(10rem,12rem)] sm:items-stretch">
                       <span class={`absolute inset-y-0 left-0 w-1 ${weddingTaskVisualStatus(task, taskDone(task)).railClass}`} aria-hidden="true" />
                       <div class="min-w-0"><span class={`inline-flex rounded-lg px-2 py-1 text-[11px] font-bold ${weddingTaskVisualStatus(task, taskDone(task)).badgeClass}`}>{weddingTaskVisualStatus(task, taskDone(task)).label}</span><div class="mt-2 flex min-w-0 items-start gap-2"><p class={`min-w-0 break-words text-sm font-semibold ${taskDone(task) ? "text-wedding-ink/55 line-through" : "text-wedding-ink"}`}>{task.title}</p><WeddingTaskContextHelp title={task.title} /></div><p class="mt-1 text-xs text-wedding-ink/60">{task.dueAt?.slice(0, 10) || task.dueLabel || "Deadline not set"}</p></div>
                       <WeddingTaskOwnerControl task={task} weddingPlanId={props.weddingPlanId} responseWorkspaceId={props.responseWorkspaceId} people={props.people} saveProjection={props.saveProjection} onRefreshWorkspace={props.onRefreshWorkspace} />
-                      <WeddingTaskCompletionButton task={task} weddingPlanId={props.weddingPlanId} responseWorkspaceId={props.responseWorkspaceId} saveProjection={props.saveProjection} onRefreshWorkspace={props.onRefreshWorkspace} compact />
+                      <div class="flex min-h-16 min-w-0 items-end justify-end"><WeddingTaskCompletionButton task={task} weddingPlanId={props.weddingPlanId} responseWorkspaceId={props.responseWorkspaceId} saveProjection={props.saveProjection} onRefreshWorkspace={props.onRefreshWorkspace} compact /></div>
                     </li>
                   )}</For>
                 </ul>

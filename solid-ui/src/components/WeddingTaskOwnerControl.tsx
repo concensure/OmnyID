@@ -75,8 +75,8 @@ export function WeddingTaskOwnerControl(props: {
   }
 
   return (
-    <div class="min-w-[11rem]" aria-label={`Owner for ${props.task.title}`}>
-      <div class="flex min-w-0 items-end gap-1.5">
+    <div class="flex min-w-[11rem] items-end sm:min-h-16" aria-label={`Owner for ${props.task.title}`}>
+      <div class="flex w-full min-w-0 items-end gap-1.5">
         <label class="min-w-0 flex-1 text-xs font-semibold text-wedding-ink/70">
           Owner
           <div class="mt-1"><WeddingTaskOwnerPicker compact value={draft()} onChange={(value) => { setDraft(value); setNotice(null); }} people={props.people} weddingPlanId={props.weddingPlanId ?? ""} responseWorkspaceId={props.responseWorkspaceId} contactUserId={props.contactUserId} saveProjection={props.saveProjection} /></div>

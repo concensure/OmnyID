@@ -30,6 +30,8 @@ test("tasks expose responsibility fields and seating exposes an interactive canv
   assert.match(tasks, /WeddingTaskOwnerControl/);
   assert.match(timeline, /WeddingTaskOwnerControl/);
   assert.match(journey, /WeddingTaskOwnerControl/);
+  assert.match(journey, /minmax\(10rem,12rem\)/);
+  assert.match(journey, /items-end justify-end/);
   assert.match(stageView, /WeddingTaskOwnerControl/);
   assert.match(ownerControl, /weddingHelperResponsibilityToAfpSendInput/);
   assert.match(ownerControl, /dispatchWeddingTaskResponsibilityChange/);

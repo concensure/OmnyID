@@ -5583,3 +5583,13 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch `agent/codex/W
 - Verification passed: disposable-Postgres lifecycle proof; two route-policy and one migration-catalog Rust tests; TypeScript; both line budgets; all 2,047 Wedding tests; production build; four Playwright/Axe/PDF cases at 320px, 375px and 1280px; and all four Compose parses with local placeholder values supplied only for staging's required secrets. The build retains the existing `ResponseQueueView` large-chunk warning.
 - WED-286 remains independently open where provider-observed bounce/complaint evidence and the remaining attachment/thread/response-queue work require a dedicated candidate; no mail flag was enabled here.
 - Completed a reviewed Oracle cleanup after a fresh inventory. Removed 9.409 GB of build cache, four exact unused homeserver image tags, six explicitly named older backup generations and journal history above 100 MB. Retained all running images, both rollback generations, all named/attached volumes and the newest three backups (`20261029T001242Z`, `20261029T015204Z`, `20261029T030536Z`). Root use fell from 83% (7.8 GB free) to 52% (22 GB free); all nine application containers remained up and `/workspace/` returned HTTP 200. Deleted cache/images can be rebuilt or pulled; deleted old backup generations are not recoverable, with three newer generations retained.
+## 2026-10-30 - WED-301 Wedding comparison/search/task-row regression repair (Codex, complete)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch `agent/codex/WED-301`, based on post-WED-293 coordination commit `c74db8a12145e119c260cf719504353ed36f97f4`.
+
+- Restored verified vendor-upload photos to comparison cards by recognizing only the bounded public owner-photo route at server directory, search-artifact and saved-card media boundaries. Arbitrary third-party and malformed paths remain rejected.
+- Bound master-search suggestion dismissal to the exact submitted query. Results no longer remain covered after submission, while editing the query deliberately reopens relevant suggestions.
+- Standardized Wedding Overview task rows with a fixed action column, right-aligned completion action and bottom-aligned shared owner control; the small-screen stack is unchanged.
+- Focused verification passed: seven frontend state/static checks, TypeScript and the Rust couple-facing vendor-photo route test. The final WED-294 candidate must still run the complete Wedding/build/line-budget matrix before production deployment.
+
+Next: commit WED-301, branch WED-294 from it and implement deterministic run-sheet conflict/buffer/A2UI help without enabling hosted sharing or adding a model dependency.

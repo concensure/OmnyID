@@ -1,5 +1,5 @@
 version: 1
-updated: 2026-10-29
+updated: 2026-10-30
 
 lifecycle:
   allowed_statuses:
@@ -15,6 +15,26 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-301
+    title: Repair Wedding vendor media, master-search dismissal and task-row alignment
+    status: done
+    owner: codex
+    branch: agent/codex/WED-301
+    depends_on: [WED-300, WED-293]
+    files: [solid-ui/src/components/WeddingVendor*.tsx, solid-ui/src/components/WeddingTask*.tsx, solid-ui/src/components/**Search*.tsx, solid-ui/src/lib/wedding*State.ts, solid-ui/tests/wedding-*.test.ts, Documents/verification/**, .agent/**]
+    acceptance: [safe current vendor photos render in comparison cards with an accessible fallback, submitted master-search suggestions close and do not obscure results, Wedding Overview task owner and action controls align consistently on desktop and mobile without bypassing the existing A2UI-backed task projection, focused tests typecheck Wedding tests build and line budgets pass]
+    progress: "Completed from post-WED-293 coordination commit c74db8a12145e119c260cf719504353ed36f97f4. Current verified owner-photo routes now pass the same couple-facing allowlist in server search, search-artifact projection and saved-card rehydration while arbitrary external media stays blocked. Master-search suggestions bind dismissal to the submitted query and reopen only after a genuine edit. Wedding Overview task rows reserve a stable action column and bottom-align the shared owner projection on desktop while retaining stacked mobile layout. Focused frontend tests, TypeScript and the focused Rust route test pass; full clean-candidate verification follows WED-294 before deployment."
+
+  - id: WED-294
+    title: Add deterministic run-sheet conflicts buffers and contextual A2UI help
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-294
+    depends_on: [WED-292, WED-293, WED-301]
+    files: [solid-ui/src/components/DatabaseView.tsx, solid-ui/src/components/WeddingRunSheet*.tsx, solid-ui/src/lib/weddingRunSheet*State.ts, solid-ui/src/lib/databaseMessageCommands.ts, solid-ui/tests/wedding-run-sheet-*.test.ts, Documents/design/database/wedding-runsheet-database-tasks.md, Documents/verification/**, .agent/**]
+    acceptance: [deterministic evidence-labelled rules cover owner or vendor overlap travel access curfew meals speeches photos and transport with explicit unknown states, risky transitions receive reviewable 15 to 20 minute buffer suggestions that explain affected rows, suggested approved and confirmed remain distinct and suggestions cannot confirm facts, contextual A2UI cards project the next conflict fixed milestones buffer review missing owner place or time distribution readiness and day-of current or next item, A2UI actions produce bounded intents resolved by existing authoritative commands, opening typing sorting and budget exhaustion cause zero model calls, focused tests typecheck Wedding tests build and line budgets pass]
+    progress: "Ready after WED-301. The core must remain deterministic and usable with no LLM; optional model extraction is not required for this slice."
+
   - id: WED-300
     title: Stabilize Wedding Today interactions, task projection and enquiry evidence
     status: done
