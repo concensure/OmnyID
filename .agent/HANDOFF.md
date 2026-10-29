@@ -5618,3 +5618,21 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch `agent/codex/W
 - Detailed evidence: `Documents/verification/wed-301-wed-294-oracle-release-2026-10-30.md`. The coordination commit after the application SHA is documentation-only and is not a new deployed candidate.
 
 Next: WED-295 should harden run-sheet distribution readiness and operational review without weakening WED-293's false-default grant boundary. Independently, WED-286 still needs provider-observed bounce/complaint evidence before any vendor-mail transport flag can be enabled. Splitting the inherited 1.66 MB `ResponseQueueView` bundle is the highest-value frontend performance follow-up.
+
+## 2026-10-30 - WED-295 run-sheet recovery and rollout hardening (Codex, complete and live)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch `agent/codex/WED-295`; exact deployed application commit `27bb198aece93a71999bbe4f386fd5ae2f71030c`. Clean release checkout: `C:\Users\ozans\AppData\Local\Temp\omnyid-wed295-release-27bb198`.
+
+- Deterministically collapses legacy, replayed and duplicate projected rows while preserving detached/manual rows and all generic-database behavior.
+- Adds bounded 80-write checkpoint-chained rebuilds, one fresh conflict retry and a no-write `Review rebuild` command.
+- Adds a sanitized 72-hour account/database/plan-scoped offline snapshot. It is visibly read-only, carries its last-sync time and excludes private notes, contacts and source provenance.
+- Adds content-free, zero-model/token/cost telemetry plus 205-source and 500-generic-row performance/regression fixtures.
+- Adds outsider, wrong-plan and cross-tenant refusal evidence, 200% text-zoom/focus/forced-colour coverage, and a false-default hosted-shadow verifier.
+- Exact candidate passed TypeScript, 27 generic Database tests, 2,063 Wedding tests, line budgets, production build, five Playwright/Axe/PDF checks, five Rust route tests and two real disposable-Postgres scenarios.
+- Oracle preflight, image build/replacement, Caddy smoke, backup verification and the isolated restore drill passed. Eight deployed source hashes match and the hosted Database bundle includes the recovery controls. A stalled local audit poller was stopped only after the remote audit exited 0; a fresh read-only proof also passed.
+- Hosted shadow: the correct API-origin open and acknowledge requests returned 404; grants and acknowledgements remained 0; no external delivery occurred. Run-sheet sharing and all three vendor-mail flags remain explicitly false.
+- Oracle root storage settled at 73% used with about 13 GB free. Full evidence: `Documents/verification/wed-295-runsheet-hardening-release-2026-10-30.md`.
+
+The application SHA above is the production candidate. The following coordination/evidence commit is documentation-only. Do not enable hosted sharing or vendor-mail flags as part of a routine deployment.
+
+Next: split the inherited approximately 1.66 MB `ResponseQueueView` bundle to improve Wedding Today/response first-load performance. WED-286's provider-observed bounce/complaint evidence remains an independent activation prerequisite for vendor mail.
