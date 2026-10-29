@@ -144,26 +144,53 @@ async fn wedding_google_place_photo_http(
 ) -> Result<axum::response::Response, (StatusCode, String)> {
     enforce_rate_limit(
         &state,
-        authenticated_rate_limit_key("wedding_google_place_photo", &headers),
+        public_rate_limit_key("wedding_google_place_photo", &headers),
         RateLimitPolicy {
             max_requests: 120,
             window: Duration::from_secs(60),
         },
     )
     .await?;
-    let _user = authenticated_user(&state.db, &headers).await?;
-    if !admin_shared_tool_policy_enabled("google-places-api") {
-        return Err((
-            StatusCode::FORBIDDEN,
-            "Google Places shared wedding-template access is not enabled.".to_string(),
-        ));
-    }
     let photo_name = clean_google_place_photo_name(&query.name).ok_or_else(|| {
         (
             StatusCode::BAD_REQUEST,
             "Invalid Google Places photo name.".to_string(),
         )
     })?;
+    let max_width = query.max_width_px.unwrap_or(720).clamp(120, 1200);
+    let proxy_url =
+        google_place_photo_proxy_url_at_width(&photo_name, max_width).ok_or_else(|| {
+            (
+                StatusCode::BAD_REQUEST,
+                "Invalid Google Places photo name.".to_string(),
+            )
+        })?;
+    let listed = sqlx::query_scalar::<_, bool>(
+        r#"SELECT EXISTS (
+            SELECT 1 FROM wedding_vendor_photos WHERE photo_url = $1
+            UNION ALL
+            SELECT 1 FROM wedding_vendor_room_photos WHERE photo_url = $1
+        )"#,
+    )
+    .bind(&proxy_url)
+    .fetch_one(&state.db.pool)
+    .await
+    .map_err(|err| {
+        tracing::warn!(%err, "wedding vendor photo allowlist lookup failed");
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Could not verify this vendor photo.".to_string(),
+        )
+    })?;
+    if !listed {
+        return Err((StatusCode::NOT_FOUND, "Vendor photo not found.".to_string()));
+    }
+    if !admin_shared_tool_policy_enabled("google-places-api") {
+        return Err((
+            StatusCode::FORBIDDEN,
+            "Google Places shared wedding-template access is not enabled.".to_string(),
+        ));
+    }
     let key = resolve_admin_tool_secret(GOOGLE_PLACES_SPEC)
         .map(|secret| secret.secret)
         .ok_or_else(|| {
@@ -172,7 +199,6 @@ async fn wedding_google_place_photo_http(
                 "Google Places API key is not configured.".to_string(),
             )
         })?;
-    let max_width = query.max_width_px.unwrap_or(720).clamp(120, 1200);
     let max_width_string = max_width.to_string();
     let media_url = format!("https://places.googleapis.com/v1/{photo_name}/media");
     let response = reqwest::Client::new()
@@ -211,7 +237,9 @@ async fn wedding_google_place_photo_http(
         .header(axum::http::header::CONTENT_TYPE, content_type)
         .header(
             axum::http::header::CACHE_CONTROL,
-            axum::http::HeaderValue::from_static("private, max-age=86400"),
+            axum::http::HeaderValue::from_static(
+                "public, max-age=86400, stale-while-revalidate=604800",
+            ),
         )
         .body(axum::body::Body::from(bytes))
         .map_err(|err| {
@@ -1327,7 +1355,7 @@ async fn persist_live_vendor_sources(
             photos: source
                 .photo_url
                 .as_deref()
-                .filter(|url| is_unsplash_photo_url(url))
+                .filter(|url| is_couple_facing_vendor_photo_url(url))
                 .map(|url| WeddingVendorPhotoUpsertRecord {
                     slot: 1,
                     photo_url: url.to_string(),
@@ -1418,7 +1446,10 @@ pub(super) fn is_omnyid_wedding_vendor_asset_url(url: &str) -> bool {
     let path = parsed.path();
     path.starts_with("/wedding/assets/venue-photos/")
         && matches!(
-            path.rsplit('.').next().map(str::to_ascii_lowercase).as_deref(),
+            path.rsplit('.')
+                .next()
+                .map(str::to_ascii_lowercase)
+                .as_deref(),
             Some("jpg" | "jpeg" | "png" | "webp")
         )
 }
@@ -1431,7 +1462,9 @@ pub(super) fn is_google_wedding_vendor_photo_proxy_url(url: &str) -> bool {
     let Some(name) = params.next() else {
         return false;
     };
-    if !name.to_ascii_lowercase().starts_with("name=places%2f") || name.len() <= "name=places%2f".len() {
+    if !name.to_ascii_lowercase().starts_with("name=places%2f")
+        || name.len() <= "name=places%2f".len()
+    {
         return false;
     }
     match (params.next(), params.next()) {
@@ -1461,6 +1494,13 @@ pub(super) fn is_public_wedding_vendor_owner_photo_url(url: &str) -> bool {
     parts.next().is_none()
         && ulid::Ulid::from_string(asset_id).is_ok()
         && matches!(variant, "full" | "medium" | "thumb")
+}
+
+pub(super) fn is_couple_facing_vendor_photo_url(url: &str) -> bool {
+    is_unsplash_photo_url(url)
+        || is_omnyid_wedding_vendor_asset_url(url)
+        || is_google_wedding_vendor_photo_proxy_url(url)
+        || is_public_wedding_vendor_owner_photo_url(url)
 }
 
 fn infer_email_from_text(text: &str) -> Option<String> {
@@ -1543,10 +1583,15 @@ fn clean_google_place_photo_name(value: &str) -> Option<String> {
 }
 
 fn google_place_photo_proxy_url(photo_name: &str) -> Option<String> {
+    google_place_photo_proxy_url_at_width(photo_name, 720)
+}
+
+fn google_place_photo_proxy_url_at_width(photo_name: &str, max_width: u16) -> Option<String> {
     let clean_name = clean_google_place_photo_name(photo_name)?;
+    let width = max_width.clamp(120, 1200);
     Some(format!(
-        "/wedding/vendor-photo/google?name={}&max_width_px=720",
-        urlencoding::encode(&clean_name)
+        "/wedding/vendor-photo/google?name={}&max_width_px={width}",
+        urlencoding::encode(&clean_name),
     ))
 }
 
@@ -2330,6 +2375,20 @@ mod tests {
         assert!(google_place_photo_proxy_url("https://example.com/photo.jpg").is_none());
         assert!(google_place_photo_proxy_url("places/example/photos/photo?key=secret").is_none());
         assert!(google_place_photo_proxy_url("../places/example/photos/photo").is_none());
+    }
+
+    #[test]
+    fn google_place_photo_proxy_url_bounds_the_catalogued_public_variant() {
+        assert_eq!(
+            google_place_photo_proxy_url_at_width("places/example/photos/photo_abc-123", 480)
+                .as_deref(),
+            Some(
+                "/wedding/vendor-photo/google?name=places%2Fexample%2Fphotos%2Fphoto_abc-123&max_width_px=480"
+            )
+        );
+        assert!(is_couple_facing_vendor_photo_url(
+            "/wedding/vendor-photo/google?name=places%2Fexample%2Fphotos%2Fphoto_abc-123&max_width_px=480"
+        ));
     }
 
     #[test]
