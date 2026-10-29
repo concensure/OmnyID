@@ -27,13 +27,13 @@ tasks:
 
   - id: WED-294
     title: Add deterministic run-sheet conflicts buffers and contextual A2UI help
-    status: in_progress
+    status: done
     owner: codex
     branch: agent/codex/WED-294
     depends_on: [WED-292, WED-293, WED-301]
     files: [solid-ui/src/components/DatabaseView.tsx, solid-ui/src/components/WeddingRunSheet*.tsx, solid-ui/src/lib/weddingRunSheet*State.ts, solid-ui/src/lib/databaseMessageCommands.ts, solid-ui/tests/wedding-run-sheet-*.test.ts, Documents/design/database/wedding-runsheet-database-tasks.md, Documents/verification/**, .agent/**]
     acceptance: [deterministic evidence-labelled rules cover owner or vendor overlap travel access curfew meals speeches photos and transport with explicit unknown states, risky transitions receive reviewable 15 to 20 minute buffer suggestions that explain affected rows, suggested approved and confirmed remain distinct and suggestions cannot confirm facts, contextual A2UI cards project the next conflict fixed milestones buffer review missing owner place or time distribution readiness and day-of current or next item, A2UI actions produce bounded intents resolved by existing authoritative commands, opening typing sorting and budget exhaustion cause zero model calls, focused tests typecheck Wedding tests build and line budgets pass]
-    progress: "Ready after WED-301. The core must remain deterministic and usable with no LLM; optional model extraction is not required for this slice."
+    progress: "Completed after WED-301. A pure evidence-labelled projector covers owner/vendor overlap, travel, access, curfew, meal, speech, photo and transport conflicts plus explicit unknown owner/place/time/travel evidence. Reviewable 15/20-minute buffers remain suggested until an authoritative database revision records approval; they never confirm a row. Six A2UI-compatible contextual cards emit bounded intents resolved by Database commands. Suggestion provenance includes source refs, fingerprint, deterministic prompt version, zero token/cost values, approval status and revision history. Account/wedding budget exhaustion preserves the zero-model fallback. Pre-freeze pass: TypeScript, 2,056 Wedding tests, focused rule/static tests, line budgets, production build, three responsive Axe cases and multi-page PDF pagination. Hosted sharing remains false. Exact clean-candidate and Oracle evidence follow in the release record."
 
   - id: WED-300
     title: Stabilize Wedding Today interactions, task projection and enquiry evidence

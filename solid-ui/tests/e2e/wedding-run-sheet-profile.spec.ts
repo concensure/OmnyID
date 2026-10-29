@@ -13,12 +13,18 @@ for (const viewport of [{ width: 320, height: 720 }, { width: 375, height: 812 }
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
 
     if (viewport.width < 768) {
-      await expect(page.getByRole("article")).toHaveCount(2);
+      await expect(page.getByLabel("Run-sheet items").getByRole("article")).toHaveCount(2);
       await page.getByRole("button", { name: "15 min earlier" }).first().click();
       await expect(page.getByRole("status")).toHaveText("Moved earlier");
     } else {
-      await expect(page.getByRole("article")).toHaveCount(0);
+      await expect(page.getByLabel("Run-sheet items").getByRole("article")).toHaveCount(0);
     }
+
+    await page.getByRole("button", { name: "Review buffer" }).click();
+    await expect(page.getByRole("dialog", { name: "Review this buffer" })).toBeVisible();
+    await expect(page.getByText(/does not confirm either item/i)).toBeVisible();
+    await page.getByRole("button", { name: /Add 20-minute buffer/ }).click();
+    await expect(page.getByRole("status")).toHaveText("Buffer approved");
 
     await page.getByRole("button", { name: "Add run-sheet item" }).click();
     await expect(page.getByRole("dialog", { name: "Add run-sheet item" })).toBeVisible();

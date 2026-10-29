@@ -66,6 +66,12 @@ import {
 import { weddingTaskDateToAfpSendInput } from "@/lib/weddingTaskDateProjectionState";
 import { DatabaseGhostGrid } from "@/components/DatabaseGrid";
 import { WeddingRunSheetSavedViews } from "@/components/WeddingRunSheetSavedViews";
+import { WeddingRunSheetIntelligencePanel } from "@/components/WeddingRunSheetContextCards";
+import {
+  buildWeddingRunSheetIntelligence,
+  weddingRunSheetApprovedBufferPatch,
+  type WeddingRunSheetBufferSuggestion,
+} from "@/lib/weddingRunSheetIntelligenceState";
 
 type DensityBucket = "compact" | "comfortable" | "spacious";
 
@@ -182,9 +188,14 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
   });
 
   const selectedDatabaseRecords = createMemo(() => databaseRecordsForDatabase(records(), selectedDatabaseId()));
-  const runSheetRows = createMemo(() => selectedProfilePlugin()?.toolbarKind === "wedding_run_sheet"
+  const rawRunSheetRows = createMemo(() => selectedProfilePlugin()?.toolbarKind === "wedding_run_sheet"
     ? projectWeddingRunSheetRows(selectedDatabaseRecords())
     : []);
+  const runSheetRows = createMemo(() => {
+    const rows = rawRunSheetRows();
+    const findings = buildWeddingRunSheetIntelligence({ rows }).findings;
+    return rows.map((row) => ({ ...row, conflictCodes: Array.from(new Set([...row.conflictCodes, ...findings.filter((item) => item.recordIds.includes(row.record.id)).map((item) => item.kind)])) }));
+  });
   const visibleRunSheetRows = createMemo(() => filterWeddingRunSheetRows(runSheetRows(), runSheetFilters()));
   const runSheetPresentationById = createMemo(() => new Map(runSheetRows().map((row) => [row.record.id, row])));
 
@@ -472,6 +483,12 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
     void saveDatabaseRowPatch(row, { start_at: review.nextValue }, "Move run-sheet time");
   }
 
+  async function approveRunSheetBuffer(suggestion: WeddingRunSheetBufferSuggestion): Promise<boolean> {
+    const row = runSheetPresentationById().get(suggestion.targetRecordId)?.record;
+    return !!row && !selectedDefinition()?.archived
+      && saveDatabaseRowPatch(row, weddingRunSheetApprovedBufferPatch(suggestion, new Date().toISOString()), "Add run-sheet buffer");
+  }
+
   async function confirmRunSheetOverride() {
     const pending = pendingRunSheetTimeChange();
     if (!pending || runSheetActionBusy()) return;
@@ -636,6 +653,17 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
         onRunSheetFilters={setRunSheetFilters}
         onAddRunSheetItem={() => { setRunSheetActionError(""); setShowRunSheetAdd(true); }}
       />
+
+      <Show when={selectedProfilePlugin()?.toolbarKind === "wedding_run_sheet"}>
+        <WeddingRunSheetIntelligencePanel
+          rows={runSheetRows()}
+          archived={selectedDefinition()?.archived ?? false}
+          onFocusRecords={(recordIds) => { setRunSheetFilters(weddingRunSheetDefaultFilters()); setSelectedRowIds(recordIds); queueMicrotask(() => tableScrollRef?.scrollIntoView({ behavior: "smooth", block: "nearest" })); }}
+          onShowAttention={() => setRunSheetFilters({ day: "all", status: "all", conflictsOnly: true })}
+          onShowAll={() => setRunSheetFilters(weddingRunSheetDefaultFilters())}
+          onApproveBuffer={approveRunSheetBuffer}
+        />
+      </Show>
 
       <Show when={selectedProfilePlugin()?.toolbarKind === "wedding_run_sheet" && selectedDatabaseId()}>{(databaseId) =>
         <WeddingRunSheetSavedViews

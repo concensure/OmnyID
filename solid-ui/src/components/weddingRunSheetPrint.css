@@ -8,6 +8,16 @@
     visibility: hidden !important;
   }
 
+  /* Hidden application content must not reserve blank print pages. Keep only
+     the ancestor path to the in-flow preview and the preview itself. */
+  body.omnyid-runsheet-printing *:has([data-runsheet-print-shell]) {
+    display: contents !important;
+  }
+
+  body.omnyid-runsheet-printing *:has([data-runsheet-print-shell]) > *:not(:has([data-runsheet-print-shell])):not([data-runsheet-print-shell]) {
+    display: none !important;
+  }
+
   body.omnyid-runsheet-printing [data-runsheet-print],
   body.omnyid-runsheet-printing [data-runsheet-print] *,
   body.omnyid-runsheet-printing [data-runsheet-print-shell] {

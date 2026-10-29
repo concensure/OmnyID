@@ -8,6 +8,7 @@ import {
   WeddingRunSheetProfileToolbar,
 } from "../../src/components/WeddingRunSheetProfileToolbar";
 import { WeddingRunSheetSavedViews } from "../../src/components/WeddingRunSheetSavedViews";
+import { WeddingRunSheetIntelligencePanel } from "../../src/components/WeddingRunSheetContextCards";
 import {
   filterWeddingRunSheetRows,
   projectWeddingRunSheetRows,
@@ -25,6 +26,7 @@ const records: DatabaseViewRecord[] = [
     data: {
       title: "Ceremony",
       start_at: "2027-11-20T04:00:00.000Z",
+      end_at: "2027-11-20T04:20:00.000Z",
       status: "confirmed",
       time_zone: "Australia/Sydney",
       location: "Harbour garden",
@@ -73,6 +75,14 @@ function Fixture() {
       archived={false}
       onFilters={setFilters}
       onAddItem={() => setDialogOpen(true)}
+    />
+    <WeddingRunSheetIntelligencePanel
+      rows={rows}
+      archived={false}
+      onFocusRecords={() => setStatus("Items focused")}
+      onShowAttention={() => setStatus("Attention shown")}
+      onShowAll={() => setStatus("All shown")}
+      onApproveBuffer={async () => { setStatus("Buffer approved"); return true; }}
     />
     <WeddingRunSheetMobileCards
       rows={visibleRows()}

@@ -5593,3 +5593,14 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch `agent/codex/W
 - Focused verification passed: seven frontend state/static checks, TypeScript and the Rust couple-facing vendor-photo route test. The final WED-294 candidate must still run the complete Wedding/build/line-budget matrix before production deployment.
 
 Next: commit WED-301, branch WED-294 from it and implement deterministic run-sheet conflict/buffer/A2UI help without enabling hosted sharing or adding a model dependency.
+## 2026-10-30 - WED-294 deterministic run-sheet intelligence (Codex, implementation complete)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch `agent/codex/WED-294`, based on WED-301 commit `2ca727b`.
+
+- Added deterministic, evidence-labelled conflicts for owner/vendor overlap, travel, access, curfew, meals, speeches, photos and transport. Missing facts stay explicit unknowns; a false-positive fixture proves unrelated overlapping work is not treated as a conflict.
+- Added 15/20-minute transition buffers with affected-row review, source/fingerprint/version/zero-token-cost provenance, explicit suggested-to-approved history and no path to confirmed state.
+- Mounted six A2UI-compatible contextual cards in the existing Database run-sheet profile. Their bounded intents are resolved through existing Database revision commands; no parallel schedule or model dependency was introduced.
+- Pre-freeze verification passed: TypeScript; 2,056 Wedding tests; focused run-sheet rule, editing, saved-view, readiness and static tests; both line budgets; production build; three responsive Playwright/Axe cases; and multi-page PDF pagination. The print selector was hardened so hidden application content cannot reserve blank pages.
+- Every Compose/environment default checked keeps `OMNYID_WEDDING_RUNSHEET_SHARING_ENABLED=false`. WED-293 code is present but remains disabled.
+
+Next: commit the candidate, rerun the release matrix from an exact clean detached checkout, deploy that SHA to Oracle without changing flags, collect hosted hashes/runtime/disk evidence, then add the exact-SHA release record.

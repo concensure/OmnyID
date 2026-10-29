@@ -316,6 +316,8 @@ Make the schedule operationally useful without presenting AI guesses as facts.
 - Conflicts and missing information are actionable and evidence-labelled.
 - Core schedule use remains available with no LLM.
 
+Complete in WED-294. The Database run-sheet profile now derives evidence-labelled owner/vendor overlap, travel, access, curfew, meal, speech, photo and transport findings without a model call. Missing owner, place, time and unmeasured travel remain explicit unknowns. Six contextual cards use an A2UI-compatible projection and emit only focus, filter or buffer-review intents; Database remains the authoritative command boundary. Buffer suggestions explain both affected rows before approval, persist source references, an input fingerprint, deterministic prompt version, zero token/cost accounting and revision history, and cannot set a row to confirmed. Account or wedding model-budget exhaustion leaves the same deterministic surface available. Responsive Axe checks and print pagination cover the mounted experience; hosted sharing remains independently false-default.
+
 ## 9. WED-295 — Hardening, accessibility, migration, and rollout
 
 ### Goal
