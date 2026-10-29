@@ -5636,3 +5636,17 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch `agent/codex/W
 The application SHA above is the production candidate. The following coordination/evidence commit is documentation-only. Do not enable hosted sharing or vendor-mail flags as part of a routine deployment.
 
 Next: split the inherited approximately 1.66 MB `ResponseQueueView` bundle to improve Wedding Today/response first-load performance. WED-286's provider-observed bounce/complaint evidence remains an independent activation prerequisite for vendor mail.
+
+## 2026-10-30 - WED-302 Wedding response payload split (Codex, complete and live)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch `agent/codex/WED-302`; exact deployed UI application commit `823bf7a0aa85301bf039bc7feac203ef94d5ed20`.
+
+- Kept `ResponseQueueView` route-lazy and moved the Wedding workspace, intake wizard and rich-response renderer behind explicit feature boundaries. No AFP state, action handler or backend contract moved.
+- Added accessible loading announcements and a local error boundary so a deferred module failure does not collapse the entire planner.
+- Core response feature output fell from 1,660,630 bytes / about 452 KB gzip to 876,101 bytes / about 249 KB gzip. Workspace, intake and rich-response code now build separately.
+- Exact clean candidate passed typecheck, 2,065 Wedding tests, both line budgets and the production build.
+- Deployed only the UI service from the clean checkout; Oracle preflight, Caddy/workspace smoke and post-deploy backup/restore proof passed. All four hosted feature chunks returned HTTP 200 at expected sizes.
+- Run-sheet sharing and all three vendor-mail flags remain false. Oracle root storage is 73% used with about 13 GB free.
+- Full evidence: `Documents/verification/wed-302-response-payload-release-2026-10-30.md`.
+
+Next: measure and split the remaining approximately 750 KB Wedding workspace by menu-owned secondary surfaces, or return to WED-286 for provider-observed bounce/complaint evidence. Do not enable vendor mail until that evidence is complete.

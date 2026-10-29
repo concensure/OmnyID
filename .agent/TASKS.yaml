@@ -17,13 +17,13 @@ lifecycle:
 tasks:
   - id: WED-302
     title: Split the Wedding response workflow payload without changing AFP authority
-    status: in_progress
+    status: done
     owner: codex
     branch: agent/codex/WED-302
     depends_on: [WED-295, WED-300, WED-301]
     files: [solid-ui/src/components/ResponseQueueView.tsx, solid-ui/src/components/WeddingResponseWorkspaceView.tsx, solid-ui/src/components/WeddingRichResponseView.tsx, solid-ui/src/components/WeddingSiteIntakeWizard.tsx, solid-ui/src/lib/**, solid-ui/tests/**, solid-ui/vite.config.mjs, Documents/verification/**, .agent/**]
     acceptance: [the response queue route no longer ships a monolithic approximately 1.66 MB feature chunk, optional Wedding intake and rich response code load only when their surfaces are needed, Wedding Today and response workflows preserve the same AFP-backed state and user actions, loading fallbacks are accessible and mobile-safe, focused tests typecheck Wedding tests build and line budgets pass, exact bundle evidence records initial and deferred payload sizes]
-    progress: "Implementation is ready to freeze. ResponseQueueView remains route-lazy and now defers the Wedding workspace, rich-response and intake surfaces behind explicit Solid lazy boundaries with mobile-safe status fallbacks and a local recovery boundary. The core feature chunk fell from 1,660,630 bytes / about 452 KB gzip to 876,101 bytes / about 249 KB gzip; the workspace, intake and rich-response surfaces are separate 749,544-, 26,481- and 5,549-byte chunks. AFP-backed state, handlers and backend contracts are unchanged. Typecheck, two boundary tests, all 2,065 Wedding tests, both line budgets and the production build pass. Exact clean-SHA verification and deployment evidence are next."
+    progress: "Complete and live in exact application SHA 823bf7a0aa85301bf039bc7feac203ef94d5ed20. ResponseQueueView remains route-lazy and now defers the Wedding workspace, rich-response and intake surfaces behind explicit Solid lazy boundaries with mobile-safe status fallbacks and a local recovery boundary. The hosted core feature chunk is 877,006 bytes versus the prior 1,660,630 bytes; workspace, intake and rich-response are separate 749,995-, 26,481- and 5,549-byte hosted chunks. AFP-backed state, handlers and backend contracts are unchanged. Exact clean-SHA typecheck, all 2,065 Wedding tests, both line budgets and production build pass. Oracle UI-only deployment, workspace smoke, backup/restore production proof and hosted chunk checks pass. Evidence: Documents/verification/wed-302-response-payload-release-2026-10-30.md."
 
   - id: WED-295
     title: Harden run-sheet migration offline operation authorization and rollout evidence
