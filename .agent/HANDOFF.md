@@ -5604,3 +5604,17 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch `agent/codex/W
 - Every Compose/environment default checked keeps `OMNYID_WEDDING_RUNSHEET_SHARING_ENABLED=false`. WED-293 code is present but remains disabled.
 
 Next: commit the candidate, rerun the release matrix from an exact clean detached checkout, deploy that SHA to Oracle without changing flags, collect hosted hashes/runtime/disk evidence, then add the exact-SHA release record.
+
+## 2026-10-30 - WED-301 and WED-294 Oracle release (Codex, complete and live)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch `agent/codex/WED-294`; exact deployed application commit `b5f493d8d092b16609f6a0cb81ad704b4fafc43a`.
+
+- Vendor comparison media, submitted master-search dismissal and Wedding Overview owner/action alignment are live. Production diagnosis found that most catalogue-backed Google media names had expired. The final endpoint refreshes only an already-catalogued place, validates current media before replacing the stale URL and leaves arbitrary references inaccessible.
+- Production proof for an expired row returned HTTP 200, `image/jpeg`, 136094 bytes, replaced the stale reference and left zero copies of that old URL. A syntactically valid uncatalogued reference returned HTTP 404.
+- WED-294's deterministic conflict/buffer projector and six A2UI context cards are live in the existing Database run-sheet profile. No model call or parallel schedule store was added.
+- Exact-candidate checks passed: TypeScript, both line budgets, Wedding-site smoke, 2,056 Wedding tests, production build, Oracle staging self-test and eight focused Google Places/photo Rust tests. Post-deploy Oracle production proof passed, ten representative deployed source hashes match and both hosted run-sheet bundle markers are present.
+- The first final upload lost its SSH connection before extraction and changed no container. The idempotent retry uploaded successfully. Its preflight backup check was transiently unhealthy, but the mandatory post-deploy backup/runtime proof passed.
+- `OMNYID_WEDDING_RUNSHEET_SHARING_ENABLED`, `OMNYID_VENDOR_MAIL_ENABLED`, `OMNYID_VENDOR_SENDER_MASK_ENABLED` and `OMNYID_VENDOR_MAIL_INGRESS_ENABLED` remain `false`. Oracle root disk is 69% used with 14 GB free.
+- Detailed evidence: `Documents/verification/wed-301-wed-294-oracle-release-2026-10-30.md`. The coordination commit after the application SHA is documentation-only and is not a new deployed candidate.
+
+Next: WED-295 should harden run-sheet distribution readiness and operational review without weakening WED-293's false-default grant boundary. Independently, WED-286 still needs provider-observed bounce/complaint evidence before any vendor-mail transport flag can be enabled. Splitting the inherited 1.66 MB `ResponseQueueView` bundle is the highest-value frontend performance follow-up.

@@ -2030,3 +2030,9 @@ Every open re-projects current rows from the owner's AFP ledger through the save
 Wedding run-sheet conflicts and buffers are derived from the same Database record revisions; they are not a second schedule store. A conflict requires explicit time plus the evidence appropriate to its rule. Missing owner, place, time or travel duration remains unknown, and unrelated simultaneous items do not conflict merely because they overlap.
 
 Contextual guidance is represented as `a2ui.v1` card data, but card actions carry only bounded focus, filter or buffer-review intents. `DatabaseView` resolves those intents through the existing revision command. A buffer begins as `suggested`, shows every affected row before approval, and persists as `approved` with source references, input fingerprint, deterministic prompt version, zero token/cost accounting and revision history; it cannot set `confirmed`. The core makes zero model calls and remains fully available when account or wedding model budgets are exhausted. Hosted run-sheet sharing stays false-default and independent.
+
+## 2026-10-30: Public vendor media is catalogue-bound and stale references refresh in place
+
+A couple-facing comparison may render only an approved first-party asset, an existing bounded owner-photo route, or a Google media reference already present in the vendor photo catalogue. The public media endpoint never accepts an arbitrary provider reference merely because its syntax is valid.
+
+Google photo references can expire independently of the vendor record. On a provider `400`, the server may derive the bounded place ID from the already-catalogued reference, request current photo metadata with the server-held provider credential, and retry one current reference. It replaces the stale catalogue URL transactionally only after current media succeeds. This refresh changes media provenance only; it does not create suitability evidence, alter ranking, or expose the provider credential.
