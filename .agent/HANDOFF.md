@@ -5573,6 +5573,8 @@ Remaining:
 
 ## 2026-10-29 - WED-293 hosted run-sheet grant lifecycle (Codex, implementation complete)
 
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch `agent/codex/WED-293-hosted`, exact application commit `bc28f8657b229ab52a15f0e728bcb65297260924`.
+
 - Added a false-default hosted-sharing capability over the existing saved-view and AFP record authority. Grants store only a token digest plus bounded owner/view/role/record metadata; the 256-bit token remains in the browser fragment until exchanged in a no-credentials request body.
 - Added authenticated create/list/revoke controls, indistinguishable unavailable responses for invalid/expired/revoked links, owner revocation while creation is disabled, read-time deny-by-default projection, and tenant-private AFP grant/view/expiry/revocation audit events.
 - Added vendor final-run-sheet acknowledgement and change-request responses with expiry bounds and idempotency, plus an accessible public mobile surface and owner-side state projection.
