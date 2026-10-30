@@ -1,5 +1,5 @@
 // @locs-version: 1.0
-import type { SendAfpMessageInput } from "@/lib/api";
+import type { AfpMessage, SendAfpMessageInput } from "@/lib/api";
 import type { WeddingGuestTrackingState } from "@/lib/weddingGuestTrackingState";
 import {
   normalizeWeddingPlanningMetadata,
@@ -17,6 +17,15 @@ export type WeddingRsvpReminderCandidate = {
   deadline: string;
   exactContent: string;
   sourceReferences: string[];
+  sendAllowedNow: boolean;
+  sendBlockReason: string | null;
+};
+
+export type WeddingRsvpReminderReceipt = {
+  householdId: string;
+  deliveryStatus: "approved" | "provider_accepted" | "delivered" | "failed";
+  providerMessageId: string | null;
+  createdAt: string;
 };
 
 function clean(value: unknown): string {
@@ -25,6 +34,11 @@ function clean(value: unknown): string {
 
 function unique(values: readonly string[]): string[] {
   return Array.from(new Set(values.map(clean).filter(Boolean)));
+}
+
+function reminderEmail(value: unknown): string {
+  const contact = clean(value).toLowerCase();
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact) && contact.length <= 254 ? contact : "";
 }
 
 export function buildWeddingRsvpReminderCandidates(input: {
@@ -36,7 +50,6 @@ export function buildWeddingRsvpReminderCandidates(input: {
   priorReminderHouseholdIds?: readonly string[] | null;
   quietHoursActive?: boolean;
 }): WeddingRsvpReminderCandidate[] {
-  if (input.quietHoursActive) return [];
   const prior = new Set(input.priorReminderHouseholdIds ?? []);
   const households = new Map<string, typeof input.guestTracking.guestRows>();
   for (const row of input.guestTracking.guestRows ?? []) {
@@ -49,7 +62,7 @@ export function buildWeddingRsvpReminderCandidates(input: {
   }
   return Array.from(households.entries()).flatMap(([key, rows]) => {
     if (!rows || rows.length === 0 || prior.has(key)) return [];
-    const contacts = unique(rows.map((row) => row.contactLabel ?? ""));
+    const contacts = unique(rows.filter((row) => row.rsvpReminderPermission === true).map((row) => reminderEmail(row.contactLabel)));
     if (contacts.length === 0) return [];
     const names = unique(rows.map((row) => row.displayName));
     const invitations = unique(rows.flatMap((row) => row.eventResponses
@@ -71,8 +84,78 @@ export function buildWeddingRsvpReminderCandidates(input: {
       deadline: input.responseDeadline,
       exactContent,
       sourceReferences: invitations.map((id) => `invitation:${id}`),
+      sendAllowedNow: input.quietHoursActive !== true,
+      sendBlockReason: input.quietHoursActive ? "Quiet hours are active. Review now, but send after 8 am local time." : null,
     }];
   }).sort((left, right) => left.householdLabel.localeCompare(right.householdLabel));
+}
+
+function record(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+export function weddingRsvpReminderReceiptsFromAfpMessages(
+  messages: readonly AfpMessage[] | null | undefined,
+): WeddingRsvpReminderReceipt[] {
+  return (messages ?? []).flatMap((message) => {
+    if (message.kind !== "wedding_rsvp_reminder_receipt" && message.kind !== "wedding_rsvp_reminder_approval") return [];
+    const content = record(message.content);
+    const householdId = clean(content.household_id);
+    const rawStatus = message.kind === "wedding_rsvp_reminder_approval" ? "approved" : clean(content.delivery_status);
+    if (!householdId || !["approved", "provider_accepted", "delivered", "failed"].includes(rawStatus)) return [];
+    return [{
+      householdId,
+      deliveryStatus: rawStatus as WeddingRsvpReminderReceipt["deliveryStatus"],
+      providerMessageId: clean(content.provider_message_id) || null,
+      createdAt: clean(content.created_at) || message.timestamp,
+    }];
+  }).sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+}
+
+export function weddingRsvpReminderApprovalToAfpSendInput(
+  candidate: WeddingRsvpReminderCandidate,
+  metadataInput?: unknown,
+  nowIso = new Date().toISOString(),
+): SendAfpMessageInput {
+  const metadata = normalizeWeddingPlanningMetadata(metadataInput);
+  const approvalId = `${candidate.id}:approval:${globalThis.crypto?.randomUUID?.() ?? Date.now()}`;
+  return {
+    id: approvalId,
+    thread_id: `wedding_rsvp_reminders:${metadata.responseWorkspaceId}`,
+    from: "user://wedding-couple",
+    to: ["agent://wedding-planning"],
+    type: "ledger",
+    kind: "wedding_rsvp_reminder_approval",
+    subtype: "wedding_rsvp_reminder_approval",
+    content: {
+      kind: "wedding_rsvp_reminder_approval",
+      contract_version: 1,
+      approval_id: approvalId,
+      draft_id: candidate.id,
+      household_id: candidate.householdId,
+      recipient_labels: candidate.recipientLabels,
+      contact_labels: candidate.contactLabels,
+      invitation_ids: candidate.invitationIds,
+      exact_content: candidate.exactContent,
+      channel: "email",
+      approval_status: "approved",
+      sends_message: false,
+      created_at: nowIso,
+    },
+    metadata: {
+      template: "wedding_planning",
+      weddingPlanId: metadata.weddingPlanId,
+      responseWorkspaceId: metadata.responseWorkspaceId,
+      origin: "wedding_rsvp_reminder",
+      approval_status: "approved",
+      sends_message: false,
+      provider_status: "not_submitted",
+      model_calls: 0,
+    },
+    references: candidate.sourceReferences.map((target) => ({ type: "source", target, label: "RSVP source" })),
+    supertags: ["template:wedding_planning", "wedding_rsvp:reminder_approval", "approval:recorded", "external_send:not_started"],
+    store_in_relational: true,
+  };
 }
 
 export function weddingRsvpReminderDraftToAfpSendInput(

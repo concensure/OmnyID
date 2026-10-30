@@ -163,6 +163,7 @@ export function WeddingWorkspaceContextPanels(props: {
     childSeatRequirement?: "standard" | "high_chair" | "booster" | "none" | "unknown";
     childMealRequirement?: "adult" | "child" | "none" | "unknown";
     contactLabel: string;
+    rsvpReminderPermission?: boolean;
     mealPreference: string;
     dietaryNote: string;
     accessibilityNote: string;
@@ -206,6 +207,7 @@ export function WeddingWorkspaceContextPanels(props: {
       childSeatRequirement: input.childSeatRequirement,
       childMealRequirement: input.childMealRequirement,
       contactLabel: input.contactLabel,
+      rsvpReminderPermission: input.rsvpReminderPermission,
       mealPreference: input.mealPreference,
       dietaryNote: input.dietaryNote,
       accessibilityNote: input.accessibilityNote,

@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildWeddingRsvpReminderCandidates, weddingRsvpReminderDraftToAfpSendInput } from "../src/lib/weddingRsvpReminderState";
+import { buildWeddingRsvpReminderCandidates, weddingRsvpReminderApprovalToAfpSendInput, weddingRsvpReminderDraftToAfpSendInput, weddingRsvpReminderReceiptsFromAfpMessages } from "../src/lib/weddingRsvpReminderState";
+import type { AfpMessage } from "../src/lib/api";
 import type { WeddingGuestTrackingState } from "../src/lib/weddingGuestTrackingState";
 
 function state(): WeddingGuestTrackingState {
   const guestRows: NonNullable<WeddingGuestTrackingState["guestRows"]> = [
-    { id: "guest:one", personId: "person:one", householdId: "household:one", displayName: "Alex", householdLabel: "Rivera", rsvpStatus: "Pending", contactLabel: "alex@example.test", mealPreference: null, dietaryNote: null, accessibilityNote: null, mealRequired: false, sourceLabel: "Guest list", eventResponses: [{ invitationId: "invite:one", eventId: "event:wedding", attendance: "Pending", responseSource: null, viewedAt: null, respondedAt: null, lockedAt: null, changed: false, revision: 1 }] },
+    { id: "guest:one", personId: "person:one", householdId: "household:one", displayName: "Alex", householdLabel: "Rivera", rsvpStatus: "Pending", contactLabel: "alex@example.test", rsvpReminderPermission: true, mealPreference: null, dietaryNote: null, accessibilityNote: null, mealRequired: false, sourceLabel: "Guest list", eventResponses: [{ invitationId: "invite:one", eventId: "event:wedding", attendance: "Pending", responseSource: null, viewedAt: null, respondedAt: null, lockedAt: null, changed: false, revision: 1 }] },
     { id: "guest:two", personId: "person:two", householdId: "household:two", displayName: "Sam", householdLabel: "Chen", rsvpStatus: "Not attending", contactLabel: "sam@example.test", mealPreference: null, dietaryNote: null, accessibilityNote: null, mealRequired: false, sourceLabel: "Guest list", eventResponses: [{ invitationId: "invite:two", eventId: "event:wedding", attendance: "Not attending", responseSource: "guest", viewedAt: null, respondedAt: "2027-09-01", lockedAt: null, changed: false, revision: 1 }] },
   ];
   return { guestFileCount: 0, guestRowCount: 2, guestRows, attendingCount: 0, declinedCount: 1, pendingCount: 1, householdCount: 2, dietaryCount: 0, accessibilityCount: 0, missingContactCount: 0, missingMealCount: 0, finalCountOptions: [], followUpTaskCandidates: [], boundaryRuleLabels: [], invitationScopeLabels: [], summaryLabel: "", warningLabels: [], sourceLabels: [], rsvpResponseSummary: { guestCount: 2, repliedCount: 1, awaitingCount: 1, completeCount: 1, incompleteCount: 0, changedCount: 0, lockedCount: 0, privateRequirementCount: 0, rows: [{ guestId: "guest:one", displayName: "Alex", attendance: "Pending", operationalState: "invited", statusLabel: "Awaiting reply", provenanceLabel: "Guest list", missingDetailLabels: [], eventCount: 1, hasPrivateRequirements: false, privacyLabel: null }, { guestId: "guest:two", displayName: "Sam", attendance: "Not attending", operationalState: "responded", statusLabel: "Declined", provenanceLabel: "Submitted by guest", missingDetailLabels: [], eventCount: 1, hasPrivateRequirements: false, privacyLabel: null }], summaryLabel: "" } };
@@ -22,8 +23,39 @@ test("reminder candidates exclude declined households and never send while draft
   assert.equal((afp.metadata as Record<string, unknown>).model_calls, 0);
 });
 
-test("quiet hours and prior household receipts suppress reminders", () => {
+test("quiet hours block sending while prior household receipts suppress reminders", () => {
   const base = { guestTracking: state(), eventId: "event:wedding", eventLabel: "Wedding day", hostLabel: "Priya and Daniel", responseDeadline: "2027-10-01" };
-  assert.deepEqual(buildWeddingRsvpReminderCandidates({ ...base, quietHoursActive: true }), []);
+  const duringQuietHours = buildWeddingRsvpReminderCandidates({ ...base, quietHoursActive: true });
+  assert.equal(duringQuietHours.length, 1);
+  assert.equal(duringQuietHours[0]?.sendAllowedNow, false);
+  assert.match(duringQuietHours[0]?.sendBlockReason ?? "", /quiet hours/i);
   assert.deepEqual(buildWeddingRsvpReminderCandidates({ ...base, priorReminderHouseholdIds: ["household:one"] }), []);
+});
+
+test("contact permission is false-default and approval records exact unsent content", () => {
+  const withoutPermission = state();
+  withoutPermission.guestRows![0]!.rsvpReminderPermission = false;
+  const input = { guestTracking: withoutPermission, eventId: "event:wedding", eventLabel: "Wedding day", hostLabel: "Priya and Daniel", responseDeadline: "2027-10-01" };
+  assert.deepEqual(buildWeddingRsvpReminderCandidates(input), []);
+
+  const candidate = buildWeddingRsvpReminderCandidates({ ...input, guestTracking: state() })[0]!;
+  const approval = weddingRsvpReminderApprovalToAfpSendInput(candidate, { weddingPlanId: "plan:one", responseWorkspaceId: "workspace:one" }, "2027-09-01T00:00:00Z");
+  assert.deepEqual(approval.content.contact_labels, ["alex@example.test"]);
+  assert.equal(approval.content.exact_content, candidate.exactContent);
+  assert.equal(approval.content.sends_message, false);
+  assert.equal(approval.metadata?.provider_status, "not_submitted");
+});
+
+test("only provider-accepted or delivered receipts need suppress a repeat", () => {
+  const messages = [{
+    kind: "wedding_rsvp_reminder_receipt",
+    timestamp: "2027-09-02T00:00:00Z",
+    content: { household_id: "household:one", delivery_status: "provider_accepted", provider_message_id: "provider:redacted" },
+  }] as AfpMessage[];
+  const receipts = weddingRsvpReminderReceiptsFromAfpMessages(messages);
+  assert.equal(receipts[0]?.householdId, "household:one");
+  assert.equal(receipts[0]?.deliveryStatus, "provider_accepted");
+  const prior = receipts.filter((receipt) => receipt.deliveryStatus === "provider_accepted" || receipt.deliveryStatus === "delivered").map((receipt) => receipt.householdId);
+  const candidates = buildWeddingRsvpReminderCandidates({ guestTracking: state(), eventId: "event:wedding", eventLabel: "Wedding day", hostLabel: "Priya and Daniel", responseDeadline: "2027-10-01", priorReminderHouseholdIds: prior });
+  assert.deepEqual(candidates, []);
 });

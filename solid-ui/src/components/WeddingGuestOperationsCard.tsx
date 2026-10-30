@@ -40,6 +40,7 @@ export function WeddingGuestOperationsCard(props: {
     childSeatRequirement?: "standard" | "high_chair" | "booster" | "none" | "unknown";
     childMealRequirement?: "adult" | "child" | "none" | "unknown";
     contactLabel: string;
+    rsvpReminderPermission?: boolean;
     mealPreference: string;
     dietaryNote: string;
     accessibilityNote: string;
@@ -63,6 +64,7 @@ export function WeddingGuestOperationsCard(props: {
   const [guestChildSeat, setGuestChildSeat] = createSignal<"standard" | "high_chair" | "booster" | "none" | "unknown">("unknown");
   const [guestChildMeal, setGuestChildMeal] = createSignal<"adult" | "child" | "none" | "unknown">("unknown");
   const [guestContact, setGuestContact] = createSignal("");
+  const [guestReminderPermission, setGuestReminderPermission] = createSignal(false);
   const [guestMeal, setGuestMeal] = createSignal("");
   const [guestDietary, setGuestDietary] = createSignal("");
   const [guestAccessibility, setGuestAccessibility] = createSignal("");
@@ -118,6 +120,7 @@ export function WeddingGuestOperationsCard(props: {
         plusOneAllowed: false,
         childrenInvited: false,
         contactLabel: guest.contactLabel ?? "",
+        rsvpReminderPermission: guest.rsvpReminderPermission === true,
         mealPreference: guest.mealPreference ?? "",
         dietaryNote: guest.dietaryNote ?? "",
         accessibilityNote: guest.accessibilityNote ?? "",
@@ -168,6 +171,7 @@ export function WeddingGuestOperationsCard(props: {
           childSeatRequirement: guestChildSeat(),
           childMealRequirement: guestChildMeal(),
           contactLabel: guestContact(),
+          rsvpReminderPermission: guestReminderPermission(),
           mealPreference: guestMeal(),
           dietaryNote: guestDietary(),
           accessibilityNote: guestAccessibility(),
@@ -194,6 +198,7 @@ export function WeddingGuestOperationsCard(props: {
       setGuestChildSeat("unknown");
       setGuestChildMeal("unknown");
       setGuestContact("");
+      setGuestReminderPermission(false);
       setGuestMeal("");
       setGuestDietary("");
       setGuestAccessibility("");
@@ -379,6 +384,10 @@ export function WeddingGuestOperationsCard(props: {
                   onInput={(event) => setGuestContact(event.currentTarget.value)}
                   placeholder="Email or phone"
                 />
+              </label>
+              <label class="flex min-h-11 items-start gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-sky-950 sm:col-span-2">
+                <input type="checkbox" class="mt-0.5 h-5 w-5" checked={guestReminderPermission()} onChange={(event) => setGuestReminderPermission(event.currentTarget.checked)} />
+                <span>Allow RSVP reminders to this contact only. Off means OmnyID will not prepare or send reminders to them.</span>
               </label>
               <label class="min-w-0">
                 <span class="text-xs font-semibold text-sky-950/70">Meal choice</span>

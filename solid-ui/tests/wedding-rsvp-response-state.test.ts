@@ -79,6 +79,7 @@ test("manual guest draft round-trips response provenance and private logistics t
     rsvpStatus: "Attending",
     previousRsvpStatus: "Pending",
     contactLabel: "alex@example.test",
+    rsvpReminderPermission: true,
     mealPreference: "Vegetarian",
     dietaryNote: "Coeliac - caterer confirmation required",
     accessibilityNote: "Step-free route",
@@ -101,6 +102,7 @@ test("manual guest draft round-trips response provenance and private logistics t
   assert.equal(restoredGuest?.kind, "wedding_boundary_guest_profile");
   if (restoredGuest?.kind !== "wedding_boundary_guest_profile") return;
   assert.equal(restoredGuest.contactLabel, "alex@example.test");
+  assert.equal(restoredGuest.rsvpReminderPermission, true);
   assert.equal(restoredGuest.mealPreference, "Vegetarian");
   assert.equal(restoredGuest.dietaryNote, "Coeliac - caterer confirmation required");
   assert.equal(restoredGuest.accessibilityNote, "Step-free route");

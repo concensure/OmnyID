@@ -127,12 +127,12 @@ Acceptance: a response is entered once and every dependent view reconciles; no v
 Depends on: WED-303B, WED-303C
 
 - [x] Build household-level outstanding/reminder candidates from the shared projector.
-- [ ] Respect deadline, viewed/responded state, quiet hours, contact permissions and prior reminder receipt.
+- [x] Respect deadline, viewed/responded state, quiet hours, contact permissions and prior reminder receipt.
 - [x] Allow optional deterministic template or requested small-model draft.
 - [x] Persist any generated draft with sources, model/cost, approval and revision history.
-- [ ] Require exact recipient/content/channel preview and approval before sending.
+- [x] Require exact recipient/content/channel preview and approval before sending.
 - [ ] Record provider acceptance, delivery/failure and retry decisions separately.
-- [ ] Never message declined/complete households or use contacts for marketing.
+- [x] Never message declined/complete households or use contacts for marketing.
 
 Acceptance: reminders are deduplicated, approval-gated and limited to outstanding scoped recipients.
 

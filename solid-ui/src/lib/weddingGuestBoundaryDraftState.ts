@@ -31,6 +31,7 @@ export type WeddingGuestBoundaryDraftInput = {
   childSeatRequirement?: WeddingBoundaryEventInvitation["seatRequirement"];
   childMealRequirement?: WeddingBoundaryEventInvitation["mealRequirement"];
   contactLabel?: string | null;
+  rsvpReminderPermission?: boolean | null;
   mealPreference?: string | null;
   dietaryNote?: string | null;
   accessibilityNote?: string | null;
@@ -104,6 +105,7 @@ export function buildWeddingGuestBoundaryDraftObjects(
     ageBand: "unknown",
     familySide: "other",
     contactLabel: clean(input.contactLabel) || null,
+    rsvpReminderPermission: input.rsvpReminderPermission === true,
     mealPreference: clean(input.mealPreference) || null,
     dietaryNote: clean(input.dietaryNote) || null,
     accessibilityNote: clean(input.accessibilityNote) || null,
@@ -167,6 +169,7 @@ export function buildWeddingGuestBoundaryDraftObjects(
       displayName,
       relationshipLabel: "Plus-one",
       contactLabel: null,
+      rsvpReminderPermission: false,
       mealPreference: null,
       dietaryNote: null,
       accessibilityNote: null,
@@ -201,6 +204,7 @@ export function buildWeddingGuestBoundaryDraftObjects(
       ageBand: input.childAgeBand ?? "unknown",
       relationshipLabel: "Child",
       contactLabel: null,
+      rsvpReminderPermission: false,
       mealPreference: null,
       dietaryNote: null,
       accessibilityNote: null,

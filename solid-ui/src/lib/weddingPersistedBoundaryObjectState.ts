@@ -283,6 +283,7 @@ export function weddingPersistedBoundaryObjectFromAfpMessage(
       ageBand: clean(contentValue(message, "age_band")) as WeddingBoundaryGuestProfile["ageBand"],
       relationshipLabel: clean(contentValue(message, "relationship_label")),
       contactLabel: clean(contentValue(message, "contact_label")),
+      rsvpReminderPermission: contentValue(message, "rsvp_reminder_permission") === true,
       mealPreference: clean(contentValue(message, "meal_preference")),
       dietaryNote: clean(contentValue(message, "dietary_note")),
       accessibilityNote: clean(contentValue(message, "accessibility_note")),

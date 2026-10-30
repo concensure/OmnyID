@@ -17,7 +17,9 @@ import {
 import { buildWeddingRsvpReconciliationState } from "@/lib/weddingRsvpReconciliationState";
 import {
   buildWeddingRsvpReminderCandidates,
+  weddingRsvpReminderApprovalToAfpSendInput,
   weddingRsvpReminderDraftToAfpSendInput,
+  weddingRsvpReminderReceiptsFromAfpMessages,
 } from "@/lib/weddingRsvpReminderState";
 import type { WeddingRsvpSetupState } from "@/lib/weddingRsvpSetupState";
 import { friendlyErrorText } from "@/lib/visibleErrorText";
@@ -46,19 +48,29 @@ export function WeddingRsvpOperationsPanel(props: {
   const [pendingExport, setPendingExport] = createSignal(false);
   const [correctingReceiptId, setCorrectingReceiptId] = createSignal<string | null>(null);
   const [pendingRevocationId, setPendingRevocationId] = createSignal<string | null>(null);
+  const [pendingReminderApprovalId, setPendingReminderApprovalId] = createSignal<string | null>(null);
   const [busy, setBusy] = createSignal(false);
   const [notice, setNotice] = createSignal<string | null>(null);
   const reconciliation = createMemo(() => buildWeddingRsvpReconciliationState({
     guestTracking: props.guestTracking,
     eventId: props.setup.eventId,
   }));
-  const reminders = createMemo(() => buildWeddingRsvpReminderCandidates({
-    guestTracking: props.guestTracking,
-    eventId: props.setup.eventId,
-    eventLabel: props.setup.eventLabel,
-    hostLabel: props.setup.hostLabel,
-    responseDeadline: props.setup.responseDeadline,
-  }));
+  const reminderReceipts = createMemo(() => weddingRsvpReminderReceiptsFromAfpMessages(props.afpMessages));
+  const reminders = createMemo(() => {
+    const hour = new Date().getHours();
+    const priorReminderHouseholdIds = reminderReceipts()
+      .filter((receipt) => receipt.deliveryStatus === "provider_accepted" || receipt.deliveryStatus === "delivered")
+      .map((receipt) => receipt.householdId);
+    return buildWeddingRsvpReminderCandidates({
+      guestTracking: props.guestTracking,
+      eventId: props.setup.eventId,
+      eventLabel: props.setup.eventLabel,
+      hostLabel: props.setup.hostLabel,
+      responseDeadline: props.setup.responseDeadline,
+      priorReminderHouseholdIds,
+      quietHoursActive: hour >= 21 || hour < 8,
+    });
+  });
   const vendorPreview = createMemo(() => buildWeddingRsvpVendorExportPreview({
     guestTracking: props.guestTracking,
     eventId: props.setup.eventId,
@@ -97,6 +109,21 @@ export function WeddingRsvpOperationsPanel(props: {
       setNotice(`${previous ? "Correction recorded" : "Approval recorded"} for ${recipient} and the brief was downloaded. OmnyID did not send it.`);
     } catch (error) {
       setNotice(friendlyErrorText(error, "The approval receipt could not be saved, so no brief was downloaded."));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const approveReminder = async () => {
+    const candidate = reminders().find((item) => item.id === pendingReminderApprovalId());
+    if (!candidate || !props.onSaveProjection || busy()) return;
+    setBusy(true);
+    setNotice(null);
+    try {
+      await props.onSaveProjection(weddingRsvpReminderApprovalToAfpSendInput(candidate, props.metadata));
+      setPendingReminderApprovalId(null);
+      setNotice(`Exact email content and recipient approved for ${candidate.householdLabel}. Nothing was sent or submitted to a provider.`);
+    } catch (error) {
+      setNotice(friendlyErrorText(error, "The reminder approval could not be saved."));
     } finally {
       setBusy(false);
     }
@@ -151,7 +178,7 @@ export function WeddingRsvpOperationsPanel(props: {
       <Show when={reminderOpen()}>
         <div class="mt-3 grid gap-2" aria-label="RSVP reminder drafts">
           <Show when={reminders().length > 0} fallback={<p class="rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-700">No eligible reminder is due. Complete and declined households are excluded.</p>}>
-            <For each={reminders()}>{(candidate, index) => <article class="rounded-xl border border-sky-100 p-3"><p class="text-sm font-semibold text-sky-950">{candidate.householdLabel}</p><p class="mt-1 text-xs leading-5 text-sky-950/75">To: {candidate.contactLabels.join(", ")} · {candidate.reasonLabel}</p><pre class="mt-2 whitespace-pre-wrap break-words rounded-lg bg-sky-50 p-2 font-sans text-xs leading-5 text-sky-950">{candidate.exactContent}</pre><button type="button" disabled={!props.onSaveProjection || busy()} class="mt-2 min-h-11 rounded-lg bg-sky-900 px-3 text-sm font-semibold text-white disabled:opacity-50" onClick={() => void saveReminderDraft(index())}>Save draft — do not send</button></article>}</For>
+            <For each={reminders()}>{(candidate, index) => <article class="rounded-xl border border-sky-100 p-3"><p class="text-sm font-semibold text-sky-950">{candidate.householdLabel}</p><p class="mt-1 text-xs leading-5 text-sky-950/75">Email: {candidate.contactLabels.join(", ")} · {candidate.reasonLabel}</p><Show when={candidate.sendBlockReason}><p class="mt-1 text-xs font-semibold text-amber-900">{candidate.sendBlockReason}</p></Show><pre class="mt-2 whitespace-pre-wrap break-words rounded-lg bg-sky-50 p-2 font-sans text-xs leading-5 text-sky-950">{candidate.exactContent}</pre><div class="mt-2 flex flex-wrap gap-2"><button type="button" disabled={!props.onSaveProjection || busy()} class="min-h-11 rounded-lg border border-sky-200 bg-white px-3 text-sm font-semibold text-sky-950 disabled:opacity-50" onClick={() => void saveReminderDraft(index())}>Save draft</button><button type="button" disabled={!props.onSaveProjection || busy() || !candidate.sendAllowedNow} class="min-h-11 rounded-lg bg-sky-900 px-3 text-sm font-semibold text-white disabled:opacity-50" onClick={() => setPendingReminderApprovalId(candidate.id)}>Review approval</button></div><p class="mt-2 text-xs leading-5 text-sky-950/65">Approval records the exact recipient and content. It does not send or claim provider acceptance.</p></article>}</For>
           </Show>
         </div>
       </Show>
@@ -178,6 +205,7 @@ export function WeddingRsvpOperationsPanel(props: {
       <Show when={notice()}>{(message) => <p role="status" class="mt-3 rounded-xl border border-sky-100 bg-sky-50 px-3 py-2 text-xs leading-5 text-sky-950">{message()}</p>}</Show>
       <WeddingConfirmDialog open={pendingExport()} title={correctingReceiptId() ? "Approve and record this correction?" : "Approve this minimum-necessary brief?"} detail={`This records approval to include ${vendorPreview().fieldLabels.join(", ")} for ${recipientLabel().trim()}. It downloads a CSV for manual handoff; OmnyID will not send it.`} confirmLabel={correctingReceiptId() ? "Record correction" : "Approve and download"} busy={busy()} onCancel={() => setPendingExport(false)} onConfirm={() => void approveExport()} />
       <WeddingConfirmDialog open={Boolean(pendingRevocationId())} title="Withdraw permission for future use?" detail="This records that the recipient should not use this RSVP brief again. It cannot recall a file that was already downloaded or handed over." confirmLabel="Withdraw future use" destructive busy={busy()} onCancel={() => setPendingRevocationId(null)} onConfirm={() => void confirmRevocation()} />
+      <WeddingConfirmDialog open={Boolean(pendingReminderApprovalId())} title="Approve this exact RSVP reminder?" detail="Check the email address and message above. This records your approval for this one reminder; it does not send it or submit it to an email provider." confirmLabel="Record approval" busy={busy()} onCancel={() => setPendingReminderApprovalId(null)} onConfirm={() => void approveReminder()} />
     </section>
   );
 }

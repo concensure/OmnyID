@@ -86,6 +86,7 @@ export type WeddingBoundaryGuestProfile = WeddingBoundaryLedgerObjectBase & {
   ageBand?: "adult" | "child_under_12" | "teen" | "unknown" | null;
   relationshipLabel?: string | null;
   contactLabel?: string | null;
+  rsvpReminderPermission?: boolean | null;
   mealPreference?: string | null;
   dietaryNote?: string | null;
   accessibilityNote?: string | null;
@@ -411,6 +412,7 @@ function publicContentFor(object: WeddingBoundaryLedgerObject): Record<string, u
       age_band: object.ageBand ?? "unknown",
       relationship_label: object.relationshipLabel ?? null,
       contact_label: object.contactLabel ?? null,
+      rsvp_reminder_permission: object.rsvpReminderPermission === true,
       meal_preference: object.mealPreference ?? null,
       dietary_note: object.dietaryNote ?? null,
       accessibility_note: object.accessibilityNote ?? null,

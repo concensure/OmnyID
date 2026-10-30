@@ -40,6 +40,7 @@ export type WeddingGuestTrackingRow = {
   householdLabel: string;
   rsvpStatus: "Attending" | "Not attending" | "Pending";
   contactLabel: string | null;
+  rsvpReminderPermission?: boolean;
   mealPreference: string | null;
   dietaryNote: string | null;
   accessibilityNote: string | null;
@@ -506,6 +507,7 @@ export function buildWeddingGuestTrackingState(input: {
       householdLabel,
       rsvpStatus: attendance,
       contactLabel: hasUsefulValue(profile.contactLabel ?? "") ? profile.contactLabel ?? null : null,
+      rsvpReminderPermission: profile.rsvpReminderPermission === true,
       mealPreference: hasUsefulValue(profile.mealPreference ?? "") ? profile.mealPreference ?? null : null,
       dietaryNote: hasUsefulValue(profile.dietaryNote ?? "") ? profile.dietaryNote ?? null : null,
       accessibilityNote: hasUsefulValue(profile.accessibilityNote ?? "") ? profile.accessibilityNote ?? null : null,
