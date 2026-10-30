@@ -53,6 +53,7 @@ import {
   buildWeddingPlanAggregateState,
   type WeddingWorkspaceAggregateAction,
 } from "@/lib/weddingWorkspaceAggregateState";
+import { recordWeddingRsvpResponse } from "@/lib/weddingRsvpResponseState";
 
 function weddingLocationAdviceLabel(state: WeddingResponseWorkspaceViewState): string {
   const locationLabel = state.workspace.artifacts
@@ -148,8 +149,32 @@ export function WeddingWorkspaceContextPanels(props: {
     mealPreference: string;
     dietaryNote: string;
     accessibilityNote: string;
+    personId?: string;
+    invitationId?: string;
+    eventId?: string;
+    responseRevision?: number;
   }): Promise<string> {
     if (!props.saveProjection) throw new Error("Saving is not connected yet.");
+    if (input.personId && input.invitationId && input.eventId && input.previousRsvpStatus) {
+      const attendance = input.rsvpStatus === "Attending"
+        ? "attending"
+        : input.rsvpStatus === "Not attending"
+          ? "not_attending"
+          : "pending";
+      const nonce = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}`;
+      const result = await recordWeddingRsvpResponse({
+        weddingPlanId: props.state.workspace.metadata.weddingPlanId,
+        responseWorkspaceId: props.state.workspace.metadata.responseWorkspaceId,
+        invitationId: input.invitationId,
+        personId: input.personId,
+        eventId: input.eventId,
+        attendance,
+        expectedRevision: input.responseRevision ?? 0,
+        idempotencyKey: `rsvp:${input.invitationId}:${input.responseRevision ?? 0}:${nonce}`,
+      });
+      props.onRefreshWorkspace?.();
+      return result.explanation;
+    }
     const objects = buildWeddingGuestBoundaryDraftObjects({
       displayName: input.displayName,
       householdLabel: input.householdLabel,

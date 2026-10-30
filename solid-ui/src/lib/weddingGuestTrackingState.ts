@@ -33,6 +33,7 @@ export type WeddingGuestTrackingState = {
 
 export type WeddingGuestTrackingRow = {
   id: string;
+  personId: string | null;
   displayName: string;
   householdLabel: string;
   rsvpStatus: "Attending" | "Not attending" | "Pending";
@@ -445,6 +446,7 @@ export function buildWeddingGuestTrackingState(input: {
       if (status === "attending" && mealIndex >= 0 && !hasUsefulValue(mealPreference)) missingMealCount += 1;
       guestRows.push({
         id: `${clean(artifact.id) || clean(artifact.title) || "guest_list"}:guest:${rowIndex}`,
+        personId: null,
         displayName,
         householdLabel,
         rsvpStatus: rsvpStatusLabel(cell(row, rsvpIndex)),
@@ -494,6 +496,7 @@ export function buildWeddingGuestTrackingState(input: {
     if (attendance === "Attending" && !hasUsefulValue(profile.mealPreference ?? "")) missingMealCount += 1;
     guestRows.push({
       id: `boundary:${profile.personId}`,
+      personId: profile.personId,
       displayName: profile.displayName,
       householdLabel,
       rsvpStatus: attendance,

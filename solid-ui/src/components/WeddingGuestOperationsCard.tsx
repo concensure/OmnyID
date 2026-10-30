@@ -37,6 +37,10 @@ export function WeddingGuestOperationsCard(props: {
     mealPreference: string;
     dietaryNote: string;
     accessibilityNote: string;
+    personId?: string;
+    invitationId?: string;
+    eventId?: string;
+    responseRevision?: number;
   }) => Promise<string>;
   onSaveGuestRules?: (input: { plusOneRule: string; childrenRule: string }) => Promise<string>;
 }) {
@@ -89,6 +93,7 @@ export function WeddingGuestOperationsCard(props: {
     const guest = (props.state.guestRows ?? []).find((row) => row.id === guestId);
     if (!guest || savingRsvpId()) return;
     const original = guest.rsvpStatus;
+    const eventResponse = guest.eventResponses[0] ?? null;
     setSavingRsvpId(guestId);
     setSaveNotice(null);
     try {
@@ -104,6 +109,10 @@ export function WeddingGuestOperationsCard(props: {
         mealPreference: guest.mealPreference ?? "",
         dietaryNote: guest.dietaryNote ?? "",
         accessibilityNote: guest.accessibilityNote ?? "",
+        personId: guest.personId ?? undefined,
+        invitationId: eventResponse?.invitationId,
+        eventId: eventResponse?.eventId,
+        responseRevision: eventResponse?.revision ?? 0,
       });
     } catch (error) {
       setSaveNotice(friendlyErrorText(error, "RSVP could not be saved. Try again."));

@@ -1,4 +1,6 @@
-// @locs-version: 1.0
+// @locs-version: 2.0
+import { apiFetch, type AfpMessage } from "@/lib/api";
+import type { WeddingBoundaryEventInvitation } from "@/lib/weddingBoundaryLedgerState";
 export type WeddingRsvpAttendance = "Attending" | "Not attending" | "Pending";
 
 export type WeddingRsvpOperationalState =
@@ -61,6 +63,97 @@ export type WeddingRsvpResponseSummaryState = {
   rows: WeddingRsvpResponseRow[];
   summaryLabel: string;
 };
+
+export type WeddingRsvpResponseCommand = {
+  weddingPlanId: string;
+  responseWorkspaceId: string;
+  invitationId: string;
+  personId: string;
+  eventId: string;
+  attendance: "pending" | "attending" | "not_attending";
+  expectedRevision: number;
+  idempotencyKey: string;
+  privateAnswersCiphertext?: string | null;
+};
+
+export type WeddingRsvpResponseCommandResult = {
+  response: Record<string, unknown>;
+  impact_receipt: Record<string, unknown>;
+  replayed: boolean;
+  explanation: string;
+};
+
+export function recordWeddingRsvpResponse(input: WeddingRsvpResponseCommand) {
+  return apiFetch<WeddingRsvpResponseCommandResult>("/wedding/rsvp/responses", {
+    method: "POST",
+    bodyJson: {
+      wedding_plan_id: input.weddingPlanId,
+      response_workspace_id: input.responseWorkspaceId,
+      invitation_id: input.invitationId,
+      person_id: input.personId,
+      event_id: input.eventId,
+      attendance: input.attendance,
+      expected_revision: input.expectedRevision,
+      idempotency_key: input.idempotencyKey,
+      private_answers_ciphertext: input.privateAnswersCiphertext ?? null,
+    },
+  });
+}
+
+function record(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function number(value: unknown): number | null {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : null;
+}
+
+function messageWorkspaceId(message: AfpMessage): string {
+  const metadata = record(message.metadata);
+  return clean(metadata.responseWorkspaceId ?? metadata.response_workspace_id);
+}
+
+export function weddingRsvpResponseInvitationFromAfpMessage(
+  message: AfpMessage,
+): WeddingBoundaryEventInvitation | null {
+  const content = record(message.content);
+  const kind = clean(message.subtype ?? message.kind ?? content.kind);
+  if (kind !== "wedding_rsvp_response" || !messageWorkspaceId(message)) return null;
+  const invitationId = clean(content.invitation_id);
+  const eventId = clean(content.event_id);
+  const personId = clean(content.person_id);
+  const invitationStatus = clean(content.invitation_status);
+  if (!invitationId || !eventId || !personId || !["invited", "rsvp_yes", "rsvp_no"].includes(invitationStatus)) return null;
+  const source = clean(content.source);
+  return {
+    id: invitationId,
+    kind: "wedding_boundary_event_invitation",
+    title: "Guest RSVP",
+    visibility: "approved_shared",
+    createdBy: source === "guest" ? "guest" : "couple",
+    createdAt: clean(content.responded_at) || message.timestamp,
+    invitationId,
+    eventId,
+    personId,
+    invitationStatus: invitationStatus as WeddingBoundaryEventInvitation["invitationStatus"],
+    responseSource: ["guest", "couple_manual", "import", "system_correction"].includes(source)
+      ? source as WeddingBoundaryEventInvitation["responseSource"]
+      : "couple_manual",
+    respondedAt: clean(content.responded_at) || message.timestamp,
+    lockedAt: clean(content.locked_at) || null,
+    previousInvitationStatus: clean(content.previous_invitation_status) as WeddingBoundaryEventInvitation["previousInvitationStatus"] || null,
+    responseRevision: number(content.revision),
+    plusOneAllowed: content.plus_one_allowed === true,
+    childrenInvited: content.children_invited === true,
+    visibleToGuest: true,
+    metadata: {
+      persisted_afp_message_id: message.id,
+      persisted_rsvp_response: true,
+      response_id: clean(content.response_id),
+      has_private_answers: content.has_private_answers === true,
+    },
+  };
+}
 
 function clean(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";

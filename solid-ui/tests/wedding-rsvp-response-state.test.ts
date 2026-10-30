@@ -4,7 +4,10 @@ import test from "node:test";
 import { weddingBoundaryLedgerObjectToAfpMessage } from "@/lib/weddingBoundaryLedgerState";
 import { buildWeddingGuestBoundaryDraftObjects } from "@/lib/weddingGuestBoundaryDraftState";
 import { weddingPersistedBoundaryObjectFromAfpMessage } from "@/lib/weddingPersistedBoundaryObjectState";
-import { buildWeddingRsvpResponseSummary } from "@/lib/weddingRsvpResponseState";
+import {
+  buildWeddingRsvpResponseSummary,
+  weddingRsvpResponseInvitationFromAfpMessage,
+} from "@/lib/weddingRsvpResponseState";
 
 const metadata = {
   wedding_plan_id: "wedding_plan:rsvp-test",
@@ -109,4 +112,47 @@ test("manual guest draft round-trips response provenance and private logistics t
   assert.equal(restoredInvitation.respondedAt, "2027-01-10T10:00:00Z");
   assert.equal(restoredInvitation.previousInvitationStatus, "invited");
   assert.equal(restoredInvitation.responseRevision, 2);
+});
+
+test("canonical RSVP response projects into the existing invitation identity without exposing private answers", () => {
+  const projected = weddingRsvpResponseInvitationFromAfpMessage({
+    id: "01HRSVPRESPONSE000000000001",
+    thread_id: "01HRSVPTHREAD0000000000001",
+    from: "system://wedding-rsvp",
+    to: ["agent://wedding-planning"],
+    timestamp: "2027-01-11T10:00:00Z",
+    type: "ledger",
+    kind: "wedding_rsvp_response",
+    subtype: "wedding_rsvp_response",
+    content: {
+      kind: "wedding_rsvp_response",
+      contract_version: 1,
+      response_id: "response:alex:2",
+      invitation_id: "invite:alex:reception",
+      event_id: "reception",
+      person_id: "alex",
+      source: "guest",
+      invitation_status: "rsvp_yes",
+      previous_invitation_status: "invited",
+      revision: 2,
+      responded_at: "2027-01-11T10:00:00Z",
+      has_private_answers: true,
+      encrypted_private_payload: "opaque-secret-envelope",
+      plus_one_allowed: true,
+      children_invited: false,
+    },
+    metadata: {
+      responseWorkspaceId: "response_workspace:rsvp-test",
+    },
+  } as never);
+
+  assert.ok(projected);
+  assert.equal(projected?.id, "invite:alex:reception");
+  assert.equal(projected?.invitationId, "invite:alex:reception");
+  assert.equal(projected?.responseSource, "guest");
+  assert.equal(projected?.responseRevision, 2);
+  assert.equal(projected?.previousInvitationStatus, "invited");
+  assert.equal(projected?.plusOneAllowed, true);
+  assert.equal((projected?.metadata as Record<string, unknown>).has_private_answers, true);
+  assert.equal(JSON.stringify(projected).includes("opaque-secret-envelope"), false);
 });

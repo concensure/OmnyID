@@ -18,6 +18,7 @@ import {
   weddingPersistedBoundaryObjectFromAfpMessage,
   weddingPersistedSeatingConstraintFromAfpMessage,
 } from "@/lib/weddingPersistedBoundaryObjectState";
+import { weddingRsvpResponseInvitationFromAfpMessage } from "@/lib/weddingRsvpResponseState";
 import {
   applyWeddingPersistedTaskDateUpdates,
   weddingPersistedTaskDateUpdateFromAfpMessage,
@@ -865,7 +866,8 @@ export function buildWeddingPersistedWorkspaceState(input: {
     return item ? [item] : [];
   });
   const boundaryObjects = coalesceWeddingBoundaryLedgerObjects(scopedMessages.flatMap((message) => {
-    const item = weddingPersistedBoundaryObjectFromAfpMessage(message, metadata);
+    const item = weddingPersistedBoundaryObjectFromAfpMessage(message, metadata)
+      ?? weddingRsvpResponseInvitationFromAfpMessage(message);
     return item ? [item] : [];
   }));
   const seatingConstraints = scopedMessages.flatMap((message) => {
