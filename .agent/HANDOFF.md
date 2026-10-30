@@ -5663,7 +5663,7 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch `agent/codex/W
 
 Next: continue WED-303B with a versioned canonical response event and server-side scope/idempotency validation. Do not build a second guest store, and do not enable a public RSVP capability until WED-303C security evidence exists.
 
-## 2026-10-30 - WED-303B authoritative RSVP response command (Codex, complete)
+## 2026-10-30 - WED-303B authoritative couple-response slice (Codex, implemented)
 
 Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch `agent/codex/WED-303`; exact clean code commit `b110d7e7eed583c51b857139376de47cbc51a19e`.
 
@@ -5674,4 +5674,4 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch `agent/codex/W
 - Exact candidate evidence: TypeScript passed; both line-budget tests passed; all 2,070 Wedding tests passed; six Rust adversarial route tests passed; production build passed. New files are 999 lines or fewer. No deployment was requested or performed.
 - Preserved unrelated untracked evidence at `artifacts/oracle-production-proof-wed298-fb1eb49/` and `solid-ui/artifacts/`.
 
-Next: implement WED-303C digest-only public RSVP capabilities with random tokens, expiry, revocation, event/household scope and false-default availability. Add disposable-Postgres isolation/replay evidence before exposing any public response surface.
+Next: finish WED-303B with disposable-Postgres cross-tenant, changed-replay and concurrent-stale-write evidence, then implement WED-303C digest-only public RSVP capabilities with random tokens, expiry, revocation, event/household scope and false-default availability. Do not expose a public response surface before that evidence exists.
