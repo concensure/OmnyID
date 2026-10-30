@@ -5801,3 +5801,47 @@ Remaining:
   correction/revocation events for exported vendor briefs.
 - Keep `OMNYID_WEDDING_RSVP_PUBLIC_ENABLED` false until hosted accessibility,
   couple/guest usability, flags-off shadow and allowlisted pilot evidence exist.
+## 2026-10-31 - WED-303 RSVP entitlement, audit and reconciliation completion (Codex, in progress)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch
+`agent/codex/WED-303`; current code candidate
+`c8a6c1ea61c7b67af47b4756b51a2abe2b9417ee` before this coordination commit.
+
+Changed:
+
+- Modelled named and unnamed plus-ones and children as separate canonical AFP
+  household guests and event invitations, including child age band, seat and meal
+  requirements. Public capabilities and response events preserve only those
+  bounded entitlement facts.
+- Added false-default RSVP reminder contact permission. Only explicit, valid
+  email contacts can produce candidates; declined/complete households, quiet
+  hours and accepted/delivered receipts are respected. Exact recipient/content
+  approval is durable but explicitly does not send or claim provider acceptance.
+- Added export history with linked corrections and future-use revocations. The
+  UI states that an already-downloaded file cannot be recalled.
+- Made accessibility answers always optional, added deterministic follow-up
+  candidates for configured missing details, bounded A2UI setup/reconciliation
+  intents and one-source count agreement checks across Wedding surfaces.
+- Added a 320-pixel Guest card fixture; its first run found four WCAG contrast
+  failures, which were corrected before the final Axe pass.
+
+Evidence:
+
+- TypeScript, both line budgets, all 2,088 Wedding tests and production build
+  pass.
+- Focused Guest/People Playwright and Axe pass at 320 and 1280 pixels.
+- Seventeen focused RSVP ledger/reminder tests pass. The previously run 13
+  RSVP Rust tests pass against real local PostgreSQL after the entitlement
+  backend changes.
+- Unrelated untracked production-proof directories remain untouched. Nothing
+  was deployed and `OMNYID_WEDDING_RSVP_PUBLIC_ENABLED` remains false.
+
+Remaining:
+
+- Do not expose a client-authored provider receipt. Add a server-authoritative
+  send adapter only if it can reload the exact approved AFP event in the signed-
+  in tenant, reserve one idempotency key, enforce the RSVP send flag and write
+  provider accepted/delivered/failed/retry decisions separately.
+- Then freeze a new full SHA and run hosted accessibility, couple/guest
+  usability, flags-off shadow, allowlisted pilot and exact deployed-SHA/rollback
+  evidence before enabling public collection.
