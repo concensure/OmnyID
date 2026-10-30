@@ -2,7 +2,7 @@ use super::{
     AppState, RateLimitPolicy, auth::authenticated_user, authenticated_rate_limit_key,
     enforce_rate_limit,
 };
-use crate::db::tenant_schema_name;
+use crate::db::{Db, tenant_schema_name};
 use axum::{
     Json, Router,
     extract::State,
@@ -58,11 +58,11 @@ pub(crate) struct RecordResponseRequest {
 }
 
 #[derive(Clone, Debug, Serialize)]
-struct RecordResponseReply {
-    response: Value,
-    impact_receipt: Value,
-    replayed: bool,
-    explanation: String,
+pub(crate) struct RecordResponseReply {
+    pub response: Value,
+    pub impact_receipt: Value,
+    pub replayed: bool,
+    pub explanation: String,
 }
 
 #[derive(Clone, Debug)]
@@ -352,27 +352,35 @@ async fn record_response_http(
     )
     .await?;
     let user = authenticated_user(&state.db, &headers).await?;
+    record_response_for_user(&state.db, &user.id, request)
+        .await
+        .map(Json)
+}
+
+pub(crate) async fn record_response_for_user(
+    db: &Db,
+    owner_user_id: &str,
+    request: RecordResponseRequest,
+) -> Result<RecordResponseReply, (StatusCode, String)> {
     validate_request(&request)?;
-    state
-        .db
-        .ensure_user_private_schema(&user.id)
+    db.ensure_user_private_schema(owner_user_id)
         .await
         .map_err(store_error)?;
-    let table = format!("\"{}\".messages", tenant_schema_name(&user.id));
-    let mut tx = state.db.pool.begin().await.map_err(store_error)?;
+    let table = format!("\"{}\".messages", tenant_schema_name(owner_user_id));
+    let mut tx = db.pool.begin().await.map_err(store_error)?;
     sqlx::query("SELECT pg_advisory_xact_lock(hashtext($1))")
-        .bind(format!("{}:{}", user.id, request.invitation_id))
+        .bind(format!("{}:{}", owner_user_id, request.invitation_id))
         .execute(&mut *tx)
         .await
         .map_err(store_error)?;
     if let Some((response, impact_receipt)) = existing_replay(&mut tx, &table, &request).await? {
         tx.commit().await.map_err(store_error)?;
-        return Ok(Json(RecordResponseReply {
+        return Ok(RecordResponseReply {
             response,
             impact_receipt,
             replayed: true,
             explanation: "This RSVP was already saved; no duplicate changes were made.".into(),
-        }));
+        });
     }
     let authority = invitation_authority(&mut tx, &table, &request)
         .await?
@@ -494,12 +502,12 @@ async fn record_response_http(
     )
     .await?;
     tx.commit().await.map_err(store_error)?;
-    Ok(Json(RecordResponseReply {
+    Ok(RecordResponseReply {
         response,
         impact_receipt: receipt,
         replayed: false,
         explanation:
             "RSVP saved. Guest totals and the Wedding Home guest tile will use this response."
                 .into(),
-    }))
+    })
 }
