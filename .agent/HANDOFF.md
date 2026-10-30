@@ -1,3 +1,44 @@
+## 2026-10-31 - WED-303D controlled RSVP setup and household preview (Codex, in progress)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch
+`agent/codex/WED-303`; exact clean code candidate
+`c41b0f4cab38e979b2f418b4637936f37bcbad7a` before this coordination commit.
+
+Changed:
+
+- Added a mobile-friendly RSVP setup panel to the existing Guests surface,
+  not a parallel guest store. It reuses saved event invitations, accepts a
+  future deadline and a bounded question library, and previews the exact
+  named recipients and plus-one/children entitlements by household.
+- Setup saves as a versioned, couple-only `wedding_rsvp_setup` AFP object.
+  The payload explicitly records `sends_invitation:false`,
+  `creates_capability:false` and `model_calls:0`; it contains no contact,
+  dietary or accessibility answers.
+- Manual responses still use the canonical response command. Public link
+  creation and sending remain separate and unavailable while
+  `OMNYID_WEDDING_RSVP_PUBLIC_ENABLED` is false.
+
+Evidence:
+
+- Exact candidate passed TypeScript, both line budgets, Wedding site/security
+  smoke, all 2,075 Wedding tests and the production build.
+- Five focused setup tests cover deadline/question validation, bounded meal
+  and custom questions, AFP workspace scoping, no-side-effect metadata and
+  household preview privacy.
+- New files are 216, 317 and 196 lines; the modified context panel is 454
+  lines. The unrelated pre-existing untracked artifact directories were not
+  changed. Nothing was deployed and no rollout flag changed.
+
+Remaining:
+
+- Finish WED-303D's named/unnamed plus-one and child age/seat/meal
+  entitlements and explicit confirmation-gated protected-link creation.
+- Then build WED-303E's public mobile response surface against the existing
+  digest-only capability boundary. It must exchange the fragment token
+  without history/telemetry persistence, validate controlled answers on the
+  server, retain focus during validation and keep the rollout flag false until
+  hosted accessibility/privacy evidence passes.
+
 ## 2026-10-30 - WED-303 canonical RSVP response and capability boundary (Codex, in progress)
 
 Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch
