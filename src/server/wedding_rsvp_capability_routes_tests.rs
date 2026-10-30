@@ -310,6 +310,28 @@ async fn disposable_postgres_proves_capability_isolation_rotation_and_revocation
     .expect("expiry audit marker");
     assert!(expired_recorded);
 
+    let audit_events = sqlx::query_scalar::<_, serde_json::Value>(&format!(
+        "SELECT content FROM {table} WHERE metadata->>'origin'='wedding_rsvp_capability' ORDER BY timestamp,id"
+    ))
+    .fetch_all(&db.pool)
+    .await
+    .expect("capability AFP audit events");
+    assert!(audit_events.len() >= 8);
+    let audit_json = serde_json::to_string(&audit_events).expect("serialize capability audit");
+    for secret in [
+        digest_one.clone(),
+        digest_two.clone(),
+        digest_three.clone(),
+        URL_SAFE_NO_PAD.encode([11_u8; 32]),
+        URL_SAFE_NO_PAD.encode([12_u8; 32]),
+        URL_SAFE_NO_PAD.encode([13_u8; 32]),
+    ] {
+        assert!(
+            !audit_json.contains(&secret),
+            "AFP must not contain capability secrets"
+        );
+    }
+
     sqlx::raw_sql(&format!("DROP SCHEMA IF EXISTS \"{owner_schema}\" CASCADE"))
         .execute(&db.pool)
         .await

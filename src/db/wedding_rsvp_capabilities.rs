@@ -1,7 +1,7 @@
 use super::{Db, tenant_schema_name};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{Value, json};
 use sqlx::{Postgres, Row, Transaction};
 use std::collections::{HashMap, HashSet};
 
@@ -86,6 +86,51 @@ fn metadata_scope(alias: &str, plan_parameter: usize, workspace_parameter: usize
     format!(
         "COALESCE({alias}.metadata->>'weddingPlanId',{alias}.metadata->>'wedding_plan_id')=${plan_parameter} AND COALESCE({alias}.metadata->>'responseWorkspaceId',{alias}.metadata->>'response_workspace_id')=${workspace_parameter}"
     )
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn insert_lifecycle_event(
+    tx: &mut Transaction<'_, Postgres>,
+    owner_user_id: &str,
+    grant_id: &str,
+    wedding_plan_id: &str,
+    response_workspace_id: &str,
+    household_id: &str,
+    invitation_ids: &[String],
+    event: &str,
+    event_id: &str,
+    detail: Value,
+) -> Result<(), sqlx::Error> {
+    let table = format!("\"{}\".messages", tenant_schema_name(owner_user_id));
+    let kind = format!("wedding_rsvp_capability_{event}");
+    let content = json!({
+        "kind": kind,
+        "contract_version": 1,
+        "capability_id": grant_id,
+        "wedding_plan_id": wedding_plan_id,
+        "response_workspace_id": response_workspace_id,
+        "household_id": household_id,
+        "invitation_ids": invitation_ids,
+        "detail": detail,
+    });
+    let query = format!(
+        "INSERT INTO {table} (id,thread_id,from_agent,to_agents,timestamp,type,kind,subtype,content,signature,store_in_relational,metadata) VALUES ($1,$2,'omnyid://wedding/rsvp-capability','[\"agent://wedding\"]'::jsonb,NOW(),$3,$4,$4,$5,'server:wedding-rsvp-capability:v1',TRUE,$6) ON CONFLICT(id) DO NOTHING"
+    );
+    sqlx::query(&query)
+        .bind(event_id)
+        .bind(format!("wedding_rsvp_capability:{response_workspace_id}"))
+        .bind("ledger")
+        .bind(&kind)
+        .bind(content)
+        .bind(json!({
+            "origin": "wedding_rsvp_capability",
+            "weddingPlanId": wedding_plan_id,
+            "responseWorkspaceId": response_workspace_id,
+            "capabilityId": grant_id,
+        }))
+        .execute(&mut **tx)
+        .await?;
+    Ok(())
 }
 
 async fn invitation_scope(
@@ -235,6 +280,19 @@ impl Db {
             .fetch_one(&mut *tx)
             .await?;
         let result = summary(&row)?;
+        insert_lifecycle_event(
+            &mut tx,
+            owner_user_id,
+            &result.grant_id,
+            &result.wedding_plan_id,
+            &result.response_workspace_id,
+            &result.household_id,
+            &result.invitation_ids,
+            "granted",
+            &format!("rsvp-capability-granted:{}", result.grant_id),
+            json!({"expires_at": result.expires_at}),
+        )
+        .await?;
         tx.commit().await?;
         Ok(Some(result))
     }
@@ -260,19 +318,39 @@ impl Db {
         owner_user_id: &str,
         grant_id: &str,
     ) -> Result<Option<WeddingRsvpCapabilityGrantSummary>, sqlx::Error> {
-        sqlx::query(
+        let mut tx = self.pool.begin().await?;
+        let updated = sqlx::query(
             "UPDATE wedding_rsvp_capability_grants SET revoked_at=COALESCE(revoked_at,NOW()) WHERE grant_id=$1 AND owner_user_id=$2",
         )
         .bind(grant_id)
         .bind(owner_user_id)
-        .execute(&self.pool)
+        .execute(&mut *tx)
         .await?;
+        if updated.rows_affected() == 0 {
+            tx.rollback().await?;
+            return Ok(None);
+        }
         let row = sqlx::query(&grant_select("grant_id=$1 AND owner_user_id=$2"))
             .bind(grant_id)
             .bind(owner_user_id)
-            .fetch_optional(&self.pool)
+            .fetch_one(&mut *tx)
             .await?;
-        row.as_ref().map(summary).transpose()
+        let result = summary(&row)?;
+        insert_lifecycle_event(
+            &mut tx,
+            owner_user_id,
+            &result.grant_id,
+            &result.wedding_plan_id,
+            &result.response_workspace_id,
+            &result.household_id,
+            &result.invitation_ids,
+            "revoked",
+            &format!("rsvp-capability-revoked:{}", result.grant_id),
+            json!({}),
+        )
+        .await?;
+        tx.commit().await?;
+        Ok(Some(result))
     }
 
     pub async fn rotate_wedding_rsvp_capability_grant(
@@ -338,6 +416,19 @@ impl Db {
             .fetch_one(&mut *tx)
             .await?;
         let result = summary(&row)?;
+        insert_lifecycle_event(
+            &mut tx,
+            owner_user_id,
+            &result.grant_id,
+            &result.wedding_plan_id,
+            &result.response_workspace_id,
+            &result.household_id,
+            &result.invitation_ids,
+            "regenerated",
+            &format!("rsvp-capability-regenerated:{}", result.grant_id),
+            json!({"replaces_capability_id": input.source_grant_id}),
+        )
+        .await?;
         tx.commit().await?;
         Ok(Some(result))
     }
@@ -371,6 +462,28 @@ impl Db {
             .bind(&grant_id)
             .execute(&mut *tx)
             .await?;
+            if expires_at <= Utc::now() {
+                let owner_user_id: String = row.try_get("owner_user_id")?;
+                let wedding_plan_id: String = row.try_get("wedding_plan_id")?;
+                let response_workspace_id: String = row.try_get("response_workspace_id")?;
+                let household_id: String = row.try_get("household_id")?;
+                let invitation_ids =
+                    serde_json::from_value::<Vec<String>>(row.try_get("invitation_ids")?)
+                        .unwrap_or_default();
+                insert_lifecycle_event(
+                    &mut tx,
+                    &owner_user_id,
+                    &grant_id,
+                    &wedding_plan_id,
+                    &response_workspace_id,
+                    &household_id,
+                    &invitation_ids,
+                    "expired",
+                    &format!("rsvp-capability-expired:{grant_id}"),
+                    json!({}),
+                )
+                .await?;
+            }
             tx.commit().await?;
             return Ok(None);
         }
@@ -392,11 +505,24 @@ impl Db {
         else {
             return Ok(None);
         };
-        sqlx::query(
-            "UPDATE wedding_rsvp_capability_grants SET open_count=open_count+1,last_opened_at=NOW() WHERE grant_id=$1",
+        let open_count: i64 = sqlx::query_scalar(
+            "UPDATE wedding_rsvp_capability_grants SET open_count=open_count+1,last_opened_at=NOW() WHERE grant_id=$1 RETURNING open_count",
         )
         .bind(&grant_id)
-        .execute(&mut *tx)
+        .fetch_one(&mut *tx)
+        .await?;
+        insert_lifecycle_event(
+            &mut tx,
+            &owner_user_id,
+            &grant_id,
+            &wedding_plan_id,
+            &response_workspace_id,
+            &household_id,
+            &invitation_ids,
+            "opened",
+            &format!("rsvp-capability-opened:{grant_id}:{open_count}"),
+            json!({"open_count": open_count}),
+        )
         .await?;
         tx.commit().await?;
         Ok(Some(WeddingRsvpCapabilityScope {
