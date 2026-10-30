@@ -22,6 +22,7 @@ export type WeddingRsvpReconciliationState = {
   lateChangeExceptions: WeddingRsvpReconciliationCandidate[];
   connectedChangeLabels: string[];
   sourceReferences: string[];
+  a2ui: Record<string, unknown>;
 };
 
 function clean(value: unknown): string {
@@ -37,6 +38,7 @@ export function buildWeddingRsvpReconciliationState(input: {
   eventId?: string | null;
   contractedHeadcount?: number | null;
   estimatedCostPerGuest?: number | null;
+  requiredQuestionIds?: readonly string[] | null;
 }): WeddingRsvpReconciliationState {
   const eventId = clean(input.eventId) || null;
   const rows = input.guestTracking.guestRows ?? [];
@@ -49,6 +51,7 @@ export function buildWeddingRsvpReconciliationState(input: {
   });
   const missingDetailCandidates: WeddingRsvpReconciliationCandidate[] = [];
   const lateChangeExceptions: WeddingRsvpReconciliationCandidate[] = [];
+  const requiredQuestionIds = new Set(input.requiredQuestionIds ?? []);
   for (const row of attendingRows) {
     const sourceReferences = unique([
       `guest:${row.id}`,
@@ -63,6 +66,26 @@ export function buildWeddingRsvpReconciliationState(input: {
         guestLabel: row.displayName,
         kind: "meal",
         label: `${row.displayName} still needs a meal choice.`,
+        sourceReferences,
+      });
+    }
+    if (requiredQuestionIds.has("dietary_requirements") && !clean(row.dietaryNote)) {
+      missingDetailCandidates.push({
+        id: `rsvp-follow-up:${row.id}:dietary`,
+        guestId: row.id,
+        guestLabel: row.displayName,
+        kind: "dietary",
+        label: `${row.displayName} still needs to answer the required dietary question. Do not infer it from their meal choice.`,
+        sourceReferences,
+      });
+    }
+    if (requiredQuestionIds.has("accessibility_requirements") && !clean(row.accessibilityNote)) {
+      missingDetailCandidates.push({
+        id: `rsvp-follow-up:${row.id}:accessibility`,
+        guestId: row.id,
+        guestLabel: row.displayName,
+        kind: "accessibility",
+        label: `${row.displayName} has not answered the legacy required accessibility question. Keep it optional in future invitations.`,
         sourceReferences,
       });
     }
@@ -114,5 +137,27 @@ export function buildWeddingRsvpReconciliationState(input: {
         : "No locked response changes need review.",
     ],
     sourceReferences,
+    a2ui: {
+      schema_version: "a2ui.v1",
+      kind: "wedding_rsvp_reconciliation",
+      status: missingDetailCandidates.length + lateChangeExceptions.length > 0 ? "needs_review" : "ready",
+      actions: [
+        ...(missingDetailCandidates.length > 0 ? [{
+          intent: "wedding.rsvp.review_incomplete",
+          label: `Review ${missingDetailCandidates.length} missing detail${missingDetailCandidates.length === 1 ? "" : "s"}`,
+          target_ids: missingDetailCandidates.map((candidate) => candidate.id),
+        }] : []),
+        ...(lateChangeExceptions.length > 0 ? [{
+          intent: "wedding.rsvp.review_late_change",
+          label: `Review ${lateChangeExceptions.length} late change${lateChangeExceptions.length === 1 ? "" : "s"}`,
+          target_ids: lateChangeExceptions.map((candidate) => candidate.id),
+        }] : []),
+        {
+          intent: "wedding.rsvp.preview_vendor_brief",
+          label: "Preview minimum-necessary vendor brief",
+          target_ids: eventId ? [eventId] : [],
+        },
+      ],
+    },
   };
 }

@@ -57,6 +57,12 @@ export type WeddingRsvpSetupEventOption = {
   invitationCount: number;
 };
 
+export type WeddingRsvpSetupDraftResult = {
+  setup: WeddingRsvpSetupState | null;
+  errorLabels: string[];
+  a2ui: Record<string, unknown>;
+};
+
 export type WeddingRsvpInvitationPreview = {
   householdId: string | null;
   householdLabel: string;
@@ -125,7 +131,7 @@ function normalizedQuestions(input: WeddingRsvpSetupDraftInput): WeddingRsvpQues
   return QUESTION_LIBRARY.map((question) => ({
     ...question,
     enabled: enabled.has(question.id),
-    required: enabled.has(question.id) && required.has(question.id),
+    required: question.id === "attendance" || (enabled.has(question.id) && required.has(question.id) && question.id !== "accessibility_requirements"),
     prompt: question.id === "custom_text" && enabled.has(question.id) ? customPrompt || null : null,
     options: question.id === "meal_choice" && enabled.has(question.id) ? mealOptions : [],
   }));
@@ -136,7 +142,7 @@ export function buildWeddingRsvpSetupDraft(
   metadataInput?: unknown,
   currentRevision = 0,
   nowIso = new Date().toISOString(),
-): { setup: WeddingRsvpSetupState | null; errorLabels: string[] } {
+): WeddingRsvpSetupDraftResult {
   const metadata = normalizeWeddingPlanningMetadata(metadataInput);
   const eventId = clean(input.eventId);
   const eventLabel = clean(input.eventLabel).slice(0, 120);
@@ -155,7 +161,17 @@ export function buildWeddingRsvpSetupDraft(
       ? "Add at least two meal choices or turn meal choice off."
       : null,
   ].filter((label): label is string => Boolean(label));
-  if (errorLabels.length > 0) return { setup: null, errorLabels };
+  const a2ui = {
+    schema_version: "a2ui.v1",
+    kind: "wedding_rsvp_setup_review",
+    status: errorLabels.length > 0 ? "needs_input" : "ready",
+    gaps: errorLabels.map((label, index) => ({ id: `rsvp_setup_gap:${index + 1}`, label })),
+    actions: [
+      { intent: "wedding.rsvp.preview_invitations", label: "Preview invitations", enabled: errorLabels.length === 0 },
+      { intent: "wedding.rsvp.save_setup", label: "Save RSVP setup", enabled: errorLabels.length === 0 },
+    ],
+  };
+  if (errorLabels.length > 0) return { setup: null, errorLabels, a2ui };
   return {
     setup: {
       setupId: `wedding_rsvp_setup:${safeWeddingLabel(metadata.responseWorkspaceId)}:${safeWeddingLabel(eventId)}`,
@@ -172,6 +188,7 @@ export function buildWeddingRsvpSetupDraft(
       updatedAt: nowIso,
     },
     errorLabels,
+    a2ui,
   };
 }
 
@@ -198,7 +215,7 @@ function setupFromMessage(message: AfpMessage): WeddingRsvpSetupState | null {
     return {
       ...question,
       enabled,
-      required: question.id === "attendance" || (enabled && stored?.required === true),
+      required: question.id === "attendance" || (enabled && stored?.required === true && question.id !== "accessibility_requirements"),
       prompt: question.id === "custom_text" ? clean(stored?.prompt).slice(0, 160) || null : null,
       options: question.id === "meal_choice" ? strings(stored?.options).slice(0, 8) : [],
     };

@@ -179,12 +179,13 @@ export function WeddingRsvpSetupPanel(props: {
                     <input type="checkbox" class="mt-0.5 h-5 w-5 accent-teal-700" checked={enabled()} disabled={question.id === "attendance"} onChange={(event) => toggleEnabled(question.id, event.currentTarget.checked)} />
                     <span>{question.label}{question.sensitive ? <span class="ml-1 text-xs font-medium text-teal-700">Private</span> : null}</span>
                   </label>
-                  <Show when={enabled() && question.id !== "attendance"}>
+                  <Show when={enabled() && question.id !== "attendance" && question.id !== "accessibility_requirements"}>
                     <label class="mt-2 flex min-h-8 items-center gap-2 text-xs font-semibold text-teal-950/70">
                       <input type="checkbox" class="h-4 w-4 accent-teal-700" checked={required()} onChange={(event) => toggleRequired(question.id, event.currentTarget.checked)} />
                       Required to complete RSVP
                     </label>
                   </Show>
+                  <Show when={question.id === "accessibility_requirements" && enabled()}><p class="mt-2 text-xs leading-5 text-teal-800">Always optional. A guest can RSVP without disclosing access needs.</p></Show>
                 </div>
               );
             }}

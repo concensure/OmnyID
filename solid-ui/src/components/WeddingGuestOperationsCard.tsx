@@ -496,7 +496,7 @@ export function WeddingGuestOperationsCard(props: {
           <div class="flex flex-wrap items-start justify-between gap-2">
             <div class="min-w-0">
               <p class="text-xs font-semibold text-sky-950/70">Guest RSVP quick actions</p>
-              <p class="mt-1 text-xs leading-5 text-sky-950/60">Choose a status to save it to this wedding guest list.</p>
+              <p class="mt-1 text-xs leading-5 text-sky-950/75">Choose a status to save it to this wedding guest list.</p>
             </div>
             <Show when={(props.state.guestRows?.length ?? 0) > guestRows().length}>
               <span class="max-w-full break-words rounded-full bg-sky-50 px-2 py-1 text-xs font-semibold text-sky-900">
@@ -511,7 +511,7 @@ export function WeddingGuestOperationsCard(props: {
                   <div class="flex flex-wrap items-start justify-between gap-2">
                     <div class="min-w-0">
                       <p class="break-words text-sm font-semibold text-sky-950">{guest.displayName}</p>
-                      <p class="mt-0.5 break-words text-xs leading-4 text-sky-950/60">
+                      <p class="mt-0.5 break-words text-xs leading-4 text-sky-950/75">
                         {guest.householdLabel} - {guest.sourceLabel}
                       </p>
                       <Show when={guest.responseDetail}>
@@ -548,7 +548,7 @@ export function WeddingGuestOperationsCard(props: {
                     </For>
                   </div>
                   <Show when={[guest.mealPreference, guest.dietaryNote, guest.accessibilityNote].some(Boolean)}>
-                    <p class="mt-2 break-words text-xs leading-4 text-sky-950/60">
+                    <p class="mt-2 break-words text-xs leading-4 text-sky-950/75">
                       {[guest.mealPreference, guest.dietaryNote, guest.accessibilityNote].filter(Boolean).join(" - ")}
                     </p>
                   </Show>
@@ -558,7 +558,7 @@ export function WeddingGuestOperationsCard(props: {
                     </p>
                   </Show>
                   <Show when={guest.responseDetail?.privacyLabel}>
-                    <p class="mt-1 break-words text-xs leading-4 text-sky-950/60">
+                    <p class="mt-1 break-words text-xs leading-4 text-sky-950/75">
                       {guest.responseDetail?.privacyLabel}
                     </p>
                   </Show>
@@ -616,7 +616,7 @@ export function WeddingGuestOperationsCard(props: {
                     </span>
                   </div>
                   <p class="mt-1 text-xs leading-5 text-sky-950/70">{option.recommendationLabel}</p>
-                  <p class="mt-1 text-xs leading-5 text-sky-950/60">{option.riskLabel}</p>
+                  <p class="mt-1 text-xs leading-5 text-sky-950/75">{option.riskLabel}</p>
                 </article>
               )}
             </For>
@@ -671,7 +671,7 @@ function GuestSwitchRow(props: { label: string; hint: string; checked: boolean; 
     >
       <span class="min-w-0">
         <span class="block text-sm font-semibold text-sky-950">{props.label}</span>
-        <span class="block text-xs text-sky-950/60">{props.hint}</span>
+        <span class="block text-xs text-sky-950/75">{props.hint}</span>
       </span>
       <span class={`relative h-7 w-12 shrink-0 rounded-full border-2 border-sky-950 transition ${props.checked ? "bg-sky-800" : "bg-white"}`} aria-hidden="true">
         <span class={`absolute top-0.5 h-5 w-5 rounded-full border border-sky-950 bg-white shadow transition-all ${props.checked ? "left-5" : "left-0.5"}`} />

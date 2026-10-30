@@ -11,6 +11,7 @@ for (const viewport of [{ width: 320, height: 720 }, { width: 1280, height: 800 
     await expect(page.getByRole("button", { name: /17 replies waiting/ })).toBeVisible();
     await expect(page.locator('[data-people-action="guests"]')).toContainText("Manage Guests & Boundaries");
     await expect(page.locator('[data-people-action="seating"]')).toContainText("Open Seating Plan");
+    await expect(page.locator("[data-rsvp-guest-card]").getByText("Guests", { exact: true })).toBeVisible();
 
     const brand = await page.evaluate(() => {
       const card = getComputedStyle(document.querySelector('[data-people-action="guests"]')!);
@@ -39,6 +40,15 @@ for (const viewport of [{ width: 320, height: 720 }, { width: 1280, height: 800 
     await page.getByRole("button", { name: /12 seats unassigned/ }).click();
     await expect(page.getByRole("status")).toHaveText("Opened seating");
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+
+    if (viewport.width === 320) {
+      await page.getByRole("button", { name: "Add or group guest" }).click();
+      await expect(page.getByLabel("Name")).toBeVisible();
+      await expect(page.getByLabel("Household or group")).toBeVisible();
+      await page.getByText("Add contact, meal, or access notes").click();
+      await expect(page.getByText(/Allow RSVP reminders to this contact only/)).toBeVisible();
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+    }
 
     const accessibility = await new AxeBuilder({ page }).analyze();
     expect(accessibility.violations.filter(({ impact }) => impact === "serious" || impact === "critical")).toEqual([]);

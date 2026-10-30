@@ -47,7 +47,7 @@ Status: in progress
 - [x] guest tracking multi-event and rehydration tests.
 - [x] persisted boundary object round-trip tests.
 - [x] Home overview shared-count tests.
-- [ ] Guest card render and 320-pixel layout tests.
+- [x] Guest card render and 320-pixel layout tests.
 
 ## WED-303B — canonical response event and command validation
 
@@ -87,7 +87,7 @@ Depends on: WED-303B
 - [x] Add per-person/per-event entitlements, named/unnamed plus-one and child age/seat/meal requirements.
 - [x] Preview the exact invitation for each household before publishing.
 - [x] Add paper/phone/manual-response flow through the canonical response command.
-- [ ] Add A2UI cards for setup gaps and bounded actions.
+- [x] Add A2UI cards for setup gaps and bounded actions.
 - [x] Make publish/send an explicit, confirmation-gated action.
 
 Acceptance: setup changes existing AFP records; preview and link creation send nothing; no free-form schema can bypass field/privacy rules.
@@ -114,11 +114,11 @@ Depends on: WED-303B
 
 - [x] Update seating eligibility/unassigned counts from canonical attendance.
 - [x] Update catering/headcount projection while preserving contractual commitments.
-- [ ] Create deterministic missing-meal/dietary/accessibility follow-up candidates.
+- [x] Create deterministic missing-meal/dietary/accessibility follow-up candidates.
 - [x] Create late-change exception after catering/seating lock rather than overwriting committed state.
 - [x] Show connected-change explanation and source links.
 - [x] Add final-count and budget-impact tests.
-- [ ] Prove Home, Guests, People, Seating and export count agreement.
+- [x] Prove Home, Guests, People, Seating and export count agreement.
 
 Acceptance: a response is entered once and every dependent view reconciles; no vendor commitment changes silently.
 

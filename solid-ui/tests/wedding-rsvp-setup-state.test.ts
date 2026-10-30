@@ -206,3 +206,30 @@ test("invitation preview groups exact household recipients without leaking priva
   assert.equal(previews[0]?.recipients[1]?.childrenInvited, true);
   assert.doesNotMatch(JSON.stringify(previews), /example\.test|private allergy|private access|vegetarian/i);
 });
+
+test("accessibility remains optional even when a stale or forged draft asks to require it", () => {
+  const setup = buildWeddingRsvpSetupDraft({
+    eventId: "wedding_event:main_wedding",
+    eventLabel: "Wedding day",
+    responseDeadline: "2027-03-01",
+    enabledQuestionIds: ["accessibility_requirements"],
+    requiredQuestionIds: ["accessibility_requirements"],
+  }, metadata, 0, "2027-02-01T00:00:00Z").setup!;
+  assert.equal(setup.questions.find((question) => question.id === "accessibility_requirements")?.required, false);
+});
+
+test("setup gaps and valid actions expose bounded A2UI intents", () => {
+  const result = buildWeddingRsvpSetupDraft({
+    eventId: "",
+    eventLabel: "",
+    responseDeadline: "",
+    enabledQuestionIds: [],
+    requiredQuestionIds: [],
+  }, metadata, 0, "2027-02-01T00:00:00Z");
+  assert.equal(result.a2ui.schema_version, "a2ui.v1");
+  assert.equal(result.a2ui.kind, "wedding_rsvp_setup_review");
+  assert.equal(result.a2ui.status, "needs_input");
+  assert.ok(Array.isArray(result.a2ui.gaps));
+  assert.ok((result.a2ui.actions as Array<{ intent: string; enabled: boolean }>).every((action) => action.intent.startsWith("wedding.rsvp.") && action.enabled === false));
+  assert.doesNotMatch(JSON.stringify(result.a2ui), /token|private note|contact/i);
+});

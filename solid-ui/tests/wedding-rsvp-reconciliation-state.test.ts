@@ -30,14 +30,21 @@ function fixture(): WeddingGuestTrackingState {
 }
 
 test("reconciliation keeps seating, catering, budget and commitments explainable", () => {
-  const state = buildWeddingRsvpReconciliationState({ guestTracking: fixture(), eventId: "event:wedding", contractedHeadcount: 1, estimatedCostPerGuest: 180 });
+  const state = buildWeddingRsvpReconciliationState({ guestTracking: fixture(), eventId: "event:wedding", contractedHeadcount: 1, estimatedCostPerGuest: 180, requiredQuestionIds: ["meal_choice", "dietary_requirements"] });
   assert.equal(state.seatingEligibleCount, 2);
   assert.equal(state.cateringHeadcount, 2);
   assert.equal(state.contractualVariance, 1);
   assert.equal(state.estimatedBudgetImpact, 360);
   assert.deepEqual(state.attendingGuestIds, ["guest:alex", "guest:sam"]);
   assert.equal(state.missingDetailCandidates[0]?.kind, "meal");
+  assert.ok(state.missingDetailCandidates.some((candidate) => candidate.kind === "dietary" && candidate.guestId === "guest:sam"));
   assert.equal(state.lateChangeExceptions.length, 1);
   assert.match(state.connectedChangeLabels.join(" "), /No vendor commitment was changed|saved vendor commitment remains/i);
   assert.ok(state.sourceReferences.includes("invitation:invite:alex"));
+  assert.equal(state.a2ui.schema_version, "a2ui.v1");
+  assert.deepEqual((state.a2ui.actions as Array<{ intent: string }>).map((action) => action.intent), [
+    "wedding.rsvp.review_incomplete",
+    "wedding.rsvp.review_late_change",
+    "wedding.rsvp.preview_vendor_brief",
+  ]);
 });

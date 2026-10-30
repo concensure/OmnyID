@@ -54,6 +54,7 @@ export function WeddingRsvpOperationsPanel(props: {
   const reconciliation = createMemo(() => buildWeddingRsvpReconciliationState({
     guestTracking: props.guestTracking,
     eventId: props.setup.eventId,
+    requiredQuestionIds: props.setup.questions.filter((question) => question.required).map((question) => question.id),
   }));
   const reminderReceipts = createMemo(() => weddingRsvpReminderReceiptsFromAfpMessages(props.afpMessages));
   const reminders = createMemo(() => {

@@ -2,8 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { buildWeddingGuestBoundaryDraftObjects } from "../src/lib/weddingGuestBoundaryDraftState.ts";
+import { buildWeddingHomeOverviewActionTiles } from "../src/lib/weddingHomeOverviewState.ts";
 import { buildWeddingInspirationItem } from "../src/lib/weddingInspirationState.ts";
+import { buildWeddingRsvpReconciliationState } from "../src/lib/weddingRsvpReconciliationState.ts";
+import { buildWeddingRsvpVendorExportPreview } from "../src/lib/weddingRsvpExportState.ts";
 import { buildWeddingResponseWorkspaceViewState } from "../src/lib/weddingResponseWorkspaceViewState.ts";
+import { buildWeddingPeopleAggregateState } from "../src/lib/weddingWorkspaceAggregateState.ts";
 import {
   weddingResponseWorkspaceMetadata as metadata,
 } from "./wedding-response-workspace-fixtures.ts";
@@ -85,6 +89,16 @@ test("buildWeddingResponseWorkspaceViewState counts saved boundary guests in gue
     && item.sourceSurface === "tasks"
     && item.evidenceLabels.includes("seating action"),
   ));
+  const eventId = state.guestTracking.guestRows[0]?.eventResponses[0]?.eventId ?? "";
+  const homeGuestTile = buildWeddingHomeOverviewActionTiles(state).find((tile) => tile.id === "guests");
+  const peopleGuestSummary = buildWeddingPeopleAggregateState(state).summaryItems?.find((item) => item.id === "guests");
+  const reconciliation = buildWeddingRsvpReconciliationState({ guestTracking: state.guestTracking, eventId });
+  const catererExport = buildWeddingRsvpVendorExportPreview({ guestTracking: state.guestTracking, eventId, audience: "caterer" });
+  assert.equal(homeGuestTile?.valueLabel, "1");
+  assert.equal(peopleGuestSummary?.label, "1 guest");
+  assert.equal(state.seatingPlan.guestRowsConsidered, state.guestTracking.attendingCount);
+  assert.equal(reconciliation.cateringHeadcount, state.guestTracking.attendingCount);
+  assert.equal(catererExport.rowCount, state.guestTracking.attendingCount);
 });
 
 test("buildWeddingResponseWorkspaceViewState exposes seating draft tracking", () => {
