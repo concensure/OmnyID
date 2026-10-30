@@ -135,10 +135,6 @@ pub(crate) fn validate_expected_revision(
     current_revision: i64,
 ) -> Result<(), (StatusCode, String)> {
     if expected_revision != current_revision {
-        #[cfg(test)]
-        eprintln!(
-            "RSVP revision conflict: expected={expected_revision}, current={current_revision}"
-        );
         return Err(conflict(
             "This RSVP changed on another screen. Refresh before saving your answer.",
         ));
@@ -178,9 +174,13 @@ fn request_fingerprint(request: &RecordResponseRequest) -> String {
     hex::encode(Sha256::digest(canonical.to_string().as_bytes()))
 }
 
-fn metadata_scope_clause(alias: &str) -> String {
+fn metadata_scope_clause(
+    alias: &str,
+    wedding_plan_parameter: usize,
+    response_workspace_parameter: usize,
+) -> String {
     format!(
-        "(COALESCE({alias}.metadata->>'weddingPlanId',{alias}.metadata->>'wedding_plan_id')=$2 AND COALESCE({alias}.metadata->>'responseWorkspaceId',{alias}.metadata->>'response_workspace_id')=$3)"
+        "(COALESCE({alias}.metadata->>'weddingPlanId',{alias}.metadata->>'wedding_plan_id')=${wedding_plan_parameter} AND COALESCE({alias}.metadata->>'responseWorkspaceId',{alias}.metadata->>'response_workspace_id')=${response_workspace_parameter})"
     )
 }
 
@@ -237,7 +237,7 @@ async fn invitation_authority(
     table: &str,
     request: &RecordResponseRequest,
 ) -> Result<Option<InvitationAuthority>, (StatusCode, String)> {
-    let scope = metadata_scope_clause("m");
+    let scope = metadata_scope_clause("m", 2, 3);
     let query = format!(
         "SELECT m.content FROM {table} m WHERE m.kind='wedding_boundary_event_invitation' AND m.content->>'invitation_id'=$1 AND {scope} ORDER BY m.timestamp DESC,m.id DESC LIMIT 1"
     );
@@ -288,7 +288,7 @@ async fn latest_response(
     table: &str,
     request: &RecordResponseRequest,
 ) -> Result<Option<Value>, (StatusCode, String)> {
-    let scope = metadata_scope_clause("m");
+    let scope = metadata_scope_clause("m", 3, 4);
     let query = format!(
         "SELECT m.content FROM {table} m WHERE m.kind=$1 AND m.content->>'invitation_id'=$2 AND {scope} ORDER BY (m.content->>'revision')::bigint DESC,m.timestamp DESC LIMIT 1"
     );
