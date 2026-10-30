@@ -1,3 +1,44 @@
+## 2026-10-30 - WED-303 canonical RSVP response and capability boundary (Codex, in progress)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch
+`agent/codex/WED-303`; exact clean code candidate
+`fdc06a854c4331a6051aee3f5727356c30408ba0` before this coordination commit.
+
+Changed:
+
+- Extracted the authenticated RSVP command behind a directly testable tenant
+  service and corrected its latest-response scope placeholders. Response plus
+  impact receipt remain one AFP transaction with revision and idempotency
+  guards.
+- Added migration 0127 and a separate household/invitation capability service:
+  256-bit token, digest-only storage, exact account/wedding/workspace/household
+  scope, expiry, rotation, revocation, constant unavailable responses and
+  bounded open/create rates.
+- Capability opening reprojects only invitation-safe fields from the owner's
+  tenant AFP ledger. Grant/open/rotate/revoke/expiry lifecycle events are AFP
+  records without the raw token or digest. The public RSVP flag remains false.
+
+Evidence:
+
+- Ten combined RSVP Rust tests pass against local disposable Postgres,
+  including cross-account/wedding/household refusal, forged references,
+  collision, replay, concurrent response revision, expiry, rotation,
+  revocation, atomic response receipts and AFP secret scanning.
+- The migration catalog test, TypeScript, both line budgets, Wedding site
+  smoke, all 2,070 Wedding tests and production UI build pass.
+- Failed-test fixtures were removed from `omnyid_test`; the final inspection
+  found zero matching RSVP users or schemas. No production database, flag or
+  deployment changed.
+
+Remaining:
+
+- Finish WED-303B controlled-question/required-field entitlement checks as part
+  of WED-303D setup rather than accepting arbitrary fields.
+- Build WED-303D controlled RSVP setup/preview in the existing Guests surface,
+  then WED-303E's public mobile page against this capability boundary. Keep
+  `OMNYID_WEDDING_RSVP_PUBLIC_ENABLED` false until those slices and hosted
+  accessibility/privacy evidence pass.
+
 ## 2026-10-29 - WED-293 saved views and safe print preview (Codex, in progress)
 
 Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch `agent/codex/WED-293`; exact clean code candidate `65eeda8573de6c8686512259dab1f2397d409c41`.

@@ -1,3 +1,26 @@
+## 2026-10-30: RSVP capabilities are household-scoped and operationally separate from run-sheet shares
+
+WED-303C follows the proven run-sheet security pattern but does not reuse its
+table. A run-sheet grant binds saved-view revisions and record IDs; an RSVP
+grant binds one account, wedding plan, response workspace, household and a
+bounded set of invitations. Generalising the former would weaken both schemas
+and make cross-household errors easier, so migration 0127 adds a content-light
+RSVP-specific operational index.
+
+The browser receives 256 random bits only at grant creation or rotation. The
+database stores only the SHA-256 digest. AFP lifecycle events record the opaque
+capability ID, exact scope, expiry and bounded open count, never the bearer or
+its digest. Opening reprojects current invitation-safe names and entitlements
+from the owner's existing tenant AFP ledger; private contact, dietary and
+accessibility fields are not copied into the grant or public response.
+
+Create and regenerate remain unavailable unless
+`OMNYID_WEDDING_RSVP_PUBLIC_ENABLED=true`; list and revoke remain available so
+an operator or couple can inspect and close grants after disabling rollout.
+Invalid, expired and revoked tokens share one response shape. The flag remains
+false. WED-303D/E must add controlled question entitlement and the public guest
+surface before any rollout decision.
+
 ## 2026-10-28: Provider acceptance, delivery and tenant persistence are separate evidence
 
 WED-286 never treats an accepted or queued Email Sending response as mailbox

@@ -53,14 +53,14 @@ Status: in progress
 
 Depends on: WED-303A
 
-- [ ] Define a versioned `wedding_rsvp_response.v1` AFP object compatible with the A projection.
-- [ ] Add random response IDs, invitation/person/event references, source, revision, idempotency key and supersedes reference.
-- [ ] Separate public attendance from encrypted private answer payloads.
+- [x] Define a versioned `wedding_rsvp_response.v1` AFP object compatible with the A projection.
+- [x] Add random response IDs, invitation/person/event references, source, revision, idempotency key and supersedes reference.
+- [x] Separate public attendance from encrypted private answer payloads.
 - [ ] Add server validation for wedding/invitation/event scope, entitlements, controlled questions, required fields and response lock.
-- [ ] Append response and impact receipt atomically; reject stale revisions and replay exact idempotency keys.
-- [ ] Project the response object into the same `WeddingGuestTrackingState` contract.
-- [ ] Add deterministic consequence explanations for Home, seating, catering, tasks and final count.
-- [ ] Add cross-account, cross-wedding, cross-household and forged-reference tests.
+- [x] Append response and impact receipt atomically; reject stale revisions and replay exact idempotency keys.
+- [x] Project the response object into the same `WeddingGuestTrackingState` contract.
+- [x] Add deterministic consequence explanations for Home, seating, catering, tasks and final count.
+- [x] Add cross-account, cross-wedding, cross-household and forged-reference tests.
 
 Acceptance: a valid command produces one response event and one bounded impact receipt; retries do not double-count; invalid scope fails closed without revealing guest existence.
 
@@ -68,13 +68,13 @@ Acceptance: a valid command produces one response event and one bounded impact r
 
 Depends on: WED-303B
 
-- [ ] Add a migration for invitation capability digests, scope, expiry, revocation and rate-limit metadata only if existing share-grant infrastructure cannot be safely generalized.
-- [ ] Reuse the run-sheet share grant security pattern where applicable: 256-bit token, digest at rest, exact scope, expiry, revoke and constant-shape errors.
-- [ ] Generate/regenerate/revoke links through authenticated couple commands.
-- [ ] Prevent raw capability values in AFP, logs, traces and analytics.
-- [ ] Add open/submit throttles and abuse telemetry without answer content.
-- [ ] Add disposable-Postgres tests for collision, expiry, revocation, replay and concurrent submission.
-- [ ] Keep the production flag false.
+- [x] Add a migration for invitation capability digests, scope, expiry, revocation and rate-limit metadata only if existing share-grant infrastructure cannot be safely generalized.
+- [x] Reuse the run-sheet share grant security pattern where applicable: 256-bit token, digest at rest, exact scope, expiry, revoke and constant-shape errors.
+- [x] Generate/regenerate/revoke links through authenticated couple commands.
+- [x] Prevent raw capability values in AFP, logs, traces and analytics.
+- [x] Add open/submit throttles and abuse telemetry without answer content.
+- [x] Add disposable-Postgres tests for collision, expiry, revocation, replay and concurrent submission.
+- [x] Keep the production flag false.
 
 Acceptance: only a live capability can read the exact invitation scope; a capability cannot enumerate or reach another household, wedding or account.
 
