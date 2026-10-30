@@ -241,10 +241,13 @@ async fn disposable_postgres_proves_tenant_replay_atomicity_and_concurrency() {
         record_response_for_user(&db, &owner, left),
         record_response_for_user(&db, &owner, right),
     );
-    assert!(matches!(
-        (&left_result, &right_result),
-        (Ok(_), Err((StatusCode::CONFLICT, _))) | (Err((StatusCode::CONFLICT, _)), Ok(_))
-    ));
+    assert!(
+        matches!(
+            (&left_result, &right_result),
+            (Ok(_), Err((StatusCode::CONFLICT, _))) | (Err((StatusCode::CONFLICT, _)), Ok(_))
+        ),
+        "expected one winner and one stale conflict; left={left_result:?}, right={right_result:?}"
+    );
 
     let response_count: i64 = sqlx::query_scalar(&format!(
         "SELECT COUNT(*) FROM {owner_table} WHERE kind='wedding_rsvp_response'"
