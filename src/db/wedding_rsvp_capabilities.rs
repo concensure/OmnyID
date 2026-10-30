@@ -119,10 +119,11 @@ async fn invitation_scope(
     let values = values
         .into_iter()
         .filter_map(|value| {
-            value
+            let invitation_id = value
                 .get("invitation_id")
                 .and_then(Value::as_str)
-                .map(|id| (id.to_string(), value))
+                .map(str::to_string)?;
+            Some((invitation_id, value))
         })
         .collect::<HashMap<_, _>>();
     let profile_query = format!(

@@ -69,7 +69,7 @@ fn bad_request(message: &str) -> (StatusCode, String) {
 }
 
 fn store_error(error: sqlx::Error) -> (StatusCode, String) {
-    tracing::error!(error_kind = %error.as_database_error().map(|value| value.kind().to_string()).unwrap_or_else(|| "storage".into()), "Wedding RSVP capability persistence failed");
+    tracing::error!(error_kind = %error.as_database_error().map(|value| format!("{:?}", value.kind())).unwrap_or_else(|| "storage".into()), "Wedding RSVP capability persistence failed");
     (
         StatusCode::SERVICE_UNAVAILABLE,
         "RSVP invitations are temporarily unavailable.".into(),
