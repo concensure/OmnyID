@@ -135,6 +135,10 @@ pub(crate) fn validate_expected_revision(
     current_revision: i64,
 ) -> Result<(), (StatusCode, String)> {
     if expected_revision != current_revision {
+        #[cfg(test)]
+        eprintln!(
+            "RSVP revision conflict: expected={expected_revision}, current={current_revision}"
+        );
         return Err(conflict(
             "This RSVP changed on another screen. Refresh before saving your answer.",
         ));
