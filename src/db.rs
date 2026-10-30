@@ -41,7 +41,7 @@ pub use wedding_runsheet_projection::{
 mod wedding_runsheet_sharing;
 pub use wedding_runsheet_sharing::{WeddingRunSheetHostedView, WeddingRunSheetShareAcknowledgement, WeddingRunSheetShareGrantCreate, WeddingRunSheetShareGrantSummary};
 mod wedding_rsvp_capabilities;
-pub use wedding_rsvp_capabilities::{WeddingRsvpCapabilityGrantCreate, WeddingRsvpCapabilityGrantRotation, WeddingRsvpCapabilityGrantSummary, WeddingRsvpCapabilityInvitation, WeddingRsvpCapabilityScope};
+pub use wedding_rsvp_capabilities::{WeddingRsvpCapabilityGrantCreate, WeddingRsvpCapabilityGrantRotation, WeddingRsvpCapabilityGrantSummary, WeddingRsvpCapabilityInvitation, WeddingRsvpCapabilityScope, WeddingRsvpCapabilitySubmissionAuthority};
 mod wedding_vendor_contact_schedule;
 mod wedding_vendor_directory;
 pub mod wedding_vendor_evidence;

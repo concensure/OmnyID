@@ -14,7 +14,11 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use sqlx::{Postgres, Transaction};
-use std::{sync::Arc, time::Duration};
+use std::{
+    collections::{BTreeMap, HashMap, HashSet},
+    sync::Arc,
+    time::Duration,
+};
 use ulid::Ulid;
 
 const RESPONSE_KIND: &str = "wedding_rsvp_response";
@@ -54,6 +58,10 @@ pub(crate) struct RecordResponseRequest {
     pub attendance: Attendance,
     pub expected_revision: i64,
     pub idempotency_key: String,
+    #[serde(default)]
+    pub answers: BTreeMap<String, String>,
+    #[serde(default)]
+    pub private_answer_question_ids: Vec<String>,
     pub private_answers_ciphertext: Option<String>,
 }
 
@@ -74,6 +82,34 @@ pub(crate) struct InvitationAuthority {
     pub locked_at: Option<String>,
     pub plus_one_allowed: bool,
     pub children_invited: bool,
+}
+
+#[derive(Clone, Copy)]
+enum ResponseSource {
+    CoupleManual,
+    Guest,
+}
+
+impl ResponseSource {
+    fn label(self) -> &'static str {
+        match self {
+            Self::CoupleManual => "couple_manual",
+            Self::Guest => "guest",
+        }
+    }
+
+    fn origin(self) -> &'static str {
+        match self {
+            Self::CoupleManual => "authenticated_couple_rsvp",
+            Self::Guest => "protected_guest_rsvp",
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct CapabilityProof {
+    pub capability_id: String,
+    pub token_digest: String,
 }
 
 fn valid_id(value: &str) -> bool {
@@ -114,6 +150,27 @@ pub(crate) fn validate_request(
     }
     if request.expected_revision < 0 {
         return Err(bad_request("The RSVP revision is invalid."));
+    }
+    if request.answers.len() > 8
+        || request.answers.iter().any(|(key, value)| {
+            !valid_id(key)
+                || value.trim().is_empty()
+                || value.chars().count() > 400
+                || value.chars().any(|character| character.is_control())
+        })
+        || request.private_answer_question_ids.len() > 8
+        || request
+            .private_answer_question_ids
+            .iter()
+            .any(|id| !valid_id(id))
+        || request
+            .private_answer_question_ids
+            .iter()
+            .collect::<HashSet<_>>()
+            .len()
+            != request.private_answer_question_ids.len()
+    {
+        return Err(bad_request("The RSVP answers are invalid."));
     }
     if request
         .private_answers_ciphertext
@@ -160,6 +217,159 @@ pub(crate) fn validate_invitation_scope(
     Ok(())
 }
 
+fn controlled_question(id: &str) -> Option<bool> {
+    match id {
+        "attendance" | "meal_choice" => Some(false),
+        "dietary_requirements"
+        | "accessibility_requirements"
+        | "travel_plan"
+        | "accommodation"
+        | "custom_text" => Some(true),
+        _ => None,
+    }
+}
+
+pub(crate) fn validate_controlled_answers(
+    request: &RecordResponseRequest,
+    setup: &Value,
+) -> Result<(), (StatusCode, String)> {
+    let questions = setup
+        .get("questions")
+        .and_then(Value::as_array)
+        .ok_or_else(|| bad_request("This RSVP is not configured for responses."))?;
+    let mut enabled = HashMap::new();
+    for question in questions {
+        let id = question.get("id").and_then(Value::as_str).unwrap_or("");
+        let Some(sensitive) = controlled_question(id) else {
+            return Err(bad_request("This RSVP contains an unsupported question."));
+        };
+        if question.get("enabled").and_then(Value::as_bool) != Some(true)
+            || enabled
+                .insert(
+                    id,
+                    (
+                        sensitive,
+                        id == "attendance"
+                            || question.get("required").and_then(Value::as_bool) == Some(true),
+                        question.get("options").and_then(Value::as_array),
+                    ),
+                )
+                .is_some()
+        {
+            return Err(bad_request("This RSVP question setup is invalid."));
+        }
+    }
+    if !enabled.contains_key("attendance") {
+        return Err(bad_request("This RSVP is missing its attendance question."));
+    }
+    if request.attendance == Attendance::NotAttending {
+        if !request.answers.is_empty()
+            || !request.private_answer_question_ids.is_empty()
+            || request.private_answers_ciphertext.is_some()
+        {
+            return Err(bad_request(
+                "Declined guests should not submit attendee-only answers.",
+            ));
+        }
+        return Ok(());
+    }
+    if request.attendance == Attendance::Pending {
+        return Err(bad_request("Choose attending or not attending."));
+    }
+    for key in request.answers.keys() {
+        let Some((sensitive, _, options)) = enabled.get(key.as_str()) else {
+            return Err(bad_request("That RSVP question is not enabled."));
+        };
+        if *sensitive || key == "attendance" {
+            return Err(bad_request("Private RSVP answers must stay encrypted."));
+        }
+        if key == "meal_choice"
+            && !options.is_some_and(|values| {
+                values
+                    .iter()
+                    .filter_map(Value::as_str)
+                    .any(|value| value == request.answers[key])
+            })
+        {
+            return Err(bad_request("Choose one of the available meal options."));
+        }
+    }
+    let private_ids = request
+        .private_answer_question_ids
+        .iter()
+        .map(String::as_str)
+        .collect::<HashSet<_>>();
+    for id in &private_ids {
+        if !enabled.get(id).is_some_and(|(sensitive, _, _)| *sensitive) {
+            return Err(bad_request("That private RSVP question is not enabled."));
+        }
+    }
+    if private_ids.is_empty() != request.private_answers_ciphertext.is_none() {
+        return Err(bad_request(
+            "Private RSVP answers require one encrypted envelope.",
+        ));
+    }
+    for (id, (sensitive, required, _)) in &enabled {
+        if id == &"attendance" || !required {
+            continue;
+        }
+        let present = if *sensitive {
+            private_ids.contains(id)
+        } else {
+            request.answers.contains_key(*id)
+        };
+        if !present {
+            return Err(bad_request(format!("Answer the required {id} question.")));
+        }
+    }
+    Ok(())
+}
+
+async fn response_setup(
+    tx: &mut Transaction<'_, Postgres>,
+    table: &str,
+    request: &RecordResponseRequest,
+) -> Result<Option<Value>, (StatusCode, String)> {
+    let scope = metadata_scope_clause("m", 2, 3);
+    let query = format!(
+        "SELECT m.content FROM {table} m WHERE m.kind='wedding_rsvp_setup' AND m.content->>'event_id'=$1 AND {scope} ORDER BY (m.content->>'revision')::bigint DESC,m.timestamp DESC,m.id DESC LIMIT 1"
+    );
+    sqlx::query_scalar::<_, Value>(&query)
+        .bind(&request.event_id)
+        .bind(&request.wedding_plan_id)
+        .bind(&request.response_workspace_id)
+        .fetch_optional(&mut **tx)
+        .await
+        .map_err(store_error)
+}
+
+async fn validate_capability_proof(
+    tx: &mut Transaction<'_, Postgres>,
+    owner_user_id: &str,
+    request: &RecordResponseRequest,
+    proof: &CapabilityProof,
+) -> Result<(), (StatusCode, String)> {
+    let live = sqlx::query_scalar::<_, i32>(
+        "SELECT 1 FROM wedding_rsvp_capability_grants WHERE grant_id=$1 AND token_digest=$2 AND owner_user_id=$3 AND wedding_plan_id=$4 AND response_workspace_id=$5 AND revoked_at IS NULL AND expires_at>NOW() AND invitation_ids ? $6 FOR SHARE",
+    )
+    .bind(&proof.capability_id)
+    .bind(&proof.token_digest)
+    .bind(owner_user_id)
+    .bind(&request.wedding_plan_id)
+    .bind(&request.response_workspace_id)
+    .bind(&request.invitation_id)
+    .fetch_optional(&mut **tx)
+    .await
+    .map_err(store_error)?;
+    if live.is_none() {
+        return Err((
+            StatusCode::NOT_FOUND,
+            "This RSVP invitation is not available.".into(),
+        ));
+    }
+    Ok(())
+}
+
 fn request_fingerprint(request: &RecordResponseRequest) -> String {
     let canonical = json!({
         "wedding_plan_id": request.wedding_plan_id,
@@ -169,6 +379,8 @@ fn request_fingerprint(request: &RecordResponseRequest) -> String {
         "event_id": request.event_id,
         "attendance": request.attendance,
         "expected_revision": request.expected_revision,
+        "answers": request.answers,
+        "private_answer_question_ids": request.private_answer_question_ids,
         "private_answers_ciphertext": request.private_answers_ciphertext,
     });
     hex::encode(Sha256::digest(canonical.to_string().as_bytes()))
@@ -366,6 +578,39 @@ pub(crate) async fn record_response_for_user(
     owner_user_id: &str,
     request: RecordResponseRequest,
 ) -> Result<RecordResponseReply, (StatusCode, String)> {
+    record_response_for_user_with_source(
+        db,
+        owner_user_id,
+        request,
+        ResponseSource::CoupleManual,
+        None,
+    )
+    .await
+}
+
+pub(crate) async fn record_guest_response_for_user(
+    db: &Db,
+    owner_user_id: &str,
+    request: RecordResponseRequest,
+    proof: CapabilityProof,
+) -> Result<RecordResponseReply, (StatusCode, String)> {
+    record_response_for_user_with_source(
+        db,
+        owner_user_id,
+        request,
+        ResponseSource::Guest,
+        Some(proof),
+    )
+    .await
+}
+
+async fn record_response_for_user_with_source(
+    db: &Db,
+    owner_user_id: &str,
+    request: RecordResponseRequest,
+    source: ResponseSource,
+    capability: Option<CapabilityProof>,
+) -> Result<RecordResponseReply, (StatusCode, String)> {
     validate_request(&request)?;
     db.ensure_user_private_schema(owner_user_id)
         .await
@@ -377,6 +622,9 @@ pub(crate) async fn record_response_for_user(
         .execute(&mut *tx)
         .await
         .map_err(store_error)?;
+    if let Some(proof) = capability.as_ref() {
+        validate_capability_proof(&mut tx, owner_user_id, &request, proof).await?;
+    }
     if let Some((response, impact_receipt)) = existing_replay(&mut tx, &table, &request).await? {
         tx.commit().await.map_err(store_error)?;
         return Ok(RecordResponseReply {
@@ -393,6 +641,15 @@ pub(crate) async fn record_response_for_user(
             "That invitation is not available in this wedding.".into(),
         ))?;
     validate_invitation_scope(&request, &authority)?;
+    if matches!(source, ResponseSource::Guest)
+        || !request.answers.is_empty()
+        || !request.private_answer_question_ids.is_empty()
+    {
+        let setup = response_setup(&mut tx, &table, &request)
+            .await?
+            .ok_or_else(|| bad_request("This RSVP is not configured for responses."))?;
+        validate_controlled_answers(&request, &setup)?;
+    }
     let latest = latest_response(&mut tx, &table, &request).await?;
     let current_revision = latest
         .as_ref()
@@ -419,8 +676,11 @@ pub(crate) async fn record_response_for_user(
         "invitation_id": request.invitation_id,
         "person_id": request.person_id,
         "event_id": request.event_id,
-        "source": "couple_manual",
+        "source": source.label(),
+        "capability_id": capability.as_ref().map(|value| value.capability_id.as_str()),
         "attendance": request.attendance,
+        "answers": request.answers,
+        "private_answer_question_ids": request.private_answer_question_ids,
         "invitation_status": invitation_status,
         "previous_invitation_status": previous_status,
         "revision": revision,
@@ -454,7 +714,7 @@ pub(crate) async fn record_response_for_user(
         "weddingPlanId": request.wedding_plan_id,
         "responseWorkspaceId": request.response_workspace_id,
         "idempotency_key": request.idempotency_key,
-        "origin": "authenticated_couple_rsvp",
+        "origin": source.origin(),
         "model_calls": 0,
         "e2ee_required": request.private_answers_ciphertext.is_some(),
         "private_fields": if request.private_answers_ciphertext.is_some() { vec!["encrypted_private_payload"] } else { Vec::<&str>::new() },

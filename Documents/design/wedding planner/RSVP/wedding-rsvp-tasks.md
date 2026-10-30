@@ -56,7 +56,7 @@ Depends on: WED-303A
 - [x] Define a versioned `wedding_rsvp_response.v1` AFP object compatible with the A projection.
 - [x] Add random response IDs, invitation/person/event references, source, revision, idempotency key and supersedes reference.
 - [x] Separate public attendance from encrypted private answer payloads.
-- [ ] Add server validation for wedding/invitation/event scope, entitlements, controlled questions, required fields and response lock.
+- [x] Add server validation for wedding/invitation/event scope, entitlements, controlled questions, required fields and response lock.
 - [x] Append response and impact receipt atomically; reject stale revisions and replay exact idempotency keys.
 - [x] Project the response object into the same `WeddingGuestTrackingState` contract.
 - [x] Add deterministic consequence explanations for Home, seating, catering, tasks and final count.
@@ -83,12 +83,12 @@ Acceptance: only a live capability can read the exact invitation scope; a capabi
 Depends on: WED-303B
 
 - [x] Add event setup/reuse, deadline and controlled question library to the existing Guests surface.
-- [ ] Support attendance, meal choice, dietary/allergy category + detail, accessibility, travel, accommodation and a bounded custom question.
+- [x] Support attendance, meal choice, dietary/allergy category + detail, accessibility, travel, accommodation and a bounded custom question.
 - [ ] Add per-person/per-event entitlements, named/unnamed plus-one and child age/seat/meal requirements.
 - [x] Preview the exact invitation for each household before publishing.
 - [x] Add paper/phone/manual-response flow through the canonical response command.
 - [ ] Add A2UI cards for setup gaps and bounded actions.
-- [ ] Make publish/send an explicit, confirmation-gated action.
+- [x] Make publish/send an explicit, confirmation-gated action.
 
 Acceptance: setup changes existing AFP records; preview and link creation send nothing; no free-form schema can bypass field/privacy rules.
 
@@ -96,15 +96,15 @@ Acceptance: setup changes existing AFP records; preview and link creation send n
 
 Depends on: WED-303C, WED-303D
 
-- [ ] Add a small public RSVP route that exchanges a capability without persisting it in browser history or telemetry.
-- [ ] Render couple/event identity, named recipients and only entitled fields.
-- [ ] Add household shortcut with visible per-person results.
-- [ ] Apply conditional steps so declined guests skip irrelevant questions.
-- [ ] Show collection notice before sensitive fields and make optional fields explicit.
-- [ ] Add review, submit receipt and amendment flow.
-- [ ] Provide generic invalid/expired/revoked states and a safe couple-contact fallback.
-- [ ] Add 320/375/1280 pixel, 200% zoom, keyboard, screen-reader and slow-network tests.
-- [ ] Keep attribution optional and secondary; never require account creation.
+- [x] Add a small public RSVP route that exchanges a capability without persisting it in browser history or telemetry.
+- [x] Render couple/event identity, named recipients and only entitled fields.
+- [x] Add household shortcut with visible per-person results.
+- [x] Apply conditional steps so declined guests skip irrelevant questions.
+- [x] Show collection notice before sensitive fields and make optional fields explicit.
+- [x] Add review, submit receipt and amendment flow.
+- [x] Provide generic invalid/expired/revoked states and a safe couple-contact fallback.
+- [x] Add 320/375/1280 pixel, 200% zoom, keyboard, screen-reader and slow-network tests.
+- [x] Keep attribution optional and secondary; never require account creation.
 
 Acceptance: the core no-special-needs path is short and comprehensible, no other household data is visible, focus survives validation, and one submission produces one AFP response.
 
@@ -112,12 +112,12 @@ Acceptance: the core no-special-needs path is short and comprehensible, no other
 
 Depends on: WED-303B
 
-- [ ] Update seating eligibility/unassigned counts from canonical attendance.
-- [ ] Update catering/headcount projection while preserving contractual commitments.
+- [x] Update seating eligibility/unassigned counts from canonical attendance.
+- [x] Update catering/headcount projection while preserving contractual commitments.
 - [ ] Create deterministic missing-meal/dietary/accessibility follow-up candidates.
-- [ ] Create late-change exception after catering/seating lock rather than overwriting committed state.
-- [ ] Show connected-change explanation and source links.
-- [ ] Add final-count and budget-impact tests.
+- [x] Create late-change exception after catering/seating lock rather than overwriting committed state.
+- [x] Show connected-change explanation and source links.
+- [x] Add final-count and budget-impact tests.
 - [ ] Prove Home, Guests, People, Seating and export count agreement.
 
 Acceptance: a response is entered once and every dependent view reconciles; no vendor commitment changes silently.
@@ -126,10 +126,10 @@ Acceptance: a response is entered once and every dependent view reconciles; no v
 
 Depends on: WED-303B, WED-303C
 
-- [ ] Build household-level outstanding/reminder candidates from the shared projector.
+- [x] Build household-level outstanding/reminder candidates from the shared projector.
 - [ ] Respect deadline, viewed/responded state, quiet hours, contact permissions and prior reminder receipt.
-- [ ] Allow optional deterministic template or requested small-model draft.
-- [ ] Persist any generated draft with sources, model/cost, approval and revision history.
+- [x] Allow optional deterministic template or requested small-model draft.
+- [x] Persist any generated draft with sources, model/cost, approval and revision history.
 - [ ] Require exact recipient/content/channel preview and approval before sending.
 - [ ] Record provider acceptance, delivery/failure and retry decisions separately.
 - [ ] Never message declined/complete households or use contacts for marketing.
@@ -140,12 +140,12 @@ Acceptance: reminders are deduplicated, approval-gated and limited to outstandin
 
 Depends on: WED-303F
 
-- [ ] Add couple CSV export with provenance and event-specific responses.
-- [ ] Add caterer and venue projections over the same guest IDs.
-- [ ] Exclude contact, private notes and accessibility details by default.
-- [ ] Require exact field/recipient preview and explicit approval for a vendor brief.
+- [x] Add couple CSV export with provenance and event-specific responses.
+- [x] Add caterer and venue projections over the same guest IDs.
+- [x] Exclude contact, private notes and accessibility details by default.
+- [x] Require exact field/recipient preview and explicit approval for a vendor brief.
 - [ ] Record export/share receipt, correction and revocation where supported.
-- [ ] Distinguish allergy, coeliac and preference; never infer health facts from meal choice.
+- [x] Distinguish allergy, coeliac and preference; never infer health facts from meal choice.
 
 Acceptance: exports reconcile with the UI and every sensitive vendor field has purpose, preview and approval evidence.
 

@@ -3,6 +3,29 @@ use crate::db::{Db, WeddingRsvpCapabilityGrantCreate, WeddingRsvpCapabilityGrant
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use chrono::{Duration as ChronoDuration, Utc};
 use serde_json::json;
+use sha2::{Digest, Sha256};
+
+fn token_for(label: &str) -> String {
+    URL_SAFE_NO_PAD.encode(Sha256::digest(label.as_bytes()))
+}
+
+async fn drop_test_schema(db: &Db, schema: &str) {
+    for attempt in 0..8 {
+        match sqlx::raw_sql(&format!("DROP SCHEMA IF EXISTS \"{schema}\" CASCADE"))
+            .execute(&db.pool)
+            .await
+        {
+            Ok(_) => return,
+            Err(error)
+                if error.as_database_error().is_some_and(|value| value.code().as_deref() == Some("40P01")) && attempt < 7 =>
+            {
+                tokio::time::sleep(std::time::Duration::from_millis(100 * (attempt + 1))).await;
+            }
+            Err(error) => panic!("drop RSVP capability test schema: {error:?}"),
+        }
+    }
+    panic!("RSVP capability test schema cleanup did not complete");
+}
 
 fn create_request(expires_at: String) -> CreateRequest {
     CreateRequest {
@@ -94,6 +117,37 @@ async fn insert_scope_fixture(
         .expect("insert invitation");
 }
 
+async fn insert_setup_fixture(db: &Db, table: &str) {
+    let insert = format!(
+        "INSERT INTO {table} (id,thread_id,from_agent,to_agents,timestamp,type,kind,subtype,content,signature,store_in_relational,metadata) VALUES ($1,'rsvp-capability-test','test','[]'::jsonb,NOW(),'ledger','wedding_rsvp_setup','wedding_rsvp_setup',$2,'test',TRUE,$3)"
+    );
+    sqlx::query(&insert)
+        .bind(ulid::Ulid::new().to_string())
+        .bind(json!({
+            "setup_id": "wedding_rsvp_setup:test:ceremony",
+            "revision": 1,
+            "status": "draft",
+            "host_label": "Alex and Taylor",
+            "event_id": "wedding_event:primary:ceremony",
+            "event_label": "Wedding ceremony",
+            "response_deadline": "2027-10-01",
+            "encryption_key_id": "wedding-rsvp-test-key",
+            "encryption_public_key_hex": "11".repeat(32),
+            "questions": [
+                {"id":"attendance","enabled":true,"required":true,"sensitive":false},
+                {"id":"meal_choice","enabled":true,"required":true,"sensitive":false,"options":["Vegetarian","Chicken"]},
+                {"id":"dietary_requirements","enabled":true,"required":false,"sensitive":true}
+            ]
+        }))
+        .bind(json!({
+            "weddingPlanId": "wedding_plan:primary",
+            "responseWorkspaceId": "response_workspace:primary"
+        }))
+        .execute(&db.pool)
+        .await
+        .expect("insert RSVP setup");
+}
+
 #[tokio::test]
 async fn disposable_postgres_proves_capability_isolation_rotation_and_revocation() {
     let database_url = std::env::var("OMNYID_RSVP_TEST_DATABASE_URL")
@@ -129,6 +183,7 @@ async fn disposable_postgres_proves_capability_isolation_rotation_and_revocation
     let table = format!("\"{owner_schema}\".messages");
     let invitation_id = "wedding_invitation:primary:alex:ceremony";
     let other_invitation_id = "wedding_invitation:primary:sam:ceremony";
+    insert_setup_fixture(&db, &table).await;
     insert_scope_fixture(
         &db,
         &table,
@@ -146,7 +201,8 @@ async fn disposable_postgres_proves_capability_isolation_rotation_and_revocation
     )
     .await;
 
-    let digest_one = token_digest(&URL_SAFE_NO_PAD.encode([11_u8; 32])).expect("digest one");
+    let token_one = token_for(&format!("{unique}:one"));
+    let digest_one = token_digest(&token_one).expect("digest one");
     let expires_at = Utc::now() + ChronoDuration::days(2);
     let invalid_scope = db
         .create_wedding_rsvp_capability_grant(
@@ -157,7 +213,7 @@ async fn disposable_postgres_proves_capability_isolation_rotation_and_revocation
                 response_workspace_id: "response_workspace:primary".into(),
                 household_id: "wedding_household:primary:rivera".into(),
                 invitation_ids: vec![invitation_id.into(), other_invitation_id.into()],
-                token_digest: token_digest(&URL_SAFE_NO_PAD.encode([10_u8; 32]))
+                token_digest: token_digest(&token_for(&format!("{unique}:invalid")))
                     .expect("invalid scope digest"),
                 expires_at,
             },
@@ -208,9 +264,13 @@ async fn disposable_postgres_proves_capability_isolation_rotation_and_revocation
     assert_eq!(opened.household_id, "wedding_household:primary:rivera");
     assert_eq!(opened.invitations.len(), 1);
     assert_eq!(opened.invitations[0].display_name, "Alex Rivera");
+    assert_eq!(opened.host_label, "Alex and Taylor");
+    assert_eq!(opened.event_label, "Wedding ceremony");
+    assert_eq!(opened.questions.len(), 3);
+    assert_eq!(opened.questions[2].id, "dietary_requirements");
     let opened_json = serde_json::to_string(&opened).expect("serialize safe scope");
     assert!(!opened_json.contains("private@example.invalid"));
-    assert!(!opened_json.contains("dietary"));
+    assert!(!opened_json.contains("private dietary detail"));
     let (left, right) = tokio::join!(
         db.open_wedding_rsvp_capability(&digest_one),
         db.open_wedding_rsvp_capability(&digest_one),
@@ -234,7 +294,8 @@ async fn disposable_postgres_proves_capability_isolation_rotation_and_revocation
         .await;
     assert!(collision.is_err(), "digest collision must be rejected");
 
-    let digest_two = token_digest(&URL_SAFE_NO_PAD.encode([12_u8; 32])).expect("digest two");
+    let token_two = token_for(&format!("{unique}:two"));
+    let digest_two = token_digest(&token_two).expect("digest two");
     let rotated = db
         .rotate_wedding_rsvp_capability_grant(
             &owner,
@@ -271,7 +332,8 @@ async fn disposable_postgres_proves_capability_isolation_rotation_and_revocation
             .is_none()
     );
 
-    let digest_three = token_digest(&URL_SAFE_NO_PAD.encode([13_u8; 32])).expect("digest three");
+    let token_three = token_for(&format!("{unique}:three"));
+    let digest_three = token_digest(&token_three).expect("digest three");
     let expiring_id = format!("rsvp-capability-expiring-{unique}");
     db.create_wedding_rsvp_capability_grant(
         &owner,
@@ -322,9 +384,9 @@ async fn disposable_postgres_proves_capability_isolation_rotation_and_revocation
         digest_one.clone(),
         digest_two.clone(),
         digest_three.clone(),
-        URL_SAFE_NO_PAD.encode([11_u8; 32]),
-        URL_SAFE_NO_PAD.encode([12_u8; 32]),
-        URL_SAFE_NO_PAD.encode([13_u8; 32]),
+        token_one,
+        token_two,
+        token_three,
     ] {
         assert!(
             !audit_json.contains(&secret),
@@ -332,19 +394,11 @@ async fn disposable_postgres_proves_capability_isolation_rotation_and_revocation
         );
     }
 
-    sqlx::raw_sql(&format!("DROP SCHEMA IF EXISTS \"{owner_schema}\" CASCADE"))
-        .execute(&db.pool)
-        .await
-        .expect("drop owner schema");
-    sqlx::raw_sql(&format!(
-        "DROP SCHEMA IF EXISTS \"{outsider_schema}\" CASCADE"
-    ))
-    .execute(&db.pool)
-    .await
-    .expect("drop outsider schema");
     sqlx::query("DELETE FROM users WHERE id=ANY($1)")
         .bind(vec![owner, outsider])
         .execute(&db.pool)
         .await
         .expect("remove disposable RSVP capability users");
+    drop_test_schema(&db, &owner_schema).await;
+    drop_test_schema(&db, &outsider_schema).await;
 }

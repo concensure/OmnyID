@@ -1,7 +1,9 @@
 // @locs-version: 1.0
 import { For, Show, createMemo, createSignal } from "solid-js";
 
+import { WeddingRsvpPublishingPanel } from "@/components/WeddingRsvpPublishingPanel";
 import type { WeddingGuestTrackingState } from "@/lib/weddingGuestTrackingState";
+import { ensureWeddingRsvpCoupleKey } from "@/lib/weddingRsvpCoupleKeys";
 import {
   buildWeddingRsvpInvitationPreviews,
   buildWeddingRsvpSetupDraft,
@@ -43,6 +45,7 @@ export function WeddingRsvpSetupPanel(props: {
   const [eventChoice, setEventChoice] = createSignal(props.current?.eventId ?? eventOptions()[0]?.id ?? "new_event");
   const [newEventLabel, setNewEventLabel] = createSignal("Wedding day");
   const [deadline, setDeadline] = createSignal(props.current?.responseDeadline ?? dateAfterToday(28));
+  const [hostLabel, setHostLabel] = createSignal(props.current?.hostLabel ?? "The couple");
   const [enabledQuestions, setEnabledQuestions] = createSignal<WeddingRsvpQuestionId[]>(currentQuestionIds);
   const [requiredQuestions, setRequiredQuestions] = createSignal<WeddingRsvpQuestionId[]>(currentRequiredIds);
   const [customPrompt, setCustomPrompt] = createSignal(
@@ -67,6 +70,7 @@ export function WeddingRsvpSetupPanel(props: {
   const draft = createMemo(() => buildWeddingRsvpSetupDraft({
     eventId: eventId(),
     eventLabel: eventLabel(),
+    hostLabel: hostLabel(),
     responseDeadline: deadline(),
     enabledQuestionIds: enabledQuestions(),
     requiredQuestionIds: requiredQuestions(),
@@ -109,8 +113,14 @@ export function WeddingRsvpSetupPanel(props: {
     setSaving(true);
     setNotice(null);
     try {
-      const savedNotice = await props.onSave(result.setup);
-      setLocalSetup(result.setup);
+      const key = await ensureWeddingRsvpCoupleKey(metadata.responseWorkspaceId);
+      const securedSetup = {
+        ...result.setup,
+        encryptionKeyId: key.keyId,
+        encryptionPublicKeyHex: key.publicKeyHex,
+      };
+      const savedNotice = await props.onSave(securedSetup);
+      setLocalSetup(securedSetup);
       setNotice(savedNotice);
     } catch (error) {
       setNotice(friendlyErrorText(error, "RSVP setup could not be saved. Try again."));
@@ -144,6 +154,10 @@ export function WeddingRsvpSetupPanel(props: {
           <input type="date" min={new Date().toISOString().slice(0, 10)} class="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-teal-950 focus:border-teal-500 focus:ring-2 focus:ring-teal-100" value={deadline()} onInput={(event) => setDeadline(event.currentTarget.value)} />
         </label>
       </div>
+      <label class="mt-3 block min-w-0 text-xs font-semibold text-teal-950/75">
+        Names shown to guests
+        <input maxlength="120" class="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-teal-950 focus:border-teal-500 focus:ring-2 focus:ring-teal-100" value={hostLabel()} onInput={(event) => setHostLabel(event.currentTarget.value)} placeholder="Priya and Daniel" />
+      </label>
       <Show when={eventChoice() === "new_event"}>
         <label class="mt-3 block min-w-0 text-xs font-semibold text-teal-950/75">
           Event name
@@ -222,6 +236,7 @@ export function WeddingRsvpSetupPanel(props: {
           </Show>
         </div>
       </Show>
+      <Show when={localSetup()}>{(setup) => <WeddingRsvpPublishingPanel setup={setup()} guestTracking={props.guestTracking} metadata={metadata} />}</Show>
     </section>
   );
 }

@@ -1,0 +1,142 @@
+// @locs-version: 1.0
+import { For, Show, createMemo, createSignal } from "solid-js";
+
+import { WeddingConfirmDialog } from "@/components/WeddingConfirmDialog";
+import type { SendAfpMessageInput } from "@/lib/api";
+import type { WeddingGuestTrackingState } from "@/lib/weddingGuestTrackingState";
+import {
+  buildWeddingRsvpCoupleCsv,
+  buildWeddingRsvpVendorExportPreview,
+  weddingRsvpExportReceiptToAfpSendInput,
+  weddingRsvpVendorPreviewCsv,
+  type WeddingRsvpVendorExportAudience,
+} from "@/lib/weddingRsvpExportState";
+import { buildWeddingRsvpReconciliationState } from "@/lib/weddingRsvpReconciliationState";
+import {
+  buildWeddingRsvpReminderCandidates,
+  weddingRsvpReminderDraftToAfpSendInput,
+} from "@/lib/weddingRsvpReminderState";
+import type { WeddingRsvpSetupState } from "@/lib/weddingRsvpSetupState";
+import { friendlyErrorText } from "@/lib/visibleErrorText";
+
+function downloadText(filename: string, text: string, type = "text/csv;charset=utf-8"): void {
+  const url = URL.createObjectURL(new Blob([text], { type }));
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+export function WeddingRsvpOperationsPanel(props: {
+  setup: WeddingRsvpSetupState;
+  guestTracking: WeddingGuestTrackingState;
+  metadata?: unknown;
+  onSaveProjection?: ((input: SendAfpMessageInput) => Promise<unknown>) | null;
+}) {
+  const [reminderOpen, setReminderOpen] = createSignal(false);
+  const [exportsOpen, setExportsOpen] = createSignal(false);
+  const [audience, setAudience] = createSignal<WeddingRsvpVendorExportAudience>("caterer");
+  const [recipientLabel, setRecipientLabel] = createSignal("");
+  const [includeDietaryDetails, setIncludeDietaryDetails] = createSignal(false);
+  const [pendingExport, setPendingExport] = createSignal(false);
+  const [busy, setBusy] = createSignal(false);
+  const [notice, setNotice] = createSignal<string | null>(null);
+  const reconciliation = createMemo(() => buildWeddingRsvpReconciliationState({
+    guestTracking: props.guestTracking,
+    eventId: props.setup.eventId,
+  }));
+  const reminders = createMemo(() => buildWeddingRsvpReminderCandidates({
+    guestTracking: props.guestTracking,
+    eventId: props.setup.eventId,
+    eventLabel: props.setup.eventLabel,
+    hostLabel: props.setup.hostLabel,
+    responseDeadline: props.setup.responseDeadline,
+  }));
+  const vendorPreview = createMemo(() => buildWeddingRsvpVendorExportPreview({
+    guestTracking: props.guestTracking,
+    eventId: props.setup.eventId,
+    audience: audience(),
+    includeDietaryDetails: includeDietaryDetails(),
+  }));
+  const saveReminderDraft = async (index: number) => {
+    const candidate = reminders()[index];
+    if (!candidate || !props.onSaveProjection || busy()) return;
+    setBusy(true);
+    setNotice(null);
+    try {
+      await props.onSaveProjection(weddingRsvpReminderDraftToAfpSendInput(candidate, props.metadata));
+      setNotice(`Reminder draft saved for ${candidate.householdLabel}. Nothing was sent.`);
+    } catch (error) {
+      setNotice(friendlyErrorText(error, "The reminder draft could not be saved."));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const approveExport = async () => {
+    const recipient = recipientLabel().trim();
+    if (!recipient || !props.onSaveProjection || busy()) return;
+    setBusy(true);
+    setNotice(null);
+    try {
+      const preview = vendorPreview();
+      await props.onSaveProjection(weddingRsvpExportReceiptToAfpSendInput({
+        preview,
+        recipientLabel: recipient,
+        approvedBy: "couple",
+        metadata: props.metadata,
+      }));
+      downloadText(`${audience()}-rsvp-brief.csv`, weddingRsvpVendorPreviewCsv(preview));
+      setPendingExport(false);
+      setNotice(`Approved ${preview.fieldLabels.length} fields for ${recipient} and downloaded the brief. OmnyID did not send it.`);
+    } catch (error) {
+      setNotice(friendlyErrorText(error, "The approval receipt could not be saved, so no brief was downloaded."));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section class="mt-3 min-w-0 rounded-[24px] border border-sky-100 bg-white p-3 shadow-card sm:rounded-[28px] sm:p-4" aria-labelledby="rsvp-operations-title">
+      <div class="flex flex-wrap items-start justify-between gap-2">
+        <div class="min-w-0">
+          <h3 id="rsvp-operations-title" class="text-base font-semibold text-sky-950">RSVP updates</h3>
+          <p class="mt-1 text-sm leading-6 text-sky-950/75">One response updates guest counts, seating eligibility, follow-ups and export previews. Vendor commitments never change silently.</p>
+        </div>
+        <span class="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-900">{reconciliation().cateringHeadcount} attending</span>
+      </div>
+      <ul class="mt-3 grid gap-2 text-xs leading-5 text-sky-950/80 sm:grid-cols-2">
+        <For each={reconciliation().connectedChangeLabels}>{(label) => <li class="rounded-xl border border-sky-100 bg-sky-50/60 px-3 py-2">{label}</li>}</For>
+      </ul>
+      <Show when={reconciliation().missingDetailCandidates.length + reconciliation().lateChangeExceptions.length > 0}>
+        <div class="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-950">
+          {reconciliation().missingDetailCandidates.length} missing detail{reconciliation().missingDetailCandidates.length === 1 ? "" : "s"} · {reconciliation().lateChangeExceptions.length} late change{reconciliation().lateChangeExceptions.length === 1 ? "" : "s"} held for review
+        </div>
+      </Show>
+      <div class="mt-3 grid gap-2 sm:grid-cols-3">
+        <button type="button" class="min-h-11 rounded-lg border border-sky-200 bg-white px-3 text-sm font-semibold text-sky-950" onClick={() => downloadText("wedding-rsvp-responses.csv", buildWeddingRsvpCoupleCsv(props.guestTracking, props.setup.eventId))}>Download couple CSV</button>
+        <button type="button" class="min-h-11 rounded-lg border border-sky-200 bg-white px-3 text-sm font-semibold text-sky-950" onClick={() => setReminderOpen((value) => !value)}>Review reminders ({reminders().length})</button>
+        <button type="button" class="min-h-11 rounded-lg border border-sky-200 bg-white px-3 text-sm font-semibold text-sky-950" onClick={() => setExportsOpen((value) => !value)}>Prepare vendor brief</button>
+      </div>
+      <Show when={reminderOpen()}>
+        <div class="mt-3 grid gap-2" aria-label="RSVP reminder drafts">
+          <Show when={reminders().length > 0} fallback={<p class="rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-700">No eligible reminder is due. Complete and declined households are excluded.</p>}>
+            <For each={reminders()}>{(candidate, index) => <article class="rounded-xl border border-sky-100 p-3"><p class="text-sm font-semibold text-sky-950">{candidate.householdLabel}</p><p class="mt-1 text-xs leading-5 text-sky-950/75">To: {candidate.contactLabels.join(", ")} · {candidate.reasonLabel}</p><pre class="mt-2 whitespace-pre-wrap break-words rounded-lg bg-sky-50 p-2 font-sans text-xs leading-5 text-sky-950">{candidate.exactContent}</pre><button type="button" disabled={!props.onSaveProjection || busy()} class="mt-2 min-h-11 rounded-lg bg-sky-900 px-3 text-sm font-semibold text-white disabled:opacity-50" onClick={() => void saveReminderDraft(index())}>Save draft — do not send</button></article>}</For>
+          </Show>
+        </div>
+      </Show>
+      <Show when={exportsOpen()}>
+        <div class="mt-3 rounded-xl border border-sky-100 bg-sky-50/50 p-3">
+          <div class="grid gap-2 sm:grid-cols-2"><label class="text-xs font-semibold text-sky-950">Brief for<select class="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm" value={audience()} onChange={(event) => setAudience(event.currentTarget.value as WeddingRsvpVendorExportAudience)}><option value="caterer">Caterer</option><option value="venue">Venue</option></select></label><label class="text-xs font-semibold text-sky-950">Exact recipient<input class="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm" value={recipientLabel()} onInput={(event) => setRecipientLabel(event.currentTarget.value)} placeholder="Business or contact name" /></label></div>
+          <Show when={audience() === "caterer"}><label class="mt-3 flex items-start gap-2 text-xs font-semibold text-sky-950"><input type="checkbox" class="mt-0.5 h-5 w-5" checked={includeDietaryDetails()} onChange={(event) => setIncludeDietaryDetails(event.currentTarget.checked)} />Include dietary detail after reviewing the exact rows</label></Show>
+          <p class="mt-3 text-xs font-semibold text-sky-950">Previewed fields: {vendorPreview().fieldLabels.join(", ")}</p>
+          <p class="mt-1 text-xs leading-5 text-sky-950/70">Excluded: {vendorPreview().excludedFieldLabels.join(", ")}. {vendorPreview().rowCount} attending guest row{vendorPreview().rowCount === 1 ? "" : "s"}.</p>
+          <For each={vendorPreview().warningLabels}>{(label) => <p class="mt-1 text-xs leading-5 text-amber-900">{label}</p>}</For>
+          <button type="button" disabled={!recipientLabel().trim() || !props.onSaveProjection || vendorPreview().rowCount === 0} class="mt-3 min-h-11 rounded-lg bg-sky-900 px-4 text-sm font-semibold text-white disabled:opacity-50" onClick={() => setPendingExport(true)}>Review approval and download</button>
+        </div>
+      </Show>
+      <Show when={notice()}>{(message) => <p role="status" class="mt-3 rounded-xl border border-sky-100 bg-sky-50 px-3 py-2 text-xs leading-5 text-sky-950">{message()}</p>}</Show>
+      <WeddingConfirmDialog open={pendingExport()} title="Approve this minimum-necessary brief?" detail={`This records approval to include ${vendorPreview().fieldLabels.join(", ")} for ${recipientLabel().trim()}. It downloads a CSV for manual handoff; OmnyID will not send it.`} confirmLabel="Approve and download" busy={busy()} onCancel={() => setPendingExport(false)} onConfirm={() => void approveExport()} />
+    </section>
+  );
+}

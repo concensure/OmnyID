@@ -35,6 +35,7 @@ export type WeddingGuestTrackingRow = {
   id: string;
   personId: string | null;
   displayName: string;
+  householdId?: string | null;
   householdLabel: string;
   rsvpStatus: "Attending" | "Not attending" | "Pending";
   contactLabel: string | null;
@@ -448,6 +449,7 @@ export function buildWeddingGuestTrackingState(input: {
         id: `${clean(artifact.id) || clean(artifact.title) || "guest_list"}:guest:${rowIndex}`,
         personId: null,
         displayName,
+        householdId: null,
         householdLabel,
         rsvpStatus: rsvpStatusLabel(cell(row, rsvpIndex)),
         contactLabel: hasUsefulValue(contactLabel) ? contactLabel : null,
@@ -498,6 +500,7 @@ export function buildWeddingGuestTrackingState(input: {
       id: `boundary:${profile.personId}`,
       personId: profile.personId,
       displayName: profile.displayName,
+      householdId: profile.householdId ?? null,
       householdLabel,
       rsvpStatus: attendance,
       contactLabel: hasUsefulValue(profile.contactLabel ?? "") ? profile.contactLabel ?? null : null,

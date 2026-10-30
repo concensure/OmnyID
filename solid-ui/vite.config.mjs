@@ -68,6 +68,7 @@ export default defineConfig({
         practice: resolve(import.meta.dirname, "practice.html"),
         quotationResponse: resolve(import.meta.dirname, "quotation-response.html"),
         runsheetShare: resolve(import.meta.dirname, "runsheet-share.html"),
+        rsvp: resolve(import.meta.dirname, "rsvp.html"),
       },
       onwarn(warning, warn) {
         const message = typeof warning === "string" ? warning : warning.message ?? "";

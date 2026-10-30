@@ -21,6 +21,7 @@ import { WeddingCustomSurfaceTools } from "@/components/WeddingCustomSurfaceTool
 import { WeddingDecisionFocusCard } from "@/components/WeddingDecisionFocusCard";
 import { WeddingGuestOperationsCard } from "@/components/WeddingGuestOperationsCard";
 import { WeddingRsvpSetupPanel } from "@/components/WeddingRsvpSetupPanel";
+import { WeddingRsvpOperationsPanel } from "@/components/WeddingRsvpOperationsPanel";
 import { WeddingHelpersPanel } from "@/components/WeddingHelpersPanel";
 import { WeddingHomeOverviewGrid } from "@/components/WeddingHomeOverviewGrid";
 import { WeddingImportantDetailsPanel } from "@/components/WeddingImportantDetailsPanel";
@@ -398,6 +399,14 @@ export function WeddingWorkspaceContextPanels(props: {
           metadata={props.state.workspace.metadata}
           onSave={saveRsvpSetup}
         />
+        <Show when={rsvpSetup()}>{(setup) => (
+          <WeddingRsvpOperationsPanel
+            setup={setup()}
+            guestTracking={props.state.guestTracking}
+            metadata={props.state.workspace.metadata}
+            onSaveProjection={props.saveProjection}
+          />
+        )}</Show>
         <div class="mt-3">
           <WeddingBoundaryManagementCard
             state={props.state.boundaryState}

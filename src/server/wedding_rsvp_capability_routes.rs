@@ -1,3 +1,7 @@
+use super::wedding_rsvp_response_routes::{
+    Attendance, CapabilityProof, RecordResponseReply, RecordResponseRequest,
+    record_guest_response_for_user,
+};
 use super::{
     AppState, RateLimitPolicy,
     auth::{authenticated_user, public_rate_limit_key},
@@ -19,7 +23,11 @@ use chacha20poly1305::aead::{OsRng, rand_core::RngCore};
 use chrono::{DateTime, Duration as ChronoDuration, Utc};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::{collections::HashSet, sync::Arc, time::Duration};
+use std::{
+    collections::{BTreeMap, HashSet},
+    sync::Arc,
+    time::Duration,
+};
 use ulid::Ulid;
 
 const MAX_GRANT_DAYS: i64 = 30;
@@ -40,6 +48,7 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
             post(regenerate_http),
         )
         .route("/wedding/rsvp/capabilities/open", post(open_http))
+        .route("/wedding/rsvp/capabilities/respond", post(respond_http))
 }
 
 fn enabled() -> bool {
@@ -316,4 +325,78 @@ async fn open_http(
         .map_err(store_error)?
         .ok_or_else(unavailable)?;
     Ok(([(CACHE_CONTROL, "private, no-store")], Json(scope)))
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct PublicResponseRequest {
+    token: String,
+    invitation_id: String,
+    person_id: String,
+    event_id: String,
+    attendance: Attendance,
+    expected_revision: i64,
+    idempotency_key: String,
+    #[serde(default)]
+    answers: BTreeMap<String, String>,
+    #[serde(default)]
+    private_answer_question_ids: Vec<String>,
+    private_answers_ciphertext: Option<String>,
+}
+
+async fn respond_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(request): Json<PublicResponseRequest>,
+) -> Result<impl IntoResponse, (StatusCode, String)> {
+    enforce_rate_limit(
+        &state,
+        public_rate_limit_key("wedding_rsvp_capability_respond", &headers),
+        RateLimitPolicy {
+            max_requests: 30,
+            window: Duration::from_secs(3600),
+        },
+    )
+    .await?;
+    if !enabled() || request.attendance == Attendance::Pending {
+        return Err(unavailable());
+    }
+    let digest = token_digest(&request.token).ok_or_else(unavailable)?;
+    let authority = state
+        .db
+        .wedding_rsvp_submission_authority(&digest, &request.invitation_id)
+        .await
+        .map_err(store_error)?
+        .ok_or_else(unavailable)?;
+    let command = RecordResponseRequest {
+        wedding_plan_id: authority.wedding_plan_id,
+        response_workspace_id: authority.response_workspace_id,
+        invitation_id: request.invitation_id,
+        person_id: request.person_id,
+        event_id: request.event_id,
+        attendance: request.attendance,
+        expected_revision: request.expected_revision,
+        idempotency_key: request.idempotency_key,
+        answers: request.answers,
+        private_answer_question_ids: request.private_answer_question_ids,
+        private_answers_ciphertext: request.private_answers_ciphertext,
+    };
+    let result: RecordResponseReply = record_guest_response_for_user(
+        &state.db,
+        &authority.owner_user_id,
+        command,
+        CapabilityProof {
+            capability_id: authority.capability_id,
+            token_digest: digest,
+        },
+    )
+    .await
+    .map_err(|error| {
+        if matches!(error.0, StatusCode::FORBIDDEN | StatusCode::NOT_FOUND) {
+            unavailable()
+        } else {
+            error
+        }
+    })?;
+    Ok(([(CACHE_CONTROL, "private, no-store")], Json(result)))
 }

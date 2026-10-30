@@ -32,7 +32,10 @@ export type WeddingRsvpSetupState = {
   status: "draft";
   eventId: string;
   eventLabel: string;
+  hostLabel: string;
   responseDeadline: string;
+  encryptionKeyId: string | null;
+  encryptionPublicKeyHex: string | null;
   questions: WeddingRsvpQuestion[];
   updatedAt: string;
 };
@@ -40,6 +43,7 @@ export type WeddingRsvpSetupState = {
 export type WeddingRsvpSetupDraftInput = {
   eventId: string;
   eventLabel: string;
+  hostLabel?: string | null;
   responseDeadline: string;
   enabledQuestionIds: readonly WeddingRsvpQuestionId[];
   requiredQuestionIds: readonly WeddingRsvpQuestionId[];
@@ -54,6 +58,7 @@ export type WeddingRsvpSetupEventOption = {
 };
 
 export type WeddingRsvpInvitationPreview = {
+  householdId: string | null;
   householdLabel: string;
   recipients: Array<{
     displayName: string;
@@ -135,6 +140,7 @@ export function buildWeddingRsvpSetupDraft(
   const metadata = normalizeWeddingPlanningMetadata(metadataInput);
   const eventId = clean(input.eventId);
   const eventLabel = clean(input.eventLabel).slice(0, 120);
+  const hostLabel = clean(input.hostLabel).slice(0, 120) || "The couple";
   const responseDeadline = exactDate(input.responseDeadline);
   const questions = normalizedQuestions(input);
   const errorLabels = [
@@ -158,7 +164,10 @@ export function buildWeddingRsvpSetupDraft(
       status: "draft",
       eventId,
       eventLabel,
+      hostLabel,
       responseDeadline,
+      encryptionKeyId: null,
+      encryptionPublicKeyHex: null,
       questions,
       updatedAt: nowIso,
     },
@@ -172,6 +181,7 @@ function setupFromMessage(message: AfpMessage): WeddingRsvpSetupState | null {
   if (kind !== "wedding_rsvp_setup") return null;
   const eventId = clean(content.event_id);
   const eventLabel = clean(content.event_label);
+  const hostLabel = clean(content.host_label).slice(0, 120) || "The couple";
   const responseDeadline = exactDate(content.response_deadline);
   const setupId = clean(content.setup_id);
   if (!eventId || !eventLabel || !responseDeadline || !setupId) return null;
@@ -200,7 +210,12 @@ function setupFromMessage(message: AfpMessage): WeddingRsvpSetupState | null {
     status: "draft",
     eventId,
     eventLabel,
+    hostLabel,
     responseDeadline,
+    encryptionKeyId: clean(content.encryption_key_id) || null,
+    encryptionPublicKeyHex: /^[0-9a-f]{64}$/i.test(clean(content.encryption_public_key_hex))
+      ? clean(content.encryption_public_key_hex).toLowerCase()
+      : null,
     questions,
     updatedAt: clean(content.updated_at) || message.timestamp,
   };
@@ -251,7 +266,10 @@ export function weddingRsvpSetupToAfpSendInput(
       status: setup.status,
       event_id: setup.eventId,
       event_label: setup.eventLabel,
+      host_label: setup.hostLabel,
       response_deadline: setup.responseDeadline,
+      encryption_key_id: setup.encryptionKeyId,
+      encryption_public_key_hex: setup.encryptionPublicKeyHex,
       questions: enabledQuestions.map((question) => ({
         id: question.id,
         label: question.label,
@@ -310,27 +328,28 @@ export function buildWeddingRsvpInvitationPreviews(
   setup: WeddingRsvpSetupState,
   guestTracking: WeddingGuestTrackingState,
 ): WeddingRsvpInvitationPreview[] {
-  const households = new Map<string, WeddingRsvpInvitationPreview["recipients"]>();
+  const households = new Map<string, { householdId: string | null; recipients: WeddingRsvpInvitationPreview["recipients"] }>();
   for (const row of guestTracking.guestRows ?? []) {
     const response = row.eventResponses.find((item) => item.eventId === setup.eventId);
     if (!response) continue;
-    const recipients = households.get(row.householdLabel) ?? [];
-    recipients.push({
+    const household = households.get(row.householdLabel) ?? { householdId: row.householdId ?? null, recipients: [] };
+    household.recipients.push({
       displayName: row.displayName,
       invitationId: response.invitationId,
       responseStatus: response.attendance,
       plusOneAllowed: response.plusOneAllowed === true,
       childrenInvited: response.childrenInvited === true,
     });
-    households.set(row.householdLabel, recipients);
+    households.set(row.householdLabel, household);
   }
   const questionLabels = setup.questions
     .filter((question) => question.enabled)
     .map((question) => question.prompt || question.label);
   return Array.from(households.entries())
-    .map(([householdLabel, recipients]) => ({
+    .map(([householdLabel, household]) => ({
+      householdId: household.householdId,
       householdLabel,
-      recipients: recipients.sort((left, right) => left.displayName.localeCompare(right.displayName)),
+      recipients: household.recipients.sort((left, right) => left.displayName.localeCompare(right.displayName)),
       questionLabels,
       privacyLabel: "Private answers stay with the couple unless they explicitly approve a minimum-necessary vendor brief.",
     }))
