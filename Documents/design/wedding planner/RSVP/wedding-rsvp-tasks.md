@@ -84,7 +84,7 @@ Depends on: WED-303B
 
 - [x] Add event setup/reuse, deadline and controlled question library to the existing Guests surface.
 - [x] Support attendance, meal choice, dietary/allergy category + detail, accessibility, travel, accommodation and a bounded custom question.
-- [ ] Add per-person/per-event entitlements, named/unnamed plus-one and child age/seat/meal requirements.
+- [x] Add per-person/per-event entitlements, named/unnamed plus-one and child age/seat/meal requirements.
 - [x] Preview the exact invitation for each household before publishing.
 - [x] Add paper/phone/manual-response flow through the canonical response command.
 - [ ] Add A2UI cards for setup gaps and bounded actions.
@@ -144,7 +144,7 @@ Depends on: WED-303F
 - [x] Add caterer and venue projections over the same guest IDs.
 - [x] Exclude contact, private notes and accessibility details by default.
 - [x] Require exact field/recipient preview and explicit approval for a vendor brief.
-- [ ] Record export/share receipt, correction and revocation where supported.
+- [x] Record export/share receipt, correction and revocation where supported.
 - [x] Distinguish allergy, coeliac and preference; never infer health facts from meal choice.
 
 Acceptance: exports reconcile with the UI and every sensitive vendor field has purpose, preview and approval evidence.

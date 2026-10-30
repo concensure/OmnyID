@@ -416,6 +416,7 @@ export function WeddingWorkspaceContextPanels(props: {
             setup={setup()}
             guestTracking={props.state.guestTracking}
             metadata={props.state.workspace.metadata}
+            afpMessages={props.state.afpMessages}
             onSaveProjection={props.saveProjection}
           />
         )}</Show>

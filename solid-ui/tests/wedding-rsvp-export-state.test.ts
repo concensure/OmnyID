@@ -1,7 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildWeddingRsvpCoupleCsv, buildWeddingRsvpVendorExportPreview, weddingRsvpExportReceiptToAfpSendInput } from "../src/lib/weddingRsvpExportState";
+import {
+  buildWeddingRsvpCoupleCsv,
+  buildWeddingRsvpVendorExportPreview,
+  weddingRsvpExportCorrectionToAfpSendInput,
+  weddingRsvpExportReceiptToAfpSendInput,
+  weddingRsvpExportReceiptsFromAfpMessages,
+  weddingRsvpExportRevocationToAfpSendInput,
+} from "../src/lib/weddingRsvpExportState";
+import type { AfpMessage } from "../src/lib/api";
 import type { WeddingGuestTrackingState } from "../src/lib/weddingGuestTrackingState";
 
 const guestTracking = {
@@ -33,4 +41,41 @@ test("unstructured dietary text is held for review instead of inferred", () => {
   const preview = buildWeddingRsvpVendorExportPreview({ guestTracking: input, eventId: "event:wedding", audience: "caterer" });
   assert.equal(preview.rows[0]?.dietary_category, "Unclassified — couple review required");
   assert.match(preview.warningLabels.join(" "), /couple to label/i);
+});
+
+test("corrections and future-use revocations remain linked to the original receipt", () => {
+  const preview = buildWeddingRsvpVendorExportPreview({ guestTracking, eventId: "event:wedding", audience: "caterer" });
+  const original = weddingRsvpExportReceiptToAfpSendInput({
+    preview,
+    recipientLabel: "Sample Caterer",
+    approvedBy: "couple",
+    nowIso: "2027-09-01T10:00:00Z",
+  });
+  const originalMessage = { ...original, timestamp: "2027-09-01T10:00:00Z" } as AfpMessage;
+  const [originalReceipt] = weddingRsvpExportReceiptsFromAfpMessages([originalMessage]);
+  assert.ok(originalReceipt);
+
+  const correction = weddingRsvpExportCorrectionToAfpSendInput({
+    previousReceipt: originalReceipt!,
+    preview,
+    approvedBy: "couple",
+    nowIso: "2027-09-02T10:00:00Z",
+  });
+  assert.equal(correction.content.corrects_receipt_id, originalReceipt?.receiptId);
+  assert.equal(correction.content.delivery_status, "downloaded_for_manual_handoff");
+
+  const revocation = weddingRsvpExportRevocationToAfpSendInput({
+    receipt: originalReceipt!,
+    revokedBy: "couple",
+    nowIso: "2027-09-03T10:00:00Z",
+  });
+  assert.equal(revocation.content.effect, "future_use_only_downloaded_file_cannot_be_recalled");
+  const history = weddingRsvpExportReceiptsFromAfpMessages([
+    originalMessage,
+    { ...correction, timestamp: "2027-09-02T10:00:00Z" } as AfpMessage,
+    { ...revocation, timestamp: "2027-09-03T10:00:00Z" } as AfpMessage,
+  ]);
+  assert.equal(history.length, 2);
+  assert.equal(history[0]?.correctsReceiptId, originalReceipt?.receiptId);
+  assert.equal(history.find((receipt) => receipt.receiptId === originalReceipt?.receiptId)?.revokedAt, "2027-09-03T10:00:00Z");
 });

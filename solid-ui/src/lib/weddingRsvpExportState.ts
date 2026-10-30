@@ -1,5 +1,5 @@
 // @locs-version: 1.0
-import type { SendAfpMessageInput } from "@/lib/api";
+import type { AfpMessage, SendAfpMessageInput } from "@/lib/api";
 import type { WeddingGuestTrackingState } from "@/lib/weddingGuestTrackingState";
 import {
   normalizeWeddingPlanningMetadata,
@@ -18,6 +18,19 @@ export type WeddingRsvpVendorExportPreview = {
   excludedFieldLabels: string[];
   warningLabels: string[];
   sourceReferences: string[];
+};
+
+export type WeddingRsvpExportReceipt = {
+  receiptId: string;
+  exportId: string;
+  audience: WeddingRsvpVendorExportAudience;
+  recipientLabel: string;
+  eventId: string;
+  approvedFields: string[];
+  rowCount: number;
+  createdAt: string;
+  correctsReceiptId: string | null;
+  revokedAt: string | null;
 };
 
 function clean(value: unknown): string {
@@ -155,6 +168,118 @@ export function weddingRsvpExportReceiptToAfpSendInput(input: {
     },
     references: input.preview.sourceReferences.map((target) => ({ type: "source", target, label: "RSVP source" })),
     supertags: ["template:wedding_planning", "wedding_rsvp:export_receipt", "approval:recorded", "privacy:minimum_necessary"],
+    store_in_relational: true,
+  };
+}
+
+function record(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function strings(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string" && item.trim().length > 0) : [];
+}
+
+export function weddingRsvpExportReceiptsFromAfpMessages(
+  messages: readonly AfpMessage[] | null | undefined,
+): WeddingRsvpExportReceipt[] {
+  const revocations = new Map<string, string>();
+  for (const message of messages ?? []) {
+    if (message.kind !== "wedding_rsvp_export_revocation") continue;
+    const content = record(message.content);
+    const receiptId = clean(content.receipt_id);
+    const revokedAt = clean(content.revoked_at) || message.timestamp;
+    if (receiptId) revocations.set(receiptId, revokedAt);
+  }
+  return (messages ?? []).flatMap((message) => {
+    if (message.kind !== "wedding_rsvp_export_receipt") return [];
+    const content = record(message.content);
+    const receiptId = clean(content.receipt_id);
+    const audience = clean(content.audience);
+    if (!receiptId || (audience !== "caterer" && audience !== "venue")) return [];
+    return [{
+      receiptId,
+      exportId: clean(content.export_id),
+      audience,
+      recipientLabel: clean(content.recipient_label),
+      eventId: clean(content.event_id),
+      approvedFields: strings(content.approved_fields),
+      rowCount: Number.isSafeInteger(content.row_count) ? Number(content.row_count) : 0,
+      createdAt: clean(content.created_at) || message.timestamp,
+      correctsReceiptId: clean(content.corrects_receipt_id) || null,
+      revokedAt: revocations.get(receiptId) ?? (clean(content.revoked_at) || null),
+    } satisfies WeddingRsvpExportReceipt];
+  }).sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+}
+
+export function weddingRsvpExportCorrectionToAfpSendInput(input: {
+  previousReceipt: WeddingRsvpExportReceipt;
+  preview: WeddingRsvpVendorExportPreview;
+  approvedBy: string;
+  metadata?: unknown;
+  nowIso?: string;
+}): SendAfpMessageInput {
+  const next = weddingRsvpExportReceiptToAfpSendInput({
+    preview: input.preview,
+    recipientLabel: input.previousReceipt.recipientLabel,
+    approvedBy: input.approvedBy,
+    metadata: input.metadata,
+    nowIso: input.nowIso,
+  });
+  next.content = {
+    ...record(next.content),
+    receipt_type: "correction",
+    corrects_receipt_id: input.previousReceipt.receiptId,
+  };
+  next.references = [
+    ...(next.references ?? []),
+    { type: "corrects", target: input.previousReceipt.receiptId, label: "Corrected export receipt" },
+  ];
+  next.supertags = [...(next.supertags ?? []), "wedding_rsvp:export_correction"];
+  return next;
+}
+
+export function weddingRsvpExportRevocationToAfpSendInput(input: {
+  receipt: WeddingRsvpExportReceipt;
+  revokedBy: string;
+  reason?: string | null;
+  metadata?: unknown;
+  nowIso?: string;
+}): SendAfpMessageInput {
+  const metadata = normalizeWeddingPlanningMetadata(input.metadata);
+  const nowIso = input.nowIso ?? new Date().toISOString();
+  const revocationId = `${input.receipt.receiptId}:revocation:${globalThis.crypto?.randomUUID?.() ?? Date.now()}`;
+  return {
+    id: revocationId,
+    thread_id: `wedding_rsvp_exports:${metadata.responseWorkspaceId}`,
+    from: "user://wedding-couple",
+    to: ["agent://wedding-planning", "agent://knowledge-graph"],
+    type: "ledger",
+    kind: "wedding_rsvp_export_revocation",
+    subtype: "wedding_rsvp_export_revocation",
+    content: {
+      kind: "wedding_rsvp_export_revocation",
+      contract_version: 1,
+      revocation_id: revocationId,
+      receipt_id: input.receipt.receiptId,
+      export_id: input.receipt.exportId,
+      audience: input.receipt.audience,
+      recipient_label: input.receipt.recipientLabel,
+      revoked_by: clean(input.revokedBy) || "couple",
+      reason: clean(input.reason) || "Permission withdrawn for future use",
+      effect: "future_use_only_downloaded_file_cannot_be_recalled",
+      revoked_at: nowIso,
+    },
+    metadata: {
+      template: "wedding_planning",
+      weddingPlanId: metadata.weddingPlanId,
+      responseWorkspaceId: metadata.responseWorkspaceId,
+      origin: "wedding_rsvp_export",
+      external_delivery: false,
+      model_calls: 0,
+    },
+    references: [{ type: "revokes", target: input.receipt.receiptId, label: "Export receipt" }],
+    supertags: ["template:wedding_planning", "wedding_rsvp:export_revocation", "privacy:future_use_revoked"],
     store_in_relational: true,
   };
 }
