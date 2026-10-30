@@ -22,6 +22,9 @@ export type WeddingRsvpReminderCandidate = {
 };
 
 export type WeddingRsvpReminderReceipt = {
+  messageId: string;
+  threadId: string;
+  draftId: string | null;
   householdId: string;
   deliveryStatus: "approved" | "provider_accepted" | "delivered" | "failed";
   providerMessageId: string | null;
@@ -62,7 +65,7 @@ export function buildWeddingRsvpReminderCandidates(input: {
   }
   return Array.from(households.entries()).flatMap(([key, rows]) => {
     if (!rows || rows.length === 0 || prior.has(key)) return [];
-    const contacts = unique(rows.filter((row) => row.rsvpReminderPermission === true).map((row) => reminderEmail(row.contactLabel)));
+    const contacts = unique(rows.filter((row) => row.rsvpReminderPermission === true).map((row) => reminderEmail(row.contactLabel))).slice(0, 1);
     if (contacts.length === 0) return [];
     const names = unique(rows.map((row) => row.displayName));
     const invitations = unique(rows.flatMap((row) => row.eventResponses
@@ -75,7 +78,7 @@ export function buildWeddingRsvpReminderCandidates(input: {
       : `Hello ${names.join(" and ")},\n\nA gentle reminder to reply about ${input.eventLabel} by ${input.responseDeadline}. Please use your private RSVP link when you are ready.\n\n${input.hostLabel}`;
     return [{
       id: `wedding_rsvp_reminder:${safeWeddingLabel(key)}:${input.responseDeadline}`,
-      householdId: rows[0]?.householdId ?? null,
+      householdId: rows[0]?.householdId || safeWeddingLabel(key),
       householdLabel: rows[0]?.householdLabel ?? key,
       recipientLabels: names,
       contactLabels: contacts,
@@ -104,6 +107,9 @@ export function weddingRsvpReminderReceiptsFromAfpMessages(
     const rawStatus = message.kind === "wedding_rsvp_reminder_approval" ? "approved" : clean(content.delivery_status);
     if (!householdId || !["approved", "provider_accepted", "delivered", "failed"].includes(rawStatus)) return [];
     return [{
+      messageId: message.id,
+      threadId: message.thread_id,
+      draftId: clean(content.draft_id) || null,
       householdId,
       deliveryStatus: rawStatus as WeddingRsvpReminderReceipt["deliveryStatus"],
       providerMessageId: clean(content.provider_message_id) || null,

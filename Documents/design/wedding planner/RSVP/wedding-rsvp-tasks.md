@@ -131,10 +131,16 @@ Depends on: WED-303B, WED-303C
 - [x] Allow optional deterministic template or requested small-model draft.
 - [x] Persist any generated draft with sources, model/cost, approval and revision history.
 - [x] Require exact recipient/content/channel preview and approval before sending.
-- [ ] Record provider acceptance, delivery/failure and retry decisions separately.
+- [x] Record provider acceptance, delivery/failure and retry decisions separately.
 - [x] Never message declined/complete households or use contacts for marketing.
 
 Acceptance: reminders are deduplicated, approval-gated and limited to outstanding scoped recipients.
+
+Implementation note: the server reloads the exact couple-owned AFP draft and
+approval before sending one permitted recipient through the reviewed mail
+adapter. A deterministic reservation prevents concurrent duplicates, while
+provider acceptance, delivery, failure and retry decisions remain distinct AFP
+events. `OMNYID_WEDDING_RSVP_REMINDER_SEND_ENABLED` remains false by default.
 
 ## WED-303H — exports and minimum-necessary vendor sharing
 

@@ -28,6 +28,11 @@ test("mobile wedding surfaces remove redundant chrome without removing actions",
   assert.match(mobileFocus, /label=\{mobileFocusMode\(\) === "responses" \? "Response" : "Decision"\}[\s\S]*sequential/);
   assert.match(mobileFocus, /immersive=\{clearDecisionView\(\) \|\| \(!selectedSection\(\) && mobileFocusMode\(\) !== "overview"\)\}/);
   assert.doesNotMatch(mobileFocus, /Decision"\} \$\{Math\.min\(position/);
+  assert.match(mobileDeck, /primaryActionLabel/);
+  assert.doesNotMatch(mobileDeck, />Approve<\/button>/);
+  assert.match(mobileFocus, /if \(openVendorResearch\(item\)\) return/);
+  assert.match(mobileFocus, /setMobileFocusSingleCardSectionId\("vendor_search"\)/);
+  assert.match(mobileFocus, /hasVendorShortlist\(item\) \? "Open shortlist" : "Search vendors"/);
 });
 
 test("operator-only vendor provider setup and technical freshness copy stay out of decision cards", () => {

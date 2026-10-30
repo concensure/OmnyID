@@ -48,12 +48,16 @@ test("contact permission is false-default and approval records exact unsent cont
 
 test("only provider-accepted or delivered receipts need suppress a repeat", () => {
   const messages = [{
+    id: "receipt:one",
+    thread_id: "thread:reminders",
     kind: "wedding_rsvp_reminder_receipt",
     timestamp: "2027-09-02T00:00:00Z",
     content: { household_id: "household:one", delivery_status: "provider_accepted", provider_message_id: "provider:redacted" },
   }] as AfpMessage[];
   const receipts = weddingRsvpReminderReceiptsFromAfpMessages(messages);
   assert.equal(receipts[0]?.householdId, "household:one");
+  assert.equal(receipts[0]?.messageId, "receipt:one");
+  assert.equal(receipts[0]?.threadId, "thread:reminders");
   assert.equal(receipts[0]?.deliveryStatus, "provider_accepted");
   const prior = receipts.filter((receipt) => receipt.deliveryStatus === "provider_accepted" || receipt.deliveryStatus === "delivered").map((receipt) => receipt.householdId);
   const candidates = buildWeddingRsvpReminderCandidates({ guestTracking: state(), eventId: "event:wedding", eventLabel: "Wedding day", hostLabel: "Priya and Daniel", responseDeadline: "2027-10-01", priorReminderHouseholdIds: prior });

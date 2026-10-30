@@ -267,7 +267,7 @@ export function WeddingVendorSearchHomeSection(props: {
     onCleanup(() => window.clearInterval(timer));
   });
   return (
-    <div data-wedding-surface="vendor-search" class="min-w-0 rounded-xl border border-wedding-border bg-wedding-card px-4 py-5 shadow-wedding-card sm:px-5 sm:py-6">
+    <div data-wedding-surface="vendor-search" class="min-w-0 overflow-hidden rounded-xl border border-wedding-border bg-wedding-card px-3 py-4 shadow-wedding-card sm:px-5 sm:py-6">
       <form
         onSubmit={(event) => {
           event.preventDefault();
@@ -286,7 +286,7 @@ export function WeddingVendorSearchHomeSection(props: {
       <div class="min-w-0">
         <div class="flex min-w-0 flex-wrap items-center justify-between gap-2">
           <p class="font-display text-[22px] font-semibold leading-7 tracking-[-.01em] text-wedding-ink">Find vendors</p>
-          <div class="flex max-w-full gap-1 overflow-x-auto pb-1 text-xs" aria-label="Show vendors by wedding status">
+          <div class="-mx-1 flex max-w-full snap-x gap-1 overflow-x-auto px-1 pb-1 text-xs [scrollbar-width:none]" aria-label="Show vendors by wedding status">
             <For each={lifecycleFilters}>{(filter) => <button type="button" class={`min-h-9 shrink-0 rounded-full border px-2.5 font-semibold ${lifecycleFilter() === filter.id ? "border-wedding-primary bg-wedding-page text-wedding-primary" : "border-wedding-border bg-white text-wedding-ink/65"}`} aria-pressed={lifecycleFilter() === filter.id} onClick={() => setLifecycleFilter(lifecycleFilter() === filter.id ? "all" : filter.id)}>{filter.label}{lifecycleCount(filter.id) ? ` ${lifecycleCount(filter.id)}` : ""}</button>}</For>
           </div>
       </div>
@@ -309,7 +309,7 @@ export function WeddingVendorSearchHomeSection(props: {
       </label>
       </div>
       </form>
-      <div class="-mx-4 mt-3 flex snap-x gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:px-0" aria-label="Popular vendor types">
+      <div class="-mx-3 mt-3 flex snap-x gap-2 overflow-x-auto px-3 pb-2 pr-8 [scrollbar-width:none] sm:mx-0 sm:px-0 sm:pr-0" aria-label="Popular vendor types">
         <For each={VENDOR_CATEGORY_CHIPS}>{(chip) => (
           <button
             type="button"

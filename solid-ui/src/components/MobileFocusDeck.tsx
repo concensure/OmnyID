@@ -24,6 +24,7 @@ export function MobileFocusDeck(props: {
   renderEnd: () => JSX.Element;
   label: "Decision" | "Response";
   sequential?: boolean;
+  primaryActionLabel?: (item: FocusDeckItem) => string;
 }) {
   const [drag, setDrag] = createSignal<{ x: number; y: number; startedAt: number; pointerId: number; width: number; height: number; axis: ReturnType<typeof decisionOsSwipeAxisLock> } | null>(null);
   const [exiting, setExiting] = createSignal(false);
@@ -31,6 +32,11 @@ export function MobileFocusDeck(props: {
   const [announcement, setAnnouncement] = createSignal("");
   const item = createMemo(() => props.items[Math.min(Math.max(0, props.position), props.items.length - 1)]);
   const atEnd = () => props.position >= props.items.length || props.items.length === 0;
+  const primaryActionLabel = () => {
+    const current = item();
+    if (current && props.primaryActionLabel) return props.primaryActionLabel(current);
+    return props.label === "Response" ? "Review response" : "Review decision";
+  };
   const action = createMemo(() => {
     const state = drag();
     if (!state) return null;
@@ -43,7 +49,7 @@ export function MobileFocusDeck(props: {
   });
   const edgeLabel = () => {
     const direction = action();
-    if (direction === "approve") return `Approve: ${item()?.recommendedActionLabel ?? "recommendation"}`;
+    if (direction === "approve") return primaryActionLabel();
     if (direction === "defer") return "Later";
     if (offset().x < 0) return "Previous";
     return "Next";
@@ -161,12 +167,12 @@ export function MobileFocusDeck(props: {
         </div>
         <div class="flex items-center justify-between pt-2">
           <Show when={!props.sequential} fallback={<span class="h-11 w-11" aria-hidden="true" />}><button type="button" class={ICON_BUTTON_CLASS} aria-label={`Previous ${props.label.toLowerCase()}`} onClick={() => navigate(-1)}><DeckIcon d="M15 19l-7-7 7-7" /></button></Show>
-          <p class="text-xs text-wedding-muted" aria-hidden="true">Swipe up for later, down to approve</p>
+          <p class="text-xs text-wedding-muted" aria-hidden="true">Swipe up for later, down to {primaryActionLabel().toLowerCase()}</p>
           <Show when={!props.sequential} fallback={<span class="h-11 w-11" aria-hidden="true" />}><button type="button" class={ICON_BUTTON_CLASS} aria-label={`Next ${props.label.toLowerCase()}`} onClick={() => navigate(1)}><DeckIcon d="M9 5l7 7-7 7" /></button></Show>
         </div>
         <nav class="flex gap-2 pt-1 pb-[max(0.75rem,env(safe-area-inset-bottom))]" aria-label={`${props.label} actions`}>
           <button type="button" class="inline-flex min-h-12 items-center justify-center gap-1.5 rounded-lg border border-wedding-muted bg-white px-4 text-sm font-semibold text-wedding-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-accent focus-visible:ring-offset-2" onClick={() => commit("defer", "button")}><DeckIcon d="M12 6v6l4 2M12 21a9 9 0 100-18 9 9 0 000 18z" />Later</button>
-          <button type="button" class="inline-flex min-h-12 flex-1 items-center justify-center gap-1.5 rounded-lg border-2 border-wedding-cta bg-white px-4 text-sm font-bold text-wedding-text hover:bg-wedding-surface-blush focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-accent focus-visible:ring-offset-2" aria-label={`Approve: ${item()?.recommendedActionLabel ?? "recommendation"}`} onClick={() => commit("approve", "button")}><DeckIcon d="M5 13l4 4L19 7" />Approve</button>
+          <button type="button" class="inline-flex min-h-12 flex-1 items-center justify-center gap-1.5 rounded-lg border-2 border-wedding-cta bg-white px-4 text-sm font-bold text-wedding-text hover:bg-wedding-surface-blush focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-accent focus-visible:ring-offset-2" aria-label={primaryActionLabel()} onClick={() => commit("approve", "button")}><DeckIcon d="M5 13l4 4L19 7" />{primaryActionLabel()}</button>
         </nav>
       </Show>
     </section>

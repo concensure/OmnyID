@@ -12,6 +12,12 @@ import type { WeddingResponseWorkspaceViewState } from "../../src/lib/weddingRes
 import type { WeddingWorkspaceMenuId } from "../../src/lib/weddingWorkspaceMenuState";
 
 const state = {
+  afpMessages: [],
+  helperContactNames: [],
+  workspace: {
+    artifacts: [],
+    metadata: { weddingPlanId: "fixture-plan", responseWorkspaceId: "fixture-workspace" },
+  },
   contextCards: [{ planningContext: { location: "Sydney NSW", guestCount: 80 }, answeredLabels: [] }],
   guestTracking: { guestRowCount: 0, attendingCount: 0, declinedCount: 0, pendingCount: 0 },
   seatingPlan: { assignedSeatCount: 0, unassignedAttendingCount: 0 },

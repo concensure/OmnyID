@@ -68,7 +68,7 @@ export function WeddingPlanningJourneyStepper(props: {
           <div class="mt-3 grid gap-3">
             <For each={groups()}>{(group) => (
               <section>
-                <h4 class="text-xs font-bold uppercase tracking-[0.08em] text-wedding-ink/60">{group.category}</h4>
+                <h4 class="text-xs font-bold uppercase tracking-[0.08em] text-wedding-ink/70">{group.category}</h4>
                 <ul class="mt-2 space-y-2">
                   <For each={group.tasks}>{(task) => (
                     <li class="relative grid min-w-0 gap-3 overflow-hidden rounded-lg border border-wedding-border bg-white py-3 pl-5 pr-3 sm:grid-cols-[minmax(0,1fr)_minmax(11rem,15rem)_minmax(10rem,12rem)] sm:items-stretch">

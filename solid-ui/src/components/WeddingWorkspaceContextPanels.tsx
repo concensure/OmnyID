@@ -420,6 +420,7 @@ export function WeddingWorkspaceContextPanels(props: {
             metadata={props.state.workspace.metadata}
             afpMessages={props.state.afpMessages}
             onSaveProjection={props.saveProjection}
+            onRefreshWorkspace={props.onRefreshWorkspace}
           />
         )}</Show>
         <div class="mt-3">

@@ -208,7 +208,7 @@ import { completedWeddingVendorSearchSession, editedWeddingVendorSearchSession, 
 import { WEDDING_WORKSPACE_MENU_ITEMS, weddingMenuKeyDownStep } from "@/lib/weddingWorkspaceDesktopMenuState";
 
 const RESPONSE_QUEUE_VIEW_CLASS =
-  "view-enter min-w-0 space-y-4 rounded-[24px] border border-sky-100/80 bg-[linear-gradient(135deg,rgba(240,249,255,0.96),rgba(255,255,255,0.96))] p-3 shadow-[0_22px_70px_-36px_rgba(14,116,144,0.4)] backdrop-blur-sm sm:rounded-[32px] sm:p-5";
+  "view-enter min-w-0 space-y-4 rounded-[24px] border border-sky-100/80 bg-[linear-gradient(135deg,rgba(240,249,255,0.96),rgba(255,255,255,0.96))] p-3 shadow-[0_22px_70px_-36px_rgba(14,116,144,0.4)] backdrop-blur-sm phone:rounded-none phone:border-0 phone:bg-transparent phone:p-0 phone:shadow-none sm:rounded-[32px] sm:p-5";
 const RESPONSE_QUEUE_VIEW_HEADER_CLASS = "flex min-w-0 flex-wrap items-center justify-end gap-3";
 const RESPONSE_QUEUE_VIEW_TITLE_TAG = "h1" as const;
 function initialWeddingWorkspaceMenu(): WeddingWorkspaceMenuId {

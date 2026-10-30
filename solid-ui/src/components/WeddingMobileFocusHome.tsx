@@ -234,6 +234,7 @@ export function WeddingMobileFocusHome(props: {
       setMobileFocusSingleCardSectionId(item.kind === "vendor_draft" || item.kind === "vendor_receipt" ? "quote_replies" : "vendor_search");
       return;
     }
+    if (openVendorResearch(item)) return;
     setPendingApproval({ item, method });
   }
 
@@ -286,10 +287,36 @@ export function WeddingMobileFocusHome(props: {
     const decision = decisionItemFor(item.id);
     const query = decision ? weddingVendorResearchQueryForDecision(decision) : null;
     if (!query) return false;
-    const launch = saveWeddingVendorSearchLaunch(query, { source: "wedding_home" });
-    if (launch) dispatchWeddingVendorSearchLaunch(launch);
-    props.onSelectMenu?.("response_queue");
+    if (!hasVendorShortlist(item)) {
+      const launch = saveWeddingVendorSearchLaunch(query, { source: "wedding_home" });
+      if (launch) dispatchWeddingVendorSearchLaunch(launch);
+    }
+    setMobileFocusMode("overview");
+    setMobileFocusSingleCardSectionId("vendor_search");
     return true;
+  }
+
+  function hasVendorShortlist(item: FocusDeckItem): boolean {
+    const decision = decisionItemFor(item.id);
+    const query = decision ? weddingVendorResearchQueryForDecision(decision) : null;
+    if (!query) return false;
+    const categoryWord = query.replace(/^wedding\s+/i, "").replace(/s$/, "").toLowerCase();
+    return props.state.artifactPreviews.some((artifact) => {
+      if (artifact.vendorComparisonCards.length === 0) return false;
+      const evidence = [artifact.title, artifact.category, ...artifact.vendorComparisonCards.flatMap((card) => [
+        card.category ?? "", card.title, ...(card.facetLabels ?? []),
+      ])].join(" ").toLowerCase();
+      return evidence.includes(categoryWord);
+    });
+  }
+
+  function primaryActionLabel(item: FocusDeckItem): string {
+    const decision = decisionItemFor(item.id);
+    if (decision && weddingVendorResearchQueryForDecision(decision)) {
+      return hasVendorShortlist(item) ? "Open shortlist" : "Search vendors";
+    }
+    if (item.kind === "response") return "Review response";
+    return "Review decision";
   }
 
   function completeVendorItem(item: FocusDeckItem) {
@@ -371,6 +398,7 @@ export function WeddingMobileFocusHome(props: {
                 onDefer={defer}
                 label={mobileFocusMode() === "responses" ? "Response" : "Decision"}
                 sequential
+                primaryActionLabel={primaryActionLabel}
                 renderCard={(item) => item.kind.startsWith("vendor_")
                   ? <WeddingVendorDeckCard
                     item={item}

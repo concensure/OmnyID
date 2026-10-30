@@ -30,6 +30,7 @@ import {
 } from "@/lib/weddingBudgetAllocationState";
 import { buildWeddingBudgetContributionProjectionInput } from "@/lib/weddingBudgetContributionState";
 import { buildWeddingBudgetCategoryGuidanceLabel } from "@/lib/weddingBudgetGuidanceState";
+import type { WeddingBudgetContribution } from "@/lib/weddingBudgetInsightsState";
 
 function moneyLabel(amount: number, currency: string): string {
   return amount.toLocaleString(undefined, {
@@ -51,6 +52,15 @@ function draftFromTrackingState(state: WeddingBudgetTrackingState, fallbackCurre
 
 function budgetAllocationSignature(state: WeddingBudgetTrackingState): string {
   return state.budgetAllocation.map((category) => `${category.categoryId}:${category.amount}`).join("|");
+}
+
+function contributionKey(row: WeddingBudgetContribution): string {
+  return `${row.personLabel.trim().toLowerCase()}|${row.amountLabel.trim()}|${row.conditionLabel.trim().toLowerCase()}`;
+}
+
+function contributionAmountFromLabel(value: string): number {
+  const amount = Number(value.replace(/[^0-9.-]/g, ""));
+  return Number.isFinite(amount) ? amount : 0;
 }
 
 export function WeddingBudgetTrackerCard(props: {
@@ -84,6 +94,7 @@ export function WeddingBudgetTrackerCard(props: {
   const [contributorContactName, setContributorContactName] = createSignal("");
   const [contributorContactEmail, setContributorContactEmail] = createSignal("");
   const [savingContributorContact, setSavingContributorContact] = createSignal(false);
+  const [optimisticContributions, setOptimisticContributions] = createSignal<WeddingBudgetContribution[]>([]);
   const [lastSyncedAllocationSignature, setLastSyncedAllocationSignature] = createSignal(budgetAllocationSignature(props.state));
   const allocated = createMemo(() => weddingBudgetAllocationAllocatedAmount(draft()));
   const remaining = createMemo(() => weddingBudgetAllocationRemaining(draft()));
@@ -101,6 +112,13 @@ export function WeddingBudgetTrackerCard(props: {
   const contributorPeople = createMemo(() => [...new Set((props.contributorPeople ?? [])
     .map((person) => person.trim())
     .filter(Boolean))].slice(0, 60));
+  const contributionRows = createMemo(() => {
+    const saved = props.state.insights.contributionRows;
+    const savedKeys = new Set(saved.map(contributionKey));
+    return [...saved, ...optimisticContributions().filter((row) => !savedKeys.has(contributionKey(row)))];
+  });
+  const contributionTotal = createMemo(() => contributionRows()
+    .reduce((total, row) => total + contributionAmountFromLabel(row.amountLabel), 0));
 
   createEffect(() => {
     const signature = budgetAllocationSignature(props.state);
@@ -110,6 +128,13 @@ export function WeddingBudgetTrackerCard(props: {
     setLastSyncedAllocationSignature(signature);
     setSaveNotice(null);
     if (props.weddingPlanId) saveWeddingBudgetAllocationDraft(props.weddingPlanId, nextDraft);
+  });
+
+  createEffect(() => {
+    const savedKeys = new Set(props.state.insights.contributionRows.map(contributionKey));
+    const current = optimisticContributions();
+    const pending = current.filter((row) => !savedKeys.has(contributionKey(row)));
+    if (pending.length !== current.length) setOptimisticContributions(pending);
   });
 
   function updateDraft(next: WeddingBudgetAllocationDraft) {
@@ -160,9 +185,15 @@ export function WeddingBudgetTrackerCard(props: {
       setContributionNotice("Add who is contributing and the amount before saving.");
       return;
     }
+    const savedRow: WeddingBudgetContribution = {
+      personLabel: contributorLabel().trim(),
+      amountLabel: moneyLabel(Number(contributionAmount()), currency),
+      conditionLabel: contributionCondition().trim() || "No condition recorded.",
+    };
     setSavingContribution(true);
     try {
       await props.onSaveContribution(weddingDecisionProjectionToAfpSendInput(projection));
+      setOptimisticContributions((rows) => [...rows.filter((row) => contributionKey(row) !== contributionKey(savedRow)), savedRow]);
       setContributorLabel("");
       setContributionAmount("");
       setContributionCondition("");
@@ -619,7 +650,12 @@ export function WeddingBudgetTrackerCard(props: {
         </div>
       </Show>
       <div class="mt-3 rounded-2xl border border-slate-200 bg-white p-3">
-        <p class="text-sm font-semibold text-emerald-950">Contributions</p>
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <p class="text-sm font-semibold text-emerald-950">Contributions</p>
+          <Show when={contributionRows().length > 0}>
+            <span class="rounded-lg bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-900">{moneyLabel(contributionTotal(), currency)} recorded</span>
+          </Show>
+        </div>
         <div class="mt-2 grid gap-2 sm:grid-cols-[1fr_9rem]">
           <input
             type="text"
@@ -702,13 +738,13 @@ export function WeddingBudgetTrackerCard(props: {
         <Show when={contributionNotice()}>
           {(notice) => <p class="mt-2 text-xs leading-5 text-emerald-950/75">{notice()}</p>}
         </Show>
-        <Show when={props.state.insights.contributionRows.length > 0} fallback={
+        <Show when={contributionRows().length > 0} fallback={
           <p class="mt-1 text-xs leading-5 text-emerald-900/70">
             Add who is contributing and any conditions in an uploaded budget, quote, or contract so spending stays clear.
           </p>
         }>
           <div class="mt-2 space-y-1.5">
-            <For each={props.state.insights.contributionRows}>
+            <For each={contributionRows()}>
               {(row) => (
                 <div class="rounded-xl border border-emerald-100 bg-emerald-50/60 px-3 py-2 text-xs leading-5 text-emerald-950/75">
                   <span class="font-semibold">{row.personLabel}</span> - {row.amountLabel}

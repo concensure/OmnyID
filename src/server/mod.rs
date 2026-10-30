@@ -174,7 +174,7 @@ mod value_signal_helpers;
 mod wedding_admin_ai_policy;
 mod wedding_ai_cost_policy;
 mod wedding_llm_ladder;
-mod wedding_preference_routes; mod wedding_quote_study_routes; mod wedding_rsvp_capability_routes; mod wedding_rsvp_response_routes; mod wedding_runsheet_projection_routes; mod wedding_runsheet_share_routes;
+mod wedding_preference_routes; mod wedding_quote_study_routes; mod wedding_rsvp_capability_routes; mod wedding_rsvp_reminder_routes; mod wedding_rsvp_response_routes; mod wedding_runsheet_projection_routes; mod wedding_runsheet_share_routes;
 #[cfg(test)]
 mod wedding_rsvp_capability_routes_tests;
 #[cfg(test)]
@@ -1405,6 +1405,7 @@ pub async fn run() {
         .merge(wedding_vendor_outreach_routes::routes())
         .merge(wedding_preference_routes::routes())
         .merge(wedding_rsvp_capability_routes::routes())
+        .merge(wedding_rsvp_reminder_routes::routes())
         .merge(wedding_rsvp_response_routes::routes())
         .merge(wedding_runsheet_projection_routes::routes())
         .merge(wedding_runsheet_share_routes::routes())
@@ -1549,6 +1550,7 @@ pub async fn build_test_router(database_url: &str) -> Router {
         .merge(quotation_response_portal_routes::routes()).merge(quotation_vendor_response_routes::routes()).merge(quotation_vendor_attachment_routes::routes()).merge(quotation_vendor_revision_routes::routes()).merge(quotation_source_routes::routes())
         .merge(wedding_quote_study_routes::routes()).merge(vendor_email_worker_ingress::routes()).merge(wedding_vendor_claim_routes::routes()).merge(wedding_vendor_ownership_routes::routes()).merge(wedding_vendor_sender_identity_routes::routes()).merge(wedding_vendor_photo_routes::routes())
         .merge(wedding_rsvp_capability_routes::routes())
+        .merge(wedding_rsvp_reminder_routes::routes())
         .merge(wedding_rsvp_response_routes::routes())
         .merge(wedding_runsheet_projection_routes::routes())
         .merge(wedding_runsheet_share_routes::routes())

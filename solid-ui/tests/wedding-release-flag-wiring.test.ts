@@ -48,3 +48,19 @@ test("minimal Oracle profile passes protected Cloudflare account mail configurat
     assert.ok(compose.includes(`${variable}: \${${variable}:-}`), `${variable} must reach the homeserver`);
   }
 });
+
+test("RSVP reminder delivery stays default-off and its authenticated routes bypass the static wedding site", () => {
+  const flag = "OMNYID_WEDDING_RSVP_REMINDER_SEND_ENABLED";
+  const composeValues = new Map([
+    ["docker-compose.yml", `${flag}: "false"`],
+    ["docker-compose.oracle.yml", `${flag}: \${${flag}:-false}`],
+    ["docker-compose.oracle.minimal.yml", `${flag}: \${${flag}:-false}`],
+    ["docker-compose.oracle.staging.yml", `${flag}: \${OMNYID_STAGING_WEDDING_RSVP_REMINDER_SEND_ENABLED:-false}`],
+  ]);
+  for (const [path, expected] of composeValues) {
+    assert.ok(read(path).includes(expected), `${path} must pass ${flag} default-off`);
+  }
+  assert.match(read("Caddyfile"), /handle \/wedding\/rsvp\/reminders\/\*/);
+  assert.match(read("scripts/deploy-oracle.ps1"), /staged Caddyfile is missing the RSVP reminder proxy route/);
+  assert.match(read("scripts/deploy-oracle.ps1"), /running Caddyfile is missing the RSVP reminder proxy route/);
+});

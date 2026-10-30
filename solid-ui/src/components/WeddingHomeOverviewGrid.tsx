@@ -50,11 +50,11 @@ function DomainTile(props: { tile?: WeddingHomeOverviewActionTile; domain: Domai
   return (
     <button
       type="button"
-      class={`group min-h-[10.5rem] min-w-0 rounded-xl border border-wedding-border bg-wedding-card p-4 text-left text-wedding-ink shadow-wedding-card transition-colors duration-150 hover:border-wedding-primary/40 hover:bg-wedding-page focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-primary focus-visible:ring-offset-2 sm:p-5 ${props.desktopSpan ?? ""} ${props.dense ? "min-h-[9rem] p-3 sm:p-3" : ""}`}
+      class={`group min-h-[8.5rem] min-w-0 overflow-hidden rounded-xl border border-wedding-border bg-wedding-card p-4 text-left text-wedding-ink shadow-wedding-card transition-colors duration-150 hover:border-wedding-primary/40 hover:bg-wedding-page focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-primary focus-visible:ring-offset-2 sm:min-h-[10.5rem] sm:p-5 ${props.desktopSpan ?? ""} ${props.dense ? "min-h-[8rem] p-3 sm:min-h-[9rem] sm:p-3" : ""}`}
       title={props.tile?.actionLabel}
       onClick={props.onOpen}
     >
-      <div class="flex min-w-0 flex-wrap items-start justify-between gap-2">
+      <div class="flex min-w-0 flex-col items-start gap-2 sm:flex-row sm:justify-between">
         <div class="flex min-w-0 items-center gap-2">
           <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-wedding-slate text-wedding-primary" aria-hidden="true">
             <WeddingDashboardIcon id={style.icon} class="h-[18px] w-[18px]" />
@@ -62,13 +62,13 @@ function DomainTile(props: { tile?: WeddingHomeOverviewActionTile; domain: Domai
           <span class="truncate text-xs font-semibold uppercase tracking-[0.08em]">{style.label}</span>
         </div>
         <Show when={props.tile}>{(tile) => (
-          <span class={`ml-auto inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold ${status().shell}`}>
+          <span class={`inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold sm:ml-auto ${status().shell}`}>
             <WeddingDashboardIcon id={status().icon} class="h-3.5 w-3.5" />
             <span>{tile().toneLabel}</span>
           </span>
         )}</Show>
       </div>
-      <p class="mt-4 break-words text-[2.125rem] font-extrabold leading-9 tracking-[-.02em] tabular-nums">{displayValue(props.tile)}</p>
+      <p class="mt-3 break-words text-[1.65rem] font-extrabold leading-8 tracking-[-.02em] tabular-nums sm:mt-4 sm:text-[2.125rem] sm:leading-9">{displayValue(props.tile)}</p>
       <p class="mt-1 line-clamp-2 text-sm leading-5 text-wedding-ink/70">{props.tile?.detailLabel}</p>
       <span class="mt-3 inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-wedding-secondary">
         {props.tile?.actionLabel}<WeddingDashboardIcon id="arrow-right" class="h-4 w-4" />
@@ -113,12 +113,12 @@ export function WeddingHomeOverviewGrid(props: {
   };
 
   return (
-    <section class={`grid min-w-0 grid-cols-2 gap-3 lg:grid-cols-12 lg:gap-4 ${dense() ? "gap-2" : ""}`} aria-label="Wedding plan overview">
-      <article data-wedding-surface="countdown" class={`col-span-2 min-h-[13.75rem] min-w-0 rounded-xl border border-wedding-border bg-wedding-card p-5 text-wedding-ink shadow-wedding-card lg:col-span-9 lg:p-6 ${dense() ? "min-h-[12rem] p-4" : ""}`}>
+    <section class={`grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-12 lg:gap-4 ${dense() ? "gap-2" : ""}`} aria-label="Wedding plan overview">
+      <article data-wedding-surface="countdown" class={`min-h-[13.75rem] min-w-0 overflow-hidden rounded-xl border border-wedding-border bg-wedding-card p-4 text-wedding-ink shadow-wedding-card sm:col-span-2 sm:p-5 lg:col-span-9 lg:p-6 ${dense() ? "min-h-[12rem] p-3 sm:p-4" : ""}`}>
         <div class="flex flex-wrap items-start justify-between gap-4">
           <div class="min-w-0">
             <p class="break-words text-xs font-semibold uppercase tracking-[0.08em] text-wedding-primary">Wedding day · {dateLabel(weddingDate())}</p>
-            <p class={`mt-3 break-words font-display font-bold tracking-[-.03em] text-wedding-primary tabular-nums ${/^\d+$/.test(countdown()) ? "text-7xl leading-[.9] lg:text-8xl" : "max-w-[10ch] text-4xl leading-tight"}`}>{countdown()}</p>
+            <p class={`mt-3 break-words font-display font-bold tracking-[-.03em] text-wedding-primary tabular-nums ${/^\d+$/.test(countdown()) ? "text-6xl leading-[.9] sm:text-7xl lg:text-8xl" : "max-w-[10ch] text-4xl leading-tight"}`}>{countdown()}</p>
             <p class="mt-2 text-base text-wedding-ink/70">
               {weddingDate() ? `days to go · ${progress().percentage}% of planning complete` : "Add your date to start the countdown"}
             </p>
@@ -160,7 +160,7 @@ export function WeddingHomeOverviewGrid(props: {
         </Show>
       </article>
 
-      <aside class="order-last col-span-2 rounded-xl border border-wedding-border bg-wedding-card p-4 text-wedding-ink shadow-wedding-card lg:order-none lg:col-span-3 lg:row-span-3" aria-label="Wedding plan up next">
+      <aside class="order-last min-w-0 overflow-hidden rounded-xl border border-wedding-border bg-wedding-card p-4 text-wedding-ink shadow-wedding-card sm:col-span-2 lg:order-none lg:col-span-3 lg:row-span-3" aria-label="Wedding plan up next">
         <p class="text-xs font-semibold uppercase tracking-[0.08em] text-wedding-primary">Up next</p>
         <button type="button" class="mt-3 flex min-h-11 w-full items-start gap-2 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-primary" onClick={openTimeline}>
           <span class="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border-2 border-wedding-primary text-wedding-primary"><WeddingDashboardIcon id="calendar-days" class="h-4 w-4" /></span>

@@ -301,6 +301,12 @@
         import omnyid_proxy
     }
 
+    # Authenticated couple-owned RSVP reminder status and send commands. Keep
+    # this ahead of the static /wedding/* site handler below.
+    handle /wedding/rsvp/reminders/* {
+        import omnyid_proxy
+    }
+
     handle /wedding/vendor-search {
         import omnyid_proxy
     }
