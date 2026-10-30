@@ -164,9 +164,9 @@ Depends on: WED-303A through WED-303H
 - [x] Run focused Rust, migration and disposable-Postgres suites.
 - [x] Run adversarial token, cross-tenant, forged event, duplicate/retry and late-lock scenarios.
 - [ ] Run hosted accessibility and couple/guest usability scenarios.
-- [ ] Run hosted shadow with RSVP publish/send/provider flags off.
+- [x] Run hosted shadow with RSVP publish/send/provider flags off.
 - [ ] Pilot with an allowlisted cohort and explicit rollback.
-- [ ] Record exact deployed SHA, health/version, feature flags and rollback evidence.
+- [ ] Record exact deployed SHA, health/version, feature flags and rollback evidence. Exact SHA, routes, flags, backup and health are recorded for `eff62d1c44d3140d9fa2edae04cc4cbfcd65ba21`; a new rollback drill is still outstanding.
 
 Acceptance: evidence distinguishes local simulation, hosted shadow, provider acceptance and actual guest receipt; no gate is marked passed by assertion alone.
 

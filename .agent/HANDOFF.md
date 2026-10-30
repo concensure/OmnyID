@@ -5845,3 +5845,40 @@ Remaining:
 - Then freeze a new full SHA and run hosted accessibility, couple/guest
   usability, flags-off shadow, allowlisted pilot and exact deployed-SHA/rollback
   evidence before enabling public collection.
+## 2026-10-31 - WED-303 provider lifecycle and WED-304 mobile release (Codex)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch
+`agent/codex/WED-303`. Application SHA
+`eff62d1c44d3140d9fa2edae04cc4cbfcd65ba21` is live on Oracle.
+
+Changed:
+
+- Completed the false-default server-authoritative RSVP reminder provider
+  lifecycle, including exact approval rehydration, idempotency reservation,
+  accepted/delivered/failed/retry AFP events and protected Caddy routing.
+- Replaced generic decision approval with `Open shortlist` / `Search vendors`
+  and the existing in-place Vendor surface.
+- Renamed mobile Timeline to Plan, made contributions reproject immediately,
+  and repaired narrow Today, Overview and Vendor layouts/filter rails.
+- Corrected the Oracle staging manifest to include `solid-ui/rsvp.html`; the
+  earlier candidate failed before replacement, then the corrected candidate
+  built and deployed cleanly.
+
+Evidence:
+
+- Exact-SHA typecheck, 2,089 Wedding tests, production build, both line
+  budgets, staging self-test, 16 RSVP Rust tests and five Playwright/Axe cases
+  passed.
+- Hosted workspace and Wedding routes return 200; the unauthenticated RSVP
+  reminder status route reaches the backend and returns 401. Backup/runtime
+  proof passes. Disk is 74% with about 12 GB free.
+- Public RSVP, RSVP reminder provider send and all vendor-mail flags remain
+  false or unset with false defaults.
+- Full record:
+  `Documents/verification/wed-303-wed-304-rsvp-mobile-release-2026-10-31.md`.
+
+Remaining:
+
+- WED-303 public rollout still needs hosted couple/guest accessibility and
+  usability, a new rollback drill and an allowlisted cohort. No code blocker
+  remains for those controlled gates.
