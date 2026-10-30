@@ -7,6 +7,7 @@ const weddingRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const projectRoot = resolve(weddingRoot, '..');
 const docsRoot = resolve(projectRoot, 'docs');
 const docsTailwind = readFileSync(resolve(docsRoot, 'tailwind.css'), 'utf8');
+const workspaceCss = readFileSync(resolve(projectRoot, 'solid-ui', 'src', 'index.css'), 'utf8');
 const caddy = readFileSync(resolve(projectRoot, 'Caddyfile'), 'utf8');
 const failures = [];
 const pageScriptHashes = new Set();
@@ -35,6 +36,12 @@ if (!caddy.includes('Strict-Transport-Security "max-age=15552000; includeSubDoma
 }
 if (!caddy.includes('import cloudflare_only')) {
   failures.push('public sites must import the Cloudflare-origin allowlist');
+}
+if (workspaceCss.includes('https://fonts.googleapis.com')) {
+  const workspaceFontConnections = caddy.match(/connect-src[^;\n"]*https:\/\/fonts\.googleapis\.com/g) ?? [];
+  if (workspaceFontConnections.length < 2) {
+    failures.push('workspace and password-reset CSP must allow the configured Google Fonts stylesheet connection');
+  }
 }
 for (const requiredClass of ['.fixed', '.grid', '.h-8', '.w-full', '.md\\:grid-cols-2']) {
   if (!docsTailwind.includes(requiredClass)) failures.push(`docs/tailwind.css is missing ${requiredClass}; rebuild it with docs/tailwind.config.cjs`);
