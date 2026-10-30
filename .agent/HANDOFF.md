@@ -5882,3 +5882,29 @@ Remaining:
 - WED-303 public rollout still needs hosted couple/guest accessibility and
   usability, a new rollback drill and an allowlisted cohort. No code blocker
   remains for those controlled gates.
+## 2026-10-31 - WED-303 hosted RSVP shadow and restore drill (Codex)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch
+`agent/codex/WED-303`. Application SHA `eff62d1c44d3140d9fa2edae04cc4cbfcd65ba21`
+remains live; Caddy/static release `65b12a3a3d764b560b9e95948df1e201c9eb7472`
+is live.
+
+Changed and verified:
+
+- The hosted guest RSVP shadow passes six accepting, declining, validation,
+  zoom, privacy and responsive scenarios with no serious/critical Axe finding.
+- The first run exposed a Google Fonts CSP mismatch. `65b12a3` adds only the
+  already-configured stylesheet host to workspace/reset `connect-src` and adds
+  a security regression check. The live rerun has no CSP or page error.
+- Exact-candidate typecheck, 2,089 Wedding tests, line budgets, Wedding-site
+  security suite, production build and production Caddy validation pass.
+- A fresh isolated Oracle restore drill passes. Disk returned to 74% with
+  about 12 GB free. All RSVP/vendor delivery flags remain false or false by
+  default; no message, capability or invitation was sent.
+
+Remaining:
+
+- The authenticated couple-side usability check and allowlisted pilot remain
+  open. The authorized test account's saved credential returned HTTP 401, so
+  no pass was claimed and no password reset/account mutation was attempted.
+- Evidence: `Documents/verification/wed-303-rsvp-hosted-shadow-2026-10-31.md`.

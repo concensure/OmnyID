@@ -163,10 +163,10 @@ Depends on: WED-303A through WED-303H
 - [x] Run typecheck, full Wedding tests, production build and line budgets.
 - [x] Run focused Rust, migration and disposable-Postgres suites.
 - [x] Run adversarial token, cross-tenant, forged event, duplicate/retry and late-lock scenarios.
-- [ ] Run hosted accessibility and couple/guest usability scenarios.
+- [ ] Run hosted accessibility and couple/guest usability scenarios. The six-scenario hosted guest flow passes at 320/375/1280 px, 200% text zoom and Axe; the authenticated couple half is still open because the authorized test credential returned 401.
 - [x] Run hosted shadow with RSVP publish/send/provider flags off.
 - [ ] Pilot with an allowlisted cohort and explicit rollback.
-- [ ] Record exact deployed SHA, health/version, feature flags and rollback evidence. Exact SHA, routes, flags, backup and health are recorded for `eff62d1c44d3140d9fa2edae04cc4cbfcd65ba21`; a new rollback drill is still outstanding.
+- [x] Record exact deployed SHA, health/version, feature flags and rollback evidence. Application SHA `eff62d1c44d3140d9fa2edae04cc4cbfcd65ba21`, config/static SHA `65b12a3a3d764b560b9e95948df1e201c9eb7472`, hosted routes, false-default flags, matching Caddy hash and a fresh passing restore drill are recorded.
 
 Acceptance: evidence distinguishes local simulation, hosted shadow, provider acceptance and actual guest receipt; no gate is marked passed by assertion alone.
 
