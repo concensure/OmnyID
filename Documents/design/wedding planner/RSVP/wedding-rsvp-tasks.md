@@ -153,10 +153,10 @@ Acceptance: exports reconcile with the UI and every sensitive vendor field has p
 
 Depends on: WED-303A through WED-303H
 
-- [ ] Freeze one full 40-character SHA and use a clean release worktree.
-- [ ] Run typecheck, full Wedding tests, production build and line budgets.
-- [ ] Run focused Rust, migration and disposable-Postgres suites.
-- [ ] Run adversarial token, cross-tenant, forged event, duplicate/retry and late-lock scenarios.
+- [x] Freeze one full 40-character SHA and use a clean release worktree.
+- [x] Run typecheck, full Wedding tests, production build and line budgets.
+- [x] Run focused Rust, migration and disposable-Postgres suites.
+- [x] Run adversarial token, cross-tenant, forged event, duplicate/retry and late-lock scenarios.
 - [ ] Run hosted accessibility and couple/guest usability scenarios.
 - [ ] Run hosted shadow with RSVP publish/send/provider flags off.
 - [ ] Pilot with an allowlisted cohort and explicit rollback.
@@ -196,5 +196,5 @@ At minimum, automate these scenarios before enabling public collection:
 - [x] Specification written against current architecture.
 - [x] Dependency-ordered implementation plan written.
 - [x] WED-303A code and focused tests complete.
-- [ ] Required repository checks complete.
-- [ ] Coordination records and commit complete.
+- [x] Required repository checks complete.
+- [x] Coordination records and commit complete.

@@ -5757,3 +5757,47 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch `agent/codex/W
 - Preserved unrelated untracked evidence at `artifacts/oracle-production-proof-wed298-fb1eb49/` and `solid-ui/artifacts/`.
 
 Next: finish WED-303B with disposable-Postgres cross-tenant, changed-replay and concurrent-stale-write evidence, then implement WED-303C digest-only public RSVP capabilities with random tokens, expiry, revocation, event/household scope and false-default availability. Do not expose a public response surface before that evidence exists.
+## 2026-10-31 - WED-303E-H protected guest flow and RSVP operations (Codex, in progress)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch
+`agent/codex/WED-303`; exact clean code candidate
+`4f6fafc6c15d2ecf7605ead4de7acd91920ba1ae` before this coordination commit.
+
+Changed:
+
+- Added explicit confirmation-gated household link creation. Tokens are 256-bit,
+  digest-only at rest and shown once; revoke and expiry remain server-authoritative.
+- Added a browser-generated X25519 couple key. IndexedDB retains a non-extractable
+  private key while only the public key and key ID enter the RSVP setup AFP object.
+- Added `/workspace/rsvp.html`, which clears the fragment token immediately,
+  renders only the named invitation scope, encrypts sensitive answers for the
+  couple and submits per-person revisions through the canonical response command.
+- Public submission rechecks capability scope inside the write transaction,
+  validates controlled and required questions, rejects plaintext private fields,
+  and prevents revoke/submit races, replay and stale writes.
+- Added shared RSVP operations over the existing guest ledger: seating/catering
+  reconciliation without mutating vendor commitments, late-lock exceptions,
+  deterministic approval-required reminder drafts, couple CSV, and previewed
+  caterer/venue CSV with an AFP approval receipt and minimum-necessary defaults.
+
+Evidence:
+
+- Exact candidate passed production build, TypeScript, both line budgets, all
+  Wedding site/security smoke checks and all 2,081 Wedding tests.
+- Six Playwright scenarios pass at 320, 375 and 1280 pixels, including 200%
+  zoom, keyboard focus recovery, slow loading and Axe serious/critical checks.
+- Thirteen focused Rust tests pass against local disposable PostgreSQL, including
+  cross-tenant/forged references, exact replay, one-winner concurrency and
+  capability revocation. The embedded migration-catalog test passes.
+- Disposable RSVP test users and schemas returned to `0|0`. No production flag
+  changed, nothing was deployed, and the pre-existing artifact directories were
+  not committed.
+
+Remaining:
+
+- Extend canonical invitation entitlements for named/unnamed plus-ones and child
+  age/seat/meal detail; do not bolt these onto a browser-only guest record.
+- Connect reminder approval to the existing provider receipt lifecycle and add
+  correction/revocation events for exported vendor briefs.
+- Keep `OMNYID_WEDDING_RSVP_PUBLIC_ENABLED` false until hosted accessibility,
+  couple/guest usability, flags-off shadow and allowlisted pilot evidence exist.
