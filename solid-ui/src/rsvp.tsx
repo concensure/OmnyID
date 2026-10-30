@@ -41,6 +41,24 @@ function questionLabel(question: WeddingRsvpCapabilityQuestion): string {
   return question.prompt?.trim() || question.label;
 }
 
+function entitlementLabel(invitation: WeddingRsvpCapabilityInvitation): string | null {
+  if (invitation.guest_role === "plus_one") {
+    return invitation.name_pending
+      ? "Plus-one place · the couple can replace this placeholder with the guest's name later"
+      : "Named plus-one · this person has their own RSVP";
+  }
+  if (invitation.guest_role === "child") {
+    const age = invitation.age_band === "child_under_12" ? "under 12" : invitation.age_band === "teen" ? "teen" : "age to confirm";
+    const seat = invitation.seat_requirement === "high_chair" ? "high chair" : invitation.seat_requirement === "booster" ? "booster seat" : invitation.seat_requirement === "standard" ? "standard seat" : invitation.seat_requirement === "none" ? "no seat" : "seat to confirm";
+    const meal = invitation.meal_requirement === "child" ? "child meal" : invitation.meal_requirement === "adult" ? "adult meal" : invitation.meal_requirement === "none" ? "no meal" : "meal to confirm";
+    return `Child · ${age} · ${seat} · ${meal}`;
+  }
+  if (invitation.plus_one_allowed || invitation.children_invited) {
+    return `${invitation.plus_one_allowed ? "Plus-one included as a separate guest. " : ""}${invitation.children_invited ? "Named children are included as separate guests." : ""}`.trim();
+  }
+  return null;
+}
+
 function PrivateQuestion(props: {
   question: WeddingRsvpCapabilityQuestion;
   value: string;
@@ -214,7 +232,7 @@ function WeddingRsvpPage() {
                         <label id={`meal_choice-${invitation.invitation_id}`} tabindex="-1" class="text-sm font-semibold">Meal choice {!question.required && <span class="font-normal text-teal-800">(optional)</span>}<select class="mt-1 min-h-12 w-full rounded-xl border border-teal-200 bg-white px-3" value={draft().answers.meal_choice ?? ""} onChange={(event) => updateDraft(invitation.invitation_id, (current) => ({ ...current, answers: { ...current.answers, meal_choice: event.currentTarget.value } }))}><option value="">Choose one</option><For each={question.options}>{(option) => <option value={option}>{option}</option>}</For></select></label>
                       </Show>}</For>
                     </div></Show>
-                    <Show when={invitation.plus_one_allowed || invitation.children_invited}><p class="mt-3 text-xs font-semibold text-teal-800">{invitation.plus_one_allowed ? "A plus-one is included. " : ""}{invitation.children_invited ? "Children are included." : ""}</p></Show>
+                    <Show when={entitlementLabel(invitation)}>{(label) => <p class="mt-3 rounded-lg bg-teal-50 px-2.5 py-2 text-xs font-semibold leading-5 text-teal-900">{label()}</p>}</Show>
                   </fieldset>;
                 }}</For>
               </div>

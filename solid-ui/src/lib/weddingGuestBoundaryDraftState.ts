@@ -23,7 +23,13 @@ export type WeddingGuestBoundaryDraftInput = {
   rsvpStatus?: WeddingGuestDraftRsvpStatus | null;
   previousRsvpStatus?: WeddingGuestDraftRsvpStatus | null;
   plusOneAllowed?: boolean | null;
+  plusOneMode?: "none" | "named" | "unnamed" | null;
+  plusOneName?: string | null;
   childrenInvited?: boolean | null;
+  childName?: string | null;
+  childAgeBand?: WeddingBoundaryGuestProfile["ageBand"];
+  childSeatRequirement?: WeddingBoundaryEventInvitation["seatRequirement"];
+  childMealRequirement?: WeddingBoundaryEventInvitation["mealRequirement"];
   contactLabel?: string | null;
   mealPreference?: string | null;
   dietaryNote?: string | null;
@@ -77,6 +83,10 @@ export function buildWeddingGuestBoundaryDraftObjects(
   const nextInvitationStatus = invitationStatus(input.rsvpStatus);
   const previousInvitation = input.previousRsvpStatus ? invitationStatus(input.previousRsvpStatus) : null;
   const responseRecorded = nextInvitationStatus === "rsvp_yes" || nextInvitationStatus === "rsvp_no";
+  const plusOneMode = input.plusOneAllowed === true ? input.plusOneMode ?? "none" : "none";
+  const plusOneName = clean(input.plusOneName);
+  const childName = clean(input.childName);
+  const householdMemberPersonIds = [personId];
   const commonMetadata = {
     wedding_guest_draft: true,
     source_surface: "wedding_guest_operations",
@@ -109,7 +119,7 @@ export function buildWeddingGuestBoundaryDraftObjects(
     householdId,
     displayName: householdLabel,
     primaryContactPersonId: personId,
-    memberPersonIds: [personId],
+    memberPersonIds: householdMemberPersonIds,
     familySide: "other",
     metadata: commonMetadata,
   };
@@ -130,10 +140,88 @@ export function buildWeddingGuestBoundaryDraftObjects(
     responseRevision: previousInvitation && previousInvitation !== nextInvitationStatus ? 2 : 1,
     plusOneAllowed: input.plusOneAllowed === true,
     childrenInvited: input.childrenInvited === true,
+    guestRole: "primary",
+    companionToPersonId: null,
+    namePending: false,
+    seatRequirement: "standard",
+    mealRequirement: "adult",
     visibleToGuest: true,
     metadata: commonMetadata,
   };
-  return [household, guest, invitation];
+  const companions: WeddingBoundaryLedgerObject[] = [];
+  if (plusOneMode !== "none") {
+    const displayName = plusOneMode === "named" && plusOneName
+      ? plusOneName
+      : `Guest of ${guest.displayName}`;
+    const companionSlug = plusOneMode === "named" && plusOneName
+      ? `${guestSlug(plusOneName)}-plus-one`
+      : `${guestSlug(guest.displayName)}-plus-one`;
+    const companionPersonId = `wedding_guest:${safeWeddingLabel(metadata.responseWorkspaceId)}:${companionSlug}`;
+    const companionInvitationId = `wedding_invitation:${safeWeddingLabel(metadata.responseWorkspaceId)}:${companionSlug}:main_wedding`;
+    householdMemberPersonIds.push(companionPersonId);
+    companions.push({
+      ...guest,
+      id: companionPersonId,
+      title: displayName,
+      personId: companionPersonId,
+      displayName,
+      relationshipLabel: "Plus-one",
+      contactLabel: null,
+      mealPreference: null,
+      dietaryNote: null,
+      accessibilityNote: null,
+      metadata: { ...commonMetadata, companion_to_person_id: personId, name_pending: plusOneMode === "unnamed" },
+    }, {
+      ...invitation,
+      id: companionInvitationId,
+      title: `${displayName} invitation`,
+      invitationId: companionInvitationId,
+      personId: companionPersonId,
+      plusOneAllowed: false,
+      childrenInvited: false,
+      guestRole: "plus_one",
+      companionToPersonId: personId,
+      namePending: plusOneMode === "unnamed",
+      seatRequirement: "standard",
+      mealRequirement: "adult",
+      metadata: { ...commonMetadata, companion_to_person_id: personId, name_pending: plusOneMode === "unnamed" },
+    } satisfies WeddingBoundaryEventInvitation);
+  }
+  if (input.childrenInvited === true && childName) {
+    const childSlug = `${guestSlug(childName)}-child`;
+    const childPersonId = `wedding_guest:${safeWeddingLabel(metadata.responseWorkspaceId)}:${childSlug}`;
+    const childInvitationId = `wedding_invitation:${safeWeddingLabel(metadata.responseWorkspaceId)}:${childSlug}:main_wedding`;
+    householdMemberPersonIds.push(childPersonId);
+    companions.push({
+      ...guest,
+      id: childPersonId,
+      title: childName,
+      personId: childPersonId,
+      displayName: childName,
+      ageBand: input.childAgeBand ?? "unknown",
+      relationshipLabel: "Child",
+      contactLabel: null,
+      mealPreference: null,
+      dietaryNote: null,
+      accessibilityNote: null,
+      metadata: { ...commonMetadata, child_of_person_id: personId },
+    }, {
+      ...invitation,
+      id: childInvitationId,
+      title: `${childName} invitation`,
+      invitationId: childInvitationId,
+      personId: childPersonId,
+      plusOneAllowed: false,
+      childrenInvited: false,
+      guestRole: "child",
+      companionToPersonId: personId,
+      namePending: false,
+      seatRequirement: input.childSeatRequirement ?? "unknown",
+      mealRequirement: input.childMealRequirement ?? "unknown",
+      metadata: { ...commonMetadata, child_of_person_id: personId },
+    } satisfies WeddingBoundaryEventInvitation);
+  }
+  return [household, guest, invitation, ...companions];
 }
 
 export function buildWeddingGuestBoundaryRuleObjects(

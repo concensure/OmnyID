@@ -35,6 +35,7 @@ export type WeddingGuestTrackingRow = {
   id: string;
   personId: string | null;
   displayName: string;
+  ageBand?: "adult" | "child_under_12" | "teen" | "unknown" | null;
   householdId?: string | null;
   householdLabel: string;
   rsvpStatus: "Attending" | "Not attending" | "Pending";
@@ -500,6 +501,7 @@ export function buildWeddingGuestTrackingState(input: {
       id: `boundary:${profile.personId}`,
       personId: profile.personId,
       displayName: profile.displayName,
+      ageBand: profile.ageBand ?? "unknown",
       householdId: profile.householdId ?? null,
       householdLabel,
       rsvpStatus: attendance,
@@ -507,7 +509,7 @@ export function buildWeddingGuestTrackingState(input: {
       mealPreference: hasUsefulValue(profile.mealPreference ?? "") ? profile.mealPreference ?? null : null,
       dietaryNote: hasUsefulValue(profile.dietaryNote ?? "") ? profile.dietaryNote ?? null : null,
       accessibilityNote: hasUsefulValue(profile.accessibilityNote ?? "") ? profile.accessibilityNote ?? null : null,
-      mealRequired: true,
+      mealRequired: !invitations.some((invitation) => invitation.mealRequirement === "none"),
       eventResponses: invitations.map((invitation) => ({
         invitationId: invitation.invitationId,
         eventId: invitation.eventId,
@@ -520,6 +522,11 @@ export function buildWeddingGuestTrackingState(input: {
         revision: invitation.responseRevision ?? null,
         plusOneAllowed: invitation.plusOneAllowed === true,
         childrenInvited: invitation.childrenInvited === true,
+        guestRole: invitation.guestRole ?? "primary",
+        companionToPersonId: invitation.companionToPersonId ?? null,
+        namePending: invitation.namePending === true,
+        seatRequirement: invitation.seatRequirement ?? "unknown",
+        mealRequirement: invitation.mealRequirement ?? "unknown",
       })),
       sourceLabel: "Saved in your guest list",
     });

@@ -155,7 +155,13 @@ export function WeddingWorkspaceContextPanels(props: {
     rsvpStatus: string;
     previousRsvpStatus?: string;
     plusOneAllowed: boolean;
+    plusOneMode?: "none" | "named" | "unnamed";
+    plusOneName?: string;
     childrenInvited: boolean;
+    childName?: string;
+    childAgeBand?: "adult" | "child_under_12" | "teen" | "unknown";
+    childSeatRequirement?: "standard" | "high_chair" | "booster" | "none" | "unknown";
+    childMealRequirement?: "adult" | "child" | "none" | "unknown";
     contactLabel: string;
     mealPreference: string;
     dietaryNote: string;
@@ -192,7 +198,13 @@ export function WeddingWorkspaceContextPanels(props: {
       rsvpStatus: input.rsvpStatus === "Attending" || input.rsvpStatus === "Not attending" ? input.rsvpStatus : "Pending",
       previousRsvpStatus: input.previousRsvpStatus === "Attending" || input.previousRsvpStatus === "Not attending" ? input.previousRsvpStatus : input.previousRsvpStatus === "Pending" ? "Pending" : null,
       plusOneAllowed: input.plusOneAllowed,
+      plusOneMode: input.plusOneMode,
+      plusOneName: input.plusOneName,
       childrenInvited: input.childrenInvited,
+      childName: input.childName,
+      childAgeBand: input.childAgeBand,
+      childSeatRequirement: input.childSeatRequirement,
+      childMealRequirement: input.childMealRequirement,
       contactLabel: input.contactLabel,
       mealPreference: input.mealPreference,
       dietaryNote: input.dietaryNote,

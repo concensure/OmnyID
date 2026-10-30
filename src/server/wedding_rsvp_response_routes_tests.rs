@@ -57,6 +57,11 @@ fn authority() -> InvitationAuthority {
         locked_at: None,
         plus_one_allowed: false,
         children_invited: true,
+        guest_role: "primary".into(),
+        companion_to_person_id: None,
+        name_pending: false,
+        seat_requirement: "standard".into(),
+        meal_requirement: "adult".into(),
     }
 }
 

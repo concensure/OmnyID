@@ -26,6 +26,11 @@ export type WeddingRsvpEventSnapshot = {
   revision: number | null;
   plusOneAllowed?: boolean;
   childrenInvited?: boolean;
+  guestRole?: "primary" | "plus_one" | "child" | null;
+  companionToPersonId?: string | null;
+  namePending?: boolean;
+  seatRequirement?: "standard" | "high_chair" | "booster" | "none" | "unknown" | null;
+  mealRequirement?: "adult" | "child" | "none" | "unknown" | null;
 };
 
 export type WeddingRsvpGuestSnapshot = {
@@ -147,6 +152,11 @@ export function weddingRsvpResponseInvitationFromAfpMessage(
     responseRevision: number(content.revision),
     plusOneAllowed: content.plus_one_allowed === true,
     childrenInvited: content.children_invited === true,
+    guestRole: clean(content.guest_role) as WeddingRsvpEventSnapshot["guestRole"] || "primary",
+    companionToPersonId: clean(content.companion_to_person_id) || null,
+    namePending: content.name_pending === true,
+    seatRequirement: clean(content.seat_requirement) as WeddingRsvpEventSnapshot["seatRequirement"] || "unknown",
+    mealRequirement: clean(content.meal_requirement) as WeddingRsvpEventSnapshot["mealRequirement"] || "unknown",
     visibleToGuest: true,
     metadata: {
       persisted_afp_message_id: message.id,

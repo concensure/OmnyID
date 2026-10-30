@@ -49,6 +49,12 @@ pub struct WeddingRsvpCapabilityInvitation {
     pub response_revision: i64,
     pub plus_one_allowed: bool,
     pub children_invited: bool,
+    pub age_band: String,
+    pub guest_role: String,
+    pub companion_to_person_id: Option<String>,
+    pub name_pending: bool,
+    pub seat_requirement: String,
+    pub meal_requirement: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
@@ -261,6 +267,34 @@ async fn invitation_scope(
                 .get("children_invited")
                 .and_then(Value::as_bool)
                 .unwrap_or(false),
+            age_band: profile
+                .get("age_band")
+                .and_then(Value::as_str)
+                .unwrap_or("unknown")
+                .to_string(),
+            guest_role: invitation
+                .get("guest_role")
+                .and_then(Value::as_str)
+                .unwrap_or("primary")
+                .to_string(),
+            companion_to_person_id: invitation
+                .get("companion_to_person_id")
+                .and_then(Value::as_str)
+                .map(str::to_string),
+            name_pending: invitation
+                .get("name_pending")
+                .and_then(Value::as_bool)
+                .unwrap_or(false),
+            seat_requirement: invitation
+                .get("seat_requirement")
+                .and_then(Value::as_str)
+                .unwrap_or("unknown")
+                .to_string(),
+            meal_requirement: invitation
+                .get("meal_requirement")
+                .and_then(Value::as_str)
+                .unwrap_or("unknown")
+                .to_string(),
         });
     }
     Ok(Some(projected))

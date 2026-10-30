@@ -82,6 +82,11 @@ pub(crate) struct InvitationAuthority {
     pub locked_at: Option<String>,
     pub plus_one_allowed: bool,
     pub children_invited: bool,
+    pub guest_role: String,
+    pub companion_to_person_id: Option<String>,
+    pub name_pending: bool,
+    pub seat_requirement: String,
+    pub meal_requirement: String,
 }
 
 #[derive(Clone, Copy)]
@@ -492,6 +497,29 @@ async fn invitation_authority(
             .get("children_invited")
             .and_then(Value::as_bool)
             .unwrap_or(false),
+        guest_role: content
+            .get("guest_role")
+            .and_then(Value::as_str)
+            .unwrap_or("primary")
+            .to_string(),
+        companion_to_person_id: content
+            .get("companion_to_person_id")
+            .and_then(Value::as_str)
+            .map(str::to_string),
+        name_pending: content
+            .get("name_pending")
+            .and_then(Value::as_bool)
+            .unwrap_or(false),
+        seat_requirement: content
+            .get("seat_requirement")
+            .and_then(Value::as_str)
+            .unwrap_or("unknown")
+            .to_string(),
+        meal_requirement: content
+            .get("meal_requirement")
+            .and_then(Value::as_str)
+            .unwrap_or("unknown")
+            .to_string(),
     }))
 }
 
@@ -689,6 +717,11 @@ async fn record_response_for_user_with_source(
         "locked_at": Value::Null,
         "plus_one_allowed": authority.plus_one_allowed,
         "children_invited": authority.children_invited,
+        "guest_role": authority.guest_role,
+        "companion_to_person_id": authority.companion_to_person_id,
+        "name_pending": authority.name_pending,
+        "seat_requirement": authority.seat_requirement,
+        "meal_requirement": authority.meal_requirement,
         "has_private_answers": request.private_answers_ciphertext.is_some(),
         "encrypted_private_payload": request.private_answers_ciphertext,
         "request_fingerprint": request_fingerprint(&request),

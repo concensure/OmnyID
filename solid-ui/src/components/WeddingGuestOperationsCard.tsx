@@ -32,7 +32,13 @@ export function WeddingGuestOperationsCard(props: {
     rsvpStatus: string;
     previousRsvpStatus?: string;
     plusOneAllowed: boolean;
+    plusOneMode?: "none" | "named" | "unnamed";
+    plusOneName?: string;
     childrenInvited: boolean;
+    childName?: string;
+    childAgeBand?: "adult" | "child_under_12" | "teen" | "unknown";
+    childSeatRequirement?: "standard" | "high_chair" | "booster" | "none" | "unknown";
+    childMealRequirement?: "adult" | "child" | "none" | "unknown";
     contactLabel: string;
     mealPreference: string;
     dietaryNote: string;
@@ -49,7 +55,13 @@ export function WeddingGuestOperationsCard(props: {
   const [guestGroup, setGuestGroup] = createSignal("");
   const [guestRsvp, setGuestRsvp] = createSignal("Pending");
   const [guestPlusOneAllowed, setGuestPlusOneAllowed] = createSignal(false);
+  const [guestPlusOneMode, setGuestPlusOneMode] = createSignal<"named" | "unnamed">("unnamed");
+  const [guestPlusOneName, setGuestPlusOneName] = createSignal("");
   const [guestChildrenInvited, setGuestChildrenInvited] = createSignal(false);
+  const [guestChildName, setGuestChildName] = createSignal("");
+  const [guestChildAgeBand, setGuestChildAgeBand] = createSignal<"child_under_12" | "teen" | "unknown">("unknown");
+  const [guestChildSeat, setGuestChildSeat] = createSignal<"standard" | "high_chair" | "booster" | "none" | "unknown">("unknown");
+  const [guestChildMeal, setGuestChildMeal] = createSignal<"adult" | "child" | "none" | "unknown">("unknown");
   const [guestContact, setGuestContact] = createSignal("");
   const [guestMeal, setGuestMeal] = createSignal("");
   const [guestDietary, setGuestDietary] = createSignal("");
@@ -131,6 +143,14 @@ export function WeddingGuestOperationsCard(props: {
     const name = guestName().trim();
     const group = guestGroup().trim() || "Ungrouped";
     if (!name || savingGuest()) return;
+    if (guestPlusOneAllowed() && guestPlusOneMode() === "named" && !guestPlusOneName().trim()) {
+      setSaveNotice("Add the named plus-one, or choose “Name can be added later”.");
+      return;
+    }
+    if (guestChildrenInvited() && !guestChildName().trim()) {
+      setSaveNotice("Add the child's name so their RSVP stays separate from the adult guest.");
+      return;
+    }
     setSaveNotice(null);
     setSavingGuest(true);
     try {
@@ -140,7 +160,13 @@ export function WeddingGuestOperationsCard(props: {
           householdLabel: group,
           rsvpStatus: guestRsvp(),
           plusOneAllowed: guestPlusOneAllowed(),
+          plusOneMode: guestPlusOneAllowed() ? guestPlusOneMode() : "none",
+          plusOneName: guestPlusOneName(),
           childrenInvited: guestChildrenInvited(),
+          childName: guestChildName(),
+          childAgeBand: guestChildAgeBand(),
+          childSeatRequirement: guestChildSeat(),
+          childMealRequirement: guestChildMeal(),
           contactLabel: guestContact(),
           mealPreference: guestMeal(),
           dietaryNote: guestDietary(),
@@ -160,7 +186,13 @@ export function WeddingGuestOperationsCard(props: {
       setGuestGroup("");
       setGuestRsvp("Pending");
       setGuestPlusOneAllowed(false);
+      setGuestPlusOneMode("unnamed");
+      setGuestPlusOneName("");
       setGuestChildrenInvited(false);
+      setGuestChildName("");
+      setGuestChildAgeBand("unknown");
+      setGuestChildSeat("unknown");
+      setGuestChildMeal("unknown");
       setGuestContact("");
       setGuestMeal("");
       setGuestDietary("");
@@ -303,6 +335,39 @@ export function WeddingGuestOperationsCard(props: {
               onChange={setGuestChildrenInvited}
             />
           </div>
+          <Show when={guestPlusOneAllowed()}>
+            <div class="mt-3 grid gap-2 rounded-xl border border-sky-100 bg-sky-50 p-3 sm:grid-cols-2">
+              <label class="text-xs font-semibold text-sky-950">Plus-one type
+                <select class="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm" value={guestPlusOneMode()} onChange={(event) => setGuestPlusOneMode(event.currentTarget.value as "named" | "unnamed")}>
+                  <option value="unnamed">Name can be added later</option>
+                  <option value="named">Named person</option>
+                </select>
+              </label>
+              <Show when={guestPlusOneMode() === "named"}>
+                <label class="text-xs font-semibold text-sky-950">Plus-one name
+                  <input maxlength="120" class="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm" value={guestPlusOneName()} onInput={(event) => setGuestPlusOneName(event.currentTarget.value)} placeholder="Taylor Lee" />
+                </label>
+              </Show>
+              <p class="text-xs leading-5 text-sky-950/70 sm:col-span-2">A plus-one becomes a separate guest and invitation in this household, so their RSVP, meal and seat stay individually reconcilable.</p>
+            </div>
+          </Show>
+          <Show when={guestChildrenInvited()}>
+            <div class="mt-3 grid gap-2 rounded-xl border border-sky-100 bg-sky-50 p-3 sm:grid-cols-2">
+              <label class="text-xs font-semibold text-sky-950">Child name
+                <input maxlength="120" class="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm" value={guestChildName()} onInput={(event) => setGuestChildName(event.currentTarget.value)} placeholder="Avery Lee" />
+              </label>
+              <label class="text-xs font-semibold text-sky-950">Age band
+                <select class="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm" value={guestChildAgeBand()} onChange={(event) => setGuestChildAgeBand(event.currentTarget.value as "child_under_12" | "teen" | "unknown")}><option value="unknown">Not recorded</option><option value="child_under_12">Under 12</option><option value="teen">Teen</option></select>
+              </label>
+              <label class="text-xs font-semibold text-sky-950">Seat requirement
+                <select class="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm" value={guestChildSeat()} onChange={(event) => setGuestChildSeat(event.currentTarget.value as "standard" | "high_chair" | "booster" | "none" | "unknown")}><option value="unknown">Confirm later</option><option value="standard">Standard seat</option><option value="high_chair">High chair</option><option value="booster">Booster seat</option><option value="none">No seat needed</option></select>
+              </label>
+              <label class="text-xs font-semibold text-sky-950">Meal requirement
+                <select class="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm" value={guestChildMeal()} onChange={(event) => setGuestChildMeal(event.currentTarget.value as "adult" | "child" | "none" | "unknown")}><option value="unknown">Confirm later</option><option value="child">Child meal</option><option value="adult">Adult meal</option><option value="none">No meal needed</option></select>
+              </label>
+              <p class="text-xs leading-5 text-sky-950/70 sm:col-span-2">Add one named child at a time. Use “Add or group guest” again for another child so each person keeps their own RSVP.</p>
+            </div>
+          </Show>
           <details class="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-3">
             <summary class="flex min-h-11 cursor-pointer items-center text-sm font-semibold text-sky-950">Add contact, meal, or access notes</summary>
             <div class="grid gap-2 pb-3 sm:grid-cols-2">

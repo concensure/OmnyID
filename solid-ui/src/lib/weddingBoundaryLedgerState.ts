@@ -107,6 +107,11 @@ export type WeddingBoundaryEventInvitation = WeddingBoundaryLedgerObjectBase & {
   responseRevision?: number | null;
   plusOneAllowed?: boolean | null;
   childrenInvited?: boolean | null;
+  guestRole?: "primary" | "plus_one" | "child" | null;
+  companionToPersonId?: string | null;
+  namePending?: boolean | null;
+  seatRequirement?: "standard" | "high_chair" | "booster" | "none" | "unknown" | null;
+  mealRequirement?: "adult" | "child" | "none" | "unknown" | null;
   visibleToGuest?: boolean | null;
 };
 
@@ -428,6 +433,11 @@ function publicContentFor(object: WeddingBoundaryLedgerObject): Record<string, u
       response_revision: object.responseRevision ?? null,
       plus_one_allowed: object.plusOneAllowed === true,
       children_invited: object.childrenInvited === true,
+      guest_role: object.guestRole ?? "primary",
+      companion_to_person_id: object.companionToPersonId ?? null,
+      name_pending: object.namePending === true,
+      seat_requirement: object.seatRequirement ?? "unknown",
+      meal_requirement: object.mealRequirement ?? "unknown",
       visible_to_guest: object.visibleToGuest !== false,
     };
   }

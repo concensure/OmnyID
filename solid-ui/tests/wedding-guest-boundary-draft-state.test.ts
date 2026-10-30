@@ -61,6 +61,67 @@ test("guest invitation drafts expose plus-one and children facts through AFP", (
   assert.equal(message.content.children_invited, false);
 });
 
+test("named and unnamed plus-ones are separate canonical household guests", () => {
+  const named = buildWeddingGuestBoundaryDraftObjects({
+    displayName: "Alex Lee",
+    householdLabel: "Lee household",
+    rsvpStatus: "Pending",
+    plusOneAllowed: true,
+    plusOneMode: "named",
+    plusOneName: "Jordan Kim",
+  }, metadata, "2026-09-25T00:00:00.000Z");
+  const namedHousehold = named.find((object) => object.kind === "wedding_boundary_household");
+  const namedProfiles = named.filter((object) => object.kind === "wedding_boundary_guest_profile");
+  const namedInvitations = named.filter((object) => object.kind === "wedding_boundary_event_invitation");
+
+  assert.equal(namedProfiles.length, 2);
+  assert.equal(namedInvitations.length, 2);
+  assert.equal(namedHousehold?.kind === "wedding_boundary_household" ? namedHousehold.memberPersonIds?.length : 0, 2);
+  const companion = namedInvitations.find((object) => object.kind === "wedding_boundary_event_invitation" && object.guestRole === "plus_one");
+  assert.equal(companion?.kind === "wedding_boundary_event_invitation" ? companion.namePending : null, false);
+  const primaryProfile = namedProfiles.find((object) => object.kind === "wedding_boundary_guest_profile" && object.relationshipLabel !== "Plus-one");
+  assert.equal(
+    companion?.kind === "wedding_boundary_event_invitation" ? companion.companionToPersonId : null,
+    primaryProfile?.kind === "wedding_boundary_guest_profile" ? primaryProfile.personId : null,
+  );
+
+  const unnamed = buildWeddingGuestBoundaryDraftObjects({
+    displayName: "Sam Patel",
+    householdLabel: "Patel household",
+    rsvpStatus: "Pending",
+    plusOneAllowed: true,
+    plusOneMode: "unnamed",
+  }, metadata, "2026-09-25T00:00:00.000Z");
+  const unnamedProfile = unnamed.find((object) => object.kind === "wedding_boundary_guest_profile" && object.relationshipLabel === "Plus-one");
+  const unnamedInvitation = unnamed.find((object) => object.kind === "wedding_boundary_event_invitation" && object.guestRole === "plus_one");
+  assert.equal(unnamedProfile?.kind === "wedding_boundary_guest_profile" ? unnamedProfile.displayName : null, "Guest of Sam Patel");
+  assert.equal(unnamedInvitation?.kind === "wedding_boundary_event_invitation" ? unnamedInvitation.namePending : null, true);
+});
+
+test("a child is a separate invitation with age, seat, and meal requirements", () => {
+  const objects = buildWeddingGuestBoundaryDraftObjects({
+    displayName: "Taylor Wong",
+    householdLabel: "Wong household",
+    rsvpStatus: "Pending",
+    childrenInvited: true,
+    childName: "Ari Wong",
+    childAgeBand: "child_under_12",
+    childSeatRequirement: "high_chair",
+    childMealRequirement: "child",
+  }, metadata, "2026-09-25T00:00:00.000Z");
+  const child = objects.find((object) => object.kind === "wedding_boundary_guest_profile" && object.relationshipLabel === "Child");
+  const invitation = objects.find((object) => object.kind === "wedding_boundary_event_invitation" && object.guestRole === "child");
+  assert.equal(child?.kind === "wedding_boundary_guest_profile" ? child.ageBand : null, "child_under_12");
+  assert.equal(invitation?.kind === "wedding_boundary_event_invitation" ? invitation.seatRequirement : null, "high_chair");
+  assert.equal(invitation?.kind === "wedding_boundary_event_invitation" ? invitation.mealRequirement : null, "child");
+
+  assert.ok(invitation);
+  const restored = weddingBoundaryLedgerObjectToAfpMessage(invitation!, metadata, "2026-09-25T00:00:00.000Z");
+  assert.equal(restored.content.guest_role, "child");
+  assert.equal(restored.content.seat_requirement, "high_chair");
+  assert.equal(restored.content.meal_requirement, "child");
+});
+
 test("guest boundary drafts project through AFP topology and knowledge graph routing", () => {
   const [, guest] = buildWeddingGuestBoundaryDraftObjects({
     displayName: "Alex Lee",

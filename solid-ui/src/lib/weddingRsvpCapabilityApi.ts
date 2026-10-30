@@ -19,6 +19,12 @@ export type WeddingRsvpCapabilityInvitation = {
   response_revision: number;
   plus_one_allowed: boolean;
   children_invited: boolean;
+  age_band: string;
+  guest_role: "primary" | "plus_one" | "child";
+  companion_to_person_id?: string | null;
+  name_pending: boolean;
+  seat_requirement: "standard" | "high_chair" | "booster" | "none" | "unknown";
+  meal_requirement: "adult" | "child" | "none" | "unknown";
 };
 
 export type WeddingRsvpCapabilityScope = {

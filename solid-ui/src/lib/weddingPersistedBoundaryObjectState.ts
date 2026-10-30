@@ -309,6 +309,11 @@ export function weddingPersistedBoundaryObjectFromAfpMessage(
       responseRevision: positiveInteger(contentValue(message, "response_revision")),
       plusOneAllowed: bool(contentValue(message, "plus_one_allowed")),
       childrenInvited: bool(contentValue(message, "children_invited")),
+      guestRole: clean(contentValue(message, "guest_role")) as WeddingBoundaryEventInvitation["guestRole"],
+      companionToPersonId: clean(contentValue(message, "companion_to_person_id")),
+      namePending: bool(contentValue(message, "name_pending")),
+      seatRequirement: clean(contentValue(message, "seat_requirement")) as WeddingBoundaryEventInvitation["seatRequirement"],
+      mealRequirement: clean(contentValue(message, "meal_requirement")) as WeddingBoundaryEventInvitation["mealRequirement"],
       visibleToGuest: contentValue(message, "visible_to_guest") !== false,
     };
   }
