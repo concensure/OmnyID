@@ -2065,3 +2065,18 @@ imported and future guest-submitted answers keep provenance. New guest profiles 
 dietary or accessibility logistics are couple-only by default; vendor sharing remains a separate,
 minimum-necessary preview and approval boundary. Public invitation capabilities remain false-default
 until random-token, expiry, revocation, isolation and idempotency work is implemented and evidenced.
+
+## 2026-10-30: RSVP writes are scoped AFP commands with atomic consequence receipts
+
+An RSVP response is a versioned `wedding_rsvp_response` event in the account's existing tenant AFP
+ledger, not a mutable RSVP row or parallel guest store. The original event invitation remains the
+scope authority for wedding, workspace, person and event. An authenticated couple command must match
+that authority, the current revision and the unlocked state before it can append.
+
+The server serializes competing writes per invitation, treats an exact idempotency replay as a no-op,
+rejects reuse of that key for changed answers, and writes the response plus its
+`wedding_rsvp_impact_receipt` in one transaction. The receipt names the guest summary, Wedding Home
+tile and final-count effects so connected information is not left for the couple to reconcile. Public
+attendance remains separate from an optional opaque `encrypted:v1` private-answer envelope; plaintext
+private answers are refused. Public guest capabilities remain absent until WED-303C adds and proves
+random digest-only tokens, expiry, revocation and tenant isolation.
