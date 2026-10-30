@@ -1,6 +1,6 @@
 use super::wedding_rsvp_response_routes::{
-    Attendance, InvitationAuthority, RecordResponseRequest, validate_invitation_scope,
-    validate_request,
+    Attendance, InvitationAuthority, RecordResponseRequest, validate_expected_revision,
+    validate_invitation_scope, validate_request,
 };
 use axum::http::StatusCode;
 
@@ -49,6 +49,22 @@ fn rejects_empty_or_oversized_private_answer_envelopes() {
     assert_eq!(
         validate_request(&oversized).unwrap_err().0,
         StatusCode::BAD_REQUEST
+    );
+
+    let mut plaintext = request();
+    plaintext.private_answers_ciphertext = Some("Guest has a severe nut allergy".into());
+    assert_eq!(
+        validate_request(&plaintext).unwrap_err().0,
+        StatusCode::BAD_REQUEST
+    );
+}
+
+#[test]
+fn rejects_stale_revisions_before_append() {
+    assert!(validate_expected_revision(2, 2).is_ok());
+    assert_eq!(
+        validate_expected_revision(1, 2).unwrap_err().0,
+        StatusCode::CONFLICT
     );
 }
 

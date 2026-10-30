@@ -118,9 +118,26 @@ pub(crate) fn validate_request(
     if request
         .private_answers_ciphertext
         .as_ref()
-        .is_some_and(|value| value.is_empty() || value.len() > MAX_PRIVATE_ENVELOPE_BYTES)
+        .is_some_and(|value| {
+            !value.starts_with("encrypted:v1:")
+                || value.len() <= "encrypted:v1:".len()
+                || value.len() > MAX_PRIVATE_ENVELOPE_BYTES
+                || value.chars().any(char::is_whitespace)
+        })
     {
         return Err(bad_request("The private RSVP answer envelope is invalid."));
+    }
+    Ok(())
+}
+
+pub(crate) fn validate_expected_revision(
+    expected_revision: i64,
+    current_revision: i64,
+) -> Result<(), (StatusCode, String)> {
+    if expected_revision != current_revision {
+        return Err(conflict(
+            "This RSVP changed on another screen. Refresh before saving your answer.",
+        ));
     }
     Ok(())
 }
@@ -370,11 +387,7 @@ async fn record_response_http(
         .and_then(|value| value.get("revision"))
         .and_then(Value::as_i64)
         .unwrap_or(authority.response_revision);
-    if request.expected_revision != current_revision {
-        return Err(conflict(
-            "This RSVP changed on another screen. Refresh before saving your answer.",
-        ));
-    }
+    validate_expected_revision(request.expected_revision, current_revision)?;
     let previous_status = latest
         .as_ref()
         .and_then(|value| value.get("invitation_status"))
