@@ -82,11 +82,11 @@ Acceptance: only a live capability can read the exact invitation scope; a capabi
 
 Depends on: WED-303B
 
-- [ ] Add event setup/reuse, deadline and controlled question library to the existing Guests surface.
+- [x] Add event setup/reuse, deadline and controlled question library to the existing Guests surface.
 - [ ] Support attendance, meal choice, dietary/allergy category + detail, accessibility, travel, accommodation and a bounded custom question.
 - [ ] Add per-person/per-event entitlements, named/unnamed plus-one and child age/seat/meal requirements.
-- [ ] Preview the exact invitation for each household before publishing.
-- [ ] Add paper/phone/manual-response flow through the canonical response command.
+- [x] Preview the exact invitation for each household before publishing.
+- [x] Add paper/phone/manual-response flow through the canonical response command.
 - [ ] Add A2UI cards for setup gaps and bounded actions.
 - [ ] Make publish/send an explicit, confirmation-gated action.
 

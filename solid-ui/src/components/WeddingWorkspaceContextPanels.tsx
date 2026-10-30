@@ -20,6 +20,7 @@ import { WeddingCollaborationAccessCard } from "@/components/WeddingCollaboratio
 import { WeddingCustomSurfaceTools } from "@/components/WeddingCustomSurfaceTools";
 import { WeddingDecisionFocusCard } from "@/components/WeddingDecisionFocusCard";
 import { WeddingGuestOperationsCard } from "@/components/WeddingGuestOperationsCard";
+import { WeddingRsvpSetupPanel } from "@/components/WeddingRsvpSetupPanel";
 import { WeddingHelpersPanel } from "@/components/WeddingHelpersPanel";
 import { WeddingHomeOverviewGrid } from "@/components/WeddingHomeOverviewGrid";
 import { WeddingImportantDetailsPanel } from "@/components/WeddingImportantDetailsPanel";
@@ -54,6 +55,11 @@ import {
   type WeddingWorkspaceAggregateAction,
 } from "@/lib/weddingWorkspaceAggregateState";
 import { recordWeddingRsvpResponse } from "@/lib/weddingRsvpResponseState";
+import {
+  weddingRsvpSetupFromAfpMessages,
+  weddingRsvpSetupToAfpSendInput,
+  type WeddingRsvpSetupState,
+} from "@/lib/weddingRsvpSetupState";
 
 function weddingLocationAdviceLabel(state: WeddingResponseWorkspaceViewState): string {
   const locationLabel = state.workspace.artifacts
@@ -100,6 +106,10 @@ export function WeddingWorkspaceContextPanels(props: {
     sharePlanOpen: props.sharePlanOpen,
     sharePlanAvailable: Boolean(props.onToggleSharePlan),
   }));
+  const rsvpSetup = createMemo(() => weddingRsvpSetupFromAfpMessages(
+    props.state.afpMessages,
+    props.state.workspace.metadata.responseWorkspaceId,
+  ));
   function openAggregateAction(action: WeddingWorkspaceAggregateAction) {
     if (!action.enabled) return;
     if (action.targetMenu === "share_plan") {
@@ -203,6 +213,12 @@ export function WeddingWorkspaceContextPanels(props: {
     }
     props.onRefreshWorkspace?.();
     return "Guest rules saved to family boundaries.";
+  }
+  async function saveRsvpSetup(setup: WeddingRsvpSetupState): Promise<string> {
+    if (!props.saveProjection) throw new Error("Saving is not connected yet.");
+    await props.saveProjection(weddingRsvpSetupToAfpSendInput(setup, props.state.workspace.metadata));
+    props.onRefreshWorkspace?.();
+    return "RSVP setup saved. No invitation or link was sent.";
   }
   async function saveFamilyRequest(input: { requesterLabel: string; requestLabel: string; changeType: WeddingBoundaryChangeType }): Promise<string> {
     if (!props.saveProjection) throw new Error("Saving is not connected yet.");
@@ -375,6 +391,12 @@ export function WeddingWorkspaceContextPanels(props: {
           metadata={props.state.workspace.metadata}
           onSaveGuestDraft={saveGuestDraft}
           onSaveGuestRules={saveGuestRules}
+        />
+        <WeddingRsvpSetupPanel
+          current={rsvpSetup()}
+          guestTracking={props.state.guestTracking}
+          metadata={props.state.workspace.metadata}
+          onSave={saveRsvpSetup}
         />
         <div class="mt-3">
           <WeddingBoundaryManagementCard

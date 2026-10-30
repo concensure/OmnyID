@@ -515,6 +515,8 @@ export function buildWeddingGuestTrackingState(input: {
         lockedAt: invitation.lockedAt ?? null,
         changed: Boolean(invitation.previousInvitationStatus && invitation.previousInvitationStatus !== invitation.invitationStatus),
         revision: invitation.responseRevision ?? null,
+        plusOneAllowed: invitation.plusOneAllowed === true,
+        childrenInvited: invitation.childrenInvited === true,
       })),
       sourceLabel: "Saved in your guest list",
     });

@@ -24,6 +24,8 @@ export type WeddingRsvpEventSnapshot = {
   lockedAt: string | null;
   changed: boolean;
   revision: number | null;
+  plusOneAllowed?: boolean;
+  childrenInvited?: boolean;
 };
 
 export type WeddingRsvpGuestSnapshot = {

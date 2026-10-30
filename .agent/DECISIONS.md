@@ -1,3 +1,17 @@
+## 2026-10-30: Saving RSVP setup is not publishing an RSVP invitation
+
+WED-303D stores the selected event, response deadline and controlled question
+configuration as a versioned `wedding_rsvp_setup` object in the wedding's AFP
+ledger. The existing Guest projection remains authoritative for people,
+households, event invitations and entitlements; the setup object does not copy
+guest contact details or private response answers.
+
+The setup surface may preview the exact saved household invitation scope, but
+its save action has explicit `sends_invitation:false` and
+`creates_capability:false` metadata. Creating or rotating a protected public
+capability and sending it remain separate, confirmation-gated actions. This
+keeps preview and editing safe while the public RSVP rollout flag is false.
+
 ## 2026-10-30: RSVP capabilities are household-scoped and operationally separate from run-sheet shares
 
 WED-303C follows the proven run-sheet security pattern but does not reuse its
