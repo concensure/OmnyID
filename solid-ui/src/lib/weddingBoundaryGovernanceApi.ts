@@ -38,7 +38,7 @@ export function decideWeddingBoundaryRequest(input: {
 export type WeddingBoundaryHouseholdCommand = {
   weddingPlanId: string;
   responseWorkspaceId: string;
-  operation: "split_household" | "merge_households" | "archive_household" | "assign_group" | "change_allocation" | "change_representative" | "close_requests" | "reopen_requests";
+  operation: "split_household" | "merge_households" | "archive_household" | "assign_group" | "change_allocation" | "change_representative" | "close_requests" | "reopen_requests" | "apply_group_plus_one_policy";
   sourceHouseholdIds: string[];
   expectedRevisions: Record<string, number>;
   targetHouseholdId?: string;
@@ -48,6 +48,8 @@ export type WeddingBoundaryHouseholdCommand = {
   familyGroupId?: string;
   invitationAllocation?: number;
   representativePersonId?: string;
+  plusOneAllowed?: boolean;
+  exceptionPersonIds?: string[];
   confirmedElevatedImpact?: boolean;
   idempotencyKey: string;
 };
@@ -68,7 +70,122 @@ export function applyWeddingBoundaryHouseholdCommand(input: WeddingBoundaryHouse
       family_group_id: input.familyGroupId,
       invitation_allocation: input.invitationAllocation,
       representative_person_id: input.representativePersonId,
+      plus_one_allowed: input.plusOneAllowed,
+      exception_person_ids: input.exceptionPersonIds ?? [],
       confirmed_elevated_impact: input.confirmedElevatedImpact,
+      idempotency_key: input.idempotencyKey,
+    },
+  });
+}
+
+export type WeddingBoundaryDelegatedRole = "planner" | "rsvp_guest";
+
+export type WeddingBoundaryDelegatedGrant = {
+  grant_id: string;
+  wedding_plan_id: string;
+  response_workspace_id: string;
+  role: WeddingBoundaryDelegatedRole;
+  person_id?: string | null;
+  household_ids: string[];
+  allowed_actions: string[];
+  expires_at: string;
+  revoked_at?: string | null;
+};
+
+export function createWeddingBoundaryDelegatedGrant(input: {
+  weddingPlanId: string;
+  responseWorkspaceId: string;
+  delegateEmail: string;
+  role: WeddingBoundaryDelegatedRole;
+  personId?: string;
+  householdIds?: string[];
+  expiresAt: string;
+}) {
+  return apiFetch<WeddingBoundaryDelegatedGrant>("/wedding/boundaries/delegates/grants", {
+    method: "POST",
+    bodyJson: {
+      wedding_plan_id: input.weddingPlanId,
+      response_workspace_id: input.responseWorkspaceId,
+      delegate_email: input.delegateEmail,
+      role: input.role,
+      person_id: input.personId,
+      household_ids: input.householdIds ?? [],
+      expires_at: input.expiresAt,
+    },
+  });
+}
+
+export function listWeddingBoundaryDelegatedGrants(responseWorkspaceId: string) {
+  return apiFetch<WeddingBoundaryDelegatedGrant[]>(`/wedding/boundaries/delegates/grants?response_workspace_id=${encodeURIComponent(responseWorkspaceId)}`);
+}
+
+export function revokeWeddingBoundaryDelegatedGrant(grantId: string) {
+  return apiFetch<WeddingBoundaryDelegatedGrant>(`/wedding/boundaries/delegates/grants/${encodeURIComponent(grantId)}/revoke`, { method: "POST" });
+}
+
+export function openWeddingBoundaryDelegatedGrant(grantId: string) {
+  return apiFetch<Record<string, unknown>>(`/wedding/boundaries/delegates/grants/${encodeURIComponent(grantId)}/open`);
+}
+
+export function proposeWeddingBoundaryDelegatedChange(input: {
+  grantId: string;
+  changeType: "add_guest" | "remove_guest" | "plus_one_change" | "event_invite_change" | "guest_contact_update";
+  requestLabel: string;
+  targetHouseholdId?: string;
+  targetPersonId?: string;
+  proposedGuestName?: string;
+  proposedPlusOneAllowed?: boolean;
+  proposedInvitationStatus?: string;
+  proposedContactLabel?: string;
+  idempotencyKey: string;
+}) {
+  return apiFetch<{ request_id: string; status: "pending"; replayed: boolean; explanation: string }>(`/wedding/boundaries/delegates/grants/${encodeURIComponent(input.grantId)}/propose`, {
+    method: "POST",
+    bodyJson: {
+      change_type: input.changeType,
+      request_label: input.requestLabel,
+      target_household_id: input.targetHouseholdId,
+      target_person_id: input.targetPersonId,
+      proposed_guest_name: input.proposedGuestName,
+      proposed_plus_one_allowed: input.proposedPlusOneAllowed,
+      proposed_invitation_status: input.proposedInvitationStatus,
+      proposed_contact_label: input.proposedContactLabel,
+      idempotency_key: input.idempotencyKey,
+    },
+  });
+}
+
+export function readWeddingBoundaryPrivateNote(input: { weddingPlanId: string; responseWorkspaceId: string; personId: string }) {
+  const query = new URLSearchParams({
+    wedding_plan_id: input.weddingPlanId,
+    response_workspace_id: input.responseWorkspaceId,
+    person_id: input.personId,
+  });
+  return apiFetch<{ person_id: string; ciphertext: string | null; version: number; updated_at?: string }>(`/wedding/boundaries/private-notes?${query.toString()}`);
+}
+
+export function saveWeddingBoundaryPrivateNote(input: { weddingPlanId: string; responseWorkspaceId: string; personId: string; ciphertext: string; expectedVersion?: number; idempotencyKey: string }) {
+  return apiFetch<{ person_id: string; version: number; note_ref: string; replayed: boolean }>("/wedding/boundaries/private-notes", {
+    method: "POST",
+    bodyJson: {
+      wedding_plan_id: input.weddingPlanId,
+      response_workspace_id: input.responseWorkspaceId,
+      person_id: input.personId,
+      ciphertext: input.ciphertext,
+      expected_version: input.expectedVersion,
+      idempotency_key: input.idempotencyKey,
+    },
+  });
+}
+
+export function removeWeddingBoundaryPrivateNote(input: { weddingPlanId: string; responseWorkspaceId: string; personId: string; expectedVersion: number; idempotencyKey: string }) {
+  return apiFetch<{ person_id: string; removed: boolean; replayed: boolean }>("/wedding/boundaries/private-notes/remove", {
+    method: "POST",
+    bodyJson: {
+      wedding_plan_id: input.weddingPlanId,
+      response_workspace_id: input.responseWorkspaceId,
+      person_id: input.personId,
+      expected_version: input.expectedVersion,
       idempotency_key: input.idempotencyKey,
     },
   });

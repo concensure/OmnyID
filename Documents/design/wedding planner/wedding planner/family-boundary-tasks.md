@@ -75,12 +75,12 @@ Depends on: 4
 
 Depends on: 4, 5
 
-- [x] Define Couple, delegated Planner, Family helper and RSVP guest capability presets with record-level scopes; hosted delegated routes remain false-default rollout work.
+- [x] Define Couple, delegated Planner, Family helper and RSVP guest capability presets with record-level scopes; authenticated Planner/RSVP routes are owner-allowlisted and false-default.
 - [x] Reuse the existing digest-only expiring/revocable capability boundary for the family-helper slice.
 - [x] Enforce account, wedding, household, principal and action on the new helper routes.
 - [x] Separate view and propose permissions; helper grants never receive approval authority.
 - [x] Immediately refuse revoked or expired family-helper links.
-- [ ] Test forged household IDs, forwarded links, cross-tenant reads/writes and planner privilege escalation.
+- [x] Test forged household IDs, forwarded links, cross-tenant reads/writes and planner privilege escalation.
 
 ## 7. Request lifecycle and atomic decisions
 
@@ -111,8 +111,8 @@ Depends on: 5, 7, 8
 
 - [x] Assign households to a group through one stale-safe bulk command and affected-record receipt.
 - [x] Change allocation through one stale-safe bulk command; the richer committed/named/accepted UI breakdown remains open.
-- [ ] Apply group plus-one policy while preserving authorised exceptions.
-- [ ] Change representatives with immediate old-grant revocation and pending-request review.
+- [x] Apply group plus-one policy while preserving authorised exceptions.
+- [x] Change representatives with immediate old-grant revocation and pending-request review.
 - [x] Close/reopen request windows without deleting submitted requests.
 - [x] Require elevated confirmation for bulk changes affecting sent or accepted invitations.
 
@@ -120,9 +120,9 @@ Depends on: 5, 7, 8
 
 Depends on: 6, 7
 
-- [ ] Store sensitive private values in controlled mutable records; immutable events use references/redacted snapshots.
+- [x] Store sensitive private values in controlled mutable encrypted records; immutable events use references/redacted snapshots.
 - [ ] Minimise helper/guest projections field by field.
-- [ ] Add revocation, expiry and deletion/retention tests.
+- [x] Add revocation, expiry and deletion/retention tests.
 - [ ] Record actor, causation, expected versions, decision and reconciliation references without duplicating private content.
 - [ ] Run security/privacy review for cross-scope disclosure and forwarded capabilities.
 
@@ -130,7 +130,7 @@ Depends on: 6, 7
 
 Depends on: 1–10 as applicable
 
-- [ ] Run typecheck, focused tests, all Wedding tests, Rust route/database tests, line budgets and production build.
+- [x] Run typecheck, focused tests, all Wedding tests, Rust route/database tests, line budgets and production build for the current local candidate.
 - [ ] Run keyboard, focus restoration, screen-reader naming, colour-independent status, 320/375 px and 200% zoom checks.
 - [ ] Run couple usability for request review, household attention and rule comprehension.
 - [ ] Run delegated-helper usability with deliberately restricted data.
@@ -142,8 +142,8 @@ Depends on: 1–10 as applicable
 
 The checked items now include the couple-facing and server-authority foundation: native mobile shell, reversible onboarding imagery, source-confirmed meal choices, compact boundary summary, typed family groups and rules, deterministic household and conflict previews, AFP-backed household revisions, false-default digest-only family-helper grants, minimum-necessary helper projections, idempotent request decisions, stale policy/household checks, and an atomic add-guest approval that creates an unsent invitation draft and one impact receipt.
 
-WED-309 adds the next server-authority slice: atomic stale-safe household split/merge/archive and bounded bulk commands, explicit remove/plus-one/invitation/contact-label request mutations, configurable two-partner partial approval, minimum-necessary Planner/RSVP capability presets, a flags-off helper shadow assertion, and live disposable PostgreSQL/ClamAV evidence. The first partner approval records progress but applies no connected mutation; a different active couple-role identity must provide the second approval.
+WED-309 adds the next server-authority slices: atomic stale-safe household split/merge/archive and bounded bulk commands, explicit remove/plus-one/invitation/contact-label request mutations, configurable two-partner partial approval, authenticated minimum-necessary Planner/RSVP grants, opaque mutable encrypted private notes, serialized last-seat approvals, group plus-one policies with named exceptions, immediate representative-change grant revocation, a flags-off helper shadow assertion, and live disposable PostgreSQL/ClamAV evidence. The first partner approval records progress but applies no connected mutation; a different active couple-role identity must provide the second approval. Delegates can only see their scoped projection and submit a pending request; they never receive couple approval authority or private-note access.
 
-This is not the end of the roadmap. Authenticated hosted routes for delegated Planner and RSVP-guest roles, a controlled mutable encrypted private-note command, simultaneous last-seat contention, representative-change grant revocation, group-wide plus-one exceptions, per-projector reconciliation receipts, helper UI/hosted cohort evidence, and the complete security/accessibility/usability matrix remain open. `OMNYID_WEDDING_BOUNDARY_HELPERS_ENABLED` stays false unless the hosted rollout criteria pass.
+This is not the end of the roadmap. Delegate/helper management UI, per-projector reconciliation acknowledgements, sent-invitation policy-change previews, removal-after-RSVP handling, restricted projection field audits, helper/delegate expiry and deletion-retention tests, hosted flags-off evidence, a controlled allowlisted cohort, and the complete security/accessibility/usability matrix remain open. `OMNYID_WEDDING_BOUNDARY_HELPERS_ENABLED` and `OMNYID_WEDDING_BOUNDARY_DELEGATES_ENABLED` stay false unless the hosted rollout criteria pass.
 
 Release evidence for this slice is in `Documents/verification/wed-306-native-mobile-meal-family-boundaries-2026-10-31.md`. The pre-change coordination SHA was `3bd1f79fdae00c370556b504e0fde1daf66cc36f`; the exact deployed application SHA is `3c626dd149d61ae57c739fa90cd26acecb0109aa`.

@@ -6086,3 +6086,47 @@ Not performed:
   mutation, simultaneous last-seat contention, representative grant revocation,
   group plus-one exceptions, per-projector receipts, helper UI and controlled
   hosted rollout evidence. Keep helper capabilities false-default.
+
+## 2026-11-01 - WED-309B delegated Family Boundaries enforcement (Codex)
+
+Continued in `C:\Users\ozans\Desktop\projects\OmnyID-WED-286` from
+`ff2385d4a43bf34b7a4ee4ef4330d1555d24fbe8`.
+
+Changed:
+
+- Added migration 0129 for authenticated delegated grants and opaque mutable
+  encrypted private notes. Both tables cascade with account deletion; AFP remains
+  the domain history and carries redacted note references only.
+- Added owner-created Planner and RSVP-guest grants. Opening and proposing require
+  an authenticated exact delegate account, live expiry/revocation, the global
+  false-default flag and an owner ID allowlist. Proposals are pending requests;
+  delegates cannot approve them.
+- Added minimum-necessary Planner household and RSVP self-invitation projections.
+  Private notes and unrelated guest/contact data are not returned.
+- Serialized household-capacity approvals, added group plus-one policy with named
+  exceptions, and revoked household helper/former-representative grants when the
+  representative changes.
+- Added encrypted note save/read/remove API contracts with optimistic versions,
+  idempotency and no ciphertext in AFP events.
+
+Verification on the working candidate:
+
+- Disposable PostgreSQL Family Boundary integration: 4 passed, covering tenant
+  isolation, idempotency/stale revisions, two-partner approval, non-add mutation,
+  delegate scope/outsider refusal/forged approval, revocation, expiry, deletion
+  cascade, ciphertext isolation, group exceptions and simultaneous last-seat
+  contention.
+- Focused Rust boundary tests: 7 passed.
+- Embedded migration catalogue: 1 passed.
+- `npm run typecheck`: passed.
+- `npm run test:wedding`: 2,116 passed.
+- `npm run test:line-budget`: 2 passed; substantive files remain below 999 lines.
+- `npm run build`: passed.
+
+Still open:
+
+- No deployment or rollout flag change was requested. Both helper and delegate
+  capabilities remain false-default.
+- Build delegate/helper management UI, projector acknowledgements, sent-invite
+  policy previews and removal-after-RSVP handling; complete field-by-field privacy,
+  accessibility/usability and exact-hosted flags-off evidence before any cohort.

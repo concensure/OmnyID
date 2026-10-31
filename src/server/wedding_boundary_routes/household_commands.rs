@@ -1,7 +1,7 @@
 use super::*;
 use std::collections::{BTreeSet, HashMap};
 
-const OPERATIONS: [&str; 8] = [
+const OPERATIONS: [&str; 9] = [
     "split_household",
     "merge_households",
     "archive_household",
@@ -10,6 +10,7 @@ const OPERATIONS: [&str; 8] = [
     "change_representative",
     "close_requests",
     "reopen_requests",
+    "apply_group_plus_one_policy",
 ];
 
 pub(super) fn routes() -> Router<Arc<AppState>> {
@@ -36,6 +37,9 @@ struct HouseholdCommandRequest {
     family_group_id: Option<String>,
     invitation_allocation: Option<i64>,
     representative_person_id: Option<String>,
+    plus_one_allowed: Option<bool>,
+    #[serde(default)]
+    exception_person_ids: Vec<String>,
     confirmed_elevated_impact: Option<bool>,
     idempotency_key: String,
 }
@@ -197,6 +201,11 @@ fn validate_request(
         || ids.iter().any(|value| !valid_id(value))
         || request.move_person_ids.len() > 200
         || request.move_person_ids.iter().any(|value| !valid_id(value))
+        || request.exception_person_ids.len() > 200
+        || request
+            .exception_person_ids
+            .iter()
+            .any(|value| !valid_id(value))
         || request.expected_revisions.len() != ids.len()
         || ids.iter().any(|id| {
             request
@@ -310,7 +319,10 @@ async fn apply_household_command(
         "split_household" => split(&mut tx, &table, &request, households).await?,
         "merge_households" => merge(&mut tx, &table, &request, households).await?,
         "archive_household" => archive(&mut tx, &table, &request, households).await?,
-        _ => revise_many(&mut tx, &table, &request, households).await?,
+        "apply_group_plus_one_policy" => {
+            apply_group_plus_one_policy(&mut tx, &table, &request, households).await?
+        }
+        _ => revise_many(&mut tx, &table, &user.id, &request, households).await?,
     }
     let receipt_id = format!("wedding-boundary-household-impact-{}", Ulid::new());
     append_event(
@@ -337,6 +349,106 @@ async fn apply_household_command(
     finish_receipt(&mut tx, &user.id, &request.idempotency_key, &response).await?;
     tx.commit().await.map_err(store_error)?;
     Ok(Json(response))
+}
+
+async fn apply_group_plus_one_policy(
+    tx: &mut Transaction<'_, Postgres>,
+    table: &str,
+    request: &HouseholdCommandRequest,
+    households: HashMap<String, Value>,
+) -> Result<(), (StatusCode, String)> {
+    let group_id = request
+        .family_group_id
+        .as_deref()
+        .filter(|value| valid_id(value))
+        .ok_or_else(|| bad("Choose the family group for this plus-one policy."))?;
+    let allowed = request
+        .plus_one_allowed
+        .ok_or_else(|| bad("Choose whether this group receives plus-ones."))?;
+    if households
+        .values()
+        .any(|household| household.get("family_group_id").and_then(Value::as_str) != Some(group_id))
+    {
+        return Err(conflict(
+            "Review the households in this family group before changing plus-ones.",
+        ));
+    }
+    let people = households
+        .values()
+        .flat_map(member_ids)
+        .collect::<BTreeSet<_>>();
+    let exceptions = request
+        .exception_person_ids
+        .iter()
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    if !exceptions.is_subset(&people) {
+        return Err(bad(
+            "Every plus-one exception must belong to this family group.",
+        ));
+    }
+    let policy_id = format!("wedding-boundary-plus-one-policy-{}", Ulid::new());
+    append_event(
+        tx,
+        table,
+        &policy_id,
+        "wedding_boundary_policy",
+        &request.wedding_plan_id,
+        &request.response_workspace_id,
+        json!({
+            "boundary_object_id": policy_id,
+            "rule_type": "plus_one",
+            "scope_kind": "family_group",
+            "scope_id": group_id,
+            "effect": {"plus_one_allowed": allowed},
+            "exception_person_ids": exceptions,
+            "enforcement": "require_approval",
+            "rule_status": "active",
+            "version": 1,
+            "private_content_copied": false
+        }),
+    )
+    .await?;
+    for person_id in people.difference(&exceptions) {
+        let query = format!(
+            "SELECT m.content FROM {table} m WHERE m.kind='wedding_boundary_event_invitation' AND m.content->>'person_id'=$1 AND {} ORDER BY COALESCE((m.content->>'response_revision')::bigint,1) DESC,m.timestamp DESC,m.id DESC LIMIT 1 FOR UPDATE",
+            metadata_scope("m", 2, 3)
+        );
+        let Some(mut invitation) = sqlx::query_scalar::<_, Value>(&query)
+            .bind(person_id)
+            .bind(&request.wedding_plan_id)
+            .bind(&request.response_workspace_id)
+            .fetch_optional(&mut **tx)
+            .await
+            .map_err(store_error)?
+        else {
+            continue;
+        };
+        let object = invitation.as_object_mut().expect("invitation object");
+        object.insert("plus_one_allowed".into(), json!(allowed));
+        object.insert("plus_one_policy_id".into(), json!(policy_id));
+        object.insert(
+            "response_revision".into(),
+            json!(
+                object
+                    .get("response_revision")
+                    .and_then(Value::as_i64)
+                    .unwrap_or(1)
+                    + 1
+            ),
+        );
+        append_event(
+            tx,
+            table,
+            &format!("group-plus-one-{}", Ulid::new()),
+            "wedding_boundary_event_invitation",
+            &request.wedding_plan_id,
+            &request.response_workspace_id,
+            invitation,
+        )
+        .await?;
+    }
+    Ok(())
 }
 
 async fn split(
@@ -540,11 +652,21 @@ async fn archive(
 async fn revise_many(
     tx: &mut Transaction<'_, Postgres>,
     table: &str,
+    owner_user_id: &str,
     request: &HouseholdCommandRequest,
     households: HashMap<String, Value>,
 ) -> Result<(), (StatusCode, String)> {
     for (_, mut household) in households {
         let current_members = member_ids(&household);
+        let household_id = household
+            .get("household_id")
+            .and_then(Value::as_str)
+            .expect("stored household has an ID")
+            .to_string();
+        let former_representative = household
+            .get("primary_contact_person_id")
+            .and_then(Value::as_str)
+            .map(str::to_string);
         let object = household.as_object_mut().expect("household object");
         match request.operation.as_str() {
             "assign_group" => {
@@ -577,6 +699,34 @@ async fn revise_many(
                     ));
                 }
                 object.insert("primary_contact_person_id".into(), json!(person));
+                if former_representative
+                    .as_deref()
+                    .is_some_and(|former| former != person)
+                {
+                    let helper_revoked = sqlx::query("UPDATE wedding_boundary_helper_grants SET revoked_at=NOW() WHERE owner_user_id=$1 AND wedding_plan_id=$2 AND response_workspace_id=$3 AND revoked_at IS NULL AND household_ids ? $4")
+                        .bind(owner_user_id).bind(&request.wedding_plan_id).bind(&request.response_workspace_id).bind(&household_id)
+                        .execute(&mut **tx).await.map_err(store_error)?.rows_affected();
+                    let delegate_revoked = sqlx::query("UPDATE wedding_boundary_delegated_grants SET revoked_at=NOW() WHERE owner_user_id=$1 AND wedding_plan_id=$2 AND response_workspace_id=$3 AND person_id=$4 AND revoked_at IS NULL")
+                        .bind(owner_user_id).bind(&request.wedding_plan_id).bind(&request.response_workspace_id).bind(former_representative.as_deref())
+                        .execute(&mut **tx).await.map_err(store_error)?.rows_affected();
+                    append_event(
+                        tx,
+                        table,
+                        &format!("representative-grants-revoked-{}", Ulid::new()),
+                        "wedding_boundary_permission_revoked",
+                        &request.wedding_plan_id,
+                        &request.response_workspace_id,
+                        json!({
+                            "household_id": household_id,
+                            "former_representative_person_id": former_representative,
+                            "helper_grants_revoked": helper_revoked,
+                            "delegated_grants_revoked": delegate_revoked,
+                            "reason": "household_representative_changed",
+                            "private_content_copied": false
+                        }),
+                    )
+                    .await?;
+                }
             }
             "close_requests" => {
                 object.insert("request_window_status".into(), json!("closed"));
@@ -605,9 +755,10 @@ mod tests {
 
     #[test]
     fn command_surface_is_explicit_and_bounded() {
-        assert_eq!(OPERATIONS.len(), 8);
+        assert_eq!(OPERATIONS.len(), 9);
         assert!(OPERATIONS.contains(&"split_household"));
         assert!(OPERATIONS.contains(&"change_representative"));
+        assert!(OPERATIONS.contains(&"apply_group_plus_one_policy"));
         assert!(!OPERATIONS.contains(&"delete_household"));
     }
 }

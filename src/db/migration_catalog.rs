@@ -653,4 +653,11 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Content-light helper grants and idempotency receipts for server-authoritative Wedding Family Boundaries",
         include_str!("../../postgres/migrations/0128_wedding_boundary_governance.sql"),
     ),
+    (
+        "0129_wedding_boundary_delegates_and_private_notes",
+        "Authenticated scoped Family Boundary delegates and opaque mutable private-note records",
+        include_str!(
+            "../../postgres/migrations/0129_wedding_boundary_delegates_and_private_notes.sql"
+        ),
+    ),
 ];

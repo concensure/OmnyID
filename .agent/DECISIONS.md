@@ -2190,3 +2190,19 @@ first distinct couple-role approval without applying consequences; only a second
 couple-role actor may apply the mutation. Sent or accepted invitation effects require elevated
 confirmation. Private notes remain outside immutable events until an encrypted mutable-record
 command exists, and all delegated/helper hosted capabilities remain false-default.
+
+## 2026-11-01: Authenticated Wedding delegates receive projections and proposal rights, not owner authority
+
+Planner and RSVP-guest access binds an exact registered OmnyID account to an expiring, revocable,
+role-scoped grant. Activation requires both the global delegate switch and an owner-account allowlist.
+A planner sees only selected household planning fields; an RSVP guest sees only their own invitation.
+Neither receives private notes, another guest's records, couple approval authority, invitation-send
+authority or direct spend/vendor powers. Delegate changes become pending AFP requests in the owner's
+Wedding ledger and require the normal couple decision path. Forwarded grant IDs, cross-tenant reads
+and attempts to approve from the delegate account fail closed.
+
+Private guest notes are opaque `encrypted:v1` envelopes in a controlled mutable table keyed by owner,
+Wedding, workspace and person. Immutable AFP events contain only the person reference, version and
+operation, never ciphertext. Household capacity approvals take a household-scoped transaction lock;
+group plus-one policies preserve named exceptions; changing representatives immediately revokes the
+affected public helper links and the former representative's authenticated grant.

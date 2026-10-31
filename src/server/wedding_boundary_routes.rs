@@ -23,7 +23,9 @@ use ulid::Ulid;
 const MAX_GRANT_DAYS: i64 = 30;
 const HELPER_ACTIONS: [&str; 2] = ["view_summary", "propose_request"];
 
+mod delegated_access;
 mod household_commands;
+mod private_notes;
 mod request_mutations;
 
 pub(super) fn routes() -> Router<Arc<AppState>> {
@@ -39,7 +41,9 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
         .route("/wedding/boundaries/helpers/open", post(open_helper))
         .route("/wedding/boundaries/helpers/propose", post(propose_request))
         .route("/wedding/boundaries/decisions", post(decide_request))
+        .merge(delegated_access::routes())
         .merge(household_commands::routes())
+        .merge(private_notes::routes())
 }
 
 fn helper_enabled() -> bool {
@@ -811,6 +815,18 @@ async fn decide_request(
     let current_status = current.get("request_status").and_then(Value::as_str);
     if !matches!(current_status, Some("pending") | Some("partially_approved")) {
         return Err(conflict("This family request has already been decided."));
+    }
+    if request.decision == "approve"
+        && let Some(household_id) = current.get("target_household_id").and_then(Value::as_str)
+    {
+        sqlx::query("SELECT pg_advisory_xact_lock(hashtext($1))")
+            .bind(format!(
+                "boundary-capacity:{}:{}:{household_id}",
+                user.id, request.response_workspace_id
+            ))
+            .execute(&mut *tx)
+            .await
+            .map_err(store_error)?;
     }
     let required_approvals = current
         .get("required_approval_count")

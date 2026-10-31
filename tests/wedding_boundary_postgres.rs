@@ -114,6 +114,31 @@ async fn post_json(app: &Router, uri: &str, auth: &str, body: Value) -> (StatusC
     (status, payload)
 }
 
+async fn get_json(app: &Router, uri: &str, auth: &str) -> (StatusCode, Value) {
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri(uri)
+                .header(AUTHORIZATION, auth)
+                .body(Body::empty())
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+    let status = response.status();
+    let bytes = response
+        .into_body()
+        .collect()
+        .await
+        .expect("body")
+        .to_bytes();
+    let payload = serde_json::from_slice(&bytes)
+        .unwrap_or_else(|_| json!({"text":String::from_utf8_lossy(&bytes)}));
+    (status, payload)
+}
+
 async fn request_json(app: &Router, auth: &str, body: Value) -> (StatusCode, Value) {
     post_json(app, "/wedding/boundaries/households/commands", auth, body).await
 }
@@ -332,5 +357,336 @@ async fn two_partner_approval_applies_only_after_distinct_second_partner() {
     assert!(
         plus_one_allowed,
         "approved non-add request updates the canonical invitation"
+    );
+}
+
+#[tokio::test]
+async fn delegated_access_is_scoped_revocable_and_private_notes_stay_opaque() {
+    let Some(db_url) = test_db_url() else { return };
+    let db = Db::new(&db_url).await.expect("connect test database");
+    let (owner, owner_auth) = seed_user(&db, "delegate-owner").await;
+    let (delegate, delegate_auth) = seed_user(&db, "delegate-planner").await;
+    let (_outsider, outsider_auth) = seed_user(&db, "delegate-outsider").await;
+    let plan = format!("wedding-plan-{}", Ulid::new());
+    let workspace = format!("wedding-workspace-{}", Ulid::new());
+    let household = format!("household-{}", Ulid::new());
+    let person = format!("person-{}", Ulid::new());
+    append_fixture(&db, &owner.id, "wedding_boundary_household", &plan, &workspace, json!({
+        "ledger_kind":"wedding_boundary_household","boundary_object_id":household,"household_id":household,
+        "display_name":"Scoped household","title":"Scoped household","status":"active",
+        "member_person_ids":[person],"invitation_allocation":2,"revision":1
+    })).await;
+    append_fixture(&db, &owner.id, "wedding_boundary_guest_profile", &plan, &workspace, json!({
+        "ledger_kind":"wedding_boundary_guest_profile","boundary_object_id":person,"person_id":person,
+        "display_name":"Scoped guest","title":"Scoped guest","status":"active","household_id":household
+    })).await;
+    append_fixture(&db, &owner.id, "wedding_boundary_event_invitation", &plan, &workspace, json!({
+        "ledger_kind":"wedding_boundary_event_invitation","boundary_object_id":format!("invite-{person}"),
+        "invitation_id":format!("invite-{person}"),"event_id":format!("event-{workspace}"),"person_id":person,
+        "invitation_status":"not_invited","plus_one_allowed":false,"response_revision":1
+    })).await;
+    let app = omnyid_homeserver::server::build_test_router(&db_url).await;
+    unsafe {
+        std::env::remove_var("OMNYID_WEDDING_BOUNDARY_DELEGATES_ENABLED");
+        std::env::remove_var("OMNYID_WEDDING_BOUNDARY_DELEGATE_OWNER_ALLOWLIST");
+    }
+    let grant_body = json!({
+        "wedding_plan_id":plan,"response_workspace_id":workspace,"delegate_email":delegate.email,
+        "role":"planner","person_id":null,"household_ids":[household],
+        "expires_at":(Utc::now()+Duration::days(2)).to_rfc3339()
+    });
+    let (disabled_status, _) = post_json(
+        &app,
+        "/wedding/boundaries/delegates/grants",
+        &owner_auth,
+        grant_body.clone(),
+    )
+    .await;
+    assert_eq!(disabled_status, StatusCode::NOT_FOUND);
+    unsafe {
+        std::env::set_var("OMNYID_WEDDING_BOUNDARY_DELEGATES_ENABLED", "true");
+        std::env::set_var(
+            "OMNYID_WEDDING_BOUNDARY_DELEGATE_OWNER_ALLOWLIST",
+            &owner.id,
+        );
+    }
+    let (grant_status, grant) = post_json(
+        &app,
+        "/wedding/boundaries/delegates/grants",
+        &owner_auth,
+        grant_body,
+    )
+    .await;
+    assert_eq!(grant_status, StatusCode::OK, "grant: {grant}");
+    let grant_id = grant["grant_id"].as_str().expect("grant id");
+    let open_uri = format!("/wedding/boundaries/delegates/grants/{grant_id}/open");
+    let (open_status, opened) = get_json(&app, &open_uri, &delegate_auth).await;
+    assert_eq!(open_status, StatusCode::OK, "open: {opened}");
+    assert_eq!(opened["private_notes_visible"], false);
+    assert!(opened.get("guests").is_none());
+    let (outsider_status, _) = get_json(&app, &open_uri, &outsider_auth).await;
+    assert_eq!(outsider_status, StatusCode::NOT_FOUND);
+
+    let proposal_uri = format!("/wedding/boundaries/delegates/grants/{grant_id}/propose");
+    let (proposal_status, proposal) = post_json(
+        &app,
+        &proposal_uri,
+        &delegate_auth,
+        json!({
+            "change_type":"plus_one_change","request_label":"Please allow a plus-one",
+            "target_household_id":household,"target_person_id":person,"proposed_guest_name":null,
+            "proposed_plus_one_allowed":true,"proposed_invitation_status":null,
+            "proposed_contact_label":null,"idempotency_key":format!("proposal-{}",Ulid::new())
+        }),
+    )
+    .await;
+    assert_eq!(proposal_status, StatusCode::OK, "proposal: {proposal}");
+    assert_eq!(proposal["status"], "pending");
+    let request_id = proposal["request_id"].as_str().expect("request id");
+    let (delegate_decision_status, _) = post_json(
+        &app,
+        "/wedding/boundaries/decisions",
+        &delegate_auth,
+        json!({
+            "wedding_plan_id":plan,"response_workspace_id":workspace,"request_id":request_id,
+            "decision":"approve","expected_revision":1,"approval_actor_id":null,
+            "idempotency_key":format!("forged-delegate-decision-{}",Ulid::new())
+        }),
+    )
+    .await;
+    assert_eq!(delegate_decision_status, StatusCode::FORBIDDEN);
+    let (decision_status, decision) = post_json(
+        &app,
+        "/wedding/boundaries/decisions",
+        &owner_auth,
+        json!({
+            "wedding_plan_id":plan,"response_workspace_id":workspace,"request_id":request_id,
+            "decision":"approve","expected_revision":1,"approval_actor_id":null,
+            "idempotency_key":format!("delegate-decision-{}",Ulid::new())
+        }),
+    )
+    .await;
+    assert_eq!(decision_status, StatusCode::OK, "decision: {decision}");
+
+    let ciphertext = "encrypted:v1:opaque-couple-owned-envelope";
+    let (note_status, note) = post_json(
+        &app,
+        "/wedding/boundaries/private-notes",
+        &owner_auth,
+        json!({
+            "wedding_plan_id":plan,"response_workspace_id":workspace,"person_id":person,
+            "ciphertext":ciphertext,"expected_version":null,
+            "idempotency_key":format!("private-note-{}",Ulid::new())
+        }),
+    )
+    .await;
+    assert_eq!(note_status, StatusCode::OK, "private note: {note}");
+    let query = format!(
+        "/wedding/boundaries/private-notes?wedding_plan_id={plan}&response_workspace_id={workspace}&person_id={person}"
+    );
+    let (owner_read_status, owner_note) = get_json(&app, &query, &owner_auth).await;
+    assert_eq!(owner_read_status, StatusCode::OK);
+    assert_eq!(owner_note["ciphertext"], ciphertext);
+    let (_, delegate_note) = get_json(&app, &query, &delegate_auth).await;
+    assert!(delegate_note["ciphertext"].is_null());
+    let table = format!("\"{}\".messages", tenant_schema(&owner.id));
+    let leak_query = format!("SELECT COUNT(*) FROM {table} WHERE content::text LIKE $1");
+    let leaked = sqlx::query_scalar::<_, i64>(&leak_query)
+        .bind(format!("%{ciphertext}%"))
+        .fetch_one(&db.pool)
+        .await
+        .expect("ciphertext leak query");
+    assert_eq!(
+        leaked, 0,
+        "opaque ciphertext must not be copied into AFP events"
+    );
+
+    let revoke_uri = format!("/wedding/boundaries/delegates/grants/{grant_id}/revoke");
+    let (revoke_status, _) = post_json(&app, &revoke_uri, &owner_auth, json!({})).await;
+    assert_eq!(revoke_status, StatusCode::OK);
+    let (revoked_status, _) = get_json(&app, &open_uri, &delegate_auth).await;
+    assert_eq!(revoked_status, StatusCode::NOT_FOUND);
+    sqlx::query("UPDATE wedding_boundary_delegated_grants SET revoked_at=NULL,created_at=NOW()-INTERVAL '2 days',expires_at=NOW()-INTERVAL '1 day' WHERE grant_id=$1")
+        .bind(grant_id).execute(&db.pool).await.expect("expire delegated grant");
+    let (expired_status, _) = get_json(&app, &open_uri, &delegate_auth).await;
+    assert_eq!(expired_status, StatusCode::NOT_FOUND);
+    sqlx::query("DELETE FROM users WHERE id=$1")
+        .bind(&delegate.id)
+        .execute(&db.pool)
+        .await
+        .expect("delete delegate account");
+    let grant_count = sqlx::query_scalar::<_, i64>(
+        "SELECT COUNT(*) FROM wedding_boundary_delegated_grants WHERE grant_id=$1",
+    )
+    .bind(grant_id)
+    .fetch_one(&db.pool)
+    .await
+    .expect("grant retention count");
+    assert_eq!(grant_count, 0, "delegate deletion must cascade its grants");
+    sqlx::query("DELETE FROM users WHERE id=$1")
+        .bind(&owner.id)
+        .execute(&db.pool)
+        .await
+        .expect("delete owner account");
+    let private_count = sqlx::query_scalar::<_, i64>(
+        "SELECT COUNT(*) FROM wedding_boundary_private_notes WHERE owner_user_id=$1",
+    )
+    .bind(&owner.id)
+    .fetch_one(&db.pool)
+    .await
+    .expect("private-note retention count");
+    assert_eq!(
+        private_count, 0,
+        "account deletion must cascade private boundary notes"
+    );
+    unsafe {
+        std::env::remove_var("OMNYID_WEDDING_BOUNDARY_DELEGATES_ENABLED");
+        std::env::remove_var("OMNYID_WEDDING_BOUNDARY_DELEGATE_OWNER_ALLOWLIST");
+    }
+}
+
+#[tokio::test]
+async fn group_plus_one_exceptions_and_last_seat_are_serialized() {
+    let Some(db_url) = test_db_url() else { return };
+    let db = Db::new(&db_url).await.expect("connect test database");
+    let (owner, auth) = seed_user(&db, "capacity-owner").await;
+    let (former_representative_account, _) = seed_user(&db, "former-representative").await;
+    let plan = format!("wedding-plan-{}", Ulid::new());
+    let workspace = format!("wedding-workspace-{}", Ulid::new());
+    let household = format!("household-{}", Ulid::new());
+    let group = format!("family-group-{}", Ulid::new());
+    let person_a = format!("person-a-{}", Ulid::new());
+    let person_b = format!("person-b-{}", Ulid::new());
+    append_fixture(&db, &owner.id, "wedding_boundary_household", &plan, &workspace, json!({
+        "ledger_kind":"wedding_boundary_household","boundary_object_id":household,"household_id":household,
+        "display_name":"Capacity household","title":"Capacity household","status":"active",
+        "family_group_id":group,"primary_contact_person_id":person_a,"member_person_ids":[person_a,person_b],"invitation_allocation":3,"revision":1
+    })).await;
+    for person in [&person_a, &person_b] {
+        append_fixture(&db, &owner.id, "wedding_boundary_guest_profile", &plan, &workspace, json!({
+            "ledger_kind":"wedding_boundary_guest_profile","boundary_object_id":person,"person_id":person,
+            "display_name":"Capacity guest","title":"Capacity guest","status":"active","household_id":household
+        })).await;
+        append_fixture(&db, &owner.id, "wedding_boundary_event_invitation", &plan, &workspace, json!({
+            "ledger_kind":"wedding_boundary_event_invitation","boundary_object_id":format!("invite-{person}"),
+            "invitation_id":format!("invite-{person}"),"event_id":format!("event-{workspace}"),"person_id":person,
+            "invitation_status":"not_invited","plus_one_allowed":true,"response_revision":1
+        })).await;
+    }
+    let app = omnyid_homeserver::server::build_test_router(&db_url).await;
+    let (policy_status, policy) = request_json(&app, &auth, json!({
+        "wedding_plan_id":plan,"response_workspace_id":workspace,"operation":"apply_group_plus_one_policy",
+        "source_household_ids":[household],"target_household_id":null,"new_household_id":null,
+        "new_household_label":null,"move_person_ids":[],"expected_revisions":{(household.clone()):1},
+        "family_group_id":group,"invitation_allocation":null,"representative_person_id":null,
+        "plus_one_allowed":false,"exception_person_ids":[person_b],"confirmed_elevated_impact":false,
+        "idempotency_key":format!("group-policy-{}",Ulid::new())
+    })).await;
+    assert_eq!(policy_status, StatusCode::OK, "policy: {policy}");
+    let table = format!("\"{}\".messages", tenant_schema(&owner.id));
+    let invitation_query = format!(
+        "SELECT (content->>'plus_one_allowed')::boolean FROM {table} WHERE kind='wedding_boundary_event_invitation' AND content->>'person_id'=$1 ORDER BY COALESCE((content->>'response_revision')::bigint,1) DESC,timestamp DESC,id DESC LIMIT 1"
+    );
+    let a_allowed = sqlx::query_scalar::<_, bool>(&invitation_query)
+        .bind(&person_a)
+        .fetch_one(&db.pool)
+        .await
+        .expect("person a");
+    let b_allowed = sqlx::query_scalar::<_, bool>(&invitation_query)
+        .bind(&person_b)
+        .fetch_one(&db.pool)
+        .await
+        .expect("person b");
+    assert!(!a_allowed);
+    assert!(
+        b_allowed,
+        "authorised exception must preserve its plus-one state"
+    );
+
+    sqlx::query("INSERT INTO wedding_boundary_helper_grants (grant_id,owner_user_id,wedding_plan_id,response_workspace_id,principal_label,household_ids,allowed_actions,token_digest,expires_at) VALUES ($1,$2,$3,$4,'Former representative',$5,$6,$7,NOW()+INTERVAL '2 days')")
+        .bind(format!("helper-{}",Ulid::new())).bind(&owner.id).bind(&plan).bind(&workspace)
+        .bind(json!([household.clone()])).bind(json!(["view_summary"])).bind("a".repeat(64))
+        .execute(&db.pool).await.expect("helper grant fixture");
+    sqlx::query("INSERT INTO wedding_boundary_delegated_grants (grant_id,owner_user_id,delegate_user_id,wedding_plan_id,response_workspace_id,role,person_id,household_ids,allowed_actions,expires_at) VALUES ($1,$2,$3,$4,$5,'rsvp_guest',$6,$7,$8,NOW()+INTERVAL '2 days')")
+        .bind(format!("delegate-{}",Ulid::new())).bind(&owner.id).bind(&former_representative_account.id)
+        .bind(&plan).bind(&workspace).bind(&person_a).bind(json!([household.clone()]))
+        .bind(json!(["view_own_invitation"])).execute(&db.pool).await.expect("delegate fixture");
+    let (representative_status, representative_response) = request_json(&app, &auth, json!({
+        "wedding_plan_id":plan,"response_workspace_id":workspace,"operation":"change_representative",
+        "source_household_ids":[household],"target_household_id":null,"new_household_id":null,
+        "new_household_label":null,"move_person_ids":[],"expected_revisions":{(household.clone()):1},
+        "family_group_id":null,"invitation_allocation":null,"representative_person_id":person_b,
+        "plus_one_allowed":null,"exception_person_ids":[],"confirmed_elevated_impact":false,
+        "idempotency_key":format!("representative-{}",Ulid::new())
+    })).await;
+    assert_eq!(
+        representative_status,
+        StatusCode::OK,
+        "representative: {representative_response}"
+    );
+    let helper_live = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM wedding_boundary_helper_grants WHERE owner_user_id=$1 AND response_workspace_id=$2 AND revoked_at IS NULL")
+        .bind(&owner.id).bind(&workspace).fetch_one(&db.pool).await.expect("helper live count");
+    let delegate_live = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM wedding_boundary_delegated_grants WHERE owner_user_id=$1 AND response_workspace_id=$2 AND revoked_at IS NULL")
+        .bind(&owner.id).bind(&workspace).fetch_one(&db.pool).await.expect("delegate live count");
+    assert_eq!(
+        helper_live, 0,
+        "representative changes revoke household helper links"
+    );
+    assert_eq!(
+        delegate_live, 0,
+        "representative changes revoke the former representative's authenticated grant"
+    );
+
+    let request_a = format!("last-seat-a-{}", Ulid::new());
+    let request_b = format!("last-seat-b-{}", Ulid::new());
+    for (request_id, person_id) in [
+        (&request_a, format!("new-a-{}", Ulid::new())),
+        (&request_b, format!("new-b-{}", Ulid::new())),
+    ] {
+        append_fixture(&db, &owner.id, "wedding_boundary_change_request", &plan, &workspace, json!({
+            "ledger_kind":"wedding_boundary_change_request","boundary_object_id":request_id,"request_id":request_id,
+            "requested_by":"family:helper","change_type":"add_guest","target_household_id":household,
+            "target_person_id":person_id,"proposed_guest_name":"Last seat guest","expected_household_revision":2,
+            "request_status":"pending","status":"pending","approval_required":true,"required_approval_count":1,"revision":1
+        })).await;
+    }
+    let decision = |request_id: String| {
+        json!({
+            "wedding_plan_id":plan,"response_workspace_id":workspace,"request_id":request_id,"decision":"approve",
+            "expected_revision":1,"approval_actor_id":null,"idempotency_key":format!("capacity-{}",Ulid::new())
+        })
+    };
+    let app_a = app.clone();
+    let app_b = app.clone();
+    let auth_a = auth.clone();
+    let auth_b = auth.clone();
+    let (result_a, result_b) = tokio::join!(
+        post_json(
+            &app_a,
+            "/wedding/boundaries/decisions",
+            &auth_a,
+            decision(request_a)
+        ),
+        post_json(
+            &app_b,
+            "/wedding/boundaries/decisions",
+            &auth_b,
+            decision(request_b)
+        )
+    );
+    let statuses = [result_a.0, result_b.0];
+    assert_eq!(
+        statuses
+            .iter()
+            .filter(|status| **status == StatusCode::OK)
+            .count(),
+        1
+    );
+    assert_eq!(
+        statuses
+            .iter()
+            .filter(|status| **status == StatusCode::CONFLICT)
+            .count(),
+        1
     );
 }
