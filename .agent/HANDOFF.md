@@ -1,43 +1,29 @@
-## 2026-10-31 - WED-303D controlled RSVP setup and household preview (Codex, in progress)
+## 2026-10-31 - WED-303/WED-305 release and allowlisted pilot (Codex, complete)
 
 Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch
-`agent/codex/WED-303`; exact clean code candidate
-`c41b0f4cab38e979b2f418b4637936f37bcbad7a` before this coordination commit.
+`agent/codex/WED-303`; exact deployed release
+`77b4bb0868017e0e295811d2722257f276faea8b`. Clean release checkout:
+`C:\Users\ozans\AppData\Local\Temp\omnyid-wed305-release-77b4bb0`.
 
-Changed:
+- Account-scoped onboarding and intake prevent a recreated email from reading
+  deleted-account browser state. Account deletion now purges external objects
+  before tenant/profile/ledger/quota removal and returns an explicit receipt.
+- Connected mobile decision, vendor lifecycle/favourite, automatic import and
+  quote-acceptance projections are live.
+- Compose now passes the RSVP public switch and account allowlist to every
+  homeserver profile with false/empty defaults.
+- Exact-SHA typecheck, 2,095 Wedding tests, line budgets, build, cargo check,
+  Compose validation and Oracle preflight/backup/restore proof pass. Root and
+  `/var` are 81% used.
+- The controlled one-account RSVP pilot wrote one response and one impact
+  receipt, suppressed an identical replay, revoked the link, and restored the
+  byte-identical environment. Hosted status is false, there are no live grants
+  and `/healthz` returns 200. Raw credentials and capability tokens were not
+  retained.
 
-- Added a mobile-friendly RSVP setup panel to the existing Guests surface,
-  not a parallel guest store. It reuses saved event invitations, accepts a
-  future deadline and a bounded question library, and previews the exact
-  named recipients and plus-one/children entitlements by household.
-- Setup saves as a versioned, couple-only `wedding_rsvp_setup` AFP object.
-  The payload explicitly records `sends_invitation:false`,
-  `creates_capability:false` and `model_calls:0`; it contains no contact,
-  dietary or accessibility answers.
-- Manual responses still use the canonical response command. Public link
-  creation and sending remain separate and unavailable while
-  `OMNYID_WEDDING_RSVP_PUBLIC_ENABLED` is false.
-
-Evidence:
-
-- Exact candidate passed TypeScript, both line budgets, Wedding site/security
-  smoke, all 2,075 Wedding tests and the production build.
-- Five focused setup tests cover deadline/question validation, bounded meal
-  and custom questions, AFP workspace scoping, no-side-effect metadata and
-  household preview privacy.
-- New files are 216, 317 and 196 lines; the modified context panel is 454
-  lines. The unrelated pre-existing untracked artifact directories were not
-  changed. Nothing was deployed and no rollout flag changed.
-
-Remaining:
-
-- Finish WED-303D's named/unnamed plus-one and child age/seat/meal
-  entitlements and explicit confirmation-gated protected-link creation.
-- Then build WED-303E's public mobile response surface against the existing
-  digest-only capability boundary. It must exchange the fragment token
-  without history/telemetry persistence, validate controlled answers on the
-  server, retain focus during validation and keep the rollout flag false until
-  hosted accessibility/privacy evidence passes.
+Evidence: `Documents/verification/wed-305-account-isolation-mobile-projections-2026-10-31.md`.
+General public RSVP remains deliberately disabled; no WED-303/WED-305 code
+work remains.
 
 ## 2026-10-30 - WED-303 canonical RSVP response and capability boundary (Codex, in progress)
 

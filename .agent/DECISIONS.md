@@ -2100,8 +2100,10 @@ Attendance and operational completion are distinct. Pending, incomplete, changed
 visible, and an attending guest with a required missing answer is not treated as complete. Manual,
 imported and future guest-submitted answers keep provenance. New guest profiles containing contact,
 dietary or accessibility logistics are couple-only by default; vendor sharing remains a separate,
-minimum-necessary preview and approval boundary. Public invitation capabilities remain false-default
-until random-token, expiry, revocation, isolation and idempotency work is implemented and evidenced.
+minimum-necessary preview and approval boundary. Public invitation capabilities remain false-default.
+A controlled rollout sets both the global switch and an account-ID allowlist in the homeserver
+runtime; a successful pilot does not imply broad activation. The byte-identical environment is
+restored after the window, and retained capability evidence is redacted.
 
 ## 2026-10-30: RSVP writes are scoped AFP commands with atomic consequence receipts
 
