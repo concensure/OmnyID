@@ -7,6 +7,7 @@ import {
   loadOnboardingDone,
   ONBOARDING_DONE_KEY,
   saveOnboardingDone,
+  shouldQueueOnboardingAfterLogin,
 } from "../src/lib/onboardingLocalState.ts";
 
 const localStorageState = new Map<string, string>();
@@ -54,4 +55,13 @@ test("completed onboarding never leaks from a deleted account to a recreated acc
   assert.equal(loadOnboardingDone("user-old"), true);
   assert.equal(loadOnboardingDone("user-new"), false);
   assert.equal(loadOnboardingDone(), false);
+});
+
+test("post-login onboarding is queued for a recreated account but not a wedding deep link", () => {
+  localStorageState.clear();
+  saveOnboardingDone("user-old");
+
+  assert.equal(shouldQueueOnboardingAfterLogin({ userId: "user-new", weddingDeepLink: false }), true);
+  assert.equal(shouldQueueOnboardingAfterLogin({ userId: "user-new", weddingDeepLink: true }), false);
+  assert.equal(shouldQueueOnboardingAfterLogin({ userId: "user-old", weddingDeepLink: false }), false);
 });

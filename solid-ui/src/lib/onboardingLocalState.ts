@@ -28,6 +28,14 @@ export function saveOnboardingDone(userId?: string | null): void {
   }
 }
 
+export function shouldQueueOnboardingAfterLogin(input: {
+  userId?: string | null;
+  weddingDeepLink: boolean;
+}): boolean {
+  const userId = input.userId?.trim();
+  return Boolean(userId) && !input.weddingDeepLink && !loadOnboardingDone(userId);
+}
+
 export function completeWelcomeOnboarding(userId?: string | null): void {
   try {
     localStorage.removeItem(scopedKey(JUST_REGISTERED_KEY, userId));

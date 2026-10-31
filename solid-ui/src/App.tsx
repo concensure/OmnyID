@@ -163,7 +163,7 @@ import { summarizeKnowledgeAttachmentSupport } from "@/lib/knowledgeAttachmentSu
 import { decorateSearchPreviewMessageWithStudyStructure } from "@/lib/studySearchResultState";
 import { decoratePreviewMessageWithStudyLaunchMetadata } from "@/lib/studyLaunchMetadataState";
 import { consumeStudySearchContinuationSeed } from "@/lib/studySearchContinuationState";
-import { loadOnboardingDone } from "@/lib/onboardingLocalState";
+import { loadOnboardingDone, shouldQueueOnboardingAfterLogin } from "@/lib/onboardingLocalState";
 import { loadShouldShowGuidedTour } from "@/lib/guidedTourLocalState";
 import { type OnboardingQuickStartSeed } from "@/lib/onboardingQuickStart";
 import { saveReportNavigationIntent, type ReportNavigationIntent } from "@/lib/reportNavigationState";
@@ -3171,7 +3171,14 @@ function App() {
             startLoraPolling();
             void import("@/lib/weddingLeadMagnetImportRunnerState").then(({ requestWeddingLeadMagnetImport }) => requestWeddingLeadMagnetImport());
             // Preserve the wedding deep link after authentication.
-            if (shouldLaunchWeddingTemplateFromDeepLink()) launchWeddingTemplateFromDeepLink();
+            if (shouldLaunchWeddingTemplateFromDeepLink()) {
+              launchWeddingTemplateFromDeepLink();
+            } else if (shouldQueueOnboardingAfterLogin({ userId: loginUserId, weddingDeepLink: false })) {
+              // App mounted before this session existed, so the mount-time
+              // onboarding check could not run. Queue it behind the privacy
+              // tour for this account instead of silently skipping setup.
+              setShowOnboarding(true);
+            }
           }}
         />
       </Show>
