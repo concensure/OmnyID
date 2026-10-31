@@ -124,7 +124,7 @@ exit "`$exit_code"
     $normalizedRunnerScript = ($runnerScript -replace "`r`n", "`n").TrimEnd("`n")
     Invoke-RemoteSshCommand -RemoteCommand ("bash -lc " + (Convert-ToShellSingleQuotedLiteral "cat > $runnerPathLiteral")) -InputText ($normalizedRunnerScript + "`n")
     Invoke-RemoteSshCommand -RemoteCommand ("bash -lc " + (Convert-ToShellSingleQuotedLiteral "chmod 700 $runnerPathLiteral"))
-    Invoke-RemoteSshCommand -RemoteCommand ("bash -lc " + (Convert-ToShellSingleQuotedLiteral "nohup bash $runnerPathLiteral >/dev/null 2>&1 & printf '%s' \$! > $pidPathLiteral"))
+    Invoke-RemoteSshCommand -RemoteCommand ("bash -lc " + (Convert-ToShellSingleQuotedLiteral "nohup bash $runnerPathLiteral >/dev/null 2>&1 & printf '%s' `$! > $pidPathLiteral"))
 
     $deadline = [DateTime]::UtcNow.AddSeconds([Math]::Max($RemoteAuditMaxWaitSeconds, 30))
     $pollSeconds = [Math]::Max($RemoteAuditPollSeconds, 5)
