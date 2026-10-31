@@ -95,6 +95,7 @@ import {
   buildWeddingNavigationIntentFromPresentationAction,
   buildWeddingNavigationIntentFromSidebarAction,
   dispatchWeddingNavigationIntent,
+  subscribeWeddingNavigationIntent,
 } from "@/lib/weddingNavigationState";
 import { buildWeddingPersistedWorkspaceState } from "@/lib/weddingPersistedWorkspaceState";
 import { normalizeWeddingPlanningMetadata } from "@/lib/weddingPlanningTemplateState";
@@ -1090,6 +1091,14 @@ export function ResponseQueueView(props: {
     const budgetLocalSaveHandler = () => setWeddingLocalBudgetRefreshKey((value) => value + 1);
     window.addEventListener(WEDDING_BUDGET_ALLOCATION_LOCAL_SAVE_EVENT, budgetLocalSaveHandler);
     onCleanup(() => window.removeEventListener(WEDDING_BUDGET_ALLOCATION_LOCAL_SAVE_EVENT, budgetLocalSaveHandler));
+
+    const unsubscribeWeddingIntent = subscribeWeddingNavigationIntent((nextIntent) => {
+      if (nextIntent.view !== "response_queue") return;
+      const storedIntent = { ...nextIntent, savedAt: new Date().toISOString() };
+      setWeddingNavigationIntent(storedIntent);
+      void refreshWeddingWorkspaceMessages(storedIntent);
+    });
+    onCleanup(unsubscribeWeddingIntent);
 
     const intent = consumeWeddingNavigationIntent();
     if (intent?.view === "response_queue") {
