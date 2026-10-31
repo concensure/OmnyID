@@ -64,3 +64,29 @@ test("RSVP reminder delivery stays default-off and its authenticated routes bypa
   assert.match(read("scripts/deploy-oracle.ps1"), /staged Caddyfile is missing the RSVP reminder proxy route/);
   assert.match(read("scripts/deploy-oracle.ps1"), /running Caddyfile is missing the RSVP reminder proxy route/);
 });
+
+test("public RSVP rollout reaches every homeserver profile with a false default and a bounded pilot list", () => {
+  const composeValues = new Map([
+    ["docker-compose.yml", [
+      'OMNYID_WEDDING_RSVP_PUBLIC_ENABLED: "false"',
+      'OMNYID_WEDDING_RSVP_PILOT_USER_IDS: ""',
+    ]],
+    ["docker-compose.oracle.yml", [
+      "OMNYID_WEDDING_RSVP_PUBLIC_ENABLED: ${OMNYID_WEDDING_RSVP_PUBLIC_ENABLED:-false}",
+      "OMNYID_WEDDING_RSVP_PILOT_USER_IDS: ${OMNYID_WEDDING_RSVP_PILOT_USER_IDS:-}",
+    ]],
+    ["docker-compose.oracle.minimal.yml", [
+      "OMNYID_WEDDING_RSVP_PUBLIC_ENABLED: ${OMNYID_WEDDING_RSVP_PUBLIC_ENABLED:-false}",
+      "OMNYID_WEDDING_RSVP_PILOT_USER_IDS: ${OMNYID_WEDDING_RSVP_PILOT_USER_IDS:-}",
+    ]],
+    ["docker-compose.oracle.staging.yml", [
+      "OMNYID_WEDDING_RSVP_PUBLIC_ENABLED: ${OMNYID_STAGING_WEDDING_RSVP_PUBLIC_ENABLED:-false}",
+      "OMNYID_WEDDING_RSVP_PILOT_USER_IDS: ${OMNYID_STAGING_WEDDING_RSVP_PILOT_USER_IDS:-}",
+    ]],
+  ]);
+  for (const [path, expected] of composeValues) {
+    for (const value of expected) {
+      assert.ok(read(path).includes(value), `${path} must pass ${value}`);
+    }
+  }
+});
