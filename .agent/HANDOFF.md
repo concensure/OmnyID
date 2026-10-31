@@ -6039,3 +6039,50 @@ Remaining:
 - Implement WED-308 Runbooks from the dependency-ordered task document after
   freezing this documentation candidate; begin with contracts, per-user seeding,
   existing-event adapter and pure matcher.
+
+## 2026-11-01 - WED-309 OAuth, Quiz v2 and Family Boundaries command slice (Codex)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch
+`agent/codex/WED-308`, starting SHA
+`dcbe97eff14f2b62a582fe76d340db3f831d9528`.
+
+Changed:
+
+- Fixed the Google first-login loop by adopting the first authenticated session
+  in place. Only replacement of an already authenticated account now triggers
+  the isolation reload.
+- Rebuilt the Wedding Animal Quiz from the supplied DOCX as a deterministic
+  six-dimension, eight-archetype v2 flow. It emits private bounded AFP answer,
+  result and consent evidence and pre-fills reviewable qualitative Wedding
+  onboarding suggestions without fabricating hard wedding facts.
+- Added the Step 1 quiz prompt and linked editorial/live quiz surfaces; reconciled
+  the mandatory blog publication catalogue.
+- Added tenant-private, revision-checked and idempotent household split, merge,
+  archive and bounded bulk commands; explicit remove/plus-one/invitation/contact
+  request mutations; and configurable two-distinct-partner approval.
+- Added minimum-necessary delegated Planner and RSVP-guest capability presets.
+  Hosted delegated/helper routes remain disabled and are not claimed complete.
+
+Verification on the working candidate:
+
+- `npm run typecheck`: passed.
+- `npm run test:wedding`: 2,116 passed.
+- `npm run test:wedding-site`: website, CSP, quiz v2, account confirmation and
+  blog catalogue smoke tests passed.
+- `npm run test:line-budget`: 2 passed; all new files remain below 999 lines.
+- `npm run build`: passed.
+- `cargo test --lib server::wedding_boundary_routes -j1 -- --nocapture`: 4 passed.
+- `cargo test --test wedding_boundary_postgres -j1 -- --test-threads=1
+  --nocapture`: 2 passed against disposable local PostgreSQL.
+- Disposable ClamAV live suite: clean file, harmless EICAR and unavailable
+  fail-closed cases all passed; the temporary scanner was stopped and removed.
+
+Not performed:
+
+- No Oracle deployment or production flags were changed in this turn.
+- Hosted Google completion still needs an authorised browser smoke on a deployed
+  exact candidate.
+- Still open: authenticated delegated Planner/RSVP routes, encrypted private-note
+  mutation, simultaneous last-seat contention, representative grant revocation,
+  group plus-one exceptions, per-projector receipts, helper UI and controlled
+  hosted rollout evidence. Keep helper capabilities false-default.

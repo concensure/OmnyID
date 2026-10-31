@@ -3,9 +3,11 @@ import { apiFetch, apiUrlForPath } from "@/lib/api";
 
 export type WeddingBoundaryDecisionReply = {
   request_id: string;
-  decision_id: string;
-  impact_receipt_id: string;
-  status: "approved" | "declined" | "withdrawn";
+  decision_id?: string;
+  impact_receipt_id?: string;
+  status: "approved" | "partially_approved" | "declined" | "withdrawn";
+  approval_count?: number;
+  required_approval_count?: number;
   replayed: boolean;
   explanation: string;
 };
@@ -16,6 +18,7 @@ export function decideWeddingBoundaryRequest(input: {
   requestId: string;
   decision: "approve" | "decline" | "withdraw";
   expectedRevision: number;
+  approvalActorId?: string;
   idempotencyKey: string;
 }) {
   return apiFetch<WeddingBoundaryDecisionReply>("/wedding/boundaries/decisions", {
@@ -26,6 +29,46 @@ export function decideWeddingBoundaryRequest(input: {
       request_id: input.requestId,
       decision: input.decision,
       expected_revision: input.expectedRevision,
+      approval_actor_id: input.approvalActorId,
+      idempotency_key: input.idempotencyKey,
+    },
+  });
+}
+
+export type WeddingBoundaryHouseholdCommand = {
+  weddingPlanId: string;
+  responseWorkspaceId: string;
+  operation: "split_household" | "merge_households" | "archive_household" | "assign_group" | "change_allocation" | "change_representative" | "close_requests" | "reopen_requests";
+  sourceHouseholdIds: string[];
+  expectedRevisions: Record<string, number>;
+  targetHouseholdId?: string;
+  newHouseholdId?: string;
+  newHouseholdLabel?: string;
+  movePersonIds?: string[];
+  familyGroupId?: string;
+  invitationAllocation?: number;
+  representativePersonId?: string;
+  confirmedElevatedImpact?: boolean;
+  idempotencyKey: string;
+};
+
+export function applyWeddingBoundaryHouseholdCommand(input: WeddingBoundaryHouseholdCommand) {
+  return apiFetch<{ status: "applied"; operation: WeddingBoundaryHouseholdCommand["operation"]; impact_receipt_id: string; replayed: boolean; explanation: string }>("/wedding/boundaries/households/commands", {
+    method: "POST",
+    bodyJson: {
+      wedding_plan_id: input.weddingPlanId,
+      response_workspace_id: input.responseWorkspaceId,
+      operation: input.operation,
+      source_household_ids: input.sourceHouseholdIds,
+      target_household_id: input.targetHouseholdId,
+      new_household_id: input.newHouseholdId,
+      new_household_label: input.newHouseholdLabel,
+      move_person_ids: input.movePersonIds ?? [],
+      expected_revisions: input.expectedRevisions,
+      family_group_id: input.familyGroupId,
+      invitation_allocation: input.invitationAllocation,
+      representative_person_id: input.representativePersonId,
+      confirmed_elevated_impact: input.confirmedElevatedImpact,
       idempotency_key: input.idempotencyKey,
     },
   });

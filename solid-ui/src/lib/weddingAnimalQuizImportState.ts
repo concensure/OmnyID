@@ -28,7 +28,7 @@ const QUIZ_FAMILY_LABELS: Record<string, string> = {
 };
 
 export type WeddingAnimalQuizHandoff = {
-  version: 1;
+  version: 1 | 2;
   created_at: string;
   expires_at: string;
   animal_title: string | null;
@@ -43,6 +43,18 @@ export type WeddingAnimalQuizHandoff = {
   values: string[];
   deal_breakers: string[];
   family_involvement: string | null;
+  dimension_scores: Array<{ code: string; score: number | null; count: number }>;
+  evidence_answer_ids: string[];
+  evidence_labels: string[];
+  planning_preferences: {
+    inspiration: string | null;
+    reminders: string | null;
+    guest_planning: string | null;
+    budget_trade_off: string | null;
+    shortlist_tempo: string | null;
+    approval_workflow: string | null;
+  } | null;
+  requires_confirmation: boolean;
 };
 
 function clean(value: unknown, limit = 120): string | null {
@@ -86,9 +98,17 @@ function parsedHandoff(value: unknown, now: Date): WeddingAnimalQuizHandoff | nu
   const source = record(value);
   const createdAt = date(source.created_at);
   const expiresAt = date(source.expires_at);
-  if (source.version !== 1 || !createdAt || !expiresAt || Date.parse(expiresAt) <= now.getTime()) return null;
+  if ((source.version !== 1 && source.version !== 2) || !createdAt || !expiresAt || Date.parse(expiresAt) <= now.getTime()) return null;
+  const preferences = record(source.planning_preferences);
+  const scores = Array.isArray(source.dimension_scores)
+    ? source.dimension_scores.map((value) => record(value)).map((value) => ({
+        code: clean(value.code, 4) ?? "",
+        score: typeof value.score === "number" && value.score >= 0 && value.score <= 100 ? Math.round(value.score) : null,
+        count: typeof value.count === "number" && value.count >= 0 ? Math.min(12, Math.round(value.count)) : 0,
+      })).filter((value) => /^[OSGFDC]$/.test(value.code)).slice(0, 6)
+    : [];
   const result: WeddingAnimalQuizHandoff = {
-    version: 1,
+    version: source.version,
     created_at: createdAt,
     expires_at: expiresAt,
     animal_title: clean(source.animal_title),
@@ -103,9 +123,21 @@ function parsedHandoff(value: unknown, now: Date): WeddingAnimalQuizHandoff | nu
     values: strings(source.values, 5),
     deal_breakers: strings(source.deal_breakers, 3),
     family_involvement: clean(source.family_involvement),
+    dimension_scores: scores,
+    evidence_answer_ids: strings(source.evidence_answer_ids, 12),
+    evidence_labels: strings(source.evidence_labels, 12),
+    planning_preferences: source.version === 2 ? {
+      inspiration: clean(preferences.inspiration),
+      reminders: clean(preferences.reminders),
+      guest_planning: clean(preferences.guest_planning),
+      budget_trade_off: clean(preferences.budget_trade_off),
+      shortlist_tempo: clean(preferences.shortlist_tempo),
+      approval_workflow: clean(preferences.approval_workflow),
+    } : null,
+    requires_confirmation: source.requires_confirmation !== false,
   };
   return result.top_priorities.length || result.atmosphere_keywords.length || result.venue_vibes.length
-    || result.deal_breakers.length || result.guest_range ? result : null;
+    || result.deal_breakers.length || result.guest_range || result.dimension_scores.length ? result : null;
 }
 
 /** Compatibility adapter for completed quizzes saved before the explicit handoff was introduced. */
@@ -137,7 +169,37 @@ function legacyBriefToHandoff(value: unknown, now: Date): WeddingAnimalQuizHando
     values: strings(source.values, 5),
     deal_breakers: labels(source.dealbreakers, QUIZ_DEAL_BREAKER_LABELS, 3),
     family_involvement: QUIZ_FAMILY_LABELS[clean(source.family_involvement) ?? ""] ?? clean(source.family_involvement),
+    dimension_scores: [], evidence_answer_ids: [], evidence_labels: [], planning_preferences: null,
+    requires_confirmation: true,
   }, now);
+}
+
+export type WeddingAnimalQuizOnboardingSeed = {
+  budgetComfort: string;
+  prioritiesCsv: string;
+  atmosphereDescription: string;
+  quizSummary: string[];
+};
+
+/** Quiz signals are suggestions only: never manufacture a guest count, budget amount, date or location. */
+export function weddingAnimalQuizHandoffToOnboardingSeed(
+  handoff: WeddingAnimalQuizHandoff,
+): WeddingAnimalQuizOnboardingSeed {
+  const preferences = handoff.planning_preferences;
+  const summary = preferences ? [
+    preferences.inspiration,
+    preferences.reminders,
+    preferences.guest_planning,
+    preferences.budget_trade_off,
+    preferences.shortlist_tempo,
+    preferences.approval_workflow,
+  ].filter((value): value is string => Boolean(value)) : [];
+  return {
+    budgetComfort: preferences?.budget_trade_off ?? handoff.budget_comfort ?? "",
+    prioritiesCsv: handoff.top_priorities.join(", "),
+    atmosphereDescription: preferences?.inspiration ?? handoff.atmosphere_keywords.join("; "),
+    quizSummary: [...new Set(summary)],
+  };
 }
 
 /** Untrusted browser handoffs are bounded, schema checked and expired before AFP sees them. */
@@ -171,6 +233,7 @@ function handoffPhrases(handoff: WeddingAnimalQuizHandoff): string[] {
     ...handoff.venue_vibes,
     ...handoff.values,
     handoff.family_involvement ?? "",
+    ...(handoff.planning_preferences ? Object.values(handoff.planning_preferences).filter((value): value is string => Boolean(value)) : []),
   ].filter(Boolean))];
 }
 
@@ -189,7 +252,7 @@ export function weddingAnimalQuizHandoffToPreferenceProfile(handoff: WeddingAnim
       polarity: 1,
       anchor: phrase,
       anchorSource: "lead_magnet",
-      confidence: 0.7,
+    confidence: 0.7,
       authority: "deterministic",
     });
   }
@@ -224,6 +287,66 @@ function fingerprint(handoff: WeddingAnimalQuizHandoff): string {
   return `animal_quiz:${(hash >>> 0).toString(36)}`;
 }
 
+function quizLedgerEvents(
+  handoff: WeddingAnimalQuizHandoff,
+  metadata: WeddingPlanningMetadata,
+  importFingerprint: string,
+): SendAfpMessageInput[] {
+  if (handoff.version !== 2) return [];
+  const common: Pick<SendAfpMessageInput, "thread_id" | "from" | "to" | "timestamp" | "type" | "supertags" | "store_in_relational"> = {
+    thread_id: `wedding_animal_quiz:${metadata.responseWorkspaceId}`,
+    from: "user://wedding-animal-quiz",
+    to: ["agent://wedding-planning"],
+    timestamp: handoff.created_at,
+    type: "ledger",
+    supertags: ["template:wedding_planning", "wedding_animal_quiz", "privacy:private"],
+    store_in_relational: true,
+  };
+  const answers = handoff.evidence_answer_ids.map((answerId, index): SendAfpMessageInput => ({
+    ...common,
+    id: `wedding_animal_quiz_answer:${importFingerprint}:${index + 1}`,
+    kind: "wedding_animal_quiz_answer",
+    subtype: "quiz_answer",
+    content: {
+      quiz_version: handoff.version,
+      answer_id: answerId,
+      answer_label: handoff.evidence_labels[index] ?? null,
+      confirmed_as_planning_fact: false,
+    },
+    metadata: {
+      ...metadata,
+      import_source: "wedding_animal_quiz",
+      import_fingerprint: importFingerprint,
+      privacy_scope: "private",
+    },
+  }));
+  return [
+    ...answers,
+    {
+      ...common,
+      id: `wedding_animal_quiz_result:${importFingerprint}`,
+      kind: "wedding_animal_quiz_result",
+      subtype: "quiz_result",
+      content: {
+        quiz_version: handoff.version,
+        animal_title: handoff.animal_title,
+        dimension_scores: handoff.dimension_scores,
+        evidence_answer_ids: handoff.evidence_answer_ids,
+        requires_confirmation: handoff.requires_confirmation,
+      },
+      metadata: { ...metadata, import_source: "wedding_animal_quiz", import_fingerprint: importFingerprint, privacy_scope: "private" },
+    },
+    {
+      ...common,
+      id: `wedding_animal_quiz_consent:${importFingerprint}`,
+      kind: "wedding_animal_quiz_consent",
+      subtype: "quiz_account_import_consent",
+      content: { quiz_version: handoff.version, consent: "account_import", raw_partner_answers_stored: false },
+      metadata: { ...metadata, import_source: "wedding_animal_quiz", import_fingerprint: importFingerprint, privacy_scope: "private" },
+    },
+  ];
+}
+
 export type WeddingAnimalQuizImportResult =
   | { status: "nothing_to_import" }
   | { status: "imported"; profile: WeddingPreferenceProfile; messageId: string; fingerprint: string; summary: string };
@@ -249,6 +372,13 @@ export async function importWeddingAnimalQuizHandoff(input: {
     hardConstraints: handoff.deal_breakers.map((anchor) => ({ key: "quiz_deal_breaker", anchor })),
   });
   preference.metadata = { ...(preference.metadata ?? {}), import_source: "wedding_animal_quiz", import_fingerprint: id };
+  preference.metadata.quiz_version = handoff.version;
+  preference.metadata.confirmation_status = "pending_user_review";
+  preference.references = [...(preference.references ?? []), ...handoff.evidence_answer_ids.map((id) => ({
+    type: "quiz_answer",
+    target: `omnyid://wedding/quiz-answer/${encodeURIComponent(id)}`,
+    label: id,
+  }))];
   const intake = weddingIntakeProfileToAfpSendInput({
     metadata: input.metadata,
     planningContext: quizPlanningContext(handoff, input.existingPlanning),
@@ -268,7 +398,8 @@ export async function importWeddingAnimalQuizHandoff(input: {
     message.metadata = { ...(message.metadata ?? {}), import_source: "wedding_animal_quiz", import_fingerprint: id };
     return message;
   });
-  const [saved] = await Promise.all([preference, intake, ...dealBreakers].map((message) => input.saveProjection(message)));
+  const quizEvents = quizLedgerEvents(handoff, input.metadata, id);
+  const [saved] = await Promise.all([preference, intake, ...dealBreakers, ...quizEvents].map((message) => input.saveProjection(message)));
   const savedRecord = saved && typeof saved === "object" ? saved as Record<string, unknown> : {};
   input.storage.removeItem(WEDDING_ANIMAL_QUIZ_HANDOFF_KEY);
   input.storage.removeItem(WEDDING_ANIMAL_QUIZ_BRIEF_KEY);

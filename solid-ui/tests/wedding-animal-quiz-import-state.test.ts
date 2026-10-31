@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   importWeddingAnimalQuizHandoff,
   readWeddingAnimalQuizHandoff,
+  weddingAnimalQuizHandoffToOnboardingSeed,
   WEDDING_ANIMAL_QUIZ_BRIEF_KEY,
   WEDDING_ANIMAL_QUIZ_HANDOFF_KEY,
 } from "../src/lib/weddingAnimalQuizImportState.ts";
@@ -35,6 +36,69 @@ const handoff = {
   deal_breakers: ["Going into debt"],
   family_involvement: "Family co-hosts",
 };
+
+const v2Handoff = {
+  version: 2,
+  quiz_version: 2,
+  created_at: "2026-11-01T00:00:00.000Z",
+  expires_at: "2026-12-01T00:00:00.000Z",
+  animal_title: "Owl — Thoughtful organiser",
+  dimension_scores: [
+    { code: "O", score: 75, count: 2 }, { code: "S", score: 100, count: 2 },
+    { code: "G", score: 25, count: 2 }, { code: "F", score: 0, count: 2 },
+    { code: "D", score: 75, count: 2 }, { code: "C", score: 50, count: 2 },
+  ],
+  evidence_answer_ids: ["Q01:C", "Q07:D"],
+  evidence_labels: ["Personal and eclectic", "Bold colour installation"],
+  atmosphere_keywords: ["Distinctive"],
+  values: ["Structured", "Intimate", "Cost certainty", "Decide promptly", "Balanced decision ownership"],
+  planning_preferences: {
+    inspiration: "Distinctive", reminders: "Structured", guest_planning: "Intimate",
+    budget_trade_off: "Cost certainty", shortlist_tempo: "Decide promptly",
+    approval_workflow: "Balanced decision ownership",
+  },
+  requires_confirmation: true,
+};
+
+test("v2 quiz suggestions prefill only supported qualitative onboarding fields", () => {
+  const storage = new MemoryStorage();
+  storage.setItem(WEDDING_ANIMAL_QUIZ_HANDOFF_KEY, JSON.stringify(v2Handoff));
+  const parsed = readWeddingAnimalQuizHandoff(storage, new Date("2026-11-02T00:00:00.000Z"));
+  assert.ok(parsed);
+  const seed = weddingAnimalQuizHandoffToOnboardingSeed(parsed);
+  assert.equal(seed.atmosphereDescription, "Distinctive");
+  assert.equal(seed.budgetComfort, "Cost certainty");
+  assert.equal(seed.prioritiesCsv, "");
+  assert.equal("guestCount" in seed, false);
+  assert.equal("location" in seed, false);
+});
+
+test("v2 account import records bounded answer evidence, result and consent events", async () => {
+  const storage = new MemoryStorage();
+  storage.setItem(WEDDING_ANIMAL_QUIZ_HANDOFF_KEY, JSON.stringify(v2Handoff));
+  const saved: Array<Record<string, unknown>> = [];
+  const result = await importWeddingAnimalQuizHandoff({
+    storage,
+    metadata: {
+      template: "wedding_planning", weddingPlanId: "wedding_plan:v2",
+      responseWorkspaceId: "response_workspace:v2", sourceResponseId: null,
+      artifactKind: null, supertags: ["template:wedding_planning"], privacyScope: "private", approvalState: "draft",
+    },
+    existingPlanning: {},
+    saveProjection: async (message) => { saved.push(message as Record<string, unknown>); return { message_id: message.id }; },
+    now: new Date("2026-11-02T00:00:00.000Z"),
+  });
+  assert.equal(result.status, "imported");
+  assert.equal(saved.filter((message) => message.kind === "wedding_animal_quiz_answer").length, 2);
+  assert.equal(saved.filter((message) => message.kind === "wedding_animal_quiz_result").length, 1);
+  assert.equal(saved.filter((message) => message.kind === "wedding_animal_quiz_consent").length, 1);
+  const consent = saved.find((message) => message.kind === "wedding_animal_quiz_consent")?.content as Record<string, unknown>;
+  assert.equal(consent.raw_partner_answers_stored, false);
+  assert.equal(JSON.stringify(saved).includes("guest_count"), true);
+  const intake = saved.find((message) => message.subtype === "wedding_intake_profile")?.content as Record<string, unknown>;
+  assert.equal(intake.guest_count, null);
+  assert.equal(intake.location, null);
+});
 
 test("quiz handoff rejects expired or oversized browser input", () => {
   const storage = new MemoryStorage();

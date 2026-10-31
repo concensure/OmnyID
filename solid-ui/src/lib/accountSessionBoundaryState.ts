@@ -33,6 +33,19 @@ export type AccountSessionBoundaryResult = {
   removedSessionKeys: string[];
 };
 
+/**
+ * A first successful sign-in already cleared ambiguous browser state before
+ * this decision is made, so it can adopt the new session in place. A hard
+ * reload is reserved for replacing an authenticated account whose reactive
+ * projections may still be mounted in memory.
+ */
+export function shouldReloadForAuthenticatedAccountReplacement(input: {
+  accountChanged: boolean;
+  hadAuthenticatedSession: boolean;
+}): boolean {
+  return input.accountChanged && input.hadAuthenticatedSession;
+}
+
 function clean(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }

@@ -175,6 +175,27 @@ test("buildWeddingFamilyBoundaryRequestObject creates approval-gated family requ
   assert.ok(message.to?.includes("agent://decision-queue"));
 });
 
+test("configured partner-pair approval cannot be auto-applied by a permissive role", () => {
+  const request = buildWeddingFamilyBoundaryRequestObject({
+    requesterLabel: "Planner",
+    requestLabel: "Move the invitation group",
+    changeType: "household_change",
+    requiredApprovalCount: 2,
+  }, metadata, "2026-09-25T00:00:00.000Z");
+  assert.ok(request);
+  const evaluated = applyWeddingFamilyBoundaryRequestEvaluation({
+    request,
+    roleAssignments: [{
+      id: "role:planner", kind: "wedding_boundary_role_assignment", title: "Planner",
+      personId: "family:planner", role: "planner", canEdit: ["household_change"],
+    }],
+  });
+  assert.equal(evaluated.requestStatus, "pending");
+  assert.equal(evaluated.approvalRequired, true);
+  assert.equal(evaluated.requiredApprovalCount, 2);
+  assert.match(String(evaluated.publicReason), /Both partners/);
+});
+
 test("applyWeddingFamilyBoundaryRequestEvaluation links active rules before saving", () => {
   const request = buildWeddingFamilyBoundaryRequestObject({
     requesterLabel: "Mum",

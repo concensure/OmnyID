@@ -53,6 +53,7 @@ export type WeddingFamilyBoundaryRequestDraftInput = {
   changeType?: WeddingBoundaryChangeRequest["changeType"] | null;
   targetHouseholdId?: string | null;
   proposedGuestName?: string | null;
+  requiredApprovalCount?: 1 | 2 | null;
 };
 
 export type WeddingFamilyBoundaryPolicyDraftInput = {
@@ -321,6 +322,8 @@ export function buildWeddingFamilyBoundaryRequestObject(
     proposedGuestName: proposedGuestName || null,
     requestStatus: "pending",
     approvalRequired: true,
+    approvalCount: 0,
+    requiredApprovalCount: input.requiredApprovalCount === 2 ? 2 : 1,
     revision: 1,
     publicReason: `${requesterLabel} asked: ${requestLabel}`,
     metadata: {
@@ -341,16 +344,17 @@ export function applyWeddingFamilyBoundaryRequestEvaluation(input: {
     policies: input.policies,
     roleAssignments: input.roleAssignments,
   });
-  const publicReason = evaluation.reasonLabels[0] || input.request.publicReason || (
+  const requiresPartnerPair = input.request.requiredApprovalCount === 2;
+  const publicReason = requiresPartnerPair ? "Both partners chose to approve this kind of request before anything changes." : evaluation.reasonLabels[0] || input.request.publicReason || (
     evaluation.status === "approved"
       ? "This helper is allowed to make this update."
       : "The couple will review this before anything changes."
   );
   return {
     ...input.request,
-    status: evaluation.status,
-    requestStatus: evaluation.status,
-    approvalRequired: evaluation.approvalRequired,
+    status: requiresPartnerPair && evaluation.status === "approved" ? "pending" : evaluation.status,
+    requestStatus: requiresPartnerPair && evaluation.status === "approved" ? "pending" : evaluation.status,
+    approvalRequired: requiresPartnerPair || evaluation.approvalRequired,
     policyIds: evaluation.policyIds.length > 0 ? evaluation.policyIds : input.request.policyIds,
     policyVersions: Object.fromEntries((input.policies ?? []).filter((policy) => evaluation.policyIds.includes(policy.id)).map((policy) => [policy.id, policy.version ?? 1])),
     publicReason,

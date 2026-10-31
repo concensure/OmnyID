@@ -6,6 +6,8 @@ import type {
   WeddingBoundaryHousehold,
   WeddingBoundaryLedgerObject,
   WeddingBoundaryPolicy,
+  WeddingBoundaryRole,
+  WeddingBoundaryRoleAssignment,
 } from "@/lib/weddingBoundaryLedgerState";
 import type {
   WeddingBoundaryImpactArea,
@@ -13,6 +15,19 @@ import type {
   WeddingBoundaryRuleConflict,
   WeddingBoundaryRuleScopeKind,
 } from "@/lib/weddingBoundaryGovernanceTypes";
+
+export type WeddingBoundaryRoleCapabilityPreset = Pick<WeddingBoundaryRoleAssignment,
+  "role" | "canView" | "canSuggest" | "canEdit" | "requiresApprovalFor" | "privateNotesVisible">;
+
+export function weddingBoundaryRoleCapabilityPreset(role: WeddingBoundaryRole): WeddingBoundaryRoleCapabilityPreset {
+  const suggestionTypes: WeddingBoundaryRoleAssignment["canSuggest"] = ["add_guest", "remove_guest", "plus_one_change", "event_invite_change", "household_change"];
+  if (role === "couple") return { role, canView: ["all_wedding_boundary_records"], canSuggest: suggestionTypes, canEdit: suggestionTypes, requiresApprovalFor: [], privateNotesVisible: true };
+  if (role === "planner") return { role, canView: ["approved_guest_logistics", "household_summary", "request_status"], canSuggest: suggestionTypes, canEdit: ["guest_contact_update"], requiresApprovalFor: suggestionTypes, privateNotesVisible: false };
+  if (role === "rsvp_guest") return { role, canView: ["own_invitation", "own_rsvp", "published_event_details"], canSuggest: ["plus_one_change", "event_invite_change", "guest_contact_update"], canEdit: ["guest_contact_update"], requiresApprovalFor: ["plus_one_change", "event_invite_change"], privateNotesVisible: false };
+  if (role === "parent_family" || role === "helper") return { role, canView: ["granted_household_summary"], canSuggest: suggestionTypes, canEdit: [], requiresApprovalFor: suggestionTypes, privateNotesVisible: false };
+  if (role === "vendor") return { role, canView: ["approved_vendor_logistics"], canSuggest: [], canEdit: [], requiresApprovalFor: [], privateNotesVisible: false };
+  return { role, canView: ["own_invitation"], canSuggest: ["guest_contact_update"], canEdit: ["guest_contact_update"], requiresApprovalFor: [], privateNotesVisible: false };
+}
 
 export type WeddingBoundaryHouseholdCommand =
   | { kind: "split_household"; sourceHouseholdId: string; newHouseholdId: string; movePersonIds: string[] }

@@ -44,12 +44,13 @@ test("public directory and claim flow expose database-backed discovery without e
 
 test("solo animal quiz sharing speaks for one person and avoids fragile emoji in message text", async () => {
   const [page, home, script] = await Promise.all([read("wedding/animal-quiz.html"), read("wedding/index.html"), read("wedding/assets/js/quiz.js")]);
-  assert.match(page, /quiz\.js\?v=20261029-wed297/);
-  assert.match(script, /my wedding animal might be the/);
+  assert.match(page, /quiz\.js\?v=20261101-wed309/);
+  assert.match(script, /I found my wedding animal:/);
   assert.doesNotMatch(script, /I just found out our wedding animal might be/);
   assert.doesNotMatch(script, /might be the ' \+ a\.name \+ ' ' \+ a\.emoji/);
-  assert.match(script, /budget_stretch:/);
-  assert.match(script, /deal_breakers:/);
+  assert.match(script, /dimension_scores/);
+  assert.doesNotMatch(script, /guest_range:/);
+  assert.doesNotMatch(script, /budget_stretch:/);
   assert.doesNotMatch(script, /�/);
   assert.match(home, /The Wedding Animal Quiz/);
   assert.match(home, /Find my wedding animal/);

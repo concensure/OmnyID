@@ -73,6 +73,7 @@ export function WeddingSiteIntakeWizard(props: {
   onWeddingFollowUpPrioritiesInput: (value: string) => void;
   weddingFollowUpAtmosphere: () => string;
   onWeddingFollowUpAtmosphereInput: (value: string) => void;
+  quizSuggestions?: string[];
   weddingFollowUpImageLinks: () => string;
   onWeddingFollowUpImageLinksInput: (value: string) => void;
   weddingFollowUpCoupleNames: () => string;
@@ -233,6 +234,12 @@ export function WeddingSiteIntakeWizard(props: {
 
       {/* Step 0 — the basics, with the fast-path paste box first */}
       <Show when={step() === 0}>
+        <div class="mb-3 rounded-xl border border-wedding-border bg-white px-3 py-2 text-xs leading-5 text-wedding-ink">
+          Not sure where to start? Try the <a class="font-semibold text-wedding-secondary underline underline-offset-2" href="/wedding/blog/couples-barely-know-each-other.html">wedding animal quiz</a> to gather your style.
+          <Show when={(props.quizSuggestions?.length ?? 0) > 0}>
+            <p class="mt-1 text-[11px] text-wedding-ink/70">Quiz suggestions ready to review: {props.quizSuggestions?.join(" · ")}. Nothing becomes a confirmed fact until you keep or edit it here.</p>
+          </Show>
+        </div>
         <div class="mt-4 grid min-w-0 gap-3 rounded-xl border border-wedding-border bg-wedding-page p-3 md:grid-cols-2">
           <label class={`${labelClass} md:col-span-2`}>
             Paste a planning message for the fastest start — or fill in the fields below. Everything here can be changed later.

@@ -14,6 +14,7 @@ import type { WeddingBoundaryRequestDecision } from "@/lib/weddingBoundaryDecisi
 import type {
   WeddingBoundaryChangeType,
   WeddingBoundaryPolicyRuleType,
+  WeddingBoundaryRoleAssignment,
   WeddingBoundaryState,
 } from "@/lib/weddingBoundaryLedgerState";
 import type { WeddingBoundaryTopologyState } from "@/lib/weddingBoundaryTopologyState";
@@ -28,8 +29,8 @@ import type {
 export function WeddingBoundaryManagementCard(props: {
   state: WeddingBoundaryState;
   topology: WeddingBoundaryTopologyState;
-  onDecideRequest?: (requestId: string, decision: WeddingBoundaryRequestDecision) => Promise<string>;
-  onSaveFamilyRequest?: (input: { requesterLabel: string; requestLabel: string; changeType: WeddingBoundaryChangeType; targetHouseholdId: string; proposedGuestName: string }) => Promise<string>;
+  onDecideRequest?: (requestId: string, decision: WeddingBoundaryRequestDecision, approvalActorId?: string) => Promise<string>;
+  onSaveFamilyRequest?: (input: { requesterLabel: string; requestLabel: string; changeType: WeddingBoundaryChangeType; targetHouseholdId: string; proposedGuestName: string; requiredApprovalCount: 1 | 2 }) => Promise<string>;
   onSaveFamilyRule?: (input: { title: string; plainLanguage: string; ruleType: WeddingBoundaryPolicyRuleType; scopeKind: WeddingBoundaryRuleScopeKind; scopeId: string; effect: WeddingBoundaryRuleEffect; authority: WeddingBoundaryRuleAuthority; effectiveUntil: string }) => Promise<string>;
   onSaveHousehold?: (input: { householdId: string; familyGroupLabel: string; invitationAllocation: number | null; requestDeadline: string | null }) => Promise<string>;
 }) {
@@ -48,6 +49,8 @@ export function WeddingBoundaryManagementCard(props: {
   const [requestChangeType, setRequestChangeType] = createSignal<WeddingBoundaryChangeType>("add_guest");
   const [requestHouseholdId, setRequestHouseholdId] = createSignal("");
   const [proposedGuestName, setProposedGuestName] = createSignal("");
+  const [requiredApprovalCount, setRequiredApprovalCount] = createSignal<1 | 2>(1);
+  const [approvalActorId, setApprovalActorId] = createSignal("");
   const [ruleTitle, setRuleTitle] = createSignal("");
   const [ruleText, setRuleText] = createSignal("");
   const [ruleType, setRuleType] = createSignal<WeddingBoundaryPolicyRuleType>("invitation_scope");
@@ -77,6 +80,7 @@ export function WeddingBoundaryManagementCard(props: {
     const request = reviewingRequest();
     return request ? previewWeddingBoundaryRequestDecision({ request, objects: props.state.allObjects }) : null;
   });
+  const coupleApprovers = createMemo(() => props.state.allObjects.filter((object): object is WeddingBoundaryRoleAssignment => object.kind === "wedding_boundary_role_assignment" && object.role === "couple" && object.status !== "archived"));
 
   function focusSection(id: string): void {
     queueMicrotask(() => document.getElementById(id)?.focus());
@@ -138,12 +142,12 @@ export function WeddingBoundaryManagementCard(props: {
     }
   }
 
-  async function decideRequest(requestId: string, decision: WeddingBoundaryRequestDecision): Promise<void> {
+  async function decideRequest(requestId: string, decision: WeddingBoundaryRequestDecision, actorId?: string): Promise<void> {
     if (!props.onDecideRequest || decidingRequestId()) return;
     setDecisionNotice(null);
     setDecidingRequestId(requestId);
     try {
-      const notice = await props.onDecideRequest(requestId, decision);
+      const notice = await props.onDecideRequest(requestId, decision, actorId);
       setDecisionNotice(notice);
       setCompletedRequestIds((current) => ({ ...current, [requestId]: true }));
     } catch (error) {
@@ -167,12 +171,14 @@ export function WeddingBoundaryManagementCard(props: {
         changeType: requestChangeType(),
         targetHouseholdId: requestHouseholdId(),
         proposedGuestName: proposedGuestName(),
+        requiredApprovalCount: requiredApprovalCount(),
       });
       setDecisionNotice(notice);
       setRequesterLabel("");
       setRequestLabel("");
       setRequestHouseholdId("");
       setProposedGuestName("");
+      setRequiredApprovalCount(1);
       setShowAddRequest(false);
       setShowRequests(true);
     } catch (error) {
@@ -360,6 +366,13 @@ export function WeddingBoundaryManagementCard(props: {
                 <input class="mt-1 w-full rounded-xl border border-cyan-100 bg-white px-3 py-2 text-sm text-cyan-950 outline-none focus:border-cyan-400" value={proposedGuestName()} placeholder="Full name" onInput={(event) => setProposedGuestName(event.currentTarget.value)} />
               </label>
             </Show>
+            <label class="min-w-0">
+              <span class="text-xs font-semibold text-cyan-950/70">Approval needed</span>
+              <select class="mt-1 w-full rounded-xl border border-cyan-100 bg-white px-3 py-2 text-sm text-cyan-950 outline-none focus:border-cyan-400" value={requiredApprovalCount()} onChange={(event) => setRequiredApprovalCount(event.currentTarget.value === "2" ? 2 : 1)}>
+                <option value="1">One partner</option>
+                <option value="2">Both partners</option>
+              </select>
+            </label>
           </div>
           <button type="button" class="mt-3 rounded-full bg-cyan-700 px-3 py-2 text-xs font-semibold text-white transition hover:bg-cyan-800 disabled:cursor-not-allowed disabled:opacity-50" disabled={!requestLabel().trim() || !requestHouseholdId() || (requestChangeType() === "add_guest" && !proposedGuestName().trim()) || savingDraft()} onClick={() => void saveFamilyRequest()}>
             {savingDraft() ? "Saving..." : "Save for review"}
@@ -461,7 +474,7 @@ export function WeddingBoundaryManagementCard(props: {
                         type="button"
                         disabled={Boolean(decidingRequestId())}
                         class="rounded-full bg-cyan-700 px-3 py-2 text-xs font-semibold text-white transition hover:bg-cyan-800 disabled:cursor-not-allowed disabled:opacity-50 sm:py-1.5"
-                        onClick={() => { setReviewingRequestId(item.id); setReviewingDecision("approve"); }}
+                        onClick={() => { setApprovalActorId(""); setReviewingRequestId(item.id); setReviewingDecision("approve"); }}
                       >
                         {decidingRequestId() === item.id ? "Saving..." : "Review impact"}
                       </button>
@@ -469,7 +482,7 @@ export function WeddingBoundaryManagementCard(props: {
                         type="button"
                         disabled={Boolean(decidingRequestId())}
                         class="rounded-full border border-cyan-200 bg-white/85 px-3 py-2 text-xs font-semibold text-cyan-950 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-50 sm:py-1.5"
-                        onClick={() => { setReviewingRequestId(item.id); setReviewingDecision("decline"); }}
+                        onClick={() => { setApprovalActorId(""); setReviewingRequestId(item.id); setReviewingDecision("decline"); }}
                       >
                         Keep unchanged
                       </button>
@@ -627,9 +640,19 @@ export function WeddingBoundaryManagementCard(props: {
                   </div>
                 )}
               </Show>
+              <Show when={reviewingDecision() === "approve" && request().requiredApprovalCount === 2}>
+                <label class="mt-3 block">
+                  <span class="text-sm font-semibold text-cyan-950">Approving partner</span>
+                  <select class="mt-1 min-h-12 w-full rounded-2xl border border-cyan-200 bg-white px-3 text-sm text-cyan-950" value={approvalActorId()} onChange={(event) => setApprovalActorId(event.currentTarget.value)}>
+                    <option value="">Choose your partner identity</option>
+                    <For each={coupleApprovers()}>{(role) => <option value={role.personId}>{role.title}</option>}</For>
+                  </select>
+                  <span class="mt-1 block text-xs leading-5 text-cyan-950/65">The first approval records progress only. Connected wedding data changes after a different partner approves.</span>
+                </label>
+              </Show>
               <div class="mt-5 grid grid-cols-2 gap-3">
-                <button type="button" class="min-h-12 rounded-2xl border border-cyan-200 bg-white px-4 font-semibold text-cyan-950" onClick={() => setReviewingRequestId(null)}>Cancel</button>
-                <button type="button" disabled={Boolean(decidingRequestId()) || (reviewingDecision() === "approve" && decisionPreview()?.canApply === false)} class="min-h-12 rounded-2xl bg-cyan-700 px-4 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50" onClick={() => { const id = request().requestId; const decision = reviewingDecision(); setReviewingRequestId(null); void decideRequest(id, decision); }}>
+                <button type="button" class="min-h-12 rounded-2xl border border-cyan-200 bg-white px-4 font-semibold text-cyan-950" onClick={() => { setReviewingRequestId(null); setApprovalActorId(""); }}>Cancel</button>
+                <button type="button" disabled={Boolean(decidingRequestId()) || (reviewingDecision() === "approve" && decisionPreview()?.canApply === false) || (reviewingDecision() === "approve" && request().requiredApprovalCount === 2 && !approvalActorId())} class="min-h-12 rounded-2xl bg-cyan-700 px-4 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50" onClick={() => { const id = request().requestId; const decision = reviewingDecision(); const actor = approvalActorId() || undefined; setReviewingRequestId(null); setApprovalActorId(""); void decideRequest(id, decision, actor); }}>
                   {reviewingDecision() === "approve" ? "Confirm approval" : "Confirm unchanged"}
                 </button>
               </div>

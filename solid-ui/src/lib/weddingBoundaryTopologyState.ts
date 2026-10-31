@@ -215,7 +215,7 @@ function objectTags(object: WeddingBoundaryLedgerObject): string[] {
 }
 
 function changeRequestNeedsCoupleReview(object: WeddingBoundaryChangeRequest): boolean {
-  return object.approvalRequired === true && object.requestStatus === "pending";
+  return object.approvalRequired === true && (object.requestStatus === "pending" || object.requestStatus === "partially_approved");
 }
 
 function nodeMetadataFor(object: WeddingBoundaryLedgerObject): Record<string, unknown> {

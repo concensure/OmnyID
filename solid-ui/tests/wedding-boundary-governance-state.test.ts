@@ -5,6 +5,7 @@ import {
   previewWeddingBoundaryHouseholdCommand,
   previewWeddingBoundaryRequestDecision,
   projectWeddingBoundaryEffectiveRules,
+  weddingBoundaryRoleCapabilityPreset,
 } from "../src/lib/weddingBoundaryGovernanceState";
 import type {
   WeddingBoundaryChangeRequest,
@@ -155,4 +156,14 @@ test("governance projects only minimum necessary household aggregates to a helpe
     assert.partialDeepStrictEqual(result[0], { householdId: "household:a", namedGuestCount: 2, allocation: 4 });
     assert.ok(!JSON.stringify(result).includes("dietary"));
     assert.ok(!JSON.stringify(result).includes("person:a"));
-  });
+});
+
+test("delegated planner and RSVP guest presets are minimum-necessary and approval bounded", () => {
+  const planner = weddingBoundaryRoleCapabilityPreset("planner");
+  const guestRole = weddingBoundaryRoleCapabilityPreset("rsvp_guest");
+  assert.equal(planner.privateNotesVisible, false);
+  assert.ok(planner.requiresApprovalFor?.includes("household_change"));
+  assert.deepEqual(guestRole.canView, ["own_invitation", "own_rsvp", "published_event_details"]);
+  assert.equal(guestRole.canEdit?.includes("household_change"), false);
+  assert.equal(guestRole.privateNotesVisible, false);
+});

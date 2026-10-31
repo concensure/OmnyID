@@ -2169,3 +2169,24 @@ allowed only in schema-bounded classify/reason/draft steps, with model/cost/sour
 step trace. Default templates are copied into the user's ledger and never act as one global mutable
 catalogue. New focused modules must keep substantive logic out of the already oversized
 `server/proactive_routes.rs`.
+
+## 2026-11-01: Quiz results are bounded planning evidence, not inferred wedding facts
+
+The Wedding Animal Quiz uses the supplied versioned, deterministic six-dimension scoring contract.
+It may seed reviewable qualitative onboarding suggestions such as atmosphere, priorities and budget
+comfort language, but it must not invent or silently confirm a numeric budget, guest count, date or
+location. Answer, result and consent records are private AFP evidence with source and version
+references; raw partner answers are not copied into the account ledger. A first successful identity
+session is adopted in place so its quiz handoff survives, while an actual authenticated-account
+replacement still performs the account-isolation reload.
+
+## 2026-11-01: Family household mutations are versioned AFP successor commands
+
+Household split, merge, archive, assignment, allocation, representative and request-window changes
+operate on the canonical Wedding AFP ledger through tenant-scoped commands with expected revisions,
+idempotency receipts and bounded impact receipts. Non-add-guest request approvals use explicit
+mutation handlers rather than a generic patch surface. A configured two-partner request records the
+first distinct couple-role approval without applying consequences; only a second distinct active
+couple-role actor may apply the mutation. Sent or accepted invitation effects require elevated
+confirmation. Private notes remain outside immutable events until an encrypted mutable-record
+command exists, and all delegated/helper hosted capabilities remain false-default.

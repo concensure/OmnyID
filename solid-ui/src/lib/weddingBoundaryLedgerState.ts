@@ -28,7 +28,7 @@ export type WeddingBoundaryLedgerKind =
   | "wedding_boundary_decline_template"
   | "wedding_boundary_visibility_page";
 
-export type WeddingBoundaryRole = "couple" | "parent_family" | "helper" | "vendor" | "guest";
+export type WeddingBoundaryRole = "couple" | "planner" | "parent_family" | "helper" | "rsvp_guest" | "vendor" | "guest";
 export type WeddingBoundaryPolicyRuleType = "plus_one" | "children" | "invitation_scope" | "allocation" | "deadline" | "visibility" | "access" | "seating" | "communication";
 export type WeddingBoundaryPolicyEnforcement = "block" | "require_approval" | "warn";
 export type WeddingBoundaryChangeType =
@@ -154,6 +154,8 @@ export type WeddingBoundaryChangeRequest = WeddingBoundaryLedgerObjectBase & {
   targetHouseholdId?: string | null;
   requestStatus: WeddingBoundaryRequestStatus;
   approvalRequired?: boolean | null;
+  approvalCount?: number | null;
+  requiredApprovalCount?: 1 | 2 | null;
   policyIds?: readonly string[] | null;
   policyVersions?: Readonly<Record<string, number>> | null;
   publicReason?: string | null;
@@ -312,7 +314,7 @@ function objectTimestampMs(object: WeddingBoundaryLedgerObject, index: number): 
 }
 
 function changeRequestNeedsCoupleReview(object: WeddingBoundaryChangeRequest): boolean {
-  return object.approvalRequired === true && object.requestStatus === "pending";
+  return object.approvalRequired === true && (object.requestStatus === "pending" || object.requestStatus === "partially_approved");
 }
 
 export function coalesceWeddingBoundaryLedgerObjects(
@@ -523,6 +525,8 @@ function publicContentFor(object: WeddingBoundaryLedgerObject): Record<string, u
       request_status: object.requestStatus,
       approval_required: changeRequestNeedsCoupleReview(object),
       approval_gate_recorded: object.approvalRequired === true,
+      approval_count: object.approvalCount ?? 0,
+      required_approval_count: object.requiredApprovalCount ?? 1,
       policy_ids: object.policyIds ?? [],
       policy_versions: object.policyVersions ?? {},
       public_reason: object.publicReason ?? null,

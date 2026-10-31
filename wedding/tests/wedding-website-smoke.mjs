@@ -387,7 +387,7 @@ const quizUi = readFileSync(resolve(root, 'assets', 'js', 'quiz.js'), 'utf8');
 const quizEngine = readFileSync(resolve(root, 'assets', 'js', 'quiz-engine.js'), 'utf8');
 if (!quizHtml.includes('name="referrer" content="no-referrer"')) failures.push('animal-quiz.html: strict referrer policy is missing');
 if (!quizUi.includes('Create account with this result') || !quizUi.includes('Create an account without importing it')) failures.push('quiz.js: explicit import and no-import account choices are required');
-if (!quizUi.includes('omnyid.wedding.animal_quiz.handoff.v1') || !quizUi.includes('expires_at')) failures.push('quiz.js: bounded expiring workspace handoff is missing');
+if (!quizUi.includes('omnyid.wedding.animal_quiz.handoff.v1') || !(quizUi + quizEngine).includes('expires_at')) failures.push('animal quiz: bounded expiring workspace handoff is missing');
 if (/\bfetch\s*\(|XMLHttpRequest|WebSocket|EventSource/.test(quizUi + quizEngine)) failures.push('animal quiz: unexpected backend or streaming transport is present');
 if (/api[_-]?key|client[_-]?secret|bearer\s+[a-z0-9._-]{12,}|password\s*[:=]/i.test(quizUi + quizEngine)) failures.push('animal quiz: secret-like material is present');
 if (/encodeURIComponent\(cleanName\(|names\s*=\s*encodeURIComponent|members\.slice/.test(quizEngine)) failures.push('quiz-engine.js: names remain in public share hashes');

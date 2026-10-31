@@ -139,7 +139,7 @@ export function WeddingWorkspaceContextPanels(props: {
     // still entering the associated contribution.
     await props.saveProjection(input);
   }
-  async function decideBoundaryRequest(requestId: string, decision: WeddingBoundaryRequestDecision): Promise<string> {
+  async function decideBoundaryRequest(requestId: string, decision: WeddingBoundaryRequestDecision, approvalActorId?: string): Promise<string> {
     const request = props.state.boundaryState.approvalQueue.find((item) => item.requestId === requestId);
     if (!request) throw new Error("This guest-list request is no longer waiting for review.");
     const nonce = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}`;
@@ -149,6 +149,7 @@ export function WeddingWorkspaceContextPanels(props: {
       requestId,
       decision: decision === "approve" ? "approve" : "decline",
       expectedRevision: request.revision ?? 1,
+      approvalActorId,
       idempotencyKey: `boundary:${requestId}:${request.revision ?? 1}:${decision}:${nonce}`,
     });
     props.onRefreshWorkspace?.();
@@ -251,7 +252,7 @@ export function WeddingWorkspaceContextPanels(props: {
     await props.saveProjection(sendInput);
     return "Meal choices confirmed for this wedding.";
   }
-  async function saveFamilyRequest(input: { requesterLabel: string; requestLabel: string; changeType: WeddingBoundaryChangeType; targetHouseholdId: string; proposedGuestName: string }): Promise<string> {
+  async function saveFamilyRequest(input: { requesterLabel: string; requestLabel: string; changeType: WeddingBoundaryChangeType; targetHouseholdId: string; proposedGuestName: string; requiredApprovalCount: 1 | 2 }): Promise<string> {
     if (!props.saveProjection) throw new Error("Saving is not connected yet.");
     const request = buildWeddingFamilyBoundaryRequestObject(input, props.state.workspace.metadata);
     if (!request) throw new Error("Add a request before saving.");

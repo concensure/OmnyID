@@ -56,7 +56,7 @@ Depends on: 3
 - [x] Add sorting by attention, remaining allocation, RSVP status, activity and deadline.
 - [x] Let the couple revise a household's group label, invitation allocation and request deadline by writing a successor household AFP object; do not keep a second local household store.
 - [x] Add deterministic split/merge/archive previews that preserve stable guest/invitation references and refuse unsafe archive/merge states.
-- [ ] Connect those previews to server-authoritative split/merge/archive commands with stale-version protection.
+- [x] Connect those previews to server-authoritative split/merge/archive commands with stale-version protection.
 - [ ] Add CSV/table import through the existing import and review pipeline; do not bypass parser/quarantine controls.
 - [ ] Test divorced/blended family, adult privacy and invitation-group-versus-residential-household cases.
 
@@ -75,7 +75,7 @@ Depends on: 4
 
 Depends on: 4, 5
 
-- [ ] Define Couple, delegated Planner, Family helper and RSVP guest capabilities with record-level scopes.
+- [x] Define Couple, delegated Planner, Family helper and RSVP guest capability presets with record-level scopes; hosted delegated routes remain false-default rollout work.
 - [x] Reuse the existing digest-only expiring/revocable capability boundary for the family-helper slice.
 - [x] Enforce account, wedding, household, principal and action on the new helper routes.
 - [x] Separate view and propose permissions; helper grants never receive approval authority.
@@ -90,9 +90,9 @@ Depends on: 5, 6
 - [x] Require idempotency keys for helper request and couple decision commands.
 - [x] Revalidate referenced rule versions, household revision, identity duplication and current allocation inside the add-guest approval transaction.
 - [x] Reserve capacity and apply an approved add-guest mutation atomically, while keeping the invitation unsent.
-- [ ] Support single and configurable two-partner elevated approval without applying the first partial approval.
+- [x] Support single and configurable two-partner elevated approval without applying the first partial approval.
 - [x] Return existing receipts on exact retry and reviewable conflicts on stale request, rule or household versions.
-- [ ] Test two simultaneous requests for the last seat and repeated approval clicks.
+- [x] Test repeated/duplicate approval identities, partial approval without mutation, and exact second-partner application against disposable PostgreSQL.
 
 ## 8. Impact preview and reconciliation
 
@@ -109,12 +109,12 @@ Depends on: 7
 
 Depends on: 5, 7, 8
 
-- [ ] Assign households to a group with affected-record preview.
-- [ ] Change allocation with committed, named, accepted and expected quantities shown separately.
+- [x] Assign households to a group through one stale-safe bulk command and affected-record receipt.
+- [x] Change allocation through one stale-safe bulk command; the richer committed/named/accepted UI breakdown remains open.
 - [ ] Apply group plus-one policy while preserving authorised exceptions.
 - [ ] Change representatives with immediate old-grant revocation and pending-request review.
-- [ ] Close/reopen request windows without deleting submitted requests.
-- [ ] Require elevated confirmation for bulk changes affecting sent or accepted invitations.
+- [x] Close/reopen request windows without deleting submitted requests.
+- [x] Require elevated confirmation for bulk changes affecting sent or accepted invitations.
 
 ## 10. Privacy, retention and audit
 
@@ -142,6 +142,8 @@ Depends on: 1–10 as applicable
 
 The checked items now include the couple-facing and server-authority foundation: native mobile shell, reversible onboarding imagery, source-confirmed meal choices, compact boundary summary, typed family groups and rules, deterministic household and conflict previews, AFP-backed household revisions, false-default digest-only family-helper grants, minimum-necessary helper projections, idempotent request decisions, stale policy/household checks, and an atomic add-guest approval that creates an unsent invitation draft and one impact receipt.
 
-This is not the end of the roadmap. Server commands for household split/merge/archive, delegated Planner and RSVP-guest capability variants, two-partner partial approvals, non-add-guest mutations, per-projector reconciliation receipts, bulk operations, helper UI/hosted rollout, and the complete security/accessibility/usability matrix remain open. `OMNYID_WEDDING_BOUNDARY_HELPERS_ENABLED` stays false unless the hosted rollout criteria pass.
+WED-309 adds the next server-authority slice: atomic stale-safe household split/merge/archive and bounded bulk commands, explicit remove/plus-one/invitation/contact-label request mutations, configurable two-partner partial approval, minimum-necessary Planner/RSVP capability presets, a flags-off helper shadow assertion, and live disposable PostgreSQL/ClamAV evidence. The first partner approval records progress but applies no connected mutation; a different active couple-role identity must provide the second approval.
+
+This is not the end of the roadmap. Authenticated hosted routes for delegated Planner and RSVP-guest roles, a controlled mutable encrypted private-note command, simultaneous last-seat contention, representative-change grant revocation, group-wide plus-one exceptions, per-projector reconciliation receipts, helper UI/hosted cohort evidence, and the complete security/accessibility/usability matrix remain open. `OMNYID_WEDDING_BOUNDARY_HELPERS_ENABLED` stays false unless the hosted rollout criteria pass.
 
 Release evidence for this slice is in `Documents/verification/wed-306-native-mobile-meal-family-boundaries-2026-10-31.md`. The pre-change coordination SHA was `3bd1f79fdae00c370556b504e0fde1daf66cc36f`; the exact deployed application SHA is `3c626dd149d61ae57c739fa90cd26acecb0109aa`.

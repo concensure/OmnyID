@@ -23,6 +23,9 @@ use ulid::Ulid;
 const MAX_GRANT_DAYS: i64 = 30;
 const HELPER_ACTIONS: [&str; 2] = ["view_summary", "propose_request"];
 
+mod household_commands;
+mod request_mutations;
+
 pub(super) fn routes() -> Router<Arc<AppState>> {
     Router::new()
         .route(
@@ -36,6 +39,7 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
         .route("/wedding/boundaries/helpers/open", post(open_helper))
         .route("/wedding/boundaries/helpers/propose", post(propose_request))
         .route("/wedding/boundaries/decisions", post(decide_request))
+        .merge(household_commands::routes())
 }
 
 fn helper_enabled() -> bool {
@@ -535,7 +539,10 @@ async fn apply_approved_add_guest(
         .await
         .map_err(store_error)?
         .ok_or_else(|| conflict("That household is no longer available."))?;
-    let revision = household.get("revision").and_then(Value::as_i64).unwrap_or(1);
+    let revision = household
+        .get("revision")
+        .and_then(Value::as_i64)
+        .unwrap_or(1);
     let expected_revision = request
         .get("expected_household_revision")
         .and_then(Value::as_i64)
@@ -550,10 +557,16 @@ async fn apply_approved_add_guest(
         .and_then(Value::as_array)
         .cloned()
         .unwrap_or_default();
-    if members.iter().any(|value| value.as_str() == Some(person_id)) {
+    if members
+        .iter()
+        .any(|value| value.as_str() == Some(person_id))
+    {
         return Err(conflict("That guest is already in this household."));
     }
-    if let Some(allocation) = household.get("invitation_allocation").and_then(Value::as_i64) {
+    if let Some(allocation) = household
+        .get("invitation_allocation")
+        .and_then(Value::as_i64)
+    {
         if allocation >= 0 && members.len() as i64 >= allocation {
             return Err(conflict(
                 "This household has reached its current invitation allocation.",
@@ -604,6 +617,19 @@ async fn apply_approved_add_guest(
         "budget_forecast",
         "tasks",
     ])
+}
+
+async fn apply_approved_request(
+    tx: &mut Transaction<'_, Postgres>,
+    table: &str,
+    plan: &str,
+    workspace: &str,
+    request: &Value,
+) -> Result<Vec<&'static str>, (StatusCode, String)> {
+    if request.get("change_type").and_then(Value::as_str) == Some("add_guest") {
+        return apply_approved_add_guest(tx, table, plan, workspace, request).await;
+    }
+    request_mutations::apply(tx, table, plan, workspace, request).await
 }
 
 #[derive(Deserialize)]
@@ -664,7 +690,10 @@ async fn propose_request(
         .await
         .map_err(store_error)?
         .ok_or_else(unavailable)?;
-    let household_revision = household.get("revision").and_then(Value::as_i64).unwrap_or(1);
+    let household_revision = household
+        .get("revision")
+        .and_then(Value::as_i64)
+        .unwrap_or(1);
     let target_person_id = format!("wedding_guest:{}:{}", grant.workspace, Ulid::new());
     let request_fingerprint = fingerprint(
         &json!({"grant": grant.grant_id, "household": request.household_id, "change": request.change_type, "label": request.request_label, "guest": request.proposed_guest_name}),
@@ -703,6 +732,7 @@ struct DecisionRequest {
     request_id: String,
     decision: String,
     expected_revision: i64,
+    approval_actor_id: Option<String>,
     idempotency_key: String,
 }
 
@@ -743,7 +773,7 @@ async fn decide_request(
         .await
         .map_err(store_error)?;
     let request_fingerprint = fingerprint(
-        &json!({"plan":request.wedding_plan_id,"workspace":request.response_workspace_id,"request":request.request_id,"decision":request.decision,"expected_revision":request.expected_revision}),
+        &json!({"plan":request.wedding_plan_id,"workspace":request.response_workspace_id,"request":request.request_id,"decision":request.decision,"expected_revision":request.expected_revision,"approval_actor_id":request.approval_actor_id}),
     );
     if let Some(response) = replay_or_reserve(
         &mut tx,
@@ -778,8 +808,90 @@ async fn decide_request(
             "This request changed on another screen. Refresh before deciding.",
         ));
     }
-    if current.get("request_status").and_then(Value::as_str) != Some("pending") {
+    let current_status = current.get("request_status").and_then(Value::as_str);
+    if !matches!(current_status, Some("pending") | Some("partially_approved")) {
         return Err(conflict("This family request has already been decided."));
+    }
+    let required_approvals = current
+        .get("required_approval_count")
+        .and_then(Value::as_i64)
+        .unwrap_or(1)
+        .clamp(1, 2);
+    if request.decision == "approve" && required_approvals == 2 {
+        let actor = request
+            .approval_actor_id
+            .as_deref()
+            .filter(|value| valid_id(value))
+            .ok_or_else(|| bad("Choose which partner is approving this request."))?;
+        let role_query = format!(
+            "SELECT EXISTS(SELECT 1 FROM {table} m WHERE m.kind='wedding_boundary_role_assignment' AND m.content->>'person_id'=$1 AND m.content->>'role'='couple' AND COALESCE(m.content->>'status','active')='active' AND {})",
+            metadata_scope("m", 2, 3)
+        );
+        let valid_actor = sqlx::query_scalar::<_, bool>(&role_query)
+            .bind(actor)
+            .bind(&request.wedding_plan_id)
+            .bind(&request.response_workspace_id)
+            .fetch_one(&mut *tx)
+            .await
+            .map_err(store_error)?;
+        if !valid_actor {
+            return Err((
+                StatusCode::FORBIDDEN,
+                "That approver is not an active partner for this wedding.".into(),
+            ));
+        }
+        let approval_query = format!(
+            "SELECT COUNT(DISTINCT m.content->>'actor_person_id') FROM {table} m WHERE m.kind='wedding_boundary_approval' AND m.content->>'request_id'=$1 AND {}",
+            metadata_scope("m", 2, 3)
+        );
+        let approval_count = sqlx::query_scalar::<_, i64>(&approval_query)
+            .bind(&request.request_id)
+            .bind(&request.wedding_plan_id)
+            .bind(&request.response_workspace_id)
+            .fetch_one(&mut *tx)
+            .await
+            .map_err(store_error)?;
+        let duplicate_query = format!(
+            "SELECT EXISTS(SELECT 1 FROM {table} m WHERE m.kind='wedding_boundary_approval' AND m.content->>'request_id'=$1 AND m.content->>'actor_person_id'=$2 AND {})",
+            metadata_scope("m", 3, 4)
+        );
+        let duplicate = sqlx::query_scalar::<_, bool>(&duplicate_query)
+            .bind(&request.request_id)
+            .bind(actor)
+            .bind(&request.wedding_plan_id)
+            .bind(&request.response_workspace_id)
+            .fetch_one(&mut *tx)
+            .await
+            .map_err(store_error)?;
+        if duplicate {
+            return Err(conflict(
+                "This partner has already approved the current request.",
+            ));
+        }
+        append_event(&mut tx, &table, &format!("boundary-approval-{}", Ulid::new()), "wedding_boundary_approval", &request.wedding_plan_id, &request.response_workspace_id, json!({"request_id":request.request_id,"actor_person_id":actor,"reviewed_revision":revision,"approval_number":approval_count + 1,"private_content_copied":false})).await?;
+        if approval_count + 1 < required_approvals {
+            let mut partial = current.clone();
+            if let Some(object) = partial.as_object_mut() {
+                object.insert("request_status".into(), json!("partially_approved"));
+                object.insert("status".into(), json!("partially_approved"));
+                object.insert("revision".into(), json!(revision + 1));
+                object.insert("approval_count".into(), json!(approval_count + 1));
+            }
+            append_event(
+                &mut tx,
+                &table,
+                &format!("request-partial-{}", Ulid::new()),
+                "wedding_boundary_change_request",
+                &request.wedding_plan_id,
+                &request.response_workspace_id,
+                partial,
+            )
+            .await?;
+            let response = json!({"request_id":request.request_id,"status":"partially_approved","approval_count":approval_count + 1,"required_approval_count":required_approvals,"replayed":false,"explanation":"One partner approved. No guest, invitation, budget, seating or vendor record changed while the second approval is pending."});
+            finish_receipt(&mut tx, &user.id, &request.idempotency_key, &response).await?;
+            tx.commit().await.map_err(store_error)?;
+            return Ok(Json(response));
+        }
     }
     let status = match request.decision.as_str() {
         "approve" => "approved",
@@ -795,7 +907,7 @@ async fn decide_request(
             &current,
         )
         .await?;
-        apply_approved_add_guest(
+        apply_approved_request(
             &mut tx,
             &table,
             &request.wedding_plan_id,

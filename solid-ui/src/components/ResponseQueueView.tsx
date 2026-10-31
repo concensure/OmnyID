@@ -164,6 +164,10 @@ import {
   weddingTemplateFollowUpDraftFromPlanningContext,
   type WeddingTemplateFollowUpDraft,
 } from "@/lib/weddingTemplateFollowUpLocalState";
+import {
+  readWeddingAnimalQuizHandoff,
+  weddingAnimalQuizHandoffToOnboardingSeed,
+} from "@/lib/weddingAnimalQuizImportState";
 import { buildWeddingNeedToKnowExtractionState } from "@/lib/weddingNeedToKnowExtractionState";
 import { buildWeddingTemplateFollowUpState } from "@/lib/weddingTemplateFollowUpState";
 import { buildWeddingTemplateLaunchState } from "@/lib/weddingTemplateLaunchState";
@@ -369,6 +373,7 @@ export function ResponseQueueView(props: {
   const [weddingFollowUpPriorities, setWeddingFollowUpPriorities] = createSignal("");
   const [weddingFollowUpAtmosphere, setWeddingFollowUpAtmosphere] = createSignal("");
   const [weddingFollowUpImageLinks, setWeddingFollowUpImageLinks] = createSignal("");
+  const [weddingQuizSuggestions, setWeddingQuizSuggestions] = createSignal<string[]>([]);
 
   async function refreshWeddingProviderCapabilitiesNow(): Promise<WeddingProviderCapabilitiesResponse | null> {
     try {
@@ -1103,6 +1108,14 @@ export function ResponseQueueView(props: {
     const intent = consumeWeddingNavigationIntent();
     if (intent?.view === "response_queue") {
       setWeddingNavigationIntent(intent);
+      const quizHandoff = readWeddingAnimalQuizHandoff(localStorage);
+      if (quizHandoff) {
+        const quizSeed = weddingAnimalQuizHandoffToOnboardingSeed(quizHandoff);
+        setWeddingQuizSuggestions(quizSeed.quizSummary);
+        if (!weddingFollowUpBudget()) setWeddingFollowUpBudget(quizSeed.budgetComfort);
+        if (!weddingFollowUpPriorities()) setWeddingFollowUpPriorities(quizSeed.prioritiesCsv);
+        if (!weddingFollowUpAtmosphere()) setWeddingFollowUpAtmosphere(quizSeed.atmosphereDescription);
+      }
       const draft = loadWeddingTemplateFollowUpDraft(intent.responseWorkspaceId, localStorage, weddingStorageUserId());
       if (draft) {
         setWeddingFollowUpDate(draft.dateOrSeason);
@@ -2028,6 +2041,7 @@ export function ResponseQueueView(props: {
             onWeddingFollowUpPrioritiesInput={setWeddingFollowUpPriorities}
             weddingFollowUpAtmosphere={weddingFollowUpAtmosphere}
             onWeddingFollowUpAtmosphereInput={setWeddingFollowUpAtmosphere}
+            quizSuggestions={weddingQuizSuggestions()}
             weddingFollowUpImageLinks={weddingFollowUpImageLinks}
             onWeddingFollowUpImageLinksInput={setWeddingFollowUpImageLinks}
             weddingFollowUpCoupleNames={weddingFollowUpCoupleNames}

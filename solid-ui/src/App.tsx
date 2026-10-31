@@ -416,7 +416,10 @@ import {
   withAdminPrimaryUseCaseDefault,
 } from "@/lib/primaryUseCaseProfileState";
 import { loadUserProfile } from "@/lib/profileLocalState";
-import { enforceAuthenticatedAccountBoundary } from "@/lib/accountSessionBoundaryState";
+import {
+  enforceAuthenticatedAccountBoundary,
+  shouldReloadForAuthenticatedAccountReplacement,
+} from "@/lib/accountSessionBoundaryState";
 import { buildThreadSearchInput, parseThreadSearchInput } from "@/lib/threadSearch";
 import {
   subscribeDecisionOsNavigateEvent,
@@ -3093,12 +3096,16 @@ function App() {
           sessionStorage: window.sessionStorage,
           preserveWeddingQuizHandoff: new URLSearchParams(window.location.search).get("source") === "wedding_quiz",
         });
-        if (boundary.accountChanged || !session()?.token) {
+        if (shouldReloadForAuthenticatedAccountReplacement({
+          accountChanged: boundary.accountChanged,
+          hadAuthenticatedSession: Boolean(session()?.token),
+        })) {
           window.location.reload();
           return;
         }
+        setSession(nextSession);
       }
-      setSession(nextSession);
+      if (!nextSession) setSession(null);
       if (!nextSession) {
         setDashboard(null);
         applyPrimaryUseCaseTheme(null);

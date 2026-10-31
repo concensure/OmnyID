@@ -393,6 +393,8 @@ export function weddingPersistedBoundaryObjectFromAfpMessage(
       targetHouseholdId: clean(contentValue(message, "target_household_id")),
       requestStatus: boundaryRequestStatusFrom(contentValue(message, "request_status")),
       approvalRequired: bool(contentValue(message, "approval_gate_recorded")) || bool(contentValue(message, "approval_required")),
+      approvalCount: positiveInteger(contentValue(message, "approval_count")) ?? 0,
+      requiredApprovalCount: (positiveInteger(contentValue(message, "required_approval_count")) === 2 ? 2 : 1),
       policyIds: strings(contentValue(message, "policy_ids")),
       policyVersions: numberRecord(contentValue(message, "policy_versions")),
       publicReason: clean(contentValue(message, "public_reason")),

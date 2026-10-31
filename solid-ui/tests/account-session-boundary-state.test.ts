@@ -6,6 +6,7 @@ import test from "node:test";
 import {
   AUTHENTICATED_ACCOUNT_BOUNDARY_KEY,
   enforceAuthenticatedAccountBoundary,
+  shouldReloadForAuthenticatedAccountReplacement,
 } from "../src/lib/accountSessionBoundaryState";
 
 class MemoryStorage implements Storage {
@@ -67,12 +68,18 @@ test("first authenticated load drops legacy caches without deleting a quiz hando
   assert.equal(local.getItem(AUTHENTICATED_ACCOUNT_BOUNDARY_KEY), "user-one");
 });
 
-test("App establishes the boundary before reactive state and reloads on account replacement", () => {
+test("first login is adopted in place while a live account replacement reloads", () => {
+  assert.equal(shouldReloadForAuthenticatedAccountReplacement({ accountChanged: true, hadAuthenticatedSession: false }), false);
+  assert.equal(shouldReloadForAuthenticatedAccountReplacement({ accountChanged: true, hadAuthenticatedSession: true }), true);
+  assert.equal(shouldReloadForAuthenticatedAccountReplacement({ accountChanged: false, hadAuthenticatedSession: true }), false);
+
   const app = readFileSync(resolve(process.cwd(), "src/App.tsx"), "utf8");
   const sessionRead = app.indexOf("const initialSession = readSession()");
   const boundary = app.indexOf("enforceAuthenticatedAccountBoundary({", sessionRead);
   const signal = app.indexOf("createSignal(initialSession)", boundary);
   assert.ok(sessionRead >= 0 && boundary > sessionRead && signal > boundary);
-  assert.match(app, /if \(boundary\.accountChanged \|\| !session\(\)\?\.token\) \{\s*window\.location\.reload\(\)/);
+  assert.match(app, /shouldReloadForAuthenticatedAccountReplacement\(\{/);
+  assert.match(app, /hadAuthenticatedSession: Boolean\(session\(\)\?\.token\)/);
+  assert.match(app, /setSession\(nextSession\)/);
   assert.match(app, /if \(!nextSession\) \{\s*setDashboard\(null\)/);
 });
