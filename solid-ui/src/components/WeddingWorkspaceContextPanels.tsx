@@ -9,6 +9,7 @@ import type {
   WeddingBoundaryChangeType,
   WeddingBoundaryPolicyRuleType,
 } from "@/lib/weddingBoundaryLedgerState";
+import type { WeddingBoundaryRuleAuthority, WeddingBoundaryRuleEffect, WeddingBoundaryRuleScopeKind } from "@/lib/weddingBoundaryGovernanceTypes";
 import type { WeddingWorkspaceSidebarAction } from "@/lib/weddingWorkspaceActionState";
 import type { WeddingWorkspaceMenuId } from "@/lib/weddingWorkspaceMenuState";
 import { WeddingAdvancedAuditPanels } from "@/components/WeddingAdvancedAuditPanels";
@@ -34,10 +35,8 @@ import { WeddingProductionRemainingWorkCard } from "@/components/WeddingProducti
 import { WeddingSeatingPanel } from "@/components/WeddingSeatingPanel";
 import { WeddingTimelinePanel } from "@/components/WeddingTimelinePanel";
 import { WeddingVisionPanel } from "@/components/WeddingVisionPanel";
-import {
-  buildWeddingBoundaryRequestDecision,
-  type WeddingBoundaryRequestDecision,
-} from "@/lib/weddingBoundaryDecisionState";
+import type { WeddingBoundaryRequestDecision } from "@/lib/weddingBoundaryDecisionState";
+import { decideWeddingBoundaryRequest } from "@/lib/weddingBoundaryGovernanceApi";
 import { weddingBoundaryLedgerObjectToAfpSendInput } from "@/lib/weddingBoundaryLedgerState";
 import {
   applyWeddingFamilyBoundaryRequestEvaluation,
@@ -141,23 +140,19 @@ export function WeddingWorkspaceContextPanels(props: {
     await props.saveProjection(input);
   }
   async function decideBoundaryRequest(requestId: string, decision: WeddingBoundaryRequestDecision): Promise<string> {
-    if (!props.saveProjection) throw new Error("Saving is not connected yet.");
     const request = props.state.boundaryState.approvalQueue.find((item) => item.requestId === requestId);
     if (!request) throw new Error("This guest-list request is no longer waiting for review.");
-    const result = buildWeddingBoundaryRequestDecision({
-      request,
-      decision,
-      decidedBy: "couple",
-      publicReason: decision === "approve"
-        ? "Approved by the couple."
-        : "Declined by the couple.",
+    const nonce = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}`;
+    const result = await decideWeddingBoundaryRequest({
+      weddingPlanId: props.state.workspace.metadata.weddingPlanId,
+      responseWorkspaceId: props.state.workspace.metadata.responseWorkspaceId,
+      requestId,
+      decision: decision === "approve" ? "approve" : "decline",
+      expectedRevision: request.revision ?? 1,
+      idempotencyKey: `boundary:${requestId}:${request.revision ?? 1}:${decision}:${nonce}`,
     });
-    await props.saveProjection(weddingBoundaryLedgerObjectToAfpSendInput(result.updatedRequest, props.state.workspace.metadata));
-    if (result.rationale) {
-      await props.saveProjection(weddingBoundaryLedgerObjectToAfpSendInput(result.rationale, props.state.workspace.metadata));
-    }
     props.onRefreshWorkspace?.();
-    return result.statusLabel;
+    return result.explanation;
   }
   async function saveGuestDraft(input: {
     displayName: string;
@@ -256,12 +251,13 @@ export function WeddingWorkspaceContextPanels(props: {
     await props.saveProjection(sendInput);
     return "Meal choices confirmed for this wedding.";
   }
-  async function saveFamilyRequest(input: { requesterLabel: string; requestLabel: string; changeType: WeddingBoundaryChangeType }): Promise<string> {
+  async function saveFamilyRequest(input: { requesterLabel: string; requestLabel: string; changeType: WeddingBoundaryChangeType; targetHouseholdId: string; proposedGuestName: string }): Promise<string> {
     if (!props.saveProjection) throw new Error("Saving is not connected yet.");
     const request = buildWeddingFamilyBoundaryRequestObject(input, props.state.workspace.metadata);
     if (!request) throw new Error("Add a request before saving.");
+    const household = (props.state.boundaryState.householdObjects ?? []).find((item) => item.householdId === input.targetHouseholdId);
     const object = applyWeddingFamilyBoundaryRequestEvaluation({
-      request,
+      request: { ...request, expectedHouseholdRevision: household?.revision ?? 1 },
       policies: props.state.boundaryState.familyVisibleObjects.filter((item) => item.kind === "wedding_boundary_policy"),
       roleAssignments: props.state.boundaryState.familyVisibleObjects.filter((item) => item.kind === "wedding_boundary_role_assignment"),
     });
@@ -271,7 +267,7 @@ export function WeddingWorkspaceContextPanels(props: {
     if (object.requestStatus === "approved") return "Family request saved as an allowed update.";
     return "Family request saved for couple review.";
   }
-  async function saveFamilyRule(input: { title: string; plainLanguage: string; ruleType: WeddingBoundaryPolicyRuleType }): Promise<string> {
+  async function saveFamilyRule(input: { title: string; plainLanguage: string; ruleType: WeddingBoundaryPolicyRuleType; scopeKind: WeddingBoundaryRuleScopeKind; scopeId: string; effect: WeddingBoundaryRuleEffect; authority: WeddingBoundaryRuleAuthority; effectiveUntil: string }): Promise<string> {
     if (!props.saveProjection) throw new Error("Saving is not connected yet.");
     const object = buildWeddingFamilyBoundaryPolicyObject(input, props.state.workspace.metadata);
     if (!object) throw new Error("Add a rule before saving.");
@@ -284,13 +280,14 @@ export function WeddingWorkspaceContextPanels(props: {
     const household = (props.state.boundaryState.householdObjects ?? []).find((item) => item.householdId === input.householdId);
     if (!household) throw new Error("This household is no longer available. Refresh and try again.");
     const nowIso = new Date().toISOString();
-    const currentRevision = typeof household.metadata?.household_revision === "number" ? household.metadata.household_revision : 0;
+    const currentRevision = household.revision ?? (typeof household.metadata?.household_revision === "number" ? household.metadata.household_revision : 0);
     await props.saveProjection(weddingBoundaryLedgerObjectToAfpSendInput({
       ...household,
       familyGroupId: input.familyGroupLabel.trim() ? `family_group:${safeWeddingLabel(input.familyGroupLabel)}` : null,
       familyGroupLabel: input.familyGroupLabel.trim() || null,
       invitationAllocation: input.invitationAllocation,
       requestDeadline: input.requestDeadline,
+      revision: currentRevision + 1,
       createdAt: nowIso,
       metadata: { ...(household.metadata ?? {}), household_revision: currentRevision + 1, updated_at: nowIso },
     }, props.state.workspace.metadata, nowIso));

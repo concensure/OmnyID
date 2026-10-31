@@ -2147,3 +2147,25 @@ cannot retain the preceding account. The Wedding quiz brief is the sole bounded
 handoff exception and is preserved only for an explicit `source=wedding_quiz`
 signup. This client boundary complements, and does not replace, server tenant
 isolation and deletion of account-owned database and object-storage data.
+
+## 2026-11-01: Family-boundary approval is a scoped AFP transaction, not a browser decision
+
+Family groups, households, rules, requests, guest profiles and invitations remain objects in the
+account's canonical Wedding AFP ledger. Content-light global tables may hold only digest-only helper
+grant enforcement data and idempotency receipts. A couple approval is serialized by request and
+household, revalidates request, rule and household revisions plus current allocation, and writes the
+guest, household successor, unsent invitation draft, request successor, decision and impact receipt
+inside one transaction. It never infers attendance, sends an invitation, commits spend or changes a
+vendor contract. Family-helper capability links remain false-default, expiring, revocable and limited
+to minimum-necessary household summaries plus named add-guest proposals; helpers cannot approve.
+
+## 2026-11-01: Per-user Runbooks extend the proactive engine rather than forming a second agent stack
+
+Runbook definitions, instances, traces, escalations, waits and outcomes are per-user AFP objects.
+Existing passive-event and Watcher AFP records are the event ingress; State Synthesizer handoffs are
+the bounded evidence source; proactive policy, autonomy, provenance, outcome memory and current
+approval surfaces remain authoritative. Matching is deterministic and model-free. LLM calls are
+allowed only in schema-bounded classify/reason/draft steps, with model/cost/source history on the
+step trace. Default templates are copied into the user's ledger and never act as one global mutable
+catalogue. New focused modules must keep substantive logic out of the already oversized
+`server/proactive_routes.rs`.

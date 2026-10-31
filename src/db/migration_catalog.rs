@@ -648,4 +648,9 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Digest-only expiring household capability grants for Wedding RSVP invitations",
         include_str!("../../postgres/migrations/0127_wedding_rsvp_capability_grants.sql"),
     ),
+    (
+        "0128_wedding_boundary_governance",
+        "Content-light helper grants and idempotency receipts for server-authoritative Wedding Family Boundaries",
+        include_str!("../../postgres/migrations/0128_wedding_boundary_governance.sql"),
+    ),
 ];

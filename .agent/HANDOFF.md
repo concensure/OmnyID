@@ -5976,3 +5976,66 @@ Remaining:
   precedence, server-authoritative grants, atomic request decisions, connected
   reconciliation and restricted-helper rollout evidence. Do not introduce a
   parallel guest or household store.
+
+## 2026-11-01 - WED-308 Family governance foundation and proactive Runbook design (Codex)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch
+`agent/codex/WED-308`. Started from documentation SHA
+`8bb33709a5b0d289baaae97f93f82f530dd8445f`; the live Oracle application remains
+`b353d47122fe8aa15885ae4fdc64a81aaec69b41` because this slice was not requested
+for deployment.
+
+Changed:
+
+- Extended the canonical Wedding boundary AFP contract with typed family groups,
+  structured rule scope/effect/authority/version fields, complete request states,
+  household/request revisions and policy-version references.
+- Added deterministic household split/merge/archive previews, effective-rule
+  precedence/conflict projection, request impact previews and minimum-necessary
+  helper projections.
+- Replaced browser-created request decisions with a server-authoritative route.
+  Approved named add-guest requests recheck policy and household revisions,
+  allocation and duplicates, then atomically write the household successor,
+  guest, unsent invitation draft, request successor, decision and impact receipt.
+- Added migration 0128 for digest-only expiring/revocable helper grants and
+  idempotency receipts. Helper access is false by default via
+  `OMNYID_WEDDING_BOUNDARY_HELPERS_ENABLED`; helpers can view scoped summaries
+  and propose a named guest, never approve.
+- Added `Documents/design/runbooks/per-user-proactive-runbooks-spec.md` and
+  `per-user-proactive-runbooks-tasks.md`. They reuse current proactive ingress,
+  Watcher, State Synthesizer, autonomy/policy, provenance, outcome memory,
+  approvals and A2UI rather than creating parallel infrastructure.
+
+Verification:
+
+- `npm run typecheck`: passed.
+- Focused Family Boundaries native tests: 27 passed.
+- `cargo test --lib server::wedding_boundary_routes::tests -- --nocapture`: 3
+  passed after the final helper-contract narrowing.
+- `npm run test:wedding`: 2,112 passed.
+- `npm run test:line-budget`: 2 passed.
+- `npm run build`: passed.
+- Planning readiness: evaluation, planning library, parser boundaries, migration
+  catalog, SDK, typecheck/line budgets, Wedding tests, production build, focused
+  browser accessibility and Oracle Compose structure passed. Overall remains
+  blocked because disposable Postgres/ClamAV endpoints and the supplied human
+  review directory were absent; no release pass is claimed.
+
+Operational notes:
+
+- `cargo clean -p omnyid-homeserver` removed 25.8 GiB of reproducible local Rust
+  build output after C: reached 0.2 GiB free. C: had about 16.9 GiB free after
+  verification.
+- Docker Desktop reported that it could not start, so no disposable Postgres
+  migration application was run. The embedded migration-catalog check passed.
+- Preserve the pre-existing untracked Oracle proof and `solid-ui/artifacts`
+  directories; they are not part of WED-308.
+
+Remaining:
+
+- Complete server split/merge/archive commands, non-add request mutations,
+  delegated Planner/RSVP roles, two-partner partial approvals, per-projector
+  reconciliation, bulk operations and the restricted hosted helper rollout.
+- Implement WED-308 Runbooks from the dependency-ordered task document after
+  freezing this documentation candidate; begin with contracts, per-user seeding,
+  existing-event adapter and pure matcher.

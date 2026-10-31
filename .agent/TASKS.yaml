@@ -15,6 +15,16 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-308
+    title: Complete Family Boundaries governance and specify per-user proactive Runbooks
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-308
+    depends_on: [WED-306, WED-307]
+    files: [solid-ui/src/components/WeddingBoundaryManagementCard.tsx, solid-ui/src/components/WeddingWorkspaceContextPanels.tsx, solid-ui/src/lib/weddingBoundary*.ts, solid-ui/src/lib/weddingMealChoiceState.ts, solid-ui/tests/wedding-boundary-*.test.ts, solid-ui/tests/wedding-family-boundary*.test.ts, src/server/wedding_boundary*.rs, src/db/wedding_boundary*.rs, src/db.rs, src/db/migration_catalog.rs, src/server/mod.rs, postgres/migrations/0128_wedding_boundary*.sql, Documents/design/wedding planner/wedding planner/family-boundary-*.md, Documents/design/runbooks/**, .agent/**]
+    acceptance: [Family groups households structured rules scoped grants requests decisions and reconciliation extend the canonical Wedding AFP guest ledger rather than a parallel store, household split merge archive and material rule changes require deterministic impact preview and preserve stable guest and invitation references, every server command enforces tenant wedding principal scope expected versions idempotency revocation and action authority, request approval reserves capacity and records the decision plus connected projection receipts atomically without inferring RSVP sending invitations or committing spend, restricted helper views minimise private fields and reject forwarded forged cross-household and cross-tenant access, the mobile A2UI surface has accessible focus names status and confirmation at 320 and 375 pixels and 200 percent zoom, focused frontend and Rust tests typecheck Wedding tests line budgets and production build pass, a runbook specification and dependency-ordered task document reuse the existing proactive routes policy outcome memory provenance watcher synthesizer and approval modules and nominate an appropriate LLM]
+    progress: "Family Boundaries now has typed family groups and structured rules, deterministic household/conflict/impact previews, a server-authoritative decision route, false-default digest-only helper grants, idempotency receipts, stale rule/household checks and atomic add-guest reconciliation into the canonical household/guest/invitation AFP ledger without sending an invite or inferring attendance. Focused frontend/Rust tests, typecheck, 2,112 Wedding tests, line budgets, migration catalog and production build pass. The runbook spec and dependency-ordered plan are in Documents/design/runbooks and explicitly reuse passive-event ingress, Watcher, Synthesizer, proactive policy/outcomes/provenance, approvals and A2UI. Remaining family work is listed in the task document: server split/merge/archive, non-add mutations, planner/two-partner grants, per-projector reconciliation, bulk operations and hosted rollout. No deployment was requested or performed; external helper links remain false-default."
+
   - id: WED-307
     title: Enforce account-switch isolation and continue Family Boundaries on the approved ranking release
     status: done

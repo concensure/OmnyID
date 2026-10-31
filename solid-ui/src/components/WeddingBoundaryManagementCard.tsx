@@ -18,13 +18,19 @@ import type {
 } from "@/lib/weddingBoundaryLedgerState";
 import type { WeddingBoundaryTopologyState } from "@/lib/weddingBoundaryTopologyState";
 import type { WeddingBoundaryHouseholdRow } from "@/lib/weddingBoundaryHouseholdState";
+import { previewWeddingBoundaryRequestDecision } from "@/lib/weddingBoundaryGovernanceState";
+import type {
+  WeddingBoundaryRuleAuthority,
+  WeddingBoundaryRuleEffect,
+  WeddingBoundaryRuleScopeKind,
+} from "@/lib/weddingBoundaryGovernanceTypes";
 
 export function WeddingBoundaryManagementCard(props: {
   state: WeddingBoundaryState;
   topology: WeddingBoundaryTopologyState;
   onDecideRequest?: (requestId: string, decision: WeddingBoundaryRequestDecision) => Promise<string>;
-  onSaveFamilyRequest?: (input: { requesterLabel: string; requestLabel: string; changeType: WeddingBoundaryChangeType }) => Promise<string>;
-  onSaveFamilyRule?: (input: { title: string; plainLanguage: string; ruleType: WeddingBoundaryPolicyRuleType }) => Promise<string>;
+  onSaveFamilyRequest?: (input: { requesterLabel: string; requestLabel: string; changeType: WeddingBoundaryChangeType; targetHouseholdId: string; proposedGuestName: string }) => Promise<string>;
+  onSaveFamilyRule?: (input: { title: string; plainLanguage: string; ruleType: WeddingBoundaryPolicyRuleType; scopeKind: WeddingBoundaryRuleScopeKind; scopeId: string; effect: WeddingBoundaryRuleEffect; authority: WeddingBoundaryRuleAuthority; effectiveUntil: string }) => Promise<string>;
   onSaveHousehold?: (input: { householdId: string; familyGroupLabel: string; invitationAllocation: number | null; requestDeadline: string | null }) => Promise<string>;
 }) {
   let disclosureButton: HTMLButtonElement | undefined;
@@ -40,9 +46,18 @@ export function WeddingBoundaryManagementCard(props: {
   const [requesterLabel, setRequesterLabel] = createSignal("");
   const [requestLabel, setRequestLabel] = createSignal("");
   const [requestChangeType, setRequestChangeType] = createSignal<WeddingBoundaryChangeType>("add_guest");
+  const [requestHouseholdId, setRequestHouseholdId] = createSignal("");
+  const [proposedGuestName, setProposedGuestName] = createSignal("");
   const [ruleTitle, setRuleTitle] = createSignal("");
   const [ruleText, setRuleText] = createSignal("");
   const [ruleType, setRuleType] = createSignal<WeddingBoundaryPolicyRuleType>("invitation_scope");
+  const [ruleScopeKind, setRuleScopeKind] = createSignal<WeddingBoundaryRuleScopeKind>("wedding");
+  const [ruleScopeId, setRuleScopeId] = createSignal("");
+  const [ruleEffect, setRuleEffect] = createSignal<WeddingBoundaryRuleEffect>("require_approval");
+  const [ruleAuthority, setRuleAuthority] = createSignal<WeddingBoundaryRuleAuthority>("couple");
+  const [ruleEffectiveUntil, setRuleEffectiveUntil] = createSignal("");
+  const [reviewingRequestId, setReviewingRequestId] = createSignal<string | null>(null);
+  const [reviewingDecision, setReviewingDecision] = createSignal<WeddingBoundaryRequestDecision>("approve");
   const [savingDraft, setSavingDraft] = createSignal(false);
   const [editingHouseholdId, setEditingHouseholdId] = createSignal<string | null>(null);
   const [householdGroupLabel, setHouseholdGroupLabel] = createSignal("");
@@ -57,6 +72,11 @@ export function WeddingBoundaryManagementCard(props: {
     props.state.approvalQueue.map((request) => request.requestId),
     completedRequestIds(),
   ));
+  const reviewingRequest = createMemo(() => props.state.approvalQueue.find((request) => request.requestId === reviewingRequestId()) ?? null);
+  const decisionPreview = createMemo(() => {
+    const request = reviewingRequest();
+    return request ? previewWeddingBoundaryRequestDecision({ request, objects: props.state.allObjects }) : null;
+  });
 
   function focusSection(id: string): void {
     queueMicrotask(() => document.getElementById(id)?.focus());
@@ -145,10 +165,14 @@ export function WeddingBoundaryManagementCard(props: {
         requesterLabel: requesterLabel().trim() || "Family",
         requestLabel: requestLabel(),
         changeType: requestChangeType(),
+        targetHouseholdId: requestHouseholdId(),
+        proposedGuestName: proposedGuestName(),
       });
       setDecisionNotice(notice);
       setRequesterLabel("");
       setRequestLabel("");
+      setRequestHouseholdId("");
+      setProposedGuestName("");
       setShowAddRequest(false);
       setShowRequests(true);
     } catch (error) {
@@ -170,10 +194,17 @@ export function WeddingBoundaryManagementCard(props: {
         title: ruleTitle().trim() || "Family boundary rule",
         plainLanguage: ruleText(),
         ruleType: ruleType(),
+        scopeKind: ruleScopeKind(),
+        scopeId: ruleScopeId(),
+        effect: ruleEffect(),
+        authority: ruleAuthority(),
+        effectiveUntil: ruleEffectiveUntil(),
       });
       setDecisionNotice(notice);
       setRuleTitle("");
       setRuleText("");
+      setRuleScopeId("");
+      setRuleEffectiveUntil("");
       setShowAddRule(false);
       setShowRules(true);
     } catch (error) {
@@ -298,7 +329,7 @@ export function WeddingBoundaryManagementCard(props: {
       <Show when={showAddRequest()}>
         <div id="wedding-boundary-add-request" class="mt-3 rounded-2xl border border-cyan-100 bg-white/80 p-3">
           <p class="text-sm font-semibold text-cyan-950">Record a family request</p>
-          <div class="mt-2 grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)_auto]">
+          <div class="mt-2 grid gap-2 md:grid-cols-2">
             <label class="min-w-0">
               <span class="text-xs font-semibold text-cyan-950/70">Who asked?</span>
               <input class="mt-1 w-full rounded-xl border border-cyan-100 bg-white px-3 py-2 text-sm text-cyan-950 outline-none focus:border-cyan-400" value={requesterLabel()} placeholder="Mum, Dad, cousin" onInput={(event) => setRequesterLabel(event.currentTarget.value)} />
@@ -316,8 +347,21 @@ export function WeddingBoundaryManagementCard(props: {
                 <option value="household_change">Household change</option>
               </select>
             </label>
+            <label class="min-w-0">
+              <span class="text-xs font-semibold text-cyan-950/70">Household affected</span>
+              <select class="mt-1 w-full rounded-xl border border-cyan-100 bg-white px-3 py-2 text-sm text-cyan-950 outline-none focus:border-cyan-400" value={requestHouseholdId()} onChange={(event) => setRequestHouseholdId(event.currentTarget.value)}>
+                <option value="">Choose a household</option>
+                <For each={props.state.householdRows ?? []}>{(household) => <option value={household.householdId}>{household.displayName}</option>}</For>
+              </select>
+            </label>
+            <Show when={requestChangeType() === "add_guest"}>
+              <label class="min-w-0">
+                <span class="text-xs font-semibold text-cyan-950/70">Guest name</span>
+                <input class="mt-1 w-full rounded-xl border border-cyan-100 bg-white px-3 py-2 text-sm text-cyan-950 outline-none focus:border-cyan-400" value={proposedGuestName()} placeholder="Full name" onInput={(event) => setProposedGuestName(event.currentTarget.value)} />
+              </label>
+            </Show>
           </div>
-          <button type="button" class="mt-3 rounded-full bg-cyan-700 px-3 py-2 text-xs font-semibold text-white transition hover:bg-cyan-800 disabled:cursor-not-allowed disabled:opacity-50" disabled={!requestLabel().trim() || savingDraft()} onClick={() => void saveFamilyRequest()}>
+          <button type="button" class="mt-3 rounded-full bg-cyan-700 px-3 py-2 text-xs font-semibold text-white transition hover:bg-cyan-800 disabled:cursor-not-allowed disabled:opacity-50" disabled={!requestLabel().trim() || !requestHouseholdId() || (requestChangeType() === "add_guest" && !proposedGuestName().trim()) || savingDraft()} onClick={() => void saveFamilyRequest()}>
             {savingDraft() ? "Saving..." : "Save for review"}
           </button>
         </div>
@@ -326,7 +370,7 @@ export function WeddingBoundaryManagementCard(props: {
       <Show when={showAddRule()}>
         <div id="wedding-boundary-add-rule" class="mt-3 rounded-2xl border border-cyan-100 bg-white/80 p-3">
           <p class="text-sm font-semibold text-cyan-950">Add a boundary rule</p>
-          <div class="mt-2 grid gap-2 md:grid-cols-[minmax(0,1fr)_auto]">
+          <div class="mt-2 grid gap-2 md:grid-cols-2">
             <label class="min-w-0">
               <span class="text-xs font-semibold text-cyan-950/70">Rule name</span>
               <input class="mt-1 w-full rounded-xl border border-cyan-100 bg-white px-3 py-2 text-sm text-cyan-950 outline-none focus:border-cyan-400" value={ruleTitle()} placeholder="Guest limit" onInput={(event) => setRuleTitle(event.currentTarget.value)} />
@@ -335,11 +379,51 @@ export function WeddingBoundaryManagementCard(props: {
               <span class="text-xs font-semibold text-cyan-950/70">Rule type</span>
               <select class="mt-1 w-full rounded-xl border border-cyan-100 bg-white px-3 py-2 text-sm text-cyan-950 outline-none focus:border-cyan-400" value={ruleType()} onChange={(event) => setRuleType(event.currentTarget.value as WeddingBoundaryPolicyRuleType)}>
                 <option value="invitation_scope">Guest list</option>
+                <option value="allocation">Allocation</option>
+                <option value="deadline">Deadline</option>
+                <option value="visibility">Visibility</option>
                 <option value="plus_one">Plus-ones</option>
                 <option value="children">Children</option>
                 <option value="seating">Seating</option>
                 <option value="communication">Messages</option>
               </select>
+            </label>
+            <label class="min-w-0">
+              <span class="text-xs font-semibold text-cyan-950/70">Applies to</span>
+              <select class="mt-1 w-full rounded-xl border border-cyan-100 bg-white px-3 py-2 text-sm text-cyan-950" value={ruleScopeKind()} onChange={(event) => setRuleScopeKind(event.currentTarget.value as WeddingBoundaryRuleScopeKind)}>
+                <option value="wedding">Whole wedding</option>
+                <option value="family_group">Family group</option>
+                <option value="household">Household</option>
+                <option value="guest">One guest</option>
+              </select>
+            </label>
+            <Show when={ruleScopeKind() !== "wedding"}>
+              <label class="min-w-0">
+                <span class="text-xs font-semibold text-cyan-950/70">Group, household, or guest reference</span>
+                <input class="mt-1 w-full rounded-xl border border-cyan-100 bg-white px-3 py-2 text-sm text-cyan-950" value={ruleScopeId()} onInput={(event) => setRuleScopeId(event.currentTarget.value)} />
+              </label>
+            </Show>
+            <label class="min-w-0">
+              <span class="text-xs font-semibold text-cyan-950/70">What happens</span>
+              <select class="mt-1 w-full rounded-xl border border-cyan-100 bg-white px-3 py-2 text-sm text-cyan-950" value={ruleEffect()} onChange={(event) => setRuleEffect(event.currentTarget.value as WeddingBoundaryRuleEffect)}>
+                <option value="require_approval">Ask us to approve</option>
+                <option value="deny">Do not allow</option>
+                <option value="allow">Allow within this scope</option>
+                <option value="limit">Apply a limit</option>
+                <option value="notify">Notify us</option>
+              </select>
+            </label>
+            <label class="min-w-0">
+              <span class="text-xs font-semibold text-cyan-950/70">Approval authority</span>
+              <select class="mt-1 w-full rounded-xl border border-cyan-100 bg-white px-3 py-2 text-sm text-cyan-950" value={ruleAuthority()} onChange={(event) => setRuleAuthority(event.currentTarget.value as WeddingBoundaryRuleAuthority)}>
+                <option value="couple">Either partner</option>
+                <option value="partner_pair">Both partners</option>
+                <option value="planner">Delegated planner</option>
+              </select>
+            </label>
+            <label class="min-w-0">
+              <span class="text-xs font-semibold text-cyan-950/70">Ends on (optional)</span>
+              <input type="date" class="mt-1 w-full rounded-xl border border-cyan-100 bg-white px-3 py-2 text-sm text-cyan-950" value={ruleEffectiveUntil()} onInput={(event) => setRuleEffectiveUntil(event.currentTarget.value)} />
             </label>
           </div>
           <label class="mt-2 block min-w-0">
@@ -377,15 +461,15 @@ export function WeddingBoundaryManagementCard(props: {
                         type="button"
                         disabled={Boolean(decidingRequestId())}
                         class="rounded-full bg-cyan-700 px-3 py-2 text-xs font-semibold text-white transition hover:bg-cyan-800 disabled:cursor-not-allowed disabled:opacity-50 sm:py-1.5"
-                        onClick={() => void decideRequest(item.id, "approve")}
+                        onClick={() => { setReviewingRequestId(item.id); setReviewingDecision("approve"); }}
                       >
-                        {decidingRequestId() === item.id ? "Saving..." : "Approve"}
+                        {decidingRequestId() === item.id ? "Saving..." : "Review impact"}
                       </button>
                       <button
                         type="button"
                         disabled={Boolean(decidingRequestId())}
                         class="rounded-full border border-cyan-200 bg-white/85 px-3 py-2 text-xs font-semibold text-cyan-950 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-50 sm:py-1.5"
-                        onClick={() => void decideRequest(item.id, "decline")}
+                        onClick={() => { setReviewingRequestId(item.id); setReviewingDecision("decline"); }}
                       >
                         Keep unchanged
                       </button>
@@ -522,6 +606,36 @@ export function WeddingBoundaryManagementCard(props: {
             {(label) => <li class="text-xs leading-5 text-cyan-950/70">{label}</li>}
           </For>
         </ul>
+      </Show>
+
+      <Show when={reviewingRequest()}>
+        {(request) => (
+          <div class="fixed inset-0 z-[80] flex items-end justify-center bg-cyan-950/45 p-3 sm:items-center" role="presentation">
+            <section role="dialog" aria-modal="true" aria-labelledby="wedding-boundary-confirm-title" class="w-full max-w-lg rounded-3xl bg-white p-5 shadow-2xl">
+              <h3 id="wedding-boundary-confirm-title" class="text-xl font-bold text-cyan-950">
+                {reviewingDecision() === "approve" ? "Approve this family request?" : "Keep the guest list unchanged?"}
+              </h3>
+              <p class="mt-2 text-sm leading-6 text-cyan-950/75">{request().title}</p>
+              <Show when={reviewingDecision() === "approve" && decisionPreview()}>
+                {(impact) => (
+                  <div class="mt-3 rounded-2xl bg-cyan-50 p-3">
+                    <p class="text-sm font-semibold text-cyan-950">What OmnyID will recheck</p>
+                    <p class="mt-1 text-sm leading-6 text-cyan-950/75">{impact().impactAreas.map((area) => area.replaceAll("_", " ")).join(", ")}</p>
+                    <ul class="mt-2 list-disc space-y-1 pl-5 text-sm leading-6 text-cyan-950/75">
+                      <For each={impact().warnings}>{(warning) => <li>{warning}</li>}</For>
+                    </ul>
+                  </div>
+                )}
+              </Show>
+              <div class="mt-5 grid grid-cols-2 gap-3">
+                <button type="button" class="min-h-12 rounded-2xl border border-cyan-200 bg-white px-4 font-semibold text-cyan-950" onClick={() => setReviewingRequestId(null)}>Cancel</button>
+                <button type="button" disabled={Boolean(decidingRequestId()) || (reviewingDecision() === "approve" && decisionPreview()?.canApply === false)} class="min-h-12 rounded-2xl bg-cyan-700 px-4 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50" onClick={() => { const id = request().requestId; const decision = reviewingDecision(); setReviewingRequestId(null); void decideRequest(id, decision); }}>
+                  {reviewingDecision() === "approve" ? "Confirm approval" : "Confirm unchanged"}
+                </button>
+              </div>
+            </section>
+          </div>
+        )}
       </Show>
     </div>
   );

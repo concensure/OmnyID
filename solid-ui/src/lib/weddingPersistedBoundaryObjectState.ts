@@ -5,6 +5,7 @@ import type {
   WeddingBoundaryChangeRequest,
   WeddingBoundaryDecisionRationale,
   WeddingBoundaryEventInvitation,
+  WeddingBoundaryFamilyGroupObject,
   WeddingBoundaryGuestProfile,
   WeddingBoundaryHousehold,
   WeddingBoundaryLedgerKind,
@@ -17,6 +18,13 @@ import type {
   WeddingBoundaryRoleAssignment,
   WeddingBoundaryVisibility,
 } from "@/lib/weddingBoundaryLedgerState";
+import type {
+  WeddingBoundaryOverridePolicy,
+  WeddingBoundaryRuleAuthority,
+  WeddingBoundaryRuleEffect,
+  WeddingBoundaryRuleScopeKind,
+  WeddingBoundaryRuleStatus,
+} from "@/lib/weddingBoundaryGovernanceTypes";
 import {
   normalizeWeddingPlanningMetadata,
   type WeddingPlanningMetadata,
@@ -34,6 +42,7 @@ import {
 
 const BOUNDARY_KINDS = new Set<WeddingBoundaryLedgerKind>([
   "wedding_boundary_policy",
+  "wedding_boundary_family_group",
   "wedding_boundary_role_assignment",
   "wedding_boundary_household",
   "wedding_boundary_guest_profile",
@@ -55,6 +64,9 @@ const BOUNDARY_POLICY_RULE_TYPES = new Set<WeddingBoundaryPolicyRuleType>([
   "plus_one",
   "children",
   "invitation_scope",
+  "allocation",
+  "deadline",
+  "visibility",
   "access",
   "seating",
   "communication",
@@ -75,9 +87,13 @@ const BOUNDARY_ROLES = new Set<WeddingBoundaryRole>([
 ]);
 
 const BOUNDARY_REQUEST_STATUSES = new Set<WeddingBoundaryRequestStatus>([
+  "draft",
   "pending",
   "approved",
+  "partially_approved",
   "declined",
+  "withdrawn",
+  "expired",
   "auto_blocked",
 ]);
 
@@ -112,6 +128,14 @@ function nonNegativeInteger(value: unknown): number | null {
 
 function contentValue(message: AfpMessage, key: string): unknown {
   return decryptedDisplayContent(message)[key] ?? message.metadata?.[key];
+}
+
+function numberRecord(value: unknown): Record<string, number> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return Object.fromEntries(Object.entries(value).flatMap(([key, item]) => {
+    const parsed = Number(item);
+    return key && Number.isInteger(parsed) && parsed > 0 ? [[key, parsed]] : [];
+  }));
 }
 
 function workspaceIdFrom(message: AfpMessage): string | null {
@@ -246,7 +270,33 @@ export function weddingPersistedBoundaryObjectFromAfpMessage(
       plainLanguage: clean(contentValue(message, "plain_language")) ?? base.title,
       scope: clean(contentValue(message, "scope")) as WeddingBoundaryPolicy["scope"],
       approvedBy: strings(contentValue(message, "approved_by")),
+      scopeKind: clean(contentValue(message, "scope_kind")) as WeddingBoundaryRuleScopeKind,
+      scopeId: clean(contentValue(message, "scope_id")),
+      condition: contentValue(message, "condition") as Record<string, unknown> ?? {},
+      effect: clean(contentValue(message, "effect")) as WeddingBoundaryRuleEffect,
+      authority: clean(contentValue(message, "authority")) as WeddingBoundaryRuleAuthority,
+      effectiveFrom: clean(contentValue(message, "effective_from")),
+      effectiveUntil: clean(contentValue(message, "effective_until")),
+      ruleStatus: clean(contentValue(message, "rule_status")) as WeddingBoundaryRuleStatus,
+      overridePolicy: clean(contentValue(message, "override_policy")) as WeddingBoundaryOverridePolicy,
+      version: positiveInteger(contentValue(message, "version")) ?? 1,
+      supersedesId: clean(contentValue(message, "supersedes_id")),
     };
+  }
+  if (kind === "wedding_boundary_family_group") {
+    const familyGroupId = clean(contentValue(message, "family_group_id"));
+    if (!familyGroupId) return null;
+    return {
+      ...base,
+      kind,
+      familyGroupId,
+      label: clean(contentValue(message, "label")) ?? base.title,
+      householdIds: strings(contentValue(message, "household_ids")),
+      invitationAllocation: nonNegativeInteger(contentValue(message, "invitation_allocation")),
+      ruleIds: strings(contentValue(message, "rule_ids")),
+      version: positiveInteger(contentValue(message, "version")) ?? 1,
+      supersedesId: clean(contentValue(message, "supersedes_id")),
+    } satisfies WeddingBoundaryFamilyGroupObject;
   }
   if (kind === "wedding_boundary_role_assignment") {
     const personId = clean(contentValue(message, "person_id"));
@@ -278,6 +328,7 @@ export function weddingPersistedBoundaryObjectFromAfpMessage(
       familyGroupLabel: clean(contentValue(message, "family_group_label")),
       invitationAllocation: nonNegativeInteger(contentValue(message, "invitation_allocation")),
       requestDeadline: clean(contentValue(message, "request_deadline")),
+      revision: positiveInteger(contentValue(message, "revision")) ?? 1,
     };
   }
   if (kind === "wedding_boundary_guest_profile") {
@@ -343,7 +394,11 @@ export function weddingPersistedBoundaryObjectFromAfpMessage(
       requestStatus: boundaryRequestStatusFrom(contentValue(message, "request_status")),
       approvalRequired: bool(contentValue(message, "approval_gate_recorded")) || bool(contentValue(message, "approval_required")),
       policyIds: strings(contentValue(message, "policy_ids")),
+      policyVersions: numberRecord(contentValue(message, "policy_versions")),
       publicReason: clean(contentValue(message, "public_reason")),
+      revision: positiveInteger(contentValue(message, "revision")) ?? 1,
+      proposedGuestName: clean(contentValue(message, "proposed_guest_name")),
+      expectedHouseholdRevision: positiveInteger(contentValue(message, "expected_household_revision")),
     };
   }
   if (kind === "wedding_boundary_decision_rationale") {

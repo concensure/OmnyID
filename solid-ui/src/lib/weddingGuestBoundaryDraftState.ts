@@ -14,6 +14,11 @@ import type {
   WeddingBoundaryPolicyRuleType,
   WeddingBoundaryRoleAssignment,
 } from "@/lib/weddingBoundaryLedgerState";
+import type {
+  WeddingBoundaryRuleAuthority,
+  WeddingBoundaryRuleEffect,
+  WeddingBoundaryRuleScopeKind,
+} from "@/lib/weddingBoundaryGovernanceTypes";
 
 export type WeddingGuestDraftRsvpStatus = "Pending" | "Attending" | "Not attending";
 
@@ -46,12 +51,19 @@ export type WeddingFamilyBoundaryRequestDraftInput = {
   requesterLabel: string;
   requestLabel: string;
   changeType?: WeddingBoundaryChangeRequest["changeType"] | null;
+  targetHouseholdId?: string | null;
+  proposedGuestName?: string | null;
 };
 
 export type WeddingFamilyBoundaryPolicyDraftInput = {
   title?: string | null;
   plainLanguage: string;
   ruleType?: WeddingBoundaryPolicyRuleType | null;
+  scopeKind?: WeddingBoundaryRuleScopeKind | null;
+  scopeId?: string | null;
+  effect?: WeddingBoundaryRuleEffect | null;
+  authority?: WeddingBoundaryRuleAuthority | null;
+  effectiveUntil?: string | null;
 };
 
 function clean(value: unknown): string {
@@ -123,6 +135,7 @@ export function buildWeddingGuestBoundaryDraftObjects(
     primaryContactPersonId: personId,
     memberPersonIds: householdMemberPersonIds,
     familySide: "other",
+    revision: 1,
     metadata: commonMetadata,
   };
   const invitation: WeddingBoundaryEventInvitation = {
@@ -289,6 +302,10 @@ export function buildWeddingFamilyBoundaryRequestObject(
   const requestLabel = clean(input.requestLabel);
   if (!requestLabel) return null;
   const requestId = `wedding_boundary_request:${safeWeddingLabel(metadata.responseWorkspaceId)}:${safeWeddingLabel(requesterLabel)}:${safeWeddingLabel(requestLabel)}`;
+  const proposedGuestName = clean(input.proposedGuestName);
+  const targetPersonId = proposedGuestName
+    ? `wedding_guest:${safeWeddingLabel(metadata.responseWorkspaceId)}:${guestSlug(proposedGuestName)}`
+    : null;
   return {
     id: requestId,
     kind: "wedding_boundary_change_request",
@@ -299,12 +316,17 @@ export function buildWeddingFamilyBoundaryRequestObject(
     requestId,
     requestedBy: `family:${safeWeddingLabel(requesterLabel)}`,
     changeType: input.changeType ?? "add_guest",
+    targetHouseholdId: clean(input.targetHouseholdId) || null,
+    targetPersonId,
+    proposedGuestName: proposedGuestName || null,
     requestStatus: "pending",
     approvalRequired: true,
+    revision: 1,
     publicReason: `${requesterLabel} asked: ${requestLabel}`,
     metadata: {
       wedding_family_boundary_draft: true,
       source_surface: "wedding_boundary_management",
+      proposed_guest_name: proposedGuestName || null,
     },
   };
 }
@@ -330,6 +352,7 @@ export function applyWeddingFamilyBoundaryRequestEvaluation(input: {
     requestStatus: evaluation.status,
     approvalRequired: evaluation.approvalRequired,
     policyIds: evaluation.policyIds.length > 0 ? evaluation.policyIds : input.request.policyIds,
+    policyVersions: Object.fromEntries((input.policies ?? []).filter((policy) => evaluation.policyIds.includes(policy.id)).map((policy) => [policy.id, policy.version ?? 1])),
     publicReason,
     metadata: {
       ...(input.request.metadata ?? {}),
@@ -363,6 +386,16 @@ export function buildWeddingFamilyBoundaryPolicyObject(
     plainLanguage,
     scope: "guest_list",
     approvedBy: ["couple"],
+    scopeKind: input.scopeKind ?? "wedding",
+    scopeId: clean(input.scopeId) || null,
+    condition: {},
+    effect: input.effect ?? "require_approval",
+    authority: input.authority ?? "couple",
+    effectiveFrom: nowIso,
+    effectiveUntil: clean(input.effectiveUntil) || null,
+    ruleStatus: "active",
+    overridePolicy: "couple_only",
+    version: 1,
     metadata: {
       wedding_family_boundary_rule_draft: true,
       source_surface: "wedding_boundary_management",

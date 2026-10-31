@@ -7,9 +7,18 @@ import {
 } from "@/lib/weddingPlanningTemplateState";
 import type { WeddingSemanticUiKind, WeddingSemanticUiObject } from "@/lib/weddingSemanticUiState";
 import { buildWeddingBoundaryHouseholdRows, type WeddingBoundaryHouseholdRow } from "@/lib/weddingBoundaryHouseholdState";
+import type {
+  WeddingBoundaryFamilyGroup,
+  WeddingBoundaryOverridePolicy,
+  WeddingBoundaryRuleAuthority,
+  WeddingBoundaryRuleEffect,
+  WeddingBoundaryRuleScopeKind,
+  WeddingBoundaryRuleStatus,
+} from "@/lib/weddingBoundaryGovernanceTypes";
 
 export type WeddingBoundaryLedgerKind =
   | "wedding_boundary_policy"
+  | "wedding_boundary_family_group"
   | "wedding_boundary_role_assignment"
   | "wedding_boundary_household"
   | "wedding_boundary_guest_profile"
@@ -20,7 +29,7 @@ export type WeddingBoundaryLedgerKind =
   | "wedding_boundary_visibility_page";
 
 export type WeddingBoundaryRole = "couple" | "parent_family" | "helper" | "vendor" | "guest";
-export type WeddingBoundaryPolicyRuleType = "plus_one" | "children" | "invitation_scope" | "access" | "seating" | "communication";
+export type WeddingBoundaryPolicyRuleType = "plus_one" | "children" | "invitation_scope" | "allocation" | "deadline" | "visibility" | "access" | "seating" | "communication";
 export type WeddingBoundaryPolicyEnforcement = "block" | "require_approval" | "warn";
 export type WeddingBoundaryChangeType =
   | "add_guest"
@@ -30,7 +39,7 @@ export type WeddingBoundaryChangeType =
   | "household_change"
   | "guest_note_change"
   | "guest_contact_update";
-export type WeddingBoundaryRequestStatus = "pending" | "approved" | "declined" | "auto_blocked";
+export type WeddingBoundaryRequestStatus = "draft" | "pending" | "approved" | "partially_approved" | "declined" | "withdrawn" | "expired" | "auto_blocked";
 export type WeddingBoundaryVisibility = "couple_only" | "approved_shared" | "family_visible" | "vendor_logistics";
 
 export type WeddingBoundaryLedgerObjectBase = {
@@ -56,6 +65,17 @@ export type WeddingBoundaryPolicy = WeddingBoundaryLedgerObjectBase & {
   appliesToEventIds?: readonly string[] | null;
   appliesToRoleIds?: readonly string[] | null;
   approvedBy?: readonly string[] | null;
+  scopeKind?: WeddingBoundaryRuleScopeKind | null;
+  scopeId?: string | null;
+  condition?: Record<string, unknown> | null;
+  effect?: WeddingBoundaryRuleEffect | null;
+  authority?: WeddingBoundaryRuleAuthority | null;
+  effectiveFrom?: string | null;
+  effectiveUntil?: string | null;
+  ruleStatus?: WeddingBoundaryRuleStatus | null;
+  overridePolicy?: WeddingBoundaryOverridePolicy | null;
+  version?: number | null;
+  supersedesId?: string | null;
   privateRationaleCiphertext?: string | null;
 };
 
@@ -81,7 +101,10 @@ export type WeddingBoundaryHousehold = WeddingBoundaryLedgerObjectBase & {
   familyGroupLabel?: string | null;
   invitationAllocation?: number | null;
   requestDeadline?: string | null;
+  revision?: number | null;
 };
+
+export type WeddingBoundaryFamilyGroupObject = WeddingBoundaryFamilyGroup & WeddingBoundaryLedgerObjectBase;
 
 export type WeddingBoundaryGuestProfile = WeddingBoundaryLedgerObjectBase & {
   kind: "wedding_boundary_guest_profile";
@@ -132,8 +155,12 @@ export type WeddingBoundaryChangeRequest = WeddingBoundaryLedgerObjectBase & {
   requestStatus: WeddingBoundaryRequestStatus;
   approvalRequired?: boolean | null;
   policyIds?: readonly string[] | null;
+  policyVersions?: Readonly<Record<string, number>> | null;
   publicReason?: string | null;
   privateRationaleCiphertext?: string | null;
+  revision?: number | null;
+  proposedGuestName?: string | null;
+  expectedHouseholdRevision?: number | null;
 };
 
 export type WeddingBoundaryDecisionRationale = WeddingBoundaryLedgerObjectBase & {
@@ -164,6 +191,7 @@ export type WeddingBoundaryVisibilityPage = WeddingBoundaryLedgerObjectBase & {
 
 export type WeddingBoundaryLedgerObject =
   | WeddingBoundaryPolicy
+  | WeddingBoundaryFamilyGroupObject
   | WeddingBoundaryRoleAssignment
   | WeddingBoundaryHousehold
   | WeddingBoundaryGuestProfile
@@ -195,6 +223,7 @@ export type WeddingBoundaryState = {
   familyVisibleObjects: WeddingBoundaryLedgerObject[];
   warningLabels: string[];
   summaryLabel: string;
+  allObjects: WeddingBoundaryLedgerObject[];
 };
 
 function clean(value: unknown): string {
@@ -264,6 +293,7 @@ function messageToSendInput(message: AfpMessage): SendAfpMessageInput {
 }
 
 function objectId(object: WeddingBoundaryLedgerObject): string {
+  if (object.kind === "wedding_boundary_family_group") return object.familyGroupId;
   if (object.kind === "wedding_boundary_household") return object.householdId;
   if (object.kind === "wedding_boundary_guest_profile") return object.personId;
   if (object.kind === "wedding_boundary_event_invitation") return object.invitationId;
@@ -347,6 +377,9 @@ function referencesFor(object: WeddingBoundaryLedgerObject, metadata: WeddingPla
   if (object.kind === "wedding_boundary_policy") {
     refs.push(...(object.appliesToEventIds ?? []).map((id) => ref("policy_applies_to_event", id, "Policy applies to event")));
     refs.push(...(object.appliesToRoleIds ?? []).map((id) => ref("policy_applies_to_role", id, "Policy applies to role")));
+  } else if (object.kind === "wedding_boundary_family_group") {
+    refs.push(...object.householdIds.map((id) => ref("family_group_contains_household", id, "Family group household")));
+    refs.push(...(object.ruleIds ?? []).map((id) => ref("family_group_uses_rule", id, "Family group rule")));
   } else if (object.kind === "wedding_boundary_role_assignment") {
     refs.push(ref("role_grants_visibility", object.personId, "Role assigned to person", { role: object.role }));
   } else if (object.kind === "wedding_boundary_household") {
@@ -385,7 +418,30 @@ function publicContentFor(object: WeddingBoundaryLedgerObject): Record<string, u
       scope: object.scope ?? "guest_list",
       plain_language: object.plainLanguage,
       approved_by: object.approvedBy ?? [],
+      scope_kind: object.scopeKind ?? "wedding",
+      scope_id: object.scopeId ?? null,
+      condition: object.condition ?? {},
+      effect: object.effect ?? (object.enforcement === "block" ? "deny" : object.enforcement),
+      authority: object.authority ?? "couple",
+      effective_from: object.effectiveFrom ?? null,
+      effective_until: object.effectiveUntil ?? null,
+      rule_status: object.ruleStatus ?? object.status ?? "active",
+      override_policy: object.overridePolicy ?? "couple_only",
+      version: object.version ?? 1,
+      supersedes_id: object.supersedesId ?? null,
       private_rationale_encrypted: Boolean(object.privateRationaleCiphertext),
+    };
+  }
+  if (object.kind === "wedding_boundary_family_group") {
+    return {
+      ...base,
+      family_group_id: object.familyGroupId,
+      label: object.label,
+      household_ids: object.householdIds,
+      invitation_allocation: object.invitationAllocation ?? null,
+      rule_ids: object.ruleIds ?? [],
+      version: object.version,
+      supersedes_id: object.supersedesId ?? null,
     };
   }
   if (object.kind === "wedding_boundary_role_assignment") {
@@ -412,6 +468,7 @@ function publicContentFor(object: WeddingBoundaryLedgerObject): Record<string, u
       family_group_label: object.familyGroupLabel ?? null,
       invitation_allocation: object.invitationAllocation ?? null,
       request_deadline: object.requestDeadline ?? null,
+      revision: object.revision ?? 1,
     };
   }
   if (object.kind === "wedding_boundary_guest_profile") {
@@ -467,8 +524,12 @@ function publicContentFor(object: WeddingBoundaryLedgerObject): Record<string, u
       approval_required: changeRequestNeedsCoupleReview(object),
       approval_gate_recorded: object.approvalRequired === true,
       policy_ids: object.policyIds ?? [],
+      policy_versions: object.policyVersions ?? {},
       public_reason: object.publicReason ?? null,
       private_rationale_encrypted: Boolean(object.privateRationaleCiphertext),
+      revision: object.revision ?? 1,
+      proposed_guest_name: object.proposedGuestName ?? null,
+      expected_household_revision: object.expectedHouseholdRevision ?? null,
     };
   }
   if (object.kind === "wedding_boundary_decision_rationale") {
@@ -539,6 +600,7 @@ function semanticSummaryFor(object: WeddingBoundaryLedgerObject): string {
     );
   }
   if (object.kind === "wedding_boundary_role_assignment") return "This person has a clear wedding role and visibility scope.";
+  if (object.kind === "wedding_boundary_family_group") return "This family group keeps shared allocation and rules connected to its households.";
   if (object.kind === "wedding_boundary_guest_profile") return "This guest profile keeps household, access, and invitation context together.";
   if (object.kind === "wedding_boundary_event_invitation") return "This invitation links a guest to one wedding event and its RSVP state.";
   if (object.kind === "wedding_boundary_visibility_page") return "This shared page controls what this audience can see.";
@@ -793,5 +855,6 @@ export function buildWeddingBoundaryState(input: {
     familyVisibleObjects: familyObjects,
     warningLabels,
     summaryLabel: `${guests.length} guest profile${guests.length === 1 ? "" : "s"}, ${households.length} household${households.length === 1 ? "" : "s"}, ${approvals.length} request${approvals.length === 1 ? "" : "s"} waiting for review.`,
+    allObjects: objects,
   };
 }

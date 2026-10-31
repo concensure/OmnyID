@@ -51,11 +51,12 @@ Depends on: 0
 
 Depends on: 3
 
-- [ ] Add typed `family_group` allocation and household assignment events to the existing boundary ledger contract.
+- [x] Add typed `family_group` allocation and household assignment events to the existing boundary ledger contract.
 - [x] Project household representative, group, named invitation count, allocation, RSVP status, pending request count and last activity.
 - [x] Add sorting by attention, remaining allocation, RSVP status, activity and deadline.
 - [x] Let the couple revise a household's group label, invitation allocation and request deadline by writing a successor household AFP object; do not keep a second local household store.
-- [ ] Support safe split/merge/archive commands with preview and stable guest/invitation references.
+- [x] Add deterministic split/merge/archive previews that preserve stable guest/invitation references and refuse unsafe archive/merge states.
+- [ ] Connect those previews to server-authoritative split/merge/archive commands with stale-version protection.
 - [ ] Add CSV/table import through the existing import and review pipeline; do not bypass parser/quarantine controls.
 - [ ] Test divorced/blended family, adult privacy and invitation-group-versus-residential-household cases.
 
@@ -63,11 +64,11 @@ Depends on: 3
 
 Depends on: 4
 
-- [ ] Extend rule creation with type, scope, condition, effect, authority, effective period, visibility, status and override policy.
+- [x] Extend the policy contract and couple-facing rule builder with type, scope, condition envelope, effect, authority, effective period, visibility, status and override policy.
 - [ ] Make conditional fields mandatory for allocations, deadlines and scoped rules.
-- [ ] Project effective rules with inherited source explanations.
-- [ ] Enforce type-aware precedence; a specific invitation rule cannot override system privacy.
-- [ ] Detect same-level conflicts and require resolution instead of choosing by an opaque numeric rank.
+- [x] Project effective rules with inherited source explanations.
+- [x] Enforce type-aware precedence; a specific invitation rule cannot override system privacy.
+- [x] Detect same-level conflicts and require resolution instead of choosing by an opaque numeric rank.
 - [ ] Add versioned supersede/archive commands and impact preview for rules affecting sent invitations.
 
 ## 6. Server-authoritative grants
@@ -75,10 +76,10 @@ Depends on: 4
 Depends on: 4, 5
 
 - [ ] Define Couple, delegated Planner, Family helper and RSVP guest capabilities with record-level scopes.
-- [ ] Reuse the existing digest-only expiring/revocable capability boundary where possible.
-- [ ] Enforce account, wedding, household, principal and action on every route.
-- [ ] Separate view, propose and approve permissions.
-- [ ] Immediately refuse revoked links and delegated access.
+- [x] Reuse the existing digest-only expiring/revocable capability boundary for the family-helper slice.
+- [x] Enforce account, wedding, household, principal and action on the new helper routes.
+- [x] Separate view and propose permissions; helper grants never receive approval authority.
+- [x] Immediately refuse revoked or expired family-helper links.
 - [ ] Test forged household IDs, forwarded links, cross-tenant reads/writes and planner privilege escalation.
 
 ## 7. Request lifecycle and atomic decisions
@@ -86,20 +87,20 @@ Depends on: 4, 5
 Depends on: 5, 6
 
 - [ ] Implement draft, pending, approved, partially approved, declined, withdrawn, expired and auto-blocked transitions.
-- [ ] Require idempotency keys for request and decision commands.
-- [ ] Revalidate rule version, allocation version, identity conflicts and current capacity inside the approval transaction.
-- [ ] Reserve capacity and apply an approved guest mutation atomically.
+- [x] Require idempotency keys for helper request and couple decision commands.
+- [x] Revalidate referenced rule versions, household revision, identity duplication and current allocation inside the add-guest approval transaction.
+- [x] Reserve capacity and apply an approved add-guest mutation atomically, while keeping the invitation unsent.
 - [ ] Support single and configurable two-partner elevated approval without applying the first partial approval.
-- [ ] Return existing receipts on retry and reviewable conflicts on stale versions.
+- [x] Return existing receipts on exact retry and reviewable conflicts on stale request, rule or household versions.
 - [ ] Test two simultaneous requests for the last seat and repeated approval clicks.
 
 ## 8. Impact preview and reconciliation
 
 Depends on: 7
 
-- [ ] Preview affected guests, invitation entitlement, RSVP, seating, catering exposure, budget forecast and tasks before material approval.
-- [ ] Reconcile approved changes into the canonical guest projection and emit one downstream receipt per projector.
-- [ ] Never infer attendance, send an invitation, commit spend or change a vendor contract without separate authority.
+- [x] Preview affected guest-list, invitation, RSVP, seating, catering, budget and task areas before add-guest approval.
+- [x] Reconcile an approved add-guest request into the canonical household/guest/invitation ledger and emit one aggregate downstream impact receipt.
+- [x] Never infer attendance, send an invitation, commit spend or change a vendor contract from the family-boundary approval.
 - [ ] Keep private seating-conflict reasons out of helper and guest projections.
 - [ ] Add retry-safe reconciliation and a visible explanation of connected updates.
 - [ ] Test removal after RSVP, household split after RSVP, sent-invitation policy change and seating conflict privacy.
@@ -139,6 +140,8 @@ Depends on: 1–10 as applicable
 
 ## Current implementation boundary
 
-The checked items now include the first couple-facing slice plus the next household projection slice: native mobile shell, reversible onboarding imagery, source-confirmed meal choices, a compact boundary summary, disclosure focus management, deterministic household attention rows, and AFP-backed group/allocation/deadline revisions. A standalone typed family-group entity, safe split/merge/archive, server-authoritative grants, atomic allocation decisions, bulk household operations and full reconciliation remain required before presenting Family Boundaries as complete governance for outside family helpers.
+The checked items now include the couple-facing and server-authority foundation: native mobile shell, reversible onboarding imagery, source-confirmed meal choices, compact boundary summary, typed family groups and rules, deterministic household and conflict previews, AFP-backed household revisions, false-default digest-only family-helper grants, minimum-necessary helper projections, idempotent request decisions, stale policy/household checks, and an atomic add-guest approval that creates an unsent invitation draft and one impact receipt.
+
+This is not the end of the roadmap. Server commands for household split/merge/archive, delegated Planner and RSVP-guest capability variants, two-partner partial approvals, non-add-guest mutations, per-projector reconciliation receipts, bulk operations, helper UI/hosted rollout, and the complete security/accessibility/usability matrix remain open. `OMNYID_WEDDING_BOUNDARY_HELPERS_ENABLED` stays false unless the hosted rollout criteria pass.
 
 Release evidence for this slice is in `Documents/verification/wed-306-native-mobile-meal-family-boundaries-2026-10-31.md`. The pre-change coordination SHA was `3bd1f79fdae00c370556b504e0fde1daf66cc36f`; the exact deployed application SHA is `3c626dd149d61ae57c739fa90cd26acecb0109aa`.
