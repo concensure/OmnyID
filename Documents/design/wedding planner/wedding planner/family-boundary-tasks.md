@@ -44,7 +44,7 @@ Depends on: 0
 - [x] Collapse detailed controls by default and open Requests or household/visibility context from the corresponding metric.
 - [x] Retain the current AFP-backed request, rule and visibility controls behind disclosure.
 - [x] Add plain-language privacy/suggestion-versus-approval help.
-- [ ] Restore focus on collapse and focus the requested subsection on open.
+- [x] Restore focus on collapse and focus the requested subsection on open.
 - [ ] Add rendering, keyboard, screen-reader name and 320 px reflow tests.
 
 ## 4. Household and family-group foundation
@@ -52,8 +52,9 @@ Depends on: 0
 Depends on: 3
 
 - [ ] Add typed `family_group` allocation and household assignment events to the existing boundary ledger contract.
-- [ ] Project household representative, group, named invitation count, allocation, RSVP status, pending request count and last activity.
-- [ ] Add sorting by attention, remaining allocation, RSVP status, activity and deadline.
+- [x] Project household representative, group, named invitation count, allocation, RSVP status, pending request count and last activity.
+- [x] Add sorting by attention, remaining allocation, RSVP status, activity and deadline.
+- [x] Let the couple revise a household's group label, invitation allocation and request deadline by writing a successor household AFP object; do not keep a second local household store.
 - [ ] Support safe split/merge/archive commands with preview and stable guest/invitation references.
 - [ ] Add CSV/table import through the existing import and review pipeline; do not bypass parser/quarantine controls.
 - [ ] Test divorced/blended family, adult privacy and invitation-group-versus-residential-household cases.
@@ -138,6 +139,6 @@ Depends on: 1–10 as applicable
 
 ## Current implementation boundary
 
-The checked items constitute the first couple-facing slice: native mobile shell, reversible onboarding imagery, source-confirmed meal choices, and a compact boundary summary over the existing ledger. Server-authoritative grants, atomic allocation decisions, bulk household operations and full reconciliation remain required before presenting Family Boundaries as complete governance for outside family helpers.
+The checked items now include the first couple-facing slice plus the next household projection slice: native mobile shell, reversible onboarding imagery, source-confirmed meal choices, a compact boundary summary, disclosure focus management, deterministic household attention rows, and AFP-backed group/allocation/deadline revisions. A standalone typed family-group entity, safe split/merge/archive, server-authoritative grants, atomic allocation decisions, bulk household operations and full reconciliation remain required before presenting Family Boundaries as complete governance for outside family helpers.
 
 Release evidence for this slice is in `Documents/verification/wed-306-native-mobile-meal-family-boundaries-2026-10-31.md`. The pre-change coordination SHA was `3bd1f79fdae00c370556b504e0fde1daf66cc36f`; the exact deployed application SHA is `3c626dd149d61ae57c739fa90cd26acecb0109aa`.

@@ -154,16 +154,13 @@ test("saveContacts persists only normalized contact rows", () => {
   ]);
 });
 
-test("loadContacts migrates legacy global contacts storage into the scoped key", () => {
+test("authenticated contacts never adopt unowned legacy global storage", () => {
   localStorageState.clear();
   localStorageState.set(CONTACTS_KEY, JSON.stringify([{ id: "1", name: "Alice", relationshipKind: "friend" }]));
 
-  assert.deepEqual(loadContacts("user-1"), [{ id: "1", name: "Alice", relationshipKind: "friend" }]);
-  assert.equal(localStorageState.has(CONTACTS_KEY), false);
-  assert.equal(
-    localStorageState.get(accountScopedStorageKey(CONTACTS_KEY, "user-1")),
-    JSON.stringify([{ id: "1", name: "Alice", relationshipKind: "friend" }]),
-  );
+  assert.deepEqual(loadContacts("user-1"), []);
+  assert.equal(localStorageState.has(CONTACTS_KEY), true);
+  assert.equal(localStorageState.has(accountScopedStorageKey(CONTACTS_KEY, "user-1")), false);
 });
 
 test("saveContacts dispatches contact changed events for same-tab refreshes", () => {

@@ -56,6 +56,7 @@ import {
   type WeddingWorkspaceAggregateAction,
 } from "@/lib/weddingWorkspaceAggregateState";
 import { recordWeddingRsvpResponse } from "@/lib/weddingRsvpResponseState";
+import { safeWeddingLabel } from "@/lib/weddingPlanningTemplateState";
 import {
   weddingRsvpSetupFromAfpMessages,
   weddingRsvpSetupToAfpSendInput,
@@ -278,6 +279,24 @@ export function WeddingWorkspaceContextPanels(props: {
     props.onRefreshWorkspace?.();
     return "Family boundary rule saved.";
   }
+  async function saveFamilyHousehold(input: { householdId: string; familyGroupLabel: string; invitationAllocation: number | null; requestDeadline: string | null }): Promise<string> {
+    if (!props.saveProjection) throw new Error("Saving is not connected yet.");
+    const household = (props.state.boundaryState.householdObjects ?? []).find((item) => item.householdId === input.householdId);
+    if (!household) throw new Error("This household is no longer available. Refresh and try again.");
+    const nowIso = new Date().toISOString();
+    const currentRevision = typeof household.metadata?.household_revision === "number" ? household.metadata.household_revision : 0;
+    await props.saveProjection(weddingBoundaryLedgerObjectToAfpSendInput({
+      ...household,
+      familyGroupId: input.familyGroupLabel.trim() ? `family_group:${safeWeddingLabel(input.familyGroupLabel)}` : null,
+      familyGroupLabel: input.familyGroupLabel.trim() || null,
+      invitationAllocation: input.invitationAllocation,
+      requestDeadline: input.requestDeadline,
+      createdAt: nowIso,
+      metadata: { ...(household.metadata ?? {}), household_revision: currentRevision + 1, updated_at: nowIso },
+    }, props.state.workspace.metadata, nowIso));
+    props.onRefreshWorkspace?.();
+    return "Household group and allocation saved.";
+  }
   function generateRecommendationSet(cardTitle: string, nextQuestionLabel: string) {
     props.onSidebarAction(buildWeddingRecommendationGenerationAction({
       cardTitle,
@@ -407,12 +426,12 @@ export function WeddingWorkspaceContextPanels(props: {
                 <button
                   type="button"
                   disabled={!action.enabled}
-                  class="min-h-[8.5rem] rounded-2xl border border-indigo-200 bg-white/80 p-4 text-left transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 disabled:cursor-not-allowed disabled:opacity-45"
+                  class="flex min-h-[10rem] min-w-0 flex-col items-start gap-3 rounded-2xl border border-indigo-200 bg-white/80 p-5 text-left transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 disabled:cursor-not-allowed disabled:opacity-45 sm:min-h-[9rem]"
                   onClick={() => openAggregateAction(action)}
                 >
-                  <span class="text-sm font-semibold text-indigo-950">{action.title}</span>
-                  <span class="mt-1 block text-xs leading-5 text-indigo-950/70">{action.detail}</span>
-                  <span class="mt-2 block text-[11px] font-semibold text-indigo-950/65">{action.metaLabel}</span>
+                  <span class="block w-full text-sm font-semibold leading-5 text-indigo-950">{action.title}</span>
+                  <span class="block w-full text-xs leading-5 text-indigo-950/70">{action.detail}</span>
+                  <span class="mt-auto block w-full text-[11px] font-semibold leading-4 text-indigo-950/65">{action.metaLabel}</span>
                 </button>
               )}
             </For>
@@ -453,6 +472,7 @@ export function WeddingWorkspaceContextPanels(props: {
             onDecideRequest={decideBoundaryRequest}
             onSaveFamilyRequest={saveFamilyRequest}
             onSaveFamilyRule={saveFamilyRule}
+            onSaveHousehold={saveFamilyHousehold}
           />
         </div>
       </div>

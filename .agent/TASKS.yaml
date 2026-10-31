@@ -1,5 +1,5 @@
 version: 1
-updated: 2026-10-31
+updated: 2026-11-01
 
 lifecycle:
   allowed_statuses:
@@ -15,6 +15,16 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-307
+    title: Enforce account-switch isolation and continue Family Boundaries on the approved ranking release
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-307
+    depends_on: [WED-296, WED-305, WED-306]
+    files: [solid-ui/src/App.tsx, solid-ui/src/components/WeddingWorkspaceContextPanels.tsx, solid-ui/src/components/WeddingBoundaryManagementCard.tsx, solid-ui/src/lib/accountSessionBoundaryState.ts, solid-ui/src/lib/contactsLocalState.ts, solid-ui/src/lib/profileLocalState.ts, solid-ui/src/lib/weddingBoundary*.ts, solid-ui/tests/account-session-boundary-state.test.ts, solid-ui/tests/contacts-local-state.test.ts, solid-ui/tests/profile-local-state.test.ts, solid-ui/tests/wedding-family-boundary*.test.ts, solid-ui/tests/wedding-workspace-aggregate*.test.ts, Documents/design/wedding planner/wedding planner/family-boundary-tasks.md, Documents/verification/**, .agent/**]
+    acceptance: [Changing authenticated accounts in one browser cannot retain the prior account's in-memory dashboard decision progress contacts budget contributions or active persona, authenticated readers do not adopt unowned legacy contacts or Wedding caches, the Plan hub action copy has native mobile spacing and reflows without narrow middle columns, the next Family Boundaries slice restores disclosure focus and advances the canonical household projection without creating a parallel guest store, ranking Policy V2 remains compiled into production with policy-version 2 fingerprints and its approved release controls, focused isolation family and mobile tests typecheck all Wedding tests line budgets production build exact-SHA Oracle deployment and hosted checks pass]
+    progress: "Implementation candidate isolates account changes before browser state is read, reloads on identity replacement, refuses unowned legacy contact/profile data, clears both dot- and colon-style Wedding caches, stacks Plan action copy for mobile, restores Family boundary disclosure focus, projects household attention rows, and saves household group/allocation/deadline successors to AFP. Production inspection shows recreated casper account has zero onboarding/persona rows and a fresh account id; the stale persona/contact/task symptoms were browser-memory reuse. Typecheck, 2,105 Wedding tests, focused isolation/family/policy tests, line budgets and a Policy-V2=true production build pass. Exact-SHA clean release and hosted proof remain."
+
   - id: WED-306
     title: Make Wedding mobile surfaces native and add sourced meal and family-boundary workflows
     status: in_progress

@@ -6,6 +6,7 @@ import {
   type WeddingPlanningMetadata,
 } from "@/lib/weddingPlanningTemplateState";
 import type { WeddingSemanticUiKind, WeddingSemanticUiObject } from "@/lib/weddingSemanticUiState";
+import { buildWeddingBoundaryHouseholdRows, type WeddingBoundaryHouseholdRow } from "@/lib/weddingBoundaryHouseholdState";
 
 export type WeddingBoundaryLedgerKind =
   | "wedding_boundary_policy"
@@ -76,6 +77,10 @@ export type WeddingBoundaryHousehold = WeddingBoundaryLedgerObjectBase & {
   primaryContactPersonId?: string | null;
   memberPersonIds?: readonly string[] | null;
   familySide?: "bride" | "groom" | "shared" | "other" | null;
+  familyGroupId?: string | null;
+  familyGroupLabel?: string | null;
+  invitationAllocation?: number | null;
+  requestDeadline?: string | null;
 };
 
 export type WeddingBoundaryGuestProfile = WeddingBoundaryLedgerObjectBase & {
@@ -185,6 +190,8 @@ export type WeddingBoundaryState = {
   familyVisibleCount: number;
   privateObjectCount: number;
   approvalQueue: WeddingBoundaryChangeRequest[];
+  householdRows?: WeddingBoundaryHouseholdRow[];
+  householdObjects?: WeddingBoundaryHousehold[];
   familyVisibleObjects: WeddingBoundaryLedgerObject[];
   warningLabels: string[];
   summaryLabel: string;
@@ -401,6 +408,10 @@ function publicContentFor(object: WeddingBoundaryLedgerObject): Record<string, u
       primary_contact_person_id: object.primaryContactPersonId ?? null,
       member_person_ids: object.memberPersonIds ?? [],
       family_side: object.familySide ?? null,
+      family_group_id: object.familyGroupId ?? null,
+      family_group_label: object.familyGroupLabel ?? null,
+      invitation_allocation: object.invitationAllocation ?? null,
+      request_deadline: object.requestDeadline ?? null,
     };
   }
   if (object.kind === "wedding_boundary_guest_profile") {
@@ -777,6 +788,8 @@ export function buildWeddingBoundaryState(input: {
     familyVisibleCount: familyObjects.length,
     privateObjectCount: privateCount,
     approvalQueue: approvals,
+    householdRows: buildWeddingBoundaryHouseholdRows(objects),
+    householdObjects: households,
     familyVisibleObjects: familyObjects,
     warningLabels,
     summaryLabel: `${guests.length} guest profile${guests.length === 1 ? "" : "s"}, ${households.length} household${households.length === 1 ? "" : "s"}, ${approvals.length} request${approvals.length === 1 ? "" : "s"} waiting for review.`,

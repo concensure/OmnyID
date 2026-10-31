@@ -55,8 +55,9 @@ function removeProfileStorageValue(key: string): void {
 
 export function loadUserProfile(userId?: string | null): UserProfile {
   const scopedKey = profileStorageKey(userId);
+  const authenticated = typeof userId === "string" && userId.trim().length > 0;
   try {
-    const raw = localStorage.getItem(scopedKey) ?? localStorage.getItem(PROFILE_KEY);
+    const raw = localStorage.getItem(scopedKey) ?? (authenticated ? null : localStorage.getItem(PROFILE_KEY));
     if (!raw) return { ...DEFAULT_USER_PROFILE };
     const parsed = parseJsonValue(raw);
     if (!parsed.ok) {

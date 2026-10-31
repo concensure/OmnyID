@@ -105,6 +105,11 @@ function positiveInteger(value: unknown): number | null {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
+function nonNegativeInteger(value: unknown): number | null {
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : null;
+}
+
 function contentValue(message: AfpMessage, key: string): unknown {
   return decryptedDisplayContent(message)[key] ?? message.metadata?.[key];
 }
@@ -269,6 +274,10 @@ export function weddingPersistedBoundaryObjectFromAfpMessage(
       primaryContactPersonId: clean(contentValue(message, "primary_contact_person_id")),
       memberPersonIds: strings(contentValue(message, "member_person_ids")),
       familySide: clean(contentValue(message, "family_side")) as WeddingBoundaryHousehold["familySide"],
+      familyGroupId: clean(contentValue(message, "family_group_id")),
+      familyGroupLabel: clean(contentValue(message, "family_group_label")),
+      invitationAllocation: nonNegativeInteger(contentValue(message, "invitation_allocation")),
+      requestDeadline: clean(contentValue(message, "request_deadline")),
     };
   }
   if (kind === "wedding_boundary_guest_profile") {

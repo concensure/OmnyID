@@ -416,6 +416,7 @@ import {
   withAdminPrimaryUseCaseDefault,
 } from "@/lib/primaryUseCaseProfileState";
 import { loadUserProfile } from "@/lib/profileLocalState";
+import { enforceAuthenticatedAccountBoundary } from "@/lib/accountSessionBoundaryState";
 import { buildThreadSearchInput, parseThreadSearchInput } from "@/lib/threadSearch";
 import {
   subscribeDecisionOsNavigateEvent,
@@ -1147,7 +1148,14 @@ function buildCommandPreviewRenderFailureMessage(
 }
 
 function App() {
-  const [session, setSession] = createSignal(readSession());
+  const initialSession = readSession();
+  enforceAuthenticatedAccountBoundary({
+    userId: initialSession?.user.id,
+    localStorage: window.localStorage,
+    sessionStorage: window.sessionStorage,
+    preserveWeddingQuizHandoff: new URLSearchParams(window.location.search).get("source") === "wedding_quiz",
+  });
+  const [session, setSession] = createSignal(initialSession);
   // Declared early: userId/workspaceBootstrap are read synchronously by several
   // createMemo initializers further down (e.g. studyLensDashboard, weddingArrivalBanner),
   // and createMemo runs its computation immediately, so these must exist before those do.
@@ -3078,8 +3086,21 @@ function App() {
 
     const unsubscribeSessionChanged = subscribeSessionChangedEvent((detail) => {
       const nextSession = detail.session;
+      if (nextSession) {
+        const boundary = enforceAuthenticatedAccountBoundary({
+          userId: nextSession.user.id,
+          localStorage: window.localStorage,
+          sessionStorage: window.sessionStorage,
+          preserveWeddingQuizHandoff: new URLSearchParams(window.location.search).get("source") === "wedding_quiz",
+        });
+        if (boundary.accountChanged || !session()?.token) {
+          window.location.reload();
+          return;
+        }
+      }
       setSession(nextSession);
       if (!nextSession) {
+        setDashboard(null);
         applyPrimaryUseCaseTheme(null);
         setPrimaryUseCaseProfile(null);
         setPrimaryUseCaseNeedsPrompt(false);

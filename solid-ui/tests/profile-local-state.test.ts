@@ -107,19 +107,16 @@ test("loadUserProfile clears unparseable persisted profiles", () => {
   assert.equal(localStorageState.has(accountScopedStorageKey(PROFILE_KEY, "user-1")), false);
 });
 
-test("loadUserProfile migrates legacy global profile storage into the scoped key", () => {
+test("authenticated profile never adopts unowned legacy global storage", () => {
   localStorageState.clear();
   localStorageState.set(PROFILE_KEY, JSON.stringify({ displayName: " Ozan " }));
 
   assert.deepEqual(loadUserProfile("user-1"), {
-    displayName: "Ozan",
+    displayName: "",
     bio: "",
     avatar: "🧑",
     websites: [],
   });
-  assert.equal(localStorageState.has(PROFILE_KEY), false);
-  assert.equal(
-    localStorageState.get(accountScopedStorageKey(PROFILE_KEY, "user-1")),
-    JSON.stringify({ displayName: "Ozan", bio: "", avatar: "🧑", websites: [] }),
-  );
+  assert.equal(localStorageState.has(PROFILE_KEY), true);
+  assert.equal(localStorageState.has(accountScopedStorageKey(PROFILE_KEY, "user-1")), false);
 });

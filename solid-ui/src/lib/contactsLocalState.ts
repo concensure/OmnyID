@@ -174,7 +174,8 @@ function removeContactsStorageValue(key: string): void {
 export function loadContacts(userId?: string | null): Contact[] {
   const scopedKey = contactsStorageKey(userId);
   try {
-    const raw = localStorage.getItem(scopedKey) ?? localStorage.getItem(CONTACTS_KEY);
+    const authenticated = typeof userId === "string" && userId.trim().length > 0;
+    const raw = localStorage.getItem(scopedKey) ?? (authenticated ? null : localStorage.getItem(CONTACTS_KEY));
     if (!raw) return [];
     const parsed = parseJsonValue(raw);
     if (!parsed.ok) {

@@ -17,6 +17,7 @@ import type {
   WeddingBoundaryState,
 } from "@/lib/weddingBoundaryLedgerState";
 import type { WeddingBoundaryTopologyState } from "@/lib/weddingBoundaryTopologyState";
+import type { WeddingBoundaryHouseholdRow } from "@/lib/weddingBoundaryHouseholdState";
 
 export function WeddingBoundaryManagementCard(props: {
   state: WeddingBoundaryState;
@@ -24,7 +25,9 @@ export function WeddingBoundaryManagementCard(props: {
   onDecideRequest?: (requestId: string, decision: WeddingBoundaryRequestDecision) => Promise<string>;
   onSaveFamilyRequest?: (input: { requesterLabel: string; requestLabel: string; changeType: WeddingBoundaryChangeType }) => Promise<string>;
   onSaveFamilyRule?: (input: { title: string; plainLanguage: string; ruleType: WeddingBoundaryPolicyRuleType }) => Promise<string>;
+  onSaveHousehold?: (input: { householdId: string; familyGroupLabel: string; invitationAllocation: number | null; requestDeadline: string | null }) => Promise<string>;
 }) {
+  let disclosureButton: HTMLButtonElement | undefined;
   const [showRequests, setShowRequests] = createSignal(false);
   const [expanded, setExpanded] = createSignal(false);
   const [showRules, setShowRules] = createSignal(false);
@@ -41,6 +44,10 @@ export function WeddingBoundaryManagementCard(props: {
   const [ruleText, setRuleText] = createSignal("");
   const [ruleType, setRuleType] = createSignal<WeddingBoundaryPolicyRuleType>("invitation_scope");
   const [savingDraft, setSavingDraft] = createSignal(false);
+  const [editingHouseholdId, setEditingHouseholdId] = createSignal<string | null>(null);
+  const [householdGroupLabel, setHouseholdGroupLabel] = createSignal("");
+  const [householdAllocation, setHouseholdAllocation] = createSignal("");
+  const [householdDeadline, setHouseholdDeadline] = createSignal("");
   const viewState = createMemo(() => buildWeddingBoundaryManagementViewState(props));
   const visibleApprovalItems = createMemo(() => visibleWeddingBoundaryApprovalItems(
     viewState().approvalItems,
@@ -50,6 +57,66 @@ export function WeddingBoundaryManagementCard(props: {
     props.state.approvalQueue.map((request) => request.requestId),
     completedRequestIds(),
   ));
+
+  function focusSection(id: string): void {
+    queueMicrotask(() => document.getElementById(id)?.focus());
+  }
+
+  function toggleExpanded(): void {
+    if (expanded()) {
+      setExpanded(false);
+      queueMicrotask(() => disclosureButton?.focus());
+      return;
+    }
+    setExpanded(true);
+    focusSection("wedding-family-boundary-details");
+  }
+
+  function openRequests(): void {
+    setExpanded(true);
+    setShowRequests(true);
+    focusSection("wedding-boundary-requests");
+  }
+
+  function openHouseholds(): void {
+    setExpanded(true);
+    setShowPeople(true);
+    focusSection("wedding-boundary-people");
+  }
+
+  function beginHouseholdEdit(household: WeddingBoundaryHouseholdRow): void {
+    setEditingHouseholdId(household.householdId);
+    setHouseholdGroupLabel(household.familyGroupLabel === "Not grouped" ? "" : household.familyGroupLabel);
+    setHouseholdAllocation(household.invitationAllocation === null ? "" : String(household.invitationAllocation));
+    setHouseholdDeadline(household.requestDeadline ?? "");
+  }
+
+  async function saveHousehold(): Promise<void> {
+    const householdId = editingHouseholdId();
+    if (!householdId || !props.onSaveHousehold || savingDraft()) return;
+    const allocationText = householdAllocation().trim();
+    const allocation = allocationText ? Number(allocationText) : null;
+    if (allocation !== null && (!Number.isInteger(allocation) || allocation < 0)) {
+      setDecisionNotice("Enter a whole-number invitation allocation, or leave it blank.");
+      return;
+    }
+    setSavingDraft(true);
+    setDecisionNotice(null);
+    try {
+      const notice = await props.onSaveHousehold({
+        householdId,
+        familyGroupLabel: householdGroupLabel(),
+        invitationAllocation: allocation,
+        requestDeadline: householdDeadline().trim() || null,
+      });
+      setDecisionNotice(notice);
+      setEditingHouseholdId(null);
+    } catch (error) {
+      setDecisionNotice(weddingBoundaryDecisionNoticeFromError(error));
+    } finally {
+      setSavingDraft(false);
+    }
+  }
 
   async function decideRequest(requestId: string, decision: WeddingBoundaryRequestDecision): Promise<void> {
     if (!props.onDecideRequest || decidingRequestId()) return;
@@ -132,24 +199,25 @@ export function WeddingBoundaryManagementCard(props: {
           <p class="mt-0.5 text-sm leading-5 text-cyan-900/75">Manage requests and family permissions</p>
         </div>
         <button
+          ref={disclosureButton}
           type="button"
           class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-2xl text-cyan-950 transition hover:bg-white/75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-600"
           aria-expanded={expanded()}
           aria-controls="wedding-family-boundary-details"
           aria-label={expanded() ? "Close family boundaries" : "Open family boundaries"}
-          onClick={() => setExpanded((value) => !value)}
+          onClick={toggleExpanded}
         >
           <span aria-hidden="true" class={`transition-transform ${expanded() ? "rotate-90" : ""}`}>›</span>
         </button>
       </div>
 
       <div class="mt-3 grid grid-cols-2 gap-3" aria-label="Family boundary summary">
-        <button type="button" class="min-h-[7.5rem] rounded-2xl border border-cyan-100 bg-white/80 p-4 text-left transition hover:border-cyan-300" onClick={() => { setExpanded(true); setShowRequests(true); }}>
+        <button type="button" class="min-h-[7.5rem] rounded-2xl border border-cyan-100 bg-white/80 p-4 text-left transition hover:border-cyan-300" onClick={openRequests}>
           <span class="block text-sm font-semibold text-cyan-950/70">Requests</span>
           <span class="mt-2 block text-3xl font-semibold text-cyan-950">{pendingReviewCount()}</span>
           <span class="mt-1 block text-xs font-semibold text-cyan-900/70">{pendingReviewCount() === 0 ? "Nothing needs review" : "Need review"}</span>
         </button>
-        <button type="button" class="min-h-[7.5rem] rounded-2xl border border-cyan-100 bg-white/80 p-4 text-left transition hover:border-cyan-300" onClick={() => { setExpanded(true); setShowPeople(true); }}>
+        <button type="button" class="min-h-[7.5rem] rounded-2xl border border-cyan-100 bg-white/80 p-4 text-left transition hover:border-cyan-300" onClick={openHouseholds}>
           <span class="block text-sm font-semibold text-cyan-950/70">Households</span>
           <span class="mt-2 block text-3xl font-semibold text-cyan-950">{props.state.householdCount}</span>
           <span class="mt-1 block text-xs font-semibold text-cyan-900/70">Invitation groups</span>
@@ -157,7 +225,7 @@ export function WeddingBoundaryManagementCard(props: {
       </div>
 
       <Show when={expanded()}>
-      <div id="wedding-family-boundary-details">
+      <div id="wedding-family-boundary-details" tabindex="-1" class="focus:outline-none">
         <p class="mt-3 rounded-2xl border border-cyan-100 bg-white/70 px-3 py-2 text-sm leading-6 text-cyan-950/75">
           {props.state.summaryLabel}
         </p>
@@ -285,7 +353,7 @@ export function WeddingBoundaryManagementCard(props: {
       </Show>
 
       <Show when={showRequests()}>
-        <div id="wedding-boundary-requests" class="mt-3 space-y-2">
+        <div id="wedding-boundary-requests" tabindex="-1" class="mt-3 space-y-2 focus:outline-none">
           <Show when={visibleApprovalItems().length > 0} fallback={<p class="rounded-2xl border border-cyan-100 bg-white/75 p-3 text-xs leading-5 text-cyan-950/70">No guest-list requests need a decision right now.</p>}>
             <For each={visibleApprovalItems()}>
               {(item) => (
@@ -365,8 +433,59 @@ export function WeddingBoundaryManagementCard(props: {
       </Show>
 
       <Show when={showPeople()}>
-        <div id="wedding-boundary-people" class="mt-3 rounded-2xl border border-cyan-100 bg-white/75 p-3">
-          <p class="text-sm font-semibold text-cyan-950">Visibility map</p>
+        <div id="wedding-boundary-people" tabindex="-1" class="mt-3 rounded-2xl border border-cyan-100 bg-white/75 p-3 focus:outline-none">
+          <p class="text-sm font-semibold text-cyan-950">Households</p>
+          <p class="mt-1 text-xs leading-5 text-cyan-950/65">Invitation groups are shown separately from residential addresses. Requests needing attention appear first.</p>
+          <div class="mt-3 grid gap-2">
+            <Show when={(props.state.householdRows ?? []).length > 0} fallback={<p class="rounded-xl bg-cyan-50 px-3 py-2 text-xs leading-5 text-cyan-950/70">No households yet. Add guests to create invitation groups.</p>}>
+              <For each={props.state.householdRows ?? []}>
+                {(household) => (
+                  <article class="rounded-xl border border-cyan-100 bg-white p-3">
+                    <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                      <div class="min-w-0">
+                        <p class="break-words text-sm font-semibold text-cyan-950">{household.displayName}</p>
+                        <p class="mt-0.5 text-xs leading-5 text-cyan-950/65">{household.familyGroupLabel} · Representative: {household.representativeLabel}</p>
+                      </div>
+                      <Show when={household.attentionLabels.length > 0} fallback={<span class="self-start rounded-full bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-800">No immediate review</span>}>
+                        <span class="self-start rounded-full bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-900">{household.attentionLabels[0]}</span>
+                      </Show>
+                    </div>
+                    <div class="mt-2 grid gap-1 text-xs leading-5 text-cyan-950/70 sm:grid-cols-2">
+                      <p>{household.memberCount} named member{household.memberCount === 1 ? "" : "s"} · {household.namedInvitationCount} invited</p>
+                      <p>{household.invitationAllocation === null ? "Allocation not set" : `${household.remainingAllocation ?? 0} of ${household.invitationAllocation} places remaining`}</p>
+                      <p class="sm:col-span-2">{household.rsvpLabel}</p>
+                    </div>
+                    <Show when={props.onSaveHousehold}>
+                      <button type="button" class="mt-2 rounded-full border border-cyan-200 bg-white px-3 py-2 text-xs font-semibold text-cyan-950 transition hover:bg-cyan-50" onClick={() => editingHouseholdId() === household.householdId ? setEditingHouseholdId(null) : beginHouseholdEdit(household)}>
+                        {editingHouseholdId() === household.householdId ? "Close household details" : "Edit group and allocation"}
+                      </button>
+                    </Show>
+                    <Show when={editingHouseholdId() === household.householdId}>
+                      <div class="mt-3 grid gap-3 rounded-xl bg-cyan-50/75 p-3 sm:grid-cols-3">
+                        <label class="min-w-0">
+                          <span class="text-xs font-semibold text-cyan-950/70">Family group</span>
+                          <input class="mt-1 min-h-11 w-full rounded-lg border border-cyan-200 bg-white px-3 text-sm" value={householdGroupLabel()} placeholder="Shared friends" onInput={(event) => setHouseholdGroupLabel(event.currentTarget.value)} />
+                        </label>
+                        <label class="min-w-0">
+                          <span class="text-xs font-semibold text-cyan-950/70">Invitation allocation</span>
+                          <input type="number" min="0" step="1" inputmode="numeric" class="mt-1 min-h-11 w-full rounded-lg border border-cyan-200 bg-white px-3 text-sm" value={householdAllocation()} placeholder="No limit set" onInput={(event) => setHouseholdAllocation(event.currentTarget.value)} />
+                        </label>
+                        <label class="min-w-0">
+                          <span class="text-xs font-semibold text-cyan-950/70">Request deadline</span>
+                          <input type="date" class="mt-1 min-h-11 w-full rounded-lg border border-cyan-200 bg-white px-3 text-sm" value={householdDeadline()} onInput={(event) => setHouseholdDeadline(event.currentTarget.value)} />
+                        </label>
+                        <div class="flex flex-wrap gap-2 sm:col-span-3">
+                          <button type="button" disabled={savingDraft()} class="min-h-11 rounded-full bg-cyan-700 px-4 text-xs font-semibold text-white disabled:opacity-50" onClick={() => void saveHousehold()}>{savingDraft() ? "Saving..." : "Save household"}</button>
+                          <button type="button" class="min-h-11 rounded-full border border-cyan-200 bg-white px-4 text-xs font-semibold text-cyan-950" onClick={() => setEditingHouseholdId(null)}>Cancel</button>
+                        </div>
+                      </div>
+                    </Show>
+                  </article>
+                )}
+              </For>
+            </Show>
+          </div>
+          <p class="mt-4 text-sm font-semibold text-cyan-950">Visibility map</p>
           <div class="mt-2 flex flex-wrap gap-1.5">
             <Show when={viewState().hasVisibilityItems} fallback={
               <button
