@@ -50,7 +50,7 @@ function DomainTile(props: { tile?: WeddingHomeOverviewActionTile; domain: Domai
   return (
     <button
       type="button"
-      class={`group min-h-[8.5rem] min-w-0 overflow-hidden rounded-xl border border-wedding-border bg-wedding-card p-4 text-left text-wedding-ink shadow-wedding-card transition-colors duration-150 hover:border-wedding-primary/40 hover:bg-wedding-page focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-primary focus-visible:ring-offset-2 sm:min-h-[10.5rem] sm:p-5 ${props.desktopSpan ?? ""} ${props.dense ? "min-h-[8rem] p-3 sm:min-h-[9rem] sm:p-3" : ""}`}
+      class={`group flex min-h-[17rem] min-w-0 flex-col overflow-hidden rounded-xl border border-wedding-border bg-wedding-card p-4 text-left text-wedding-ink shadow-wedding-card transition-colors duration-150 hover:border-wedding-primary/40 hover:bg-wedding-page focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-primary focus-visible:ring-offset-2 sm:min-h-[12rem] sm:p-5 ${props.desktopSpan ?? ""} ${props.dense ? "min-h-[15rem] p-3 sm:min-h-[11rem] sm:p-3" : ""}`}
       title={props.tile?.actionLabel}
       onClick={props.onOpen}
     >
@@ -69,8 +69,8 @@ function DomainTile(props: { tile?: WeddingHomeOverviewActionTile; domain: Domai
         )}</Show>
       </div>
       <p class="mt-3 break-words text-[1.65rem] font-extrabold leading-8 tracking-[-.02em] tabular-nums sm:mt-4 sm:text-[2.125rem] sm:leading-9">{displayValue(props.tile)}</p>
-      <p class="mt-1 line-clamp-2 text-sm leading-5 text-wedding-ink/70">{props.tile?.detailLabel}</p>
-      <span class="mt-3 inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-wedding-secondary">
+      <p class="mt-2 break-words text-sm leading-5 text-wedding-ink/70 sm:line-clamp-2">{props.tile?.detailLabel}</p>
+      <span class="mt-auto flex min-h-12 w-full items-center justify-between gap-2 border-t border-wedding-border pt-3 text-sm font-semibold text-wedding-secondary">
         {props.tile?.actionLabel}<WeddingDashboardIcon id="arrow-right" class="h-4 w-4" />
       </span>
     </button>

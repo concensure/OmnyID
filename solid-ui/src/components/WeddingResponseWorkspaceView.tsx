@@ -1,6 +1,5 @@
 // @locs-version: 2.1
 import { createEffect, createMemo, createSignal, onCleanup, onMount, Show } from "solid-js";
-
 import { WeddingProjectionQueuePanel } from "@/components/WeddingProjectionQueuePanel";
 import { WeddingPreferenceConfirmationChips } from "@/components/WeddingPreferenceConfirmationChips";
 import { WeddingWorkspaceContextPanels } from "@/components/WeddingWorkspaceContextPanels";
@@ -43,6 +42,7 @@ import { buildWeddingVendorQuoteThreadProofState, mergeWeddingVendorQuoteThreadP
 import { weddingVendorQuoteReceiptPersistenceNotice } from "@/lib/weddingVendorQuoteReceiptPersistenceState";
 import { buildWeddingProviderExecutorReadinessState } from "@/lib/weddingProviderExecutorReadinessState";
 import { weddingVendorContactReferenceToAfpSendInput } from "@/lib/weddingVendorContactReferenceAfpState";
+import { useWeddingVendorQuoteAcceptanceOwner } from "@/lib/useWeddingVendorQuoteAcceptanceOwner";
 import { dismissWeddingVendorFollowUp, saveWeddingVendorFollowUpDate } from "@/lib/weddingVendorFollowUpActions";
 import { useWeddingVendorOutreachOwner } from "@/lib/useWeddingVendorOutreachOwner";
 import { useWeddingVendorQuoteDecisionProjection } from "@/lib/useWeddingVendorQuoteDecisionProjection";
@@ -92,6 +92,7 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
   >({});
   const [quoteReplyApprovedWording, setQuoteReplyApprovedWording] = createSignal<Record<string, boolean>>({});
   const [quoteReplyBudgetAck, setQuoteReplyBudgetAck] = createSignal<Record<string, true>>({});
+  const quoteAcceptance = useWeddingVendorQuoteAcceptanceOwner({ state, saveProjection: props.saveProjection, onRefresh: props.onRefreshWorkspace, onNotice: setExportNotice });
   const [quoteReplyUndoUntil, setQuoteReplyUndoUntil] = createSignal<Record<string, string>>({});
   const [quoteReplyLocalExecutions, setQuoteReplyLocalExecutions] = createSignal<Record<string, WeddingApprovalExecutionState>>({});
   const [quoteReplyClearedExecutionRequests, setQuoteReplyClearedExecutionRequests] = createSignal<Record<string, true>>({});
@@ -869,6 +870,8 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
         onSend: () => startQuoteReplySend(baseFlow),
         onUndo: () => undoQuoteReplySend(baseFlow),
         onViewSentThread: () => void viewQuoteReplyThread(baseFlow),
+        onAcceptQuote: () => void quoteAcceptance.accept(flow.quote, flow.quoteMessageId ?? flow.id),
+        quoteAccepted: quoteAcceptance.isAccepted(flow.quote.vendorName),
         onParseAttachment: () => void parseQuoteAttachment(baseFlow),
         onProviderSetup: props.onProviderSetup,
         dealBreakerContext: {
@@ -995,6 +998,7 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
             hiddenVendorIds={preferenceFeedback.hiddenVendorIds()} onNotForUs={preferenceFeedback.recordVendorFeedback} onRestoreVendor={preferenceFeedback.restoreVendor}
             feedbackConfirmationPrompt={preferenceFeedback.feedbackConfirmation()?.prompt ?? null} feedbackConfirmationActionLabel={preferenceFeedback.feedbackConfirmation()?.kind === "intimate" ? "Make it a must-have" : "Review preferences"} feedbackNotice={preferenceFeedback.feedbackNotice()}
             onConfirmFeedbackSuggestion={preferenceFeedback.confirmFeedbackSuggestion} onDismissFeedbackSuggestion={preferenceFeedback.dismissFeedbackSuggestion}
+            onAcceptQuote={(quote, sourceId) => void quoteAcceptance.accept(quote, sourceId)}
           />{homeSections().find((section) => section.id === "vendor_follow_up")?.render()}</div>
         </Show>
 
@@ -1034,6 +1038,7 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
           onResearch={handleSidebarAction}
           onOpenFollowUpQueue={openSelectedVendorFollowUpQueue}
           onOpenVendorQuoteReplySurface={openVendorQuoteReplySurface}
+          onAcceptQuote={(quote, sourceId) => void quoteAcceptance.accept(quote, sourceId)}
           onVendorChoiceSelected={(input) => saveVendorChoiceSelection(input, { refreshWorkspace: false, surfaceNotice: false })}
           outreachFlows={vendorOutreach.flows()}
           gmailConnected={Boolean(props.gmailStatus?.connected)}

@@ -85,6 +85,18 @@ test("wedding follow-up local state isolates response workspaces", () => {
   assert.equal(loadWeddingTemplateFollowUpDraft("response_workspace:b", storage)?.location, "Melbourne");
 });
 
+test("wedding follow-up draft never leaks between recreated accounts", () => {
+  const storage = memoryStorage();
+  saveWeddingTemplateFollowUpDraft(
+    { responseWorkspaceId: "response_workspace:shared", guestCount: "80", budgetComfort: "$35,000" },
+    storage,
+    "user-old",
+  );
+
+  assert.equal(loadWeddingTemplateFollowUpDraft("response_workspace:shared", storage, "user-new"), null);
+  assert.equal(loadWeddingTemplateFollowUpDraft("response_workspace:shared", storage, "user-old")?.guestCount, "80");
+});
+
 test("wedding follow-up draft can hydrate from approved planning context", () => {
   const draft = weddingTemplateFollowUpDraftFromPlanningContext("response_workspace:harbour", {
     dateOrSeason: "October 2027",

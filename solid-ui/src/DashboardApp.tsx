@@ -52,7 +52,7 @@ export function DashboardApp() {
       }
     } else {
       // Check onboarding status for authenticated users
-      const done = loadOnboardingDone();
+      const done = loadOnboardingDone(session.user.id);
       if (!done) setShowOnboarding(true);
 
       // Load LoRA score
@@ -165,7 +165,7 @@ export function DashboardApp() {
 
           {/* Onboarding wizard */}
           <Show when={showOnboarding()}>
-            <OnboardingWizard onComplete={() => setShowOnboarding(false)} />
+            <OnboardingWizard userId={readSession()?.user.id} onComplete={() => setShowOnboarding(false)} />
           </Show>
         </div>
       }>

@@ -54,6 +54,7 @@ type WeddingWorkspaceDocumentsPanelProps = {
   onResearch: (action: WeddingWorkspaceSidebarAction) => void;
   onOpenFollowUpQueue: () => void;
   onOpenVendorQuoteReplySurface: () => void;
+  onAcceptQuote?: (quote: import("@/lib/weddingArtifactPreviewState").WeddingArtifactQuotePreview, sourceId: string) => void;
   onVendorChoiceSelected?: (input: WeddingVendorChoiceSelectionSaveInput) => void;
   outreachFlows?: Record<string, WeddingVendorOutreachFlowState>;
   gmailConnected?: boolean;
@@ -340,6 +341,7 @@ export function WeddingWorkspaceDocumentsPanel(props: WeddingWorkspaceDocumentsP
               onResearch={props.onResearch}
               onOpenFollowUpQueue={props.onOpenFollowUpQueue}
               onOpenVendorQuoteReplySurface={props.onOpenVendorQuoteReplySurface}
+              onAcceptQuote={props.onAcceptQuote}
               onVendorChoiceSelected={props.onVendorChoiceSelected}
               researchAction={props.researchAction}
               outreachFlows={props.outreachFlows}

@@ -201,7 +201,10 @@ export function WeddingMobileFocusHome(props: {
     setNotice(null);
     if (!pending.locallyApplied) pending.onSaved();
   };
-  const decisionItemFor = (id: string) => display().itemCards.find((card) => card.id === id)?.item;
+  // The focused deck can advance beyond the initially visible item. Resolve
+  // actions from the complete queue so later vendor-research decisions retain
+  // their category-specific Search/Open-shortlist consequence.
+  const decisionItemFor = (id: string) => display().queuedItemCards.find((card) => card.id === id)?.item;
   const rememberTriage = (action: "approve" | "defer", itemId: string) => {
     const resolved = new Set(resolvedIds());
     const deferred = new Set(deferredIds());

@@ -1266,7 +1266,7 @@ function App() {
   const shouldLaunchWeddingTemplateFromDeepLink = () =>
     pendingAuthSource === "wedding" || pendingAuthSource === "marketing" || pendingAuthSource === "wedding_quiz";
   function launchWeddingTemplateFromDeepLink() {
-    saveWeddingEntrySource("wedding_site");
+    saveWeddingEntrySource("wedding_site", userId() || initUserId);
     setShowTour(false); setShowOnboarding(false); setShowProfilingConsent(false);
     void savePrimaryUseCase("wedding_planning", "inferred").catch(() => {});
     void import("@/lib/weddingLeadMagnetImportRunnerState").then(({ requestWeddingLeadMagnetImport }) => requestWeddingLeadMagnetImport());
@@ -1368,7 +1368,7 @@ function App() {
       if (status === "ok") profile = await getSelfProfile();
     }
 
-    const entrySource = loadWeddingEntrySource();
+    const entrySource = loadWeddingEntrySource(userId() || initUserId);
     setPrimaryUseCaseProfile(profile.primary_use_case ?? null);
     setPrimaryUseCaseNeedsPrompt(profileNeedsPrimaryUseCasePrompt(profile, entrySource));
     applyPrimaryUseCaseTheme(profile);
@@ -2308,7 +2308,7 @@ function App() {
         savedAt: new Date().toISOString(),
       };
       dispatchWeddingVendorSearchLaunch(savedLaunch);
-      saveWeddingEntrySource("generic");
+      saveWeddingEntrySource("generic", userId() || initUserId);
       void savePrimaryUseCase("wedding_planning", "manual").catch(() => {});
       void import("@/lib/weddingTemplateDeepLinkLaunchState").then(({ buildWeddingTemplateDeepLinkLaunch, dispatchWeddingTemplateDeepLinkLaunch }) => {
         const launch = buildWeddingTemplateDeepLinkLaunch();
@@ -2873,7 +2873,7 @@ function App() {
       } catch { /* no key configured — messages shown in ciphertext-aware mode */ }
 
       // Check if onboarding wizard is needed (authenticated only, after tour)
-      if (!loadOnboardingDone() && loadWeddingEntrySource() !== "wedding_site" && !shouldLaunchWeddingTemplateFromDeepLink()) {
+      if (!loadOnboardingDone(initUserId) && loadWeddingEntrySource(initUserId) !== "wedding_site" && !shouldLaunchWeddingTemplateFromDeepLink()) {
         setShowOnboarding(true);
       }
     }
@@ -2892,7 +2892,7 @@ function App() {
     // Ask for local profiling consent only once the user is authenticated.
     // Showing this in guest mode blocks the rail and makes working controls
     // feel broken before the user can even sign in.
-    if (session()?.token && !hasConsentBeenAsked() && loadWeddingEntrySource() !== "wedding_site" && !shouldLaunchWeddingTemplateFromDeepLink()) {
+    if (session()?.token && !hasConsentBeenAsked() && loadWeddingEntrySource(initUserId) !== "wedding_site" && !shouldLaunchWeddingTemplateFromDeepLink()) {
       setShowProfilingConsent(true);
     }
     if (session()?.token) {
@@ -3229,6 +3229,7 @@ function App() {
       <Show when={!showTour() && showOnboarding() && Boolean(session()?.token)}>
         <Suspense>
           <LazyOnboardingWizard
+            userId={userId()}
             onComplete={() => setShowOnboarding(false)}
             onNavigate={(view, options) => {
               setShowOnboarding(false);
@@ -3328,7 +3329,7 @@ function App() {
           advanced={advanced()}
           paraViewEnabled={paraViewEnabled()}
           studyLensEnabled={studyLensEnabled()}
-          hideTrigger={activeView() === "response_queue" && (loadWeddingEntrySource() === "wedding_site" || (primaryUseCaseProfile()?.kind === "wedding_planning" && primaryUseCaseProfile()?.status === "active"))}
+          hideTrigger={activeView() === "response_queue" && (loadWeddingEntrySource(userId()) === "wedding_site" || (primaryUseCaseProfile()?.kind === "wedding_planning" && primaryUseCaseProfile()?.status === "active"))}
           userId={userId()}
           onSelectApp={selectKnownView}
         />
@@ -3369,7 +3370,7 @@ function App() {
             trail={navTrail()}
             labels={VIEW_LABELS}
             weddingActive={activeView() === "response_queue" && (
-              loadWeddingEntrySource() === "wedding_site"
+              loadWeddingEntrySource(userId()) === "wedding_site"
               || (primaryUseCaseProfile()?.kind === "wedding_planning" && primaryUseCaseProfile()?.status === "active")
             )}
             onSelectView={selectView}

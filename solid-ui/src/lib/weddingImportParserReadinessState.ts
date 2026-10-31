@@ -341,17 +341,17 @@ export function buildWeddingImportParserTaskItems(input: {
   const metadata = normalizeWeddingPlanningMetadata(input.metadata);
   const existingKeys = existingImportParserTaskKeys(input.existingTaskItems ?? []);
   const needsFormulaReview = readiness.formulaReviewCount > 0;
-  const needsParserOrStorageWork = !readiness.productionReady && readiness.blockerLabels.length > 0;
-  if (!needsParserOrStorageWork && !needsFormulaReview) return [];
-  const taskKind = needsParserOrStorageWork ? "parser" : "formula_review";
+  // Original uploads are persisted by the import pipeline. A missing storage
+  // receipt is an operational retry/error, not wedding work for the couple.
+  const needsParserWork = readiness.parserNeededCount > 0;
+  if (!needsParserWork && !needsFormulaReview) return [];
+  const taskKind = needsParserWork ? "parser" : "formula_review";
   const blockerId = `wedding_import_${taskKind}:${safeWeddingLabel(metadata.responseWorkspaceId)}`;
   const id = `wedding_import_${taskKind}_task:${safeWeddingLabel(metadata.responseWorkspaceId)}`;
   if (existingKeys.has(id) || existingKeys.has(blockerId)) return [];
-  const title = needsFormulaReview && !needsParserOrStorageWork
+  const title = needsFormulaReview && !needsParserWork
     ? "Verify formula-backed wedding import totals"
-    : readiness.parserNeededCount > 0
-    ? "Connect wedding spreadsheet import parser"
-    : "Save original wedding import files to storage";
+    : "Connect wedding spreadsheet import parser";
 
   return [{
     id,

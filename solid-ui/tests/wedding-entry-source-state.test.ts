@@ -46,3 +46,15 @@ test("intake variant lock is scoped per wedding plan and does not leak across pl
   assert.equal(loadWeddingIntakeVariantShown("plan-a"), "wedding_site");
   assert.equal(loadWeddingIntakeVariantShown("plan-b"), "generic");
 });
+
+test("entry source and intake variant are isolated by signed-in account", () => {
+  localStorageState.clear();
+  saveWeddingEntrySource("wedding_site", "user-old");
+  saveWeddingIntakeVariantShown("shared-plan", "wedding_site", "user-old");
+
+  assert.equal(loadWeddingEntrySource("user-new"), null);
+  assert.equal(loadWeddingIntakeVariantShown("shared-plan", "user-new"), null);
+  saveWeddingEntrySource("generic", "user-new");
+  assert.equal(loadWeddingEntrySource("user-old"), "wedding_site");
+  assert.equal(loadWeddingEntrySource("user-new"), "generic");
+});

@@ -60,6 +60,8 @@ export function WeddingVendorQuoteReplyCard(props: {
   onSend: () => void;
   onUndo: () => void;
   onViewSentThread: () => void;
+  onAcceptQuote?: () => void;
+  quoteAccepted?: boolean;
   onParseAttachment?: () => void;
   onProviderSetup?: (view: ViewName) => void;
   dealBreakerContext?: {
@@ -426,6 +428,14 @@ export function WeddingVendorQuoteReplyCard(props: {
               class="min-h-[44px] rounded-2xl border-2 border-wedding-cta bg-white px-5 py-3 text-sm font-bold text-wedding-text transition hover:bg-wedding-surface-blush focus:outline-none focus:ring-2 focus:ring-wedding-cta focus:ring-offset-2"
             >
               {homeSurface().replyActionLabel}
+            </button>
+            <button
+              type="button"
+              onClick={() => props.onAcceptQuote?.()}
+              disabled={!props.onAcceptQuote || props.quoteAccepted}
+              class="min-h-[44px] rounded-2xl bg-wedding-primary px-5 py-3 text-sm font-bold text-white transition hover:bg-wedding-primary/90 focus:outline-none focus:ring-2 focus:ring-wedding-primary focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 sm:col-span-2"
+            >
+              {props.quoteAccepted ? "Quote accepted" : "Accept quote"}
             </button>
           </div>
         </div>

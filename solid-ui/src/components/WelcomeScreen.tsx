@@ -21,11 +21,7 @@ const TONES = [
   { value: "formal", label: "Formal & precise", desc: "Structured, professional language." },
 ];
 
-function markDone() {
-  completeWelcomeOnboarding();
-}
-
-export function WelcomeScreen(props: { onComplete: () => void }) {
+export function WelcomeScreen(props: { onComplete: () => void; userId?: string | null }) {
   const [step, setStep] = createSignal<Step>("welcome");
   const [goal, setGoal] = createSignal("");
   const [tone, setTone] = createSignal("");
@@ -33,6 +29,7 @@ export function WelcomeScreen(props: { onComplete: () => void }) {
   const [saveError, setSaveError] = createSignal<WelcomeScreenFailureReceipt | null>(null);
 
   const displayName = () => readSession()?.user?.display_name ?? "there";
+  const markDone = () => completeWelcomeOnboarding(props.userId);
 
   function isMissingOnboardingEndpoint(cause: unknown) {
     return cause instanceof Error && cause.message.includes("Request failed with 404");

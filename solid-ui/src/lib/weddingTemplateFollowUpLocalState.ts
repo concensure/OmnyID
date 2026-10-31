@@ -48,9 +48,10 @@ function storageOrNull(storage?: Storage | null): Storage | null {
   return storage ?? globalThis.localStorage ?? globalThis.window?.localStorage ?? null;
 }
 
-function keyFor(responseWorkspaceId: unknown): string | null {
+function keyFor(responseWorkspaceId: unknown, userId?: string | null): string | null {
   const id = clean(responseWorkspaceId);
-  return id ? `${WEDDING_TEMPLATE_FOLLOW_UP_KEY_PREFIX}:${id}` : null;
+  const scope = clean(userId);
+  return id ? `${WEDDING_TEMPLATE_FOLLOW_UP_KEY_PREFIX}:${id}${scope ? `:${scope}` : ""}` : null;
 }
 
 function normalizedNoim(value: unknown): WeddingTemplateFollowUpDraft["noimDownloaded"] {
@@ -167,9 +168,10 @@ function normalizeDraft(value: unknown): WeddingTemplateFollowUpDraft | null {
 export function saveWeddingTemplateFollowUpDraft(
   input: WeddingTemplateFollowUpDraftInput,
   storage?: Storage | null,
+  userId?: string | null,
 ): WeddingTemplateFollowUpDraft | null {
   const target = storageOrNull(storage);
-  const key = keyFor(input.responseWorkspaceId);
+  const key = keyFor(input.responseWorkspaceId, userId);
   if (!target || !key) return null;
   const draft: WeddingTemplateFollowUpDraft = {
     responseWorkspaceId: clean(input.responseWorkspaceId),
@@ -202,9 +204,10 @@ export function saveWeddingTemplateFollowUpDraft(
 export function loadWeddingTemplateFollowUpDraft(
   responseWorkspaceId: string | null | undefined,
   storage?: Storage | null,
+  userId?: string | null,
 ): WeddingTemplateFollowUpDraft | null {
   const target = storageOrNull(storage);
-  const key = keyFor(responseWorkspaceId);
+  const key = keyFor(responseWorkspaceId, userId);
   if (!target || !key) return null;
   try {
     const raw = target.getItem(key);
@@ -225,9 +228,10 @@ export function loadWeddingTemplateFollowUpDraft(
 export function clearWeddingTemplateFollowUpDraft(
   responseWorkspaceId: string | null | undefined,
   storage?: Storage | null,
+  userId?: string | null,
 ): void {
   const target = storageOrNull(storage);
-  const key = keyFor(responseWorkspaceId);
+  const key = keyFor(responseWorkspaceId, userId);
   if (!target || !key) return;
   try {
     target.removeItem(key);

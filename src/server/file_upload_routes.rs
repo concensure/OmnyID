@@ -723,6 +723,9 @@ pub(super) async fn delete_uploaded_file(
     storage_backend: &str,
     storage_key: &str,
 ) -> Result<(), String> {
+    if !is_safe_storage_key(storage_key) {
+        return Err("invalid attachment storage key".to_string());
+    }
     match storage_backend {
         "seaweedfs" => {
             let client =

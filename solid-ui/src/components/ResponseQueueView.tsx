@@ -460,7 +460,7 @@ export function ResponseQueueView(props: {
 
   function saveWeddingFollowUpProgress() {
     const workspaceId = weddingNavigationIntent()?.responseWorkspaceId;
-    if (workspaceId) saveWeddingTemplateFollowUpDraft(currentWeddingFollowUpDraft(workspaceId), localStorage);
+    if (workspaceId) saveWeddingTemplateFollowUpDraft(currentWeddingFollowUpDraft(workspaceId), localStorage, weddingStorageUserId());
   }
 
   function hydrateWeddingFollowUpDraftFromApprovedContext(draft: WeddingTemplateFollowUpDraft) {
@@ -643,18 +643,18 @@ export function ResponseQueueView(props: {
     const planId = launch.metadata.weddingPlanId;
     const accountVariant = weddingAccountOnboardingVariant();
     if (accountVariant) return accountVariant;
-    const localVariant = loadWeddingIntakeVariantShown(planId);
+    const localVariant = loadWeddingIntakeVariantShown(planId, weddingStorageUserId());
     if (localVariant) return localVariant;
     if (weddingSignedIn() && weddingAccountOnboardingResolvedPlanId() !== planId) return null;
-    return loadWeddingEntrySource() === "wedding_site" ? "wedding_site" : "generic";
+    return loadWeddingEntrySource(weddingStorageUserId()) === "wedding_site" ? "wedding_site" : "generic";
   });
   createEffect(() => {
     const launch = weddingTemplateLaunch();
     const variant = weddingIntakeVariant();
     if (!launch || !variant) return;
-    saveWeddingIntakeVariantShown(launch.metadata.weddingPlanId, variant);
+    saveWeddingIntakeVariantShown(launch.metadata.weddingPlanId, variant, weddingStorageUserId());
     if (weddingSignedIn()) {
-      const entrySource = loadWeddingEntrySource() ?? "generic";
+      const entrySource = loadWeddingEntrySource(weddingStorageUserId()) ?? "generic";
       void saveWeddingOnboardingState(launch.metadata.weddingPlanId, variant, entrySource)
         .then((response) => {
           if (response.onboardingState) setWeddingAccountOnboardingVariant(response.onboardingState.intakeVariant);
@@ -1094,7 +1094,7 @@ export function ResponseQueueView(props: {
     const intent = consumeWeddingNavigationIntent();
     if (intent?.view === "response_queue") {
       setWeddingNavigationIntent(intent);
-      const draft = loadWeddingTemplateFollowUpDraft(intent.responseWorkspaceId, localStorage);
+      const draft = loadWeddingTemplateFollowUpDraft(intent.responseWorkspaceId, localStorage, weddingStorageUserId());
       if (draft) {
         setWeddingFollowUpDate(draft.dateOrSeason);
         setWeddingFollowUpLocation(draft.location);
@@ -1383,7 +1383,7 @@ export function ResponseQueueView(props: {
         noimDownloaded: normalizedNoimAnswer(weddingFollowUpNoim()) ?? "",
         celebrantPath: weddingFollowUpCelebrant(),
         requested: true,
-      }, localStorage);
+      }, localStorage, weddingStorageUserId());
     }
     setWeddingFollowUpRequested(true);
     setActiveWeddingArtifactId(null);

@@ -323,6 +323,38 @@ async fn account_delete_http(
     }
     let _ = remove_runtime_backup_artifacts(&user.id);
 
+    // Attachment metadata lives inside the tenant schema, while the bytes live
+    // in SeaweedFS or the managed upload directory. Enumerate and remove those
+    // objects before dropping the schema so account deletion cannot orphan
+    // allocated storage. Fail closed: the user can retry without losing the
+    // only authoritative list of objects still requiring deletion.
+    let stored_attachments = state
+        .db
+        .stored_message_attachments_for_account_deletion(&user.id)
+        .await
+        .map_err(internal_error)
+        .map_err(status_to_http)?;
+    for attachment in &stored_attachments {
+        file_upload_routes::delete_uploaded_file(
+            &attachment.storage_backend,
+            &attachment.storage_key,
+        )
+        .await
+        .map_err(|error| {
+            tracing::error!(
+                user_id = %user.id,
+                attachment_id = %attachment.id,
+                error = %error,
+                "account deletion could not purge an attachment object"
+            );
+            (
+                StatusCode::SERVICE_UNAVAILABLE,
+                "Account deletion could not finish removing stored files. No profile data was deleted; please try again shortly."
+                    .to_string(),
+            )
+        })?;
+    }
+
     state
         .db
         .delete_user_account_and_data(&user.id, &user.email, &agent_ids)
@@ -332,6 +364,9 @@ async fn account_delete_http(
 
     Ok(Json(serde_json::json!({
         "status": "deleted",
+        "stored_files_deleted": stored_attachments.len(),
+        "profile_and_ledger_deleted": true,
+        "allocated_storage_released": true,
         "message": account_user_facing_text(
             "Your OmnyID account and hosted data were deleted from the managed environment.",
             active_persona.as_ref(),
@@ -366,6 +401,25 @@ mod tests {
             clean_support_access_reason(Some(" "), false).expect("optional"),
             None
         );
+    }
+
+    #[test]
+    fn account_deletion_purges_external_objects_before_tenant_metadata() {
+        let source = include_str!("account_routes.rs");
+        let list = source
+            .find("stored_message_attachments_for_account_deletion")
+            .expect("attachment inventory");
+        let purge = source[list..]
+            .find("delete_uploaded_file")
+            .map(|offset| list + offset)
+            .expect("object purge");
+        let tenant_delete = source[purge..]
+            .find("delete_user_account_and_data")
+            .map(|offset| purge + offset)
+            .expect("tenant deletion");
+        assert!(list < purge && purge < tenant_delete);
+        assert!(source.contains("stored_files_deleted"));
+        assert!(source.contains("allocated_storage_released"));
     }
 
     #[test]

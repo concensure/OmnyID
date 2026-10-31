@@ -15,6 +15,16 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-305
+    title: Repair recreated-account isolation and connected Wedding mobile projections
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-303
+    depends_on: [WED-303, WED-304]
+    files: [src/server/account_routes.rs, src/server/finance_routes.rs, src/server/auth.rs, src/db.rs, src/db/**, postgres/migrations/**, solid-ui/src/App.tsx, solid-ui/src/components/Wedding*.tsx, solid-ui/src/lib/wedding*State.ts, solid-ui/tests/wedding-*.test.ts, solid-ui/tests/account-*.test.ts, Caddyfile, scripts/**, Documents/verification/**, .agent/**]
+    acceptance: [a recreated email receives a new-user onboarding state and cannot inherit the deleted account's AFP wedding profile quota or storage objects, account deletion has tested transactional deletion or an explicit asynchronous purge receipt covering profile ledger wedding data quota and object storage, vendor-research decisions use consequence-specific in-place search or shortlist actions for every vendor category, mobile overview cards reflow with actions on their own row and Plan aggregate columns have sufficient separation, vendor category and lifecycle filters update in place from one account-scoped AFP lifecycle projection and comparison cards expose favourite, original wedding imports persist automatically without a user task, quote-received vendors and quote acceptance are reachable from decision follow-up document and vendor lifecycle surfaces through one canonical acceptance command, exact-candidate tests build line budgets clean deployment and hosted mobile verification pass]
+    progress: "Implementation complete pending clean-SHA release and hosted pilot evidence. Read-only production inspection proves the recreated account has no onboarding/profile history or stored attachments and only post-recreation empty ledger rows; the reported 80-guest/budget state came from browser keys shared across accounts. Onboarding, wedding entry source, intake variant and intake draft state are now account-scoped. Account deletion inventories and idempotently purges all SeaweedFS/filesystem attachment objects before dropping tenant profile/ledger/quota data, fails closed if object purge fails, and returns an explicit purge receipt. Later vendor-research decisions resolve against the full queue; mobile overview actions reflow onto their own row; Plan cards have increased separation; category filters update in place; Favourite is available on mobile; lifecycle filters merge current comparison favourites and recognize enquiry/quote variants; storage-only import retries no longer become user tasks. Quote acceptance is one confirmed AFP decision that reprojects into vendor lifecycle and Budget without implying contract signature, booking, payment or external send, and is reachable from follow-up, Documents and Quote received. Typecheck, 2,094 Wedding tests, production build, focused Rust account/file-purge tests and focused state tests pass; line budget was corrected after extracting quote acceptance ownership."
+
   - id: WED-303
     title: Extend the canonical Wedding guest projection with private RSVP responses
     status: review

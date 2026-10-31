@@ -105,6 +105,7 @@ export type OnboardingNavigationOptions = {
 
 export function OnboardingWizard(props: {
   onComplete: () => void;
+  userId?: string | null;
   onNavigate?: (view: ActivationTargetView, options?: OnboardingNavigationOptions) => void;
 }) {
   const [step, setStep] = createSignal(0);
@@ -163,7 +164,7 @@ export function OnboardingWizard(props: {
   }
 
   function markDone() {
-    saveOnboardingDone();
+    saveOnboardingDone(props.userId);
   }
 
   function isMissingOnboardingEndpoint(cause: unknown) {

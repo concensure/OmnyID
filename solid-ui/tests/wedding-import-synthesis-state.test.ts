@@ -755,6 +755,11 @@ test("local-only imports block production readiness until original files are sav
   assert.equal(readiness.unsavedOriginalUploadCount, 1);
   assert.ok(readiness.blockerLabels.some((label) => /need to be saved/i.test(label)));
   assert.ok(readiness.nextActionLabels.some((label) => /Save original wedding imports to Files/i.test(label)));
+  assert.deepEqual(
+    buildWeddingImportParserTaskItems({ importParserReadiness: readiness, metadata }),
+    [],
+    "automatic storage retry must not become a couple planning task",
+  );
 });
 
 test("import parser readiness blocks production when spreadsheet imports still need a parser", () => {

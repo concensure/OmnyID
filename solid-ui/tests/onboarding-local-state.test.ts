@@ -46,3 +46,12 @@ test("welcome onboarding completion clears the just-registered marker and marks 
   assert.equal(localStorageState.get(ONBOARDING_DONE_KEY), "true");
   assert.equal(loadOnboardingDone(), true);
 });
+
+test("completed onboarding never leaks from a deleted account to a recreated account", () => {
+  localStorageState.clear();
+  saveOnboardingDone("user-old");
+
+  assert.equal(loadOnboardingDone("user-old"), true);
+  assert.equal(loadOnboardingDone("user-new"), false);
+  assert.equal(loadOnboardingDone(), false);
+});

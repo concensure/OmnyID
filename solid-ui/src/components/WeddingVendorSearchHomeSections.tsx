@@ -18,6 +18,7 @@ import type { WeddingVendorChoiceSelectionSaveInput } from "@/components/Wedding
 import type { WeddingPreferenceProfile } from "@/lib/weddingPreferenceProfileState";
 import type { WeddingPreferenceChipChange } from "@/lib/weddingPreferenceInterpreterState";
 import type { WeddingPreferenceSignalReason } from "@/lib/weddingPreferenceSignalState";
+import type { WeddingArtifactQuotePreview } from "@/lib/weddingArtifactPreviewState";
 import { weddingVendorCardWithCurrentPhoto } from "@/lib/weddingVendorCardMediaState";
 import {
   loadWeddingDecisionSelections,
@@ -30,6 +31,7 @@ import {
 } from "@/lib/weddingHomeUiCopyState";
 import {
   findWeddingVendorLifecycle,
+  mergeWeddingVendorLifecycleCandidates,
   projectWeddingVendorLifecycle,
   weddingVendorBookingToAfpSendInput,
   weddingVendorLifecycleMatches,
@@ -183,6 +185,7 @@ export function WeddingVendorSearchHomeSection(props: {
   onConfirmFeedbackSuggestion?: () => void;
   onDismissFeedbackSuggestion?: () => void;
   stayOnHome?: boolean;
+  onAcceptQuote?: (quote: WeddingArtifactQuotePreview, sourceId: string) => void;
 }) {
   const workspace = () => props.workspace;
   const [fullResultExpanded, setFullResultExpanded] = createSignal(false);
@@ -191,7 +194,15 @@ export function WeddingVendorSearchHomeSection(props: {
   const [lifecycleFilter, setLifecycleFilter] = createSignal<WeddingVendorLifecycleFilter>("all");
   const [bookingVendor, setBookingVendor] = createSignal<WeddingVendorLifecycleRecord | null>(null);
   const [bookingBusy, setBookingBusy] = createSignal(false);
-  const lifecycleRecords = createMemo(() => projectWeddingVendorLifecycle(workspace().state.afpMessages));
+  const lifecycleRecords = createMemo(() => {
+    const comparison = props.result?.preview ?? props.result?.sourcePreview;
+    const candidates = comparison?.vendorComparisonCards.map((card) => ({
+      vendorId: card.vendorId,
+      vendorName: card.title,
+      favourited: selectedForFollowUp(comparison, card.choiceId),
+    })) ?? [];
+    return mergeWeddingVendorLifecycleCandidates(projectWeddingVendorLifecycle(workspace().state.afpMessages), candidates);
+  });
   const lifecycleFilters: ReadonlyArray<{ id: WeddingVendorLifecycleFilter; label: string }> = [
     { id: "enquired", label: "Enquired" }, { id: "favourited", label: "Favourited" },
     { id: "quote_received", label: "Quote received" }, { id: "booked", label: "Booked" },
@@ -222,7 +233,7 @@ export function WeddingVendorSearchHomeSection(props: {
   const cardVendorKey = (card: WeddingVendorChoiceCardData) => card.vendorId?.trim() || card.choiceId;
   const visibleCards = (artifact: WeddingWorkspaceArtifactPreview) => artifact.vendorComparisonCards
     .filter((card) => !props.hiddenVendorIds?.includes(cardVendorKey(card)))
-    .filter((card) => lifecycleFilter() === "all" || weddingVendorLifecycleMatches(findWeddingVendorLifecycle({ records: lifecycleRecords(), vendorId: card.vendorId, vendorName: card.title }) ?? { key: "", vendorId: card.vendorId ?? null, vendorName: card.title, enquired: false, favourited: selectedForFollowUp(artifact, card.choiceId), quoteReceived: false, booked: false, reminderAt: null, followUpDismissed: false, followUpDismissedAt: null, sourceMessageIds: [] }, lifecycleFilter()))
+    .filter((card) => lifecycleFilter() === "all" || weddingVendorLifecycleMatches(findWeddingVendorLifecycle({ records: lifecycleRecords(), vendorId: card.vendorId, vendorName: card.title }) ?? { key: "", vendorId: card.vendorId ?? null, vendorName: card.title, enquired: false, favourited: selectedForFollowUp(artifact, card.choiceId), quoteReceived: false, quoteAccepted: false, booked: false, reminderAt: null, followUpDismissed: false, followUpDismissedAt: null, sourceMessageIds: [] }, lifecycleFilter()))
     .map((card) => weddingVendorCardWithCurrentPhoto(card, workspace().weddingVendorDirectory));
   const hiddenCards = (artifact: WeddingWorkspaceArtifactPreview) => artifact.vendorComparisonCards
     .filter((card) => props.hiddenVendorIds?.includes(cardVendorKey(card)));
@@ -236,7 +247,9 @@ export function WeddingVendorSearchHomeSection(props: {
     if (props.stayOnHome) workspace().onRunLiveVendorSearch?.({ stayOnHome: true });
     else workspace().onRunLiveVendorSearch?.();
   }
-  function runCategorySearch(query: string): void {
+  function runCategorySearch(event: MouseEvent, query: string): void {
+    event.preventDefault();
+    event.stopPropagation();
     if (searchDisabled()) return;
     workspace().onVendorSearchQueryChange?.(query);
     queueMicrotask(runSearch);
@@ -244,6 +257,9 @@ export function WeddingVendorSearchHomeSection(props: {
   const isSelectedCategory = (query: string) => workspace().vendorSearchQuery?.trim().toLowerCase() === query.toLowerCase();
   const lifecycleCount = (filter: WeddingVendorLifecycleFilter) => lifecycleRecords().filter((record) => weddingVendorLifecycleMatches(record, filter)).length;
   const filteredLifecycleRecords = () => lifecycleRecords().filter((record) => weddingVendorLifecycleMatches(record, lifecycleFilter()));
+  const quoteFlowForVendor = (vendor: WeddingVendorLifecycleRecord) => workspace().state.activeVendorQuoteReplyFlows.find((flow) =>
+    flow.quote.vendorName.trim().toLowerCase() === vendor.vendorName.trim().toLowerCase()
+  ) ?? null;
   async function confirmBooking(): Promise<void> {
     const vendor = bookingVendor();
     const saveProjection = workspace().saveProjection;
@@ -316,7 +332,7 @@ export function WeddingVendorSearchHomeSection(props: {
             class={`inline-flex min-h-11 shrink-0 snap-start items-center gap-1.5 rounded-lg border px-3 text-sm font-semibold transition duration-100 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-primary focus-visible:ring-offset-2 disabled:opacity-45 ${isSelectedCategory(chip.query) ? "border-wedding-primary bg-wedding-primary text-wedding-page" : "border-wedding-border bg-white text-wedding-ink hover:border-wedding-primary hover:text-wedding-primary"}`}
             disabled={searchDisabled()}
             aria-pressed={isSelectedCategory(chip.query)}
-            onClick={() => runCategorySearch(chip.query)}
+            onClick={(event) => runCategorySearch(event, chip.query)}
           >
             <WeddingDashboardIcon id={chip.icon} class="h-4 w-4" />{chip.label}
           </button>
@@ -330,7 +346,10 @@ export function WeddingVendorSearchHomeSection(props: {
           <Show when={filteredLifecycleRecords().length > 0} fallback={<p class="rounded-lg border border-wedding-border bg-white p-3 text-sm text-wedding-ink/70">No vendors have this status yet.</p>}>
             <For each={filteredLifecycleRecords()}>{(vendor) => <article class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-wedding-border bg-white p-3">
               <div><p class="font-semibold text-wedding-ink">{vendor.vendorName}</p><p class="text-xs text-wedding-ink/65">{[vendor.enquired && "Enquired", vendor.favourited && "Favourited", vendor.quoteReceived && "Quote received", vendor.booked && "Booked"].filter(Boolean).join(" · ")}</p></div>
-              <Show when={vendor.quoteReceived && !vendor.booked}><button type="button" class="min-h-11 rounded-lg bg-wedding-primary px-3 text-sm font-bold text-white" onClick={() => setBookingVendor(vendor)}>Book</button></Show>
+              <div class="flex flex-wrap gap-2">
+                <Show when={quoteFlowForVendor(vendor)}>{(flow) => <button type="button" class="min-h-11 rounded-lg border border-wedding-secondary bg-white px-3 text-sm font-bold text-wedding-secondary disabled:opacity-60" disabled={vendor.quoteAccepted || !props.onAcceptQuote} onClick={() => props.onAcceptQuote?.(flow().quote, flow().quoteMessageId ?? flow().id)}>{vendor.quoteAccepted ? "Quote accepted" : "Accept quote"}</button>}</Show>
+                <Show when={vendor.quoteReceived && !vendor.booked}><button type="button" class="min-h-11 rounded-lg bg-wedding-primary px-3 text-sm font-bold text-white" onClick={() => setBookingVendor(vendor)}>Book</button></Show>
+              </div>
             </article>}</For>
           </Show>
         </div>

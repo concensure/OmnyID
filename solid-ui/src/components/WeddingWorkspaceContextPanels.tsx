@@ -381,13 +381,13 @@ export function WeddingWorkspaceContextPanels(props: {
               </For>
             </div>
           </div>
-          <div class="mt-3 grid gap-2 lg:grid-cols-3">
+          <div class="mt-4 grid gap-4 lg:grid-cols-3">
             <For each={planAggregate().actions}>
               {(action) => (
                 <button
                   type="button"
                   disabled={!action.enabled}
-                  class="rounded-2xl border border-indigo-200 bg-white/80 p-3 text-left transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 disabled:cursor-not-allowed disabled:opacity-45"
+                  class="min-h-[8.5rem] rounded-2xl border border-indigo-200 bg-white/80 p-4 text-left transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 disabled:cursor-not-allowed disabled:opacity-45"
                   onClick={() => openAggregateAction(action)}
                 >
                   <span class="text-sm font-semibold text-indigo-950">{action.title}</span>

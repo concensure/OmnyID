@@ -74,10 +74,11 @@ test("a successful vendor delivery has a clear, encouraging confirmation", () =>
   assert.match(choiceCard, /another step closer to your wedding/);
 });
 
-test("live vendor results use the primary action for mobile follow-up selection", () => {
+test("live vendor results expose a distinct mobile favourite action", () => {
   assert.match(vendorSearch, /loadWeddingDecisionSelections/);
   assert.match(vendorSearch, /onToggleFollowUp=\{\(card\) => toggleFollowUp/);
-  assert.match(choiceCard, /hidden min-h-11[\s\S]*sm:inline-flex/);
+  assert.match(choiceCard, /inline-flex min-h-11 w-full items-center justify-center/);
+  assert.match(choiceCard, /"Favourited" : "Favourite"/);
   assert.match(choiceCard, /min-h-12 w-full rounded-lg/);
 });
 

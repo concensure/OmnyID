@@ -33,6 +33,7 @@ test("mobile wedding surfaces remove redundant chrome without removing actions",
   assert.match(mobileFocus, /if \(openVendorResearch\(item\)\) return/);
   assert.match(mobileFocus, /setMobileFocusSingleCardSectionId\("vendor_search"\)/);
   assert.match(mobileFocus, /hasVendorShortlist\(item\) \? "Open shortlist" : "Search vendors"/);
+  assert.match(mobileFocus, /display\(\)\.queuedItemCards\.find/);
 });
 
 test("operator-only vendor provider setup and technical freshness copy stay out of decision cards", () => {

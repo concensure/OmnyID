@@ -111,6 +111,7 @@ function ArtifactPreviewCard(props: {
   vendorDirectory?: readonly WeddingVendor[];
   onOpenFollowUpQueue?: () => void;
   onOpenVendorQuoteReplySurface?: () => void;
+  onAcceptQuote?: (quote: import("@/lib/weddingArtifactPreviewState").WeddingArtifactQuotePreview, sourceId: string) => void;
   onVendorChoiceSelected?: (input: WeddingVendorChoiceSelectionSaveInput) => void;
   outreachFlows?: Record<string, WeddingVendorOutreachFlowState>;
   gmailConnected?: boolean;
@@ -224,6 +225,14 @@ function ArtifactPreviewCard(props: {
             class="rounded-full bg-emerald-900 px-4 py-2 text-xs font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
           >
             Continue reply
+          </button>
+          <button
+            type="button"
+            onClick={() => props.onAcceptQuote?.(preview, props.artifact.artifactId)}
+            disabled={!props.onAcceptQuote}
+            class="rounded-full bg-wedding-primary px-4 py-2 text-xs font-semibold text-white transition hover:bg-wedding-primary/90 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
+          >
+            Accept quote
           </button>
         </div>
       </div>
@@ -613,6 +622,7 @@ export function WeddingArtifactDetailPanel(props: {
   onResearch?: (action: WeddingWorkspaceSidebarAction) => void;
   onOpenFollowUpQueue?: () => void;
   onOpenVendorQuoteReplySurface?: () => void;
+  onAcceptQuote?: (quote: import("@/lib/weddingArtifactPreviewState").WeddingArtifactQuotePreview, sourceId: string) => void;
   onVendorChoiceSelected?: (input: WeddingVendorChoiceSelectionSaveInput) => void;
   researchAction?: WeddingWorkspaceSidebarAction | null;
   outreachFlows?: Record<string, WeddingVendorOutreachFlowState>;
@@ -745,6 +755,7 @@ export function WeddingArtifactDetailPanel(props: {
                         vendorDirectory={props.vendorDirectory}
                         onOpenFollowUpQueue={props.onOpenFollowUpQueue}
                         onOpenVendorQuoteReplySurface={props.onOpenVendorQuoteReplySurface}
+                        onAcceptQuote={props.onAcceptQuote}
                         onVendorChoiceSelected={props.onVendorChoiceSelected}
                         outreachFlows={props.outreachFlows}
                         gmailConnected={props.gmailConnected}

@@ -6,8 +6,13 @@ export type WeddingEntrySource = "wedding_site" | "generic";
 
 const WEDDING_ENTRY_SOURCE_KEY = "omnyid.wedding.entry-source";
 
-function weddingIntakeVariantShownKey(weddingPlanId: string): string {
-  return `omnyid.wedding.intake-variant-shown.${weddingPlanId}`;
+function scopedKey(baseKey: string, userId?: string | null): string {
+  const scope = userId?.trim();
+  return scope ? `${baseKey}:${scope}` : baseKey;
+}
+
+function weddingIntakeVariantShownKey(weddingPlanId: string, userId?: string | null): string {
+  return scopedKey(`omnyid.wedding.intake-variant-shown.${weddingPlanId}`, userId);
 }
 
 function isWeddingEntrySource(value: unknown): value is WeddingEntrySource {
@@ -15,18 +20,18 @@ function isWeddingEntrySource(value: unknown): value is WeddingEntrySource {
 }
 
 /** Call once, at the moment a ?source=wedding deep link is confirmed (e.g. after login). */
-export function saveWeddingEntrySource(source: WeddingEntrySource): void {
+export function saveWeddingEntrySource(source: WeddingEntrySource, userId?: string | null): void {
   try {
-    localStorage.setItem(WEDDING_ENTRY_SOURCE_KEY, source);
+    localStorage.setItem(scopedKey(WEDDING_ENTRY_SOURCE_KEY, userId), source);
   } catch {
     // Ignore localStorage write failures for convenience state.
   }
 }
 
 /** Null means "no deep-link source recorded yet" — callers should treat that as generic. */
-export function loadWeddingEntrySource(): WeddingEntrySource | null {
+export function loadWeddingEntrySource(userId?: string | null): WeddingEntrySource | null {
   try {
-    const raw = localStorage.getItem(WEDDING_ENTRY_SOURCE_KEY);
+    const raw = localStorage.getItem(scopedKey(WEDDING_ENTRY_SOURCE_KEY, userId));
     return isWeddingEntrySource(raw) ? raw : null;
   } catch {
     return null;
@@ -34,17 +39,17 @@ export function loadWeddingEntrySource(): WeddingEntrySource | null {
 }
 
 /** Locks in which intake variant a given wedding plan has already shown, so it can't flip mid-flow. */
-export function saveWeddingIntakeVariantShown(weddingPlanId: string, variant: WeddingEntrySource): void {
+export function saveWeddingIntakeVariantShown(weddingPlanId: string, variant: WeddingEntrySource, userId?: string | null): void {
   try {
-    localStorage.setItem(weddingIntakeVariantShownKey(weddingPlanId), variant);
+    localStorage.setItem(weddingIntakeVariantShownKey(weddingPlanId, userId), variant);
   } catch {
     // Ignore localStorage write failures for convenience state.
   }
 }
 
-export function loadWeddingIntakeVariantShown(weddingPlanId: string): WeddingEntrySource | null {
+export function loadWeddingIntakeVariantShown(weddingPlanId: string, userId?: string | null): WeddingEntrySource | null {
   try {
-    const raw = localStorage.getItem(weddingIntakeVariantShownKey(weddingPlanId));
+    const raw = localStorage.getItem(weddingIntakeVariantShownKey(weddingPlanId, userId));
     return isWeddingEntrySource(raw) ? raw : null;
   } catch {
     return null;

@@ -323,13 +323,13 @@ export function WeddingVendorChoiceCard(props: {
               type="button"
               onClick={() => props.onToggleFollowUp?.(card)}
               aria-pressed={Boolean(props.selectedForFollowUp)}
-              class={`hidden min-h-11 rounded-lg px-3 py-2 text-xs font-bold transition sm:inline-flex sm:w-auto sm:px-2.5 sm:py-1.5 ${
+              class={`inline-flex min-h-11 w-full items-center justify-center rounded-lg px-3 py-2 text-xs font-bold transition sm:w-auto sm:px-2.5 sm:py-1.5 ${
                 props.selectedForFollowUp
                   ? "bg-wedding-primary text-wedding-page hover:bg-wedding-primary/90"
                   : "border border-wedding-secondary bg-white text-wedding-secondary hover:bg-wedding-slate"
               }`}
             >
-              {props.selectedForFollowUp ? "Selected for follow-up" : "Select for follow-up"}
+              {props.selectedForFollowUp ? "Favourited" : "Favourite"}
             </button>
           </Show>
           <Show

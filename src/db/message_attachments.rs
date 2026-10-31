@@ -15,6 +15,44 @@ pub struct StoredMessageAttachment {
 }
 
 impl Db {
+    pub async fn stored_message_attachments_for_account_deletion(
+        &self,
+        owner_user_id: &str,
+    ) -> Result<Vec<StoredMessageAttachment>, sqlx::Error> {
+        self.ensure_user_private_schema(owner_user_id).await?;
+        let attachments = tenant_attachments_table(owner_user_id);
+        let rows = sqlx::query(&format!(
+            r#"SELECT id, name, mime_type, size_bytes, storage, sha256
+               FROM {attachments}
+               ORDER BY id"#,
+        ))
+        .fetch_all(&self.pool)
+        .await?;
+
+        rows.into_iter()
+            .map(|row| {
+                let storage: Value = row.try_get("storage")?;
+                Ok(StoredMessageAttachment {
+                    id: row.try_get("id")?,
+                    name: row.try_get("name")?,
+                    mime_type: row.try_get("mime_type")?,
+                    size_bytes: row.try_get("size_bytes")?,
+                    storage_backend: storage
+                        .get("backend")
+                        .and_then(Value::as_str)
+                        .unwrap_or_default()
+                        .to_string(),
+                    storage_key: storage
+                        .get("key")
+                        .and_then(Value::as_str)
+                        .unwrap_or_default()
+                        .to_string(),
+                    sha256: row.try_get("sha256")?,
+                })
+            })
+            .collect()
+    }
+
     pub async fn claimed_vendor_response_attachment_count(
         &self,
         owner_user_id: &str,

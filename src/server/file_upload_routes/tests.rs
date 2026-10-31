@@ -1,7 +1,7 @@
 use super::{
     AttachmentDownloadToken, DOWNLOAD_TOKEN_TTL_SECS, MAX_ATTACHMENT_FILE_NAME_LEN,
     MAX_ATTACHMENT_TOKEN_CLOCK_SKEW_SECS, UploadAdmission, apply_attachment_download_headers,
-    build_download_url, evaluate_upload_admission, guess_mime_from_name,
+    build_download_url, evaluate_upload_admission, guess_mime_from_name, is_safe_storage_key,
     normalize_upload_mime_type, sanitize_upload_file_name, sign_download_token,
     verify_download_token,
 };
@@ -15,6 +15,14 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 const TEST_FREE_STORAGE_BYTES: i64 = 1024 * 1024 * 1024;
 const TEST_PAID_STORAGE_BYTES: i64 = 2 * 1024 * 1024 * 1024;
 const TEST_PAID_MAX_UPLOAD_BYTES: i64 = 100 * 1024 * 1024;
+
+#[test]
+fn account_file_purge_rejects_path_traversal_keys() {
+    assert!(is_safe_storage_key("user_01/2026/10/quote.pdf"));
+    assert!(!is_safe_storage_key("../other-user/quote.pdf"));
+    assert!(!is_safe_storage_key("user_01/../../other-user/quote.pdf"));
+    assert!(!is_safe_storage_key(""));
+}
 
 #[test]
 fn upload_file_name_is_sanitized_for_storage() {
