@@ -8,9 +8,9 @@ Rule: extend the canonical AFP guest model and A2UI resolver; do not create a pa
 
 - [x] Read the current family-boundary requirements and inspect the existing boundary, guest, RSVP, seating and permission projections.
 - [x] Register WED-306 and freeze its file scope.
-- [ ] Record exact pre-change and candidate SHAs.
-- [ ] Keep policy V2 and unrelated public/provider flags at their current approved values.
-- [ ] Build and deploy only a clean exact SHA; evidence must name that full SHA.
+- [x] Record exact pre-change and candidate SHAs.
+- [x] Keep policy V2 and unrelated public/provider flags at their current approved values.
+- [x] Build and deploy only a clean exact SHA; evidence must name that full SHA.
 
 ## 1. Immediate mobile and intake repairs
 
@@ -19,7 +19,7 @@ Depends on: 0
 - [x] Remove technical WebP/size copy from couple-facing onboarding.
 - [x] Make atmosphere photograph choices true toggles with exact-token matching so a second selection removes the choice without damaging typed words.
 - [x] Remove the outer desktop glass border and redundant horizontal inset from authenticated Wedding mobile views while preserving internal card structure.
-- [ ] Add focused rendering tests for the helper copy, selected/unselected state and mobile shell classes.
+- [x] Add focused rendering tests for the helper copy, selected/unselected state and mobile shell classes.
 - [ ] Verify at 320 px, 375 px and 200% text zoom.
 
 ## 2. Canonical meal-choice catalogue
@@ -139,3 +139,5 @@ Depends on: 1–10 as applicable
 ## Current implementation boundary
 
 The checked items constitute the first couple-facing slice: native mobile shell, reversible onboarding imagery, source-confirmed meal choices, and a compact boundary summary over the existing ledger. Server-authoritative grants, atomic allocation decisions, bulk household operations and full reconciliation remain required before presenting Family Boundaries as complete governance for outside family helpers.
+
+Release evidence for this slice is in `Documents/verification/wed-306-native-mobile-meal-family-boundaries-2026-10-31.md`. The pre-change coordination SHA was `3bd1f79fdae00c370556b504e0fde1daf66cc36f`; the exact deployed application SHA is `3c626dd149d61ae57c739fa90cd26acecb0109aa`.

@@ -1,3 +1,37 @@
+## 2026-10-31 - WED-306 native mobile, sourced meals and family-boundary first slice (Codex, in progress)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch
+`agent/codex/WED-306`; exact deployed application release
+`3c626dd149d61ae57c739fa90cd26acecb0109aa`. Clean release checkout:
+`C:\Users\ozans\AppData\Local\Temp\omnyid-wed306-release-3c626dd`.
+
+- Removed the desktop glass frame/inset from authenticated Wedding mobile
+  surfaces while preserving internal card boundaries. The onboarding photo
+  prompt no longer exposes WebP implementation detail and exact selections
+  can be selected again to remove them.
+- Added one workspace-scoped, source-labelled and couple-confirmed meal-choice
+  catalogue projection. It reads only explicit structured fields from venue
+  packages/quotes, vendor conversations or the run sheet; prose is not treated
+  as authoritative. RSVP and guest entry use the same AFP catalogue.
+- Reworked Family boundaries into a compact Requests/Households summary over
+  the existing AFP boundary state. Existing request, rule and visibility
+  controls remain behind an accessible disclosure.
+- Fixed the vendor quote frontend to call the deployed protected
+  `/quotation/vendor-transactions/*` endpoints instead of nonexistent
+  `/api/quotation/vendor-transactions/*` paths.
+- Exact-SHA typecheck, ten focused tests, both line budgets, all 2,101 Wedding
+  tests, production build and the 320 px/desktop People Playwright checks pass.
+  Oracle deployment and post-deploy backup/restore proof pass. Hosted bundles
+  contain the new intake/family/meal markers and no old WebP copy; the correct
+  quote inbox route returns 401 without a session while the old path returns
+  404. All approved quotation flags remain true and public RSVP remains false.
+  Root disk returned to 83% after the isolated restore drill was removed.
+
+Evidence: `Documents/verification/wed-306-native-mobile-meal-family-boundaries-2026-10-31.md`.
+WED-306 remains in progress: implement the remaining dependency-ordered
+household/rule/grant/atomic-decision/reconciliation work in
+`Documents/design/wedding planner/wedding planner/family-boundary-tasks.md`.
+
 ## 2026-10-31 - WED-303/WED-305 release and allowlisted pilot (Codex, complete)
 
 Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch
