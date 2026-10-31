@@ -2135,3 +2135,15 @@ tile and final-count effects so connected information is not left for the couple
 attendance remains separate from an optional opaque `encrypted:v1` private-answer envelope; plaintext
 private answers are refused. Public guest capabilities remain absent until WED-303C adds and proves
 random digest-only tokens, expiry, revocation and tenant isolation.
+
+## 2026-11-01: Authenticated identity boundaries run before browser hydration
+
+An authenticated account change must be resolved before any dashboard, Wedding,
+contact, profile or persona-adjacent browser state is read. Properly
+account-scoped values may survive, but a legacy or ambiguous value without a
+provable owner is discarded rather than adopted by the next signed-in account.
+Identity replacement triggers a reload after cleanup so existing reactive state
+cannot retain the preceding account. The Wedding quiz brief is the sole bounded
+handoff exception and is preserved only for an explicit `source=wedding_quiz`
+signup. This client boundary complements, and does not replace, server tenant
+isolation and deletion of account-owned database and object-storage data.

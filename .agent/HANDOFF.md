@@ -5928,3 +5928,51 @@ Remaining:
   open. The authorized test account's saved credential returned HTTP 401, so
   no pass was claimed and no password reset/account mutation was attempted.
 - Evidence: `Documents/verification/wed-303-rsvp-hosted-shadow-2026-10-31.md`.
+
+## 2026-11-01 - WED-307 account isolation, Family households and Policy V2 release (Codex)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch
+`agent/codex/WED-307`. Exact application SHA
+`b353d47122fe8aa15885ae4fdc64a81aaec69b41` is live on Oracle.
+
+Changed:
+
+- Added a pre-hydration authenticated-account boundary and reload path so a
+  second account on one browser cannot inherit ambiguous Wedding decisions,
+  tasks, contacts, budget contributors or persona-adjacent state.
+- Refused unowned legacy contact/profile adoption for authenticated accounts.
+- Stacked Plan action content on mobile and gave the explanatory copy adequate
+  width and height.
+- Continued the canonical Family Boundaries projection with disclosure focus,
+  household attention rows and AFP successor edits for family group, invitation
+  allocation and request deadline.
+- Kept ranking Policy V2 enabled and verified its versioned policy fingerprint
+  in the hosted production bundle.
+
+Evidence:
+
+- Exact-SHA typecheck, both line budgets, focused isolation/family/policy tests,
+  all 2,105 Wedding tests and production build pass.
+- Hosted workspace and assets return 200 and contain the account boundary,
+  Policy V2 true value, household editor and mobile spacing rule.
+- Oracle inspection of the recreated Casper account found a fresh account ID,
+  zero onboarding rows and zero persona rows; the prior carry-over was browser
+  state, not retained server profile data.
+- Production homeserver is running with zero restarts. Manifest and backup
+  verification passed.
+- Full evidence:
+  `Documents/verification/wed-307-account-isolation-family-households-policy-v2-2026-11-01.md`.
+
+Operational caveat:
+
+- The post-deploy restore drill was stopped by its safety preflight because it
+  needed about 0.34 GiB more free disk. Root is 84% used with 7.2 GiB free;
+  Docker reports substantial reclaimable image/build cache. Do not claim a
+  passing restore proof until a reviewed safe prune and rerun succeeds.
+
+Remaining:
+
+- Continue the broader WED-306 Family Boundaries roadmap with structured rule
+  precedence, server-authoritative grants, atomic request decisions, connected
+  reconciliation and restricted-helper rollout evidence. Do not introduce a
+  parallel guest or household store.
