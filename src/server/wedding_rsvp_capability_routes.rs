@@ -58,6 +58,26 @@ fn enabled() -> bool {
         == Some("true")
 }
 
+fn pilot_user_allowed_for(enabled: bool, configured_user_ids: Option<&str>, user_id: &str) -> bool {
+    if !enabled {
+        return false;
+    }
+    let Some(configured_user_ids) = configured_user_ids.filter(|value| !value.trim().is_empty())
+    else {
+        return true;
+    };
+    configured_user_ids
+        .split(',')
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .any(|value| value == user_id)
+}
+
+fn pilot_user_allowed(user_id: &str) -> bool {
+    let configured = std::env::var("OMNYID_WEDDING_RSVP_PILOT_USER_IDS").ok();
+    pilot_user_allowed_for(enabled(), configured.as_deref(), user_id)
+}
+
 fn valid_id(value: &str) -> bool {
     !value.is_empty()
         && value.len() <= 160
@@ -127,9 +147,9 @@ async fn status_http(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
 ) -> Result<Json<StatusResponse>, (StatusCode, String)> {
-    let _ = authenticated_user(&state.db, &headers).await?;
+    let user = authenticated_user(&state.db, &headers).await?;
     Ok(Json(StatusResponse {
-        enabled: enabled(),
+        enabled: pilot_user_allowed(&user.id),
         max_expiry_days: MAX_GRANT_DAYS,
         token_in_fragment: true,
     }))
@@ -209,7 +229,7 @@ async fn create_http(
     )
     .await?;
     let user = authenticated_user(&state.db, &headers).await?;
-    if !enabled() {
+    if !pilot_user_allowed(&user.id) {
         return Err(unavailable());
     }
     let expires_at = validate_create(&request, Utc::now())?;
@@ -272,7 +292,7 @@ async fn regenerate_http(
     )
     .await?;
     let user = authenticated_user(&state.db, &headers).await?;
-    if !enabled() || !valid_id(&grant_id) {
+    if !pilot_user_allowed(&user.id) || !valid_id(&grant_id) {
         return Err(unavailable());
     }
     let expires_at = parse_expiry(&request.expires_at, Utc::now())?;
@@ -318,6 +338,15 @@ async fn open_http(
         return Err(unavailable());
     }
     let digest = token_digest(&request.token).ok_or_else(unavailable)?;
+    let owner_user_id = state
+        .db
+        .wedding_rsvp_capability_owner(&digest)
+        .await
+        .map_err(store_error)?
+        .ok_or_else(unavailable)?;
+    if !pilot_user_allowed(&owner_user_id) {
+        return Err(unavailable());
+    }
     let scope = state
         .db
         .open_wedding_rsvp_capability(&digest)
@@ -368,6 +397,9 @@ async fn respond_http(
         .await
         .map_err(store_error)?
         .ok_or_else(unavailable)?;
+    if !pilot_user_allowed(&authority.owner_user_id) {
+        return Err(unavailable());
+    }
     let command = RecordResponseRequest {
         wedding_plan_id: authority.wedding_plan_id,
         response_workspace_id: authority.response_workspace_id,
@@ -399,4 +431,34 @@ async fn respond_http(
         }
     })?;
     Ok(([(CACHE_CONTROL, "private, no-store")], Json(result)))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::pilot_user_allowed_for;
+
+    #[test]
+    fn rsvp_pilot_requires_the_global_switch() {
+        assert!(!pilot_user_allowed_for(false, Some("couple-a"), "couple-a"));
+    }
+
+    #[test]
+    fn rsvp_pilot_limits_configured_accounts() {
+        assert!(pilot_user_allowed_for(
+            true,
+            Some("couple-a, couple-b"),
+            "couple-b"
+        ));
+        assert!(!pilot_user_allowed_for(
+            true,
+            Some("couple-a, couple-b"),
+            "couple-c"
+        ));
+    }
+
+    #[test]
+    fn empty_pilot_list_preserves_an_explicit_full_rollout() {
+        assert!(pilot_user_allowed_for(true, None, "couple-a"));
+        assert!(pilot_user_allowed_for(true, Some("  "), "couple-a"));
+    }
 }

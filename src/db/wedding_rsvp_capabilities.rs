@@ -689,6 +689,18 @@ impl Db {
         Ok(Some(result))
     }
 
+    pub async fn wedding_rsvp_capability_owner(
+        &self,
+        token_digest: &str,
+    ) -> Result<Option<String>, sqlx::Error> {
+        sqlx::query_scalar(
+            "SELECT owner_user_id FROM wedding_rsvp_capability_grants WHERE token_digest=$1 AND revoked_at IS NULL AND expires_at>NOW()",
+        )
+        .bind(token_digest)
+        .fetch_optional(&self.pool)
+        .await
+    }
+
     pub async fn open_wedding_rsvp_capability(
         &self,
         token_digest: &str,
