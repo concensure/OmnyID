@@ -26,6 +26,7 @@ export function WeddingBoundaryManagementCard(props: {
   onSaveFamilyRule?: (input: { title: string; plainLanguage: string; ruleType: WeddingBoundaryPolicyRuleType }) => Promise<string>;
 }) {
   const [showRequests, setShowRequests] = createSignal(false);
+  const [expanded, setExpanded] = createSignal(false);
   const [showRules, setShowRules] = createSignal(false);
   const [showPeople, setShowPeople] = createSignal(false);
   const [showAddRequest, setShowAddRequest] = createSignal(false);
@@ -116,58 +117,63 @@ export function WeddingBoundaryManagementCard(props: {
   }
 
   return (
-    <div class="min-w-0 rounded-[24px] border border-cyan-100/80 bg-cyan-50/80 p-3 shadow-card sm:rounded-[28px] sm:p-4">
-      <div class="flex items-start justify-between gap-2">
-        <div class="min-w-0">
+    <div class="min-w-0 rounded-[24px] border border-cyan-100/80 bg-cyan-50/80 p-3 shadow-card phone:rounded-none phone:border-0 phone:bg-transparent phone:p-0 phone:shadow-none sm:rounded-[28px] sm:p-4">
+      <div class="flex items-start gap-3">
+        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-cyan-900 text-white" aria-hidden="true">
+          <WeddingDashboardIcon id="shield-check" class="h-5 w-5" />
+        </span>
+        <div class="min-w-0 flex-1">
           <div class="flex items-center gap-2">
-            <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white" style="background-color: #0E7490" aria-hidden="true">
-              <WeddingDashboardIcon id="shield-check" class="h-4 w-4" />
-            </span>
             <p class="text-lg font-bold tracking-tight text-cyan-950">Family boundaries</p>
             <WeddingInfoTip title="Boundary tip" tone="sky">
-              Write rules as calm policy, not as personal blame. For example: "venue limit is 80 guests" or "children are only invited for immediate family."
+              Family members can suggest changes, but only authorised people can approve changes to the official guest list. Private dietary, contact, and seating details stay restricted.
             </WeddingInfoTip>
           </div>
-          <p class="mt-1 text-sm leading-6 text-cyan-900/75">
-            Keep guest-list choices calm by showing who can suggest changes and what needs your approval.
-          </p>
+          <p class="mt-0.5 text-sm leading-5 text-cyan-900/75">Manage requests and family permissions</p>
         </div>
-        <span class="max-w-full break-words rounded-full bg-white/80 px-2 py-1 text-xs font-semibold text-cyan-900">
-          {pendingReviewCount()} to review
-        </span>
+        <button
+          type="button"
+          class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-2xl text-cyan-950 transition hover:bg-white/75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-600"
+          aria-expanded={expanded()}
+          aria-controls="wedding-family-boundary-details"
+          aria-label={expanded() ? "Close family boundaries" : "Open family boundaries"}
+          onClick={() => setExpanded((value) => !value)}
+        >
+          <span aria-hidden="true" class={`transition-transform ${expanded() ? "rotate-90" : ""}`}>›</span>
+        </button>
       </div>
 
-      <div class="mt-3 grid grid-cols-3 gap-2">
-        <div class="rounded-2xl border border-cyan-100 bg-white/75 px-2.5 py-2">
-          <p class="text-xs font-semibold text-cyan-950/65">Rules</p>
-          <p class="mt-1 text-2xl font-semibold text-cyan-950">{props.state.activePolicyCount}</p>
-        </div>
-        <div class="rounded-2xl border border-cyan-100 bg-white/75 px-2.5 py-2">
-          <p class="text-xs font-semibold text-cyan-950/65">People</p>
-          <p class="mt-1 text-2xl font-semibold text-cyan-950">{props.state.guestCount}</p>
-        </div>
-        <div class="rounded-2xl border border-cyan-100 bg-white/75 px-2.5 py-2">
-          <p class="text-xs font-semibold text-cyan-950/65">Shared</p>
-          <p class="mt-1 text-2xl font-semibold text-cyan-950">{props.state.familyVisibleCount}</p>
-        </div>
+      <div class="mt-3 grid grid-cols-2 gap-3" aria-label="Family boundary summary">
+        <button type="button" class="min-h-[7.5rem] rounded-2xl border border-cyan-100 bg-white/80 p-4 text-left transition hover:border-cyan-300" onClick={() => { setExpanded(true); setShowRequests(true); }}>
+          <span class="block text-sm font-semibold text-cyan-950/70">Requests</span>
+          <span class="mt-2 block text-3xl font-semibold text-cyan-950">{pendingReviewCount()}</span>
+          <span class="mt-1 block text-xs font-semibold text-cyan-900/70">{pendingReviewCount() === 0 ? "Nothing needs review" : "Need review"}</span>
+        </button>
+        <button type="button" class="min-h-[7.5rem] rounded-2xl border border-cyan-100 bg-white/80 p-4 text-left transition hover:border-cyan-300" onClick={() => { setExpanded(true); setShowPeople(true); }}>
+          <span class="block text-sm font-semibold text-cyan-950/70">Households</span>
+          <span class="mt-2 block text-3xl font-semibold text-cyan-950">{props.state.householdCount}</span>
+          <span class="mt-1 block text-xs font-semibold text-cyan-900/70">Invitation groups</span>
+        </button>
       </div>
 
-      <p class="mt-3 rounded-2xl border border-cyan-100 bg-white/70 px-3 py-2 text-sm leading-6 text-cyan-950/75">
-        {props.state.summaryLabel}
-      </p>
+      <Show when={expanded()}>
+      <div id="wedding-family-boundary-details">
+        <p class="mt-3 rounded-2xl border border-cyan-100 bg-white/70 px-3 py-2 text-sm leading-6 text-cyan-950/75">
+          {props.state.summaryLabel}
+        </p>
 
-      <div class="mt-3 grid gap-2 md:grid-cols-2">
-        <section class="rounded-2xl border border-cyan-100 bg-white/75 p-3" aria-label="People and details currently included">
-          <p class="text-xs font-semibold text-cyan-950">Included for sharing</p>
-          <p class="mt-1 text-xs font-normal leading-5 text-cyan-950/75">{viewState().includeText}</p>
-        </section>
-        <section class="rounded-2xl border border-cyan-100 bg-white/75 p-3" aria-label="People and details currently excluded">
-          <p class="text-xs font-semibold text-cyan-950">Kept private or blocked</p>
-          <p class="mt-1 text-xs font-normal leading-5 text-cyan-950/75">{viewState().excludeText}</p>
-        </section>
-      </div>
+        <div class="mt-3 grid gap-2 md:grid-cols-2">
+          <section class="rounded-2xl border border-cyan-100 bg-white/75 p-3" aria-label="People and details currently included">
+            <p class="text-xs font-semibold text-cyan-950">Included for sharing</p>
+            <p class="mt-1 text-xs font-normal leading-5 text-cyan-950/75">{viewState().includeText}</p>
+          </section>
+          <section class="rounded-2xl border border-cyan-100 bg-white/75 p-3" aria-label="People and details currently excluded">
+            <p class="text-xs font-semibold text-cyan-950">Kept private or blocked</p>
+            <p class="mt-1 text-xs font-normal leading-5 text-cyan-950/75">{viewState().excludeText}</p>
+          </section>
+        </div>
 
-      <div class="mt-3 flex flex-wrap gap-2">
+        <div class="mt-3 flex flex-wrap gap-2">
         <button
           type="button"
           aria-expanded={showRequests()}
@@ -214,6 +220,8 @@ export function WeddingBoundaryManagementCard(props: {
           {showPeople() ? "Hide people" : "Who can see what"}
         </button>
       </div>
+      </div>
+      </Show>
 
       <Show when={decisionNotice()}>
         <p class="mt-3 rounded-2xl border border-cyan-100 bg-white/75 p-3 text-xs leading-5 text-cyan-950/75">{decisionNotice()}</p>

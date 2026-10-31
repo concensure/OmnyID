@@ -26,6 +26,7 @@ function rsvpToneClass(status: string): string {
 export function WeddingGuestOperationsCard(props: {
   state: WeddingGuestTrackingState;
   metadata?: unknown;
+  availableMealChoices?: readonly string[];
   onSaveGuestDraft?: (input: {
     displayName: string;
     householdLabel: string;
@@ -66,6 +67,7 @@ export function WeddingGuestOperationsCard(props: {
   const [guestContact, setGuestContact] = createSignal("");
   const [guestReminderPermission, setGuestReminderPermission] = createSignal(false);
   const [guestMeal, setGuestMeal] = createSignal("");
+  const [manualMealChoice, setManualMealChoice] = createSignal(false);
   const [guestDietary, setGuestDietary] = createSignal("");
   const [guestAccessibility, setGuestAccessibility] = createSignal("");
   const [plusOneRule, setPlusOneRule] = createSignal("No extra plus-ones unless the couple approves them.");
@@ -200,6 +202,7 @@ export function WeddingGuestOperationsCard(props: {
       setGuestContact("");
       setGuestReminderPermission(false);
       setGuestMeal("");
+      setManualMealChoice(false);
       setGuestDietary("");
       setGuestAccessibility("");
       setSaveNotice(notice);
@@ -391,12 +394,21 @@ export function WeddingGuestOperationsCard(props: {
               </label>
               <label class="min-w-0">
                 <span class="text-xs font-semibold text-sky-950/70">Meal choice</span>
-                <input
-                  class="mt-1 w-full min-h-11 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-sky-950 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
-                  value={guestMeal()}
-                  onInput={(event) => setGuestMeal(event.currentTarget.value)}
-                  placeholder="Chicken, fish, vegetarian"
-                />
+                <Show when={(props.availableMealChoices?.length ?? 0) > 0 && !manualMealChoice()} fallback={
+                  <input
+                    class="mt-1 w-full min-h-11 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-sky-950 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
+                    value={guestMeal()}
+                    onInput={(event) => setGuestMeal(event.currentTarget.value)}
+                    placeholder="Enter a choice confirmed by the venue"
+                  />
+                }>
+                  <select class="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-sky-950" value={guestMeal()} onChange={(event) => { if (event.currentTarget.value === "__manual") { setGuestMeal(""); setManualMealChoice(true); } else setGuestMeal(event.currentTarget.value); }}>
+                    <option value="">Choose one</option>
+                    <For each={props.availableMealChoices ?? []}>{(option) => <option value={option}>{option}</option>}</For>
+                    <option value="__manual">Enter another confirmed choice</option>
+                  </select>
+                </Show>
+                <Show when={manualMealChoice()}><button type="button" class="mt-1 text-xs font-semibold text-sky-800 underline underline-offset-2" onClick={() => { setGuestMeal(""); setManualMealChoice(false); }}>Use venue choices</button></Show>
               </label>
               <label class="min-w-0">
                 <span class="text-xs font-semibold text-sky-950/70">Dietary note</span>

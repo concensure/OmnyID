@@ -52,6 +52,10 @@ export interface VendorTransportReceipt {
   received_at: string;
 }
 
+export const VENDOR_TRANSACTION_INBOX_PATH = "/quotation/vendor-transactions/inbox";
+export const VENDOR_TRANSACTION_INVITATIONS_PATH = "/quotation/vendor-transactions/invitations";
+export const VENDOR_TRANSACTION_RESPONSES_PATH = "/quotation/vendor-transactions/responses";
+
 type ProjectionPayload = {
   projection?: Record<string, unknown>;
   response_recipient_encryption_public_key?: unknown;
@@ -72,7 +76,7 @@ const prohibitedField = (key: string): boolean => [
 
 export async function loadVendorTransactionInbox(): Promise<VendorTransactionInboxItem[]> {
   const response = await apiFetch<{ transactions?: VendorTransactionInboxItem[] }>(
-    "/api/quotation/vendor-transactions/inbox",
+    VENDOR_TRANSACTION_INBOX_PATH,
   );
   return Array.isArray(response.transactions) ? response.transactions.slice(0, 50) : [];
 }
@@ -102,7 +106,7 @@ export async function inviteClaimedVendorTransaction(input: {
       expires_at: input.expiresAt,
     },
   );
-  return apiFetch<VendorTransportReceipt>("/api/quotation/vendor-transactions/invitations", {
+  return apiFetch<VendorTransportReceipt>(VENDOR_TRANSACTION_INVITATIONS_PATH, {
     method: "POST",
     bodyJson: {
       thread_id: input.threadId,
@@ -286,7 +290,7 @@ export async function submitVendorTransactionResponse(input: {
     signature: "",
   };
   const message = await signVendorAfpMessage(agentId, unsigned);
-  return apiFetch<VendorTransportReceipt>("/api/quotation/vendor-transactions/responses", {
+  return apiFetch<VendorTransportReceipt>(VENDOR_TRANSACTION_RESPONSES_PATH, {
     method: "POST",
     bodyJson: {
       request_id: `request-${crypto.randomUUID()}`,

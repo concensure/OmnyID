@@ -61,6 +61,11 @@ import {
   weddingRsvpSetupToAfpSendInput,
   type WeddingRsvpSetupState,
 } from "@/lib/weddingRsvpSetupState";
+import {
+  buildWeddingMealChoiceState,
+  weddingMealChoiceCatalogueToAfpSendInput,
+  type WeddingMealChoiceSource,
+} from "@/lib/weddingMealChoiceState";
 
 function weddingLocationAdviceLabel(state: WeddingResponseWorkspaceViewState): string {
   const locationLabel = state.workspace.artifacts
@@ -108,6 +113,10 @@ export function WeddingWorkspaceContextPanels(props: {
     sharePlanAvailable: Boolean(props.onToggleSharePlan),
   }));
   const rsvpSetup = createMemo(() => weddingRsvpSetupFromAfpMessages(
+    props.state.afpMessages,
+    props.state.workspace.metadata.responseWorkspaceId,
+  ));
+  const mealChoiceState = createMemo(() => buildWeddingMealChoiceState(
     props.state.afpMessages,
     props.state.workspace.metadata.responseWorkspaceId,
   ));
@@ -234,6 +243,17 @@ export function WeddingWorkspaceContextPanels(props: {
     await props.saveProjection(weddingRsvpSetupToAfpSendInput(setup, props.state.workspace.metadata));
     props.onRefreshWorkspace?.();
     return "RSVP setup saved. No invitation or link was sent.";
+  }
+  async function saveMealChoices(input: { options: string[]; source: WeddingMealChoiceSource; sourceLabel: string; sourceMessageId?: string | null }): Promise<string> {
+    if (!props.saveProjection) throw new Error("Saving is not connected yet.");
+    const sendInput = weddingMealChoiceCatalogueToAfpSendInput({
+      ...input,
+      currentRevision: mealChoiceState().confirmed?.revision ?? 0,
+      metadata: props.state.workspace.metadata,
+    });
+    if (!sendInput) throw new Error("Add at least two current meal choices before confirming them.");
+    await props.saveProjection(sendInput);
+    return "Meal choices confirmed for this wedding.";
   }
   async function saveFamilyRequest(input: { requesterLabel: string; requestLabel: string; changeType: WeddingBoundaryChangeType }): Promise<string> {
     if (!props.saveProjection) throw new Error("Saving is not connected yet.");
@@ -404,6 +424,7 @@ export function WeddingWorkspaceContextPanels(props: {
         <WeddingGuestOperationsCard
           state={props.state.guestTracking}
           metadata={props.state.workspace.metadata}
+          availableMealChoices={mealChoiceState().confirmed?.options ?? rsvpSetup()?.questions.find((question) => question.id === "meal_choice")?.options ?? []}
           onSaveGuestDraft={saveGuestDraft}
           onSaveGuestRules={saveGuestRules}
         />
@@ -411,6 +432,8 @@ export function WeddingWorkspaceContextPanels(props: {
           current={rsvpSetup()}
           guestTracking={props.state.guestTracking}
           metadata={props.state.workspace.metadata}
+          mealChoiceState={mealChoiceState()}
+          onSaveMealChoices={saveMealChoices}
           onSave={saveRsvpSetup}
         />
         <Show when={rsvpSetup()}>{(setup) => (

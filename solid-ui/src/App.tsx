@@ -3148,7 +3148,7 @@ function App() {
 
 
   return (
-    <main id="main-content" tabindex="-1" class="min-h-screen p-4 md:p-6 text-on-surface">
+    <main id="main-content" tabindex="-1" class={`min-h-screen text-on-surface ${weddingReturnContextActive() && activeView() === "response_queue" ? "p-0 sm:p-6" : "p-4 md:p-6"}`}>
       <a href="#workspace-shell" class="skip-link">Skip to workspace content</a><h1 class="sr-only">OmnyID workspace</h1>
       <Show when={showAuthModal()}>
         <AuthModal
@@ -3342,7 +3342,7 @@ function App() {
         />
       </Show>
 
-      <GlassPanel id="workspace-shell" tabindex="-1" class="mx-auto max-w-[1700px] p-0 sm:p-5 sm:pl-[76px] lg:p-8 lg:pl-[80px]">
+      <GlassPanel id="workspace-shell" tabindex="-1" class={`mx-auto max-w-[1700px] p-0 sm:p-5 sm:pl-[76px] lg:p-8 lg:pl-[80px] ${weddingReturnContextActive() && activeView() === "response_queue" ? "phone:rounded-none phone:border-0 phone:bg-transparent phone:shadow-none" : ""}`}>
 
         {/* Fleet pane — slides in below nav when user clicks active/idle badge */}
         <Show when={fleetOpen()}>

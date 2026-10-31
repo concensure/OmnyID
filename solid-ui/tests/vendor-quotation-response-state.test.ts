@@ -3,9 +3,22 @@ import test from "node:test";
 
 import {
   projectDecryptedVendorTransaction,
+  VENDOR_TRANSACTION_INBOX_PATH,
+  VENDOR_TRANSACTION_INVITATIONS_PATH,
+  VENDOR_TRANSACTION_RESPONSES_PATH,
   vendorResponseA2ui,
   type VendorTransactionInboxItem,
 } from "../src/lib/vendorQuotationResponseState.ts";
+
+test("claimed-vendor quotation requests use the server's protected route family", () => {
+  assert.equal(VENDOR_TRANSACTION_INBOX_PATH, "/quotation/vendor-transactions/inbox");
+  assert.equal(VENDOR_TRANSACTION_INVITATIONS_PATH, "/quotation/vendor-transactions/invitations");
+  assert.equal(VENDOR_TRANSACTION_RESPONSES_PATH, "/quotation/vendor-transactions/responses");
+  assert.doesNotMatch(
+    [VENDOR_TRANSACTION_INBOX_PATH, VENDOR_TRANSACTION_INVITATIONS_PATH, VENDOR_TRANSACTION_RESPONSES_PATH].join(" "),
+    /\/api\/quotation/,
+  );
+});
 
 const item = (): VendorTransactionInboxItem => ({
   invitation_message_id: "invite-1",

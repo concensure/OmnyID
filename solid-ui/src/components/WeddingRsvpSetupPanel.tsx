@@ -17,6 +17,10 @@ import {
   safeWeddingLabel,
 } from "@/lib/weddingPlanningTemplateState";
 import { friendlyErrorText } from "@/lib/visibleErrorText";
+import type {
+  WeddingMealChoiceSource,
+  WeddingMealChoiceState,
+} from "@/lib/weddingMealChoiceState";
 
 function dateAfterToday(days: number): string {
   const date = new Date();
@@ -28,6 +32,13 @@ export function WeddingRsvpSetupPanel(props: {
   current: WeddingRsvpSetupState | null;
   guestTracking: WeddingGuestTrackingState;
   metadata?: unknown;
+  mealChoiceState?: WeddingMealChoiceState;
+  onSaveMealChoices?: (input: {
+    options: string[];
+    source: WeddingMealChoiceSource;
+    sourceLabel: string;
+    sourceMessageId?: string | null;
+  }) => Promise<string>;
   onSave?: (setup: WeddingRsvpSetupState) => Promise<string>;
 }) {
   const metadata = normalizeWeddingPlanningMetadata(props.metadata);
@@ -52,9 +63,14 @@ export function WeddingRsvpSetupPanel(props: {
     props.current?.questions.find((question) => question.id === "custom_text")?.prompt ?? "",
   );
   const [mealOptions, setMealOptions] = createSignal(
-    props.current?.questions.find((question) => question.id === "meal_choice")?.options.join(", ")
-      || "Chicken, Fish, Vegetarian",
+    props.mealChoiceState?.confirmed?.options.join(", ")
+      || props.current?.questions.find((question) => question.id === "meal_choice")?.options.join(", ")
+      || "",
   );
+  const [mealSource, setMealSource] = createSignal<WeddingMealChoiceSource>(props.mealChoiceState?.confirmed?.source ?? "manual");
+  const [mealSourceLabel, setMealSourceLabel] = createSignal(props.mealChoiceState?.confirmed?.sourceLabel ?? "Entered by the couple");
+  const [mealSourceMessageId, setMealSourceMessageId] = createSignal<string | null>(props.mealChoiceState?.confirmed?.sourceMessageId ?? null);
+  const [mealChoicesConfirmed, setMealChoicesConfirmed] = createSignal(Boolean(props.mealChoiceState?.confirmed || props.current?.questions.find((question) => question.id === "meal_choice")?.options.length));
   const [showPreview, setShowPreview] = createSignal(false);
   const [saving, setSaving] = createSignal(false);
   const [notice, setNotice] = createSignal<string | null>(null);
@@ -109,10 +125,22 @@ export function WeddingRsvpSetupPanel(props: {
       setNotice(result.errorLabels.join(" "));
       return;
     }
+    if (enabledQuestions().includes("meal_choice") && !mealChoicesConfirmed()) {
+      setNotice("Confirm that these are the current meal choices before saving the RSVP setup.");
+      return;
+    }
     if (!props.onSave || saving()) return;
     setSaving(true);
     setNotice(null);
     try {
+      if (enabledQuestions().includes("meal_choice") && props.onSaveMealChoices) {
+        await props.onSaveMealChoices({
+          options: mealOptions().split(","),
+          source: mealSource(),
+          sourceLabel: mealSourceLabel(),
+          sourceMessageId: mealSourceMessageId(),
+        });
+      }
       const key = await ensureWeddingRsvpCoupleKey(metadata.responseWorkspaceId);
       const securedSetup = {
         ...result.setup,
@@ -194,9 +222,47 @@ export function WeddingRsvpSetupPanel(props: {
       </fieldset>
 
       <Show when={enabledQuestions().includes("meal_choice")}>
-        <label class="mt-3 block text-xs font-semibold text-teal-950/75">Meal choices, separated by commas
-          <input class="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-teal-950 focus:border-teal-500 focus:ring-2 focus:ring-teal-100" value={mealOptions()} onInput={(event) => setMealOptions(event.currentTarget.value)} />
-        </label>
+        <fieldset class="mt-3 rounded-xl border border-teal-100 bg-white p-3">
+          <legend class="px-1 text-sm font-semibold text-teal-950">Meal choices</legend>
+          <p class="text-xs leading-5 text-teal-950/65">Use the venue's current menu when it is available, or enter the choices yourself. A meal choice is not a dietary or allergy statement.</p>
+          <Show when={(props.mealChoiceState?.suggestions.length ?? 0) > 0}>
+            <div class="mt-2 space-y-2" aria-label="Meal choices found in wedding evidence">
+              <For each={props.mealChoiceState?.suggestions ?? []}>{(suggestion) => (
+                <button
+                  type="button"
+                  class="flex min-h-11 w-full items-center justify-between gap-3 rounded-lg border border-teal-100 bg-teal-50 px-3 py-2 text-left text-xs text-teal-950"
+                  onClick={() => {
+                    setMealOptions(suggestion.options.join(", "));
+                    setMealSource(suggestion.source);
+                    setMealSourceLabel(suggestion.sourceLabel);
+                    setMealSourceMessageId(suggestion.sourceMessageId);
+                    setMealChoicesConfirmed(false);
+                  }}
+                >
+                  <span><span class="block font-semibold">{suggestion.sourceLabel}</span><span class="block leading-5 opacity-75">{suggestion.options.join(" · ")}</span></span>
+                  <span class="shrink-0 font-semibold">Use</span>
+                </button>
+              )}</For>
+            </div>
+          </Show>
+          <div class="mt-3 grid gap-2 sm:grid-cols-2">
+            <label class="text-xs font-semibold text-teal-950/75">Source
+              <select class="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-teal-950" value={mealSource()} onChange={(event) => { const source = event.currentTarget.value as WeddingMealChoiceSource; setMealSource(source); setMealSourceMessageId(null); setMealSourceLabel(source === "venue_package" ? "Venue package or quote" : source === "vendor_conversation" ? "Vendor conversation" : source === "run_sheet" ? "Wedding run sheet" : "Entered by the couple"); setMealChoicesConfirmed(false); }}>
+                <option value="venue_package">Venue package or quote</option>
+                <option value="vendor_conversation">Vendor conversation</option>
+                <option value="run_sheet">Wedding run sheet</option>
+                <option value="manual">Enter manually</option>
+              </select>
+            </label>
+            <label class="text-xs font-semibold text-teal-950/75">Choices, separated by commas
+              <input class="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-teal-950 focus:border-teal-500 focus:ring-2 focus:ring-teal-100" value={mealOptions()} onInput={(event) => { setMealOptions(event.currentTarget.value); setMealChoicesConfirmed(false); }} placeholder="For example: beef, fish, vegetarian" />
+            </label>
+          </div>
+          <label class="mt-3 flex min-h-11 items-start gap-2 rounded-lg border border-teal-100 bg-teal-50 px-3 py-2 text-xs font-semibold text-teal-950">
+            <input type="checkbox" class="mt-0.5 h-5 w-5 accent-teal-700" checked={mealChoicesConfirmed()} onChange={(event) => setMealChoicesConfirmed(event.currentTarget.checked)} />
+            <span>I confirm these are the choices guests can currently select. Updating them later will require reviewing affected RSVPs.</span>
+          </label>
+        </fieldset>
       </Show>
       <Show when={enabledQuestions().includes("custom_text")}>
         <label class="mt-3 block text-xs font-semibold text-teal-950/75">Custom question

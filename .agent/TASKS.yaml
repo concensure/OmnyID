@@ -15,6 +15,16 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-306
+    title: Make Wedding mobile surfaces native and add sourced meal and family-boundary workflows
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-306
+    depends_on: [WED-303, WED-305]
+    files: [solid-ui/src/App.tsx, solid-ui/src/components/WeddingMobilePage.tsx, solid-ui/src/components/WeddingSiteIntakeWizard.tsx, solid-ui/src/components/WeddingGuestOperationsCard.tsx, solid-ui/src/components/WeddingRsvpSetupPanel.tsx, solid-ui/src/components/WeddingBoundaryManagementCard.tsx, solid-ui/src/lib/weddingMealChoiceState.ts, solid-ui/src/lib/weddingBoundary*.ts, solid-ui/src/lib/vendorQuotationResponseState.ts, solid-ui/tests/vendor-quotation-response-state.test.ts, solid-ui/tests/wedding-*.test.ts, Documents/design/wedding planner/wedding planner/family-boundary-*.md, Documents/verification/**, .agent/**]
+    acceptance: [Wedding mobile views use the available viewport without an outer desktop glass frame while retaining internal card boundaries, atmosphere photo choices can be selected and unselected without corrupting free text, meal choices are explicit source-labelled options from confirmed venue evidence or couple manual entry and remain separate from dietary or health facts, the Family boundaries summary prioritises pending requests and household count and opens the existing detailed AFP-backed controls, a specification and dependency-ordered task document define server-enforced atomic idempotent privacy-safe family governance without creating a parallel guest store, focused tests typecheck Wedding tests line budgets build exact-candidate deployment and hosted mobile checks pass, the existing vendor quote-intelligence surface is verified live without enabling an unapproved rollout flag]
+    progress: "Started from deployed WED-305 coordination HEAD 3bd1f79fdae00c370556b504e0fde1daf66cc36f. Requirements and current AFP/RSVP projections reviewed; implementation and release evidence pending."
+
   - id: WED-305
     title: Repair recreated-account isolation and connected Wedding mobile projections
     status: done

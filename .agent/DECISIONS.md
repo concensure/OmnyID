@@ -1,3 +1,19 @@
+## 2026-10-31: Meal choices are confirmed AFP evidence, not inferred guest facts
+
+WED-306 introduces one revisioned `wedding_meal_choice_catalogue` in the
+existing Wedding ledger. The projector may offer options only when a venue
+package, quotation, vendor conversation or run sheet contains an explicit
+structured meal/menu array. It does not turn prose into menu facts. The couple
+must confirm the current options before an RSVP setup containing meal choice is
+saved; manual entry uses the same event and source metadata.
+
+Guest meal selection references this catalogue. Dietary, allergy and
+accessibility answers remain separate sensitive records and are never inferred
+from the selected dish. Family Boundaries continues to govern canonical guest
+and invitation changes rather than owning another guest store. Its collapsed
+card is a projection of pending requests and household records, with the
+existing AFP-backed rule/request controls disclosed in place.
+
 ## 2026-10-30: Saving RSVP setup is not publishing an RSVP invitation
 
 WED-303D stores the selected event, response deadline and controlled question

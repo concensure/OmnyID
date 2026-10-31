@@ -171,8 +171,15 @@ export function WeddingSiteIntakeWizard(props: {
   }
   function chooseAtmosphere(detail: string) {
     const current = props.weddingFollowUpAtmosphere().trim();
-    if (current.toLowerCase().includes(detail.toLowerCase())) return;
-    props.onWeddingFollowUpAtmosphereInput(current ? `${current}; ${detail}` : detail);
+    const parts = current
+      .split(";")
+      .map((part) => part.trim())
+      .filter(Boolean);
+    const selectedIndex = parts.findIndex((part) => part.toLowerCase() === detail.toLowerCase());
+    const next = selectedIndex >= 0
+      ? parts.filter((_, index) => index !== selectedIndex)
+      : [...parts, detail];
+    props.onWeddingFollowUpAtmosphereInput(next.join("; "));
   }
   async function finishSetup() {
     if (finishing()) return;
@@ -373,7 +380,9 @@ export function WeddingSiteIntakeWizard(props: {
             <div class="mt-1 grid grid-cols-2 gap-2 sm:grid-cols-4" role="group" aria-label="Photographic atmosphere choices">
               <For each={ATMOSPHERE_PHOTO_CHOICES}>
                 {(choice, index) => {
-                  const selected = () => props.weddingFollowUpAtmosphere().toLowerCase().includes(choice.detail.toLowerCase());
+                  const selected = () => props.weddingFollowUpAtmosphere()
+                    .split(";")
+                    .some((part) => part.trim().toLowerCase() === choice.detail.toLowerCase());
                   return (
                     <button
                       type="button"
@@ -397,7 +406,7 @@ export function WeddingSiteIntakeWizard(props: {
                 }}
               </For>
             </div>
-            <WeddingInlineHelpNote class="mt-2 font-normal">Choose any photographs that feel close, then add your own words below. The local WebP thumbnails are each under 30 KB so this step stays quick on mobile.</WeddingInlineHelpNote>
+            <WeddingInlineHelpNote class="mt-2 font-normal">Choose any photographs that feel close, then add your own words below. Select a photograph again to remove it.</WeddingInlineHelpNote>
             <textarea
               class="min-h-24 w-full rounded-2xl border border-rose-100 bg-white px-3 py-2 text-sm font-normal text-on-surface outline-none focus:border-rose-300"
               value={props.weddingFollowUpAtmosphere()}
