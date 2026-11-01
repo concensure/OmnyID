@@ -6130,3 +6130,48 @@ Still open:
 - Build delegate/helper management UI, projector acknowledgements, sent-invite
   policy previews and removal-after-RSVP handling; complete field-by-field privacy,
   accessibility/usability and exact-hosted flags-off evidence before any cohort.
+
+## 2026-11-01 - WED-310 RSVP completion and Oracle release (Codex)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch
+`agent/codex/WED-308`. Exact application candidate
+`eb398ebfecaec6a0277d7fe634e6c97198b44afe` is live on Oracle.
+
+Completed:
+
+- Reconciled the two apparently open RSVP gates to retained evidence: WED-303
+  contains the hosted guest accessibility/usability run, and WED-305 contains
+  both the authenticated fresh-account check and controlled one-account RSVP
+  pilot with replay, revocation and exact rollback. No duplicate production
+  RSVP was created.
+- Verified the clean exact candidate with typecheck, 2,116 Wedding tests, both
+  line budgets, production build, migration catalogue, 13 real
+  disposable-Postgres RSVP tests and four Family Boundary database scenarios.
+- Deployed from
+  `C:\Users\ozans\AppData\Local\Temp\omnyid-wed310-release-eb398eb` with
+  simulated data excluded. Selected release-defining local and Oracle source
+  hashes match, and migration 0129 is present.
+- Hosted workspace, RSVP and Quiz routes return 200. Public RSVP and reminder
+  provider sending are false, the RSVP pilot list is empty, and Family helper
+  and delegate flags remain unset/false-default.
+- Safely pruned unused Docker builder cache before and after build. The initial
+  restore proof safety-blocked on capacity and was not claimed as passing; after
+  reclaiming 4.87 GB, backup verification and the isolated restore drill both
+  passed. Oracle root usage is 79% with about 9.4 GB free.
+
+Evidence:
+
+- `Documents/verification/wed-310-rsvp-release-2026-11-01.md`.
+- Ignored machine artifact:
+  `artifacts/oracle-production-proof-wed310-eb398eb/postdeploy/`.
+
+Remaining:
+
+- WED-309/WED-308 Family Boundaries work continues with delegate/helper
+  management UI, per-projector acknowledgement, sent-invitation impact preview,
+  restricted-field audit and a separately authorised rollout cohort. Keep both
+  Family rollout flags false until those criteria pass.
+- The historical Oracle `release-manifest.json` does not update with current
+  source identity. Add a generated release version endpoint/manifest in a
+  future operational slice; this release uses clean-checkout SHA plus matching
+  deployed-source hashes instead.

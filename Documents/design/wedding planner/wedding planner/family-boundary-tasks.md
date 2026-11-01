@@ -134,7 +134,7 @@ Depends on: 1–10 as applicable
 - [ ] Run keyboard, focus restoration, screen-reader naming, colour-independent status, 320/375 px and 200% zoom checks.
 - [ ] Run couple usability for request review, household attention and rule comprehension.
 - [ ] Run delegated-helper usability with deliberately restricted data.
-- [ ] Verify exact-candidate hosted flags-off shadow before any capability cohort.
+- [x] Verify exact-candidate hosted flags-off shadow before any capability cohort. Oracle release `eb398ebfecaec6a0277d7fe634e6c97198b44afe` serves the matching migration and routes while helper/delegate switches remain unset/false-default; unauthenticated delegated routes return 404.
 - [ ] Release in an allowlisted cohort; observe authorisation refusals, stale conflicts, duplicate suppression and reconciliation errors.
 - [ ] Promote only after objective rollout criteria pass.
 
@@ -144,6 +144,6 @@ The checked items now include the couple-facing and server-authority foundation:
 
 WED-309 adds the next server-authority slices: atomic stale-safe household split/merge/archive and bounded bulk commands, explicit remove/plus-one/invitation/contact-label request mutations, configurable two-partner partial approval, authenticated minimum-necessary Planner/RSVP grants, opaque mutable encrypted private notes, serialized last-seat approvals, group plus-one policies with named exceptions, immediate representative-change grant revocation, a flags-off helper shadow assertion, and live disposable PostgreSQL/ClamAV evidence. The first partner approval records progress but applies no connected mutation; a different active couple-role identity must provide the second approval. Delegates can only see their scoped projection and submit a pending request; they never receive couple approval authority or private-note access.
 
-This is not the end of the roadmap. Delegate/helper management UI, per-projector reconciliation acknowledgements, sent-invitation policy-change previews, removal-after-RSVP handling, restricted projection field audits, helper/delegate expiry and deletion-retention tests, hosted flags-off evidence, a controlled allowlisted cohort, and the complete security/accessibility/usability matrix remain open. `OMNYID_WEDDING_BOUNDARY_HELPERS_ENABLED` and `OMNYID_WEDDING_BOUNDARY_DELEGATES_ENABLED` stay false unless the hosted rollout criteria pass.
+This is not the end of the roadmap. Delegate/helper management UI, per-projector reconciliation acknowledgements, sent-invitation policy-change previews, removal-after-RSVP handling, restricted projection field audits, a controlled allowlisted cohort, and the complete security/accessibility/usability matrix remain open. Expiry, revocation and deletion retention are covered locally, and the exact-candidate flags-off Oracle shadow is recorded in `Documents/verification/wed-310-rsvp-release-2026-11-01.md`. `OMNYID_WEDDING_BOUNDARY_HELPERS_ENABLED` and `OMNYID_WEDDING_BOUNDARY_DELEGATES_ENABLED` stay false unless the remaining hosted rollout criteria pass.
 
 Release evidence for this slice is in `Documents/verification/wed-306-native-mobile-meal-family-boundaries-2026-10-31.md`. The pre-change coordination SHA was `3bd1f79fdae00c370556b504e0fde1daf66cc36f`; the exact deployed application SHA is `3c626dd149d61ae57c739fa90cd26acecb0109aa`.
