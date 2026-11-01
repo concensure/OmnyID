@@ -9,6 +9,7 @@ const boundary = read("src/components/WeddingBoundaryManagementCard.tsx");
 const mobilePage = read("src/components/WeddingMobilePage.tsx");
 const app = read("src/App.tsx");
 const contextPanels = read("src/components/WeddingWorkspaceContextPanels.tsx");
+const governanceApi = read("src/lib/weddingBoundaryGovernanceApi.ts");
 
 test("atmosphere photographs toggle exact selections without technical image copy", () => {
   assert.match(intake, /selectedIndex >= 0/);
@@ -37,6 +38,15 @@ test("Family boundaries prioritises request and household metrics and discloses 
   assert.match(boundary, /Edit group and allocation/);
   assert.match(boundary, /Invitation allocation/);
   assert.match(boundary, /Request deadline/);
+  assert.match(boundary, /Replace rule/);
+  assert.match(boundary, /Archive rule/);
+  assert.match(boundary, /Split, merge or archive/);
+  assert.match(boundary, /Confirm this household change/);
+  assert.match(boundary, /No invitation is sent and no attendance or spend is inferred/);
+  assert.match(contextPanels, /applyWeddingBoundaryRuleCommand/);
+  assert.match(contextPanels, /applyWeddingBoundaryHouseholdCommand/);
+  assert.match(governanceApi, /\/wedding\/boundaries\/rules\/commands/);
+  assert.match(governanceApi, /\/wedding\/boundaries\/households\/commands/);
   assert.match(contextPanels, /weddingBoundaryLedgerObjectToAfpSendInput\(\{/);
   assert.match(contextPanels, /household_revision: currentRevision \+ 1/);
   assert.doesNotMatch(boundary, />Shared</);

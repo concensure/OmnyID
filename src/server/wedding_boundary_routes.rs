@@ -27,6 +27,7 @@ mod delegated_access;
 mod household_commands;
 mod private_notes;
 mod request_mutations;
+mod rule_commands;
 
 pub(super) fn routes() -> Router<Arc<AppState>> {
     Router::new()
@@ -44,6 +45,7 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
         .merge(delegated_access::routes())
         .merge(household_commands::routes())
         .merge(private_notes::routes())
+        .merge(rule_commands::routes())
 }
 
 fn helper_enabled() -> bool {

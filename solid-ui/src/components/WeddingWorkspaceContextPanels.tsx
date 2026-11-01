@@ -7,6 +7,7 @@ import type {
 } from "@/lib/weddingResponseWorkspaceViewState";
 import type {
   WeddingBoundaryChangeType,
+  WeddingBoundaryPolicy,
   WeddingBoundaryPolicyRuleType,
 } from "@/lib/weddingBoundaryLedgerState";
 import type { WeddingBoundaryRuleAuthority, WeddingBoundaryRuleEffect, WeddingBoundaryRuleScopeKind } from "@/lib/weddingBoundaryGovernanceTypes";
@@ -36,7 +37,7 @@ import { WeddingSeatingPanel } from "@/components/WeddingSeatingPanel";
 import { WeddingTimelinePanel } from "@/components/WeddingTimelinePanel";
 import { WeddingVisionPanel } from "@/components/WeddingVisionPanel";
 import type { WeddingBoundaryRequestDecision } from "@/lib/weddingBoundaryDecisionState";
-import { decideWeddingBoundaryRequest } from "@/lib/weddingBoundaryGovernanceApi";
+import { applyWeddingBoundaryHouseholdCommand, applyWeddingBoundaryRuleCommand, decideWeddingBoundaryRequest, type WeddingBoundaryHouseholdCommand, type WeddingBoundaryRuleReplacement } from "@/lib/weddingBoundaryGovernanceApi";
 import { weddingBoundaryLedgerObjectToAfpSendInput } from "@/lib/weddingBoundaryLedgerState";
 import {
   applyWeddingFamilyBoundaryRequestEvaluation,
@@ -279,6 +280,32 @@ export function WeddingWorkspaceContextPanels(props: {
     props.onRefreshWorkspace?.();
     return "Family boundary rule saved.";
   }
+  async function changeFamilyRule(input: { operation: "archive_rule" | "supersede_rule"; rule: WeddingBoundaryPolicy; replacement?: WeddingBoundaryRuleReplacement; confirmedElevatedImpact: boolean }): Promise<string> {
+    const nonce = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}`;
+    const result = await applyWeddingBoundaryRuleCommand({
+      weddingPlanId: props.state.workspace.metadata.weddingPlanId,
+      responseWorkspaceId: props.state.workspace.metadata.responseWorkspaceId,
+      operation: input.operation,
+      ruleId: input.rule.id,
+      expectedVersion: input.rule.version ?? 1,
+      replacement: input.replacement,
+      confirmedElevatedImpact: input.confirmedElevatedImpact,
+      idempotencyKey: `wedding-rule:${nonce}`,
+    });
+    props.onRefreshWorkspace?.();
+    return [result.explanation, ...(result.connected_updates ?? [])].join(" ");
+  }
+  async function changeFamilyHouseholds(input: Omit<WeddingBoundaryHouseholdCommand, "weddingPlanId" | "responseWorkspaceId" | "idempotencyKey">): Promise<string> {
+    const nonce = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}`;
+    const result = await applyWeddingBoundaryHouseholdCommand({
+      ...input,
+      weddingPlanId: props.state.workspace.metadata.weddingPlanId,
+      responseWorkspaceId: props.state.workspace.metadata.responseWorkspaceId,
+      idempotencyKey: `wedding-household:${nonce}`,
+    });
+    props.onRefreshWorkspace?.();
+    return [result.explanation, ...(result.connected_updates ?? [])].join(" ");
+  }
   async function saveFamilyHousehold(input: { householdId: string; familyGroupLabel: string; invitationAllocation: number | null; requestDeadline: string | null }): Promise<string> {
     if (!props.saveProjection) throw new Error("Saving is not connected yet.");
     const household = (props.state.boundaryState.householdObjects ?? []).find((item) => item.householdId === input.householdId);
@@ -473,7 +500,9 @@ export function WeddingWorkspaceContextPanels(props: {
             onDecideRequest={decideBoundaryRequest}
             onSaveFamilyRequest={saveFamilyRequest}
             onSaveFamilyRule={saveFamilyRule}
+            onChangeFamilyRule={changeFamilyRule}
             onSaveHousehold={saveFamilyHousehold}
+            onApplyHouseholdCommand={changeFamilyHouseholds}
           />
         </div>
       </div>

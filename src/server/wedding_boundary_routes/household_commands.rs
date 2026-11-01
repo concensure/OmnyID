@@ -182,7 +182,7 @@ async fn has_committed_invitation(
         .map_err(store_error)
 }
 
-async fn invitation_snapshots(
+pub(super) async fn invitation_snapshots(
     tx: &mut Transaction<'_, Postgres>,
     table: &str,
     plan: &str,

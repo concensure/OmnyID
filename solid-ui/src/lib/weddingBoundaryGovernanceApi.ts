@@ -82,6 +82,61 @@ export function applyWeddingBoundaryHouseholdCommand(input: WeddingBoundaryHouse
   });
 }
 
+export type WeddingBoundaryRuleReplacement = {
+  title: string;
+  plainLanguage: string;
+  ruleType: "plus_one" | "children" | "invitation_scope" | "allocation" | "deadline" | "visibility" | "access" | "seating" | "communication";
+  scopeKind: "wedding" | "family_group" | "household" | "guest";
+  scopeId?: string;
+  effect: "allow" | "deny" | "require_approval" | "notify" | "limit";
+  authority: "couple" | "partner_pair" | "planner";
+  effectiveUntil?: string;
+};
+
+export function applyWeddingBoundaryRuleCommand(input: {
+  weddingPlanId: string;
+  responseWorkspaceId: string;
+  operation: "archive_rule" | "supersede_rule";
+  ruleId: string;
+  expectedVersion: number;
+  replacement?: WeddingBoundaryRuleReplacement;
+  confirmedElevatedImpact?: boolean;
+  idempotencyKey: string;
+}) {
+  return apiFetch<{
+    status: "applied";
+    operation: "archive_rule" | "supersede_rule";
+    rule_id: string;
+    replacement_rule_id?: string | null;
+    impact_receipt_id: string;
+    replayed: boolean;
+    explanation: string;
+    connected_updates?: string[];
+    response_history_preserved?: boolean;
+  }>("/wedding/boundaries/rules/commands", {
+    method: "POST",
+    bodyJson: {
+      wedding_plan_id: input.weddingPlanId,
+      response_workspace_id: input.responseWorkspaceId,
+      operation: input.operation,
+      rule_id: input.ruleId,
+      expected_version: input.expectedVersion,
+      replacement: input.replacement ? {
+        title: input.replacement.title,
+        plain_language: input.replacement.plainLanguage,
+        rule_type: input.replacement.ruleType,
+        scope_kind: input.replacement.scopeKind,
+        scope_id: input.replacement.scopeId,
+        effect: input.replacement.effect,
+        authority: input.replacement.authority,
+        effective_until: input.replacement.effectiveUntil,
+      } : undefined,
+      confirmed_elevated_impact: input.confirmedElevatedImpact ?? false,
+      idempotency_key: input.idempotencyKey,
+    },
+  });
+}
+
 export type WeddingBoundaryDelegatedRole = "planner" | "rsvp_guest";
 
 export type WeddingBoundaryDelegatedGrant = {

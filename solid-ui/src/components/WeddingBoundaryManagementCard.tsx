@@ -13,13 +13,17 @@ import {
 import type { WeddingBoundaryRequestDecision } from "@/lib/weddingBoundaryDecisionState";
 import type {
   WeddingBoundaryChangeType,
+  WeddingBoundaryGuestProfile,
+  WeddingBoundaryPolicy,
   WeddingBoundaryPolicyRuleType,
   WeddingBoundaryRoleAssignment,
   WeddingBoundaryState,
 } from "@/lib/weddingBoundaryLedgerState";
 import type { WeddingBoundaryTopologyState } from "@/lib/weddingBoundaryTopologyState";
 import type { WeddingBoundaryHouseholdRow } from "@/lib/weddingBoundaryHouseholdState";
-import { previewWeddingBoundaryRequestDecision } from "@/lib/weddingBoundaryGovernanceState";
+import { previewWeddingBoundaryHouseholdCommand, previewWeddingBoundaryPolicyChange, previewWeddingBoundaryRequestDecision } from "@/lib/weddingBoundaryGovernanceState";
+import type { WeddingBoundaryRuleReplacement } from "@/lib/weddingBoundaryGovernanceApi";
+import type { WeddingBoundaryHouseholdCommand } from "@/lib/weddingBoundaryGovernanceApi";
 import type {
   WeddingBoundaryRuleAuthority,
   WeddingBoundaryRuleEffect,
@@ -32,7 +36,9 @@ export function WeddingBoundaryManagementCard(props: {
   onDecideRequest?: (requestId: string, decision: WeddingBoundaryRequestDecision, approvalActorId?: string, confirmedElevatedImpact?: boolean) => Promise<string>;
   onSaveFamilyRequest?: (input: { requesterLabel: string; requestLabel: string; changeType: WeddingBoundaryChangeType; targetHouseholdId: string; proposedGuestName: string; requiredApprovalCount: 1 | 2 }) => Promise<string>;
   onSaveFamilyRule?: (input: { title: string; plainLanguage: string; ruleType: WeddingBoundaryPolicyRuleType; scopeKind: WeddingBoundaryRuleScopeKind; scopeId: string; effect: WeddingBoundaryRuleEffect; authority: WeddingBoundaryRuleAuthority; effectiveUntil: string }) => Promise<string>;
+  onChangeFamilyRule?: (input: { operation: "archive_rule" | "supersede_rule"; rule: WeddingBoundaryPolicy; replacement?: WeddingBoundaryRuleReplacement; confirmedElevatedImpact: boolean }) => Promise<string>;
   onSaveHousehold?: (input: { householdId: string; familyGroupLabel: string; invitationAllocation: number | null; requestDeadline: string | null }) => Promise<string>;
+  onApplyHouseholdCommand?: (input: Omit<WeddingBoundaryHouseholdCommand, "weddingPlanId" | "responseWorkspaceId" | "idempotencyKey">) => Promise<string>;
 }) {
   let disclosureButton: HTMLButtonElement | undefined;
   const [showRequests, setShowRequests] = createSignal(false);
@@ -59,6 +65,9 @@ export function WeddingBoundaryManagementCard(props: {
   const [ruleEffect, setRuleEffect] = createSignal<WeddingBoundaryRuleEffect>("require_approval");
   const [ruleAuthority, setRuleAuthority] = createSignal<WeddingBoundaryRuleAuthority>("couple");
   const [ruleEffectiveUntil, setRuleEffectiveUntil] = createSignal("");
+  const [replacingRuleId, setReplacingRuleId] = createSignal<string | null>(null);
+  const [reviewingRuleId, setReviewingRuleId] = createSignal<string | null>(null);
+  const [reviewingRuleOperation, setReviewingRuleOperation] = createSignal<"archive_rule" | "supersede_rule">("archive_rule");
   const [reviewingRequestId, setReviewingRequestId] = createSignal<string | null>(null);
   const [reviewingDecision, setReviewingDecision] = createSignal<WeddingBoundaryRequestDecision>("approve");
   const [savingDraft, setSavingDraft] = createSignal(false);
@@ -66,6 +75,11 @@ export function WeddingBoundaryManagementCard(props: {
   const [householdGroupLabel, setHouseholdGroupLabel] = createSignal("");
   const [householdAllocation, setHouseholdAllocation] = createSignal("");
   const [householdDeadline, setHouseholdDeadline] = createSignal("");
+  const [organisingHouseholdId, setOrganisingHouseholdId] = createSignal<string | null>(null);
+  const [splitHouseholdLabel, setSplitHouseholdLabel] = createSignal("");
+  const [splitPersonIds, setSplitPersonIds] = createSignal<string[]>([]);
+  const [mergeTargetHouseholdId, setMergeTargetHouseholdId] = createSignal("");
+  const [pendingHouseholdCommand, setPendingHouseholdCommand] = createSignal<Omit<WeddingBoundaryHouseholdCommand, "weddingPlanId" | "responseWorkspaceId" | "idempotencyKey" | "confirmedElevatedImpact"> | null>(null);
   const viewState = createMemo(() => buildWeddingBoundaryManagementViewState(props));
   const visibleApprovalItems = createMemo(() => visibleWeddingBoundaryApprovalItems(
     viewState().approvalItems,
@@ -81,6 +95,26 @@ export function WeddingBoundaryManagementCard(props: {
     return request ? previewWeddingBoundaryRequestDecision({ request, objects: props.state.allObjects }) : null;
   });
   const coupleApprovers = createMemo(() => props.state.allObjects.filter((object): object is WeddingBoundaryRoleAssignment => object.kind === "wedding_boundary_role_assignment" && object.role === "couple" && object.status !== "archived"));
+  const activePolicies = createMemo(() => props.state.allObjects.filter((object): object is WeddingBoundaryPolicy => object.kind === "wedding_boundary_policy" && (object.ruleStatus ?? object.status ?? "active") === "active"));
+  const reviewingRule = createMemo(() => activePolicies().find((policy) => policy.id === reviewingRuleId()) ?? null);
+  const ruleChangePreview = createMemo(() => {
+    const policy = reviewingRule();
+    return policy ? previewWeddingBoundaryPolicyChange({ policy, nextStatus: reviewingRuleOperation() === "archive_rule" ? "archived" : "superseded", objects: props.state.allObjects }) : null;
+  });
+  const householdCommandPreview = createMemo(() => {
+    const command = pendingHouseholdCommand();
+    if (!command) return null;
+    if (command.operation === "split_household") return previewWeddingBoundaryHouseholdCommand({
+      command: { kind: "split_household", sourceHouseholdId: command.sourceHouseholdIds[0] ?? "", newHouseholdId: command.newHouseholdId ?? "", movePersonIds: command.movePersonIds ?? [] },
+      objects: props.state.allObjects,
+    });
+    if (command.operation === "merge_households") return previewWeddingBoundaryHouseholdCommand({
+      command: { kind: "merge_households", sourceHouseholdIds: command.sourceHouseholdIds, targetHouseholdId: command.targetHouseholdId ?? "" },
+      objects: props.state.allObjects,
+    });
+    return previewWeddingBoundaryHouseholdCommand({ command: { kind: "archive_household", householdId: command.sourceHouseholdIds[0] ?? "" }, objects: props.state.allObjects });
+  });
+  const guestProfiles = createMemo(() => props.state.allObjects.filter((object): object is WeddingBoundaryGuestProfile => object.kind === "wedding_boundary_guest_profile" && object.status !== "archived"));
 
   function focusSection(id: string): void {
     queueMicrotask(() => document.getElementById(id)?.focus());
@@ -187,8 +221,39 @@ export function WeddingBoundaryManagementCard(props: {
       setSavingDraft(false);
     }
   }
-  async function saveFamilyRule(): Promise<void> {
+  function resetRuleDraft(): void {
+    setRuleTitle("");
+    setRuleText("");
+    setRuleType("invitation_scope");
+    setRuleScopeKind("wedding");
+    setRuleScopeId("");
+    setRuleEffect("require_approval");
+    setRuleAuthority("couple");
+    setRuleEffectiveUntil("");
+    setReplacingRuleId(null);
+  }
+  function beginRuleReplacement(policy: WeddingBoundaryPolicy): void {
+    setRuleTitle(policy.title);
+    setRuleText(policy.plainLanguage);
+    setRuleType(policy.ruleType);
+    setRuleScopeKind(policy.scopeKind ?? "wedding");
+    setRuleScopeId(policy.scopeId ?? "");
+    setRuleEffect(policy.effect ?? (policy.enforcement === "block" ? "deny" : policy.enforcement === "require_approval" ? "require_approval" : "notify"));
+    setRuleAuthority(policy.authority ?? "couple");
+    setRuleEffectiveUntil(policy.effectiveUntil ?? "");
+    setReplacingRuleId(policy.id);
+    setShowAddRule(true);
+    setShowRules(false);
+    focusSection("wedding-boundary-add-rule");
+  }
+  async function saveFamilyRule(confirmed = false): Promise<void> {
     if (savingDraft()) return;
+    const replacementId = replacingRuleId();
+    if (replacementId && !confirmed) {
+      setReviewingRuleId(replacementId);
+      setReviewingRuleOperation("supersede_rule");
+      return;
+    }
     if (!props.onSaveFamilyRule) {
       setDecisionNotice(weddingBoundaryDraftSaveUnavailableNotice("rule"));
       return;
@@ -196,23 +261,94 @@ export function WeddingBoundaryManagementCard(props: {
     setDecisionNotice(null);
     setSavingDraft(true);
     try {
-      const notice = await props.onSaveFamilyRule({
+      const authority = ruleAuthority();
+      const replacement: WeddingBoundaryRuleReplacement = {
         title: ruleTitle().trim() || "Family boundary rule",
         plainLanguage: ruleText(),
         ruleType: ruleType(),
         scopeKind: ruleScopeKind(),
-        scopeId: ruleScopeId(),
+        scopeId: ruleScopeId() || undefined,
         effect: ruleEffect(),
-        authority: ruleAuthority(),
-        effectiveUntil: ruleEffectiveUntil(),
-      });
+        authority: authority === "system" ? "couple" : authority,
+        effectiveUntil: ruleEffectiveUntil() || undefined,
+      };
+      const currentRule = replacementId ? activePolicies().find((policy) => policy.id === replacementId) : null;
+      const notice = currentRule && props.onChangeFamilyRule
+        ? await props.onChangeFamilyRule({ operation: "supersede_rule", rule: currentRule, replacement, confirmedElevatedImpact: ruleChangePreview()?.requiresElevatedConfirmation === true })
+        : await props.onSaveFamilyRule({ ...replacement, scopeId: replacement.scopeId ?? "", effectiveUntil: replacement.effectiveUntil ?? "" });
       setDecisionNotice(notice);
-      setRuleTitle("");
-      setRuleText("");
-      setRuleScopeId("");
-      setRuleEffectiveUntil("");
+      resetRuleDraft();
+      setReviewingRuleId(null);
       setShowAddRule(false);
       setShowRules(true);
+    } catch (error) {
+      setDecisionNotice(weddingBoundaryDecisionNoticeFromError(error));
+    } finally {
+      setSavingDraft(false);
+    }
+  }
+  async function archiveRule(confirmed = false): Promise<void> {
+    const policy = reviewingRule();
+    if (!policy || !props.onChangeFamilyRule || savingDraft()) return;
+    if (!confirmed) return;
+    setSavingDraft(true);
+    setDecisionNotice(null);
+    try {
+      const notice = await props.onChangeFamilyRule({
+        operation: "archive_rule",
+        rule: policy,
+        confirmedElevatedImpact: ruleChangePreview()?.requiresElevatedConfirmation === true,
+      });
+      setDecisionNotice(notice);
+      setReviewingRuleId(null);
+    } catch (error) {
+      setDecisionNotice(weddingBoundaryDecisionNoticeFromError(error));
+    } finally {
+      setSavingDraft(false);
+    }
+  }
+  function expectedHouseholdRevisions(ids: string[]): Record<string, number> {
+    return Object.fromEntries(ids.map((id) => {
+      const household = (props.state.householdObjects ?? []).find((item) => item.householdId === id);
+      return [id, household?.revision ?? 1];
+    }));
+  }
+  function reviewHouseholdCommand(operation: "split_household" | "merge_households" | "archive_household", householdId: string): void {
+    if (operation === "split_household") {
+      const newHouseholdLabel = splitHouseholdLabel().trim();
+      if (!newHouseholdLabel || splitPersonIds().length === 0) {
+        setDecisionNotice("Name the new household and choose who moves into it.");
+        return;
+      }
+      const nonce = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}`;
+      setPendingHouseholdCommand({ operation, sourceHouseholdIds: [householdId], expectedRevisions: expectedHouseholdRevisions([householdId]), newHouseholdId: `household:split:${nonce}`, newHouseholdLabel, movePersonIds: splitPersonIds() });
+      return;
+    }
+    if (operation === "merge_households") {
+      const target = mergeTargetHouseholdId();
+      if (!target || target === householdId) {
+        setDecisionNotice("Choose a different household to merge with this one.");
+        return;
+      }
+      const ids = [householdId, target];
+      setPendingHouseholdCommand({ operation, sourceHouseholdIds: ids, expectedRevisions: expectedHouseholdRevisions(ids), targetHouseholdId: target });
+      return;
+    }
+    setPendingHouseholdCommand({ operation, sourceHouseholdIds: [householdId], expectedRevisions: expectedHouseholdRevisions([householdId]) });
+  }
+  async function applyHouseholdCommand(): Promise<void> {
+    const command = pendingHouseholdCommand();
+    if (!command || !props.onApplyHouseholdCommand || savingDraft() || householdCommandPreview()?.canApply === false) return;
+    setSavingDraft(true);
+    setDecisionNotice(null);
+    try {
+      const notice = await props.onApplyHouseholdCommand({ ...command, confirmedElevatedImpact: householdCommandPreview()?.requiresElevatedConfirmation === true });
+      setDecisionNotice(notice);
+      setPendingHouseholdCommand(null);
+      setOrganisingHouseholdId(null);
+      setSplitHouseholdLabel("");
+      setSplitPersonIds([]);
+      setMergeTargetHouseholdId("");
     } catch (error) {
       setDecisionNotice(weddingBoundaryDecisionNoticeFromError(error));
     } finally {
@@ -311,7 +447,11 @@ export function WeddingBoundaryManagementCard(props: {
           aria-expanded={showAddRule()}
           aria-controls="wedding-boundary-add-rule"
           class="rounded-full border border-cyan-200 bg-white/85 px-3 py-2 text-xs font-semibold text-cyan-950 transition hover:bg-white sm:py-1.5"
-          onClick={() => setShowAddRule(!showAddRule())}
+          onClick={() => {
+            const opening = !showAddRule();
+            resetRuleDraft();
+            setShowAddRule(opening);
+          }}
         >
           Add rule
         </button>
@@ -382,7 +522,10 @@ export function WeddingBoundaryManagementCard(props: {
 
       <Show when={showAddRule()}>
         <div id="wedding-boundary-add-rule" class="mt-3 rounded-2xl border border-cyan-100 bg-white/80 p-3">
-          <p class="text-sm font-semibold text-cyan-950">Add a boundary rule</p>
+          <p class="text-sm font-semibold text-cyan-950">{replacingRuleId() ? "Replace this boundary rule" : "Add a boundary rule"}</p>
+          <Show when={replacingRuleId()}>
+            <p class="mt-1 text-xs leading-5 text-cyan-950/65">Saving creates a new rule and keeps the earlier version in the audit history.</p>
+          </Show>
           <div class="mt-2 grid gap-2 md:grid-cols-2">
             <label class="min-w-0">
               <span class="text-xs font-semibold text-cyan-950/70">Rule name</span>
@@ -443,9 +586,14 @@ export function WeddingBoundaryManagementCard(props: {
             <span class="text-xs font-semibold text-cyan-950/70">Plain-language rule</span>
             <textarea class="mt-1 min-h-20 w-full rounded-xl border border-cyan-100 bg-white px-3 py-2 text-sm text-cyan-950 outline-none focus:border-cyan-400" value={ruleText()} placeholder="We are keeping the reception to named guests only." onInput={(event) => setRuleText(event.currentTarget.value)} />
           </label>
-          <button type="button" class="mt-3 rounded-full bg-cyan-700 px-3 py-2 text-xs font-semibold text-white transition hover:bg-cyan-800 disabled:cursor-not-allowed disabled:opacity-50" disabled={!ruleText().trim() || savingDraft()} onClick={() => void saveFamilyRule()}>
-            {savingDraft() ? "Saving..." : "Save rule"}
-          </button>
+          <div class="mt-3 flex flex-wrap gap-2">
+            <button type="button" class="rounded-full bg-cyan-700 px-3 py-2 text-xs font-semibold text-white transition hover:bg-cyan-800 disabled:cursor-not-allowed disabled:opacity-50" disabled={!ruleText().trim() || savingDraft()} onClick={() => void saveFamilyRule()}>
+              {savingDraft() ? "Saving..." : replacingRuleId() ? "Review replacement" : "Save rule"}
+            </button>
+            <Show when={replacingRuleId()}>
+              <button type="button" class="rounded-full border border-cyan-200 bg-white px-3 py-2 text-xs font-semibold text-cyan-950" onClick={() => { resetRuleDraft(); setShowAddRule(false); setShowRules(true); }}>Cancel</button>
+            </Show>
+          </div>
         </div>
       </Show>
 
@@ -497,7 +645,7 @@ export function WeddingBoundaryManagementCard(props: {
 
       <Show when={showRules()}>
         <div id="wedding-boundary-rules" class="mt-3 space-y-2">
-          <Show when={viewState().hasRules} fallback={
+          <Show when={activePolicies().length > 0} fallback={
             <div class="rounded-2xl border border-cyan-100 bg-white/75 p-3">
               <p class="text-xs leading-5 text-cyan-950/70">No family rules are set yet.</p>
               <button
@@ -512,16 +660,22 @@ export function WeddingBoundaryManagementCard(props: {
               </button>
             </div>
           }>
-            <For each={viewState().ruleItems}>
-              {(item) => (
+            <For each={activePolicies().slice(0, 8)}>
+              {(policy) => (
               <article class="rounded-2xl border border-cyan-100 bg-white/75 p-3">
                 <div class="flex items-start justify-between gap-2">
-                  <p class="break-words text-sm font-semibold text-cyan-950">{item.label}</p>
+                  <p class="break-words text-sm font-semibold text-cyan-950">{policy.title}</p>
                   <span class="rounded-full bg-cyan-50 px-2 py-1 text-xs font-semibold text-cyan-900">
-                    Rule
+                    Version {policy.version ?? 1}
                   </span>
                 </div>
-                <p class="mt-1 text-xs leading-5 text-cyan-950/70">{item.detail}</p>
+                <p class="mt-1 text-xs leading-5 text-cyan-950/70">{policy.plainLanguage}</p>
+                <Show when={props.onChangeFamilyRule}>
+                  <div class="mt-3 flex flex-wrap gap-2">
+                    <button type="button" class="min-h-11 rounded-full border border-cyan-200 bg-white px-3 text-xs font-semibold text-cyan-950" onClick={() => beginRuleReplacement(policy)}>Replace rule</button>
+                    <button type="button" class="min-h-11 rounded-full border border-rose-200 bg-white px-3 text-xs font-semibold text-rose-900" onClick={() => { setReviewingRuleId(policy.id); setReviewingRuleOperation("archive_rule"); }}>Archive rule</button>
+                  </div>
+                </Show>
               </article>
               )}
             </For>
@@ -557,6 +711,11 @@ export function WeddingBoundaryManagementCard(props: {
                         {editingHouseholdId() === household.householdId ? "Close household details" : "Edit group and allocation"}
                       </button>
                     </Show>
+                    <Show when={props.onApplyHouseholdCommand}>
+                      <button type="button" class="ml-2 mt-2 rounded-full border border-cyan-200 bg-white px-3 py-2 text-xs font-semibold text-cyan-950 transition hover:bg-cyan-50" onClick={() => { setOrganisingHouseholdId(organisingHouseholdId() === household.householdId ? null : household.householdId); setEditingHouseholdId(null); setSplitHouseholdLabel(""); setSplitPersonIds([]); setMergeTargetHouseholdId(""); }}>
+                        {organisingHouseholdId() === household.householdId ? "Close changes" : "Split, merge or archive"}
+                      </button>
+                    </Show>
                     <Show when={editingHouseholdId() === household.householdId}>
                       <div class="mt-3 grid gap-3 rounded-xl bg-cyan-50/75 p-3 sm:grid-cols-3">
                         <label class="min-w-0">
@@ -575,6 +734,36 @@ export function WeddingBoundaryManagementCard(props: {
                           <button type="button" disabled={savingDraft()} class="min-h-11 rounded-full bg-cyan-700 px-4 text-xs font-semibold text-white disabled:opacity-50" onClick={() => void saveHousehold()}>{savingDraft() ? "Saving..." : "Save household"}</button>
                           <button type="button" class="min-h-11 rounded-full border border-cyan-200 bg-white px-4 text-xs font-semibold text-cyan-950" onClick={() => setEditingHouseholdId(null)}>Cancel</button>
                         </div>
+                      </div>
+                    </Show>
+                    <Show when={organisingHouseholdId() === household.householdId}>
+                      <div class="mt-3 grid gap-3 rounded-xl bg-cyan-50/75 p-3">
+                        <div>
+                          <p class="text-xs font-semibold text-cyan-950">Split into a new household</p>
+                          <input class="mt-2 min-h-11 w-full rounded-lg border border-cyan-200 bg-white px-3 text-sm" value={splitHouseholdLabel()} placeholder="New household name" onInput={(event) => setSplitHouseholdLabel(event.currentTarget.value)} />
+                          <div class="mt-2 grid gap-2 sm:grid-cols-2">
+                            <For each={guestProfiles().filter((guest) => guest.householdId === household.householdId)}>{(guest) => (
+                              <label class="flex min-h-11 items-center gap-2 rounded-lg border border-cyan-100 bg-white px-3 text-xs text-cyan-950">
+                                <input type="checkbox" checked={splitPersonIds().includes(guest.personId)} onChange={(event) => setSplitPersonIds((current) => event.currentTarget.checked ? [...current, guest.personId] : current.filter((id) => id !== guest.personId))} />
+                                <span>{guest.displayName}</span>
+                              </label>
+                            )}</For>
+                          </div>
+                          <button type="button" class="mt-2 min-h-11 rounded-full border border-cyan-200 bg-white px-4 text-xs font-semibold text-cyan-950" onClick={() => reviewHouseholdCommand("split_household", household.householdId)}>Review split</button>
+                        </div>
+                        <div class="border-t border-cyan-100 pt-3">
+                          <label class="text-xs font-semibold text-cyan-950">Merge into another household</label>
+                          <select class="mt-2 min-h-11 w-full rounded-lg border border-cyan-200 bg-white px-3 text-sm" value={mergeTargetHouseholdId()} onChange={(event) => setMergeTargetHouseholdId(event.currentTarget.value)}>
+                            <option value="">Choose destination</option>
+                            <For each={(props.state.householdRows ?? []).filter((item) => item.householdId !== household.householdId)}>{(item) => <option value={item.householdId}>{item.displayName}</option>}</For>
+                          </select>
+                          <button type="button" class="mt-2 min-h-11 rounded-full border border-cyan-200 bg-white px-4 text-xs font-semibold text-cyan-950" onClick={() => reviewHouseholdCommand("merge_households", household.householdId)}>Review merge</button>
+                        </div>
+                        <Show when={household.memberCount === 0}>
+                          <div class="border-t border-cyan-100 pt-3">
+                            <button type="button" class="min-h-11 rounded-full border border-rose-200 bg-white px-4 text-xs font-semibold text-rose-900" onClick={() => reviewHouseholdCommand("archive_household", household.householdId)}>Review archive</button>
+                          </div>
+                        </Show>
                       </div>
                     </Show>
                   </article>
@@ -659,6 +848,56 @@ export function WeddingBoundaryManagementCard(props: {
             </section>
           </div>
         )}
+      </Show>
+
+      <Show when={reviewingRule()}>
+        {(policy) => (
+          <div class="fixed inset-0 z-[80] flex items-end justify-center bg-cyan-950/45 p-3 sm:items-center" role="presentation">
+            <section role="dialog" aria-modal="true" aria-labelledby="wedding-boundary-rule-confirm-title" class="w-full max-w-lg rounded-3xl bg-white p-5 shadow-2xl">
+              <h3 id="wedding-boundary-rule-confirm-title" class="text-xl font-bold text-cyan-950">
+                {reviewingRuleOperation() === "archive_rule" ? "Archive this family rule?" : "Replace this family rule?"}
+              </h3>
+              <p class="mt-2 text-sm font-semibold text-cyan-950">{policy().title}</p>
+              <p class="mt-1 text-sm leading-6 text-cyan-950/75">{policy().plainLanguage}</p>
+              <Show when={ruleChangePreview()}>
+                {(impact) => (
+                  <div class="mt-3 rounded-2xl bg-cyan-50 p-3">
+                    <p class="text-sm font-semibold text-cyan-950">What changes together</p>
+                    <ul class="mt-2 list-disc space-y-1 pl-5 text-sm leading-6 text-cyan-950/75">
+                      <For each={impact().warnings}>{(warning) => <li>{warning}</li>}</For>
+                    </ul>
+                    <p class="mt-2 text-xs leading-5 text-cyan-950/65">{impact().affectedInvitationIds.length} invitation record{impact().affectedInvitationIds.length === 1 ? "" : "s"} will be rechecked. No invitation is sent and no attendance or spend is inferred.</p>
+                  </div>
+                )}
+              </Show>
+              <div class="mt-5 grid grid-cols-2 gap-3">
+                <button type="button" class="min-h-12 rounded-2xl border border-cyan-200 bg-white px-4 font-semibold text-cyan-950" onClick={() => setReviewingRuleId(null)}>Cancel</button>
+                <button type="button" disabled={savingDraft() || ruleChangePreview()?.canApply === false} class="min-h-12 rounded-2xl bg-cyan-700 px-4 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50" onClick={() => reviewingRuleOperation() === "archive_rule" ? void archiveRule(true) : void saveFamilyRule(true)}>
+                  {savingDraft() ? "Saving..." : reviewingRuleOperation() === "archive_rule" ? "Archive rule" : "Confirm replacement"}
+                </button>
+              </div>
+            </section>
+          </div>
+        )}
+      </Show>
+
+      <Show when={pendingHouseholdCommand()}>
+        <div class="fixed inset-0 z-[80] flex items-end justify-center bg-cyan-950/45 p-3 sm:items-center" role="presentation">
+          <section role="dialog" aria-modal="true" aria-labelledby="wedding-household-command-title" class="w-full max-w-lg rounded-3xl bg-white p-5 shadow-2xl">
+            <h3 id="wedding-household-command-title" class="text-xl font-bold text-cyan-950">Confirm this household change?</h3>
+            <Show when={householdCommandPreview()}>{(impact) => (
+              <div class="mt-3 rounded-2xl bg-cyan-50 p-3">
+                <p class="text-sm font-semibold text-cyan-950">What changes together</p>
+                <ul class="mt-2 list-disc space-y-1 pl-5 text-sm leading-6 text-cyan-950/75"><For each={impact().warnings}>{(warning) => <li>{warning}</li>}</For></ul>
+                <p class="mt-2 text-xs leading-5 text-cyan-950/65">{impact().affectedPersonIds.length} guest record{impact().affectedPersonIds.length === 1 ? "" : "s"} and {impact().affectedInvitationIds.length} invitation record{impact().affectedInvitationIds.length === 1 ? "" : "s"} will be rechecked without deleting response history.</p>
+              </div>
+            )}</Show>
+            <div class="mt-5 grid grid-cols-2 gap-3">
+              <button type="button" class="min-h-12 rounded-2xl border border-cyan-200 bg-white px-4 font-semibold text-cyan-950" onClick={() => setPendingHouseholdCommand(null)}>Cancel</button>
+              <button type="button" disabled={savingDraft() || householdCommandPreview()?.canApply === false} class="min-h-12 rounded-2xl bg-cyan-700 px-4 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50" onClick={() => void applyHouseholdCommand()}>{savingDraft() ? "Saving..." : "Confirm change"}</button>
+            </div>
+          </section>
+        </div>
       </Show>
     </div>
   );
