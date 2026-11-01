@@ -6175,3 +6175,52 @@ Remaining:
   source identity. Add a generated release version endpoint/manifest in a
   future operational slice; this release uses clean-checkout SHA plus matching
   deployed-source hashes instead.
+
+## 2026-11-01 - WED-311 Family connected-impact reconciliation (Codex)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch
+`agent/codex/WED-308`, implementation commit
+`2941e25585649744537e0f8d5069ecb886c42252`.
+
+Changed:
+
+- Passed the current impact review confirmation into the server decision and
+  idempotency fingerprint. A helper-authored request can no longer pre-authorise
+  removal after a sent or accepted invitation.
+- Removing an accepted guest writes archived guest/invitation successors while
+  preserving the immutable RSVP response and stable invitation ID.
+- Decision and household impact receipts now name connected updates and record
+  actor, causation, expected versions, reconciliation reference and explicit
+  no-send/no-attendance/no-spend guarantees without copying private content.
+- Added deterministic versioned rule-change preview for sent invitations and
+  explicit field allowlists for Planner, helper and RSVP-guest projections.
+- Moved add-guest mutation code into the bounded mutation module, reducing the
+  main route from 995 to 877 lines; every changed source remains below 999 lines.
+
+Verification:
+
+- `npm run typecheck`: passed.
+- `npm run test:wedding`: 2,117 passed.
+- `npm run test:line-budget`: 2 passed.
+- `npm run build`: passed.
+- `cargo test --lib server::wedding_boundary_routes -j1 -- --nocapture`: 8 passed.
+- Final-candidate `cargo test --test wedding_boundary_postgres -j1 --
+  --test-threads=1 --nocapture`: 5 passed against a disposable PostgreSQL 18
+  tmpfs instance. It covered accepted-RSVP removal, household split after RSVP,
+  exact replay, stable invitation/history retention, tenant scope and restricted
+  projections. The disposable container and data were removed after the run.
+
+Not performed:
+
+- No Oracle deployment or production environment change. The live application
+  remains `eb398ebfecaec6a0277d7fe634e6c97198b44afe` from WED-310.
+- Family helper and authenticated delegate rollout flags remain false-default.
+
+Remaining:
+
+- WED-311 stays in progress: mount versioned rule supersede/archive commands in
+  the Couple UI and connect household split/merge/archive/bulk management to the
+  existing server command surface.
+- Then build delegate/helper grant management UI, projector acknowledgements,
+  restricted-data usability/accessibility evidence and a separately authorised
+  allowlisted cohort before either Family rollout flag can be enabled.
