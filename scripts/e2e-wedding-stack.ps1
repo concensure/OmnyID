@@ -59,7 +59,6 @@ Write-Host "source_sha=$gitSha"
 if ($gitTop -ne $repo) { throw "Git toplevel does not match the WED-317 worktree" }
 if ($dirty.Count -ne 0) { throw "Refusing to build or run the full-account harness from a dirty tree" }
 
-docker info *> $null
 $dbPort = Get-FreeLoopbackPort
 $apiPort = Get-FreeLoopbackPort
 $uiPort = Get-FreeLoopbackPort
@@ -84,6 +83,8 @@ $uiOut = Join-Path $tempRoot "ui.out.log"
 $uiErr = Join-Path $tempRoot "ui.err.log"
 $seedOut = Join-Path $tempRoot "seed.out.log"
 $seedErr = Join-Path $tempRoot "seed.err.log"
+$dockerProbeOut = Join-Path $tempRoot "docker.out.log"
+$dockerProbeErr = Join-Path $tempRoot "docker.err.log"
 $server = $null
 $ui = $null
 $containerStarted = $false
@@ -121,6 +122,13 @@ $serverEnvironment = @{
 }
 
 try {
+    $dockerProbe = Start-Process -FilePath "docker.exe" -ArgumentList @("info") -WindowStyle Hidden -PassThru `
+        -RedirectStandardOutput $dockerProbeOut -RedirectStandardError $dockerProbeErr
+    if (-not $dockerProbe.WaitForExit(15000)) {
+        Stop-Child $dockerProbe
+        throw "Docker Desktop did not answer within 15 seconds"
+    }
+    if ($dockerProbe.ExitCode -ne 0) { throw "Docker Desktop is not ready" }
     docker run --detach --name $container --publish "127.0.0.1:$dbPort`:5432" `
         --tmpfs "/var/lib/postgresql/data:rw,noexec,nosuid,size=2g" `
         --env POSTGRES_USER=omnyid_test --env POSTGRES_PASSWORD=omnyid_test `

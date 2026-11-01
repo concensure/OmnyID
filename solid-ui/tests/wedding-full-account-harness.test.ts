@@ -12,6 +12,7 @@ test("full-account stack is disposable and refuses unsafe targets", () => {
   assert.match(stack, /--tmpfs/);
   assert.match(stack, /CARGO_TARGET_DIR = \$cargoTarget/);
   assert.match(stack, /CARGO_PROFILE_DEV_DEBUG = "0"/);
+  assert.match(stack, /Docker Desktop did not answer within 15 seconds/);
   assert.match(stack, /Remove-Item -LiteralPath \$resolvedCargoTarget -Recurse -Force/);
   assert.match(stack, /127\.0\.0\.1:\$dbPort/);
   assert.match(stack, /omnyid_test/);
