@@ -2,13 +2,6 @@ use serde_json::json;
 
 use crate::{db::Db, knowledge_curator::DaemonHeartbeat};
 
-fn heartbeat_is_meaningful(heartbeat: &DaemonHeartbeat) -> bool {
-    heartbeat.queue_depth > 0
-        || heartbeat.events_processed_last_hour > 0
-        || heartbeat.tokens_used_today > 0
-        || heartbeat.error_count_last_hour > 0
-}
-
 impl Db {
     pub async fn record_daemon_heartbeat(
         &self,
@@ -36,13 +29,13 @@ impl Db {
                 created_at
             )
             SELECT $1, $2, $3, $4, $5::timestamptz
-            WHERE $6
-               OR NOT EXISTS (
-                    SELECT 1
-                    FROM daemon_heartbeats
-                    WHERE daemon_id = $2
-                      AND created_at >= $5::timestamptz - INTERVAL '15 minutes'
-               )
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM daemon_heartbeats
+                WHERE daemon_id = $2
+                  AND created_at >= $5::timestamptz - INTERVAL '15 minutes'
+                  AND metrics = $4
+            )
             ON CONFLICT (heartbeat_id) DO NOTHING
             "#,
         )
@@ -56,7 +49,6 @@ impl Db {
             "error_count_last_hour": heartbeat.error_count_last_hour,
         }))
         .bind(&heartbeat.created_at)
-        .bind(heartbeat_is_meaningful(heartbeat))
         .execute(&self.pool)
         .await?;
 
@@ -66,7 +58,6 @@ impl Db {
 
 #[cfg(test)]
 mod tests {
-    use super::heartbeat_is_meaningful;
     use crate::{db::MIGRATIONS, knowledge_curator::DaemonHeartbeat};
 
     fn heartbeat() -> DaemonHeartbeat {
@@ -83,14 +74,12 @@ mod tests {
     }
 
     #[test]
-    fn idle_heartbeat_is_sampled_while_meaningful_work_is_always_recorded() {
-        let mut value = heartbeat();
-        assert!(!heartbeat_is_meaningful(&value));
-        value.events_processed_last_hour = 1;
-        assert!(heartbeat_is_meaningful(&value));
-        value.events_processed_last_hour = 0;
-        value.error_count_last_hour = 1;
-        assert!(heartbeat_is_meaningful(&value));
+    fn heartbeat_fixture_starts_idle() {
+        let value = heartbeat();
+        assert_eq!(value.queue_depth, 0);
+        assert_eq!(value.events_processed_last_hour, 0);
+        assert_eq!(value.tokens_used_today, 0);
+        assert_eq!(value.error_count_last_hour, 0);
     }
 
     #[test]

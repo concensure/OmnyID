@@ -1,5 +1,5 @@
 use omnyid_homeserver::{
-    daemon_registry::{self, DaemonManifest, spawn_daemon},
+    daemon_registry::{self, spawn_daemon, DaemonManifest},
     db::{Db, UserRecord},
     knowledge_curator::DaemonKind,
 };
@@ -58,13 +58,24 @@ async fn idle_heartbeats_are_sampled_and_rate_limit_rows_expire_globally() {
     daemon_registry::record_heartbeat(&db, &registration.daemon_id, &user.id, 0, 1, 0, 0)
         .await
         .expect("record meaningful heartbeat");
-    let meaningful_count: i64 =
+    let changed_metrics_count: i64 =
         sqlx::query_scalar("SELECT count(*) FROM daemon_heartbeats WHERE daemon_id = $1")
             .bind(&registration.daemon_id)
             .fetch_one(&db.pool)
             .await
-            .expect("count meaningful heartbeat");
-    assert_eq!(meaningful_count, 2);
+            .expect("count changed heartbeat metrics");
+    assert_eq!(changed_metrics_count, 2);
+
+    daemon_registry::record_heartbeat(&db, &registration.daemon_id, &user.id, 0, 1, 0, 0)
+        .await
+        .expect("record repeated work heartbeat");
+    let repeated_count: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM daemon_heartbeats WHERE daemon_id = $1")
+            .bind(&registration.daemon_id)
+            .fetch_one(&db.pool)
+            .await
+            .expect("count repeated heartbeat metrics");
+    assert_eq!(repeated_count, 2);
 
     let stale_bucket = format!("retention-test:{suffix}:stale");
     let current_bucket = format!("retention-test:{suffix}:current");
