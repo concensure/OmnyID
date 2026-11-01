@@ -10,6 +10,7 @@ const vite = readFileSync(new URL("../vite.config.mjs", import.meta.url), "utf8"
 
 test("full-account stack is disposable and refuses unsafe targets", () => {
   assert.match(stack, /--tmpfs/);
+  assert.match(stack, /CARGO_TARGET_DIR = \$cargoTarget/);
   assert.match(stack, /127\.0\.0\.1:\$dbPort/);
   assert.match(stack, /omnyid_test/);
   assert.match(stack, /Refusing to build or run.+dirty tree/);

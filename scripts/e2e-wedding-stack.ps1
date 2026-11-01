@@ -77,6 +77,7 @@ if (-not $tempRoot.StartsWith($tempBase, [StringComparison]::OrdinalIgnoreCase) 
 }
 New-Item -ItemType Directory -Path $tempRoot | Out-Null
 $manifestPath = Join-Path $tempRoot "seed-manifest.json"
+$cargoTarget = if ($SkipBuild) { Join-Path $repo "target" } else { Join-Path $tempRoot "cargo-target" }
 $serverOut = Join-Path $tempRoot "homeserver.out.log"
 $serverErr = Join-Path $tempRoot "homeserver.err.log"
 $uiOut = Join-Path $tempRoot "ui.out.log"
@@ -137,10 +138,11 @@ try {
     if (-not $SkipBuild) {
         Push-Location $repo
         try {
+            $env:CARGO_TARGET_DIR = $cargoTarget
             cargo build --bin omnyid-homeserver --bin wedding_e2e_seed
             if ($LASTEXITCODE -ne 0) { throw "Rust build failed" }
         }
-        finally { Pop-Location }
+        finally { Remove-Item Env:CARGO_TARGET_DIR -ErrorAction SilentlyContinue; Pop-Location }
         Push-Location (Join-Path $repo "solid-ui")
         try {
             npm ci
@@ -156,8 +158,8 @@ try {
         finally { Remove-Item Env:OMNYID_E2E_API_ORIGIN -ErrorAction SilentlyContinue; Pop-Location }
     }
 
-    $serverExe = Join-Path $repo "target\debug\omnyid-homeserver.exe"
-    $seedExe = Join-Path $repo "target\debug\wedding_e2e_seed.exe"
+    $serverExe = Join-Path $cargoTarget "debug\omnyid-homeserver.exe"
+    $seedExe = Join-Path $cargoTarget "debug\wedding_e2e_seed.exe"
     if (-not (Test-Path $serverExe) -or -not (Test-Path $seedExe)) { throw "Build the WED-317 binaries first" }
     $server = Start-Process -FilePath $serverExe -WorkingDirectory $repo -WindowStyle Hidden -PassThru `
         -RedirectStandardOutput $serverOut -RedirectStandardError $serverErr -Environment $serverEnvironment
