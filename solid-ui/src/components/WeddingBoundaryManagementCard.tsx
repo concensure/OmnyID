@@ -381,8 +381,8 @@ export function WeddingBoundaryManagementCard(props: {
           <WeddingDashboardIcon id="shield-check" class="h-5 w-5" />
         </span>
         <div class="min-w-0 flex-1">
-          <div class="flex items-center gap-2">
-            <p class="text-lg font-bold tracking-tight text-cyan-950">Family boundaries</p>
+          <div class="flex min-w-0 flex-wrap items-center gap-2">
+            <p class="min-w-0 break-words text-lg font-bold tracking-tight text-cyan-950">Family boundaries</p>
             <WeddingInfoTip title="Boundary tip" tone="sky">
               Family members can suggest changes, but only authorised people can approve changes to the official guest list. Private dietary, contact, and seating details stay restricted.
             </WeddingInfoTip>

@@ -25,6 +25,27 @@ export type WeddingMealChoiceState = {
   suggestions: WeddingMealChoiceEvidence[];
 };
 
+export type WeddingMealChoiceGuestSnapshot = {
+  id: string;
+  displayName: string;
+  attendance?: "Attending" | "Not attending" | "Pending";
+  rsvpStatus?: "Attending" | "Not attending" | "Pending";
+  mealPreference: string | null;
+};
+
+export type WeddingMealChoiceReplacementImpact = {
+  changesCatalogue: boolean;
+  addedOptions: string[];
+  removedOptions: string[];
+  affectedResponses: Array<{
+    guestId: string;
+    displayName: string;
+    mealChoice: string;
+  }>;
+  requiresConfirmation: boolean;
+  summaryLabel: string;
+};
+
 const OPTION_KEYS = new Set(["meal_choices", "meal_options", "menu_options"]);
 
 function clean(value: unknown): string {
@@ -148,18 +169,60 @@ export function buildWeddingMealChoiceState(
   };
 }
 
+export function buildWeddingMealChoiceReplacementImpact(input: {
+  current: WeddingMealChoiceEvidence | null | undefined;
+  nextOptions: readonly string[];
+  guests?: readonly WeddingMealChoiceGuestSnapshot[] | null;
+}): WeddingMealChoiceReplacementImpact {
+  const currentOptions = options(input.current?.options ?? []);
+  const nextOptions = options(input.nextOptions);
+  const currentKeys = new Set(currentOptions.map((item) => item.toLowerCase()));
+  const nextKeys = new Set(nextOptions.map((item) => item.toLowerCase()));
+  const addedOptions = nextOptions.filter((item) => !currentKeys.has(item.toLowerCase()));
+  const removedOptions = currentOptions.filter((item) => !nextKeys.has(item.toLowerCase()));
+  const changesCatalogue = currentOptions.length > 0
+    && (addedOptions.length > 0 || removedOptions.length > 0);
+  const affectedResponses = changesCatalogue
+    ? (input.guests ?? []).flatMap((guest) => {
+      const mealChoice = clean(guest.mealPreference);
+      if ((guest.attendance ?? guest.rsvpStatus) !== "Attending" || !mealChoice || nextKeys.has(mealChoice.toLowerCase())) return [];
+      return [{
+        guestId: clean(guest.id).slice(0, 160),
+        displayName: clean(guest.displayName).slice(0, 120) || "Guest",
+        mealChoice: mealChoice.slice(0, 80),
+      }];
+    }).slice(0, 80)
+    : [];
+  const requiresConfirmation = affectedResponses.length > 0;
+  return {
+    changesCatalogue,
+    addedOptions,
+    removedOptions,
+    affectedResponses,
+    requiresConfirmation,
+    summaryLabel: !changesCatalogue
+      ? currentOptions.length > 0 ? "These choices match the current catalogue." : "This creates the first confirmed meal catalogue."
+      : requiresConfirmation
+        ? `${affectedResponses.length} attending guest response${affectedResponses.length === 1 ? " uses" : "s use"} a choice that would be removed.`
+        : "The catalogue changes, but no saved attending response uses a removed choice.",
+  };
+}
+
 export function weddingMealChoiceCatalogueToAfpSendInput(input: {
   options: readonly string[];
   source: WeddingMealChoiceSource;
   sourceLabel: string;
   sourceMessageId?: string | null;
   currentRevision?: number;
+  replacementImpact?: WeddingMealChoiceReplacementImpact | null;
+  confirmedAffectedResponses?: boolean;
   metadata?: unknown;
   nowIso?: string;
 }): SendAfpMessageInput | null {
   const metadata = normalizeWeddingPlanningMetadata(input.metadata);
   const storedOptions = options(input.options);
   if (storedOptions.length < 2) return null;
+  if (input.replacementImpact?.requiresConfirmation && input.confirmedAffectedResponses !== true) return null;
   const revision = Math.max(1, (input.currentRevision ?? 0) + 1);
   const catalogueId = `wedding_meal_choices:${safeWeddingLabel(metadata.responseWorkspaceId)}`;
   const nowIso = input.nowIso ?? new Date().toISOString();
@@ -183,6 +246,12 @@ export function weddingMealChoiceCatalogueToAfpSendInput(input: {
       source_label: clean(input.sourceLabel).slice(0, 120) || "Couple-entered choices",
       source_message_id: clean(input.sourceMessageId) || null,
       confirmed_by_couple: true,
+      replacement_review: input.replacementImpact?.changesCatalogue ? {
+        reviewed: true,
+        affected_response_count: input.replacementImpact.affectedResponses.length,
+        affected_guest_refs: input.replacementImpact.affectedResponses.map((response) => response.guestId),
+        removed_option_count: input.replacementImpact.removedOptions.length,
+      } : null,
       updated_at: nowIso,
     },
     metadata: {

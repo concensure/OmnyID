@@ -29,6 +29,7 @@ import { WeddingHelpersPanel } from "@/components/WeddingHelpersPanel";
 import { WeddingHomeOverviewGrid } from "@/components/WeddingHomeOverviewGrid";
 import { WeddingImportantDetailsPanel } from "@/components/WeddingImportantDetailsPanel";
 import { WeddingInspirationPanel } from "@/components/WeddingInspirationPanel";
+import { WeddingMealChoiceCataloguePanel } from "@/components/WeddingMealChoiceCataloguePanel";
 import { WeddingNextStepCard } from "@/components/WeddingNextStepCard";
 import { WeddingPlanningTasksPanel } from "@/components/WeddingPlanningTasksPanel";
 import { WeddingPeopleHub } from "@/components/WeddingPeopleHub";
@@ -64,6 +65,7 @@ import {
   type WeddingRsvpSetupState,
 } from "@/lib/weddingRsvpSetupState";
 import {
+  buildWeddingMealChoiceReplacementImpact,
   buildWeddingMealChoiceState,
   weddingMealChoiceCatalogueToAfpSendInput,
   type WeddingMealChoiceSource,
@@ -246,15 +248,24 @@ export function WeddingWorkspaceContextPanels(props: {
     props.onRefreshWorkspace?.();
     return "RSVP setup saved. No invitation or link was sent.";
   }
-  async function saveMealChoices(input: { options: string[]; source: WeddingMealChoiceSource; sourceLabel: string; sourceMessageId?: string | null }): Promise<string> {
+  async function saveMealChoices(input: { options: string[]; source: WeddingMealChoiceSource; sourceLabel: string; sourceMessageId?: string | null; confirmedAffectedResponses: boolean }): Promise<string> {
     if (!props.saveProjection) throw new Error("Saving is not connected yet.");
+    const replacementImpact = buildWeddingMealChoiceReplacementImpact({
+      current: mealChoiceState().confirmed,
+      nextOptions: input.options,
+      guests: props.state.guestTracking.guestRows ?? [],
+    });
     const sendInput = weddingMealChoiceCatalogueToAfpSendInput({
       ...input,
+      replacementImpact,
       currentRevision: mealChoiceState().confirmed?.revision ?? 0,
       metadata: props.state.workspace.metadata,
     });
-    if (!sendInput) throw new Error("Add at least two current meal choices before confirming them.");
+    if (!sendInput) throw new Error(replacementImpact.requiresConfirmation
+      ? "Review and confirm the affected guest responses before replacing these choices."
+      : "Add at least two current meal choices before confirming them.");
     await props.saveProjection(sendInput);
+    props.onRefreshWorkspace?.();
     return "Meal choices confirmed for this wedding.";
   }
   async function saveFamilyRequest(input: { requesterLabel: string; requestLabel: string; changeType: WeddingBoundaryChangeType; targetHouseholdId: string; proposedGuestName: string; requiredApprovalCount: 1 | 2 }): Promise<string> {
@@ -465,6 +476,11 @@ export function WeddingWorkspaceContextPanels(props: {
               )}
             </For>
           </div>
+          <WeddingMealChoiceCataloguePanel
+            state={mealChoiceState()}
+            guestRows={props.state.guestTracking.guestRows}
+            onSave={saveMealChoices}
+          />
         </section>
       </div>
 

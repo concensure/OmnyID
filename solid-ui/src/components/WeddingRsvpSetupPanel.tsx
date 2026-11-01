@@ -21,6 +21,7 @@ import type {
   WeddingMealChoiceSource,
   WeddingMealChoiceState,
 } from "@/lib/weddingMealChoiceState";
+import { buildWeddingMealChoiceReplacementImpact } from "@/lib/weddingMealChoiceState";
 
 function dateAfterToday(days: number): string {
   const date = new Date();
@@ -38,6 +39,7 @@ export function WeddingRsvpSetupPanel(props: {
     source: WeddingMealChoiceSource;
     sourceLabel: string;
     sourceMessageId?: string | null;
+    confirmedAffectedResponses: boolean;
   }) => Promise<string>;
   onSave?: (setup: WeddingRsvpSetupState) => Promise<string>;
 }) {
@@ -71,6 +73,7 @@ export function WeddingRsvpSetupPanel(props: {
   const [mealSourceLabel, setMealSourceLabel] = createSignal(props.mealChoiceState?.confirmed?.sourceLabel ?? "Entered by the couple");
   const [mealSourceMessageId, setMealSourceMessageId] = createSignal<string | null>(props.mealChoiceState?.confirmed?.sourceMessageId ?? null);
   const [mealChoicesConfirmed, setMealChoicesConfirmed] = createSignal(Boolean(props.mealChoiceState?.confirmed || props.current?.questions.find((question) => question.id === "meal_choice")?.options.length));
+  const [confirmedAffectedResponses, setConfirmedAffectedResponses] = createSignal(false);
   const [showPreview, setShowPreview] = createSignal(false);
   const [saving, setSaving] = createSignal(false);
   const [notice, setNotice] = createSignal<string | null>(null);
@@ -96,6 +99,11 @@ export function WeddingRsvpSetupPanel(props: {
   const previews = createMemo(() => draft().setup
     ? buildWeddingRsvpInvitationPreviews(draft().setup!, props.guestTracking)
     : []);
+  const mealReplacementImpact = createMemo(() => buildWeddingMealChoiceReplacementImpact({
+    current: props.mealChoiceState?.confirmed,
+    nextOptions: mealOptions().split(","),
+    guests: props.guestTracking.guestRows ?? [],
+  }));
 
   const toggleEnabled = (id: WeddingRsvpQuestionId, enabled: boolean) => {
     if (id === "attendance") return;
@@ -129,6 +137,10 @@ export function WeddingRsvpSetupPanel(props: {
       setNotice("Confirm that these are the current meal choices before saving the RSVP setup.");
       return;
     }
+    if (enabledQuestions().includes("meal_choice") && mealReplacementImpact().requiresConfirmation && !confirmedAffectedResponses()) {
+      setNotice("Review and confirm the affected guest responses before replacing these choices.");
+      return;
+    }
     if (!props.onSave || saving()) return;
     setSaving(true);
     setNotice(null);
@@ -139,6 +151,7 @@ export function WeddingRsvpSetupPanel(props: {
           source: mealSource(),
           sourceLabel: mealSourceLabel(),
           sourceMessageId: mealSourceMessageId(),
+          confirmedAffectedResponses: confirmedAffectedResponses(),
         });
       }
       const key = await ensureWeddingRsvpCoupleKey(metadata.responseWorkspaceId);
@@ -237,6 +250,7 @@ export function WeddingRsvpSetupPanel(props: {
                     setMealSourceLabel(suggestion.sourceLabel);
                     setMealSourceMessageId(suggestion.sourceMessageId);
                     setMealChoicesConfirmed(false);
+                    setConfirmedAffectedResponses(false);
                   }}
                 >
                   <span><span class="block font-semibold">{suggestion.sourceLabel}</span><span class="block leading-5 opacity-75">{suggestion.options.join(" · ")}</span></span>
@@ -247,7 +261,7 @@ export function WeddingRsvpSetupPanel(props: {
           </Show>
           <div class="mt-3 grid gap-2 sm:grid-cols-2">
             <label class="text-xs font-semibold text-teal-950/75">Source
-              <select class="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-teal-950" value={mealSource()} onChange={(event) => { const source = event.currentTarget.value as WeddingMealChoiceSource; setMealSource(source); setMealSourceMessageId(null); setMealSourceLabel(source === "venue_package" ? "Venue package or quote" : source === "vendor_conversation" ? "Vendor conversation" : source === "run_sheet" ? "Wedding run sheet" : "Entered by the couple"); setMealChoicesConfirmed(false); }}>
+              <select class="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-teal-950" value={mealSource()} onChange={(event) => { const source = event.currentTarget.value as WeddingMealChoiceSource; setMealSource(source); setMealSourceMessageId(null); setMealSourceLabel(source === "venue_package" ? "Venue package or quote" : source === "vendor_conversation" ? "Vendor conversation" : source === "run_sheet" ? "Wedding run sheet" : "Entered by the couple"); setMealChoicesConfirmed(false); setConfirmedAffectedResponses(false); }}>
                 <option value="venue_package">Venue package or quote</option>
                 <option value="vendor_conversation">Vendor conversation</option>
                 <option value="run_sheet">Wedding run sheet</option>
@@ -255,9 +269,22 @@ export function WeddingRsvpSetupPanel(props: {
               </select>
             </label>
             <label class="text-xs font-semibold text-teal-950/75">Choices, separated by commas
-              <input class="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-teal-950 focus:border-teal-500 focus:ring-2 focus:ring-teal-100" value={mealOptions()} onInput={(event) => { setMealOptions(event.currentTarget.value); setMealChoicesConfirmed(false); }} placeholder="For example: beef, fish, vegetarian" />
+              <input class="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-teal-950 focus:border-teal-500 focus:ring-2 focus:ring-teal-100" value={mealOptions()} onInput={(event) => { setMealOptions(event.currentTarget.value); setMealChoicesConfirmed(false); setConfirmedAffectedResponses(false); }} placeholder="For example: beef, fish, vegetarian" />
             </label>
           </div>
+          <Show when={mealReplacementImpact().requiresConfirmation}>
+            <div class="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3" role="group" aria-labelledby="rsvp-meal-impact-title">
+              <p id="rsvp-meal-impact-title" class="text-xs font-semibold text-amber-950">Review affected RSVPs</p>
+              <p class="mt-1 text-xs leading-5 text-amber-950/80">{mealReplacementImpact().summaryLabel}</p>
+              <ul class="mt-1 list-disc pl-5 text-xs leading-5 text-amber-950/80">
+                <For each={mealReplacementImpact().affectedResponses}>{(response) => <li>{response.displayName}: {response.mealChoice}</li>}</For>
+              </ul>
+              <label class="mt-2 flex min-h-11 items-start gap-2 text-xs font-semibold text-amber-950">
+                <input type="checkbox" class="mt-0.5 h-5 w-5 accent-amber-700" checked={confirmedAffectedResponses()} onChange={(event) => setConfirmedAffectedResponses(event.currentTarget.checked)} />
+                <span>I have reviewed these responses. Keep them for follow-up instead of changing a guest's answer.</span>
+              </label>
+            </div>
+          </Show>
           <label class="mt-3 flex min-h-11 items-start gap-2 rounded-lg border border-teal-100 bg-teal-50 px-3 py-2 text-xs font-semibold text-teal-950">
             <input type="checkbox" class="mt-0.5 h-5 w-5 accent-teal-700" checked={mealChoicesConfirmed()} onChange={(event) => setMealChoicesConfirmed(event.currentTarget.checked)} />
             <span>I confirm these are the choices guests can currently select. Updating them later will require reviewing affected RSVPs.</span>

@@ -127,7 +127,7 @@ import {
   buildWeddingBoundaryTopologyState,
   type WeddingBoundaryTopologyState,
 } from "@/lib/weddingBoundaryTopologyState";
-import { buildWeddingBoundaryStarterObjects } from "@/lib/weddingBoundaryDefaultsState";
+import { buildWeddingBoundaryStarterObjects, weddingBoundaryStarterGuestsFromArtifacts } from "@/lib/weddingBoundaryDefaultsState";
 import {
   normalizeWeddingPlanningMetadata,
   type WeddingArtifactKind,
@@ -756,6 +756,7 @@ export function buildWeddingResponseWorkspaceViewState(input: WeddingResponseWor
   const boundaryObjects = input.boundaryObjects ?? buildWeddingBoundaryStarterObjects({
     metadata: input.metadata ?? artifacts[0]?.metadata,
     guestNames: guestNamesFromArtifacts(artifacts),
+    guestRows: weddingBoundaryStarterGuestsFromArtifacts(artifacts),
     helperNames: helperContactNames,
     collaboratorInvites: collaboration.invites,
   });
