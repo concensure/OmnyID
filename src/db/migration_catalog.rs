@@ -660,4 +660,9 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
             "../../postgres/migrations/0129_wedding_boundary_delegates_and_private_notes.sql"
         ),
     ),
+    (
+        "0130_operational_retention_and_legacy_watcher",
+        "Global rate-limit retention index and retirement of unsupported watcher registrations",
+        include_str!("../../postgres/migrations/0130_operational_retention_and_legacy_watcher.sql"),
+    ),
 ];

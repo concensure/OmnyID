@@ -116,6 +116,13 @@ mod tests {
     }
 
     #[test]
+    fn rate_limit_retention_runs_inside_the_forty_eight_hour_promise() {
+        assert_eq!(super::RATE_LIMIT_RETENTION_HOURS, 47);
+        assert!(super::RATE_LIMIT_PRUNE_BATCH > 0);
+        assert!(super::RATE_LIMIT_PRUNE_MAX_BATCHES_PER_PASS > 0);
+    }
+
+    #[test]
     fn legacy_daemon_kinds_are_not_misclassified_as_knowledge_curators() {
         assert_eq!(
             daemon_kind_from_str("knowledge_curator"),
@@ -394,6 +401,9 @@ const CURATOR_AUDIT_RETENTION_HOURS_ENV: &str = "OMNYID_CURATOR_AUDIT_RETENTION_
 const CURATOR_AUDIT_RETENTION_HOURS_DEFAULT: i64 = 7 * 24;
 const CURATOR_AUDIT_PRUNE_BATCH: i64 = 5_000;
 const CURATOR_AUDIT_PRUNE_MAX_BATCHES_PER_PASS: u32 = 20;
+const RATE_LIMIT_RETENTION_HOURS: i64 = 47;
+const RATE_LIMIT_PRUNE_BATCH: i64 = 5_000;
+const RATE_LIMIT_PRUNE_MAX_BATCHES_PER_PASS: u32 = 20;
 
 fn positive_limit(raw: Option<&str>, default: i64) -> i64 {
     raw.and_then(|value| value.trim().parse::<i64>().ok())
@@ -493,11 +503,42 @@ async fn prune_curator_run_audits(db: &Db) -> Result<u64, sqlx::Error> {
     Ok(deleted_total)
 }
 
+async fn prune_rate_limit_history(db: &Db) -> Result<u64, sqlx::Error> {
+    let mut deleted_total = 0u64;
+    for _ in 0..RATE_LIMIT_PRUNE_MAX_BATCHES_PER_PASS {
+        let deleted = sqlx::query(
+            r#"
+            DELETE FROM rate_limit_log rate_log
+            USING (
+                SELECT ctid
+                FROM rate_limit_log
+                WHERE request_time < NOW() - make_interval(hours => $1::int)
+                ORDER BY request_time
+                LIMIT $2
+                FOR UPDATE SKIP LOCKED
+            ) stale
+            WHERE rate_log.ctid = stale.ctid
+            "#,
+        )
+        .bind(RATE_LIMIT_RETENTION_HOURS)
+        .bind(RATE_LIMIT_PRUNE_BATCH)
+        .execute(&db.pool)
+        .await?
+        .rows_affected();
+        deleted_total += deleted;
+        if deleted < RATE_LIMIT_PRUNE_BATCH as u64 {
+            break;
+        }
+    }
+    Ok(deleted_total)
+}
+
 /// Bounds high-volume daemon observability using independently committed batches.
-pub async fn prune_operational_daemon_history(db: &Db) -> Result<(u64, u64), sqlx::Error> {
+pub async fn prune_operational_daemon_history(db: &Db) -> Result<(u64, u64, u64), sqlx::Error> {
     let heartbeats = prune_heartbeats(db).await?;
     let curator_audits = prune_curator_run_audits(db).await?;
-    Ok((heartbeats, curator_audits))
+    let rate_limit_rows = prune_rate_limit_history(db).await?;
+    Ok((heartbeats, curator_audits, rate_limit_rows))
 }
 
 /// Returns stale-heartbeat warnings for active daemons.

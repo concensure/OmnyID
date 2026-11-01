@@ -13,6 +13,18 @@ if ([string]::IsNullOrWhiteSpace($OutputDir)) {
     $OutputDir = Join-Path $env:TEMP "omnyid-oracle-runtime-stage"
 }
 
+$sourceCommit = (& git.exe -C $SourceRoot rev-parse HEAD 2>&1 | Out-String).Trim()
+if ($LASTEXITCODE -ne 0 -or $sourceCommit -notmatch '^[0-9a-f]{40}$') {
+    throw "[stage-oracle-runtime] SourceRoot must be a Git checkout with a full HEAD SHA: $SourceRoot"
+}
+$sourceStatus = (& git.exe -C $SourceRoot status --short 2>&1 | Out-String).Trim()
+if ($LASTEXITCODE -ne 0) {
+    throw "[stage-oracle-runtime] could not inspect Git status for SourceRoot: $SourceRoot"
+}
+if (-not [string]::IsNullOrWhiteSpace($sourceStatus)) {
+    throw "[stage-oracle-runtime] refusing to stage a dirty source tree at $sourceCommit"
+}
+
 $runtimeFiles = @(
     ".dockerignore",
     "Caddyfile",
@@ -306,6 +318,8 @@ $excludedBytes = [int64](($excludedEntries | Measure-Object -Property bytes -Sum
 
 $manifest = [pscustomobject]@{
     source_root = $SourceRoot
+    source_commit = $sourceCommit
+    source_commit_marker = "SOURCE_COMMIT"
     output_dir = $OutputDir
     include_simulated_data = [bool]$IncludeSimulatedData
     required_runtime_scripts = $runtimeScriptFiles
@@ -324,4 +338,5 @@ $manifest = [pscustomobject]@{
 }
 
 $manifest | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $OutputDir "oracle-runtime-manifest.json")
+Set-Content -LiteralPath (Join-Path $OutputDir "SOURCE_COMMIT") -Value $sourceCommit -Encoding ASCII
 Write-Output "[stage-oracle-runtime] staged $($copied.Count) paths into $OutputDir ($totalBytes bytes)"

@@ -174,7 +174,11 @@ foreach (`$relativePath in `$requiredScripts) {
     }
     "stub" | Set-Content -Path `$target -Encoding ASCII
 }
+`$sourceCommit = "0123456789abcdef0123456789abcdef01234567"
+`$sourceCommit | Set-Content (Join-Path `$OutputDir "SOURCE_COMMIT") -Encoding ASCII
 @{
+    source_commit = `$sourceCommit
+    source_commit_marker = "SOURCE_COMMIT"
     copied_paths = `$requiredScripts
     required_runtime_scripts = `$requiredScripts
     copied_path_count = `$requiredScripts.Count
@@ -198,6 +202,8 @@ function Invoke-FakeSsh {
     Add-Content -Path "$tmpRoot\ssh.log" -Value `$line
     if (`$line -like "*echo present; else echo missing; fi*") {
         "present"
+    } elseif (`$line -like "*SOURCE_COMMIT*echo verified*") {
+        "verified"
     }
 }
 

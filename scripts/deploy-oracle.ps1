@@ -144,6 +144,18 @@ function Assert-StagedOracleRuntimeManifest {
     }
 
     $manifest = Get-Content -LiteralPath $ManifestPath -Raw | ConvertFrom-Json
+    $sourceCommit = [string]$manifest.source_commit
+    if ($sourceCommit -notmatch '^[0-9a-f]{40}$') {
+        throw "[deploy-oracle] staged runtime manifest has no valid full source_commit"
+    }
+    $markerPath = Join-Path (Split-Path -Parent $ManifestPath) "SOURCE_COMMIT"
+    if (-not (Test-Path -LiteralPath $markerPath)) {
+        throw "[deploy-oracle] staged runtime is missing SOURCE_COMMIT"
+    }
+    $markerCommit = (Get-Content -LiteralPath $markerPath -Raw).Trim()
+    if ($markerCommit -ne $sourceCommit) {
+        throw "[deploy-oracle] SOURCE_COMMIT does not match oracle-runtime-manifest.json"
+    }
     $copiedPaths = @($manifest.copied_paths)
     $requiredScripts = @($manifest.required_runtime_scripts)
     if ($requiredScripts.Count -eq 0) {
@@ -156,6 +168,27 @@ function Assert-StagedOracleRuntimeManifest {
     }
 
     return $manifest
+}
+
+function Assert-RemoteOracleRuntimeProvenance {
+    param(
+        [string]$RemoteHostValue,
+        [string]$UserValue,
+        [string]$KeyPathValue,
+        [string]$RemoteDirValue,
+        [string]$ExpectedCommit
+    )
+
+    $remoteDirLiteral = Convert-ToShellSingleQuotedLiteral $RemoteDirValue
+    $expectedLiteral = Convert-ToShellSingleQuotedLiteral $ExpectedCommit
+    $command = "commit=`$(cat $remoteDirLiteral/SOURCE_COMMIT 2>/dev/null) && " +
+        "test `"`$commit`" = $expectedLiteral && " +
+        "grep -F `"`"source_commit`": `"`$commit`"`" " +
+        "$remoteDirLiteral/oracle-runtime-manifest.json >/dev/null && echo verified"
+    $result = & ssh.exe -o BatchMode=yes -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -i $KeyPathValue "$UserValue@$RemoteHostValue" $command 2>&1
+    if ($LASTEXITCODE -ne 0 -or (($result | Out-String).Trim()) -ne "verified") {
+        throw "[deploy-oracle] remote runtime provenance does not match $ExpectedCommit"
+    }
 }
 
 function Assert-RemoteOracleRuntimeScripts {
@@ -387,6 +420,7 @@ Assert-ExternalSuccess "uploading runtime archive"
 $LASTEXITCODE = $extractExit
 Assert-ExternalSuccess "extracting runtime archive"
 Assert-RemoteOracleRuntimeScripts -RemoteHostValue $RemoteHost -UserValue $User -KeyPathValue $KeyPath -RemoteDirValue $RemoteDir
+Assert-RemoteOracleRuntimeProvenance -RemoteHostValue $RemoteHost -UserValue $User -KeyPathValue $KeyPath -RemoteDirValue $RemoteDir -ExpectedCommit ([string]$stageManifest.source_commit)
 
 if ($EnvFile) {
     & (Join-Path $PSScriptRoot "startup-policy-check.ps1") -EnvFile $EnvFile

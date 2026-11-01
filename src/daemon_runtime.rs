@@ -104,9 +104,9 @@ pub fn start_health_maintenance_daemon(db: Db, mut shutdown: ShutdownRx) -> Join
                 (0, 0)
             };
             match daemon_registry::prune_operational_daemon_history(&db).await {
-                Ok((0, 0)) => {}
-                Ok((heartbeats, curator_audits)) => {
-                    info!(heartbeats, curator_audits, "Pruned old daemon history")
+                Ok((0, 0, 0)) => {}
+                Ok((heartbeats, curator_audits, rate_limit_rows)) => {
+                    info!(heartbeats, curator_audits, rate_limit_rows, "Pruned old history")
                 }
                 Err(err) => {
                     warn!(%err, "Failed to prune daemon history; check DB connectivity and retention indexes")

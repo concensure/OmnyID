@@ -3,7 +3,7 @@ use crate::calendar_event_profile::calendar_event_profile_from_fields;
 use crate::coordination_bus::{coord_family_of, coordination_bus};
 use crate::crypto::is_supported_encryption_envelope;
 use crate::integration::{ActionResult, IntegrationCapability};
-use crate::knowledge_curator::{BacklinkKind, BacklinkRecord, DaemonHeartbeat, DaemonKind};
+use crate::knowledge_curator::{BacklinkKind, BacklinkRecord, DaemonKind};
 use crate::local_sync::{DeviceBootstrap, SyncSliceSpec};
 use crate::message::{
     collect_search_facets_from_parts, metadata_store_flag, SupertagDefinitionContent,
@@ -22,6 +22,7 @@ mod migration_catalog;
 pub use migration_catalog::MIGRATIONS;
 mod message_attachments;
 pub use message_attachments::StoredMessageAttachment;
+mod operational_retention;
 mod quotation_response_capabilities;
 pub use quotation_response_capabilities::StoredQuotationResponseCapability;
 mod quotation_vendor_responses;
@@ -2098,51 +2099,6 @@ impl Db {
         .execute(&self.pool)
         .await?;
         Ok(daemon_id)
-    }
-
-    pub async fn record_daemon_heartbeat(
-        &self,
-        heartbeat: &DaemonHeartbeat,
-    ) -> Result<(), sqlx::Error> {
-        sqlx::query(
-            r#"
-            UPDATE daemon_registrations
-            SET last_heartbeat_at = $2::timestamptz
-            WHERE daemon_id = $1
-            "#,
-        )
-        .bind(&heartbeat.daemon_id)
-        .bind(&heartbeat.created_at)
-        .execute(&self.pool)
-        .await?;
-
-        sqlx::query(
-            r#"
-            INSERT INTO daemon_heartbeats (
-                heartbeat_id,
-                daemon_id,
-                user_id,
-                metrics,
-                created_at
-            )
-            VALUES ($1, $2, $3, $4, $5::timestamptz)
-            ON CONFLICT (heartbeat_id) DO NOTHING
-            "#,
-        )
-        .bind(&heartbeat.heartbeat_id)
-        .bind(&heartbeat.daemon_id)
-        .bind(&heartbeat.user_id)
-        .bind(json!({
-            "queue_depth": heartbeat.queue_depth,
-            "events_processed_last_hour": heartbeat.events_processed_last_hour,
-            "tokens_used_today": heartbeat.tokens_used_today,
-            "error_count_last_hour": heartbeat.error_count_last_hour,
-        }))
-        .bind(&heartbeat.created_at)
-        .execute(&self.pool)
-        .await?;
-
-        Ok(())
     }
 
     pub async fn upsert_relational_projection(

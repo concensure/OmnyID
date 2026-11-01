@@ -116,8 +116,7 @@ try {
         "typescript-sdk/src",
         "target",
         "training_data",
-        "artifacts",
-        ".git"
+        "artifacts"
     )) {
         New-Item -ItemType Directory -Path (Join-Path $sourceRoot $dir) -Force | Out-Null
     }
@@ -134,7 +133,13 @@ try {
     New-TestFile -RelativePath "target/should-not-copy.txt"
     New-TestFile -RelativePath "training_data/should-not-copy.txt"
     New-TestFile -RelativePath "artifacts/should-not-copy.txt"
-    New-TestFile -RelativePath ".git/config"
+
+    & git.exe -C $sourceRoot init | Out-Null
+    & git.exe -C $sourceRoot config user.email "runtime-stage-test@omnyid.invalid"
+    & git.exe -C $sourceRoot config user.name "Oracle runtime stage self-test"
+    & git.exe -C $sourceRoot add --all
+    & git.exe -C $sourceRoot commit -m "test fixture" | Out-Null
+    $expectedSourceCommit = (& git.exe -C $sourceRoot rev-parse HEAD | Out-String).Trim()
 
     & (Join-Path $PSScriptRoot "stage-oracle-runtime.ps1") -SourceRoot $sourceRoot -OutputDir $stageWithData -IncludeSimulatedData
     & (Join-Path $PSScriptRoot "stage-oracle-runtime.ps1") -SourceRoot $sourceRoot -OutputDir $stageWithoutData -IncludeSimulatedData:$false
@@ -157,6 +162,7 @@ try {
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $stageWithData "postgres/data"))) "did not expect reviewed source data in staged output"
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $stageWithData ".git"))) "did not expect .git in staged output"
     Assert-True (Test-Path -LiteralPath (Join-Path $stageWithData "oracle-runtime-manifest.json")) "expected oracle runtime manifest"
+    Assert-True (Test-Path -LiteralPath (Join-Path $stageWithData "SOURCE_COMMIT")) "expected source commit marker"
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $stageWithoutData "benchmarks/sample.jsonl"))) "did not expect simulated sample data when IncludeSimulatedData is disabled"
 
     $manifestWithData = Get-Content (Join-Path $stageWithData "oracle-runtime-manifest.json") -Raw | ConvertFrom-Json
@@ -168,6 +174,10 @@ try {
     Assert-True ($manifestWithData.largest_paths.Count -gt 0) "expected largest paths list in manifest"
     Assert-Equal $manifestWithData.include_simulated_data $true "expected manifest to record simulated-data inclusion"
     Assert-Equal $manifestWithoutData.include_simulated_data $false "expected manifest to record simulated-data exclusion"
+    Assert-Equal $manifestWithData.source_commit $expectedSourceCommit "expected full source SHA in manifest"
+    Assert-Equal $manifestWithoutData.source_commit $expectedSourceCommit "expected stable SHA in both manifests"
+    Assert-Equal $manifestWithData.source_commit_marker "SOURCE_COMMIT" "expected marker path in manifest"
+    Assert-Equal ((Get-Content (Join-Path $stageWithData "SOURCE_COMMIT") -Raw).Trim()) $expectedSourceCommit "expected marker to match manifest SHA"
     Assert-True ($manifestWithData.total_staged_gib -ge 0) "expected total_staged_gib in manifest"
     Assert-True (@($manifestWithData.category_totals).Count -ge 1) "expected category totals in manifest"
     Assert-Equal (@($manifestWithData.required_runtime_scripts).Count) (@(Get-OracleRequiredRuntimeScriptPaths).Count) "expected required runtime script count in manifest"
