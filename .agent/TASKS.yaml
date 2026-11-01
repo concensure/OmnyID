@@ -24,7 +24,7 @@ tasks:
     depends_on: [WED-315]
     files: [scripts/stage-oracle-runtime.ps1, scripts/deploy-oracle.ps1, src/db.rs, src/daemon_registry.rs, src/ledger_ingestion_daemon.rs, postgres/migrations/**, wedding/privacy.html, wedding/**, src/server/wedding_*routes.rs, solid-ui/**, typescript-sdk/**, Documents/marketing/wedding planning/**, .agent/**]
     acceptance: [Every staged Oracle runtime records one matching full source SHA in oracle-runtime-manifest.json and SOURCE_COMMIT and deploy verifies both, idle daemon liveness does not append unbounded heartbeat history and stale unsupported watcher registrations emit no AFP, rate-limit IP records are purged within 48 hours with safe production cleanup evidence, privacy copy ships only with the behavior it describes, landing phases and Quiz v2 follow their registered dependency order and project core, exact-SHA tests build release and hosted health evidence are recorded]
-    progress: "Oracle runs exact release 10250f2033c666ca33fcffc98aa6608c7d9e076c with matching SOURCE_COMMIT and oracle-runtime-manifest.json. Migration 0130 revoked legacy background watchers, global retention leaves zero rate-limit rows older than 48 hours and zero curator audit rows older than seven days, and unchanged daemon pulses no longer append history while registration liveness advances. Detached commit 53450ed is preserved on archive/oracle-deploy-53450ed-20260928. Landing phases 0-1 and Quiz v2 core/import are implemented and locally verified; Binder, first-party measurement, privacy patch and the final atomic landing release remain dependency-gated. Evidence: Documents/verification/wed-316-oracle-provenance-retention-2026-11-02.md."
+    progress: "Oracle runs exact release 10250f2033c666ca33fcffc98aa6608c7d9e076c with matching SOURCE_COMMIT and oracle-runtime-manifest.json. Migration 0130 revoked legacy background watchers, global retention leaves zero rate-limit rows older than 48 hours and zero curator audit rows older than seven days, and unchanged daemon pulses no longer append history while registration liveness advances. Detached commit 53450ed is preserved on archive/oracle-deploy-53450ed-20260928. Landing phases 0-1 and Quiz v2 core/import are locally verified at 07b53690d7f224caeaf8a2a4ba4eb698bc72fd59. Binder and first-party measurement now have false-default code, migrations, privacy copy and disposable-Postgres evidence; Binder PDF hot-sync plus Gmail/Outlook receipt gates, authenticated Quiz planning projections, final acceptance and the atomic landing release remain open. Evidence: Documents/verification/wed-316-oracle-provenance-retention-2026-11-02.md."
 
   - id: WLP-00
     title: Remove unsupported Wedding landing claims and establish verified design foundations
@@ -50,27 +50,29 @@ tasks:
 
   - id: WLP-02
     title: Deliver Wedding Day Binder capture and double opt-in
-    status: ready
+    status: review
     owner: codex
     branch: agent/codex/WED-316
     worktree: C:/Users/ozans/Desktop/projects/OmnyID-WED-316
     depends_on: [WLP-01]
     files: [wedding/index.html, wedding/downloads/**, wedding/privacy.html, src/server/wedding_binder_routes.rs, src/server/mod.rs, src/db.rs, postgres/migrations/**, Caddyfile, wedding/tests/**]
     acceptance: [Binder request needs only email and enumeration-safe states, repeat requests within 24 hours send once, marketing remains unticked and double opt-in, SMTP multipart delivery links to fillable and print PDFs, admin list unsubscribe and strict abuse controls work, public form stays disabled until real Gmail and Outlook receipt gates pass]
+    progress: "Implemented migration 0131, enumeration-safe 24-hour suppression, hashed double-opt-in tokens, multipart Cloudflare/Resend delivery, operator list, bounded acquisition data, honeypot/rate/body controls, a false-default capability check and reviewed PDF hash manifest. Unit and disposable-Postgres tests pass. Still gated on exact PDF hot-sync plus real Gmail and Outlook receipt checks before OMNYID_WEDDING_BINDER_ENABLED may turn true."
 
   - id: WLP-03
     title: Add privacy-preserving first-party Wedding measurement
-    status: ready
+    status: review
     owner: codex
     branch: agent/codex/WED-316
     worktree: C:/Users/ozans/Desktop/projects/OmnyID-WED-316
     depends_on: [WLP-00]
     files: [wedding/assets/js/measure.js, wedding/privacy.html, src/server/wedding_site_measurement_routes.rs, src/server/mod.rs, src/db.rs, postgres/migrations/**, Caddyfile, wedding/tests/**]
     acceptance: [Measurement sets no cookies stores no IP personal data answers or form content, GPC and DNT send nothing, payload and properties are allowlisted and bounded, fourteen-month retention and admin funnel report work, common visits use one non-blocking batch]
+    progress: "Implemented migration 0132, false-default /wedding/e ingest, strict event/property/path limits, GPC/DNT and bot suppression before rate limiting, sessionStorage-only visit IDs, sendBeacon/fetch batching, 14-month scheduled retention and operator funnel aggregates. Unit, disposable-Postgres, site smoke and browser accessibility checks pass; hosted release evidence remains open."
 
   - id: WLP-04
     title: Complete verified Wedding landing demos and Quiz entry
-    status: ready
+    status: review
     owner: codex
     branch: agent/codex/WED-316
     worktree: C:/Users/ozans/Desktop/projects/OmnyID-WED-316
@@ -227,6 +229,7 @@ tasks:
     depends_on: [WLP-03]
     files: [wedding/assets/js/quiz*.js, wedding/assets/js/measure.js, wedding/tests/**]
     acceptance: [Only six allowlisted Quiz event names and non-personal bounded properties use the first-party endpoint, no answers names or content leave the browser, payload tests pass]
+    progress: "The endpoint allows exactly the six Quiz event names with bounded non-personal properties; public Quiz start, completion, share and partner-invite acceptance use the shared first-party transport. Import and suggestion acceptance remain tied to their authenticated workspace actions and need final QZ-09/QZ-11 wiring before completion."
 
   - id: QZ-14
     title: Verify Quiz accessibility mobile behavior and claims

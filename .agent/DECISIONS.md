@@ -2327,3 +2327,19 @@ subjective usability or a controlled external cohort.
 - Implementation proceeds in `C:/Users/ozans/Desktop/projects/OmnyID-WED-316`
   on `agent/codex/WED-316`; the untracked primary-checkout specifications and
   art are read-only inputs until intentionally added to the task worktree.
+
+## 2026-11-02: Wedding Binder and site measurement remain false-default release units
+
+- Binder requests use a separate privacy-minimised delivery ledger rather than
+  subscribing an address to the existing newsletter at capture time. Planning tips
+  require a hashed-token confirmation before the newsletter row exists.
+- Repeat Binder requests within 24 hours produce the same public response and no
+  second email. The public capability remains disabled until both reviewed PDFs are
+  installed by exact hash and real Gmail and Outlook receipt evidence exists.
+- Public Wedding measurement uses no cookie, persistent browser identifier, IP
+  column, user agent, form content or quiz answer. It honours GPC and DNT before
+  sending, accepts only closed event/property sets, and retains rows for 14 months.
+- `OMNYID_WEDDING_BINDER_ENABLED` and `OMNYID_WEDDING_MEASUREMENT_ENABLED` are
+  independent false-default release controls. The matching privacy copy and both
+  capabilities must ship as one exact-SHA release; provider acceptance alone is not
+  Binder receipt evidence.

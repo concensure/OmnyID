@@ -14,6 +14,9 @@
     stage: 'intro', index: 0, answers: {}, skipped: [], history: [], reviewing: false,
     invited: null, comparison: null, legacyLink: false
   };
+  function track(event, props) {
+    if (window.OmnyWeddingMeasure) window.OmnyWeddingMeasure.track(event, props);
+  }
 
   function esc(value) { return String(value == null ? '' : value).replace(/[&<>"']/g, function (char) {
     return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char];
@@ -146,6 +149,10 @@
   function resultView() {
     var result = E.buildResult(state.answers), animal = result.animal;
     publish(result);
+    track('quiz_completed', {
+      quiz_version: '2',
+      animal_id: result.animal_id || 'unassigned'
+    });
     var heading = animal ? animal.name + ' — ' + animal.subtitle : 'Your planning profile';
     var crest = animal ? '<img class="qz-animal" src="' + photo(animal.photo) + '" alt="Illustrated ' + esc(animal.name) + '" width="190" height="190">' : '';
     var runner = result.runner_up ? '<p class="qz-note">A nearby storytelling label is ' + esc(result.runner_up.name + ' — ' + result.runner_up.subtitle) + '.</p>' : '';
@@ -209,6 +216,7 @@
     }
     var action = button.dataset.action;
     if (action === 'start') {
+      track('quiz_started', { quiz_version: '2' });
       state.reviewing = false; state.history = []; state.skipped = [];
       var first = E.nextQuestion(state.answers, state.skipped);
       state.index = first ? D.QUESTIONS.indexOf(first) : 0;
@@ -224,7 +232,7 @@
     else if (action === 'result') { state.stage = 'result'; resultView(); }
     else if (action === 'continue') { state.reviewing = false; state.history = []; state.stage = 'question'; nextAdaptiveQuestion(); }
     else if (action === 'revise') { state.reviewing = true; state.history = []; state.index = 0; state.stage = 'question'; questionView(); }
-    else if (action === 'partner') { var result = E.buildResult(state.answers); shareLink(E.partnerHash(state.answers), 'I found my wedding animal: ' + (result.animal ? result.animal.name : 'a planning profile') + '. Take the same planning quiz so we can compare:'); }
+    else if (action === 'partner') { var result = E.buildResult(state.answers); track('quiz_shared', { quiz_version: '2' }); shareLink(E.partnerHash(state.answers), 'I found my wedding animal: ' + (result.animal ? result.animal.name : 'a planning profile') + '. Take the same planning quiz so we can compare:'); }
     else if (action === 'compare') { state.comparison = E.comparison(state.invited || {}, state.answers); state.stage = 'compare'; compareView(); }
     else if (action === 'share-back') shareLink(E.coupleHash(state.invited || {}, state.answers), 'Here is our private Wedding Animal planning comparison:');
     else if (action === 'download') {
@@ -241,7 +249,7 @@
   });
   function boot() {
     var hash = E.parseHash(location.hash); load();
-    if (hash && hash.kind === 'p2') state.invited = hash.answers;
+    if (hash && hash.kind === 'p2') { state.invited = hash.answers; track('partner_invite_accepted', { quiz_version: '2' }); }
     if (hash && hash.kind === 'c2') { state.comparison = E.comparison(hash.first, hash.second); state.stage = 'compare'; compareView(); return; }
     if (location.hash && !hash) state.legacyLink = true;
     introView();

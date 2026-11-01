@@ -665,4 +665,14 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Global rate-limit retention index and retirement of unsupported watcher registrations",
         include_str!("../../postgres/migrations/0130_operational_retention_and_legacy_watcher.sql"),
     ),
+    (
+        "0131_wedding_binder_requests",
+        "Privacy-minimised Wedding Day Binder delivery and double opt-in receipts",
+        include_str!("../../postgres/migrations/0131_wedding_binder_requests.sql"),
+    ),
+    (
+        "0132_wedding_site_measurement",
+        "Cookie-free non-identifying first-party Wedding site measurement",
+        include_str!("../../postgres/migrations/0132_wedding_site_measurement.sql"),
+    ),
 ];

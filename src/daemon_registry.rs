@@ -538,6 +538,12 @@ pub async fn prune_operational_daemon_history(db: &Db) -> Result<(u64, u64, u64)
     let heartbeats = prune_heartbeats(db).await?;
     let curator_audits = prune_curator_run_audits(db).await?;
     let rate_limit_rows = prune_rate_limit_history(db).await?;
+    sqlx::query("DELETE FROM wedding_site_sessions WHERE first_seen < NOW() - INTERVAL '14 months'")
+        .execute(&db.pool)
+        .await?;
+    sqlx::query("DELETE FROM wedding_binder_requests WHERE requested_at < NOW() - INTERVAL '12 months'")
+        .execute(&db.pool)
+        .await?;
     Ok((heartbeats, curator_audits, rate_limit_rows))
 }
 

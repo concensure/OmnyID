@@ -39,7 +39,11 @@ const expectedPages = [
 function htmlFiles(dir) {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const fullPath = join(dir, entry.name);
-    if (entry.isDirectory()) return htmlFiles(fullPath);
+    if (entry.isDirectory()) {
+      // Transactional email templates are not public, navigable site pages.
+      if (entry.name === 'email') return [];
+      return htmlFiles(fullPath);
+    }
     return entry.name.endsWith('.html') ? [fullPath] : [];
   });
 }

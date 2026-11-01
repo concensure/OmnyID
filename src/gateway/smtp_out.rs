@@ -249,6 +249,69 @@ pub async fn send_transactional_email(to: &str, subject: &str, body: &str) -> Re
     }
 }
 
+/// Send platform-owned mail with both text and HTML alternatives. This deliberately
+/// requires the platform provider so callers never silently lose the HTML alternative.
+pub async fn send_transactional_multipart_email(
+    to: &str,
+    subject: &str,
+    text_body: &str,
+    html_body: &str,
+) -> Result<(), String> {
+    let api_token = crate::secret_manager::read_process_secret_trimmed(
+        "OMNYID_TRANSACTIONAL_CLOUDFLARE_API_TOKEN",
+    );
+    let account_id = std::env::var("OMNYID_TRANSACTIONAL_CLOUDFLARE_ACCOUNT_ID")
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty());
+    let resend_api_key =
+        crate::secret_manager::read_process_secret_trimmed("OMNYID_TRANSACTIONAL_RESEND_API_KEY");
+    let from = std::env::var("OMNYID_TRANSACTIONAL_FROM_ADDRESS")
+        .ok()
+        .or_else(|| std::env::var("FROM_ADDRESS").ok())
+        .or_else(|| std::env::var("OMNYID_EMAIL_ADDRESS").ok())
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| "Transactional sender address is not configured".to_string())?;
+
+    let cloudflare_error = match (api_token, account_id) {
+        (Some(token), Some(account_id)) => match send_transactional_multipart_via_cloudflare(
+            &token,
+            &account_id,
+            &from,
+            to,
+            subject,
+            text_body,
+            html_body,
+        )
+        .await
+        {
+            Ok(()) => return Ok(()),
+            Err(error) => Some(error),
+        },
+        (Some(_), None) => Some("Cloudflare transactional account is not configured".to_string()),
+        (None, _) => None,
+    };
+
+    let Some(resend_api_key) = resend_api_key else {
+        return Err(cloudflare_error
+            .unwrap_or_else(|| "No multipart transactional provider is configured".to_string()));
+    };
+    send_transactional_multipart_via_resend(
+        &resend_api_key,
+        &from,
+        to,
+        subject,
+        text_body,
+        html_body,
+    )
+    .await
+    .map_err(|error| match cloudflare_error {
+        Some(primary) => format!("Cloudflare primary failed: {primary}; Resend failed: {error}"),
+        None => error,
+    })
+}
+
 /// Platform-owned account mail is separate from the Gmail continuity gateway.
 /// Cloudflare Email Sending is attempted first; Resend is only used after that
 /// attempt fails or when Cloudflare has not been configured yet.
@@ -353,6 +416,42 @@ fn cloudflare_email_sending_payload(from: &str, to: &str, subject: &str, body: &
     })
 }
 
+async fn send_transactional_multipart_via_cloudflare(
+    api_key: &str,
+    account_id: &str,
+    from: &str,
+    to: &str,
+    subject: &str,
+    text_body: &str,
+    html_body: &str,
+) -> Result<(), String> {
+    let response = reqwest::Client::new()
+        .post(format!(
+            "https://api.cloudflare.com/client/v4/accounts/{}/email/sending/send",
+            urlencoding::encode(account_id)
+        ))
+        .bearer_auth(api_key)
+        .json(&serde_json::json!({
+            "from": from,
+            "to": [to],
+            "subject": subject,
+            "text": text_body,
+            "html": html_body,
+        }))
+        .send()
+        .await
+        .map_err(|error| format!("Cloudflare Email Sending request failed: {error}"))?;
+    if response.status().is_success() {
+        return Ok(());
+    }
+    let status = response.status();
+    let detail = response.text().await.unwrap_or_default();
+    Err(format!(
+        "Cloudflare Email Sending returned {status}: {}",
+        detail.chars().take(500).collect::<String>()
+    ))
+}
+
 async fn send_transactional_email_via_resend(
     api_key: &str,
     from: &str,
@@ -381,6 +480,38 @@ async fn send_transactional_email_via_resend(
     let detail = response.text().await.unwrap_or_default();
     let detail = detail.chars().take(500).collect::<String>();
     Err(format!("Resend returned {status}: {detail}"))
+}
+
+async fn send_transactional_multipart_via_resend(
+    api_key: &str,
+    from: &str,
+    to: &str,
+    subject: &str,
+    text_body: &str,
+    html_body: &str,
+) -> Result<(), String> {
+    let response = reqwest::Client::new()
+        .post("https://api.resend.com/emails")
+        .bearer_auth(api_key)
+        .json(&serde_json::json!({
+            "from": from,
+            "to": [to],
+            "subject": subject,
+            "text": text_body,
+            "html": html_body,
+        }))
+        .send()
+        .await
+        .map_err(|error| format!("Resend request failed: {error}"))?;
+    if response.status().is_success() {
+        return Ok(());
+    }
+    let status = response.status();
+    let detail = response.text().await.unwrap_or_default();
+    Err(format!(
+        "Resend returned {status}: {}",
+        detail.chars().take(500).collect::<String>()
+    ))
 }
 
 fn gmail_config_from_env(config: &MailGatewayConfig) -> Result<GmailOAuthConfig, String> {

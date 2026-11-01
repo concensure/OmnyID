@@ -6460,3 +6460,46 @@ Evidence:
 
 - `Documents/verification/wed-316-oracle-provenance-retention-2026-11-02.md`
 - `Documents/verification/wedding-animal-quiz-v2-pilot-protocol.md`
+
+## 2026-11-02: WED-316 Binder and first-party measurement slice
+
+Implemented after the landing/Quiz core candidate:
+
+- Added additive migrations 0131 and 0132 for privacy-minimised Binder delivery
+  receipts and cookie-free Wedding site measurement.
+- Added an enumeration-safe Binder API with one-email-per-address-per-24-hours,
+  hashed double-opt-in confirmation, multipart Cloudflare/Resend delivery, strict
+  body/rate/honeypot controls, operator listing and 12-month retention.
+- Added a false-default Binder section to the landing page. The reviewed PDFs stay
+  outside Git; their source paths and exact SHA-256 values are recorded beside the
+  versioned cover asset.
+- Added a false-default `/wedding/e` endpoint and deferred browser transport. Event,
+  property, path and attribution values are closed and bounded; GPC/DNT and known
+  bots exit before rate limiting; no IP, user agent, name, email, form content or
+  quiz answer enters the measurement tables. Sessions expire after 14 months.
+- Integrated the supplied privacy-page content with the newer live privacy copy,
+  preserving hosted-AI and processor disclosures while adding truthful Binder,
+  measurement, Quiz and 48-hour rate-limit retention sections.
+
+Verification:
+
+- `cargo check`: passed.
+- Binder route unit tests: 3 passed.
+- Measurement route unit tests: 3 passed.
+- Fresh disposable-Postgres Binder and measurement tests: 2 passed; the exact test
+  database was dropped and its absence verified.
+- `npm run typecheck`: passed.
+- `npm run test:wedding`: 2,140 passed.
+- `npm run test:wedding-site`: passed.
+- `npm run test:line-budget`: 2 passed.
+- Wedding marketing Playwright matrix: 11 passed at mobile and desktop sizes.
+- `npm run build`: passed.
+
+Release boundary:
+
+- Nothing in this slice is deployed. Both release flags remain false-default.
+- Before Binder enablement, hot-sync the two reviewed PDFs by exact recorded hash,
+  then prove actual receipt and working links in one Gmail and one Outlook mailbox.
+- Quiz import/suggestion measurement remains coupled to QZ-09/QZ-11 authenticated
+  workspace actions. Image diversity owner review, Lighthouse/image-blocked checks,
+  final Quiz acceptance and the controlled pilot remain open.

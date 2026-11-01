@@ -256,6 +256,18 @@
         import omnyid_proxy
     }
 
+    handle /wedding/binder {
+        import omnyid_proxy
+    }
+
+    handle /wedding/binder/* {
+        import omnyid_proxy
+    }
+
+    handle /wedding/e {
+        import omnyid_proxy
+    }
+
     # Operator-published articles are served from durable Postgres content.
     # Keep these ahead of the static wedding file server so source deploys do
     # not erase articles published through the admin surface.

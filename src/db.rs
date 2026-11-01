@@ -30,6 +30,10 @@ pub use quotation_vendor_responses::{
     StoredVendorTransport, VendorTransportStoreOutcome, VendorTransportWrite,
 };
 mod wedding_newsletter;
+mod wedding_site_measurement;
+pub use wedding_site_measurement::{WeddingSiteEventWrite, WeddingSiteSessionWrite};
+mod wedding_binder;
+pub use wedding_binder::WeddingBinderAcquisition;
 mod wedding_blog_publications;
 pub use wedding_blog_publications::WeddingBlogPublicationRecord; mod wedding_quote_study; pub use wedding_quote_study::WeddingQuoteStudyRecord;
 mod wedding_onboarding_state;
