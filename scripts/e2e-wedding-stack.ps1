@@ -100,6 +100,7 @@ $serverEnvironment = @{
     OMNYID_ALLOW_INSECURE_UNSIGNED = "false"
     OMNYID_ALLOW_PLAINTEXT_STORAGE = "false"
     OMNYID_SIGNING_KEY_HEX = ("31" * 32)
+    OMNYID_ENCRYPTION_KEY_HEX = ("32" * 32)
     RUST_LOG = "warn,omnyid_homeserver=info"
 }
 

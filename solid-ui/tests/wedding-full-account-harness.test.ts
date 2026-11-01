@@ -16,6 +16,7 @@ test("full-account stack is disposable and refuses unsafe targets", () => {
   assert.match(stack, /OMNYID_DISABLE_DOTENV_AUTOLOAD = "true"/);
   assert.match(stack, /OMNYID_VENDOR_MAIL_ENABLED = "false"/);
   assert.match(stack, /OMNYID_TRANSACTIONAL_CLOUDFLARE_API_TOKEN = ""/);
+  assert.match(stack, /OMNYID_ENCRYPTION_KEY_HEX = \("32" \* 32\)/);
   assert.match(stack, /docker stop \$container/);
   assert.match(stack, /docker rm \$container/);
   assert.match(stack, /auth\/google\/config/);
