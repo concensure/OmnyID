@@ -6,8 +6,8 @@ import test from "node:test";
 const serviceWorkerSource = readFileSync(resolve("public/sw.js"), "utf8");
 
 test("workspace service worker bumps the shell cache after asset-cache policy changes", () => {
-  assert.match(serviceWorkerSource, /const SHELL_CACHE = "omnyid-shell-v4"/);
-  assert.doesNotMatch(serviceWorkerSource, /omnyid-shell-v3/);
+  assert.match(serviceWorkerSource, /const SHELL_CACHE = "omnyid-shell-v16"/);
+  assert.doesNotMatch(serviceWorkerSource, /API_CACHE/);
 });
 
 test("workspace service worker does not cache-first JS and CSS module assets", () => {
@@ -16,4 +16,13 @@ test("workspace service worker does not cache-first JS and CSS module assets", (
   assert.match(serviceWorkerSource, /event\.request\.destination === "style"/);
   assert.match(serviceWorkerSource, /event\.respondWith\(networkFirstWithCache\(event\.request, SHELL_CACHE\)\)/);
   assert.match(serviceWorkerSource, /stale module graph/i);
+});
+
+test("workspace service worker never caches account-scoped API responses", () => {
+  for (const prefix of ["api", "auth", "agent", "dashboard", "relay", "files", "wedding"]) {
+    assert.match(serviceWorkerSource, new RegExp(`url\\.pathname\\.startsWith\\(\"/${prefix}/\"\\)`));
+  }
+  assert.match(serviceWorkerSource, /event\.respondWith\(networkOnly\(event\.request\)\)/);
+  assert.doesNotMatch(serviceWorkerSource, /cacheFirstWithNetwork/);
+  assert.match(serviceWorkerSource, /Cache-Control": "no-store"/);
 });

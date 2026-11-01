@@ -1,6 +1,5 @@
 // OmnyID Service Worker - offline shell + update notification
-const SHELL_CACHE = "omnyid-shell-v15";
-const API_CACHE = "omnyid-api-v1";
+const SHELL_CACHE = "omnyid-shell-v16";
 
 const SHELL_ASSETS = [
   "/workspace/",
@@ -21,7 +20,7 @@ self.addEventListener("activate", (event) => {
     caches.keys().then((keys) =>
       Promise.all(
         keys
-          .filter((key) => key !== SHELL_CACHE && key !== API_CACHE)
+          .filter((key) => key !== SHELL_CACHE)
           .map((key) => caches.delete(key)),
       ),
     ).then(() => self.clients.claim()),
@@ -47,9 +46,9 @@ self.addEventListener("fetch", (event) => {
     url.pathname.startsWith("/dashboard/") ||
     url.pathname.startsWith("/relay/") ||
     url.pathname.startsWith("/files/") ||
-    url.pathname === "/wedding/provider-capabilities"
+    url.pathname.startsWith("/wedding/")
   ) {
-    event.respondWith(networkFirstWithCache(event.request, API_CACHE));
+    event.respondWith(networkOnly(event.request));
     return;
   }
 
@@ -74,8 +73,25 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  event.respondWith(cacheFirstWithNetwork(event.request, SHELL_CACHE));
+  // Do not put unclassified application responses into a shared origin cache.
+  // They may be authenticated or account-scoped even when their route does not
+  // use one of the prefixes above. The browser can still apply normal HTTP cache
+  // semantics to public resources that are not intercepted here.
 });
+
+async function networkOnly(request) {
+  try {
+    return await fetch(request);
+  } catch {
+    return new Response(JSON.stringify({ error: "offline" }), {
+      status: 503,
+      headers: {
+        "Cache-Control": "no-store",
+        "Content-Type": "application/json",
+      },
+    });
+  }
+}
 
 async function networkFirstWithCache(request, cacheName) {
   try {
@@ -92,22 +108,6 @@ async function networkFirstWithCache(request, cacheName) {
       status: 503,
       headers: { "Content-Type": "application/json" },
     });
-  }
-}
-
-async function cacheFirstWithNetwork(request, cacheName) {
-  const cached = await caches.match(request);
-  if (cached) return cached;
-  try {
-    const response = await fetch(request);
-    if (response.ok) {
-      const cache = await caches.open(cacheName);
-      cache.put(request, response.clone());
-    }
-    return response;
-  } catch {
-    const fallback = await caches.match("/workspace/");
-    return fallback ?? new Response("Offline", { status: 503 });
   }
 }
 
