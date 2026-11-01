@@ -139,10 +139,17 @@ try {
         Push-Location $repo
         try {
             $env:CARGO_TARGET_DIR = $cargoTarget
+            $env:CARGO_INCREMENTAL = "0"
+            $env:CARGO_PROFILE_DEV_DEBUG = "0"
             cargo build --bin omnyid-homeserver --bin wedding_e2e_seed
             if ($LASTEXITCODE -ne 0) { throw "Rust build failed" }
         }
-        finally { Remove-Item Env:CARGO_TARGET_DIR -ErrorAction SilentlyContinue; Pop-Location }
+        finally {
+            Remove-Item Env:CARGO_TARGET_DIR -ErrorAction SilentlyContinue
+            Remove-Item Env:CARGO_INCREMENTAL -ErrorAction SilentlyContinue
+            Remove-Item Env:CARGO_PROFILE_DEV_DEBUG -ErrorAction SilentlyContinue
+            Pop-Location
+        }
         Push-Location (Join-Path $repo "solid-ui")
         try {
             npm ci
@@ -222,6 +229,10 @@ try {
             }
         }
         if (-not $completed) {
+            $resolvedCargoTarget = [IO.Path]::GetFullPath($cargoTarget)
+            if ($resolvedCargoTarget.StartsWith($tempRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase) -and (Test-Path -LiteralPath $resolvedCargoTarget)) {
+                Remove-Item -LiteralPath $resolvedCargoTarget -Recurse -Force
+            }
             Write-Host "Harness failed; local redacted logs retained at $tempRoot"
         } elseif (Test-Path -LiteralPath $tempRoot) {
             $resolvedTemp = [IO.Path]::GetFullPath((Resolve-Path -LiteralPath $tempRoot).Path)
