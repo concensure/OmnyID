@@ -54,6 +54,7 @@ async function api(page: Page, path: string, init: { method?: string; body?: unk
   return page.evaluate(async ({ path: apiPath, method, body }) => {
     const response = await fetch(apiPath, {
       method: method || "GET",
+      cache: "no-store",
       headers: body === undefined ? {} : { "Content-Type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body),
     });

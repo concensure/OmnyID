@@ -1,4 +1,5 @@
 use super::*;
+use axum::http::{HeaderName, header::CACHE_CONTROL};
 
 const PLANNER_ACTIONS: [&str; 2] = ["view_scoped_summary", "propose_change"];
 const RSVP_GUEST_ACTIONS: [&str; 2] = ["view_own_invitation", "propose_own_change"];
@@ -432,7 +433,7 @@ async fn open_grant(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Path(grant_id): Path<String>,
-) -> Result<Json<Value>, (StatusCode, String)> {
+) -> Result<([(HeaderName, &'static str); 1], Json<Value>), (StatusCode, String)> {
     let delegate = authenticated_user(&state.db, &headers).await?;
     let grant = live_grant(&state, &delegate.id, &grant_id).await?;
     let table = tenant_table(&grant.owner_user_id);
@@ -462,12 +463,10 @@ async fn open_grant(
             .await
             .map_err(store_error)?
             .ok_or_else(unavailable)?;
-        return Ok(Json(rsvp_guest_projection(
-            &grant,
-            person,
-            &guest,
-            &invitation,
-        )));
+        return Ok((
+            [(CACHE_CONTROL, "private, no-store")],
+            Json(rsvp_guest_projection(&grant, person, &guest, &invitation)),
+        ));
     }
     let household_query = format!(
         "SELECT DISTINCT ON (m.content->>'household_id') m.content FROM {table} m WHERE m.kind='wedding_boundary_household' AND m.content->>'household_id'=ANY($1) AND {} ORDER BY m.content->>'household_id',COALESCE((m.content->>'revision')::bigint,1) DESC,m.timestamp DESC,m.id DESC",
@@ -480,12 +479,15 @@ async fn open_grant(
         .fetch_all(&state.db.pool)
         .await
         .map_err(store_error)?;
-    Ok(Json(json!({
-        "grant_id": grant.grant_id,
-        "role": grant.role,
-        "households": households.iter().map(planner_household_projection).collect::<Vec<_>>(),
-        "private_notes_visible": false
-    })))
+    Ok((
+        [(CACHE_CONTROL, "private, no-store")],
+        Json(json!({
+            "grant_id": grant.grant_id,
+            "role": grant.role,
+            "households": households.iter().map(planner_household_projection).collect::<Vec<_>>(),
+            "private_notes_visible": false
+        })),
+    ))
 }
 
 #[derive(Debug, Deserialize, Serialize)]
