@@ -1,3 +1,27 @@
+## 2026-11-01 - WED-312 Family access management and assurance (Codex, complete)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch
+`agent/codex/WED-308`; exact implementation SHA
+`a1e4023fba9d276f26b3d911fd7c404ed3346d84`. Clean verification worktree:
+`C:\Users\ozans\AppData\Local\Temp\omnyid-wed312-verify-a1e4023`.
+
+- Added one owner-facing surface for Family helper links and authenticated
+  Planner/RSVP-guest grants. It distinguishes the authority types, reveals a
+  helper capability once, lists no secret material and requires explicit
+  revocation confirmation.
+- Enforced structured allocation, deadline and scoped-rule conditions in the
+  UI and server. Only pending/partially-approved requests remain reviewable;
+  elapsed deadlines close without applying connected mutations.
+- Exact-SHA typecheck, 2,124 Wedding tests, two line-budget tests, production
+  build, 13 focused Rust unit tests and seven disposable-Postgres scenarios
+  pass. The temporary database was removed.
+- No deployment was requested. Production remains
+  `eb398ebfecaec6a0277d7fe634e6c97198b44afe`; both Family rollout switches
+  remain false. Hosted accessibility/usability, CSV import, shared meal
+  catalogue editing/impact review and a separately authorised cohort remain.
+
+Evidence: `Documents/verification/wed-312-family-boundary-access-assurance-2026-11-01.md`.
+
 ## 2026-10-31 - WED-306 native mobile, sourced meals and family-boundary first slice (Codex, in progress)
 
 Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch

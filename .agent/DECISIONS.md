@@ -2246,3 +2246,18 @@ The Couple surface uses the existing authoritative household command route for s
 archive. It selects stable person and household references, sends expected revisions, and presents the
 same deterministic impact preview before applying. These owner commands do not enable Family helper
 or authenticated delegate access; both rollout flags remain false-default.
+
+## 2026-11-01: Family access is owner-managed while rollout remains false-default
+
+Family helper links and authenticated Planner/RSVP-guest grants share one owner-facing management
+surface but remain different authority types. A link reveals its capability once and persists only a
+digest; an authenticated delegate binds an exact account and never receives the link material. Both
+use minimum-necessary scopes, explicit revocation and use-time expiry. Capability discovery may report
+only the two rollout booleans and must not expose owner, account, grant or capability identifiers.
+
+Allocation, deadline and non-wedding-scoped rules require structured conditions on both sides of the
+API. Request deadlines are authority boundaries: after the deadline, the request becomes terminal and
+cannot apply a guest, invitation, RSVP, budget or vendor mutation. Only pending and partially approved
+requests appear in the review queue. These contracts are locally assured, but they do not enable the
+hosted features; both Family rollout switches stay false until the hosted accessibility/usability
+matrix and a separately authorised narrow cohort pass.

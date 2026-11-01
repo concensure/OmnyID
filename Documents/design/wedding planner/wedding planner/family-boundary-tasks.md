@@ -65,7 +65,7 @@ Depends on: 3
 Depends on: 4
 
 - [x] Extend the policy contract and couple-facing rule builder with type, scope, condition envelope, effect, authority, effective period, visibility, status and override policy.
-- [ ] Make conditional fields mandatory for allocations, deadlines and scoped rules.
+- [x] Make conditional fields mandatory for allocations, deadlines and scoped rules.
 - [x] Project effective rules with inherited source explanations.
 - [x] Enforce type-aware precedence; a specific invitation rule cannot override system privacy.
 - [x] Detect same-level conflicts and require resolution instead of choosing by an opaque numeric rank.
@@ -81,6 +81,7 @@ Depends on: 4, 5
 - [x] Separate view and propose permissions; helper grants never receive approval authority.
 - [x] Immediately refuse revoked or expired family-helper links.
 - [x] Test forged household IDs, forwarded links, cross-tenant reads/writes and planner privilege escalation.
+- [x] Give the couple one owner-facing access surface to inspect, create and revoke Family helper, Planner and RSVP-guest grants without redisplaying capability tokens.
 
 ## 7. Request lifecycle and atomic decisions
 
@@ -93,6 +94,7 @@ Depends on: 5, 6
 - [x] Support single and configurable two-partner elevated approval without applying the first partial approval.
 - [x] Return existing receipts on exact retry and reviewable conflicts on stale request, rule or household versions.
 - [x] Test repeated/duplicate approval identities, partial approval without mutation, and exact second-partner application against disposable PostgreSQL.
+- [x] Keep only pending and partially approved requests in the review queue; project an elapsed deadline as terminal expiry and refuse any later mutation.
 
 ## 8. Impact preview and reconciliation
 
@@ -124,7 +126,7 @@ Depends on: 6, 7
 - [x] Minimise helper/guest projections field by field.
 - [x] Add revocation, expiry and deletion/retention tests.
 - [x] Record actor, causation, expected versions, decision and reconciliation references without duplicating private content.
-- [ ] Run security/privacy review for cross-scope disclosure and forwarded capabilities.
+- [x] Run security/privacy review for cross-scope disclosure and forwarded capabilities. Evidence: `Documents/verification/wed-312-family-boundary-access-assurance-2026-11-01.md`.
 
 ## 11. Accessibility, usability and rollout
 
@@ -146,6 +148,8 @@ WED-309 adds the next server-authority slices: atomic stale-safe household split
 
 WED-311 connects the review preview to the server's elevated-impact confirmation instead of trusting a field on the older request event. Removing a guest after an accepted RSVP now archives the active guest and closes the invitation while retaining the immutable RSVP response. Decision and household receipts list user-facing connected updates, preserve stable invitation references, carry actor/causation/expected-version references and replay exactly once. Planner, helper and RSVP-guest projections use explicit allowlists; dietary/contact/private-note and seating-conflict fields are excluded. The Couple surface now exposes server-authoritative rule replacement/archive and household split/merge/archive commands. Each command revalidates current versions, previews sent or accepted invitation impact, requires elevated confirmation when necessary, retains immutable response history and returns the original receipt on exact retry.
 
-This is not the end of the roadmap. Delegate/helper management UI, per-projector reconciliation acknowledgements, a controlled allowlisted cohort, and the complete security/accessibility/usability matrix remain open. Expiry, revocation, deletion retention, restricted projection allowlists, removal after RSVP and sent-invitation rule changes are covered locally. The exact-candidate flags-off Oracle shadow is recorded in `Documents/verification/wed-310-rsvp-release-2026-11-01.md`. `OMNYID_WEDDING_BOUNDARY_HELPERS_ENABLED` and `OMNYID_WEDDING_BOUNDARY_DELEGATES_ENABLED` stay false unless the remaining hosted rollout criteria pass.
+WED-312 adds the owner-facing access-management surface for Family helpers, authenticated Planners and RSVP guests. It reveals a helper token once, persists only its digest, distinguishes link access from account-bound access, exposes no owner/account identifiers through capability discovery, and keeps both rollout switches false by default. Allocation, deadline and scoped rules now reject incomplete structured conditions on both sides of the API. Only pending and partially approved requests remain reviewable; elapsed deadlines close requests without applying a guest, RSVP, invitation, budget or vendor mutation.
+
+This is not the end of the roadmap. A controlled allowlisted Family cohort, the hosted accessibility/usability matrix, CSV/table import, the shared Plan/day-details meal editor and catalogue-replacement impact review remain open. Expiry, revocation, deletion retention, restricted projection allowlists, removal after RSVP and sent-invitation rule changes are covered locally. The exact-candidate flags-off Oracle shadow is recorded in `Documents/verification/wed-310-rsvp-release-2026-11-01.md`. `OMNYID_WEDDING_BOUNDARY_HELPERS_ENABLED` and `OMNYID_WEDDING_BOUNDARY_DELEGATES_ENABLED` stay false unless the remaining hosted rollout criteria pass.
 
 Release evidence for this slice is in `Documents/verification/wed-306-native-mobile-meal-family-boundaries-2026-10-31.md`. The pre-change coordination SHA was `3bd1f79fdae00c370556b504e0fde1daf66cc36f`; the exact deployed application SHA is `3c626dd149d61ae57c739fa90cd26acecb0109aa`.
