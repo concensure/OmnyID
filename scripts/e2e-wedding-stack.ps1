@@ -94,6 +94,7 @@ $serverEnvironment = @{
     OMNYID_DISABLE_DOTENV_AUTOLOAD = "true"
     OMNYID_HTTP_BIND_ADDR = "127.0.0.1:$apiPort"
     OMNYID_BASE_URL = $uiOrigin
+    OMNYID_ALLOWED_ORIGINS = $uiOrigin
     OMNYID_ENABLE_INTERNAL_GRPC = "false"
     OMNYID_ENABLE_WEBTRANSPORT = "false"
     OMNYID_COORD_DB_NOTIFY = "false"

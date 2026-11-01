@@ -14,6 +14,7 @@ test("full-account stack is disposable and refuses unsafe targets", () => {
   assert.match(stack, /omnyid_test/);
   assert.match(stack, /Refusing to build or run.+dirty tree/);
   assert.match(stack, /OMNYID_DISABLE_DOTENV_AUTOLOAD = "true"/);
+  assert.match(stack, /OMNYID_ALLOWED_ORIGINS = \$uiOrigin/);
   assert.match(stack, /OMNYID_VENDOR_MAIL_ENABLED = "false"/);
   assert.match(stack, /OMNYID_TRANSACTIONAL_CLOUDFLARE_API_TOKEN = ""/);
   assert.match(stack, /OMNYID_ENCRYPTION_KEY_HEX = \("32" \* 32\)/);
