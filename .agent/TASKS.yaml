@@ -15,6 +15,16 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-311
+    title: Complete Family Boundary connected impacts and restricted projections
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-308
+    depends_on: [WED-309, WED-310]
+    files: [src/server/wedding_boundary_routes.rs, src/server/wedding_boundary_routes/request_mutations.rs, src/server/wedding_boundary_routes/household_commands.rs, src/server/wedding_boundary_routes/delegated_access.rs, tests/wedding_boundary_postgres.rs, solid-ui/src/components/WeddingBoundaryManagementCard.tsx, solid-ui/src/lib/weddingBoundaryGovernanceApi.ts, solid-ui/src/lib/weddingBoundaryGovernanceState.ts, solid-ui/tests/wedding-boundary-governance-state.test.ts, Documents/design/wedding planner/wedding planner/family-boundary-tasks.md, .agent/**]
+    acceptance: [Removing a guest after an RSVP requires an exact connected-impact confirmation while preserving immutable response history and producing one retry-safe reconciliation receipt, household changes after an RSVP preserve stable guest and invitation references and name every affected projection, material rule changes affecting sent invitations provide a deterministic preview and require elevated confirmation, helper Planner and RSVP-guest projections use explicit field allowlists and do not expose private notes dietary facts contact details or seating-conflict reasons outside role scope, the couple sees a plain-language explanation of connected updates and exact retries return the original receipt without sending an invitation inferring attendance committing spend or changing a vendor contract, focused frontend and disposable-Postgres tests typecheck Wedding tests line budgets and production build pass]
+    progress: "Connected-impact slice complete from RSVP release documentation SHA 2908c1ac12db6270ae484ac2b21400b5be5805cb: elevated confirmation now crosses the review/API boundary; accepted-RSVP removal preserves immutable response history; household changes preserve invitation references; receipts are retry-safe and name connected updates; delegated projections use explicit privacy allowlists; and a versioned sent-invitation rule preview is tested. Typecheck, 2,117 Wedding tests, line budgets, production build, eight focused Rust tests and five final-candidate disposable-Postgres scenarios pass. Still open before marking WED-311 done: mount versioned rule supersede/archive commands in the Couple UI and connect household command management surfaces. Both Family rollout switches remain false-default; no hosted cohort or deployment was authorised."
+
   - id: WED-310
     title: Reconcile RSVP rollout evidence and release the completed RSVP candidate
     status: done

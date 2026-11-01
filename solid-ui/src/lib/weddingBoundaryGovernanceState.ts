@@ -214,6 +214,36 @@ export function previewWeddingBoundaryRequestDecision(input: {
   ], !missingTarget && input.request.requestStatus === "pending");
 }
 
+export function previewWeddingBoundaryPolicyChange(input: {
+  policy: WeddingBoundaryPolicy;
+  nextStatus: "superseded" | "archived";
+  objects: readonly WeddingBoundaryLedgerObject[];
+}): WeddingBoundaryImpactPreview {
+  const { households, guests, invitations } = currentObjects(input.objects);
+  const scope = policyScope(input.policy);
+  const scopeId = clean(input.policy.scopeId);
+  const householdIds = scope === "wedding"
+    ? households.map((item) => item.householdId)
+    : scope === "family_group"
+      ? households.filter((item) => item.familyGroupId === scopeId).map((item) => item.householdId)
+      : scope === "household"
+        ? [scopeId]
+        : [];
+  const personIds = scope === "guest"
+    ? [scopeId]
+    : unique(householdIds.flatMap((householdId) => householdPeople(householdId, households, guests)));
+  const invitationIds = invitationIdsForPeople(personIds, invitations);
+  const currentVersion = input.policy.version ?? 0;
+  const valid = currentVersion >= 1 && (scope === "wedding" || Boolean(scopeId));
+  const committed = hasCommittedInvitation(personIds, invitations);
+  return preview("change_rule", householdIds, personIds, invitationIds, committed, [
+    valid ? `This creates rule version ${currentVersion + 1}; the earlier version remains in the audit history.` : "Refresh this rule before changing it.",
+    invitationIds.length > 0 ? "Existing invitation and RSVP records stay intact; connected projections will be rechecked." : "No existing invitation is affected.",
+    committed ? "A sent or accepted invitation is affected. Review the named impact before confirming." : "",
+    input.nextStatus === "archived" ? "Archiving stops this rule from governing future changes." : "The replacement rule must be reviewed before this version is superseded.",
+  ], valid);
+}
+
 export function buildWeddingBoundaryHelperProjection(input: {
   householdIds: readonly string[];
   objects: readonly WeddingBoundaryLedgerObject[];

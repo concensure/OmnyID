@@ -2217,3 +2217,18 @@ local and hosted flags-off verification, but it must not create another live cap
 response merely to reproduce evidence that remains valid. Any future public expansion is a separate
 rollout decision and keeps RSVP publication, reminder-provider sending, Family helper access and
 authenticated Family delegate access independently false by default.
+
+## 2026-11-01: Family Boundary elevated impact is confirmed on the decision, not inferred from an old request
+
+The couple's impact review confirmation is a versioned input to the server decision command and its
+idempotency fingerprint. A helper or delegate cannot pre-authorise a consequential change by placing
+a boolean on the earlier request event. Removing a guest after a sent or accepted invitation therefore
+fails closed until the couple confirms the current impact. The mutation archives the active guest and
+closes the invitation through successor AFP objects while retaining the immutable RSVP response.
+
+One aggregate receipt records actor, causation, expected revision, affected projections, stable
+invitation/history guarantees and plain-language connected updates without copying dietary, contact,
+private-note or seating-conflict content. Exact retries return the stored receipt. Household changes
+apply the same receipt shape and preserve invitation references. Planner, helper and RSVP-guest reads
+are explicit allowlists rather than filtered copies of whole ledger objects. Rollout flags remain
+false-default; these contracts do not authorise a hosted helper/delegate cohort.

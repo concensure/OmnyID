@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   buildWeddingBoundaryHelperProjection,
   previewWeddingBoundaryHouseholdCommand,
+  previewWeddingBoundaryPolicyChange,
   previewWeddingBoundaryRequestDecision,
   projectWeddingBoundaryEffectiveRules,
   weddingBoundaryRoleCapabilityPreset,
@@ -156,6 +157,24 @@ test("governance projects only minimum necessary household aggregates to a helpe
     assert.partialDeepStrictEqual(result[0], { householdId: "household:a", namedGuestCount: 2, allocation: 4 });
     assert.ok(!JSON.stringify(result).includes("dietary"));
     assert.ok(!JSON.stringify(result).includes("person:a"));
+});
+
+test("governance previews a versioned rule change before touching sent invitations", () => {
+  const result = previewWeddingBoundaryPolicyChange({
+    policy: policy("household:plus-one", {
+      ruleType: "plus_one",
+      scopeKind: "household",
+      scopeId: "household:a",
+      version: 3,
+    }),
+    nextStatus: "archived",
+    objects,
+  });
+  assert.equal(result.canApply, true);
+  assert.equal(result.requiresElevatedConfirmation, true);
+  assert.deepEqual(result.affectedInvitationIds, ["invite:a", "invite:b"]);
+  assert.match(result.warnings.join(" "), /version 4/);
+  assert.match(result.warnings.join(" "), /RSVP records stay intact/);
 });
 
 test("delegated planner and RSVP guest presets are minimum-necessary and approval bounded", () => {

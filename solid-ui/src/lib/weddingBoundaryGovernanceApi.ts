@@ -10,6 +10,8 @@ export type WeddingBoundaryDecisionReply = {
   required_approval_count?: number;
   replayed: boolean;
   explanation: string;
+  connected_updates?: string[];
+  response_history_preserved?: boolean;
 };
 
 export function decideWeddingBoundaryRequest(input: {
@@ -19,6 +21,7 @@ export function decideWeddingBoundaryRequest(input: {
   decision: "approve" | "decline" | "withdraw";
   expectedRevision: number;
   approvalActorId?: string;
+  confirmedElevatedImpact?: boolean;
   idempotencyKey: string;
 }) {
   return apiFetch<WeddingBoundaryDecisionReply>("/wedding/boundaries/decisions", {
@@ -30,6 +33,7 @@ export function decideWeddingBoundaryRequest(input: {
       decision: input.decision,
       expected_revision: input.expectedRevision,
       approval_actor_id: input.approvalActorId,
+      confirmed_elevated_impact: input.confirmedElevatedImpact ?? false,
       idempotency_key: input.idempotencyKey,
     },
   });
@@ -55,7 +59,7 @@ export type WeddingBoundaryHouseholdCommand = {
 };
 
 export function applyWeddingBoundaryHouseholdCommand(input: WeddingBoundaryHouseholdCommand) {
-  return apiFetch<{ status: "applied"; operation: WeddingBoundaryHouseholdCommand["operation"]; impact_receipt_id: string; replayed: boolean; explanation: string }>("/wedding/boundaries/households/commands", {
+  return apiFetch<{ status: "applied"; operation: WeddingBoundaryHouseholdCommand["operation"]; impact_receipt_id: string; replayed: boolean; explanation: string; connected_updates?: string[]; response_history_preserved?: boolean }>("/wedding/boundaries/households/commands", {
     method: "POST",
     bodyJson: {
       wedding_plan_id: input.weddingPlanId,

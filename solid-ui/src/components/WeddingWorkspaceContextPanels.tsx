@@ -139,7 +139,7 @@ export function WeddingWorkspaceContextPanels(props: {
     // still entering the associated contribution.
     await props.saveProjection(input);
   }
-  async function decideBoundaryRequest(requestId: string, decision: WeddingBoundaryRequestDecision, approvalActorId?: string): Promise<string> {
+  async function decideBoundaryRequest(requestId: string, decision: WeddingBoundaryRequestDecision, approvalActorId?: string, confirmedElevatedImpact?: boolean): Promise<string> {
     const request = props.state.boundaryState.approvalQueue.find((item) => item.requestId === requestId);
     if (!request) throw new Error("This guest-list request is no longer waiting for review.");
     const nonce = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}`;
@@ -150,10 +150,13 @@ export function WeddingWorkspaceContextPanels(props: {
       decision: decision === "approve" ? "approve" : "decline",
       expectedRevision: request.revision ?? 1,
       approvalActorId,
+      confirmedElevatedImpact,
       idempotencyKey: `boundary:${requestId}:${request.revision ?? 1}:${decision}:${nonce}`,
     });
     props.onRefreshWorkspace?.();
-    return result.explanation;
+    return result.connected_updates?.length
+      ? `${result.explanation} ${result.connected_updates.join("; ")}.`
+      : result.explanation;
   }
   async function saveGuestDraft(input: {
     displayName: string;

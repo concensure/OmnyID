@@ -29,7 +29,7 @@ import type {
 export function WeddingBoundaryManagementCard(props: {
   state: WeddingBoundaryState;
   topology: WeddingBoundaryTopologyState;
-  onDecideRequest?: (requestId: string, decision: WeddingBoundaryRequestDecision, approvalActorId?: string) => Promise<string>;
+  onDecideRequest?: (requestId: string, decision: WeddingBoundaryRequestDecision, approvalActorId?: string, confirmedElevatedImpact?: boolean) => Promise<string>;
   onSaveFamilyRequest?: (input: { requesterLabel: string; requestLabel: string; changeType: WeddingBoundaryChangeType; targetHouseholdId: string; proposedGuestName: string; requiredApprovalCount: 1 | 2 }) => Promise<string>;
   onSaveFamilyRule?: (input: { title: string; plainLanguage: string; ruleType: WeddingBoundaryPolicyRuleType; scopeKind: WeddingBoundaryRuleScopeKind; scopeId: string; effect: WeddingBoundaryRuleEffect; authority: WeddingBoundaryRuleAuthority; effectiveUntil: string }) => Promise<string>;
   onSaveHousehold?: (input: { householdId: string; familyGroupLabel: string; invitationAllocation: number | null; requestDeadline: string | null }) => Promise<string>;
@@ -142,12 +142,12 @@ export function WeddingBoundaryManagementCard(props: {
     }
   }
 
-  async function decideRequest(requestId: string, decision: WeddingBoundaryRequestDecision, actorId?: string): Promise<void> {
+  async function decideRequest(requestId: string, decision: WeddingBoundaryRequestDecision, actorId?: string, confirmedElevatedImpact = false): Promise<void> {
     if (!props.onDecideRequest || decidingRequestId()) return;
     setDecisionNotice(null);
     setDecidingRequestId(requestId);
     try {
-      const notice = await props.onDecideRequest(requestId, decision, actorId);
+      const notice = await props.onDecideRequest(requestId, decision, actorId, confirmedElevatedImpact);
       setDecisionNotice(notice);
       setCompletedRequestIds((current) => ({ ...current, [requestId]: true }));
     } catch (error) {
@@ -652,7 +652,7 @@ export function WeddingBoundaryManagementCard(props: {
               </Show>
               <div class="mt-5 grid grid-cols-2 gap-3">
                 <button type="button" class="min-h-12 rounded-2xl border border-cyan-200 bg-white px-4 font-semibold text-cyan-950" onClick={() => { setReviewingRequestId(null); setApprovalActorId(""); }}>Cancel</button>
-                <button type="button" disabled={Boolean(decidingRequestId()) || (reviewingDecision() === "approve" && decisionPreview()?.canApply === false) || (reviewingDecision() === "approve" && request().requiredApprovalCount === 2 && !approvalActorId())} class="min-h-12 rounded-2xl bg-cyan-700 px-4 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50" onClick={() => { const id = request().requestId; const decision = reviewingDecision(); const actor = approvalActorId() || undefined; setReviewingRequestId(null); setApprovalActorId(""); void decideRequest(id, decision, actor); }}>
+                <button type="button" disabled={Boolean(decidingRequestId()) || (reviewingDecision() === "approve" && decisionPreview()?.canApply === false) || (reviewingDecision() === "approve" && request().requiredApprovalCount === 2 && !approvalActorId())} class="min-h-12 rounded-2xl bg-cyan-700 px-4 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50" onClick={() => { const id = request().requestId; const decision = reviewingDecision(); const actor = approvalActorId() || undefined; const elevated = decision === "approve" && decisionPreview()?.requiresElevatedConfirmation === true; setReviewingRequestId(null); setApprovalActorId(""); void decideRequest(id, decision, actor, elevated); }}>
                   {reviewingDecision() === "approve" ? "Confirm approval" : "Confirm unchanged"}
                 </button>
               </div>

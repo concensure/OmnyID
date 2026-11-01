@@ -374,6 +374,39 @@ async fn live_grant(
     })
 }
 
+fn rsvp_guest_projection(
+    grant: &LiveGrant,
+    person: &str,
+    guest: &Value,
+    invitation: &Value,
+) -> Value {
+    json!({
+        "grant_id": grant.grant_id,
+        "role": grant.role,
+        "guest": {"person_id": person, "display_name": guest.get("display_name")},
+        "invitation": {
+            "invitation_id": invitation.get("invitation_id"),
+            "event_id": invitation.get("event_id"),
+            "invitation_status": invitation.get("invitation_status"),
+            "plus_one_allowed": invitation.get("plus_one_allowed"),
+            "children_invited": invitation.get("children_invited"),
+            "response_revision": invitation.get("response_revision")
+        },
+        "private_notes_visible": false
+    })
+}
+
+fn planner_household_projection(value: &Value) -> Value {
+    json!({
+        "household_id": value.get("household_id"),
+        "display_name": value.get("display_name"),
+        "invitation_allocation": value.get("invitation_allocation"),
+        "request_deadline": value.get("request_deadline"),
+        "request_window_status": value.get("request_window_status"),
+        "revision": value.get("revision")
+    })
+}
+
 async fn open_grant(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -408,20 +441,12 @@ async fn open_grant(
             .await
             .map_err(store_error)?
             .ok_or_else(unavailable)?;
-        return Ok(Json(json!({
-            "grant_id": grant.grant_id,
-            "role": grant.role,
-            "guest": {"person_id": person, "display_name": guest.get("display_name")},
-            "invitation": {
-                "invitation_id": invitation.get("invitation_id"),
-                "event_id": invitation.get("event_id"),
-                "invitation_status": invitation.get("invitation_status"),
-                "plus_one_allowed": invitation.get("plus_one_allowed"),
-                "children_invited": invitation.get("children_invited"),
-                "response_revision": invitation.get("response_revision")
-            },
-            "private_notes_visible": false
-        })));
+        return Ok(Json(rsvp_guest_projection(
+            &grant,
+            person,
+            &guest,
+            &invitation,
+        )));
     }
     let household_query = format!(
         "SELECT DISTINCT ON (m.content->>'household_id') m.content FROM {table} m WHERE m.kind='wedding_boundary_household' AND m.content->>'household_id'=ANY($1) AND {} ORDER BY m.content->>'household_id',COALESCE((m.content->>'revision')::bigint,1) DESC,m.timestamp DESC,m.id DESC",
@@ -437,14 +462,7 @@ async fn open_grant(
     Ok(Json(json!({
         "grant_id": grant.grant_id,
         "role": grant.role,
-        "households": households.into_iter().map(|value| json!({
-            "household_id": value.get("household_id"),
-            "display_name": value.get("display_name"),
-            "invitation_allocation": value.get("invitation_allocation"),
-            "request_deadline": value.get("request_deadline"),
-            "request_window_status": value.get("request_window_status"),
-            "revision": value.get("revision")
-        })).collect::<Vec<_>>(),
+        "households": households.iter().map(planner_household_projection).collect::<Vec<_>>(),
         "private_notes_visible": false
     })))
 }
@@ -630,6 +648,33 @@ mod tests {
         assert!(!PLANNER_ACTIONS.contains(&"approve_request"));
         assert!(!RSVP_GUEST_ACTIONS.contains(&"view_private_notes"));
         assert!(!RSVP_GUEST_CHANGES.contains(&"add_guest"));
+    }
+
+    #[test]
+    fn delegated_projections_drop_private_and_logistics_only_fields() {
+        let grant = LiveGrant {
+            grant_id: "grant-a".into(),
+            owner_user_id: "owner-a".into(),
+            plan: "plan-a".into(),
+            workspace: "workspace-a".into(),
+            role: "rsvp_guest".into(),
+            person_id: Some("person-a".into()),
+            household_ids: vec!["household-a".into()],
+        };
+        let secret = "must-not-leak";
+        let guest = json!({"display_name":"Alex","dietary_note":secret,"contact_label":secret,"private_note":secret});
+        let invitation = json!({"invitation_id":"invite-a","event_id":"event-a","invitation_status":"invited","plus_one_allowed":false,"children_invited":false,"response_revision":2,"seating_conflict_reason":secret,"meal_requirement":secret});
+        let household = json!({"household_id":"household-a","display_name":"Household A","invitation_allocation":2,"request_deadline":null,"request_window_status":"open","revision":1,"seating_conflict_reason":secret,"member_person_ids":["person-a"]});
+        assert!(
+            !rsvp_guest_projection(&grant, "person-a", &guest, &invitation)
+                .to_string()
+                .contains(secret)
+        );
+        assert!(
+            !planner_household_projection(&household)
+                .to_string()
+                .contains(secret)
+        );
     }
 
     #[test]

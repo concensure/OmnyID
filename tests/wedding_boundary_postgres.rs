@@ -163,6 +163,25 @@ async fn household_split_is_atomic_idempotent_stale_safe_and_tenant_private() {
             "ledger_kind":"wedding_boundary_guest_profile","boundary_object_id":person,"person_id":person,"display_name":label,"title":label,"status":"active","household_id":source
         })).await;
     }
+    let invitation_b = format!("invite-{}", Ulid::new());
+    let response_b = format!("rsvp-response-{}", Ulid::new());
+    append_fixture(&db, &owner.id, "wedding_boundary_event_invitation", &plan, &workspace, json!({
+        "ledger_kind":"wedding_boundary_event_invitation","boundary_object_id":invitation_b,
+        "invitation_id":invitation_b,"event_id":format!("event-{workspace}"),"person_id":person_b,
+        "invitation_status":"rsvp_yes","response_revision":2
+    })).await;
+    append_fixture(
+        &db,
+        &owner.id,
+        "wedding_rsvp_response",
+        &plan,
+        &workspace,
+        json!({
+            "kind":"wedding_rsvp_response","response_id":response_b,"invitation_id":invitation_b,
+            "person_id":person_b,"attendance":"attending","revision":1
+        }),
+    )
+    .await;
     let app = omnyid_homeserver::server::build_test_router(&db_url).await;
     let prior_helper_flag = std::env::var_os("OMNYID_WEDDING_BOUNDARY_HELPERS_ENABLED");
     unsafe { std::env::remove_var("OMNYID_WEDDING_BOUNDARY_HELPERS_ENABLED") };
@@ -195,7 +214,7 @@ async fn household_split_is_atomic_idempotent_stale_safe_and_tenant_private() {
         "source_household_ids":[source],"target_household_id":null,"new_household_id":destination,
         "new_household_label":"Sam household","move_person_ids":[person_b],"expected_revisions":{(source.clone()):1},
         "family_group_id":null,"invitation_allocation":null,"representative_person_id":null,
-        "confirmed_elevated_impact":false,"idempotency_key":key
+        "confirmed_elevated_impact":true,"idempotency_key":key
     });
     let (status, response) = request_json(&app, &owner_auth, command.clone()).await;
     assert_eq!(status, StatusCode::OK, "split response: {response}");
@@ -225,6 +244,33 @@ async fn household_split_is_atomic_idempotent_stale_safe_and_tenant_private() {
         .await
         .expect("moved guest");
     assert_eq!(moved_to, destination);
+    let invitation_query = format!(
+        "SELECT content FROM {table} WHERE kind='wedding_boundary_event_invitation' AND content->>'person_id'=$1 ORDER BY COALESCE((content->>'response_revision')::bigint,1) DESC,timestamp DESC,id DESC LIMIT 1"
+    );
+    let preserved = sqlx::query_scalar::<_, Value>(&invitation_query)
+        .bind(&person_b)
+        .fetch_one(&db.pool)
+        .await
+        .expect("preserved invitation");
+    assert_eq!(preserved["invitation_id"], invitation_b);
+    assert_eq!(preserved["invitation_status"], "rsvp_yes");
+    let response_query = format!(
+        "SELECT COUNT(*) FROM {table} WHERE kind='wedding_rsvp_response' AND content->>'response_id'=$1"
+    );
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>(&response_query)
+            .bind(response_b)
+            .fetch_one(&db.pool)
+            .await
+            .expect("response history"),
+        1
+    );
+    assert_eq!(response["response_history_preserved"], true);
+    assert!(
+        response["connected_updates"]
+            .as_array()
+            .is_some_and(|items| items.iter().any(|item| item == "RSVP history retained"))
+    );
 }
 
 #[tokio::test]
@@ -361,6 +407,117 @@ async fn two_partner_approval_applies_only_after_distinct_second_partner() {
 }
 
 #[tokio::test]
+async fn removing_an_rsvped_guest_requires_confirmation_and_preserves_response_history() {
+    let Some(db_url) = test_db_url() else { return };
+    let db = Db::new(&db_url).await.expect("connect test database");
+    let (owner, auth) = seed_user(&db, "remove-rsvp").await;
+    let plan = format!("wedding-plan-{}", Ulid::new());
+    let workspace = format!("wedding-workspace-{}", Ulid::new());
+    let household = format!("household-{}", Ulid::new());
+    let person = format!("person-{}", Ulid::new());
+    let invitation = format!("invite-{}", Ulid::new());
+    let request_id = format!("remove-request-{}", Ulid::new());
+    let response_id = format!("rsvp-response-{}", Ulid::new());
+    append_fixture(&db, &owner.id, "wedding_boundary_household", &plan, &workspace, json!({
+        "ledger_kind":"wedding_boundary_household","boundary_object_id":household,"household_id":household,
+        "display_name":"Accepted household","status":"active","member_person_ids":[person],"revision":1
+    })).await;
+    append_fixture(&db, &owner.id, "wedding_boundary_guest_profile", &plan, &workspace, json!({
+        "ledger_kind":"wedding_boundary_guest_profile","boundary_object_id":person,"person_id":person,
+        "display_name":"Accepted guest","status":"active","household_id":household
+    })).await;
+    append_fixture(&db, &owner.id, "wedding_boundary_event_invitation", &plan, &workspace, json!({
+        "ledger_kind":"wedding_boundary_event_invitation","boundary_object_id":invitation,"invitation_id":invitation,
+        "event_id":format!("event-{workspace}"),"person_id":person,"invitation_status":"rsvp_yes",
+        "visible_to_guest":true,"response_revision":2
+    })).await;
+    append_fixture(&db, &owner.id, "wedding_rsvp_response", &plan, &workspace, json!({
+        "kind":"wedding_rsvp_response","response_id":response_id,"invitation_id":invitation,"person_id":person,
+        "attendance":"attending","revision":1,"encrypted_private_payload":"encrypted:v1:not-for-boundary-receipt"
+    })).await;
+    append_fixture(&db, &owner.id, "wedding_boundary_change_request", &plan, &workspace, json!({
+        "ledger_kind":"wedding_boundary_change_request","boundary_object_id":request_id,"request_id":request_id,
+        "requested_by":"family:planner","change_type":"remove_guest","target_person_id":person,
+        "request_status":"pending","status":"pending","approval_required":true,"required_approval_count":1,
+        "policy_ids":[],"policy_versions":{},"revision":1
+    })).await;
+    let app = omnyid_homeserver::server::build_test_router(&db_url).await;
+    let unconfirmed = json!({
+        "wedding_plan_id":plan,"response_workspace_id":workspace,"request_id":request_id,"decision":"approve",
+        "expected_revision":1,"approval_actor_id":null,"confirmed_elevated_impact":false,
+        "idempotency_key":format!("remove-unconfirmed-{}",Ulid::new())
+    });
+    let (blocked_status, blocked) =
+        post_json(&app, "/wedding/boundaries/decisions", &auth, unconfirmed).await;
+    assert_eq!(
+        blocked_status,
+        StatusCode::CONFLICT,
+        "unconfirmed removal: {blocked}"
+    );
+
+    let confirmed = json!({
+        "wedding_plan_id":plan,"response_workspace_id":workspace,"request_id":request_id,"decision":"approve",
+        "expected_revision":1,"approval_actor_id":null,"confirmed_elevated_impact":true,
+        "idempotency_key":format!("remove-confirmed-{}",Ulid::new())
+    });
+    let (status, response) = post_json(
+        &app,
+        "/wedding/boundaries/decisions",
+        &auth,
+        confirmed.clone(),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "confirmed removal: {response}");
+    assert_eq!(response["response_history_preserved"], true);
+    assert!(
+        response["connected_updates"]
+            .as_array()
+            .is_some_and(|items| items.len() >= 3)
+    );
+    let (retry_status, retry) =
+        post_json(&app, "/wedding/boundaries/decisions", &auth, confirmed).await;
+    assert_eq!(retry_status, StatusCode::OK, "retry: {retry}");
+    assert_eq!(retry["impact_receipt_id"], response["impact_receipt_id"]);
+
+    let table = format!("\"{}\".messages", tenant_schema(&owner.id));
+    let response_count_query = format!(
+        "SELECT COUNT(*) FROM {table} WHERE kind='wedding_rsvp_response' AND content->>'response_id'=$1"
+    );
+    let response_count = sqlx::query_scalar::<_, i64>(&response_count_query)
+        .bind(&response_id)
+        .fetch_one(&db.pool)
+        .await
+        .expect("response history count");
+    assert_eq!(
+        response_count, 1,
+        "historical RSVP response must remain immutable"
+    );
+    let invitation_query = format!(
+        "SELECT content FROM {table} WHERE kind='wedding_boundary_event_invitation' AND content->>'person_id'=$1 ORDER BY COALESCE((content->>'response_revision')::bigint,1) DESC,timestamp DESC,id DESC LIMIT 1"
+    );
+    let latest_invitation = sqlx::query_scalar::<_, Value>(&invitation_query)
+        .bind(&person)
+        .fetch_one(&db.pool)
+        .await
+        .expect("latest invitation");
+    assert_eq!(latest_invitation["invitation_id"], invitation);
+    assert_eq!(latest_invitation["invitation_status"], "declined_by_couple");
+    assert_eq!(latest_invitation["previous_invitation_status"], "rsvp_yes");
+    let receipt_id = response["impact_receipt_id"].as_str().expect("receipt id");
+    let receipt_query = format!(
+        "SELECT content FROM {table} WHERE kind='wedding_boundary_impact_receipt' AND content->>'receipt_id'=$1"
+    );
+    let receipt = sqlx::query_scalar::<_, Value>(&receipt_query)
+        .bind(receipt_id)
+        .fetch_one(&db.pool)
+        .await
+        .expect("impact receipt");
+    assert_eq!(receipt["response_history_preserved"], true);
+    assert_eq!(receipt["previous_invitation_status"], "rsvp_yes");
+    assert!(!receipt.to_string().contains("not-for-boundary-receipt"));
+}
+
+#[tokio::test]
 async fn delegated_access_is_scoped_revocable_and_private_notes_stay_opaque() {
     let Some(db_url) = test_db_url() else { return };
     let db = Db::new(&db_url).await.expect("connect test database");
@@ -371,19 +528,23 @@ async fn delegated_access_is_scoped_revocable_and_private_notes_stay_opaque() {
     let workspace = format!("wedding-workspace-{}", Ulid::new());
     let household = format!("household-{}", Ulid::new());
     let person = format!("person-{}", Ulid::new());
+    let restricted_marker = "restricted-seating-dietary-contact";
     append_fixture(&db, &owner.id, "wedding_boundary_household", &plan, &workspace, json!({
         "ledger_kind":"wedding_boundary_household","boundary_object_id":household,"household_id":household,
         "display_name":"Scoped household","title":"Scoped household","status":"active",
-        "member_person_ids":[person],"invitation_allocation":2,"revision":1
+        "member_person_ids":[person],"invitation_allocation":2,"revision":1,
+        "seating_conflict_reason":restricted_marker
     })).await;
     append_fixture(&db, &owner.id, "wedding_boundary_guest_profile", &plan, &workspace, json!({
         "ledger_kind":"wedding_boundary_guest_profile","boundary_object_id":person,"person_id":person,
-        "display_name":"Scoped guest","title":"Scoped guest","status":"active","household_id":household
+        "display_name":"Scoped guest","title":"Scoped guest","status":"active","household_id":household,
+        "dietary_note":restricted_marker,"contact_label":restricted_marker
     })).await;
     append_fixture(&db, &owner.id, "wedding_boundary_event_invitation", &plan, &workspace, json!({
         "ledger_kind":"wedding_boundary_event_invitation","boundary_object_id":format!("invite-{person}"),
         "invitation_id":format!("invite-{person}"),"event_id":format!("event-{workspace}"),"person_id":person,
-        "invitation_status":"not_invited","plus_one_allowed":false,"response_revision":1
+        "invitation_status":"not_invited","plus_one_allowed":false,"response_revision":1,
+        "seating_conflict_reason":restricted_marker
     })).await;
     let app = omnyid_homeserver::server::build_test_router(&db_url).await;
     unsafe {
@@ -424,6 +585,7 @@ async fn delegated_access_is_scoped_revocable_and_private_notes_stay_opaque() {
     assert_eq!(open_status, StatusCode::OK, "open: {opened}");
     assert_eq!(opened["private_notes_visible"], false);
     assert!(opened.get("guests").is_none());
+    assert!(!opened.to_string().contains(restricted_marker));
     let (outsider_status, _) = get_json(&app, &open_uri, &outsider_auth).await;
     assert_eq!(outsider_status, StatusCode::NOT_FOUND);
 

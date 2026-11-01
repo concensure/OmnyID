@@ -182,6 +182,64 @@ async fn has_committed_invitation(
         .map_err(store_error)
 }
 
+async fn invitation_snapshots(
+    tx: &mut Transaction<'_, Postgres>,
+    table: &str,
+    plan: &str,
+    workspace: &str,
+    person_ids: &[String],
+) -> Result<Vec<Value>, (StatusCode, String)> {
+    if person_ids.is_empty() {
+        return Ok(Vec::new());
+    }
+    let query = format!(
+        "SELECT DISTINCT ON (m.content->>'person_id') m.content FROM {table} m WHERE m.kind='wedding_boundary_event_invitation' AND m.content->>'person_id'=ANY($1) AND {} ORDER BY m.content->>'person_id',COALESCE((m.content->>'response_revision')::bigint,1) DESC,m.timestamp DESC,m.id DESC",
+        metadata_scope("m", 2, 3)
+    );
+    let invitations = sqlx::query_scalar::<_, Value>(&query)
+        .bind(person_ids)
+        .bind(plan)
+        .bind(workspace)
+        .fetch_all(&mut **tx)
+        .await
+        .map_err(store_error)?;
+    Ok(invitations
+        .into_iter()
+        .map(|value| {
+            json!({
+                "invitation_id": value.get("invitation_id"),
+                "person_id": value.get("person_id"),
+                "invitation_status": value.get("invitation_status"),
+                "response_revision": value.get("response_revision")
+            })
+        })
+        .collect())
+}
+
+fn connected_updates(operation: &str) -> Vec<&'static str> {
+    match operation {
+        "split_household" | "merge_households" => vec![
+            "Household membership updated",
+            "Guest and invitation references preserved",
+            "RSVP history retained",
+            "Seating, catering, budget and task views queued for refresh",
+        ],
+        "archive_household" => vec![
+            "Empty household archived without deleting history",
+            "Guest-list and task views queued for refresh",
+        ],
+        "apply_group_plus_one_policy" => vec![
+            "Family rule version recorded",
+            "Named exceptions preserved",
+            "Invitation, RSVP, seating, catering and budget views queued for refresh",
+        ],
+        _ => vec![
+            "Household settings updated",
+            "Connected wedding views queued for refresh",
+        ],
+    }
+}
+
 fn validate_request(
     request: &HouseholdCommandRequest,
 ) -> Result<Vec<String>, (StatusCode, String)> {
@@ -309,6 +367,14 @@ async fn apply_household_command(
         &all_people,
     )
     .await?;
+    let invitation_snapshots = invitation_snapshots(
+        &mut tx,
+        &table,
+        &request.wedding_plan_id,
+        &request.response_workspace_id,
+        &all_people,
+    )
+    .await?;
     if committed && request.confirmed_elevated_impact != Some(true) {
         return Err(conflict(
             "Some affected invitations were sent or accepted. Confirm the elevated impact before applying this change.",
@@ -325,6 +391,7 @@ async fn apply_household_command(
         _ => revise_many(&mut tx, &table, &user.id, &request, households).await?,
     }
     let receipt_id = format!("wedding-boundary-household-impact-{}", Ulid::new());
+    let connected_updates = connected_updates(&request.operation);
     append_event(
         &mut tx,
         &table,
@@ -335,17 +402,26 @@ async fn apply_household_command(
         json!({
             "receipt_id": receipt_id,
             "operation": request.operation,
+            "actor": "couple",
+            "causation": {"command_fingerprint": command_fingerprint},
+            "expected_revisions": request.expected_revisions,
+            "reconciliation_reference": receipt_id,
             "affected_household_ids": ids,
             "affected_person_ids": all_people,
+            "affected_invitations": invitation_snapshots,
             "effects": ["guest_list", "invitation_entitlement", "rsvp", "seating", "catering", "budget_forecast", "tasks"],
+            "connected_updates": connected_updates,
+            "response_history_preserved": true,
+            "stable_invitation_references_preserved": true,
             "attendance_inferred": false,
             "invitation_sent": false,
             "spend_committed": false,
-            "vendor_contract_changed": false
+            "vendor_contract_changed": false,
+            "private_content_copied": false
         }),
     )
     .await?;
-    let response = json!({"status":"applied","operation":request.operation,"impact_receipt_id":receipt_id,"replayed":false,"explanation":"The household change is recorded once and connected wedding views can refresh from the same ledger."});
+    let response = json!({"status":"applied","operation":request.operation,"impact_receipt_id":receipt_id,"replayed":false,"explanation":"The household change is recorded once. Guest and invitation history stays intact while connected wedding views refresh from the same ledger.","connected_updates":connected_updates,"response_history_preserved":true});
     finish_receipt(&mut tx, &user.id, &request.idempotency_key, &response).await?;
     tx.commit().await.map_err(store_error)?;
     Ok(Json(response))

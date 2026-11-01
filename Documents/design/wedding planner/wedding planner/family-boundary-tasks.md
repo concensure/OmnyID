@@ -101,9 +101,9 @@ Depends on: 7
 - [x] Preview affected guest-list, invitation, RSVP, seating, catering, budget and task areas before add-guest approval.
 - [x] Reconcile an approved add-guest request into the canonical household/guest/invitation ledger and emit one aggregate downstream impact receipt.
 - [x] Never infer attendance, send an invitation, commit spend or change a vendor contract from the family-boundary approval.
-- [ ] Keep private seating-conflict reasons out of helper and guest projections.
-- [ ] Add retry-safe reconciliation and a visible explanation of connected updates.
-- [ ] Test removal after RSVP, household split after RSVP, sent-invitation policy change and seating conflict privacy.
+- [x] Keep private seating-conflict reasons out of helper and guest projections.
+- [x] Add retry-safe reconciliation and a visible explanation of connected updates.
+- [x] Test removal after RSVP, household split after RSVP, sent-invitation policy change and seating conflict privacy.
 
 ## 9. Bulk operations
 
@@ -121,9 +121,9 @@ Depends on: 5, 7, 8
 Depends on: 6, 7
 
 - [x] Store sensitive private values in controlled mutable encrypted records; immutable events use references/redacted snapshots.
-- [ ] Minimise helper/guest projections field by field.
+- [x] Minimise helper/guest projections field by field.
 - [x] Add revocation, expiry and deletion/retention tests.
-- [ ] Record actor, causation, expected versions, decision and reconciliation references without duplicating private content.
+- [x] Record actor, causation, expected versions, decision and reconciliation references without duplicating private content.
 - [ ] Run security/privacy review for cross-scope disclosure and forwarded capabilities.
 
 ## 11. Accessibility, usability and rollout
@@ -143,6 +143,8 @@ Depends on: 1–10 as applicable
 The checked items now include the couple-facing and server-authority foundation: native mobile shell, reversible onboarding imagery, source-confirmed meal choices, compact boundary summary, typed family groups and rules, deterministic household and conflict previews, AFP-backed household revisions, false-default digest-only family-helper grants, minimum-necessary helper projections, idempotent request decisions, stale policy/household checks, and an atomic add-guest approval that creates an unsent invitation draft and one impact receipt.
 
 WED-309 adds the next server-authority slices: atomic stale-safe household split/merge/archive and bounded bulk commands, explicit remove/plus-one/invitation/contact-label request mutations, configurable two-partner partial approval, authenticated minimum-necessary Planner/RSVP grants, opaque mutable encrypted private notes, serialized last-seat approvals, group plus-one policies with named exceptions, immediate representative-change grant revocation, a flags-off helper shadow assertion, and live disposable PostgreSQL/ClamAV evidence. The first partner approval records progress but applies no connected mutation; a different active couple-role identity must provide the second approval. Delegates can only see their scoped projection and submit a pending request; they never receive couple approval authority or private-note access.
+
+WED-311 connects the review preview to the server's elevated-impact confirmation instead of trusting a field on the older request event. Removing a guest after an accepted RSVP now archives the active guest and closes the invitation while retaining the immutable RSVP response. Decision and household receipts list user-facing connected updates, preserve stable invitation references, carry actor/causation/expected-version references and replay exactly once. Planner, helper and RSVP-guest projections use explicit allowlists; dietary/contact/private-note and seating-conflict fields are excluded. A deterministic versioned rule-change preview identifies sent or accepted invitations before a rule is archived or superseded. The server-side rule supersede/archive command itself remains open under section 5.
 
 This is not the end of the roadmap. Delegate/helper management UI, per-projector reconciliation acknowledgements, sent-invitation policy-change previews, removal-after-RSVP handling, restricted projection field audits, a controlled allowlisted cohort, and the complete security/accessibility/usability matrix remain open. Expiry, revocation and deletion retention are covered locally, and the exact-candidate flags-off Oracle shadow is recorded in `Documents/verification/wed-310-rsvp-release-2026-11-01.md`. `OMNYID_WEDDING_BOUNDARY_HELPERS_ENABLED` and `OMNYID_WEDDING_BOUNDARY_DELEGATES_ENABLED` stay false unless the remaining hosted rollout criteria pass.
 
