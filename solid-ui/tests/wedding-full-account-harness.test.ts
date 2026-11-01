@@ -6,6 +6,7 @@ const stack = readFileSync(new URL("../../scripts/e2e-wedding-stack.ps1", import
 const seed = readFileSync(new URL("../../src/bin/wedding_e2e_seed.rs", import.meta.url), "utf8");
 const journey = readFileSync(new URL("../tests/e2e-full-account/wedding-full-account.spec.ts", import.meta.url), "utf8");
 const server = readFileSync(new URL("../../src/server/mod.rs", import.meta.url), "utf8");
+const vite = readFileSync(new URL("../vite.config.mjs", import.meta.url), "utf8");
 
 test("full-account stack is disposable and refuses unsafe targets", () => {
   assert.match(stack, /--tmpfs/);
@@ -39,4 +40,9 @@ test("real server exposes an explicit harness bind without changing its producti
   assert.match(server, /OMNYID_HTTP_BIND_ADDR/);
   assert.match(server, /"0\.0\.0\.0:8080"/);
   assert.match(server, /let http_addr = http_bind_addr\(\)/);
+});
+
+test("clean UI builds resolve SDK runtime dependencies from the UI package", () => {
+  assert.match(vite, /find: \/\^zod\\\/v3\$\//);
+  assert.match(vite, /node_modules\/zod\/v3\/index\.js/);
 });

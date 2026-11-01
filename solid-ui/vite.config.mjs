@@ -44,6 +44,8 @@ export default defineConfig({
       { find: "afp-ts/workflows", replacement: resolve(sdkRoot, "workflows.ts") },
       { find: "afp-ts/quotation", replacement: resolve(sdkRoot, "quotation.ts") },
       { find: "afp-ts", replacement: resolve(sdkRoot, "index.ts") },
+      { find: /^zod\/v3$/, replacement: resolve(import.meta.dirname, "node_modules/zod/v3/index.js") },
+      { find: /^zod$/, replacement: resolve(import.meta.dirname, "node_modules/zod/index.js") },
       { find: "@", replacement: resolve(import.meta.dirname, "src") },
       { find: "voice-input-ts", replacement: resolve(import.meta.dirname, "src/lib/voiceInput.ts") },
       { find: "@electric-sql/pglite/dist/fs/nodefs.js", replacement: emptyShim },
