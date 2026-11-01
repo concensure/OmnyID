@@ -28,7 +28,7 @@ function Wait-Http([string]$Url, [int]$Seconds = 60) {
 
 function Stop-Child($Process) {
     if ($null -ne $Process -and -not $Process.HasExited) {
-        Stop-Process -Id $Process.Id -Force -ErrorAction SilentlyContinue
+        Stop-Process -Id $Process.Id -ErrorAction SilentlyContinue
         $Process.WaitForExit(5000) | Out-Null
     }
 }
@@ -145,7 +145,7 @@ try {
     if (-not (Test-Path $serverExe) -or -not (Test-Path $seedExe)) { throw "Build the WED-317 binaries first" }
     $server = Start-Process -FilePath $serverExe -WorkingDirectory $repo -WindowStyle Hidden -PassThru `
         -RedirectStandardOutput $serverOut -RedirectStandardError $serverErr -Environment $serverEnvironment
-    Wait-Http "$apiOrigin/healthz" 90
+    Wait-Http "$apiOrigin/auth/google/config" 90
 
     $seedEnvironment = @{
         DATABASE_URL = $databaseUrl
@@ -166,7 +166,7 @@ try {
     $serverEnvironment.OMNYID_WEDDING_BOUNDARY_DELEGATE_OWNER_ALLOWLIST = $allowlist
     $server = Start-Process -FilePath $serverExe -WorkingDirectory $repo -WindowStyle Hidden -PassThru `
         -RedirectStandardOutput $serverOut -RedirectStandardError $serverErr -Environment $serverEnvironment
-    Wait-Http "$apiOrigin/healthz" 90
+    Wait-Http "$apiOrigin/auth/google/config" 90
 
     $uiEnvironment = @{ OMNYID_E2E_API_ORIGIN = $apiOrigin }
     $ui = Start-Process -FilePath "npm.cmd" -ArgumentList @("run", "preview", "--", "--host", "127.0.0.1", "--port", "$uiPort") `
@@ -198,7 +198,10 @@ try {
         Stop-Child $server
         if ($containerStarted) {
             $resolvedContainer = (docker inspect --format '{{.Name}}' $container 2>$null).TrimStart('/')
-            if ($resolvedContainer -eq $container) { docker rm --force $container | Out-Null }
+            if ($resolvedContainer -eq $container) {
+                docker stop $container | Out-Null
+                docker rm $container | Out-Null
+            }
         }
         if (Test-Path -LiteralPath $tempRoot) {
             $resolvedTemp = [IO.Path]::GetFullPath((Resolve-Path -LiteralPath $tempRoot).Path)
