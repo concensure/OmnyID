@@ -1,3 +1,27 @@
+## 2026-11-01 - WED-314 Family request lifecycle (Codex, complete)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch
+`agent/codex/WED-308`; exact implementation SHA
+`de3e9bb6f74e47c7f2b2f356a821b6205c44e538`. Clean verifier:
+`C:\Users\ozans\AppData\Local\Temp\omnyid-wed314-verify-de3e9bb`.
+
+- Couple-captured requests now save as drafts outside the decision queue.
+- Added authenticated tenant-scoped, version-checked and idempotent submit and
+  withdraw commands. Submit evaluates current rules and does not mutate guests,
+  invitations, RSVP, budget, seating or vendor state; withdrawal is confirmed
+  and terminal.
+- Exact-SHA typecheck, 2,134 Wedding tests, two line-budget tests, production
+  build, two browser cases, two Rust units and seven disposable-Postgres Family
+  scenarios pass. The temporary database was dropped.
+- No deployment was requested. Oracle remains
+  `eb398ebfecaec6a0277d7fe634e6c97198b44afe`; helper and delegate switches stay
+  false.
+- Autonomous Family implementation is complete. Remaining release work is
+  couple usability, restricted delegated-helper usability, a separately
+  authorised allowlisted cohort and promotion only after its criteria pass.
+
+Evidence: `Documents/verification/wed-314-family-request-lifecycle-2026-11-01.md`.
+
 ## 2026-11-01 - WED-313 Family meal, import and accessibility assurance (Codex, complete)
 
 Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch

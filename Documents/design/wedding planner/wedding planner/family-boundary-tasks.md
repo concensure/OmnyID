@@ -87,7 +87,7 @@ Depends on: 4, 5
 
 Depends on: 5, 6
 
-- [ ] Implement draft, pending, approved, partially approved, declined, withdrawn, expired and auto-blocked transitions.
+- [x] Implement draft, pending, approved, partially approved, declined, withdrawn, expired and auto-blocked transitions.
 - [x] Require idempotency keys for helper request and couple decision commands.
 - [x] Revalidate referenced rule versions, household revision, identity duplication and current allocation inside the add-guest approval transaction.
 - [x] Reserve capacity and apply an approved add-guest mutation atomically, while keeping the invitation unsent.
@@ -152,6 +152,8 @@ WED-312 adds the owner-facing access-management surface for Family helpers, auth
 
 WED-313 adds one shared Plan/RSVP meal-catalogue editor, explicit structured venue-quote, vendor-conversation and run-sheet option projection, replacement-impact confirmation for attending guest responses, and reviewed guest-table import through the existing synthesized-artifact projection. Prose never becomes a meal choice. Imported invitation-group households deliberately omit contact, dietary, allergy and private-note columns. Real-browser checks cover keyboard focus restoration, accessible names, colour-independent status, 320/375 px layouts and 200% zoom.
 
-This is not the end of the roadmap. A controlled allowlisted Family cohort and couple/delegated-helper usability remain open. The explicit request draft/submit/withdraw lifecycle is the remaining autonomous lifecycle slice. Expiry, revocation, deletion retention, restricted projection allowlists, removal after RSVP and sent-invitation rule changes are covered locally. The exact-candidate flags-off Oracle shadow is recorded in `Documents/verification/wed-310-rsvp-release-2026-11-01.md`. `OMNYID_WEDDING_BOUNDARY_HELPERS_ENABLED` and `OMNYID_WEDDING_BOUNDARY_DELEGATES_ENABLED` stay false unless the remaining hosted rollout criteria pass.
+WED-314 completes the explicit request lifecycle. Couple-captured requests remain drafts until the couple submits them. Submission re-evaluates the latest active server-side rules and produces pending, auto-blocked or expired state without mutating guests, invitations, RSVP, budget, seating or vendor records. Draft and submitted requests can be withdrawn through a version-checked, idempotent command; withdrawal is terminal and requires an inline confirmation.
+
+The autonomous Family implementation roadmap in this document is complete. The remaining work is deliberately external release assurance: couple usability, delegated-helper usability, a separately authorised allowlisted cohort, and promotion only after those objective criteria pass. Expiry, revocation, deletion retention, restricted projection allowlists, removal after RSVP and sent-invitation rule changes are covered locally. The exact-candidate flags-off Oracle shadow is recorded in `Documents/verification/wed-310-rsvp-release-2026-11-01.md`. `OMNYID_WEDDING_BOUNDARY_HELPERS_ENABLED` and `OMNYID_WEDDING_BOUNDARY_DELEGATES_ENABLED` stay false unless the remaining hosted rollout criteria pass.
 
 Release evidence for this slice is in `Documents/verification/wed-306-native-mobile-meal-family-boundaries-2026-10-31.md`. The pre-change coordination SHA was `3bd1f79fdae00c370556b504e0fde1daf66cc36f`; the exact deployed application SHA is `3c626dd149d61ae57c739fa90cd26acecb0109aa`.

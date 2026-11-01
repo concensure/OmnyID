@@ -1,3 +1,17 @@
+## 2026-11-01: Family requests remain drafts until an explicit server transition
+
+Couple-captured Family requests are AFP drafts, not decisions or pending
+reviews. They enter the review queue only through an authenticated,
+tenant-scoped, version-checked and idempotent submit command. Submission
+re-evaluates the latest active server-side Family rules and may produce pending,
+auto-blocked or expired state; it never changes a guest, invitation, RSVP,
+budget, seating or vendor record.
+
+Withdrawal uses the same command boundary, requires explicit confirmation in
+the couple UI and is terminal. Its receipt contains lifecycle and audit
+references but no copied guest or private-family content. This preserves one
+canonical Wedding ledger while keeping draft intent out of actionable queues.
+
 ## 2026-11-01: Meal replacement and reviewed guest import stay content-minimal
 
 WED-313 keeps Plan and RSVP on one revisioned, couple-only
