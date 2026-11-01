@@ -15,6 +15,16 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-314
+    title: Complete Family request draft, submit and withdrawal lifecycle
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-308
+    depends_on: [WED-313]
+    files: [src/server/wedding_boundary_routes.rs, src/server/wedding_boundary_routes/request_lifecycle.rs, solid-ui/src/lib/weddingBoundaryLedgerState.ts, solid-ui/src/lib/weddingGuestBoundaryDraftState.ts, solid-ui/src/lib/weddingBoundaryGovernanceApi.ts, solid-ui/src/components/WeddingBoundaryRequestLifecyclePanel.tsx, solid-ui/src/components/WeddingBoundaryManagementCard.tsx, solid-ui/src/components/WeddingWorkspaceContextPanels.tsx, solid-ui/tests/wedding-boundary-request-lifecycle.test.ts, solid-ui/tests/wedding-guest-boundary-draft-state.test.ts, Documents/design/wedding planner/wedding planner/family-boundary-tasks.md, Documents/verification/**, .agent/**]
+    acceptance: [Couple-captured family requests save as drafts and do not enter the decision queue until explicitly submitted, draft submission and draft pending or partially-approved withdrawal are authenticated tenant-scoped version-checked and idempotent server commands, submitted requests become pending or auto-blocked from current authoritative rules and never mutate guests invitations RSVP budget seating or vendor records, draft and submitted controls are mobile accessible and project from the same AFP request successors, terminal requests cannot transition again, focused frontend and Rust tests typecheck Wedding tests line budgets and production build pass, both Family rollout flags stay false]
+    progress: "Started after exact-SHA WED-313 assurance. No hosted rollout or deployment is required; both Family switches remain false."
+
   - id: WED-313
     title: Complete Family meal-catalogue editing and replacement safeguards
     status: done

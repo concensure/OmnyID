@@ -159,7 +159,7 @@ test("buildWeddingGuestBoundaryRuleObjects creates family-visible enforceable po
   assert.ok(policies.every((policy) => policy.visibility === "family_visible"));
 });
 
-test("buildWeddingFamilyBoundaryRequestObject creates approval-gated family requests", () => {
+test("buildWeddingFamilyBoundaryRequestObject creates a non-reviewable draft", () => {
   const request = buildWeddingFamilyBoundaryRequestObject({
     requesterLabel: "Mum",
     requestLabel: "Add two cousins",
@@ -168,11 +168,11 @@ test("buildWeddingFamilyBoundaryRequestObject creates approval-gated family requ
 
   assert.ok(request);
   assert.equal(request.kind, "wedding_boundary_change_request");
-  assert.equal(request.requestStatus, "pending");
+  assert.equal(request.requestStatus, "draft");
   assert.equal(request.approvalRequired, true);
   const message = weddingBoundaryLedgerObjectToAfpMessage(request, metadata, "2026-09-25T00:00:00.000Z");
-  assert.ok(message.supertags?.includes("wedding_boundary:approval_required"));
-  assert.ok(message.to?.includes("agent://decision-queue"));
+  assert.ok(!message.supertags?.includes("wedding_boundary:approval_required"));
+  assert.ok(!message.to?.includes("agent://decision-queue"));
 });
 
 test("configured partner-pair approval cannot be auto-applied by a permissive role", () => {
@@ -190,7 +190,8 @@ test("configured partner-pair approval cannot be auto-applied by a permissive ro
       personId: "family:planner", role: "planner", canEdit: ["household_change"],
     }],
   });
-  assert.equal(evaluated.requestStatus, "pending");
+  assert.equal(evaluated.requestStatus, "draft");
+  assert.equal(evaluated.metadata?.boundary_submission_status, "pending");
   assert.equal(evaluated.approvalRequired, true);
   assert.equal(evaluated.requiredApprovalCount, 2);
   assert.match(String(evaluated.publicReason), /Both partners/);
@@ -227,7 +228,8 @@ test("applyWeddingFamilyBoundaryRequestEvaluation links active rules before savi
     }],
   });
 
-  assert.equal(evaluated.requestStatus, "pending");
+  assert.equal(evaluated.requestStatus, "draft");
+  assert.equal(evaluated.metadata?.boundary_submission_status, "pending");
   assert.equal(evaluated.approvalRequired, true);
   assert.deepEqual(evaluated.policyIds, ["policy:no-extra-plus-ones"]);
   assert.equal(evaluated.metadata?.boundary_evaluation_applied, true);
@@ -256,7 +258,8 @@ test("applyWeddingFamilyBoundaryRequestEvaluation records blocked requests witho
   });
   const message = weddingBoundaryLedgerObjectToAfpMessage(evaluated, metadata, "2026-09-25T00:00:00.000Z");
 
-  assert.equal(evaluated.requestStatus, "auto_blocked");
+  assert.equal(evaluated.requestStatus, "draft");
+  assert.equal(evaluated.metadata?.boundary_submission_status, "auto_blocked");
   assert.equal(evaluated.approvalRequired, true);
   assert.deepEqual(evaluated.policyIds, ["policy:adults-only"]);
   assert.match(String(evaluated.publicReason), /blocks this change/i);

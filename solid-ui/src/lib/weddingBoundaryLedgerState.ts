@@ -221,6 +221,7 @@ export type WeddingBoundaryState = {
   familyVisibleCount: number;
   privateObjectCount: number;
   approvalQueue: WeddingBoundaryChangeRequest[];
+  requestObjects: WeddingBoundaryChangeRequest[];
   householdRows?: WeddingBoundaryHouseholdRow[];
   householdObjects?: WeddingBoundaryHousehold[];
   familyVisibleObjects: WeddingBoundaryLedgerObject[];
@@ -677,11 +678,13 @@ export function weddingBoundaryLedgerObjectToAfpMessage(
       : object.kind === "wedding_boundary_change_request" ? clean(object.privateRationaleCiphertext)
         : object.kind === "wedding_boundary_decision_rationale" ? clean(object.rationaleCiphertext)
           : "";
+  const recipients = ["agent://wedding-planning", "agent://decision-queue", "agent://knowledge-graph", "agent://topology"]
+    .filter((recipient) => recipient !== "agent://decision-queue" || object.kind !== "wedding_boundary_change_request" || changeRequestNeedsCoupleReview(object));
   return {
     id: `afp-wedding-boundary-${safeWeddingLabel(id)}`,
     thread_id: `wedding_boundary:${safeWeddingLabel(metadata.responseWorkspaceId)}`,
     from: "system://wedding-planning",
-    to: ["agent://wedding-planning", "agent://decision-queue", "agent://knowledge-graph", "agent://topology"],
+    to: recipients,
     timestamp: clean(object.createdAt) || nowIso,
     type: "ledger",
     kind: object.kind,
@@ -851,6 +854,7 @@ export function buildWeddingBoundaryState(input: {
     familyVisibleCount: familyObjects.length,
     privateObjectCount: privateCount,
     approvalQueue: approvals,
+    requestObjects: objects.filter((object): object is WeddingBoundaryChangeRequest => object.kind === "wedding_boundary_change_request"),
     householdRows: buildWeddingBoundaryHouseholdRows(objects),
     householdObjects: households,
     familyVisibleObjects: familyObjects,

@@ -908,3 +908,65 @@ async fn expired_requests_close_without_mutation_and_access_capabilities_stay_fa
     match prior_delegate { Some(value) => unsafe { std::env::set_var("OMNYID_WEDDING_BOUNDARY_DELEGATES_ENABLED", value) }, None => unsafe { std::env::remove_var("OMNYID_WEDDING_BOUNDARY_DELEGATES_ENABLED") } }
     match prior_allowlist { Some(value) => unsafe { std::env::set_var("OMNYID_WEDDING_BOUNDARY_DELEGATE_OWNER_ALLOWLIST", value) }, None => unsafe { std::env::remove_var("OMNYID_WEDDING_BOUNDARY_DELEGATE_OWNER_ALLOWLIST") } }
 }
+
+#[tokio::test]
+async fn request_draft_submit_withdraw_is_versioned_idempotent_and_non_mutating() {
+    let Some(db_url) = test_db_url() else { return };
+    let db = Db::new(&db_url).await.expect("connect test database");
+    let (owner, auth) = seed_user(&db, "lifecycle-owner").await;
+    let plan = format!("wedding-plan-{}", Ulid::new());
+    let workspace = format!("wedding-workspace-{}", Ulid::new());
+    let request_id = format!("request-{}", Ulid::new());
+    let person_id = format!("person-{}", Ulid::new());
+    append_fixture(&db, &owner.id, "wedding_boundary_change_request", &plan, &workspace, json!({
+        "ledger_kind":"wedding_boundary_change_request","boundary_object_id":request_id,"request_id":request_id,
+        "requested_by":"couple","change_type":"add_guest","target_person_id":person_id,
+        "proposed_guest_name":"Draft guest","request_status":"draft","status":"draft",
+        "approval_required":true,"approval_gate_recorded":false,"policy_ids":[],"policy_versions":{},"revision":1
+    })).await;
+    let app = omnyid_homeserver::server::build_test_router(&db_url).await;
+    let idempotency_key = format!("submit-{}", Ulid::new());
+    let submit = json!({
+        "wedding_plan_id":plan,"response_workspace_id":workspace,"request_id":request_id,
+        "operation":"submit","expected_revision":1,"idempotency_key":idempotency_key
+    });
+    let (submit_status, submitted) = post_json(&app, "/wedding/boundaries/requests/transitions", &auth, submit.clone()).await;
+    assert_eq!(submit_status, StatusCode::OK, "submit: {submitted}");
+    assert_eq!(submitted["status"], "pending");
+    let (replay_status, replay) = post_json(&app, "/wedding/boundaries/requests/transitions", &auth, submit).await;
+    assert_eq!(replay_status, StatusCode::OK, "replay: {replay}");
+    assert_eq!(replay, submitted, "exact retries return the original receipt");
+    let withdraw = json!({
+        "wedding_plan_id":plan,"response_workspace_id":workspace,"request_id":request_id,
+        "operation":"withdraw","expected_revision":2,"idempotency_key":format!("withdraw-{}",Ulid::new())
+    });
+    let (withdraw_status, withdrawn) = post_json(&app, "/wedding/boundaries/requests/transitions", &auth, withdraw).await;
+    assert_eq!(withdraw_status, StatusCode::OK, "withdraw: {withdrawn}");
+    assert_eq!(withdrawn["status"], "withdrawn");
+    let table = format!("\"{}\".messages", tenant_schema(&owner.id));
+    let created_guests = sqlx::query_scalar::<_, i64>(&format!(
+        "SELECT COUNT(*) FROM {table} WHERE kind='wedding_boundary_guest_profile' AND content->>'person_id'=$1"
+    )).bind(&person_id).fetch_one(&db.pool).await.expect("guest count");
+    assert_eq!(created_guests, 0);
+    let terminal_retry = json!({
+        "wedding_plan_id":plan,"response_workspace_id":workspace,"request_id":request_id,
+        "operation":"submit","expected_revision":3,"idempotency_key":format!("terminal-{}",Ulid::new())
+    });
+    let (terminal_status, _) = post_json(&app, "/wedding/boundaries/requests/transitions", &auth, terminal_retry).await;
+    assert_eq!(terminal_status, StatusCode::CONFLICT);
+    let blocked_request_id = format!("request-blocked-{}", Ulid::new());
+    append_fixture(&db, &owner.id, "wedding_boundary_policy", &plan, &workspace, json!({
+        "ledger_kind":"wedding_boundary_policy","boundary_object_id":format!("policy-{}",Ulid::new()),
+        "rule_type":"children","enforcement":"block","rule_status":"active","version":1
+    })).await;
+    append_fixture(&db, &owner.id, "wedding_boundary_change_request", &plan, &workspace, json!({
+        "ledger_kind":"wedding_boundary_change_request","boundary_object_id":blocked_request_id,"request_id":blocked_request_id,
+        "requested_by":"couple","change_type":"add_guest","request_status":"draft","revision":1,"policy_ids":[],"policy_versions":{}
+    })).await;
+    let (blocked_status, blocked) = post_json(&app, "/wedding/boundaries/requests/transitions", &auth, json!({
+        "wedding_plan_id":plan,"response_workspace_id":workspace,"request_id":blocked_request_id,
+        "operation":"submit","expected_revision":1,"idempotency_key":format!("blocked-{}",Ulid::new())
+    })).await;
+    assert_eq!(blocked_status, StatusCode::OK, "blocked: {blocked}");
+    assert_eq!(blocked["status"], "auto_blocked");
+}

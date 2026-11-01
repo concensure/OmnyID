@@ -39,6 +39,27 @@ export function decideWeddingBoundaryRequest(input: {
   });
 }
 
+export function transitionWeddingBoundaryRequest(input: {
+  weddingPlanId: string;
+  responseWorkspaceId: string;
+  requestId: string;
+  operation: "submit" | "withdraw";
+  expectedRevision: number;
+  idempotencyKey: string;
+}) {
+  return apiFetch<{ request_id: string; status: "pending" | "withdrawn" | "expired" | "auto_blocked"; revision: number; replayed: boolean; explanation: string; connected_updates: string[] }>("/wedding/boundaries/requests/transitions", {
+    method: "POST",
+    bodyJson: {
+      wedding_plan_id: input.weddingPlanId,
+      response_workspace_id: input.responseWorkspaceId,
+      request_id: input.requestId,
+      operation: input.operation,
+      expected_revision: input.expectedRevision,
+      idempotency_key: input.idempotencyKey,
+    },
+  });
+}
+
 export type WeddingBoundaryHouseholdCommand = {
   weddingPlanId: string;
   responseWorkspaceId: string;

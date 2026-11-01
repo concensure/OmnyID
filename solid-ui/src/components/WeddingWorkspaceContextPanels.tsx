@@ -39,7 +39,7 @@ import { WeddingSeatingPanel } from "@/components/WeddingSeatingPanel";
 import { WeddingTimelinePanel } from "@/components/WeddingTimelinePanel";
 import { WeddingVisionPanel } from "@/components/WeddingVisionPanel";
 import type { WeddingBoundaryRequestDecision } from "@/lib/weddingBoundaryDecisionState";
-import { applyWeddingBoundaryHouseholdCommand, applyWeddingBoundaryRuleCommand, decideWeddingBoundaryRequest, type WeddingBoundaryHouseholdCommand, type WeddingBoundaryRuleReplacement } from "@/lib/weddingBoundaryGovernanceApi";
+import { applyWeddingBoundaryHouseholdCommand, applyWeddingBoundaryRuleCommand, decideWeddingBoundaryRequest, transitionWeddingBoundaryRequest, type WeddingBoundaryHouseholdCommand, type WeddingBoundaryRuleReplacement } from "@/lib/weddingBoundaryGovernanceApi";
 import { weddingBoundaryLedgerObjectToAfpSendInput } from "@/lib/weddingBoundaryLedgerState";
 import {
   applyWeddingFamilyBoundaryRequestEvaluation,
@@ -162,6 +162,21 @@ export function WeddingWorkspaceContextPanels(props: {
       ? `${result.explanation} ${result.connected_updates.join("; ")}.`
       : result.explanation;
   }
+  async function transitionBoundaryRequest(requestId: string, operation: "submit" | "withdraw"): Promise<string> {
+    const request = props.state.boundaryState.requestObjects.find((item) => item.requestId === requestId);
+    if (!request) throw new Error("This family request is no longer available.");
+    const nonce = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}`;
+    const result = await transitionWeddingBoundaryRequest({
+      weddingPlanId: props.state.workspace.metadata.weddingPlanId,
+      responseWorkspaceId: props.state.workspace.metadata.responseWorkspaceId,
+      requestId,
+      operation,
+      expectedRevision: request.revision ?? 1,
+      idempotencyKey: `boundary-transition:${requestId}:${request.revision ?? 1}:${operation}:${nonce}`,
+    });
+    props.onRefreshWorkspace?.();
+    return result.explanation;
+  }
   async function saveGuestDraft(input: {
     displayName: string;
     householdLabel: string;
@@ -280,9 +295,7 @@ export function WeddingWorkspaceContextPanels(props: {
     });
     await props.saveProjection(weddingBoundaryLedgerObjectToAfpSendInput(object, props.state.workspace.metadata));
     props.onRefreshWorkspace?.();
-    if (object.requestStatus === "auto_blocked") return "Family request saved and marked as blocked by your guest rules.";
-    if (object.requestStatus === "approved") return "Family request saved as an allowed update.";
-    return "Family request saved for couple review.";
+    return "Family request saved as a draft. Submit it when you are ready for it to enter the decision queue.";
   }
   async function saveFamilyRule(input: { title: string; plainLanguage: string; ruleType: WeddingBoundaryPolicyRuleType; scopeKind: WeddingBoundaryRuleScopeKind; scopeId: string; effect: WeddingBoundaryRuleEffect; authority: WeddingBoundaryRuleAuthority; effectiveUntil: string; condition: Record<string, unknown> }): Promise<string> {
     if (!props.saveProjection) throw new Error("Saving is not connected yet.");
@@ -515,6 +528,7 @@ export function WeddingWorkspaceContextPanels(props: {
             state={props.state.boundaryState}
             topology={props.state.boundaryTopology}
             onDecideRequest={decideBoundaryRequest}
+            onTransitionRequest={transitionBoundaryRequest}
             onSaveFamilyRequest={saveFamilyRequest}
             onSaveFamilyRule={saveFamilyRule}
             onChangeFamilyRule={changeFamilyRule}

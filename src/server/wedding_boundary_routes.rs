@@ -26,6 +26,7 @@ const HELPER_ACTIONS: [&str; 2] = ["view_summary", "propose_request"];
 mod delegated_access;
 mod household_commands;
 mod private_notes;
+mod request_lifecycle;
 mod request_mutations;
 mod rule_commands;
 
@@ -45,6 +46,7 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
         .merge(delegated_access::routes())
         .merge(household_commands::routes())
         .merge(private_notes::routes())
+        .merge(request_lifecycle::routes())
         .merge(rule_commands::routes())
 }
 

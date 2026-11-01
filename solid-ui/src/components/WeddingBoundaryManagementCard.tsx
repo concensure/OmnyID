@@ -3,6 +3,7 @@ import { createMemo, createSignal, For, Show } from "solid-js";
 
 import { WeddingDashboardIcon } from "@/components/WeddingDashboardIcons";
 import { WeddingInfoTip } from "@/components/WeddingInfoTip";
+import WeddingBoundaryRequestLifecyclePanel from "@/components/WeddingBoundaryRequestLifecyclePanel";
 import {
   buildWeddingBoundaryManagementViewState,
   weddingBoundaryDraftSaveUnavailableNotice,
@@ -34,6 +35,7 @@ export function WeddingBoundaryManagementCard(props: {
   state: WeddingBoundaryState;
   topology: WeddingBoundaryTopologyState;
   onDecideRequest?: (requestId: string, decision: WeddingBoundaryRequestDecision, approvalActorId?: string, confirmedElevatedImpact?: boolean) => Promise<string>;
+  onTransitionRequest?: (requestId: string, operation: "submit" | "withdraw") => Promise<string>;
   onSaveFamilyRequest?: (input: { requesterLabel: string; requestLabel: string; changeType: WeddingBoundaryChangeType; targetHouseholdId: string; proposedGuestName: string; requiredApprovalCount: 1 | 2 }) => Promise<string>;
   onSaveFamilyRule?: (input: { title: string; plainLanguage: string; ruleType: WeddingBoundaryPolicyRuleType; scopeKind: WeddingBoundaryRuleScopeKind; scopeId: string; effect: WeddingBoundaryRuleEffect; authority: WeddingBoundaryRuleAuthority; effectiveUntil: string; condition: Record<string, unknown> }) => Promise<string>;
   onChangeFamilyRule?: (input: { operation: "archive_rule" | "supersede_rule"; rule: WeddingBoundaryPolicy; replacement?: WeddingBoundaryRuleReplacement; confirmedElevatedImpact: boolean }) => Promise<string>;
@@ -533,7 +535,7 @@ export function WeddingBoundaryManagementCard(props: {
             </label>
           </div>
           <button type="button" class="mt-3 rounded-full bg-cyan-700 px-3 py-2 text-xs font-semibold text-white transition hover:bg-cyan-800 disabled:cursor-not-allowed disabled:opacity-50" disabled={!requestLabel().trim() || !requestHouseholdId() || (requestChangeType() === "add_guest" && !proposedGuestName().trim()) || savingDraft()} onClick={() => void saveFamilyRequest()}>
-            {savingDraft() ? "Saving..." : "Save for review"}
+            {savingDraft() ? "Saving..." : "Save draft"}
           </button>
         </div>
       </Show>
@@ -629,6 +631,7 @@ export function WeddingBoundaryManagementCard(props: {
 
       <Show when={showRequests()}>
         <div id="wedding-boundary-requests" tabindex="-1" class="mt-3 space-y-2 focus:outline-none">
+          <WeddingBoundaryRequestLifecyclePanel requests={props.state.requestObjects} onTransition={props.onTransitionRequest} onNotice={setDecisionNotice} />
           <Show when={visibleApprovalItems().length > 0} fallback={<p class="rounded-2xl border border-cyan-100 bg-white/75 p-3 text-xs leading-5 text-cyan-950/70">No guest-list requests need a decision right now.</p>}>
             <For each={visibleApprovalItems()}>
               {(item) => (

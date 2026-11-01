@@ -322,7 +322,7 @@ export function buildWeddingFamilyBoundaryRequestObject(
     targetHouseholdId: clean(input.targetHouseholdId) || null,
     targetPersonId,
     proposedGuestName: proposedGuestName || null,
-    requestStatus: "pending",
+    requestStatus: "draft",
     approvalRequired: true,
     approvalCount: 0,
     requiredApprovalCount: input.requiredApprovalCount === 2 ? 2 : 1,
@@ -355,8 +355,8 @@ export function applyWeddingFamilyBoundaryRequestEvaluation(input: {
   );
   return {
     ...input.request,
-    status: requiresPartnerPair && evaluation.status === "approved" ? "pending" : evaluation.status,
-    requestStatus: requiresPartnerPair && evaluation.status === "approved" ? "pending" : evaluation.status,
+    status: "draft",
+    requestStatus: "draft",
     approvalRequired: requiresPartnerPair || evaluation.approvalRequired,
     policyIds: evaluation.policyIds.length > 0 ? evaluation.policyIds : input.request.policyIds,
     policyVersions: Object.fromEntries((input.policies ?? []).filter((policy) => evaluation.policyIds.includes(policy.id)).map((policy) => [policy.id, policy.version ?? 1])),
@@ -364,6 +364,7 @@ export function applyWeddingFamilyBoundaryRequestEvaluation(input: {
     metadata: {
       ...(input.request.metadata ?? {}),
       boundary_evaluation_applied: true,
+      boundary_submission_status: requiresPartnerPair && evaluation.status === "approved" ? "pending" : evaluation.status,
       boundary_allowed_without_approval: evaluation.allowedWithoutApproval,
       boundary_reason_labels: evaluation.reasonLabels,
     },
