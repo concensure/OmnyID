@@ -5607,6 +5607,36 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch `agent/codex/W
 - Safe reruns passed: 7 Worker tests, 7 provider units, 4 ingress units, 7 SMTP-out units, one disposable-Postgres complaint/no-retry integration and 3 live disposable ClamAV cases. These remain autonomous evidence, not substitutes for the missing external/human proof.
 - WED-289 verification passed 6 Rust contract tests, 13 frontend database tests, TypeScript typecheck, all 2,012 Wedding tests, production UI build and both line-budget checks. The build reports only the existing large-chunk warning.
 - No Cloudflare/provider/routing/allowlist/Oracle write, production flag change, deployment or policy-V2 enablement occurred. Next dependency-ready slice is WED-290 generic database definitions, creation and switching.
+
+## 2026-11-02 - WED-317 disposable full-account Wedding harness (Codex, complete)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-317`, branch `agent/codex/WED-317`, based on
+`726bc483c51f417d1e45a00d7871c288a8320204`; full clean-stack evidence was produced at
+`c58d8637860a6bcbb8347bfc4138e65d18605d21`.
+
+- Added a guarded PowerShell harness that launches tmpfs pgvector on a random loopback port, the real
+  production homeserver and a production-built Solid UI. It creates Mia, Jordan, Priya, Sam and Alex
+  through `/auth/register`, seeds deterministic two-couple AFP fixtures, and tears down all services.
+- Added five isolated Playwright contexts covering draft submit/withdraw, catering-only helper and
+  delegated grants, delegated proposal and owner approval, cross-couple grant-ID substitution,
+  revocation and denial after revocation. Synthetic `@omnyid.test` identities and external-send-off
+  guards prevent production effects.
+- Fixed a privacy issue discovered by the journey: the service worker cached unclassified Wedding GET
+  responses and could replay a private pre-revocation or previous-account view. Account-scoped routes
+  are now network-only, the former API cache is deleted, and delegated views are `private, no-store`.
+- The harness has bounded Docker readiness, isolated low-footprint Cargo output, process-tree teardown,
+  and deletes large build artifacts on failure. A diagnostic `cargo clean` removed 12.1 GiB of generated
+  WED-317 target files after the local drive filled; no source, Docker volume or user data was removed.
+- Live DNS inspection explains the Gmail rejection: Cloudflare Email Routing is inbound-only, SPF does
+  not authorise Google, no Google DKIM selector exists, and DMARC correctly rejects the unaligned From.
+  Do not weaken DMARC or add a second SPF record; use Cloudflare application sending, Google Workspace
+  DKIM/SPF, or a verified SMTP provider and verify received headers.
+- Checks: full clean browser stack passed at the SHA above; production UI build passed; TypeScript,
+  line-budget and seven focused service-worker/harness tests passed. Clean npm install reports 38
+  moderate and one high audit finding, retained for explicit dependency review.
+- No production deployment, DNS mutation, email send or Oracle write occurred. Recommended next action:
+  review the branch/PR, then separately authenticate the desired manual Gmail send-as provider before
+  changing DNS.
 ## 2026-10-29 - WED-296 owner-authorized Wedding release (Codex, complete)
 
 Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch `agent/codex/WED-296`, based on WED-289 commit `259c0a5e0175a30131d95eea841fafb2b51abd3c`.

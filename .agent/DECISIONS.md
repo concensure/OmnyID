@@ -2356,3 +2356,8 @@ subjective usability or a controlled external cohort.
   negative case, while all email and external integrations stay off.
 - Cloudflare Email Routing is an inbound facility and does not authenticate Gmail UI send-as mail.
   Keep DMARC at reject; add outbound SPF/DKIM only from the chosen provider's exact verified records.
+- The workspace service worker must never cache authenticated or potentially account-scoped API
+  responses. `/api`, `/auth`, `/agent`, `/dashboard`, `/relay`, `/files` and `/wedding` are
+  network-only; activation deletes the former API cache. Only explicit shell and hashed static assets
+  may use the service-worker cache. This prevents revoked or previous-account wedding projections
+  from being replayed locally.

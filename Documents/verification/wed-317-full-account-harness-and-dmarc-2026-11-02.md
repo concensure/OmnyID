@@ -17,11 +17,33 @@ or send credential.
 - External effects: transactional email, vendor mail, Email Worker, gRPC, WebTransport and run-sheet
   sharing remain disabled
 - Teardown: browser/server processes and the exact named container are removed in `finally`
+- Storage bound: each run uses a disposable Cargo target with debug symbols and incremental storage
+  disabled; failed runs delete build artifacts while retaining only small redacted logs
 
 The deterministic journeys exercise request submit and withdrawal, a protected helper scope, Alex's
 catering-only household scope, delegated proposal, owner approval, revocation, and cross-couple grant
 identifier substitution. The test also proves that the restricted household and private marker are
 absent from Alex's projection.
+
+## Verification evidence
+
+The full clean-stack journey passed at implementation commit
+`c58d8637860a6bcbb8347bfc4138e65d18605d21`. It performed a clean Rust build, clean npm install,
+production UI build, disposable database migration, five real registrations, five UI logins, all
+journey mutations and teardown. The run found and verified a privacy-relevant service-worker defect:
+the backend correctly returned 404 after revocation, but the prior worker replayed an earlier private
+200 response. The worker now treats all account-scoped routes as network-only and deletes the former
+API cache during activation. Delegated projections also return `Cache-Control: private, no-store`.
+
+Additional checks passed after the final TypeScript resolver update:
+
+- TypeScript `tsc --noEmit`
+- both line-budget checks
+- seven focused service-worker and harness contract tests
+
+The clean install reports 39 dependency audit findings (38 moderate and one high). They were not
+silently auto-fixed because `npm audit fix --force` can introduce breaking dependency changes; they
+remain a separate dependency-review item rather than a hidden harness exception.
 
 ## Live email authentication observation
 
