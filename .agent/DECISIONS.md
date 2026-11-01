@@ -2232,3 +2232,17 @@ private-note or seating-conflict content. Exact retries return the stored receip
 apply the same receipt shape and preserve invitation references. Planner, helper and RSVP-guest reads
 are explicit allowlists rather than filtered copies of whole ledger objects. Rollout flags remain
 false-default; these contracts do not authorise a hosted helper/delegate cohort.
+
+## 2026-11-01: Family rule and household restructuring are reviewed server commands
+
+An active Family Boundary rule is never edited in place. Archive writes a successor version on the
+same stable rule identity; replacement writes a superseded successor plus one new active rule that
+references the preceding identity. The server locks and revalidates the current version, derives the
+affected households, guests and latest invitations, and requires current elevated-impact confirmation
+when an invitation was sent or accepted. One idempotency receipt and one aggregate impact receipt
+preserve history and explicitly record no-send, no-attendance, no-spend and no-private-copy guarantees.
+
+The Couple surface uses the existing authoritative household command route for split, merge and empty
+archive. It selects stable person and household references, sends expected revisions, and presents the
+same deterministic impact preview before applying. These owner commands do not enable Family helper
+or authenticated delegate access; both rollout flags remain false-default.

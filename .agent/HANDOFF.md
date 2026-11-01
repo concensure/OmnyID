@@ -6224,3 +6224,51 @@ Remaining:
 - Then build delegate/helper grant management UI, projector acknowledgements,
   restricted-data usability/accessibility evidence and a separately authorised
   allowlisted cohort before either Family rollout flag can be enabled.
+
+## 2026-11-01 - WED-311 Family rule and household command completion (Codex)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch
+`agent/codex/WED-308`, exact implementation commit
+`9943b7657c682d285675afddcc10c771d082f6e2`.
+
+Completed:
+
+- Added the authenticated, tenant-scoped `/wedding/boundaries/rules/commands`
+  route for versioned archive and replacement. It locks and revalidates the
+  current rule, requires current confirmation for sent/accepted invitation
+  effects, retains earlier versions and returns the original response on retry.
+- Added privacy-safe aggregate rule impact receipts with actor, causation,
+  expected version, affected stable references, connected projection updates
+  and explicit no-send/no-attendance/no-spend/no-private-copy guarantees.
+- Mounted Replace rule and Archive rule in the Couple Family Boundaries surface
+  with plain-language deterministic impact review.
+- Mounted household split, merge and empty archive over the existing
+  server-authoritative household command route, including stable member
+  selection, expected revisions and impact confirmation.
+- Added focused mobile/source assertions and a real disposable-Postgres rule
+  scenario covering elevated confirmation, exact retry, archive/replacement
+  versions and private-field exclusion. No new file exceeds 999 lines.
+
+Exact-candidate verification:
+
+- `npm run typecheck`: passed.
+- `npm run test:wedding`: 2,117 passed.
+- `npm run test:line-budget`: 2 passed.
+- `npm run build`: passed.
+- `cargo test --lib server::wedding_boundary_routes -j1 -- --nocapture`: 10 passed.
+- Disposable PostgreSQL 18 + pgvector rule command: 1 passed.
+- Disposable PostgreSQL existing Family Boundary suite: 5 passed.
+- The disposable container and its tmpfs data were removed.
+
+Not performed:
+
+- No Oracle deployment, hosted cohort or environment change. Production remains
+  application SHA `eb398ebfecaec6a0277d7fe634e6c97198b44afe`.
+- `OMNYID_WEDDING_BOUNDARY_HELPERS_ENABLED` and
+  `OMNYID_WEDDING_BOUNDARY_DELEGATES_ENABLED` remain false-default.
+
+Recommended next action:
+
+- Continue the broader Family roadmap with owner-facing helper/delegate grant
+  management, projector acknowledgement receipts and the accessibility/usability
+  matrix. Authorise a narrow allowlisted cohort only after those checks pass.
