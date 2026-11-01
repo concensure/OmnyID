@@ -675,4 +675,14 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Cookie-free non-identifying first-party Wedding site measurement",
         include_str!("../../postgres/migrations/0132_wedding_site_measurement.sql"),
     ),
+    (
+        "0133_operator_email_relay",
+        "False-default authenticated operational alias relay with encrypted routing",
+        include_str!("../../postgres/migrations/0133_operator_email_relay.sql"),
+    ),
+    (
+        "0134_wedding_vendor_listing_proposals",
+        "Private reviewed proposals for businesses absent from the Wedding vendor directory",
+        include_str!("../../postgres/migrations/0134_wedding_vendor_listing_proposals.sql"),
+    ),
 ];

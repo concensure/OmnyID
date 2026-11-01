@@ -7,7 +7,7 @@ import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
 
 import { VendorOwnershipProofPanel } from "@/components/vendor/VendorOwnershipProofPanel";
 import { VendorProfileDashboard } from "@/components/vendor/VendorProfileDashboard";
-import { getVendorClaim, getVendorClaimSuggestions, startVendorClaim, type VendorClaim, type VendorClaimSuggestion } from "@/lib/vendorClaimApi";
+import { getVendorClaim, getVendorClaimSuggestions, getVendorListingProposalCapabilities, proposeVendorListing, startVendorClaim, type VendorClaim, type VendorClaimSuggestion } from "@/lib/vendorClaimApi";
 
 const slugFromUrl = () => {
   const params = new URLSearchParams(window.location.search);
@@ -23,6 +23,12 @@ export function VendorClaimFlow() {
   const [claim, setClaim] = createSignal<VendorClaim | null>(null);
   const [busy, setBusy] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
+  const [proposalEnabled, setProposalEnabled] = createSignal(false);
+  const [showProposal, setShowProposal] = createSignal(false);
+  const [category, setCategory] = createSignal("");
+  const [serviceArea, setServiceArea] = createSignal("");
+  const [websiteUrl, setWebsiteUrl] = createSignal("");
+  const [businessEmail, setBusinessEmail] = createSignal("");
   let suggestionTimer: number | undefined;
 
   const searchSuggestions = (value: string) => {
@@ -74,7 +80,25 @@ export function VendorClaimFlow() {
       setBusy(false);
     }
   };
+  const propose = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await proposeVendorListing({
+        businessName: businessName(), category: category(), serviceArea: serviceArea(),
+        websiteUrl: websiteUrl(), businessEmail: businessEmail(), declaredRole: role(),
+      });
+      setClaim(response);
+      setShowProposal(false);
+      window.history.replaceState(null, "", `?vendor_slug=${encodeURIComponent(response.vendor_slug)}`);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not submit this listing for review.");
+    } finally {
+      setBusy(false);
+    }
+  };
   onMount(() => {
+    void getVendorListingProposalCapabilities().then(setProposalEnabled).catch(() => setProposalEnabled(false));
     if (vendorSlug()) void loadExisting();
   });
   onCleanup(() => window.clearTimeout(suggestionTimer));
@@ -105,11 +129,29 @@ export function VendorClaimFlow() {
             </Show>
           </div>
           <p class="mt-2 text-xs leading-5 text-wedding-muted">Choose one of the closest matches. Small spelling differences are okay; only active listings are suggested.</p>
+          <Show when={proposalEnabled() && businessName().trim().length >= 2 && !vendorSlug()}>
+            <button type="button" class="mt-3 min-h-11 font-semibold text-wedding-accent underline underline-offset-4" aria-expanded={showProposal()} onClick={() => setShowProposal((value) => !value)}>
+              My business is not listed
+            </button>
+          </Show>
           <label class="mt-4 block text-sm font-medium">Your role
             <select class="mt-1 min-h-11 w-full rounded-lg border border-wedding-muted px-3" value={role()} disabled={busy()} onChange={(event) => setRole(event.currentTarget.value)}>
               <option value="owner">Business owner</option><option value="manager">Manager</option><option value="marketing">Marketing contact</option><option value="other">Other authorised representative</option>
             </select>
           </label>
+          <Show when={showProposal()}>
+            <fieldset class="mt-4 grid gap-3 rounded-xl border border-wedding-muted bg-wedding-surface p-4">
+              <legend class="px-1 text-sm font-bold">Propose a private listing</legend>
+              <p class="text-xs leading-5 text-wedding-muted">This stays out of public search until ownership and the listing are reviewed.</p>
+              <label class="text-sm font-medium">Category<input class="mt-1 min-h-11 w-full rounded-lg border border-wedding-muted bg-white px-3" value={category()} maxlength="80" onInput={(event) => setCategory(event.currentTarget.value)} /></label>
+              <label class="text-sm font-medium">Service area<input class="mt-1 min-h-11 w-full rounded-lg border border-wedding-muted bg-white px-3" value={serviceArea()} maxlength="180" onInput={(event) => setServiceArea(event.currentTarget.value)} /></label>
+              <label class="text-sm font-medium">Business website<input class="mt-1 min-h-11 w-full rounded-lg border border-wedding-muted bg-white px-3" type="url" inputmode="url" placeholder="https://" value={websiteUrl()} onInput={(event) => setWebsiteUrl(event.currentTarget.value)} /></label>
+              <label class="text-sm font-medium">Business email<input class="mt-1 min-h-11 w-full rounded-lg border border-wedding-muted bg-white px-3" type="email" inputmode="email" value={businessEmail()} onInput={(event) => setBusinessEmail(event.currentTarget.value)} /></label>
+              <button type="button" class="min-h-11 rounded-lg bg-wedding-accent px-4 font-bold text-white disabled:opacity-60" disabled={busy() || !category().trim() || !serviceArea().trim() || !websiteUrl().trim() || !businessEmail().trim()} onClick={() => void propose()}>
+                {busy() ? "Submitting…" : "Submit and prove ownership"}
+              </button>
+            </fieldset>
+          </Show>
           <div class="mt-5 grid gap-2 sm:grid-cols-2">
             <button class="min-h-11 rounded-lg border border-wedding-accent px-4 font-bold text-wedding-accent" type="button" disabled={busy() || !vendorSlug()} onClick={() => void loadExisting()}>Check existing claim</button>
             <button class="min-h-11 rounded-lg bg-wedding-accent px-4 font-bold text-white disabled:opacity-60" type="button" disabled={busy() || !vendorSlug()} onClick={() => void begin()}>{busy() ? "Working…" : "Start ownership proof"}</button>

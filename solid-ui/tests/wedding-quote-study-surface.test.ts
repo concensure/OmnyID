@@ -40,6 +40,9 @@ test("public directory and claim flow expose database-backed discovery without e
   assert.match(claimFlow, /role="combobox"/);
   assert.doesNotMatch(claimFlow, />Listing handle/);
   assert.match(claimApi, /\/api\/wedding\/vendor\/suggestions/);
+  assert.match(claimFlow, /My business is not listed/);
+  assert.match(claimFlow, /This stays out of public search until ownership and the listing are reviewed/);
+  assert.match(claimApi, /\/api\/wedding\/vendor\/listing-proposals/);
 });
 
 test("solo animal quiz sharing speaks for one person and avoids fragile emoji in message text", async () => {

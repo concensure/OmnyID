@@ -5,7 +5,6 @@ import type { AfpMessage } from "../src/lib/api";
 import {
   projectWeddingVendorLifecycle,
   mergeWeddingVendorLifecycleCandidates,
-  weddingVendorBookingToAfpSendInput,
   weddingVendorFollowUpDismissalToAfpSendInput,
   weddingVendorLifecycleMatches,
   weddingVendorReminderToAfpSendInput,
@@ -24,12 +23,16 @@ const metadata = {
 };
 
 test("vendor lifecycle merges favourite, enquiry, quote and booking events", () => {
-    const booking = weddingVendorBookingToAfpSendInput({ metadata, vendorId: "vendor-1", vendorName: "Harbour House" });
     const records = projectWeddingVendorLifecycle([
       message("select", "wedding_vendor_contact_reference", "2026-01-01T00:00:00Z", { option_label: "Harbour House", selected_for_follow_up: true }),
       message("sent", "wedding_vendor_outreach_sent", "2026-01-02T00:00:00Z", { vendor_id: "vendor-1", vendor_label: "Harbour House" }),
       message("quote", "wedding_vendor_quote_received", "2026-01-03T00:00:00Z", { quote: { vendorName: "Harbour House" } }),
-      message("book", booking.kind ?? "", booking.timestamp ?? "2026-01-04T00:00:00Z", booking.content),
+      message("book", "wedding_vendor_booking_confirmed", "2026-01-04T00:00:00Z", {
+        vendor_id: "vendor-1",
+        vendor_name: "Harbour House",
+        evidence_message_id: "vendor-acceptance-1",
+        payment_executed: false,
+      }),
     ]);
     assert.equal(records.length, 1);
     assert.deepEqual({ vendorId: records[0].vendorId, favourited: records[0].favourited, enquired: records[0].enquired, quoteReceived: records[0].quoteReceived, booked: records[0].booked }, { vendorId: "vendor-1", favourited: true, enquired: true, quoteReceived: true, booked: true });
@@ -58,11 +61,17 @@ test("closing a follow-up is a durable AFP lifecycle state", () => {
     assert.ok(records[0].followUpDismissedAt);
 });
 
-test("vendor booking records a decision without pretending to pay", () => {
-    const input = weddingVendorBookingToAfpSendInput({ metadata, vendorName: "Harbour House" });
-    assert.equal(input.kind, "wedding_vendor_booking_confirmed");
-    assert.equal(input.content.payment_executed, false);
-    assert.equal(input.store_in_relational, true);
+test("only an evidence-backed confirmation event marks a vendor booked", () => {
+    const record = projectWeddingVendorLifecycle([
+      message("accepted", "wedding_vendor_quote_accepted", "2026-01-03T00:00:00Z", {
+        vendor_id: "vendor-1", vendor_name: "Harbour House",
+      }),
+      message("request", "wedding_vendor_booking_requested", "2026-01-04T00:00:00Z", {
+        vendor_id: "vendor-1", vendor_name: "Harbour House",
+      }),
+    ])[0];
+    assert.equal(record.quoteAccepted, true);
+    assert.equal(record.booked, false);
 });
 
 test("vendor lifecycle recognises tagged enquiry and quote variants", () => {

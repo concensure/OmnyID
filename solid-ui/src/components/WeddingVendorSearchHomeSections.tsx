@@ -8,7 +8,6 @@ import { renderMarkdown } from "@/lib/markdownRenderer";
 import { WeddingVendorChoiceCard } from "@/components/WeddingVendorChoiceCard";
 import { WeddingPreferenceConfirmationChips } from "@/components/WeddingPreferenceConfirmationChips";
 import { WeddingDealBreakerEditor } from "@/components/WeddingDealBreakerEditor";
-import { WeddingConfirmDialog } from "@/components/WeddingConfirmDialog";
 import type { WeddingVendorChoiceCardData } from "@/components/WeddingVendorChoiceCard";
 import type { WeddingResponseWorkspaceViewProps } from "@/components/WeddingResponseWorkspaceViewTypes";
 import { decisionCardFromWeddingVendorComparison } from "@/lib/decisionCardState";
@@ -33,7 +32,6 @@ import {
   findWeddingVendorLifecycle,
   mergeWeddingVendorLifecycleCandidates,
   projectWeddingVendorLifecycle,
-  weddingVendorBookingToAfpSendInput,
   weddingVendorLifecycleMatches,
   type WeddingVendorLifecycleFilter,
   type WeddingVendorLifecycleRecord,
@@ -192,8 +190,6 @@ export function WeddingVendorSearchHomeSection(props: {
   const [searchProgressIndex, setSearchProgressIndex] = createSignal(0);
   const [selectedChoiceIds, setSelectedChoiceIds] = createSignal<string[]>([]);
   const [lifecycleFilter, setLifecycleFilter] = createSignal<WeddingVendorLifecycleFilter>("all");
-  const [bookingVendor, setBookingVendor] = createSignal<WeddingVendorLifecycleRecord | null>(null);
-  const [bookingBusy, setBookingBusy] = createSignal(false);
   const lifecycleRecords = createMemo(() => {
     const comparison = props.result?.preview ?? props.result?.sourcePreview;
     const candidates = comparison?.vendorComparisonCards.map((card) => ({
@@ -283,17 +279,6 @@ export function WeddingVendorSearchHomeSection(props: {
   const quoteFlowForVendor = (vendor: WeddingVendorLifecycleRecord) => workspace().state.activeVendorQuoteReplyFlows.find((flow) =>
     flow.quote.vendorName.trim().toLowerCase() === vendor.vendorName.trim().toLowerCase()
   ) ?? null;
-  async function confirmBooking(): Promise<void> {
-    const vendor = bookingVendor();
-    const saveProjection = workspace().saveProjection;
-    if (!vendor || !saveProjection) return;
-    setBookingBusy(true);
-    try {
-      await saveProjection(weddingVendorBookingToAfpSendInput({ metadata: workspace().state.workspace.metadata, vendorId: vendor.vendorId, vendorName: vendor.vendorName }));
-      setBookingVendor(null);
-      workspace().onRefreshWorkspace?.();
-    } finally { setBookingBusy(false); }
-  }
   createEffect(() => {
     if (!workspace().vendorSearchRunning) {
       setSearchProgressIndex(0);
@@ -375,7 +360,7 @@ export function WeddingVendorSearchHomeSection(props: {
               </button>
               <div class="flex flex-wrap gap-2">
                 <Show when={quoteFlowForVendor(vendor)}>{(flow) => <button type="button" class="min-h-11 rounded-lg border border-wedding-secondary bg-white px-3 text-sm font-bold text-wedding-secondary disabled:opacity-60" disabled={vendor.quoteAccepted || !props.onAcceptQuote} onClick={() => props.onAcceptQuote?.(flow().quote, flow().quoteMessageId ?? flow().id)}>{vendor.quoteAccepted ? "Quote accepted" : "Accept quote"}</button>}</Show>
-                <Show when={vendor.quoteReceived && !vendor.booked}><button type="button" class="min-h-11 rounded-lg bg-wedding-primary px-3 text-sm font-bold text-white" onClick={() => setBookingVendor(vendor)}>Book</button></Show>
+                <Show when={vendor.quoteAccepted && !vendor.booked}><button type="button" class="min-h-11 rounded-lg bg-wedding-primary px-3 text-sm font-bold text-white" onClick={() => openLifecycleDocument(vendor)}>Review booking terms</button></Show>
               </div>
             </article>}</For>
           </Show>
@@ -548,7 +533,6 @@ export function WeddingVendorSearchHomeSection(props: {
       <Show when={visibleBlockedReason()}>
         {(reason) => <p class="mt-2 break-words text-xs leading-5 text-wedding-ink/70">{reason()}</p>}
       </Show>
-      <WeddingConfirmDialog open={Boolean(bookingVendor())} title={`Book ${bookingVendor()?.vendorName ?? "this vendor"}?`} detail="This records your booking decision in the wedding ledger. It does not sign a contract, pay a deposit, or send a message." confirmLabel="Confirm booking" busy={bookingBusy()} onCancel={() => setBookingVendor(null)} onConfirm={() => void confirmBooking()} />
     </div>
   );
 }

@@ -15,6 +15,17 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-318
+    title: Release Family access, build the operator email relay, and close vendor-side workflow gaps
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-318
+    worktree: C:/Users/ozans/Desktop/projects/OmnyID-WED-318
+    depends_on: [WED-317, WED-296]
+    files: [cloudflare/vendor-email-ingress-worker/**, src/gateway/**, src/server/operator_email_relay*, src/server/vendor_email_worker_ingress.rs, src/db/**, postgres/migrations/**, solid-ui/src/components/vendor/**, solid-ui/src/lib/vendor**, Documents/design/wedding planner/vendor side/**, Documents/verification/**, .agent/**]
+    acceptance: [The reviewed Family helper and delegate release remains explicit reversible and account-safe, command-by-email is DMARC-authenticated sender-allowlisted alias-allowlisted replay-safe destination-bounded and never an open relay, every outbound aliases the selected operational handle BCCs the authorised operator and preserves safe thread correlation, existing vendor login claim proof profile photo and response paths are verified against real contracts, missing-listing quote-construction and two-sided evidence-backed booking gaps have dependency-ordered tasks, focused security database browser typecheck build and line-budget evidence is recorded before any relay enablement]
+    progress: "Family access is live at exact SHA 5f1539e657a0cb7e8fa51943f42d9ed2fd77726b with matching runtime provenance, explicit helper/delegate switches and bounded production proof. The false-default operator relay, missing-listing proposal and itemised quote builder are implemented and locally verified. The relay still needs dedicated live provider/BCC/reply evidence, listing proposal still needs disposable-Postgres HTTP evidence, and exact vendor-confirmed two-sided booking remains open; none of those incomplete switches is enabled."
+
   - id: WED-317
     title: Build a disposable full-account Wedding browser harness and diagnose outbound DMARC
     status: done

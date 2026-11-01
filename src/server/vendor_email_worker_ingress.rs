@@ -28,6 +28,8 @@ use ulid::Ulid;
 
 use super::{AppState, RateLimitPolicy, enforce_rate_limit};
 
+mod operator_relay;
+
 const MAX_RAW_BYTES: usize = 10 * 1024 * 1024;
 const MAX_CLOCK_SKEW_SECS: i64 = 300;
 const PROVIDER: &str = "cloudflare_email_worker";
@@ -84,10 +86,10 @@ async fn cloudflare_email_inbound_http(
     headers: HeaderMap,
     body: Bytes,
 ) -> Result<(StatusCode, Json<Value>), (StatusCode, String)> {
-    if !env_enabled("OMNYID_VENDOR_MAIL_INGRESS_ENABLED")
-        || !env_enabled("OMNYID_VENDOR_MAIL_ENABLED")
-        || !env_enabled("OMNYID_VENDOR_SENDER_MASK_ENABLED")
-    {
+    let vendor_ingress_enabled = env_enabled("OMNYID_VENDOR_MAIL_INGRESS_ENABLED")
+        && env_enabled("OMNYID_VENDOR_MAIL_ENABLED")
+        && env_enabled("OMNYID_VENDOR_SENDER_MASK_ENABLED");
+    if !vendor_ingress_enabled && !operator_relay::enabled() {
         return Err((StatusCode::NOT_FOUND, "not_found".to_string()));
     }
     if !valid_content_type(&headers) {
@@ -127,6 +129,12 @@ async fn cloudflare_email_inbound_http(
         configured_max_bytes().map_err(IngressError::http)?,
     )
     .map_err(IngressError::http)?;
+    if operator_relay::is_configured_alias(&envelope.to) {
+        return operator_relay::handle(&state, &envelope, &body).await;
+    }
+    if !vendor_ingress_enabled {
+        return Err((StatusCode::NOT_FOUND, "not_found".to_string()));
+    }
     let route = resolve_recipient(&state, &envelope.to).await?;
     let recipient_rate_key = hex::encode(Sha256::digest(envelope.to.as_bytes()));
     enforce_rate_limit(

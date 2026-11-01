@@ -38,6 +38,16 @@ function normalizedMessageId(value) {
     .slice(0, 512);
 }
 
+function configuredAddresses(value) {
+  return new Set(String(value ?? "").split(",").map((entry) => entry.trim().toLowerCase()).filter(Boolean));
+}
+
+export function cloudflareDmarcPassed(headers) {
+  const result = String(headers?.get?.("Authentication-Results") ?? "").trim().toLowerCase();
+  return result.startsWith("mx.cloudflare.net;")
+    && result.split(";").some((part) => part.trim().startsWith("dmarc=pass"));
+}
+
 export async function deterministicEventId({ from, to, messageId, bodyDigest }) {
   if (!HEX_64.test(bodyDigest)) throw new Error("invalid_body_digest");
   const material = [
@@ -144,6 +154,10 @@ export async function processEmail(message, env, fetchImpl = fetch) {
 
   const from = normalizedAddress(message.from);
   const to = normalizedAddress(message.to);
+  if (configuredAddresses(env.OPERATOR_ALIASES).has(to) && !cloudflareDmarcPassed(message.headers)) {
+    message.setReject("Message cannot be accepted");
+    return { status: "rejected", reason: "dmarc_not_passed" };
+  }
   const bodyDigest = await sha256Hex(bytes);
   const eventId = await deterministicEventId({
     from,

@@ -172,14 +172,12 @@ function lifecycleInput(input: {
   metadata: WeddingPlanningMetadata;
   vendorId?: string | null;
   vendorName: string;
-  kind: "wedding_vendor_booking_confirmed" | "wedding_vendor_follow_up_reminder" | "wedding_vendor_follow_up_dismissed";
+  kind: "wedding_vendor_follow_up_reminder" | "wedding_vendor_follow_up_dismissed";
   reminderAt?: string | null;
 }): SendAfpMessageInput {
   const vendorKey = keyPart(input.vendorId || input.vendorName) || "vendor";
   const timestamp = new Date().toISOString();
-  const title = input.kind === "wedding_vendor_booking_confirmed"
-    ? `${input.vendorName} marked as booked`
-    : input.kind === "wedding_vendor_follow_up_dismissed"
+  const title = input.kind === "wedding_vendor_follow_up_dismissed"
       ? `${input.vendorName} follow-up dismissed`
       : `Reminder set for ${input.vendorName}`;
   return {
@@ -213,9 +211,6 @@ function lifecycleInput(input: {
     store_in_relational: true,
   };
 }
-
-export const weddingVendorBookingToAfpSendInput = (input: { metadata: WeddingPlanningMetadata; vendorId?: string | null; vendorName: string }) =>
-  lifecycleInput({ ...input, kind: "wedding_vendor_booking_confirmed" });
 
 export const weddingVendorReminderToAfpSendInput = (input: { metadata: WeddingPlanningMetadata; vendorId?: string | null; vendorName: string; reminderAt: string }) =>
   lifecycleInput({ ...input, kind: "wedding_vendor_follow_up_reminder", reminderAt: input.reminderAt });

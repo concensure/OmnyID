@@ -4,7 +4,7 @@
 // @stability: draft
 // @owner: omnyid
 
-import { For, Show, createResource, createSignal } from "solid-js";
+import { For, Show, createMemo, createResource, createSignal } from "solid-js";
 
 import { VendorSenderIdentityPicker } from "@/components/vendor/VendorSenderIdentityPicker";
 import type {
@@ -21,6 +21,12 @@ import {
   type VendorContextProjectionView,
   type VendorTransactionInboxItem,
 } from "@/lib/vendorQuotationResponseState";
+import {
+  buildVendorQuotePreview,
+  formatQuoteMoney,
+  type VendorQuoteDraft,
+  type VendorQuoteLine,
+} from "@/lib/vendorQuoteDraftState";
 
 type SubmitInput = Parameters<typeof submitVendorTransactionResponse>[0];
 type VendorUpload = Awaited<ReturnType<typeof uploadVendorResponseAttachment>>;
@@ -48,6 +54,43 @@ export function VendorQuotationResponsePanel(props: Props = {}) {
   const [senderIdentity, setSenderIdentity] = createSignal<SelectedVendorSenderIdentity | null>(null);
   const [uploads, setUploads] = createSignal<VendorUpload[]>([]);
   const [uploadBusy, setUploadBusy] = createSignal(false);
+  const [quoteEnabled, setQuoteEnabled] = createSignal(false);
+  const [quoteLines, setQuoteLines] = createSignal<VendorQuoteLine[]>([]);
+  const [quoteCurrency, setQuoteCurrency] = createSignal<VendorQuoteDraft["currency"]>("AUD");
+  const [quoteTaxTreatment, setQuoteTaxTreatment] = createSignal<VendorQuoteDraft["taxTreatment"]>("inclusive");
+  const [quoteTaxAmount, setQuoteTaxAmount] = createSignal("0.00");
+  const [quoteExpiry, setQuoteExpiry] = createSignal("");
+  const [quoteGuestBasis, setQuoteGuestBasis] = createSignal("");
+  const [quoteConditions, setQuoteConditions] = createSignal("");
+  const [privateCalculationNotes, setPrivateCalculationNotes] = createSignal("");
+  const [quoteApproved, setQuoteApproved] = createSignal(false);
+
+  const resetQuote = () => {
+    setQuoteEnabled(false);
+    setQuoteLines([{ id: crypto.randomUUID(), description: "", quantity: 1, unitAmount: "" }]);
+    setQuoteCurrency("AUD");
+    setQuoteTaxTreatment("inclusive");
+    setQuoteTaxAmount("0.00");
+    setQuoteExpiry("");
+    setQuoteGuestBasis("");
+    setQuoteConditions("");
+    setPrivateCalculationNotes("");
+    setQuoteApproved(false);
+  };
+
+  const quoteDraft = (): VendorQuoteDraft => ({
+    currency: quoteCurrency(), taxTreatment: quoteTaxTreatment(), taxAmount: quoteTaxAmount(),
+    expiresOn: quoteExpiry(), conditions: quoteConditions(), lines: quoteLines(),
+    guestBasis: quoteGuestBasis().trim() ? Number(quoteGuestBasis()) : undefined,
+  });
+  const quotePreview = createMemo(() => {
+    if (!quoteEnabled()) return null;
+    try {
+      return { value: buildVendorQuotePreview(quoteDraft()), error: null };
+    } catch (reason) {
+      return { value: null, error: reason instanceof Error ? reason.message : "Complete the quote details." };
+    }
+  });
 
   const unlock = async (item: VendorTransactionInboxItem) => {
     setBusy(true);
@@ -60,6 +103,7 @@ export function VendorQuotationResponsePanel(props: Props = {}) {
       setAnswers(Object.fromEntries(view.questions.map(({ id }) => [id, ""])));
       setSenderIdentity(null);
       setUploads([]);
+      resetQuote();
       vendorResponseA2ui(view); // Keep the same field projection consumable by agent-native surfaces.
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not unlock this transaction.");
@@ -76,6 +120,10 @@ export function VendorQuotationResponsePanel(props: Props = {}) {
       setError("Choose how this response should appear before sending.");
       return;
     }
+    if (quoteEnabled() && !quoteApproved()) {
+      setError("Review the normalised quote preview before sending.");
+      return;
+    }
     setBusy(true);
     setError(null);
     setReceipt(null);
@@ -88,6 +136,7 @@ export function VendorQuotationResponsePanel(props: Props = {}) {
         senderIdentity: sender,
         attachments: uploads().map((upload) => upload.attachment),
         sources: uploads().map((upload) => upload.source),
+        quoteDraft: quoteEnabled() ? quoteDraft() : undefined,
       });
       if (result.status !== "accepted") {
         throw new Error("The response was not accepted. Refresh the transaction before retrying.");
@@ -97,6 +146,7 @@ export function VendorQuotationResponsePanel(props: Props = {}) {
       setProjection(null);
       setSenderIdentity(null);
       setUploads([]);
+      resetQuote();
       await refetch();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not send this response.");
@@ -172,6 +222,71 @@ export function VendorQuotationResponsePanel(props: Props = {}) {
               <textarea required maxLength={4000} rows={4} class="mt-1 w-full rounded-lg border border-wedding-muted p-3" value={answers()[question.id] ?? ""} onInput={(event) => setAnswers((current) => ({ ...current, [question.id]: event.currentTarget.value }))} />
             </label>
           )}</For>
+          <Show when={view().allowedActions.includes("submit_revision")}>
+            <div class="mt-4 rounded-lg border border-wedding-muted bg-white p-3">
+              <label class="flex min-h-11 items-center gap-3 text-sm font-semibold">
+                <input type="checkbox" class="h-5 w-5" checked={quoteEnabled()} onChange={(event) => { setQuoteEnabled(event.currentTarget.checked); setQuoteApproved(false); }} />
+                Include an itemised quote
+              </label>
+              <Show when={quoteEnabled()}>
+                <fieldset class="mt-3 grid gap-3" onInput={() => setQuoteApproved(false)}>
+                  <legend class="sr-only">Itemised quote details</legend>
+                  <p class="text-xs leading-5 text-wedding-muted">These fields become the couple's normalised quote preview. Nothing is sent until you review and submit.</p>
+                  <For each={quoteLines()}>{(line, index) => (
+                    <div class="grid gap-2 rounded-lg bg-wedding-surface p-3 sm:grid-cols-[minmax(0,1fr)_6rem_9rem_auto] sm:items-end">
+                      <label class="text-xs font-medium">Item
+                        <input required maxLength={300} class="mt-1 min-h-11 w-full rounded-lg border border-wedding-muted px-3" value={line.description} onInput={(event) => setQuoteLines((current) => current.map((item) => item.id === line.id ? { ...item, description: event.currentTarget.value } : item))} />
+                      </label>
+                      <label class="text-xs font-medium">Quantity
+                        <input required type="number" min="1" max="10000" step="1" inputmode="numeric" class="mt-1 min-h-11 w-full rounded-lg border border-wedding-muted px-3" value={line.quantity} onInput={(event) => setQuoteLines((current) => current.map((item) => item.id === line.id ? { ...item, quantity: event.currentTarget.valueAsNumber } : item))} />
+                      </label>
+                      <label class="text-xs font-medium">Unit price
+                        <input required inputmode="decimal" placeholder="0.00" class="mt-1 min-h-11 w-full rounded-lg border border-wedding-muted px-3" value={line.unitAmount} onInput={(event) => setQuoteLines((current) => current.map((item) => item.id === line.id ? { ...item, unitAmount: event.currentTarget.value } : item))} />
+                      </label>
+                      <button type="button" class="min-h-11 rounded-lg border border-wedding-muted px-3 text-sm font-semibold disabled:opacity-50" disabled={quoteLines().length === 1} onClick={() => setQuoteLines((current) => current.filter((item) => item.id !== line.id))}>Remove</button>
+                      <span class="sr-only">Quote line {index() + 1}</span>
+                    </div>
+                  )}</For>
+                  <button type="button" class="min-h-11 justify-self-start rounded-lg border border-wedding-accent px-3 text-sm font-semibold disabled:opacity-50" disabled={quoteLines().length >= 20} onClick={() => setQuoteLines((current) => [...current, { id: crypto.randomUUID(), description: "", quantity: 1, unitAmount: "" }])}>Add quote line</button>
+                  <div class="grid gap-3 sm:grid-cols-2">
+                    <label class="text-sm font-medium">Currency
+                      <select class="mt-1 min-h-11 w-full rounded-lg border border-wedding-muted px-3" value={quoteCurrency()} onChange={(event) => setQuoteCurrency(event.currentTarget.value as VendorQuoteDraft["currency"])}><option>AUD</option><option>NZD</option><option>USD</option></select>
+                    </label>
+                    <label class="text-sm font-medium">Tax treatment
+                      <select class="mt-1 min-h-11 w-full rounded-lg border border-wedding-muted px-3" value={quoteTaxTreatment()} onChange={(event) => setQuoteTaxTreatment(event.currentTarget.value as VendorQuoteDraft["taxTreatment"])}><option value="inclusive">Tax included</option><option value="exclusive">Tax added</option><option value="exempt">Tax exempt</option></select>
+                    </label>
+                    <label class="text-sm font-medium">Tax amount
+                      <input required={quoteTaxTreatment() !== "exempt"} disabled={quoteTaxTreatment() === "exempt"} inputmode="decimal" class="mt-1 min-h-11 w-full rounded-lg border border-wedding-muted px-3 disabled:bg-wedding-surface" value={quoteTaxAmount()} onInput={(event) => setQuoteTaxAmount(event.currentTarget.value)} />
+                    </label>
+                    <label class="text-sm font-medium">Quote expires
+                      <input required type="date" class="mt-1 min-h-11 w-full rounded-lg border border-wedding-muted px-3" value={quoteExpiry()} onInput={(event) => setQuoteExpiry(event.currentTarget.value)} />
+                    </label>
+                    <label class="text-sm font-medium">Guest basis (optional)
+                      <input type="number" min="1" max="10000" step="1" inputmode="numeric" class="mt-1 min-h-11 w-full rounded-lg border border-wedding-muted px-3" value={quoteGuestBasis()} onInput={(event) => setQuoteGuestBasis(event.currentTarget.value)} />
+                    </label>
+                  </div>
+                  <label class="text-sm font-medium">Conditions shown to the couple (optional)
+                    <textarea maxLength={4000} rows={3} class="mt-1 w-full rounded-lg border border-wedding-muted p-3" value={quoteConditions()} onInput={(event) => setQuoteConditions(event.currentTarget.value)} />
+                  </label>
+                  <label class="text-sm font-medium">Private calculation notes
+                    <textarea maxLength={4000} rows={2} class="mt-1 w-full rounded-lg border border-wedding-muted p-3" value={privateCalculationNotes()} onInput={(event) => setPrivateCalculationNotes(event.currentTarget.value)} />
+                    <span class="mt-1 block text-xs leading-5 text-wedding-muted">Only you can see these working notes. They are not included in the encrypted response.</span>
+                  </label>
+                </fieldset>
+                <Show when={quotePreview()}>{(preview) => (
+                  <div class="mt-4 rounded-lg border border-wedding-accent/30 bg-wedding-surface p-3" aria-live="polite">
+                    <h4 class="text-sm font-semibold">Normalised preview for the couple</h4>
+                    <Show when={preview().value} fallback={<p class="mt-2 text-sm text-amber-900">{preview().error}</p>}>
+                      {(ready) => <dl class="mt-2 grid grid-cols-2 gap-x-4 gap-y-2 text-sm"><dt>Subtotal</dt><dd class="text-right font-semibold">{formatQuoteMoney(ready().subtotalMinor, ready().currency)}</dd><dt>Tax</dt><dd class="text-right font-semibold">{formatQuoteMoney(ready().taxMinor, ready().currency)}</dd><dt>Total</dt><dd class="text-right text-base font-bold">{formatQuoteMoney(ready().totalMinor, ready().currency)}</dd><dt>Expires</dt><dd class="text-right font-semibold">{new Date(ready().expiresAt).toLocaleDateString()}</dd></dl>}
+                    </Show>
+                  </div>
+                )}</Show>
+                <Show when={quotePreview()?.value}>
+                  <label class="mt-3 flex min-h-11 items-start gap-3 text-sm font-semibold"><input required type="checkbox" class="mt-1 h-5 w-5" checked={quoteApproved()} onChange={(event) => setQuoteApproved(event.currentTarget.checked)} />I reviewed the itemised total, tax, expiry and conditions shown above.</label>
+                </Show>
+              </Show>
+            </div>
+          </Show>
           <div class="mt-4 rounded-lg border border-wedding-muted bg-white p-3">
             <div class="flex flex-wrap items-center justify-between gap-2">
               <div>

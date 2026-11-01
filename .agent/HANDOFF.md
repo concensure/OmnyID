@@ -6533,3 +6533,32 @@ Release boundary:
 - Quiz import/suggestion measurement remains coupled to QZ-09/QZ-11 authenticated
   workspace actions. Image diversity owner review, Lighthouse/image-blocked checks,
   final Quiz acceptance and the controlled pilot remain open.
+## 2026-11-02: WED-318 Family release and vendor-side candidate
+
+Released Family access from the clean WED-317 worktree at exact SHA
+`5f1539e657a0cb7e8fa51943f42d9ed2fd77726b`. Oracle `SOURCE_COMMIT` and
+`oracle-runtime-manifest.json` match. The recreated homeserver has helper/delegate switches enabled
+and the owner-approved explicit `*` cohort. A bounded production proof passes with the backup
+verified; the full disposable restore drill was skipped because current free disk is below its
+calculated restore requirement.
+
+Implemented in WED-318, still false-default:
+
+- secure Gmail-command operational alias relay using the existing Cloudflare ingress HMAC,
+  first-header DMARC evidence, exact sender/alias lists, ClamAV, one external destination, encrypted
+  routing state, durable replay reservation, operator BCC and provider Message-ID reply correlation;
+- private missing-listing proposal that reuses ownership proof and requires operator publication;
+- itemised vendor quote draft with tax, expiry, conditions, private notes and exact couple preview;
+- removal of the unsafe one-sided `Book` writer in favour of `Review booking terms`.
+
+Verification passed: Worker 8; relay provider 4; relay server 3; listing validation 2; migration
+catalogue 1; ownership API 2; claim 4; photo 3; quotation library 33; portal contract 7; response
+contract 9; Wedding UI 2,147; focused vendor UI/state 14; TypeScript; production build; line budget.
+The listing proposal HTTP test compiled but could not run because local Docker and its disposable
+Postgres/ClamAV endpoints were unavailable. Do not substitute Oracle for this test.
+
+Open boundaries: do not enable the relay before the dedicated token/key and controlled provider,
+BCC and bidirectional reply proof; do not enable listing proposal before disposable-Postgres HTTP
+evidence; two-sided vendor-confirmed booking and connected reconciliation remain WED-318G.
+
+Evidence: `Documents/verification/wed-318-family-release-and-vendor-relay-2026-11-02.md`.

@@ -5,6 +5,7 @@ import test from "node:test";
 import {
   canonicalRequest,
   classifyGatewayStatus,
+  cloudflareDmarcPassed,
   deterministicEventId,
   hmacSha256Hex,
   processEmail,
@@ -36,9 +37,37 @@ function env(overrides = {}) {
     INGRESS_SHARED_SECRET: SECRET,
     MAX_RAW_BYTES: "10485760",
     GATEWAY_TIMEOUT_MS: "1000",
+    OPERATOR_ALIASES: "hello@omnyid.com,info@omnyid.com,wedding@omnyid.com,privacy@omnyid.com",
     ...overrides,
   };
 }
+
+test("operator aliases require Cloudflare's first DMARC result", async () => {
+  assert.equal(cloudflareDmarcPassed(new Headers({
+    "Authentication-Results": "mx.cloudflare.net; spf=pass; dkim=pass; dmarc=pass",
+  })), true);
+  assert.equal(cloudflareDmarcPassed(new Headers({
+    "Authentication-Results": "attacker.invalid; dmarc=pass",
+  })), false);
+  assert.equal(cloudflareDmarcPassed(new Headers({
+    "Authentication-Results": "mx.cloudflare.net; spf=pass; dmarc=fail",
+  })), false);
+
+  const refused = mockMessage("Authentication-Results: attacker.invalid; dmarc=pass\r\n\r\nHello");
+  refused.to = "hello@omnyid.com";
+  refused.headers = new Headers({
+    "Message-ID": "<abc@example.com>",
+    "Authentication-Results": "attacker.invalid; dmarc=pass",
+  });
+  let fetched = false;
+  const result = await processEmail(refused, env(), async () => {
+    fetched = true;
+    return new Response(null, { status: 202 });
+  });
+  assert.equal(result.reason, "dmarc_not_passed");
+  assert.equal(fetched, false);
+  assert.deepEqual(refused.rejects, ["Message cannot be accepted"]);
+});
 
 test("digest and deterministic event identity are stable", async () => {
   const bodyDigest = await sha256Hex(new TextEncoder().encode("message"));

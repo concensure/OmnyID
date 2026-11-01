@@ -44,6 +44,7 @@ const projection: VendorContextProjectionView = {
   projectionFingerprint: item.projection_fingerprint,
   responseRecipientId: "agent:couple@example.com",
   responseRecipientEncryptionPublicKey: "b".repeat(64),
+  allowedActions: ["answer_questions", "submit_revision"],
   questions: [{ id: "availability", label: "Are you available on the requested date?" }],
   approvedFields: [{ key: "guest_count", value: 85 }],
 };

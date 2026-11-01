@@ -22,6 +22,15 @@ export interface VendorClaimSuggestion {
   service_area: string;
 }
 
+export interface VendorListingProposalInput {
+  businessName: string;
+  category: string;
+  serviceArea: string;
+  websiteUrl: string;
+  businessEmail: string;
+  declaredRole: string;
+}
+
 export interface VendorOwnershipMethod {
   id: "email_domain" | "website_meta" | "social_business";
   label: string;
@@ -87,6 +96,25 @@ export async function getVendorClaim(vendorSlug: string): Promise<VendorClaim | 
 export async function getVendorClaimSuggestions(query: string): Promise<VendorClaimSuggestion[]> {
   const response = await apiFetch<{ items?: VendorClaimSuggestion[] }>(`/api/wedding/vendor/suggestions?q=${encodeURIComponent(query)}`);
   return Array.isArray(response.items) ? response.items.slice(0, 8) : [];
+}
+
+export async function getVendorListingProposalCapabilities(): Promise<boolean> {
+  const response = await apiFetch<{ listing_proposals_enabled?: boolean }>("/api/wedding/vendor/listing-proposals/capabilities");
+  return response.listing_proposals_enabled === true;
+}
+
+export async function proposeVendorListing(input: VendorListingProposalInput): Promise<VendorClaim & { proposal_id: string }> {
+  return apiFetch<VendorClaim & { proposal_id: string }>("/api/wedding/vendor/listing-proposals", {
+    method: "POST",
+    bodyJson: {
+      business_name: input.businessName,
+      category: input.category,
+      service_area: input.serviceArea,
+      website_url: input.websiteUrl,
+      business_email: input.businessEmail,
+      declared_role: input.declaredRole,
+    },
+  });
 }
 
 export const getVendorOwnership = (vendorSlug: string) =>

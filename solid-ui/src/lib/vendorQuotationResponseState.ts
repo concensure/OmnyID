@@ -9,6 +9,7 @@ import { vendorResponseFingerprint, type QuotationVendorResponse } from "afp-ts/
 import { apiFetch } from "@/lib/api";
 import { uploadVendorTransactionAttachment } from "@/lib/vendorTransactionAttachmentApi";
 import type { SelectedVendorSenderIdentity } from "@/lib/vendorSenderIdentityState";
+import { buildVendorQuotePreview, type VendorQuoteDraft } from "@/lib/vendorQuoteDraftState";
 import {
   decryptVendorAgentEnvelope,
   encryptVendorAgentEnvelope,
@@ -38,6 +39,7 @@ export interface VendorContextProjectionView {
   projectionFingerprint: string;
   responseRecipientId: string;
   responseRecipientEncryptionPublicKey: string;
+  allowedActions: Array<"answer_questions" | "submit_revision" | "confirm_booking_details">;
   questions: Array<{ id: string; label: string }>;
   approvedFields: Array<{ key: string; value: unknown }>;
 }
@@ -137,6 +139,10 @@ export function projectDecryptedVendorTransaction(
   const questionIds = Array.isArray(projection.question_ids)
     ? projection.question_ids.map(identifier).filter(Boolean).slice(0, 50)
     : [];
+  const allowedActions = Array.isArray(projection.allowed_actions)
+    ? projection.allowed_actions.filter((value): value is VendorContextProjectionView["allowedActions"][number] =>
+      value === "answer_questions" || value === "submit_revision" || value === "confirm_booking_details")
+    : [];
   const exact = {
     grantId: identifier(projection.grant_id),
     vendorId: identifier(projection.recipient_vendor_id),
@@ -162,6 +168,7 @@ export function projectDecryptedVendorTransaction(
   }
   return {
     ...exact,
+    allowedActions,
     responseRecipientEncryptionPublicKey: recipientKey,
     questions: questionIds.map((id) => ({
       id,
@@ -200,6 +207,7 @@ export async function submitVendorTransactionResponse(input: {
   senderIdentity: SelectedVendorSenderIdentity;
   attachments?: QuotationVendorResponse["attachments"];
   sources?: QuotationVendorResponse["sources"];
+  quoteDraft?: VendorQuoteDraft;
 }): Promise<VendorTransportReceipt> {
   const agentId = identifier(input.item.envelope.to?.[0]);
   const keys = await loadVendorAgentPublicKeys(agentId);
@@ -210,6 +218,7 @@ export async function submitVendorTransactionResponse(input: {
 
   const now = new Date().toISOString();
   const responseId = `response-${crypto.randomUUID()}`;
+  const quote = input.quoteDraft ? buildVendorQuotePreview(input.quoteDraft) : null;
   const response: QuotationVendorResponse = {
     schema_version: "quotation.vendor_response.v1",
     response_id: responseId,
@@ -235,7 +244,8 @@ export async function submitVendorTransactionResponse(input: {
       answer: input.answers[id]!.trim(),
       anchors: [],
     })),
-    commercial_facts: [],
+    commercial_facts: quote?.facts ?? [],
+    explanation: quote?.explanation,
     sources: input.sources ?? [],
     attachments: input.attachments ?? [],
     attestation: {

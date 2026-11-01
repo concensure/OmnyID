@@ -538,12 +538,35 @@ pub async fn prune_operational_daemon_history(db: &Db) -> Result<(u64, u64, u64)
     let heartbeats = prune_heartbeats(db).await?;
     let curator_audits = prune_curator_run_audits(db).await?;
     let rate_limit_rows = prune_rate_limit_history(db).await?;
-    sqlx::query("DELETE FROM wedding_site_sessions WHERE first_seen < NOW() - INTERVAL '14 months'")
-        .execute(&db.pool)
-        .await?;
-    sqlx::query("DELETE FROM wedding_binder_requests WHERE requested_at < NOW() - INTERVAL '12 months'")
-        .execute(&db.pool)
-        .await?;
+    sqlx::query(
+        "DELETE FROM wedding_site_sessions WHERE first_seen < NOW() - INTERVAL '14 months'",
+    )
+    .execute(&db.pool)
+    .await?;
+    sqlx::query(
+        "DELETE FROM wedding_binder_requests WHERE requested_at < NOW() - INTERVAL '12 months'",
+    )
+    .execute(&db.pool)
+    .await?;
+    sqlx::query(
+        "UPDATE operator_email_relay_threads SET status = 'closed', closed_at = COALESCE(closed_at, NOW()) WHERE status = 'active' AND last_activity_at < NOW() - INTERVAL '365 days'",
+    )
+    .execute(&db.pool)
+    .await?;
+    sqlx::query(
+        r#"DELETE FROM operator_email_relay_events event
+            USING operator_email_relay_threads thread
+           WHERE event.relay_thread_id = thread.relay_thread_id
+             AND thread.status <> 'active'
+             AND event.created_at < NOW() - INTERVAL '90 days'"#,
+    )
+    .execute(&db.pool)
+    .await?;
+    sqlx::query(
+        "DELETE FROM operator_email_relay_threads WHERE status <> 'active' AND last_activity_at < NOW() - INTERVAL '365 days'",
+    )
+    .execute(&db.pool)
+    .await?;
     Ok((heartbeats, curator_audits, rate_limit_rows))
 }
 

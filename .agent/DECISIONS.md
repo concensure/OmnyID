@@ -2361,3 +2361,25 @@ subjective usability or a controlled external cohort.
   network-only; activation deletes the former API cache. Only explicit shell and hashed static assets
   may use the service-worker cache. This prevents revoked or previous-account wedding projections
   from being replayed locally.
+## 2026-11-02: Operational email aliases use a private authenticated relay
+
+- Gmail commands are sent from an exact real operator mailbox to an exact reserved OmnyID alias.
+  Gmail's unauthenticated alias/send-as behavior is not part of the trust chain.
+- Cloudflare's first trusted DMARC result and the existing Worker-to-Oracle HMAC envelope must both
+  pass. The server independently enforces sender, alias, destination, scanner and replay policy.
+- New commands contain one `To:` line; replies resolve only through an exact provider Message-ID.
+  The selected alias is From and Reply-To, the operator is BCC'd, and no arbitrary thread party can
+  be substituted.
+- Relay storage is content-free apart from dedicated-key encrypted routing addresses. The feature is
+  independently false-default and cannot share vendor-mail enablement as implicit authority.
+- Provider acceptance is not delivery evidence. Live enablement requires a controlled BCC and
+  bidirectional reply proof followed by route/flag restoration.
+
+## 2026-11-02: Vendor commercial closure stays two-sided
+
+- A couple quote acceptance is not a booking. A business source, verified representative and exact
+  quote/date/amount/condition evidence are required before a booking-confirmed projection exists.
+- Until that mutation exists, the couple UI says `Review booking terms`; it must not append a
+  one-sided booked event.
+- A missing vendor listing remains hidden through ownership proof and moves to operator review. It
+  cannot rank or accept leads before verified ownership and an explicit publish decision.

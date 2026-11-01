@@ -349,6 +349,8 @@ async fn ownership_admin_decision_http(
                 .bind(&vendor_id).bind(claim_id).execute(&mut *tx).await.map_err(database_failure)?;
             sqlx::query("UPDATE wedding_vendors SET claim_status = 'verified', claimed_by_user_id = $1, claimed_at = COALESCE(claimed_at, NOW()), verified_at = NOW(), updated_at = NOW() WHERE vendor_id = $2")
                 .bind(&claimant_id).bind(&vendor_id).execute(&mut *tx).await.map_err(database_failure)?;
+            sqlx::query("UPDATE wedding_vendor_listing_proposals SET status = 'awaiting_review', updated_at = NOW() WHERE claim_id = $1 AND status = 'awaiting_ownership'")
+                .bind(claim_id).execute(&mut *tx).await.map_err(database_failure)?;
             sqlx::query("INSERT INTO user_roles (user_id, role) VALUES ($1, 'vendor') ON CONFLICT DO NOTHING")
                 .bind(&claimant_id).execute(&mut *tx).await.map_err(database_failure)?;
         }
@@ -662,6 +664,8 @@ async fn finalize_ownership(
         .bind(&context.vendor_id).bind(&context.claim_id).execute(&mut *tx).await.map_err(database_failure)?;
     sqlx::query("UPDATE wedding_vendors SET claim_status = 'verified', claimed_by_user_id = $1, claimed_at = COALESCE(claimed_at, NOW()), verified_at = NOW(), updated_at = NOW() WHERE vendor_id = $2")
         .bind(user_id).bind(&context.vendor_id).execute(&mut *tx).await.map_err(database_failure)?;
+    sqlx::query("UPDATE wedding_vendor_listing_proposals SET status = 'awaiting_review', updated_at = NOW() WHERE claim_id = $1 AND status = 'awaiting_ownership'")
+        .bind(&context.claim_id).execute(&mut *tx).await.map_err(database_failure)?;
     sqlx::query(
         "INSERT INTO user_roles (user_id, role) VALUES ($1, 'vendor') ON CONFLICT DO NOTHING",
     )
