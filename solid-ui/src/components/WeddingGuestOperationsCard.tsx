@@ -83,17 +83,24 @@ export function WeddingGuestOperationsCard(props: {
   const [saveNotice, setSaveNotice] = createSignal<string | null>(null);
   const [showAddedGuests, setShowAddedGuests] = createSignal(false);
   const [editingDraftIndex, setEditingDraftIndex] = createSignal<number | null>(null);
-  const [guestFilter, setGuestFilter] = createSignal<GuestRsvpStatus | "Needs" | null>(null);
+  const [guestFilter, setGuestFilter] = createSignal<GuestRsvpStatus | "Replied" | "Needs" | null>(null);
   const displayCounts = createMemo(() => weddingGuestOperationsDisplayCounts(props.state, draftGuests()));
   const responseRowsByGuestId = createMemo(() => new Map(
     props.state.rsvpResponseSummary.rows.map((row) => [row.guestId, row]),
   ));
-  const guestRows = createMemo(() => (props.state.guestRows ?? []).slice(0, 8).map((row) => ({
+  const guestRows = createMemo(() => (props.state.guestRows ?? []).map((row) => ({
     ...row,
     rsvpStatus: rsvpOverrides()[row.id] ?? row.rsvpStatus,
     locallyChanged: Boolean(rsvpOverrides()[row.id]),
     responseDetail: responseRowsByGuestId().get(row.id) ?? null,
   })));
+  const filteredGuestRows = createMemo(() => guestRows().filter((guest) => {
+    if (guestFilter() === null) return true;
+    if (guestFilter() === "Replied") return guest.rsvpStatus !== "Pending";
+    if (guestFilter() === "Needs") return !guest.contactLabel || (guest.responseDetail?.missingDetailLabels.length ?? 0) > 0;
+    return guest.rsvpStatus === guestFilter();
+  }));
+  const toggleGuestFilter = (filter: GuestRsvpStatus | "Replied" | "Needs") => setGuestFilter((current) => current === filter ? null : filter);
   const saveLocalState = (next: {
     guests?: WeddingGuestOperationsLocalDraftGuest[];
     rules?: string[];
@@ -249,18 +256,18 @@ export function WeddingGuestOperationsCard(props: {
       </div>
       <p class="mt-2 text-sm leading-6 text-sky-900/75">{props.state.summaryLabel}</p>
       <div class="mt-3 grid grid-cols-3 gap-2" aria-label="RSVP response summary">
-        <div class="min-w-0 rounded-xl border border-sky-100 bg-white/80 px-2.5 py-2">
-          <p class="text-xs font-semibold text-sky-950/65">Replied</p>
+        <button type="button" aria-pressed={guestFilter() === "Replied"} onClick={() => toggleGuestFilter("Replied")} class={`min-w-0 rounded-xl border px-2.5 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-700 ${guestFilter() === "Replied" ? "border-sky-700 bg-sky-100" : "border-sky-100 bg-white/80"}`}>
+          <p class="flex items-center gap-1 text-xs font-semibold text-sky-950/65"><WeddingDashboardIcon id="check-circle" class="h-4 w-4" />Replied</p>
           <p class="mt-1 text-xl font-semibold text-sky-950">{props.state.rsvpResponseSummary.repliedCount}</p>
-        </div>
-        <div class="min-w-0 rounded-xl border border-amber-100 bg-amber-50/80 px-2.5 py-2">
-          <p class="text-xs font-semibold text-amber-950/70">Awaiting</p>
+        </button>
+        <button type="button" aria-pressed={guestFilter() === "Pending"} onClick={() => toggleGuestFilter("Pending")} class={`min-w-0 rounded-xl border px-2.5 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-700 ${guestFilter() === "Pending" ? "border-amber-700 bg-amber-100" : "border-amber-100 bg-amber-50/80"}`}>
+          <p class="flex items-center gap-1 text-xs font-semibold text-amber-950/70"><WeddingDashboardIcon id="clock" class="h-4 w-4" />Pending</p>
           <p class="mt-1 text-xl font-semibold text-amber-950">{props.state.rsvpResponseSummary.awaitingCount}</p>
-        </div>
-        <div class="min-w-0 rounded-xl border border-rose-100 bg-rose-50/80 px-2.5 py-2">
-          <p class="text-xs font-semibold text-rose-950/70">Need details</p>
+        </button>
+        <button type="button" aria-pressed={guestFilter() === "Needs"} onClick={() => toggleGuestFilter("Needs")} class={`min-w-0 rounded-xl border px-2.5 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-700 ${guestFilter() === "Needs" ? "border-rose-700 bg-rose-100" : "border-rose-100 bg-rose-50/80"}`}>
+          <p class="flex items-center gap-1 text-xs font-semibold text-rose-950/70"><WeddingDashboardIcon id="alert-circle" class="h-4 w-4" />Need details</p>
           <p class="mt-1 text-xl font-semibold text-rose-950">{props.state.rsvpResponseSummary.incompleteCount}</p>
-        </div>
+        </button>
       </div>
       <Show when={saveNotice()}>
         {(notice) => (
@@ -510,14 +517,14 @@ export function WeddingGuestOperationsCard(props: {
               <p class="text-xs font-semibold text-sky-950/70">Guest RSVP quick actions</p>
               <p class="mt-1 text-xs leading-5 text-sky-950/75">Choose a status to save it to this wedding guest list.</p>
             </div>
-            <Show when={(props.state.guestRows?.length ?? 0) > guestRows().length}>
-              <span class="max-w-full break-words rounded-full bg-sky-50 px-2 py-1 text-xs font-semibold text-sky-900">
-                Showing {guestRows().length} of {props.state.guestRows?.length}
-              </span>
+            <Show when={guestFilter()}>
+              <button type="button" class="min-h-10 rounded-lg border border-sky-200 bg-white px-3 text-xs font-semibold text-sky-950" onClick={() => setGuestFilter(null)}>
+                Show all guests
+              </button>
             </Show>
           </div>
           <div class="mt-2 space-y-2">
-            <For each={guestRows().filter((guest) => guestFilter() === null || (guestFilter() === "Needs" ? guest.rsvpStatus === "Pending" || !guest.contactLabel || (guest.responseDetail?.missingDetailLabels.length ?? 0) > 0 : guest.rsvpStatus === guestFilter()))}>
+            <For each={filteredGuestRows()}>
               {(guest) => (
                 <article class="rounded-xl border border-sky-100 bg-sky-50/60 px-2.5 py-2 phone:rounded-none phone:border-0 phone:border-t phone:border-slate-200 phone:bg-transparent phone:px-0 phone:py-3">
                   <div class="flex flex-wrap items-start justify-between gap-2">
@@ -580,22 +587,6 @@ export function WeddingGuestOperationsCard(props: {
           </div>
         </div>
       </Show>
-      <div class="mt-3 grid grid-cols-3 gap-2">
-        <button type="button" onClick={() => setGuestFilter("Attending")} class="rounded-2xl border border-slate-200 bg-white px-2.5 py-2 text-left hover:border-sky-300">
-          <p class="text-xs font-semibold text-sky-950/65">Attending</p>
-          <p class="mt-1 text-2xl font-semibold text-sky-950">{displayCounts().attendingCount}</p>
-        </button>
-        <button type="button" onClick={() => setGuestFilter("Pending")} class="rounded-2xl border border-slate-200 bg-white px-2.5 py-2 text-left hover:border-sky-300">
-          <p class="text-xs font-semibold text-sky-950/65">Pending</p>
-          <p class="mt-1 text-2xl font-semibold text-sky-950">{displayCounts().pendingCount}</p>
-        </button>
-        <button type="button" onClick={() => setGuestFilter("Needs")} class="rounded-2xl border border-slate-200 bg-white px-2.5 py-2 text-left hover:border-sky-300">
-          <p class="text-xs font-semibold text-sky-950/65">Needs</p>
-          <p class="mt-1 text-2xl font-semibold text-sky-950">
-            {displayCounts().needsCount}
-          </p>
-        </button>
-      </div>
       <Show
         when={props.state.warningLabels.length > 0}
         fallback={

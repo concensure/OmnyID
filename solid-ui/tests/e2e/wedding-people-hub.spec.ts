@@ -42,6 +42,10 @@ for (const viewport of [{ width: 320, height: 720 }, { width: 1280, height: 800 
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
 
     if (viewport.width === 320) {
+      await page.locator("[data-rsvp-guest-card]").getByRole("button", { name: /Pending 1/ }).click();
+      await expect(page.locator("[data-rsvp-guest-card]").getByRole("button", { name: /Pending 1/ })).toHaveAttribute("aria-pressed", "true");
+      await expect(page.locator("[data-rsvp-guest-card]").getByText("Alex Rivera", { exact: true })).toBeVisible();
+      await page.locator("[data-rsvp-guest-card]").getByRole("button", { name: "Show all guests" }).click();
       await page.getByRole("button", { name: "Add or group guest" }).click();
       await expect(page.getByLabel("Name")).toBeVisible();
       await expect(page.getByLabel("Household or group")).toBeVisible();

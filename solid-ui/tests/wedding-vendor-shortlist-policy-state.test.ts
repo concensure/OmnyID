@@ -40,6 +40,19 @@ test("shortlist removes canonical duplicates and unsuitable booked, excluded, ca
   assert.equal(isWeddingVendorMvpSuitable(candidate("excluded", "bookable", { group: "excluded" }), "Venue"), false);
 });
 
+test("free-text shortlist can compare relevant candidates without a preselected category", () => {
+  const result = selectWeddingVendorShortlist({
+    targetCategory: null,
+    bookable: [
+      candidate("venue", "bookable", { category: "Venue" }),
+      candidate("photo", "bookable", { category: "Photography" }),
+      candidate("music", "bookable", { category: "Entertainment" }),
+    ],
+  });
+  assert.equal(result.status, "complete");
+  assert.deepEqual(result.candidates.map((item) => item.id), ["venue", "photo", "music"]);
+});
+
 test("media is always verified photo or an honest placeholder", () => {
   assert.deepEqual(weddingVendorShortlistMedia({ vendorName: "Harbour House", imageUrl: "https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format" }), {
     kind: "verified_photo", url: "https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format", alt: "Harbour House vendor photo", label: "Vendor photo",

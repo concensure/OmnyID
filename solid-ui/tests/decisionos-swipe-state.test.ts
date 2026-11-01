@@ -109,6 +109,8 @@ test("four-way focus deck swipe keeps approval distance-only", () => {
   assert.equal(decisionOsSwipeDirection({ dx: 0, dy: 20, elapsedMs: 10, cardWidth: 360, cardHeight: 500, mapping: "left_is_prev" }), null);
   assert.equal(decisionOsSwipeDirection({ dx: 0, dy: 30, elapsedMs: 40, cardWidth: 360, cardHeight: 500, mapping: "left_is_prev" }), "approve");
   assert.equal(decisionOsSwipeDirection({ dx: 0, dy: 130, elapsedMs: 300, cardWidth: 360, cardHeight: 500, mapping: "left_is_prev" }), "approve");
-  assert.equal(decisionOsSwipeProgress({ dx: -72, dy: 0, cardWidth: 360, cardHeight: 500 }), 0.91);
+  assert.ok(Math.abs(decisionOsSwipeProgress({ dx: -72, dy: 0, cardWidth: 360, cardHeight: 500 }) - 0.91) < 0.001);
   assert.equal(decisionOsSwipeProgress({ dx: 0, dy: 120, cardWidth: 360, cardHeight: 500 }), 1);
+  assert.equal(decisionOsSwipeDirection({ dx: 0, dy: 90, elapsedMs: 900, cardWidth: 360, cardHeight: 1000, mapping: "left_is_prev" }), "approve");
+  assert.equal(decisionOsSwipeDirection({ dx: 0, dy: -98, elapsedMs: 900, cardWidth: 360, cardHeight: 1000, mapping: "left_is_prev" }), "defer");
 });

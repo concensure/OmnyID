@@ -120,6 +120,9 @@ export function WeddingWorkspaceContextPanels(props: {
     props.state.afpMessages,
     props.state.workspace.metadata.responseWorkspaceId,
   ));
+  const rsvpHostLabel = createMemo(() => props.state.contextCards
+    .map((card) => card.planningContext?.familyOrStakeholderRoles?.trim() ?? "")
+    .find(Boolean) || "The couple");
   const mealChoiceState = createMemo(() => buildWeddingMealChoiceState(
     props.state.afpMessages,
     props.state.workspace.metadata.responseWorkspaceId,
@@ -507,6 +510,7 @@ export function WeddingWorkspaceContextPanels(props: {
         />
         <WeddingRsvpSetupPanel
           current={rsvpSetup()}
+          defaultHostLabel={rsvpHostLabel()}
           guestTracking={props.state.guestTracking}
           metadata={props.state.workspace.metadata}
           mealChoiceState={mealChoiceState()}

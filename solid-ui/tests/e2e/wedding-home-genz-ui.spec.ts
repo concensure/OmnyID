@@ -12,6 +12,7 @@ for (const viewport of [{ width: 320, height: 720 }, { width: 390, height: 844 }
     await expect(page.getByText("Find vendors", { exact: true })).toBeVisible();
     await expect(page.getByLabel("Wedding planning journey")).toBeVisible();
     await expect(page.getByLabel(/Plan & budget: \d+ of \d+ tasks done/)).toBeVisible();
+    await expect(page.getByLabel(/Plan & budget: \d+ of \d+ tasks done/).locator("span").first()).toHaveCSS("background-color", "rgb(15, 95, 90)");
     await expect(page.getByText("Invalid AFP payload from provider")).toHaveCount(0);
     await expect(page.getByRole("heading", { name: "A wedding decision to review" })).toBeVisible();
 

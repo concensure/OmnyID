@@ -257,6 +257,29 @@ export function WeddingVendorSearchHomeSection(props: {
   const isSelectedCategory = (query: string) => workspace().vendorSearchQuery?.trim().toLowerCase() === query.toLowerCase();
   const lifecycleCount = (filter: WeddingVendorLifecycleFilter) => lifecycleRecords().filter((record) => weddingVendorLifecycleMatches(record, filter)).length;
   const filteredLifecycleRecords = () => lifecycleRecords().filter((record) => weddingVendorLifecycleMatches(record, lifecycleFilter()));
+  const vendorKey = (value: unknown) => typeof value === "string"
+    ? value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()
+    : "";
+  const lifecycleArtifact = (vendor: WeddingVendorLifecycleRecord) => {
+    const key = vendorKey(vendor.vendorName);
+    return [...workspace().state.artifactPreviews]
+      .map((artifact) => {
+        const cardMatch = artifact.vendorComparisonCards.some((card) => (
+          (vendor.vendorId && card.vendorId === vendor.vendorId) || vendorKey(card.title) === key
+        ));
+        const quoteMatch = artifact.preview?.kind === "quote" && vendorKey(artifact.preview.vendorName) === key;
+        const sourceMatch = vendor.sourceMessageIds.includes(artifact.artifactId);
+        const textMatch = key.length >= 4 && vendorKey(`${artifact.title} ${artifact.bodyText ?? ""}`).includes(key);
+        return { artifact, score: quoteMatch && vendor.quoteReceived ? 5 : cardMatch ? 4 : quoteMatch ? 3 : sourceMatch ? 2 : textMatch ? 1 : 0 };
+      })
+      .filter((item) => item.score > 0)
+      .sort((left, right) => right.score - left.score || right.artifact.createdAt - left.artifact.createdAt)[0]?.artifact ?? null;
+  };
+  const openLifecycleDocument = (vendor: WeddingVendorLifecycleRecord) => {
+    const artifact = lifecycleArtifact(vendor);
+    if (artifact) workspace().onSelectArtifact?.(artifact.artifactId);
+    workspace().onSelectMenu?.("documents");
+  };
   const quoteFlowForVendor = (vendor: WeddingVendorLifecycleRecord) => workspace().state.activeVendorQuoteReplyFlows.find((flow) =>
     flow.quote.vendorName.trim().toLowerCase() === vendor.vendorName.trim().toLowerCase()
   ) ?? null;
@@ -345,7 +368,11 @@ export function WeddingVendorSearchHomeSection(props: {
         <div class="mt-3 grid gap-2" aria-live="polite">
           <Show when={filteredLifecycleRecords().length > 0} fallback={<p class="rounded-lg border border-wedding-border bg-white p-3 text-sm text-wedding-ink/70">No vendors have this status yet.</p>}>
             <For each={filteredLifecycleRecords()}>{(vendor) => <article class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-wedding-border bg-white p-3">
-              <div><p class="font-semibold text-wedding-ink">{vendor.vendorName}</p><p class="text-xs text-wedding-ink/65">{[vendor.enquired && "Enquired", vendor.favourited && "Favourited", vendor.quoteReceived && "Quote received", vendor.booked && "Booked"].filter(Boolean).join(" · ")}</p></div>
+              <button type="button" class="min-h-11 min-w-0 flex-1 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-primary" onClick={() => openLifecycleDocument(vendor)}>
+                <span class="block break-words font-semibold text-wedding-ink">{vendor.vendorName}</span>
+                <span class="mt-0.5 block text-xs text-wedding-ink/65">{[vendor.enquired && "Enquired", vendor.favourited && "Favourited", vendor.quoteReceived && "Quote received", vendor.booked && "Booked"].filter(Boolean).join(" · ")}</span>
+                <span class="mt-1 block text-xs font-semibold text-wedding-secondary">{lifecycleArtifact(vendor) ? "View vendor document" : "Open Documents"}</span>
+              </button>
               <div class="flex flex-wrap gap-2">
                 <Show when={quoteFlowForVendor(vendor)}>{(flow) => <button type="button" class="min-h-11 rounded-lg border border-wedding-secondary bg-white px-3 text-sm font-bold text-wedding-secondary disabled:opacity-60" disabled={vendor.quoteAccepted || !props.onAcceptQuote} onClick={() => props.onAcceptQuote?.(flow().quote, flow().quoteMessageId ?? flow().id)}>{vendor.quoteAccepted ? "Quote accepted" : "Accept quote"}</button>}</Show>
                 <Show when={vendor.quoteReceived && !vendor.booked}><button type="button" class="min-h-11 rounded-lg bg-wedding-primary px-3 text-sm font-bold text-white" onClick={() => setBookingVendor(vendor)}>Book</button></Show>

@@ -15,6 +15,16 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-315
+    title: Repair connected Wedding task, vendor, date, RSVP and guest projections
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-315
+    depends_on: [WED-314]
+    files: [solid-ui/src/components/WeddingPlanningTasksPanel.tsx, solid-ui/src/components/WeddingTaskCompletionButton.tsx, solid-ui/src/components/WeddingVendorSearchHomeSections.tsx, solid-ui/src/components/WeddingArtifactDetailPanel.tsx, solid-ui/src/components/WeddingPlanningJourneyStepper.tsx, solid-ui/src/components/WeddingRsvpSetupPanel.tsx, solid-ui/src/components/WeddingGuestOperationsCard.tsx, solid-ui/src/components/WeddingHomeOverviewGrid.tsx, solid-ui/src/components/ResponseQueueView.tsx, solid-ui/src/lib/weddingJourneyStageState.ts, solid-ui/src/lib/weddingWorkspaceSidebarActionState.ts, solid-ui/src/lib/weddingArtifactPreviewState.ts, solid-ui/src/lib/weddingVendorLifecycleState.ts, solid-ui/tests/wedding-*.test.ts, Documents/verification/**, .agent/**]
+    acceptance: [Task completion actions use the same account-scoped completion projection as To-do Done and All filters, every task shows one of the six Wedding stages and status and stage filters compose independently, free-text vendor searches run and render comparisons without a preselected category, lifecycle-filter vendors open their relevant Documents artifact and location-search guidance is actionable, decision-card swipe gestures either perform their labelled action or are not advertised, the overview date comes from confirmed onboarding evidence and Add date opens an inline calendar, the current journey-stage marker is visibly filled, RSVP host names default from couple profile while remaining editable, guest status counts reveal their filtered rows in place, Seating unlocks from the canonical guest projection, focused tests typecheck Wedding tests line budgets build and synthetic external-gate review evidence pass]
+    progress: "Implementation complete in the advanced isolated WED-286 worktree: canonical task completion and independent stage filtering, category-optional vendor comparisons, lifecycle-to-Documents navigation, actionable map guidance, visibly reactive mobile swipes, onboarding-date normalization, filled journey marker, profile-backed RSVP host names, in-place guest summary filters and guest-row seating unlock. Prior WED-307 evidence and focused account-boundary tests show retained server-scoped vendors and contacts are not evidence of the earlier browser carry-over, so no account data was purged. Preliminary typecheck, 2,140 Wedding tests, line budgets, production build and focused browser checks pass; exact-SHA synthetic Family isolation evidence remains next."
+
   - id: WED-314
     title: Complete Family request draft, submit and withdrawal lifecycle
     status: done

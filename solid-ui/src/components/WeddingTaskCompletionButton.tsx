@@ -17,8 +17,12 @@ export function WeddingTaskCompletionButton(props: {
   saveProjection?: ((input: SendAfpMessageInput) => Promise<unknown>) | null;
   onRefreshWorkspace?: (() => void) | null;
   compact?: boolean;
+  completed?: boolean;
 }) {
-  const projectedDone = () => /done|complete|accepted/i.test(`${props.task.reviewStatus ?? ""} ${props.task.approvalState ?? ""}`);
+  const projectedDone = () => props.completed ?? (
+    props.task.semanticTags?.some((tag) => tag.toLowerCase() === "wedding_task_status:done") === true
+    || props.task.semanticObject?.stateLabel?.toLowerCase() === "done"
+  );
   const read = () => loadWeddingTaskCompletion({ taskId: props.task.id, weddingPlanId: props.weddingPlanId, responseWorkspaceId: props.responseWorkspaceId });
   const [done, setDone] = createSignal(read()?.completed ?? projectedDone());
   const [busy, setBusy] = createSignal(false);

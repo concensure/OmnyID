@@ -31,6 +31,7 @@ function dateAfterToday(days: number): string {
 
 export function WeddingRsvpSetupPanel(props: {
   current: WeddingRsvpSetupState | null;
+  defaultHostLabel?: string | null;
   guestTracking: WeddingGuestTrackingState;
   metadata?: unknown;
   mealChoiceState?: WeddingMealChoiceState;
@@ -58,7 +59,12 @@ export function WeddingRsvpSetupPanel(props: {
   const [eventChoice, setEventChoice] = createSignal(props.current?.eventId ?? eventOptions()[0]?.id ?? "new_event");
   const [newEventLabel, setNewEventLabel] = createSignal("Wedding day");
   const [deadline, setDeadline] = createSignal(props.current?.responseDeadline ?? dateAfterToday(28));
-  const [hostLabel, setHostLabel] = createSignal(props.current?.hostLabel ?? "The couple");
+  const savedHostLabel = props.current?.hostLabel?.trim() ?? "";
+  const [hostLabel, setHostLabel] = createSignal(
+    savedHostLabel && savedHostLabel.toLowerCase() !== "the couple"
+      ? savedHostLabel
+      : props.defaultHostLabel?.trim() || "The couple",
+  );
   const [enabledQuestions, setEnabledQuestions] = createSignal<WeddingRsvpQuestionId[]>(currentQuestionIds);
   const [requiredQuestions, setRequiredQuestions] = createSignal<WeddingRsvpQuestionId[]>(currentRequiredIds);
   const [customPrompt, setCustomPrompt] = createSignal(

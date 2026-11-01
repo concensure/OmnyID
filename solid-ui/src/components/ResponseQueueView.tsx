@@ -1711,7 +1711,9 @@ export function ResponseQueueView(props: {
         vendorCategories: effectiveCategoryLabels,
         // A named directory lookup is not a category request. Treating it as
         // `Custom vendor search` filters out a real saved venue such as Mackay.
-        targetCategory: directoryLookupOnly ? null : queryIntent.category ?? effectiveCategoryLabels[0] ?? null,
+        targetCategory: directoryLookupOnly || (freeformQuery && !queryIntent.category)
+          ? null
+          : queryIntent.category ?? effectiveCategoryLabels[0] ?? null,
         requireExactlyThree: true,
         // An exact vendor-name lookup must be predictable and private: search
         // the existing directory only instead of turning a name into a broad

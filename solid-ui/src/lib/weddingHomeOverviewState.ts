@@ -369,7 +369,7 @@ export function buildWeddingHomeOverviewActionTiles(state: WeddingResponseWorksp
   };
 
   const seating = state.seatingPlan;
-  const canSeatGuests = guestTracking.attendingCount > 0 || seating.assignedSeatCount > 0 || seating.unassignedAttendingCount > 0;
+  const canSeatGuests = guestTracking.guestRowCount > 0 || guestTracking.attendingCount > 0 || seating.assignedSeatCount > 0 || seating.unassignedAttendingCount > 0;
   const seatingTile = {
     id: "seating" as const,
     valueLabel: canSeatGuests ? `${seating.assignedSeatCount}` : "—",

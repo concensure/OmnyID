@@ -103,9 +103,9 @@ export function decisionOsSwipeDirection(args: {
     const distance = Math.abs(args.dy);
     const fastEnough = distance >= 24 && distance / elapsedMs >= 0.6;
     if (args.dy < 0) {
-      return distance >= Math.max(80, args.cardHeight * 0.18) || fastEnough ? "defer" : null;
+      return distance >= Math.min(96, Math.max(72, args.cardHeight * 0.14)) || fastEnough ? "defer" : null;
     }
-    return distance >= Math.max(72, args.cardHeight * 0.18) || fastEnough ? "approve" : null;
+    return distance >= Math.min(88, Math.max(64, args.cardHeight * 0.14)) || fastEnough ? "approve" : null;
   }
   return null;
 }
@@ -121,7 +121,7 @@ export function decisionOsSwipeProgress(args: {
   const threshold = axis === "horizontal"
     ? Math.max(72, args.cardWidth * 0.22)
     : args.dy > 0
-      ? Math.max(72, args.cardHeight * 0.18)
-      : Math.max(80, args.cardHeight * 0.18);
+      ? Math.min(88, Math.max(64, args.cardHeight * 0.14))
+      : Math.min(96, Math.max(72, args.cardHeight * 0.14));
   return axis ? Math.min(1, distance / threshold) : 0;
 }

@@ -71,10 +71,17 @@ export function MobileFocusDeck(props: {
     if (direction === "next") navigate(1);
     // Approval is deliberately two-step. The parent opens a confirmation and
     // advances only after the person has explicitly confirmed that decision.
-    if (direction === "approve" && active) { props.onApprove(active, method); navigator.vibrate?.(8); }
+    if (direction === "approve" && active) {
+      setAnnouncement(`${primaryActionLabel()} opened for ${active.title}.`);
+      props.onApprove(active, method);
+      navigator.vibrate?.(8);
+    }
     if (direction === "defer" && active) {
       const saved = await props.onDefer(active, method);
-      if (saved !== false) navigate(1);
+      if (saved !== false) {
+        setAnnouncement(`${active.title} moved to later.`);
+        navigate(1);
+      }
       navigator.vibrate?.(8);
     }
   };
@@ -162,7 +169,7 @@ export function MobileFocusDeck(props: {
             onPointerUp={pointerEnd}
             onPointerCancel={pointerCancel}
           >
-            <Show when={item()}>{(current) => props.renderCard(current())}</Show>
+            <Show keyed when={item()}>{(current) => props.renderCard(current)}</Show>
           </div>
         </div>
         <div class="flex items-center justify-between pt-2">

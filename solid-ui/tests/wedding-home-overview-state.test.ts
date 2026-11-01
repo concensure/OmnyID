@@ -296,6 +296,25 @@ test("home overview tiles reflect populated guests and seating", () => {
   assert.equal(firstActionTarget(seating!), "seating");
 });
 
+test("one pending guest unlocks the draft seating plan", () => {
+  const tiles = buildWeddingHomeOverviewActionTiles(state({
+    guestTracking: {
+      guestRowCount: 1,
+      attendingCount: 0,
+      declinedCount: 0,
+      pendingCount: 1,
+    } as WeddingResponseWorkspaceViewState["guestTracking"],
+    seatingPlan: {
+      assignedSeatCount: 0,
+      unassignedAttendingCount: 0,
+    } as WeddingResponseWorkspaceViewState["seatingPlan"],
+  }));
+  const seating = tiles.find((tile) => tile.id === "seating");
+  assert.equal(seating?.menuId, "seating");
+  assert.equal(seating?.toneLabel, "On track");
+  assert.equal(seating?.actionLabel, "Open seating");
+});
+
 test("home guest tile uses the shared RSVP summary for incomplete and changed responses", () => {
   const tiles = buildWeddingHomeOverviewActionTiles(state({
     guestTracking: {

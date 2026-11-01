@@ -53,6 +53,17 @@ test("weddingTimelineWeddingDateLabel reads an exact date from structured planni
   assert.equal(result, "2027-10-03");
 });
 
+test("weddingTimelineWeddingDateLabel normalizes common Australian onboarding date formats", () => {
+  const named = weddingTimelineWeddingDateLabel(state({
+    contextCards: [{ planningContext: { dateOrSeason: "29 Dec 2027" }, answeredLabels: [] }] as WeddingResponseWorkspaceViewState["contextCards"],
+  }));
+  const numeric = weddingTimelineWeddingDateLabel(state({
+    contextCards: [{ planningContext: { dateOrSeason: "29/12/2027" }, answeredLabels: [] }] as WeddingResponseWorkspaceViewState["contextCards"],
+  }));
+  assert.equal(named, "2027-12-29");
+  assert.equal(numeric, "2027-12-29");
+});
+
 test("weddingTimelineWeddingDateLabel ignores seasons and non-wedding timeline dates", () => {
   const result = weddingTimelineWeddingDateLabel(state({
     ganttTimeline: {

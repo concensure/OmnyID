@@ -170,12 +170,7 @@ export function selectWeddingVendorShortlist(input: {
   rankingPolicyV2?: boolean;
 }): WeddingVendorShortlistOutcome {
   const targetCategory = clean(input.targetCategory);
-  if (!targetCategory) {
-    return {
-      status: "blocked", candidates: [], shortfall: 3,
-      reason: "Choose a vendor category before searching.", retryAction: "collect_category_or_location",
-    };
-  }
+  const choiceLabel = targetCategory || "vendor";
   const seen = new Set<string>();
   const eligible = [...(input.bookable ?? []), ...(input.verify ?? [])]
     .filter((candidate) => isWeddingVendorMvpSuitable(candidate, targetCategory))
@@ -203,13 +198,13 @@ export function selectWeddingVendorShortlist(input: {
   if (input.canRunOnlineFallback === false) {
     return {
       status: "blocked", candidates, shortfall,
-      reason: `Only ${candidates.length} suitable ${targetCategory} choice${candidates.length === 1 ? "" : "s"} are available.`,
+      reason: `Only ${candidates.length} suitable ${choiceLabel} choice${candidates.length === 1 ? "" : "s"} are available.`,
       retryAction: "retry_directory_and_online",
     };
   }
   return {
     status: "needs_online_shortfall", candidates, shortfall,
-    reason: `The directory has ${candidates.length} suitable ${targetCategory} choice${candidates.length === 1 ? "" : "s"}; search for ${shortfall} more.`,
+    reason: `The directory has ${candidates.length} suitable ${choiceLabel} choice${candidates.length === 1 ? "" : "s"}; search for ${shortfall} more.`,
     retryAction: "retry_directory_and_online",
   };
 }

@@ -117,11 +117,17 @@ export function WeddingHomeOverviewGrid(props: {
       <article data-wedding-surface="countdown" class={`min-h-[13.75rem] min-w-0 overflow-hidden rounded-xl border border-wedding-border bg-wedding-card p-4 text-wedding-ink shadow-wedding-card sm:col-span-2 sm:p-5 lg:col-span-9 lg:p-6 ${dense() ? "min-h-[12rem] p-3 sm:p-4" : ""}`}>
         <div class="flex flex-wrap items-start justify-between gap-4">
           <div class="min-w-0">
-            <p class="break-words text-xs font-semibold uppercase tracking-[0.08em] text-wedding-primary">Wedding day · {dateLabel(weddingDate())}</p>
-            <p class={`mt-3 break-words font-display font-bold tracking-[-.03em] text-wedding-primary tabular-nums ${/^\d+$/.test(countdown()) ? "text-6xl leading-[.9] sm:text-7xl lg:text-8xl" : "max-w-[10ch] text-4xl leading-tight"}`}>{countdown()}</p>
-            <p class="mt-2 text-base text-wedding-ink/70">
-              {weddingDate() ? `days to go · ${progress().percentage}% of planning complete` : "Add your date to start the countdown"}
-            </p>
+            <Show when={weddingDate()} fallback={
+              <div>
+                <p class="break-words text-xs font-semibold uppercase tracking-[0.08em] text-wedding-primary">Wedding day · date not set</p>
+                <div class="mt-3"><Show when={props.onSaveWeddingDate}>{(save) => <WeddingDateEntryControl onSave={save()} locale="en-AU" compact />}</Show></div>
+                <p class="mt-2 text-base text-wedding-ink/70">Pick a date to start the countdown.</p>
+              </div>
+            }>
+              <p class="break-words text-xs font-semibold uppercase tracking-[0.08em] text-wedding-primary">Wedding day · {dateLabel(weddingDate())}</p>
+              <p class={`mt-3 break-words font-display font-bold tracking-[-.03em] text-wedding-primary tabular-nums ${/^\d+$/.test(countdown()) ? "text-6xl leading-[.9] sm:text-7xl lg:text-8xl" : "max-w-[10ch] text-4xl leading-tight"}`}>{countdown()}</p>
+              <p class="mt-2 text-base text-wedding-ink/70">days to go · {progress().percentage}% of planning complete</p>
+            </Show>
           </div>
           <button type="button" class="min-h-11 rounded-lg border border-wedding-secondary px-4 text-sm font-semibold text-wedding-secondary transition hover:bg-wedding-slate focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-primary focus-visible:ring-offset-2" onClick={openTimeline}>
             Open timeline
@@ -135,13 +141,9 @@ export function WeddingHomeOverviewGrid(props: {
           onRefreshWorkspace={props.onRefreshWorkspace}
           people={props.state.helperContactNames}
         />
-        <Show when={!weddingDate() && props.onSaveWeddingDate} fallback={
-          <button type="button" class="mt-5 flex min-h-12 w-full items-center justify-between gap-3 rounded-lg border border-wedding-border bg-wedding-page px-4 text-left text-sm font-semibold text-wedding-ink transition hover:border-wedding-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-primary" onClick={openTimeline}>
-            <span class="min-w-0 truncate">Next · {timeline().detailLabel.replace(/^Next:\s*/i, "")}</span><WeddingDashboardIcon id="arrow-right" class="h-5 w-5 shrink-0" />
-          </button>
-        }>
-          <div class="mt-4 rounded-lg border border-wedding-border bg-wedding-page p-3"><WeddingDateEntryControl onSave={props.onSaveWeddingDate!} locale="en-AU" compact /></div>
-        </Show>
+        <button type="button" class="mt-5 flex min-h-12 w-full items-center justify-between gap-3 rounded-lg border border-wedding-border bg-wedding-page px-4 text-left text-sm font-semibold text-wedding-ink transition hover:border-wedding-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-primary" onClick={openTimeline}>
+          <span class="min-w-0 truncate">Next · {timeline().detailLabel.replace(/^Next:\s*/i, "")}</span><WeddingDashboardIcon id="arrow-right" class="h-5 w-5 shrink-0" />
+        </button>
         <Show when={transportOpen()}>
           <section class="mt-3 rounded-lg border border-wedding-border bg-wedding-page p-4" aria-label="Transport and access check">
             <div class="flex flex-wrap items-start justify-between gap-2"><div><p class="text-sm font-semibold text-wedding-ink">Transport and access check</p><p class="mt-1 text-xs text-wedding-ink/65">For {destination()}</p></div><button type="button" class="min-h-10 rounded-lg border border-wedding-border bg-white px-3 text-xs font-semibold" onClick={() => setTransportOpen(false)}>Close</button></div>
