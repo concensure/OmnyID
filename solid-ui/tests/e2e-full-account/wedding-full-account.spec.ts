@@ -21,7 +21,7 @@ const password = process.env.OMNYID_E2E_PASSWORD?.trim();
 if (!manifestPath || !password) throw new Error("seed manifest and synthetic password are required");
 const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as Manifest;
 
-async function signIn(browser: Browser, email: string): Promise<{ context: BrowserContext; page: Page; token: string }> {
+async function signIn(browser: Browser, email: string): Promise<{ context: BrowserContext; page: Page; userId: string; cookie: string }> {
   const context = await browser.newContext();
   const page = await context.newPage();
   await page.goto("/workspace/?open_auth=1", { waitUntil: "domcontentloaded" });
@@ -33,22 +33,35 @@ async function signIn(browser: Browser, email: string): Promise<{ context: Brows
   }).not.toBeNull();
   const session = await page.evaluate(() => JSON.parse(sessionStorage.getItem("omnyid.preview.session") || "null"));
   expect(session?.user?.email).toBe(email);
-  expect(session?.token).toEqual(expect.any(String));
-  return { context, page, token: session.token as string };
+  expect(session?.token).toBe("cookie");
+  const authenticatedUser = await page.evaluate(async () => {
+    const response = await fetch("/auth/session");
+    return { status: response.status, body: await response.json() };
+  });
+  expect(authenticatedUser).toMatchObject({ status: 200, body: { email } });
+  const sessionCookie = (await context.cookies()).find(({ name }) => name === "omnyid_session");
+  expect(sessionCookie?.httpOnly).toBe(true);
+  expect(sessionCookie?.value).toEqual(expect.any(String));
+  return {
+    context,
+    page,
+    userId: (authenticatedUser.body as { id: string }).id,
+    cookie: sessionCookie!.value,
+  };
 }
 
-async function api(page: Page, token: string, path: string, init: { method?: string; body?: unknown } = {}): Promise<ApiReply> {
-  return page.evaluate(async ({ token: bearer, path: apiPath, method, body }) => {
+async function api(page: Page, path: string, init: { method?: string; body?: unknown } = {}): Promise<ApiReply> {
+  return page.evaluate(async ({ path: apiPath, method, body }) => {
     const response = await fetch(apiPath, {
       method: method || "GET",
-      headers: { Authorization: `Bearer ${bearer}`, ...(body === undefined ? {} : { "Content-Type": "application/json" }) },
+      headers: body === undefined ? {} : { "Content-Type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
     const text = await response.text();
     let parsed: unknown = text;
     try { parsed = text ? JSON.parse(text) : null; } catch { /* retain bounded text */ }
     return { status: response.status, body: parsed };
-  }, { token, path, method: init.method, body: init.body });
+  }, { path, method: init.method, body: init.body });
 }
 
 function grantBody(couple: Couple, delegateEmail: string) {
@@ -72,11 +85,12 @@ test("Mia/Jordan and Priya/Sam stay isolated through real registration, login, g
     signIn(browser, "alex@omnyid.test"),
   ]);
   const [mia, jordan, priya, sam, alex] = sessions;
-  expect(new Set(sessions.map(({ token }) => token)).size).toBe(5);
+  expect(new Set(sessions.map(({ cookie }) => cookie)).size).toBe(5);
+  expect(new Set(sessions.map(({ userId }) => userId)).size).toBe(5);
 
   const miaCouple = manifest.couples.mia_jordan;
   const priyaCouple = manifest.couples.priya_sam;
-  const submitted = await api(mia.page, mia.token, "/wedding/boundaries/requests/transitions", {
+  const submitted = await api(mia.page, "/wedding/boundaries/requests/transitions", {
     method: "POST",
     body: {
       wedding_plan_id: miaCouple.plan_id,
@@ -88,7 +102,7 @@ test("Mia/Jordan and Priya/Sam stay isolated through real registration, login, g
     },
   });
   expect(submitted).toMatchObject({ status: 200, body: { status: "pending", revision: 2 } });
-  const withdrawn = await api(mia.page, mia.token, "/wedding/boundaries/requests/transitions", {
+  const withdrawn = await api(mia.page, "/wedding/boundaries/requests/transitions", {
     method: "POST",
     body: {
       wedding_plan_id: miaCouple.plan_id,
@@ -101,7 +115,7 @@ test("Mia/Jordan and Priya/Sam stay isolated through real registration, login, g
   });
   expect(withdrawn).toMatchObject({ status: 200, body: { status: "withdrawn", revision: 3 } });
 
-  const helperReply = await api(mia.page, mia.token, "/wedding/boundaries/grants", {
+  const helperReply = await api(mia.page, "/wedding/boundaries/grants", {
     method: "POST",
     body: {
       wedding_plan_id: miaCouple.plan_id,
@@ -114,27 +128,27 @@ test("Mia/Jordan and Priya/Sam stay isolated through real registration, login, g
   });
   expect(helperReply.status).toBe(200);
   const helper = helperReply.body as { grant: { grant_id: string }; token: string };
-  const helperView = await api(jordan.page, jordan.token, "/wedding/boundaries/helpers/open", {
+  const helperView = await api(jordan.page, "/wedding/boundaries/helpers/open", {
     method: "POST", body: { token: helper.token },
   });
   expect(helperView.status).toBe(200);
   expect(JSON.stringify(helperView.body)).toContain(miaCouple.catering_household_id);
   expect(JSON.stringify(helperView.body)).not.toContain(miaCouple.private_household_id);
 
-  const miaGrantReply = await api(mia.page, mia.token, "/wedding/boundaries/delegates/grants", {
+  const miaGrantReply = await api(mia.page, "/wedding/boundaries/delegates/grants", {
     method: "POST", body: grantBody(miaCouple, "alex@omnyid.test"),
   });
   expect(miaGrantReply.status).toBe(200);
   const miaGrant = miaGrantReply.body as { grant_id: string };
   expect(miaGrant.grant_id).toEqual(expect.any(String));
-  const alexView = await api(alex.page, alex.token, `/wedding/boundaries/delegates/grants/${miaGrant.grant_id}/open`);
+  const alexView = await api(alex.page, `/wedding/boundaries/delegates/grants/${miaGrant.grant_id}/open`);
   expect(alexView.status).toBe(200);
   expect(JSON.stringify(alexView.body)).toContain(miaCouple.catering_household_id);
   expect(JSON.stringify(alexView.body)).not.toContain(miaCouple.private_household_id);
   expect(JSON.stringify(alexView.body)).not.toContain("must stay private");
-  expect((await api(sam.page, sam.token, `/wedding/boundaries/delegates/grants/${miaGrant.grant_id}/open`)).status).toBe(404);
+  expect((await api(sam.page, `/wedding/boundaries/delegates/grants/${miaGrant.grant_id}/open`)).status).toBe(404);
 
-  const proposal = await api(alex.page, alex.token, `/wedding/boundaries/delegates/grants/${miaGrant.grant_id}/propose`, {
+  const proposal = await api(alex.page, `/wedding/boundaries/delegates/grants/${miaGrant.grant_id}/propose`, {
     method: "POST",
     body: {
       change_type: "plus_one_change",
@@ -150,7 +164,7 @@ test("Mia/Jordan and Priya/Sam stay isolated through real registration, login, g
   });
   expect(proposal).toMatchObject({ status: 200, body: { status: "pending" } });
   const requestId = (proposal.body as { request_id: string }).request_id;
-  const approved = await api(mia.page, mia.token, "/wedding/boundaries/decisions", {
+  const approved = await api(mia.page, "/wedding/boundaries/decisions", {
     method: "POST",
     body: {
       wedding_plan_id: miaCouple.plan_id,
@@ -165,21 +179,21 @@ test("Mia/Jordan and Priya/Sam stay isolated through real registration, login, g
   });
   expect(approved).toMatchObject({ status: 200, body: { status: "approved" } });
 
-  const priyaGrantReply = await api(priya.page, priya.token, "/wedding/boundaries/delegates/grants", {
+  const priyaGrantReply = await api(priya.page, "/wedding/boundaries/delegates/grants", {
     method: "POST", body: grantBody(priyaCouple, "sam@omnyid.test"),
   });
   expect(priyaGrantReply.status).toBe(200);
   const priyaGrant = priyaGrantReply.body as { grant_id: string };
-  expect((await api(sam.page, sam.token, `/wedding/boundaries/delegates/grants/${priyaGrant.grant_id}/open`)).status).toBe(200);
-  expect((await api(jordan.page, jordan.token, `/wedding/boundaries/delegates/grants/${priyaGrant.grant_id}/open`)).status).toBe(404);
-  expect((await api(alex.page, alex.token, `/wedding/boundaries/delegates/grants/${priyaGrant.grant_id}/open`)).status).toBe(404);
-  expect((await api(mia.page, mia.token, `/wedding/boundaries/delegates/grants/${priyaGrant.grant_id}/revoke`, { method: "POST", body: {} })).status).toBe(404);
+  expect((await api(sam.page, `/wedding/boundaries/delegates/grants/${priyaGrant.grant_id}/open`)).status).toBe(200);
+  expect((await api(jordan.page, `/wedding/boundaries/delegates/grants/${priyaGrant.grant_id}/open`)).status).toBe(404);
+  expect((await api(alex.page, `/wedding/boundaries/delegates/grants/${priyaGrant.grant_id}/open`)).status).toBe(404);
+  expect((await api(mia.page, `/wedding/boundaries/delegates/grants/${priyaGrant.grant_id}/revoke`, { method: "POST", body: {} })).status).toBe(404);
 
-  const revoked = await api(mia.page, mia.token, `/wedding/boundaries/delegates/grants/${miaGrant.grant_id}/revoke`, { method: "POST", body: {} });
+  const revoked = await api(mia.page, `/wedding/boundaries/delegates/grants/${miaGrant.grant_id}/revoke`, { method: "POST", body: {} });
   expect(revoked.status).toBe(200);
-  expect((await api(alex.page, alex.token, `/wedding/boundaries/delegates/grants/${miaGrant.grant_id}/open`)).status).toBe(404);
-  expect((await api(mia.page, mia.token, `/wedding/boundaries/grants/${helper.grant.grant_id}/revoke`, { method: "POST", body: {} })).status).toBe(200);
-  expect((await api(jordan.page, jordan.token, "/wedding/boundaries/helpers/open", { method: "POST", body: { token: helper.token } })).status).toBe(404);
+  expect((await api(alex.page, `/wedding/boundaries/delegates/grants/${miaGrant.grant_id}/open`)).status).toBe(404);
+  expect((await api(mia.page, `/wedding/boundaries/grants/${helper.grant.grant_id}/revoke`, { method: "POST", body: {} })).status).toBe(200);
+  expect((await api(jordan.page, "/wedding/boundaries/helpers/open", { method: "POST", body: { token: helper.token } })).status).toBe(404);
 
   for (const { context } of sessions) await context.close();
 });
