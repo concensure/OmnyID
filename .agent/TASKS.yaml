@@ -1,5 +1,5 @@
 version: 1
-updated: 2026-11-01
+updated: 2026-11-02
 
 lifecycle:
   allowed_statuses:
@@ -15,6 +15,238 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-316
+    title: Harden Oracle provenance and retention then deliver Wedding landing and Quiz v2
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-316
+    worktree: C:/Users/ozans/Desktop/projects/OmnyID-WED-316
+    depends_on: [WED-315]
+    files: [scripts/stage-oracle-runtime.ps1, scripts/deploy-oracle.ps1, src/db.rs, src/daemon_registry.rs, src/ledger_ingestion_daemon.rs, postgres/migrations/**, wedding/privacy.html, wedding/**, src/server/wedding_*routes.rs, solid-ui/**, typescript-sdk/**, Documents/marketing/wedding planning/**, .agent/**]
+    acceptance: [Every staged Oracle runtime records one matching full source SHA in oracle-runtime-manifest.json and SOURCE_COMMIT and deploy verifies both, idle daemon liveness does not append unbounded heartbeat history and stale unsupported watcher registrations emit no AFP, rate-limit IP records are purged within 48 hours with safe production cleanup evidence, privacy copy ships only with the behavior it describes, landing phases and Quiz v2 follow their registered dependency order and project core, exact-SHA tests build release and hosted health evidence are recorded]
+    progress: "Registered from clean base 9e86b17e259fca67c4db97340b648cd508a57bc8. Detached Oracle deploy commit 53450ed was preserved on archive/oracle-deploy-53450ed-20260928 before its temporary worktree was removed. Read-only production audit found no running watcher executor, stale legacy watcher registrations, an empty watcher audit table, high idle daemon-heartbeat volume, and rate-limit rows older than the promised 48-hour retention."
+
+  - id: WLP-00
+    title: Remove unsupported Wedding landing claims and establish verified design foundations
+    status: ready
+    owner: codex
+    branch: agent/codex/WED-316
+    worktree: C:/Users/ozans/Desktop/projects/OmnyID-WED-316
+    depends_on: []
+    files: [wedding/index.html, wedding/assets/css/style.css, wedding/assets/js/main.js, wedding/assets/js/landing-config.js, wedding/assets/images/**, wedding/claims-ledger.md, wedding/tests/**]
+    acceptance: [Unsupported metrics testimonials and hotlinked images are removed, every factual landing claim has dated repository or behavior evidence, DESIGN_SYSTEM section 11 tokens are scoped to landing-v2, regression tests reject removed claims]
+
+  - id: WLP-01
+    title: Build contextual Wedding landing experience
+    status: ready
+    owner: codex
+    branch: agent/codex/WED-316
+    worktree: C:/Users/ozans/Desktop/projects/OmnyID-WED-316
+    depends_on: [WLP-00]
+    files: [wedding/index.html, wedding/assets/css/style.css, wedding/assets/js/main.js, wedding/assets/js/landing-config.js, wedding/tests/**]
+    acceptance: [Hero selector verified demos trust and final CTA are mobile and keyboard accessible, recognised intent values safely select matching content while unknown input is inert, source=wedding behavior and existing routes remain intact, layout swaps in place without scroll jump]
+
+  - id: WLP-02
+    title: Deliver Wedding Day Binder capture and double opt-in
+    status: ready
+    owner: codex
+    branch: agent/codex/WED-316
+    worktree: C:/Users/ozans/Desktop/projects/OmnyID-WED-316
+    depends_on: [WLP-01]
+    files: [wedding/index.html, wedding/downloads/**, wedding/privacy.html, src/server/wedding_binder_routes.rs, src/server/mod.rs, src/db.rs, postgres/migrations/**, Caddyfile, wedding/tests/**]
+    acceptance: [Binder request needs only email and enumeration-safe states, repeat requests within 24 hours send once, marketing remains unticked and double opt-in, SMTP multipart delivery links to fillable and print PDFs, admin list unsubscribe and strict abuse controls work, public form stays disabled until real Gmail and Outlook receipt gates pass]
+
+  - id: WLP-03
+    title: Add privacy-preserving first-party Wedding measurement
+    status: ready
+    owner: codex
+    branch: agent/codex/WED-316
+    worktree: C:/Users/ozans/Desktop/projects/OmnyID-WED-316
+    depends_on: [WLP-00]
+    files: [wedding/assets/js/measure.js, wedding/privacy.html, src/server/wedding_site_measurement_routes.rs, src/server/mod.rs, src/db.rs, postgres/migrations/**, Caddyfile, wedding/tests/**]
+    acceptance: [Measurement sets no cookies stores no IP personal data answers or form content, GPC and DNT send nothing, payload and properties are allowlisted and bounded, fourteen-month retention and admin funnel report work, common visits use one non-blocking batch]
+
+  - id: WLP-04
+    title: Complete verified Wedding landing demos and Quiz entry
+    status: ready
+    owner: codex
+    branch: agent/codex/WED-316
+    worktree: C:/Users/ozans/Desktop/projects/OmnyID-WED-316
+    depends_on: [WLP-01, WLP-02, WLP-03, QZ-08, QZ-10]
+    files: [wedding/index.html, wedding/assets/js/landing-config.js, wedding/assets/css/style.css, wedding/tests/**, Documents/verification/**]
+    acceptance: [Guest and final-prep demos show only verified capabilities and label planned items, Quiz entry and intent variant make no scientific claim, landing passes 320px accessibility performance and smoke budgets with desktop and mobile evidence]
+
+  - id: QZ-00
+    title: Register and govern Wedding Animal Quiz v2 replacement
+    status: done
+    owner: codex
+    branch: agent/codex/WED-316
+    worktree: C:/Users/ozans/Desktop/projects/OmnyID-WED-316
+    depends_on: []
+    files: [.agent/TASKS.yaml, .agent/DECISIONS.md, .agent/HANDOFF.md]
+    acceptance: [QZ-00 through QZ-16 are registered before product code, decision records that the supplied spec replaces the live quiz removes compatibility percentages and excludes LLM narrative from v1]
+    progress: "Registered in the WED-316 coordination commit before any product code change."
+
+  - id: QZ-01
+    title: Implement versioned Wedding Animal Quiz content
+    status: ready
+    owner: codex
+    branch: agent/codex/WED-316
+    worktree: C:/Users/ozans/Desktop/projects/OmnyID-WED-316
+    depends_on: [QZ-00]
+    files: [wedding/assets/js/quiz-data.js, wedding/tests/**]
+    acceptance: [Content matches the supplied spec exactly with 12 questions 48 signed-weight options six dimensions eight prototypes comparison prompts fixed templates and a version, tests assert counts and weights]
+
+  - id: QZ-02
+    title: Curate accessible licensed Quiz image assets
+    status: ready
+    owner: codex
+    branch: agent/codex/WED-316
+    worktree: C:/Users/ozans/Desktop/projects/OmnyID-WED-316
+    depends_on: [QZ-00]
+    files: [wedding/assets/images/quiz/**, wedding/assets/images/quiz/quiz-images.json, wedding/animal-quiz.html, wedding/tests/**]
+    acceptance: [All 48 choices have neutral alt text licence author and source records, each WebP is 480px and targets 60KB or less with explicit dimensions, labels preserve use without images, owner diversity review remains an explicit release acceptance]
+
+  - id: QZ-03
+    title: Implement deterministic Quiz scoring and archetypes
+    status: ready
+    owner: codex
+    branch: agent/codex/WED-316
+    worktree: C:/Users/ozans/Desktop/projects/OmnyID-WED-316
+    depends_on: [QZ-01]
+    files: [wedding/assets/js/quiz-scoring.js, wedding/tests/**]
+    acceptance: [Scores use the specified clamped signed-weight formula, unanswered dimensions stay unknown, follow-ups prioritize least-observed dimensions, revisions recompute deterministically, animal assignment requires four observed dimensions and tie-breaking is documented and tested]
+
+  - id: QZ-04
+    title: Implement consent-safe partner comparison
+    status: ready
+    owner: codex
+    branch: agent/codex/WED-316
+    worktree: C:/Users/ozans/Desktop/projects/OmnyID-WED-316
+    depends_on: [QZ-03]
+    files: [wedding/assets/js/quiz-comparison.js, wedding/tests/**]
+    acceptance: [Only mutually observed dimensions compare using 20 and 40 thresholds, output has at most two differences and one agreement with dimension prompts, no compatibility percentage appears]
+
+  - id: QZ-05
+    title: Replace the public Quiz UI
+    status: ready
+    owner: codex
+    branch: agent/codex/WED-316
+    worktree: C:/Users/ozans/Desktop/projects/OmnyID-WED-316
+    depends_on: [QZ-01, QZ-02, QZ-03]
+    files: [wedding/animal-quiz.html, wedding/assets/js/quiz*.js, wedding/assets/css/quiz.css, wedding/tests/**]
+    acceptance: [Image-choice quiz supports progress back skip early reveal six score bars answer counts and optional partner invite without an email wall, keyboard focus reduced motion blocked images and mobile use pass, Axe has no serious issue and Lighthouse mobile reaches 90]
+
+  - id: QZ-06
+    title: Enforce Quiz partner and sharing privacy
+    status: ready
+    owner: codex
+    branch: agent/codex/WED-316
+    worktree: C:/Users/ozans/Desktop/projects/OmnyID-WED-316
+    depends_on: [QZ-04, QZ-05]
+    files: [wedding/assets/js/quiz*.js, wedding/tests/**]
+    acceptance: [Comparison requires both partners consent, private answers remain private before consent, public cards and invites omit budget date partner answers family and guest details, omission tests pass]
+
+  - id: QZ-07
+    title: Add Quiz v2 local persistence and user controls
+    status: ready
+    owner: codex
+    branch: agent/codex/WED-316
+    worktree: C:/Users/ozans/Desktop/projects/OmnyID-WED-316
+    depends_on: [QZ-05]
+    files: [wedding/assets/js/quiz*.js, wedding/animal-quiz.html, wedding/tests/**]
+    acceptance: [Versioned v2 handoff persists locally, users can export delete and correct results, v1 state is removed, old share links fail friendly rather than crashing]
+
+  - id: QZ-08
+    title: Import consented Quiz results into AFP
+    status: ready
+    owner: codex
+    branch: agent/codex/WED-316
+    worktree: C:/Users/ozans/Desktop/projects/OmnyID-WED-316
+    depends_on: [QZ-07]
+    files: [solid-ui/src/**, typescript-sdk/src/workflows.ts, src/server/user_management_routes/wedding_admin.rs, solid-ui/tests/**]
+    acceptance: [Workspace previews exactly what import adds and requires consent, wedding_quiz entry source is allowlisted, quiz AFP message types include version provenance timestamp and evidence without overwriting confirmed facts, import half of O-1 passes]
+
+  - id: QZ-09
+    title: Project Quiz evidence into Wedding knowledge
+    status: ready
+    owner: codex
+    branch: agent/codex/WED-316
+    worktree: C:/Users/ozans/Desktop/projects/OmnyID-WED-316
+    depends_on: [QZ-08]
+    files: [solid-ui/src/lib/weddingPreferenceConflictState.ts, solid-ui/src/lib/weddingKnowledgeGraphState.ts, solid-ui/tests/**]
+    acceptance: [One inferred private preference per observed dimension and archetype nodes carry provenance evidence and searchable terms, correction and deletion remove projections from search and graph, K-1 passes]
+
+  - id: QZ-10
+    title: Pre-fill Wedding onboarding from Quiz suggestions
+    status: ready
+    owner: codex
+    branch: agent/codex/WED-316
+    worktree: C:/Users/ozans/Desktop/projects/OmnyID-WED-316
+    depends_on: [QZ-08]
+    files: [solid-ui/src/components/OnboardingWizard.tsx, solid-ui/src/components/FirstRunExperience.tsx, solid-ui/src/lib/weddingFirstRunIntakeGateState.ts, solid-ui/src/**, solid-ui/tests/**]
+    acceptance: [Quiz suggestions are visibly sourced editable and unconfirmed, declining import exactly matches ordinary onboarding, no budget amount guest count date vendor booking or send permission is inferred, O-1 passes]
+
+  - id: QZ-11
+    title: Apply confirmed Quiz preferences to planning
+    status: ready
+    owner: codex
+    branch: agent/codex/WED-316
+    worktree: C:/Users/ozans/Desktop/projects/OmnyID-WED-316
+    depends_on: [QZ-09, QZ-10]
+    files: [solid-ui/src/lib/weddingIntakeProfileAfpProjectionState.ts, solid-ui/src/lib/weddingWorkspaceGeneratedTaskItemsState.ts, solid-ui/src/lib/weddingNextStepState.ts, solid-ui/src/lib/weddingVendor*State.ts, solid-ui/tests/**]
+    acceptance: [Confirmed preferences offer source-cited dismissible tasks next steps search defaults shortlist sizes and conversation prompts, partner differences use existing conflict semantics without compatibility percentage, planner is unchanged without quiz data, P-1 passes]
+
+  - id: QZ-12
+    title: Add optional post-v1 Quiz narrative
+    status: proposed
+    owner: codex
+    branch: agent/codex/WED-316
+    worktree: C:/Users/ozans/Desktop/projects/OmnyID-WED-316
+    depends_on: [QZ-08]
+    files: [solid-ui/src/**, src/**, solid-ui/tests/**]
+    acceptance: [Not a v1 blocker, if implemented narrative is signed-in only AFP-persisted before display evidence-cited and cannot alter structured scoring animals budget traits or answers, fixed template fallback remains]
+
+  - id: QZ-13
+    title: Measure Quiz funnel without personal data
+    status: ready
+    owner: codex
+    branch: agent/codex/WED-316
+    worktree: C:/Users/ozans/Desktop/projects/OmnyID-WED-316
+    depends_on: [WLP-03]
+    files: [wedding/assets/js/quiz*.js, wedding/assets/js/measure.js, wedding/tests/**]
+    acceptance: [Only six allowlisted Quiz event names and non-personal bounded properties use the first-party endpoint, no answers names or content leave the browser, payload tests pass]
+
+  - id: QZ-14
+    title: Verify Quiz accessibility mobile behavior and claims
+    status: ready
+    owner: codex
+    branch: agent/codex/WED-316
+    worktree: C:/Users/ozans/Desktop/projects/OmnyID-WED-316
+    depends_on: [QZ-05, QZ-06, QZ-07, QZ-08, QZ-09, QZ-10, QZ-11, QZ-13]
+    files: [wedding/tests/**, solid-ui/tests/**, Documents/verification/**]
+    acceptance: [All supplied spec acceptance checks have exact evidence, accessibility mobile image-blocked and copy reviews pass, no diagnosis prediction scientific validity or compatibility claim remains]
+
+  - id: QZ-15
+    title: Replace live Quiz and reconcile editorial surfaces
+    status: ready
+    owner: codex
+    branch: agent/codex/WED-316
+    worktree: C:/Users/ozans/Desktop/projects/OmnyID-WED-316
+    depends_on: [QZ-01, QZ-02, QZ-03, QZ-04, QZ-05, QZ-06, QZ-07, QZ-08, QZ-09, QZ-10, QZ-11, QZ-13, QZ-14]
+    files: [wedding/animal-quiz.html, wedding/assets/**, wedding/blog/couples-barely-know-each-other.html, Documents/marketing/wedding planning/posts/blog/blog-publication-catalogue.csv, .agent/**]
+    acceptance: [Old Quiz and compatibility copy are replaced, blog and publication catalogue match the new behavior, retired Bear and Flamingo assets are excluded and Elephant and Beaver are present, clean hot-sync list is prepared, owner approval is recorded before deployment]
+
+  - id: QZ-16
+    title: Define honest Wedding Animal Quiz pilot
+    status: ready
+    owner: codex
+    branch: agent/codex/WED-316
+    worktree: C:/Users/ozans/Desktop/projects/OmnyID-WED-316
+    depends_on: [QZ-14]
+    files: [Documents/verification/**]
+    acceptance: [Pilot protocol starts with 30 to 50 comprehension and friction participants then a larger diverse score stability sample, measures accepted planning suggestions and workflows, makes no validity claim]
+
   - id: WED-315
     title: Repair connected Wedding task, vendor, date, RSVP and guest projections
     status: done

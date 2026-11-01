@@ -2308,3 +2308,22 @@ Retained vendors or contacts alone are not evidence of cross-account leakage. Th
 server projection and browser-state evidence must be inspected before deletion or migration. Synthetic
 tests can establish deterministic behavior and isolation, but cannot replace human comprehension,
 subjective usability or a controlled external cohort.
+
+## 2026-11-02: Wedding Animal Quiz v2 replaces the live quiz
+
+- The supplied `OmnyID_Wedding_Animal_Quiz_Spec.docx` governs question content,
+  signed weights, deterministic scoring, archetypes, comparison and privacy.
+- Quiz v2 replaces the current public quiz at the same route; it is not a
+  parallel product.
+- Relationship compatibility percentages and scientific, psychological,
+  diagnostic or predictive claims are removed. Partner comparison uses only
+  practical per-dimension thresholds and explicit mutual consent.
+- V1 has no LLM-generated narrative. Any later narrative is optional,
+  evidence-cited, AFP-persisted before display and cannot alter structured
+  answers, scores, archetypes or confirmed Wedding facts.
+- Quiz-derived preferences remain `inferred` with provenance until the person
+  explicitly confirms or edits them. They never overwrite confirmed budget,
+  guest, date, venue, booking or send-authorisation facts.
+- Implementation proceeds in `C:/Users/ozans/Desktop/projects/OmnyID-WED-316`
+  on `agent/codex/WED-316`; the untracked primary-checkout specifications and
+  art are read-only inputs until intentionally added to the task worktree.
