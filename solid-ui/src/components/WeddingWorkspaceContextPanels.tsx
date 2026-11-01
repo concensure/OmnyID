@@ -15,6 +15,7 @@ import type { WeddingWorkspaceSidebarAction } from "@/lib/weddingWorkspaceAction
 import type { WeddingWorkspaceMenuId } from "@/lib/weddingWorkspaceMenuState";
 import { WeddingAdvancedAuditPanels } from "@/components/WeddingAdvancedAuditPanels";
 import { WeddingBackgroundAutomationCard } from "@/components/WeddingBackgroundAutomationCard";
+import { WeddingBoundaryAccessManagementPanel } from "@/components/WeddingBoundaryAccessManagementPanel";
 import { WeddingBoundaryManagementCard } from "@/components/WeddingBoundaryManagementCard";
 import { WeddingBudgetTrackerCard } from "@/components/WeddingBudgetTrackerCard";
 import { WeddingBudgetEvidenceHub } from "@/components/WeddingBudgetEvidenceHub";
@@ -258,9 +259,9 @@ export function WeddingWorkspaceContextPanels(props: {
   }
   async function saveFamilyRequest(input: { requesterLabel: string; requestLabel: string; changeType: WeddingBoundaryChangeType; targetHouseholdId: string; proposedGuestName: string; requiredApprovalCount: 1 | 2 }): Promise<string> {
     if (!props.saveProjection) throw new Error("Saving is not connected yet.");
-    const request = buildWeddingFamilyBoundaryRequestObject(input, props.state.workspace.metadata);
-    if (!request) throw new Error("Add a request before saving.");
     const household = (props.state.boundaryState.householdObjects ?? []).find((item) => item.householdId === input.targetHouseholdId);
+    const request = buildWeddingFamilyBoundaryRequestObject({ ...input, expiresAt: household?.requestDeadline }, props.state.workspace.metadata);
+    if (!request) throw new Error("Add a request before saving.");
     const object = applyWeddingFamilyBoundaryRequestEvaluation({
       request: { ...request, expectedHouseholdRevision: household?.revision ?? 1 },
       policies: props.state.boundaryState.familyVisibleObjects.filter((item) => item.kind === "wedding_boundary_policy"),
@@ -272,7 +273,7 @@ export function WeddingWorkspaceContextPanels(props: {
     if (object.requestStatus === "approved") return "Family request saved as an allowed update.";
     return "Family request saved for couple review.";
   }
-  async function saveFamilyRule(input: { title: string; plainLanguage: string; ruleType: WeddingBoundaryPolicyRuleType; scopeKind: WeddingBoundaryRuleScopeKind; scopeId: string; effect: WeddingBoundaryRuleEffect; authority: WeddingBoundaryRuleAuthority; effectiveUntil: string }): Promise<string> {
+  async function saveFamilyRule(input: { title: string; plainLanguage: string; ruleType: WeddingBoundaryPolicyRuleType; scopeKind: WeddingBoundaryRuleScopeKind; scopeId: string; effect: WeddingBoundaryRuleEffect; authority: WeddingBoundaryRuleAuthority; effectiveUntil: string; condition: Record<string, unknown> }): Promise<string> {
     if (!props.saveProjection) throw new Error("Saving is not connected yet.");
     const object = buildWeddingFamilyBoundaryPolicyObject(input, props.state.workspace.metadata);
     if (!object) throw new Error("Add a rule before saving.");
@@ -503,6 +504,11 @@ export function WeddingWorkspaceContextPanels(props: {
             onChangeFamilyRule={changeFamilyRule}
             onSaveHousehold={saveFamilyHousehold}
             onApplyHouseholdCommand={changeFamilyHouseholds}
+          />
+          <WeddingBoundaryAccessManagementPanel
+            state={props.state.boundaryState}
+            weddingPlanId={props.state.workspace.metadata.weddingPlanId}
+            responseWorkspaceId={props.state.workspace.metadata.responseWorkspaceId}
           />
         </div>
       </div>

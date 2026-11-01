@@ -1,4 +1,5 @@
 // @locs-version: 1.0
+import { weddingBoundaryRequestStatusAt } from "@/lib/weddingBoundaryLedgerState";
 import type {
   WeddingBoundaryChangeRequest,
   WeddingBoundaryEventInvitation,
@@ -57,6 +58,30 @@ function clean(value: unknown): string {
 
 function unique(values: readonly string[]): string[] {
   return [...new Set(values.filter(Boolean))];
+}
+
+export function validateWeddingBoundaryRuleDraft(input: {
+  ruleType: WeddingBoundaryPolicy["ruleType"];
+  scopeKind: WeddingBoundaryRuleScopeKind;
+  scopeId?: string | null;
+  condition?: Record<string, unknown> | null;
+}): string | null {
+  if (input.scopeKind !== "wedding" && !clean(input.scopeId)) {
+    return "Choose the exact family group, household or guest this rule applies to.";
+  }
+  if (input.ruleType === "allocation") {
+    const maximum = input.condition?.maximum_guest_count;
+    if (typeof maximum !== "number" || !Number.isInteger(maximum) || maximum < 0 || maximum > 5_000) {
+      return "Enter the maximum number of guests allowed by this allocation rule.";
+    }
+  }
+  if (input.ruleType === "deadline") {
+    const deadline = clean(input.condition?.request_deadline);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(deadline) || !Number.isFinite(Date.parse(`${deadline}T00:00:00Z`))) {
+      return "Choose the request deadline this rule will enforce.";
+    }
+  }
+  return null;
 }
 
 function currentObjects(objects: readonly WeddingBoundaryLedgerObject[]) {
@@ -211,7 +236,7 @@ export function previewWeddingBoundaryRequestDecision(input: {
   return preview("decide_request", householdId ? [householdId] : [], personIds, invitationIds, hasCommittedInvitation(personIds, invitations), [
     missingTarget ? "Add the exact guest or household before approving this request." : "Approval will recheck the current rule and allocation versions.",
     "Approving does not infer attendance, send an invitation, commit spend, or change a vendor contract.",
-  ], !missingTarget && input.request.requestStatus === "pending");
+  ], !missingTarget && (weddingBoundaryRequestStatusAt(input.request) === "pending" || weddingBoundaryRequestStatusAt(input.request) === "partially_approved"));
 }
 
 export function previewWeddingBoundaryPolicyChange(input: {

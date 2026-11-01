@@ -54,6 +54,7 @@ export type WeddingFamilyBoundaryRequestDraftInput = {
   targetHouseholdId?: string | null;
   proposedGuestName?: string | null;
   requiredApprovalCount?: 1 | 2 | null;
+  expiresAt?: string | null;
 };
 
 export type WeddingFamilyBoundaryPolicyDraftInput = {
@@ -65,6 +66,7 @@ export type WeddingFamilyBoundaryPolicyDraftInput = {
   effect?: WeddingBoundaryRuleEffect | null;
   authority?: WeddingBoundaryRuleAuthority | null;
   effectiveUntil?: string | null;
+  condition?: Record<string, unknown> | null;
 };
 
 function clean(value: unknown): string {
@@ -324,6 +326,7 @@ export function buildWeddingFamilyBoundaryRequestObject(
     approvalRequired: true,
     approvalCount: 0,
     requiredApprovalCount: input.requiredApprovalCount === 2 ? 2 : 1,
+    expiresAt: clean(input.expiresAt) || null,
     revision: 1,
     publicReason: `${requesterLabel} asked: ${requestLabel}`,
     metadata: {
@@ -392,7 +395,7 @@ export function buildWeddingFamilyBoundaryPolicyObject(
     approvedBy: ["couple"],
     scopeKind: input.scopeKind ?? "wedding",
     scopeId: clean(input.scopeId) || null,
-    condition: {},
+    condition: input.condition ?? {},
     effect: input.effect ?? "require_approval",
     authority: input.authority ?? "couple",
     effectiveFrom: nowIso,

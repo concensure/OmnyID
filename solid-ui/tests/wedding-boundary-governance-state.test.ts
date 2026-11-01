@@ -6,6 +6,7 @@ import {
   previewWeddingBoundaryPolicyChange,
   previewWeddingBoundaryRequestDecision,
   projectWeddingBoundaryEffectiveRules,
+  validateWeddingBoundaryRuleDraft,
   weddingBoundaryRoleCapabilityPreset,
 } from "../src/lib/weddingBoundaryGovernanceState";
 import type {
@@ -16,6 +17,7 @@ import type {
   WeddingBoundaryLedgerObject,
   WeddingBoundaryPolicy,
 } from "../src/lib/weddingBoundaryLedgerState";
+import { buildWeddingBoundaryState, weddingBoundaryRequestStatusAt } from "../src/lib/weddingBoundaryLedgerState";
 
 const household = (id: string, members: string[], allocation = 4): WeddingBoundaryHousehold => ({
   id,
@@ -185,4 +187,29 @@ test("delegated planner and RSVP guest presets are minimum-necessary and approva
   assert.deepEqual(guestRole.canView, ["own_invitation", "own_rsvp", "published_event_details"]);
   assert.equal(guestRole.canEdit?.includes("household_change"), false);
   assert.equal(guestRole.privateNotesVisible, false);
+});
+
+test("boundary rule validation requires exact scope and conditional values", () => {
+  assert.match(validateWeddingBoundaryRuleDraft({ ruleType: "visibility", scopeKind: "household", condition: {} }) ?? "", /exact family group/);
+  assert.match(validateWeddingBoundaryRuleDraft({ ruleType: "allocation", scopeKind: "wedding", condition: {} }) ?? "", /maximum number/);
+  assert.match(validateWeddingBoundaryRuleDraft({ ruleType: "deadline", scopeKind: "wedding", condition: { request_deadline: "not-a-date" } }) ?? "", /request deadline/);
+  assert.equal(validateWeddingBoundaryRuleDraft({ ruleType: "allocation", scopeKind: "household", scopeId: "household:a", condition: { maximum_guest_count: 8 } }), null);
+  assert.equal(validateWeddingBoundaryRuleDraft({ ruleType: "deadline", scopeKind: "wedding", condition: { request_deadline: "2027-09-01" } }), null);
+});
+
+test("request lifecycle keeps only open states in the decision queue and expires elapsed deadlines", () => {
+  const at = new Date("2027-09-02T12:00:00Z");
+  assert.equal(weddingBoundaryRequestStatusAt(request({ expiresAt: "2027-09-01" }), at), "expired");
+  assert.equal(weddingBoundaryRequestStatusAt(request({ requestStatus: "partially_approved", expiresAt: "2027-09-03" }), at), "partially_approved");
+  assert.equal(weddingBoundaryRequestStatusAt(request({ requestStatus: "withdrawn", expiresAt: "2027-09-03" }), at), "withdrawn");
+  const state = buildWeddingBoundaryState({
+    objects: [
+      request({ requestId: "pending", id: "pending" }),
+      request({ requestId: "partial", id: "partial", requestStatus: "partially_approved" }),
+      request({ requestId: "withdrawn", id: "withdrawn", requestStatus: "withdrawn" }),
+      request({ requestId: "expired", id: "expired", requestStatus: "expired" }),
+      request({ requestId: "blocked", id: "blocked", requestStatus: "auto_blocked" }),
+    ],
+  });
+  assert.deepEqual(state.approvalQueue.map((item) => item.requestId), ["pending", "partial"]);
 });

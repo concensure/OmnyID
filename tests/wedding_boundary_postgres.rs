@@ -852,3 +852,59 @@ async fn group_plus_one_exceptions_and_last_seat_are_serialized() {
         1
     );
 }
+
+#[tokio::test]
+async fn expired_requests_close_without_mutation_and_access_capabilities_stay_false_default() {
+    let Some(db_url) = test_db_url() else { return };
+    let db = Db::new(&db_url).await.expect("connect test database");
+    let (owner, auth) = seed_user(&db, "expiry-owner").await;
+    let plan = format!("wedding-plan-{}", Ulid::new());
+    let workspace = format!("wedding-workspace-{}", Ulid::new());
+    let household = format!("household-{}", Ulid::new());
+    let request_id = format!("request-{}", Ulid::new());
+    let proposed_person = format!("person-{}", Ulid::new());
+    append_fixture(&db, &owner.id, "wedding_boundary_household", &plan, &workspace, json!({
+        "ledger_kind":"wedding_boundary_household","boundary_object_id":household,"household_id":household,
+        "display_name":"Expired request household","title":"Expired request household","status":"active",
+        "member_person_ids":[],"invitation_allocation":4,"revision":1
+    })).await;
+    append_fixture(&db, &owner.id, "wedding_boundary_change_request", &plan, &workspace, json!({
+        "ledger_kind":"wedding_boundary_change_request","boundary_object_id":request_id,"request_id":request_id,
+        "requested_by":"family:helper","change_type":"add_guest","target_household_id":household,
+        "target_person_id":proposed_person,"proposed_guest_name":"Expired guest","expected_household_revision":1,
+        "expires_at":(Utc::now()-Duration::days(1)).to_rfc3339(),"request_status":"pending","status":"pending",
+        "approval_required":true,"approval_gate_recorded":true,"required_approval_count":1,"revision":1
+    })).await;
+    let prior_helper = std::env::var_os("OMNYID_WEDDING_BOUNDARY_HELPERS_ENABLED");
+    let prior_delegate = std::env::var_os("OMNYID_WEDDING_BOUNDARY_DELEGATES_ENABLED");
+    let prior_allowlist = std::env::var_os("OMNYID_WEDDING_BOUNDARY_DELEGATE_OWNER_ALLOWLIST");
+    unsafe {
+        std::env::remove_var("OMNYID_WEDDING_BOUNDARY_HELPERS_ENABLED");
+        std::env::remove_var("OMNYID_WEDDING_BOUNDARY_DELEGATES_ENABLED");
+        std::env::remove_var("OMNYID_WEDDING_BOUNDARY_DELEGATE_OWNER_ALLOWLIST");
+    }
+    let app = omnyid_homeserver::server::build_test_router(&db_url).await;
+    let (capability_status, capabilities) = get_json(&app, "/wedding/boundaries/access/capabilities", &auth).await;
+    assert_eq!(capability_status, StatusCode::OK, "capabilities: {capabilities}");
+    assert_eq!(capabilities["helper_links_enabled"], false);
+    assert_eq!(capabilities["authenticated_delegates_enabled"], false);
+    let (status, response) = post_json(&app, "/wedding/boundaries/decisions", &auth, json!({
+        "wedding_plan_id":plan,"response_workspace_id":workspace,"request_id":request_id,"decision":"approve",
+        "expected_revision":1,"approval_actor_id":null,"confirmed_elevated_impact":false,
+        "idempotency_key":format!("expiry-{}",Ulid::new())
+    })).await;
+    assert_eq!(status, StatusCode::OK, "expiry: {response}");
+    assert_eq!(response["status"], "expired");
+    let table = format!("\"{}\".messages", tenant_schema(&owner.id));
+    let latest_status = sqlx::query_scalar::<_, String>(&format!(
+        "SELECT content->>'request_status' FROM {table} WHERE kind='wedding_boundary_change_request' AND content->>'request_id'=$1 ORDER BY COALESCE((content->>'revision')::bigint,1) DESC,timestamp DESC,id DESC LIMIT 1"
+    )).bind(&request_id).fetch_one(&db.pool).await.expect("latest request");
+    assert_eq!(latest_status, "expired");
+    let created_guests = sqlx::query_scalar::<_, i64>(&format!(
+        "SELECT COUNT(*) FROM {table} WHERE kind='wedding_boundary_guest_profile' AND content->>'person_id'=$1"
+    )).bind(&proposed_person).fetch_one(&db.pool).await.expect("guest count");
+    assert_eq!(created_guests, 0, "expiry must not mutate the guest list");
+    match prior_helper { Some(value) => unsafe { std::env::set_var("OMNYID_WEDDING_BOUNDARY_HELPERS_ENABLED", value) }, None => unsafe { std::env::remove_var("OMNYID_WEDDING_BOUNDARY_HELPERS_ENABLED") } }
+    match prior_delegate { Some(value) => unsafe { std::env::set_var("OMNYID_WEDDING_BOUNDARY_DELEGATES_ENABLED", value) }, None => unsafe { std::env::remove_var("OMNYID_WEDDING_BOUNDARY_DELEGATES_ENABLED") } }
+    match prior_allowlist { Some(value) => unsafe { std::env::set_var("OMNYID_WEDDING_BOUNDARY_DELEGATE_OWNER_ALLOWLIST", value) }, None => unsafe { std::env::remove_var("OMNYID_WEDDING_BOUNDARY_DELEGATE_OWNER_ALLOWLIST") } }
+}

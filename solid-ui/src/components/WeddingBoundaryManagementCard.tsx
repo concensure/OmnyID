@@ -21,7 +21,7 @@ import type {
 } from "@/lib/weddingBoundaryLedgerState";
 import type { WeddingBoundaryTopologyState } from "@/lib/weddingBoundaryTopologyState";
 import type { WeddingBoundaryHouseholdRow } from "@/lib/weddingBoundaryHouseholdState";
-import { previewWeddingBoundaryHouseholdCommand, previewWeddingBoundaryPolicyChange, previewWeddingBoundaryRequestDecision } from "@/lib/weddingBoundaryGovernanceState";
+import { previewWeddingBoundaryHouseholdCommand, previewWeddingBoundaryPolicyChange, previewWeddingBoundaryRequestDecision, validateWeddingBoundaryRuleDraft } from "@/lib/weddingBoundaryGovernanceState";
 import type { WeddingBoundaryRuleReplacement } from "@/lib/weddingBoundaryGovernanceApi";
 import type { WeddingBoundaryHouseholdCommand } from "@/lib/weddingBoundaryGovernanceApi";
 import type {
@@ -35,7 +35,7 @@ export function WeddingBoundaryManagementCard(props: {
   topology: WeddingBoundaryTopologyState;
   onDecideRequest?: (requestId: string, decision: WeddingBoundaryRequestDecision, approvalActorId?: string, confirmedElevatedImpact?: boolean) => Promise<string>;
   onSaveFamilyRequest?: (input: { requesterLabel: string; requestLabel: string; changeType: WeddingBoundaryChangeType; targetHouseholdId: string; proposedGuestName: string; requiredApprovalCount: 1 | 2 }) => Promise<string>;
-  onSaveFamilyRule?: (input: { title: string; plainLanguage: string; ruleType: WeddingBoundaryPolicyRuleType; scopeKind: WeddingBoundaryRuleScopeKind; scopeId: string; effect: WeddingBoundaryRuleEffect; authority: WeddingBoundaryRuleAuthority; effectiveUntil: string }) => Promise<string>;
+  onSaveFamilyRule?: (input: { title: string; plainLanguage: string; ruleType: WeddingBoundaryPolicyRuleType; scopeKind: WeddingBoundaryRuleScopeKind; scopeId: string; effect: WeddingBoundaryRuleEffect; authority: WeddingBoundaryRuleAuthority; effectiveUntil: string; condition: Record<string, unknown> }) => Promise<string>;
   onChangeFamilyRule?: (input: { operation: "archive_rule" | "supersede_rule"; rule: WeddingBoundaryPolicy; replacement?: WeddingBoundaryRuleReplacement; confirmedElevatedImpact: boolean }) => Promise<string>;
   onSaveHousehold?: (input: { householdId: string; familyGroupLabel: string; invitationAllocation: number | null; requestDeadline: string | null }) => Promise<string>;
   onApplyHouseholdCommand?: (input: Omit<WeddingBoundaryHouseholdCommand, "weddingPlanId" | "responseWorkspaceId" | "idempotencyKey">) => Promise<string>;
@@ -65,6 +65,7 @@ export function WeddingBoundaryManagementCard(props: {
   const [ruleEffect, setRuleEffect] = createSignal<WeddingBoundaryRuleEffect>("require_approval");
   const [ruleAuthority, setRuleAuthority] = createSignal<WeddingBoundaryRuleAuthority>("couple");
   const [ruleEffectiveUntil, setRuleEffectiveUntil] = createSignal("");
+  const [ruleConditionValue, setRuleConditionValue] = createSignal("");
   const [replacingRuleId, setReplacingRuleId] = createSignal<string | null>(null);
   const [reviewingRuleId, setReviewingRuleId] = createSignal<string | null>(null);
   const [reviewingRuleOperation, setReviewingRuleOperation] = createSignal<"archive_rule" | "supersede_rule">("archive_rule");
@@ -230,6 +231,7 @@ export function WeddingBoundaryManagementCard(props: {
     setRuleEffect("require_approval");
     setRuleAuthority("couple");
     setRuleEffectiveUntil("");
+    setRuleConditionValue("");
     setReplacingRuleId(null);
   }
   function beginRuleReplacement(policy: WeddingBoundaryPolicy): void {
@@ -241,6 +243,11 @@ export function WeddingBoundaryManagementCard(props: {
     setRuleEffect(policy.effect ?? (policy.enforcement === "block" ? "deny" : policy.enforcement === "require_approval" ? "require_approval" : "notify"));
     setRuleAuthority(policy.authority ?? "couple");
     setRuleEffectiveUntil(policy.effectiveUntil ?? "");
+    setRuleConditionValue(policy.ruleType === "allocation"
+      ? String(policy.condition?.maximum_guest_count ?? "")
+      : policy.ruleType === "deadline"
+        ? String(policy.condition?.request_deadline ?? "")
+        : "");
     setReplacingRuleId(policy.id);
     setShowAddRule(true);
     setShowRules(false);
@@ -262,6 +269,16 @@ export function WeddingBoundaryManagementCard(props: {
     setSavingDraft(true);
     try {
       const authority = ruleAuthority();
+      const condition = ruleType() === "allocation"
+        ? { maximum_guest_count: ruleConditionValue().trim() ? Number(ruleConditionValue()) : Number.NaN }
+        : ruleType() === "deadline"
+          ? { request_deadline: ruleConditionValue() }
+          : {};
+      const validationNotice = validateWeddingBoundaryRuleDraft({ ruleType: ruleType(), scopeKind: ruleScopeKind(), scopeId: ruleScopeId(), condition });
+      if (validationNotice) {
+        setDecisionNotice(validationNotice);
+        return;
+      }
       const replacement: WeddingBoundaryRuleReplacement = {
         title: ruleTitle().trim() || "Family boundary rule",
         plainLanguage: ruleText(),
@@ -271,11 +288,12 @@ export function WeddingBoundaryManagementCard(props: {
         effect: ruleEffect(),
         authority: authority === "system" ? "couple" : authority,
         effectiveUntil: ruleEffectiveUntil() || undefined,
+        condition,
       };
       const currentRule = replacementId ? activePolicies().find((policy) => policy.id === replacementId) : null;
       const notice = currentRule && props.onChangeFamilyRule
         ? await props.onChangeFamilyRule({ operation: "supersede_rule", rule: currentRule, replacement, confirmedElevatedImpact: ruleChangePreview()?.requiresElevatedConfirmation === true })
-        : await props.onSaveFamilyRule({ ...replacement, scopeId: replacement.scopeId ?? "", effectiveUntil: replacement.effectiveUntil ?? "" });
+        : await props.onSaveFamilyRule({ ...replacement, scopeId: replacement.scopeId ?? "", effectiveUntil: replacement.effectiveUntil ?? "", condition });
       setDecisionNotice(notice);
       resetRuleDraft();
       setReviewingRuleId(null);
@@ -557,6 +575,18 @@ export function WeddingBoundaryManagementCard(props: {
               <label class="min-w-0">
                 <span class="text-xs font-semibold text-cyan-950/70">Group, household, or guest reference</span>
                 <input class="mt-1 w-full rounded-xl border border-cyan-100 bg-white px-3 py-2 text-sm text-cyan-950" value={ruleScopeId()} onInput={(event) => setRuleScopeId(event.currentTarget.value)} />
+              </label>
+            </Show>
+            <Show when={ruleType() === "allocation"}>
+              <label class="min-w-0">
+                <span class="text-xs font-semibold text-cyan-950/70">Maximum guests</span>
+                <input type="number" min="0" max="5000" step="1" class="mt-1 w-full rounded-xl border border-cyan-100 bg-white px-3 py-2 text-sm text-cyan-950" value={ruleConditionValue()} onInput={(event) => setRuleConditionValue(event.currentTarget.value)} />
+              </label>
+            </Show>
+            <Show when={ruleType() === "deadline"}>
+              <label class="min-w-0">
+                <span class="text-xs font-semibold text-cyan-950/70">Request deadline</span>
+                <input type="date" class="mt-1 w-full rounded-xl border border-cyan-100 bg-white px-3 py-2 text-sm text-cyan-950" value={ruleConditionValue()} onInput={(event) => setRuleConditionValue(event.currentTarget.value)} />
               </label>
             </Show>
             <label class="min-w-0">

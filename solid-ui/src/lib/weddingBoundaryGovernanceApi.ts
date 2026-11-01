@@ -5,7 +5,7 @@ export type WeddingBoundaryDecisionReply = {
   request_id: string;
   decision_id?: string;
   impact_receipt_id?: string;
-  status: "approved" | "partially_approved" | "declined" | "withdrawn";
+  status: "approved" | "partially_approved" | "declined" | "withdrawn" | "expired";
   approval_count?: number;
   required_approval_count?: number;
   replayed: boolean;
@@ -91,6 +91,7 @@ export type WeddingBoundaryRuleReplacement = {
   effect: "allow" | "deny" | "require_approval" | "notify" | "limit";
   authority: "couple" | "partner_pair" | "planner";
   effectiveUntil?: string;
+  condition?: Record<string, unknown>;
 };
 
 export function applyWeddingBoundaryRuleCommand(input: {
@@ -130,6 +131,7 @@ export function applyWeddingBoundaryRuleCommand(input: {
         effect: input.replacement.effect,
         authority: input.replacement.authority,
         effective_until: input.replacement.effectiveUntil,
+        condition: input.replacement.condition ?? {},
       } : undefined,
       confirmed_elevated_impact: input.confirmedElevatedImpact ?? false,
       idempotency_key: input.idempotencyKey,
@@ -138,6 +140,15 @@ export function applyWeddingBoundaryRuleCommand(input: {
 }
 
 export type WeddingBoundaryDelegatedRole = "planner" | "rsvp_guest";
+
+export type WeddingBoundaryAccessCapabilities = {
+  helper_links_enabled: boolean;
+  authenticated_delegates_enabled: boolean;
+};
+
+export function loadWeddingBoundaryAccessCapabilities() {
+  return apiFetch<WeddingBoundaryAccessCapabilities>("/wedding/boundaries/access/capabilities");
+}
 
 export type WeddingBoundaryDelegatedGrant = {
   grant_id: string;

@@ -18,6 +18,10 @@ const RSVP_GUEST_CHANGES: [&str; 3] = [
 pub(super) fn routes() -> Router<Arc<AppState>> {
     Router::new()
         .route(
+            "/wedding/boundaries/access/capabilities",
+            get(access_capabilities),
+        )
+        .route(
             "/wedding/boundaries/delegates/grants",
             get(list_grants).post(create_grant),
         )
@@ -33,6 +37,23 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
             "/wedding/boundaries/delegates/grants/{grant_id}/propose",
             post(propose_change),
         )
+}
+
+#[derive(Debug, Serialize)]
+struct BoundaryAccessCapabilities {
+    helper_links_enabled: bool,
+    authenticated_delegates_enabled: bool,
+}
+
+async fn access_capabilities(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> Result<Json<BoundaryAccessCapabilities>, (StatusCode, String)> {
+    let owner = authenticated_user(&state.db, &headers).await?;
+    Ok(Json(BoundaryAccessCapabilities {
+        helper_links_enabled: helper_enabled(),
+        authenticated_delegates_enabled: access_enabled(&owner.id),
+    }))
 }
 
 fn access_enabled(owner_user_id: &str) -> bool {

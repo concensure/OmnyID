@@ -163,6 +163,7 @@ export type WeddingBoundaryChangeRequest = WeddingBoundaryLedgerObjectBase & {
   revision?: number | null;
   proposedGuestName?: string | null;
   expectedHouseholdRevision?: number | null;
+  expiresAt?: string | null;
 };
 
 export type WeddingBoundaryDecisionRationale = WeddingBoundaryLedgerObjectBase & {
@@ -534,6 +535,7 @@ function publicContentFor(object: WeddingBoundaryLedgerObject): Record<string, u
       revision: object.revision ?? 1,
       proposed_guest_name: object.proposedGuestName ?? null,
       expected_household_revision: object.expectedHouseholdRevision ?? null,
+      expires_at: object.expiresAt ?? null,
     };
   }
   if (object.kind === "wedding_boundary_decision_rationale") {
@@ -829,13 +831,8 @@ export function buildWeddingBoundaryState(input: {
   const metadata = normalizeWeddingPlanningMetadata(input.metadata);
   const objects = coalesceWeddingBoundaryLedgerObjects(input.objects);
   const policies = objects.filter((object): object is WeddingBoundaryPolicy => object.kind === "wedding_boundary_policy");
-  const approvals = objects.filter((object): object is WeddingBoundaryChangeRequest => (
-    object.kind === "wedding_boundary_change_request"
-    && (object.approvalRequired === true || object.requestStatus === "pending")
-    && object.requestStatus !== "approved"
-    && object.requestStatus !== "declined"
-    && object.requestStatus !== "auto_blocked"
-  ));
+  const approvals = objects.filter((object): object is WeddingBoundaryChangeRequest => object.kind === "wedding_boundary_change_request")
+    .filter((request) => weddingBoundaryRequestStatusAt(request) === "pending" || weddingBoundaryRequestStatusAt(request) === "partially_approved");
   const households = objects.filter((object) => object.kind === "wedding_boundary_household");
   const guests = objects.filter((object) => object.kind === "wedding_boundary_guest_profile");
   const familyObjects = objects.filter(familyVisible).map(familySafeObject);
@@ -861,4 +858,15 @@ export function buildWeddingBoundaryState(input: {
     summaryLabel: `${guests.length} guest profile${guests.length === 1 ? "" : "s"}, ${households.length} household${households.length === 1 ? "" : "s"}, ${approvals.length} request${approvals.length === 1 ? "" : "s"} waiting for review.`,
     allObjects: objects,
   };
+}
+
+export function weddingBoundaryRequestStatusAt(
+  request: WeddingBoundaryChangeRequest,
+  at = new Date(),
+): WeddingBoundaryRequestStatus {
+  if (request.requestStatus !== "pending" && request.requestStatus !== "partially_approved") return request.requestStatus;
+  const expiresAt = clean(request.expiresAt);
+  if (!expiresAt) return request.requestStatus;
+  const expiry = /^\d{4}-\d{2}-\d{2}$/.test(expiresAt) ? Date.parse(`${expiresAt}T23:59:59.999Z`) : Date.parse(expiresAt);
+  return Number.isFinite(expiry) && expiry <= at.getTime() ? "expired" : request.requestStatus;
 }

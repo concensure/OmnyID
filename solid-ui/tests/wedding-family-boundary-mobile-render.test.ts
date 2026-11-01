@@ -10,6 +10,7 @@ const mobilePage = read("src/components/WeddingMobilePage.tsx");
 const app = read("src/App.tsx");
 const contextPanels = read("src/components/WeddingWorkspaceContextPanels.tsx");
 const governanceApi = read("src/lib/weddingBoundaryGovernanceApi.ts");
+const boundaryAccess = read("src/components/WeddingBoundaryAccessManagementPanel.tsx");
 
 test("atmosphere photographs toggle exact selections without technical image copy", () => {
   assert.match(intake, /selectedIndex >= 0/);
@@ -50,4 +51,12 @@ test("Family boundaries prioritises request and household metrics and discloses 
   assert.match(contextPanels, /weddingBoundaryLedgerObjectToAfpSendInput\(\{/);
   assert.match(contextPanels, /household_revision: currentRevision \+ 1/);
   assert.doesNotMatch(boundary, />Shared</);
+});
+
+test("Family access settings preserve touch targets and single-column mobile flow", () => {
+  assert.match(boundaryAccess, /grid gap-4 xl:grid-cols-2/);
+  assert.match(boundaryAccess, /sm:p-4/);
+  assert.match(boundaryAccess, /min-h-11/);
+  assert.match(boundaryAccess, /grid grid-cols-2 gap-2/);
+  assert.doesNotMatch(boundaryAccess, /overflow-x-auto|whitespace-nowrap/);
 });

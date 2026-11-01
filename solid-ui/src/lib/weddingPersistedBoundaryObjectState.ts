@@ -401,6 +401,7 @@ export function weddingPersistedBoundaryObjectFromAfpMessage(
       revision: positiveInteger(contentValue(message, "revision")) ?? 1,
       proposedGuestName: clean(contentValue(message, "proposed_guest_name")),
       expectedHouseholdRevision: positiveInteger(contentValue(message, "expected_household_revision")),
+      expiresAt: clean(contentValue(message, "expires_at")),
     };
   }
   if (kind === "wedding_boundary_decision_rationale") {

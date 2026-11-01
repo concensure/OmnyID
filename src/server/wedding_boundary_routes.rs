@@ -581,7 +581,7 @@ async fn propose_request(
     }
     let request_id = format!("wedding-boundary-request-{}", Ulid::new());
     let response = json!({"request_id": request_id, "status": "pending", "replayed": false, "explanation": "Request sent for the couple to review. Nothing changed on the guest list."});
-    append_event(&mut tx, &tenant_table(&grant.owner_user_id), &request_id, "wedding_boundary_change_request", &grant.plan, &grant.workspace, json!({"ledger_kind":"wedding_boundary_change_request","boundary_object_id":request_id,"title":request.request_label.trim(),"request_id":request_id,"requested_by":format!("helper_grant:{}",grant.grant_id),"change_type":request.change_type,"target_household_id":request.household_id,"target_person_id":target_person_id,"proposed_guest_name":request.proposed_guest_name.trim(),"expected_household_revision":household_revision,"request_status":"pending","approval_required":true,"approval_gate_recorded":true,"policy_ids":[],"policy_versions":{},"public_reason":"A family helper suggested adding this guest.","revision":1,"visibility":"couple_only"})).await?;
+    append_event(&mut tx, &tenant_table(&grant.owner_user_id), &request_id, "wedding_boundary_change_request", &grant.plan, &grant.workspace, json!({"ledger_kind":"wedding_boundary_change_request","boundary_object_id":request_id,"title":request.request_label.trim(),"request_id":request_id,"requested_by":format!("helper_grant:{}",grant.grant_id),"change_type":request.change_type,"target_household_id":request.household_id,"target_person_id":target_person_id,"proposed_guest_name":request.proposed_guest_name.trim(),"expected_household_revision":household_revision,"expires_at":household.get("request_deadline"),"request_status":"pending","approval_required":true,"approval_gate_recorded":true,"policy_ids":[],"policy_versions":{},"public_reason":"A family helper suggested adding this guest.","revision":1,"visibility":"couple_only"})).await?;
     finish_receipt(
         &mut tx,
         &grant.owner_user_id,
@@ -605,6 +605,19 @@ struct DecisionRequest {
     #[serde(default)]
     confirmed_elevated_impact: bool,
     idempotency_key: String,
+}
+
+fn request_expired(value: &Value, now: DateTime<Utc>) -> bool {
+    let Some(raw) = value.get("expires_at").and_then(Value::as_str) else {
+        return false;
+    };
+    if let Ok(timestamp) = DateTime::parse_from_rfc3339(raw) {
+        return timestamp.with_timezone(&Utc) <= now;
+    }
+    chrono::NaiveDate::parse_from_str(raw, "%Y-%m-%d")
+        .ok()
+        .and_then(|date| date.and_hms_opt(23, 59, 59))
+        .is_some_and(|timestamp| timestamp.and_utc() <= now)
 }
 
 async fn decide_request(
@@ -682,6 +695,30 @@ async fn decide_request(
     let current_status = current.get("request_status").and_then(Value::as_str);
     if !matches!(current_status, Some("pending") | Some("partially_approved")) {
         return Err(conflict("This family request has already been decided."));
+    }
+    if request_expired(&current, Utc::now()) {
+        let mut expired = current.clone();
+        if let Some(object) = expired.as_object_mut() {
+            object.insert("request_status".into(), json!("expired"));
+            object.insert("status".into(), json!("expired"));
+            object.insert("approval_required".into(), json!(false));
+            object.insert("approval_gate_recorded".into(), json!(false));
+            object.insert("revision".into(), json!(revision + 1));
+        }
+        append_event(
+            &mut tx,
+            &table,
+            &format!("request-expired-{}", Ulid::new()),
+            "wedding_boundary_change_request",
+            &request.wedding_plan_id,
+            &request.response_workspace_id,
+            expired,
+        )
+        .await?;
+        let response = json!({"request_id":request.request_id,"status":"expired","replayed":false,"explanation":"This request expired before a decision. The guest list and connected wedding records remain unchanged.","connected_updates":[],"response_history_preserved":true});
+        finish_receipt(&mut tx, &user.id, &request.idempotency_key, &response).await?;
+        tx.commit().await.map_err(store_error)?;
+        return Ok(Json(response));
     }
     if request.decision == "approve"
         && let Some(household_id) = current.get("target_household_id").and_then(Value::as_str)
@@ -875,5 +912,19 @@ mod tests {
     fn helper_never_receives_approval_authority() {
         assert_eq!(HELPER_ACTIONS, ["view_summary", "propose_request"]);
         assert!(!HELPER_ACTIONS.contains(&"approve_request"));
+    }
+
+    #[test]
+    fn request_expiry_accepts_dates_and_timestamps_without_expiring_open_requests() {
+        let now = DateTime::parse_from_rfc3339("2027-09-02T12:00:00Z")
+            .unwrap()
+            .with_timezone(&Utc);
+        assert!(request_expired(&json!({"expires_at":"2027-09-01"}), now));
+        assert!(request_expired(
+            &json!({"expires_at":"2027-09-02T11:59:59Z"}),
+            now
+        ));
+        assert!(!request_expired(&json!({"expires_at":"2027-09-03"}), now));
+        assert!(!request_expired(&json!({}), now));
     }
 }

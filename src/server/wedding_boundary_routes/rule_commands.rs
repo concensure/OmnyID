@@ -35,6 +35,12 @@ struct RuleReplacement {
     effect: String,
     authority: String,
     effective_until: Option<String>,
+    #[serde(default = "empty_condition")]
+    condition: Value,
+}
+
+fn empty_condition() -> Value {
+    json!({})
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -53,6 +59,19 @@ struct RuleCommandRequest {
 fn validate_replacement(value: &RuleReplacement) -> Result<(), (StatusCode, String)> {
     let scope_id_valid =
         value.scope_kind == "wedding" || value.scope_id.as_deref().is_some_and(valid_id);
+    let condition_valid = match value.rule_type.as_str() {
+        "allocation" => value
+            .condition
+            .get("maximum_guest_count")
+            .and_then(Value::as_i64)
+            .is_some_and(|count| (0..=5_000).contains(&count)),
+        "deadline" => value
+            .condition
+            .get("request_deadline")
+            .and_then(Value::as_str)
+            .is_some_and(|date| chrono::NaiveDate::parse_from_str(date, "%Y-%m-%d").is_ok()),
+        _ => value.condition.is_object(),
+    };
     if !valid_label(&value.title)
         || value.plain_language.trim().is_empty()
         || value.plain_language.chars().count() > 1_000
@@ -62,6 +81,7 @@ fn validate_replacement(value: &RuleReplacement) -> Result<(), (StatusCode, Stri
         || !scope_id_valid
         || !EFFECTS.contains(&value.effect.as_str())
         || !AUTHORITIES.contains(&value.authority.as_str())
+        || !condition_valid
         || value
             .effective_until
             .as_deref()
@@ -237,7 +257,7 @@ fn replacement_policy(replacement: &RuleReplacement, supersedes_id: &str) -> Val
         "approved_by": [],
         "scope_kind": replacement.scope_kind,
         "scope_id": replacement.scope_id,
-        "condition": {},
+        "condition": replacement.condition,
         "effect": replacement.effect,
         "authority": replacement.authority,
         "effective_from": Utc::now().to_rfc3339(),
@@ -444,6 +464,7 @@ mod tests {
             effect: "require_approval".into(),
             authority: "couple".into(),
             effective_until: None,
+            condition: json!({}),
         });
         assert!(validate_request(&input).is_err());
     }
@@ -452,5 +473,51 @@ mod tests {
     fn supersede_requires_a_valid_replacement() {
         let input = request("supersede_rule");
         assert!(validate_request(&input).is_err());
+    }
+
+    fn replacement(rule_type: &str, condition: Value) -> RuleReplacement {
+        RuleReplacement {
+            title: "Guest boundaries".into(),
+            plain_language: "Keep this boundary clear for everyone.".into(),
+            rule_type: rule_type.into(),
+            scope_kind: "wedding".into(),
+            scope_id: None,
+            effect: "require_approval".into(),
+            authority: "couple".into(),
+            effective_until: None,
+            condition,
+        }
+    }
+
+    #[test]
+    fn allocation_and_deadline_rules_require_structured_conditions() {
+        assert!(validate_replacement(&replacement("allocation", json!({}))).is_err());
+        assert!(
+            validate_replacement(&replacement(
+                "allocation",
+                json!({"maximum_guest_count": 90})
+            ))
+            .is_ok()
+        );
+        assert!(
+            validate_replacement(&replacement("deadline", json!({"request_deadline":"soon"})))
+                .is_err()
+        );
+        assert!(
+            validate_replacement(&replacement(
+                "deadline",
+                json!({"request_deadline":"2027-09-01"})
+            ))
+            .is_ok()
+        );
+    }
+
+    #[test]
+    fn scoped_rule_requires_a_bounded_scope_identifier() {
+        let mut scoped = replacement("visibility", json!({}));
+        scoped.scope_kind = "household".into();
+        assert!(validate_replacement(&scoped).is_err());
+        scoped.scope_id = Some("household:rivera".into());
+        assert!(validate_replacement(&scoped).is_ok());
     }
 }
