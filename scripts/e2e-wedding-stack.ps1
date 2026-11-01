@@ -120,15 +120,23 @@ try {
 
     if (-not $SkipBuild) {
         Push-Location $repo
-        try { cargo build --bin omnyid-homeserver --bin wedding_e2e_seed }
-        finally { Pop-Location }
-        if (-not (Test-Path (Join-Path $repo "solid-ui\node_modules"))) {
-            Push-Location (Join-Path $repo "solid-ui")
-            try { npm ci }
-            finally { Pop-Location }
+        try {
+            cargo build --bin omnyid-homeserver --bin wedding_e2e_seed
+            if ($LASTEXITCODE -ne 0) { throw "Rust build failed" }
         }
+        finally { Pop-Location }
         Push-Location (Join-Path $repo "solid-ui")
-        try { $env:OMNYID_E2E_API_ORIGIN = $apiOrigin; npm run build }
+        try {
+            npm ci
+            if ($LASTEXITCODE -ne 0) { throw "npm ci failed" }
+        }
+        finally { Pop-Location }
+        Push-Location (Join-Path $repo "solid-ui")
+        try {
+            $env:OMNYID_E2E_API_ORIGIN = $apiOrigin
+            npm run build
+            if ($LASTEXITCODE -ne 0) { throw "Solid UI production build failed" }
+        }
         finally { Remove-Item Env:OMNYID_E2E_API_ORIGIN -ErrorAction SilentlyContinue; Pop-Location }
     }
 
