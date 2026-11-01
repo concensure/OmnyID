@@ -27,10 +27,24 @@ function Wait-Http([string]$Url, [int]$Seconds = 60) {
 }
 
 function Stop-Child($Process) {
-    if ($null -ne $Process -and -not $Process.HasExited) {
-        Stop-Process -Id $Process.Id -ErrorAction SilentlyContinue
-        $Process.WaitForExit(5000) | Out-Null
+    if ($null -eq $Process) { return }
+    $rootId = [int]$Process.Id
+    $descendants = [Collections.Generic.List[int]]::new()
+    $pending = [Collections.Generic.Queue[int]]::new()
+    $pending.Enqueue($rootId)
+    while ($pending.Count -gt 0) {
+        $parentId = $pending.Dequeue()
+        foreach ($child in @(Get-CimInstance Win32_Process -Filter "ParentProcessId = $parentId" -ErrorAction SilentlyContinue)) {
+            $childId = [int]$child.ProcessId
+            $descendants.Add($childId)
+            $pending.Enqueue($childId)
+        }
     }
+    for ($index = $descendants.Count - 1; $index -ge 0; $index--) {
+        Stop-Process -Id $descendants[$index] -Force -ErrorAction SilentlyContinue
+    }
+    Stop-Process -Id $rootId -Force -ErrorAction SilentlyContinue
+    if (-not $Process.HasExited) { $Process.WaitForExit(5000) | Out-Null }
 }
 
 $repo = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path

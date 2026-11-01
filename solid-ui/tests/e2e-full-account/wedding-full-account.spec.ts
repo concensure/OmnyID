@@ -33,7 +33,7 @@ async function signIn(browser: Browser, email: string): Promise<{ context: Brows
   }).not.toBeNull();
   const session = await page.evaluate(() => JSON.parse(sessionStorage.getItem("omnyid.preview.session") || "null"));
   expect(session?.user?.email).toBe(email);
-  expect(session?.token).toBe("cookie");
+  expect(session?.token).toBe("__http_only_cookie__");
   const authenticatedUser = await page.evaluate(async () => {
     const response = await fetch("/auth/session");
     return { status: response.status, body: await response.json() };

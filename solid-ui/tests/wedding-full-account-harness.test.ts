@@ -30,6 +30,8 @@ test("journey isolates sessions and challenges cross-couple grant identifiers", 
     assert.match(journey, new RegExp(`${email}\\@omnyid\\.test`));
   }
   assert.match(journey, /new Set\(sessions\.map/);
+  assert.match(journey, /__http_only_cookie__/);
+  assert.match(journey, /fetch\("\/auth\/session"\)/);
   assert.match(journey, /e2e-mia-submit/);
   assert.match(journey, /e2e-mia-withdraw/);
   assert.match(journey, /e2e-alex-catering-change/);
