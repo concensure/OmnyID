@@ -35,6 +35,22 @@
       };
     });
   }
+  function nextQuestion(answers, skippedIds) {
+    var safe = normalizeAnswers(answers);
+    var skipped = new Set(Array.isArray(skippedIds) ? skippedIds : []);
+    var available = D.QUESTIONS.filter(function (question) {
+      return !safe[question.id] && !skipped.has(question.id);
+    });
+    var core = available.find(function (question) { return question.core; });
+    if (core) return core;
+    var counts = Object.fromEntries(scoreAnswers(safe).map(function (score) {
+      return [score.code, score.count];
+    }));
+    return available.sort(function (left, right) {
+      return counts[left.dimension] - counts[right.dimension]
+        || D.QUESTIONS.indexOf(left) - D.QUESTIONS.indexOf(right);
+    })[0] || null;
+  }
   function distance(archetype, scores) {
     var observed = scores.map(function (item, index) { return { item: item, index: index }; })
       .filter(function (entry) { return entry.item.score != null; });
@@ -46,6 +62,7 @@
   }
   function assignAnimal(scores) {
     var ranked = D.ARCHETYPES.map(function (animal) { return { animal: animal, distance: distance(animal, scores) }; })
+      // Stable ids make an equal-distance result repeatable across browsers and revisions.
       .sort(function (left, right) { return left.distance - right.distance || left.animal.id.localeCompare(right.animal.id); });
     if (!Number.isFinite(ranked[0].distance)) return { animal: null, runnerUp: null, ranked: ranked };
     var close = ranked[1] && ranked[1].distance - ranked[0].distance <= 225;
@@ -84,11 +101,13 @@
       if (left.score == null || right.score == null) return;
       var gap = Math.abs(left.score - right.score);
       differences.push({ code: dimension.code, name: dimension.name, difference: gap,
+        prompt: D.COMPARISON_PROMPTS[dimension.code],
         state: gap < 20 ? 'broadly_aligned' : gap < 40 ? 'worth_discussing' : 'priority_discussion' });
     });
     var discussions = differences.filter(function (item) { return item.difference >= 20; })
       .sort(function (a, b) { return b.difference - a.difference; }).slice(0, 2);
-    var agreement = differences.slice().sort(function (a, b) { return a.difference - b.difference; })[0] || null;
+    var agreement = differences.filter(function (item) { return item.difference < 20; })
+      .sort(function (a, b) { return a.difference - b.difference; })[0] || null;
     return { first: first, second: second, agreement: agreement, discussions: discussions };
   }
   function encodeAnswers(answers) {
@@ -137,8 +156,13 @@
     return {
       version: 2,
       quiz_version: 2,
+      answers: Object.entries(result.answers).map(function (entry) {
+        return { question_id: entry[0], option_id: entry[1] };
+      }),
       created_at: created.toISOString(),
       expires_at: expires.toISOString(),
+      animal_id: result.animal_id,
+      runner_up_id: result.runner_up_id,
       animal_title: result.animal ? result.animal.name + ' — ' + result.animal.subtitle : null,
       dimension_scores: result.dimension_scores,
       evidence_answer_ids: result.evidence_answer_ids,
@@ -153,10 +177,12 @@
         shortlist_tempo: labels.D,
         approval_workflow: labels.C
       },
+      consent: { account_import: false, partner_comparison: false },
       requires_confirmation: true
     };
   }
-  var api = { byId: byId, normalizeAnswers: normalizeAnswers, scoreAnswers: scoreAnswers, assignAnimal: assignAnimal,
+  var api = { byId: byId, normalizeAnswers: normalizeAnswers, scoreAnswers: scoreAnswers,
+    nextQuestion: nextQuestion, assignAnimal: assignAnimal,
     buildResult: buildResult, comparison: comparison, encodeAnswers: encodeAnswers, decodeAnswers: decodeAnswers,
     partnerHash: partnerHash, coupleHash: coupleHash, parseHash: parseHash, buildHandoff: buildHandoff };
   root.OmnyQuizEngine = api;

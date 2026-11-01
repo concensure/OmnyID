@@ -74,6 +74,7 @@ export function WeddingSiteIntakeWizard(props: {
   weddingFollowUpAtmosphere: () => string;
   onWeddingFollowUpAtmosphereInput: (value: string) => void;
   quizSuggestions?: string[];
+  onImportQuizSuggestions?: () => void;
   weddingFollowUpImageLinks: () => string;
   onWeddingFollowUpImageLinksInput: (value: string) => void;
   weddingFollowUpCoupleNames: () => string;
@@ -237,7 +238,28 @@ export function WeddingSiteIntakeWizard(props: {
         <div class="mb-3 rounded-xl border border-wedding-border bg-white px-3 py-2 text-xs leading-5 text-wedding-ink">
           Not sure where to start? Try the <a class="font-semibold text-wedding-secondary underline underline-offset-2" href="/wedding/blog/couples-barely-know-each-other.html">wedding animal quiz</a> to gather your style.
           <Show when={(props.quizSuggestions?.length ?? 0) > 0}>
-            <p class="mt-1 text-[11px] text-wedding-ink/70">Quiz suggestions ready to review: {props.quizSuggestions?.join(" · ")}. Nothing becomes a confirmed fact until you keep or edit it here.</p>
+            <div class="mt-2 rounded-lg border border-wedding-border bg-wedding-page p-3">
+              <p class="text-[11px] font-semibold text-wedding-ink">Bring your quiz results into your plan?</p>
+              <p class="mt-1 text-[11px] leading-5 text-wedding-ink/70">
+                This adds these private, editable suggestions: {props.quizSuggestions?.join(" · ")}.
+                It will not infer a budget amount, guest count, wedding date, vendor booking, or permission to contact anyone.
+              </p>
+              <div class="mt-2 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  class="rounded-full bg-wedding-primary px-4 py-2 text-xs font-semibold text-white transition hover:bg-wedding-primary/90"
+                  onClick={props.onImportQuizSuggestions}
+                >
+                  Bring these into my plan
+                </button>
+                <a
+                  class="rounded-full border border-wedding-border bg-white px-4 py-2 text-xs font-semibold text-wedding-ink"
+                  href="/wedding/animal-quiz.html"
+                >
+                  Review quiz answers
+                </a>
+              </div>
+            </div>
           </Show>
         </div>
         <div class="mt-4 grid min-w-0 gap-3 rounded-xl border border-wedding-border bg-wedding-page p-3 md:grid-cols-2">

@@ -7,6 +7,7 @@ import {
   weddingAnimalQuizHandoffToOnboardingSeed,
   WEDDING_ANIMAL_QUIZ_BRIEF_KEY,
   WEDDING_ANIMAL_QUIZ_HANDOFF_KEY,
+  WEDDING_ANIMAL_QUIZ_RESULT_KEY,
 } from "../src/lib/weddingAnimalQuizImportState.ts";
 
 class MemoryStorage implements Storage {
@@ -62,7 +63,7 @@ const v2Handoff = {
 
 test("v2 quiz suggestions prefill only supported qualitative onboarding fields", () => {
   const storage = new MemoryStorage();
-  storage.setItem(WEDDING_ANIMAL_QUIZ_HANDOFF_KEY, JSON.stringify(v2Handoff));
+  storage.setItem(WEDDING_ANIMAL_QUIZ_RESULT_KEY, JSON.stringify(v2Handoff));
   const parsed = readWeddingAnimalQuizHandoff(storage, new Date("2026-11-02T00:00:00.000Z"));
   assert.ok(parsed);
   const seed = weddingAnimalQuizHandoffToOnboardingSeed(parsed);
@@ -75,7 +76,7 @@ test("v2 quiz suggestions prefill only supported qualitative onboarding fields",
 
 test("v2 account import records bounded answer evidence, result and consent events", async () => {
   const storage = new MemoryStorage();
-  storage.setItem(WEDDING_ANIMAL_QUIZ_HANDOFF_KEY, JSON.stringify(v2Handoff));
+  storage.setItem(WEDDING_ANIMAL_QUIZ_RESULT_KEY, JSON.stringify(v2Handoff));
   const saved: Array<Record<string, unknown>> = [];
   const result = await importWeddingAnimalQuizHandoff({
     storage,
@@ -98,6 +99,7 @@ test("v2 account import records bounded answer evidence, result and consent even
   const intake = saved.find((message) => message.subtype === "wedding_intake_profile")?.content as Record<string, unknown>;
   assert.equal(intake.guest_count, null);
   assert.equal(intake.location, null);
+  assert.equal(storage.getItem(WEDDING_ANIMAL_QUIZ_RESULT_KEY), null);
 });
 
 test("quiz handoff rejects expired or oversized browser input", () => {

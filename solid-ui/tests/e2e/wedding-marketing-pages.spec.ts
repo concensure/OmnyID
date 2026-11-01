@@ -95,3 +95,41 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 1280, height: 800 
     });
   }
 }
+
+for (const viewport of [{ width: 390, height: 844 }, { width: 1280, height: 800 }]) {
+  test(`Wedding landing context is accessible at ${viewport.width}px`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    const response = await page.goto(`${origin}/wedding/?intent=quotes&utm_source=review`, { waitUntil: "networkidle" });
+
+    expect(response?.status()).toBe(200);
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Compare wedding quotes without the confusion.");
+    await expect(page.getByRole("radio", { name: /Finding vendors/ })).toHaveAttribute("aria-checked", "true");
+    await page.getByRole("radio", { name: /Managing guests/ }).click();
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Keep every guest detail in one place.");
+    await expect(page.getByRole("radio", { name: /Managing guests/ })).toHaveAttribute("aria-checked", "true");
+
+    const registration = page.getByRole("link", { name: /Build my wedding plan|Start planning free/ }).first();
+    if (await registration.count()) {
+      await expect(registration).toHaveAttribute("href", /utm_source=review/);
+    }
+    const pageOverflows = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
+    expect(pageOverflows).toBe(false);
+
+    const accessibility = await new AxeBuilder({ page }).analyze();
+    expect(accessibility.violations.filter(({ impact }) => impact === "serious" || impact === "critical")).toEqual([]);
+  });
+}
+
+test("Wedding landing ignores unknown intent and the Quiz stays usable on mobile", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto(`${origin}/wedding/?intent=%3Cscript%3E`, { waitUntil: "networkidle" });
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Less wedding admin. More wedding.");
+
+  await page.goto(`${origin}/wedding/animal-quiz.html`, { waitUntil: "networkidle" });
+  await expect(page.getByRole("heading", { level: 1, name: "Find my Wedding Animal" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Start the quiz/ })).toBeVisible();
+  const accessibility = await new AxeBuilder({ page }).analyze();
+  expect(accessibility.violations.filter(({ impact }) => impact === "serious" || impact === "critical")).toEqual([]);
+});

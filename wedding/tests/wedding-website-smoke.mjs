@@ -12,6 +12,8 @@ const docsHtml = readFileSync(docsIndex, 'utf8');
 const docsJs = readFileSync(docsApp, 'utf8');
 const vendorAcquisitionHtml = readFileSync(vendorAcquisitionPage, 'utf8');
 const weddingJs = readFileSync(resolve(root, 'assets', 'js', 'main.js'), 'utf8');
+const landingConfig = readFileSync(resolve(root, 'assets', 'js', 'landing-config.js'), 'utf8');
+const landingContext = readFileSync(resolve(root, 'assets', 'js', 'landing-context.js'), 'utf8');
 const expectedPages = [
   'blog.html',
   'disclosures.html',
@@ -280,11 +282,34 @@ if (!weddingJs.includes('filterCards') || !weddingJs.includes('data-blog-search'
 if (!/Built for couples planning across\s*<\/p>\s*<div class="logo-strip-items">\s*<span>Sydney<\/span>\s*<\/div>/m.test(weddingHome)) {
   failures.push('index.html: planning strip must list Sydney only');
 }
-if ((weddingHome.match(/Sydney planning scenario/g) ?? []).length !== 2) {
-  failures.push('index.html: Byron Bay and Melbourne testimonial captions must use the Sydney planning scenario copy');
+for (const unsupported of [
+  'Planning hours organized per month',
+  'Hidden costs surfaced before booking',
+  'Target deadline coverage once calendar sync is enabled',
+  'Venue booked · caterer next',
+  '$18,400 of $30,000 planned',
+  'NOIM &amp; vendor timing, handled',
+  'A full picture arrives at once',
+  'testi-wrap',
+  'images.unsplash.com',
+]) {
+  if (weddingHome.includes(unsupported)) {
+    failures.push(`index.html: unsupported landing claim or remote asset returned: ${unsupported}`);
+  }
 }
-if (weddingHome.includes('Byron Bay planning scenario') || weddingHome.includes('Melbourne planning scenario')) {
-  failures.push('index.html: retired testimonial city captions remain');
+for (const context of ['starting', 'vendors', 'guests', 'final']) {
+  if (!weddingHome.includes(`data-context="${context}"`) || !landingConfig.includes(`${context}: {`)) {
+    failures.push(`landing context is missing from markup or typed config: ${context}`);
+  }
+}
+for (const intent of ['planning', 'quotes', 'suppliers', 'guests', 'dayof']) {
+  if (!landingConfig.includes(`${intent}:`)) failures.push(`landing intent is missing: ${intent}`);
+}
+if (!landingContext.includes('window.sessionStorage') || landingContext.includes('window.localStorage')) {
+  failures.push('landing context selection must be visit-scoped in sessionStorage only');
+}
+if (!landingContext.includes("['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term']")) {
+  failures.push('landing campaign propagation must use the reviewed parameter-name allowlist');
 }
 const vendorDirectory = htmlByPath.get(normalize(resolve(root, 'vendors.html')));
 if (!vendorDirectory || !vendorDirectory.includes('assets/js/directory.js')) {

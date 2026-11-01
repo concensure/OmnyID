@@ -1156,7 +1156,8 @@ function App() {
     userId: initialSession?.user.id,
     localStorage: window.localStorage,
     sessionStorage: window.sessionStorage,
-    preserveWeddingQuizHandoff: new URLSearchParams(window.location.search).get("source") === "wedding_quiz",
+    preserveWeddingQuizHandoff: new URLSearchParams(window.location.search).get("source") === "wedding_quiz"
+      || new URLSearchParams(window.location.search).get("from") === "quiz",
   });
   const [session, setSession] = createSignal(initialSession);
   // Declared early: userId/workspaceBootstrap are read synchronously by several
@@ -1273,14 +1274,24 @@ function App() {
   // this same workspace sign-in form instead of a separate static one.
   const deepLinkParams = new URLSearchParams(window.location.search);
   const pendingAuthSource = deepLinkParams.get("source");
+  const pendingWeddingQuizHandoff = deepLinkParams.get("from") === "quiz"
+    || pendingAuthSource === "wedding_quiz";
   const pendingVendorSlug = (deepLinkParams.get("vendor_slug") ?? deepLinkParams.get("vendor") ?? "").trim().toLowerCase(), vendorPortalUrlFromDeepLink = () => `/workspace/vendor.html${pendingVendorSlug ? `?vendor_slug=${encodeURIComponent(pendingVendorSlug)}` : ""}`;
   const shouldLaunchWeddingTemplateFromDeepLink = () =>
     pendingAuthSource === "wedding" || pendingAuthSource === "marketing" || pendingAuthSource === "wedding_quiz";
   function launchWeddingTemplateFromDeepLink() {
-    saveWeddingEntrySource("wedding_site", userId() || initUserId);
+    saveWeddingEntrySource(
+      pendingWeddingQuizHandoff ? "wedding_quiz" : "wedding_site",
+      userId() || initUserId,
+    );
     setShowTour(false); setShowOnboarding(false); setShowProfilingConsent(false);
     void savePrimaryUseCase("wedding_planning", "inferred").catch(() => {});
-    void import("@/lib/weddingLeadMagnetImportRunnerState").then(({ requestWeddingLeadMagnetImport }) => requestWeddingLeadMagnetImport());
+    // Quiz results remain browser-local suggestions until the couple explicitly
+    // chooses "Bring these into my plan" in the Wedding intake. Other reviewed
+    // lead-magnet handoffs retain their existing one-time import request.
+    if (!pendingWeddingQuizHandoff) {
+      void import("@/lib/weddingLeadMagnetImportRunnerState").then(({ requestWeddingLeadMagnetImport }) => requestWeddingLeadMagnetImport());
+    }
     void import("@/lib/weddingTemplateDeepLinkLaunchState").then(({ buildWeddingTemplateDeepLinkLaunch, dispatchWeddingTemplateDeepLinkLaunch }) => {
       const launch = buildWeddingTemplateDeepLinkLaunch();
       dispatchWeddingTemplateDeepLinkLaunch(launch);
@@ -3094,7 +3105,8 @@ function App() {
           userId: nextSession.user.id,
           localStorage: window.localStorage,
           sessionStorage: window.sessionStorage,
-          preserveWeddingQuizHandoff: new URLSearchParams(window.location.search).get("source") === "wedding_quiz",
+          preserveWeddingQuizHandoff: new URLSearchParams(window.location.search).get("source") === "wedding_quiz"
+            || new URLSearchParams(window.location.search).get("from") === "quiz",
         });
         if (shouldReloadForAuthenticatedAccountReplacement({
           accountChanged: boundary.accountChanged,

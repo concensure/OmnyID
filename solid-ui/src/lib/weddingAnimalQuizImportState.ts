@@ -9,6 +9,7 @@ import type { WeddingPreferenceFacet, WeddingPreferenceProfile } from "@/lib/wed
 import type { WeddingPlanningMetadata } from "@/lib/weddingPlanningTemplateState";
 
 export const WEDDING_ANIMAL_QUIZ_HANDOFF_KEY = "omnyid.wedding.animal_quiz.handoff.v1";
+export const WEDDING_ANIMAL_QUIZ_RESULT_KEY = "omnyid.wedding.quizResult.v2";
 export const WEDDING_ANIMAL_QUIZ_BRIEF_KEY = "omnyid.wedding.coupleBrief.v1";
 
 const QUIZ_PRIORITY_LABELS: Record<string, string> = {
@@ -205,13 +206,17 @@ export function weddingAnimalQuizHandoffToOnboardingSeed(
 /** Untrusted browser handoffs are bounded, schema checked and expired before AFP sees them. */
 export function readWeddingAnimalQuizHandoff(storage: Storage, now = new Date()): WeddingAnimalQuizHandoff | null {
   try {
-    const raw = storage.getItem(WEDDING_ANIMAL_QUIZ_HANDOFF_KEY);
+    const raw = storage.getItem(WEDDING_ANIMAL_QUIZ_RESULT_KEY)
+      ?? storage.getItem(WEDDING_ANIMAL_QUIZ_HANDOFF_KEY);
     if (raw && raw.length <= 12_000) {
       const value = json(raw);
       const result = parsedHandoff(value, now);
       if (result) return result;
       const expiresAt = date(record(value).expires_at);
-      if (expiresAt && Date.parse(expiresAt) <= now.getTime()) storage.removeItem(WEDDING_ANIMAL_QUIZ_HANDOFF_KEY);
+      if (expiresAt && Date.parse(expiresAt) <= now.getTime()) {
+        storage.removeItem(WEDDING_ANIMAL_QUIZ_RESULT_KEY);
+        storage.removeItem(WEDDING_ANIMAL_QUIZ_HANDOFF_KEY);
+      }
     }
     const legacy = storage.getItem(WEDDING_ANIMAL_QUIZ_BRIEF_KEY);
     if (!legacy || legacy.length > 64_000) return null;
@@ -402,6 +407,7 @@ export async function importWeddingAnimalQuizHandoff(input: {
   const [saved] = await Promise.all([preference, intake, ...dealBreakers, ...quizEvents].map((message) => input.saveProjection(message)));
   const savedRecord = saved && typeof saved === "object" ? saved as Record<string, unknown> : {};
   input.storage.removeItem(WEDDING_ANIMAL_QUIZ_HANDOFF_KEY);
+  input.storage.removeItem(WEDDING_ANIMAL_QUIZ_RESULT_KEY);
   input.storage.removeItem(WEDDING_ANIMAL_QUIZ_BRIEF_KEY);
   return {
     status: "imported",

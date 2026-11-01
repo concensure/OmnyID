@@ -8,8 +8,9 @@
 <link rel="icon" type="image/png" href="assets/logo/omnyid-mark.png">
 <link rel="apple-touch-icon" href="assets/logo/omnyid-mark.png">
 <link rel="stylesheet" href="assets/css/style.css">
+<link rel="stylesheet" href="assets/css/landing-v2.css">
 </head>
-<body>
+<body class="landing-v2">
 <a class="skip-link" href="#main">Skip to main content</a>
 
 <header class="site-header">
@@ -42,32 +43,20 @@
     <div class="container hero-inner">
       <div class="hero-copy">
         <p class="eyebrow">✦ Planning, made calm</p>
-        <h1>Plan your whole wedding, end to end — without losing your evenings.</h1>
-        <p class="lede">OmnyID turns "we have no idea where to start" into a clear plan. Venues, vendors, budget, guest list and timeline, organised in one private workspace that remembers every decision so you don't have to.</p>
+        <h1 data-context-headline>Less wedding admin. More wedding.</h1>
+        <p class="lede" data-context-description>Keep your vendors, quotes, guests and next decisions in one place, so you spend less time chasing details and more time enjoying the journey.</p>
         <div class="hero-cta">
-          <a class="btn btn-primary btn-lg" href="../workspace/?auth=register&amp;source=wedding">Start planning free</a>
+          <a class="btn btn-primary btn-lg" href="../workspace/?auth=register&amp;source=wedding" data-context-cta>Start planning free</a>
           <a class="btn btn-text" href="#how-it-works">See how it works ↓</a>
         </div>
         <div class="hero-trust">
           <div class="trust-item"><strong>Private by default</strong><span>We never sell or transfer your data</span></div>
-          <div class="trust-item"><strong>Built with AU couples in mind</strong><span>NOIM &amp; vendor timing, handled</span></div>
+          <div class="trust-item"><strong>Built with AU couples in mind</strong><span>Australian wedding planning context</span></div>
         </div>
       </div>
       <div class="hero-visual">
         <div class="hero-card">
           <img src="assets/images/elvis-bekmanis-WJc87MVcDaA-unsplash.jpg" alt="Bride and groom embracing under her veil in a golden wheat field" loading="eager">
-        </div>
-        <div class="floating-card card-a">
-          <div class="fc-icon rose">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
-          </div>
-          <div class="fc-text"><strong>128 days to go</strong><span>Venue booked · caterer next</span></div>
-        </div>
-        <div class="floating-card card-b">
-          <div class="fc-icon sage">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C8 6 6 9.5 6 13a6 6 0 0012 0c0-3.5-2-7-6-11z"/></svg>
-          </div>
-          <div class="fc-text"><strong>Budget on track</strong><span>$18,400 of $30,000 planned</span></div>
         </div>
       </div>
     </div>
@@ -102,6 +91,31 @@
     </div>
   </div>
 
+  <section class="planning-context" aria-labelledby="planningContextTitle">
+    <div class="container">
+      <div class="section-head center reveal">
+        <p class="eyebrow" style="justify-content:center">✦ Start where you are</p>
+        <h2 id="planningContextTitle">Where are you in your planning?</h2>
+        <p>Choose the closest fit. This only changes what this page shows you.</p>
+      </div>
+      <div class="context-grid reveal-stagger" role="radiogroup" aria-labelledby="planningContextTitle">
+        <button class="context-card" type="button" role="radio" aria-checked="false" data-context="starting">
+          <strong>Just getting started</strong><span>Know what to do next.</span>
+        </button>
+        <button class="context-card" type="button" role="radio" aria-checked="false" data-context="vendors">
+          <strong>Finding vendors</strong><span>Compare quotes and replies.</span>
+        </button>
+        <button class="context-card" type="button" role="radio" aria-checked="false" data-context="guests">
+          <strong>Managing guests</strong><span>Keep every detail together.</span>
+        </button>
+        <button class="context-card" type="button" role="radio" aria-checked="false" data-context="final">
+          <strong>Final preparations</strong><span>See what still needs attention.</span>
+        </button>
+      </div>
+      <p class="context-summary" data-context-benefit aria-live="polite"></p>
+    </div>
+  </section>
+
   <!-- ============ HOW IT WORKS ============ -->
   <section id="how-it-works">
     <div class="container">
@@ -119,7 +133,7 @@
         <li class="step-card">
           <div class="step-num">2</div>
           <div><h3>Get a rich, ready plan</h3>
-          <p>A full picture arrives at once: budget snapshot, vendor shortlist, timeline, and the decisions that actually need your input.</p></div>
+          <p>Review a connected starting plan, then confirm or edit the details before they guide your budget, timeline and next decisions.</p></div>
         </li>
         <li class="step-card">
           <div class="step-num">3</div>
@@ -438,10 +452,10 @@
   <section style="padding-top:0;">
     <div class="container">
       <div class="gallery-strip reveal-stagger">
-        <figure><img src="https://images.unsplash.com/photo-1465495976277-4387d4b0b4c6?auto=format&fit=crop&w=500&q=80" alt="Bride in wedding dress" loading="lazy"></figure>
-        <figure><img src="https://images.unsplash.com/photo-1511285560929-80b456fea0bc?auto=format&fit=crop&w=500&q=80" alt="Couple on their wedding day" loading="lazy"></figure>
-        <figure><img src="https://images.unsplash.com/photo-1520854221256-17451cc331bf?auto=format&fit=crop&w=500&q=80" alt="Reception table styled with warm light" loading="lazy"></figure>
-        <figure><img src="https://images.unsplash.com/photo-1606800052052-a08af7148866?auto=format&fit=crop&w=500&q=80" alt="Wedding rings close up" loading="lazy"></figure>
+        <figure><img src="assets/images/web/gallery-bride.jpg" alt="Bride in wedding dress" loading="lazy"></figure>
+        <figure><img src="assets/images/web/gallery-couple.jpg" alt="Couple on their wedding day" loading="lazy"></figure>
+        <figure><img src="assets/images/web/gallery-reception.jpg" alt="Reception table styled with warm light" loading="lazy"></figure>
+        <figure><img src="assets/images/web/gallery-rings.jpg" alt="Wedding rings close up" loading="lazy"></figure>
       </div>
     </div>
   </section>
@@ -457,68 +471,6 @@
         <figure><img src="assets/images/zhouxing-lu-LvSDR31F_Vc-unsplash.jpg" alt="Aerial view of a bride and groom walking down the aisle at an outdoor garden ceremony" loading="lazy"></figure>
         <figure><img src="assets/images/mark-zamora-rqL9iNe6UPI-unsplash.jpg" alt="Bride and groom exiting the church through a bubble send-off with guests" loading="lazy"></figure>
         <figure><img src="assets/images/photos-by-lanty-O38Id_cyV4M-unsplash.jpg" alt="Reception table set with soft florals and gingham napkins" loading="lazy"></figure>
-      </div>
-    </div>
-  </section>
-
-  <!-- ============ STATS ============ -->
-  <section>
-    <div class="container">
-      <div class="stat-band reveal">
-        <div class="stat-item">
-          <div class="num"><span data-count-to="14" data-suffix="+">0</span> hrs</div>
-          <div class="lbl">Planning hours organized per month</div>
-        </div>
-        <div class="stat-item">
-          <div class="num">$<span data-count-to="2100">0</span></div>
-          <div class="lbl">Hidden costs surfaced before booking</div>
-        </div>
-        <div class="stat-item">
-          <div class="num"><span data-count-to="97" data-suffix="%">0</span></div>
-          <div class="lbl">Target deadline coverage once calendar sync is enabled</div>
-        </div>
-        <div class="stat-item">
-          <div class="num"><span data-count-to="0" data-suffix="%">0</span></div>
-          <div class="lbl">Of your data ever sold or shared</div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ============ TESTIMONIALS ============ -->
-  <section>
-    <div class="container">
-      <div class="section-head center reveal">
-        <p class="eyebrow" style="justify-content:center">✦ Planning scenarios</p>
-        <h2>What calmer planning can feel like</h2>
-      </div>
-      <div class="testi-wrap reveal">
-        <div class="testi-slide is-active">
-          <p class="testi-quote">"We went from a group chat full of half-decisions to an actual plan in a weekend. The budget flags alone saved us from a $600 surprise."</p>
-          <div class="testi-person">
-            <img src="https://images.unsplash.com/photo-1522673607200-164d1b6ce486?auto=format&fit=crop&w=100&q=80" alt="Portrait of Priya">
-            <div><div class="name">Priya &amp; Ravi</div><div class="place">Hunter Valley planning scenario</div></div>
-          </div>
-        </div>
-        <div class="testi-slide">
-          <p class="testi-quote">"I'm not a spreadsheet person and I never opened one. Everything I needed was just... there, waiting, already organised."</p>
-          <div class="testi-person">
-            <img src="https://images.unsplash.com/photo-1537633552985-df8429e8048b?auto=format&fit=crop&w=100&q=80" alt="Portrait of Marcus">
-            <div><div class="name">Marcus &amp; Jordan</div><div class="place">Sydney planning scenario</div></div>
-          </div>
-        </div>
-        <div class="testi-slide">
-          <p class="testi-quote">"Our families have different traditions and different expectations. OmnyID never assumed — it just asked the right question at the right time."</p>
-          <div class="testi-person">
-            <img src="https://images.unsplash.com/photo-1517457373958-b7bdd4587205?auto=format&fit=crop&w=100&q=80" alt="Portrait of Aisha">
-            <div><div class="name">Aisha &amp; Tom</div><div class="place">Sydney planning scenario</div></div>
-          </div>
-        </div>
-        <div class="testi-dots">
-          <button class="is-active" aria-label="Testimonial 1"></button>
-          <button aria-label="Testimonial 2"></button>
-          <button aria-label="Testimonial 3"></button>
-        </div>
       </div>
     </div>
   </section>
@@ -665,6 +617,8 @@
   </div>
 </div>
 
+<script src="assets/js/landing-config.js"></script>
+<script src="assets/js/landing-context.js"></script>
 <script src="assets/js/main.js"></script>
 </body>
 </html>

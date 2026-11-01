@@ -158,30 +158,6 @@
     if (!reduceMotion) scheduleAuto();
   }
 
-  /* ---------- testimonial carousel ---------- */
-  var testiWrap = document.querySelector('.testi-wrap');
-  if (testiWrap) {
-    var slides = testiWrap.querySelectorAll('.testi-slide');
-    var dots = testiWrap.querySelectorAll('.testi-dots button');
-    var tIdx = 0;
-    function showSlide(i) {
-      slides.forEach(function (s, si) { s.classList.toggle('is-active', si === i); });
-      dots.forEach(function (d, di) { d.classList.toggle('is-active', di === i); });
-      tIdx = i;
-    }
-    dots.forEach(function (d, i) {
-      d.addEventListener('click', function () { showSlide(i); clearInterval(testiTimer); });
-    });
-    var testiTimer;
-    function restartAuto() {
-      clearInterval(testiTimer);
-      if (reduceMotion) return;
-      testiTimer = setInterval(function () { showSlide((tIdx + 1) % slides.length); }, 5500);
-    }
-    testiWrap.addEventListener('focusin', function () { clearInterval(testiTimer); });
-    if (slides.length) { showSlide(0); restartAuto(); }
-  }
-
   /* ---------- FAQ accordion ---------- */
   document.querySelectorAll('.faq-item').forEach(function (item) {
     var q = item.querySelector('.faq-q');

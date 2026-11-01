@@ -6394,3 +6394,69 @@ Recommended next action:
 - Run the remaining real-human comprehension sessions and a separately authorised
   controlled cohort. Extend isolation assurance with explicit two-owner cross-grant
   swaps and normalize or document the outsider household-command status contract.
+
+## 2026-11-02 - WED-316 Oracle operations, landing foundations and Quiz v2 (Codex)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-316`, branch
+`agent/codex/WED-316`. Oracle currently runs exact clean commit
+`10250f2033c666ca33fcffc98aa6608c7d9e076c`.
+
+Completed and live on Oracle:
+
+- Staging writes the full source SHA to both `SOURCE_COMMIT` and the existing
+  `oracle-runtime-manifest.json`; deployment verifies both before and after upload.
+- Revoked the unsupported legacy watcher registrations. Daemon registration
+  liveness continues, while unchanged pulse metrics no longer append heartbeat
+  history. A fresh 15-second check held at exactly 500,001 rows.
+- Scheduled bounded cleanup leaves no rate-limit row older than 48 hours and no
+  curator audit row older than seven days. The former curator skip loop continues
+  to shrink rather than refill its audit table.
+- Preserved detached deployment commit `53450ed` on
+  `archive/oracle-deploy-53450ed-20260928` before removing its temporary worktree.
+- Safely pruned 4.931 GB of unused Docker builder cache. Current root usage is
+  84%, with 7.3 GB free. Old image tags remain because some back live staging
+  containers.
+
+Implemented locally after that release:
+
+- Wedding landing phases 0 and 1: unsupported claims and hotlinks removed,
+  claims ledger, §11-scoped visual tokens, four contextual entry modes, safe
+  intent/campaign propagation, keyboard operation and in-place demos.
+- Quiz v2 deterministic content/scoring/comparison/persistence, adaptive question
+  order, early result, correction/deletion/export, complete image provenance,
+  bounded WebP assets and new Elephant/Beaver imagery.
+- Quiz-to-workspace import is false-default: the intake shows the exact private,
+  editable suggestions and only dispatches the AFP import after the couple presses
+  `Bring these into my plan`. It does not infer a budget amount, guest count, date,
+  booking or contact permission.
+- Editorial Quiz copy and the publication catalogue are reconciled, and an honest
+  two-phase pilot protocol is recorded.
+
+Verification on the current local candidate:
+
+- `npm run typecheck`: passed.
+- `npm run test:wedding`: 2,140 passed.
+- `npm run test:wedding-site`: passed.
+- `npm run test:line-budget`: 2 passed.
+- `npm run build`: passed.
+- Focused Quiz/account tests: 13 passed.
+- Landing/Quiz Playwright mobile and desktop matrix: 11 passed, including Axe and
+  horizontal-overflow checks.
+- `cargo check`: passed.
+
+Release boundary:
+
+- The landing/Quiz files are not deployed yet. WLP-02 (Binder), WLP-03
+  (first-party measurement), QZ-09/QZ-11 knowledge/planning projections and QZ-13
+  measurement remain open.
+- The supplied privacy patch truthfully describes those still-open features, so it
+  has not been applied or published. Apply it to the final candidate only after
+  WLP-02 and WLP-03 are implemented, then ship all of them atomically.
+- Quiz image diversity owner acceptance, image-blocked use, Lighthouse mobile 90,
+  the final privacy walkthrough and the pilot remain release evidence, not inferred
+  passes.
+
+Evidence:
+
+- `Documents/verification/wed-316-oracle-provenance-retention-2026-11-02.md`
+- `Documents/verification/wedding-animal-quiz-v2-pilot-protocol.md`

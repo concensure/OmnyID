@@ -1,0 +1,84 @@
+(function (root) {
+  'use strict';
+
+  /** @type {Record<string, {
+   * id: string,
+   * label: string,
+   * headline: string,
+   * description: string,
+   * benefit: string,
+   * demoId: string,
+   * ctaLabel: string,
+   * destination: string,
+   * granularity: string,
+   * variant: string
+   * }>} */
+  var contexts = {
+    starting: {
+      id: 'starting',
+      label: 'Just getting started',
+      headline: 'Less wedding admin. More wedding.',
+      description: 'Keep your vendors, quotes, guests and next decisions in one place, so you spend less time chasing details and more time enjoying the journey.',
+      benefit: 'Start with a clear plan showing the next decisions that need you.',
+      demoId: 'overview',
+      ctaLabel: 'Build my wedding plan',
+      destination: '../workspace/?auth=register&source=wedding',
+      granularity: 'G6 outcome',
+      variant: 'default'
+    },
+    vendors: {
+      id: 'vendors',
+      label: 'Finding vendors',
+      headline: 'Compare wedding quotes without the confusion.',
+      description: 'Keep each enquiry, reply and quote connected to your budget and priorities, with messages waiting for your approval.',
+      benefit: 'See what is included, what is missing and what needs a follow-up.',
+      demoId: 'vendors',
+      ctaLabel: 'See how quote comparison works',
+      destination: '#vendor-flow',
+      granularity: 'G4 capability',
+      variant: 'default'
+    },
+    guests: {
+      id: 'guests',
+      label: 'Managing guests',
+      headline: 'Keep every guest detail in one place.',
+      description: 'Connect RSVPs, households, meal choices, access needs and family boundaries without reconciling separate lists.',
+      benefit: 'Review guest details together while keeping sensitive notes private.',
+      demoId: 'overview',
+      ctaLabel: 'Explore guest planning',
+      destination: '#preview',
+      granularity: 'G4 capability',
+      variant: 'default'
+    },
+    final: {
+      id: 'final',
+      label: 'Final preparations',
+      headline: 'Know what is ready and what still needs attention.',
+      description: 'Bring deadlines, confirmations and the day-of run sheet together so changes stay visible to the people who need them.',
+      benefit: 'Work from one source-linked run sheet instead of reconciling copies.',
+      demoId: 'timeline',
+      ctaLabel: 'Explore day-of planning',
+      destination: '#wedding-run-sheet',
+      granularity: 'G5 functional outcome',
+      variant: 'default'
+    }
+  };
+
+  root.OmnyWeddingLanding = {
+    contexts: contexts,
+    defaultContext: 'starting',
+    intents: {
+      planning: 'starting',
+      quotes: 'vendors',
+      suppliers: 'vendors',
+      guests: 'guests',
+      dayof: 'final'
+    },
+    quizVariant: {
+      headline: 'What kind of wedding planner are you?',
+      description: 'Take the playful, image-first Wedding Animal Quiz, then choose whether to bring its suggestions into your plan.',
+      ctaLabel: 'Find my wedding animal',
+      destination: 'animal-quiz.html'
+    }
+  };
+}(window));

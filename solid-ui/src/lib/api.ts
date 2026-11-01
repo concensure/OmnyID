@@ -5692,7 +5692,7 @@ export type WeddingVendorContactRecord = {
   updatedAt: string;
 };
 
-export type WeddingIntakeSource = "wedding_site" | "generic";
+export type WeddingIntakeSource = "wedding_site" | "wedding_quiz" | "generic";
 
 export type WeddingUserOnboardingState = {
   userId: string;
@@ -6137,7 +6137,7 @@ export function normalizeWeddingVendorContactResponse(value: unknown): { contact
 }
 
 function isWeddingIntakeSource(value: unknown): value is WeddingIntakeSource {
-  return value === "wedding_site" || value === "generic";
+  return value === "wedding_site" || value === "wedding_quiz" || value === "generic";
 }
 
 function normalizeWeddingUserOnboardingState(value: unknown): WeddingUserOnboardingState | null {

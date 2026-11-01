@@ -99,7 +99,7 @@ fn validate_wedding_intake_source(
     label: &str,
 ) -> Result<String, (StatusCode, String)> {
     let source = clean_required_string(value, label)?;
-    if matches!(source.as_str(), "wedding_site" | "generic") {
+    if matches!(source.as_str(), "wedding_site" | "wedding_quiz" | "generic") {
         Ok(source)
     } else {
         Err((StatusCode::BAD_REQUEST, format!("invalid {label}")))

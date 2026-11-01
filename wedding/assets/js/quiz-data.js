@@ -9,6 +9,22 @@
     { code: 'D', name: 'Decision tempo', low: 'Explore', high: 'Decide promptly' },
     { code: 'C', name: 'Decision ownership', low: 'Shared consensus', high: 'Delegated autonomy' }
   ];
+  var COMPARISON_PROMPTS = {
+    O: 'Which two visual elements matter most to each of you?',
+    S: 'Which deadlines need reminders and which can remain flexible?',
+    G: 'What are your ideal and maximum guest numbers?',
+    F: 'What is your hard budget cap and top-three priorities?',
+    D: 'How many alternatives should you compare before choosing?',
+    C: 'Which categories need both partners’ approval?'
+  };
+  var RESULT_TEMPLATE = {
+    playfulNote: 'This is a playful planning profile, not a psychological or compatibility test.',
+    evidenceLead: 'Based on your choices of {choice_one} and {choice_two}',
+    interpretation: 'you seem to lean towards {dimension_description}.',
+    strength: 'This may help you with {practical_strength}.',
+    friction: 'One decision to clarify is {conditional_friction}.',
+    action: 'Try {concrete_action}.'
+  };
   function option(id, label, image, weight, art) { return { id: id, label: label, img: image, weight: weight, art: art }; }
   var QUESTIONS = [
     { id: 'Q01', dimension: 'O', core: true, title: 'Which celebration feels most like yours?', opts: [
@@ -63,7 +79,7 @@
       option('D', 'Create an unforgettable moment', 'sparklers', 2, 'An immersive celebration moment') ] },
     { id: 'Q11', dimension: 'D', core: false, title: 'Three photographers look suitable. What next?', opts: [
       option('A', 'Review many more portfolios', 'camera', -2, 'Many photography portfolios'),
-      option('B', 'Request additional galleries', 'aisle', -1, 'Several full gallery comparisons'),
+      option('B', 'Request additional galleries', 'veilfield', -1, 'Several full gallery comparisons'),
       option('C', 'Meet the top two', 'veilfield', 1, 'Two photographer profiles'),
       option('D', 'Book the best match', 'veilkiss', 2, 'A confirmed photographer booking') ] },
     { id: 'Q12', dimension: 'C', core: false, title: 'How should vendor emails be approved?', opts: [
@@ -76,13 +92,22 @@
     { id: 'fox', name: 'Fox', subtitle: 'Creative explorer', photo: 'an-fox', vector: [90, 40, 45, 65, 20, 60], interpretation: 'You enjoy distinctive options and exploring possibilities.', strength: 'building an original shortlist', friction: 'when exploration should end', action: 'Set a shortlist deadline.' },
     { id: 'owl', name: 'Owl', subtitle: 'Thoughtful organiser', photo: 'an-owl', vector: [40, 90, 45, 30, 25, 40], interpretation: 'You value detailed plans and careful comparison.', strength: 'making criteria visible', friction: 'how much evidence is enough', action: 'Set decision criteria.' },
     { id: 'dolphin', name: 'Dolphin', subtitle: 'People-first collaborator', photo: 'an-dolphin', vector: [55, 55, 85, 55, 45, 20], interpretation: 'You favour inclusion and shared discussion.', strength: 'keeping people involved', friction: 'who has the final say', action: 'Agree guest priorities.' },
-    { id: 'elephant', name: 'Elephant', subtitle: 'Grounded guardian', photo: 'an-bear', vector: [25, 85, 75, 20, 70, 35], interpretation: 'You prefer predictability and cost clarity.', strength: 'protecting the plan from surprises', friction: 'where flexibility is worthwhile', action: 'Create contingency and milestones.' },
+    { id: 'elephant', name: 'Elephant', subtitle: 'Grounded guardian', photo: 'an-elephant', vector: [25, 85, 75, 20, 70, 35], interpretation: 'You prefer predictability and cost clarity.', strength: 'protecting the plan from surprises', friction: 'where flexibility is worthwhile', action: 'Create contingency and milestones.' },
     { id: 'peacock', name: 'Peacock', subtitle: 'Experience curator', photo: 'an-peacock', vector: [90, 55, 75, 90, 65, 50], interpretation: 'You favour memorable, expressive experiences.', strength: 'identifying high-impact moments', friction: 'which splurges deserve priority', action: 'Rank splurges against a ceiling.' },
     { id: 'otter', name: 'Otter', subtitle: 'Flexible improviser', photo: 'an-otter', vector: [65, 20, 60, 60, 35, 65], interpretation: 'You prefer flexibility over detailed plans.', strength: 'adapting without losing the mood', friction: 'which deadlines cannot move', action: 'Automate key reminders.' },
-    { id: 'beaver', name: 'Beaver', subtitle: 'Practical executor', photo: 'an-bear', vector: [35, 95, 40, 25, 90, 80], interpretation: 'You value ownership and prompt decisions.', strength: 'turning choices into action', friction: 'which choices need joint approval', action: 'Delegate tasks with approval thresholds.' },
+    { id: 'beaver', name: 'Beaver', subtitle: 'Practical executor', photo: 'an-beaver', vector: [35, 95, 40, 25, 90, 80], interpretation: 'You value ownership and prompt decisions.', strength: 'turning choices into action', friction: 'which choices need joint approval', action: 'Delegate tasks with approval thresholds.' },
     { id: 'swan', name: 'Swan', subtitle: 'Intimate romantic', photo: 'an-swan', vector: [45, 55, 15, 60, 50, 25], interpretation: 'You favour an intimate, meaningful atmosphere.', strength: 'protecting the guest experience', friction: 'how large the celebration should become', action: 'Prioritise guest experience over scale.' }
   ];
-  var api = { VERSION: 2, DIMENSIONS: DIMENSIONS, QUESTIONS: QUESTIONS, SOLO: QUESTIONS, ARCHETYPES: ARCHETYPES };
+  var api = {
+    VERSION: 2,
+    VERSION_LABEL: 'wedding-animal-v2.0.0',
+    DIMENSIONS: DIMENSIONS,
+    QUESTIONS: QUESTIONS,
+    SOLO: QUESTIONS,
+    ARCHETYPES: ARCHETYPES,
+    COMPARISON_PROMPTS: COMPARISON_PROMPTS,
+    RESULT_TEMPLATE: RESULT_TEMPLATE
+  };
   root.OmnyQuizData = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 }(typeof window !== 'undefined' ? window : globalThis));

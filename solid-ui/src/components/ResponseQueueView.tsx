@@ -168,6 +168,7 @@ import {
   readWeddingAnimalQuizHandoff,
   weddingAnimalQuizHandoffToOnboardingSeed,
 } from "@/lib/weddingAnimalQuizImportState";
+import { requestWeddingLeadMagnetImport } from "@/lib/weddingLeadMagnetImportRunnerState";
 import { buildWeddingNeedToKnowExtractionState } from "@/lib/weddingNeedToKnowExtractionState";
 import { buildWeddingTemplateFollowUpState } from "@/lib/weddingTemplateFollowUpState";
 import { buildWeddingTemplateLaunchState } from "@/lib/weddingTemplateLaunchState";
@@ -2044,6 +2045,11 @@ export function ResponseQueueView(props: {
             weddingFollowUpAtmosphere={weddingFollowUpAtmosphere}
             onWeddingFollowUpAtmosphereInput={setWeddingFollowUpAtmosphere}
             quizSuggestions={weddingQuizSuggestions()}
+            onImportQuizSuggestions={() => {
+              requestWeddingLeadMagnetImport();
+              setWeddingQuizSuggestions([]);
+              toast.success("Quiz suggestions are being added privately. You can review or edit them before confirming your plan.");
+            }}
             weddingFollowUpImageLinks={weddingFollowUpImageLinks}
             onWeddingFollowUpImageLinksInput={setWeddingFollowUpImageLinks}
             weddingFollowUpCoupleNames={weddingFollowUpCoupleNames}

@@ -20,6 +20,7 @@ const ACCOUNT_SENSITIVE_PREFIXES = [
 
 const WEDDING_QUIZ_HANDOFF_KEYS = new Set([
   "omnyid.wedding.animal_quiz.handoff.v1",
+  "omnyid.wedding.quizResult.v2",
   "omnyid.wedding.couple_brief",
   "omnyid.wedding.coupleBrief.v1",
 ]);

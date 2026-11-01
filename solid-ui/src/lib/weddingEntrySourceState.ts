@@ -2,7 +2,7 @@
 // Distinguishes a visitor who deep-linked in from the wedding marketing site
 // (omnyid.com/wedding, via ?source=wedding) from everyone else, so the wedding
 // intake can show the right variant and never flip once a user has seen one.
-export type WeddingEntrySource = "wedding_site" | "generic";
+export type WeddingEntrySource = "wedding_site" | "wedding_quiz" | "generic";
 
 const WEDDING_ENTRY_SOURCE_KEY = "omnyid.wedding.entry-source";
 
@@ -16,7 +16,7 @@ function weddingIntakeVariantShownKey(weddingPlanId: string, userId?: string | n
 }
 
 function isWeddingEntrySource(value: unknown): value is WeddingEntrySource {
-  return value === "wedding_site" || value === "generic";
+  return value === "wedding_site" || value === "wedding_quiz" || value === "generic";
 }
 
 /** Call once, at the moment a ?source=wedding deep link is confirmed (e.g. after login). */

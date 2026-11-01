@@ -46,6 +46,31 @@
   --ease: cubic-bezier(.22,1,.36,1);
 }
 
+.landing-v2{
+  --cream: #FAF7F2;
+  --cream-deep: #EFEBE4;
+  --paper: #FFFFFF;
+  --ink: #1F1A17;
+  --ink-soft: #5F5851;
+  --ink-faint: #6B645D;
+  --line: #E8E2D9;
+  --rose: #0F5F5A;
+  --rose-deep: #0F5F5A;
+  --rose-pale: #E3F0EE;
+  --sage: #274B77;
+  --sage-deep: #274B77;
+  --sage-pale: #E8EEF5;
+  --gold: #A66A16;
+  --gold-pale: #F6E8C8;
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 12px;
+  --r-pill: 8px;
+  --shadow-sm: 0 8px 32px rgba(31, 26, 23, .04);
+  --shadow-md: 0 8px 32px rgba(31, 26, 23, .04);
+  --shadow-lg: 0 12px 36px rgba(31, 26, 23, .06);
+}
+
 /* ---------- reset ---------- */
 *, *::before, *::after{ box-sizing: border-box; }
 html{ scroll-behavior: smooth; }
@@ -474,26 +499,6 @@ main:focus{ outline:none; }
 .trio-strip figure:hover img{ transform: scale(1.06); }
 .trio-strip figure:nth-child(2){ margin-top:24px; }
 @media (max-width: 860px){ .trio-strip{ grid-template-columns: 1fr; } .trio-strip figure{ margin-top:0 !important; aspect-ratio: 3/2; } }
-
-/* ---------- stats ---------- */
-.stat-band{ background: var(--ink); color: var(--white); border-radius: var(--r-lg); padding: 56px 40px; display:grid; grid-template-columns: repeat(4,1fr); gap:24px; text-align:center; }
-.stat-item .num{ font-family: var(--font-display); font-size: clamp(30px,4vw,42px); color: var(--gold-pale); }
-.stat-item .lbl{ font-size:13.5px; color:#CFC6BB; margin-top:6px; }
-@media (max-width: 760px){ .stat-band{ grid-template-columns: repeat(2,1fr); } }
-
-/* ---------- testimonials ---------- */
-.testi-wrap{ position:relative; max-width: 760px; margin-inline:auto; text-align:center; }
-.testi-slide{ display:none; }
-.testi-slide.is-active{ display:block; animation: fadein .5s var(--ease); }
-.testi-quote{ font-family: var(--font-display); font-size: clamp(20px,2.6vw,28px); line-height:1.4; color: var(--ink); }
-.testi-person{ display:flex; align-items:center; justify-content:center; gap:12px; margin-top:24px; }
-.testi-person img{ width:46px; height:46px; border-radius:50%; object-fit:cover; }
-.testi-person .name{ font-weight:600; font-size:14.5px; text-align:left; }
-.testi-person .place{ font-size:12.5px; color: var(--ink-faint); text-align:left; }
-.testi-dots{ display:flex; justify-content:center; gap:8px; margin-top:32px; }
-.testi-dots button{ position:relative; width:28px; height:28px; background:none; border:none; padding:0; }
-.testi-dots button::before{ content:''; position:absolute; top:50%; left:50%; width:8px; height:8px; margin:-4px 0 0 -4px; border-radius:50%; background: var(--ink-faint); transition: all .25s var(--ease); }
-.testi-dots button.is-active::before{ background: var(--rose-deep); width:22px; margin-left:-11px; border-radius:99px; }
 
 /* ---------- CTA band ---------- */
 .cta-band{
