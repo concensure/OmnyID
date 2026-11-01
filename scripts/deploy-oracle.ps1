@@ -181,10 +181,12 @@ function Assert-RemoteOracleRuntimeProvenance {
 
     $remoteDirLiteral = Convert-ToShellSingleQuotedLiteral $RemoteDirValue
     $expectedLiteral = Convert-ToShellSingleQuotedLiteral $ExpectedCommit
-    $command = "commit=`$(cat $remoteDirLiteral/SOURCE_COMMIT 2>/dev/null) && " +
-        "test `"`$commit`" = $expectedLiteral && " +
-        "grep -F `"`"source_commit`": `"`$commit`"`" " +
-        "$remoteDirLiteral/oracle-runtime-manifest.json >/dev/null && echo verified"
+    $sedExpression = 's/.*"source_commit"[[:space:]]*:[[:space:]]*"\([0-9a-f]*\)".*/\1/p'
+    $sedLiteral = Convert-ToShellSingleQuotedLiteral $sedExpression
+    $command = "marker=`$(tr -d '\r\n' < $remoteDirLiteral/SOURCE_COMMIT) && " +
+        "manifest=`$(sed -n $sedLiteral $remoteDirLiteral/oracle-runtime-manifest.json) && " +
+        "test `"`$marker`" = $expectedLiteral && " +
+        "test `"`$manifest`" = $expectedLiteral && echo verified"
     $result = & ssh.exe -o BatchMode=yes -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -i $KeyPathValue "$UserValue@$RemoteHostValue" $command 2>&1
     if ($LASTEXITCODE -ne 0 -or (($result | Out-String).Trim()) -ne "verified") {
         throw "[deploy-oracle] remote runtime provenance does not match $ExpectedCommit"
