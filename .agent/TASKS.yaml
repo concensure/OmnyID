@@ -17,13 +17,13 @@ lifecycle:
 tasks:
   - id: WED-313
     title: Complete Family meal-catalogue editing and replacement safeguards
-    status: in_progress
+    status: done
     owner: codex
     branch: agent/codex/WED-308
     depends_on: [WED-312]
     files: [solid-ui/src/lib/weddingMealChoiceState.ts, solid-ui/src/lib/weddingBoundaryDefaultsState.ts, solid-ui/src/lib/weddingResponseWorkspaceViewState.ts, solid-ui/src/components/WeddingMealChoiceCataloguePanel.tsx, solid-ui/src/components/WeddingRsvpSetupPanel.tsx, solid-ui/src/components/WeddingWorkspaceContextPanels.tsx, solid-ui/src/components/WeddingBoundaryManagementCard.tsx, solid-ui/tests/wedding-meal-choice-state.test.ts, solid-ui/tests/wedding-meal-choice-catalogue-panel.test.ts, solid-ui/tests/wedding-boundary-defaults-state.test.ts, solid-ui/tests/e2e/wedding-family-boundary.tsx, solid-ui/tests/e2e/wedding-family-boundary.spec.ts, solid-ui/e2e/wedding-family-boundary.html, Documents/design/wedding planner/wedding planner/family-boundary-tasks.md, Documents/verification/**, .agent/**]
     acceptance: [Plan and RSVP edit one AFP-backed source-referenced meal catalogue rather than separate stores, explicit structured venue quote vendor conversation and run-sheet options can be reviewed but prose never becomes a choice, replacing choices identifies affected attending guest responses and requires explicit couple confirmation before persistence, the successor event records revision source zero model calls and bounded replacement-review references without copying dietary or allergy facts, workspace isolation deduplication mobile accessible controls focused tests typecheck Wedding tests line budgets and production build pass]
-    progress: "Started after WED-312 documentation commit dc9ee4c. No rollout switch or hosted environment change is required for this couple-only catalogue slice."
+    progress: "Complete at implementation SHA 0a889ffeaba142027fb6b3a124e549aed3b117bc. Plan and RSVP now edit one AFP-backed source-referenced meal catalogue; only explicit structured venue-quote, vendor-conversation and run-sheet arrays project into it; replacement identifies affected attending responses and requires couple confirmation without copying names, meal answers or health facts. Reviewed synthesized guest tables project invitation-group households while omitting contact, dietary and private columns. Exact-SHA typecheck, 2,131 Wedding tests, line budgets, build and two real-browser 320/375 px plus 200% zoom cases pass. Evidence: Documents/verification/wed-313-family-meal-import-accessibility-2026-11-01.md. Production and both false-default Family rollout switches are unchanged."
 
   - id: WED-312
     title: Complete Family Boundary access management and autonomous assurance

@@ -20,7 +20,7 @@ Depends on: 0
 - [x] Make atmosphere photograph choices true toggles with exact-token matching so a second selection removes the choice without damaging typed words.
 - [x] Remove the outer desktop glass border and redundant horizontal inset from authenticated Wedding mobile views while preserving internal card structure.
 - [x] Add focused rendering tests for the helper copy, selected/unselected state and mobile shell classes.
-- [ ] Verify at 320 px, 375 px and 200% text zoom.
+- [x] Verify at 320 px, 375 px and 200% text zoom.
 
 ## 2. Canonical meal-choice catalogue
 
@@ -31,10 +31,10 @@ Depends on: 0
 - [x] Remove invented default meals from RSVP setup.
 - [x] Let the couple choose a source, edit choices and explicitly confirm the current catalogue before saving RSVP setup.
 - [x] Use the confirmed catalogue as the guest meal selector while preserving an explicit manual-current-choice path.
-- [ ] Add a Plan/day-details editor over the same catalogue event rather than a second store.
-- [ ] Add quote-normalisation output mapping for explicit meal/menu arrays; never extract a choice from prose without reviewed structured evidence.
-- [ ] Preview affected RSVP responses before replacing a catalogue already used by guests.
-- [ ] Add tests for provenance, workspace isolation, revisions, deduplication and separation from dietary/allergy facts.
+- [x] Add a Plan/day-details editor over the same catalogue event rather than a second store.
+- [x] Add quote-normalisation output mapping for explicit meal/menu arrays; never extract a choice from prose without reviewed structured evidence.
+- [x] Preview affected RSVP responses before replacing a catalogue already used by guests.
+- [x] Add tests for provenance, workspace isolation, revisions, deduplication and separation from dietary/allergy facts.
 
 ## 3. Compact Family boundaries card
 
@@ -45,7 +45,7 @@ Depends on: 0
 - [x] Retain the current AFP-backed request, rule and visibility controls behind disclosure.
 - [x] Add plain-language privacy/suggestion-versus-approval help.
 - [x] Restore focus on collapse and focus the requested subsection on open.
-- [ ] Add rendering, keyboard, screen-reader name and 320 px reflow tests.
+- [x] Add rendering, keyboard, screen-reader name and 320 px reflow tests.
 
 ## 4. Household and family-group foundation
 
@@ -57,8 +57,8 @@ Depends on: 3
 - [x] Let the couple revise a household's group label, invitation allocation and request deadline by writing a successor household AFP object; do not keep a second local household store.
 - [x] Add deterministic split/merge/archive previews that preserve stable guest/invitation references and refuse unsafe archive/merge states.
 - [x] Connect those previews to server-authoritative split/merge/archive commands with stale-version protection.
-- [ ] Add CSV/table import through the existing import and review pipeline; do not bypass parser/quarantine controls.
-- [ ] Test divorced/blended family, adult privacy and invitation-group-versus-residential-household cases.
+- [x] Add CSV/table import through the existing import and review pipeline; do not bypass parser/quarantine controls.
+- [x] Test divorced/blended family, adult privacy and invitation-group-versus-residential-household cases.
 
 ## 5. Structured policy builder and effective-rule projection
 
@@ -133,7 +133,7 @@ Depends on: 6, 7
 Depends on: 1–10 as applicable
 
 - [x] Run typecheck, focused tests, all Wedding tests, Rust route/database tests, line budgets and production build for the current local candidate.
-- [ ] Run keyboard, focus restoration, screen-reader naming, colour-independent status, 320/375 px and 200% zoom checks.
+- [x] Run keyboard, focus restoration, screen-reader naming, colour-independent status, 320/375 px and 200% zoom checks.
 - [ ] Run couple usability for request review, household attention and rule comprehension.
 - [ ] Run delegated-helper usability with deliberately restricted data.
 - [x] Verify exact-candidate hosted flags-off shadow before any capability cohort. Oracle release `eb398ebfecaec6a0277d7fe634e6c97198b44afe` serves the matching migration and routes while helper/delegate switches remain unset/false-default; unauthenticated delegated routes return 404.
@@ -150,6 +150,8 @@ WED-311 connects the review preview to the server's elevated-impact confirmation
 
 WED-312 adds the owner-facing access-management surface for Family helpers, authenticated Planners and RSVP guests. It reveals a helper token once, persists only its digest, distinguishes link access from account-bound access, exposes no owner/account identifiers through capability discovery, and keeps both rollout switches false by default. Allocation, deadline and scoped rules now reject incomplete structured conditions on both sides of the API. Only pending and partially approved requests remain reviewable; elapsed deadlines close requests without applying a guest, RSVP, invitation, budget or vendor mutation.
 
-This is not the end of the roadmap. A controlled allowlisted Family cohort, the hosted accessibility/usability matrix, CSV/table import, the shared Plan/day-details meal editor and catalogue-replacement impact review remain open. Expiry, revocation, deletion retention, restricted projection allowlists, removal after RSVP and sent-invitation rule changes are covered locally. The exact-candidate flags-off Oracle shadow is recorded in `Documents/verification/wed-310-rsvp-release-2026-11-01.md`. `OMNYID_WEDDING_BOUNDARY_HELPERS_ENABLED` and `OMNYID_WEDDING_BOUNDARY_DELEGATES_ENABLED` stay false unless the remaining hosted rollout criteria pass.
+WED-313 adds one shared Plan/RSVP meal-catalogue editor, explicit structured venue-quote, vendor-conversation and run-sheet option projection, replacement-impact confirmation for attending guest responses, and reviewed guest-table import through the existing synthesized-artifact projection. Prose never becomes a meal choice. Imported invitation-group households deliberately omit contact, dietary, allergy and private-note columns. Real-browser checks cover keyboard focus restoration, accessible names, colour-independent status, 320/375 px layouts and 200% zoom.
+
+This is not the end of the roadmap. A controlled allowlisted Family cohort and couple/delegated-helper usability remain open. The explicit request draft/submit/withdraw lifecycle is the remaining autonomous lifecycle slice. Expiry, revocation, deletion retention, restricted projection allowlists, removal after RSVP and sent-invitation rule changes are covered locally. The exact-candidate flags-off Oracle shadow is recorded in `Documents/verification/wed-310-rsvp-release-2026-11-01.md`. `OMNYID_WEDDING_BOUNDARY_HELPERS_ENABLED` and `OMNYID_WEDDING_BOUNDARY_DELEGATES_ENABLED` stay false unless the remaining hosted rollout criteria pass.
 
 Release evidence for this slice is in `Documents/verification/wed-306-native-mobile-meal-family-boundaries-2026-10-31.md`. The pre-change coordination SHA was `3bd1f79fdae00c370556b504e0fde1daf66cc36f`; the exact deployed application SHA is `3c626dd149d61ae57c739fa90cd26acecb0109aa`.

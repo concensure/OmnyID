@@ -1,3 +1,20 @@
+## 2026-11-01: Meal replacement and reviewed guest import stay content-minimal
+
+WED-313 keeps Plan and RSVP on one revisioned, couple-only
+`wedding_meal_choice_catalogue` AFP object. It accepts only reviewed structured
+arrays from venue quotations, vendor conversations and run sheets; it never
+promotes prose into a meal option. Replacing an option already used by an
+attending response requires confirmation, but its audit metadata carries only
+removed labels, an affected count and bounded opaque response references. It
+does not copy guest names, selected answers, dietary facts or allergy facts.
+
+Reviewed guest-list table imports extend the canonical Family ledger rather
+than creating an import store. Invitation-group labels, family group,
+allocation and valid request deadlines may project into households. Contact,
+address, dietary, allergy and private-note columns are deliberately ignored.
+Parser, quarantine and human-review controls remain upstream of this
+projection.
+
 ## 2026-10-31: Meal choices are confirmed AFP evidence, not inferred guest facts
 
 WED-306 introduces one revisioned `wedding_meal_choice_catalogue` in the

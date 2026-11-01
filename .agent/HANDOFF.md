@@ -1,3 +1,25 @@
+## 2026-11-01 - WED-313 Family meal, import and accessibility assurance (Codex, complete)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch
+`agent/codex/WED-308`; exact implementation SHA
+`0a889ffeaba142027fb6b3a124e549aed3b117bc`. Clean verifier:
+`C:\Users\ozans\AppData\Local\Temp\omnyid-wed313-verify-0a889ff`.
+
+- Plan and RSVP now edit one source-referenced AFP meal catalogue. Explicit
+  structured quote/conversation/run-sheet arrays are reviewable; prose is not.
+- Replacements identify affected attending responses and require confirmation
+  without copying guest identity, meal answers or health facts into the review
+  receipt.
+- Reviewed guest-list tables project invitation-group households while
+  omitting contact, dietary, allergy and private columns.
+- Exact-SHA typecheck, 2,131 Wedding tests, line budgets, production build and
+  two real-browser 320/375 px plus 200% zoom cases pass.
+- No deployment was requested. Oracle and both false-default Family rollout
+  switches are unchanged. The autonomous request draft/submit/withdraw slice
+  is next; couple/helper usability and a cohort remain gated.
+
+Evidence: `Documents/verification/wed-313-family-meal-import-accessibility-2026-11-01.md`.
+
 ## 2026-11-01 - WED-312 Family access management and assurance (Codex, complete)
 
 Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch
