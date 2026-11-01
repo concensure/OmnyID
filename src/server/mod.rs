@@ -1135,7 +1135,7 @@ pub async fn run() {
     });
 
     let grpc_addr = grpc_bind_addr();
-    let http_addr: SocketAddr = "0.0.0.0:8080".parse().unwrap();
+    let http_addr = http_bind_addr();
 
     let grpc_server = AFPServer {
         db: db.clone(),
@@ -11135,6 +11135,13 @@ fn grpc_bind_addr() -> SocketAddr {
         .ok()
         .and_then(|value| value.parse::<SocketAddr>().ok())
         .unwrap_or_else(|| "127.0.0.1:50051".parse().expect("valid grpc bind addr"))
+}
+
+fn http_bind_addr() -> SocketAddr {
+    std::env::var("OMNYID_HTTP_BIND_ADDR")
+        .ok()
+        .and_then(|value| value.trim().parse::<SocketAddr>().ok())
+        .unwrap_or_else(|| "0.0.0.0:8080".parse().expect("valid HTTP bind addr"))
 }
 
 pub(super) fn webtransport_bind_addr() -> SocketAddr {

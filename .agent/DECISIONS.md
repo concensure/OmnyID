@@ -2343,3 +2343,16 @@ subjective usability or a controlled external cohort.
   independent false-default release controls. The matching privacy copy and both
   capabilities must ship as one exact-SHA release; provider acceptance alone is not
   Binder receipt evidence.
+
+## 2026-11-02: Full-account browser evidence uses a disposable real stack
+
+- Wedding full-account journeys run the production homeserver entry point and a production-built
+  Solid UI against a random-port tmpfs pgvector container; they do not extend the component-fixture
+  Playwright suite or use `build_test_router` as a browser substitute.
+- Synthetic accounts must be created through `/auth/register`. A separate guarded seeder may verify
+  only `@omnyid.test` rows and append deterministic AFP fixtures when the database host is exactly
+  `127.0.0.1` and the database name is exactly `omnyid_test`.
+- Every persona uses a separate browser context. Identifier substitution across couples is a required
+  negative case, while all email and external integrations stay off.
+- Cloudflare Email Routing is an inbound facility and does not authenticate Gmail UI send-as mail.
+  Keep DMARC at reject; add outbound SPF/DKIM only from the chosen provider's exact verified records.

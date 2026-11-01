@@ -1,0 +1,202 @@
+[CmdletBinding()]
+param(
+    [switch]$KeepStack,
+    [switch]$SkipBuild
+)
+
+$ErrorActionPreference = "Stop"
+Set-StrictMode -Version Latest
+
+function Get-FreeLoopbackPort {
+    $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
+    $listener.Start()
+    try { return ([System.Net.IPEndPoint]$listener.LocalEndpoint).Port }
+    finally { $listener.Stop() }
+}
+
+function Wait-Http([string]$Url, [int]$Seconds = 60) {
+    $deadline = [DateTimeOffset]::UtcNow.AddSeconds($Seconds)
+    do {
+        try {
+            $response = Invoke-WebRequest -UseBasicParsing -Uri $Url -TimeoutSec 3
+            if ($response.StatusCode -ge 200 -and $response.StatusCode -lt 500) { return }
+        } catch {}
+        Start-Sleep -Milliseconds 500
+    } while ([DateTimeOffset]::UtcNow -lt $deadline)
+    throw "Timed out waiting for $Url"
+}
+
+function Stop-Child($Process) {
+    if ($null -ne $Process -and -not $Process.HasExited) {
+        Stop-Process -Id $Process.Id -Force -ErrorAction SilentlyContinue
+        $Process.WaitForExit(5000) | Out-Null
+    }
+}
+
+$repo = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+$expectedRepo = "C:\Users\ozans\Desktop\projects\OmnyID-WED-317"
+if ($repo -ne $expectedRepo) { throw "Run this harness only from the WED-317 worktree: $expectedRepo" }
+
+$gitTop = (git -C $repo rev-parse --show-toplevel).Trim().Replace("/", "\")
+$gitSha = (git -C $repo rev-parse HEAD).Trim()
+$dirty = @(git -C $repo status --short)
+Write-Host "worktree=$gitTop"
+Write-Host "source_sha=$gitSha"
+if ($gitTop -ne $repo) { throw "Git toplevel does not match the WED-317 worktree" }
+if ($dirty.Count -ne 0) { throw "Refusing to build or run the full-account harness from a dirty tree" }
+
+docker info *> $null
+$dbPort = Get-FreeLoopbackPort
+$apiPort = Get-FreeLoopbackPort
+$uiPort = Get-FreeLoopbackPort
+$container = "omnyid-wed317-pg-$PID"
+if ($container -notmatch '^omnyid-wed317-pg-\d+$') { throw "Unsafe container name" }
+$databaseUrl = "postgres://omnyid_test:omnyid_test@127.0.0.1:$dbPort/omnyid_test"
+$apiOrigin = "http://127.0.0.1:$apiPort"
+$uiOrigin = "http://127.0.0.1:$uiPort"
+$password = "OmnyID-WED317-Synthetic-Only!"
+$tempBase = [IO.Path]::GetFullPath([IO.Path]::GetTempPath())
+$tempRoot = Join-Path $tempBase "omnyid-wedding-e2e-$PID-$([Guid]::NewGuid().ToString('N'))"
+$tempRoot = [IO.Path]::GetFullPath($tempRoot)
+if (-not $tempRoot.StartsWith($tempBase, [StringComparison]::OrdinalIgnoreCase) -or [IO.Path]::GetFileName($tempRoot) -notmatch '^omnyid-wedding-e2e-') {
+    throw "Unsafe temporary directory target"
+}
+New-Item -ItemType Directory -Path $tempRoot | Out-Null
+$manifestPath = Join-Path $tempRoot "seed-manifest.json"
+$serverOut = Join-Path $tempRoot "homeserver.out.log"
+$serverErr = Join-Path $tempRoot "homeserver.err.log"
+$uiOut = Join-Path $tempRoot "ui.out.log"
+$uiErr = Join-Path $tempRoot "ui.err.log"
+$seedOut = Join-Path $tempRoot "seed.out.log"
+$seedErr = Join-Path $tempRoot "seed.err.log"
+$server = $null
+$ui = $null
+$containerStarted = $false
+$completed = $false
+
+$serverEnvironment = @{
+    DATABASE_URL = $databaseUrl
+    OMNYID_ENV = "test"
+    OMNYID_DISABLE_DOTENV_AUTOLOAD = "true"
+    OMNYID_HTTP_BIND_ADDR = "127.0.0.1:$apiPort"
+    OMNYID_BASE_URL = $uiOrigin
+    OMNYID_ENABLE_INTERNAL_GRPC = "false"
+    OMNYID_ENABLE_WEBTRANSPORT = "false"
+    OMNYID_COORD_DB_NOTIFY = "false"
+    OMNYID_WEDDING_BOUNDARY_HELPERS_ENABLED = "true"
+    OMNYID_WEDDING_BOUNDARY_DELEGATES_ENABLED = "true"
+    OMNYID_WEDDING_BOUNDARY_DELEGATE_OWNER_ALLOWLIST = ""
+    OMNYID_WEDDING_RUNSHEET_SHARING_ENABLED = "false"
+    OMNYID_VENDOR_MAIL_ENABLED = "false"
+    OMNYID_VENDOR_MAIL_INGRESS_ENABLED = "false"
+    OMNYID_VENDOR_MAIL_OUTBOUND_ENABLED = "false"
+    OMNYID_EMAIL_WORKER_ENABLED = "false"
+    OMNYID_TRANSACTIONAL_CLOUDFLARE_API_TOKEN = ""
+    OMNYID_TRANSACTIONAL_CLOUDFLARE_ACCOUNT_ID = ""
+    OMNYID_TRANSACTIONAL_RESEND_API_KEY = ""
+    SMTP_HOST = ""
+    SMTP_USER = ""
+    SMTP_PASS = ""
+    OMNYID_ALLOW_INSECURE_UNSIGNED = "false"
+    OMNYID_ALLOW_PLAINTEXT_STORAGE = "false"
+    OMNYID_SIGNING_KEY_HEX = ("31" * 32)
+    RUST_LOG = "warn,omnyid_homeserver=info"
+}
+
+try {
+    docker run --detach --name $container --publish "127.0.0.1:$dbPort`:5432" `
+        --tmpfs "/var/lib/postgresql/data:rw,noexec,nosuid,size=2g" `
+        --env POSTGRES_USER=omnyid_test --env POSTGRES_PASSWORD=omnyid_test `
+        --env POSTGRES_DB=omnyid_test --env PGDATA=/var/lib/postgresql/data/pgdata `
+        pgvector/pgvector:pg18 | Out-Null
+    $containerStarted = $true
+    $dbDeadline = [DateTimeOffset]::UtcNow.AddSeconds(60)
+    do {
+        docker exec $container pg_isready -U omnyid_test -d omnyid_test *> $null
+        if ($LASTEXITCODE -eq 0) { break }
+        Start-Sleep -Milliseconds 500
+    } while ([DateTimeOffset]::UtcNow -lt $dbDeadline)
+    if ($LASTEXITCODE -ne 0) { throw "Disposable Postgres did not become ready" }
+
+    if (-not $SkipBuild) {
+        Push-Location $repo
+        try { cargo build --bin omnyid-homeserver --bin wedding_e2e_seed }
+        finally { Pop-Location }
+        if (-not (Test-Path (Join-Path $repo "solid-ui\node_modules"))) {
+            Push-Location (Join-Path $repo "solid-ui")
+            try { npm ci }
+            finally { Pop-Location }
+        }
+        Push-Location (Join-Path $repo "solid-ui")
+        try { $env:OMNYID_E2E_API_ORIGIN = $apiOrigin; npm run build }
+        finally { Remove-Item Env:OMNYID_E2E_API_ORIGIN -ErrorAction SilentlyContinue; Pop-Location }
+    }
+
+    $serverExe = Join-Path $repo "target\debug\omnyid-homeserver.exe"
+    $seedExe = Join-Path $repo "target\debug\wedding_e2e_seed.exe"
+    if (-not (Test-Path $serverExe) -or -not (Test-Path $seedExe)) { throw "Build the WED-317 binaries first" }
+    $server = Start-Process -FilePath $serverExe -WorkingDirectory $repo -WindowStyle Hidden -PassThru `
+        -RedirectStandardOutput $serverOut -RedirectStandardError $serverErr -Environment $serverEnvironment
+    Wait-Http "$apiOrigin/healthz" 90
+
+    $seedEnvironment = @{
+        DATABASE_URL = $databaseUrl
+        OMNYID_E2E_API_ORIGIN = $apiOrigin
+        OMNYID_E2E_PASSWORD = $password
+        OMNYID_E2E_SEED_MANIFEST = $manifestPath
+        OMNYID_DISABLE_DOTENV_AUTOLOAD = "true"
+    }
+    $seed = Start-Process -FilePath $seedExe -WorkingDirectory $repo -WindowStyle Hidden -PassThru -Wait `
+        -RedirectStandardOutput $seedOut -RedirectStandardError $seedErr -Environment $seedEnvironment
+    if ($seed.ExitCode -ne 0) { throw "Seeder failed: $(Get-Content $seedErr -Raw)" }
+    $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
+    $allowlist = @($manifest.delegate_owner_allowlist) -join ","
+    if ([string]::IsNullOrWhiteSpace($allowlist)) { throw "Seeder did not produce an owner allowlist" }
+
+    Stop-Child $server
+    $server = $null
+    $serverEnvironment.OMNYID_WEDDING_BOUNDARY_DELEGATE_OWNER_ALLOWLIST = $allowlist
+    $server = Start-Process -FilePath $serverExe -WorkingDirectory $repo -WindowStyle Hidden -PassThru `
+        -RedirectStandardOutput $serverOut -RedirectStandardError $serverErr -Environment $serverEnvironment
+    Wait-Http "$apiOrigin/healthz" 90
+
+    $uiEnvironment = @{ OMNYID_E2E_API_ORIGIN = $apiOrigin }
+    $ui = Start-Process -FilePath "npm.cmd" -ArgumentList @("run", "preview", "--", "--host", "127.0.0.1", "--port", "$uiPort") `
+        -WorkingDirectory (Join-Path $repo "solid-ui") -WindowStyle Hidden -PassThru `
+        -RedirectStandardOutput $uiOut -RedirectStandardError $uiErr -Environment $uiEnvironment
+    Wait-Http "$uiOrigin/workspace/" 60
+
+    Push-Location (Join-Path $repo "solid-ui")
+    try {
+        $env:OMNYID_E2E_UI_ORIGIN = $uiOrigin
+        $env:OMNYID_E2E_SEED_MANIFEST = $manifestPath
+        $env:OMNYID_E2E_PASSWORD = $password
+        npm run test:wedding:full-account
+        if ($LASTEXITCODE -ne 0) { throw "Full-account Playwright journey failed" }
+    } finally {
+        Remove-Item Env:OMNYID_E2E_UI_ORIGIN -ErrorAction SilentlyContinue
+        Remove-Item Env:OMNYID_E2E_SEED_MANIFEST -ErrorAction SilentlyContinue
+        Remove-Item Env:OMNYID_E2E_PASSWORD -ErrorAction SilentlyContinue
+        Pop-Location
+    }
+    $completed = $true
+    Write-Host "Full-account Wedding harness passed at $gitSha"
+} finally {
+    if ($KeepStack -and $completed) {
+        Write-Host "Stack retained for this shell session: UI $uiOrigin, API $apiOrigin, container $container"
+        Write-Host "Evidence directory: $tempRoot"
+    } else {
+        Stop-Child $ui
+        Stop-Child $server
+        if ($containerStarted) {
+            $resolvedContainer = (docker inspect --format '{{.Name}}' $container 2>$null).TrimStart('/')
+            if ($resolvedContainer -eq $container) { docker rm --force $container | Out-Null }
+        }
+        if (Test-Path -LiteralPath $tempRoot) {
+            $resolvedTemp = [IO.Path]::GetFullPath((Resolve-Path -LiteralPath $tempRoot).Path)
+            if ($resolvedTemp.StartsWith($tempBase, [StringComparison]::OrdinalIgnoreCase) -and [IO.Path]::GetFileName($resolvedTemp) -match '^omnyid-wedding-e2e-') {
+                Remove-Item -LiteralPath $resolvedTemp -Recurse -Force
+            }
+        }
+    }
+}

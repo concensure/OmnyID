@@ -15,6 +15,17 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-317
+    title: Build a disposable full-account Wedding browser harness and diagnose outbound DMARC
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-317
+    worktree: C:/Users/ozans/Desktop/projects/OmnyID-WED-317
+    depends_on: [WED-316]
+    files: [scripts/e2e-wedding-stack.ps1, src/bin/**, src/server/**, tests/common/**, solid-ui/e2e/**, solid-ui/playwright*.ts, solid-ui/package.json, Documents/verification/**, .agent/**]
+    acceptance: [A guarded script launches and tears down a tmpfs pgvector database real homeserver and real built UI, synthetic accounts are created through the real register route and use isolated browser contexts, shared deterministic fixtures cover two couples helper and delegated scopes, Playwright covers draft submit withdraw scoped grant revoke delegated completion and cross-couple identifier denial, the harness refuses non-loopback or non-omnyid_test databases and disables external sends, the live SPF DKIM and DMARC state and the hello address rejection are documented without weakening DMARC]
+    progress: "Registered from exact clean base 726bc483c51f417d1e45a00d7871c288a8320204; architecture discovery is in progress."
+
   - id: WED-316
     title: Harden Oracle provenance and retention then deliver Wedding landing and Quiz v2
     status: in_progress

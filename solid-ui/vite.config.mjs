@@ -4,6 +4,33 @@ import { resolve } from "node:path";
 
 const emptyShim = resolve(import.meta.dirname, "src/shims/empty.ts");
 const sdkRoot = resolve(import.meta.dirname, "../typescript-sdk/src");
+const apiProxyTarget = process.env.OMNYID_E2E_API_ORIGIN?.trim() || "http://127.0.0.1:8080";
+const apiProxy = {
+  "/auth": { target: apiProxyTarget, changeOrigin: true },
+  "/dashboard": { target: apiProxyTarget, changeOrigin: true },
+  "/agent": { target: apiProxyTarget, changeOrigin: true },
+  "/runtime": { target: apiProxyTarget, changeOrigin: true },
+  "/user": { target: apiProxyTarget, changeOrigin: true },
+  "/feed": { target: apiProxyTarget, changeOrigin: true },
+  "/integrations": { target: apiProxyTarget, changeOrigin: true },
+  "/task": { target: apiProxyTarget, changeOrigin: true },
+  "/multi-edit": { target: apiProxyTarget, changeOrigin: true },
+  "/social": { target: apiProxyTarget, changeOrigin: true },
+  "/actions": { target: apiProxyTarget, changeOrigin: true },
+  "/ui": { target: apiProxyTarget, changeOrigin: true },
+  "/healthz": { target: apiProxyTarget, changeOrigin: true },
+  "/relay": { target: apiProxyTarget, changeOrigin: true, ws: true },
+  "/billing": { target: apiProxyTarget, changeOrigin: true },
+  "/practice": { target: apiProxyTarget, changeOrigin: true },
+  "/key-bundle": { target: apiProxyTarget, changeOrigin: true },
+  "/send": { target: apiProxyTarget, changeOrigin: true },
+  "/query": { target: apiProxyTarget, changeOrigin: true },
+  "/llm": { target: apiProxyTarget, changeOrigin: true },
+  "/api/files": { target: apiProxyTarget, changeOrigin: true },
+  "/attachments": { target: apiProxyTarget, changeOrigin: true },
+  "/database": { target: apiProxyTarget, changeOrigin: true },
+  "/wedding": { target: apiProxyTarget, changeOrigin: true },
+};
 
 export default defineConfig({
   root: import.meta.dirname,
@@ -28,32 +55,9 @@ export default defineConfig({
   },
   server: {
     port: 4174,
-    proxy: {
-      "/auth": { target: "http://127.0.0.1:8080", changeOrigin: true },
-      "/dashboard": { target: "http://127.0.0.1:8080", changeOrigin: true },
-      "/agent": { target: "http://127.0.0.1:8080", changeOrigin: true },
-      "/runtime": { target: "http://127.0.0.1:8080", changeOrigin: true },
-      "/user": { target: "http://127.0.0.1:8080", changeOrigin: true },
-      "/feed": { target: "http://127.0.0.1:8080", changeOrigin: true },
-      "/integrations": { target: "http://127.0.0.1:8080", changeOrigin: true },
-      "/task": { target: "http://127.0.0.1:8080", changeOrigin: true },
-      "/multi-edit": { target: "http://127.0.0.1:8080", changeOrigin: true },
-      "/social": { target: "http://127.0.0.1:8080", changeOrigin: true },
-      "/actions": { target: "http://127.0.0.1:8080", changeOrigin: true },
-      "/ui": { target: "http://127.0.0.1:8080", changeOrigin: true },
-      "/healthz": { target: "http://127.0.0.1:8080", changeOrigin: true },
-      "/relay": { target: "http://127.0.0.1:8080", changeOrigin: true, ws: true },
-      "/billing": { target: "http://127.0.0.1:8080", changeOrigin: true },
-      "/practice": { target: "http://127.0.0.1:8080", changeOrigin: true },
-      "/key-bundle": { target: "http://127.0.0.1:8080", changeOrigin: true },
-      "/send": { target: "http://127.0.0.1:8080", changeOrigin: true },
-      "/query": { target: "http://127.0.0.1:8080", changeOrigin: true },
-      "/llm": { target: "http://127.0.0.1:8080", changeOrigin: true },
-      "/api/files": { target: "http://127.0.0.1:8080", changeOrigin: true },
-      "/attachments": { target: "http://127.0.0.1:8080", changeOrigin: true },
-      "/database": { target: "http://127.0.0.1:8080", changeOrigin: true },
-    },
+    proxy: apiProxy,
   },
+  preview: { proxy: apiProxy },
   optimizeDeps: {
     exclude: ["@electric-sql/pglite"],
   },
