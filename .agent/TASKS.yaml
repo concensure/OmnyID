@@ -15,6 +15,16 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-310
+    title: Reconcile RSVP rollout evidence and release the completed RSVP candidate
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-308
+    depends_on: [WED-303, WED-305, WED-309]
+    files: [Documents/design/wedding planner/RSVP/wedding-rsvp-tasks.md, Documents/verification/wed-310-rsvp-release-2026-11-01.md, .agent/TASKS.yaml, .agent/DECISIONS.md, .agent/HANDOFF.md]
+    acceptance: [The RSVP rollout checklist reconciles the already-completed authenticated couple check and controlled allowlisted pilot to their retained evidence, the exact release candidate passes typecheck Wedding tests line budgets production build and focused RSVP Rust tests, Oracle deploys only from a clean checkout of the full candidate SHA, public RSVP reminder provider helper and delegate flags are restored or retained false after verification, hosted health RSVP surfaces and version provenance are recorded without exposing capability tokens account IDs or credentials]
+    progress: "Started from 01662c9d649708ef74390151dae254cd1de05411. Existing WED-305 evidence already contains the authenticated fresh-account mobile check and a one-account RSVP pilot with idempotent response revocation and exact environment rollback; this task reconciles that evidence, verifies the newer candidate and releases it without re-running an unnecessary external send."
+
   - id: WED-309
     title: Repair Google sign-in, replace the Wedding Animal Quiz scoring contract, and complete Family Boundaries commands
     status: in_progress

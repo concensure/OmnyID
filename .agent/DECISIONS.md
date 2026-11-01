@@ -2206,3 +2206,14 @@ Wedding, workspace and person. Immutable AFP events contain only the person refe
 operation, never ciphertext. Household capacity approvals take a household-scoped transaction lock;
 group plus-one policies preserve named exceptions; changing representatives immediately revokes the
 affected public helper links and the former representative's authenticated grant.
+
+## 2026-11-01: RSVP rollout evidence is cumulative and external pilots are not repeated without need
+
+The completed WED-303 hosted accessibility shadow and WED-305 authenticated couple check plus
+single-account RSVP pilot together satisfy the RSVP rollout matrix. The pilot used one synthetic
+household, proved exact-response idempotency and revocation, and restored the environment byte for
+byte with the public switch false and pilot list empty. A later application candidate must rerun its
+local and hosted flags-off verification, but it must not create another live capability or guest
+response merely to reproduce evidence that remains valid. Any future public expansion is a separate
+rollout decision and keeps RSVP publication, reminder-provider sending, Family helper access and
+authenticated Family delegate access independently false by default.
