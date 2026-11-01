@@ -2292,3 +2292,19 @@ cannot apply a guest, invitation, RSVP, budget or vendor mutation. Only pending 
 requests appear in the review queue. These contracts are locally assured, but they do not enable the
 hosted features; both Family rollout switches stay false until the hosted accessibility/usability
 matrix and a separately authorised narrow cohort pass.
+
+## 2026-11-01: Wedding task state and stage are independent projections
+
+Wedding task completion controls must consume the same canonical completion result as the To-do,
+Done and All filters. Approval metadata is not completion evidence. Wedding stage is a separate
+six-value dimension, so every row displays its stage and the stage filter composes with every status
+filter rather than replacing it.
+
+Vendor lifecycle filters remain projections over the account-scoped AFP ledger. Selecting a vendor
+opens the most relevant canonical Documents artifact instead of creating another vendor-detail store.
+Category-free search remains valid and relies on the existing query evidence and ranking policy.
+
+Retained vendors or contacts alone are not evidence of cross-account leakage. The account boundary,
+server projection and browser-state evidence must be inspected before deletion or migration. Synthetic
+tests can establish deterministic behavior and isolation, but cannot replace human comprehension,
+subjective usability or a controlled external cohort.

@@ -6342,3 +6342,55 @@ Recommended next action:
 - Continue the broader Family roadmap with owner-facing helper/delegate grant
   management, projector acknowledgement receipts and the accessibility/usability
   matrix. Authorise a narrow allowlisted cohort only after those checks pass.
+
+## 2026-11-01 - WED-315 connected Wedding projection repairs (Codex)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch
+`agent/codex/WED-315`, implementation commit
+`585979fa793470b461c97047c66beacd03590b8a`.
+
+Completed:
+
+- Unified task-row action labels with the same canonical completion projection
+  used by To-do, Done and All, and added an independent six-stage filter plus a
+  visible stage tag on every task.
+- Allowed free-text vendor comparisons without a selected category. Lifecycle
+  results now open their best matching canonical Documents artifact, and map
+  guidance is actionable.
+- Fixed mobile decision swipes so the keyed card actually advances, normalized
+  confirmed onboarding dates, made Add date an inline calendar action and filled
+  the active journey-stage marker.
+- Defaulted RSVP host labels from couple profile names, added icon-backed in-place
+  guest response filters and unlocked Seating from the canonical guest-row count.
+- Investigated retained vendors and contacts against WED-307 and focused account
+  boundary tests. No destructive purge was justified or performed.
+
+Verification at the exact implementation SHA:
+
+- `npm run typecheck`: passed.
+- `npm run test:wedding`: 2,140 passed.
+- `npm run test:line-budget`: 2 passed.
+- `npm run build`: passed.
+- Focused account/projection tests: 25 passed.
+- Focused Playwright browser matrix: 10 passed, including 320/375 px, 200% zoom,
+  Axe, task/budget, People, home and visible decision-card swipe behavior.
+- Disposable PostgreSQL Family isolation matrix: 7 passed with both rollout
+  switches exercised as false by default and narrowly enabled in-test. The
+  disposable container and tmpfs data were removed.
+
+Evidence:
+
+- `Documents/verification/synthetic-usability-2026-11-01.md` records the supplied
+  synthetic rollout protocol, evidence and limitations. It does not claim that
+  synthetic personas pass human comprehension or controlled external cohort gates.
+
+Not performed:
+
+- No Oracle deployment or production environment change was requested.
+- No Family helper/delegate rollout switch was enabled in a hosted environment.
+
+Recommended next action:
+
+- Run the remaining real-human comprehension sessions and a separately authorised
+  controlled cohort. Extend isolation assurance with explicit two-owner cross-grant
+  swaps and normalize or document the outsider household-command status contract.
