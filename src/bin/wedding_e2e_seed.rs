@@ -85,7 +85,12 @@ async fn register(
         .await
         .with_context(|| format!("register {email}"))?;
     if !response.status().is_success() {
-        bail!("registration route rejected {email}: {}", response.status());
+        let status = response.status();
+        let detail = response.text().await.unwrap_or_default();
+        bail!(
+            "registration route rejected {email}: {status}: {}",
+            detail.chars().take(500).collect::<String>()
+        );
     }
     Ok(())
 }

@@ -203,7 +203,9 @@ try {
                 docker rm $container | Out-Null
             }
         }
-        if (Test-Path -LiteralPath $tempRoot) {
+        if (-not $completed) {
+            Write-Host "Harness failed; local redacted logs retained at $tempRoot"
+        } elseif (Test-Path -LiteralPath $tempRoot) {
             $resolvedTemp = [IO.Path]::GetFullPath((Resolve-Path -LiteralPath $tempRoot).Path)
             if ($resolvedTemp.StartsWith($tempBase, [StringComparison]::OrdinalIgnoreCase) -and [IO.Path]::GetFileName($resolvedTemp) -match '^omnyid-wedding-e2e-') {
                 Remove-Item -LiteralPath $resolvedTemp -Recurse -Force
