@@ -42,8 +42,10 @@ test("RSVP defaults names from profile and guest summary counts filter in place"
 test("wedding projection uses the authenticated session before bootstrap arrives", () => {
   const app = read("src/App.tsx");
   const queue = read("src/components/ResponseQueueView.tsx");
+  const vite = read("vite.config.mjs");
   assert.match(app, /sessionUser=\{session\(\)\?\.user \?\? null\}/);
   assert.match(app, /signedIn=\{Boolean\(session\(\)\?\.token\)\}/);
   assert.match(queue, /props\.sessionUser \?\? bootstrap\(\)\?\.user/);
   assert.match(queue, /props\.signedIn \?\?/);
+  assert.match(vite, /"\/notes": \{ target: apiProxyTarget/);
 });

@@ -29,6 +29,7 @@ const apiProxy = {
   "/api/files": { target: apiProxyTarget, changeOrigin: true },
   "/attachments": { target: apiProxyTarget, changeOrigin: true },
   "/database": { target: apiProxyTarget, changeOrigin: true },
+  "/notes": { target: apiProxyTarget, changeOrigin: true },
   "/wedding": { target: apiProxyTarget, changeOrigin: true },
 };
 
