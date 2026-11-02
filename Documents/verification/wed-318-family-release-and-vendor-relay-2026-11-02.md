@@ -2,6 +2,17 @@
 
 Date: 2026-11-02 (Australia/Sydney)
 
+## Final hosted release
+
+- Branch: `agent/codex/WED-318`
+- Exact application release: `c12bb3006556a254b1f1cb630cc4905a76b6b2ec`
+- Oracle `SOURCE_COMMIT` and `oracle-runtime-manifest.json`: exact match
+- Synchronous production proof: pass; homeserver and backup service running and the latest backup
+  verified. The disposable restore drill was skipped because Oracle did not have the calculated
+  free-space headroom.
+- Public Wedding blog batch: all 14 reviewed URLs returned HTTP 200.
+- Oracle root filesystem after release: 41 GB used of 45 GB, 3.9 GB free (92%).
+
 ## Family release
 
 - Branch: `agent/codex/WED-317`
@@ -19,9 +30,9 @@ Date: 2026-11-02 (Australia/Sydney)
 
 The helper/delegate rollout remains reversible through the two independent environment switches.
 
-## Operator email relay candidate
+## Operator email relay
 
-The relay is implemented but remains false-default and is not deployed or routed. It accepts only a
+The relay is deployed and enabled. It accepts only a
 Cloudflare Email Worker event that passes the existing timestamp/nonce/body-digest HMAC boundary,
 then additionally requires:
 
@@ -51,10 +62,23 @@ The owner-authorised production configuration is deliberately narrower than the 
 - `noreply@omnyid.com` remains outside the relay; and
 - the existing catch-all remains disabled and set to Drop.
 
-Still required before enablement: provision the dedicated sending token/key, configure the exact
-aliases and sole operator sender, run the controlled initial/BCC/reply/replay proof, and compare the
-post-change Cloudflare inventory to the protected baseline. Gmail must send commands from the real
-allowlisted Gmail identity; Gmail “Send as hello@omnyid.com” is deliberately not used.
+Hosted configuration and evidence:
+
+- the sole operator allowlist is `concensure@gmail.com`;
+- the six routed aliases are `hello@`, `info@`, `wedding@`, `privacy@`, `support@` and
+  `admin@omnyid.com`; `noreply@` and the disabled catch-all remain outside the relay;
+- the Worker and homeserver use one newly generated shared HMAC secret held only in provider/server
+  secret storage; the relay encryption key and sending token are also file-backed server secrets;
+- a signed controlled command was accepted once by the provider, persisted as one accepted AFP
+  event and produced one send attempt with a provider message ID;
+- replaying the same raw message returned the duplicate outcome and did not create a second event;
+- the live ClamAV container was healthy, a clean sample passed, and the EICAR test was detected;
+- a public unsigned request was blocked by Cloudflare before it reached the application.
+
+Provider acceptance and replay suppression are machine-verified. Actual Gmail receipt, the operator
+BCC copy and a reply in the same visible mailbox thread still require inbox observation; they are not
+inferred from provider acceptance. Gmail commands must come from the real allowlisted Gmail identity,
+not Gmail's unauthenticated “Send as” alias.
 
 ## Wedding lifecycle mail
 
@@ -75,6 +99,12 @@ pre-send eligibility query are connected; they must not be described as schedule
 The Binder's production HTML and text templates use a backend-generated, hashed, expiring
 confirmation token. A regression test renders the exact 52-character token into the confirmation
 button and rejects the `SAMPLE-TOKEN` used by the separate static design preview.
+
+The Binder is enabled on Oracle. The reviewed fillable and print PDFs were hot-synced after deploy;
+their hosted files match the recorded SHA-256 values and both URLs return HTTP 200. A controlled
+request returned the enumeration-safe accepted response and its database receipt is `sent`, one
+attempt, marketing opt-in true and delivered timestamp present. Inbox receipt and pressing the real
+confirmation button remain external observations; the backend token and confirmation route are live.
 
 The reviewed batch contributes 14 article pages and 14 local covers. The publication catalogue,
 search taxonomy, index cards and smoke list are reconciled to 54 posts. The unrelated Animal Quiz
@@ -117,6 +147,18 @@ is outstanding.
 - Listing validation: 2 passed.
 - Migration catalogue: passed.
 
-The listing-proposal disposable-Postgres test compiled. It was not executed because the local Docker
-engine was unavailable and both expected disposable endpoints were closed. No Oracle database was
-used as a substitute.
+The later clean release verification also passed the real disposable-account browser harness against
+a tmpfs PostgreSQL stack. It exercised real registration/login, isolated Mia/Jordan and Priya/Sam
+browser sessions, Family households, helper/delegate grants, revocation and cross-couple identifier
+denial. The disposable PostgreSQL missing-listing proposal test passed once Docker was available.
+
+## Remaining product boundaries
+
+- Only the Wedding welcome email has a production trigger. The other seven lifecycle templates stay
+  deterministic policy-bound outputs until their AFP eligibility producers and pre-send cancellation
+  checks are connected.
+- Missing-listing publication remains operator-reviewed and false-default.
+- Vendor-confirmed two-sided booking closure and its connected budget/task/decision reconciliation
+  remain open; the current safe UI stops at `Review booking terms`.
+- Actual controlled-mailbox receipt/BCC/thread-reply observation is still recommended even though the
+  provider acceptance and gateway persistence proof passed.

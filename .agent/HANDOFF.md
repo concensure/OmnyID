@@ -6609,3 +6609,42 @@ finding: while the default Wedding launch was refreshing, selecting another plan
 queued only a boolean, so completion refreshed the old plan a second time. The
 queue now retains the newest navigation intent and refreshes that exact plan.
 The full journey must be rerun from the successor clean commit.
+
+## 2026-11-02: WED-318 hosted relay, Binder and blog release
+
+Released from the clean detached worktree
+`C:\Users\ozans\AppData\Local\Temp\omnyid-wed318-release-c12bb30` at exact
+application SHA `c12bb3006556a254b1f1cb630cc4905a76b6b2ec`. Oracle `SOURCE_COMMIT` and
+`oracle-runtime-manifest.json` match. The synchronous bounded production proof passed with backup
+verification; the restore drill was intentionally skipped for disk headroom. Root storage was 92%
+used with 3.9 GB free after release.
+
+Completed:
+
+- Enabled the secure operational alias relay for the sole command sender
+  `concensure@gmail.com` and the six exact aliases `hello`, `info`, `wedding`, `privacy`, `support`
+  and `admin` at `omnyid.com`. `noreply` and the disabled catch-all remain outside it.
+- Rotated and synchronized a dedicated Worker/server HMAC secret without printing it. The relay
+  encryption key and provider token remain file-backed secrets. A signed controlled command
+  produced one provider-accepted AFP event and one attempt; exact replay was suppressed. Hosted
+  ClamAV accepted a clean sample and detected EICAR.
+- Fixed the Oracle Compose contract so the Binder flag reaches the homeserver. Hot-synced the two
+  reviewed PDFs after deploy and verified their recorded hashes and HTTP 200 responses. A controlled
+  Binder request recorded `sent`, one attempt and a delivery timestamp.
+- Published the reviewed 14-post blog batch and its catalogue/search metadata without importing the
+  excluded Animal Quiz card/grid work. Every new article URL returned HTTP 200.
+- Kept seven non-welcome lifecycle emails as deterministic, consent-aware templates only. The
+  verified Wedding welcome remains the sole live trigger; no generic autonomous scheduler was added.
+- The clean disposable full-account harness passed real registration/login, two isolated couples,
+  Family household/helper/delegate/revoke journeys and cross-couple denial. The disposable
+  PostgreSQL missing-listing proposal test passed once Docker was available.
+
+External observations still recommended:
+
+- Check the controlled Gmail mailbox for the relay copy/BCC and verify reply-in-thread behavior.
+- Open the Binder delivery and press its real confirmation button. Provider acceptance and backend
+  persistence passed, but this session cannot independently observe the mailbox UI.
+
+Open product work: connect the remaining lifecycle-email AFP eligibility producers and pre-send
+suppression queries; complete two-sided vendor-confirmed booking with atomic booking/budget/task/
+decision reconciliation; keep missing-listing publication operator-reviewed until rollout approval.
