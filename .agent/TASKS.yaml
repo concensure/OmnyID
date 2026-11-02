@@ -17,14 +17,14 @@ lifecycle:
 tasks:
   - id: WED-321
     title: Repair public journey controls and make Wedding run-sheet actions usable in place
-    status: in_progress
+    status: ready
     owner: codex
     branch: agent/codex/WED-321
     worktree: C:/Users/ozans/Desktop/projects/OmnyID-WED-319
     depends_on: [WED-320, WED-319]
     files: [wedding/**, solid-ui/src/**, solid-ui/tests/**, Documents/marketing/wedding planning/posts/magnet/**, Documents/verification/**, .agent/**]
     acceptance: [Wedding landing copy is accurate and planning-stage choices visibly personalize the page, only lead magnets backed by hosted capabilities receive truthful searchable blog posts, Wedding Animal Quiz photographer choices use documented royalty-free optimized images, the public roadmap identifies Q4 and trial-runner actions give visible useful outcomes while Real Email Gateway is labelled Tester only, workspace readability uses a font-size control instead of density, the first database-create surface is fully visible, run-sheet summary links reveal relevant records in place, fixed milestones can be added from Timeline and run-sheet surfaces, vendor-view help explains its sharing boundary, empty day-of state opens the add-record surface, mobile accessibility AFP projections and existing database architecture are preserved]
-    progress: "Registered from the clean deployed WED-320 SHA. Implementation and verification are in progress."
+    progress: "Implementation commit 6250f42 repairs the public Wedding wording and phase feedback, documents why unbuilt Batch 2 lead magnets remain unpublished, replaces the four photographer-choice assets with licensed optimized local images, marks Q4 current, bounds the trial inference path with a deterministic fallback, adds a real font-size scale, portals database dialogs, and makes run-sheet card actions reveal records or open item/milestone creation in place. Typecheck, 2,162 Wedding tests, site/CSP/quiz smokes, line budgets, production build, five responsive run-sheet browser tests and four focused Rust trial-runner tests pass. Ready for an exact-SHA Oracle release."
 
   - id: WED-320
     title: Verify Wedding operational claims and unify RSVP, workspace projections, and lead-magnet delivery

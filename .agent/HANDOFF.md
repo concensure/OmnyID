@@ -6731,3 +6731,23 @@ proxied. Caddy now sends `/wedding/rsvp/capabilities*` and `/wedding/rsvp/respon
 homeserver routes, with deploy-time assertions for both staged and running configurations. A bounded
 hosted Wedding Understanding request successfully returned the exact structured reflection contract
 through `google/gemini-3.5-flash-lite`; no submitted content was persisted.
+
+## 2026-11-03 - WED-321 public journey and run-sheet repair (Codex, ready)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-319`, branch
+`agent/codex/WED-321`; implementation commit `6250f42`.
+
+- Corrected Wedding landing copy and added visible visit-scoped phase feedback; recorded why the
+  three unbuilt Batch 2 magnets must not receive launch posts yet.
+- Added four licensed, local sub-60 KB photographer-choice images; moved the public roadmap to Q4,
+  marked the email gateway tester-only, and bounded the trial runner with visible busy/error states
+  plus a 12-second server fallback.
+- Replaced the density-labelled UI with a real 10-step root font-size scale, portalled database
+  dialogs, and kept run-sheet context actions on typed A2UI intents. Links now reveal/highlight rows
+  in place on mobile and desktop; explicit fixed milestones and empty day-of records can be added.
+- Passed: typecheck; production build; 2,162 Wedding tests; site/CSP/Quiz/confirmation/blog smokes;
+  line budgets; 21 focused run-sheet/font tests; five run-sheet Playwright viewports/zoom/print tests;
+  and four Rust trial-runner tests. Repository-wide `cargo fmt --check` remains pre-existingly noisy
+  outside this slice; the touched Rust hunk is rustfmt-shaped.
+- Oracle Docker builder cache only was pruned (4.367 GB), moving root use from 94% to 84% before
+  release. No image, container, volume, backup, database or source data was removed.
