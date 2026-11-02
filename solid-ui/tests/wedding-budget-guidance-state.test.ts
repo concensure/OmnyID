@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 
 import {
   WEDDING_BUDGET_CATEGORY_GUIDANCE,
+  WEDDING_BUDGET_MODEL_VERSION,
+  WEDDING_BUDGET_TARGET_TOTAL,
   buildWeddingBudgetCategoryGuidanceLabel,
   weddingBudgetLocationMarketNote,
 } from "../src/lib/weddingBudgetGuidanceState.ts";
@@ -15,6 +17,16 @@ test("budget guidance covers every wedding budget category", () => {
   );
 });
 
+test("budget model v1 has one balanced target allocation instead of additive overlapping midpoints", () => {
+  assert.equal(WEDDING_BUDGET_MODEL_VERSION, 1);
+  assert.equal(WEDDING_BUDGET_TARGET_TOTAL, 100);
+  assert.equal(
+    Object.values(WEDDING_BUDGET_CATEGORY_GUIDANCE)
+      .reduce((sum, category) => sum + (category.lowShare + category.highShare) / 2, 0),
+    100,
+  );
+});
+
 test("budget guidance gives a useful midpoint before the couple enters a total", () => {
   const guidance = buildWeddingBudgetCategoryGuidanceLabel({
     categoryId: "venue_ceremony",
@@ -24,8 +36,9 @@ test("budget guidance gives a useful midpoint before the couple enters a total",
   });
 
   assert.match(guidance.rangeLabel, /Sydney/);
-  assert.match(guidance.rangeLabel, /35-50%/);
-  assert.match(guidance.averageLabel, /43%/);
+  assert.match(guidance.rangeLabel, /26-30%/);
+  assert.match(guidance.averageLabel, /28%/);
+  assert.match(guidance.averageLabel, /total 100%/);
   assert.match(guidance.locationNote, /higher venue minimums/i);
   assert.match(guidance.practicalTip, /minimum spend/i);
 });
@@ -38,9 +51,9 @@ test("budget guidance converts planning norms into dollar ranges once total budg
     locationLabel: "Brisbane",
   });
 
+  assert.match(guidance.rangeLabel, /\$7,600/);
   assert.match(guidance.rangeLabel, /\$10,000/);
-  assert.match(guidance.rangeLabel, /\$16,000/);
-  assert.match(guidance.averageLabel, /\$13,000/);
+  assert.match(guidance.averageLabel, /\$8,800/);
   assert.match(guidance.locationNote, /season/i);
   assert.match(guidance.practicalTip, /service charge/i);
 });

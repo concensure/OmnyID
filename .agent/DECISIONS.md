@@ -2383,3 +2383,22 @@ subjective usability or a controlled external cohort.
   one-sided booked event.
 - A missing vendor listing remains hidden through ownership proof and moves to operator review. It
   cannot rank or accept leads before verified ownership and an explicit publish decision.
+
+## 2026-11-02: Wedding lead magnets consume existing planner authorities
+
+- `wedding-budget-model.v1.json` is the authority for public and workspace budget guidance. Its
+  explicit starting targets total 100%; its planning bands are non-additive guardrails. A generated
+  public copy and parity test prevent the marketing site from drifting from the planner.
+- The existing six journey-stage ids in `weddingJourneyStageState.ts` are authoritative. Countdown
+  work must reconcile existing task and supplier lead-time sources into one catalogue before the
+  public Countdown ships; it must not create a fourth stage vocabulary.
+- Keep `/wedding/understanding`. A future public image-reflection surface submits one complete,
+  visitor-approved image batch through that bounded route. It never calls inference on selection or
+  keystrokes. A lower-cost multimodal provider requires a fixture benchmark before replacing the
+  current provider.
+- Supplier style matching is available only when the selected category has at least 50 listings with
+  populated `style_tags`. Hosted evidence currently qualifies venues and photographers only. The
+  threshold is code, while hosted counts remain queried operational evidence rather than hard-coded
+  product truth.
+- Lead-magnet continuation extends the existing consented import runner and existing AFP builders.
+  It does not add a parallel import endpoint or a new AFP event type for each tool.

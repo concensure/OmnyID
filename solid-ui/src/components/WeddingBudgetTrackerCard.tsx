@@ -247,7 +247,7 @@ export function WeddingBudgetTrackerCard(props: {
           </span>
           <p class="font-display text-lg font-semibold tracking-tight text-wedding-ink">Budget</p>
           <WeddingInfoTip title="Budget guide" tone="stone">
-            These are planning ranges, not quotes. Costs change by location, season, guest count, venue rules, and whether tax, service fees, delivery, and gratuity are included.
+            The category targets total 100%. Ranges show how one category may move as your priorities change; do not add every high end together. If a venue package includes food or drinks, count each cost once. These are planning ranges, not quotes.
           </WeddingInfoTip>
         </div>
         <span class="max-w-full break-words rounded-lg bg-wedding-slate px-2 py-1 text-xs font-semibold text-wedding-ink/75">

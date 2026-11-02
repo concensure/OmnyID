@@ -22,6 +22,7 @@ const expectedPages = [
   'privacy.html',
   'user-guide.html',
   'animal-quiz.html',
+  'wedding-cost-calculator.html',
   'get-wedding-vendors-to-reply/index.html',
   'wedding-planning-relationship-stress/index.html',
   'wedding-planning-without-decision-overload/index.html',

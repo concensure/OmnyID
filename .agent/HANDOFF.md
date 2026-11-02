@@ -6648,3 +6648,33 @@ External observations still recommended:
 Open product work: connect the remaining lifecycle-email AFP eligibility producers and pre-send
 suppression queries; complete two-sided vendor-confirmed booking with atomic booking/budget/task/
 decision reconciliation; keep missing-listing publication operator-reviewed until rollout approval.
+## 2026-11-02 - WED-319 budget authority and lead-magnet first slice (Codex, in progress)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-319`, branch
+`agent/codex/WED-319`; starting SHA
+`e459ddfe730293641f8f3a89eb2c8a221c1857c2`.
+
+- Confirmed the reported budget defect: the former seven displayed midpoints totalled 120%. Added
+  `wedding-budget-model.v1.json` with explicit targets totalling 100%, a generated public copy and a
+  parity test. Workspace guidance, its information tip and the published budget guide now explain
+  that planning bands are non-additive and bundled venue/catering costs are counted once.
+- Added the first public Budget Reality Check. Its deterministic engine balances to the exact entered
+  amount, moves up to three priorities without crossing category floors, and shows 25 conditional
+  missing-cost questions without invented amounts. Results remain local and can be printed or
+  downloaded; continuation uses an allowlisted registration source.
+- Added shared lead-magnet envelope/storage and mobile/print primitives. No analytics or network call
+  was added to the tool.
+- Recorded the capability audit at
+  `Documents/verification/wed-319-lead-magnet-capability-audit-2026-11-02.md`: the six stages already
+  exist; timing still has multiple authorities; `/wedding/understanding` is retained and already sends
+  one complete image batch only after submit; only venue (178) and photographer (93) clear the new
+  50-populated-style-tag threshold in the hosted corpus.
+- Recommended benchmarking `gemini-3.5-flash-lite` for a future low-cost image-provider adapter. The
+  current Anthropic route remains unchanged until structured-output quality, privacy and cost tests
+  pass.
+- Verification: `npm ci --ignore-scripts`; Solid UI typecheck passed; 2,151 Wedding tests passed;
+  both line-budget tests passed; production build passed; Wedding static-site and CSP smoke passed;
+  eight public budget/magnet tests and seven focused workspace budget/style tests passed.
+- Remaining work is intentionally dependency-ordered: consolidated import consent/profile registry,
+  existing-AFP writers, quote decoder, shot-list builder, one task/lead-time catalogue and Countdown
+  parity, then the licensed style library and optional explicitly submitted image reflection.

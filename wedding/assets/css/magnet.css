@@ -1,0 +1,16 @@
+.magnet-shell{max-width:920px;margin:48px auto;padding:clamp(20px,5vw,48px);border:1px solid var(--line);border-radius:12px;background:var(--paper);box-shadow:0 16px 44px rgba(68,47,35,.08)}
+.magnet-shell h1,.magnet-shell h2,.magnet-shell h3{color:var(--ink)}
+.magnet-lede{max-width:70ch;font-size:1.08rem;line-height:1.7;color:var(--ink-soft)}
+.magnet-form{display:grid;gap:20px;margin-top:28px}.magnet-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.magnet-field{display:grid;gap:7px;font-weight:700}.magnet-field input,.magnet-field select,.magnet-field textarea{width:100%;min-height:48px;padding:11px 13px;border:1px solid #bcae9e;border-radius:10px;background:#fff;color:var(--ink);font:inherit}
+.magnet-field textarea{min-height:120px;resize:vertical}.magnet-field :focus-visible,.magnet-button:focus-visible,.magnet-link-button:focus-visible{outline:3px solid rgba(12,105,96,.28);outline-offset:2px}
+.magnet-help{margin:0;font-size:.88rem;font-weight:500;line-height:1.5;color:var(--ink-soft)}
+.magnet-button,.magnet-link-button{display:inline-flex;min-height:48px;align-items:center;justify-content:center;padding:0 18px;border-radius:10px;font:700 1rem/1.2 inherit;cursor:pointer}
+.magnet-button{border:0;background:var(--action,#0d675f);color:#fff}.magnet-link-button{border:1px solid var(--action,#0d675f);background:#fff;color:var(--action,#0d675f);text-decoration:none}
+.magnet-status{min-height:24px;margin:0;font-weight:700}.magnet-status[data-kind="error"]{color:#9b2534}.magnet-status[data-kind="success"]{color:#23633f}
+.magnet-result{margin-top:30px;padding-top:28px;border-top:1px solid var(--line)}.magnet-result[hidden]{display:none}
+.magnet-card{padding:18px;border:1px solid var(--line);border-radius:10px;background:#fff}.magnet-card+.magnet-card{margin-top:14px}
+.magnet-table-wrap{overflow-x:auto}.magnet-table{width:100%;border-collapse:collapse}.magnet-table th,.magnet-table td{padding:12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}.magnet-table th{font-size:.82rem;text-transform:uppercase;letter-spacing:.06em}
+.magnet-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}.magnet-continue{margin-top:28px;padding:20px;border:1px solid #bfded8;border-radius:12px;background:#f2fbf8}.magnet-continue p{max-width:65ch}
+@media(max-width:680px){.magnet-shell{margin:20px 0;padding:20px 16px;border-radius:0;border-left:0;border-right:0}.magnet-grid{grid-template-columns:1fr}.magnet-actions>*{width:100%}.magnet-table{min-width:620px}}
+@media print{.site-header,.site-footer,.magnet-form,.magnet-actions,.magnet-continue{display:none!important}.magnet-shell{max-width:none;margin:0;padding:0;border:0;box-shadow:none}.magnet-result{border:0}.magnet-card{break-inside:avoid}}
