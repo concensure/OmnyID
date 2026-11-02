@@ -352,7 +352,7 @@ export function ResponseQueueView(props: {
   const [weddingLocalBudgetRefreshKey, setWeddingLocalBudgetRefreshKey] = createSignal(0);
   const [weddingImportRefreshKey, setWeddingImportRefreshKey] = createSignal(0);
   const [weddingRefreshRunning, setWeddingRefreshRunning] = createSignal(false);
-  const [weddingRefreshQueued, setWeddingRefreshQueued] = createSignal(false);
+  const [weddingRefreshQueuedIntent, setWeddingRefreshQueuedIntent] = createSignal<ReturnType<typeof consumeWeddingNavigationIntent>>(null);
   const [weddingRefreshState, setWeddingRefreshState] = createSignal<WeddingWorkspaceRefreshState | null>(null);
   const [weddingVendorSearchRunning, setWeddingVendorSearchRunning] = createSignal(false);
   const [weddingVendorSearchNotice, setWeddingVendorSearchNotice] = createSignal<string | null>(null);
@@ -1220,7 +1220,10 @@ export function ResponseQueueView(props: {
   ) {
     if (!intent || intent.surface !== "planning_files") return;
     if (weddingRefreshRunning()) {
-      setWeddingRefreshQueued(true);
+      // Preserve the newest workspace target. A boolean queue re-ran the first
+      // refresh after a rapid plan switch, leaving the newly selected Wedding
+      // plan projected with stale/empty data.
+      setWeddingRefreshQueuedIntent(intent);
       return;
     }
     setWeddingRefreshRunning(true);
@@ -1235,9 +1238,10 @@ export function ResponseQueueView(props: {
       setWeddingRefreshState(state);
     } finally {
       setWeddingRefreshRunning(false);
-      if (weddingRefreshQueued()) {
-        setWeddingRefreshQueued(false);
-        void refreshWeddingWorkspaceMessages(intent);
+      const queuedIntent = weddingRefreshQueuedIntent();
+      if (queuedIntent) {
+        setWeddingRefreshQueuedIntent(null);
+        void refreshWeddingWorkspaceMessages(queuedIntent);
       }
     }
   }

@@ -6604,4 +6604,8 @@ attempt proved the deeper issue: the harness was logging in at generic
 `/workspace/` even though its accounts were registered with a Wedding source.
 The journey now uses the actual `?source=wedding` marketing handoff and asserts
 that neither the generic tour nor Agent Personality wizard obscures the planner.
+That run then exposed the product race behind the original empty-household
+finding: while the default Wedding launch was refreshing, selecting another plan
+queued only a boolean, so completion refreshed the old plan a second time. The
+queue now retains the newest navigation intent and refreshes that exact plan.
 The full journey must be rerun from the successor clean commit.
