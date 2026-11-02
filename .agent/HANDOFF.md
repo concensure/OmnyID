@@ -6597,3 +6597,10 @@ pre-provisioned with the dedicated secret,
 the exact alias/operator lists and the relay flag false; no routing rule has been
 enabled yet. Hosted enablement must use a clean exact SHA and record matching
 runtime provenance.
+
+The first clean full-account attempt at `7a389281cf5d45d6f5f5203b27665257f39c6526`
+reached the real UI but correctly displayed the new-account Guided Tour, which
+intercepted the Family card. The harness now dismisses that tour through its
+visible `Skip` control before exercising Wedding projections. This is a harness
+sequencing correction, not a product bypass; the full journey must be rerun from
+the successor clean commit.

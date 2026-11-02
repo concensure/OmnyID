@@ -42,6 +42,13 @@ async function signIn(browser: Browser, email: string): Promise<{ context: Brows
   const sessionCookie = (await context.cookies()).find(({ name }) => name === "omnyid_session");
   expect(sessionCookie?.httpOnly).toBe(true);
   expect(sessionCookie?.value).toEqual(expect.any(String));
+
+  // A real first login intentionally opens the product tour. Close it through
+  // the user-facing control so it cannot mask the Wedding surface exercised by
+  // the rest of this full-account journey.
+  const skipTour = page.getByRole("button", { name: "Skip", exact: true });
+  await skipTour.click({ timeout: 10_000 }).catch(() => undefined);
+  await expect(skipTour).toBeHidden();
   return {
     context,
     page,
