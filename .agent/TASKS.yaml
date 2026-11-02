@@ -15,6 +15,17 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-319
+    title: Reconcile Wedding budget guidance and build the shared lead-magnet foundation
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-319
+    worktree: C:/Users/ozans/Desktop/projects/OmnyID-WED-319
+    depends_on: [WED-318, WED-316]
+    files: [solid-ui/src/lib/weddingBudget**, solid-ui/src/lib/weddingPlanning**, solid-ui/src/**/wedding**, wedding/assets/js/**, wedding/assets/css/**, wedding/wedding-*.html, wedding/tests/**, src/server/wedding_site**, src/server/wedding_*routes.rs, Documents/marketing/wedding planning/posts/magnet/**, Documents/verification/**, .agent/**]
+    acceptance: [Budget planning guidance is internally coherent and never presents overlapping ranges as a complete allocation, one canonical versioned model drives public and workspace projections with a parity test, existing Wedding capabilities are audited before lead-magnet copy or routes are added, the existing wedding understanding route is retained and image assessment occurs only after the visitor explicitly submits the complete set, image inference uses a bounded low-cost provider path with no per-keystroke calls, style matching is exposed only for a category with at least 50 populated vendor style_tags records, Countdown and workspace tasks consume one catalogue rather than parallel timelines, implementation remains local-first mobile accessible consented and AFP-compatible]
+    progress: "Registered from the WED-318 release head. First slice: verify the reported 120-percent range conflict, audit current budget/timeline/vision/import/vendor-style capabilities, then implement the canonical budget model and shared lead-magnet primitives before any public tool claims are enabled."
+
   - id: WED-318
     title: Release Family access, build the operator email relay, and close vendor-side workflow gaps
     status: in_progress
