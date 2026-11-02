@@ -6652,7 +6652,8 @@ decision reconciliation; keep missing-listing publication operator-reviewed unti
 
 Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-319`, branch
 `agent/codex/WED-319`; starting SHA
-`e459ddfe730293641f8f3a89eb2c8a221c1857c2`.
+`e459ddfe730293641f8f3a89eb2c8a221c1857c2`; exact tested implementation SHA
+`a689a0274f0b1f0a8e8a29dda1081b24bcb76b12`.
 
 - Confirmed the reported budget defect: the former seven displayed midpoints totalled 120%. Added
   `wedding-budget-model.v1.json` with explicit targets totalling 100%, a generated public copy and a
