@@ -48,8 +48,8 @@ test("journey isolates sessions and challenges cross-couple grant identifiers", 
   assert.match(journey, /e2e-alex-catering-change/);
   assert.match(journey, /e2e-mia-approve-alex/);
   assert.match(journey, /Open family boundaries/);
-  assert.match(journey, /Catering coordination/);
-  assert.match(journey, /Private family/);
+  assert.match(journey, /Catering coordination contact/);
+  assert.match(journey, /Private family contact/);
   assert.match(journey, /not\.toContain\(miaCouple\.private_household_id\)/);
   assert.match(journey, /priyaGrant\.grant_id.*revoke/s);
   assert.match(journey, /status\)\.toBe\(404\)/);

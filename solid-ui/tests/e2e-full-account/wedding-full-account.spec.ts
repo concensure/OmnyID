@@ -121,8 +121,8 @@ test("Mia/Jordan and Priya/Sam stay isolated through real registration, login, g
     window.dispatchEvent(new CustomEvent("omnyid:wedding-workspace-menu", { detail: { menu: "guests" } }));
   });
   await mia.page.getByRole("button", { name: "Open family boundaries" }).click();
-  await expect(mia.page.getByText("Catering coordination", { exact: true }).first()).toBeVisible();
-  await expect(mia.page.getByText("Private family", { exact: true }).first()).toBeVisible();
+  await expect(mia.page.getByText("Catering coordination contact", { exact: true }).first()).toBeVisible();
+  await expect(mia.page.getByText("Private family contact", { exact: true }).first()).toBeVisible();
 
   const submitted = await api(mia.page, "/wedding/boundaries/requests/transitions", {
     method: "POST",
