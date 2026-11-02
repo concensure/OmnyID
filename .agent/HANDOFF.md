@@ -6724,3 +6724,10 @@ skipped for disk headroom. The hosted audit then found no OpenRouter variable in
 The successor release adds a default `/run/secrets/openrouter_api_key` Compose contract and teaches
 the existing secret migration/sync tools about `OPENROUTER_API_KEY_FILE`; deploy that successor after
 promoting the locally supplied key as a mode-600 remote secret.
+
+Hosted follow-up found and fixed one additional edge-routing defect: authenticated login passed, but
+`/wedding/rsvp/capabilities/status` returned the static-site 404 because only RSVP reminders were
+proxied. Caddy now sends `/wedding/rsvp/capabilities*` and `/wedding/rsvp/responses` to the existing
+homeserver routes, with deploy-time assertions for both staged and running configurations. A bounded
+hosted Wedding Understanding request successfully returned the exact structured reflection contract
+through `google/gemini-3.5-flash-lite`; no submitted content was persisted.

@@ -61,8 +61,12 @@ test("RSVP reminder delivery stays default-off and its authenticated routes bypa
     assert.ok(read(path).includes(expected), `${path} must pass ${flag} default-off`);
   }
   assert.match(read("Caddyfile"), /handle \/wedding\/rsvp\/reminders\/\*/);
+  assert.match(read("Caddyfile"), /handle \/wedding\/rsvp\/capabilities\*/);
+  assert.match(read("Caddyfile"), /handle \/wedding\/rsvp\/responses/);
   assert.match(read("scripts/deploy-oracle.ps1"), /staged Caddyfile is missing the RSVP reminder proxy route/);
   assert.match(read("scripts/deploy-oracle.ps1"), /running Caddyfile is missing the RSVP reminder proxy route/);
+  assert.match(read("scripts/deploy-oracle.ps1"), /staged Caddyfile is missing the RSVP capability proxy route/);
+  assert.match(read("scripts/deploy-oracle.ps1"), /running Caddyfile is missing the RSVP response proxy route/);
 });
 
 test("public RSVP rollout reaches every homeserver profile with a false default and a bounded pilot list", () => {

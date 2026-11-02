@@ -319,6 +319,17 @@
         import omnyid_proxy
     }
 
+    # Logged-in couple capability management and public token redemption use
+    # the same RSVP ledger. These paths must not fall through to the static
+    # Wedding site handler.
+    handle /wedding/rsvp/capabilities* {
+        import omnyid_proxy
+    }
+
+    handle /wedding/rsvp/responses {
+        import omnyid_proxy
+    }
+
     handle /wedding/vendor-search {
         import omnyid_proxy
     }
