@@ -44,10 +44,49 @@ Evidence:
 - Trusted first auth header, exact command removal and ciphertext context binding: 3 passed.
 - Production UI build and TypeScript checks passed.
 
-Still required before enablement: provision the dedicated sending token/key, configure exact aliases
-and operator sender, run the controlled initial/BCC/operator-reply/external-reply/replay proof, then
-restore the Worker route and compare Cloudflare inventories. Gmail must send commands from the real
+The owner-authorised production configuration is deliberately narrower than the general code path:
+
+- sole command sender: `concensure@gmail.com`;
+- relayed aliases: `hello`, `info`, `wedding`, `privacy`, `support`, and `admin` at `omnyid.com`;
+- `noreply@omnyid.com` remains outside the relay; and
+- the existing catch-all remains disabled and set to Drop.
+
+Still required before enablement: provision the dedicated sending token/key, configure the exact
+aliases and sole operator sender, run the controlled initial/BCC/reply/replay proof, and compare the
+post-change Cloudflare inventory to the protected baseline. Gmail must send commands from the real
 allowlisted Gmail identity; Gmail “Send as hello@omnyid.com” is deliberately not used.
+
+## Wedding lifecycle mail
+
+The supplied membership schedule is implemented as deterministic, bounded templates and send
+policies rather than free-form generation. The core library covers welcome, partner invitation,
+partner acceptance, vendor response, quote-ready, weekly progress, 14-day reactivation and
+post-wedding transition. Every template revalidates before send; service and journey messages need
+notification permission where appropriate, weekly/reactivation messages are capped, and the
+post-wedding product transition requires commercial consent.
+
+The Wedding welcome is connected to successful email verification. Its Wedding experience is
+persisted in the server-issued verification-token identifier and is not trusted from a client body.
+Other templates remain reusable event outputs until their corresponding AFP event producer and
+pre-send eligibility query are connected; they must not be described as scheduled production mail.
+
+## Binder confirmation and blog batch
+
+The Binder's production HTML and text templates use a backend-generated, hashed, expiring
+confirmation token. A regression test renders the exact 52-character token into the confirmation
+button and rejects the `SAMPLE-TOKEN` used by the separate static design preview.
+
+The reviewed batch contributes 14 article pages and 14 local covers. The publication catalogue,
+search taxonomy, index cards and smoke list are reconciled to 54 posts. The unrelated Animal Quiz
+card and grid restructuring from the source worktree were not transplanted.
+
+## Disposable account harness repair
+
+The seed now writes the canonical `template:wedding_planning` and `event:wedding` AFP pair consumed
+by the current Wedding projection. The browser journey additionally opens Guests and Family
+boundaries through the real UI and checks the seeded household names, so an empty Family projection
+cannot silently pass. The stack script is worktree-agnostic but refuses the primary checkout, any
+non-WED task worktree, non-loopback PostgreSQL, or a database not ending in `/omnyid_test`.
 
 ## Vendor journey audit
 

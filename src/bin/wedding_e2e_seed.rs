@@ -115,7 +115,12 @@ async fn append_fixture(
         .bind(content)
         .bind(json!({"weddingPlanId":plan,"responseWorkspaceId":workspace,"test_fixture":true}))
         .bind(vec![
-            "template:wedding_planner",
+            // The real workspace refresh uses an all-tag query for these two
+            // canonical tags. A near-match here makes valid fixture rows
+            // invisible to the browser even though the API and database tests
+            // can still see them.
+            "template:wedding_planning",
+            "event:wedding",
             "wedding_boundary",
             "e2e_fixture",
         ])

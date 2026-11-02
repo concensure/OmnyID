@@ -91,6 +91,33 @@ test("Mia/Jordan and Priya/Sam stay isolated through real registration, login, g
 
   const miaCouple = manifest.couples.mia_jordan;
   const priyaCouple = manifest.couples.priya_sam;
+
+  // Prove the same persisted fixtures consumed by the route tests are visible
+  // through the real wedding UI. This catches tag/projection drift that an API
+  // response alone cannot detect.
+  await mia.page.evaluate((couple) => {
+    window.dispatchEvent(new CustomEvent("omnyid:open-wedding-planning-intent", {
+      detail: {
+        view: "response_queue",
+        surface: "planning_files",
+        weddingPlanId: couple.plan_id,
+        responseWorkspaceId: couple.workspace_id,
+        sourceResponseId: null,
+        artifactId: null,
+        sectionId: "home",
+        notice: "Opening synthetic wedding plan.",
+        metadata: {},
+      },
+    }));
+  }, miaCouple);
+  await expect(mia.page.getByRole("button", { name: /^Guests/ }).first()).toBeVisible();
+  await mia.page.evaluate(() => {
+    window.dispatchEvent(new CustomEvent("omnyid:wedding-workspace-menu", { detail: { menu: "guests" } }));
+  });
+  await mia.page.getByRole("button", { name: "Open family boundaries" }).click();
+  await expect(mia.page.getByText("Catering coordination", { exact: true }).first()).toBeVisible();
+  await expect(mia.page.getByText("Private family", { exact: true }).first()).toBeVisible();
+
   const submitted = await api(mia.page, "/wedding/boundaries/requests/transitions", {
     method: "POST",
     body: {

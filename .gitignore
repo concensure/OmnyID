@@ -13,6 +13,7 @@ Thumbs.db
 
 # Node / frontend
 node_modules/
+.wrangler/
 .next/
 dist/
 build/

@@ -2945,10 +2945,12 @@ function App() {
           return;
         }
         try {
-          await verifyEmailToken(token);
+          const verification = await verifyEmailToken(token);
           setAuthNotice({
             tone: "success",
-            text: "Email verified. You can sign in now.",
+            text: verification.experience === "wedding"
+              ? "Email verified. Sign in to begin your wedding plan."
+              : "Email verified. You can sign in now.",
           });
         } catch (error) {
           const message = error instanceof Error ? error.message : "Verification failed.";

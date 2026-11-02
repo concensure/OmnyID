@@ -28,6 +28,9 @@ test("full-account stack is disposable and refuses unsafe targets", () => {
   assert.match(seed, /only synthetic @omnyid\.test accounts are allowed/);
   assert.match(seed, /refusing non-disposable database/);
   assert.match(seed, /\/auth\/register/);
+  assert.match(seed, /"template:wedding_planning"/);
+  assert.match(seed, /"event:wedding"/);
+  assert.doesNotMatch(seed, /"template:wedding_planner"/);
 });
 
 test("journey isolates sessions and challenges cross-couple grant identifiers", () => {
@@ -42,6 +45,9 @@ test("journey isolates sessions and challenges cross-couple grant identifiers", 
   assert.match(journey, /e2e-mia-withdraw/);
   assert.match(journey, /e2e-alex-catering-change/);
   assert.match(journey, /e2e-mia-approve-alex/);
+  assert.match(journey, /Open family boundaries/);
+  assert.match(journey, /Catering coordination/);
+  assert.match(journey, /Private family/);
   assert.match(journey, /not\.toContain\(miaCouple\.private_household_id\)/);
   assert.match(journey, /priyaGrant\.grant_id.*revoke/s);
   assert.match(journey, /status\)\.toBe\(404\)/);

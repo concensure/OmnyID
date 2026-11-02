@@ -38,5 +38,19 @@
   "wedding-rain-plan-checklist": { "stakeholders": ["couples", "venues", "photographers", "celebrants"], "stage": "Final prep", "locations": ["NSW", "Australia"], "emotions": ["weather anxiety", "confidence"] },
   "wedding-speech-length-and-structure": { "stakeholders": ["couples", "MCs", "wedding party", "guests"], "stage": "Final prep", "locations": [], "emotions": ["nerves", "confidence"] },
   "what-wedding-decor-would-you-diy": { "stakeholders": ["couples", "florists", "venues"], "stage": "Details & invites", "locations": [], "emotions": ["creativity", "joy"] },
-  "why-ai-wedding-planners-fall-short": { "stakeholders": ["couples", "wedding planners"], "stage": "Plan & budget", "locations": [], "emotions": ["distrust", "confidence"] }
+  "why-ai-wedding-planners-fall-short": { "stakeholders": ["couples", "wedding planners"], "stage": "Plan & budget", "locations": [], "emotions": ["distrust", "confidence"] },
+  "australian-wedding-trends-2027": { "stakeholders": ["couples", "vendors"], "stage": "Plan & budget", "locations": ["Australia"], "emotions": ["curiosity", "inspiration"] },
+  "venue-tour-questions-australian-couples": { "stakeholders": ["couples", "venues"], "stage": "Venue & date", "locations": ["Australia"], "emotions": ["uncertainty", "confidence"] },
+  "do-you-need-a-wedding-planner-australia": { "stakeholders": ["couples", "wedding planners"], "stage": "Plan & budget", "locations": ["Australia"], "emotions": ["overwhelm", "clarity"] },
+  "caterer-questions-beyond-the-menu": { "stakeholders": ["couples", "caterers", "venues"], "stage": "Celebrant & suppliers", "locations": ["Australia"], "emotions": ["cost anxiety", "confidence"] },
+  "photographer-and-videographer-questions-australia": { "stakeholders": ["couples", "photographers", "videographers"], "stage": "Celebrant & suppliers", "locations": ["Australia"], "emotions": ["uncertainty", "confidence"] },
+  "florist-and-dj-questions-wedding": { "stakeholders": ["couples", "florists", "DJs", "bands"], "stage": "Celebrant & suppliers", "locations": [], "emotions": ["creativity", "confidence"] },
+  "buying-a-wedding-dress-online-australia": { "stakeholders": ["couples", "dressmakers", "alterations specialists"], "stage": "Details & invites", "locations": ["Australia"], "emotions": ["uncertainty", "excitement"] },
+  "wedding-vendor-contract-checklist-australia": { "stakeholders": ["couples", "vendors"], "stage": "Plan & budget", "locations": ["Australia"], "emotions": ["anxiety", "security"] },
+  "open-bar-cash-bar-or-tab-australia": { "stakeholders": ["couples", "venues", "caterers", "guests"], "stage": "Celebrant & suppliers", "locations": ["Australia"], "emotions": ["cost anxiety", "clarity"] },
+  "wedding-budget-2027-tipping-hidden-costs": { "stakeholders": ["couples", "vendors"], "stage": "Plan & budget", "locations": ["Australia"], "emotions": ["cost anxiety", "clarity"] },
+  "wedding-website-and-childfree-invitation-wording": { "stakeholders": ["couples", "guests", "families"], "stage": "Details & invites", "locations": [], "emotions": ["etiquette anxiety", "confidence"] },
+  "small-ceremony-big-reception-australia": { "stakeholders": ["couples", "venues", "guests"], "stage": "Venue & date", "locations": ["Australia"], "emotions": ["intimacy", "joy"] },
+  "wedding-party-without-the-stress": { "stakeholders": ["couples", "wedding party", "families"], "stage": "Details & invites", "locations": [], "emotions": ["stress", "relief"] },
+  "what-couples-forget-final-three-months": { "stakeholders": ["couples", "vendors", "wedding party"], "stage": "Final prep", "locations": [], "emotions": ["overwhelm", "confidence"] }
 }

@@ -34,6 +34,20 @@ const expectedPages = [
   'blog/fake-wedding-exit-is-it-worth-it.html',
   'blog/fake-wedding-exit-what-can-go-wrong.html',
   'blog/couples-barely-know-each-other.html',
+  'blog/australian-wedding-trends-2027.html',
+  'blog/venue-tour-questions-australian-couples.html',
+  'blog/do-you-need-a-wedding-planner-australia.html',
+  'blog/caterer-questions-beyond-the-menu.html',
+  'blog/photographer-and-videographer-questions-australia.html',
+  'blog/florist-and-dj-questions-wedding.html',
+  'blog/buying-a-wedding-dress-online-australia.html',
+  'blog/wedding-vendor-contract-checklist-australia.html',
+  'blog/open-bar-cash-bar-or-tab-australia.html',
+  'blog/wedding-budget-2027-tipping-hidden-costs.html',
+  'blog/wedding-website-and-childfree-invitation-wording.html',
+  'blog/small-ceremony-big-reception-australia.html',
+  'blog/wedding-party-without-the-stress.html',
+  'blog/what-couples-forget-final-three-months.html',
 ];
 
 function htmlFiles(dir) {

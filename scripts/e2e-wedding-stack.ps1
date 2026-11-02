@@ -48,26 +48,29 @@ function Stop-Child($Process) {
 }
 
 $repo = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
-$expectedRepo = "C:\Users\ozans\Desktop\projects\OmnyID-WED-317"
-if ($repo -ne $expectedRepo) { throw "Run this harness only from the WED-317 worktree: $expectedRepo" }
+$repoLeaf = Split-Path -Leaf $repo
+if ($repoLeaf -notmatch '^OmnyID-WED-\d+$') {
+    throw "Run this harness only from a dedicated OmnyID-WED task worktree, not the primary checkout"
+}
 
 $gitTop = (git -C $repo rev-parse --show-toplevel).Trim().Replace("/", "\")
 $gitSha = (git -C $repo rev-parse HEAD).Trim()
 $dirty = @(git -C $repo status --short)
 Write-Host "worktree=$gitTop"
 Write-Host "source_sha=$gitSha"
-if ($gitTop -ne $repo) { throw "Git toplevel does not match the WED-317 worktree" }
+if ($gitTop -ne $repo) { throw "Git toplevel does not match the selected WED task worktree" }
 if ($dirty.Count -ne 0) { throw "Refusing to build or run the full-account harness from a dirty tree" }
 
 $dbPort = Get-FreeLoopbackPort
 $apiPort = Get-FreeLoopbackPort
 $uiPort = Get-FreeLoopbackPort
-$container = "omnyid-wed317-pg-$PID"
-if ($container -notmatch '^omnyid-wed317-pg-\d+$') { throw "Unsafe container name" }
+$taskSlug = $repoLeaf.ToLowerInvariant()
+$container = "omnyid-e2e-$taskSlug-pg-$PID"
+if ($container -notmatch '^omnyid-e2e-omnyid-wed-\d+-pg-\d+$') { throw "Unsafe container name" }
 $databaseUrl = "postgres://omnyid_test:omnyid_test@127.0.0.1:$dbPort/omnyid_test"
 $apiOrigin = "http://127.0.0.1:$apiPort"
 $uiOrigin = "http://127.0.0.1:$uiPort"
-$password = "OmnyID-WED317-Synthetic-Only!"
+$password = "OmnyID-Wedding-E2E-Synthetic-Only!"
 $tempBase = [IO.Path]::GetFullPath([IO.Path]::GetTempPath())
 $tempRoot = Join-Path $tempBase "omnyid-wedding-e2e-$PID-$([Guid]::NewGuid().ToString('N'))"
 $tempRoot = [IO.Path]::GetFullPath($tempRoot)
@@ -175,7 +178,7 @@ try {
 
     $serverExe = Join-Path $cargoTarget "debug\omnyid-homeserver.exe"
     $seedExe = Join-Path $cargoTarget "debug\wedding_e2e_seed.exe"
-    if (-not (Test-Path $serverExe) -or -not (Test-Path $seedExe)) { throw "Build the WED-317 binaries first" }
+    if (-not (Test-Path $serverExe) -or -not (Test-Path $seedExe)) { throw "Build the selected WED task binaries first" }
     $server = Start-Process -FilePath $serverExe -WorkingDirectory $repo -WindowStyle Hidden -PassThru `
         -RedirectStandardOutput $serverOut -RedirectStandardError $serverErr -Environment $serverEnvironment
     Wait-Http "$apiOrigin/auth/google/config" 90

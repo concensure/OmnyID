@@ -323,6 +323,8 @@ mod tests {
         assert!(plain.contains("confirm so we know"));
         assert!(html.contains("Yes, send me planning tips"));
         assert!(plain.contains("binder/confirm?token="));
+        assert!(html.contains(&format!("binder/confirm?token={}", "a".repeat(52))));
+        assert!(!html.contains("SAMPLE-TOKEN"));
     }
 
     #[test]

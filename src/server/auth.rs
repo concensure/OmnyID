@@ -894,8 +894,44 @@ pub(super) async fn verify_email_http(
         .map_err(internal_error)
         .map_err(status_to_http)?;
 
+    let experience = verification_source::token_experience(&record.id);
+    if experience == "wedding" {
+        if let Some(user) = state
+            .db
+            .find_user_by_id(&record.user_id)
+            .await
+            .map_err(internal_error)
+            .map_err(status_to_http)?
+        {
+            let message = crate::wedding_lifecycle_email::compose_wedding_lifecycle_email(
+                crate::wedding_lifecycle_email::WeddingLifecycleEmailKind::Welcome,
+                &crate::wedding_lifecycle_email::WeddingLifecycleEmailContext {
+                    recipient_name: user.display_name.clone(),
+                    action_url: "https://omnyid.com/workspace/?auth=signin&source=wedding"
+                        .to_string(),
+                    ..Default::default()
+                },
+            );
+            tokio::spawn(async move {
+                if let Err(error) = crate::gateway::smtp_out::send_transactional_email(
+                    &user.email,
+                    &message.subject,
+                    &message.body,
+                )
+                .await
+                {
+                    tracing::warn!(%error, user_id = %user.id, "Wedding welcome email failed after verification");
+                }
+            });
+        }
+    }
+
     Ok(Json(
-        serde_json::json!({ "ok": true, "email_verified": true }),
+        serde_json::json!({
+            "ok": true,
+            "email_verified": true,
+            "experience": experience,
+        }),
     ))
 }
 
@@ -1128,7 +1164,7 @@ async fn issue_and_send_verification_email(
 ) -> Result<(), (StatusCode, String)> {
     let raw_token = generate_secure_token();
     let token_hash = crate::db::sha256_token(&raw_token);
-    let token_id = ulid::Ulid::new().to_string();
+    let token_id = verification_source::verification_token_id(source);
     let expires_at = (chrono::Utc::now() + chrono::Duration::hours(24)).to_rfc3339();
 
     state

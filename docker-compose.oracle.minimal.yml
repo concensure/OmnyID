@@ -95,14 +95,29 @@ services:
       - storage
     restart: unless-stopped
 
+  # Malware scanning is private to the Compose network. No clamd port is
+  # published on the host because its TCP protocol has no authentication.
+  clamav:
+    image: clamav/clamav:1.4.6-debian13-slim
+    mem_limit: ${OMNYID_CLAMAV_MEM_LIMIT:-1536m}
+    cpus: ${OMNYID_CLAMAV_CPUS:-1.0}
+    pids_limit: ${OMNYID_CLAMAV_PIDS_LIMIT:-128}
+    volumes:
+      - clamav-data:/var/lib/clamav
+    restart: unless-stopped
+
   homeserver:
     build: .
     mem_limit: ${OMNYID_HOMESERVER_MEM_LIMIT:-4g}
     cpus: ${OMNYID_HOMESERVER_CPUS:-2.5}
     pids_limit: ${OMNYID_HOMESERVER_PIDS_LIMIT:-512}
     depends_on:
-      - postgres
-      - seaweedfs
+      postgres:
+        condition: service_started
+      seaweedfs:
+        condition: service_started
+      clamav:
+        condition: service_healthy
     entrypoint: ["/bin/bash", "-c", "exec /bin/bash -s -- \"$@\" < <(tr -d '\\r' < /usr/local/bin/runtime-env-entrypoint.sh)", "--"]
     command: ["./omnyid-homeserver"]
     environment:
@@ -205,7 +220,7 @@ services:
       OMNYID_OPERATOR_EMAIL_RELAY_CLOUDFLARE_ACCOUNT_ID: ${OMNYID_OPERATOR_EMAIL_RELAY_CLOUDFLARE_ACCOUNT_ID:-}
       OMNYID_OPERATOR_EMAIL_RELAY_CLOUDFLARE_API_TOKEN_FILE: ${OMNYID_OPERATOR_EMAIL_RELAY_CLOUDFLARE_API_TOKEN_FILE:-}
       OMNYID_VENDOR_LISTING_PROPOSALS_ENABLED: ${OMNYID_VENDOR_LISTING_PROPOSALS_ENABLED:-false}
-      CLAMD_HOST: ${CLAMD_HOST:-}
+      CLAMD_HOST: ${CLAMD_HOST:-clamav:3310}
       OMNYID_VENDOR_SENDER_MASK_ENABLED: ${OMNYID_VENDOR_SENDER_MASK_ENABLED:-false}
       OMNYID_VENDOR_MAIL_RESEND_WEBHOOK_SECRET_FILE: ${OMNYID_VENDOR_MAIL_RESEND_WEBHOOK_SECRET_FILE:-}
       OMNYID_CEREBRAS_API_KEY_FILE: ${OMNYID_CEREBRAS_API_KEY_FILE:-}
@@ -367,6 +382,7 @@ services:
 volumes:
   postgres-data:
   seaweedfs-data:
+  clamav-data:
   workspace-assets:
   # Filled by the staging stack; declared here so Caddy can mount it read-only.
   staging-workspace-assets:

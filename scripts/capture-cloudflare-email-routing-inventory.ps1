@@ -1,5 +1,4 @@
 param(
-    [Parameter(Mandatory = $true)]
     [string]$ApiTokenFile,
     [Parameter(Mandatory = $true)]
     [string]$ZoneId,
@@ -12,13 +11,16 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-if (-not (Test-Path -LiteralPath $ApiTokenFile)) {
-    throw "Cloudflare API token file was not found. Provide a file with the Email Routing read permission."
+$token = if (-not [string]::IsNullOrWhiteSpace($ApiTokenFile)) {
+    if (-not (Test-Path -LiteralPath $ApiTokenFile)) {
+        throw "Cloudflare API token file was not found."
+    }
+    (Get-Content -LiteralPath $ApiTokenFile -Raw).Trim()
+} else {
+    [string]$env:CLOUDFLARE_API_TOKEN
 }
-
-$token = (Get-Content -LiteralPath $ApiTokenFile -Raw).Trim()
 if ([string]::IsNullOrWhiteSpace($token)) {
-    throw "Cloudflare API token file is empty."
+    throw "Provide -ApiTokenFile or set CLOUDFLARE_API_TOKEN with Email Routing read permission."
 }
 
 $headers = @{ Authorization = "Bearer $token" }

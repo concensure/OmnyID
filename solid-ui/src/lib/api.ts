@@ -4073,11 +4073,24 @@ export const probeApiReachability = async (): Promise<ApiReachability> => {
     latency_ms: Math.max(0, Math.round(finishedAt - startedAt)),
   };
 };
-export const verifyEmailToken = (token: string) =>
+export type VerifyEmailResponse = {
+  ok: boolean;
+  email_verified: boolean;
+  experience: "generic" | "wedding";
+};
+
+export const verifyEmailToken = (token: string): Promise<VerifyEmailResponse> =>
   publicApiFetch<unknown>("/auth/verify-email", {
     method: "POST",
     bodyJson: { token },
-  }).then(normalizeOkResponse);
+  }).then((value) => {
+    if (!isRecord(value)) throw new Error("Invalid email-verification response.");
+    return {
+      ok: apiBoolean(value.ok),
+      email_verified: apiBoolean(value.email_verified),
+      experience: value.experience === "wedding" ? "wedding" : "generic",
+    };
+  });
 export const authenticateWithGoogleIdToken = (idToken: string): Promise<AuthApiResponse> =>
   publicApiFetch<unknown>("/auth/google", {
     method: "POST",

@@ -146,6 +146,7 @@ pub mod wedding_vendor_decision_patterns;
 pub mod wedding_vendor_email_contract;
 pub mod wedding_vendor_quote_orchestration;
 pub mod wedding_vendor_replay;
+pub mod wedding_lifecycle_email;
 pub mod workflow_instance_contracts;
 pub mod workflow_supervisor;
 pub mod workflow_trace_events;

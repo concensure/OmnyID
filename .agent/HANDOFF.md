@@ -6562,3 +6562,38 @@ BCC and bidirectional reply proof; do not enable listing proposal before disposa
 evidence; two-sided vendor-confirmed booking and connected reconciliation remain WED-318G.
 
 Evidence: `Documents/verification/wed-318-family-release-and-vendor-relay-2026-11-02.md`.
+
+## 2026-11-02: WED-318 secure alias relay and membership-email release candidate
+
+Implemented in the isolated `agent/codex/WED-318` worktree, pending the clean-SHA
+hosted release:
+
+- restricted the operational alias relay to the sole Gmail operator
+  `concensure@gmail.com` and the six exact aliases `hello@`, `info@`, `wedding@`,
+  `privacy@`, `support@` and `admin@omnyid.com`; an untrusted sender can never
+  invoke the `To:` command and instead follows the bounded inbound-forward path;
+- added the ClamAV container dependency, encrypted relay-thread state, durable
+  replay reservation, operator BCC and provider Message-ID correlation while
+  retaining false-default enablement until the hosted scanner and routing proof;
+- added eight deterministic wedding-journey email templates from the reviewed
+  schedule. Only the wedding-origin welcome is connected to a live trigger;
+  the remaining templates are reusable policy-bound outputs, not an unreviewed
+  autonomous schedule;
+- bound the verification experience to the server-created verification token so
+  client input cannot convert a generic registration into Wedding onboarding;
+- proved the production Binder HTML consumes its server-generated confirmation
+  URL and cannot emit the design preview's sample token;
+- integrated the 14-post reviewed blog batch and local covers without importing
+  the excluded Animal Quiz card or its grid restructuring;
+- hardened the disposable full-account harness against the primary checkout,
+  unsafe databases, dirty candidates and invisible Wedding-template seed values.
+
+Local evidence before freezing the candidate: Worker 8, Wedding UI 2,147,
+Wedding site/catalogue, line budget, TypeScript and production UI build passed.
+Focused Rust verification passed for verification-source 3, lifecycle mail 3,
+relay planning 4, provider boundary 4, Binder 3 and migration catalogue 1. The
+clean disposable full-account run is the remaining pre-release check. Oracle is
+pre-provisioned with the dedicated secret,
+the exact alias/operator lists and the relay flag false; no routing rule has been
+enabled yet. Hosted enablement must use a clean exact SHA and record matching
+runtime provenance.

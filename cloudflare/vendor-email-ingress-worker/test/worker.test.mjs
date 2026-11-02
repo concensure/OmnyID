@@ -164,4 +164,16 @@ test("wrangler config cannot create or take over routing rules", async () => {
   );
   assert.equal(Object.hasOwn(config, "addresses"), false);
   assert.equal(config.observability.enabled, false);
+  assert.deepEqual(
+    config.vars.OPERATOR_ALIASES.split(","),
+    [
+      "hello@omnyid.com",
+      "info@omnyid.com",
+      "wedding@omnyid.com",
+      "privacy@omnyid.com",
+      "support@omnyid.com",
+      "admin@omnyid.com",
+    ],
+  );
+  assert.doesNotMatch(config.vars.OPERATOR_ALIASES, /noreply@/u);
 });

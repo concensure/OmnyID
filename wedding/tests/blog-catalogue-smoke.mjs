@@ -12,8 +12,9 @@ const articles = readdirSync(blogRoot).filter((name) => name.endsWith('.html')).
 const catalogueRows = csv.trim().split(/\r?\n/).slice(1);
 const indexed = new Set(Array.from(index.matchAll(/href="blog\/([^"]+\.html)"/g), (match) => match[1]));
 const stages = new Set();
+const expectedArticleCount = 54;
 
-if (articles.length !== 40) failures.push(`expected 40 articles, found ${articles.length}`);
+if (articles.length !== expectedArticleCount) failures.push(`expected ${expectedArticleCount} articles, found ${articles.length}`);
 if (indexed.size !== articles.length) failures.push(`index has ${indexed.size} unique article links for ${articles.length} articles`);
 if (catalogueRows.length !== articles.length) failures.push(`CSV has ${catalogueRows.length} records for ${articles.length} articles`);
 if ((index.match(/<!-- omnyid-catalogue:start -->/g) || []).length !== 1) failures.push('generated catalogue block is not singular');

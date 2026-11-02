@@ -56,6 +56,7 @@ struct RelayThread {
 enum RelayPlan {
     Initial { thread: RelayThread, body: String },
     OperatorReply { thread: RelayThread, body: String },
+    ExternalInbound { thread: RelayThread, body: String },
     ExternalReply { thread: RelayThread, body: String },
 }
 
@@ -64,6 +65,7 @@ impl RelayPlan {
         match self {
             Self::Initial { thread, .. }
             | Self::OperatorReply { thread, .. }
+            | Self::ExternalInbound { thread, .. }
             | Self::ExternalReply { thread, .. } => thread,
         }
     }
@@ -72,6 +74,7 @@ impl RelayPlan {
         match self {
             Self::Initial { body, .. }
             | Self::OperatorReply { body, .. }
+            | Self::ExternalInbound { body, .. }
             | Self::ExternalReply { body, .. } => body,
         }
     }
@@ -79,7 +82,7 @@ impl RelayPlan {
     fn direction(&self) -> &'static str {
         match self {
             Self::Initial { .. } | Self::OperatorReply { .. } => "operator_to_external",
-            Self::ExternalReply { .. } => "external_to_operator",
+            Self::ExternalInbound { .. } | Self::ExternalReply { .. } => "external_to_operator",
         }
     }
 }
@@ -181,7 +184,9 @@ pub(super) async fn handle(
         RelayPlan::Initial { .. } | RelayPlan::OperatorReply { .. } => {
             (thread.recipient.clone(), Some(thread.operator.clone()))
         }
-        RelayPlan::ExternalReply { .. } => (thread.operator.clone(), None),
+        RelayPlan::ExternalInbound { .. } | RelayPlan::ExternalReply { .. } => {
+            (thread.operator.clone(), None)
+        }
     };
     let request = OperatorRelaySendRequest {
         from: thread.alias.clone(),
@@ -268,17 +273,35 @@ async fn build_plan(
         });
     }
 
-    let thread = resolve_thread(state, config, parsed).await?;
+    let body = validated_body(&parsed.body)?;
+    let thread = match resolve_thread(state, config, parsed).await {
+        Ok(thread) => thread,
+        Err(error)
+            if error.code == "thread_reference_required" || error.code == "thread_not_found" =>
+        {
+            return Ok(RelayPlan::ExternalInbound {
+                thread: RelayThread {
+                    id: format!("oprelay_{}", Ulid::new().to_string().to_lowercase()),
+                    alias: envelope.to.clone(),
+                    operator: config.operators[0].clone(),
+                    recipient: sender.to_string(),
+                },
+                body: external_inbound_body(sender, &body),
+            });
+        }
+        Err(error) => return Err(error),
+    };
     if !thread.recipient.eq_ignore_ascii_case(sender) || thread.alias != envelope.to {
         return Err(RelayError::new(
             StatusCode::UNAUTHORIZED,
             "sender_not_authorized",
         ));
     }
-    Ok(RelayPlan::ExternalReply {
-        thread,
-        body: validated_body(&parsed.body)?,
-    })
+    Ok(RelayPlan::ExternalReply { thread, body })
+}
+
+fn external_inbound_body(sender: &str, body: &str) -> String {
+    format!("Message from {sender}\n\n{body}")
 }
 
 fn parse_initial_command(body: &str) -> Result<Option<(String, String)>, RelayError> {
@@ -379,7 +402,10 @@ async fn reserve_event(
             "relay_persistence_unavailable",
         )
     })?;
-    if matches!(plan, RelayPlan::Initial { .. }) {
+    if matches!(
+        plan,
+        RelayPlan::Initial { .. } | RelayPlan::ExternalInbound { .. }
+    ) {
         let thread = plan.thread();
         let operator_ciphertext =
             encrypt_address(config, &thread.id, "operator", &thread.operator)?;
@@ -543,7 +569,7 @@ fn config() -> Result<RelayConfig, RelayError> {
     .and_then(|value| <[u8; 32]>::try_from(value).ok())
     .ok_or_else(|| RelayError::new(StatusCode::SERVICE_UNAVAILABLE, "relay_config_unavailable"))?;
     if aliases.is_empty()
-        || operators.is_empty()
+        || operators.len() != 1
         || aliases.iter().any(|value| !value.ends_with("@omnyid.com"))
         || operators.iter().any(|value| value.ends_with("@omnyid.com"))
         || aliases
@@ -717,5 +743,12 @@ mod tests {
         );
         assert!(decrypt_address(&config, "thread-b", "recipient", ciphertext.clone()).is_err());
         assert!(decrypt_address(&config, "thread-a", "operator", ciphertext).is_err());
+    }
+
+    #[test]
+    fn unsolicited_external_mail_is_labelled_for_the_single_operator() {
+        let body = external_inbound_body("alice@example.com", "Can you help?");
+        assert_eq!(body, "Message from alice@example.com\n\nCan you help?");
+        assert!(!body.contains("To:"));
     }
 }
