@@ -136,8 +136,11 @@ async fn seed_couple(
     partner_email: &str,
 ) -> Result<CoupleFixture> {
     let schema = db.ensure_user_private_schema(&owner.id).await?;
-    let plan = format!("e2e-{key}-plan");
-    let workspace = format!("e2e-{key}-workspace");
+    // Match the canonical identifiers produced by the Wedding template. The
+    // projection normalizer deliberately prefixes non-canonical values, so a
+    // synthetic `e2e-...-workspace` fixture can never match its own metadata.
+    let plan = format!("wedding_plan:e2e-{key}");
+    let workspace = format!("response_workspace:e2e-{key}");
     let catering_household = format!("e2e-{key}-catering-household");
     let private_household = format!("e2e-{key}-private-household");
     let catering_person = format!("e2e-{key}-catering-person");

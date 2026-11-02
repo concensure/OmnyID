@@ -30,6 +30,8 @@ test("full-account stack is disposable and refuses unsafe targets", () => {
   assert.match(seed, /\/auth\/register/);
   assert.match(seed, /"template:wedding_planning"/);
   assert.match(seed, /"event:wedding"/);
+  assert.match(seed, /wedding_plan:e2e-\{key\}/);
+  assert.match(seed, /response_workspace:e2e-\{key\}/);
   assert.doesNotMatch(seed, /"template:wedding_planner"/);
 });
 
