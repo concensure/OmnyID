@@ -4107,6 +4107,8 @@ function App() {
                   <div class="view-enter">
                     <LazyResponseQueueView
                       bootstrap={workspaceBootstrap()}
+                      sessionUser={session()?.user ?? null}
+                      signedIn={Boolean(session()?.token)}
                       onNavigate={(view, hint) => {
                         if (view === "agent_settings" && hint === "llm") {
                           setAgentSettingsFocusLlm(true);

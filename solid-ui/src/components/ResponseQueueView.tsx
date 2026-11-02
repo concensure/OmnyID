@@ -3,7 +3,7 @@
 // @primary-capability: response-queue-wedding-workspace
 // @stability: beta
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
-import type { DashboardBootstrap } from "@/lib/api";
+import type { DashboardBootstrap, Session } from "@/lib/api";
 import { QueueDensityToggle } from "@/components/QueueDensityToggle";
 import { ResponseQueueSurface } from "@/components/ResponseQueueSurface";
 import { WeddingNavigationArrivalBanner } from "@/components/WeddingNavigationArrivalBanner";
@@ -317,6 +317,8 @@ function vendorSearchQueryWithFallbackArea(query: string, area: string): string 
 
 export function ResponseQueueView(props: {
   bootstrap: DashboardBootstrap | null;
+  sessionUser?: Session["user"] | null;
+  signedIn?: boolean;
   onNavigate?: (view: ViewName, hint?: string) => void;
 }) {
   const bootstrap = createMemo(() => props.bootstrap);
@@ -493,9 +495,14 @@ export function ResponseQueueView(props: {
     setWeddingFollowUpRequested(merged.requested);
   }
 
-  const weddingStorageUserId = createMemo(() => bootstrap()?.user?.id ?? null);
-  const weddingStorageUserEmail = createMemo(() => bootstrap()?.user?.email ?? "");
-  const weddingSignedIn = createMemo(() => Boolean(bootstrap()?.user && bootstrap()?.user.auth_provider !== "guest"));
+  // Authentication is session-owned. The dashboard bootstrap arrives later and
+  // must not make the Wedding projection briefly behave as a guest after login.
+  const weddingAccountUser = createMemo(() => props.sessionUser ?? bootstrap()?.user ?? null);
+  const weddingStorageUserId = createMemo(() => weddingAccountUser()?.id ?? null);
+  const weddingStorageUserEmail = createMemo(() => weddingAccountUser()?.email ?? "");
+  const weddingSignedIn = createMemo(() => props.signedIn ?? Boolean(
+    weddingAccountUser() && weddingAccountUser()?.auth_provider !== "guest",
+  ));
   const weddingVendorSmokeTestAvailable = createMemo(() => weddingSignedIn());
   const [weddingArrivalMenuAppliedKey, setWeddingArrivalMenuAppliedKey] = createSignal<string | null>(null);
   createEffect(() => {
