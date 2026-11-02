@@ -25,6 +25,7 @@ $script:OracleRemoteSecretFileNames = @{
     "OMNYID_NVIDIA_API_KEY_FILE"      = "omnyid_nvidia_api_key"
     "OMNYID_RUNPOD_API_KEY_FILE"      = "omnyid_runpod_api_key"
     "OMNYID_OPENAI_API_KEY_FILE"      = "omnyid_openai_api_key"
+    "OPENROUTER_API_KEY_FILE"         = "openrouter_api_key"
     "OMNYID_ADMIN_BRAVE_SEARCH_API_KEY_FILE" = "omnyid_brave_search_api_key"
     "OMNYID_BRAVE_SEARCH_API_KEY_FILE"       = "omnyid_brave_search_api_key"
     "BRAVE_SEARCH_API_KEY_FILE"              = "omnyid_brave_search_api_key"

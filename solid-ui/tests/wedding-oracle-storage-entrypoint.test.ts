@@ -23,3 +23,18 @@ for (const composeFile of [
     ));
   });
 }
+
+for (const composeFile of [
+  "docker-compose.oracle.yml",
+  "docker-compose.oracle.minimal.yml",
+]) {
+  test(`${composeFile} keeps OpenRouter credentials file-backed`, () => {
+    const compose = readFileSync(resolve(root, composeFile), "utf8");
+
+    assert.match(
+      compose,
+      /OPENROUTER_API_KEY_FILE: \$\{OPENROUTER_API_KEY_FILE:-\/run\/secrets\/openrouter_api_key\}/,
+    );
+    assert.doesNotMatch(compose, /^\s+OPENROUTER_API_KEY:/m);
+  });
+}

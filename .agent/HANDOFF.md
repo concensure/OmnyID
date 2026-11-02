@@ -6717,3 +6717,10 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-319`, branch
 
 Next action: freeze the successor commit, deploy from a clean detached worktree, apply migration
 0135, verify exact Oracle runtime provenance and hosted health, then begin LP-02.
+
+Deployment follow-up: application SHA `9f3d02fad114c1ffc12dc0f3b6865519c6012a6b` built and started
+successfully, migration 0135 applied, and direct production proof passed with the restore drill
+skipped for disk headroom. The hosted audit then found no OpenRouter variable in `.env.oracle`.
+The successor release adds a default `/run/secrets/openrouter_api_key` Compose contract and teaches
+the existing secret migration/sync tools about `OPENROUTER_API_KEY_FILE`; deploy that successor after
+promoting the locally supplied key as a mode-600 remote secret.

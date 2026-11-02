@@ -29,7 +29,9 @@ $mappings = @(
     @{ Key = "ANTHROPIC_API_KEY"; FileKey = "OMNYID_ANTHROPIC_KEY_FILE"; FileName = "omnyid_anthropic_api_key" },
     @{ Key = "OMNYID_RUNPOD_API_KEY"; FileKey = "OMNYID_RUNPOD_API_KEY_FILE"; FileName = "omnyid_runpod_api_key" },
     @{ Key = "OMNYID_OPENAI_API_KEY"; FileKey = "OMNYID_OPENAI_API_KEY_FILE"; FileName = "omnyid_openai_api_key" },
-    @{ Key = "OPENAI_API_KEY"; FileKey = "OMNYID_OPENAI_API_KEY_FILE"; FileName = "omnyid_openai_api_key" }
+    @{ Key = "OPENAI_API_KEY"; FileKey = "OMNYID_OPENAI_API_KEY_FILE"; FileName = "omnyid_openai_api_key" },
+    @{ Key = "OPENROUTER_API_KEY"; FileKey = "OPENROUTER_API_KEY_FILE"; FileName = "openrouter_api_key" },
+    @{ Key = "OMNYID_OPENROUTER_API_KEY"; FileKey = "OPENROUTER_API_KEY_FILE"; FileName = "openrouter_api_key" }
 )
 
 if ($Keys.Count -gt 0) {
