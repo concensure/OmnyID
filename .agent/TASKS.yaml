@@ -15,6 +15,16 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-320
+    title: Verify Wedding operational claims and unify RSVP, workspace projections, and lead-magnet delivery
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-320
+    worktree: C:/Users/ozans/Desktop/projects/OmnyID-WED-319
+    depends_on: [WED-319, WED-318, WED-305]
+    files: [cloudflare/vendor-email-ingress-worker/**, src/server/wedding_**, src/server/operator_email_relay*, solid-ui/src/**, wedding/**, Documents/marketing/wedding planning/posts/magnet/**, Documents/verification/**, .agent/**]
+    acceptance: [The operator relay diagnosis preserves DMARC and records the exact external configuration required, image understanding calls google/gemini-3.5-flash-lite through the existing server-side OpenRouter adapter only on explicit complete-batch submission, RSVP responses update the authenticated Guest projection from the same AFP ledger, LP-01 claims are either evidenced or removed from public copy, contributor creation never changes task ownership without an explicit assignment event, non-admin users cannot open Setup Check, onboarding data-sharing consent and Documents use one projection, Timeline and document actions are mobile-aligned and open the exact referenced document, location and weather evidence is relevant sanitized and source-labelled, vendor lifecycle filters reveal the relevant vendor thread and documents in place, remaining Batch 2 tasks reuse verified Wedding capabilities rather than duplicate them]
+
   - id: WED-319
     title: Reconcile Wedding budget guidance and build the shared lead-magnet foundation
     status: in_progress
