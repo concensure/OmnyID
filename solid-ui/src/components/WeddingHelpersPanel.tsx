@@ -76,11 +76,11 @@ export function WeddingHelpersPanel(props: {
     // An unassigned task belongs to the account owner first. It can then be
     // deliberately reassigned to a partner or helper instead of vanishing
     // from everyone's workload.
-    assignee: task.assignee?.trim() || helperPeople()[0] || "You",
+    assignee: task.assignee?.trim() || "You",
   };
   }));
   const taskAssignee = (task: WeddingPlanningTask) =>
-    taskAssignees()[task.id] ?? task.assignee ?? helperPeople()[0] ?? "You";
+    taskAssignees()[task.id] ?? task.assignee ?? "You";
   const taskAction = (task: WeddingPlanningTask) => weddingTaskSidebarAction(task, props.state);
   const openHelperTasks = createMemo(() => helperTasks().filter((task) => !weddingHelperTaskIsDone(task, doneTaskIds())));
   const doneHelperTasks = createMemo(() => helperTasks().filter((task) => weddingHelperTaskIsDone(task, doneTaskIds())));

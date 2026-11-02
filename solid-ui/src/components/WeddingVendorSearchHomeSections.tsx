@@ -190,6 +190,8 @@ export function WeddingVendorSearchHomeSection(props: {
   const [searchProgressIndex, setSearchProgressIndex] = createSignal(0);
   const [selectedChoiceIds, setSelectedChoiceIds] = createSignal<string[]>([]);
   const [lifecycleFilter, setLifecycleFilter] = createSignal<WeddingVendorLifecycleFilter>("all");
+  const [expandedLifecycleVendorKey, setExpandedLifecycleVendorKey] = createSignal<string | null>(null);
+  const [selectedLifecycleArtifactId, setSelectedLifecycleArtifactId] = createSignal<string | null>(null);
   const lifecycleRecords = createMemo(() => {
     const comparison = props.result?.preview ?? props.result?.sourcePreview;
     const candidates = comparison?.vendorComparisonCards.map((card) => ({
@@ -270,6 +272,30 @@ export function WeddingVendorSearchHomeSection(props: {
       })
       .filter((item) => item.score > 0)
       .sort((left, right) => right.score - left.score || right.artifact.createdAt - left.artifact.createdAt)[0]?.artifact ?? null;
+  };
+  const lifecycleArtifacts = (vendor: WeddingVendorLifecycleRecord) => {
+    const key = vendorKey(vendor.vendorName);
+    return [...workspace().state.artifactPreviews]
+      .filter((artifact) => artifact.vendorComparisonCards.some((card) => (
+        (vendor.vendorId && card.vendorId === vendor.vendorId) || vendorKey(card.title) === key
+      )) || (artifact.preview?.kind === "quote" && vendorKey(artifact.preview.vendorName) === key)
+        || (key.length >= 4 && vendorKey(`${artifact.title} ${artifact.bodyText ?? ""}`).includes(key)))
+      .sort((left, right) => right.createdAt - left.createdAt);
+  };
+  const directoryVendor = (vendor: WeddingVendorLifecycleRecord) => workspace().weddingVendorDirectory?.find((item) => (
+    (vendor.vendorId && item.vendorId === vendor.vendorId) || vendorKey(item.vendorName) === vendorKey(vendor.vendorName)
+  )) ?? null;
+  const lifecycleMessages = (vendor: WeddingVendorLifecycleRecord) => workspace().state.afpMessages
+    .filter((message) => vendor.sourceMessageIds.includes(message.id))
+    .sort((left, right) => Date.parse(right.timestamp) - Date.parse(left.timestamp));
+  const lifecycleMessageLabel = (message: (typeof workspace extends never ? never : ReturnType<typeof workspace>["state"]["afpMessages"][number])) => {
+    const label = [message.subtype, message.kind, message.type].find((value) => typeof value === "string" && value.trim());
+    return (label ?? "Vendor update").replace(/^wedding_vendor_/, "").replace(/_/g, " ");
+  };
+  const toggleLifecycleVendor = (vendor: WeddingVendorLifecycleRecord) => {
+    const opening = expandedLifecycleVendorKey() !== vendor.key;
+    setExpandedLifecycleVendorKey(opening ? vendor.key : null);
+    setSelectedLifecycleArtifactId(opening ? lifecycleArtifact(vendor)?.artifactId ?? null : null);
   };
   const openLifecycleDocument = (vendor: WeddingVendorLifecycleRecord) => {
     const artifact = lifecycleArtifact(vendor);
@@ -352,16 +378,44 @@ export function WeddingVendorSearchHomeSection(props: {
       <Show when={lifecycleFilter() !== "all"}>
         <div class="mt-3 grid gap-2" aria-live="polite">
           <Show when={filteredLifecycleRecords().length > 0} fallback={<p class="rounded-lg border border-wedding-border bg-white p-3 text-sm text-wedding-ink/70">No vendors have this status yet.</p>}>
-            <For each={filteredLifecycleRecords()}>{(vendor) => <article class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-wedding-border bg-white p-3">
-              <button type="button" class="min-h-11 min-w-0 flex-1 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-primary" onClick={() => openLifecycleDocument(vendor)}>
+            <For each={filteredLifecycleRecords()}>{(vendor) => <article class="rounded-lg border border-wedding-border bg-white p-3">
+              <div class="flex flex-wrap items-center justify-between gap-2">
+              <button type="button" class="min-h-11 min-w-0 flex-1 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-primary" aria-expanded={expandedLifecycleVendorKey() === vendor.key} onClick={() => toggleLifecycleVendor(vendor)}>
                 <span class="block break-words font-semibold text-wedding-ink">{vendor.vendorName}</span>
                 <span class="mt-0.5 block text-xs text-wedding-ink/65">{[vendor.enquired && "Enquired", vendor.favourited && "Favourited", vendor.quoteReceived && "Quote received", vendor.booked && "Booked"].filter(Boolean).join(" · ")}</span>
-                <span class="mt-1 block text-xs font-semibold text-wedding-secondary">{lifecycleArtifact(vendor) ? "View vendor document" : "Open Documents"}</span>
+                <span class="mt-1 block text-xs font-semibold text-wedding-secondary">{expandedLifecycleVendorKey() === vendor.key ? "Hide details" : "View vendor, conversation and files"}</span>
               </button>
               <div class="flex flex-wrap gap-2">
                 <Show when={quoteFlowForVendor(vendor)}>{(flow) => <button type="button" class="min-h-11 rounded-lg border border-wedding-secondary bg-white px-3 text-sm font-bold text-wedding-secondary disabled:opacity-60" disabled={vendor.quoteAccepted || !props.onAcceptQuote} onClick={() => props.onAcceptQuote?.(flow().quote, flow().quoteMessageId ?? flow().id)}>{vendor.quoteAccepted ? "Quote accepted" : "Accept quote"}</button>}</Show>
                 <Show when={vendor.quoteAccepted && !vendor.booked}><button type="button" class="min-h-11 rounded-lg bg-wedding-primary px-3 text-sm font-bold text-white" onClick={() => openLifecycleDocument(vendor)}>Review booking terms</button></Show>
               </div>
+              </div>
+              <Show when={expandedLifecycleVendorKey() === vendor.key}>
+                <div class="mt-3 grid gap-3 border-t border-wedding-border pt-3 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+                  <section class="rounded-lg bg-wedding-page p-3">
+                    <p class="text-xs font-semibold uppercase tracking-wide text-wedding-ink/60">About this vendor</p>
+                    <p class="mt-2 text-sm leading-6 text-wedding-ink">{directoryVendor(vendor)?.notes || `${vendor.vendorName} is saved in this wedding's vendor activity.`}</p>
+                    <Show when={directoryVendor(vendor)}>{(entry) => <div class="mt-2 space-y-1 text-xs leading-5 text-wedding-ink/70">
+                      <p>{[entry().category, entry().serviceArea].filter(Boolean).join(" · ")}</p>
+                      <Show when={entry().websiteUrl}>{(url) => <a class="font-semibold text-wedding-secondary underline" href={url()} target="_blank" rel="noreferrer">Vendor website</a>}</Show>
+                    </div>}</Show>
+                    <Show when={lifecycleMessages(vendor).length > 0}>
+                      <p class="mt-4 text-xs font-semibold uppercase tracking-wide text-wedding-ink/60">Conversation activity</p>
+                      <ul class="mt-2 space-y-2"><For each={lifecycleMessages(vendor)}>{(message) => <li class="rounded-lg border border-wedding-border bg-white px-3 py-2 text-xs text-wedding-ink"><span class="font-semibold capitalize">{lifecycleMessageLabel(message)}</span><span class="ml-2 text-wedding-ink/55">{new Date(message.timestamp).toLocaleDateString()}</span></li>}</For></ul>
+                    </Show>
+                  </section>
+                  <section class="min-w-0 rounded-lg border border-wedding-border bg-white p-3">
+                    <p class="text-xs font-semibold uppercase tracking-wide text-wedding-ink/60">Related documents</p>
+                    <Show when={lifecycleArtifacts(vendor).length > 0} fallback={<p class="mt-2 text-sm text-wedding-ink/65">No related document has been saved yet.</p>}>
+                      <div class="mt-2 flex gap-2 overflow-x-auto pb-1"><For each={lifecycleArtifacts(vendor)}>{(artifact) => <button type="button" class={`min-h-10 shrink-0 rounded-lg border px-3 text-left text-xs font-semibold ${selectedLifecycleArtifactId() === artifact.artifactId ? "border-wedding-primary bg-wedding-page text-wedding-primary" : "border-wedding-border bg-white text-wedding-ink"}`} onClick={() => setSelectedLifecycleArtifactId(artifact.artifactId)}>{artifact.title}</button>}</For></div>
+                      <Show when={lifecycleArtifacts(vendor).find((artifact) => artifact.artifactId === selectedLifecycleArtifactId()) ?? lifecycleArtifacts(vendor)[0]}>{(artifact) => <div class="mt-3 min-w-0">
+                        <div class="prose prose-sm max-w-none break-words text-wedding-ink" innerHTML={renderMarkdown(artifact().bodyText || artifact().emptyBodyLabel)} />
+                        <button type="button" class="mt-3 min-h-11 rounded-lg border border-wedding-secondary bg-white px-3 text-sm font-semibold text-wedding-secondary" onClick={() => { workspace().onSelectArtifact?.(artifact().artifactId); workspace().onSelectMenu?.("documents"); }}>Open in Documents</button>
+                      </div>}</Show>
+                    </Show>
+                  </section>
+                </div>
+              </Show>
             </article>}</For>
           </Show>
         </div>

@@ -175,6 +175,7 @@ struct WeddingOnboardingStateUpsertRequest {
     wedding_plan_id: String,
     intake_variant: String,
     entry_source: String,
+    admin_data_consent: Option<bool>,
 }
 
 #[derive(serde::Deserialize)]

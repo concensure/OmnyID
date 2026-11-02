@@ -81,7 +81,7 @@ export function WeddingTaskOwnerControl(props: {
           Owner
           <div class="mt-1"><WeddingTaskOwnerPicker compact value={draft()} onChange={(value) => { setDraft(value); setNotice(null); }} people={props.people} weddingPlanId={props.weddingPlanId ?? ""} responseWorkspaceId={props.responseWorkspaceId} contactUserId={props.contactUserId} saveProjection={props.saveProjection} /></div>
         </label>
-        <button type="button" disabled={!draft().trim() || saving()} class="min-h-10 rounded-lg border border-wedding-secondary bg-white px-3 text-xs font-semibold text-wedding-secondary disabled:opacity-45" onClick={() => void saveOwner()}>
+        <button type="button" disabled={!draft().trim() || saving()} class="min-h-11 rounded-lg border border-wedding-secondary bg-white px-3 text-xs font-semibold text-wedding-secondary disabled:opacity-45" onClick={() => void saveOwner()}>
           {saving() ? "Saving" : "Assign"}
         </button>
       </div>

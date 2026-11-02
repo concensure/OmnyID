@@ -35,6 +35,7 @@ import {
   normalizeAdminWeddingVendorsResponse,
   normalizeAdminThirdPartyToolPolicyPayload,
   normalizeWeddingLiveEvidenceResponse,
+  normalizeWeddingOnboardingStateResponse,
   normalizeWeddingVendorContactResponse,
   normalizeOkResponse,
   normalizeObjectMessagesResponse,
@@ -93,6 +94,28 @@ import {
   normalizeWorkflowWaitResumeListResponse,
   normalizeWorkflowWebhookIngressResponse,
 } from "../src/lib/api.ts";
+
+test("wedding onboarding normalizer keeps the persisted admin data-sharing choice", () => {
+  assert.deepEqual(normalizeWeddingOnboardingStateResponse({
+    onboarding_state: {
+      user_id: "user-1",
+      wedding_plan_id: "wedding-plan-1",
+      intake_variant: "wedding_site",
+      entry_source: "wedding_site",
+      admin_data_consent: true,
+      created_at: "2026-11-02T00:00:00Z",
+      updated_at: "2026-11-02T00:01:00Z",
+    },
+  }).onboardingState, {
+    userId: "user-1",
+    weddingPlanId: "wedding-plan-1",
+    intakeVariant: "wedding_site",
+    entrySource: "wedding_site",
+    adminDataConsent: true,
+    createdAt: "2026-11-02T00:00:00Z",
+    updatedAt: "2026-11-02T00:01:00Z",
+  });
+});
 
 test("api response normalizers filter malformed list rows and keep safe defaults", () => {
   assert.deepEqual(normalizeDaemonsResponse({

@@ -133,9 +133,9 @@ try {
     }
     if ($dockerProbe.ExitCode -ne 0) { throw "Docker Desktop is not ready" }
     docker run --detach --name $container --publish "127.0.0.1:$dbPort`:5432" `
-        --tmpfs "/var/lib/postgresql/data:rw,noexec,nosuid,size=2g" `
+        --tmpfs "/var/lib/postgresql:rw,nosuid,size=2g" `
         --env POSTGRES_USER=omnyid_test --env POSTGRES_PASSWORD=omnyid_test `
-        --env POSTGRES_DB=omnyid_test --env PGDATA=/var/lib/postgresql/data/pgdata `
+        --env POSTGRES_DB=omnyid_test `
         pgvector/pgvector:pg18 | Out-Null
     $containerStarted = $true
     $dbDeadline = [DateTimeOffset]::UtcNow.AddSeconds(60)

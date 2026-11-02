@@ -215,7 +215,8 @@ import {
   type WeddingVendorSearchResultAction,
 } from "@/lib/weddingVendorSearchResultActionState";
 import { completedWeddingVendorSearchSession, editedWeddingVendorSearchSession, loadWeddingVendorSearchSession, saveWeddingVendorSearchSession } from "@/lib/weddingVendorSearchSessionState";
-import { WEDDING_WORKSPACE_MENU_ITEMS, weddingMenuKeyDownStep } from "@/lib/weddingWorkspaceDesktopMenuState";
+import { weddingMenuKeyDownStep, weddingWorkspaceMenuItemsForEmail } from "@/lib/weddingWorkspaceDesktopMenuState";
+import { WeddingUploadFilesButton } from "@/components/WeddingUploadFilesButton";
 
 const RESPONSE_QUEUE_VIEW_CLASS =
   "view-enter min-w-0 space-y-4 rounded-[24px] border border-sky-100/80 bg-[linear-gradient(135deg,rgba(240,249,255,0.96),rgba(255,255,255,0.96))] p-3 shadow-[0_22px_70px_-36px_rgba(14,116,144,0.4)] backdrop-blur-sm phone:rounded-none phone:border-0 phone:bg-transparent phone:p-0 phone:shadow-none sm:rounded-[32px] sm:p-5";
@@ -341,10 +342,11 @@ export function ResponseQueueView(props: {
     }
   }
   function handleWeddingMenuTabKeyDown(event: KeyboardEvent, currentIndex: number) {
-    const nextIndex = weddingMenuKeyDownStep(event.key, currentIndex, WEDDING_WORKSPACE_MENU_ITEMS.length);
+    const items = weddingDesktopMenuItems();
+    const nextIndex = weddingMenuKeyDownStep(event.key, currentIndex, items.length);
     if (nextIndex === null) return;
     event.preventDefault();
-    const nextItem = WEDDING_WORKSPACE_MENU_ITEMS[nextIndex];
+    const nextItem = items[nextIndex];
     setWeddingWorkspaceMenu(nextItem.id);
     document.getElementById(`wedding-tab-${nextItem.id}`)?.focus();
   }
@@ -504,10 +506,16 @@ export function ResponseQueueView(props: {
   const weddingAccountUser = createMemo(() => props.sessionUser ?? bootstrap()?.user ?? null);
   const weddingStorageUserId = createMemo(() => weddingAccountUser()?.id ?? null);
   const weddingStorageUserEmail = createMemo(() => weddingAccountUser()?.email ?? "");
+  const weddingDesktopMenuItems = createMemo(() => weddingWorkspaceMenuItemsForEmail(weddingStorageUserEmail()));
   const weddingSignedIn = createMemo(() => props.signedIn ?? Boolean(
     weddingAccountUser() && weddingAccountUser()?.auth_provider !== "guest",
   ));
   const weddingVendorSmokeTestAvailable = createMemo(() => weddingSignedIn());
+  createEffect(() => {
+    if (weddingWorkspaceMenu() === "advanced" && !weddingDesktopMenuItems().some((item) => item.id === "advanced")) {
+      setWeddingWorkspaceMenu("home");
+    }
+  });
   const [weddingArrivalMenuAppliedKey, setWeddingArrivalMenuAppliedKey] = createSignal<string | null>(null);
   createEffect(() => {
     const intent = weddingNavigationIntent();
@@ -647,12 +655,18 @@ export function ResponseQueueView(props: {
   const [weddingAccountOnboardingVariant, setWeddingAccountOnboardingVariant] = createSignal<WeddingEntrySource | null>(null);
   createEffect(() => {
     const launch = weddingTemplateLaunch();
-    if (!launch || !weddingIntakeActive() || !weddingSignedIn()) return;
-    const planId = launch.metadata.weddingPlanId;
+    const intent = weddingNavigationIntent();
+    if (!weddingSignedIn()) return;
+    const planId = launch?.metadata.weddingPlanId
+      ?? (intent?.surface === "planning_files" ? intent.weddingPlanId : "");
+    if (!planId) return;
     if (weddingAccountOnboardingRequestedPlanId() === planId) return;
     setWeddingAccountOnboardingRequestedPlanId(planId);
     void fetchWeddingOnboardingState(planId)
-      .then((response) => setWeddingAccountOnboardingVariant(response.onboardingState?.intakeVariant ?? null))
+      .then((response) => {
+        setWeddingAccountOnboardingVariant(response.onboardingState?.intakeVariant ?? null);
+        setWeddingAdminDataConsentEnabled(response.onboardingState?.adminDataConsent === true);
+      })
       .catch(() => setWeddingAccountOnboardingVariant(null))
       .finally(() => setWeddingAccountOnboardingResolvedPlanId(planId));
   });
@@ -680,7 +694,7 @@ export function ResponseQueueView(props: {
     saveWeddingIntakeVariantShown(launch.metadata.weddingPlanId, variant, weddingStorageUserId());
     if (weddingSignedIn()) {
       const entrySource = loadWeddingEntrySource(weddingStorageUserId()) ?? "generic";
-      void saveWeddingOnboardingState(launch.metadata.weddingPlanId, variant, entrySource)
+      void saveWeddingOnboardingState(launch.metadata.weddingPlanId, variant, entrySource, weddingAdminDataConsentEnabled())
         .then((response) => {
           if (response.onboardingState) setWeddingAccountOnboardingVariant(response.onboardingState.intakeVariant);
         })
@@ -690,6 +704,21 @@ export function ResponseQueueView(props: {
   const activeWeddingLaunch = createMemo(() => (
     weddingIntakeActive() ? weddingTemplateLaunch() : null
   ));
+  function updateWeddingAdminDataConsent(enabled: boolean): void {
+    setWeddingAdminDataConsentEnabled(enabled);
+    const launch = weddingTemplateLaunch();
+    const intent = weddingNavigationIntent();
+    const planId = launch?.metadata.weddingPlanId
+      ?? (intent?.surface === "planning_files" ? intent.weddingPlanId : "");
+    if (!planId || !weddingSignedIn()) return;
+    const variant = weddingAccountOnboardingVariant()
+      ?? weddingIntakeVariant()
+      ?? (loadWeddingEntrySource(weddingStorageUserId()) === "wedding_site" ? "wedding_site" : "generic");
+    const entrySource = loadWeddingEntrySource(weddingStorageUserId()) ?? "generic";
+    void saveWeddingOnboardingState(planId, variant, entrySource, enabled).catch(() => {
+      toast.error("That data-sharing choice could not be saved. Please try again.");
+    });
+  }
   const weddingTemplateFollowUp = createMemo(() => {
     const intent = weddingNavigationIntent();
     if (!intent || intent.surface !== "planning_files" || intent.sourceResponseId || !weddingFollowUpRequested()) {
@@ -1890,9 +1919,9 @@ export function ResponseQueueView(props: {
   return (
     <div class={RESPONSE_QUEUE_VIEW_CLASS}>
       <Show when={weddingWorkspace()}>
-        <div class="relative z-[200] -mx-1 flex flex-wrap gap-2 overflow-visible px-1 pb-1 phone:hidden sm:pb-0">
+        <div class="relative z-[200] -mx-1 flex flex-wrap items-start gap-2 overflow-visible px-1 pb-1 phone:hidden sm:pb-0">
           <div role="tablist" aria-label="Wedding planner sections" class="flex shrink-0 gap-2">
-            <For each={WEDDING_WORKSPACE_MENU_ITEMS}>
+            <For each={weddingDesktopMenuItems()}>
               {(item, index) => {
                 const selected = () => {
                   const active = weddingWorkspaceMenu();
@@ -1945,31 +1974,8 @@ export function ResponseQueueView(props: {
               }}
             </For>
           </div>
-          <div aria-label="Wedding planner controls" class="flex shrink-0 items-center gap-2">
-            <label
-              tabIndex={0}
-              class={`group relative z-[1000] inline-flex min-h-10 cursor-pointer items-center justify-center rounded-full border px-4 text-xs font-semibold shadow-sm transition ${
-              weddingImportRunning()
-                ? "cursor-wait border-teal-100 bg-white/50 text-teal-900/50"
-                : "border-teal-200 bg-white/85 text-teal-950 hover:border-teal-300 hover:bg-white"
-            }`}
-            >
-              {weddingImportRunning() ? "Importing..." : "Upload files"}
-              <input
-                type="file"
-                class="sr-only"
-                multiple
-                accept=".csv,.tsv,.txt,.xls,.xlsx,.pdf,.doc,.docx,text/csv,text/tab-separated-values,text/plain,application/pdf,application/msword,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                disabled={weddingImportRunning()}
-                onChange={importWeddingFilesFromHeader}
-              />
-              <span class="pointer-events-none absolute bottom-[calc(100%+0.5rem)] right-0 z-[5000] w-72 rounded-2xl border border-teal-100 bg-white px-3 py-2 text-left text-xs font-normal leading-5 text-teal-950 opacity-0 shadow-2xl transition group-hover:opacity-100 group-focus-within:opacity-100">
-                <span class="block font-semibold">Bring in your existing lists</span>
-                <span class="mt-1 block">
-                  Upload guest lists, budgets, spreadsheets, vendor quotes, contracts, Google Sheets exports, or The Knot exports. OmnyID will organize what it can and keep the original files for later.
-                </span>
-              </span>
-            </label>
+          <div aria-label="Wedding planner controls" class="ml-auto flex shrink-0 items-center gap-2 overflow-visible">
+            <WeddingUploadFilesButton running={weddingImportRunning()} onChange={importWeddingFilesFromHeader} />
             <QueueDensityToggle
               density={viewState().density}
               onSelect={selectDensityMode}
@@ -2100,6 +2106,8 @@ export function ResponseQueueView(props: {
             onWeddingFollowUpNoimChange={setWeddingFollowUpNoim}
             weddingFollowUpCelebrant={weddingFollowUpCelebrant}
             onWeddingFollowUpCelebrantChange={setWeddingFollowUpCelebrant}
+            adminDataConsentEnabled={weddingAdminDataConsentEnabled}
+            onAdminDataConsentChange={updateWeddingAdminDataConsent}
             onSaveProgress={saveWeddingFollowUpProgress}
             onGenerateFollowUp={(starterIntents) => generateWeddingFollowUp({ starterIntents })}
             vendorSearchResultAction={weddingVendorSearchResultAction()}
@@ -2142,7 +2150,7 @@ export function ResponseQueueView(props: {
             onToggleSharePlan={() => setShowWeddingSharePlan((current) => !current)}
             onImportFiles={(files) => void importWeddingFiles(Array.from(files))}
             onQueryChange={setWeddingWorkspaceQuery}
-            onAdminDataConsentChange={setWeddingAdminDataConsentEnabled}
+            onAdminDataConsentChange={updateWeddingAdminDataConsent}
             onRefreshWorkspace={() => void refreshWeddingWorkspaceMessages()}
             onSelectArtifact={setActiveWeddingArtifactId}
             onFilterChip={(chip) => setWeddingWorkspaceQuery(chip.query)}

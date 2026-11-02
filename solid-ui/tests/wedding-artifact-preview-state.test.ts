@@ -356,6 +356,50 @@ test("buildWeddingArtifactPreviewState creates map previews from location sectio
   assert.match(preview.routeLabel, /planning hint/i);
 });
 
+test("map previews ignore unrelated provider tables and strip raw snippet markup", () => {
+  const preview = buildWeddingArtifactPreviewState({
+    artifactKind: "map_collection",
+    bodyText: [
+      "# Live location and weather evidence",
+      "",
+      "| Provider | Snippet |",
+      "| --- | --- |",
+      "| Brave Search | The RSL has <strong>oceanfront spaces</strong> for 50 to 280 guests |",
+      "",
+      "## Weather evidence",
+      "",
+      "- No weather forecast returned.",
+    ].join("\n"),
+  });
+
+  assert.equal(preview?.kind, "map");
+  if (preview?.kind !== "map") return;
+  assert.deepEqual(preview.locations, []);
+  assert.match(preview.locationSearchUrl, /google\.com\/maps\/search/);
+});
+
+test("map previews use requested locations and expose a location-search link", () => {
+  const preview = buildWeddingArtifactPreviewState({
+    artifactKind: "map_collection",
+    bodyText: [
+      "# Live location and weather evidence",
+      "",
+      "## Requested locations",
+      "",
+      "- Cronulla NSW",
+      "",
+      "## Map evidence",
+      "",
+      "- Cronulla NSW (-34.05, 151.15) via Google Maps",
+    ].join("\n"),
+  });
+
+  assert.equal(preview?.kind, "map");
+  if (preview?.kind !== "map") return;
+  assert.equal(preview.locations[0]?.label, "Cronulla NSW");
+  assert.match(preview.locationSearchUrl, /Cronulla%20NSW/);
+});
+
 test("buildWeddingArtifactPreviewState creates guest previews with privacy labels", () => {
   const preview = buildWeddingArtifactPreviewState({
     artifactKind: "guest_list",

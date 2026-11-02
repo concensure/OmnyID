@@ -433,28 +433,20 @@ export function WeddingWorkspaceContextPanels(props: {
       </div>
 
       <Show when={activeMenu() === "people"}>
-      <div class="grid gap-3 xl:grid-cols-2">
+      <div class="grid gap-3">
         <WeddingPeopleHub state={peopleAggregate()} onSelectMenu={props.onSelectMenu} />
-        <div class="xl:col-span-2">
-          <WeddingHelpersPanel
-            state={props.state}
-            onSidebarAction={props.onSidebarAction}
-            saveProjection={props.saveProjection}
-            onRefreshWorkspace={props.onRefreshWorkspace}
-            metadata={props.state.workspace.metadata}
-            contactUserId={props.contactUserId}
-          />
-        </div>
-        <div class="xl:col-span-2">
-          <WeddingCustomSurfaceTools
-            activeMenu={activeMenu()}
-            storageKey={props.state.workspace.metadata.responseWorkspaceId}
-            metadata={props.state.workspace.metadata}
-            saveProjection={props.saveProjection}
-            onRefreshWorkspace={props.onRefreshWorkspace}
-          />
-        </div>
       </div>
+      </Show>
+
+      <Show when={activeMenu() === "helpers"}>
+        <WeddingHelpersPanel
+          state={props.state}
+          onSidebarAction={props.onSidebarAction}
+          saveProjection={props.saveProjection}
+          onRefreshWorkspace={props.onRefreshWorkspace}
+          metadata={props.state.workspace.metadata}
+          contactUserId={props.contactUserId}
+        />
       </Show>
 
       <div hidden={activeMenu() !== "plan"}>
@@ -500,7 +492,7 @@ export function WeddingWorkspaceContextPanels(props: {
         </section>
       </div>
 
-      <div hidden={activeMenu() !== "guests"}>
+      <div hidden={activeMenu() !== "guests" && activeMenu() !== "people"} class={activeMenu() === "people" ? "mt-3" : ""}>
         <WeddingGuestOperationsCard
           state={props.state.guestTracking}
           metadata={props.state.workspace.metadata}
@@ -545,6 +537,17 @@ export function WeddingWorkspaceContextPanels(props: {
             responseWorkspaceId={props.state.workspace.metadata.responseWorkspaceId}
           />
         </div>
+        <Show when={activeMenu() === "people"}>
+          <div class="mt-3">
+            <WeddingCustomSurfaceTools
+              activeMenu={activeMenu()}
+              storageKey={props.state.workspace.metadata.responseWorkspaceId}
+              metadata={props.state.workspace.metadata}
+              saveProjection={props.saveProjection}
+              onRefreshWorkspace={props.onRefreshWorkspace}
+            />
+          </div>
+        </Show>
       </div>
 
       <div hidden={activeMenu() !== "inspiration"}>

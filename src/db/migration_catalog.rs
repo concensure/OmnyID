@@ -685,4 +685,9 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Private reviewed proposals for businesses absent from the Wedding vendor directory",
         include_str!("../../postgres/migrations/0134_wedding_vendor_listing_proposals.sql"),
     ),
+    (
+        "0135_wedding_onboarding_admin_data_consent",
+        "Explicit account-scoped Wedding onboarding consent for de-identified admin research sharing",
+        include_str!("../../postgres/migrations/0135_wedding_onboarding_admin_data_consent.sql"),
+    ),
 ];

@@ -94,6 +94,8 @@ export function WeddingSiteIntakeWizard(props: {
   onWeddingFollowUpNoimChange: (value: string) => void;
   weddingFollowUpCelebrant: () => string;
   onWeddingFollowUpCelebrantChange: (value: string) => void;
+  adminDataConsentEnabled: () => boolean;
+  onAdminDataConsentChange: (enabled: boolean) => void;
   onSaveProgress: () => void;
   onGenerateFollowUp: (starterIntents?: WeddingTemplateStarterIntent[]) => void | Promise<void>;
   vendorSearchResultAction?: WeddingVendorSearchResultAction | null;
@@ -650,6 +652,20 @@ export function WeddingSiteIntakeWizard(props: {
               )}
             </For>
           </div>
+          <label class="flex min-h-11 items-start gap-3 rounded-xl border border-wedding-border bg-white px-3 py-3 text-sm leading-5 text-wedding-ink">
+            <input
+              type="checkbox"
+              class="mt-0.5 h-5 w-5 shrink-0 accent-wedding-primary"
+              checked={props.adminDataConsentEnabled()}
+              onChange={(event) => props.onAdminDataConsentChange(event.currentTarget.checked)}
+            />
+            <span>
+              <span class="block font-semibold">Share anonymized wedding planning data with admin</span>
+              <span class="mt-1 block text-xs leading-5 text-wedding-ink/70">
+                Optional. Names, direct contact details, guest identities, and private documents are excluded. You can change this later in Documents.
+              </span>
+            </span>
+          </label>
           <div>
             <button
               class="w-full rounded-lg bg-wedding-primary px-4 py-2.5 text-sm font-semibold text-wedding-page shadow-sm transition hover:bg-wedding-primary/90 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto sm:py-2"

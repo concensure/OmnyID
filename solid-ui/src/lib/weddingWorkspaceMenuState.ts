@@ -45,7 +45,6 @@ export function isWeddingWorkspaceMenuId(value: unknown): value is WeddingWorksp
 
 export function canonicalWeddingWorkspaceMenuId(value: WeddingWorkspaceMenuId): WeddingWorkspaceMenuId {
   if (value === "vision") return "inspiration";
-  if (value === "helpers") return "people";
   return value;
 }
 

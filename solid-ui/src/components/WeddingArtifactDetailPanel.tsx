@@ -493,9 +493,7 @@ function ArtifactPreviewCard(props: {
             {preview.mapReadinessLabel}
           </span>
         </div>
-        <Show when={preview.locations[0]?.mapUrl} fallback={<p class="mt-2 text-sm leading-6 text-emerald-900/75">{preview.routeLabel}</p>}>
-          {(mapUrl) => <a class="mt-2 inline-flex text-sm font-semibold leading-6 text-emerald-950 underline decoration-emerald-400 underline-offset-4 hover:text-emerald-700" href={mapUrl()} target="_blank" rel="noreferrer">{preview.routeLabel}</a>}
-        </Show>
+        <a class="mt-2 inline-flex text-sm font-semibold leading-6 text-emerald-950 underline decoration-emerald-400 underline-offset-4 hover:text-emerald-700" href={preview.locationSearchUrl} target="_blank" rel="noreferrer">{preview.routeLabel}</a>
         <div class="mt-3 grid gap-2">
           <For each={preview.locations}>
             {(location) => (

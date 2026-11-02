@@ -19,8 +19,8 @@ export const WEDDING_WORKSPACE_MENU_ITEMS: readonly WeddingWorkspaceDesktopMenuI
     activeClassName: "border-pink-300 bg-pink-100 text-pink-950",
   },
   {
-    id: "people", icon: "contacts", label: "People",
-    title: "Guests, seating, and family decisions.",
+    id: "people", icon: "contacts", label: "Guests",
+    title: "Guests, RSVPs, seating, and family decisions.",
     className: "border-amber-100 bg-amber-50/80 text-amber-950 hover:border-amber-200",
     activeClassName: "border-amber-300 bg-amber-100 text-amber-950",
   },
@@ -55,6 +55,16 @@ export const WEDDING_WORKSPACE_MENU_ITEMS: readonly WeddingWorkspaceDesktopMenuI
     activeClassName: "border-stone-400 bg-stone-100 text-stone-950",
   },
 ];
+
+const WEDDING_SETUP_CHECK_ADMIN_EMAILS = new Set(["concensure@gmail.com"]);
+
+/** Setup diagnostics are an operator surface, not part of a couple's planner. */
+export function weddingWorkspaceMenuItemsForEmail(email: string | null | undefined): readonly WeddingWorkspaceDesktopMenuItem[] {
+  const normalized = email?.trim().toLowerCase() ?? "";
+  return WEDDING_SETUP_CHECK_ADMIN_EMAILS.has(normalized)
+    ? WEDDING_WORKSPACE_MENU_ITEMS
+    : WEDDING_WORKSPACE_MENU_ITEMS.filter((item) => item.id !== "advanced");
+}
 
 export function weddingMenuKeyDownStep(key: string, currentIndex: number, itemCount: number): number | null {
   if (key === "ArrowRight") return (currentIndex + 1) % itemCount;

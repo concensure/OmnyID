@@ -902,6 +902,7 @@ pub(super) async fn wedding_onboarding_state_upsert_http(
             &wedding_plan_id,
             &intake_variant,
             &entry_source,
+            body.admin_data_consent,
         )
         .await
         .map_err(readiness_error_to_http)?;

@@ -9,6 +9,7 @@ pub struct WeddingUserOnboardingStateRecord {
     pub wedding_plan_id: String,
     pub intake_variant: String,
     pub entry_source: String,
+    pub admin_data_consent: bool,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -26,6 +27,7 @@ impl Db {
                 wedding_plan_id,
                 intake_variant,
                 entry_source,
+                admin_data_consent,
                 created_at::text AS created_at,
                 updated_at::text AS updated_at
             FROM wedding_user_onboarding_state
@@ -42,6 +44,7 @@ impl Db {
             wedding_plan_id: row.get("wedding_plan_id"),
             intake_variant: row.get("intake_variant"),
             entry_source: row.get("entry_source"),
+            admin_data_consent: row.get("admin_data_consent"),
             created_at: row.get("created_at"),
             updated_at: row.get("updated_at"),
         }))
@@ -57,6 +60,7 @@ impl Db {
         wedding_plan_id: &str,
         intake_variant: &str,
         entry_source: &str,
+        admin_data_consent: Option<bool>,
     ) -> Result<WeddingUserOnboardingStateRecord, sqlx::Error> {
         let row = sqlx::query(
             r#"
@@ -64,17 +68,20 @@ impl Db {
                 user_id,
                 wedding_plan_id,
                 intake_variant,
-                entry_source
+                entry_source,
+                admin_data_consent
             )
-            VALUES ($1, $2, $3, $4)
+            VALUES ($1, $2, $3, $4, COALESCE($5, FALSE))
             ON CONFLICT (user_id, wedding_plan_id) DO UPDATE SET
                 entry_source = EXCLUDED.entry_source,
+                admin_data_consent = COALESCE($5, wedding_user_onboarding_state.admin_data_consent),
                 updated_at = NOW()
             RETURNING
                 user_id,
                 wedding_plan_id,
                 intake_variant,
                 entry_source,
+                admin_data_consent,
                 created_at::text AS created_at,
                 updated_at::text AS updated_at
             "#,
@@ -83,6 +90,7 @@ impl Db {
         .bind(wedding_plan_id)
         .bind(intake_variant)
         .bind(entry_source)
+        .bind(admin_data_consent)
         .fetch_one(&self.pool)
         .await?;
 
@@ -91,6 +99,7 @@ impl Db {
             wedding_plan_id: row.get("wedding_plan_id"),
             intake_variant: row.get("intake_variant"),
             entry_source: row.get("entry_source"),
+            admin_data_consent: row.get("admin_data_consent"),
             created_at: row.get("created_at"),
             updated_at: row.get("updated_at"),
         })

@@ -5,7 +5,7 @@ const TITLE_BY_MENU: Record<WeddingWorkspaceMenuId, string> = {
   response_queue: "Live vendor search",
   budget: "Budget",
   timeline: "Timeline",
-  people: "People",
+  people: "Guests",
   plan: "Plan",
   tasks: "Tasks",
   vision: "Vision",
@@ -13,8 +13,8 @@ const TITLE_BY_MENU: Record<WeddingWorkspaceMenuId, string> = {
   guests: "Guests",
   inspiration: "Inspiration",
   seating: "Seating",
-  helpers: "Helpers",
-  advanced: "Advanced",
+  helpers: "Who is helping",
+  advanced: "Setup checks",
 };
 
 export function weddingMobilePageTitle(menu: WeddingWorkspaceMenuId): string {

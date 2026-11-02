@@ -186,10 +186,10 @@ export function WeddingTimelinePanel(props: {
                       {item.title}
                     </button>
                     <p class="text-xs text-wedding-ink/65">{item.categoryLabel}</p>
-                    <div class="mt-1 flex flex-wrap gap-2">
+                    <div class="mt-1 flex flex-wrap items-end gap-2">
                       <Show when={props.state.planningTaskItems.find((task) => task.id === item.id)}>{(task) => <WeddingTaskCompletionButton task={task()} weddingPlanId={props.state.workspace.metadata.weddingPlanId} responseWorkspaceId={props.state.workspace.metadata.responseWorkspaceId} saveProjection={props.saveProjection} onRefreshWorkspace={props.onRefreshWorkspace} compact />}</Show>
                       <Show when={props.state.planningTaskItems.find((task) => task.id === item.id)}>{(task) => <WeddingTaskOwnerControl task={task()} weddingPlanId={props.state.workspace.metadata.weddingPlanId} responseWorkspaceId={props.state.workspace.metadata.responseWorkspaceId} people={props.state.helperContactNames} saveProjection={props.saveProjection} onRefreshWorkspace={props.onRefreshWorkspace} />}</Show>
-                      <Show when={props.state.planningTaskItems.find((task) => task.id === item.id)}>{(task) => <label class="text-xs font-semibold text-wedding-ink/70">Deadline <input type="date" value={task().dueAt?.slice(0, 10) ?? ""} onChange={(event) => void saveTaskDate(task().id, task().title, event.currentTarget.value)} class="ml-1 min-h-10 rounded-lg border border-wedding-border bg-white px-2" /></label>}</Show>
+                      <Show when={props.state.planningTaskItems.find((task) => task.id === item.id)}>{(task) => <label class="flex min-h-16 flex-col justify-end text-xs font-semibold text-wedding-ink/70">Deadline <input type="date" value={task().dueAt?.slice(0, 10) ?? ""} onChange={(event) => void saveTaskDate(task().id, task().title, event.currentTarget.value)} class="mt-1 min-h-11 rounded-lg border border-wedding-border bg-white px-2" /></label>}</Show>
                       <button
                         type="button"
                         class={ROW_ACTION_CLASS}
@@ -298,10 +298,10 @@ export function WeddingTimelinePanel(props: {
                   <p class="mt-1 text-xs font-semibold text-wedding-secondary sm:hidden">
                     {taskActionLabelFor(row.id, "Open task")}
                   </p>
-                  <div class="mt-2 hidden flex-wrap gap-1.5 sm:flex">
+                  <div class="mt-2 hidden flex-wrap items-end gap-1.5 sm:flex">
                     <Show when={props.state.planningTaskItems.find((task) => task.id === row.id)}>{(task) => <WeddingTaskCompletionButton task={task()} weddingPlanId={props.state.workspace.metadata.weddingPlanId} responseWorkspaceId={props.state.workspace.metadata.responseWorkspaceId} saveProjection={props.saveProjection} onRefreshWorkspace={props.onRefreshWorkspace} compact />}</Show>
                     <Show when={props.state.planningTaskItems.find((task) => task.id === row.id)}>{(task) => <WeddingTaskOwnerControl task={task()} weddingPlanId={props.state.workspace.metadata.weddingPlanId} responseWorkspaceId={props.state.workspace.metadata.responseWorkspaceId} people={props.state.helperContactNames} saveProjection={props.saveProjection} onRefreshWorkspace={props.onRefreshWorkspace} />}</Show>
-                    <Show when={props.state.planningTaskItems.find((task) => task.id === row.id)}>{(task) => <label class="text-xs font-semibold text-wedding-ink/70">Deadline <input type="date" value={task().dueAt?.slice(0, 10) ?? ""} onChange={(event) => void saveTaskDate(task().id, task().title, event.currentTarget.value)} class="ml-1 min-h-10 rounded-lg border border-wedding-border bg-white px-2" /></label>}</Show>
+                    <Show when={props.state.planningTaskItems.find((task) => task.id === row.id)}>{(task) => <label class="flex min-h-16 flex-col justify-end text-xs font-semibold text-wedding-ink/70">Deadline <input type="date" value={task().dueAt?.slice(0, 10) ?? ""} onChange={(event) => void saveTaskDate(task().id, task().title, event.currentTarget.value)} class="mt-1 min-h-11 rounded-lg border border-wedding-border bg-white px-2" /></label>}</Show>
                     <button
                       type="button"
                       class={ROW_ACTION_CLASS}

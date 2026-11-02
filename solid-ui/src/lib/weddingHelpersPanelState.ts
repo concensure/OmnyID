@@ -302,15 +302,17 @@ export function buildWeddingHelperPeople(
   partnerNames: readonly string[] = [],
 ): string[] {
   const seen = new Set<string>();
-  const fallbackPartners = partnerNames.length > 0 ? [...partnerNames] : ["You", "Your partner"];
-  const names = [...contactNames, ...customHelpers, ...fallbackPartners].filter((name) => {
+  const fallbackPartners = partnerNames.length > 0 ? [...partnerNames] : ["Your partner"];
+  // Keep the signed-in account owner first. Adding a contact or budget
+  // contributor must never silently transfer ownership of every open task.
+  const names = ["You", ...partnerNames, ...contactNames, ...customHelpers, ...fallbackPartners].filter((name) => {
     const label = clean(name);
     const key = label.toLowerCase();
     if (!key || seen.has(key)) return false;
     seen.add(key);
     return true;
   }).map((name) => clean(name));
-  return names.length > 0 ? names : fallbackPartners;
+  return names.length > 0 ? names : ["You", ...fallbackPartners];
 }
 
 export function weddingHelperContactRelationshipKind(role: string | null | undefined): Contact["relationshipKind"] {

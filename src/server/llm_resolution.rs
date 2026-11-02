@@ -141,6 +141,13 @@ pub(super) fn read_hosted_mistral_api_key() -> Option<String> {
         .or_else(|| read_process_secret_trimmed("MISTRAL_API_KEY"))
 }
 
+/// Platform-owned OpenRouter secret for bounded public Wedding tools. The
+/// secret manager's normal `*_FILE` handling is retained in production.
+pub(super) fn read_hosted_openrouter_api_key() -> Option<String> {
+    read_process_secret_trimmed("OPENROUTER_API_KEY")
+        .or_else(|| read_process_secret_trimmed("OMNYID_OPENROUTER_API_KEY"))
+}
+
 pub(super) fn hosted_wedding_draft_model_configured() -> bool {
     read_hosted_cerebras_api_key().is_some()
         || read_hosted_mistral_api_key().is_some()

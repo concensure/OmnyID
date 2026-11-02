@@ -24,7 +24,7 @@ test("vendor lifecycle rows open matched Documents and map guidance is a link", 
   assert.match(search, /lifecycleArtifact/);
   assert.match(search, /onSelectArtifact/);
   assert.match(search, /onSelectMenu\?\.\("documents"\)/);
-  assert.match(detail, /href=\{mapUrl\(\)\}/);
+  assert.match(detail, /href=\{preview\.locationSearchUrl\}/);
   assert.match(queue, /freeformQuery && !queryIntent\.category/);
 });
 
@@ -37,6 +37,15 @@ test("RSVP defaults names from profile and guest summary counts filter in place"
   assert.match(guests, /aria-pressed=\{guestFilter\(\) === "Replied"\}/);
   assert.match(guests, /filteredGuestRows/);
   assert.match(guests, /WeddingDashboardIcon id="check-circle"/);
+  assert.match(context, /activeMenu\(\) !== "guests" && activeMenu\(\) !== "people"/);
+});
+
+test("the More sheet exposes Guests, helpers, Documents and Inspiration without a parallel hub", () => {
+  const more = read("src/components/WeddingMobileMoreSheet.tsx");
+  assert.match(more, /Guests & RSVP/);
+  assert.match(more, /Who is helping/);
+  assert.match(more, /Documents/);
+  assert.match(more, /Inspiration/);
 });
 
 test("wedding projection uses the authenticated session before bootstrap arrives", () => {

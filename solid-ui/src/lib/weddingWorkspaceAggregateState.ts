@@ -96,8 +96,8 @@ export function buildWeddingPeopleAggregateState(state: WeddingResponseWorkspace
     privateItemCount > 0 ? `${countLabel(privateItemCount, "private note")} couple-only` : null,
   ].filter((label): label is string => Boolean(label));
   return make({
-    title: "People",
-    detail: "Guests, family boundaries and seating in one place.",
+    title: "Guests",
+    detail: "Guest details, RSVPs, family boundaries and seating in one place.",
     summaryPills: [
       countLabel(state.guestTracking.guestRowCount, "guest"),
       `${countLabel(state.guestTracking.pendingCount, "reply", "replies")} waiting`,

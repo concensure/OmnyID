@@ -41,10 +41,10 @@ use serde_json::Value;
 use super::{
     AppState, RateLimitPolicy,
     auth::{enforce_rate_limit, public_rate_limit_key},
-    llm_resolution::read_hosted_anthropic_api_key,
+    llm_resolution::read_hosted_openrouter_api_key,
 };
 
-const MODEL: &str = "claude-haiku-4-5-20251001";
+const MODEL: &str = "google/gemini-3.5-flash-lite";
 const MAX_OUTPUT_TOKENS: u32 = 500;
 
 const MAX_IMAGES: usize = 3;
@@ -182,9 +182,9 @@ async fn wedding_understanding_http(
         ));
     }
 
-    // Build the vision content blocks while validating each image. Images
-    // are placed before the trailing text block, matching Anthropic's own
-    // guidance for multi-image prompts.
+    // Build OpenRouter's OpenAI-compatible multimodal content blocks while
+    // validating each image. The browser never provides a remote image URL;
+    // only bounded, decoded-and-checked data URLs reach the provider.
     let mut content: Vec<Value> = Vec::with_capacity(request.images.len() + 1);
     for image in &request.images {
         if !ALLOWED_IMAGE_MEDIA_TYPES.contains(&image.media_type.as_str()) {
@@ -206,11 +206,9 @@ async fn wedding_understanding_http(
             ));
         }
         content.push(serde_json::json!({
-            "type": "image",
-            "source": {
-                "type": "base64",
-                "media_type": image.media_type,
-                "data": image.data_base64,
+            "type": "image_url",
+            "image_url": {
+                "url": format!("data:{};base64,{}", image.media_type, image.data_base64),
             }
         }));
     }
@@ -242,12 +240,12 @@ async fn wedding_understanding_http(
     );
     content.push(serde_json::json!({ "type": "text", "text": user_text }));
 
-    let api_key = read_hosted_anthropic_api_key().ok_or((
+    let api_key = read_hosted_openrouter_api_key().ok_or((
         StatusCode::SERVICE_UNAVAILABLE,
         "this feature isn't configured yet".to_string(),
     ))?;
 
-    let raw = anthropic_vision_infer(
+    let raw = openrouter_vision_infer(
         &state.http_client,
         &api_key,
         MODEL,
@@ -265,7 +263,7 @@ async fn wedding_understanding_http(
     })?;
 
     let payload = parse_model_payload(&raw).map_err(|err| {
-        tracing::warn!(%err, raw = %raw, "wedding_understanding: could not parse model output");
+        tracing::warn!(%err, "wedding_understanding: could not parse model output");
         (
             StatusCode::BAD_GATEWAY,
             "couldn't generate your Wedding Understanding right now — please try again in a moment"
@@ -304,7 +302,7 @@ fn parse_model_payload(raw: &str) -> Result<ModelUnderstandingPayload, String> {
     Ok(payload)
 }
 
-async fn anthropic_vision_infer(
+async fn openrouter_vision_infer(
     client: &reqwest::Client,
     api_key: &str,
     model: &str,
@@ -313,16 +311,20 @@ async fn anthropic_vision_infer(
 ) -> Result<String, String> {
     let body = serde_json::json!({
         "model": model,
-        "max_tokens": MAX_OUTPUT_TOKENS,
+        "max_completion_tokens": MAX_OUTPUT_TOKENS,
         "temperature": 0.7,
-        "system": system,
-        "messages": [{ "role": "user", "content": content }],
+        "messages": [
+            { "role": "system", "content": system },
+            { "role": "user", "content": content }
+        ],
+        "response_format": { "type": "json_object" },
+        "provider": { "data_collection": "deny", "require_parameters": true },
     });
     let resp = client
-        .post("https://api.anthropic.com/v1/messages")
-        .header("x-api-key", api_key)
-        .header("anthropic-version", "2023-06-01")
-        .header("content-type", "application/json")
+        .post("https://openrouter.ai/api/v1/chat/completions")
+        .bearer_auth(api_key)
+        .header("HTTP-Referer", "https://omnyid.com/wedding/")
+        .header("X-Title", "OmnyID Wedding Understanding")
         .json(&body)
         .send()
         .await
@@ -330,13 +332,13 @@ async fn anthropic_vision_infer(
     if !resp.status().is_success() {
         let status = resp.status();
         let text = resp.text().await.unwrap_or_default();
-        return Err(format!("anthropic api error {status}: {text}"));
+        return Err(format!("openrouter api error {status}: {text}"));
     }
     let json: Value = resp
         .json()
         .await
         .map_err(|e| format!("decode error: {e}"))?;
-    Ok(json["content"][0]["text"]
+    Ok(json["choices"][0]["message"]["content"]
         .as_str()
         .unwrap_or("")
         .to_string())

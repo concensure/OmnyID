@@ -40,7 +40,7 @@ function state(overrides: Partial<WeddingResponseWorkspaceViewState> = {}): Wedd
 test("people aggregate state summarizes guests seating and family-boundary actions", () => {
   const people = buildWeddingPeopleAggregateState(state());
 
-  assert.equal(people.title, "People");
+  assert.equal(people.title, "Guests");
   assert.deepEqual(people.summaryPills, [
     "82 guests",
     "17 replies waiting",

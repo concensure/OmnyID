@@ -2402,3 +2402,20 @@ subjective usability or a controlled external cohort.
   product truth.
 - Lead-magnet continuation extends the existing consented import runner and existing AFP builders.
   It does not add a parallel import endpoint or a new AFP event type for each tool.
+
+## 2026-11-03: Wedding understanding, RSVP and public claims remain bounded by existing authorities
+
+- Wedding image understanding uses the existing explicit complete-batch route and calls
+  `google/gemini-3.5-flash-lite` through OpenRouter. It does not infer on image selection or
+  keystrokes, and the OpenRouter credential remains server-side/file-backed.
+- RSVP setup, invitations, responses, Guest counts and Family boundaries remain projections over
+  the existing account-scoped AFP ledger and capability routes. No parallel RSVP store is added.
+- Creating a contributor or contact never transfers task ownership. An explicit assignment event is
+  required; otherwise the owner remains `You`.
+- The onboarding admin-study permission and the Documents permission control are one persisted
+  false-default field. Either surface updates the same projection.
+- Public lead-magnet copy may claim only LP-01 capabilities with executable evidence. Generic task
+  email reminders, whole-plan date shifting and unsupported document subtypes remain gated until
+  their respective implementation and tests exist.
+- Operational alias commands remain fail-closed at DMARC. The real Gmail From identity must be
+  `concensure@gmail.com`; Gmail send-as aliases at `@omnyid.com` are not a trusted substitute.

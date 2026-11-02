@@ -5712,6 +5712,7 @@ export type WeddingUserOnboardingState = {
   weddingPlanId: string;
   intakeVariant: WeddingIntakeSource;
   entrySource: WeddingIntakeSource;
+  adminDataConsent: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -6166,6 +6167,7 @@ function normalizeWeddingUserOnboardingState(value: unknown): WeddingUserOnboard
     weddingPlanId: value.wedding_plan_id,
     intakeVariant: value.intake_variant,
     entrySource: value.entry_source,
+    adminDataConsent: value.admin_data_consent === true,
     createdAt: apiString(value.created_at),
     updatedAt: apiString(value.updated_at),
   };
@@ -6395,10 +6397,11 @@ export const saveWeddingOnboardingState = (
   weddingPlanId: string,
   intakeVariant: WeddingIntakeSource,
   entrySource: WeddingIntakeSource,
+  adminDataConsent?: boolean,
 ) =>
   apiFetch<unknown>("/wedding/onboarding-state", {
     method: "POST",
-    bodyJson: { wedding_plan_id: weddingPlanId, intake_variant: intakeVariant, entry_source: entrySource },
+    bodyJson: { wedding_plan_id: weddingPlanId, intake_variant: intakeVariant, entry_source: entrySource, admin_data_consent: adminDataConsent },
   }).then(normalizeWeddingOnboardingStateResponse);
 
 export const saveLlmConfig = (data: {

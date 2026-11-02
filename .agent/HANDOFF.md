@@ -6679,3 +6679,41 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-319`, branch
 - Remaining work is intentionally dependency-ordered: consolidated import consent/profile registry,
   existing-AFP writers, quote decoder, shot-list builder, one task/lead-time catalogue and Countdown
   parity, then the licensed style library and optional explicitly submitted image reflection.
+
+## 2026-11-03 - WED-320 RSVP, projection and LP-01 verification (Codex)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-319`, branch
+`agent/codex/WED-320`, starting SHA `a239cac`.
+
+- Replaced the wedding-understanding provider call with the exact server-side OpenRouter model
+  `google/gemini-3.5-flash-lite`; calls remain explicit complete-batch submissions and never expose
+  the API key to the browser.
+- Kept RSVP on the existing authenticated/public capability routes and AFP ledger. Guests/RSVP now
+  appear together in the Guests hub, while helpers have a separate `Who is helping` destination.
+  Existing RSVP replay, tenant-isolation, rotation, revocation and concurrency tests pass against
+  disposable PostgreSQL 18.
+- Persisted one false-default admin-study consent field used by both onboarding and Documents.
+  Contributors and contacts remain possible assignees, but adding one does not reassign tasks.
+- Hid Setup Check from every non-operator account, moved Upload Files to a right-aligned accessible
+  expanding plus control, aligned Timeline controls, and retained exact artifact selection for
+  `View File`.
+- Sanitized Maps previews and ignored unrelated Brave snippets. Vendor lifecycle filters now expand
+  a vendor brief, AFP activity, conversation context and selectable related documents in place.
+- Recorded LP-01 evidence in
+  `Documents/verification/wed-320-lead-magnet-capability-audit-2026-11-02.md`. Generic task email
+  reminders, shifting every task after a wedding-date change, four proposed document subtypes and a
+  shared profile/provenance registry remain gated. Batch 2 should continue with LP-02 rather than
+  duplicating existing planner routes.
+- Fixed the disposable harness for PostgreSQL 18's version-specific data layout by mounting tmpfs at
+  `/var/lib/postgresql`, not at the old data subdirectory.
+- The reported relay 550 occurs before OmnyID parses `To:`. Live SPF includes Cloudflare and DMARC is
+  `p=reject`; the Worker correctly trusts only Cloudflare's first DMARC result. Commands must use the
+  actual Gmail From identity `concensure@gmail.com`, with recipient `hello@omnyid.com`, then
+  `To: concensure+test@gmail.com` as the first body line. Do not use Gmail send-as
+  `hello@omnyid.com` and do not weaken DMARC.
+- Verification passed: Solid UI typecheck; 2,157 Wedding tests; production build; Wedding site/CSP,
+  Quiz, confirmation and blog smokes; both line-budget tests; 10 RSVP response-route tests; 3 RSVP
+  capability-route tests; migration catalogue; 4 operator-relay Rust tests; and 8 Worker tests.
+
+Next action: freeze the successor commit, deploy from a clean detached worktree, apply migration
+0135, verify exact Oracle runtime provenance and hosted health, then begin LP-02.

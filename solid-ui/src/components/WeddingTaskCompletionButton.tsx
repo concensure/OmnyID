@@ -44,5 +44,5 @@ export function WeddingTaskCompletionButton(props: {
     setBusy(true);
     try { await props.saveProjection(input); } finally { setBusy(false); }
   }
-  return <button type="button" aria-pressed={done()} disabled={busy()} onClick={() => void toggle()} class={`${props.compact ? "min-h-10 px-3 text-xs" : "min-h-11 px-4 text-sm"} shrink-0 rounded-lg border border-wedding-secondary bg-white font-semibold text-wedding-secondary disabled:opacity-50`}>{done() ? "Move back to to-do" : "Mark done"}</button>;
+  return <button type="button" aria-pressed={done()} disabled={busy()} onClick={() => void toggle()} class={`${props.compact ? "min-h-11 px-3 text-xs" : "min-h-11 px-4 text-sm"} shrink-0 rounded-lg border border-wedding-secondary bg-white font-semibold text-wedding-secondary disabled:opacity-50`}>{done() ? "Move back to to-do" : "Mark done"}</button>;
 }

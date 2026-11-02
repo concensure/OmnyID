@@ -88,7 +88,7 @@ export function WeddingTaskOwnerPicker(props: {
   return (
     <div class="min-w-0">
       <select
-        class={`${props.compact ? "min-h-10" : "min-h-11"} block w-full appearance-auto rounded-lg border border-wedding-border bg-white px-2 text-sm font-normal text-wedding-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-primary`}
+        class="block min-h-11 w-full appearance-auto rounded-lg border border-wedding-border bg-white px-2 text-sm font-normal text-wedding-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-primary"
         value={selection()}
         onChange={(event) => {
           if (event.currentTarget.value === ADD_CONTACT_VALUE) {

@@ -44,7 +44,14 @@ test("full vendor search evidence expands and closes in place", () => {
   assert.match(source, /aria-controls="wedding-vendor-search-full-result"/);
   assert.match(source, /result\(\)\.sourcePreview\?\.bodyText/);
   assert.match(source, /setFullResultExpanded\(false\)/);
-  assert.doesNotMatch(source, /Open in Documents/);
+});
+
+test("vendor lifecycle filters reveal a vendor brief, conversation activity and selectable documents in place", () => {
+  assert.match(source, /About this vendor/);
+  assert.match(source, /Conversation activity/);
+  assert.match(source, /Related documents/);
+  assert.match(source, /selectedLifecycleArtifactId/);
+  assert.match(source, /View vendor, conversation and files/);
 });
 
 test("a manual vendor search remains on the vendor surface when it launches and completes", () => {

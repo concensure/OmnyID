@@ -57,9 +57,9 @@ test("wedding helper completion uses the shared local and AFP projection", () =>
 });
 
 test("wedding helper people dedupe contacts, custom helpers, and partner names calmly", () => {
-  assert.deepEqual(buildWeddingHelperPeople(["Alex", " alex ", ""], ["Sam", "sam"]), ["Alex", "Sam", "You", "Your partner"]);
-  assert.deepEqual(buildWeddingHelperPeople(["Alex"], ["Sam"], ["Claire", "James"]), ["Alex", "Sam", "Claire", "James"]);
-  assert.deepEqual(buildWeddingHelperPeople([], [], ["Claire", "Claire"]), ["Claire"]);
+  assert.deepEqual(buildWeddingHelperPeople(["Alex", " alex ", ""], ["Sam", "sam"]), ["You", "Alex", "Sam", "Your partner"]);
+  assert.deepEqual(buildWeddingHelperPeople(["Alex"], ["Sam"], ["Claire", "James"]), ["You", "Claire", "James", "Alex", "Sam"]);
+  assert.deepEqual(buildWeddingHelperPeople([], [], ["Claire", "Claire"]), ["You", "Claire"]);
 });
 
 test("wedding helper contact drafts become stable contacts with wedding roles", () => {

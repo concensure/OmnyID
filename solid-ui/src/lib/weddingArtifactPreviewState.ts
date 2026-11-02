@@ -55,6 +55,7 @@ export type WeddingArtifactMapPreview = {
   locations: Array<{ label: string; detail: string; searchQuery: string; mapUrl: string }>;
   mapReadinessLabel: string;
   routeLabel: string;
+  locationSearchUrl: string;
 };
 
 export type WeddingArtifactGuestPreview = {
@@ -103,6 +104,10 @@ function clean(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function cleanDisplayText(value: unknown): string {
+  return clean(value).replace(/<[^>]*>/g, " ").replace(/[ \t]+/g, " ").trim();
+}
+
 function stripHeading(line: string): string {
   return line.replace(/^#{1,6}\s+/, "").trim();
 }
@@ -112,7 +117,7 @@ function splitMarkdownTableRow(line: string): string[] {
     .replace(/^\|/, "")
     .replace(/\|$/, "")
     .split("|")
-    .map((cell) => cell.trim());
+    .map((cell) => cleanDisplayText(cell));
 }
 
 function isDividerRow(cells: readonly string[]): boolean {
@@ -240,13 +245,13 @@ function sectionAfterWithSubheadings(body: string, heading: string): string {
 function sectionLines(body: string, heading: string, limit = 6): string[] {
   return sectionAfter(body, heading)
     .split(/\r?\n/)
-    .map((line) => line.replace(/^- /, "").trim())
+    .map((line) => cleanDisplayText(line.replace(/^- /, "")))
     .filter(Boolean)
     .slice(0, limit);
 }
 
 function parseLabelDetail(line: string): { label: string; detail: string } {
-  const normalized = line.replace(/^- /, "").trim();
+  const normalized = cleanDisplayText(line.replace(/^- /, ""));
   const separator = normalized.includes(":") ? ":" : normalized.includes(" - ") ? " - " : "";
   if (!separator) return { label: normalized, detail: "Needs confirmation before acting." };
   const [label, ...rest] = normalized.split(separator);
@@ -506,18 +511,25 @@ function timelinePreview(body: string): WeddingArtifactTimelinePreview {
 }
 
 function mapPreview(body: string): WeddingArtifactMapPreview {
-  const table = parseMarkdownTable(body);
-  const rows = table?.rows.map((row) => ({
-    label: clean(row[0]) || "Wedding location",
-    detail: row.slice(1).map(clean).filter(Boolean).join(" - ") || "Needs map/source verification.",
-  }));
-  const fallback = sectionLines(body, "Locations", 10).map(parseLabelDetail);
-  const locations = (rows?.length ? rows : fallback).slice(0, 10).map(mapLocation);
+  // Map artifacts may contain provider tables or web snippets. Only project
+  // explicitly labelled location sections so unrelated Brave snippets cannot
+  // masquerade as verified travel or weather evidence.
+  const requested = sectionLines(body, "Requested locations", 10)
+    .filter((line) => !/^no location supplied$/i.test(clean(line)))
+    .map((line) => ({ label: clean(line), detail: "Requested wedding location" }));
+  const legacy = sectionLines(body, "Locations", 10).map(parseLabelDetail);
+  const mapEvidence = sectionLines(body, "Map evidence", 10)
+    .filter((line) => !/^no geocode results returned/i.test(clean(line)))
+    .map(parseLabelDetail);
+  const sourceRows = requested.length > 0 ? requested : legacy.length > 0 ? legacy : mapEvidence;
+  const locations = sourceRows.slice(0, 10).map(mapLocation);
+  const fallbackQuery = locations[0]?.searchQuery || "wedding location";
   return {
     kind: "map",
     locations,
     mapReadinessLabel: locations.length > 0 ? `${locations.length} location${locations.length === 1 ? "" : "s"} ready for map handoff` : "No structured locations detected",
     routeLabel: locations.length > 1 ? "Route order is a planning hint; verify travel times in Maps." : "Open the location search before relying on travel time.",
+    locationSearchUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fallbackQuery)}`,
   };
 }
 
@@ -534,7 +546,7 @@ function guestPreview(body: string): WeddingArtifactGuestPreview {
 function documentPreview(body: string): WeddingArtifactDocumentPreview {
   const summaryLines = body
     .split(/\r?\n/)
-    .map((line) => stripHeading(line).replace(/^- /, "").trim())
+    .map((line) => cleanDisplayText(stripHeading(line).replace(/^- /, "")))
     .filter(Boolean)
     .slice(0, 8);
   return {
