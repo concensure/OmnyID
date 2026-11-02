@@ -178,6 +178,10 @@ import {
   dispatchWeddingNavigationIntent,
 } from "@/lib/weddingNavigationState";
 import { buildWeddingTemplateEntryState } from "@/lib/weddingTemplateEntryState";
+import {
+  buildWeddingTemplateDeepLinkLaunch,
+  dispatchWeddingTemplateDeepLinkLaunch,
+} from "@/lib/weddingTemplateDeepLinkLaunchState";
 import { loadWeddingEntrySource, saveWeddingEntrySource } from "@/lib/weddingEntrySourceState";
 import {
   dispatchWeddingVendorSearchLaunch,
@@ -1292,13 +1296,15 @@ function App() {
     if (!pendingWeddingQuizHandoff) {
       void import("@/lib/weddingLeadMagnetImportRunnerState").then(({ requestWeddingLeadMagnetImport }) => requestWeddingLeadMagnetImport());
     }
-    void import("@/lib/weddingTemplateDeepLinkLaunchState").then(({ buildWeddingTemplateDeepLinkLaunch, dispatchWeddingTemplateDeepLinkLaunch }) => {
-      const launch = buildWeddingTemplateDeepLinkLaunch();
-      dispatchWeddingTemplateDeepLinkLaunch(launch);
-      // The navigation bridge persists the intent before it selects the view. The
-      // mounted planner can therefore consume the intended wedding surface.
-      void preloadViewModule(launch.viewTarget);
-    });
+    // Dispatch before yielding. A lazy import here allowed a newer, explicit
+    // planner selection to win first and then be overwritten by this starter
+    // launch when the chunk resolved. That projected the selected account data
+    // against the starter plan ID and made valid AFP rows appear empty.
+    const launch = buildWeddingTemplateDeepLinkLaunch();
+    dispatchWeddingTemplateDeepLinkLaunch(launch);
+    // The navigation bridge persists the intent before it selects the view. The
+    // mounted planner can therefore consume the intended wedding surface.
+    void preloadViewModule(launch.viewTarget);
   }
 
   async function launchPreloadedTemplateView(view: ViewName): Promise<void> {
