@@ -57,6 +57,9 @@ test("unknown travel and missing facts stay unknown rather than becoming conflic
   assert.ok(state.findings.some((item) => item.kind === "missing_owner" && item.evidenceState === "unknown"));
   assert.ok(state.findings.some((item) => item.kind === "missing_place" && item.evidenceState === "unknown"));
   assert.ok(!state.findings.some((item) => item.kind === "travel" && item.evidenceState === "conflict"));
+  const missing = state.cards.find((item) => item.id === "missing_information");
+  assert.equal(missing?.intent?.kind, "focus_records");
+  assert.deepEqual(new Set(missing?.intent?.kind === "focus_records" ? missing.intent.recordIds : []), new Set(["one", "two", "three"]));
 });
 
 test("unrelated simultaneous items do not fabricate overlap conflicts", () => {
@@ -101,4 +104,24 @@ test("six contextual cards expose bounded A2UI intents without mutation authorit
   assert.deepEqual(state.cards.map((card) => card.id), ["next_conflict", "fixed_milestones", "buffer_review", "missing_information", "distribution_readiness", "day_of_now_next"]);
   assert.ok(state.cards.every((card) => card.a2ui.schema_version === "a2ui.v1"));
   assert.ok(state.cards.every((card) => !JSON.stringify(card.intent).includes("confirm")));
+});
+
+test("empty run sheets offer in-place item and milestone creation", () => {
+  const state = buildWeddingRunSheetIntelligence({ rows: [] });
+  const milestone = state.cards.find((card) => card.id === "fixed_milestones");
+  const dayOf = state.cards.find((card) => card.id === "day_of_now_next");
+  assert.deepEqual(milestone?.intent, { kind: "add_item", preset: "milestone" });
+  assert.equal(milestone?.actionLabel, "Add milestone");
+  assert.deepEqual(dayOf?.intent, { kind: "add_item", preset: "item" });
+  assert.equal(dayOf?.actionLabel, "Add first item");
+});
+
+test("fixed milestones do not count every confirmed run-sheet item", () => {
+  const state = buildWeddingRunSheetIntelligence({ rows: [
+    row("ordinary", { title: "Ordinary confirmed item", status: "confirmed", start_at: "2027-11-20T06:00:00Z", location: "Venue", owner_refs: ["coordinator"] }),
+    row("milestone", { title: "Ceremony starts", status: "confirmed", category: "milestone", fixed_milestone: true, start_at: "2027-11-20T07:00:00Z", location: "Venue", owner_refs: ["celebrant"] }),
+  ] });
+  const card = state.cards.find((item) => item.id === "fixed_milestones");
+  assert.equal(card?.summary, "1 confirmed milestone.");
+  assert.deepEqual(card?.items, ["Ceremony starts"]);
 });

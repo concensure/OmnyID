@@ -24,7 +24,7 @@
   function photo(name) { return IMG + name + '.webp'; }
   function creditPanel() {
     return '<details class="qz-credits"><summary>Image credits and licences</summary>' +
-      '<p>Photography: Maria Orlova, Getulio Moraes, Allef Vinicius, Zhouxing Lu, Ulyana Tim, Mark Zamora, Jonathan Borba, Leonardo Miranda, Photos by Lanty, Wesley Tingey, Beatriz Perez Moya, Paul Stollery, Sandy Millar, Fabio Alves, Al Elmes, Elvis Bekmanis and Jakob Owens (Unsplash); Mike Baird, Daderot, karol m, Adam.J.W.C. and Petr Kratochvil (Creative Commons/public domain); Tracy Hunter, Swami Stream, Yellowstone National Park, Bernard Spragg and AlmightyWorm (Flickr licences); and Rawpixel public-domain images.</p>' +
+      '<p>Photography: Maria Orlova, Getulio Moraes, Allef Vinicius, Zhouxing Lu, Ulyana Tim, Mark Zamora, Jonathan Borba, Leonardo Miranda, Photos by Lanty, Wesley Tingey, Beatriz Perez Moya, Paul Stollery, Sandy Millar, Fabio Alves, Al Elmes, Elvis Bekmanis and Jakob Owens (Unsplash); Mike Baird, Daderot, karol m, Adam.J.W.C., Petr Kratochvil, Ildar Sagdejev, Alethe, Hillebrand Steve and Jubair1985 (Creative Commons/public domain); Tracy Hunter, Swami Stream, Yellowstone National Park, Bernard Spragg and AlmightyWorm (Flickr licences); and Rawpixel public-domain images.</p>' +
       '<p>Elephant and Beaver artwork was generated for OmnyID. <a href="' + IMG + 'quiz-images.json">View the complete per-image source, author and licence manifest.</a></p></details>';
   }
   function save() {

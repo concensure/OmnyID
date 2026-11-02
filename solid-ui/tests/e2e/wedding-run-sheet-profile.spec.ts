@@ -26,6 +26,11 @@ for (const viewport of [{ width: 320, height: 720 }, { width: 375, height: 812 }
     await page.getByRole("button", { name: /Add 20-minute buffer/ }).click();
     await expect(page.getByRole("status")).toHaveText("Buffer approved");
 
+    await page.getByRole("button", { name: "Add milestone" }).click();
+    await expect(page.getByRole("dialog", { name: "Add fixed milestone" })).toBeVisible();
+    await expect(page.getByLabel(/Include in vendor view means/)).toBeVisible();
+    await page.getByRole("button", { name: "Cancel" }).click();
+
     await page.getByRole("button", { name: "Add run-sheet item" }).click();
     await expect(page.getByRole("dialog", { name: "Add run-sheet item" })).toBeVisible();
     await expect(page.getByLabel("Item name")).toBeFocused();

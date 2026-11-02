@@ -59,6 +59,7 @@ const records: DatabaseViewRecord[] = [
 function Fixture() {
   const [filters, setFilters] = createSignal(weddingRunSheetDefaultFilters());
   const [dialogOpen, setDialogOpen] = createSignal(false);
+  const [dialogPreset, setDialogPreset] = createSignal<"item" | "milestone">("item");
   const [status, setStatus] = createSignal("Ready");
   const rows = projectWeddingRunSheetRows(records);
   const visibleRows = createMemo(() => filterWeddingRunSheetRows(rows, filters()));
@@ -74,7 +75,7 @@ function Fixture() {
       filters={filters()}
       archived={false}
       onFilters={setFilters}
-      onAddItem={() => setDialogOpen(true)}
+      onAddItem={() => { setDialogPreset("item"); setDialogOpen(true); }}
     />
     <WeddingRunSheetIntelligencePanel
       rows={rows}
@@ -82,6 +83,7 @@ function Fixture() {
       onFocusRecords={() => setStatus("Items focused")}
       onShowAttention={() => setStatus("Attention shown")}
       onShowAll={() => setStatus("All shown")}
+      onAddItem={(preset) => { setDialogPreset(preset); setDialogOpen(true); }}
       onApproveBuffer={async () => { setStatus("Buffer approved"); return true; }}
     />
     <WeddingRunSheetMobileCards
@@ -94,6 +96,7 @@ function Fixture() {
     <p role="status" class="sr-only">{status()}</p>
     <WeddingRunSheetItemDialog
       open={dialogOpen()}
+      preset={dialogPreset()}
       busy={false}
       error=""
       onClose={closeDialog}

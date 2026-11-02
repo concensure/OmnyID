@@ -66,6 +66,14 @@ test("manual run-sheet records retain participants and stay detached from projec
   assert.deepEqual(data.participant_refs, ["Priya", "Daniel"]);
 });
 
+test("manual fixed milestones reuse run-sheet records with explicit confirmed semantics", () => {
+  const data = weddingRunSheetManualRecord({ title: "Ceremony starts", startAt: "2027-11-20T04:00:00Z", itemKind: "milestone" });
+  assert.equal(data.category, "milestone");
+  assert.equal(data.fixed_milestone, true);
+  assert.equal(data.status, "confirmed");
+  assert.equal(data.projection_state, "detached");
+});
+
 test("Sydney day filtering and datetime inputs survive UTC boundaries and daylight saving", () => {
   const utc = "2027-11-19T14:30:00.000Z";
   assert.equal(weddingRunSheetDayKey(utc, "Australia/Sydney"), "2027-11-20");

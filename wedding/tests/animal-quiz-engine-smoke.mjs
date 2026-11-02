@@ -88,6 +88,11 @@ for (const question of data.QUESTIONS) {
     assert.equal(statSync(path).size, asset.bytes);
   }
 }
+for (const assetId of ['photographer-portfolios', 'photographer-galleries', 'photographer-meeting', 'photographer-booking']) {
+  const asset = imageManifest.assets[assetId];
+  assert.ok(asset?.source.includes('commons.wikimedia.org'));
+  assert.doesNotMatch(asset.source, /images\.unsplash\.com/);
+}
 for (const animal of data.ARCHETYPES) {
   assert.ok(imageManifest.assets[animal.photo]);
   assert.equal(existsSync(new URL(`../assets/images/quiz/${animal.photo}.webp`, import.meta.url)), true);

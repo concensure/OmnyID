@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   loadDecisionQueueDensity,
   loadResponseQueueDensity,
+  queueFontSizeRootPx,
   saveDecisionQueueDensity,
   saveResponseQueueDensity,
 } from "../src/lib/queueDensityLocalState.ts";
@@ -50,4 +51,10 @@ test("queue density local state migrates legacy density labels", () => {
   assert.equal(loadResponseQueueDensity(), "7");
   assert.equal(localStorageState.get("omnyid.decision-queue.density"), "3");
   assert.equal(localStorageState.get("omnyid.response-queue.density"), "7");
+});
+
+test("font-size levels increase the root type scale without shrinking below 14px", () => {
+  assert.equal(queueFontSizeRootPx("1"), 14);
+  assert.ok(queueFontSizeRootPx("7") > 16);
+  assert.equal(queueFontSizeRootPx("10"), 19);
 });

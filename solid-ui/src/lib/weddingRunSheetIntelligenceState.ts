@@ -39,7 +39,8 @@ export type WeddingRunSheetIntent =
   | { kind: "focus_records"; recordIds: string[] }
   | { kind: "review_buffer"; suggestionId: string }
   | { kind: "show_attention" }
-  | { kind: "show_all" };
+  | { kind: "show_all" }
+  | { kind: "add_item"; preset: "item" | "milestone" };
 
 export type WeddingRunSheetContextCard = {
   id: "next_conflict" | "fixed_milestones" | "buffer_review" | "missing_information" | "distribution_readiness" | "day_of_now_next";
@@ -237,6 +238,13 @@ export function buildWeddingRunSheetIntelligence(input: { rows: WeddingRunSheetP
   const conflicts = findings.filter((item) => item.evidenceState === "conflict");
   const unknowns = findings.filter((item) => item.evidenceState === "unknown");
   const confirmed = rows.filter((row) => row.status === "confirmed");
+  const unknownRecordIds = Array.from(new Set(unknowns.flatMap((item) => item.recordIds)));
+  const attentionRecordIds = Array.from(new Set([
+    ...conflicts.flatMap((item) => item.recordIds),
+    ...unknownRecordIds,
+    ...rows.filter((row) => row.status !== "confirmed").map((row) => row.record.id),
+  ]));
+  const milestones = rows.filter((row) => row.record.data.fixed_milestone === true || row.record.data.category === "milestone");
   const now = timestamp(input.now ?? new Date().toISOString()) ?? Date.now();
   const current = rows.find((row) => (timestamp(row.effectiveStartAt) ?? Infinity) <= now && (rowEnd(row) ?? -Infinity) >= now);
   const next = rows.find((row) => (timestamp(row.effectiveStartAt) ?? -Infinity) > now);
@@ -245,11 +253,11 @@ export function buildWeddingRunSheetIntelligence(input: { rows: WeddingRunSheetP
   const firstBuffer = transition.buffers[0] ?? null;
   const cards = [
     card({ id: "next_conflict", title: "Next conflict", summary: firstConflict ? firstConflict.title : "No evidence-backed timing conflict found.", tone: firstConflict ? "risk" : "ready", items: firstConflict ? [firstConflict.detail] : [], actionLabel: firstConflict ? "Show affected items" : null, intent: firstConflict ? { kind: "focus_records", recordIds: firstConflict.recordIds } : null }),
-    card({ id: "fixed_milestones", title: "Fixed milestones", summary: `${confirmed.length} confirmed item${confirmed.length === 1 ? "" : "s"}.`, tone: confirmed.length ? "neutral" : "attention", items: confirmed.slice(0, 3).map(title), actionLabel: confirmed.length ? "Show fixed items" : null, intent: confirmed.length ? { kind: "focus_records", recordIds: confirmed.map((row) => row.record.id) } : null }),
+    card({ id: "fixed_milestones", title: "Fixed milestones", summary: `${milestones.length} confirmed milestone${milestones.length === 1 ? "" : "s"}.`, tone: milestones.length ? "neutral" : "attention", items: milestones.slice(0, 3).map(title), actionLabel: milestones.length ? "Show milestones" : "Add milestone", intent: milestones.length ? { kind: "focus_records", recordIds: milestones.map((row) => row.record.id) } : { kind: "add_item", preset: "milestone" } }),
     card({ id: "buffer_review", title: "Buffer review", summary: firstBuffer ? firstBuffer.title : "No short risky transition needs a buffer review.", tone: firstBuffer ? "attention" : "ready", items: firstBuffer ? [firstBuffer.explanation] : [], actionLabel: firstBuffer ? "Review buffer" : null, intent: firstBuffer ? { kind: "review_buffer", suggestionId: firstBuffer.id } : null }),
-    card({ id: "missing_information", title: "Missing information", summary: unknowns.length ? `${unknowns.length} detail${unknowns.length === 1 ? "" : "s"} still need confirmation.` : "Owner, place and time evidence is complete.", tone: unknowns.length ? "attention" : "ready", items: unknowns.slice(0, 3).map((item) => item.detail), actionLabel: unknowns.length ? "Show items to complete" : null, intent: unknowns.length ? { kind: "show_attention" } : null }),
-    card({ id: "distribution_readiness", title: "Distribution readiness", summary: distributionReady ? "This run sheet is ready to preview for distribution." : "Resolve conflicts, missing details and proposed times before distribution.", tone: distributionReady ? "ready" : "attention", items: [`${conflicts.length} conflicts`, `${unknowns.length} unknown details`, `${rows.length - confirmed.length} not confirmed`], actionLabel: distributionReady ? "Show all items" : "Show what needs attention", intent: distributionReady ? { kind: "show_all" } : { kind: "show_attention" } }),
-    card({ id: "day_of_now_next", title: "Day-of now and next", summary: current ? `Now: ${title(current)}` : next ? `Next: ${title(next)}` : "No upcoming timed item.", tone: current || next ? "neutral" : "attention", items: [current?.effectiveEndAt ? `Ends ${current.effectiveEndAt}` : "", next?.effectiveStartAt ? `Next starts ${next.effectiveStartAt}` : ""].filter(Boolean), actionLabel: current || next ? "Show item" : null, intent: current || next ? { kind: "focus_records", recordIds: [(current ?? next)!.record.id] } : null }),
+    card({ id: "missing_information", title: "Missing information", summary: unknowns.length ? `${unknowns.length} detail${unknowns.length === 1 ? "" : "s"} still need confirmation.` : "Owner, place and time evidence is complete.", tone: unknowns.length ? "attention" : "ready", items: unknowns.slice(0, 3).map((item) => item.detail), actionLabel: unknowns.length ? "Show items to complete" : null, intent: unknowns.length ? { kind: "focus_records", recordIds: unknownRecordIds } : null }),
+    card({ id: "distribution_readiness", title: "Distribution readiness", summary: distributionReady ? "This run sheet is ready to preview for distribution." : "Resolve conflicts, missing details and proposed times before distribution.", tone: distributionReady ? "ready" : "attention", items: [`${conflicts.length} conflicts`, `${unknowns.length} unknown details`, `${rows.length - confirmed.length} not confirmed`], actionLabel: distributionReady ? "Show all items" : "Show what needs attention", intent: distributionReady ? { kind: "show_all" } : { kind: "focus_records", recordIds: attentionRecordIds } }),
+    card({ id: "day_of_now_next", title: "Day-of now and next", summary: current ? `Now: ${title(current)}` : next ? `Next: ${title(next)}` : "No upcoming timed item.", tone: current || next ? "neutral" : "attention", items: [current?.effectiveEndAt ? `Ends ${current.effectiveEndAt}` : "", next?.effectiveStartAt ? `Next starts ${next.effectiveStartAt}` : ""].filter(Boolean), actionLabel: current || next ? "Show item" : "Add first item", intent: current || next ? { kind: "focus_records", recordIds: [(current ?? next)!.record.id] } : { kind: "add_item", preset: "item" } }),
   ];
   const accountRemainingMicrousd = input.accountModelBudgetMicrousd ?? null;
   const weddingRemainingMicrousd = input.weddingModelBudgetMicrousd ?? null;

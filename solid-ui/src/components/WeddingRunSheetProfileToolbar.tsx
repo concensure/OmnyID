@@ -72,6 +72,7 @@ export function WeddingRunSheetProfileToolbar(props: {
 
 export function WeddingRunSheetMobileCards(props: {
   rows: WeddingRunSheetPresentedRow[];
+  selectedRecordIds?: string[];
   archived: boolean;
   onTimeChange: (record: DatabaseViewRecord, nextValue: string) => void;
   onShift: (record: DatabaseViewRecord, minutes: number) => void;
@@ -79,7 +80,7 @@ export function WeddingRunSheetMobileCards(props: {
   return (
     <div class="space-y-3 md:hidden" aria-label="Run-sheet items">
       <For each={props.rows}>{(item) => (
-        <article class={`rounded-xl border bg-white p-4 ${item.conflictCodes.length ? "border-amber-300" : "border-wedding-border"}`}>
+        <article class={`rounded-xl border bg-white p-4 ${props.selectedRecordIds?.includes(item.record.id) ? "border-wedding-action ring-2 ring-wedding-action/25" : item.conflictCodes.length ? "border-amber-300" : "border-wedding-border"}`}>
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">
               <p class="font-semibold text-wedding-text">{String(item.record.data.title || "Run-sheet item")}</p>
@@ -116,10 +117,11 @@ export function WeddingRunSheetMobileCards(props: {
 
 export function WeddingRunSheetItemDialog(props: {
   open: boolean;
+  preset: "item" | "milestone";
   busy: boolean;
   error: string;
   onClose: () => void;
-  onSave: (input: { title: string; startAt: string | null; location: string; ownerRef: string; participantRefs: string[]; visibility: string[] }) => void;
+  onSave: (input: { title: string; startAt: string | null; location: string; ownerRef: string; participantRefs: string[]; visibility: string[]; itemKind: "item" | "milestone" }) => void;
 }) {
   const [title, setTitle] = createSignal("");
   const [startAt, setStartAt] = createSignal("");
@@ -139,15 +141,15 @@ export function WeddingRunSheetItemDialog(props: {
   });
   return <Show when={props.open}><div class="fixed inset-0 z-[210] flex items-end bg-on-surface/30 p-0 backdrop-blur-sm sm:items-center sm:justify-center sm:p-3" onClick={(event) => { if (event.target === event.currentTarget && !props.busy) props.onClose(); }}>
     <div role="dialog" aria-modal="true" aria-labelledby="runsheet-add-title" class="max-h-[92vh] w-full overflow-y-auto rounded-t-2xl bg-white p-5 shadow-panel sm:max-w-md sm:rounded-2xl sm:p-6" onKeyDown={(event) => { if (event.key === "Escape" && !props.busy) props.onClose(); }}>
-      <h2 id="runsheet-add-title" class="text-lg font-bold text-wedding-text">Add run-sheet item</h2>
-      <p class="mt-1 text-sm text-wedding-muted">Manual items stay yours and are not overwritten by automatic updates.</p>
+      <h2 id="runsheet-add-title" class="text-lg font-bold text-wedding-text">{props.preset === "milestone" ? "Add fixed milestone" : "Add run-sheet item"}</h2>
+      <p class="mt-1 text-sm text-wedding-muted">{props.preset === "milestone" ? "A fixed milestone is a confirmed day-of time that other run-sheet items can plan around." : "Manual items stay yours and are not overwritten by automatic updates."}</p>
       <div class="mt-4 space-y-3">
         <label class="block text-sm font-medium text-wedding-text">Item name<input ref={titleInput} value={title()} onInput={(event) => setTitle(event.currentTarget.value)} class="mt-1 min-h-11 w-full rounded-lg border border-wedding-border px-3" /></label>
         <label class="block text-sm font-medium text-wedding-text">Start time<input type="datetime-local" value={startAt()} onInput={(event) => setStartAt(event.currentTarget.value)} class="mt-1 min-h-11 w-full rounded-lg border border-wedding-border px-3" /></label>
         <label class="block text-sm font-medium text-wedding-text">Place<input value={location()} onInput={(event) => setLocation(event.currentTarget.value)} class="mt-1 min-h-11 w-full rounded-lg border border-wedding-border px-3" /></label>
         <label class="block text-sm font-medium text-wedding-text">Owner or contact<input value={ownerRef()} onInput={(event) => setOwnerRef(event.currentTarget.value)} class="mt-1 min-h-11 w-full rounded-lg border border-wedding-border px-3" /></label>
         <label class="block text-sm font-medium text-wedding-text">Participants<input value={participants()} onInput={(event) => setParticipants(event.currentTarget.value)} placeholder="Names separated by commas" class="mt-1 min-h-11 w-full rounded-lg border border-wedding-border px-3" /></label>
-        <label class="flex min-h-11 items-center gap-3 rounded-lg border border-wedding-border px-3 text-sm text-wedding-text"><input type="checkbox" checked={vendorVisible()} onChange={(event) => setVendorVisible(event.currentTarget.checked)} /> Include in vendor view</label>
+        <label class="flex min-h-11 items-center gap-3 rounded-lg border border-wedding-border px-3 text-sm text-wedding-text"><input type="checkbox" checked={vendorVisible()} onChange={(event) => setVendorVisible(event.currentTarget.checked)} /> Include in vendor view <span class="cursor-help rounded-full border border-wedding-border px-1.5 text-xs font-bold" title="Shares this item's public schedule details with authorised vendors. Private notes and couple-only records stay hidden." aria-label="Include in vendor view means authorised vendors can see this item's public schedule details, but not private notes or couple-only records.">?</span></label>
       </div>
       <Show when={props.error || inputError()}><p class="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{props.error || inputError()}</p></Show>
       <div class="mt-5 grid grid-cols-2 gap-3">
@@ -155,9 +157,10 @@ export function WeddingRunSheetItemDialog(props: {
         <button type="button" disabled={props.busy || !title().trim()} onClick={() => {
           const parsedStart = startAt() ? weddingRunSheetInputToIso(startAt(), "Australia/Sydney") : null;
           if (startAt() && !parsedStart) { setInputError("Choose a valid Sydney date and time. This time may not exist because of daylight saving."); return; }
+          if (props.preset === "milestone" && !parsedStart) { setInputError("Choose the confirmed date and time for this fixed milestone."); return; }
           setInputError("");
-          props.onSave({ title: title(), startAt: parsedStart, location: location(), ownerRef: ownerRef(), participantRefs: participants().split(",").map((value) => value.trim()).filter(Boolean), visibility: vendorVisible() ? ["master", "vendor"] : ["master"] });
-        }} class="min-h-12 rounded-lg bg-wedding-action text-base font-bold text-white disabled:opacity-50">{props.busy ? "Saving…" : "Add item"}</button>
+          props.onSave({ title: title(), startAt: parsedStart, location: location(), ownerRef: ownerRef(), participantRefs: participants().split(",").map((value) => value.trim()).filter(Boolean), visibility: vendorVisible() ? ["master", "vendor"] : ["master"], itemKind: props.preset });
+        }} class="min-h-12 rounded-lg bg-wedding-action text-base font-bold text-white disabled:opacity-50">{props.busy ? "Saving…" : props.preset === "milestone" ? "Add milestone" : "Add item"}</button>
       </div>
     </div>
   </div></Show>;

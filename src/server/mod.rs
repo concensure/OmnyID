@@ -6637,8 +6637,13 @@ async fn trial_generate_reply(
         temperature: 0.4,
     };
 
-    match crate::inference::dispatch_infer(&backend, &model, &request).await {
-        Ok(response) if !response.content.trim().is_empty() => {
+    let inference = tokio::time::timeout(
+        Duration::from_secs(12),
+        crate::inference::dispatch_infer(&backend, &model, &request),
+    )
+    .await;
+    match inference {
+        Ok(Ok(response)) if !response.content.trim().is_empty() => {
             let meta = trial_meta_summary(traces, reviews);
             if meta.is_empty() {
                 response.content
@@ -6646,9 +6651,13 @@ async fn trial_generate_reply(
                 format!("{}\n\n{meta}", response.content.trim())
             }
         }
-        Ok(_) => trial_assistant_reply(content, template, traces, reviews, intent),
-        Err(err) => {
+        Ok(Ok(_)) => trial_assistant_reply(content, template, traces, reviews, intent),
+        Ok(Err(err)) => {
             tracing::warn!(error = %err, "trial runner NVIDIA NIM call failed; using scripted fallback reply");
+            trial_assistant_reply(content, template, traces, reviews, intent)
+        }
+        Err(_) => {
+            tracing::warn!("trial runner NVIDIA NIM call timed out; using scripted fallback reply");
             trial_assistant_reply(content, template, traces, reviews, intent)
         }
     }

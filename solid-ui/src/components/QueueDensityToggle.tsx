@@ -2,11 +2,11 @@
 // @module-id: ui.queue-density-toggle
 // @primary-capability: queue-density-controls
 // @stability: beta
-import { createSignal, For, Show } from "solid-js";
-import type { QueueDensity } from "@/lib/queueDensityLocalState";
+import { createEffect, createSignal, For, Show } from "solid-js";
+import { applyQueueFontSize, type QueueDensity } from "@/lib/queueDensityLocalState";
 
 export const QUEUE_DENSITY_MODES = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"] as const;
-const QUEUE_DENSITY_LABEL = "Density";
+const QUEUE_DENSITY_LABEL = "Font size";
 const QUEUE_DENSITY_BUTTON_BASE_CLASS =
   "inline-flex min-h-8 min-w-8 items-center justify-center rounded-full border font-semibold transition";
 
@@ -51,7 +51,7 @@ export function QueueDensityToggle(props: {
     isActiveMode(mode) ? toneStyles().activeButtonClass : toneStyles().idleButtonClass;
   const buttonClass = (mode: QueueDensity) =>
     `${QUEUE_DENSITY_BUTTON_BASE_CLASS} ${buttonStateClass(mode)}`;
-  const modeTitle = (mode: QueueDensity) => `Text density ${mode} of 10`;
+  const modeTitle = (mode: QueueDensity) => `Font size ${mode} of 10`;
   const modeLabel = (mode: QueueDensity) => {
     if (mode === "1") return "A";
     if (mode === "10") return "A";
@@ -63,6 +63,7 @@ export function QueueDensityToggle(props: {
     return "h-1.5 w-1.5 rounded-full bg-current opacity-70";
   };
   const selectMode = (mode: QueueDensity) => onSelect()(mode);
+  createEffect(() => applyQueueFontSize(selectedDensity()));
   const toggleState = () => ({
     shellClass: shellClass(),
     labelClass: labelClass(),
@@ -90,18 +91,18 @@ export function QueueDensityToggle(props: {
             <button
               type="button"
               onClick={() => selectMode("1")}
-              aria-label="Text density 1 of 10"
+              aria-label="Font size 1 of 10"
               class={`${QUEUE_DENSITY_BUTTON_BASE_CLASS} ${buttonStateClass("1")}`}
-              title="Text density 1 of 10"
+              title="Font size 1 of 10"
             >
               <span class={modeLabelClass("1")}>A</span>
             </button>
             <button
               type="button"
               onClick={() => selectMode("10")}
-              aria-label="Text density 10 of 10"
+              aria-label="Font size 10 of 10"
               class={`${QUEUE_DENSITY_BUTTON_BASE_CLASS} ${buttonStateClass("10")}`}
-              title="Text density 10 of 10"
+              title="Font size 10 of 10"
             >
               <span class={modeLabelClass("10")}>A</span>
             </button>

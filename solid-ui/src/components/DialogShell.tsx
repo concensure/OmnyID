@@ -1,5 +1,6 @@
 ﻿// @locs-version: 1.0
 import { createEffect, JSX, onCleanup, Show } from "solid-js";
+import { Portal } from "solid-js/web";
 import { getFocusableElements } from "@/lib/getFocusableElements";
 import { handleDialogTabNavigation } from "@/lib/handleDialogTabNavigation";
 import { useBodyScrollLock } from "@/lib/useBodyScrollLock";
@@ -38,42 +39,44 @@ export function DialogShell(props: Props) {
 
   return (
     <Show when={isOpen()}>
-      <div
-        class={props.overlayClass}
-        onClick={(event) => {
-          if (event.target === event.currentTarget) {
-            props.onClose();
-          }
-        }}
-      >
+      <Portal>
         <div
-          ref={(element) => {
-            dialogRef = element;
-            props.dialogRef?.(element);
-          }}
-          id={props.dialogId}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby={props.labelledBy}
-          aria-describedby={props.describedBy}
-          aria-busy={props.busy}
-          tabIndex={-1}
-          onKeyDown={(event) => {
-            if (event.key === "Escape") {
-              event.preventDefault();
+          class={props.overlayClass}
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
               props.onClose();
-              return;
-            }
-            if (event.key === "Tab") {
-              handleDialogTabNavigation(event, focusableDialogElements(), dialogRef);
             }
           }}
-          class={props.dialogClass}
-          style={props.dialogStyle}
         >
-          {props.children}
+          <div
+            ref={(element) => {
+              dialogRef = element;
+              props.dialogRef?.(element);
+            }}
+            id={props.dialogId}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={props.labelledBy}
+            aria-describedby={props.describedBy}
+            aria-busy={props.busy}
+            tabIndex={-1}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                event.preventDefault();
+                props.onClose();
+                return;
+              }
+              if (event.key === "Tab") {
+                handleDialogTabNavigation(event, focusableDialogElements(), dialogRef);
+              }
+            }}
+            class={props.dialogClass}
+            style={props.dialogStyle}
+          >
+            {props.children}
+          </div>
         </div>
-      </div>
+      </Portal>
     </Show>
   );
 }

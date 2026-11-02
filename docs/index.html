@@ -538,7 +538,7 @@
                   </div>
                 </div>
                 <div class="flex flex-wrap gap-3">
-                  <button type="submit" class="rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-white transition hover:opacity-90">
+                  <button id="trial-chat-submit" type="submit" class="rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-wait disabled:opacity-60">
                     Send to trial runner
                   </button>
                   <button id="trial-convert-button" type="button" class="rounded-xl border border-outline-variant bg-surface px-5 py-3 text-sm font-semibold text-on-surface transition hover:bg-surface-container-low">
@@ -666,7 +666,10 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
               </svg>
             </div>
-            <h3 class="mb-3 text-lg font-semibold">Real Email Gateway</h3>
+            <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <h3 class="text-lg font-semibold">Real Email Gateway</h3>
+              <span class="rounded-full bg-amber-100 px-2.5 py-1 font-mono text-[9px] font-semibold uppercase tracking-widest text-amber-800">Tester only</span>
+            </div>
             <p class="text-sm leading-relaxed text-on-surface-variant">
               Connect Gmail, Outlook, or custom IMAP/SMTP providers. Your agent keeps one shared AFP thread history while still interoperating with normal inboxes.
             </p>
@@ -734,20 +737,20 @@
               <p class="text-xs text-on-surface-variant">OAuth-based email gateway, Oracle deploy, private preview onboarding, and secure relay defaults.</p>
             </div>
             <div class="flex-1 space-y-4">
+              <div class="mb-8 h-4 w-4 rounded-full bg-secondary ring-4 ring-secondary-container"></div>
+              <span class="font-mono text-xs text-secondary">Q3 2026</span>
+              <h4 class="font-bold">Private runtime templates</h4>
+              <p class="text-xs text-on-surface-variant">One-click private agent runtimes with per-user isolation, secrets, approvals, and runtime management.</p>
+            </div>
+            <div class="flex-1 space-y-4">
               <div class="relative mb-8 h-4 w-4">
                 <div class="absolute inset-0 h-4 w-4 animate-ping rounded-full bg-primary/50"></div>
                 <div class="relative h-4 w-4 rounded-full bg-primary ring-4 ring-primary-fixed"></div>
               </div>
               <div class="flex items-center gap-2">
-                <span class="font-mono text-xs font-semibold text-primary">Q3 2026</span>
+                <span class="font-mono text-xs font-semibold text-primary">Q4 2026</span>
                 <span class="rounded-full bg-primary/10 px-2 py-0.5 font-mono text-[9px] uppercase tracking-widest text-primary">In progress</span>
               </div>
-              <h4 class="font-bold">Private runtime templates</h4>
-              <p class="text-xs text-on-surface-variant">One-click private agent runtimes with per-user isolation, secrets, approvals, and runtime management.</p>
-            </div>
-            <div class="flex-1 space-y-4">
-              <div class="mb-8 h-4 w-4 rounded-full border border-dashed border-outline-variant bg-surface-container-high"></div>
-              <span class="font-mono text-xs text-outline">Q4 2026</span>
               <h4 class="font-bold">Workspace and ecosystem</h4>
               <p class="text-xs text-on-surface-variant">Richer canvas UI, capability marketplace, local personalization, and hardened sync across devices.</p>
             </div>

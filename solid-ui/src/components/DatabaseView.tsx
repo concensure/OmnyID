@@ -73,6 +73,7 @@ import {
   weddingRunSheetApprovedBufferPatch,
   type WeddingRunSheetBufferSuggestion,
 } from "@/lib/weddingRunSheetIntelligenceState";
+import { applyQueueFontSize } from "@/lib/queueDensityLocalState";
 
 type DensityBucket = "compact" | "comfortable" | "spacious";
 
@@ -109,6 +110,7 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
   const [localMessages, setLocalMessages] = createSignal<DatabaseMessage[]>([]);
   const [runSheetFilters, setRunSheetFilters] = createSignal(weddingRunSheetDefaultFilters());
   const [showRunSheetAdd, setShowRunSheetAdd] = createSignal(false);
+  const [runSheetAddPreset, setRunSheetAddPreset] = createSignal<"item" | "milestone">("item");
   const [runSheetActionBusy, setRunSheetActionBusy] = createSignal(false);
   const [runSheetActionError, setRunSheetActionError] = createSignal("");
   const [runSheetOffline, setRunSheetOffline] = createSignal(false);
@@ -117,6 +119,7 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
     review: WeddingRunSheetTimeChangeReview;
   } | null>(null);
   let tableScrollRef: HTMLDivElement | undefined;
+  let runSheetRecordsAnchorRef: HTMLDivElement | undefined;
   let lastSelectedDatabaseId: string | null = null;
 
   const allMessages = createMemo(() => [
@@ -541,7 +544,7 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
     } finally { setRunSheetActionBusy(false); }
   }
 
-  async function addManualRunSheetItem(input: { title: string; startAt: string | null; location: string; ownerRef: string; participantRefs: string[]; visibility: string[] }) {
+  async function addManualRunSheetItem(input: { title: string; startAt: string | null; location: string; ownerRef: string; participantRefs: string[]; visibility: string[]; itemKind: "item" | "milestone" }) {
     const databaseId = selectedDatabaseId();
     if (!databaseId || databaseReadOnly() || runSheetActionBusy()) return;
     setRunSheetActionBusy(true); setRunSheetActionError("");
@@ -624,10 +627,15 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
         onSelect={selectDatabase}
         onNameInput={setDatabaseName}
         onNameCommit={() => void commitDatabaseName()}
-        onDensityChange={setDensityMode}
+        onDensityChange={(mode) => { setDensityMode(mode); applyQueueFontSize(mode); }}
         onToggleFullscreen={() => setFullscreen((value) => !value)}
         onNewDatabase={() => { setDatabaseCreateError(""); setShowDatabaseCreate(true); }}
-        onNewRecord={() => selectedProfilePlugin()?.toolbarKind === "wedding_run_sheet" ? setShowRunSheetAdd(true) : setShowAdd(true)}
+        onNewRecord={() => {
+          if (selectedProfilePlugin()?.toolbarKind === "wedding_run_sheet") {
+            setRunSheetAddPreset("item");
+            setShowRunSheetAdd(true);
+          } else setShowAdd(true);
+        }}
         onNewTable={() => { setActiveTable(null); setTableName(""); setGhostHeaders([...DEFAULT_HEADERS]); }}
         onNewField={() => {
           const label = prompt("Field name:")?.trim();
@@ -665,16 +673,36 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
         runSheetFilters={runSheetFilters()}
         archived={databaseReadOnly()}
         onRunSheetFilters={setRunSheetFilters}
-        onAddRunSheetItem={() => { setRunSheetActionError(""); setShowRunSheetAdd(true); }}
+        onAddRunSheetItem={() => { setRunSheetActionError(""); setRunSheetAddPreset("item"); setShowRunSheetAdd(true); }}
       />
 
       <Show when={selectedProfilePlugin()?.toolbarKind === "wedding_run_sheet"}>
         <WeddingRunSheetIntelligencePanel
           rows={runSheetRows()}
           archived={databaseReadOnly()}
-          onFocusRecords={(recordIds) => { setRunSheetFilters(weddingRunSheetDefaultFilters()); setSelectedRowIds(recordIds); queueMicrotask(() => tableScrollRef?.scrollIntoView({ behavior: "smooth", block: "nearest" })); }}
-          onShowAttention={() => setRunSheetFilters({ day: "all", status: "all", conflictsOnly: true })}
-          onShowAll={() => setRunSheetFilters(weddingRunSheetDefaultFilters())}
+          onFocusRecords={(recordIds) => {
+            setActiveTable("run_sheet");
+            setRunSheetFilters(weddingRunSheetDefaultFilters());
+            setSelectedRowIds(recordIds);
+            window.requestAnimationFrame(() => {
+              runSheetRecordsAnchorRef?.scrollIntoView({ behavior: "smooth", block: "start" });
+              runSheetRecordsAnchorRef?.focus({ preventScroll: true });
+              const firstColumn = columns()[0]?.key;
+              if (recordIds[0] && firstColumn) document.getElementById(databaseCellFocusId(recordIds[0], firstColumn))?.focus({ preventScroll: true });
+            });
+          }}
+          onShowAttention={() => {
+            setActiveTable("run_sheet");
+            setRunSheetFilters({ day: "all", status: "all", conflictsOnly: true });
+            setSelectedRowIds([]);
+            window.requestAnimationFrame(() => runSheetRecordsAnchorRef?.scrollIntoView({ behavior: "smooth", block: "start" }));
+          }}
+          onShowAll={() => {
+            setRunSheetFilters(weddingRunSheetDefaultFilters());
+            setSelectedRowIds([]);
+            window.requestAnimationFrame(() => runSheetRecordsAnchorRef?.scrollIntoView({ behavior: "smooth", block: "start" }));
+          }}
+          onAddItem={(preset) => { setRunSheetActionError(""); setRunSheetAddPreset(preset); setShowRunSheetAdd(true); }}
           onApproveBuffer={approveRunSheetBuffer}
         />
       </Show>
@@ -710,9 +738,18 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
       </div>
 
       {/* Grid */}
+      <Show when={selectedProfilePlugin()?.toolbarKind === "wedding_run_sheet"}>
+        <div
+          ref={runSheetRecordsAnchorRef}
+          tabIndex={-1}
+          aria-label="Run-sheet items"
+          class="scroll-mt-24 outline-none"
+        />
+      </Show>
       <Show when={selectedProfilePlugin()?.toolbarKind === "wedding_run_sheet" && visibleRecords().length > 0}>
         <WeddingRunSheetMobileCards
           rows={visibleRunSheetRows()}
+          selectedRecordIds={selectedRowIds()}
           archived={databaseReadOnly()}
           onTimeChange={proposeRunSheetTimeChange}
           onShift={shiftRunSheetTime}
@@ -781,6 +818,7 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
         </Show>
         <div
           ref={tableScrollRef}
+          tabIndex={-1}
           class={`overflow-auto rounded-2xl border border-white/50 bg-white/40 shadow-card ${
             shouldVirtualizeRows() ? "max-h-[70vh]" : ""
           } ${selectedProfilePlugin()?.toolbarKind === "wedding_run_sheet" ? "hidden md:block" : ""}`}
@@ -975,6 +1013,7 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
 
       <WeddingRunSheetItemDialog
         open={showRunSheetAdd()}
+        preset={runSheetAddPreset()}
         busy={runSheetActionBusy()}
         error={runSheetActionError()}
         onClose={() => {

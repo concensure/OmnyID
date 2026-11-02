@@ -80,15 +80,15 @@ export function DatabaseHeader(props: {
         </div>
 
         <div class="flex flex-wrap items-center gap-2 lg:justify-end">
-          <div class="flex max-w-full items-center gap-1 overflow-x-auto rounded-full border border-outline/15 bg-white/30 p-1 text-[10px] text-on-surface-variant" aria-label="Text density">
-            <span class="shrink-0 px-1.5 font-mono uppercase tracking-[0.16em] text-outline/70">Density</span>
+          <div class="flex max-w-full items-center gap-1 overflow-x-auto rounded-full border border-outline/15 bg-white/30 p-1 text-[10px] text-on-surface-variant" aria-label="Font size">
+            <span class="shrink-0 px-1.5 font-mono uppercase tracking-[0.16em] text-outline/70">Font size</span>
             <For each={DENSITY_MODES}>{(mode) => (
               <button
                 type="button"
                 onClick={() => props.onDensityChange(mode)}
                 class={`inline-flex min-h-8 min-w-7 shrink-0 items-center justify-center rounded-full border font-semibold transition ${props.densityMode === mode ? "border-primary/25 bg-primary/15 text-primary shadow-sm" : "border-transparent text-on-surface-variant/60 hover:bg-white/55"}`}
                 aria-pressed={props.densityMode === mode}
-                aria-label={`Text density ${mode} of 10`}
+                aria-label={`Font size ${mode} of 10`}
               >
                 <span class={densityLabelClass(mode)}>{densityLabel(mode)}</span>
               </button>

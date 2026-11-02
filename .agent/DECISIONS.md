@@ -2419,3 +2419,13 @@ subjective usability or a controlled external cohort.
   their respective implementation and tests exist.
 - Operational alias commands remain fail-closed at DMARC. The real Gmail From identity must be
   `concensure@gmail.com`; Gmail send-as aliases at `@omnyid.com` are not a trusted substitute.
+
+## 2026-11-03: Public journey controls describe only hosted capability
+
+- Batch 2 lead-magnet launch posts stay unpublished until each proposed tool has its hosted route,
+  deterministic output contract, consented AFP import and accessibility/privacy evidence.
+- Wedding phase choices update adjacent visible content within the current visit; they do not create
+  a second planning authority or silently persist a profile choice.
+- Run-sheet context actions remain typed A2UI intents over the existing database projection. Fixed
+  milestones are explicit run-sheet records, not every confirmed item, and vendor visibility remains
+  an opt-in projection that excludes private notes.

@@ -50,9 +50,21 @@
     var description = document.querySelector('[data-context-description]');
     var benefit = document.querySelector('[data-context-benefit]');
     var cta = document.querySelector('[data-context-cta]');
+    var detail = document.querySelector('[data-context-detail]');
+    var detailKicker = document.querySelector('[data-context-detail-kicker]');
+    var detailTitle = document.querySelector('[data-context-detail-title]');
+    var detailCopy = document.querySelector('[data-context-detail-copy]');
+    var detailLink = document.querySelector('[data-context-detail-link]');
     if (headline) headline.textContent = context.headline;
     if (description) description.textContent = context.description;
     if (benefit) benefit.textContent = context.benefit;
+    if (detailKicker) detailKicker.textContent = context.detailKicker;
+    if (detailTitle) detailTitle.textContent = context.detailTitle;
+    if (detailCopy) detailCopy.textContent = context.detailCopy;
+    if (detailLink) {
+      detailLink.textContent = context.detailCtaLabel;
+      detailLink.setAttribute('href', context.detailDestination);
+    }
     if (cta) {
       cta.textContent = context.ctaLabel;
       cta.setAttribute('href', context.destination);
@@ -67,6 +79,13 @@
         // The page remains fully usable when session storage is unavailable.
       }
       activatePreview(context.demoId);
+      if (detail) {
+        detail.classList.remove('is-updated');
+        window.requestAnimationFrame(function () {
+          detail.classList.add('is-updated');
+          detail.focus({ preventScroll: true });
+        });
+      }
     }
     current = context.id;
     propagateCampaignParameters();

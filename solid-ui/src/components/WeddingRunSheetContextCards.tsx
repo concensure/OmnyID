@@ -63,6 +63,7 @@ export function WeddingRunSheetIntelligencePanel(props: {
   onFocusRecords: (recordIds: string[]) => void;
   onShowAttention: () => void;
   onShowAll: () => void;
+  onAddItem: (preset: "item" | "milestone") => void;
   onApproveBuffer: (suggestion: WeddingRunSheetBufferSuggestion) => Promise<boolean>;
 }) {
   const intelligence = createMemo(() => buildWeddingRunSheetIntelligence({ rows: props.rows }));
@@ -74,6 +75,7 @@ export function WeddingRunSheetIntelligencePanel(props: {
     if (intent.kind === "focus_records") props.onFocusRecords(intent.recordIds);
     else if (intent.kind === "show_attention") props.onShowAttention();
     else if (intent.kind === "show_all") props.onShowAll();
+    else if (intent.kind === "add_item") props.onAddItem(intent.preset);
     else if (!props.archived) setPending(intelligence().bufferSuggestions.find((item) => item.id === intent.suggestionId) ?? null);
   }
   async function approve() {

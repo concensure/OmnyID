@@ -22,7 +22,7 @@
     submit.disabled = !enabled;
     submit.setAttribute('aria-disabled', String(!enabled));
     availability.textContent = enabled
-      ? 'Available now. The binder does not depend on planning-tip consent.'
+      ? ''
       : 'Binder email delivery is being checked before it opens.';
   }
 

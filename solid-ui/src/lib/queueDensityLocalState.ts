@@ -58,6 +58,16 @@ export function queueDensityLevel(density: QueueDensity): number {
   return Number(normalizeQueueDensity(density));
 }
 
+export function queueFontSizeRootPx(density: QueueDensity): number {
+  const level = queueDensityLevel(density);
+  return 14 + ((level - 1) * 5) / 9;
+}
+
+export function applyQueueFontSize(density: QueueDensity): void {
+  if (typeof document === "undefined") return;
+  document.documentElement.style.setProperty("--base-font-size", `${queueFontSizeRootPx(density).toFixed(2)}px`);
+}
+
 export function queueDensityIsCompact(density: QueueDensity): boolean {
   return queueDensityLevel(density) <= 4;
 }

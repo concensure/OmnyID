@@ -265,6 +265,7 @@ export function weddingRunSheetManualRecord(input: {
   ownerRef?: string | null;
   participantRefs?: string[];
   visibility?: string[];
+  itemKind?: "item" | "milestone";
 }): Record<string, unknown> {
   const title = input.title.trim();
   if (!title) throw new Error("Name the run-sheet item.");
@@ -279,8 +280,9 @@ export function weddingRunSheetManualRecord(input: {
     location: input.location?.trim() || null,
     owner_refs: input.ownerRef?.trim() ? [input.ownerRef.trim()] : [],
     participant_refs: Array.from(new Set((input.participantRefs ?? []).map((value) => value.trim()).filter(Boolean))),
-    category: "custom",
-    status: "proposed",
+    category: input.itemKind === "milestone" ? "milestone" : "custom",
+    fixed_milestone: input.itemKind === "milestone",
+    status: input.itemKind === "milestone" ? "confirmed" : "proposed",
     visibility: input.visibility?.length ? Array.from(new Set(input.visibility)) : ["master"],
     source_refs: [],
     projection_state: "detached",

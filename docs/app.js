@@ -30,6 +30,7 @@
   const trialStudentValueContent = document.getElementById("trial-student-value-content");
   const trialChatForm = document.getElementById("trial-chat-form");
   const trialChatInput = document.getElementById("trial-chat-input");
+  const trialChatSubmit = document.getElementById("trial-chat-submit");
   const trialChatInputDefaultPlaceholder = trialChatInput ? trialChatInput.placeholder : "";
   const trialConvertButton = document.getElementById("trial-convert-button");
   const trialTemplateButtons = Array.prototype.slice.call(document.querySelectorAll("[data-trial-template]"));
@@ -214,9 +215,13 @@
       response = await fetch(API_BASE + path, {
         method: options && options.method ? options.method : "GET",
         headers,
-        body: options && options.body ? JSON.stringify(options.body) : undefined
+        body: options && options.body ? JSON.stringify(options.body) : undefined,
+        signal: options && options.signal ? options.signal : undefined
       });
-    } catch {
+    } catch (error) {
+      if (error && error.name === "AbortError") {
+        throw error;
+      }
       throw new Error(
         window.location.protocol === "file:"
           ? "This page was opened directly as a local file, so the browser blocks it from reaching " + API_BASE + ". Serve docs/ from a local web server (or use the hosted site) to use the trial runner."
@@ -862,6 +867,13 @@
       setTrialFeedback("Enter a prompt for the anonymous runner first.", "error");
       return;
     }
+    const controller = new AbortController();
+    const timeout = window.setTimeout(function () { controller.abort(); }, 25000);
+    if (trialChatSubmit) {
+      trialChatSubmit.disabled = true;
+      trialChatSubmit.textContent = "Building preview…";
+    }
+    setTrialFeedback("Building an ephemeral preview. This usually takes a few seconds…", "neutral");
     try {
       const payload = await withTrialSessionRetry((sessionPayload) => apiFetch("/trial/python-runner/chat", {
         method: "POST",
@@ -869,14 +881,24 @@
           session_id: sessionPayload.session_id,
           content: content,
           fingerprint: readTrialFingerprint()
-        }
+        },
+        signal: controller.signal
       }));
       trialChatInput.value = "";
       renderTrialSession(payload);
     } catch (error) {
-      setTrialFeedback(error.message, "error");
+      const message = error && error.name === "AbortError"
+        ? "The preview took too long. Your prompt is still here; please try again."
+        : error.message;
+      setTrialFeedback(message, "error");
       if (String(error.message || "").toLowerCase().includes("sign")) {
         openAuthModal();
+      }
+    } finally {
+      window.clearTimeout(timeout);
+      if (trialChatSubmit) {
+        trialChatSubmit.disabled = false;
+        trialChatSubmit.textContent = "Send to trial runner";
       }
     }
   }

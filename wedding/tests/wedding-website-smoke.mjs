@@ -321,6 +321,15 @@ for (const context of ['starting', 'vendors', 'guests', 'final']) {
     failures.push(`landing context is missing from markup or typed config: ${context}`);
   }
 }
+if (!weddingHome.includes('a good starting point for a spicy discussion') || weddingHome.includes('never a compatibility score')) {
+  failures.push('index.html: animal-quiz discussion copy has not replaced the compatibility-score wording');
+}
+if (weddingHome.includes('Available now. The binder does not depend on planning-tip consent.')) {
+  failures.push('index.html: retired binder availability sentence is still visible');
+}
+if (!weddingHome.includes('data-context-detail') || !landingContext.includes('detailTitle.textContent')) {
+  failures.push('landing context selection does not update an adjacent visible detail panel');
+}
 for (const intent of ['planning', 'quotes', 'suppliers', 'guests', 'dayof']) {
   if (!landingConfig.includes(`${intent}:`)) failures.push(`landing intent is missing: ${intent}`);
 }
@@ -400,6 +409,11 @@ if (!(howIdx > -1 && flowIdx > howIdx && previewIdx > flowIdx)) {
 }
 if (!existsSync(resolve(root, 'assets', 'images', 'vendor-reply-flow.png'))) failures.push('assets/images/vendor-reply-flow.png is missing');
 if (!weddingJs.includes('/wedding/newsletter')) failures.push('main.js: newsletter form is not wired to the subscribe endpoint');
+if (!docsHtml.includes('Q4 2026') || !docsHtml.includes('In progress')) failures.push('docs/index.html: roadmap does not identify Q4 2026 as current');
+if (!docsHtml.includes('Real Email Gateway') || !docsHtml.includes('Tester only')) failures.push('docs/index.html: Real Email Gateway is missing its tester-only boundary');
+if (!docsHtml.includes('id="trial-chat-submit"') || !docsJs.includes('AbortController') || !docsJs.includes('Building preview')) {
+  failures.push('docs trial runner is missing visible busy state and bounded request handling');
+}
 
 const listicleExpectations = {
   'wedding-planning-without-decision-overload/index.html': { items: 7, cta: 'Get my calm plan in 3 minutes' },

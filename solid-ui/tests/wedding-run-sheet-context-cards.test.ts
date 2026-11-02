@@ -10,6 +10,7 @@ test("run-sheet contextual cards preserve the A2UI intent and authoritative-comm
   assert.match(panel, /Review this buffer/);
   assert.match(panel, /does not confirm either item/);
   assert.match(panel, /onApproveBuffer/);
+  assert.match(panel, /onAddItem/);
   assert.doesNotMatch(panel, /sendAfpMessage/);
   assert.match(database, /sendDatabaseRecordRevision/);
   assert.match(database, /weddingRunSheetApprovedBufferPatch/);

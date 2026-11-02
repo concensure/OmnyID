@@ -78,10 +78,10 @@
       option('C', 'Upgrade the top priority', 'camera', 1, 'An enhanced priority feature'),
       option('D', 'Create an unforgettable moment', 'sparklers', 2, 'An immersive celebration moment') ] },
     { id: 'Q11', dimension: 'D', core: false, title: 'Three photographers look suitable. What next?', opts: [
-      option('A', 'Review many more portfolios', 'camera', -2, 'Many photography portfolios'),
-      option('B', 'Request additional galleries', 'veilfield', -1, 'Several full gallery comparisons'),
-      option('C', 'Meet the top two', 'veilfield', 1, 'Two photographer profiles'),
-      option('D', 'Book the best match', 'veilkiss', 2, 'A confirmed photographer booking') ] },
+      option('A', 'Review many more portfolios', 'photographer-portfolios', -2, 'A photographer discussing work with a group'),
+      option('B', 'Request additional galleries', 'photographer-galleries', -1, 'A wedding party being photographed outdoors'),
+      option('C', 'Meet the top two', 'photographer-meeting', 1, 'A wedding photographer preparing a group portrait'),
+      option('D', 'Book the best match', 'photographer-booking', 2, 'A couple posing during a wedding photo session') ] },
     { id: 'Q12', dimension: 'C', core: false, title: 'How should vendor emails be approved?', opts: [
       option('A', 'Both approve each message', 'longtable', -2, 'Two approvals on every message'),
       option('B', 'Both approve a reusable template', 'placecard', -1, 'A shared approved message template'),
