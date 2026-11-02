@@ -188,7 +188,11 @@ import {
   WEDDING_VENDOR_SMOKE_PLANNER_EMAIL,
   WEDDING_VENDOR_SMOKE_TEST_VENDOR_EMAIL,
 } from "@/lib/weddingVendorSmokeFixtureState";
-import { loadWeddingWorkspaceRefreshState, type WeddingWorkspaceRefreshState } from "@/lib/weddingWorkspaceRefreshState";
+import {
+  loadWeddingWorkspaceRefreshState,
+  weddingWorkspaceRefreshScopeMatches,
+  type WeddingWorkspaceRefreshState,
+} from "@/lib/weddingWorkspaceRefreshState";
 import {
   buildWeddingImportSynthesisState,
   loadWeddingImportedArtifacts,
@@ -604,13 +608,20 @@ export function ResponseQueueView(props: {
       sourceResponseId: intent.sourceResponseId,
     });
   });
+  const weddingScopedRefreshState = createMemo(() => {
+    const intent = weddingNavigationIntent();
+    const refreshed = weddingRefreshState();
+    if (!intent || intent.surface !== "planning_files" || !refreshed) return null;
+    return weddingWorkspaceRefreshScopeMatches(refreshed, intent) ? refreshed : null;
+  });
   const weddingPersistedWorkspace = createMemo(() => {
     const intent = weddingNavigationIntent();
     if (!intent || intent.surface !== "planning_files") return null;
     weddingProjectionRefreshKey();
-    const refreshed = weddingRefreshState();
+    const refreshed = weddingScopedRefreshState();
+    if (refreshed) return refreshed.persisted;
     return buildWeddingPersistedWorkspaceState({
-      messages: refreshed?.messages ?? bootstrap()?.messages ?? [],
+      messages: bootstrap()?.messages ?? [],
       weddingPlanId: intent.weddingPlanId,
       responseWorkspaceId: intent.responseWorkspaceId,
       sourceResponseId: intent.sourceResponseId,
@@ -782,7 +793,7 @@ export function ResponseQueueView(props: {
         generatedArtifacts: importedArtifacts,
         taskItems: persisted.taskItems,
         weddingVendors: weddingVendorDirectory(),
-        afpMessages: weddingRefreshState()?.messages ?? bootstrap()?.messages ?? [],
+        afpMessages: weddingScopedRefreshState()?.messages ?? bootstrap()?.messages ?? [],
         nowIso: new Date().toISOString(),
         projectionStorage: localStorage,
       });
@@ -1242,7 +1253,16 @@ export function ResponseQueueView(props: {
         sourceResponseId: intent.sourceResponseId,
         fallbackMessages: bootstrap()?.messages ?? [],
       });
-      setWeddingRefreshState(state);
+      const currentIntent = weddingNavigationIntent();
+      if (
+        currentIntent
+        && currentIntent.surface === "planning_files"
+        && weddingWorkspaceRefreshScopeMatches(state, currentIntent)
+      ) {
+        setWeddingRefreshState(state);
+      } else if (currentIntent?.surface === "planning_files") {
+        setWeddingRefreshQueuedIntent(currentIntent);
+      }
     } finally {
       setWeddingRefreshRunning(false);
       const queuedIntent = weddingRefreshQueuedIntent();

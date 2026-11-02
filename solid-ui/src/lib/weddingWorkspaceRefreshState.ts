@@ -14,7 +14,13 @@ import {
   type WeddingWorkspaceRefreshPaginationState,
 } from "@/lib/weddingWorkspaceRefreshPaginationState";
 
-export type WeddingWorkspaceRefreshState =
+export type WeddingWorkspaceRefreshScope = {
+  weddingPlanId: string;
+  responseWorkspaceId: string;
+  sourceResponseId: string | null;
+};
+
+export type WeddingWorkspaceRefreshState = WeddingWorkspaceRefreshScope & (
   | {
       status: "skipped";
       messages: AfpMessage[];
@@ -37,7 +43,16 @@ export type WeddingWorkspaceRefreshState =
       messageCount: number;
       detail: string;
       error: unknown;
-    };
+    }
+);
+
+export function weddingWorkspaceRefreshScopeMatches(
+  left: Pick<WeddingWorkspaceRefreshScope, "weddingPlanId" | "responseWorkspaceId">,
+  right: Pick<WeddingWorkspaceRefreshScope, "weddingPlanId" | "responseWorkspaceId">,
+): boolean {
+  return left.weddingPlanId === right.weddingPlanId
+    && left.responseWorkspaceId === right.responseWorkspaceId;
+}
 
 type LoadMessages = typeof fetchMessagesBySupertags;
 
@@ -58,6 +73,9 @@ export async function loadWeddingWorkspaceRefreshState(input: {
   });
   if (!input.signedIn) {
     return {
+      weddingPlanId: input.weddingPlanId,
+      responseWorkspaceId: input.responseWorkspaceId,
+      sourceResponseId: input.sourceResponseId ?? null,
       status: "skipped",
       messages: fallbackMessages,
       persisted: fallbackPersisted,
@@ -89,6 +107,9 @@ export async function loadWeddingWorkspaceRefreshState(input: {
       nextOffset: result.next_offset,
     });
     return {
+      weddingPlanId: input.weddingPlanId,
+      responseWorkspaceId: input.responseWorkspaceId,
+      sourceResponseId: input.sourceResponseId ?? null,
       status: "loaded",
       messages: result.messages,
       persisted,
@@ -100,6 +121,9 @@ export async function loadWeddingWorkspaceRefreshState(input: {
     };
   } catch (error) {
     return {
+      weddingPlanId: input.weddingPlanId,
+      responseWorkspaceId: input.responseWorkspaceId,
+      sourceResponseId: input.sourceResponseId ?? null,
       status: "error",
       messages: fallbackMessages,
       persisted: fallbackPersisted,

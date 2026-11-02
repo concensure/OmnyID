@@ -3,7 +3,10 @@ import test from "node:test";
 
 import type { AfpMessage, SupertagMessagesResponse } from "@/lib/api";
 import { weddingNeedToKnowContextToAfpMessage } from "@/lib/weddingNeedToKnowAfpProjectionState";
-import { loadWeddingWorkspaceRefreshState } from "@/lib/weddingWorkspaceRefreshState";
+import {
+  loadWeddingWorkspaceRefreshState,
+  weddingWorkspaceRefreshScopeMatches,
+} from "@/lib/weddingWorkspaceRefreshState";
 import { normalizeWeddingPlanningMetadata } from "@/lib/weddingPlanningTemplateState";
 
 const metadata = normalizeWeddingPlanningMetadata({
@@ -55,6 +58,14 @@ test("loadWeddingWorkspaceRefreshState fetches wedding-tagged messages and scope
   });
 
   assert.equal(state.status, "loaded");
+  assert.equal(state.weddingPlanId, metadata.weddingPlanId);
+  assert.equal(state.responseWorkspaceId, metadata.responseWorkspaceId);
+  assert.equal(state.sourceResponseId, metadata.sourceResponseId);
+  assert.equal(weddingWorkspaceRefreshScopeMatches(state, metadata), true);
+  assert.equal(weddingWorkspaceRefreshScopeMatches(state, {
+    weddingPlanId: metadata.weddingPlanId,
+    responseWorkspaceId: "response_workspace:another",
+  }), false);
   assert.equal(state.messageCount, 1);
   assert.equal(state.persisted.hasPersistedData, true);
   assert.equal(state.persisted.contextItems[0]?.planningContext.location, "Melbourne VIC");

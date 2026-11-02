@@ -2338,11 +2338,9 @@ function App() {
       dispatchWeddingVendorSearchLaunch(savedLaunch);
       saveWeddingEntrySource("generic", userId() || initUserId);
       void savePrimaryUseCase("wedding_planning", "manual").catch(() => {});
-      void import("@/lib/weddingTemplateDeepLinkLaunchState").then(({ buildWeddingTemplateDeepLinkLaunch, dispatchWeddingTemplateDeepLinkLaunch }) => {
-        const launch = buildWeddingTemplateDeepLinkLaunch();
-        dispatchWeddingTemplateDeepLinkLaunch(launch);
-        void preloadViewModule(launch.viewTarget);
-      });
+      const launch = buildWeddingTemplateDeepLinkLaunch();
+      dispatchWeddingTemplateDeepLinkLaunch(launch);
+      void preloadViewModule(launch.viewTarget);
       setLastQuery(query);
       setLastEngine(resolvedEngine);
       setLastOptMode(resolvedOptimizationMode);
