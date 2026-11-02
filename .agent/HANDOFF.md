@@ -6599,8 +6599,9 @@ enabled yet. Hosted enablement must use a clean exact SHA and record matching
 runtime provenance.
 
 The first clean full-account attempt at `7a389281cf5d45d6f5f5203b27665257f39c6526`
-reached the real UI but correctly displayed the new-account Guided Tour, which
-intercepted the Family card. The harness now dismisses that tour through its
-visible `Skip` control before exercising Wedding projections. This is a harness
-sequencing correction, not a product bypass; the full journey must be rerun from
-the successor clean commit.
+reached the real UI but displayed first-login UI over the Family card. A second
+attempt proved the deeper issue: the harness was logging in at generic
+`/workspace/` even though its accounts were registered with a Wedding source.
+The journey now uses the actual `?source=wedding` marketing handoff and asserts
+that neither the generic tour nor Agent Personality wizard obscures the planner.
+The full journey must be rerun from the successor clean commit.

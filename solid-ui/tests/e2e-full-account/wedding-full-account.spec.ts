@@ -24,7 +24,7 @@ const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as Manifest;
 async function signIn(browser: Browser, email: string): Promise<{ context: BrowserContext; page: Page; userId: string; cookie: string }> {
   const context = await browser.newContext();
   const page = await context.newPage();
-  await page.goto("/workspace/?open_auth=1", { waitUntil: "domcontentloaded" });
+  await page.goto("/workspace/?open_auth=1&source=wedding", { waitUntil: "domcontentloaded" });
   await page.getByLabel("Account email").fill(email);
   await page.getByLabel("Password").fill(password!);
   await page.getByRole("button", { name: "Sign in", exact: true }).last().click();
@@ -43,12 +43,11 @@ async function signIn(browser: Browser, email: string): Promise<{ context: Brows
   expect(sessionCookie?.httpOnly).toBe(true);
   expect(sessionCookie?.value).toEqual(expect.any(String));
 
-  // A real first login intentionally opens the product tour. Close it through
-  // the user-facing control so it cannot mask the Wedding surface exercised by
-  // the rest of this full-account journey.
-  const skipTour = page.getByRole("button", { name: "Skip", exact: true });
-  await skipTour.click({ timeout: 10_000 }).catch(() => undefined);
-  await expect(skipTour).toBeHidden();
+  // Wedding-origin authentication must open the Wedding template directly,
+  // without layering the generic product tour or Agent Personality wizard over
+  // the planner. This is the hosted journey used by omnyid.com/wedding.
+  await expect(page.getByText("Your private space", { exact: true })).toBeHidden();
+  await expect(page.getByText("Agent Personality", { exact: true })).toBeHidden();
   return {
     context,
     page,
