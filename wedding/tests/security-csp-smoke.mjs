@@ -39,6 +39,12 @@ if (!caddy.includes('Strict-Transport-Security "max-age=15552000; includeSubDoma
 if (!caddy.includes('import cloudflare_only')) {
   failures.push('public sites must import the Cloudflare-origin allowlist');
 }
+if (!caddy.includes('rewrite @root_home /index.html') || !caddy.includes('try_files {path} {path}.html =404')) {
+  failures.push('root routing must preserve the home page while returning 404 for unknown paths');
+}
+if (!caddy.includes('redir @root_index / 308') || !caddy.includes('redir @privacy_alias /privacy.html 308')) {
+  failures.push('duplicate root documents and legal aliases must redirect to canonical URLs before file serving');
+}
 if (workspaceCss.includes('https://fonts.googleapis.com')) {
   const workspaceFontConnections = caddy.match(/connect-src[^;\n"]*https:\/\/fonts\.googleapis\.com/g) ?? [];
   if (workspaceFontConnections.length < 2) {

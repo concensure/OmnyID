@@ -425,29 +425,26 @@
         not path /docs/*.md /docs/*.tsx /docs/*.sql /docs/*.review /docs/*.csv
     }
 
-    # Eliminate duplicate root documents and extensionless aliases. These are
-    # redirects rather than parallel indexable copies.
-    handle /index.html {
-        redir / 308
-    }
-    handle /docs/index.html {
-        redir / 308
-    }
-    handle /privacy {
-        redir /privacy.html 308
-    }
-    handle /data-rights {
-        redir /data-rights.html 308
-    }
-    handle /security {
-        redir /security.html 308
-    }
-    handle /terms {
-        redir /terms.html 308
-    }
-    handle /vendors {
-        redir /vendors.html 308
-    }
+    # Eliminate duplicate root documents and extensionless aliases. `redir`
+    # and `rewrite` run before the mutually-exclusive file-server handles, so
+    # these rules cannot be shadowed by the final catch-all.
+    @root_index path /index.html /docs/index.html
+    redir @root_index / 308
+    @privacy_alias path /privacy
+    redir @privacy_alias /privacy.html 308
+    @data_rights_alias path /data-rights
+    redir @data_rights_alias /data-rights.html 308
+    @security_alias path /security
+    redir @security_alias /security.html 308
+    @terms_alias path /terms
+    redir @terms_alias /terms.html 308
+    @vendors_alias path /vendors
+    redir @vendors_alias /vendors.html 308
+
+    # The strict catch-all below deliberately has no SPA fallback. Preserve
+    # the one real root document explicitly while unknown paths remain 404.
+    @root_home path /
+    rewrite @root_home /index.html
     handle @public_docs_alias {
         uri strip_prefix /docs
         root * /srv/docs
