@@ -6991,7 +6991,7 @@ that exact commit.
   `5a6ce9032e33c2fd80c8224b215d6be2c93d646c`; only the file-backed Cloudflare control credential was
   rotated in place.
 
-## 2026-11-04 - WED-329 shared Countdown catalogue and public checklist (Codex, release review)
+## 2026-11-04 - WED-329 shared Countdown catalogue and public checklist (Codex, complete)
 
 Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-319`, branch
 `agent/codex/WED-329`, based on clean WED-328 coordination commit
@@ -7010,9 +7010,19 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-319`, branch
   next five actions, full stage checklist, compressed-plan Catch up now, local completion, print,
   `.ics`, privacy-bounded hash sharing and consented Wedding-workspace continuation. The Wedding home
   links to it and the sitemap/public metadata contract includes it.
-- Evidence so far: generator/parity, vendor-lead-time, legal, public engine and site tests pass; all
-  2,180 Wedding tests, 74-page public metadata checks, typecheck and both line budgets pass. A clean
-  exact-SHA production build and any publication decision remain to be recorded after commit.
+- Exact application SHA `415fe21dc4a35bb944781580273d5ed2ad1346f2` passed generator/parity,
+  vendor-lead-time, legal, public engine and site tests; all 2,180 Wedding tests, 74-page public
+  metadata checks, typecheck, both line budgets and a clean production build. It was built and
+  deployed from detached checkout
+  `C:\Users\ozans\AppData\Local\Temp\omnyid-wed329-release-415fe21`.
+- Oracle `SOURCE_COMMIT` and `oracle-runtime-manifest.json` both name the full application SHA. The
+  hosted checklist and generated catalogue return 200; the latter reports `wedding-catalogue.v1`,
+  publication readiness true, 65 tasks, 31 vendor timing categories and three official legal
+  sources. Runtime proof passes with the fresh backup verified and the restore drill explicitly
+  skipped. A separate full proof correctly found the disposable restore drill capacity-blocked:
+  Oracle root use is 90 percent with about 4.9 GB free, while the drill requires about 8.2 GB.
+  No production data was deleted to manufacture a pass. Evidence is recorded in
+  `Documents/verification/wed-329-countdown-oracle-release-2026-11-04.md`.
 - This closes the autonomous Countdown publication dependency. It does not fabricate the separate
   human reviews required for the invitation wording library or the palette image/professional brief
   corpus. Those surfaces remain unpublished until their documented reviews exist.
