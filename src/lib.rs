@@ -50,6 +50,7 @@ pub mod file_ledger;
 pub mod file_path_refs;
 pub mod gateway;
 pub mod goal_progress;
+pub mod growth_analytics;
 pub mod heuristic_adaptation;
 pub mod inference;
 pub mod integration;

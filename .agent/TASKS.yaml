@@ -15,6 +15,18 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: GROWTH-00
+    title: Freeze admin growth analytics contracts and source evidence
+    status: done
+    owner: codex
+    branch: agent/codex/GROWTH-001
+    worktree: C:/Users/ozans/Desktop/projects/OmnyID-GROWTH-001
+    base_sha: 8291a0c59be5217c49871db3c8f04cb68401b8d4
+    depends_on: [WED-329, WED-328]
+    files: [src/growth_analytics/**, src/lib.rs, tests/**growth**, Documents/marketing/analytics/**, Documents/verification/**, .agent/**]
+    acceptance: [every canonical growth event maps to a real source or is explicitly absent, activation v1 uses an exact allowlist and excludes page loads logins and unsaved generated output, the primary unit is one distinct Wedding plan and partner joins cannot increment acquisition, event metadata excludes private Wedding fields, retention and 30-day attribution consent are explicitly bounded and remain false-default pending external approval, historical acquisition is reported unavailable where it was never captured, focused Rust tests cargo check and line budgets pass]
+    progress: "Completed in the recommended isolated worktree from exact WED-329 handoff SHA 8291a0c59be5217c49871db3c8f04cb68401b8d4. Executable growth-events.v1 and growth-kpis.v1 definitions map public measurement, auth, AFP Wedding and billing sources as direct, derived or explicitly absent. Activation v1 permits only four durable Wedding actions; acquisition increments once per canonical wedding_plan_id and never for partner acceptance. Metadata allowlists exclude private Wedding fields. Same-session attribution is available, while persistent attribution is false-default, explicit-opt-in, GPC/DNT-aware and capped at 30 days pending privacy-impact approval; missing historic attribution stays unavailable. Seven focused Rust tests, cargo check --lib, line budgets and git diff checks pass. GROWTH-01 is the next dependency-ready slice."
+
   - id: WED-329
     title: Complete the autonomous Batch 2 countdown catalogue and public planning checklist
     status: done

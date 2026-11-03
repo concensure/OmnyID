@@ -7026,3 +7026,27 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-319`, branch
 - This closes the autonomous Countdown publication dependency. It does not fabricate the separate
   human reviews required for the invitation wording library or the palette image/professional brief
   corpus. Those surfaces remain unpublished until their documented reviews exist.
+
+## 2026-11-04 - GROWTH-00 event and KPI contracts (Codex, complete)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
+`agent/codex/GROWTH-001`, frozen base
+`8291a0c59be5217c49871db3c8f04cb68401b8d4`.
+
+- Added executable `growth-events.v1` and `growth-kpis.v1` definitions over the existing public
+  measurement, auth, Wedding AFP and Stripe billing authorities. Each event is direct, derived or
+  explicitly absent; Binder download and refunds are not fabricated from weaker source facts.
+- Activation v1 contains exactly saved intake plan, meaningful saved budget decision, selected
+  vendor follow-up and resolved decision. Login, page/home views, Quiz completion, partner joins and
+  generated/unsaved AI output are excluded. Acquisition increments once per canonical Wedding.
+- Growth metadata is allowlisted and carries no names, emails, phones, guest/dietary/access facts,
+  message/quote text, budget amount, user ID or Wedding ID.
+- Same-session attribution may use the existing opaque visit. Persistent cross-session attribution
+  is false-default, requires explicit opt-in and no GPC/DNT, expires within 30 days and deletes the
+  link on revocation. Raw anonymous measurement has a 30-day target that GROWTH-01 must implement;
+  linked-projection retention remains disabled pending privacy-impact approval. Historic campaign
+  attribution stays unavailable where no touch exists.
+- Source audit: `Documents/verification/growth-00-source-contract-audit-2026-11-04.md`. Verification:
+  seven focused Rust tests pass, `cargo check --lib` passes, both line-budget tests pass, and no new
+  file exceeds 999 lines. Next dependency-ready work is GROWTH-01 replay-safe measurement and
+  bounded raw-row cleanup.

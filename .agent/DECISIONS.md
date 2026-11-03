@@ -2554,3 +2554,24 @@ subjective usability or a controlled external cohort.
 - Countdown readiness is derived from executable catalogue coverage and generated-static parity,
   not a hand-edited launch flag. Invitation wording and palette publication still require their
   separately documented inclusive-language, professional-content, licence and diversity reviews.
+
+# 2026-11-04 - GROWTH-00 event, KPI and privacy boundary
+
+- `growth-events.v1` maps every canonical growth event to a named existing authority or marks it
+  absent. In particular, Binder submission is not download evidence, and refunds are unavailable
+  until the signed billing ingress accepts and reconciles them. Historic acquisition remains
+  unknown when the corresponding touch was never recorded.
+- A distinct canonical `wedding_plan_id` is the acquisition, activation, retention and payment
+  unit. Registration is a user event, but only the first authorised durable Wedding scope creates
+  an acquired Wedding. Partner acceptance is engagement and never increments acquisition.
+- Activation v1 is limited to a durable saved intake plan, meaningful budget decision, selected
+  vendor follow-up record or resolved decision. Page views, login, home arrival, quiz completion,
+  partner acceptance and unsaved/generated AI output do not activate a Wedding.
+- Cross-session attribution is false-default. Same-session attribution may use the existing opaque
+  visit reference. A future persistent identifier requires explicit opt-in, no GPC/DNT signal, an
+  approved privacy-impact notice, 30-day maximum touch/link life and deletion on revocation. Raw
+  anonymous measurement has a 30-day target that GROWTH-01 must implement and prove; linked
+  projection retention remains disabled pending that review.
+- Growth metadata is allowlisted and excludes names, email, phone, guests, dietary/access details,
+  messages, quote text, budget amounts, user IDs and Wedding IDs. Source IDs and tenant-scoped joins
+  remain internal. De-identified rollups require periodic re-identification-risk review.

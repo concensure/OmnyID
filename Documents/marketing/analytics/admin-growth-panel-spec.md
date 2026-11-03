@@ -278,6 +278,26 @@ but calculations and access checks remain server-side.
 - CSV size, row count, encoding, formula injection and decompression limits fail closed.
 - Report exports require operator permission and record filters/definition versions.
 
+### 6.1 GROWTH-00 retention and consent boundary
+
+The v1 engineering policy is deliberately false-default:
+
+- same-session attribution may use the existing opaque visit reference;
+- a cross-session identifier is not created unless the visitor gives explicit analytics-attribution
+  consent, GPC/DNT is absent, and the privacy-impact wording has been approved;
+- if enabled later, a touch and its identity link expire no later than 30 days after the touch and
+  revocation deletes the link;
+- raw anonymous site-measurement rows have a 30-day target retention; implementing and proving that
+  cleanup is GROWTH-01 work (the older repository retention must not be described as compliant yet);
+- user/Wedding-linked projection retention remains disabled pending the privacy-impact assessment;
+  no arbitrary long-term period is invented; and
+- historical acquisition is `unavailable` where no eligible touch was recorded. Registration, AFP
+  or billing facts may be backfilled only without invented campaign attribution.
+
+This boundary follows the OAIC's APP 11 guidance to justify retained personal information and
+destroy or de-identify it when no longer needed. De-identified rollups require at least annual
+re-identification-risk review; they are not assumed anonymous merely because names are absent.
+
 ## 7. Performance
 
 - Incrementally project source events using unique source IDs and cursors.

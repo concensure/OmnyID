@@ -3,9 +3,11 @@
 Companion: `admin-growth-panel-spec.md`
 Recommended branch: `agent/codex/GROWTH-001`
 Recommended worktree: `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`
+Frozen implementation base: `8291a0c59be5217c49871db3c8f04cb68401b8d4` (the completed WED-329
+Countdown handoff, which includes the WED-328 Growth plan)
 
 Create one task per row in `.agent/TASKS.yaml` before implementation. Freeze the full
-WED-328 final SHA as the base. Do not use the dirty primary checkout.
+post-Batch-2 handoff SHA as the base. Do not use the dirty primary checkout.
 
 ## Dependency graph
 
