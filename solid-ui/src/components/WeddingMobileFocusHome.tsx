@@ -23,6 +23,7 @@ import {
   hiddenAttentionCount,
   installMobileFocusViewportListener,
   loadMobileFocusTriageMemory,
+  mobileDecisionResearchEligibleIds,
   mobileFocusMode,
   mobileFocusSingleCardSectionId,
   publishMobileFocusHomeSections,
@@ -30,6 +31,7 @@ import {
   saveMobileFocusTriageMemory,
   setMobileFocusMode,
   setMobileFocusSingleCardSectionId,
+  setMobileWeddingDecisionOpenIntent,
   type FocusDeckItem,
 } from "@/lib/mobileFocusHomeState";
 import type { WeddingVendorQuoteReplyFlowState } from "@/lib/weddingVendorQuoteReplyFlowState";
@@ -39,6 +41,7 @@ import type { WeddingVendorChoiceCardData } from "@/components/WeddingVendorChoi
 import type { WeddingVendorChoiceIntent } from "@/lib/weddingVendorChoiceActionState";
 import type { WeddingVendorEnquiryPermissions } from "@/lib/weddingVendorEnquiryPermissionsState";
 import { friendlyErrorText } from "@/lib/visibleErrorText";
+import { buildWeddingDecisionResearchState } from "@/lib/weddingDecisionResearchState";
 import { loadWeddingTaskCompletion, WEDDING_TASK_COMPLETION_EVENT } from "@/lib/weddingTaskCompletionLocalState";
 import {
   dispatchWeddingVendorSearchLaunch,
@@ -98,19 +101,43 @@ export function WeddingMobileFocusHome(props: {
     relief: props.state.personalOsProjection.decisionLoadRelief,
     locallyDeferredIds: hiddenIds(),
   }));
-  const decisions = createMemo(() => rankFocusDeckItems(display().queuedItemCards.map((card) => ({
-    id: card.id,
-    kind: "decision" as const,
-    sourceSurface: card.item.sourceSurface,
-    title: card.title,
-    recommendedActionLabel: card.recommendedActionLabel,
-    whyNowLabel: card.whyNowLabel,
-    dueAt: card.item.dueAt,
-    evidenceLabels: card.item.evidenceLabels,
-    deferCount: 0,
-    returnedFromLater: false,
-    external: false,
-  }))));
+  const taskForDecision = (itemId: string) => props.state.planningTaskItems.find(
+    (task) => task.id === itemId.replace(/^task:/, ""),
+  ) ?? null;
+  const researchForDecision = (itemId: string) => buildWeddingDecisionResearchState({
+    task: taskForDecision(itemId),
+    state: props.state,
+  });
+  const decisions = createMemo(() => {
+    const ranked = rankFocusDeckItems(display().queuedItemCards.map((card) => ({
+      id: card.id,
+      kind: "decision" as const,
+      sourceSurface: card.item.sourceSurface,
+      title: card.title,
+      recommendedActionLabel: card.recommendedActionLabel,
+      whyNowLabel: card.whyNowLabel,
+      dueAt: card.item.dueAt,
+      evidenceLabels: card.item.evidenceLabels,
+      deferCount: 0,
+      returnedFromLater: false,
+      external: false,
+    })));
+    // Do not eagerly prepare the whole future queue. Only the decision in
+    // front of the couple and the one immediately behind it are enriched.
+    const researchEligibleIds = mobileDecisionResearchEligibleIds(ranked);
+    return ranked.map((item) => {
+      const research = researchEligibleIds.has(item.id) ? researchForDecision(item.id) : null;
+      if (!research) return item;
+      return {
+        ...item,
+        recommendedActionLabel: research.recommendation,
+        evidenceLabels: Array.from(new Set([
+          ...item.evidenceLabels,
+          research.existingArtifactId ? "Saved wedding research" : "Prepared wedding research brief",
+        ])),
+      };
+    });
+  });
   const responses = createMemo(() => rankFocusDeckItems(props.state.activeVendorQuoteReplyFlows
     .filter((flow) => !hiddenIds().has(flow.id))
     .map((flow) => ({
@@ -237,7 +264,10 @@ export function WeddingMobileFocusHome(props: {
       setMobileFocusSingleCardSectionId(item.kind === "vendor_draft" || item.kind === "vendor_receipt" ? "quote_replies" : "vendor_search");
       return;
     }
-    if (openVendorResearch(item)) return;
+    if (item.kind === "decision") {
+      openDecisionSurface(item);
+      return;
+    }
     setPendingApproval({ item, method });
   }
 
@@ -299,6 +329,18 @@ export function WeddingMobileFocusHome(props: {
     return true;
   }
 
+  function openDecisionSurface(item: FocusDeckItem) {
+    if (openVendorResearch(item)) return;
+    const research = researchForDecision(item.id);
+    const title = taskForDecision(item.id)?.title ?? item.title;
+    setMobileWeddingDecisionOpenIntent({
+      itemId: item.id,
+      surface: research ? "research" : /pending RSVP/i.test(title) ? "rsvp" : "task",
+    });
+    setMobileFocusMode("overview");
+    setMobileFocusSingleCardSectionId("decision_focus");
+  }
+
   function hasVendorShortlist(item: FocusDeckItem): boolean {
     const decision = decisionItemFor(item.id);
     const query = decision ? weddingVendorResearchQueryForDecision(decision) : null;
@@ -319,7 +361,9 @@ export function WeddingMobileFocusHome(props: {
       return hasVendorShortlist(item) ? "Open shortlist" : "Search vendors";
     }
     if (item.kind === "response") return "Review response";
-    return "Review decision";
+    if (researchForDecision(item.id)) return "View report";
+    if (/pending RSVP/i.test(taskForDecision(item.id)?.title ?? item.title)) return "Message guest";
+    return "Open task";
   }
 
   function completeVendorItem(item: FocusDeckItem) {
@@ -417,7 +461,7 @@ export function WeddingMobileFocusHome(props: {
                     onConnectGmail={props.onConnectGmailForOutreach}
                     onDone={() => completeVendorItem(item)}
                   />
-                  : <DeckCard item={item} onOpenAgentDraft={openAgentDraft} onOpenVendorResearch={openVendorResearch} />}
+                  : <DeckCard item={item} onOpen={() => item.kind === "response" ? openAgentDraft() : openDecisionSurface(item)} />}
                 renderEnd={() => (
                   <QueueClearedZenState
                     variant="wedding"
@@ -454,8 +498,7 @@ export function WeddingMobileFocusHome(props: {
 
 function DeckCard(props: {
   item: FocusDeckItem;
-  onOpenAgentDraft: () => void;
-  onOpenVendorResearch: (item: FocusDeckItem) => boolean;
+  onOpen: () => void;
 }) {
   return (
     <div class="flex min-h-0 flex-1 flex-col">
@@ -463,9 +506,7 @@ function DeckCard(props: {
         card={decisionCardFromFocusDeckItem(props.item)}
         mode="standard"
         showActions
-        onAction={() => {
-          if (!props.onOpenVendorResearch(props.item)) props.onOpenAgentDraft();
-        }}
+        onAction={props.onOpen}
         class="shadow-none"
       />
     </div>

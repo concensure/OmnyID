@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   WEDDING_MAGNET_PROFILE_STORAGE_KEY,
   readWeddingMagnetImportFacts,
+  weddingMagnetImportFactsFromJsonText,
   weddingMagnetFactsToIntakePrefill,
 } from "../src/lib/weddingMagnetProfileImportPreviewState.ts";
 
@@ -56,4 +57,36 @@ test("malformed or unproven profile entries are ignored", () => {
       budget_total_aud: { key: "budget_total_aud", value: -1, source_label: "Budget Reality Check", result_id: "bad-budget" },
     },
   })), []);
+});
+
+test("a downloaded profile JSON is parsed through the same review contract", () => {
+  const facts = weddingMagnetImportFactsFromJsonText(JSON.stringify({
+    version: 1,
+    facts: {
+      guest_count: { key: "guest_count", value: 84, source_label: "Budget Reality Check", result_id: "budget-cross-device" },
+    },
+  }));
+  assert.deepEqual(facts.map((fact) => [fact.key, fact.value, fact.resultId]), [["guest_count", 84, "budget-cross-device"]]);
+});
+
+test("the live Budget Reality Check result file maps to shared profile fields", () => {
+  const facts = weddingMagnetImportFactsFromJsonText(JSON.stringify({
+    schema: "budget_reality_check",
+    version: 1,
+    result_id: "budget-file-1",
+    created_at: "2026-11-03T00:00:00.000Z",
+    updated_at: "2026-11-03T00:00:00.000Z",
+    inputs: { totalBudget: "42000", guests: "90", state: "NSW", locationType: "metro", setting: "garden", priorities: ["Food", "Photos"] },
+    result: { allocation: [{ id: "venue_ceremony", amount: 16_800 }] },
+    origin: { page: "/wedding/wedding-cost-calculator.html" },
+  }));
+  assert.deepEqual(facts.map((fact) => fact.key), [
+    "planning_started_at", "state", "area_type", "guest_count", "budget_total_aud", "budget_allocation", "top_priorities", "setting_preference",
+  ]);
+  assert.equal(facts.every((fact) => fact.resultId === "budget-file-1"), true);
+});
+
+test("unsupported and malformed JSON files remain fail closed", () => {
+  assert.deepEqual(weddingMagnetImportFactsFromJsonText("not json"), []);
+  assert.deepEqual(weddingMagnetImportFactsFromJsonText('{"schema":"other","version":1}'), []);
 });

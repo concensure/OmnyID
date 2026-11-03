@@ -6,10 +6,14 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const projectRoot = resolve(root, '..');
 const docsIndex = resolve(projectRoot, 'docs', 'index.html');
 const docsApp = resolve(projectRoot, 'docs', 'app.js');
+const robotsPath = resolve(projectRoot, 'docs', 'robots.txt');
+const sitemapPath = resolve(projectRoot, 'docs', 'sitemap.xml');
 const vendorAcquisitionPage = resolve(projectRoot, 'docs', 'vendors.html');
 const vendorAcquisitionCss = resolve(projectRoot, 'docs', 'vendors.css');
 const docsHtml = readFileSync(docsIndex, 'utf8');
 const docsJs = readFileSync(docsApp, 'utf8');
+const robots = readFileSync(robotsPath, 'utf8');
+const sitemap = readFileSync(sitemapPath, 'utf8');
 const vendorAcquisitionHtml = readFileSync(vendorAcquisitionPage, 'utf8');
 const weddingJs = readFileSync(resolve(root, 'assets', 'js', 'main.js'), 'utf8');
 const landingConfig = readFileSync(resolve(root, 'assets', 'js', 'landing-config.js'), 'utf8');
@@ -409,6 +413,15 @@ if (!(howIdx > -1 && flowIdx > howIdx && previewIdx > flowIdx)) {
 }
 if (!existsSync(resolve(root, 'assets', 'images', 'vendor-reply-flow.png'))) failures.push('assets/images/vendor-reply-flow.png is missing');
 if (!weddingJs.includes('/wedding/newsletter')) failures.push('main.js: newsletter form is not wired to the subscribe endpoint');
+if (!weddingHome.includes('<html lang="en-AU">') || !weddingHome.includes('<meta property="og:locale" content="en_AU">')) failures.push('index.html: Australian language and Open Graph locale metadata are missing');
+if (!weddingHome.includes('<link rel="canonical" href="https://omnyid.com/wedding/">')) failures.push('index.html: canonical Wedding URL is missing');
+for (const context of ['starting', 'vendors', 'guests', 'final']) {
+  if (!new RegExp(`${context}:[\\s\\S]*?retrieval:[\\s\\S]*?question:[\\s\\S]*?directAnswer:[\\s\\S]*?destinationPath:`).test(landingConfig)) failures.push(`landing-config.js: ${context} context lacks non-visible retrieval metadata`);
+}
+if (!robots.includes('User-agent: OAI-SearchBot') || !robots.includes('User-agent: GPTBot') || !robots.includes('Sitemap: https://omnyid.com/sitemap.xml')) failures.push('docs/robots.txt: search/training policy or sitemap link is missing');
+for (const location of ['https://omnyid.com/wedding/', 'https://omnyid.com/wedding/blog.html', 'https://omnyid.com/wedding/pricing.html']) {
+  if (!sitemap.includes(`<loc>${location}</loc>`)) failures.push(`docs/sitemap.xml: missing ${location}`);
+}
 if (!docsHtml.includes('Q4 2026') || !docsHtml.includes('In progress')) failures.push('docs/index.html: roadmap does not identify Q4 2026 as current');
 if (!docsHtml.includes('Real Email Gateway') || !docsHtml.includes('Tester only')) failures.push('docs/index.html: Real Email Gateway is missing its tester-only boundary');
 if (!docsHtml.includes('id="trial-chat-submit"') || !docsJs.includes('AbortController') || !docsJs.includes('Building preview')) {

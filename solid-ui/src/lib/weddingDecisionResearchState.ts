@@ -4,7 +4,7 @@ import type { WeddingPlanningTaskItem } from "@/lib/weddingCalendarProjectionSta
 import type { WeddingNeedToKnowContextCard, WeddingResponseWorkspaceViewState, WeddingWorkspaceArtifactPreview } from "@/lib/weddingResponseWorkspaceViewState";
 
 export type WeddingDecisionResearchState = {
-  kind: "guest_logistics" | "hen_night";
+  kind: "guest_logistics" | "hen_night" | "linked_report";
   recommendation: string;
   detailMarkdown: string;
   existingArtifactId: string | null;
@@ -36,6 +36,23 @@ function relevantLines(body: string, pattern: RegExp): string[] {
     .map((line) => line.replace(/^[-*#|\s]+/, "").replace(/\|/g, " · ").trim())
     .filter((line) => line.length >= 12 && pattern.test(line))
     .slice(0, 5);
+}
+
+function reportRecommendation(body: string, title: string): string | null {
+  const lines = body.split(/\r?\n/)
+    .map((line) => line
+      .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
+      .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+      .replace(/^[#>*|\-\s]+/, "")
+      .replace(/[*_`|]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim())
+    .filter((line) => line.length >= 18 && !/^[-: ]+$/.test(line));
+  const headingIndex = lines.findIndex((line) => /^(recommendation|recommended next step|next step|what to do|finding)s?\b/i.test(line));
+  const candidate = headingIndex >= 0 ? lines[headingIndex + 1] : lines[0];
+  if (!candidate) return null;
+  const compact = candidate.length > 260 ? `${candidate.slice(0, 257).trim()}...` : candidate;
+  return `${title}: ${compact}`;
 }
 
 function transportAllocationLabel(state: WeddingResponseWorkspaceViewState): string | null {
@@ -168,5 +185,18 @@ export function buildWeddingDecisionResearchState(input: {
       generatedArtifact: generated,
     };
   }
+  const linkedReport = task.linkedArtifactId
+    ? input.state.artifactPreviews.find((preview) => preview.artifactId === task.linkedArtifactId)
+    : null;
+  const linkedRecommendation = linkedReport?.bodyText
+    ? reportRecommendation(linkedReport.bodyText, linkedReport.title)
+    : null;
+  if (linkedReport?.bodyText && linkedRecommendation) return {
+    kind: "linked_report",
+    recommendation: linkedRecommendation,
+    detailMarkdown: linkedReport.bodyText,
+    existingArtifactId: linkedReport.artifactId,
+    generatedArtifact: null,
+  };
   return null;
 }

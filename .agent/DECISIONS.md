@@ -2459,3 +2459,20 @@ subjective usability or a controlled external cohort.
 - Batch 2 profile intake extends the canonical `omnyid.wedding.magnetProfile.v1` registry. It is a
   reviewable prefill only: each fact retains source/result provenance, sensitive-tier facts default
   off, and the existing Wedding intake remains the sole confirmation and AFP-write authority.
+
+# 2026-11-03 - WED-324 bounded decision research and non-visible Wedding retrieval
+
+- Research enrichment is deliberately bounded to the currently ranked Wedding decision and its
+  immediate successor. Later work keeps its ordinary task projection until it reaches that window,
+  preventing speculative research and unnecessary inference cost across the future queue.
+- A linked saved report is the evidence authority for its decision. Vendor research, RSVP follow-up,
+  readable report and ordinary task actions open their existing surface in place; ordinary task
+  opening continues to expose the existing owner and assignment controls.
+- Public Wedding GEO work in this slice is non-visible infrastructure only: locale/canonical/social
+  metadata, JavaScript-only question-and-answer semantics for existing stage choices, a deterministic
+  public sitemap and crawler policy. No unsupported Organization/entity or ABN claim is emitted.
+- Search/retrieval crawlers may access public pages while named model-training crawlers are opted out;
+  private account, workspace, RSVP, claim and operational paths remain excluded.
+- Cross-device Batch 2 import consumes the shared versioned magnet profile or a supported live Budget
+  Reality Check result. It produces reviewable intake prefill and does not create a parallel store or
+  bypass the existing intake confirmation and AFP-write boundary.

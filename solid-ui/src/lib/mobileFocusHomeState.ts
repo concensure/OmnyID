@@ -25,6 +25,10 @@ export type FocusDeckItem = {
 };
 export type MobileHomeSection = { id: string; title: string; summary: string };
 export type MobileFocusTriageMemory = { resolvedIds: string[]; deferredIds: string[] };
+export type MobileWeddingDecisionOpenIntent = {
+  itemId: string;
+  surface: "research" | "rsvp" | "task";
+};
 
 export const FOCUS_DECK_HORIZONTAL_MAPPING = "left_is_prev" as const;
 const [viewport, setViewport] = createSignal(false);
@@ -34,6 +38,7 @@ const [menuAttentionCount, setMenuAttentionCountSignal] = createSignal(0);
 const [mobileAskOpen, setMobileAskOpen] = createSignal(false);
 const [singleCardSectionId, setSingleCardSectionId] = createSignal<string | null>(null);
 const [homeSections, setHomeSections] = createSignal<MobileHomeSection[]>([]);
+const [decisionOpenIntent, setDecisionOpenIntentSignal] = createSignal<MobileWeddingDecisionOpenIntent | null>(null);
 let listenerInstalled = false;
 let mediaQuery: MediaQueryList | null = null;
 
@@ -60,6 +65,7 @@ export const mobileFocusMenuAttentionCount: Accessor<number> = menuAttentionCoun
 export const mobileFocusAskOpen: Accessor<boolean> = mobileAskOpen;
 export const mobileFocusSingleCardSectionId: Accessor<string | null> = singleCardSectionId;
 export const mobileFocusHomeSections: Accessor<MobileHomeSection[]> = homeSections;
+export const mobileWeddingDecisionOpenIntent: Accessor<MobileWeddingDecisionOpenIntent | null> = decisionOpenIntent;
 
 export function setMobileFocusMode(next: FocusMode, userId?: string | null): void {
   setMode(next);
@@ -79,6 +85,9 @@ export function setMobileFocusMenuAttentionCount(count: number): void {
 export function setMobileFocusAskOpen(open: boolean): void { setMobileAskOpen(open); }
 export function setMobileFocusSingleCardSectionId(id: string | null): void { setSingleCardSectionId(id); }
 export function publishMobileFocusHomeSections(sections: MobileHomeSection[]): void { setHomeSections(sections); }
+export function setMobileWeddingDecisionOpenIntent(intent: MobileWeddingDecisionOpenIntent | null): void {
+  setDecisionOpenIntentSignal(intent);
+}
 
 function triageStorageKey(workspaceId: string | null | undefined): string {
   return storageKey(workspaceId, "triage");
@@ -123,6 +132,9 @@ export function rankFocusDeckItems<T extends FocusDeckItem>(items: readonly T[],
   return items.map((item, index) => ({ item, index, tier: dueTier(item.dueAt, now) }))
     .sort((left, right) => left.tier - right.tier || right.item.deferCount - left.item.deferCount || left.index - right.index)
     .map(({ item }) => item);
+}
+export function mobileDecisionResearchEligibleIds(items: readonly Pick<FocusDeckItem, "id">[]): Set<string> {
+  return new Set(items.slice(0, 2).map((item) => item.id));
 }
 export function hiddenAttentionCount(input: { responseCount: number; overdueDecisionCount: number }): number {
   return Math.max(0, input.responseCount) + Math.max(0, input.overdueDecisionCount);

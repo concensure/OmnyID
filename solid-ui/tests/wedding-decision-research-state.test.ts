@@ -61,6 +61,20 @@ test("hen night brief adapts activity formats to the couple's saved preference",
   assert.equal(result?.generatedArtifact?.summary.kind, "research");
 });
 
+test("a linked report supplies a readable recommendation instead of a generic task instruction", () => {
+  const linkedTask = { ...task("Review the researched wet-weather plan"), linkedArtifactId: "report:rain" };
+  const linkedState = state();
+  linkedState.artifactPreviews = [{
+    artifactId: "report:rain",
+    title: "Wet-weather venue research",
+    bodyText: "## Recommendation\nConfirm the covered ceremony room and its seated capacity before paying the next deposit.\n\n## Evidence\nThe current package names an indoor room but does not state its seated capacity.",
+  }] as WeddingResponseWorkspaceViewState["artifactPreviews"];
+  const result = buildWeddingDecisionResearchState({ task: linkedTask, state: linkedState });
+  assert.equal(result?.kind, "linked_report");
+  assert.match(result?.recommendation ?? "", /Confirm the covered ceremony room/i);
+  assert.equal(result?.existingArtifactId, "report:rain");
+});
+
 test("second-order logistics tasks do not name an unrelated overall budget decision", () => {
   const cards = buildWeddingSecondOrderLoopCards({
     artifacts: [{ id: "map", title: "Venue transport notes", kind: "map_collection", bodyText: "Venue access, parking and bus routes need checking." }],

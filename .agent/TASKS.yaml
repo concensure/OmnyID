@@ -15,6 +15,17 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-324
+    title: Scope Wedding decision research, add non-visible GEO signals, and continue Batch 2
+    status: done
+    owner: codex
+    branch: agent/codex/WED-324
+    worktree: C:/Users/ozans/Desktop/projects/OmnyID-WED-319
+    depends_on: [WED-323, WED-322]
+    files: [solid-ui/src/**, solid-ui/tests/**, wedding/**, Documents/marketing/wedding planning/posts/magnet/**, Documents/verification/**, .agent/**]
+    acceptance: [only the active Wedding decision and its immediate successor are eligible for research-backed recommendation enrichment, action-specific decisions open their report or existing action surface in place without removing the task assignment surface, future not-yet-due decisions are not eagerly enriched, non-visible GEO fixes improve crawlability metadata and JavaScript-only planning-stage semantics without changing visible wedding landing-page content or adding unsupported entity claims, the next dependency-ordered Batch 2 slice reuses the shared magnet profile and existing AFP authorities, relevant tests and production build pass]
+    progress: "Only the current and immediately following ranked Wedding decisions are now eligible for research-backed recommendation enrichment; saved linked reports are projected first, vendor/RSVP/research/task actions open their matching in-place surface, and Open task retains the existing owner/assignment controls. Added non-visible en-AU/canonical/social metadata, JS-only retrieval semantics for the four existing stage choices, deterministic public sitemap generation, and a search-friendly robots policy without visible landing-copy or unsupported entity changes. Continued Batch 2 LP-07 with reviewed cross-device JSON import for the shared magnet profile and the live Budget Reality Check result; the normal intake remains the sole AFP confirmation authority. Typecheck, 2,174 Wedding tests, focused state tests, Wedding site/CSP/quiz/account/blog/magnet smokes, production build, line budgets, sitemap idempotence and git diff checks pass. No deployment was requested for this slice."
+
   - id: WED-323
     title: Make Wedding decisions actionable and continue Batch 2 magnet delivery
     status: done

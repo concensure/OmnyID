@@ -1,0 +1,49 @@
+# Public search and user-directed retrieval are welcome. Authenticated and
+# operational routes are never crawl targets.
+User-agent: *
+Allow: /
+Disallow: /workspace/
+Disallow: /api/
+Disallow: /auth/
+Disallow: /admin/
+Disallow: /agent/
+Disallow: /dashboard/
+Disallow: /files/
+Disallow: /relay/
+Disallow: /runtime/
+
+User-agent: OAI-SearchBot
+Allow: /
+Disallow: /workspace/
+Disallow: /api/
+Disallow: /auth/
+Disallow: /admin/
+Disallow: /agent/
+Disallow: /dashboard/
+Disallow: /files/
+Disallow: /relay/
+Disallow: /runtime/
+
+User-agent: Claude-SearchBot
+Allow: /
+Disallow: /workspace/
+Disallow: /api/
+Disallow: /auth/
+Disallow: /admin/
+Disallow: /agent/
+Disallow: /dashboard/
+Disallow: /files/
+Disallow: /relay/
+Disallow: /runtime/
+
+# Model-training crawlers are separate from search retrieval.
+User-agent: GPTBot
+Disallow: /
+
+User-agent: ClaudeBot
+Disallow: /
+
+User-agent: Google-Extended
+Disallow: /
+
+Sitemap: https://omnyid.com/sitemap.xml

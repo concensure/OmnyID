@@ -11,7 +11,8 @@
    * ctaLabel: string,
    * destination: string,
    * granularity: string,
-   * variant: string
+   * variant: string,
+   * retrieval: { question: string, directAnswer: string, destinationPath: string }
    * }>} */
   var contexts = {
     starting: {
@@ -29,7 +30,12 @@
       ctaLabel: 'Build my wedding plan',
       destination: '../workspace/?auth=register&source=wedding',
       granularity: 'G6 outcome',
-      variant: 'default'
+      variant: 'default',
+      retrieval: {
+        question: 'How do we start planning a wedding in Australia?',
+        directAnswer: 'Start with the date or season, location, guest range, total budget and the priorities you want later decisions to protect.',
+        destinationPath: '/wedding/'
+      }
     },
     vendors: {
       id: 'vendors',
@@ -46,7 +52,12 @@
       ctaLabel: 'See how quote comparison works',
       destination: '#vendor-flow',
       granularity: 'G4 capability',
-      variant: 'default'
+      variant: 'default',
+      retrieval: {
+        question: 'How do I compare wedding vendor quotes?',
+        directAnswer: 'Compare the same inclusions, exclusions, assumptions, payment terms and unanswered questions before choosing a supplier.',
+        destinationPath: '/wedding/#vendor-flow'
+      }
     },
     guests: {
       id: 'guests',
@@ -63,7 +74,12 @@
       ctaLabel: 'Explore guest planning',
       destination: '#preview',
       granularity: 'G4 capability',
-      variant: 'default'
+      variant: 'default',
+      retrieval: {
+        question: 'How do I manage wedding RSVPs, dietary needs and seating?',
+        directAnswer: 'Keep each guest, household, RSVP, meal choice, access need and seating assignment in one connected guest record.',
+        destinationPath: '/wedding/#preview'
+      }
     },
     final: {
       id: 'final',
@@ -80,7 +96,12 @@
       ctaLabel: 'Explore day-of planning',
       destination: '#wedding-run-sheet',
       granularity: 'G5 functional outcome',
-      variant: 'default'
+      variant: 'default',
+      retrieval: {
+        question: 'What should we have done in the final three months before an Australian wedding?',
+        directAnswer: 'Confirm suppliers, payments, guest details, wet-weather plans and the master run sheet, then share only the relevant version with each person.',
+        destinationPath: '/wedding/#wedding-run-sheet'
+      }
     }
   };
 

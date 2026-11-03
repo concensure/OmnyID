@@ -32,6 +32,10 @@ import {
   weddingVendorSearchQueryFromIntake,
 } from "@/lib/weddingVendorSearchLaunchState";
 import { weddingRsvpSetupFromAfpMessages } from "@/lib/weddingRsvpSetupState";
+import {
+  mobileWeddingDecisionOpenIntent,
+  setMobileWeddingDecisionOpenIntent,
+} from "@/lib/mobileFocusHomeState";
 
 export function WeddingDecisionFocusCard(props: {
   state: WeddingResponseWorkspaceViewState;
@@ -123,6 +127,14 @@ export function WeddingDecisionFocusCard(props: {
     locallyDeferredIds: locallyDeferredIds(),
     locallyHiddenIds: completedFocusIds(),
   }));
+  createEffect(() => {
+    const intent = mobileWeddingDecisionOpenIntent();
+    if (!intent || !display().visibleFocusItems.some((item) => item.id === intent.itemId)) return;
+    if (intent.surface === "research" && researchFor(intent.itemId)) setExpandedResearchItemId(intent.itemId);
+    if (intent.surface === "rsvp") setRsvpFollowUpOpenId(intent.itemId);
+    if (intent.surface === "task" && taskFor(intent.itemId)) setExpandedTaskId(intent.itemId);
+    setMobileWeddingDecisionOpenIntent(null);
+  });
   createEffect(() => {
     const sourceIds = new Set(props.state.personalOsProjection.decisionLoadRelief.focusItems.map((item) => item.id));
     setLocallyDeferredIds((current) => {

@@ -62,28 +62,78 @@ function displayValue(value: unknown): string {
   return clean(value, 320);
 }
 
+function factsFromProfile(value: unknown): WeddingMagnetImportFact[] {
+  const root = record(value);
+  if (root.version !== 1) return [];
+  const facts = record(root.facts);
+  return WEDDING_MAGNET_PROFILE_FIELDS.flatMap((field) => {
+    const fact = record(facts[field.key]);
+    if (fact.key !== field.key || !validValue(field, fact.value)) return [];
+    const sourceLabel = clean(fact.source_label, 100);
+    const resultId = clean(fact.result_id, 80);
+    if (!sourceLabel || !resultId) return [];
+    return [{
+      key: field.key,
+      value: fact.value,
+      displayValue: displayValue(fact.value),
+      sourceLabel,
+      resultId,
+      tier: field.tier,
+      workspaceTarget: field.workspace_target,
+      why: field.why,
+    }];
+  });
+}
+
+function budgetEnvelopeProfile(value: unknown): Record<string, unknown> | null {
+  const envelope = record(value);
+  if (envelope.version !== 1 || envelope.schema !== "budget_reality_check") return null;
+  const resultId = clean(envelope.result_id, 80);
+  const recordedAt = clean(envelope.updated_at, 40) || clean(envelope.created_at, 40);
+  const inputs = record(envelope.inputs);
+  const result = record(envelope.result);
+  if (!resultId || !recordedAt) return null;
+  const facts: Record<string, unknown> = {};
+  const add = (key: string, factValue: unknown) => {
+    if (factValue === undefined || factValue === null || factValue === "") return;
+    facts[key] = { key, value: factValue, source_label: "Budget Reality Check", result_id: resultId, recorded_at: recordedAt };
+  };
+  add("guest_count", Number(inputs.guests));
+  add("budget_total_aud", Number(inputs.totalBudget));
+  add("state", clean(inputs.state, 8));
+  const locationType = clean(inputs.locationType, 40);
+  if (locationType && locationType !== "not_decided") add("area_type", locationType === "metro" ? "capital" : locationType);
+  const setting = clean(inputs.setting, 160);
+  if (setting && setting !== "not_decided") add("setting_preference", setting);
+  const priorities = Array.isArray(inputs.priorities) ? inputs.priorities : [];
+  if (priorities.length > 0) add("top_priorities", priorities);
+  const allocation = Array.isArray(result.allocation)
+    ? Object.fromEntries(result.allocation.flatMap((item) => {
+      const entry = record(item);
+      const id = clean(entry.id, 80);
+      return id && typeof entry.amount === "number" ? [[id, entry.amount]] : [];
+    }))
+    : {};
+  if (Object.keys(allocation).length > 0) add("budget_allocation", allocation);
+  add("planning_started_at", recordedAt.slice(0, 10));
+  return { version: 1, facts };
+}
+
+export function weddingMagnetImportFactsFromJsonText(text: string): WeddingMagnetImportFact[] {
+  try {
+    const value = JSON.parse(text) as unknown;
+    const profileFacts = factsFromProfile(value);
+    if (profileFacts.length > 0) return profileFacts;
+    const envelopeProfile = budgetEnvelopeProfile(value);
+    return envelopeProfile ? factsFromProfile(envelopeProfile) : [];
+  } catch {
+    return [];
+  }
+}
+
 export function readWeddingMagnetImportFacts(storage: Storage): WeddingMagnetImportFact[] {
   try {
-    const root = record(JSON.parse(storage.getItem(WEDDING_MAGNET_PROFILE_STORAGE_KEY) ?? "null"));
-    if (root.version !== 1) return [];
-    const facts = record(root.facts);
-    return WEDDING_MAGNET_PROFILE_FIELDS.flatMap((field) => {
-      const fact = record(facts[field.key]);
-      if (fact.key !== field.key || !validValue(field, fact.value)) return [];
-      const sourceLabel = clean(fact.source_label, 100);
-      const resultId = clean(fact.result_id, 80);
-      if (!sourceLabel || !resultId) return [];
-      return [{
-        key: field.key,
-        value: fact.value,
-        displayValue: displayValue(fact.value),
-        sourceLabel,
-        resultId,
-        tier: field.tier,
-        workspaceTarget: field.workspace_target,
-        why: field.why,
-      }];
-    });
+    return weddingMagnetImportFactsFromJsonText(storage.getItem(WEDDING_MAGNET_PROFILE_STORAGE_KEY) ?? "null");
   } catch {
     return [];
   }
