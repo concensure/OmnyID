@@ -20,6 +20,7 @@ use std::time::Duration;
 use ulid::Ulid;
 mod migration_catalog;
 pub use migration_catalog::MIGRATIONS;
+mod growth_acquisition;
 mod message_attachments;
 pub use message_attachments::StoredMessageAttachment;
 mod operational_retention;

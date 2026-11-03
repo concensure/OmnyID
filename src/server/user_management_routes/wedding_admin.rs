@@ -906,6 +906,15 @@ pub(super) async fn wedding_onboarding_state_upsert_http(
         )
         .await
         .map_err(readiness_error_to_http)?;
+    if entry_source != "generic" {
+        if let Err(error) = state
+            .db
+            .attach_same_session_acquisition_to_wedding(&user.id, &wedding_plan_id)
+            .await
+        {
+            tracing::warn!(user_id = %user.id, %error, "Wedding acquisition link could not be attached");
+        }
+    }
     Ok(Json(
         serde_json::json!({ "onboarding_state": onboarding_state }),
     ))

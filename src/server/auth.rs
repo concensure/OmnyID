@@ -58,6 +58,7 @@ pub(super) async fn register_http(
     let email = request.email.trim().to_lowercase();
     let password = request.password.trim().to_string();
     let verification_source = request.source.clone();
+    let acquisition_visit_id = request.acquisition_visit_id.clone();
     let display_name = request
         .display_name
         .unwrap_or_else(|| email.split('@').next().unwrap_or("Omnyid User").to_string())
@@ -108,6 +109,13 @@ pub(super) async fn register_http(
         .await
         .map_err(internal_error)
         .map_err(status_to_http)?;
+    if let Err(err) = state
+        .db
+        .link_new_user_same_session_acquisition(&user.id, acquisition_visit_id.as_deref())
+        .await
+    {
+        warn!(user_id = %user.id, error = %err, "Same-session acquisition link could not be recorded");
+    }
     ensure_user_agents_and_demo_seed(&state, &user)
         .await
         .map_err(internal_http_error)?;
@@ -293,6 +301,19 @@ pub(super) async fn google_auth_http(
         (user, true)
     };
 
+    if account_created {
+        if let Err(err) = state
+            .db
+            .link_new_user_same_session_acquisition(
+                &user.id,
+                request.acquisition_visit_id.as_deref(),
+            )
+            .await
+        {
+            warn!(user_id = %user.id, error = %err, "Google same-session acquisition link could not be recorded");
+        }
+    }
+
     state
         .db
         .mark_email_verified(&user.id)
@@ -384,6 +405,8 @@ pub(super) struct AppleAuthRequest {
     #[serde(default)]
     pub email: String,
     #[serde(default)] pub nonce: Option<String>,
+    #[serde(default)]
+    pub acquisition_visit_id: Option<String>,
 }
 
 pub(super) async fn apple_auth_http(
@@ -431,14 +454,14 @@ pub(super) async fn apple_auth_http(
             })?
     };
 
-    let user = if let Some(existing) = state
+    let (user, account_created) = if let Some(existing) = state
         .db
         .find_user_by_google_sub(&apple_sub)
         .await
         .map_err(internal_error)
         .map_err(status_to_http)?
     {
-        existing
+        (existing, false)
     } else if let Some(existing) = state
         .db
         .find_user_by_email(&email)
@@ -455,7 +478,7 @@ pub(super) async fn apple_auth_http(
         if !linked {
             return Err(external_sign_in_failed_error());
         }
-        existing
+        (existing, false)
     } else {
         let display_name = email
             .split('@')
@@ -481,8 +504,21 @@ pub(super) async fn apple_auth_http(
         ensure_user_agents_and_demo_seed(&state, &new_user)
             .await
             .map_err(internal_http_error)?;
-        new_user
+        (new_user, true)
     };
+
+    if account_created {
+        if let Err(err) = state
+            .db
+            .link_new_user_same_session_acquisition(
+                &user.id,
+                request.acquisition_visit_id.as_deref(),
+            )
+            .await
+        {
+            warn!(user_id = %user.id, error = %err, "Apple same-session acquisition link could not be recorded");
+        }
+    }
 
     state
         .db

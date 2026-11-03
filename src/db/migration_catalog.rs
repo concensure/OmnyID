@@ -700,4 +700,9 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Replay-safe public measurement identity and visit-scoped uniqueness",
         include_str!("../../postgres/migrations/0137_wedding_site_measurement_idempotency.sql"),
     ),
+    (
+        "0138_growth_acquisition_identity",
+        "Privacy-bounded same-session acquisition touches and identity links",
+        include_str!("../../postgres/migrations/0138_growth_acquisition_identity.sql"),
+    ),
 ];

@@ -84,6 +84,7 @@ import {
   uploadFilePayload,
   verifyEmailToken,
 } from "@/lib/api";
+import { sameSessionAcquisitionVisitId } from "@/lib/growthAcquisitionState";
 import { fleetStatusSummary } from "@/lib/agentFleetResponseState";
 import { buildSessionEndedNotice } from "@/lib/sessionRecoveryState";
 import {
@@ -5163,7 +5164,7 @@ function AuthModal(props: {
     setGoogleError("");
     props.onClearNotice?.();
     try {
-      const data = await authenticateWithGoogleIdToken(idToken);
+      const data = await authenticateWithGoogleIdToken(idToken, sameSessionAcquisitionVisitId());
       completeAuth(data);
     } catch (err) {
       setError(visibleErrorText(err, "Google sign-in failed."));
@@ -5211,6 +5212,7 @@ function AuthModal(props: {
         password: submittedPassword,
         display_name: tab() === "signup" ? submittedDisplayName : undefined,
         source: tab() === "signup" ? props.signupSource : undefined,
+        acquisition_visit_id: tab() === "signup" ? sameSessionAcquisitionVisitId() : undefined,
       });
       if (data.requires_2fa) {
         setError(

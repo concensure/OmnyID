@@ -122,6 +122,7 @@ pub(super) struct RegisterRequest {
     pub(super) password: String,
     pub(super) display_name: Option<String>,
     pub(super) source: Option<String>,
+    pub(super) acquisition_visit_id: Option<String>,
 }
 
 #[derive(serde::Deserialize)]
@@ -133,6 +134,7 @@ pub(super) struct LoginRequest {
 #[derive(serde::Deserialize)]
 pub(super) struct GoogleAuthRequest {
     pub(super) id_token: String,
+    pub(super) acquisition_visit_id: Option<String>,
 }
 
 #[derive(serde::Serialize)]

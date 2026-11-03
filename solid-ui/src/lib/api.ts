@@ -4091,10 +4091,10 @@ export const verifyEmailToken = (token: string): Promise<VerifyEmailResponse> =>
       experience: value.experience === "wedding" ? "wedding" : "generic",
     };
   });
-export const authenticateWithGoogleIdToken = (idToken: string): Promise<AuthApiResponse> =>
+export const authenticateWithGoogleIdToken = (idToken: string, acquisitionVisitId?: string | null): Promise<AuthApiResponse> =>
   publicApiFetch<unknown>("/auth/google", {
     method: "POST",
-    bodyJson: { id_token: idToken },
+    bodyJson: { id_token: idToken, ...(acquisitionVisitId ? { acquisition_visit_id: acquisitionVisitId } : {}) },
   }).then(parseAuthApiResponse);
 export const authenticateWithPassword = (args: {
   mode: "login" | "register";
@@ -4102,6 +4102,7 @@ export const authenticateWithPassword = (args: {
   password: string;
   display_name?: string;
   source?: string;
+  acquisition_visit_id?: string | null;
 }): Promise<AuthApiResponse> =>
   publicApiFetch<unknown>(args.mode === "login" ? "/auth/login" : "/auth/register", {
     method: "POST",
@@ -4110,6 +4111,7 @@ export const authenticateWithPassword = (args: {
       password: args.password,
       ...(args.mode === "register" && args.display_name ? { display_name: args.display_name } : {}),
       ...(args.mode === "register" && args.source ? { source: args.source } : {}),
+      ...(args.mode === "register" && args.acquisition_visit_id ? { acquisition_visit_id: args.acquisition_visit_id } : {}),
     },
   }).then(parseAuthApiResponse);
 

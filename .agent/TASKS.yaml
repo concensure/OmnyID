@@ -39,6 +39,18 @@ tasks:
     acceptance: [stable bounded client event IDs and an exact schema version are required, exact replay stores one event while a distinct event in the same visit stores once, unknown or personal properties invalid paths and oversized batches are dropped, retry and sendBeacon preserve event identity, raw sessions and events are deleted after 30 days in bounded batches, GPC DNT and known bots remain suppressed, approved root and Wedding pages reuse one same-origin visit without third-party tracking, focused route database migration retention and browser tests plus cargo check and line budgets pass]
     progress: "Feature commit e25b8525290569dca713a268ce5966eb7eb731e1 extends the existing first-party measurement authority with public-measurement.v1, stable client event IDs, composite visit/event uniqueness, acknowledged retry with sendBeacon replay, one shared root/Wedding session, strict path/property/schema bounds and 30-day batched cascade cleanup. Only the metadata-compliant root home is added; GPC DNT and known bots remain suppressed and no third-party tracker is introduced. Browser replay, focused Rust, migration-catalog, real disposable-Postgres replay/retention, growth-contract, cargo check, line-budget and 74-page public-site checks pass. This candidate is committed but not deployed."
 
+  - id: GROWTH-02
+    title: Link consent-aware acquisition touches to canonical Weddings
+    status: in_progress
+    owner: codex
+    branch: agent/codex/GROWTH-001
+    worktree: C:/Users/ozans/Desktop/projects/OmnyID-GROWTH-001
+    base_sha: c8ab58a182fc0f27c3a60136cf3a92c68797b9c4
+    depends_on: [GROWTH-00, GROWTH-01]
+    files: [src/growth_analytics/**, src/db/**growth**, src/db/migration_catalog.rs, src/server/auth.rs, src/server/types.rs, src/server/user_management_routes/**, postgres/migrations/**, solid-ui/src/lib/api.ts, solid-ui/src/App.tsx, solid-ui/src/lib/**growth**, solid-ui/tests/**growth**, tests/**growth**, Documents/marketing/analytics/**, Documents/verification/**, .agent/**]
+    acceptance: [same-session acquisition carries only an opaque visit reference into a newly created account, campaign fields are resolved from the server-side touch rather than trusted from registration, first-touch and last-non-direct rules are deterministic and direct does not overwrite non-direct, GPC DNT or missing opt-in creates no persistent cross-session identifier, an acquisition link is scoped to its new user and tenant Wedding so swapped visits or Weddings fail closed, partner acceptance cannot create another acquisition, identity and touch rows expire or cascade within 30 days, focused browser Rust disposable-Postgres migration and line-budget tests pass]
+    progress: "Started from clean GROWTH-01 evidence commit c8ab58a182fc0f27c3a60136cf3a92c68797b9c4. This slice will implement same-session opaque-visit registration first; persistent 30-day browser linkage remains disabled until explicit approved consent exists."
+
   - id: WED-329
     title: Complete the autonomous Batch 2 countdown catalogue and public planning checklist
     status: done
