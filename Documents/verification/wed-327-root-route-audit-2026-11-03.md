@@ -44,8 +44,12 @@ Operational and API paths are intentionally absent from the sitemap. If producti
 
 ## Verification after deployment
 
-- `/this-route-should-not-exist-wed327` returns 404 rather than the home page.
-- `/index.html` and `/docs/index.html` redirect to `/`.
-- extensionless legal/vendor aliases redirect to the sitemap URL.
-- transactional pages remain absent from the sitemap and expose `noindex`.
-- every URL in `docs/sitemap.xml` has a matching self-referencing canonical.
+- Verified on the direct Oracle origin at release
+  `5a6ce9032e33c2fd80c8224b215d6be2c93d646c`: `/` returns 200 and
+  `/this-route-should-not-exist-wed327` returns 404.
+- `/index.html` and `/docs/index.html` return 308 to `/`; `/privacy` returns
+  308 to `/privacy.html`. The other extensionless aliases use the same rule.
+- The public Cloudflare path returns the same 200/308/404 outcomes.
+- Transactional pages remain absent from the sitemap and expose `noindex`.
+- Static-site tests verify every public Wedding page has its intended canonical,
+  social metadata and structured data; the sitemap/listicle contradiction is gone.

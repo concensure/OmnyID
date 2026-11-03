@@ -6920,3 +6920,35 @@ application SHA `08656091e9ed2d952ed761cc65106b68d186a2bd`; clean release checko
 - Remaining Batch 2 gates are unchanged: the reconciled Countdown catalogue, reviewed invitation
   wording library and licensed/diversity-reviewed palette corpus must exist before those tools or
   their launch claims are published.
+
+## 2026-11-03 - WED-327 stable Wedding controls and crawlable public foundations (Codex, complete)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-319`, branch
+`agent/codex/WED-327`. Exact deployed application SHA
+`5a6ce9032e33c2fd80c8224b215d6be2c93d646c`; clean release checkout
+`C:\Users\ozans\AppData\Local\Temp\omnyid-wed327-release3-5a6ce90`.
+
+- Removed Upload-files hover reflow/flicker and added an in-context explanation that saved
+  contributions increase the available Wedding budget while retaining their conditions.
+- Removed public Binder readiness and AFP implementation language. Added deterministic `en-AU`,
+  canonical, OpenGraph/Twitter and JSON-LD coverage across 68 Wedding pages; articles identify
+  Casper Wu and publication dates. Standalone sitemap landing pages now self-canonicalise.
+- Added direct home links to three quote guides, a localized two-part hero/facts table, a textual
+  calculator method and exact 100-percent model, and an explicit illustrative label on the mock
+  Harbour Room card. The root site now includes a Wedding-couple use case.
+- Replaced the JavaScript-only public vendor starting state with database-backed initial HTML and
+  individual LocalBusiness pages. Server rendering intentionally excludes imported photos until
+  licence evidence is reviewed. A Docker packaging regression was caught remotely, fixed and given
+  a static regression assertion before the successful release.
+- Root routing now preserves `/`, permanently redirects duplicate/legal aliases and returns 404 for
+  arbitrary paths. A hosted smoke caught the first strict-fallback root regression; the corrected
+  Caddyfile was validated by Oracle Caddy before the final release.
+- Continued Batch 2 only with bounded aggregate profile-import measurement. It accepts counts, not
+  Wedding facts or free text. Countdown catalogue reconciliation, reviewed invitation wording and
+  licensed/diversity-reviewed palette assets remain the next autonomous publication dependencies.
+- Exact-candidate evidence: all 2,176 Wedding tests, typecheck, line budgets, Wedding site/CSP/blog/
+  magnet/budget tests, six focused Rust tests and production build pass. Hosted checks confirm the
+  public schema/canonicals, server-rendered directory and vendor detail, calculator method, root
+  Wedding use case, 200/308/404 routing, and full runtime SHA. Independent production proof passes;
+  the latest backup is internally verified and the redundant restore drill was skipped after the
+  deploy wrapper's post-proof became locally idle. Oracle root is 86% used with 6.4 GiB free.
