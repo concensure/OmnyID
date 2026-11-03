@@ -31,12 +31,11 @@ use super::{
 const MAX_EMAIL_CHARS: usize = 254;
 const MAX_BODY_BYTES: usize = 4 * 1024;
 const CONSENT_VERSION: &str = "wedding-binder-tips-v1";
-const SUCCESS_MESSAGE: &str =
-    "Check your inbox. If it does not arrive in a few minutes, check spam or try again.";
 const FILLABLE_URL: &str = "https://omnyid.com/wedding/downloads/wedding-day-binder-fillable.pdf";
 const PRINT_URL: &str = "https://omnyid.com/wedding/downloads/wedding-day-binder-print.pdf";
 const COVER_URL: &str = "https://omnyid.com/wedding/downloads/binder-cover.jpg";
 const PRIVACY_URL: &str = "https://omnyid.com/wedding/privacy.html";
+const CONTINUE_URL: &str = "https://omnyid.com/workspace/?auth=register&source=wedding";
 const TEXT_TEMPLATE: &str = include_str!("../../wedding/email/binder-email.txt");
 const HTML_TEMPLATE: &str = include_str!("../../wedding/email/binder-email.html");
 
@@ -143,14 +142,38 @@ fn render_binder_email(
         marketing_opt_in,
     );
     let replace = |template: String| {
-        template
+        let mut rendered = template
             .replace("{{COVER_URL}}", COVER_URL)
             .replace("{{FILLABLE_URL}}", FILLABLE_URL)
             .replace("{{PRINT_URL}}", PRINT_URL)
             .replace("{{PRIVACY_URL}}", PRIVACY_URL)
-            .replace("{{CONFIRM_URL}}", &confirm_url)
+            .replace("{{CONTINUE_URL}}", CONTINUE_URL)
+            .replace("{{CONFIRM_URL}}", &confirm_url);
+        for (index, link) in crate::wedding_quote_reading::VENUE_QUOTE_READING_LINKS
+            .iter()
+            .enumerate()
+        {
+            let number = index + 1;
+            rendered = rendered
+                .replace(&format!("{{{{READING_TITLE_{number}}}}}"), link.title)
+                .replace(&format!("{{{{READING_URL_{number}}}}}"), link.url);
+        }
+        rendered
     };
     (replace(text), replace(html))
+}
+
+fn binder_response(email_status: &str, message: &str) -> Json<Value> {
+    Json(json!({
+        "status": "downloads_ready",
+        "email_status": email_status,
+        "message": message,
+        "downloads": {
+            "fillable": FILLABLE_URL,
+            "print": PRINT_URL,
+        },
+        "continue_url": CONTINUE_URL,
+    }))
 }
 
 async fn binder_status_http() -> Json<Value> {
@@ -178,9 +201,7 @@ async fn binder_request_http(
     )
     .await?;
     if !request.company.trim().is_empty() {
-        return Ok(Json(
-            json!({ "status": "accepted", "message": SUCCESS_MESSAGE }),
-        ));
+        return Ok(Json(json!({ "status": "accepted" })));
     }
     let email = request.email.trim().to_ascii_lowercase();
     if email.len() > MAX_EMAIL_CHARS || !is_plausible_email(&email) {
@@ -227,6 +248,9 @@ async fn binder_request_http(
         )
         .await
         .map_err(readiness_error_to_http)?;
+    let mut email_status = "recently_accepted";
+    let mut message =
+        "Your Binder links are ready below. A recent email request is already on its way.";
     if prepared.should_send {
         let (text_body, html_body) =
             render_binder_email(request.marketing_opt_in, confirmation_token.as_deref());
@@ -245,10 +269,16 @@ async fn binder_request_http(
                 .await
                 .map_err(readiness_error_to_http)?;
         }
+        if delivered {
+            email_status = "provider_accepted";
+            message =
+                "Your Binder links are ready below, and the email provider accepted your message.";
+        } else {
+            email_status = "unavailable";
+            message = "Your Binder links are ready below. We could not confirm the email send, so use these links now or try again.";
+        }
     }
-    Ok(Json(
-        json!({ "status": "accepted", "message": SUCCESS_MESSAGE }),
-    ))
+    Ok(binder_response(email_status, message))
 }
 
 async fn binder_confirm_http(
@@ -318,6 +348,12 @@ mod tests {
         assert!(!html.contains("Yes, send me planning tips"));
         assert!(!plain.contains("{{"));
         assert!(!html.contains("{{"));
+        assert!(plain.contains("Continue in OmnyID Wedding"));
+        assert!(html.contains("Continue in OmnyID Wedding"));
+        for link in crate::wedding_quote_reading::VENUE_QUOTE_READING_LINKS {
+            assert_eq!(plain.matches(link.url).count(), 1);
+            assert_eq!(html.matches(link.url).count(), 1);
+        }
 
         let (plain, html) = render_binder_email(true, Some(&"a".repeat(52)));
         assert!(plain.contains("confirm so we know"));

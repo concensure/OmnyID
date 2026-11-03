@@ -92,9 +92,27 @@
     }
   }
 
-  function continueUrl(from) {
+  function continueUrl(from, authenticated) {
     var safeFrom = FROM_VALUES.includes(from) ? from : '';
-    return '/workspace/?auth=register&source=wedding' + (safeFrom ? '&from=' + safeFrom : '');
+    return '/workspace/?' + (authenticated ? '' : 'auth=register&') + 'source=wedding' + (safeFrom ? '&from=' + safeFrom : '');
+  }
+
+  function personalizeContinueLinks(documentRef, fetchRef) {
+    var documentObject = documentRef || global.document;
+    var request = fetchRef || global.fetch;
+    if (!documentObject || typeof documentObject.querySelectorAll !== 'function' || typeof request !== 'function') return Promise.resolve(false);
+    var links = Array.from(documentObject.querySelectorAll('[data-magnet-continue]'));
+    if (!links.length) return Promise.resolve(false);
+    return request('/auth/session', { credentials: 'same-origin' }).then(function (response) {
+      if (!response || !response.ok) return false;
+      links.forEach(function (link) {
+        var from = link.getAttribute('data-magnet-from') || '';
+        link.href = continueUrl(from, true);
+        link.textContent = 'Add to your plan';
+        link.setAttribute('data-session-authenticated', 'true');
+      });
+      return true;
+    }).catch(function () { return false; });
   }
 
   function downloadJson(filename, value, documentRef) {
@@ -116,6 +134,8 @@
     load: load,
     remove: remove,
     continueUrl: continueUrl,
+    personalizeContinueLinks: personalizeContinueLinks,
     downloadJson: downloadJson
   });
+  personalizeContinueLinks(global.document, global.fetch);
 })(window);

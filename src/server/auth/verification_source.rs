@@ -27,6 +27,20 @@ pub(super) fn verification_token_id(source: Option<&str>) -> String {
     format!("{prefix}{}", ulid::Ulid::new())
 }
 
+pub(super) fn verification_email_body(name: &str, url: &str, source: Option<&str>) -> String {
+    let optional_reading = if is_wedding_source(source) {
+        format!(
+            "\n\n{}",
+            crate::wedding_quote_reading::optional_plain_text_reading()
+        )
+    } else {
+        String::new()
+    };
+    format!(
+        "Hi {name},\n\nVerify your OmnyID email address by visiting the link below:\n\n{url}\n\nThis link expires in 24 hours.{optional_reading}\n\nIf you did not create an OmnyID account, ignore this email.\n"
+    )
+}
+
 pub(super) fn token_experience(token_id: &str) -> &'static str {
     if token_id.starts_with(WEDDING_TOKEN_PREFIX) {
         "wedding"
@@ -79,5 +93,21 @@ mod tests {
         assert!(generic_id.starts_with(GENERIC_TOKEN_PREFIX));
         assert_eq!(token_experience(&generic_id), "generic");
         assert_eq!(token_experience("legacy-token-without-prefix"), "generic");
+    }
+
+    #[test]
+    fn wedding_registration_gets_three_quiet_quote_reads_but_generic_does_not() {
+        let wedding = verification_email_body(
+            "Alex",
+            "https://omnyid.com/verify-email?token=safe",
+            Some("wedding"),
+        );
+        let generic =
+            verification_email_body("Alex", "https://omnyid.com/verify-email?token=safe", None);
+        assert!(wedding.contains("Optional reading for when venue quotes arrive"));
+        for link in crate::wedding_quote_reading::VENUE_QUOTE_READING_LINKS {
+            assert_eq!(wedding.matches(link.url).count(), 1);
+            assert!(!generic.contains(link.url));
+        }
     }
 }

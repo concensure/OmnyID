@@ -19,6 +19,17 @@ Your PDF viewer may tint the fillable boxes on screen. That tint does not print.
 the file as a flat page without boxes, use the print version and write by hand. The binder gives
 general information only; check legal requirements for your ceremony with your celebrant.
 
+Want the binder connected to the rest of your plan? Keep the run sheet, vendors, budget and
+follow-ups together in a free workspace.
+
+Continue in OmnyID Wedding:
+{{CONTINUE_URL}}
+
+Useful later, when venue quotes arrive:
+- {{READING_TITLE_1}}: {{READING_URL_1}}
+- {{READING_TITLE_2}}: {{READING_URL_2}}
+- {{READING_TITLE_3}}: {{READING_URL_3}}
+
 [MARKETING:START - include only if the visitor ticked "planning tips"]
 You asked for occasional planning tips. Please confirm so we know it was you. We will not send
 them until you do:

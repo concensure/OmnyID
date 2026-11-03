@@ -2476,3 +2476,18 @@ subjective usability or a controlled external cohort.
 - Cross-device Batch 2 import consumes the shared versioned magnet profile or a supported live Budget
   Reality Check result. It produces reviewable intake prefill and does not create a parallel store or
   bypass the existing intake confirmation and AFP-write boundary.
+
+# 2026-11-03 - WED-326 Binder delivery and signed-in magnet continuation
+
+- A Binder request has two independent success paths: the authenticated provider acceptance is
+  recorded as email evidence, while the response always returns the canonical public downloads and
+  Wedding workspace continuation URL. The page must not strand a couple when an inbox or provider is
+  delayed, and it must not claim delivery when only provider acceptance is known.
+- A failed Binder delivery is immediately retryable. Successful delivery is deduplicated for 24 hours
+  and a concurrent pending request for five minutes, preventing duplicate sends without turning a
+  transient provider failure into a day-long block.
+- The three optional venue-quote articles are one server-owned constant used by Binder and Wedding
+  registration mail. They remain visually and textually secondary to download and verification.
+- Public lead-magnet continuation checks the existing authenticated session. Signed-in visitors see
+  `Add to your plan`; everyone else keeps the registration handoff. Both paths reuse the existing
+  profile, consent review and AFP import authorities.

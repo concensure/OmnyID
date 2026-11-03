@@ -47,7 +47,11 @@ impl Db {
             SELECT EXISTS (
                 SELECT 1
                 FROM wedding_binder_requests
-                WHERE email = $1 AND requested_at > NOW() - INTERVAL '24 hours'
+                WHERE email = $1 AND (
+                    (delivery_status = 'sent' AND requested_at > NOW() - INTERVAL '24 hours')
+                    OR
+                    (delivery_status = 'pending' AND requested_at > NOW() - INTERVAL '5 minutes')
+                )
             )
             "#,
         )
@@ -239,9 +243,30 @@ mod tests {
             .await
             .expect("repeat");
         assert!(!repeat.should_send);
-        db.finish_wedding_binder_delivery(first.request_id.as_deref().unwrap(), true)
+        db.finish_wedding_binder_delivery(first.request_id.as_deref().unwrap(), false)
             .await
             .expect("delivery receipt");
+        let retry = db
+            .prepare_wedding_binder_request(
+                &email,
+                true,
+                "test-v1",
+                Some(&hex::encode(Sha256::digest(b"retry"))),
+                WeddingBinderAcquisition {
+                    utm_source: Some("test"),
+                    utm_medium: None,
+                    utm_campaign: None,
+                    intent: Some("dayof"),
+                    referrer_class: Some("direct"),
+                    device_class: Some("desktop"),
+                },
+            )
+            .await
+            .expect("retry failed delivery");
+        assert!(retry.should_send);
+        db.finish_wedding_binder_delivery(retry.request_id.as_deref().unwrap(), true)
+            .await
+            .expect("retry delivery receipt");
         assert!(
             db.confirm_wedding_binder_tips(&digest)
                 .await

@@ -15,6 +15,17 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-326
+    title: Complete the Binder email handoff and continue truthful Batch 2 delivery
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-326
+    worktree: C:/Users/ozans/Desktop/projects/OmnyID-WED-319
+    depends_on: [WED-325, WED-324, WED-322]
+    files: [wedding/**, src/server/**, src/gateway/**, solid-ui/src/**, solid-ui/tests/**, Documents/marketing/wedding planning/posts/magnet/**, Documents/marketing/wedding planning/posts/blog/**, Documents/verification/**, scripts/**, Caddyfile, docker-compose*.yml, .agent/**]
+    acceptance: [the free Binder request returns immediate usable download links and the matching email makes those links plus Continue in OmnyID Wedding unambiguous, wedding registration and Binder emails each include exactly three quiet secondary venue-quote reading links without competing with their primary action, the next dependency-ready Batch 2 slice reuses the shared profile AFP and existing public magnet authorities without publishing gated claims, relevant Rust website frontend accessibility build and line-budget checks pass, a clean exact-SHA candidate is deployed to Oracle and runtime provenance plus health evidence is recorded]
+    progress: "Candidate implementation is locally verified. Binder responses return immediate download and continuation links, failed sends are retryable, and email provider acceptance remains distinct from receipt. Binder and Wedding registration mail share three secondary venue-quote reads. Continued Batch 2 LP-07 with a signed-in Add-to-plan Budget CTA over the existing session and import authorities. Focused Rust tests, typecheck, all 2,175 Wedding tests, static-site/CSP/quiz/account/blog/magnet tests, line budgets, production build and diff checks pass. Docker Desktop was unavailable, so the opt-in disposable Postgres Binder retry test was not run locally. Exact-SHA Oracle release and hosted evidence remain."
+
   - id: WED-325
     title: Accelerate the Wedding binder, bound funded research and trial inference, and continue Batch 2
     status: done

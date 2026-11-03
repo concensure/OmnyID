@@ -57,5 +57,25 @@ test("blocked storage leaves the result usable and returns visible copy", () => 
 test("continue URL accepts only registered lead magnet sources", () => {
   const api = core();
   assert.equal(api.continueUrl("budget"), "/workspace/?auth=register&source=wedding&from=budget");
+  assert.equal(api.continueUrl("budget", true), "/workspace/?source=wedding&from=budget");
   assert.equal(api.continueUrl("attacker"), "/workspace/?auth=register&source=wedding");
+});
+
+test("signed-in visitors get Add to your plan without opening registration", async () => {
+  const link = {
+    href: "",
+    textContent: "Save this in a free workspace",
+    attributes: new Map([["data-magnet-from", "budget"]]),
+    getAttribute(name) { return this.attributes.get(name) || null; },
+    setAttribute(name, value) { this.attributes.set(name, value); },
+  };
+  const api = core();
+  const authenticated = await api.personalizeContinueLinks(
+    { querySelectorAll: () => [link] },
+    async () => ({ ok: true }),
+  );
+  assert.equal(authenticated, true);
+  assert.equal(link.href, "/workspace/?source=wedding&from=budget");
+  assert.equal(link.textContent, "Add to your plan");
+  assert.equal(link.getAttribute("data-session-authenticated"), "true");
 });

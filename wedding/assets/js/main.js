@@ -305,6 +305,7 @@
     }
     document.querySelectorAll('[data-open-signin]').forEach(function (btn) {
       btn.addEventListener('click', function (e) {
+        if (btn.getAttribute('data-session-authenticated') === 'true') return;
         e.preventDefault();
         openSignin(btn.getAttribute('data-signin-mode') || 'register');
       });

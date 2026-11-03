@@ -177,6 +177,34 @@
   margin-top: 12px;
 }
 
+.binder-ready{
+  background: #fff;
+  border: 1px solid #bfded8;
+  border-radius: 12px;
+  margin-top: 16px;
+  padding: 18px;
+}
+
+.binder-ready[hidden]{
+  display: none;
+}
+
+.binder-ready p{
+  margin: 0 0 14px;
+}
+
+.binder-ready-actions{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.binder-continue{
+  display: inline-block;
+  font-weight: 800;
+  margin-top: 16px;
+}
+
 @media (max-width: 700px){
   .binder-layout{
     grid-template-columns: 1fr;
@@ -189,5 +217,10 @@
   .binder-form-row{
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .binder-ready-actions > *{
+    text-align: center;
+    width: 100%;
   }
 }

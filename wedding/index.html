@@ -406,6 +406,14 @@
         </form>
         <p id="binderAvailability" class="binder-availability">Binder email delivery is being checked before it opens.</p>
         <p id="binderStatus" class="binder-status" role="status" aria-live="polite"></p>
+        <div id="binderReady" class="binder-ready" hidden>
+          <p><strong>Your downloads are ready now.</strong> Choose either version while the email makes its way to you.</p>
+          <div class="binder-ready-actions">
+            <a class="btn btn-primary" data-binder-download="fillable" href="#wedding-day-binder">Download fillable PDF</a>
+            <a class="btn btn-outline" data-binder-download="print" href="#wedding-day-binder">Download print PDF</a>
+          </div>
+          <a class="binder-continue" data-binder-continue href="../workspace/?auth=register&amp;source=wedding">Continue in OmnyID Wedding <span aria-hidden="true">→</span></a>
+        </div>
       </div>
     </div>
   </section>

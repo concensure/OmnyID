@@ -1183,10 +1183,10 @@ async fn issue_and_send_verification_email(
     let base_url = auth_base_url_configured()?;
     let verify_url = verification_source::verification_url(&base_url, &raw_token, source);
 
-    let body = format!(
-        "Hi {name},\n\nVerify your OmnyID email address by visiting the link below:\n\n{url}\n\nThis link expires in 24 hours.\n\nIf you did not create an OmnyID account, ignore this email.\n",
-        name = user.display_name,
-        url = verify_url,
+    let body = verification_source::verification_email_body(
+        &user.display_name,
+        &verify_url,
+        source,
     );
 
     crate::gateway::smtp_out::send_transactional_email(

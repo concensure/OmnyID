@@ -6886,3 +6886,27 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-319`, branch
   deterministic assets, signed-in Add-to-plan variants, the reconciled Countdown catalogue, reviewed
   invitation wording library and licensed palette corpus. Do not publish gated claims before those
   underlying assets and handoffs are complete.
+
+## 2026-11-03 - WED-326 Binder email completion and Batch 2 signed-in handoff (Codex, candidate)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-319`, branch
+`agent/codex/WED-326`, based on WED-325 release-evidence commit `760fe2a`.
+
+- Binder POST responses now include the fillable and print downloads plus a clear `Continue in
+  OmnyID Wedding` path. The landing page reveals all three immediately after submission while the
+  email uses the same canonical URLs. Provider acceptance, recent dedupe and delivery-unavailable
+  states have honest, distinct copy.
+- Failed email attempts no longer enter the 24-hour successful-send dedupe window. A short pending
+  window still suppresses concurrent duplicate requests.
+- Binder and Wedding-source registration mail include the same three compact, secondary venue-quote
+  articles. Generic OmnyID registration mail is unchanged.
+- Continued Batch 2 LP-07: the live Budget Reality Check CTA checks the existing session and becomes
+  `Add to your plan` for signed-in visitors; signed-out visitors keep the established consented
+  registration/import path.
+- Passed locally: focused Rust Binder, registration-source and reading-list tests; Solid UI
+  typecheck; 2,175 Wedding tests; Wedding website/CSP/quiz/account/blog/magnet tests; line budgets;
+  production UI build; `git diff --check`. Docker Desktop was unreachable, so the opt-in disposable
+  Postgres Binder retry test was not run in this local candidate.
+- Remaining Batch 2 gates are unchanged: the reconciled Countdown catalogue, reviewed invitation
+  wording library and licensed/diversity-reviewed palette corpus must exist before those tools or
+  their launch claims are published.

@@ -10,6 +10,7 @@
   var submit = form.querySelector('[data-binder-submit]');
   var availability = document.getElementById('binderAvailability');
   var status = document.getElementById('binderStatus');
+  var ready = document.getElementById('binderReady');
   var started = false;
   submit.type = 'submit';
   submit.disabled = true;
@@ -36,6 +37,28 @@
       intent: query.get('intent'),
       device_class: width < 600 ? 'mobile' : (width < 1024 ? 'tablet' : 'desktop')
     };
+  }
+
+  function safePublicUrl(value, fallbackPath) {
+    try {
+      var parsed = new URL(value, window.location.origin);
+      if (parsed.origin !== window.location.origin) return fallbackPath;
+      return parsed.href;
+    } catch (error) {
+      return fallbackPath;
+    }
+  }
+
+  function showDownloads(body) {
+    if (!ready) return;
+    var downloads = body && body.downloads ? body.downloads : {};
+    var fillable = ready.querySelector('[data-binder-download="fillable"]');
+    var print = ready.querySelector('[data-binder-download="print"]');
+    var continueLink = ready.querySelector('[data-binder-continue]');
+    if (fillable) fillable.href = safePublicUrl(downloads.fillable, '/wedding/downloads/wedding-day-binder-fillable.pdf');
+    if (print) print.href = safePublicUrl(downloads.print, '/wedding/downloads/wedding-day-binder-print.pdf');
+    if (continueLink) continueLink.href = safePublicUrl(body.continue_url, '/workspace/?auth=register&source=wedding');
+    ready.hidden = false;
   }
 
   fetch('/wedding/binder', { credentials: 'same-origin' })
@@ -70,6 +93,7 @@
       });
     }).then(function (body) {
       status.textContent = body.message || 'Check your inbox.';
+      showDownloads(body);
       track('wedding_binder_submitted');
       form.reset();
     }).catch(function () {
