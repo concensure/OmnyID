@@ -156,6 +156,16 @@ services:
       OMNYID_RUNPOD_API_KEY_FILE: ${OMNYID_RUNPOD_API_KEY_FILE:-/run/secrets/omnyid_runpod_api_key}
       OMNYID_OPENAI_API_KEY_FILE: ${OMNYID_OPENAI_API_KEY_FILE:-/run/secrets/omnyid_openai_api_key}
       OPENROUTER_API_KEY_FILE: ${OPENROUTER_API_KEY_FILE:-/run/secrets/openrouter_api_key}
+      # Platform-funded inference is false by default and must cross the
+      # compose boundary explicitly. The homeserver enforces the weekly spend
+      # cap transactionally and the wedding route adds its own daily request
+      # limit; keeping these values here prevents an operator-only .env entry
+      # from looking enabled while remaining absent inside the container.
+      OMNYID_OPENROUTER_FUNDED_ENABLED: ${OMNYID_OPENROUTER_FUNDED_ENABLED:-false}
+      OMNYID_OPENROUTER_WEEKLY_CAP_USD: ${OMNYID_OPENROUTER_WEEKLY_CAP_USD:-50}
+      OMNYID_WEDDING_ADMIN_AI_ROUTING_ENABLED: ${OMNYID_WEDDING_ADMIN_AI_ROUTING_ENABLED:-false}
+      OMNYID_WEDDING_ADMIN_AI_AUDIT_RECEIPTS_ENABLED: ${OMNYID_WEDDING_ADMIN_AI_AUDIT_RECEIPTS_ENABLED:-false}
+      OMNYID_WEDDING_ADMIN_AI_DAILY_REQUEST_LIMIT: ${OMNYID_WEDDING_ADMIN_AI_DAILY_REQUEST_LIMIT:-}
       COMPOSIO_API_KEY: ${COMPOSIO_API_KEY:-}
       OMNYID_SEAWEEDFS_S3_ENDPOINT: http://seaweedfs:8333
       OMNYID_SEAWEEDFS_ACCESS_KEY_FILE: /run/secrets/seaweedfs_app_access_key
