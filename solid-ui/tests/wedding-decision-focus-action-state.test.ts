@@ -49,6 +49,27 @@ test("decision focus presents one card while retaining the complete ranked queue
   assert.equal(weddingVendorResearchQueryForDecision(rings), "wedding ring jewellers");
 });
 
+test("RSVP and research tasks expose consequence-specific primary actions", () => {
+  const rsvp = buildWeddingDecisionFocusDisplayState({ relief: {
+    summaryLabel: "One action",
+    focusLimit: 1,
+    focusItems: [item({ title: "Follow up 1 pending RSVP", sourceSurface: "tasks", evidenceLabels: ["guest follow-up"] })],
+    backlogCount: 0,
+    reliefLabels: [],
+  }}).itemCards[0]!;
+  assert.equal(rsvp.compareLabel, "Message guest");
+  assert.match(rsvp.recommendedActionLabel, /contextual RSVP reminder/i);
+
+  const hens = buildWeddingDecisionFocusDisplayState({ relief: {
+    summaryLabel: "One action",
+    focusLimit: 1,
+    focusItems: [item({ title: "Plan hen's night activities, budget, guest list, and transport", sourceSurface: "tasks" })],
+    backlogCount: 0,
+    reliefLabels: [],
+  }}).itemCards[0]!;
+  assert.equal(hens.compareLabel, "View research");
+});
+
 test("buildWeddingDecisionFocusSidebarAction routes task focus to Tasks with compact metadata", () => {
   const action = buildWeddingDecisionFocusSidebarAction({
     summaryLabel: "Focus on 2 wedding decisions now; 1 can wait.",

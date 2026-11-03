@@ -6788,3 +6788,33 @@ UI, homeserver, backup and Caddy services. `SOURCE_COMMIT` and `oracle-runtime-m
 the full SHA; the workspace returns HTTP 200 with CSP and no-cache headers. Independent production
 proof passed with homeserver and backup running, runtime scripts intact, and the fresh 3 November
 backup internally verified. The restore drill was skipped. Root usage was 76% after the fresh backup.
+## 2026-11-03 - WED-323 actionable decisions and Batch 2 intake bridge (Codex, candidate)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-319`, branch
+`agent/codex/WED-323`, based on deployed application SHA
+`ef3045e26765f0adecfd75a3f855256070375800` and its evidence-only successor `433bf08`.
+
+- Removed the Wedding-home planning-basics card. The actual intake/setup authorities remain
+  available where they belong.
+- Pending-RSVP decision cards now use `Message guest` and reveal an in-place, editable email and
+  contextual multi-paragraph draft. The draft includes invitation timing when known, why the reply
+  matters and a warm attendance note; contact phone/roles/notes are available on request. Saving,
+  exact-content approval, provider submission, quiet hours and replay suppression reuse the existing
+  RSVP AFP and server routes.
+- Vendor search no longer overrides pointer/focus selection, restoring normal caret placement,
+  double-click word selection, triple-click browser selection and drag selection.
+- Transport/access decisions no longer inherit a total-wedding-budget label. The recommendation
+  reads saved location/route evidence when present, names the exact transport allocation, and creates
+  an honest verification brief when evidence is missing. Hen-night recommendations use saved
+  atmosphere/priorities to generate a readable activity-format brief. Both expand in place and use
+  the existing Documents artifact projection.
+- Continued Batch 2 LP-04 without adding a parallel store: the existing public magnet profile can
+  now be reviewed in onboarding with provenance chips and per-fact toggles; sensitive facts are off
+  by default and accepted facts prefill the existing intake fields before normal confirmation.
+- Verification passed: Solid UI typecheck; 2,170 Wedding tests; Wedding site/CSP/quiz/account/blog/
+  magnet smokes; both line-budget tests; focused interaction/research/RSVP/profile tests; production
+  build. No source file exceeds 999 lines.
+
+Still open in Batch 2: complete LP-04/LP-05 mappings for constructs beyond the present intake fields,
+cross-device result-file import, the reconciled Countdown catalogue, reviewed invitation wording
+library and licensed palette corpus. Those are not represented as published capabilities.

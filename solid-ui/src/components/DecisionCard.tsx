@@ -19,6 +19,7 @@ export function DecisionCard(props: {
   hero?: JSX.Element;
   showActions?: boolean;
   showWhyItMatters?: boolean;
+  onRecommendationSelect?: () => void;
   class?: string;
 }) {
   const card = () => props.card;
@@ -87,7 +88,11 @@ export function DecisionCard(props: {
         {(recommendation) => (
           <div class={`mt-3 rounded-lg px-3 py-3 ${wedding() ? "bg-wedding-slate" : "bg-primary/5"}`}>
             <p class="text-[10px] font-semibold uppercase tracking-[0.12em] opacity-70">Recommendation</p>
-            <p class="mt-1 break-words text-sm font-semibold leading-5 [overflow-wrap:anywhere]">{text(recommendation().summary, "Review the best-fit option before choosing.")}</p>
+            <Show when={props.onRecommendationSelect} fallback={<p class="mt-1 break-words text-sm font-semibold leading-5 [overflow-wrap:anywhere]">{text(recommendation().summary, "Review the best-fit option before choosing.")}</p>}>
+              <button type="button" class="mt-1 block w-full break-words text-left text-sm font-semibold leading-5 underline decoration-current/35 underline-offset-4 [overflow-wrap:anywhere] hover:decoration-current" onClick={(event) => { event.stopPropagation(); props.onRecommendationSelect?.(); }}>
+                {text(recommendation().summary, "Review the best-fit option before choosing.")}
+              </button>
+            </Show>
             <ul class={`mt-2 grid gap-1 text-xs leading-5 ${muted()}`}>
               <For each={recommendation().reasons.slice(0, 3).filter((reason) => reason.trim().toLowerCase() !== card().whyItMatters.trim().toLowerCase())}>
                 {(reason) => <li class="break-words [overflow-wrap:anywhere]">• {text(reason, "Current evidence supports this recommendation.")}</li>}

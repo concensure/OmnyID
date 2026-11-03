@@ -55,6 +55,9 @@ function checkedLabel(item: WeddingPersonalOsRankedItem): string {
 }
 
 function recommendedActionLabel(item: WeddingPersonalOsRankedItem): string {
+  if (/pending RSVP/i.test(item.title)) return "Send a warm, contextual RSVP reminder to the guest";
+  if (/hen'?s night|hen party/i.test(item.title)) return "Use a preference-matched activity brief to choose the format before collecting money";
+  if (/transport|access|guest logistics/i.test(item.title)) return "Review the saved route, access and transport findings before finalising guest logistics";
   const vendorResearchQuery = weddingVendorResearchQueryForDecision(item);
   if (vendorResearchQuery) return `Research ${vendorResearchQuery} before choosing`;
   if (item.sourceSurface === "approval_queue") return "Review and approve only if it looks right";
@@ -66,6 +69,9 @@ function recommendedActionLabel(item: WeddingPersonalOsRankedItem): string {
 }
 
 function compareLabel(item: WeddingPersonalOsRankedItem): string {
+  if (/pending RSVP/i.test(item.title)) return "Message guest";
+  if (/hen'?s night|hen party/i.test(item.title)) return "View research";
+  if (/transport|access|guest logistics/i.test(item.title)) return "Review findings";
   if (weddingVendorResearchQueryForDecision(item)) return "Research vendors";
   if (item.sourceSurface === "approval_queue") return "Review approval";
   if (item.sourceSurface === "calendar") return "View date";

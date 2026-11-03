@@ -2,7 +2,6 @@
 
 export const WEDDING_HOME_SECTION_IDS = [
   "vendor_search",
-  "planning_basics",
   "quote_replies",
   "vendor_follow_up",
   "decision_focus",
@@ -21,7 +20,6 @@ const WEDDING_HOME_SECTION_SET = new Set<string>(WEDDING_HOME_SECTION_IDS);
 
 const WEDDING_HOME_VISIBLE_SECTION_SET = new Set<WeddingHomeSectionId>([
   "vendor_search",
-  "planning_basics",
   "quote_replies",
   "vendor_follow_up",
   "decision_focus",

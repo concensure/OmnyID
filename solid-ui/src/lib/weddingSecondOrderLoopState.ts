@@ -36,14 +36,27 @@ function taskSafeLabel(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "workspace";
 }
 
+function decisionIsContextualOption(record: WeddingPersistedDecisionRecord): boolean {
+  const kind = clean(record.artifactKind).toLowerCase();
+  const title = clean(record.artifactTitle).toLowerCase();
+  const option = clean(record.selectedOptionLabel);
+  if (/budget|contribution/.test(`${kind} ${title}`)) return false;
+  if (/^(?:aud\s*)?\$?[\d,.]+\s+total$/i.test(option)) return false;
+  return Boolean(option);
+}
+
 function decisionContextLabels(records: readonly WeddingPersistedDecisionRecord[] | null | undefined): string[] {
   return (records ?? [])
+    .filter(decisionIsContextualOption)
     .slice(0, 6)
     .map((record) => `Selected ${record.artifactKind.replace(/_/g, " ")}: ${record.selectedOptionLabel}`);
 }
 
 function primaryDecisionRecord(records: readonly WeddingPersistedDecisionRecord[] | null | undefined): WeddingPersistedDecisionRecord | null {
-  return records?.[0] ?? null;
+  // An overall budget is context for allocation, not the named subject of a
+  // transport, weather, legal or access task. Attaching "$35,000 total" to
+  // those tasks made the entire wedding budget look like category spend.
+  return (records ?? []).find(decisionIsContextualOption) ?? null;
 }
 
 function importedPrivateLabel(value: string): boolean {

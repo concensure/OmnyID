@@ -2,7 +2,7 @@
 // @module-id: wedding.magnet-profile-registry
 // @primary-capability: shared-wedding-lead-magnet-profile-contract
 // @stability: beta
-import registryJson from "./weddingMagnetProfileFields.v1.json";
+import registryJson from "./weddingMagnetProfileFields.v1.json" with { type: "json" };
 
 export type WeddingMagnetToolId = "BUD" | "QDEC" | "SHOT" | "PAL" | "INV" | "CDN";
 export type WeddingMagnetProfileTier = "B" | "P" | "S";

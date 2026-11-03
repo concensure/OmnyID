@@ -23,9 +23,10 @@ test("vendor search uses native form submission so Enter and the button share on
   assert.match(source, /workspace\(\)\.onRunLiveVendorSearch\?\.\(\)/);
 });
 
-test("opening a vendor search query selects the current request on touch and desktop", () => {
-  assert.match(source, /onFocus=\{selectQuery\}/);
-  assert.match(source, /onPointerUp=\{\(event\) => \{[\s\S]*selectQuery\(event\)/);
+test("vendor search preserves native caret and word or sentence selection", () => {
+  assert.doesNotMatch(source, /onFocus=\{selectQuery\}/);
+  assert.doesNotMatch(source, /onPointerUp=\{\(event\) => \{[\s\S]*selectQuery\(event\)/);
+  assert.doesNotMatch(source, /event\.currentTarget\.select\(\)/);
 });
 
 test("vendor search owns Enter rather than an armed global action", () => {

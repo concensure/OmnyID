@@ -1,10 +1,13 @@
 // @locs-version: 1.0
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { DecisionCard } from "@/components/DecisionCard";
+import { WeddingDecisionResearchDetail } from "@/components/WeddingDecisionResearchDetail";
+import { WeddingDecisionRsvpFollowUp } from "@/components/WeddingDecisionRsvpFollowUp";
 import { WeddingVendorOutreachComposer } from "@/components/WeddingVendorOutreachComposer";
 import type { WeddingVendorChoiceSelectionSaveInput } from "@/components/WeddingArtifactDetailPanel";
 import { loadContacts, saveContacts, subscribeContactsChangedEvent, type Contact } from "@/lib/contactsLocalState";
-import { postAgentMessage, readSession } from "@/lib/api";
+import { postAgentMessage, readSession, type SendAfpMessageInput } from "@/lib/api";
+import { buildWeddingDecisionResearchState } from "@/lib/weddingDecisionResearchState";
 import {
   WEDDING_ASSIGNMENT_ROLE_OPTIONS,
   weddingAssignmentContactKey,
@@ -28,6 +31,7 @@ import {
   saveWeddingVendorSearchLaunch,
   weddingVendorSearchQueryFromIntake,
 } from "@/lib/weddingVendorSearchLaunchState";
+import { weddingRsvpSetupFromAfpMessages } from "@/lib/weddingRsvpSetupState";
 
 export function WeddingDecisionFocusCard(props: {
   state: WeddingResponseWorkspaceViewState;
@@ -35,6 +39,8 @@ export function WeddingDecisionFocusCard(props: {
   vendorOutreach?: ReturnType<typeof useWeddingVendorOutreachOwner>;
   onVendorChoiceSelected?: (input: WeddingVendorChoiceSelectionSaveInput) => void;
   gmailConnected?: boolean;
+  saveProjection?: ((input: SendAfpMessageInput) => Promise<unknown>) | null;
+  onRefreshWorkspace?: (() => void) | null;
 }) {
   const LOCAL_DEFER_TTL_MS = 10 * 60 * 1000;
   const deferredStorageKey = () => {
@@ -69,6 +75,12 @@ export function WeddingDecisionFocusCard(props: {
   const [newContactEmail, setNewContactEmail] = createSignal("");
   const [newContactError, setNewContactError] = createSignal<string | null>(null);
   const [vendorSelectionNotice, setVendorSelectionNotice] = createSignal<Record<string, string>>({});
+  const [rsvpFollowUpOpenId, setRsvpFollowUpOpenId] = createSignal<string | null>(null);
+  const [expandedResearchItemId, setExpandedResearchItemId] = createSignal<string | null>(null);
+  const rsvpSetup = createMemo(() => weddingRsvpSetupFromAfpMessages(
+    props.state.afpMessages,
+    props.state.workspace.metadata.responseWorkspaceId,
+  ));
   const contactOptions = createMemo(() => {
     const seen = new Set<string>();
     const listed = contacts().map((contact) => ({
@@ -144,6 +156,14 @@ export function WeddingDecisionFocusCard(props: {
     const taskId = itemId.replace(/^task:/, "");
     return props.state.planningTaskItems.find((task) => task.id === taskId) ?? null;
   }
+  function isPendingRsvpFollowUp(itemId: string): boolean {
+    const task = taskFor(itemId);
+    const metadata = task?.metadata && typeof task.metadata === "object" && !Array.isArray(task.metadata)
+      ? task.metadata as Record<string, unknown>
+      : {};
+    return /pending RSVP/i.test(task?.title ?? "")
+      || metadata.guest_follow_up_candidate_id === "wedding_guest_follow_up:pending_rsvps";
+  }
   function comparisonFor(item: (typeof props.state.personalOsProjection.decisionLoadRelief.focusItems)[number]) {
     const linked = item.linkedArtifactId?.trim();
     const exact = linked ? props.state.artifactPreviews.find((artifact) => artifact.artifactId === linked) : null;
@@ -159,12 +179,35 @@ export function WeddingDecisionFocusCard(props: {
     const priority = taskPriority || evidencePriority || (item.pressureFamily === "obligation" ? "High" : item.pressureFamily === "attention" ? "Medium" : "Low");
     return `${priority.charAt(0).toUpperCase()}${priority.slice(1)} priority`;
   }
+  function researchFor(itemId: string) {
+    return buildWeddingDecisionResearchState({ task: taskFor(itemId), state: props.state });
+  }
   function decisionModel(card: ReturnType<typeof decisionCardFromWeddingFocus>): DecisionCardModel {
     const item = display().itemCards.find((candidate) => candidate.id === card.id)?.item;
     if (!item) return card;
+    const research = researchFor(item.id);
+    const researchCard: DecisionCardModel = research ? {
+      ...card,
+      title: /transport|access|guest logistics/i.test(card.title)
+        ? card.title.replace(/\s+for\s+(?:AUD\s*)?\$?[\d,.]+\s+total\s*$/i, "")
+        : card.title,
+      recommendation: {
+        summary: research.recommendation,
+        reasons: [research.existingArtifactId ? "Based on the saved research evidence linked to this wedding." : "Based on the current task, budget allocation and saved wedding preferences."],
+      },
+      evidence: card.evidence.length > 0 ? card.evidence : [{
+        label: research.existingArtifactId ? "Saved wedding research" : "Wedding task and saved profile",
+        ref: research.existingArtifactId ?? `wedding:${item.id}:research`,
+        sourceKind: "wedding_planning",
+        freshness: research.existingArtifactId ? "current" : "unknown",
+      }],
+      verification: research.existingArtifactId
+        ? { status: "partial", label: "Saved evidence available" }
+        : { status: "partial", label: "Planning brief ready; live details to verify" },
+    } : card;
     const artifact = comparisonFor(item);
     const recommended = artifact?.vendorComparisonCards.slice().sort((left, right) => left.rank - right.rank)[0];
-    if (!artifact || !recommended) return card;
+    if (!artifact || !recommended) return researchCard;
     const others = artifact.vendorComparisonCards
       .filter((vendor) => vendor.choiceId !== recommended.choiceId)
       .slice(0, 2)
@@ -176,7 +219,7 @@ export function WeddingDecisionFocusCard(props: {
       .filter((label): label is string => Boolean(label?.trim()))
       .join(" ");
     return {
-      ...card,
+      ...researchCard,
       recommendation: { summary: `${lead}${rationale ? ` ${rationale}` : ""}`, reasons: [recommended.situationFit || recommended.preferenceMatch] },
       actions: [
         { id: "select_recommended", label: "Select recommended vendor", role: "primary", effect: `Saves ${recommended.title} for follow-up`, intent: "select" },
@@ -185,6 +228,10 @@ export function WeddingDecisionFocusCard(props: {
         { id: "later", label: "Decide later", role: "dismiss", effect: "Moves this decision out of the current focus", intent: "defer" },
       ],
     };
+  }
+  function toggleResearch(itemId: string) {
+    if (!researchFor(itemId)) return;
+    setExpandedResearchItemId((current) => current === itemId ? null : itemId);
   }
   function hasChosenCelebrant() {
     return props.state.contextCards.some((card) => {
@@ -302,6 +349,7 @@ export function WeddingDecisionFocusCard(props: {
                     card={decisionModel(decisionCardFromWeddingFocus(card))}
                     mode="standard"
                     showWhyItMatters={false}
+                    onRecommendationSelect={researchFor(item.id) ? () => toggleResearch(item.id) : undefined}
                     onAction={(action) => {
                       if (action.id === "later") {
                         deferItem(item);
@@ -362,6 +410,10 @@ export function WeddingDecisionFocusCard(props: {
                         }
                       } else if (action.id === "why") {
                         setExpandedWhyItemId((current) => current === item.id ? null : item.id);
+                      } else if (action.id === "open" && isPendingRsvpFollowUp(item.id)) {
+                        setRsvpFollowUpOpenId((current) => current === item.id ? null : item.id);
+                      } else if (action.id === "open" && researchFor(item.id)) {
+                        toggleResearch(item.id);
                       } else if (action.id === "open" && launchVendorResearch(item)) {
                         setVendorSelectionNotice((current) => ({
                           ...current,
@@ -379,6 +431,35 @@ export function WeddingDecisionFocusCard(props: {
                   />
                   <Show when={vendorSelectionNotice()[item.id]}>
                     {(notice) => <p role="status" class="rounded-xl border border-pink-200 bg-white px-3 py-2 text-xs font-semibold text-pink-950">{notice()}</p>}
+                  </Show>
+                  <Show when={rsvpFollowUpOpenId() === item.id && rsvpSetup()}>
+                    {(setup) => <WeddingDecisionRsvpFollowUp
+                      setup={setup()}
+                      guestTracking={props.state.guestTracking}
+                      afpMessages={props.state.afpMessages}
+                      metadata={props.state.workspace.metadata}
+                      saveProjection={props.saveProjection}
+                      onRefreshWorkspace={props.onRefreshWorkspace}
+                    />}
+                  </Show>
+                  <Show when={rsvpFollowUpOpenId() === item.id && !rsvpSetup()}>
+                    <p class="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-950">Set the RSVP event and response deadline in Guests before sending a reminder.</p>
+                  </Show>
+                  <Show when={expandedResearchItemId() === item.id && researchFor(item.id)}>
+                    {(research) => <WeddingDecisionResearchDetail
+                      research={research()}
+                      saveProjection={props.saveProjection}
+                      onRefreshWorkspace={props.onRefreshWorkspace}
+                      onClose={() => setExpandedResearchItemId(null)}
+                      onOpenDocuments={(artifactId) => props.onSidebarAction({
+                          kind: "open_workspace_menu",
+                          label: "Open research in Documents",
+                          enabled: true,
+                          reason: null,
+                          metadata: { wedding_workspace_menu: "documents", linked_artifact_id: artifactId },
+                          contextLabels: [item.title, "Research brief"],
+                        })}
+                    />}
                   </Show>
                   <Show when={weddingVendorResearchQueryForDecision(item)}>
                     {(query) => (

@@ -44,6 +44,14 @@ function reminderEmail(value: unknown): string {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact) && contact.length <= 254 ? contact : "";
 }
 
+function readableDate(value: unknown): string | null {
+  const timestamp = clean(value);
+  if (!timestamp) return null;
+  const parsed = new Date(timestamp);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return new Intl.DateTimeFormat("en-AU", { day: "numeric", month: "long", year: "numeric" }).format(parsed);
+}
+
 export function buildWeddingRsvpReminderCandidates(input: {
   guestTracking: WeddingGuestTrackingState;
   eventId: string;
@@ -73,9 +81,16 @@ export function buildWeddingRsvpReminderCandidates(input: {
       .map((response) => response.invitationId)));
     const incomplete = rows.some((row) => input.guestTracking.rsvpResponseSummary.rows
       .find((item) => item.guestId === row.id)?.operationalState === "incomplete");
+    const sentDate = rows.flatMap((row) => row.eventResponses
+      .filter((response) => response.eventId === input.eventId)
+      .map((response) => readableDate(response.invitedAt)))
+      .find((value): value is string => Boolean(value));
+    const invitationContext = sentDate
+      ? `We sent your invitation on ${sentDate} for ${input.eventLabel}.`
+      : `We recently sent your invitation for ${input.eventLabel}.`;
     const exactContent = incomplete
-      ? `Hello ${names.join(" and ")},\n\nThanks for replying about ${input.eventLabel}. A required detail is still missing. Please use your private RSVP link to review it by ${input.responseDeadline}.\n\n${input.hostLabel}`
-      : `Hello ${names.join(" and ")},\n\nA gentle reminder to reply about ${input.eventLabel} by ${input.responseDeadline}. Please use your private RSVP link when you are ready.\n\n${input.hostLabel}`;
+      ? `Hello ${names.join(" and ")},\n\n${invitationContext} Thank you for replying—a required detail is still missing.\n\nYour response helps us finalise catering, seating and transport without making assumptions. We'd really value having you with us and want to make the day comfortable for you.\n\nPlease use your private RSVP link to review the missing detail by ${input.responseDeadline}.\n\n${input.hostLabel}`
+      : `Hello ${names.join(" and ")},\n\n${invitationContext} We are following up because we have not received your RSVP yet.\n\nYour response helps us finalise catering, seating and transport without making assumptions. We'd really value having you with us and hope you can make it.\n\nPlease use your private RSVP link to reply by ${input.responseDeadline}.\n\n${input.hostLabel}`;
     return [{
       id: `wedding_rsvp_reminder:${safeWeddingLabel(key)}:${input.responseDeadline}`,
       householdId: rows[0]?.householdId || safeWeddingLabel(key),

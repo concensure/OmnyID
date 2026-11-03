@@ -2,7 +2,6 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
 
 import { DecisionCard } from "@/components/DecisionCard";
-import { PlanningConstraintCaptureCard } from "@/components/PlanningConstraintCaptureCard";
 import { WeddingDashboardIcon, type WeddingDashboardIconId } from "@/components/WeddingDashboardIcons";
 import { renderMarkdown } from "@/lib/markdownRenderer";
 import { WeddingVendorChoiceCard } from "@/components/WeddingVendorChoiceCard";
@@ -23,11 +22,7 @@ import {
   loadWeddingDecisionSelections,
   toggleWeddingDecisionSelectionValue,
 } from "@/lib/weddingDecisionSelectionState";
-import {
-  weddingPlanningNeedLabel,
-  weddingVendorSearchBlockedCopy,
-  weddingVendorSearchNoticeCopy,
-} from "@/lib/weddingHomeUiCopyState";
+import { weddingVendorSearchBlockedCopy, weddingVendorSearchNoticeCopy } from "@/lib/weddingHomeUiCopyState";
 import {
   findWeddingVendorLifecycle,
   mergeWeddingVendorLifecycleCandidates,
@@ -82,25 +77,12 @@ function VendorSearchDraftInput(props: {
     workspace().onVendorSearchQueryChange?.(value);
   }
 
-  function selectQuery(event: { currentTarget: HTMLInputElement }) {
-    // A named vendor lookup is commonly an edit of the last search. Selecting
-    // it on focus makes that edit reliable on both touch and pointer devices.
-    event.currentTarget.select();
-  }
-
   return (
     <input
       type="text"
       name={props.name}
       value={draft()}
       onInput={(event) => setDraft(event.currentTarget.value)}
-      onFocus={selectQuery}
-      onPointerUp={(event) => {
-        // Some mobile browsers place the caret after focus. Re-select on the
-        // completing pointer event so a tap consistently selects the query.
-        event.preventDefault();
-        selectQuery(event);
-      }}
       onKeyDown={(event) => {
         // Keep Enter inside this form. The mobile magic-pointer layer treats
         // its own action controls as navigation targets, so letting an Enter
@@ -114,49 +96,6 @@ function VendorSearchDraftInput(props: {
       placeholder={props.placeholder}
       class={props.class}
     />
-  );
-}
-
-export function WeddingPlanningBasicsSection(props: { workspace: WeddingResponseWorkspaceViewProps }) {
-  const workspace = () => props.workspace;
-  return (
-    <div class="rounded-xl border border-wedding-border bg-wedding-card p-3 shadow-wedding-card">
-      <div class="flex flex-wrap items-start justify-between gap-3">
-        <div class="min-w-0">
-          <p class="text-sm font-semibold text-wedding-ink">Add a few wedding details</p>
-          <p class="mt-1 break-words text-xs leading-5 text-wedding-ink/70">
-            This helps us find vendors that fit your plans.
-          </p>
-        </div>
-        <span class="rounded-lg bg-wedding-status-progress-bg px-2 py-1 text-xs font-semibold text-wedding-status-progress-ink">
-          A few details
-        </span>
-      </div>
-      <div class="mt-3 grid gap-2 sm:grid-cols-2">
-        <Show when={workspace().vendorSearchReadiness?.status === "blocked"}>
-          <div class="rounded-lg border border-wedding-border bg-wedding-page p-3">
-            <p class="text-xs font-semibold uppercase text-wedding-primary">Better matches</p>
-            <p class="mt-1 break-words text-sm leading-6 text-wedding-ink">
-              Add {workspace().vendorSearchReadiness?.missing.map(weddingPlanningNeedLabel).join(" and ")}.
-            </p>
-            <Show when={workspace().vendorSearchReadiness?.missing.some((item) => /priorities|fit preferences/i.test(item))}>
-              <label class="mt-3 block text-xs font-semibold text-wedding-ink">
-                Vendor fit preferences
-                <VendorSearchDraftInput
-                  workspace={workspace()}
-                  placeholder="beachfront venue in Sydney with Gothic style for 60 guests"
-                  class="mt-1 w-full rounded-lg border border-wedding-border bg-white px-3 py-2 text-sm font-normal text-wedding-ink outline-none transition placeholder:text-wedding-ink/40 focus:border-wedding-primary focus:ring-2 focus:ring-wedding-primary/15"
-                />
-              </label>
-              <p class="mt-2 break-words text-[11px] leading-5 text-wedding-ink/70">
-                A specific request here can unblock vendor fit preferences for live search.
-              </p>
-            </Show>
-          </div>
-        </Show>
-      </div>
-      <PlanningConstraintCaptureCard workspace={workspace()} />
-    </div>
   );
 }
 

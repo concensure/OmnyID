@@ -8,6 +8,8 @@ import { createMemo, createSignal, For, Show } from "solid-js";
 import { WeddingDashboardIcon } from "@/components/WeddingDashboardIcons";
 import { WeddingConfirmDialog } from "@/components/WeddingConfirmDialog";
 import { WeddingInlineHelpNote } from "@/components/WeddingInlineHelpNote";
+import { WeddingMagnetProfileImportReview } from "@/components/WeddingMagnetProfileImportReview";
+import type { WeddingMagnetImportFact, WeddingMagnetIntakePrefill } from "@/lib/weddingMagnetProfileImportPreviewState";
 import type { WeddingTemplateLaunchState } from "@/lib/weddingTemplateLaunchState";
 import type { WeddingTemplateStarterIntent } from "@/lib/weddingTemplateEntryState";
 import type { WeddingTemplateFollowUpState } from "@/lib/weddingTemplateFollowUpState";
@@ -75,6 +77,7 @@ export function WeddingSiteIntakeWizard(props: {
   onWeddingFollowUpAtmosphereInput: (value: string) => void;
   quizSuggestions?: string[];
   onImportQuizSuggestions?: () => void;
+  onImportMagnetProfile?: (prefill: WeddingMagnetIntakePrefill, facts: readonly WeddingMagnetImportFact[]) => void;
   weddingFollowUpImageLinks: () => string;
   onWeddingFollowUpImageLinksInput: (value: string) => void;
   weddingFollowUpCoupleNames: () => string;
@@ -237,6 +240,7 @@ export function WeddingSiteIntakeWizard(props: {
 
       {/* Step 0 — the basics, with the fast-path paste box first */}
       <Show when={step() === 0}>
+        <Show when={props.onImportMagnetProfile}>{(onImport) => <WeddingMagnetProfileImportReview onImport={onImport()} />}</Show>
         <div class="mb-3 rounded-xl border border-wedding-border bg-white px-3 py-2 text-xs leading-5 text-wedding-ink">
           Not sure where to start? Try the <a class="font-semibold text-wedding-secondary underline underline-offset-2" href="/wedding/blog/couples-barely-know-each-other.html">wedding animal quiz</a> to gather your style.
           <Show when={(props.quizSuggestions?.length ?? 0) > 0}>

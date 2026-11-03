@@ -6,7 +6,7 @@ import { WeddingDecisionFocusCard } from "@/components/WeddingDecisionFocusCard"
 import { WeddingHomeOverviewGrid } from "@/components/WeddingHomeOverviewGrid";
 import { WeddingHomeStatusStrip } from "@/components/WeddingHomeStatusStrip";
 import { WeddingNextStepCard } from "@/components/WeddingNextStepCard";
-import { WeddingPlanningBasicsSection, WeddingVendorSearchHomeSection } from "@/components/WeddingVendorSearchHomeSections";
+import { WeddingVendorSearchHomeSection } from "@/components/WeddingVendorSearchHomeSections";
 import { WeddingPlanningThreadsCard } from "@/components/WeddingPlanningThreadsCard";
 import { WeddingProjectionApprovalCard } from "@/components/WeddingProjectionApprovalCard";
 import { WeddingResilienceCardList } from "@/components/WeddingResilienceCardList";
@@ -17,7 +17,6 @@ import type { useWeddingVendorOutreachOwner } from "@/lib/useWeddingVendorOutrea
 import type { useWeddingPreferenceFeedbackOwner } from "@/lib/useWeddingPreferenceFeedbackOwner";
 import type { useWeddingPreferenceProfileOwner } from "@/lib/useWeddingPreferenceProfileOwner";
 import type { WeddingHomeSectionId } from "@/lib/weddingHomeSectionPolicyState";
-import { planningConstraintCaptureUiEnabled } from "@/lib/planningConstraintCapture";
 import type { WeddingVendorQuoteReplyFlowState } from "@/lib/weddingVendorQuoteReplyFlowState";
 import type { WeddingResponseWorkspaceViewState, WeddingWorkspaceArtifactPreview } from "@/lib/weddingResponseWorkspaceViewState";
 
@@ -58,12 +57,6 @@ export function buildWeddingHomeSections(input: WeddingHomeSectionRegistryInput)
       title: "Next step",
       visible: true,
       render: () => <WeddingNextStepCard state={state()} onSelectMenu={workspace.onSelectMenu} onSaveWeddingDate={workspace.onSaveWeddingDate} />,
-    },
-    {
-      id: "planning_basics",
-      title: "Planning basics needed",
-      visible: workspace.vendorSearchReadiness?.status === "blocked" || planningConstraintCaptureUiEnabled(),
-      render: () => <WeddingPlanningBasicsSection workspace={workspace} />,
     },
     {
       id: "vendor_search",
@@ -126,7 +119,12 @@ export function buildWeddingHomeSections(input: WeddingHomeSectionRegistryInput)
       id: "decision_focus",
       title: "Decision focus",
       visible: true,
-      render: () => <WeddingDecisionFocusCard state={state()} onSidebarAction={input.handleSidebarAction} />,
+      render: () => <WeddingDecisionFocusCard
+        state={state()}
+        onSidebarAction={input.handleSidebarAction}
+        saveProjection={workspace.saveProjection}
+        onRefreshWorkspace={workspace.onRefreshWorkspace}
+      />,
     },
     {
       id: "resilience",

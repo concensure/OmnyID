@@ -517,6 +517,7 @@ export function buildWeddingGuestTrackingState(input: {
         eventId: invitation.eventId,
         attendance: invitationAttendance(invitation.invitationStatus),
         responseSource: invitation.responseSource ?? null,
+        invitedAt: invitation.createdAt ?? null,
         viewedAt: invitation.viewedAt ?? null,
         respondedAt: invitation.respondedAt ?? null,
         lockedAt: invitation.lockedAt ?? null,

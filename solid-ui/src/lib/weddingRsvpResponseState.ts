@@ -19,6 +19,7 @@ export type WeddingRsvpEventSnapshot = {
   eventId: string;
   attendance: WeddingRsvpAttendance;
   responseSource: WeddingRsvpResponseSource;
+  invitedAt?: string | null;
   viewedAt: string | null;
   respondedAt: string | null;
   lockedAt: string | null;

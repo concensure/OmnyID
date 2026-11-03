@@ -113,6 +113,7 @@ import type { WeddingWorkspaceSidebarAction } from "@/lib/weddingWorkspaceAction
 import { shouldShowWeddingFirstRunIntake } from "@/lib/weddingFirstRunIntakeGateState";
 import {
   WEDDING_VENDOR_CHECKLIST,
+  normalizeWeddingVendorSelections,
   weddingVendorSelectionLabels,
 } from "@/lib/weddingVendorChecklistState";
 import { WEDDING_BUDGET_ALLOCATION_LOCAL_SAVE_EVENT } from "@/lib/weddingBudgetAllocationState";
@@ -2057,6 +2058,17 @@ export function ResponseQueueView(props: {
               requestWeddingLeadMagnetImport();
               setWeddingQuizSuggestions([]);
               toast.success("Quiz suggestions are being added privately. You can review or edit them before confirming your plan.");
+            }}
+            onImportMagnetProfile={(prefill) => {
+              if (prefill.weddingDate) setWeddingFollowUpDate(prefill.weddingDate);
+              if (prefill.location) setWeddingFollowUpLocation(prefill.location);
+              if (prefill.guestCount) setWeddingFollowUpGuests(prefill.guestCount);
+              if (prefill.budgetTotal) setWeddingFollowUpBudget(prefill.budgetTotal);
+              if (prefill.priorities) setWeddingFollowUpPriorities(prefill.priorities);
+              if (prefill.atmosphere) setWeddingFollowUpAtmosphere(prefill.atmosphere);
+              if (prefill.coupleNames) setWeddingFollowUpCoupleNames(prefill.coupleNames);
+              for (const category of normalizeWeddingVendorSelections(prefill.vendorCategories)) toggleWeddingVendorSelection(category, true);
+              saveWeddingFollowUpProgress();
             }}
             weddingFollowUpImageLinks={weddingFollowUpImageLinks}
             onWeddingFollowUpImageLinksInput={setWeddingFollowUpImageLinks}

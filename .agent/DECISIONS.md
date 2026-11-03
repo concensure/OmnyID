@@ -2445,3 +2445,17 @@ subjective usability or a controlled external cohort.
   Their output cannot invoke tools or create AFP events because the browser API does not provide the
   required model-cost and provenance evidence. Server-backed Agent Settings remain the authority for
   persistent or actionable work.
+# 2026-11-03 - WED-323 action-specific decisions and Batch 2 intake handoff
+
+- A Wedding decision action must name and open its actual consequence. A pending RSVP opens the
+  existing reminder draft/approval/send flow in place; research tasks open readable evidence, not a
+  generic task restatement.
+- Research summaries may use saved Wedding artifacts, confirmed allocations and stated
+  preferences. If live evidence is absent, the UI records the exact verification gap and must not
+  invent routes, prices, availability or vendor facts. Overall wedding budget decisions are never
+  used as the named scope or spend for transport/access work.
+- Generated transport and hen-night briefs use the existing Wedding artifact AFP projection and
+  Documents surface. The recommendation is a compact, clickable projection of that same evidence.
+- Batch 2 profile intake extends the canonical `omnyid.wedding.magnetProfile.v1` registry. It is a
+  reviewable prefill only: each fact retains source/result provenance, sensitive-tier facts default
+  off, and the existing Wedding intake remains the sole confirmation and AFP-write authority.

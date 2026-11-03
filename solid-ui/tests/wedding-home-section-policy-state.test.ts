@@ -9,7 +9,6 @@ import {
 
 test("wedding home keeps the essential decision surfaces visible", () => {
   assert.equal(shouldShowWeddingHomeSection("vendor_search"), true);
-  assert.equal(shouldShowWeddingHomeSection("planning_basics"), true);
   assert.equal(shouldShowWeddingHomeSection("quote_replies"), true);
   assert.equal(shouldShowWeddingHomeSection("vendor_follow_up"), true);
   assert.equal(shouldShowWeddingHomeSection("decision_focus"), true);
@@ -28,9 +27,8 @@ test("wedding home suppresses competing operational sections", () => {
 test("wedding home order puts quote replies and follow-ups above top decisions", () => {
   const order = normalizeWeddingHomeSectionOrder([]);
 
-  assert.deepEqual(order.slice(0, 6), [
+  assert.deepEqual(order.slice(0, 5), [
     "vendor_search",
-    "planning_basics",
     "quote_replies",
     "vendor_follow_up",
     "decision_focus",
