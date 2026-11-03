@@ -6,10 +6,37 @@
   var costs = window.OMNYID_WEDDING_BUDGET_COSTS_V1;
   var engine = window.OmnyWeddingBudgetEngine;
   var magnets = window.OmnyWeddingMagnets;
+  var profileApi = window.OmnyWeddingMagnetProfile;
   var resultNode = document.querySelector('[data-budget-result]');
   var statusNode = form.querySelector('[data-budget-status]');
   var priorityInputs = Array.prototype.slice.call(form.querySelectorAll('[name="priority"]'));
   var lastEnvelope = null;
+
+  function prefill(name, key, transform) {
+    if (!profileApi) return;
+    var fact = profileApi.load(localStorage).value.facts[key];
+    var field = form.elements.namedItem(name);
+    if (!fact || !field || typeof field.value !== 'string') return;
+    var value = transform ? transform(fact.value) : fact.value;
+    if (value === undefined || value === null || String(value).trim() === '') return;
+    field.value = String(value);
+    var note = document.createElement('span');
+    note.className = 'magnet-prefill';
+    note.textContent = 'From your ' + fact.source_label;
+    field.closest('.magnet-field')?.appendChild(note);
+  }
+
+  prefill('total_budget_aud', 'budget_total_aud');
+  prefill('guests', 'guest_count');
+  prefill('state', 'state');
+  prefill('location_type', 'area_type', function (value) { return value === 'capital' ? 'metro' : value; });
+  prefill('setting', 'setting_preference');
+  if (profileApi) {
+    var priorityFact = profileApi.load(localStorage).value.facts.top_priorities;
+    if (priorityFact && Array.isArray(priorityFact.value)) {
+      priorityInputs.forEach(function (input) { input.checked = priorityFact.value.includes(input.value); });
+    }
+  }
 
   function message(text, kind) {
     statusNode.textContent = text;
@@ -96,6 +123,22 @@
       origin: { page: location.pathname, referrer_class: document.referrer ? 'referred' : 'direct' }
     });
     var saved = magnets.save(localStorage, 'omnyid.wedding.magnet.budget.v1', lastEnvelope);
+    if (profileApi) {
+      var profileWrites = [
+        ['guest_count', Number(inputs.guests)],
+        ['budget_total_aud', Number(inputs.totalBudget)],
+        ['budget_allocation', Object.fromEntries(result.allocation.map(function (item) { return [item.id, item.amount]; }))],
+        ['top_priorities', inputs.priorities],
+        ['planning_started_at', lastEnvelope.created_at.slice(0, 10)]
+      ];
+      if (inputs.state) profileWrites.push(['state', inputs.state]);
+      if (inputs.locationType !== 'not_decided') profileWrites.push(['area_type', inputs.locationType === 'metro' ? 'capital' : inputs.locationType]);
+      if (inputs.setting !== 'not_decided') profileWrites.push(['setting_preference', inputs.setting]);
+      if (inputs.drinks !== 'not_decided') profileWrites.push(['vendor_preferences', 'Drinks plan: ' + inputs.drinks]);
+      profileWrites.forEach(function (entry) {
+        profileApi.writeAndSave(localStorage, 'BUD', entry[0], entry[1], { result_id: lastEnvelope.result_id, recorded_at: lastEnvelope.updated_at });
+      });
+    }
     message(saved.ok ? 'Your result is saved on this device. Nothing was sent anywhere.' : saved.message, saved.ok ? 'success' : 'error');
     render(result);
   });

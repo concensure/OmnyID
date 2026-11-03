@@ -25436,19 +25436,27 @@ async fn llm_config_get_http(
     headers: HeaderMap,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let user = authenticated_user(&state.db, &headers).await?;
-    state
+    let mut config = state
         .db
         .get_llm_config(&user.id)
         .await
         .map_err(internal_error)
         .map_err(status_to_http)?
-        .map(Json)
         .ok_or_else(|| {
             (
                 StatusCode::NOT_FOUND,
                 "no LLM config; call POST /agent/provision first".to_string(),
             )
-        })
+        })?;
+    let inference_ready = llm_resolution::resolve_user_inference_backend(&state.db, &user.id)
+        .await
+        .map_err(internal_error)
+        .map_err(status_to_http)?
+        .is_some();
+    if let Some(object) = config.as_object_mut() {
+        object.insert("inference_ready".to_string(), Value::Bool(inference_ready));
+    }
+    Ok(Json(config))
 }
 
 async fn llm_config_set_http(
@@ -28743,8 +28751,36 @@ async fn agent_fleet_http(
         .get_master_agent_instance(&user.id)
         .await
         .map_err(internal_error)
-        .map_err(status_to_http)?
-        .ok_or_else(|| (StatusCode::NOT_FOUND, "no master agent".to_string()))?;
+        .map_err(status_to_http)?;
+    let instance = match instance {
+        Some(instance) => instance,
+        None => {
+            // Accounts created before master-agent bootstrap was introduced
+            // should heal on first fleet view instead of getting a permanent
+            // 404. The lookup above still prevents duplicate provisioning.
+            let domain = std::env::var("OMNYID_DOMAIN")
+                .unwrap_or_else(|_| "omnyid.com".to_string());
+            let provisioned = AgentInstance::provision(&user.id, &user.display_name, &domain);
+            state
+                .db
+                .save_master_agent_instance(&provisioned)
+                .await
+                .map_err(internal_error)
+                .map_err(status_to_http)?;
+            state
+                .db
+                .get_master_agent_instance(&user.id)
+                .await
+                .map_err(internal_error)
+                .map_err(status_to_http)?
+                .ok_or_else(|| {
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "master agent bootstrap did not persist".to_string(),
+                    )
+                })?
+        }
+    };
     let instance_id = instance["id"].as_str().unwrap_or("").to_string();
     let delegations = state
         .db

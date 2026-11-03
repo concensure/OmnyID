@@ -899,6 +899,11 @@ export function SearchBar(props: {
 
   async function submitQuery(q: string, modeOverride?: string) {
     const effectiveQuery = searchSubmissionText(q, booleanMode());
+    // Collapse suggestions immediately on both Enter and Run. Waiting for the
+    // command request allowed focus/input effects to reopen the dropdown over
+    // the result while the server was still working.
+    setSubmitted(true);
+    setSuppressNextFocusDropdown(true);
     setRecentQueries(saveRecentSearchQuery(q, rKey()));
     setSessionHistory((prev) => {
       return saveSessionSearchHistory([q, ...prev.filter((r) => r !== q)], shKey());
@@ -920,9 +925,9 @@ export function SearchBar(props: {
       });
       clearAttachmentDrivenComposerState(true);
       setAttachedFiles([]);
-      setSubmitted(true);
       setTimeout(() => setSubmitted(false), 1500);
     } catch (err) {
+      setSubmitted(false);
       const rawMessage = err instanceof Error ? err.message : "Could not submit this request.";
       const msg = rawMessage.toLowerCase();
       const targeted = msg.includes("rate_limit") || msg.includes("rate limit")
@@ -1009,6 +1014,7 @@ export function SearchBar(props: {
   }
 
   const dropdownVisible = () =>
+    !props.busy && !submitted() &&
     masterSearchSuggestionsVisible({ requested: showDropdown(), query: query(), dismissedForQuery: dismissedSuggestionQuery() }) && (
       isSlashMode() ||
       savedSearchSlashTerm() !== null ||

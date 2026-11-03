@@ -60,7 +60,10 @@ export function queueDensityLevel(density: QueueDensity): number {
 
 export function queueFontSizeRootPx(density: QueueDensity): number {
   const level = queueDensityLevel(density);
-  return 14 + ((level - 1) * 5) / 9;
+  // The previous 14–19px range made the default wedding workspace difficult
+  // to read on a laptop. Keep ten user-controlled steps while making the
+  // existing default (7) roughly 25% larger.
+  return 16 + ((level - 1) * 8) / 9;
 }
 
 export function applyQueueFontSize(density: QueueDensity): void {

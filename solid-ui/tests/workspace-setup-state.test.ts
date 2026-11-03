@@ -21,6 +21,7 @@ function llmConfig(overrides: Partial<LlmConfig>): LlmConfig {
     ollama_url: null,
     monthly_budget_cents: 0,
     usage_cents_current_month: 0,
+    inference_ready: false,
     ...overrides,
   };
 }
@@ -44,6 +45,7 @@ test("isWorkspaceLlmSetupComplete accepts hosted config once hosted budget is en
   const config = llmConfig({
     backend: "hosted",
     monthly_budget_cents: 900,
+    inference_ready: true,
   });
   assert.equal(
     isWorkspaceLlmSetupComplete(config),
@@ -56,15 +58,23 @@ test("isWorkspaceLlmSetupComplete accepts non-hosted backends without a hosted b
   const byok = llmConfig({
     backend: "byok",
     monthly_budget_cents: 0,
+    inference_ready: true,
   });
   const ollama = llmConfig({
     backend: "ollama",
     monthly_budget_cents: 0,
+    inference_ready: true,
   });
   assert.equal(isWorkspaceLlmSetupComplete(byok), true);
   assert.equal(isWorkspaceLlmSetupComplete(ollama), true);
   assert.equal(workspaceLlmSetupPendingReason(byok), null);
   assert.equal(workspaceLlmSetupPendingReason(ollama), null);
+});
+
+test("isWorkspaceLlmSetupComplete rejects a saved BYOK model without usable credentials", () => {
+  const config = llmConfig({ backend: "byok", model: "Qwen 3 235B Instruct", inference_ready: false });
+  assert.equal(isWorkspaceLlmSetupComplete(config), false);
+  assert.match(workspaceLlmSetupPendingReason(config) ?? "", /no usable API key/i);
 });
 
 test("workspaceLlmSetupPendingReason treats missing config as setup work, not verification failure", () => {

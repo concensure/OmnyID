@@ -65,6 +65,24 @@ test("normalizeWeddingArtifactSummary supplies kind-specific default exports", (
   assert.deepEqual(map?.exportTargets, ["html", "browser_pdf", "image_planned"]);
 });
 
+test("normalizeWeddingArtifactSummary preserves approved lead-magnet output subtypes", () => {
+  const palette = normalizeWeddingArtifactSummary({
+    title: "Coastal garden palette",
+    kind: "research",
+    subtype: "style_palette",
+    metadata: { weddingPlanId: "plan-subtype", responseWorkspaceId: "workspace-subtype" },
+  });
+  assert.equal(palette?.subtype, "style_palette");
+  assert.match(palette?.searchText ?? "", /style_palette/);
+
+  const unknown = normalizeWeddingArtifactSummary({
+    title: "Unknown subtype",
+    kind: "research",
+    metadata: { weddingPlanId: "plan-subtype", responseWorkspaceId: "workspace-subtype", artifactSubtype: "unsafe" },
+  });
+  assert.equal(unknown?.subtype, null);
+});
+
 test("normalizeWeddingArtifactSummary redacts imported upload receipts from workspace search text", () => {
   const artifact = normalizeWeddingArtifactSummary({
     id: "wedding_import:guest_list:workspace:rsvp-csv",

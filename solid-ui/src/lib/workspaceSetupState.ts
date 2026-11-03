@@ -4,17 +4,25 @@ import type { GmailConnectionStatus } from "./gmailConnectionState";
 import type { GoogleCalendarConnectionStatus } from "./googleCalendarConnectionState";
 
 export function isWorkspaceLlmSetupComplete(config: LlmConfig | null | undefined): boolean {
-  if (!config) return false;
-  if (config.backend === "hosted") {
-    return config.monthly_budget_cents > 0;
-  }
-  return true;
+  return config?.inference_ready === true;
 }
 
 export function workspaceLlmSetupPendingReason(config: LlmConfig | null | undefined): string | null {
   if (!config) return "No AI model is connected yet. Connect an AI model or enable hosted AI for this account.";
+  if (!config.inference_ready && config.backend === "byok") {
+    return "This saved BYOK model has no usable API key. Add the key again in Agent Settings.";
+  }
+  if (!config.inference_ready && config.backend === "runpod") {
+    return "This RunPod model is saved, but its endpoint credentials are unavailable. Reconnect it in Agent Settings.";
+  }
+  if (!config.inference_ready && config.backend === "ollama") {
+    return "This Ollama model is saved, but it is not available to the workspace server. Check its URL in Agent Settings.";
+  }
   if (config.backend === "hosted" && config.monthly_budget_cents <= 0) {
     return "Hosted AI is still disabled. Set a hosted budget or switch to BYOK/Ollama.";
+  }
+  if (!config.inference_ready) {
+    return "The saved AI model is not available. Reconnect it in Agent Settings before running the Master Agent.";
   }
   return null;
 }

@@ -8,6 +8,7 @@
 
 import { createSignal, createMemo, For, Show, onMount } from "solid-js";
 import { safeHref } from "@/lib/api";
+import { DaemonPanel } from "@/components/DaemonPanel";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -192,6 +193,7 @@ export function DiscoverView(props: { isDemo?: boolean }) {
   const [agentsConfigured] = createSignal(false); // set true when real agents push cards
   const [loading, setLoading] = createSignal(true);
   const [showFeedConfig, setShowFeedConfig] = createSignal(false);
+  const [showAgentActivation, setShowAgentActivation] = createSignal(false);
   const [enabledAgents, setEnabledAgents] = createSignal<Set<string>>(
     new Set(["knowledge_curator", "research_assistant"])
   );
@@ -350,7 +352,29 @@ export function DiscoverView(props: { isDemo?: boolean }) {
               with your own private feed.
             </Show>
           </p>
+          <Show when={!props.isDemo}>
+            <button
+              type="button"
+              onClick={() => setShowAgentActivation((value) => !value)}
+              class="mt-3 min-h-10 rounded-xl bg-amber-800 px-4 text-sm font-semibold text-white transition hover:bg-amber-900"
+              aria-expanded={showAgentActivation()}
+            >
+              {showAgentActivation() ? "Close agent controls" : "Set up my private feed"}
+            </button>
+          </Show>
         </div>
+      </Show>
+
+      <Show when={showAgentActivation() && !props.isDemo}>
+        <section class="mb-5 rounded-[22px] border border-violet-200/70 bg-white/85 p-4 shadow-soft" aria-label="Private feed agent controls">
+          <p class="text-sm font-semibold text-on-surface">Activate your feed agents</p>
+          <p class="mt-1 text-xs leading-5 text-on-surface-variant">
+            Start Knowledge Curator and Research Assistant here. Their status and controls stay in this view so you can confirm what is running before sample cards are replaced.
+          </p>
+          <div class="mt-4">
+            <DaemonPanel signedIn />
+          </div>
+        </section>
       </Show>
 
       {/* Skeleton loading state */}

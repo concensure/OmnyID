@@ -602,11 +602,16 @@ export function ContactsView() {
       <div class="min-w-0 rounded-2xl border border-amber-200/70 bg-amber-50/80 p-4 shadow-sm">
         <div class="flex flex-wrap items-start justify-between gap-3">
           <div class="min-w-0">
-            <p class="text-sm font-semibold text-amber-950">Contact follow-up queue</p>
-            <p class="mt-1 break-words text-xs leading-5 text-amber-900/75">{followUpQueue().summaryLabel}</p>
-            <p class="mt-1 break-words text-[11px] leading-4 text-amber-900/70">{followUpQueue().nextActionLabel}</p>
+            <p class="text-sm font-semibold text-amber-950">Active queue</p>
+            <Show
+              when={followUpQueue().items.length > 0}
+              fallback={<p class="mt-1 text-sm text-amber-900/75">✨ All caught up! No follow-ups are due right now.</p>}
+            >
+              <p class="mt-1 break-words text-xs leading-5 text-amber-900/75">{followUpQueue().summaryLabel}</p>
+              <p class="mt-1 break-words text-[11px] leading-4 text-amber-900/70">{followUpQueue().nextActionLabel}</p>
+            </Show>
           </div>
-          <div class="w-full space-y-2 sm:w-auto">
+          <div class="w-full space-y-2 sm:w-auto sm:max-w-[24rem]">
             <div class="flex flex-wrap justify-end gap-1.5">
               <span class="max-w-full rounded-full border border-amber-200 bg-white/80 px-2 py-1 text-[10px] font-semibold text-amber-900 break-words">
                 {followUpQueue().dueCount} due
@@ -621,41 +626,25 @@ export function ContactsView() {
                 {followUpTaskProjection().taskCount} task-ready
               </span>
             </div>
-            <button
-              type="button"
-              onClick={() => void saveFollowUpTasks()}
-              disabled={savingFollowUpTasks() || followUpTaskProjection().taskCount === 0}
-              class="w-full rounded-full bg-amber-700 px-3 py-2 text-[11px] font-semibold text-white transition hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-50 sm:py-1.5"
-            >
-              {savingFollowUpTasks() ? "Saving tasks..." : "Save follow-up tasks"}
-            </button>
-            <button
-              type="button"
-              onClick={() => void saveResponseEvidence()}
-              disabled={savingResponseEvidence() || responseEvidenceProjection().evidenceCount === 0}
-              class="w-full rounded-full border border-emerald-200 bg-white/80 px-3 py-2 text-[11px] font-semibold text-emerald-900 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-50 sm:py-1.5"
-            >
-              {savingResponseEvidence() ? "Saving evidence..." : `Save response evidence (${responseEvidenceProjection().evidenceCount})`}
-            </button>
-            <button
-              type="button"
-              onClick={() => void saveFollowUpOutcomes()}
-              disabled={savingFollowUpOutcome() || followUpOutcomeProjection().outcomeCount === 0}
-              class="w-full rounded-full border border-slate-200 bg-white/80 px-3 py-2 text-[11px] font-semibold text-slate-800 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-50 sm:py-1.5"
-            >
-              {savingFollowUpOutcome() ? "Saving outcomes..." : `Save outcome evidence (${followUpOutcomeProjection().outcomeCount})`}
-            </button>
+            <details class="relative ml-auto w-fit">
+              <summary class="cursor-pointer list-none rounded-xl border border-amber-200 bg-white/90 px-3 py-2 text-xs font-semibold text-amber-950 transition hover:bg-white">
+                Actions ▾
+              </summary>
+              <div class="absolute right-0 z-30 mt-2 w-64 space-y-2 rounded-2xl border border-amber-200 bg-white p-3 shadow-panel">
+                <button type="button" onClick={() => void saveFollowUpTasks()} disabled={savingFollowUpTasks() || followUpTaskProjection().taskCount === 0} class="w-full rounded-xl bg-amber-700 px-3 py-2 text-left text-xs font-semibold text-white transition hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-50">
+                  {savingFollowUpTasks() ? "Saving tasks..." : "Save follow-up tasks"}
+                </button>
+                <button type="button" onClick={() => void saveResponseEvidence()} disabled={savingResponseEvidence() || responseEvidenceProjection().evidenceCount === 0} class="w-full rounded-xl border border-emerald-200 px-3 py-2 text-left text-xs font-semibold text-emerald-900 disabled:cursor-not-allowed disabled:opacity-50">
+                  {savingResponseEvidence() ? "Saving evidence..." : `Save response evidence (${responseEvidenceProjection().evidenceCount})`}
+                </button>
+                <button type="button" onClick={() => void saveFollowUpOutcomes()} disabled={savingFollowUpOutcome() || followUpOutcomeProjection().outcomeCount === 0} class="w-full rounded-xl border border-slate-200 px-3 py-2 text-left text-xs font-semibold text-slate-800 disabled:cursor-not-allowed disabled:opacity-50">
+                  {savingFollowUpOutcome() ? "Saving outcomes..." : `Save outcome evidence (${followUpOutcomeProjection().outcomeCount})`}
+                </button>
+                <p class="text-[10px] leading-4 text-slate-600">These controls write internal task and evidence records. They never send a message.</p>
+              </div>
+            </details>
           </div>
         </div>
-        <p class="mt-2 break-words text-[11px] leading-4 text-amber-900/70">
-          {followUpTaskProjection().summaryLabel}. External sends stay blocked until explicit approval.
-        </p>
-        <p class="mt-1 break-words text-[11px] leading-4 text-emerald-900/70">
-          {responseEvidenceProjection().summaryLabel}. This saves user-entered reply evidence for Search, Knowledge Graph, Contacts, and DecisionOS.
-        </p>
-        <p class="mt-1 break-words text-[11px] leading-4 text-slate-700">
-          {followUpOutcomeProjection().summaryLabel}. This records called, move-on, and unresponsive outcomes without sending external messages.
-        </p>
         <Show when={followUpTaskReceipt()}>
           {(receipt) => (
             <p classList={{
@@ -757,7 +746,7 @@ export function ContactsView() {
         <div class="grid justify-items-start gap-2 sm:grid-cols-2">
           <For each={visible()}>
             {(contact) => (
-              <div class="group flex w-full min-w-0 items-start gap-3 rounded-2xl border border-white/50 bg-white/40 px-4 py-3 shadow-card">
+              <div class="group grid w-full min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-3 rounded-2xl border border-white/50 bg-white/40 px-4 py-3 shadow-card sm:grid-cols-[auto_minmax(0,1fr)_auto]">
                 <div class="flex h-9 w-9 flex-shrink-0 select-none items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
                   {contact.name.charAt(0).toUpperCase()}
                 </div>
@@ -878,50 +867,29 @@ export function ContactsView() {
                       onCancel={() => setContactEditorContactId(null)}
                     />
                   </Show>
-                  <div class="mt-2 flex flex-wrap gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => markContacted(contact, "user")}
-                      class="rounded-full border border-slate-200 bg-white/70 px-2.5 py-1.5 text-[10px] text-slate-700 transition hover:bg-white"
-                    >
-                      Mark user contact
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => markContacted(contact, "agent")}
-                      class="rounded-full border border-slate-200 bg-white/70 px-2.5 py-1.5 text-[10px] text-slate-700 transition hover:bg-white"
-                    >
-                      Mark agent contact
-                    </button>
+                  <div class="mt-3 flex flex-wrap items-center gap-2">
                     <button
                       type="button"
                       onClick={() => openResponseEditor(contact)}
-                      class="rounded-full border border-emerald-200 bg-emerald-50/80 px-2.5 py-1.5 text-[10px] text-emerald-700 transition hover:bg-emerald-100"
+                      class="min-h-10 rounded-xl bg-emerald-700 px-3 text-xs font-semibold text-white transition hover:bg-emerald-800"
                     >
                       Record response
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setRoleEditorContactId(roleEditorContactId() === contact.id ? null : contact.id);
-                      }}
-                      class="rounded-full border border-primary/15 bg-primary/10 px-2.5 py-1.5 text-[10px] text-primary transition hover:bg-primary/15"
-                    >
-                      {roleEditorContactId() === contact.id ? "Close roles" : "Add role"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setContactEditorContactId(contactEditorContactId() === contact.id ? null : contact.id)}
-                      class="rounded-full border border-slate-200 bg-white/70 px-2.5 py-1.5 text-[10px] text-slate-700 transition hover:bg-white"
-                    >
-                      {contactEditorContactId() === contact.id ? "Close edit" : "Edit contact"}
-                    </button>
+                    <details class="relative">
+                      <summary class="min-h-10 cursor-pointer list-none rounded-xl border border-slate-200 bg-white/80 px-3 py-2.5 text-xs font-semibold text-slate-700 transition hover:bg-white">More ▾</summary>
+                      <div class="absolute left-0 z-30 mt-2 w-52 space-y-1 rounded-2xl border border-slate-200 bg-white p-2 shadow-panel">
+                        <button type="button" onClick={() => markContacted(contact, "user")} class="w-full rounded-lg px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50">Mark user contact</button>
+                        <button type="button" onClick={() => markContacted(contact, "agent")} class="w-full rounded-lg px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50">Mark agent contact</button>
+                        <button type="button" onClick={() => setRoleEditorContactId(roleEditorContactId() === contact.id ? null : contact.id)} class="w-full rounded-lg px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50">{roleEditorContactId() === contact.id ? "Close roles" : "Edit roles"}</button>
+                        <button type="button" onClick={() => setContactEditorContactId(contactEditorContactId() === contact.id ? null : contact.id)} class="w-full rounded-lg px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50">{contactEditorContactId() === contact.id ? "Close edit" : "Edit contact"}</button>
+                      </div>
+                    </details>
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => removeContact(contact.id)}
-                  class="rounded-full px-2 py-1 text-[11px] text-outline/60 opacity-100 transition hover:bg-white/60 hover:text-red-400 sm:opacity-0 sm:group-hover:opacity-100"
+                  class="col-start-2 row-start-1 justify-self-end rounded-full px-2 py-1 text-[11px] text-outline/60 opacity-100 transition hover:bg-white/60 hover:text-red-400 sm:col-start-3 sm:opacity-0 sm:group-hover:opacity-100"
                   aria-label="Remove contact"
                 >
                   x

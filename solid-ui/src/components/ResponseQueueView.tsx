@@ -217,6 +217,7 @@ import {
 import { completedWeddingVendorSearchSession, editedWeddingVendorSearchSession, loadWeddingVendorSearchSession, saveWeddingVendorSearchSession } from "@/lib/weddingVendorSearchSessionState";
 import { weddingMenuKeyDownStep, weddingWorkspaceMenuItemsForEmail } from "@/lib/weddingWorkspaceDesktopMenuState";
 import { WeddingUploadFilesButton } from "@/components/WeddingUploadFilesButton";
+import { WeddingSetupChecklist, type WeddingSetupChecklistItem } from "@/components/WeddingSetupChecklist";
 
 const RESPONSE_QUEUE_VIEW_CLASS =
   "view-enter min-w-0 space-y-4 rounded-[24px] border border-sky-100/80 bg-[linear-gradient(135deg,rgba(240,249,255,0.96),rgba(255,255,255,0.96))] p-3 shadow-[0_22px_70px_-36px_rgba(14,116,144,0.4)] backdrop-blur-sm phone:rounded-none phone:border-0 phone:bg-transparent phone:p-0 phone:shadow-none sm:rounded-[32px] sm:p-5";
@@ -230,41 +231,38 @@ function initialWeddingWorkspaceMenu(): WeddingWorkspaceMenuId {
   return loadWeddingWorkspaceMenu();
 }
 
-function weddingSetupChecklistItems(state: WeddingResponseWorkspaceViewState): Array<{
-  id: string;
-  label: string;
-  detail: string;
-  complete: boolean;
-  menu: WeddingWorkspaceMenuId;
-}> {
+function weddingSetupChecklistItems(
+  state: WeddingResponseWorkspaceViewState,
+  dateOrSeason: string,
+): WeddingSetupChecklistItem[] {
   return [
     {
       id: "date",
       label: "Add the wedding date",
       detail: "Starts the countdown and timeline.",
-      complete: state.ganttTimeline.rows.length > 0,
-      menu: "timeline",
+      complete: Boolean(parseWeddingDateInput(dateOrSeason)),
+      destination: "timeline",
     },
     {
       id: "budget",
       label: "Set a budget",
       detail: "Shows how much is left after quotes.",
       complete: state.budgetTracking.budgetTargetAmount !== null,
-      menu: "budget",
+      destination: "budget",
     },
     {
       id: "guests",
       label: "Start the guest list",
       detail: "Unlocks RSVPs, meals, and seating.",
       complete: state.guestTracking.guestRowCount > 0,
-      menu: "guests",
+      destination: "guests",
     },
     {
       id: "helpers",
       label: "Choose who is helping",
       detail: "Keeps tasks and permissions clear.",
       complete: state.delegation.items.length > 0,
-      menu: "helpers",
+      destination: "helpers",
     },
   ];
 }
@@ -1912,7 +1910,7 @@ export function ResponseQueueView(props: {
   });
   const weddingSetupChecklist = createMemo(() => {
     const state = weddingWorkspace();
-    return state ? weddingSetupChecklistItems(state) : [];
+    return state ? weddingSetupChecklistItems(state, weddingFollowUpDate()) : [];
   });
   const incompleteWeddingSetupChecklist = createMemo(() => weddingSetupChecklist().filter((item) => !item.complete));
 
@@ -2016,39 +2014,12 @@ export function ResponseQueueView(props: {
       </Show>
 
       <Show when={weddingWorkspace() && weddingWorkspaceMenu() === "home" && !weddingFirstIntakeComplete() && incompleteWeddingSetupChecklist().length > 0}>
-        <section class="rounded-[24px] border border-rose-100/80 bg-white/80 p-3 shadow-card phone:hidden sm:rounded-[28px] sm:p-4">
-          <div class="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <p class="text-sm font-semibold text-rose-950">Then add your wedding details</p>
-              <p class="mt-1 text-sm leading-6 text-rose-900/70">
-                Add the basics once, then OmnyID can keep the rest of the planner connected.
-              </p>
-            </div>
-            <span class="w-fit rounded-full bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-900">
-              {incompleteWeddingSetupChecklist().length} to add
-            </span>
-          </div>
-          <div class="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-            <For each={weddingSetupChecklist()}>
-              {(item) => (
-                <button
-                  type="button"
-                  disabled={item.complete}
-                  onClick={() => setWeddingWorkspaceMenu(item.menu)}
-                  class={`min-w-0 rounded-2xl border px-3 py-2 text-left transition ${
-                    item.complete
-                      ? "cursor-default border-emerald-100 bg-emerald-50/75 text-emerald-950"
-                      : "border-rose-100 bg-rose-50/70 text-rose-950 hover:border-rose-200 hover:bg-rose-50"
-                  }`}
-                >
-                  <span class="block text-xs font-semibold">{item.complete ? "Done" : "Add"}</span>
-                  <span class="mt-1 block break-words text-sm font-semibold">{item.label}</span>
-                  <span class="mt-1 block text-xs leading-5 opacity-70">{item.detail}</span>
-                </button>
-              )}
-            </For>
-          </div>
-        </section>
+        <WeddingSetupChecklist
+          items={weddingSetupChecklist()}
+          initialDate={parseWeddingDateInput(weddingFollowUpDate()) ?? ""}
+          onNavigate={(destination) => setWeddingWorkspaceMenu(destination as WeddingWorkspaceMenuId)}
+          onSaveDate={async (date) => { setWeddingFollowUpDate(date); await saveWeddingDate(date); }}
+        />
       </Show>
 
       {/* Suppressed while an intake form is the active next step — its "Open wedding

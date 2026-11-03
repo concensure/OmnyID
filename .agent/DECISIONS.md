@@ -2429,3 +2429,19 @@ subjective usability or a controlled external cohort.
 - Run-sheet context actions remain typed A2UI intents over the existing database projection. Fixed
   milestones are explicit run-sheet records, not every confirmed item, and vendor visibility remains
   an opt-in projection that excludes private notes.
+
+## 2026-11-03: Batch 2 magnets share one declared-writer local profile
+
+- Public Wedding magnets use the versioned `weddingMagnetProfileFields.v1.json` registry as their
+  field, validation, provenance and writer authority. The static Wedding site consumes a generated
+  copy, while executable parity tests prevent it from drifting from the workspace contract.
+- The public profile stays browser-local until the visitor explicitly chooses an existing account
+  handoff. Every value retains its source tool, update time and bounded history; one magnet cannot
+  silently overwrite a field it is not declared to write.
+- Batch 2 launch articles remain unpublished until the corresponding deterministic engine, reviewed
+  content set and workspace handoff are present. A shared profile and document subtype alone are not
+  evidence that Countdown, Invitation or Palette products are available.
+- Chrome or Edge built-in language models are an optional read-only fallback for Master Agent text.
+  Their output cannot invoke tools or create AFP events because the browser API does not provide the
+  required model-cost and provenance evidence. Server-backed Agent Settings remain the authority for
+  persistent or actionable work.

@@ -95,7 +95,7 @@ import {
   type AuthApiResponse,
 } from "@/lib/authResponseState";
 import { visibleErrorText } from "@/lib/visibleErrorText";
-import { checkBrowserAiAvailable, classifyWithBrowserAi, getBrowserAiLabel } from "@/lib/browserAi";
+import { answerWithBrowserAi, checkBrowserAiAvailable, classifyWithBrowserAi, getBrowserAiLabel } from "@/lib/browserAi";
 import {
   hasSentStudyDeadlineAfpProjection,
   markStudyDeadlineAfpProjectionSent,
@@ -2551,6 +2551,30 @@ function App() {
         selectView("search");
         return;
       }
+      if (browserAiLabel() && !workspaceLlmSetupComplete() && supportedAttachedFiles.length === 0) {
+        const browserAnswer = await answerWithBrowserAi(query);
+        if (browserAnswer) {
+          setObjectSearchResult(null);
+          objectSearchRouterPreview.clear();
+          workspaceSearchRouterPreview.clear();
+          setCommandResult({
+            intent: "browser_answer",
+            suggested_view: "search",
+            summary: browserAnswer,
+            engine: "browser-ai",
+            links: [],
+            boundary: {
+              execution: "browser_local_read_only",
+              persisted: false,
+              workspace_tools_used: false,
+            },
+            bullets: ["Browser-local answer — no workspace tools or saved memory were used."],
+          });
+          setSearchFeedback("Answered privately with the browser's built-in model. Connect a model in Agent Settings for workspace actions and saved provenance.");
+          selectView("search");
+          return;
+        }
+      }
       // Try browser AI classification as a hint for the server (used when no server LLM configured)
       let browserIntent: string | undefined;
       let browserParsed: Record<string, unknown> | undefined;
@@ -4649,7 +4673,7 @@ function AgentStatusPill(props: {
 }) {
   const label = () => {
     const cfg = props.llmConfig;
-    if (cfg) {
+    if (cfg?.inference_ready) {
       const backendLabel: Record<string, string> = {
         byok: "BYOK",
         ollama: "Ollama",

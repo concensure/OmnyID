@@ -5435,6 +5435,7 @@ export type LlmConfig = {
   ollama_url?: string | null;
   monthly_budget_cents: number;
   usage_cents_current_month: number;
+  inference_ready: boolean;
 };
 
 function normalizeLlmBackend(value: unknown): LlmConfig["backend"] {
@@ -5453,6 +5454,7 @@ export function normalizeLlmConfig(value: unknown): LlmConfig {
     ollama_url: typeof value.ollama_url === "string" || value.ollama_url === null ? value.ollama_url : undefined,
     monthly_budget_cents: apiNumber(value.monthly_budget_cents) ?? 0,
     usage_cents_current_month: apiNumber(value.usage_cents_current_month) ?? 0,
+    inference_ready: value.inference_ready === true,
   };
 }
 

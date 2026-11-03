@@ -4,6 +4,7 @@ import {
   safeWeddingLabel,
   type WeddingApprovalState,
   type WeddingArtifactKind,
+  type WeddingArtifactSubtype,
   type WeddingPlanningMetadata,
 } from "@/lib/weddingPlanningTemplateState";
 
@@ -14,6 +15,7 @@ export type WeddingArtifactSummary = {
   id: string;
   title: string;
   kind: WeddingArtifactKind;
+  subtype: WeddingArtifactSubtype | null;
   category: string;
   createdAt: number;
   metadata: WeddingPlanningMetadata;
@@ -37,6 +39,7 @@ export type WeddingArtifactInput = {
   id?: string | null;
   title?: string | null;
   kind?: WeddingArtifactKind | null;
+  subtype?: WeddingArtifactSubtype | null;
   createdAt?: number | null;
   metadata?: unknown;
   exportTargets?: readonly string[] | null;
@@ -204,6 +207,9 @@ export function normalizeWeddingArtifactSummary(input: WeddingArtifactInput): We
     artifactKind: input.kind ?? (input.metadata && typeof input.metadata === "object"
       ? (input.metadata as Record<string, unknown>).artifactKind ?? (input.metadata as Record<string, unknown>).artifact_kind
       : null),
+    artifactSubtype: input.subtype ?? (input.metadata && typeof input.metadata === "object"
+      ? (input.metadata as Record<string, unknown>).artifactSubtype ?? (input.metadata as Record<string, unknown>).artifact_subtype
+      : null),
   });
   if (!metadata.artifactKind) return null;
   const title = clean(input.title) || weddingArtifactCategoryLabel(metadata.artifactKind);
@@ -227,7 +233,7 @@ export function normalizeWeddingArtifactSummary(input: WeddingArtifactInput): We
   const exportTargets = normalizeExportTargets(metadata.artifactKind, input.exportTargets);
   const searchableIdentity = importedPrivateEvidence
     ? ["Imported private planning file", metadata.artifactKind, weddingArtifactCategoryLabel(metadata.artifactKind)]
-    : [id, title, metadata.artifactKind, weddingArtifactCategoryLabel(metadata.artifactKind)];
+    : [id, title, metadata.artifactKind, metadata.artifactSubtype, weddingArtifactCategoryLabel(metadata.artifactKind)];
   const searchableSourceLabels = importedPrivateEvidence ? ["Imported private planning file"] : sourceLabels;
   const searchableSourceLinks = importedPrivateEvidence ? [] : sourceLinks;
   const searchableSearchLabels = importedPrivateEvidence ? safeImportSearchLabels(input) : searchLabels;
@@ -257,6 +263,7 @@ export function normalizeWeddingArtifactSummary(input: WeddingArtifactInput): We
     id,
     title,
     kind: metadata.artifactKind,
+    subtype: metadata.artifactSubtype ?? null,
     category: weddingArtifactCategoryLabel(metadata.artifactKind),
     createdAt,
     metadata,

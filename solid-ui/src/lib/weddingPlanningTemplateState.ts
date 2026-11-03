@@ -14,6 +14,13 @@ export type WeddingArtifactKind =
   | "map_collection"
   | "decision_log";
 
+export type WeddingArtifactSubtype =
+  | "style_palette"
+  | "creative_brief"
+  | "invitation_wording"
+  | "shot_list"
+  | "wedding_countdown";
+
 export type WeddingPrivacyScope =
   | "private"
   | "shared_partner"
@@ -34,6 +41,7 @@ export type WeddingPlanningMetadata = {
   responseWorkspaceId: string;
   sourceResponseId: string | null;
   artifactKind: WeddingArtifactKind | null;
+  artifactSubtype?: WeddingArtifactSubtype | null;
   supertags: string[];
   privacyScope: WeddingPrivacyScope;
   approvalState: WeddingApprovalState;
@@ -50,6 +58,14 @@ const ARTIFACT_KINDS = new Set<WeddingArtifactKind>([
   "registry",
   "map_collection",
   "decision_log",
+]);
+
+const ARTIFACT_SUBTYPES = new Set<WeddingArtifactSubtype>([
+  "style_palette",
+  "creative_brief",
+  "invitation_wording",
+  "shot_list",
+  "wedding_countdown",
 ]);
 
 const PRIVACY_SCOPES = new Set<WeddingPrivacyScope>([
@@ -103,6 +119,11 @@ function normalizedArtifactKind(value: unknown): WeddingArtifactKind | null {
   return ARTIFACT_KINDS.has(normalized) ? normalized : null;
 }
 
+function normalizedArtifactSubtype(value: unknown): WeddingArtifactSubtype | null {
+  const normalized = clean(value) as WeddingArtifactSubtype;
+  return ARTIFACT_SUBTYPES.has(normalized) ? normalized : null;
+}
+
 function normalizedPrivacyScope(value: unknown): WeddingPrivacyScope {
   const normalized = clean(value) as WeddingPrivacyScope;
   return PRIVACY_SCOPES.has(normalized) ? normalized : "private";
@@ -134,6 +155,7 @@ export function normalizeWeddingPlanningMetadata(value: unknown): WeddingPlannin
   );
   const sourceResponseId = clean(recordValue(value, "sourceResponseId") ?? recordValue(value, "source_response_id")) || null;
   const artifactKind = normalizedArtifactKind(recordValue(value, "artifactKind") ?? recordValue(value, "artifact_kind"));
+  const artifactSubtype = normalizedArtifactSubtype(recordValue(value, "artifactSubtype") ?? recordValue(value, "artifact_subtype"));
   const rawTags = Array.isArray(recordValue(value, "supertags")) ? recordValue(value, "supertags") as unknown[] : [];
   const supertags = uniqueTags([
     WEDDING_PLANNING_TEMPLATE_TAG,
@@ -141,6 +163,7 @@ export function normalizeWeddingPlanningMetadata(value: unknown): WeddingPlannin
     weddingPlanId,
     responseWorkspaceId,
     artifactKind ? `wedding_artifact:${artifactKind}` : null,
+    artifactSubtype ? `wedding_artifact_subtype:${artifactSubtype}` : null,
     ...rawTags,
   ].filter(Boolean));
 
@@ -150,6 +173,7 @@ export function normalizeWeddingPlanningMetadata(value: unknown): WeddingPlannin
     responseWorkspaceId,
     sourceResponseId,
     artifactKind,
+    artifactSubtype,
     supertags,
     privacyScope: normalizedPrivacyScope(recordValue(value, "privacyScope") ?? recordValue(value, "privacy_scope")),
     approvalState: normalizedApprovalState(recordValue(value, "approvalState") ?? recordValue(value, "approval_state")),

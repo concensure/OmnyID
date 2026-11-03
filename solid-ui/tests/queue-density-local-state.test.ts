@@ -53,8 +53,8 @@ test("queue density local state migrates legacy density labels", () => {
   assert.equal(localStorageState.get("omnyid.response-queue.density"), "7");
 });
 
-test("font-size levels increase the root type scale without shrinking below 14px", () => {
-  assert.equal(queueFontSizeRootPx("1"), 14);
-  assert.ok(queueFontSizeRootPx("7") > 16);
-  assert.equal(queueFontSizeRootPx("10"), 19);
+test("font-size levels increase the root type scale and make the default roughly 25 percent larger", () => {
+  assert.equal(queueFontSizeRootPx("1"), 16);
+  assert.ok(queueFontSizeRootPx("7") > 21);
+  assert.equal(queueFontSizeRootPx("10"), 24);
 });

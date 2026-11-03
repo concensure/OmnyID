@@ -6751,3 +6751,29 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-319`, branch
   outside this slice; the touched Rust hunk is rustfmt-shaped.
 - Oracle Docker builder cache only was pruned (4.367 GB), moving root use from 94% to 84% before
   release. No image, container, volume, backup, database or source data was removed.
+
+## 2026-11-03 - WED-322 Batch 2 foundation and workspace repair (Codex, candidate)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-319`, branch
+`agent/codex/WED-322`, based on deployed SHA `439770531a476cfc643a8f25514b2b8464f6f7eb`.
+
+- Added one versioned 36-field public-magnet profile/provenance registry, a generated static parity
+  copy, declared-writer enforcement, bounded history, conflict handling, edit/remove/export controls
+  and Budget magnet prefill/write-through. Data remains browser-local until explicit account handoff.
+- Extended the existing Wedding artifact projection with the proposed Batch 2 subtypes. No parallel
+  document store or premature launch route was added.
+- Replaced the foreign setup banner with a readable setup checklist whose date action opens and saves
+  an inline calendar. Increased the workspace root font scale, made model status depend on a usable
+  inference backend, added a read-only Chrome/Edge built-in-AI fallback, and collapsed suggestions on
+  execution.
+- Discover can open the existing automation controls in place. Contacts now has a concise empty state
+  and a primary/secondary action hierarchy. Older accounts missing a Master Agent instance recover by
+  lazy provisioning rather than remaining in a fleet-error loop.
+- Passed: Solid UI typecheck; 2,163 Wedding tests; production build; Wedding static/CSP/quiz/account
+  confirmation/blog catalogue tests; seven magnet-profile tests; focused workspace, browser-AI,
+  artifact, search and fleet tests; line budgets; the focused Rust fleet-route test; and full
+  `cargo check --lib`.
+- Repository-wide `cargo fmt --check` remains pre-existingly noisy outside this slice; the touched
+  Rust hunk is rustfmt-shaped. Countdown catalogue/date parity, the reviewed invitation phrase set and
+  the licensed palette corpus remain genuine Batch 2 publication gates, so their launch posts remain
+  unpublished.
