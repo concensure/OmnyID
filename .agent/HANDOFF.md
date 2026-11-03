@@ -7050,3 +7050,27 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
   seven focused Rust tests pass, `cargo check --lib` passes, both line-budget tests pass, and no new
   file exceeds 999 lines. Next dependency-ready work is GROWTH-01 replay-safe measurement and
   bounded raw-row cleanup.
+
+## 2026-11-04 - GROWTH-01 replay-safe public measurement (Codex, complete)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
+`agent/codex/GROWTH-001`, feature commit
+`e25b8525290569dca713a268ce5966eb7eb731e1`.
+
+- Added `public-measurement.v1` with stable client event IDs, acknowledged retry, replay-safe
+  `sendBeacon`, composite `(visit_id,event_id)` persistence and strict path/property/body bounds.
+- Root `/` now uses the existing first-party endpoint and shares one session-only visit/landing
+  snapshot with Wedding. GPC/DNT, known-bot suppression and the no-third-party boundary remain.
+- Replaced the former 14-month raw cleanup with a 30-day, four-by-1,000 batched session deletion;
+  event rows cascade. A tmpfs pgvector test proved migration, exact replay, a distinct same-visit
+  event and retention cleanup.
+- Browser replay smoke, 10 focused measurement tests, seven Growth contract tests, migration
+  parity, `cargo check --lib`, both line-budget tests, public-site/CSP tests and 74-page metadata
+  checks passed. Evidence is in
+  `Documents/verification/growth-01-public-measurement-evidence-2026-11-04.md`.
+- The user-pruned Oracle now has about 16 GB free at 64 percent use. The previously blocked WED-329
+  independent restore drill was rerun and passed with backup verification and runtime-script
+  integrity also passing. GROWTH-01 itself is committed but not deployed.
+- Next dependency-ready work is GROWTH-02 consent-aware same-session attribution and canonical
+  Wedding identity linkage. Persistent cross-session attribution remains false-default pending its
+  separate approved consent state.

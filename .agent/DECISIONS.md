@@ -2575,3 +2575,18 @@ subjective usability or a controlled external cohort.
 - Growth metadata is allowlisted and excludes names, email, phone, guests, dietary/access details,
   messages, quote text, budget amounts, user IDs and Wedding IDs. Source IDs and tenant-scoped joins
   remain internal. De-identified rollups require periodic re-identification-risk review.
+
+# 2026-11-04 - GROWTH-01 replay and raw-retention boundary
+
+- Public measurement identity is created in the browser before transport and is unique within one
+  opaque visit. The database key is `(visit_id, event_id)`, so network and navigation replays are
+  harmless without treating a different event in the same visit as a duplicate.
+- `sendBeacon` is delivery-attempt evidence, not acknowledgement. Beaconed events retain their IDs
+  in session storage until a later same-origin fetch is acknowledged. This storage remains
+  session-only and is not the unapproved 30-day cross-session attribution identifier.
+- The approved root capture surface is `/` only. Wedding capture remains `/wedding` and its child
+  paths; arbitrary root, workspace and private paths fail closed. Root and Wedding reuse the same
+  same-origin visit and first landing snapshot.
+- Raw public sessions and their cascading events are retained for at most 30 days and drained in
+  bounded batches. GPC, DNT and known-bot suppression remain mandatory, and no third-party tracker
+  is introduced.

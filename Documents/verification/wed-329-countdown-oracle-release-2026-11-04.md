@@ -33,6 +33,12 @@ preflight. Oracle root use was 90 percent with about 4.9 GB free; the drill requ
 The final runtime proof therefore records `restore_drill_status: skipped` rather than misreporting a
 restore test. No production records, backups or images were deleted as part of this release.
 
+After the user safely pruned Oracle, the independent proof was rerun on 2026-11-04 with the restore
+drill enabled. It exited successfully with `STATUS=pass`, `BACKUP_VERIFY_STATUS=pass`,
+`RESTORE_DRILL_STATUS=pass`, `RUNTIME_SCRIPT_INTEGRITY_STATUS=pass` and no failure step. Root and
+`/var` were both 64 percent used with about 16 GB free. This closes the capacity exception while
+retaining the earlier failed-closed preflight as historical evidence.
+
 ## Product boundary
 
 This release publishes the autonomous Countdown dependency. Invitation wording and Palette assets

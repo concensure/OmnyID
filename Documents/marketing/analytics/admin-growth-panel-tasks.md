@@ -52,6 +52,9 @@ Acceptance:
 
 Depends on: GROWTH-00
 
+Status: complete in feature commit `e25b8525290569dca713a268ce5966eb7eb731e1`;
+production deployment remains a separate release action.
+
 - Add a stable bounded client event ID and schema version to `/wedding/e`.
 - Persist the supplied ID with unique `(visit_id, event_id)` semantics.
 - Preserve batch retry and `sendBeacon` behaviour.
