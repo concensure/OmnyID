@@ -19,6 +19,7 @@ COPY schemas/ ./schemas/
 COPY scripts/ ./scripts/
 COPY src/ ./src/
 COPY wedding/email/ ./wedding/email/
+COPY wedding/vendors.html ./wedding/vendors.html
 COPY solid-ui/src/lib/weddingFacetVocabulary.json ./solid-ui/src/lib/weddingFacetVocabulary.json
 
 # Cache the crate registry and incremental build artifacts across builds so an

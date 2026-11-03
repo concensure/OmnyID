@@ -10,6 +10,7 @@ const robotsPath = resolve(projectRoot, 'docs', 'robots.txt');
 const sitemapPath = resolve(projectRoot, 'docs', 'sitemap.xml');
 const vendorAcquisitionPage = resolve(projectRoot, 'docs', 'vendors.html');
 const vendorAcquisitionCss = resolve(projectRoot, 'docs', 'vendors.css');
+const homeserverDockerfile = readFileSync(resolve(projectRoot, 'Dockerfile'), 'utf8');
 const docsHtml = readFileSync(docsIndex, 'utf8');
 const docsJs = readFileSync(docsApp, 'utf8');
 const robots = readFileSync(robotsPath, 'utf8');
@@ -505,6 +506,9 @@ if (/api[_-]?key|client[_-]?secret|bearer\s+[a-z0-9._-]{12,}|password\s*[:=]/i.t
 if (/encodeURIComponent\(cleanName\(|names\s*=\s*encodeURIComponent|members\.slice/.test(quizEngine)) failures.push('quiz-engine.js: names remain in public share hashes');
 if (!weddingHome.includes('Illustrative example') && !htmlByPath.get(normalize(resolve(root, 'get-wedding-vendors-to-reply/index.html')))?.includes('Illustrative example')) {
   failures.push('campaign mock vendor card is not labelled as illustrative');
+}
+if (!homeserverDockerfile.includes('COPY wedding/vendors.html ./wedding/vendors.html')) {
+  failures.push('Dockerfile: crawlable vendor directory template is missing from the homeserver build context');
 }
 
 if (failures.length) {
