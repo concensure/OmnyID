@@ -22,7 +22,7 @@ test("buildWeddingLegalAdministrationState creates DecisionOS alert options and 
   assert.equal(state.deadlineLabel, "NOIM latest-date check: 2027-06-01");
   assert.ok(state.alertOptions.some((option) => /Draft NOIM prep/i.test(option)));
   assert.ok(state.alertOptions.some((option) => /3 verified options/i.test(option)));
-  assert.ok(state.alertOptions.some((option) => /2027-05-15/i.test(option)));
+  assert.ok(state.alertOptions.some((option) => /2027-04-01/i.test(option)));
   assert.equal(state.celebrantSearchReadiness, "ready_for_search");
   assert.equal(state.noimPrefillStatus, "ready_for_user_review");
   assert.ok(state.documentChecklist.some((task) => /birth/i.test(task.title)));
@@ -32,7 +32,7 @@ test("buildWeddingLegalAdministrationState creates DecisionOS alert options and 
   assert.match(state.artifact.markdown, /Do not lodge or sign anything automatically/i);
   assert.ok(state.artifact.summary.sourceLinks.some((source) => /notice-intended-marriage/i.test(source.url)));
   assert.ok(state.artifact.summary.sourceLinks.some((source) => /marriage\.ag\.gov\.au/i.test(source.url)));
-  assert.equal(state.scheduleItems[0]?.startAt, "2027-05-15T09:00:00.000Z");
+  assert.equal(state.scheduleItems[0]?.startAt, "2027-04-01T09:00:00.000Z");
 });
 
 test("buildWeddingLegalAdministrationState stays jurisdiction-aware outside Australia", () => {

@@ -1,5 +1,5 @@
 version: 1
-updated: 2026-11-03
+updated: 2026-11-04
 
 lifecycle:
   allowed_statuses:
@@ -15,6 +15,17 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-329
+    title: Complete the autonomous Batch 2 countdown catalogue and public planning checklist
+    status: review
+    owner: codex
+    branch: agent/codex/WED-329
+    worktree: C:/Users/ozans/Desktop/projects/OmnyID-WED-319
+    depends_on: [WED-328, WED-327]
+    files: [solid-ui/src/lib/weddingTaskCatalogueState.ts, solid-ui/src/lib/weddingVendorLeadTimeState.ts, solid-ui/src/lib/weddingExpectedBehaviorTaskState.ts, solid-ui/tests/**, wedding/**, scripts/**, docs/sitemap.xml, Documents/marketing/wedding planning/posts/magnet/**, Documents/verification/**, .agent/**]
+    acceptance: [one versioned catalogue covers the six stages existing planner tasks and every shipped vendor category using the established lead-time authority, the planner vendor rules and public countdown share exact lead-time values and task identifiers, current federal NOIM guidance is sourced only from official Australian Government authorities with unverified state claims omitted, the deterministic public checklist supports exact-date calculation compressed plans catch-up completion print ICS and privacy-bounded sharing without an LLM or server-side wedding data, the static catalogue is generated from and parity-tested against the workspace authority, publication readiness is computed from executable coverage rather than a manual false constant, relevant Batch 2 Wedding public-site typecheck line-budget and production-build checks pass]
+    progress: "Started from clean WED-328 handoff commit e6bbd421c0747ee737008ca5b84f53536c74f56c. The shared catalogue now contains 65 unique tasks across all six stages, including all 31 existing vendor lead-time categories and the 20 prior workspace tasks. The planner vendor rules import the same authority. Official federal NOIM sources were rechecked on 2026-11-04; the public checklist and planner use a three-month planning reminder while retaining the statutory 18-month to one-month window and omitting state-specific claims. The deterministic public tool supports short-plan catch-up, local completion, print, ICS and date/task-id-only sharing. Focused catalogue/vendor/legal tests, all 2,180 Wedding tests, 74-page metadata checks, Wedding site tests, typecheck and line budgets pass; clean exact-SHA build and release evidence are pending."
+
   - id: WED-328
     title: Rotate Email Routing control-plane secret, enforce public metadata, and specify the admin growth panel
     status: done

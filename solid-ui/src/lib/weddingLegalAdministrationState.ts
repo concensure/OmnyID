@@ -55,12 +55,6 @@ function exactDate(value: unknown): Date | null {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-function addDays(date: Date, days: number): Date {
-  const next = new Date(date);
-  next.setUTCDate(next.getUTCDate() + days);
-  return next;
-}
-
 function addMonths(date: Date, months: number): Date {
   const next = new Date(date);
   next.setUTCMonth(next.getUTCMonth() + months);
@@ -77,7 +71,11 @@ function noimDeadline(context: WeddingPlanningContext): { due: Date | null; remi
   const due = addMonths(weddingDate, -1);
   return {
     due,
-    reminder: addDays(due, -17),
+    // The federal legal boundary remains one month. The planning reminder is
+    // intentionally earlier so a couple has time to select an authorised
+    // celebrant and correct the form without treating the legal minimum as a
+    // recommended target.
+    reminder: addMonths(weddingDate, -3),
     earliest: addMonths(weddingDate, -18),
   };
 }

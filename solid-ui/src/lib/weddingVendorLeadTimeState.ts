@@ -7,6 +7,7 @@ import {
   normalizeWeddingPlanningMetadata,
   safeWeddingLabel,
 } from "@/lib/weddingPlanningTemplateState";
+import { WEDDING_VENDOR_LEAD_TIME_RULES } from "@/lib/weddingTaskCatalogueState";
 
 export type WeddingVendorLeadTimeCategory = {
   categoryId: string;
@@ -30,39 +31,11 @@ export type WeddingVendorLeadTimeRecommendation = {
   status: "early" | "open" | "closing" | "late" | "unknown_date";
 };
 
-const LEAD_TIME_MONTHS: Record<string, Omit<WeddingVendorLeadTimeCategory, "categoryId" | "label">> = {
-  venue: { idealLeadMonths: [12, 18], hardDeadlineMonths: 12, mustDecideFirst: true },
-  planner: { idealLeadMonths: [10, 18], hardDeadlineMonths: 9 },
-  photographer: { idealLeadMonths: [9, 12], hardDeadlineMonths: 6 },
-  floral_designer: { idealLeadMonths: [4, 6], hardDeadlineMonths: 3 },
-  dj: { idealLeadMonths: [6, 9], hardDeadlineMonths: 3 },
-  band: { idealLeadMonths: [8, 12], hardDeadlineMonths: 4 },
-  caterer: { idealLeadMonths: [6, 9], hardDeadlineMonths: 4 },
-  decor: { idealLeadMonths: [4, 6], hardDeadlineMonths: 2 },
-  rental_company: { idealLeadMonths: [4, 6], hardDeadlineMonths: 2 },
-  videographer: { idealLeadMonths: [9, 12], hardDeadlineMonths: 6 },
-  officiant: { idealLeadMonths: [9, 12], hardDeadlineMonths: 1, mustDecideFirst: true },
-  hair_stylist: { idealLeadMonths: [4, 6], hardDeadlineMonths: 2 },
-  makeup_artist: { idealLeadMonths: [4, 6], hardDeadlineMonths: 2 },
-  entertainment: { idealLeadMonths: [6, 9], hardDeadlineMonths: 3 },
-  lighting_company: { idealLeadMonths: [4, 6], hardDeadlineMonths: 2 },
-  cake_baker: { idealLeadMonths: [3, 4], hardDeadlineMonths: 2 },
-  transportation_provider: { idealLeadMonths: [2, 3], hardDeadlineMonths: 1 },
-  stationer: { idealLeadMonths: [4, 6], hardDeadlineMonths: 2 },
-  calligrapher: { idealLeadMonths: [3, 5], hardDeadlineMonths: 2 },
-  bartending: { idealLeadMonths: [4, 6], hardDeadlineMonths: 2 },
-  ceremony_ensemble: { idealLeadMonths: [6, 9], hardDeadlineMonths: 3 },
-  accommodations: { idealLeadMonths: [8, 12], hardDeadlineMonths: 4 },
-  attire_designer: { idealLeadMonths: [8, 12], hardDeadlineMonths: 5 },
-  dress_salon: { idealLeadMonths: [8, 12], hardDeadlineMonths: 5 },
-  alterations_specialist: { idealLeadMonths: [2, 3], hardDeadlineMonths: 1 },
-  emcee: { idealLeadMonths: [4, 6], hardDeadlineMonths: 2 },
-  jeweler: { idealLeadMonths: [3, 6], hardDeadlineMonths: 2 },
-  photo_booth: { idealLeadMonths: [3, 6], hardDeadlineMonths: 2 },
-  travel_honeymoon_advisor: { idealLeadMonths: [6, 9], hardDeadlineMonths: 3 },
-  welcome_amenity_supplier: { idealLeadMonths: [2, 3], hardDeadlineMonths: 1 },
-  trendy_emerging: { idealLeadMonths: [3, 6], hardDeadlineMonths: 2 },
-};
+const LEAD_TIME_MONTHS = Object.fromEntries(WEDDING_VENDOR_LEAD_TIME_RULES.map((rule) => [rule.categoryId, {
+  idealLeadMonths: rule.idealLeadMonths,
+  hardDeadlineMonths: rule.hardDeadlineMonths,
+  mustDecideFirst: rule.mustDecideFirst,
+}])) as Record<string, Omit<WeddingVendorLeadTimeCategory, "categoryId" | "label">>;
 
 const DAY_MS = 86_400_000;
 

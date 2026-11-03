@@ -2532,3 +2532,25 @@ subjective usability or a controlled external cohort.
   and first-party site measurement authorities. It does not use an LLM for routine analytics, does
   not infer revenue from client events, and does not claim 30-day cross-session attribution without
   explicit persistent-attribution consent.
+
+# 2026-11-04 - WED-329 shared Countdown timing authority
+
+- `wedding-catalogue.v1` is the authority for the public Countdown and the planner's dated catalogue
+  tasks. It contains 65 unique tasks across the six established stages. All 31 vendor categories use
+  the existing planner lead-time rules; the vendor decision pipeline imports those rules rather than
+  maintaining a second table. The public wording calls them planning estimates, never availability
+  or booking guarantees.
+- For a vendor window, the public target is the earlier edge of the existing ideal research range.
+  This follows the project's ample-preparation rule. A couple still confirms the supplier's actual
+  availability, hold, booking and final-information deadlines directly.
+- Federal NOIM wording is limited to current Attorney-General's Department guidance, section 42 of
+  the Marriage Act 1961 and the federal NOIM page, checked 2026-11-04. The planning reminder is three
+  months before the ceremony, while the legal boundaries remain no more than 18 months and at least
+  one month before. Unverified state-specific lodgement statements are excluded.
+- The public Countdown is deterministic and browser-local. A short plan keeps all tasks, moves
+  incomplete past targets into `Catch up now`, and never displays an unusable past target. Its share
+  fragment contains only the date and completed catalogue IDs; print and ICS output contain no
+  names, email addresses or Wedding profile fields. No LLM or public server processing is involved.
+- Countdown readiness is derived from executable catalogue coverage and generated-static parity,
+  not a hand-edited launch flag. Invitation wording and palette publication still require their
+  separately documented inclusive-language, professional-content, licence and diversity reviews.

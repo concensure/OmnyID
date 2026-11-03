@@ -6990,3 +6990,29 @@ that exact commit.
 - No application deployment was requested or performed. Oracle application provenance remains
   `5a6ce9032e33c2fd80c8224b215d6be2c93d646c`; only the file-backed Cloudflare control credential was
   rotated in place.
+
+## 2026-11-04 - WED-329 shared Countdown catalogue and public checklist (Codex, release review)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-319`, branch
+`agent/codex/WED-329`, based on clean WED-328 coordination commit
+`e6bbd421c0747ee737008ca5b84f53536c74f56c`.
+
+- Replaced the partial manual Countdown gate with a 65-task, six-stage catalogue covering 14 plan
+  foundations, all 31 existing supplier categories and the 20 previously emitted workspace tasks.
+  The vendor decision pipeline now reads the same lead-time authority; a generator writes the public
+  JSON and parity tests reject drift.
+- Rechecked federal NOIM guidance using the Attorney-General's Department Get married and NOIM pages
+  plus section 42 of the Marriage Act 1961. The planner reminder moves to three months before the
+  ceremony while retaining the one-month latest and 18-month earliest legal boundaries. The public
+  tool contains no unverified state-specific lodgement claim and identifies itself as planning aid,
+  not legal advice.
+- Added `/wedding/wedding-planning-checklist-australia.html`: exact-date planning, current stage,
+  next five actions, full stage checklist, compressed-plan Catch up now, local completion, print,
+  `.ics`, privacy-bounded hash sharing and consented Wedding-workspace continuation. The Wedding home
+  links to it and the sitemap/public metadata contract includes it.
+- Evidence so far: generator/parity, vendor-lead-time, legal, public engine and site tests pass; all
+  2,180 Wedding tests, 74-page public metadata checks, typecheck and both line budgets pass. A clean
+  exact-SHA production build and any publication decision remain to be recorded after commit.
+- This closes the autonomous Countdown publication dependency. It does not fabricate the separate
+  human reviews required for the invitation wording library or the palette image/professional brief
+  corpus. Those surfaces remain unpublished until their documented reviews exist.
