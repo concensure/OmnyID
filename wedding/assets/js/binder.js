@@ -7,23 +7,23 @@
   var email = form.querySelector('input[name="email"]');
   var optIn = form.querySelector('input[name="marketing_opt_in"]');
   var company = form.querySelector('input[name="company"]');
-  var submit = form.querySelector('button[type="submit"]');
+  var submit = form.querySelector('[data-binder-submit]');
   var availability = document.getElementById('binderAvailability');
   var status = document.getElementById('binderStatus');
   var started = false;
+  submit.type = 'submit';
+  submit.disabled = true;
 
   function track(event, props) {
     if (window.OmnyWeddingMeasure) window.OmnyWeddingMeasure.track(event, props);
   }
 
   function setEnabled(enabled) {
-    email.disabled = !enabled;
-    optIn.disabled = !enabled;
     submit.disabled = !enabled;
     submit.setAttribute('aria-disabled', String(!enabled));
     availability.textContent = enabled
       ? ''
-      : 'Binder email delivery is being checked before it opens.';
+      : 'Binder delivery is temporarily unavailable. You can still enter your email and try again shortly.';
   }
 
   function acquisition() {
@@ -76,7 +76,10 @@
       status.textContent = 'We could not send the binder yet. Please try again shortly.';
       track('wedding_binder_error', { error_type: 'delivery_unavailable' });
     }).finally(function () {
-      submit.disabled = false;
+      fetch('/wedding/binder', { credentials: 'same-origin' })
+        .then(function (response) { return response.ok ? response.json() : { enabled: false }; })
+        .then(function (result) { setEnabled(result.enabled === true); })
+        .catch(function () { setEnabled(false); });
     });
   });
 }());

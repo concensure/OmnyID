@@ -4,7 +4,7 @@ import type { WeddingPlanningTaskItem } from "@/lib/weddingCalendarProjectionSta
 import type { WeddingNeedToKnowContextCard, WeddingResponseWorkspaceViewState, WeddingWorkspaceArtifactPreview } from "@/lib/weddingResponseWorkspaceViewState";
 
 export type WeddingDecisionResearchState = {
-  kind: "guest_logistics" | "hen_night" | "linked_report";
+  kind: "guest_logistics" | "hen_night" | "linked_report" | "funded_research";
   recommendation: string;
   detailMarkdown: string;
   existingArtifactId: string | null;

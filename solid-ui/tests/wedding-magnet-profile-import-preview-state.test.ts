@@ -6,6 +6,7 @@ import {
   readWeddingMagnetImportFacts,
   weddingMagnetImportFactsFromJsonText,
   weddingMagnetFactsToIntakePrefill,
+  weddingMagnetImportConflictKeys,
 } from "../src/lib/weddingMagnetProfileImportPreviewState.ts";
 
 function storage(value: unknown): Storage {
@@ -89,4 +90,15 @@ test("the live Budget Reality Check result file maps to shared profile fields", 
 test("unsupported and malformed JSON files remain fail closed", () => {
   assert.deepEqual(weddingMagnetImportFactsFromJsonText("not json"), []);
   assert.deepEqual(weddingMagnetImportFactsFromJsonText('{"schema":"other","version":1}'), []);
+});
+
+test("confirmed intake remains authoritative until a conflicting import is explicitly selected", () => {
+  const facts = weddingMagnetImportFactsFromJsonText(JSON.stringify({
+    version: 1,
+    facts: {
+      guest_count: { key: "guest_count", value: 84, source_label: "Budget Reality Check", result_id: "budget-conflict" },
+      location_label: { key: "location_label", value: "Sydney NSW", source_label: "Budget Reality Check", result_id: "budget-conflict" },
+    },
+  }));
+  assert.deepEqual([...weddingMagnetImportConflictKeys(facts, { guestCount: "90", location: "Sydney NSW" })], ["guest_count"]);
 });

@@ -169,3 +169,32 @@ export function weddingMagnetFactsToIntakePrefill(facts: readonly WeddingMagnetI
     vendorCategories: stringList(selectedValue(facts, "vendor_categories_needed")),
   };
 }
+
+/** Existing intake facts remain authoritative unless a person explicitly replaces them. */
+export function weddingMagnetImportConflictKeys(
+  facts: readonly WeddingMagnetImportFact[],
+  current: WeddingMagnetIntakePrefill,
+): Set<string> {
+  const normalized = (value: unknown) => Array.isArray(value)
+    ? value.map((item) => String(item).trim().toLowerCase()).filter(Boolean).sort().join("|")
+    : String(value ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+  const fields: Array<[keyof WeddingMagnetIntakePrefill, string[]]> = [
+    ["weddingDate", ["wedding_date", "wedding_date_approx"]],
+    ["location", ["location_label"]],
+    ["guestCount", ["guest_count"]],
+    ["budgetTotal", ["budget_total_aud"]],
+    ["priorities", ["top_priorities"]],
+    ["atmosphere", ["style_name", "style_description", "mood_words", "style_tags"]],
+    ["coupleNames", ["couple_names"]],
+    ["vendorCategories", ["vendor_categories_needed"]],
+  ];
+  const conflicts = new Set<string>();
+  for (const [field, keys] of fields) {
+    const currentValue = normalized(current[field]);
+    if (!currentValue) continue;
+    const imported = weddingMagnetFactsToIntakePrefill(facts.filter((fact) => keys.includes(fact.key)))[field];
+    const importedValue = normalized(imported);
+    if (importedValue && importedValue !== currentValue) keys.forEach((key) => conflicts.add(key));
+  }
+  return conflicts;
+}

@@ -172,6 +172,9 @@ mod user_integrations;
 mod user_management_routes;
 mod value_signal_helpers;
 mod wedding_admin_ai_policy;
+mod openrouter_funded_inference;
+mod public_contact_routes;
+mod wedding_decision_research_routes;
 mod wedding_ai_cost_policy;
 mod wedding_llm_ladder;
 mod wedding_boundary_routes;
@@ -600,6 +603,8 @@ impl TrialRunnerManager {
         session_id: &str,
         content: &str,
         identity_key: &str,
+        pool: &sqlx::PgPool,
+        client: &reqwest::Client,
     ) -> Result<TrialRunnerSession, String> {
         self.prune_expired().await;
         let (active_template, traces, reviews, intent, history) = {
@@ -677,7 +682,7 @@ impl TrialRunnerManager {
                 "generic"
             };
 
-            if intent == "schedule" {
+            if intent == "schedule" && contains_explicit_trial_time(content) {
                 session.calendar_view = Some(build_trial_calendar_view(content));
             } else if intent == "confirm" {
                 if let Some(ref mut cv) = session.calendar_view {
@@ -707,9 +712,12 @@ impl TrialRunnerManager {
             (active_template, traces, reviews, intent, history)
         };
 
-        // Runs the live NVIDIA NIM call outside the session lock so a slow or
-        // failing upstream request can't stall other trial sessions.
+        // Runs funded inference outside the session lock so a slow or failing
+        // upstream request cannot stall other trial sessions.
         let reply = trial_generate_reply(
+            pool,
+            client,
+            identity_key,
             content,
             &active_template,
             &traces,
@@ -1414,11 +1422,13 @@ pub async fn run() {
         .merge(wedding_runsheet_projection_routes::routes())
         .merge(wedding_runsheet_share_routes::routes())
         .merge(wedding_understanding_routes::routes())
+        .merge(wedding_decision_research_routes::routes())
         .merge(workspace_routes::routes())
         .merge(wedding_newsletter_routes::routes())
         .merge(wedding_binder_routes::routes())
         .merge(wedding_site_measurement_routes::routes())
         .merge(wedding_blog_routes::routes())
+        .merge(public_contact_routes::routes())
         .merge(wedding_quote_study_routes::routes()).merge(vendor_email_worker_ingress::routes()).merge(wedding_vendor_claim_routes::routes()).merge(wedding_vendor_listing_proposal_routes::routes()).merge(wedding_vendor_ownership_routes::routes()).merge(wedding_vendor_sender_identity_routes::routes())
         .merge(wedding_vendor_photo_routes::routes())
         .layer(cors_layer())
@@ -1819,8 +1829,8 @@ async fn trial_python_runner_chat_http(
         &state,
         public_rate_limit_key("trial_python_runner_chat", &headers),
         RateLimitPolicy {
-            max_requests: 40,
-            window: Duration::from_secs(60),
+            max_requests: 4,
+            window: Duration::from_secs(300),
         },
     )
     .await?;
@@ -1834,7 +1844,7 @@ async fn trial_python_runner_chat_http(
     let identity = trial_identity_key(&headers, request.fingerprint.as_deref());
     let session = state
         .trial_runner
-        .append_chat_turn(&request.session_id, content, &identity)
+        .append_chat_turn(&request.session_id, content, &identity, &state.db.pool, &state.http_client)
         .await
         .map_err(|err| {
             if err.contains("not found") {
@@ -6578,32 +6588,12 @@ fn trial_meta_summary(traces: &[TrialTraceEntry], reviews: &[TrialReviewItem]) -
     }
 }
 
-/// Hosted NVIDIA NIM backend for the anonymous trial runner, if a key is
-/// configured. Falls back to the scripted `trial_assistant_reply` when no key
-/// is present (e.g. local dev) so the trial keeps working without one.
-///
-/// Model choice is constrained by which NIM functions this account's key
-/// actually has enabled (most catalog models 404 for this account); verified
-/// working against the live API on 2026-09-17.
-fn trial_inference_backend() -> Option<(crate::inference::InferenceBackend, String)> {
-    let api_key = crate::secret_manager::read_process_secret_trimmed("OMNYID_NVIDIA_API_KEY")
-        .or_else(|| crate::secret_manager::read_process_secret_trimmed("NVIDIA_API_KEY"))?;
-    Some((
-        crate::inference::InferenceBackend::OpenAICompat {
-            base_url: "https://integrate.api.nvidia.com/v1".to_string(),
-            api_key,
-            cost_per_1m_input: 0.0,
-            cost_per_1m_output: 0.0,
-        },
-        "openai/gpt-oss-20b".to_string(),
-    ))
-}
-
-/// Generates the trial runner's assistant reply from the live NVIDIA NIM
-/// model when a hosted API key is configured, otherwise falls back to the
-/// scripted `trial_assistant_reply`. The confirm-intent reply always stays
-/// scripted since it is tightly coupled to the fixed calendar preview copy.
+/// Generates a bounded trial reply through the shared funded OpenRouter gate.
+/// The confirm reply remains deterministic because it changes preview state.
 async fn trial_generate_reply(
+    pool: &sqlx::PgPool,
+    client: &reqwest::Client,
+    identity_key: &str,
     content: &str,
     template: &TrialTemplate,
     traces: &[TrialTraceEntry],
@@ -6614,36 +6604,28 @@ async fn trial_generate_reply(
     if intent == "confirm" {
         return trial_assistant_reply(content, template, traces, reviews, intent);
     }
-    let Some((backend, model)) = trial_inference_backend() else {
-        return trial_assistant_reply(content, template, traces, reviews, intent);
-    };
-
     let system = format!(
-        "{} This is an anonymous, ephemeral product trial: never claim to book, pay for, sync, or persist anything outside this preview session, and keep replies concise.",
+        "{} This is an anonymous, ephemeral product trial. Never claim to book, pay, sync, or persist anything. For travel requests, produce a useful day-by-day itinerary with reasons, practical map links and month-appropriate weather guidance. Respect the requested month and year. Never invent flight, hotel, booking or clock times. Distinguish climate guidance from a live forecast.",
         template.system_prompt
     );
-    let messages = history
+    let conversation = history
         .iter()
         .filter(|message| message.role == "user" || message.role == "assistant")
-        .map(|message| crate::inference::InferenceMessage {
-            role: message.role.clone(),
-            content: message.content.clone(),
-        })
+        .rev().take(6).collect::<Vec<_>>().into_iter().rev()
+        .map(|message| format!("{}: {}", message.role, message.content))
         .collect::<Vec<_>>();
-    let request = crate::inference::InferenceRequest {
-        system,
-        messages,
-        max_tokens: 700,
-        temperature: 0.4,
-    };
-
-    let inference = tokio::time::timeout(
-        Duration::from_secs(12),
-        crate::inference::dispatch_infer(&backend, &model, &request),
-    )
-    .await;
-    match inference {
-        Ok(Ok(response)) if !response.content.trim().is_empty() => {
+    let prompt = conversation.join("\n\n");
+    match openrouter_funded_inference::infer(pool, client, openrouter_funded_inference::FundedInferenceRequest {
+        feature: "public_trial_runner",
+        user_id: None,
+        wedding_plan_id: None,
+        abuse_id: identity_key,
+        system: &system,
+        prompt: &prompt,
+        max_tokens: 800,
+        json_mode: false,
+    }).await {
+        Ok(response) => {
             let meta = trial_meta_summary(traces, reviews);
             if meta.is_empty() {
                 response.content
@@ -6651,13 +6633,8 @@ async fn trial_generate_reply(
                 format!("{}\n\n{meta}", response.content.trim())
             }
         }
-        Ok(Ok(_)) => trial_assistant_reply(content, template, traces, reviews, intent),
-        Ok(Err(err)) => {
-            tracing::warn!(error = %err, "trial runner NVIDIA NIM call failed; using scripted fallback reply");
-            trial_assistant_reply(content, template, traces, reviews, intent)
-        }
-        Err(_) => {
-            tracing::warn!("trial runner NVIDIA NIM call timed out; using scripted fallback reply");
+        Err(err) => {
+            tracing::warn!(error = %err, "funded trial inference unavailable; using bounded fallback");
             trial_assistant_reply(content, template, traces, reviews, intent)
         }
     }
@@ -6694,39 +6671,22 @@ fn trial_assistant_reply(
     }
 
     if intent == "schedule" {
-        let has_connecting_flight = lowered.contains("two")
-            || lowered.contains(" 2 ")
-            || lowered.contains("connecting")
-            || lowered.contains("layover");
-        let has_hotel = lowered.contains("hotel")
-            || lowered.contains("check-in")
-            || lowered.contains("checkin");
-        let mut lines = vec![
-            "Trip Planner · Draft itinerary".to_string(),
-            String::new(),
-            "Here is a plan built around your fixed commitments today:".to_string(),
-            String::new(),
-            "  14:00 - 15:00  Flight arrival".to_string(),
-        ];
-        if has_connecting_flight {
-            lines.push("  15:00 - 16:00  Connecting flight".to_string());
-        }
-        let mut next = if has_connecting_flight { 16 } else { 15 };
-        if has_hotel {
-            lines.push(format!(
-                "  {:02}:00 - {:02}:00  Hotel check-in",
-                next,
-                next + 1
-            ));
-            next += 1;
-        }
-        lines.push(format!("  {:02}:00 - 24:00  Free time · wind down", next));
-        lines.push(String::new());
-        lines.push(
-            "The calendar below shows a draft plan. Review it before adding anything to your calendar."
-                .to_string(),
-        );
-        return lines.join("\n");
+        return [
+            "Trip Planner · Three-day Sydney draft",
+            "",
+            "Day 1 — Circular Quay, The Rocks and the Royal Botanic Garden. Start with the harbour landmarks and an easy waterfront walk so the first day stays flexible after arrival.",
+            "Map: https://www.google.com/maps/search/?api=1&query=Circular+Quay+Sydney",
+            "",
+            "Day 2 — Bondi to Coogee coastal walk, with the Art Gallery of NSW as a wet-weather alternative. This gives you the coast without spending the whole day in transit.",
+            "Map: https://www.google.com/maps/search/?api=1&query=Bondi+to+Coogee+Walk",
+            "",
+            "Day 3 — Ferry to Manly, then a relaxed harbour-side afternoon. The ferry is part of the experience and keeps the final day easy to shorten if needed.",
+            "Map: https://www.google.com/maps/search/?api=1&query=Manly+Wharf",
+            "",
+            "January is typically warm and can be humid, but a live forecast is not reliable this far ahead. Check the Bureau of Meteorology closer to travel: https://www.bom.gov.au/nsw/forecasts/sydney.shtml",
+            "",
+            "No flight, hotel or clock time was assumed. Add those only when you know them.",
+        ].join("\n");
     }
 
     let bullets = if template.id == "travel_planner"
@@ -25459,6 +25419,12 @@ async fn llm_config_get_http(
     Ok(Json(config))
 }
 
+fn contains_explicit_trial_time(content: &str) -> bool {
+    let lowered = content.to_ascii_lowercase();
+    ["am", "pm", ":00", ":15", ":30", ":45", "noon", "midnight"]
+        .iter().any(|marker| lowered.contains(marker))
+}
+
 async fn llm_config_set_http(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -31267,6 +31233,10 @@ mod tests {
     #[tokio::test]
     async fn trial_runner_limits_chat_turns_per_template_run() {
         let manager = super::TrialRunnerManager::new();
+        let pool = sqlx::postgres::PgPoolOptions::new()
+            .connect_lazy("postgres://postgres:postgres@127.0.0.1:5432/omnyid_test")
+            .expect("lazy test pool");
+        let client = reqwest::Client::new();
         let identity = "198.51.100.5:trial-browser";
         let session = manager.create_or_get_session(identity.to_string()).await;
         manager
@@ -31275,13 +31245,13 @@ mod tests {
             .expect("template run");
         for index in 0..10 {
             let updated = manager
-                .append_chat_turn(&session.id, &format!("turn {index}"), identity)
+                .append_chat_turn(&session.id, &format!("turn {index}"), identity, &pool, &client)
                 .await
                 .expect("trial turn");
             assert_eq!(updated.turns_used, index + 1);
         }
         let err = manager
-            .append_chat_turn(&session.id, "turn 11", identity)
+            .append_chat_turn(&session.id, "turn 11", identity, &pool, &client)
             .await
             .expect_err("turn 11 should fail");
         assert!(err.contains("10-turn limit"));

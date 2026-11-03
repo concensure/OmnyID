@@ -690,4 +690,9 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Explicit account-scoped Wedding onboarding consent for de-identified admin research sharing",
         include_str!("../../postgres/migrations/0135_wedding_onboarding_admin_data_consent.sql"),
     ),
+    (
+        "0136_platform_funded_ai_usage",
+        "Transactional reservations and receipts for hard-capped platform-funded AI",
+        include_str!("../../postgres/migrations/0136_platform_funded_ai_usage.sql"),
+    ),
 ];

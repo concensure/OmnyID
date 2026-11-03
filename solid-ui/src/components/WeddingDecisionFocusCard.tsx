@@ -8,6 +8,8 @@ import type { WeddingVendorChoiceSelectionSaveInput } from "@/components/Wedding
 import { loadContacts, saveContacts, subscribeContactsChangedEvent, type Contact } from "@/lib/contactsLocalState";
 import { postAgentMessage, readSession, type SendAfpMessageInput } from "@/lib/api";
 import { buildWeddingDecisionResearchState } from "@/lib/weddingDecisionResearchState";
+import type { WeddingDecisionResearchState } from "@/lib/weddingDecisionResearchState";
+import { requestFundedWeddingDecisionResearch } from "@/lib/weddingDecisionResearchApi";
 import {
   WEDDING_ASSIGNMENT_ROLE_OPTIONS,
   weddingAssignmentContactKey,
@@ -81,6 +83,8 @@ export function WeddingDecisionFocusCard(props: {
   const [vendorSelectionNotice, setVendorSelectionNotice] = createSignal<Record<string, string>>({});
   const [rsvpFollowUpOpenId, setRsvpFollowUpOpenId] = createSignal<string | null>(null);
   const [expandedResearchItemId, setExpandedResearchItemId] = createSignal<string | null>(null);
+  const [fundedResearch, setFundedResearch] = createSignal<Record<string, WeddingDecisionResearchState>>({});
+  const fundedResearchAttempts = new Set<string>();
   const rsvpSetup = createMemo(() => weddingRsvpSetupFromAfpMessages(
     props.state.afpMessages,
     props.state.workspace.metadata.responseWorkspaceId,
@@ -127,6 +131,39 @@ export function WeddingDecisionFocusCard(props: {
     locallyDeferredIds: locallyDeferredIds(),
     locallyHiddenIds: completedFocusIds(),
   }));
+  createEffect(() => {
+    const researchKinds = new Set(["research", "transport", "hen_party", "weather_contingency", "decision"]);
+    const context = props.state.contextCards.flatMap((card) => [
+      card.planningContext.location,
+      card.planningContext.atmosphereDescription,
+      card.planningContext.vendorPreferences,
+      ...(card.planningContext.topPriorities ?? []),
+    ]).filter((value): value is string => Boolean(value?.trim())).slice(0, 12);
+    display().visibleFocusItems.slice(0, 2).forEach((item, queueRank) => {
+      const task = taskFor(item.id);
+      if (!task || !researchKinds.has(task.kind) || buildWeddingDecisionResearchState({ task, state: props.state })) return;
+      const attemptKey = `${props.state.workspace.metadata.weddingPlanId}:${task.id}:${task.title}:${task.notes ?? ""}:${context.join("|")}`;
+      if (fundedResearchAttempts.has(attemptKey)) return;
+      fundedResearchAttempts.add(attemptKey);
+      void requestFundedWeddingDecisionResearch({
+        weddingPlanId: props.state.workspace.metadata.weddingPlanId,
+        taskId: task.id,
+        title: task.title,
+        notes: task.notes,
+        context,
+        queueRank,
+      }).then((result) => {
+        if (!result.recommendation || !result.reportMarkdown) return;
+        setFundedResearch((current) => ({ ...current, [item.id]: {
+          kind: "funded_research",
+          recommendation: result.recommendation,
+          detailMarkdown: result.reportMarkdown,
+          existingArtifactId: null,
+          generatedArtifact: null,
+        }}));
+      }).catch(() => undefined);
+    });
+  });
   createEffect(() => {
     const intent = mobileWeddingDecisionOpenIntent();
     if (!intent || !display().visibleFocusItems.some((item) => item.id === intent.itemId)) return;
@@ -192,7 +229,7 @@ export function WeddingDecisionFocusCard(props: {
     return `${priority.charAt(0).toUpperCase()}${priority.slice(1)} priority`;
   }
   function researchFor(itemId: string) {
-    return buildWeddingDecisionResearchState({ task: taskFor(itemId), state: props.state });
+    return fundedResearch()[itemId] ?? buildWeddingDecisionResearchState({ task: taskFor(itemId), state: props.state });
   }
   function decisionModel(card: ReturnType<typeof decisionCardFromWeddingFocus>): DecisionCardModel {
     const item = display().itemCards.find((candidate) => candidate.id === card.id)?.item;

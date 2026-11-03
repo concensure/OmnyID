@@ -33,6 +33,14 @@
   const trialChatSubmit = document.getElementById("trial-chat-submit");
   const trialChatInputDefaultPlaceholder = trialChatInput ? trialChatInput.placeholder : "";
   const trialConvertButton = document.getElementById("trial-convert-button");
+  const contactModal = document.getElementById("contact-modal");
+  const contactForm = document.getElementById("contact-form");
+  const contactSubject = document.getElementById("contact-subject");
+  const contactContent = document.getElementById("contact-content");
+  const contactCompany = document.getElementById("contact-company");
+  const contactFeedback = document.getElementById("contact-feedback");
+  const contactSubmit = document.getElementById("contact-submit");
+  const contactCancel = document.getElementById("contact-cancel");
   const trialTemplateButtons = Array.prototype.slice.call(document.querySelectorAll("[data-trial-template]"));
   const trialSampleSourceButtons = Array.prototype.slice.call(document.querySelectorAll("[data-trial-sample-source]"));
   const sessionSummary = document.getElementById("session-summary");
@@ -146,6 +154,7 @@
   const setupDeploymentTarget = document.getElementById("setup-deployment-target");
   let session = readSession();
   let currentOnboarding = null;
+  let trialRequestActive = false;
   let currentRuntimeDeployment = null;
   let currentRunnerConfig = null;
   let currentRuntimeUpdates = null;
@@ -606,7 +615,7 @@
       return [
         '<article class="rounded-2xl border border-outline-variant/15 ', tone, ' p-4">',
         '<div class="font-mono text-[10px] uppercase tracking-[0.18em] text-outline">', escapeHtml(message.role || "system"), '</div>',
-        '<p class="mt-3 text-sm leading-7 text-on-surface-variant">', escapeHtml(message.content || ""), '</p>',
+        '<p class="mt-3 whitespace-pre-line text-sm leading-7 text-on-surface-variant">', formatTrialMessage(message.content || ""), '</p>',
         '</article>'
       ].join("");
     }).join("");
@@ -859,7 +868,7 @@
 
   async function handleTrialChatSubmit(event) {
     event.preventDefault();
-    if (!trialChatInput) {
+    if (!trialChatInput || trialRequestActive) {
       return;
     }
     const content = trialChatInput.value.trim();
@@ -868,6 +877,7 @@
       return;
     }
     const controller = new AbortController();
+    trialRequestActive = true;
     const timeout = window.setTimeout(function () { controller.abort(); }, 25000);
     if (trialChatSubmit) {
       trialChatSubmit.disabled = true;
@@ -900,6 +910,51 @@
         trialChatSubmit.disabled = false;
         trialChatSubmit.textContent = "Send to trial runner";
       }
+      trialRequestActive = false;
+    }
+  }
+
+  function formatTrialMessage(value) {
+    return escapeHtml(String(value)).replace(
+      /(https:\/\/[^\s<]+)/g,
+      '<a class="font-semibold text-primary underline" href="$1" target="_blank" rel="noopener noreferrer">$1</a>'
+    );
+  }
+
+  function openContactModal() {
+    if (!contactModal) return;
+    contactModal.classList.remove("hidden");
+    contactModal.classList.add("flex");
+    if (contactFeedback) contactFeedback.textContent = "";
+    window.setTimeout(function () { if (contactSubject) contactSubject.focus(); }, 0);
+  }
+
+  function closeContactModal() {
+    if (!contactModal) return;
+    contactModal.classList.add("hidden");
+    contactModal.classList.remove("flex");
+  }
+
+  async function submitContact(event) {
+    event.preventDefault();
+    if (!contactForm || !contactForm.reportValidity() || !contactSubmit) return;
+    contactSubmit.disabled = true;
+    contactSubmit.textContent = "Sending…";
+    if (contactFeedback) contactFeedback.textContent = "Sending your message securely…";
+    try {
+      const payload = await apiFetch("/public/contact", { method: "POST", body: {
+        title: contactSubject ? contactSubject.value : "",
+        content: contactContent ? contactContent.value : "",
+        company: contactCompany ? contactCompany.value : ""
+      }});
+      if (contactFeedback) contactFeedback.textContent = payload.message || "Your message was sent.";
+      contactForm.reset();
+      window.setTimeout(closeContactModal, 1400);
+    } catch (error) {
+      if (contactFeedback) contactFeedback.textContent = error.message || "We could not send your message yet.";
+    } finally {
+      contactSubmit.disabled = false;
+      contactSubmit.textContent = "Send";
     }
   }
 
@@ -3084,11 +3139,20 @@
       }
     });
   }
+  document.querySelectorAll("[data-open-contact]").forEach(function (button) {
+    button.addEventListener("click", openContactModal);
+  });
+  if (contactCancel) contactCancel.addEventListener("click", closeContactModal);
+  if (contactForm) contactForm.addEventListener("submit", submitContact);
+  if (contactModal) contactModal.addEventListener("click", function (event) {
+    if (event.target === contactModal) closeContactModal();
+  });
 
   document.addEventListener("keydown", function (event) {
     if (event.key === "Escape" && authModal && !authModal.classList.contains("hidden")) {
       closeAuthModal();
     }
+    if (event.key === "Escape" && contactModal && !contactModal.classList.contains("hidden")) closeContactModal();
   });
 
   async function maybeInitGoogle() {

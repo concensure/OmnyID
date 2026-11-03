@@ -382,7 +382,7 @@
   <section class="binder-section" id="wedding-day-binder" aria-labelledby="binderTitle">
     <div class="container binder-layout">
       <div class="binder-cover reveal">
-        <img src="downloads/binder-cover.jpg" width="520" height="650" loading="lazy" alt="Wedding Day Binder cover showing a couple beside a lake">
+        <img src="downloads/binder-cover.jpg" width="520" height="650" loading="lazy" decoding="async" fetchpriority="low" alt="Wedding Day Binder cover showing a couple beside a lake">
       </div>
       <div class="binder-copy reveal">
         <p class="eyebrow">✦ Not ready to sign up?</p>
@@ -392,15 +392,15 @@
         <form class="binder-form" data-binder-form novalidate aria-describedby="binderAvailability binderStatus">
           <label for="binderEmail">Email address</label>
           <div class="binder-form-row">
-            <input id="binderEmail" name="email" type="email" autocomplete="email" required maxlength="254" disabled>
-            <button class="btn btn-primary" type="submit" aria-disabled="true">Email me the binder</button>
+            <input id="binderEmail" name="email" type="email" autocomplete="email" inputmode="email" required maxlength="254">
+            <button class="btn btn-primary" type="button" data-binder-submit aria-disabled="true">Email me the binder</button>
           </div>
           <div class="binder-honeypot" aria-hidden="true">
             <label for="binderCompany">Company</label>
             <input id="binderCompany" name="company" type="text" tabindex="-1" autocomplete="off">
           </div>
           <label class="binder-opt-in">
-            <input name="marketing_opt_in" type="checkbox" disabled>
+            <input name="marketing_opt_in" type="checkbox">
             <span>Also send me occasional wedding planning tips. Unsubscribe any time.</span>
           </label>
         </form>
@@ -665,10 +665,10 @@
   </div>
 </div>
 
-<script src="assets/js/landing-config.js"></script>
-<script src="assets/js/landing-context.js"></script>
+<script src="assets/js/landing-config.js" defer></script>
+<script src="assets/js/landing-context.js" defer></script>
 <script src="assets/js/measure.js" defer></script>
 <script src="assets/js/binder.js" defer></script>
-<script src="assets/js/main.js"></script>
+<script src="assets/js/main.js" defer></script>
 </body>
 </html>

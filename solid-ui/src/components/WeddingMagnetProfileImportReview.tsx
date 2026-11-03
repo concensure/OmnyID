@@ -5,6 +5,7 @@ import {
   readWeddingMagnetImportFacts,
   weddingMagnetImportFactsFromJsonText,
   weddingMagnetFactsToIntakePrefill,
+  weddingMagnetImportConflictKeys,
   type WeddingMagnetImportFact,
   type WeddingMagnetIntakePrefill,
 } from "@/lib/weddingMagnetProfileImportPreviewState";
@@ -31,16 +32,23 @@ const FIELD_LABELS: Record<string, string> = {
 
 export function WeddingMagnetProfileImportReview(props: {
   onImport: (prefill: WeddingMagnetIntakePrefill, facts: readonly WeddingMagnetImportFact[]) => void;
+  currentPrefill: WeddingMagnetIntakePrefill;
 }) {
   const [facts, setFacts] = createSignal<WeddingMagnetImportFact[]>([]);
   const [selected, setSelected] = createSignal<Set<string>>(new Set());
   const [notice, setNotice] = createSignal<string | null>(null);
+  const conflicts = () => weddingMagnetImportConflictKeys(facts(), props.currentPrefill);
+
+  function defaultSelection(loaded: readonly WeddingMagnetImportFact[]) {
+    const conflicting = weddingMagnetImportConflictKeys(loaded, props.currentPrefill);
+    return new Set(loaded.filter((fact) => fact.tier !== "S" && !conflicting.has(fact.key)).map((fact) => fact.key));
+  }
 
   onMount(() => {
     const loaded = readWeddingMagnetImportFacts(localStorage);
     setFacts(loaded);
     // Private/sensitive profile facts always require an explicit opt-in here.
-    setSelected(new Set(loaded.filter((fact) => fact.tier !== "S").map((fact) => fact.key)));
+    setSelected(defaultSelection(loaded));
   });
 
   function toggle(key: string, enabled: boolean) {
@@ -72,7 +80,7 @@ export function WeddingMagnetProfileImportReview(props: {
       return;
     }
     setFacts(loaded);
-    setSelected(new Set(loaded.filter((fact) => fact.tier !== "S").map((fact) => fact.key)));
+    setSelected(defaultSelection(loaded));
     setNotice(`${loaded.length} ${loaded.length === 1 ? "detail is" : "details are"} ready to review. Nothing has been added to your account.`);
   }
 
@@ -102,9 +110,11 @@ export function WeddingMagnetProfileImportReview(props: {
               {FIELD_LABELS[fact.key] ?? fact.key.replace(/_/g, " ")}
               <span class="rounded-full bg-wedding-slate px-2 py-0.5 text-[10px] font-medium">From {fact.sourceLabel}</span>
               <Show when={fact.tier === "S"}><span class="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-950">Private · opt in</span></Show>
+              <Show when={conflicts().has(fact.key)}><span class="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-medium text-rose-950">Different from your current answer</span></Show>
             </span>
             <span class="mt-0.5 block break-words text-xs leading-5 text-wedding-ink/70">{fact.displayValue}</span>
             <span class="block text-[10px] leading-4 text-wedding-ink/55">{fact.why}</span>
+            <Show when={conflicts().has(fact.key)}><span class="block text-[10px] font-semibold leading-4 text-rose-900">Kept off by default. Select it only if you want to replace the current answer.</span></Show>
           </span>
         </label>}</For>
         </div>

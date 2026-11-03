@@ -240,7 +240,19 @@ export function WeddingSiteIntakeWizard(props: {
 
       {/* Step 0 — the basics, with the fast-path paste box first */}
       <Show when={step() === 0}>
-        <Show when={props.onImportMagnetProfile}>{(onImport) => <WeddingMagnetProfileImportReview onImport={onImport()} />}</Show>
+        <Show when={props.onImportMagnetProfile}>{(onImport) => <WeddingMagnetProfileImportReview
+          onImport={onImport()}
+          currentPrefill={{
+            weddingDate: props.weddingFollowUpDate(),
+            location: props.weddingFollowUpLocation(),
+            guestCount: props.weddingFollowUpGuests(),
+            budgetTotal: props.weddingFollowUpBudget(),
+            priorities: props.weddingFollowUpPriorities(),
+            atmosphere: props.weddingFollowUpAtmosphere(),
+            coupleNames: props.weddingFollowUpCoupleNames(),
+            vendorCategories: props.weddingFollowUpVendorIds(),
+          }}
+        />}</Show>
         <div class="mb-3 rounded-xl border border-wedding-border bg-white px-3 py-2 text-xs leading-5 text-wedding-ink">
           Not sure where to start? Try the <a class="font-semibold text-wedding-secondary underline underline-offset-2" href="/wedding/blog/couples-barely-know-each-other.html">wedding animal quiz</a> to gather your style.
           <Show when={(props.quizSuggestions?.length ?? 0) > 0}>

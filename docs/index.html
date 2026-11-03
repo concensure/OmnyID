@@ -510,7 +510,7 @@
               No trial session yet.
             </div>
           </div>
-          <div class="mt-6 grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+          <div class="mt-6">
             <div class="space-y-4">
               <div id="trial-messages" class="max-h-[28rem] overflow-y-auto rounded-2xl border border-outline-variant/15 bg-surface p-4 text-sm leading-7 text-on-surface-variant">
                 <p>Pick a starter to begin the anonymous runner trial.</p>
@@ -547,7 +547,7 @@
                 </div>
               </form>
             </div>
-            <div class="space-y-4">
+            <div class="mt-4 space-y-4">
               <div id="trial-student-value-panel" class="hidden rounded-[1.5rem] border border-violet-200/40 bg-violet-50/55 p-5 shadow-sm">
                 <div class="flex flex-wrap items-start justify-between gap-3">
                   <div>
@@ -558,40 +558,6 @@
                 </div>
                 <div id="trial-student-value-content" class="mt-4 space-y-3">
                   <p class="text-sm leading-6 text-on-surface-variant">Choose the Connected Study Workspace starter to see how a first run turns class material into reusable study structure.</p>
-                </div>
-              </div>
-              <div id="trial-template-summary" class="rounded-[1.5rem] border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm">
-                <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-outline">Current starter</p>
-                <div id="trial-templates" class="mt-3 space-y-3 text-sm text-on-surface-variant">
-                  <p>Template details appear here after the first session is created.</p>
-                </div>
-              </div>
-              <div class="grid gap-4 sm:grid-cols-2">
-                <div class="rounded-[1.5rem] border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm">
-                  <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-outline">Runner traces</p>
-                  <div id="trial-traces" class="mt-3 space-y-2 text-sm text-on-surface-variant">
-                    <p>No traces yet.</p>
-                  </div>
-                </div>
-                <div class="rounded-[1.5rem] border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm">
-                  <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-outline">Review queue</p>
-                  <div id="trial-review-queue" class="mt-3 space-y-2 text-sm text-on-surface-variant">
-                    <p>No review items yet.</p>
-                  </div>
-                </div>
-              </div>
-              <div class="grid gap-4 sm:grid-cols-2">
-                <div class="rounded-[1.5rem] border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm">
-                  <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-outline">Prompt history</p>
-                  <div id="trial-history" class="mt-3 space-y-2 text-sm text-on-surface-variant">
-                    <p>No prompt history yet.</p>
-                  </div>
-                </div>
-                <div class="rounded-[1.5rem] border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm">
-                  <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-outline">Runner logs</p>
-                  <div id="trial-logs" class="mt-3 space-y-2 text-sm text-on-surface-variant">
-                    <p>No runner logs yet.</p>
-                  </div>
                 </div>
               </div>
             </div>
@@ -1672,7 +1638,7 @@
       </div>
       <div class="flex flex-wrap gap-8">
         <a href="https://github.com/omnyid" class="font-body text-xs uppercase tracking-widest text-on-surface/40 transition hover:text-primary">GitHub</a>
-        <a href="#waitlist" class="font-body text-xs uppercase tracking-widest text-on-surface/40 transition hover:text-primary">Contact</a>
+        <button type="button" data-open-contact class="font-body text-xs uppercase tracking-widest text-on-surface/40 transition hover:text-primary">Contact</button>
         <a href="./privacy.html" class="font-body text-xs uppercase tracking-widest text-on-surface/40 transition hover:text-primary">Privacy</a>
         <a href="./terms.html" class="font-body text-xs uppercase tracking-widest text-on-surface/40 transition hover:text-primary">Terms</a>
         <a href="./data-rights.html" class="font-body text-xs uppercase tracking-widest text-on-surface/40 transition hover:text-primary">Data Rights</a>
@@ -1680,6 +1646,25 @@
       </div>
     </div>
   </footer>
+
+  <div id="contact-modal" class="fixed inset-0 z-[80] hidden items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="contact-title">
+    <form id="contact-form" class="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
+      <h2 id="contact-title" class="text-2xl font-semibold">Contact OmnyID</h2>
+      <p class="mt-2 text-sm text-on-surface-variant">Send a message to hello@omnyid.com.</p>
+      <label class="mt-5 grid gap-2 text-sm font-semibold">Title
+        <input id="contact-subject" required maxlength="160" class="rounded-xl border border-outline-variant px-4 py-3" />
+      </label>
+      <label class="mt-4 grid gap-2 text-sm font-semibold">Message
+        <textarea id="contact-content" required minlength="10" maxlength="5000" class="min-h-40 rounded-xl border border-outline-variant px-4 py-3"></textarea>
+      </label>
+      <input id="contact-company" class="hidden" tabindex="-1" autocomplete="off" aria-hidden="true" />
+      <p id="contact-feedback" class="mt-3 text-sm" role="status" aria-live="polite"></p>
+      <div class="mt-5 flex justify-end gap-3">
+        <button id="contact-cancel" type="button" class="rounded-xl border border-outline-variant px-5 py-3 font-semibold">Cancel</button>
+        <button id="contact-submit" type="submit" class="rounded-xl bg-primary px-5 py-3 font-semibold text-white disabled:opacity-60">Send</button>
+      </div>
+    </form>
+  </div>
 
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script src="./genesis-logo.js"></script>
