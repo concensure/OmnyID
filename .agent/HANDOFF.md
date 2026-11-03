@@ -6853,3 +6853,36 @@ based on WED-323 release-evidence commit `cf28491d8648b2f3e189767e5bd400e4c32d31
 - Remaining Batch 2 work includes per-tool mappings for the unfinished magnets, explicit reconciliation
   choices when imported facts conflict with confirmed account facts, and the signed-in Add-to-plan
   variant. This slice was not deployed because the user did not request a release in this turn.
+
+## 2026-11-03 - WED-325 binder, bounded funded inference and trial release (Codex)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-319`, branch
+`agent/codex/WED-325`. Exact deployed application SHA:
+`dcd68fe7bcc725fc65116e5b406c7fa5361a0bb9`; clean release worktree:
+`C:\Users\ozans\AppData\Local\Temp\omnyid-wed325-release-dcd68fe`.
+
+- Made the Wedding Day Binder email field and consent interactive in initial HTML; only sending waits
+  for capability readiness. Deferred non-critical landing scripts and lazy-loaded the binder image.
+- Added one shared OpenRouter funded-inference authority using `openai/gpt-5-mini`, a transactionally
+  reserved global weekly pool clamped to USD 50, provider usage receipts, privacy routing, bounded
+  outputs and feature-specific request limits. Oracle's minimal and full compose profiles explicitly
+  pass the false-default funding and Wedding policy settings; the secret remains file-backed.
+- Added authenticated, cached research for only the active and next Wedding decision while preserving
+  existing vendor, RSVP, report and assignment surfaces.
+- Repaired the anonymous Python trial: duplicate submits are suppressed, obsolete operator panels are
+  absent, and travel requests get a useful day-by-day answer with map and month-aware weather guidance
+  without invented flights or times. The hosted synthetic Sydney request completed through OpenRouter,
+  produced a provider ID and recorded USD 0.001641 actual cost.
+- Added a rate-limited fixed-recipient Contact modal/route for `hello@omnyid.com`; it is not an open
+  relay. Continued Batch 2 by making imported/current Wedding fact conflicts explicit and keeping the
+  current intake authoritative unless the user opts to replace it.
+- Verification: `cargo check --lib`; focused funded-inference/contact/trial Rust tests; Solid UI
+  typecheck; all 2,174 Wedding tests; Wedding site/CSP/quiz/account/blog/magnet smokes; focused Batch 2
+  tests; production build; line budgets; compose validation; hosted binder/contact/trial smokes.
+  Oracle `SOURCE_COMMIT` and `oracle-runtime-manifest.json` match the application SHA. Independent
+  production proof passed with homeserver/backup running and the latest backup internally verified;
+  restore drill was skipped. Root use was 83% in proof (about 8.8 GB free immediately before it).
+- Remaining autonomous Batch 2 work: tool-specific mappings for magnets not yet backed by their final
+  deterministic assets, signed-in Add-to-plan variants, the reconciled Countdown catalogue, reviewed
+  invitation wording library and licensed palette corpus. Do not publish gated claims before those
+  underlying assets and handoffs are complete.

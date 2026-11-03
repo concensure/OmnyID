@@ -1,5 +1,5 @@
 version: 1
-updated: 2026-11-02
+updated: 2026-11-03
 
 lifecycle:
   allowed_statuses:
@@ -17,14 +17,14 @@ lifecycle:
 tasks:
   - id: WED-325
     title: Accelerate the Wedding binder, bound funded research and trial inference, and continue Batch 2
-    status: in_progress
+    status: done
     owner: codex
     branch: agent/codex/WED-325
     worktree: C:/Users/ozans/Desktop/projects/OmnyID-WED-319
     depends_on: [WED-324, WED-323, WED-322]
     files: [wedding/**, docs/**, solid-ui/src/**, solid-ui/tests/**, src/**, postgres/**, scripts/**, Caddyfile, docker-compose*.yml, .agent/**]
     acceptance: [the public Wedding day binder email field is interactive immediately while non-critical assets and work are deferred, Wedding decision research uses the existing server-side OpenRouter provider with a low-cost mini model and false-default bounded admin funding, rate limits and a hard weekly fifty-US-dollar account cutoff, the public trial runner prevents duplicate submissions and returns a useful request-aware itinerary with dated weather/map evidence or honest availability boundaries, obsolete Python Trial cards are removed and Contact opens a working hello-at-omnyid form, the next dependency-ordered Batch 2 slice reuses the shared profile and AFP authorities, relevant Rust frontend website accessibility build and line-budget checks pass, the exact clean SHA is deployed to Oracle and runtime provenance plus health evidence is recorded]
-    progress: "Implemented candidate: the binder email field and consent are available in initial HTML while send readiness and non-critical scripts/images are deferred; funded OpenRouter GPT-5 Mini calls now reserve against a transactionally locked global weekly pool hard-capped at USD 50, with per-user/IP rate limits and content-free receipts. Only the active and next eligible wedding decisions request cached research and keep existing in-place action/assignment surfaces. The anonymous trial suppresses duplicate submits, removes internal runner panels, avoids invented times and shows useful itinerary/map/weather output; public Contact uses a bounded non-relay form to hello@omnyid.com. Continued Batch 2 with explicit conflict detection that keeps current intake answers authoritative by default. Cargo check, focused Rust tests, Solid UI typecheck, all 2,174 Wedding tests, site/CSP/quiz/account/blog/magnet smokes, focused Batch 2 tests, line budgets and production build pass. Exact-SHA Oracle release remains to run."
+    progress: "Application SHA dcd68fe7bcc725fc65116e5b406c7fa5361a0bb9 is live on Oracle. The binder email field and consent are available in initial HTML while send readiness and non-critical scripts/images are deferred. Funded OpenRouter GPT-5 Mini inference reserves against a transactionally locked weekly pool hard-capped at USD 50, with per-user/IP limits, content-free receipts and minimal-reasoning parameters verified against the provider. Only the active and next eligible Wedding decisions request cached research and retain existing in-place action/assignment surfaces. The anonymous trial prevents duplicate submits, removes internal runner panels, avoids invented times and now returned a hosted three-day Sydney itinerary with reasons, maps and January climate guidance; its receipt completed at USD 0.001641 with a provider ID. Public Contact is a bounded non-relay form to hello@omnyid.com. Continued Batch 2 with explicit conflict detection that keeps current intake authoritative by default. Cargo check, focused Rust tests, Solid UI typecheck, all 2,174 Wedding tests, site/CSP/quiz/account/blog/magnet smokes, focused Batch 2 tests, line budgets and production build pass. Oracle SOURCE_COMMIT and runtime manifest match; hosted smokes and independent production proof pass, including fresh-backup verification with the restore drill skipped."
 
   - id: WED-324
     title: Scope Wedding decision research, add non-visible GEO signals, and continue Batch 2
