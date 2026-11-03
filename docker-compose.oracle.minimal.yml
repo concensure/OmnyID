@@ -234,6 +234,8 @@ services:
       OMNYID_RUNPOD_API_KEY_FILE: ${OMNYID_RUNPOD_API_KEY_FILE:-/run/secrets/omnyid_runpod_api_key}
       OMNYID_OPENAI_API_KEY_FILE: ${OMNYID_OPENAI_API_KEY_FILE:-/run/secrets/omnyid_openai_api_key}
       OPENROUTER_API_KEY_FILE: ${OPENROUTER_API_KEY_FILE:-/run/secrets/openrouter_api_key}
+      OMNYID_OPENROUTER_FUNDED_ENABLED: ${OMNYID_OPENROUTER_FUNDED_ENABLED:-false}
+      OMNYID_OPENROUTER_WEEKLY_CAP_USD: ${OMNYID_OPENROUTER_WEEKLY_CAP_USD:-50}
       # Server-only Stripe Checkout configuration. The UI only receives a
       # short-lived hosted Checkout URL from the authenticated billing route.
       OMNYID_STRIPE_SECRET_KEY: ${OMNYID_STRIPE_SECRET_KEY:-}
