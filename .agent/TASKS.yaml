@@ -53,7 +53,7 @@ tasks:
 
   - id: GROWTH-03
     title: Project Wedding activation and meaningful activity from approved AFP events
-    status: in_progress
+    status: done
     owner: codex
     branch: agent/codex/GROWTH-001
     worktree: C:/Users/ozans/Desktop/projects/OmnyID-GROWTH-001
@@ -61,7 +61,7 @@ tasks:
     depends_on: [GROWTH-00, GROWTH-02]
     files: [src/growth_analytics/**, src/db.rs, src/db/**growth**, src/db/migration_catalog.rs, postgres/migrations/**, Documents/marketing/analytics/**, Documents/verification/**, .agent/**]
     acceptance: [only the four activation-v1 AFP actions with exact subtype content and authorised Wedding scope qualify, login home load partner acceptance and generated or unsaved output do not qualify, projection cursor advances deterministically and source replay is idempotent, one Wedding creation and first activation exist per canonical Wedding, meaningful activity is one Wedding and Sydney calendar day with a source count, either authorised partner can contribute without duplicating acquisition, cross-tenant and deleted source references fail closed, stored projection contains source IDs and counts but no private values, focused pure disposable-Postgres migration cargo-check and line-budget tests pass]
-    progress: "Started from clean GROWTH-02 evidence commit 0cb1c1e288a9f18ec23a3cf5e9012aafad23f2b5. Implementing an insert-time cursor projector over exact approved private AFP subtypes with server-side Wedding scope authorisation and no content/value projection."
+    progress: "Feature commit 4c330a693b7ceae8afcf4c8f46d708e42385b714 adds activation-v1 exact source classification and a cursor-based insert-time/reconciliation projector. Only persisted intake, meaningful budget decision, selected vendor follow-up and durable decision-resolution AFP records qualify; passive, generated, partner-acceptance, mismatched, deleted and unauthorised records do not. Projection is tenant-Wedding scoped, idempotent by source/event, creates one Wedding and first activation, and counts one meaningful action per Wedding/Sydney day while storing no source values or content. Three pure tests, a real tmpfs pgvector migration/replay/deletion/partner-ledger/cross-tenant test, 16 focused Growth tests, migration parity, cargo check and both line budgets pass. Not deployed."
 
   - id: WED-329
     title: Complete the autonomous Batch 2 countdown catalogue and public planning checklist

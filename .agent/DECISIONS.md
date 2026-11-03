@@ -2605,3 +2605,18 @@ subjective usability or a controlled external cohort.
 - The browser link remains sessionStorage-only. A persistent cross-session identifier is still
   disabled until explicit opt-in exists and GPC/DNT are absent. Database touches and identity links
   expire or cascade within 30 days; this does not authorise a persistent cookie or localStorage ID.
+
+# 2026-11-04 - GROWTH-03 activation projection boundary
+
+- `activation-v1` recognises exact persisted intake-profile, meaningful budget-decision, selected
+  vendor-follow-up and durable decision-resolution AFP shapes. Subtype and content kind must agree;
+  passive views, login, generated drafts, unsaved previews and partner-invite acceptance never
+  activate a Wedding.
+- The projection unit is the existing tenant-owned Wedding ledger and `wedding_plan_id`. This lets
+  delegated partner actions in the same ledger contribute without allowing an identical plan label
+  in another account to merge with or increment that Wedding.
+- The projector persists source message IDs, event names, timestamps, definition version and counts
+  only. It never copies budget amounts, vendor details, decision text, messages or profile values.
+- Source/event uniqueness makes retry and cursor rewind idempotent. Wedding creation and first
+  activation are singletons; meaningful activity counts qualifying source actions once per Sydney
+  calendar day. A deleted or unauthorised source does not project.

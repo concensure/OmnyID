@@ -100,6 +100,11 @@ Acceptance:
 
 Depends on: GROWTH-00, GROWTH-02
 
+Status: complete in feature commit `4c330a693b7ceae8afcf4c8f46d708e42385b714`.
+The canonical unit is the existing tenant-owned Wedding ledger plus its `wedding_plan_id`; delegated
+partner activity written to that ledger contributes, while a same-looking ID in another tenant is a
+different scope and cannot merge or increment the first Wedding.
+
 - Add a cursor-based projector from exact approved AFP source kinds.
 - Map saved plan, meaningful budget save, vendor save and decision resolution.
 - Store source IDs and counts only; exclude values/content.

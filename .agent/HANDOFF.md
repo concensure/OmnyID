@@ -7094,3 +7094,24 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
   Evidence: `Documents/verification/growth-02-acquisition-linkage-evidence-2026-11-04.md`.
 - Not deployed. The next dependency-ready slice is GROWTH-03: project activation and meaningful
   activity derived from exact approved AFP source kinds without projecting private values/content.
+# 2026-11-04 - GROWTH-03 AFP activation projection (Codex, complete)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
+`agent/codex/GROWTH-001`, feature commit
+`4c330a693b7ceae8afcf4c8f46d708e42385b714`.
+
+- Added a cursor-based `activation-v1` projector over the private tenant AFP ledger. It accepts only
+  exact persisted intake, meaningful budget decision, selected vendor follow-up and durable decision
+  resolution shapes. Insert-time projection is best-effort and the first onboarding authorisation
+  rewinds/reconciles bounded history for crash/order recovery.
+- One tenant-scoped Wedding and one first activation are stored. Qualifying source messages count
+  once per Wedding/Sydney calendar day; a budget decision can emit both typed source events without
+  inflating the daily action count. Projection rows contain source IDs/counts, never private values.
+- Generated/unsaved/passive/partner-acceptance events, content/subtype mismatches, deleted sources
+  and unauthorised cross-tenant sources fail closed. Delegated partner work recorded in the same
+  unified Wedding ledger contributes without creating another acquisition.
+- Three pure classifier tests, a real disposable tmpfs pgvector test with all 139 migrations,
+  16 focused Growth tests, migration parity, `cargo check --lib` and both line-budget tests pass.
+  Evidence: `Documents/verification/growth-03-activation-projection-evidence-2026-11-04.md`.
+- Not deployed. The next independent P0 slices are GROWTH-04 signed payment/refund reconciliation
+  and GROWTH-05 manual spend/Meta CSV import; GROWTH-06 rollups depends on both.
