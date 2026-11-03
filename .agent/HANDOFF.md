@@ -6958,6 +6958,9 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-319`, branch
 Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-319`, branch
 `agent/codex/WED-328`, based on clean evidence commit
 `b8e06fe1d067544c3ca3d7e94a036f2ba9677c5d`.
+The clean implementation candidate is
+`52e9a5acbe25981279641d0bcc3fb3731202851d`; all evidence below was rerun against
+that exact commit.
 
 - Replaced the revoked Cloudflare Email Routing credential with the user-provided
   `omnyid_email_routing` token without printing or committing it. Non-mutating probes verified token,
