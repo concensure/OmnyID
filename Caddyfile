@@ -253,6 +253,7 @@
         header X-Frame-Options "DENY"
         header Referrer-Policy "strict-origin-when-cross-origin"
         header Cache-Control "no-cache, no-store, must-revalidate"
+        header X-Robots-Tag "noindex, nofollow"
     }
 
     # Wedding vertical marketing site — a separate static frontend that hands
@@ -375,6 +376,16 @@
         import omnyid_proxy
     }
 
+    # Crawlable public vendor directory and individual business pages. The
+    # homeserver renders canonical database records; JavaScript only enhances them.
+    handle /wedding/vendors.html {
+        import omnyid_proxy
+    }
+
+    handle /wedding/directory/* {
+        import omnyid_proxy
+    }
+
     handle /wedding/vendors/* {
         import omnyid_proxy
     }
@@ -391,7 +402,7 @@
         }
         rewrite @weddingdirindex /index.html
         file_server
-        header Content-Security-Policy "default-src 'self'; script-src 'self' 'sha256-SR9l2aM5D8u7/lfDfy6rn64kmM0ej8dys/tlvPEWTEQ=' 'sha256-7rhxTYtNvU0MxohbRL5LuWJWg81KLSFeeRxbsdyy5io=' https://accounts.google.com/gsi/client https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https://images.unsplash.com https://lh3.googleusercontent.com https://*.googleusercontent.com; connect-src 'self' https://api.omnyid.com https://static.cloudflareinsights.com; font-src 'self' data: https://fonts.gstatic.com; frame-src https://accounts.google.com/gsi/; frame-ancestors 'none'; object-src 'none'"
+        header Content-Security-Policy "default-src 'self'; script-src 'self' 'sha256-SR9l2aM5D8u7/lfDfy6rn64kmM0ej8dys/tlvPEWTEQ=' https://accounts.google.com/gsi/client https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https://images.unsplash.com https://lh3.googleusercontent.com https://*.googleusercontent.com; connect-src 'self' https://api.omnyid.com https://static.cloudflareinsights.com; font-src 'self' data: https://fonts.gstatic.com; frame-src https://accounts.google.com/gsi/; frame-ancestors 'none'; object-src 'none'"
     }
 
     # `/srv/docs` is a deployment input, not a public-document repository.
@@ -413,6 +424,30 @@
         path /docs/*
         not path /docs/*.md /docs/*.tsx /docs/*.sql /docs/*.review /docs/*.csv
     }
+
+    # Eliminate duplicate root documents and extensionless aliases. These are
+    # redirects rather than parallel indexable copies.
+    handle /index.html {
+        redir / 308
+    }
+    handle /docs/index.html {
+        redir / 308
+    }
+    handle /privacy {
+        redir /privacy.html 308
+    }
+    handle /data-rights {
+        redir /data-rights.html 308
+    }
+    handle /security {
+        redir /security.html 308
+    }
+    handle /terms {
+        redir /terms.html 308
+    }
+    handle /vendors {
+        redir /vendors.html 308
+    }
     handle @public_docs_alias {
         uri strip_prefix /docs
         root * /srv/docs
@@ -420,6 +455,7 @@
         file_server
         header /index.html Cache-Control "no-cache, no-store, must-revalidate"
         header /app.js Cache-Control "no-cache, no-store, must-revalidate"
+        header X-Robots-Tag "noindex, follow"
         header Content-Security-Policy "default-src 'self'; script-src 'self' 'sha256-+TtZizzTI1w95JFUHKoSBQBkMcW73Ju4wKTkYgdZtTE=' 'sha256-xl/jzrGxWCaX9hNw19CWSya+urr1TdtPyFQD9Uo2Fkg=' https://accounts.google.com/gsi/client https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https://images.unsplash.com https://lh3.googleusercontent.com https://*.googleusercontent.com; connect-src 'self' https://api.omnyid.com https://static.cloudflareinsights.com; font-src 'self' data: https://fonts.gstatic.com; frame-src https://accounts.google.com/gsi/; frame-ancestors 'none'; object-src 'none'"
     }
 
@@ -430,7 +466,7 @@
     # no-cache treatment of its own index.html above.
     handle {
         root * /srv/docs
-        try_files {path} {path}.html /index.html
+        try_files {path} {path}.html =404
         file_server
         header /index.html Cache-Control "no-cache, no-store, must-revalidate"
         header /app.js Cache-Control "no-cache, no-store, must-revalidate"

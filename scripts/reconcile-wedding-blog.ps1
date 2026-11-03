@@ -89,9 +89,6 @@ foreach ($file in $articleFiles) {
     $meta = Article-Metadata $file $taxon
     $content = [regex]::Replace($meta.content, '\s*<!-- omnyid-taxonomy:start -->.*?<!-- omnyid-taxonomy:end -->\s*', "`r`n", 'Singleline')
     $content = [regex]::Replace($content, '\s*<meta\s+name="wedding:search-tags"[^>]*>\s*', "`r`n", 'IgnoreCase')
-    # Static production CSP disallows inline script. OpenGraph/canonical metadata
-    # remains in the page; do not ship unpublished JSON-LD as blocked script.
-    $content = [regex]::Replace($content, '\s*<script\s+type="application/ld\+json">.*?</script>\s*', "`r`n", 'Singleline,IgnoreCase')
     $content = $content.Replace('../../workspace/?auth=signin&amp;source=vendor_claim', '../../workspace/vendor.html?source=vendor_claim')
     $searchTags = ($meta.tags -join ', ')
     $tagMeta = '<meta name="wedding:search-tags" content="' + (Encode-Html $searchTags) + '">'
@@ -145,6 +142,15 @@ foreach ($slug in ($articleSlugs | Where-Object { $_ -notin $existingSlugs })) {
 $generatedBlock = "`r`n        <!-- omnyid-catalogue:start -->`r`n" + ($newCards -join "`r`n") + "`r`n        <!-- omnyid-catalogue:end -->`r`n"
 $index = $index -replace '(<div class="blog-grid reveal-stagger" data-blog-grid>)', ('$1' + $generatedBlock)
 Set-Content -Path $blogIndexPath -Value $index -Encoding utf8 -NoNewline
+
+node (Join-Path $RepoRoot 'scripts\reconcile-wedding-seo.mjs')
+
+# SEO reconciliation changes the article bytes, so catalogue hashes must be
+# calculated from the final publishable files rather than the pre-SEO draft.
+foreach ($row in $catalogue) {
+    $articlePath = Join-Path $blogRoot ($row.slug + '.html')
+    $row.content_sha256 = (Get-FileHash $articlePath -Algorithm SHA256).Hash.ToLowerInvariant()
+}
 
 $catalogue | Export-Csv -Path $cataloguePath -NoTypeInformation -Encoding utf8
 Get-ChildItem $blogRoot -Filter '*.html' -File | Copy-Item -Destination $EditorialRoot -Force

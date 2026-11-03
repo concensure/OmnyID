@@ -23,7 +23,9 @@ function htmlFiles(root) {
 function inlineScripts(html) {
   const scripts = [];
   for (const match of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)) {
-    if (!/\bsrc\s*=/i.test(match[1])) scripts.push(match[2].replaceAll('\r\n', '\n'));
+    const attributes = match[1];
+    if (/\btype\s*=\s*["']application\/ld\+json["']/i.test(attributes)) continue;
+    if (!/\bsrc\s*=/i.test(attributes)) scripts.push(match[2].replaceAll('\r\n', '\n'));
   }
   return scripts;
 }

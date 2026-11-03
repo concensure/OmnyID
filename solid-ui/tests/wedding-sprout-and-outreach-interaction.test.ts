@@ -21,6 +21,7 @@ const responseQueue = readFileSync(resolve(process.cwd(), "src/components/Respon
 const followUpApi = readFileSync(resolve(process.cwd(), "src/lib/weddingVendorFollowUpApi.ts"), "utf8");
 const editor = readFileSync(resolve(process.cwd(), "src/components/editor/TiptapEditor.tsx"), "utf8");
 const taskHelp = readFileSync(resolve(process.cwd(), "src/components/WeddingTaskContextHelp.tsx"), "utf8");
+const uploadFilesButton = readFileSync(resolve(process.cwd(), "src/components/WeddingUploadFilesButton.tsx"), "utf8");
 
 test("Sprout performs its initial persona load before enabling template actions", () => {
   assert.match(personaFab, /reloadPersonas\(options\?: \{ initial\?: boolean \}\)/);
@@ -109,4 +110,11 @@ test("budget contributions support saved people and adding a selected contact", 
   assert.match(budgetTracker, /Add and select/);
   assert.match(budgetTracker, /weddingHelperContactToAfpSendInput/);
   assert.match(timelinePanel, /overflow-visible text-left text-xs/);
+  assert.match(budgetTracker, /Saving a contribution adds that amount to the wedding budget available for planning/);
+});
+
+test("the upload control keeps a stable hover target", () => {
+  assert.match(uploadFilesButton, /h-10 w-10 shrink-0/);
+  assert.match(uploadFilesButton, /absolute right-\[calc\(100%\+0\.5rem\)\]/);
+  assert.doesNotMatch(uploadFilesButton, /hover:w-auto|focus-within:w-auto|group-hover:max-w/);
 });

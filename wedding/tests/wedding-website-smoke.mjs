@@ -153,6 +153,12 @@ for (const file of pages) {
   htmlByPath.set(normalize(file), readFileSync(file, 'utf8'));
 }
 
+function expectedCanonical(name) {
+  if (name === 'index.html') return 'https://omnyid.com/wedding/';
+  if (name.endsWith('/index.html')) return `https://omnyid.com/wedding/${name.slice(0, -10)}`;
+  return `https://omnyid.com/wedding/${name}`;
+}
+
 const discoveredPages = new Set(pages.map((file) => relative(root, file).replaceAll('\\', '/')));
 for (const expectedPage of expectedPages) {
   if (!discoveredPages.has(expectedPage)) {
@@ -171,6 +177,29 @@ for (const file of pages) {
   }
   if (!/<meta\s+name=["']viewport["'][^>]*content=["'][^"']*width=device-width/i.test(html)) {
     failures.push(`${name}: missing responsive viewport meta tag`);
+  }
+  const canonical = expectedCanonical(name);
+  if (!html.includes('<html lang="en-AU">')) failures.push(`${name}: language must be en-AU`);
+  if (!html.includes(`<link rel="canonical" href="${canonical}">`)) failures.push(`${name}: self-referencing canonical is missing`);
+  for (const requiredMeta of ['og:type', 'og:locale', 'og:url', 'og:title', 'og:description', 'og:image']) {
+    if (!html.includes(`property="${requiredMeta}"`)) failures.push(`${name}: ${requiredMeta} is missing`);
+  }
+  const schemas = Array.from(html.matchAll(/<script\s+type=["']application\/ld\+json["']>([\s\S]*?)<\/script>/gi));
+  if (!schemas.length) failures.push(`${name}: structured data is missing`);
+  const schemaValues = [];
+  for (const schema of schemas) {
+    try { schemaValues.push(JSON.parse(schema[1])); }
+    catch { failures.push(`${name}: structured data is not valid JSON`); }
+  }
+  const schemaText = JSON.stringify(schemaValues);
+  if (!schemaText.includes('OmnyID Pty Ltd') || !schemaText.includes('SoftwareApplication')) {
+    failures.push(`${name}: Organization or SoftwareApplication schema is missing`);
+  }
+  if (name.startsWith('blog/')) {
+    if (!schemaText.includes('"Article"') || !schemaText.includes('Casper Wu') || !schemaText.includes('datePublished')) {
+      failures.push(`${name}: dated Article schema with Casper Wu is missing`);
+    }
+    if (!html.includes('Casper Wu')) failures.push(`${name}: visible Casper Wu byline is missing`);
   }
 
   if (!standalonePages.has(name)) {
@@ -347,6 +376,9 @@ const vendorDirectory = htmlByPath.get(normalize(resolve(root, 'vendors.html')))
 if (!vendorDirectory || !vendorDirectory.includes('assets/js/directory.js')) {
   failures.push('vendors.html: vendor directory page or its data loader is missing');
 }
+if (!vendorDirectory?.includes('omnyid-server-vendors:start') || vendorDirectory?.includes('<div class="vendor-grid" id="vendorGrid" aria-live="polite"></div>')) {
+  failures.push('vendors.html: crawlable server-render fallback marker is missing');
+}
 const photoLicence = htmlByPath.get(normalize(resolve(root, 'vendor-image-licence.html')));
 if (!photoLicence || !photoLicence.includes('Vendor Image Licence Agreement')) {
   failures.push('vendor-image-licence.html: current vendor photo licence document is missing');
@@ -415,6 +447,15 @@ if (!existsSync(resolve(root, 'assets', 'images', 'vendor-reply-flow.png'))) fai
 if (!weddingJs.includes('/wedding/newsletter')) failures.push('main.js: newsletter form is not wired to the subscribe endpoint');
 if (!weddingHome.includes('<html lang="en-AU">') || !weddingHome.includes('<meta property="og:locale" content="en_AU">')) failures.push('index.html: Australian language and Open Graph locale metadata are missing');
 if (!weddingHome.includes('<link rel="canonical" href="https://omnyid.com/wedding/">')) failures.push('index.html: canonical Wedding URL is missing');
+if (/\bAFP\b/.test(weddingHome) || weddingHome.includes('Binder email delivery is being checked')) failures.push('index.html: internal AFP or retired Binder readiness copy is public');
+for (const guide of ['before-you-accept-that-wedding-quote.html', 'sydney-wedding-venue-cost-per-head.html', 'venue-tour-questions-australian-couples.html']) {
+  if (!weddingHome.includes(`blog/${guide}`)) failures.push(`index.html: missing direct guide link ${guide}`);
+}
+if (!docsHtml.includes('id="wedding-couples"') || !docsHtml.includes('href="/wedding/"')) failures.push('docs/index.html: Wedding couple use case is missing');
+const calculator = htmlByPath.get(normalize(resolve(root, 'wedding-cost-calculator.html'))) ?? '';
+for (const methodCopy of ['How the budget method works', 'Target total', '100%', 'Adjustment band', 'Model version:']) {
+  if (!calculator.includes(methodCopy)) failures.push(`wedding-cost-calculator.html: published method is missing "${methodCopy}"`);
+}
 for (const context of ['starting', 'vendors', 'guests', 'final']) {
   if (!new RegExp(`${context}:[\\s\\S]*?retrieval:[\\s\\S]*?question:[\\s\\S]*?directAnswer:[\\s\\S]*?destinationPath:`).test(landingConfig)) failures.push(`landing-config.js: ${context} context lacks non-visible retrieval metadata`);
 }
@@ -439,7 +480,7 @@ for (const [name, expected] of Object.entries(listicleExpectations)) {
   const ctaCount = (html.match(new RegExp(expected.cta, 'g')) ?? []).length;
   if (itemCount !== expected.items) failures.push(`${name}: expected ${expected.items} listicle items, found ${itemCount}`);
   if (ctaCount < 3) failures.push(`${name}: primary CTA must appear at least three times`);
-  if (!html.includes('<link rel="canonical" href="https://omnyid.com/wedding/">')) failures.push(`${name}: canonical must point to /wedding/`);
+  if (!html.includes(`<link rel="canonical" href="${expectedCanonical(name)}">`)) failures.push(`${name}: canonical must be self-referencing`);
   if (!html.includes('name="description"')) failures.push(`${name}: meta description is missing`);
   if (!html.includes('../assets/logo/omnyid-logo.png')) failures.push(`${name}: shared Wedding logo is missing`);
   if (!html.includes('Privacy') || !html.includes('private')) failures.push(`${name}: privacy reassurance is missing`);
@@ -462,6 +503,9 @@ if (!quizUi.includes('omnyid.wedding.animal_quiz.handoff.v1') || !(quizUi + quiz
 if (/\bfetch\s*\(|XMLHttpRequest|WebSocket|EventSource/.test(quizUi + quizEngine)) failures.push('animal quiz: unexpected backend or streaming transport is present');
 if (/api[_-]?key|client[_-]?secret|bearer\s+[a-z0-9._-]{12,}|password\s*[:=]/i.test(quizUi + quizEngine)) failures.push('animal quiz: secret-like material is present');
 if (/encodeURIComponent\(cleanName\(|names\s*=\s*encodeURIComponent|members\.slice/.test(quizEngine)) failures.push('quiz-engine.js: names remain in public share hashes');
+if (!weddingHome.includes('Illustrative example') && !htmlByPath.get(normalize(resolve(root, 'get-wedding-vendors-to-reply/index.html')))?.includes('Illustrative example')) {
+  failures.push('campaign mock vendor card is not labelled as illustrative');
+}
 
 if (failures.length) {
   console.error('Wedding website smoke test failed:');

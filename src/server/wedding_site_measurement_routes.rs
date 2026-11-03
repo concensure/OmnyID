@@ -54,6 +54,10 @@ const EVENTS: &[&str] = &[
     "partner_invite_accepted",
     "quiz_import_accepted",
     "suggestion_accepted",
+    "profile_prefill_used",
+    "import_fields_offered",
+    "import_fields_accepted",
+    "first_run_questions_skipped",
 ];
 const PROP_KEYS: &[&str] = &[
     "cta_id",
@@ -65,6 +69,16 @@ const PROP_KEYS: &[&str] = &[
     "quiz_version",
     "animal_id",
     "suggestion_kind",
+    "fields_offered",
+    "fields_accepted",
+    "fields_prefilled",
+    "questions_skipped",
+];
+const COUNT_PROP_KEYS: &[&str] = &[
+    "fields_offered",
+    "fields_accepted",
+    "fields_prefilled",
+    "questions_skipped",
 ];
 
 pub(super) fn routes() -> Router<Arc<AppState>> {
@@ -176,7 +190,12 @@ fn validated_props(props: Map<String, Value>) -> Option<Value> {
     if props.len() > 6 || props.keys().any(|key| !PROP_KEYS.contains(&key.as_str())) {
         return None;
     }
-    for value in props.values() {
+    for (key, value) in &props {
+        if COUNT_PROP_KEYS.contains(&key.as_str())
+            && !matches!(value, Value::Number(number) if number.as_u64().is_some_and(|count| count <= 300))
+        {
+            return None;
+        }
         match value {
             Value::String(value) if value.len() <= 40 => {}
             Value::Number(value) if value.as_u64().is_some_and(|number| number <= 300) => {}
@@ -333,5 +352,27 @@ mod tests {
             assert!(EVENTS.contains(&event));
         }
         assert!(!EVENTS.contains(&"quiz_answered"));
+    }
+
+    #[test]
+    fn profile_import_measurement_accepts_counts_and_rejects_fact_values() {
+        for event in [
+            "profile_prefill_used",
+            "import_fields_offered",
+            "import_fields_accepted",
+            "first_run_questions_skipped",
+        ] {
+            assert!(EVENTS.contains(&event));
+        }
+        let mut counts = Map::new();
+        counts.insert("fields_accepted".to_string(), Value::from(4));
+        assert!(validated_props(counts).is_some());
+
+        let mut leaked_fact = Map::new();
+        leaked_fact.insert(
+            "fields_accepted".to_string(),
+            Value::String("wedding_date=2027-11-20".to_string()),
+        );
+        assert!(validated_props(leaked_fact).is_none());
     }
 }

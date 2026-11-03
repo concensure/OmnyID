@@ -2491,3 +2491,21 @@ subjective usability or a controlled external cohort.
 - Public lead-magnet continuation checks the existing authenticated session. Signed-in visitors see
   `Add to your plan`; everyone else keeps the registration handoff. Both paths reuse the existing
   profile, consent review and AFP import authorities.
+
+# 2026-11-03 - WED-327 crawlable Wedding pages and aggregate Batch 2 measurement
+
+- The three standalone Wedding planning landing pages remain public organic-search pages because
+  they are independently useful and listed in the sitemap. They therefore use self-referencing
+  canonicals instead of declaring themselves duplicates of `/wedding/`.
+- Canonical, social and structured metadata is generated deterministically for public Wedding HTML.
+  JSON-LD remains inert data and is excluded from executable-script CSP hashing; the executable
+  `script-src` policy is not loosened.
+- The public vendor directory renders canonical database records in initial HTML. Client JavaScript
+  may enhance it, but is not the content authority. Individual vendor pages do not server-render
+  imported photos until licence evidence has been reviewed; business identity still does not imply
+  availability, price or suitability.
+- Unknown root routes return 404. Legacy root aliases redirect to one canonical document, while the
+  compatibility `/docs/*` surface is explicitly non-indexable.
+- Batch 2 profile-import measurement stores only bounded counts and event names. Wedding facts,
+  answers and free text are not analytics properties; the existing profile and intake remain the
+  state and provenance authorities.

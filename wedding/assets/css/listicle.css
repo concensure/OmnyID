@@ -138,6 +138,17 @@ body.listicle-page {
   border-radius: 12px;
   background: #f1ece3;
 }
+.example-label {
+  margin: 0 0 12px;
+  border: 1px solid rgba(76,64,54,.2);
+  border-radius: 999px;
+  background: #fff;
+  padding: 7px 11px;
+  color: #5f574f;
+  font-size: .78rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
 .preview-window { padding: 16px; border-radius: 10px; background: var(--paper); box-shadow: var(--shadow-md); }
 .preview-top { display: flex; gap: 6px; padding-bottom: 13px; border-bottom: 1px solid var(--line); }
 .preview-top span { width: 8px; height: 8px; border-radius: 50%; background: var(--line); }

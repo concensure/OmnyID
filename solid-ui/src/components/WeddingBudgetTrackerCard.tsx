@@ -651,7 +651,16 @@ export function WeddingBudgetTrackerCard(props: {
       </Show>
       <div class="mt-3 rounded-2xl border border-slate-200 bg-white p-3">
         <div class="flex flex-wrap items-center justify-between gap-2">
-          <p class="text-sm font-semibold text-emerald-950">Contributions</p>
+          <div class="flex items-center gap-2">
+            <p class="text-sm font-semibold text-emerald-950">Contributions</p>
+            <WeddingInfoTip
+              label="How contributions affect the budget"
+              title="Contributions increase your available budget"
+              tone="emerald"
+            >
+              Saving a contribution adds that amount to the wedding budget available for planning. Any conditions stay attached so you can see what the contribution may be used for.
+            </WeddingInfoTip>
+          </div>
           <Show when={contributionRows().length > 0}>
             <span class="rounded-lg bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-900">{moneyLabel(contributionTotal(), currency)} recorded</span>
           </Show>
