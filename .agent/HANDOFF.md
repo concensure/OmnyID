@@ -7074,3 +7074,23 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
 - Next dependency-ready work is GROWTH-02 consent-aware same-session attribution and canonical
   Wedding identity linkage. Persistent cross-session attribution remains false-default pending its
   separate approved consent state.
+# 2026-11-04 - GROWTH-02 same-session acquisition linkage (Codex, complete)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
+`agent/codex/GROWTH-001`, feature commit
+`b4cbff5dfeeb9254a448e8f4430025954f9d848c`.
+
+- New password, Google and Apple accounts can carry the existing opaque same-session visit; no
+  campaign field is accepted from the client. The server resolves the touch from its first-party
+  measurement row, creates one user link and attaches only that user's first Wedding plan.
+- Database uniqueness and update predicates prevent another user from claiming the visit or the
+  Wedding association from being swapped. Existing login and partner acceptance cannot increment
+  acquisition. Touch/link rows expire or cascade within 30 days.
+- Deterministic first-touch and last-non-direct functions preserve paid/search/social touches across
+  later direct visits and keep unknown distinct. Persistent cross-session browser identity stays
+  disabled pending an approved explicit-consent state and remains blocked by GPC/DNT.
+- Two browser-state tests, 12 focused Growth tests including a disposable tmpfs pgvector case,
+  migration-catalog parity, Solid typecheck, `cargo check --lib` and both line budgets pass.
+  Evidence: `Documents/verification/growth-02-acquisition-linkage-evidence-2026-11-04.md`.
+- Not deployed. The next dependency-ready slice is GROWTH-03: project activation and meaningful
+  activity derived from exact approved AFP source kinds without projecting private values/content.

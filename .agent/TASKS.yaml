@@ -41,7 +41,7 @@ tasks:
 
   - id: GROWTH-02
     title: Link consent-aware acquisition touches to canonical Weddings
-    status: in_progress
+    status: done
     owner: codex
     branch: agent/codex/GROWTH-001
     worktree: C:/Users/ozans/Desktop/projects/OmnyID-GROWTH-001
@@ -49,7 +49,7 @@ tasks:
     depends_on: [GROWTH-00, GROWTH-01]
     files: [src/growth_analytics/**, src/db/**growth**, src/db/migration_catalog.rs, src/server/auth.rs, src/server/types.rs, src/server/user_management_routes/**, postgres/migrations/**, solid-ui/src/lib/api.ts, solid-ui/src/App.tsx, solid-ui/src/lib/**growth**, solid-ui/tests/**growth**, tests/**growth**, Documents/marketing/analytics/**, Documents/verification/**, .agent/**]
     acceptance: [same-session acquisition carries only an opaque visit reference into a newly created account, campaign fields are resolved from the server-side touch rather than trusted from registration, first-touch and last-non-direct rules are deterministic and direct does not overwrite non-direct, GPC DNT or missing opt-in creates no persistent cross-session identifier, an acquisition link is scoped to its new user and tenant Wedding so swapped visits or Weddings fail closed, partner acceptance cannot create another acquisition, identity and touch rows expire or cascade within 30 days, focused browser Rust disposable-Postgres migration and line-budget tests pass]
-    progress: "Started from clean GROWTH-01 evidence commit c8ab58a182fc0f27c3a60136cf3a92c68797b9c4. This slice will implement same-session opaque-visit registration first; persistent 30-day browser linkage remains disabled until explicit approved consent exists."
+    progress: "Feature commit b4cbff5dfeeb9254a448e8f4430025954f9d848c carries only a bounded opaque same-session visit into new password, Google and Apple accounts; resolves touch fields from the server measurement row; links the new user once and attaches the first tenant-scoped Wedding without allowing visit or plan swaps; implements deterministic first-touch and last-non-direct rules; and retains/cascades link rows within 30 days. Partner acceptance has no acquisition path. Persistent cross-session browser identity remains deliberately disabled because the required explicit consent state is not approved. Two browser-state tests, 12 focused Growth tests including a real tmpfs pgvector isolation case, migration parity, typecheck, cargo check and both line budgets pass. Not deployed."
 
   - id: WED-329
     title: Complete the autonomous Batch 2 countdown catalogue and public planning checklist

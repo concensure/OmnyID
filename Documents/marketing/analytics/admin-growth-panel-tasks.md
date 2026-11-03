@@ -74,6 +74,11 @@ Acceptance:
 
 Depends on: GROWTH-00, GROWTH-01
 
+Status: complete in feature commit `b4cbff5dfeeb9254a448e8f4430025954f9d848c`.
+Same-session attribution is implemented. The optional cross-session browser identifier remains
+false-default because the required explicit consent state has not been approved; no incomplete
+consent mechanism is silently substituted.
+
 - Add acquisition touch and identity-link migrations.
 - Support same-session attribution immediately.
 - Add a 30-day first-party identifier only behind the approved consent state.

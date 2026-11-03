@@ -2590,3 +2590,18 @@ subjective usability or a controlled external cohort.
 - Raw public sessions and their cascading events are retained for at most 30 days and drained in
   bounded batches. GPC, DNT and known-bot suppression remain mandatory, and no third-party tracker
   is introduced.
+
+# 2026-11-04 - GROWTH-02 same-session acquisition boundary
+
+- Registration may carry only the existing 12-character opaque session visit. Campaign, landing
+  and intent fields are resolved from the server-held measurement row; the registration client is
+  never trusted to submit attribution facts.
+- One visit can link to one newly created user, and one user can attach that link to only the first
+  tenant-scoped Wedding plan. Existing-account login, partner acceptance and a swapped visit or
+  Wedding cannot create or replace acquisition.
+- First-touch and last-non-direct-touch are deterministic, time-bounded models. Direct, internal
+  and unknown touches never overwrite a valid last non-direct touch; absent history remains
+  unknown rather than being inferred as organic social.
+- The browser link remains sessionStorage-only. A persistent cross-session identifier is still
+  disabled until explicit opt-in exists and GPC/DNT are absent. Database touches and identity links
+  expire or cascade within 30 days; this does not authorise a persistent cookie or localStorage ID.

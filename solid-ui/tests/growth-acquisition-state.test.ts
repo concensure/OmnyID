@@ -11,9 +11,7 @@ test("same-session acquisition carries only a bounded opaque visit", () => {
   assert.equal(sameSessionAcquisitionVisitId(storage({ "omnyid.public.visit.v1": "email@example.com" })), null);
   assert.equal(sameSessionAcquisitionVisitId(storage({ "omnyid.public.visit.v1": "a1b2c3d4e5f6?utm=x" })), null);
 });
-
 test("legacy Wedding visit migrates without creating a persistent identifier", () => {
   assert.equal(sameSessionAcquisitionVisitId(storage({ "omnyid.wedding.visit.v1": "z9y8x7w6v5u4" })), "z9y8x7w6v5u4");
   assert.equal(sameSessionAcquisitionVisitId(null), null);
 });
-
