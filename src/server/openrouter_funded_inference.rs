@@ -113,7 +113,6 @@ pub(super) async fn infer(
     let mut body = serde_json::json!({
         "model": MODEL,
         "max_completion_tokens": request.max_tokens.min(900),
-        "temperature": 0.35,
         "user": abuse_hash,
         "messages": [
             { "role": "system", "content": request.system },
