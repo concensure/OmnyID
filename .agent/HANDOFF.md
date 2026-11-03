@@ -6828,3 +6828,28 @@ independently with the restore drill skipped and passed. Oracle `SOURCE_COMMIT` 
 `oracle-runtime-manifest.json` match the full SHA, the deployed Wedding workspace asset contains the
 new decision UI, `/workspace/` returns HTTP 200, all configured services are up, and the fresh
 `20261103T043008Z` backup is internally verified. Root use is 78%, with 9.9 GB free.
+
+## 2026-11-03 - WED-324 bounded decision research, Wedding GEO and Batch 2 import (Codex)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-319`, branch
+`agent/codex/WED-324`, application commit `5bb45a740aba6398305620688e4656c6c833843e`,
+based on WED-323 release-evidence commit `cf28491d8648b2f3e189767e5bd400e4c32d3135`.
+
+- Limited recommendation enrichment to the current ranked decision and its immediate successor.
+  Linked saved reports now replace generic recommendation copy when present; vendor search/shortlist,
+  RSVP message, readable report and ordinary task actions open in place. Ordinary task opening retains
+  the existing owner and assignment surface.
+- Added only non-visible Wedding landing retrieval infrastructure: `en-AU`, canonical/OpenGraph/Twitter
+  metadata, question/direct-answer semantics on the four existing JavaScript stage contexts, a
+  deterministic public sitemap, explicit Caddy handlers and a crawler policy that keeps private and
+  operational paths out. Visible landing-page body content and unsupported entity/ABN schema were not
+  changed.
+- Continued Batch 2 LP-07 by accepting an exported shared Wedding profile or supported Budget Reality
+  Check JSON through the existing intake review. Sensitive facts remain off by default; the existing
+  intake is still the only account confirmation and AFP-write authority.
+- Passed Solid UI typecheck; 13 focused decision/profile tests; all 2,174 Wedding tests; production
+  build; Wedding website, CSP, quiz, account-confirmation, blog and magnet smokes; both line-budget
+  checks; sitemap regeneration idempotence; and `git diff --check`. No Rust source changed.
+- Remaining Batch 2 work includes per-tool mappings for the unfinished magnets, explicit reconciliation
+  choices when imported facts conflict with confirmed account facts, and the signed-in Add-to-plan
+  variant. This slice was not deployed because the user did not request a release in this turn.
