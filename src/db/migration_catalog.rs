@@ -695,4 +695,9 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Transactional reservations and receipts for hard-capped platform-funded AI",
         include_str!("../../postgres/migrations/0136_platform_funded_ai_usage.sql"),
     ),
+    (
+        "0137_wedding_site_measurement_idempotency",
+        "Replay-safe public measurement identity and visit-scoped uniqueness",
+        include_str!("../../postgres/migrations/0137_wedding_site_measurement_idempotency.sql"),
+    ),
 ];

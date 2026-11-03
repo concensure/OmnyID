@@ -2,7 +2,6 @@
 use super::Db;
 use serde_json::{Value, json};
 use sqlx::Row;
-use ulid::Ulid;
 
 #[derive(Clone, Debug)]
 pub struct WeddingSiteSessionWrite {
@@ -23,6 +22,7 @@ pub struct WeddingSiteSessionWrite {
 
 #[derive(Clone, Debug)]
 pub struct WeddingSiteEventWrite {
+    pub event_id: String,
     pub event: String,
     pub page: String,
     pub props: Value,
@@ -66,9 +66,10 @@ impl Db {
                 r#"
                 INSERT INTO wedding_site_events (event_id, visit_id, event, page, props)
                 VALUES ($1, $2, $3, $4, $5)
+                ON CONFLICT (visit_id, event_id) DO NOTHING
                 "#,
             )
-            .bind(Ulid::new().to_string())
+            .bind(&event.event_id)
             .bind(&session.visit_id)
             .bind(&event.event)
             .bind(&event.page)
@@ -78,6 +79,33 @@ impl Db {
         }
         transaction.commit().await?;
         Ok(())
+    }
+
+    pub async fn prune_wedding_site_measurement_batch(
+        &self,
+        retention_days: i32,
+        batch_size: i64,
+    ) -> Result<u64, sqlx::Error> {
+        let result = sqlx::query(
+            r#"
+            WITH stale AS (
+                SELECT visit_id
+                FROM wedding_site_sessions
+                WHERE first_seen < NOW() - make_interval(days => $1::int)
+                ORDER BY first_seen, visit_id
+                LIMIT $2
+                FOR UPDATE SKIP LOCKED
+            )
+            DELETE FROM wedding_site_sessions session
+            USING stale
+            WHERE session.visit_id = stale.visit_id
+            "#,
+        )
+        .bind(retention_days)
+        .bind(batch_size)
+        .execute(&self.pool)
+        .await?;
+        Ok(result.rows_affected())
     }
 
     pub async fn wedding_site_stats(&self, from: &str, to: &str) -> Result<Value, sqlx::Error> {
@@ -126,6 +154,7 @@ impl Db {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ulid::Ulid;
 
     #[tokio::test]
     async fn disposable_postgres_measurement_records_only_supplied_bounded_projection() {
@@ -154,6 +183,7 @@ mod tests {
         db.record_wedding_site_events(
             &session,
             &[WeddingSiteEventWrite {
+                event_id: "a1b2c3d4e5f6g7h8".into(),
                 event: "quiz_started".into(),
                 page: "/wedding/animal-quiz.html".into(),
                 props: json!({"quiz_version":"2"}),
@@ -161,17 +191,50 @@ mod tests {
         )
         .await
         .expect("record");
+        db.record_wedding_site_events(
+            &session,
+            &[
+                WeddingSiteEventWrite {
+                    event_id: "a1b2c3d4e5f6g7h8".into(),
+                    event: "quiz_started".into(),
+                    page: "/wedding/animal-quiz.html".into(),
+                    props: json!({"quiz_version":"2"}),
+                },
+                WeddingSiteEventWrite {
+                    event_id: "b1b2c3d4e5f6g7h8".into(),
+                    event: "quiz_completed".into(),
+                    page: "/wedding/animal-quiz.html".into(),
+                    props: json!({"quiz_version":"2"}),
+                },
+            ],
+        )
+        .await
+        .expect("replay and new event");
         let count: i64 =
             sqlx::query_scalar("SELECT COUNT(*) FROM wedding_site_events WHERE visit_id = $1")
                 .bind(&visit_id)
                 .fetch_one(&db.pool)
                 .await
                 .expect("count");
-        assert_eq!(count, 1);
-        sqlx::query("DELETE FROM wedding_site_sessions WHERE visit_id = $1")
+        assert_eq!(count, 2);
+        sqlx::query(
+            "UPDATE wedding_site_sessions SET first_seen = NOW() - INTERVAL '31 days' WHERE visit_id = $1",
+        )
             .bind(&visit_id)
             .execute(&db.pool)
             .await
-            .expect("cascade cleanup");
+            .expect("age disposable session");
+        let deleted = db
+            .prune_wedding_site_measurement_batch(30, 100)
+            .await
+            .expect("bounded retention cleanup");
+        assert!(deleted >= 1);
+        let remaining: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM wedding_site_events WHERE visit_id = $1")
+                .bind(&visit_id)
+                .fetch_one(&db.pool)
+                .await
+                .expect("count cascaded events");
+        assert_eq!(remaining, 0);
     }
 }

@@ -60,7 +60,7 @@ pub const GROWTH_EVENT_DEFINITIONS: &[GrowthEventDefinition] = &[
         event: "landing_page_view",
         availability: SourceAvailability::Direct,
         source_authority: "wedding_site_events",
-        source_selector: "event = 'wedding_landing_view'",
+        source_selector: "event IN ('omnyid_landing_view', 'wedding_landing_view')",
         unit: GrowthUnit::Visit,
         acquisition_increment: false,
         activation_eligible: false,

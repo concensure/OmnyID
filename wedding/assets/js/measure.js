@@ -4,20 +4,39 @@
   if (navigator.globalPrivacyControl === true || navigator.doNotTrack === '1' ||
       window.doNotTrack === '1') return;
 
-  var queue = [], sentSession = false, timer = null, started = Date.now(), finished = false;
-  var visitId;
-  try {
-    visitId = sessionStorage.getItem('omnyid.wedding.visit.v1');
-    if (!/^[a-zA-Z0-9]{12}$/.test(visitId || '')) {
-      var bytes = crypto.getRandomValues(new Uint8Array(9));
-      visitId = Array.from(bytes, function (value) {
-        return value.toString(36).padStart(2, '0');
-      }).join('').slice(0, 12);
-      sessionStorage.setItem('omnyid.wedding.visit.v1', visitId);
+  var SCHEMA_VERSION = 'public-measurement.v1';
+  var VISIT_KEY = 'omnyid.public.visit.v1';
+  var LEGACY_VISIT_KEY = 'omnyid.wedding.visit.v1';
+  var SESSION_KEY = 'omnyid.public.session.v1';
+  var PENDING_KEY = 'omnyid.public.events.v1';
+  var MAX_PENDING = 96;
+  var queue = loadPending(), sentSession = false, timer = null;
+  var started = Date.now(), finished = false, flushing = false;
+
+  function randomId(length) {
+    try {
+      var bytes = crypto.getRandomValues(new Uint8Array(length));
+      return Array.from(bytes, function (value) {
+        return (value % 36).toString(36);
+      }).join('');
+    } catch (_) {
+      var value = '';
+      while (value.length < length) value += Math.random().toString(36).slice(2);
+      return value.slice(0, length);
     }
-  } catch (_) {
-    visitId = Math.random().toString(36).slice(2, 14).padEnd(12, '0');
   }
+
+  function stored(key) {
+    try { return sessionStorage.getItem(key); } catch (_) { return null; }
+  }
+
+  function save(key, value) {
+    try { sessionStorage.setItem(key, value); } catch (_) {}
+  }
+
+  var visitId = stored(VISIT_KEY) || stored(LEGACY_VISIT_KEY);
+  if (!/^[a-zA-Z0-9]{12}$/.test(visitId || '')) visitId = randomId(12);
+  save(VISIT_KEY, visitId);
 
   function clean(value) {
     value = String(value || '').trim().toLowerCase();
@@ -39,7 +58,7 @@
     }
   }
 
-  function session() {
+  function newSession() {
     var query = new URLSearchParams(location.search), source = referrer();
     ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term'].forEach(function (key) {
       var value = clean(query.get(key));
@@ -56,30 +75,94 @@
     return source;
   }
 
-  function flush() {
-    if (!queue.length) return;
-    var payload = JSON.stringify({ visit_id: visitId, session: session(), events: queue.splice(0) });
+  function loadSession() {
+    try {
+      var value = JSON.parse(stored(SESSION_KEY) || 'null');
+      if (value && typeof value === 'object' && typeof value.landing_path === 'string') return value;
+    } catch (_) {}
+    var value = newSession();
+    save(SESSION_KEY, JSON.stringify(value));
+    return value;
+  }
+
+  function loadPending() {
+    try {
+      var value = JSON.parse(stored(PENDING_KEY) || '[]');
+      return Array.isArray(value) ? value.filter(function (event) {
+        return event && /^[a-zA-Z0-9]{16,32}$/.test(event.event_id || '');
+      }).slice(-MAX_PENDING) : [];
+    } catch (_) { return []; }
+  }
+
+  var session = loadSession();
+
+  function savePending() {
+    save(PENDING_KEY, JSON.stringify(queue.slice(-MAX_PENDING)));
+  }
+
+  function acknowledge(ids) {
+    queue = queue.filter(function (event) { return ids.indexOf(event.event_id) < 0; });
+    savePending();
+  }
+
+  function schedule(delay) {
+    if (timer) return;
+    timer = window.setTimeout(function () { timer = null; flush(false); }, delay);
+  }
+
+  function flush(preferBeacon) {
+    if (!queue.length || flushing) return;
+    var events = queue.slice(0, 32);
+    var payload;
+    do {
+      payload = JSON.stringify({
+        schema_version: SCHEMA_VERSION,
+        visit_id: visitId,
+        session: session,
+        events: events
+      });
+      if (new Blob([payload]).size <= 3800 || events.length === 1) break;
+      events.pop();
+    } while (events.length);
+    if (new Blob([payload]).size > 3800) {
+      acknowledge([events[0].event_id]);
+      if (queue.length) schedule(0);
+      return;
+    }
     sentSession = true;
-    if (navigator.sendBeacon && navigator.sendBeacon('/wedding/e', new Blob([payload], {
+    if (preferBeacon && navigator.sendBeacon && navigator.sendBeacon('/wedding/e', new Blob([payload], {
       type: 'application/json'
-    }))) return;
+    }))) {
+      // Keep the same IDs until a later acknowledged request; server deduplication makes replay safe.
+      return;
+    }
+    flushing = true;
     try {
       fetch('/wedding/e', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: payload,
         keepalive: true, credentials: 'same-origin'
-      }).catch(function () {});
+      }).then(function (response) {
+        if (response.ok) acknowledge(events.map(function (event) { return event.event_id; }));
+      }).catch(function () {}).finally(function () {
+        flushing = false;
+        if (queue.length && document.visibilityState !== 'hidden') schedule(10000);
+      });
     } catch (_) {
-      // Measurement must never interrupt the page when transport is unavailable.
+      flushing = false;
     }
   }
 
   function track(event, props) {
-    if (queue.length >= 32) return;
-    queue.push({ event: event, page: location.pathname, props: props || {} });
-    if (!timer) timer = window.setTimeout(function () { timer = null; flush(); }, 10000);
+    if (queue.length >= MAX_PENDING) return;
+    queue.push({
+      event_id: randomId(20), event: event, page: location.pathname, props: props || {}
+    });
+    savePending();
+    schedule(10000);
   }
 
   window.OmnyWeddingMeasure = { track: track };
+  if (location.pathname === '/') track('omnyid_landing_view');
   if (document.body.classList.contains('landing-v2')) track('wedding_landing_view');
 
   document.addEventListener('click', function (event) {
@@ -96,7 +179,7 @@
     if (target.matches('[href*="animal-quiz"]')) track('wedding_quiz_entry_clicked');
   });
 
-  if ('IntersectionObserver' in window) {
+  if ('IntersectionObserver' in window && location.pathname.indexOf('/wedding') === 0) {
     var observer = new IntersectionObserver(function (entries) {
       entries.forEach(function (entry) {
         if (!entry.isIntersecting) return;
@@ -112,11 +195,14 @@
     if (finished) return;
     finished = true;
     var seconds = Math.min(300, Math.floor((Date.now() - started) / 5000) * 5);
-    if (seconds >= 5) track('wedding_engaged_time', { seconds_bucket: seconds });
-    flush();
+    if (seconds >= 5 && location.pathname.indexOf('/wedding') === 0) {
+      track('wedding_engaged_time', { seconds_bucket: seconds });
+    }
+    flush(true);
   }
   document.addEventListener('visibilitychange', function () {
-    if (document.visibilityState === 'hidden') flush();
+    if (document.visibilityState === 'hidden') flush(true);
   });
   window.addEventListener('pagehide', finish);
+  if (queue.length) schedule(250);
 }());

@@ -29,7 +29,9 @@ use super::{
 
 const MAX_BODY_BYTES: usize = 4 * 1024;
 const MAX_EVENTS: usize = 32;
+const MEASUREMENT_SCHEMA_VERSION: &str = "public-measurement.v1";
 const EVENTS: &[&str] = &[
+    "omnyid_landing_view",
     "wedding_landing_view",
     "wedding_context_selected",
     "wedding_context_changed",
@@ -88,14 +90,15 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
         .layer(DefaultBodyLimit::max(MAX_BODY_BYTES))
 }
 
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
 struct MeasurementBatch {
+    schema_version: String,
     visit_id: String,
     session: MeasurementSession,
     events: Vec<MeasurementEvent>,
 }
 
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
 struct MeasurementSession {
     utm_source: Option<String>,
     utm_medium: Option<String>,
@@ -112,8 +115,9 @@ struct MeasurementSession {
     landing_path: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
 struct MeasurementEvent {
+    event_id: String,
     event: String,
     page: String,
     #[serde(default)]
@@ -169,11 +173,17 @@ fn allowlisted(value: Option<String>, allowed: &[&str]) -> Option<String> {
 
 fn bounded_path(value: &str) -> Option<String> {
     let value = value.trim();
-    (value.starts_with("/wedding")
+    ((value == "/" || value == "/wedding" || value.starts_with("/wedding/"))
         && value.len() <= 120
         && !value.contains('?')
         && !value.contains('#'))
     .then(|| value.to_string())
+}
+
+fn bounded_event_id(value: &str) -> Option<String> {
+    let value = value.trim();
+    ((16..=32).contains(&value.len()) && value.bytes().all(|byte| byte.is_ascii_alphanumeric()))
+        .then(|| value.to_string())
 }
 
 fn bounded_host(value: Option<String>) -> Option<String> {
@@ -209,7 +219,8 @@ fn validated_props(props: Map<String, Value>) -> Option<Value> {
 fn validate_batch(
     batch: MeasurementBatch,
 ) -> Option<(WeddingSiteSessionWrite, Vec<WeddingSiteEventWrite>)> {
-    if batch.visit_id.len() != 12
+    if batch.schema_version != MEASUREMENT_SCHEMA_VERSION
+        || batch.visit_id.len() != 12
         || !batch
             .visit_id
             .bytes()
@@ -226,6 +237,7 @@ fn validate_batch(
             return None;
         }
         events.push(WeddingSiteEventWrite {
+            event_id: bounded_event_id(&event.event_id)?,
             event: event.event,
             page: bounded_path(&event.page)?,
             props: validated_props(event.props)?,
@@ -320,6 +332,33 @@ async fn admin_site_stats_http(
 mod tests {
     use super::*;
 
+    fn valid_batch() -> MeasurementBatch {
+        MeasurementBatch {
+            schema_version: MEASUREMENT_SCHEMA_VERSION.to_string(),
+            visit_id: "a1b2c3d4e5f6".to_string(),
+            session: MeasurementSession {
+                utm_source: None,
+                utm_medium: None,
+                utm_campaign: None,
+                utm_content: None,
+                utm_term: None,
+                intent: None,
+                ad_click_present: false,
+                referrer_class: Some("direct".to_string()),
+                referrer_host: None,
+                device_class: Some("mobile".to_string()),
+                language: Some("en".to_string()),
+                landing_path: "/".to_string(),
+            },
+            events: vec![MeasurementEvent {
+                event_id: "a1b2c3d4e5f6g7h8".to_string(),
+                event: "omnyid_landing_view".to_string(),
+                page: "/".to_string(),
+                props: Map::new(),
+            }],
+        }
+    }
+
     #[test]
     fn payload_rejects_unknown_or_personal_properties() {
         let mut props = Map::new();
@@ -352,6 +391,53 @@ mod tests {
             assert!(EVENTS.contains(&event));
         }
         assert!(!EVENTS.contains(&"quiz_answered"));
+    }
+
+    #[test]
+    fn measurement_contract_requires_stable_ids_and_approved_paths() {
+        assert_eq!(MEASUREMENT_SCHEMA_VERSION, "public-measurement.v1");
+        assert!(bounded_event_id("a1b2c3d4e5f6g7h8").is_some());
+        assert!(bounded_event_id("too-short").is_none());
+        assert!(bounded_event_id("personal@example.com").is_none());
+        assert_eq!(bounded_path("/").as_deref(), Some("/"));
+        assert_eq!(
+            bounded_path("/wedding/blog/example.html").as_deref(),
+            Some("/wedding/blog/example.html")
+        );
+        assert!(bounded_path("/pricing.html").is_none());
+        assert!(bounded_path("/weddingevil").is_none());
+    }
+
+    #[test]
+    fn batch_validation_fails_closed_on_schema_ids_paths_and_size() {
+        assert!(validate_batch(valid_batch()).is_some());
+
+        let mut wrong_schema = valid_batch();
+        wrong_schema.schema_version = "public-measurement.v0".to_string();
+        assert!(validate_batch(wrong_schema).is_none());
+
+        let mut invalid_id = valid_batch();
+        invalid_id.events[0].event_id = "short".to_string();
+        assert!(validate_batch(invalid_id).is_none());
+
+        let mut invalid_path = valid_batch();
+        invalid_path.events[0].page = "/workspace/".to_string();
+        assert!(validate_batch(invalid_path).is_none());
+
+        let mut oversized = valid_batch();
+        oversized.events = vec![oversized.events[0].clone(); MAX_EVENTS + 1];
+        assert!(validate_batch(oversized).is_none());
+    }
+
+    #[test]
+    fn privacy_and_bot_signals_remain_suppressed() {
+        let mut privacy_headers = HeaderMap::new();
+        privacy_headers.insert("sec-gpc", "1".parse().unwrap());
+        assert!(privacy_signal(&privacy_headers));
+
+        let mut bot_headers = HeaderMap::new();
+        bot_headers.insert("user-agent", "ExampleCrawler/1.0".parse().unwrap());
+        assert!(known_bot(&bot_headers));
     }
 
     #[test]

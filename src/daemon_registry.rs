@@ -123,6 +123,13 @@ mod tests {
     }
 
     #[test]
+    fn anonymous_site_measurement_is_bounded_to_thirty_days_and_small_batches() {
+        assert_eq!(super::SITE_MEASUREMENT_RETENTION_DAYS, 30);
+        assert_eq!(super::SITE_MEASUREMENT_PRUNE_BATCH, 1_000);
+        assert!(super::SITE_MEASUREMENT_PRUNE_MAX_BATCHES_PER_PASS > 0);
+    }
+
+    #[test]
     fn legacy_daemon_kinds_are_not_misclassified_as_knowledge_curators() {
         assert_eq!(
             daemon_kind_from_str("knowledge_curator"),
@@ -404,6 +411,9 @@ const CURATOR_AUDIT_PRUNE_MAX_BATCHES_PER_PASS: u32 = 20;
 const RATE_LIMIT_RETENTION_HOURS: i64 = 47;
 const RATE_LIMIT_PRUNE_BATCH: i64 = 5_000;
 const RATE_LIMIT_PRUNE_MAX_BATCHES_PER_PASS: u32 = 20;
+const SITE_MEASUREMENT_RETENTION_DAYS: i32 = 30;
+const SITE_MEASUREMENT_PRUNE_BATCH: i64 = 1_000;
+const SITE_MEASUREMENT_PRUNE_MAX_BATCHES_PER_PASS: u32 = 4;
 
 fn positive_limit(raw: Option<&str>, default: i64) -> i64 {
     raw.and_then(|value| value.trim().parse::<i64>().ok())
@@ -538,11 +548,17 @@ pub async fn prune_operational_daemon_history(db: &Db) -> Result<(u64, u64, u64)
     let heartbeats = prune_heartbeats(db).await?;
     let curator_audits = prune_curator_run_audits(db).await?;
     let rate_limit_rows = prune_rate_limit_history(db).await?;
-    sqlx::query(
-        "DELETE FROM wedding_site_sessions WHERE first_seen < NOW() - INTERVAL '14 months'",
-    )
-    .execute(&db.pool)
-    .await?;
+    for _ in 0..SITE_MEASUREMENT_PRUNE_MAX_BATCHES_PER_PASS {
+        let deleted = db
+            .prune_wedding_site_measurement_batch(
+                SITE_MEASUREMENT_RETENTION_DAYS,
+                SITE_MEASUREMENT_PRUNE_BATCH,
+            )
+            .await?;
+        if deleted < SITE_MEASUREMENT_PRUNE_BATCH as u64 {
+            break;
+        }
+    }
     sqlx::query(
         "DELETE FROM wedding_binder_requests WHERE requested_at < NOW() - INTERVAL '12 months'",
     )
