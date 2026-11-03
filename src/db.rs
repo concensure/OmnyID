@@ -21,6 +21,7 @@ use ulid::Ulid;
 mod migration_catalog;
 pub use migration_catalog::MIGRATIONS;
 mod growth_acquisition;
+mod growth_activation_projection;
 mod message_attachments;
 pub use message_attachments::StoredMessageAttachment;
 mod operational_retention;
@@ -524,6 +525,19 @@ impl Db {
                 &msg.metadata,
             ) {
                 coordination_bus().notify(family, owner_user_id);
+            }
+            if matches!(
+                msg.subtype.as_str(),
+                "wedding_intake_profile"
+                    | "wedding_decision_selection"
+                    | "selected_vendor_contact_details"
+            ) {
+                if let Err(error) = self
+                    .project_growth_activation_for_user(owner_user_id, 100)
+                    .await
+                {
+                    tracing::warn!(%error, %owner_user_id, "Growth activation projection will retry from its cursor");
+                }
             }
         }
 

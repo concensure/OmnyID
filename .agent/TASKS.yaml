@@ -51,6 +51,18 @@ tasks:
     acceptance: [same-session acquisition carries only an opaque visit reference into a newly created account, campaign fields are resolved from the server-side touch rather than trusted from registration, first-touch and last-non-direct rules are deterministic and direct does not overwrite non-direct, GPC DNT or missing opt-in creates no persistent cross-session identifier, an acquisition link is scoped to its new user and tenant Wedding so swapped visits or Weddings fail closed, partner acceptance cannot create another acquisition, identity and touch rows expire or cascade within 30 days, focused browser Rust disposable-Postgres migration and line-budget tests pass]
     progress: "Feature commit b4cbff5dfeeb9254a448e8f4430025954f9d848c carries only a bounded opaque same-session visit into new password, Google and Apple accounts; resolves touch fields from the server measurement row; links the new user once and attaches the first tenant-scoped Wedding without allowing visit or plan swaps; implements deterministic first-touch and last-non-direct rules; and retains/cascades link rows within 30 days. Partner acceptance has no acquisition path. Persistent cross-session browser identity remains deliberately disabled because the required explicit consent state is not approved. Two browser-state tests, 12 focused Growth tests including a real tmpfs pgvector isolation case, migration parity, typecheck, cargo check and both line budgets pass. Not deployed."
 
+  - id: GROWTH-03
+    title: Project Wedding activation and meaningful activity from approved AFP events
+    status: in_progress
+    owner: codex
+    branch: agent/codex/GROWTH-001
+    worktree: C:/Users/ozans/Desktop/projects/OmnyID-GROWTH-001
+    base_sha: 0cb1c1e288a9f18ec23a3cf5e9012aafad23f2b5
+    depends_on: [GROWTH-00, GROWTH-02]
+    files: [src/growth_analytics/**, src/db.rs, src/db/**growth**, src/db/migration_catalog.rs, postgres/migrations/**, Documents/marketing/analytics/**, Documents/verification/**, .agent/**]
+    acceptance: [only the four activation-v1 AFP actions with exact subtype content and authorised Wedding scope qualify, login home load partner acceptance and generated or unsaved output do not qualify, projection cursor advances deterministically and source replay is idempotent, one Wedding creation and first activation exist per canonical Wedding, meaningful activity is one Wedding and Sydney calendar day with a source count, either authorised partner can contribute without duplicating acquisition, cross-tenant and deleted source references fail closed, stored projection contains source IDs and counts but no private values, focused pure disposable-Postgres migration cargo-check and line-budget tests pass]
+    progress: "Started from clean GROWTH-02 evidence commit 0cb1c1e288a9f18ec23a3cf5e9012aafad23f2b5. Implementing an insert-time cursor projector over exact approved private AFP subtypes with server-side Wedding scope authorisation and no content/value projection."
+
   - id: WED-329
     title: Complete the autonomous Batch 2 countdown catalogue and public planning checklist
     status: done

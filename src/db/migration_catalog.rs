@@ -705,4 +705,9 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Privacy-bounded same-session acquisition touches and identity links",
         include_str!("../../postgres/migrations/0138_growth_acquisition_identity.sql"),
     ),
+    (
+        "0139_growth_activation_projection",
+        "Content-free Wedding activation and meaningful-activity projection",
+        include_str!("../../postgres/migrations/0139_growth_activation_projection.sql"),
+    ),
 ];

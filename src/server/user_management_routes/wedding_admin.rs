@@ -915,6 +915,14 @@ pub(super) async fn wedding_onboarding_state_upsert_http(
             tracing::warn!(user_id = %user.id, %error, "Wedding acquisition link could not be attached");
         }
     }
+    let projection = if onboarding_state.created_at == onboarding_state.updated_at {
+        state.db.reconcile_growth_activation_for_user(&user.id).await
+    } else {
+        state.db.project_growth_activation_for_user(&user.id, 100).await
+    };
+    if let Err(error) = projection {
+        tracing::warn!(user_id = %user.id, %error, "Growth activation reconciliation will retry from its cursor");
+    }
     Ok(Json(
         serde_json::json!({ "onboarding_state": onboarding_state }),
     ))
