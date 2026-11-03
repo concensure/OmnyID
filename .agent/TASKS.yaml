@@ -17,14 +17,14 @@ lifecycle:
 tasks:
   - id: WED-323
     title: Make Wedding decisions actionable and continue Batch 2 magnet delivery
-    status: in_progress
+    status: done
     owner: codex
     branch: agent/codex/WED-323
     worktree: C:/Users/ozans/Desktop/projects/OmnyID-WED-319
     depends_on: [WED-322, WED-320]
     files: [solid-ui/src/**, solid-ui/tests/**, wedding/**, Documents/marketing/wedding planning/posts/magnet/**, Documents/verification/**, .agent/**]
     acceptance: [the planning-basics-needed card is removed, RSVP follow-up decisions open an in-place editable recipient and generated contextual draft with send approval and contact details, vendor search behaves as a normal selectable text field without hover rerender interference, recommendation copy is evidence-backed and uses the relevant category allocation rather than the total wedding budget, research recommendations reveal readable linked evidence in Documents, the next dependency-ordered Batch 2 work reuses the shared profile and existing AFP import authorities, relevant tests and production build pass, exact-SHA Oracle deployment evidence is recorded]
-    progress: "Local candidate complete. Removed the competing planning-basics home card; pending-RSVP decisions now open an editable recipient/draft/contact-detail surface and use the existing AFP approval plus delivery route; vendor search keeps native caret/word/drag selection; transport and hen-night recommendations use saved evidence, relevant transport allocation and preference-matched formatted research artifacts instead of generic task copy. Began the next Batch 2 LP-04 dependency by reading the existing shared browser profile into a provenance-labelled intake review with per-fact toggles and sensitive facts off by default; normal intake remains the only AFP confirmation path. Typecheck, 2,170 Wedding tests, site/CSP/quiz/blog/profile smokes, line budgets and production build pass. Exact-SHA Oracle release pending."
+    progress: "Application SHA 1421f07d83d444dacbe527f7e165ab80c56e652f is live on Oracle. Removed the competing planning-basics home card; pending-RSVP decisions now open an editable recipient/draft/contact-detail surface and use the existing AFP approval plus delivery route; vendor search keeps native caret/word/drag selection; transport and hen-night recommendations use saved evidence, relevant transport allocation and preference-matched formatted research artifacts instead of generic task copy. Began the next Batch 2 LP-04 dependency by reading the existing shared browser profile into a provenance-labelled intake review with per-fact toggles and sensitive facts off by default; normal intake remains the only AFP confirmation path. The exact clean SHA passed typecheck, 2,170 Wedding tests, site/CSP/quiz/blog/profile smokes, line budgets and production build. Oracle SOURCE_COMMIT/runtime manifest match, /workspace returns 200, the deployed asset contains the new UI, the fresh backup verifies, all services are up and independent production proof passes. Root use is 78% with 9.9 GB free."
 
   - id: WED-322
     title: Unblock Batch 2 lead magnets and repair signed-in workspace guidance

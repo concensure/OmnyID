@@ -6818,3 +6818,13 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-319`, branch
 Still open in Batch 2: complete LP-04/LP-05 mappings for constructs beyond the present intake fields,
 cross-device result-file import, the reconciled Countdown catalogue, reviewed invitation wording
 library and licensed palette corpus. Those are not represented as published capabilities.
+
+Deployment follow-up: exact application SHA
+`1421f07d83d444dacbe527f7e165ab80c56e652f` was rebuilt and retested from clean detached worktree
+`C:\temp\omnyid-wed323-release-1421f07`, then deployed to Oracle. The deploy wrapper became locally
+idle after its hosted workspace smoke, after all remote transitions and a fresh verified backup had
+completed; it was stopped locally only. The repository production-proof command was then run
+independently with the restore drill skipped and passed. Oracle `SOURCE_COMMIT` and
+`oracle-runtime-manifest.json` match the full SHA, the deployed Wedding workspace asset contains the
+new decision UI, `/workspace/` returns HTTP 200, all configured services are up, and the fresh
+`20261103T043008Z` backup is internally verified. Root use is 78%, with 9.9 GB free.
