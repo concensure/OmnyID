@@ -6777,3 +6777,14 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-319`, branch
   Rust hunk is rustfmt-shaped. Countdown catalogue/date parity, the reviewed invitation phrase set and
   the licensed palette corpus remain genuine Batch 2 publication gates, so their launch posts remain
   unpublished.
+
+Deployment follow-up: application SHA `ef3045e26765f0adecfd75a3f855256070375800` was rebuilt from
+the clean detached worktree `C:\temp\omnyid-oracle-deploy-ef3045e` and deployed to Oracle. The first
+image export correctly failed closed when the disk reached 99%; no service transition occurred. A
+safe builder-cache prune removed 4.3 GB, and the previously authorised backup retention was applied:
+17 older snapshots were removed while the three newest 2 November recovery points were retained.
+`/var/backups/omnyid` fell from 15 GB to 2.1 GB before deployment. The retry built and recreated the
+UI, homeserver, backup and Caddy services. `SOURCE_COMMIT` and `oracle-runtime-manifest.json` both name
+the full SHA; the workspace returns HTTP 200 with CSP and no-cache headers. Independent production
+proof passed with homeserver and backup running, runtime scripts intact, and the fresh 3 November
+backup internally verified. The restore drill was skipped. Root usage was 76% after the fresh backup.
