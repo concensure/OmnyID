@@ -6887,10 +6887,12 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-319`, branch
   invitation wording library and licensed palette corpus. Do not publish gated claims before those
   underlying assets and handoffs are complete.
 
-## 2026-11-03 - WED-326 Binder email completion and Batch 2 signed-in handoff (Codex, candidate)
+## 2026-11-03 - WED-326 Binder email completion and Batch 2 signed-in handoff (Codex, complete)
 
 Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-319`, branch
-`agent/codex/WED-326`, based on WED-325 release-evidence commit `760fe2a`.
+`agent/codex/WED-326`, based on WED-325 release-evidence commit `760fe2a`. Exact deployed
+application SHA `08656091e9ed2d952ed761cc65106b68d186a2bd`; clean release checkout
+`C:\Users\ozans\AppData\Local\Temp\omnyid-wed326-release2-0865609`.
 
 - Binder POST responses now include the fillable and print downloads plus a clear `Continue in
   OmnyID Wedding` path. The landing page reveals all three immediately after submission while the
@@ -6907,6 +6909,14 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-319`, branch
   typecheck; 2,175 Wedding tests; Wedding website/CSP/quiz/account/blog/magnet tests; line budgets;
   production UI build; `git diff --check`. Docker Desktop was unreachable, so the opt-in disposable
   Postgres Binder retry test was not run in this local candidate.
+- Hosted evidence: Oracle `SOURCE_COMMIT` and `oracle-runtime-manifest.json` match the full SHA; the
+  public root and both Binder PDFs return 200; Binder is enabled; the live landing contains the
+  immediate-download and continuation UI; and one controlled Binder request returned
+  `downloads_ready` with `provider_accepted`. This proves provider acceptance, not inbox receipt.
+- Fresh production proof and backup verification pass. The immediately preceding detached proof
+  also completed its restore drill successfully. ClamAV became unhealthy when a signature refresh
+  left `clamd` defunct; a targeted container restart restored its configured healthcheck. All
+  production services are running. Root disk is 85% used with 7.1 GiB free.
 - Remaining Batch 2 gates are unchanged: the reconciled Countdown catalogue, reviewed invitation
   wording library and licensed/diversity-reviewed palette corpus must exist before those tools or
   their launch claims are published.
