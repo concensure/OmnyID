@@ -15,6 +15,17 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-328
+    title: Rotate Email Routing control-plane secret, enforce public metadata, and specify the admin growth panel
+    status: done
+    owner: codex
+    branch: agent/codex/WED-328
+    worktree: C:/Users/ozans/Desktop/projects/OmnyID-WED-319
+    depends_on: [WED-327, WED-326, WED-322]
+    files: [scripts/**, docs/**, wedding/**, AGENTS.md, CLAUDE.md, Documents/marketing/analytics/**, Documents/marketing/wedding planning/posts/magnet/**, .agent/**]
+    acceptance: [the replacement Cloudflare Email Routing token is handled without disclosure and stored using the existing gitignored local and file-backed Oracle secret conventions, non-mutating checks distinguish token validity from each granted control-plane capability and no routing DNS or Worker mutation is made merely to verify it, future indexable no-login OmnyID and Wedding pages are required by policy and an executable check to carry truthful en-AU canonical social and page-appropriate structured metadata, the next dependency-ready Batch 2 catalogue slice reuses the canonical Wedding task catalogue and shared magnet profile without publishing unreviewed tools, an implementation-ready admin growth panel specification and dependency-ordered task plan are created under Documents/marketing/analytics with a concrete agent and isolated-worktree recommendation, relevant secret-sync self-tests public-site tests Batch-2 tests line budgets and build checks pass]
+    progress: "Started from clean WED-327 evidence commit b8e06fe1d067544c3ca3d7e94a036f2ba9677c5d. The replacement omnyid_email_routing token was validated with non-mutating capability probes, moved from Downloads into a restricted gitignored local file, installed over the existing root-owned 0600 Oracle runtime secret, and mapped to all Email Routing consumers without logging its value or changing Cloudflare state. Public metadata policy is now enforced for 73 sitemap routes and indexable root HTML. Batch 2 now derives the existing six stages and 20 workspace tasks from one versioned catalogue while keeping public Countdown publication false. Growth-panel specification and dependency plan are complete. Secret-sync self-test, three catalogue tests, 2,179 Wedding tests, Wedding site tests, typecheck, line budgets and the production build pass. No application release was requested; production remains on 5a6ce9032e33c2fd80c8224b215d6be2c93d646c."
+
   - id: WED-327
     title: Stabilise Wedding UI and complete crawlable public Wedding foundations
     status: done

@@ -122,6 +122,26 @@ tag visible on the blog card; the richer catalogue tags remain available to
 article metadata and blog search. Run `scripts/reconcile-wedding-blog.ps1`
 when practical rather than editing generated catalogue fields by hand.
 
+## Public Page Metadata Contract
+
+Every indexable page that does not require sign-in under `docs/`, `wedding/`,
+or another public OmnyID surface must ship with the page content, not as a
+later SEO patch. Use `en-AU`, one truthful self-referencing canonical, complete
+Open Graph and Twitter metadata, and JSON-LD containing the OmnyID Pty Ltd
+Organization, the applicable SoftwareApplication, and a WebPage or Article.
+Articles identify Casper Wu and include visible, machine-readable publication
+dates. Campaign-only duplicates must be `noindex` and absent from the sitemap;
+indexable landing pages use their own canonical. Never add unsupported entity,
+availability, price, review, or business claims to structured data.
+
+Add each indexable public route to `docs/sitemap.xml` and run
+`node scripts/reconcile-wedding-seo.mjs` plus
+`node wedding/tests/public-metadata-smoke.mjs`. The reconciler covers both the
+root public site and Wedding pages despite its legacy filename. A new root HTML
+page must either appear in the sitemap and pass this contract or explicitly be
+`noindex`; transactional confirmation, reset, and authenticated pages stay out
+of the sitemap.
+
 ## Future Project Control Plane
 
 The desired long-term shape is a project MCP or AFP-backed development ledger

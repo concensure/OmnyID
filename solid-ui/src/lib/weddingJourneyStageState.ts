@@ -1,15 +1,14 @@
 import type { WeddingPlanningTaskItem } from "@/lib/weddingCalendarProjectionState";
+import {
+  WEDDING_CATALOGUE_STAGES,
+  WEDDING_CATALOGUE_WORKSPACE_TASKS,
+  WEDDING_TASK_CATALOGUE_VERSION,
+  type WeddingCatalogueStageId,
+} from "@/lib/weddingTaskCatalogueState";
 
-export const WEDDING_JOURNEY_STAGES = [
-  { id: "plan_budget", label: "Plan & budget" },
-  { id: "venue_date", label: "Venue & date" },
-  { id: "celebrant_suppliers", label: "Celebrant & suppliers" },
-  { id: "details_invites", label: "Details & invites" },
-  { id: "final_prep", label: "Final prep" },
-  { id: "wedding_after", label: "Wedding & after" },
-] as const;
+export const WEDDING_JOURNEY_STAGES = WEDDING_CATALOGUE_STAGES;
 
-export type WeddingJourneyStageId = typeof WEDDING_JOURNEY_STAGES[number]["id"];
+export type WeddingJourneyStageId = WeddingCatalogueStageId;
 
 export type WeddingJourneyTaskGroup = {
   category: string;
@@ -93,77 +92,30 @@ function correctedPrebuiltDeadline(task: WeddingPlanningTaskItem, weddingDate?: 
   return corrected ? { ...task, dueAt: corrected, dueLabel: corrected.slice(0, 10) } : task;
 }
 
-const RESEARCH_TASKS: Array<{ id: string; title: string; stage: WeddingJourneyStageId; days: number; notes?: string }> = [
-  { id: "save-the-dates", title: "Send save-the-dates", stage: "details_invites", days: -240 },
-  { id: "wedding-website", title: "Publish wedding website and guest information", stage: "details_invites", days: -210 },
-  { id: "invitations", title: "Send wedding invitations", stage: "details_invites", days: -120 },
-  { id: "rsvp-deadline", title: "Close RSVPs and confirm final guest count", stage: "final_prep", days: -42 },
-  { id: "guest-travel", title: "Confirm guest accommodation and transport information", stage: "details_invites", days: -90 },
-  { id: "permits-insurance", title: "Confirm venue permits and event insurance", stage: "venue_date", days: -150 },
-  { id: "final-fitting", title: "Complete final outfit fitting", stage: "final_prep", days: -14 },
-  { id: "rehearsal", title: "Hold ceremony rehearsal", stage: "final_prep", days: -7 },
-  { id: "shot-list", title: "Confirm photographer shot list", stage: "final_prep", days: -28 },
-  { id: "supplier-confirmations", title: "Complete final supplier confirmation sweep", stage: "final_prep", days: -21 },
-  { id: "weather-recheck", title: "Recheck weather and wet-weather plan", stage: "final_prep", days: -28 },
-  { id: "marriage-certificate", title: "Apply for the official marriage certificate", stage: "wedding_after", days: 7 },
-  { id: "thank-yous", title: "Send thank-you messages", stage: "wedding_after", days: 14 },
-  { id: "supplier-reviews", title: "Review wedding suppliers", stage: "wedding_after", days: 21 },
-  { id: "return-hire", title: "Return hired items", stage: "wedding_after", days: 2 },
-  {
-    id: "run-sheet-initial-vendor-draft",
-    title: "Send the initial run-sheet draft to key vendors",
-    stage: "final_prep",
-    days: -42,
-    notes: "Send the working run sheet to the photographer, caterer, venue manager and hair and makeup lead to confirm feasibility and timing.",
-  },
-  {
-    id: "run-sheet-finalise-logistics",
-    title: "Finalise run-sheet catering, speeches and transport times",
-    stage: "final_prep",
-    days: -21,
-    notes: "Confirm catering drop times, speech durations and transport pickup schedules.",
-  },
-  {
-    id: "run-sheet-master-signoff",
-    title: "Send the Final Master Run Sheet for vendor sign-off",
-    stage: "final_prep",
-    days: -10,
-    notes: "Send the final master version to every third-party vendor and ask them to confirm it.",
-  },
-  {
-    id: "run-sheet-vip-version",
-    title: "Send the tailored VIP and wedding-party run sheet",
-    stage: "final_prep",
-    days: -5,
-    notes: "Share only getting-ready times, photo locations, transport and responsibilities with the wedding party and parents.",
-  },
-  {
-    id: "run-sheet-day-of-copies",
-    title: "Prepare printed run-sheet copies for day-of leads",
-    stage: "wedding_after",
-    days: 0,
-    notes: "Provide printed copies to the venue manager, coordinator, photographer, DJ or MC and catering manager on the wedding day.",
-  },
-];
-
 export function addWeddingResearchTasks(
   tasks: readonly WeddingPlanningTaskItem[],
   weddingDate?: string | null,
 ): WeddingPlanningTaskItem[] {
   const result = tasks.map((task) => withWeddingJourneyStage(correctedPrebuiltDeadline(task, weddingDate)));
   const searchable = result.map((task) => `${task.id} ${task.title}`.toLowerCase());
-  for (const template of RESEARCH_TASKS) {
+  for (const template of WEDDING_CATALOGUE_WORKSPACE_TASKS) {
     if (searchable.some((value) => value.includes(template.id) || value.includes(template.title.toLowerCase()))) continue;
     result.push(withWeddingJourneyStage({
       id: `wedding-research:${template.id}`,
       title: template.title,
       kind: "other",
-      dueAt: dueDate(weddingDate, template.days),
-      dueLabel: dueDate(weddingDate, template.days)?.slice(0, 10) ?? null,
+      dueAt: dueDate(weddingDate, template.targetOffsetDays),
+      dueLabel: dueDate(weddingDate, template.targetOffsetDays)?.slice(0, 10) ?? null,
       priority: "normal",
       source: "agent",
       reviewStatus: "needs_review",
-      metadata: { wedding_journey_stage: template.stage, research_backed_template: true },
+      metadata: {
+        wedding_journey_stage: template.stageId,
+        research_backed_template: true,
+        wedding_catalogue_version: WEDDING_TASK_CATALOGUE_VERSION,
+        wedding_catalogue_task_id: template.id,
+        wedding_catalogue_source_id: template.sourceId,
+      },
       notes: template.notes ?? "Suggested from the wedding planning timeline research; edit the date to suit your plans.",
     }));
   }

@@ -6952,3 +6952,38 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-319`, branch
   Wedding use case, 200/308/404 routing, and full runtime SHA. Independent production proof passes;
   the latest backup is internally verified and the redundant restore drill was skipped after the
   deploy wrapper's post-proof became locally idle. Oracle root is 86% used with 6.4 GiB free.
+
+## 2026-11-04 - WED-328 token rotation, public metadata contract and Growth Panel plan (Codex, complete)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-319`, branch
+`agent/codex/WED-328`, based on clean evidence commit
+`b8e06fe1d067544c3ca3d7e94a036f2ba9677c5d`.
+
+- Replaced the revoked Cloudflare Email Routing credential with the user-provided
+  `omnyid_email_routing` token without printing or committing it. Non-mutating probes verified token,
+  account and zone visibility for routing addresses, Workers scripts, sending suppressions, routing
+  rules, Worker routes and DNS. The Downloads source was removed after installing an ACL-restricted
+  gitignored local secret and the existing root-owned `0600` Oracle runtime secret. The running
+  homeserver sees the replacement file; no restart or Cloudflare state mutation was needed.
+- Updated the Oracle secret-sync plan so transactional mail, vendor mail, operator relay and the
+  generic Email Routing consumer share the existing canonical runtime secret rather than creating
+  stale per-consumer copies. Its self-test resolves one upload and one runtime path.
+- Extended deterministic public metadata reconciliation beyond Wedding to all indexable root pages
+  in the sitemap. Added the repository policy and a 73-route smoke test for locale, self-canonical,
+  social metadata and page-appropriate JSON-LD. Wedding site, CSP, account, blog, quiz and magnet
+  checks remain green.
+- Continued Batch 2 with a versioned canonical six-stage/task catalogue. The 20 existing workspace
+  tasks now carry catalogue provenance and the journey projection consumes the same authority.
+  `WEDDING_COUNTDOWN_PUBLICATION_READY` remains false: vendor timing coverage, reviewed Australian
+  legal copy, invitation wording and licensed/diversity-reviewed palette assets remain open.
+- Added implementation-ready Growth Panel specification and dependency-ordered tasks under
+  `Documents/marketing/analytics`. The recommended isolated implementation is branch
+  `agent/codex/GROWTH-001` in `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, based on the final
+  clean WED-328 commit, with Codex/GPT-6 Astra high as implementer and an independent architecture/
+  privacy review.
+- Evidence: token capability probes and local/Oracle/runtime digest equality passed without storing
+  the digest; secret-sync self-test passed; three catalogue tests, all 2,179 Wedding tests, public
+  site tests, typecheck, line budgets, `git diff --check` and the production UI build passed.
+- No application deployment was requested or performed. Oracle application provenance remains
+  `5a6ce9032e33c2fd80c8224b215d6be2c93d646c`; only the file-backed Cloudflare control credential was
+  rotated in place.

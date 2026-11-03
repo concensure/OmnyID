@@ -12,9 +12,14 @@ $script:OracleRemoteSecretFileNames = @{
     "OMNYID_GMAIL_REFRESH_TOKEN_FILE" = "omnyid_gmail_refresh_token"
     "OMNYID_IMAP_PASSWORD_FILE"       = "omnyid_imap_password"
     "SMTP_PASS_FILE"                  = "omnyid_smtp_pass"
-    "OMNYID_TRANSACTIONAL_CLOUDFLARE_API_TOKEN_FILE" = "omnyid_transactional_cloudflare_api_token"
+    # One reviewed account/zone token currently covers Email Sending and the
+    # Email Routing/Worker control plane. Keep every existing consumer on the
+    # same file so a deployment cannot silently resurrect a revoked copy.
+    "OMNYID_EMAIL_ROUTING_TOKEN_FILE" = "omnyid_vendor_mail_cloudflare_api_token"
+    "OMNYID_TRANSACTIONAL_CLOUDFLARE_API_TOKEN_FILE" = "omnyid_vendor_mail_cloudflare_api_token"
     "OMNYID_TRANSACTIONAL_RESEND_API_KEY_FILE" = "omnyid_transactional_resend_api_key"
     "OMNYID_VENDOR_MAIL_CLOUDFLARE_API_TOKEN_FILE" = "omnyid_vendor_mail_cloudflare_api_token"
+    "OMNYID_OPERATOR_EMAIL_RELAY_CLOUDFLARE_API_TOKEN_FILE" = "omnyid_vendor_mail_cloudflare_api_token"
     "OMNYID_VENDOR_MAIL_RESEND_API_KEY_FILE" = "omnyid_vendor_mail_resend_api_key"
     "OMNYID_VENDOR_MAIL_WORKER_SHARED_SECRET_FILE" = "omnyid_vendor_mail_worker_shared_secret"
     "OMNYID_VENDOR_MAIL_INGRESS_ENCRYPTION_KEY_FILE" = "omnyid_vendor_mail_ingress_encryption_key"

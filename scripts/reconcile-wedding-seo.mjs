@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const weddingRoot = resolve(repoRoot, 'wedding');
+const docsRoot = resolve(repoRoot, 'docs');
 const origin = 'https://omnyid.com';
 const markerPattern = /\s*<!-- omnyid-seo:start -->[\s\S]*?<!-- omnyid-seo:end -->\s*/gi;
 const months = new Map([
@@ -45,6 +46,10 @@ function first(html, pattern, fallback = '') {
 }
 
 function pageUrl(path) {
+  if (path.startsWith(`${docsRoot}${sep}`)) {
+    const rel = relative(docsRoot, path).split(sep).join('/');
+    return rel === 'index.html' ? `${origin}/` : `${origin}/${rel}`;
+  }
   const rel = relative(weddingRoot, path).split(sep).join('/');
   if (rel === 'index.html') return `${origin}/wedding/`;
   if (rel.endsWith('/index.html')) return `${origin}/wedding/${rel.slice(0, -10)}`;
@@ -52,7 +57,11 @@ function pageUrl(path) {
 }
 
 function absoluteImage(path, source, canonical) {
-  if (!source) return `${origin}/wedding/assets/images/vendor-reply-flow.png`;
+  if (!source) {
+    return path.startsWith(`${docsRoot}${sep}`)
+      ? `${origin}/logo/omnyid-logo.png`
+      : `${origin}/wedding/assets/images/vendor-reply-flow.png`;
+  }
   try {
     const pageBase = canonical.endsWith('/') ? canonical : new URL('.', canonical).href;
     return new URL(source, pageBase).href;
@@ -75,7 +84,7 @@ function removeGeneratedMeta(html) {
     .replace(/\s*<meta\s+(?:property|name)=["'](?:og:[^"']+|twitter:[^"']+|article:published_time|article:author)["'][^>]*>\s*/gi, '\n');
 }
 
-function schemaGraph({ canonical, title, description, image, article, published }) {
+function schemaGraph({ canonical, title, description, image, article, published, wedding }) {
   const organisation = {
     '@type': 'Organization',
     '@id': `${origin}/#organization`,
@@ -85,12 +94,14 @@ function schemaGraph({ canonical, title, description, image, article, published 
   };
   const application = {
     '@type': 'SoftwareApplication',
-    '@id': `${origin}/wedding/#application`,
-    name: 'OmnyID Wedding',
-    applicationCategory: 'LifestyleApplication',
+    '@id': wedding ? `${origin}/wedding/#application` : `${origin}/#application`,
+    name: wedding ? 'OmnyID Wedding' : 'OmnyID',
+    applicationCategory: wedding ? 'LifestyleApplication' : 'ProductivityApplication',
     operatingSystem: 'Web',
-    url: `${origin}/wedding/`,
-    description: 'A connected wedding planning workspace for Australian couples.',
+    url: wedding ? `${origin}/wedding/` : origin,
+    description: wedding
+      ? 'A connected wedding planning workspace for Australian couples.'
+      : 'A local-first workspace that turns scattered information into reviewable decisions.',
     publisher: { '@id': `${origin}/#organization` },
   };
   const page = article
@@ -114,18 +125,33 @@ function schemaGraph({ canonical, title, description, image, article, published 
         description,
         url: canonical,
         inLanguage: 'en-AU',
-        isPartOf: { '@id': `${origin}/wedding/#application` },
+        isPartOf: { '@id': wedding ? `${origin}/wedding/#application` : `${origin}/#application` },
       };
   return { '@context': 'https://schema.org', '@graph': [organisation, application, page] };
 }
 
+function rootIndexableFiles() {
+  const sitemap = readFileSync(resolve(docsRoot, 'sitemap.xml'), 'utf8');
+  return Array.from(sitemap.matchAll(/<loc>(https:\/\/omnyid\.com\/[^<]*)<\/loc>/g), (match) => match[1])
+    .filter((url) => !url.startsWith(`${origin}/wedding/`))
+    .map((url) => {
+      const pathname = new URL(url).pathname;
+      return pathname === '/' ? resolve(docsRoot, 'index.html') : resolve(docsRoot, pathname.slice(1));
+    });
+}
+
 let updated = 0;
-for (const path of htmlFiles(weddingRoot)) {
+for (const path of [...htmlFiles(weddingRoot), ...rootIndexableFiles()]) {
   let html = readFileSync(path, 'utf8');
   const canonical = pageUrl(path);
-  const article = relative(weddingRoot, path).split(sep)[0] === 'blog';
-  const title = first(html, /<title[^>]*>([\s\S]*?)<\/title>/i, 'OmnyID Wedding');
-  const description = first(html, /<meta\s+name=["']description["']\s+content=["']([^"']*)["'][^>]*>/i, 'Wedding planning guidance from OmnyID Wedding.');
+  const wedding = path.startsWith(`${weddingRoot}${sep}`);
+  const article = wedding && relative(weddingRoot, path).split(sep)[0] === 'blog';
+  const title = first(html, /<title[^>]*>([\s\S]*?)<\/title>/i, wedding ? 'OmnyID Wedding' : 'OmnyID');
+  const description = first(
+    html,
+    /<meta\s+name=["']description["']\s+content=["']([^"']*)["'][^>]*>/i,
+    wedding ? 'Wedding planning guidance from OmnyID Wedding.' : 'Privacy-first decision support from OmnyID.',
+  );
   const imageSource = article
     ? first(html, /<div\s+class=["']article-cover["'][^>]*>\s*<img[^>]+src=["']([^"']+)["'][^>]*>/i, '')
     : first(html, /<img[^>]+src=["']([^"']+)["'][^>]*>/i, '');
@@ -140,7 +166,7 @@ for (const path of htmlFiles(weddingRoot)) {
       html = html.replace(/(<h1[^>]*>[\s\S]*?<\/h1>)/i, '$1\n      <p class="article-byline">By Casper Wu</p>');
     }
   }
-  const graph = JSON.stringify(schemaGraph({ canonical, title, description, image, article, published })).replaceAll('<', '\\u003c');
+  const graph = JSON.stringify(schemaGraph({ canonical, title, description, image, article, published, wedding })).replaceAll('<', '\\u003c');
   const block = [
     '<!-- omnyid-seo:start -->',
     `<link rel="canonical" href="${attr(canonical)}">`,
@@ -163,4 +189,4 @@ for (const path of htmlFiles(weddingRoot)) {
   updated += 1;
 }
 
-console.log(`Reconciled canonical, social and structured metadata for ${updated} Wedding pages.`);
+console.log(`Reconciled canonical, social and structured metadata for ${updated} public pages.`);

@@ -2509,3 +2509,26 @@ subjective usability or a controlled external cohort.
 - Batch 2 profile-import measurement stores only bounded counts and event names. Wedding facts,
   answers and free text are not analytics properties; the existing profile and intake remain the
   state and provenance authorities.
+
+# 2026-11-04 - WED-328 Email Routing control plane, public metadata and shared catalogue
+
+- Cloudflare Email Routing control-plane access uses one restricted, file-backed secret for the
+  transactional, vendor-mail and operator-relay consumers. Local configuration points to a
+  gitignored ACL-restricted file; Oracle mounts the existing root-owned `0600` runtime file. Token
+  rotation is verified with non-mutating per-capability probes and never requires the value or its
+  fingerprint in logs, Git, evidence or command arguments.
+- A token capability check does not authorise a rollout. Rotation makes no DNS, Worker, route,
+  allowlist, feature-flag or message-send change, and the existing runtime file path is retained so
+  future deployments cannot revive separate stale token copies.
+- Every indexable, unauthenticated OmnyID page uses `en-AU`, a truthful self-canonical, Open Graph
+  and Twitter metadata, plus Organization, SoftwareApplication and WebPage or Article JSON-LD.
+  Articles name Casper Wu and carry dates. Campaign duplicates are either self-contained indexable
+  pages or excluded from both indexing and the sitemap; an executable sitemap smoke test enforces
+  the contract for future pages.
+- Wedding stage names and the existing workspace task slice now derive from one versioned catalogue.
+  Public Countdown publication remains false until the complete vendor timing catalogue and reviewed
+  Australian legal block are present; shared authority is not evidence that the public tool is ready.
+- The future growth panel is a rebuildable, admin-only projection over existing AFP, auth, billing
+  and first-party site measurement authorities. It does not use an LLM for routine analytics, does
+  not infer revenue from client events, and does not claim 30-day cross-session attribution without
+  explicit persistent-attribution consent.
