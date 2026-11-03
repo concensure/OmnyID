@@ -15,6 +15,17 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-322
+    title: Unblock Batch 2 lead magnets and repair signed-in workspace guidance
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-322
+    worktree: C:/Users/ozans/Desktop/projects/OmnyID-WED-319
+    depends_on: [WED-321, WED-320, WED-319]
+    files: [wedding/**, solid-ui/src/**, solid-ui/tests/**, src/server/**, Documents/marketing/wedding planning/posts/magnet/**, Documents/verification/**, .agent/**]
+    acceptance: [Batch 2 profile and output contracts reuse existing Wedding AFP writers and public magnet shell, no tool is published before its deterministic output and workspace handoff are truthful, signed-in wedding setup actions work in place including a date calendar, workspace default typography is readable, Master Agent reports the actual usable provider and collapses suggestions on execution, Chrome built-in AI is capability-detected and never falsely promised, Discover can open the relevant automation controls in place, Contacts has a concise empty state and contextual action hierarchy, Agent Fleet failures preserve useful diagnostics and recover when the existing backend is available, relevant frontend Rust static-site accessibility build and line-budget checks pass, exact-SHA Oracle deployment evidence is recorded before publication]
+    progress: "Started from the clean deployed WED-321 lineage at 439770531a476cfc643a8f25514b2b8464f6f7eb. The older primary checkout is explicitly excluded. WED-146 overlaps Master Agent and Contacts on an obsolete lineage, so this slice adapts current contracts without copying that branch."
+
   - id: WED-321
     title: Repair public journey controls and make Wedding run-sheet actions usable in place
     status: ready
