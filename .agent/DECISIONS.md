@@ -2620,3 +2620,18 @@ subjective usability or a controlled external cohort.
 - Source/event uniqueness makes retry and cursor rewind idempotent. Wedding creation and first
   activation are singletons; meaningful activity counts qualifying source actions once per Sydney
   calendar day. A deleted or unauthorised source does not project.
+
+# 2026-11-04 - GROWTH-04 payment reconciliation boundary
+
+- `billing_events` remains the signed provider authority. Growth accepts only live, paid one-off
+  Wedding Checkout success and cumulative `charge.refunded` facts; checkout start, test mode,
+  unpaid state and arbitrary client amounts are never revenue.
+- The Checkout Session and PaymentIntent carry server-bound account, canonical Wedding, resolved
+  Stripe price and product-key metadata. The requested Wedding must already belong to the account;
+  multiple Weddings require an explicit identifier rather than a guess.
+- PaymentIntent is the transaction identity. Exact event IDs and distinct success event IDs are
+  both replay-safe, while cumulative refunds update partial/full state without deleting purchase
+  history. A mismatched owner, Wedding, currency, price or product fails closed.
+- Gross, tax when provided, cumulative refund, first purchase and 30-day maturity are reportable.
+  Profitability is not: it remains explicitly incomplete until the effective append-only cost
+  revision contains fixed payment cost, payment rate, service cost and the transaction has tax.

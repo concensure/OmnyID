@@ -201,14 +201,14 @@ pub const GROWTH_EVENT_DEFINITIONS: &[GrowthEventDefinition] = &[
     },
     GrowthEventDefinition {
         event: "payment_refunded",
-        availability: SourceAvailability::Absent,
-        source_authority: "none",
-        source_selector: "refund event is not currently accepted into the billing projection",
+        availability: SourceAvailability::Direct,
+        source_authority: "billing_events",
+        source_selector: "signed accepted live-mode charge.refunded event correlated to an existing payment-v1 transaction",
         unit: GrowthUnit::Transaction,
         acquisition_increment: false,
         activation_eligible: false,
         allowed_metadata: BILLING_METADATA,
-        note: "Do not report net revenue or paid reversals until signed refund ingestion exists.",
+        note: "Cumulative refunds reconcile transaction state without deleting the original success.",
     },
 ];
 
@@ -285,7 +285,7 @@ pub const GROWTH_KPI_DEFINITIONS: &[GrowthKpiDefinition] = &[
         denominator: "distinct mature acquired Weddings with a qualifying first purchase within 30 days",
         maturity_days: 30,
         zero_denominator_state: "no_purchases",
-        note: "Unavailable until payment and refund reconciliation are complete.",
+        note: "Uses the first qualifying live payment per Wedding; immature cohorts remain provisional.",
     },
 ];
 
@@ -395,7 +395,7 @@ mod tests {
     }
 
     #[test]
-    fn unavailable_history_and_refunds_are_not_invented() {
+    fn unavailable_history_is_not_invented_and_refunds_have_an_authority() {
         assert_eq!(
             GROWTH_PRIVACY_POLICY_V1.historic_attribution_backfill,
             "unavailable_when_no_eligible_touch_was_recorded"
@@ -406,7 +406,7 @@ mod tests {
         );
         assert_eq!(
             event_definition("payment_refunded").unwrap().availability,
-            SourceAvailability::Absent
+            SourceAvailability::Direct
         );
     }
 

@@ -37,6 +37,15 @@ If the task is missing, add it to `.agent/TASKS.yaml` with an owner, lifecycle
 status, branch, dependencies, file scope, and acceptance criteria before doing
 substantive work.
 
+## Local Worktree Storage
+
+- Put disposable verification and release worktrees under `C:\temp\wt\`; do
+  not scatter new throwaway checkouts through Desktop, `.worktrees`, or user
+  Temp folders.
+- Reuse `CARGO_TARGET_DIR=C:\cargo-target` across retained worktrees. Do not
+  create another multi-gigabyte per-worktree Cargo `target/` unless a task
+  explicitly requires isolated compiler output.
+
 ## Branch And PR Boundaries
 
 Do not casually work on `main` for implementation tasks. Use task branches:

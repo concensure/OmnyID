@@ -7115,3 +7115,34 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
   Evidence: `Documents/verification/growth-03-activation-projection-evidence-2026-11-04.md`.
 - Not deployed. The next independent P0 slices are GROWTH-04 signed payment/refund reconciliation
   and GROWTH-05 manual spend/Meta CSV import; GROWTH-06 rollups depends on both.
+
+# 2026-11-04 - Worktree retirement and GROWTH-04 payment progress (Codex, in progress)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
+`agent/codex/GROWTH-001`, base SHA
+`c5b2ee0f144e3a21d0a6505e26c2e8af76d872a4`.
+
+- Storage cleanup reclaimed roughly 280 GB of duplicated Cargo output; C: had 316.9 GB free after
+  cleanup. `CARGO_TARGET_DIR` is persisted as `C:\cargo-target`, `C:\temp\wt` is the required new
+  throwaway-worktree root, and `AGENTS.md` records both rules.
+- A verified all-refs recovery bundle is at
+  `C:\temp\omnyid-retirement-20261104\omnyid-all-refs-before-retirement.bundle`. Dirty disposable
+  checkout evidence and the staged ritzy-child patch are beside it. Thirty-six disposable/retired
+  worktrees and 91 merged/stale local branches were removed. The active WED-319 and Growth trees,
+  the latest WED-329 release checkout, and every dirty feature worktree were preserved.
+- `C:\temp\omnyid-artifacts-before-2026-10-04.zip` contains 9,220 superseded artifact files; the
+  newest complete run per evidence family and all tracked artifacts remain in the repository.
+  `.kilo`, `.secrets/oracle-backup-archive` and per-worktree Cargo targets were removed as requested.
+- GROWTH-04 now has a `payment-v1` classifier and rebuildable projection. Checkout binds a
+  tenant-owned Wedding and resolved Stripe price to the Session and PaymentIntent. Only live paid
+  Wedding success qualifies; cumulative `charge.refunded` events reconcile partial/full state by
+  PaymentIntent. Replays cannot double revenue, and test/unbound/mismatched events fail closed.
+- Added first-purchase/30-day maturity summary and append-only variable-cost revisions.
+  Profitability is typed incomplete when tax or any fixed/rate/service input is missing.
+- Passed: 19 Growth tests, 21 billing tests, migration-catalog parity, `cargo check --lib`, Solid
+  line budgets, large-file line-neutrality, new-file line limits and diff checks. Evidence is in
+  `Documents/verification/growth-04-payment-projection-progress-2026-11-04.md`.
+- Still open: the implemented real Postgres case did not run because Docker Desktop repeatedly
+  returned `Docker Desktop is unable to start`. The unidentified stale localhost listener was not
+  used. Do not mark GROWTH-04 done until a fresh tmpfs `omnyid_test` container applies all 140
+  migrations and passes the focused scenario. Nothing was deployed and no Stripe action occurred.

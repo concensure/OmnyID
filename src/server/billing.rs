@@ -1,5 +1,4 @@
 use std::sync::Arc;
-
 use axum::{
     Json,
     extract::State,
@@ -13,21 +12,18 @@ use super::{
     status_to_http,
 };
 use crate::secret_manager::read_process_secret_trimmed;
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct StoragePolicy {
     pub quota_bytes: i64,
     pub max_upload_bytes: i64,
     pub addon_count: u32,
 }
-
 const MIB_BYTES: i64 = 1024 * 1024;
 // Wedding accounts start with 50 MiB; the one-off Wedding upgrade grants 100 MiB.
 const FREE_STORAGE_BYTES: i64 = 50 * MIB_BYTES;
 const PAID_STORAGE_BYTES: i64 = 100 * MIB_BYTES;
 const FREE_MAX_UPLOAD_BYTES: i64 = 25 * 1024 * 1024;
 const PAID_MAX_UPLOAD_BYTES: i64 = 100 * 1024 * 1024;
-
 pub(crate) fn storage_policy_for_plan(plan: &str) -> StoragePolicy {
     let raw = plan.trim().to_ascii_lowercase();
     let is_free = raw.is_empty()
@@ -41,14 +37,12 @@ pub(crate) fn storage_policy_for_plan(plan: &str) -> StoragePolicy {
             addon_count: 0,
         };
     }
-
     StoragePolicy {
         quota_bytes: PAID_STORAGE_BYTES,
         max_upload_bytes: PAID_MAX_UPLOAD_BYTES,
         addon_count: 0,
     }
 }
-
 /// Operators are identified from the same configured allow-list used for the
 /// administrative cost controls.  A client supplied billing plan must never
 /// be enough to grant unlimited storage.
@@ -62,7 +56,6 @@ pub(crate) fn storage_policy_for_account(plan: &str, email: &str) -> StoragePoli
     }
     storage_policy_for_plan(plan)
 }
-
 pub(crate) fn enrich_billing_status_with_storage(
     status: &mut Value,
     used_bytes: i64,
@@ -98,29 +91,25 @@ pub(crate) fn enrich_billing_status_with_storage(
     status["billing_portal_available"] = serde_json::json!(self_serve.portal_enabled);
     policy
 }
-
 #[derive(Deserialize)]
 pub(super) struct ArchiveOnlyModeBody {
     enabled: bool,
 }
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct BillingSelfServeConfig {
     checkout_enabled: bool,
     portal_enabled: bool,
 }
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum StripeCheckoutReference {
     Price(String),
     Product(String),
 }
-
 #[derive(Deserialize)]
 pub(super) struct BillingCheckoutBody {
     plan: Option<String>,
+    wedding_plan_id: Option<String>,
 }
-
 #[derive(Deserialize)]
 pub(super) struct ExternalToolUsageBody {
     tool_slug: String,
@@ -136,7 +125,6 @@ pub(super) struct ExternalToolUsageBody {
     occurred_at: Option<String>,
     metadata_json: Option<Value>,
 }
-
 fn normalize_usage_event_text(value: &str, max_len: usize) -> Option<String> {
     let normalized = value.trim();
     if normalized.is_empty()
@@ -147,16 +135,13 @@ fn normalize_usage_event_text(value: &str, max_len: usize) -> Option<String> {
     }
     Some(normalized.to_string())
 }
-
 fn normalize_usage_event_optional_text(value: Option<String>, max_len: usize) -> Option<String> {
     let normalized = value?;
     normalize_usage_event_text(&normalized, max_len)
 }
-
 fn usage_event_number_is_valid(value: f64) -> bool {
     value.is_finite() && (0.0..=1_000_000.0).contains(&value)
 }
-
 fn connected_tool_billing_json(record: &crate::db::McpToolConnectionRecord) -> Option<Value> {
     let descriptor = record.tool_descriptor.as_ref()?.as_object()?;
     let billing = descriptor.get("billing")?.as_object()?;
@@ -179,7 +164,6 @@ fn connected_tool_billing_json(record: &crate::db::McpToolConnectionRecord) -> O
         "estimated_cost_usd_per_call": billing.get("estimated_cost_usd_per_call").and_then(Value::as_f64),
     }))
 }
-
 fn enrich_billing_status_with_external_tool_usage(
     status: &mut Value,
     connections: &[crate::db::McpToolConnectionRecord],
@@ -201,7 +185,6 @@ fn enrich_billing_status_with_external_tool_usage(
         })
         .filter(|value| !value.is_empty())
         .collect::<std::collections::BTreeSet<_>>();
-
     let total_estimated_cost_usd: f64 = usage_summary
         .iter()
         .map(|row| row.total_estimated_cost_usd.max(0.0))
@@ -215,7 +198,6 @@ fn enrich_billing_status_with_external_tool_usage(
         .sum();
     let built_in_estimated_cost_usd =
         (total_estimated_cost_usd - connected_estimated_cost_usd).max(0.0);
-
     let mut categories = std::collections::BTreeMap::<String, (f64, f64, u64)>::new();
     for row in usage_summary {
         let entry = categories
@@ -310,7 +292,6 @@ fn enrich_billing_status_with_external_tool_usage(
             .collect::<Vec<_>>(),
     });
 }
-
 fn enrich_billing_status_with_operational_guidance(
     status: &mut Value,
     guidance: Option<crate::server::types::RuntimeOperationalGuidanceResponse>,
@@ -321,17 +302,14 @@ fn enrich_billing_status_with_operational_guidance(
         }
     }
 }
-
 fn stripe_secret_key_value() -> Option<String> {
     stripe_config_value(&["OMNYID_STRIPE_SECRET_KEY", "STRIPE_SECRET_KEY"])
         .filter(|value| stripe_secret_key_looks_valid(value))
 }
-
 fn stripe_webhook_secret_value() -> Option<String> {
     read_process_secret_trimmed("OMNYID_STRIPE_WEBHOOK_SECRET")
         .filter(|value| stripe_webhook_secret_looks_valid(value))
 }
-
 fn stripe_secret_key_looks_valid(value: &str) -> bool {
     let trimmed = value.trim();
     (trimmed.starts_with("sk_live_")
@@ -340,39 +318,32 @@ fn stripe_secret_key_looks_valid(value: &str) -> bool {
         || trimmed.starts_with("rk_test_"))
         && trimmed.len() > "rk_test_".len()
 }
-
 fn stripe_webhook_secret_looks_valid(value: &str) -> bool {
     let trimmed = value.trim();
     trimmed.starts_with("whsec_") && trimmed.len() > "whsec_".len()
 }
-
 fn stripe_price_id_looks_valid(value: &str) -> bool {
     let trimmed = value.trim();
     trimmed.starts_with("price_") && trimmed.len() > "price_".len()
 }
-
 fn stripe_product_id_looks_valid(value: &str) -> bool {
     let trimmed = value.trim();
     trimmed.starts_with("prod_") && trimmed.len() > "prod_".len()
 }
-
 fn stripe_config_value(names: &[&str]) -> Option<String> {
     names
         .iter()
         .find_map(|name| read_process_secret_trimmed(name))
 }
-
 fn stripe_checkout_reference_looks_valid(reference: &StripeCheckoutReference) -> bool {
     match reference {
         StripeCheckoutReference::Price(value) => stripe_price_id_looks_valid(value),
         StripeCheckoutReference::Product(value) => stripe_product_id_looks_valid(value),
     }
 }
-
 pub(crate) fn billing_workspace_base_url_is_configured() -> bool {
     billing_workspace_base_url().is_some()
 }
-
 fn billing_self_serve_config() -> BillingSelfServeConfig {
     let secret_present = stripe_secret_key_value().is_some();
     let webhook_secret_present = stripe_webhook_secret_value().is_some();
@@ -389,7 +360,6 @@ fn billing_self_serve_config() -> BillingSelfServeConfig {
         portal_enabled: secret_present && return_url_ready,
     }
 }
-
 fn stripe_secret_key_configured() -> Result<String, (StatusCode, String)> {
     stripe_secret_key_value().ok_or_else(|| {
         (
@@ -398,7 +368,6 @@ fn stripe_secret_key_configured() -> Result<String, (StatusCode, String)> {
         )
     })
 }
-
 pub(crate) fn stripe_checkout_reference_for_plan(plan: &str) -> Option<StripeCheckoutReference> {
     let value = match plan.trim().to_ascii_lowercase().as_str() {
         "pro" => stripe_config_value(&[
@@ -474,12 +443,13 @@ async fn create_stripe_checkout_session(
     existing_customer_id: Option<&str>,
     customer_email: Option<&str>,
     account_id: &str,
+    wedding_plan_id: &str,
     checkout_reference: &StripeCheckoutReference,
 ) -> Result<String, (StatusCode, String)> {
     let price_id = resolve_stripe_checkout_price_id(secret_key, checkout_reference).await?;
     let mut params = vec![
         ("mode".to_string(), "payment".to_string()),
-        ("line_items[0][price]".to_string(), price_id),
+        ("line_items[0][price]".to_string(), price_id.clone()),
         ("line_items[0][quantity]".to_string(), "1".to_string()),
         ("customer_creation".to_string(), "always".to_string()),
         (
@@ -499,6 +469,11 @@ async fn create_stripe_checkout_session(
             "omnyid_wedding".to_string(),
         ),
     ];
+    params.extend(crate::growth_analytics::stripe_checkout_binding_params(
+        account_id,
+        wedding_plan_id,
+        &price_id,
+    ));
     if let Some(customer_id) = existing_customer_id.filter(|value| !value.trim().is_empty()) {
         params.push(("customer".to_string(), customer_id.to_string()));
     } else if let Some(email) = customer_email.filter(|value| !value.trim().is_empty()) {
@@ -772,6 +747,9 @@ pub(super) async fn billing_webhook_http(
         .map_err(status_to_http)?;
 
     if !inserted {
+        if let Err(error) = state.db.project_growth_payment_payload(&event_id, &payload).await {
+            tracing::warn!(%error, %event_id, "Growth payment projection remains queued for reconciliation");
+        }
         return Ok(Json(serde_json::json!({
             "received": true,
             "duplicate": true,
@@ -794,6 +772,10 @@ pub(super) async fn billing_webhook_http(
             .await
             .map_err(internal_error)
             .map_err(status_to_http)?;
+    }
+
+    if let Err(error) = state.db.project_growth_payment_payload(&event_id, &payload).await {
+        tracing::warn!(%error, %event_id, "Growth payment projection remains queued for reconciliation");
     }
 
     Ok(Json(
@@ -914,6 +896,9 @@ fn extract_billing_event_fields(
 }
 
 fn checkout_payment_is_paid(payload: &Value) -> bool {
+    if payload.get("livemode").and_then(Value::as_bool) != Some(true) {
+        return false;
+    }
     let event_type = payload
         .get("type")
         .and_then(Value::as_str)
@@ -1128,6 +1113,10 @@ pub(super) async fn billing_checkout_http(
                 "Stripe checkout is not configured for the requested plan.".to_string(),
             )
         })?;
+    let wedding_plan_id = state.db
+        .resolve_growth_checkout_wedding_plan(&user.id, body.wedding_plan_id.as_deref()).await
+        .map_err(internal_error).map_err(status_to_http)?
+        .ok_or((StatusCode::CONFLICT, "Save one Wedding plan before starting Wedding checkout.".to_string()))?;
     let status = state
         .db
         .get_billing_status(&user.id)
@@ -1156,6 +1145,7 @@ pub(super) async fn billing_checkout_http(
         status.get("stripe_customer_id").and_then(Value::as_str),
         Some(&user.email),
         &user.id,
+        &wedding_plan_id,
         &checkout_reference,
     )
     .await?;
@@ -1331,6 +1321,7 @@ mod tests {
     fn paid_wedding_checkout_event_is_the_only_checkout_event_that_changes_entitlement() {
         let paid = serde_json::json!({
             "type": "checkout.session.completed",
+            "livemode": true,
             "data": { "object": {
                 "mode": "payment",
                 "payment_status": "paid",
@@ -1351,8 +1342,17 @@ mod tests {
         // the entitlement status persisted by OmnyID.
         assert_eq!(status.as_deref(), Some("active"));
 
+        let mut test_mode = paid.clone();
+        test_mode["livemode"] = serde_json::json!(false);
+        assert!(!checkout_payment_is_paid(&test_mode));
+        assert!(!billing_event_updates_entitlement(
+            &test_mode,
+            Some("user_abc")
+        ));
+
         let unpaid = serde_json::json!({
             "type": "checkout.session.completed",
+            "livemode": true,
             "data": { "object": {
                 "mode": "payment",
                 "payment_status": "unpaid",
