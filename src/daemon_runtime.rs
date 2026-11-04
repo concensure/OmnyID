@@ -913,6 +913,7 @@ pub fn seaweedfs_client() -> Option<ObjectStoreClient> {
     let region =
         std::env::var("OMNYID_SEAWEEDFS_REGION").unwrap_or_else(|_| "us-east-1".to_string());
     let config = S3Config::builder()
+        .behavior_version_latest()
         .region(Region::new(region))
         .credentials_provider(Credentials::new(
             access_key, secret_key, None, None, "omnyid",

@@ -7298,3 +7298,22 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
   no-secret-logging cases. Nothing has been deployed from this commit yet; production still reports
   WED-329. Next action is an exact-SHA clean release build, hosted dependency check, and either keep
   quote study disabled or prove one synthetic upload/deletion before enabling it.
+
+# 2026-11-05 - WED-331 Oracle release and quote-study S3 regression (Codex, in progress)
+
+- Exact candidate `6a3501364bd8bf5f42b03315a1beafbcb95f99b1` was built from clean detached
+  worktree `C:\temp\wt\omnyid-wed331-release-6a35013` and released to Oracle. Hosted
+  `SOURCE_COMMIT` and `oracle-runtime-manifest.json` match it. Core services run; backup verification
+  and the restore drill passed. A hosted 375px Chromium journey built a future-date Countdown with
+  no page error.
+- Quote-study dependency checks found mounted OpenRouter and SeaweedFS credentials and reachable
+  ClamAV/SeaweedFS services. The first consented fictional quote returned 502 before issuing a
+  receipt. Logs identified an AWS SDK panic while constructing the shared S3 client because its
+  service config did not set a behaviour version. The feature flag was immediately restored to
+  `false`; no study submission or undeleted synthetic object was created.
+- `src/daemon_runtime.rs` now selects the current AWS SDK behaviour version. New isolated regression
+  `tests/seaweedfs_client_config.rs` constructs the same client and would catch the hosted panic.
+  The regression passes, as do all three quote-study consent/type/conservative-report unit tests.
+- Next action: create a new candidate commit, repeat the clean exact-SHA build and guarded Oracle
+  deployment, then enable the flag only long enough to prove a completed synthetic analysis and
+  receipt-authorised deletion. Keep it disabled if that proof does not pass.

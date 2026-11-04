@@ -2730,3 +2730,12 @@ subjective usability or a controlled external cohort.
   `OMNYID_WEDDING_QUOTE_STUDY_ENABLED` switch into the homeserver, but activation still requires a
   hosted ClamAV, private SeaweedFS and OpenRouter readiness check plus one consented synthetic
   upload/deletion proof. Presence of the page or server route alone is not release evidence.
+
+# 2026-11-05 - Shared SeaweedFS clients declare an AWS SDK behaviour version
+
+- Any directly constructed AWS service config must set an explicit behaviour version before
+  creating its client. The current AWS SDK panics at runtime when `Client::from_conf` receives a
+  config without one; compilation and raw TCP reachability do not detect that failure.
+- The shared SeaweedFS client uses the SDK's current behaviour version, so uploads, downloads,
+  exports, vendor photos and quote-study storage keep one tested configuration rather than each
+  route creating a separate client.
