@@ -146,14 +146,14 @@ tasks:
 
   - id: WED-330
     title: Reconcile public Wedding proof and change-planning fit
-    status: in_progress
+    status: done
     owner: codex
     branch: agent/codex/WED-330
     worktree: C:/Users/ozans/Desktop/projects/OmnyID-GROWTH-001
     depends_on: [WED-329]
     files: [wedding/**, solid-ui/src/**wedding**, solid-ui/tests/**wedding**, Documents/verification/**, .agent/**]
     acceptance: [the November fit assessment is checked against current code rather than treated as product truth, unsupported popularity and undefined-limit claims are removed or made exact, public coverage is described honestly beyond Sydney without implying unsupported destination or legal capability, a clearly labelled fictional change-impact example demonstrates existing guest budget booking and notification evidence without posing as customer proof, current scoped collaboration regional directory guest seating stage and budget scenario capabilities are reused rather than duplicated, example people and stories are original composites and never testimonials, relevant public-site accessibility metadata tests Wedding tests typecheck build and line budgets pass]
-    progress: "Assessment triage found its trust critique already resolved in current source: invented testimonials and unsourced counters are absent and the claims ledger excludes them. Existing product code already covers scoped planner/helper roles, regional vendor data, guest/seating operations, six-stage planning, budget scenarios and booking refund evidence. Work is limited to unresolved truthful public proof and change-planning presentation; no customer-profile story will be copied or represented as a real user."
+    progress: "Assessment triage found its trust critique already resolved in current source: invented testimonials and unsourced counters are absent and the claims ledger excludes them. Added executable protection for that boundary, removed the unsupported popularity badge and undefined email limit, changed Sydney-only positioning to truthful NSW-first coverage, added a visibly fictional connected-change example, surfaced existing guest/seating and scoped-collaboration capabilities, and qualified NOIM reminders. Existing AFP/A2UI authorities were reused; no profile story, testimonial, parallel plan or destination/legal claim was invented. Public-site metadata/CSP/blog/magnet tests, 2,183 Wedding tests, typecheck, line budgets, the production build, and a 375px Chromium interaction/overflow/axe check pass. Nothing was deployed."
 
   - id: WED-329
     title: Complete the autonomous Batch 2 countdown catalogue and public planning checklist

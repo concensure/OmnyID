@@ -7249,3 +7249,24 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
 - No Oracle release or flag change occurred. Hosted false-default/runtime/rollback evidence remains
   a deployment-stage review item. Production stays false-default.
 - WED-330 is registered next to reconcile the Wedding fit assessment against current capabilities.
+
+## 2026-11-04 - WED-330 Wedding fit reconciliation (Codex, complete)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
+`agent/codex/WED-330`, based on GROWTH evidence commit `494d9b2`.
+
+- Reconciled both 4 November Wedding research reports against current code. The detailed accepted,
+  already-present and deliberately-unclaimed matrix is in
+  `Documents/verification/wed-330-fit-assessment-reconciliation-2026-11-04.md`.
+- Removed the unsupported pricing popularity badge and undefined monthly draft limit. Replaced
+  Sydney-only coverage copy with truthful NSW-first wording and suitability caveats.
+- Added an explicitly fictional, original replanning example that connects guest-count, minimum
+  spend, deposit evidence, tasks and approval-gated outreach without posing as a customer result.
+- The public workspace preview now exposes the existing guest/RSVP/seating projection and the
+  feature grid exposes existing scoped collaborators. NOIM copy is qualified as reminders rather
+  than legal lodgement.
+- Passed: public-site/CSP/metadata/blog/magnet/countdown checks, 2,183 Wedding tests, typecheck,
+  line budgets, production build, and two iPhone-sized Chromium interaction/overflow/axe checks.
+  The browser test found and drove an AA contrast correction for warning pills.
+- Nothing was deployed. GROWTH-10 remains at review only because hosted flag-off provenance and
+  rollback observation are not interchangeable with the completed local disposable proof.

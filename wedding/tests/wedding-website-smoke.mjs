@@ -333,8 +333,8 @@ for (const required of [
 if (!weddingJs.includes('filterCards') || !weddingJs.includes('data-blog-search')) {
   failures.push('main.js: blog search is not wired to the guide cards');
 }
-if (!/Built for couples planning across\s*<\/p>\s*<div class="logo-strip-items">\s*<span>Sydney<\/span>\s*<\/div>/m.test(weddingHome)) {
-  failures.push('index.html: planning strip must list Sydney only');
+if (!/Vendor coverage is NSW-first and expanding\s*<\/p>\s*<div class="logo-strip-items">[\s\S]*?<span>Sydney<\/span>[\s\S]*?<span>Regional NSW<\/span>[\s\S]*?<span>Australia-wide planning tools<\/span>/m.test(weddingHome)) {
+  failures.push('index.html: planning strip must state truthful NSW-first coverage and Australia-wide planning tools');
 }
 for (const unsupported of [
   'Planning hours organized per month',
@@ -426,7 +426,9 @@ const pricing = htmlByPath.get(normalize(resolve(root, 'pricing.html'))) ?? '';
 if (!pricing.includes('$39 <small>AUD / one-off</small>')) failures.push('pricing.html: Couple\'s Plan must be $39 AUD / one-off');
 if (pricing.includes('Full Autonomy') || pricing.includes('$69')) failures.push('pricing.html: Full Autonomy plan must be removed');
 if (pricing.includes('Up to 3 saved vendor comparisons')) failures.push('pricing.html: free plan must not cap vendor comparisons');
-if (!pricing.includes('Email drafting &amp; approval, up to a monthly limit')) failures.push('pricing.html: free plan must include limited email drafting');
+if (!pricing.includes('Email drafting &amp; approval')) failures.push('pricing.html: free plan must include email drafting and approval');
+if (pricing.includes('monthly limit')) failures.push('pricing.html: must not advertise an undefined monthly email limit');
+if (pricing.includes('Most couples choose this')) failures.push('pricing.html: must not publish an unsubstantiated popularity badge');
 if (/AUD \/ month<\/small><\/div>\s*<a[^>]*>Start your plan/.test(pricing)) failures.push('pricing.html: Couple\'s Plan must not be monthly');
 
 if (!weddingHome.includes('<p>Subscribe to our newsletter</p>') || !/<button class="btn btn-primary" type="submit">Subscribe<\/button>/.test(weddingHome)) {
@@ -440,11 +442,14 @@ if (!weddingHome.includes('Are wedding tasks and the next-decision card the same
   failures.push('index.html: task-versus-decision architecture FAQ is missing');
 }
 const howIdx = weddingHome.indexOf('id="how-it-works"');
+const changeIdx = weddingHome.indexOf('id="change-planning"');
 const flowIdx = weddingHome.indexOf('id="vendor-flow"');
 const previewIdx = weddingHome.indexOf('id="preview"');
-if (!(howIdx > -1 && flowIdx > howIdx && previewIdx > flowIdx)) {
-  failures.push('index.html: vendor response flow section must sit between How it works and Inside your workspace');
+if (!(howIdx > -1 && changeIdx > howIdx && flowIdx > changeIdx && previewIdx > flowIdx)) {
+  failures.push('index.html: qualified change example and vendor response flow must sit between How it works and Inside your workspace');
 }
+if (!weddingHome.includes('Illustrative scenario, not a customer story.') || !weddingHome.includes('Renee and Kai are fictional')) failures.push('index.html: change example must be visibly identified as fictional');
+if (!weddingHome.includes('data-pane="guests"') || !weddingHome.includes('Guest replies and seating stay connected')) failures.push('index.html: guest and seating capability must be visible in the public preview');
 if (!existsSync(resolve(root, 'assets', 'images', 'vendor-reply-flow.png'))) failures.push('assets/images/vendor-reply-flow.png is missing');
 if (!weddingJs.includes('/wedding/newsletter')) failures.push('main.js: newsletter form is not wired to the subscribe endpoint');
 if (!weddingHome.includes('<html lang="en-AU">') || !weddingHome.includes('<meta property="og:locale" content="en_AU">')) failures.push('index.html: Australian language and Open Graph locale metadata are missing');

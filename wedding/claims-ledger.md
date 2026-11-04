@@ -12,6 +12,9 @@ product behavior and source remain current.
 | The workspace connects vendors, quotes, dates and preferences | Wedding AFP projections in `solid-ui/src/lib/wedding*State.ts` | Verified |
 | The public vendor-reply image is example data | `wedding/assets/images/vendor-reply-flow.png` and adjacent visible demo label | Verified |
 | The Wedding Animal Quiz is a playful planning profile, not a compatibility test | Quiz v2 specification and `wedding/animal-quiz.html` | Must remain qualified |
+| NSW-first vendor coverage is expanding | Sydney and regional NSW rows in the reviewed vendor seed plus the live directory projection | Verified; not Australia-wide vendor coverage |
+| Replanning can show connected guest, budget, booking and draft-message effects | Existing Wedding guest, budget scenario, closure-evidence, task and approval projections | Verified as capability; public figures are explicitly illustrative |
+| Scoped collaborators do not receive the whole private plan by default | Wedding boundary grants and run-sheet share projections | Verified |
 
 ## Claims intentionally excluded
 

@@ -75,6 +75,7 @@
         <div class="hero-trust">
           <div class="trust-item"><strong>Private by default</strong><span>We never sell or transfer your data</span></div>
           <div class="trust-item"><strong>Built with AU couples in mind</strong><span>Australian wedding planning context</span></div>
+          <div class="trust-item"><strong>Australian timing, clearly qualified</strong><span>NOIM reminders, not legal lodgement</span></div>
         </div>
         <table class="hero-facts">
           <caption>OmnyID Wedding at a glance</caption>
@@ -115,9 +116,9 @@
   <!-- ============ LOGO / TRUST STRIP ============ -->
   <div class="logo-strip">
     <div class="container logo-strip-inner">
-      <p>Built for couples planning across</p>
+      <p>Vendor coverage is NSW-first and expanding</p>
       <div class="logo-strip-items">
-        <span>Sydney</span>
+        <span>Sydney</span><span>Regional NSW</span><span>Australia-wide planning tools</span>
       </div>
     </div>
   </div>
@@ -186,6 +187,38 @@
     </div>
   </section>
 
+  <section id="change-planning" aria-labelledby="changePlanningTitle">
+    <div class="container">
+      <div class="section-head center reveal">
+        <p class="eyebrow" style="justify-content:center">✦ Plans change</p>
+        <h2 id="changePlanningTitle">See the connected impact before you agree to a new plan</h2>
+        <p>A changed guest count, date or venue can affect more than one total. OmnyID keeps the source facts together and shows what needs review; it does not rewrite a contract or contact anyone without approval.</p>
+      </div>
+      <div class="change-example reveal" aria-label="Illustrative replanning example">
+        <p class="example-disclosure"><strong>Illustrative scenario, not a customer story.</strong> Renee and Kai are fictional, and the figures below demonstrate the workflow rather than a typical outcome.</p>
+        <div class="change-comparison">
+          <article>
+            <p class="eyebrow">Before</p>
+            <h3>120 guests</h3>
+            <p>$18,000 venue-and-catering estimate at $150 per guest, with evidence of a $2,000 deposit.</p>
+          </article>
+          <article>
+            <p class="eyebrow">Changed plan</p>
+            <h3>75 guests</h3>
+            <p>The per-head amount would be $11,250, but a recorded $15,000 minimum spend becomes the working estimate.</p>
+          </article>
+        </div>
+        <div class="change-impact-grid">
+          <article><strong>Budget</strong><span>The projection moves from $18,000 to $15,000—not to zero and not to the raw per-head result.</span></article>
+          <article><strong>Booking evidence</strong><span>The deposit remains recorded. Refund, transfer and cancellation terms stay “confirm” until the contract supports them.</span></article>
+          <article><strong>Guests and tasks</strong><span>Guest, catering and seating work can be reviewed from the same plan instead of reconciled across copies.</span></article>
+          <article><strong>People to notify</strong><span>Venue and caterer messages can be drafted with the changed facts, but nothing is sent until the couple approves it.</span></article>
+        </div>
+        <a class="btn btn-outline" href="../workspace/?auth=register&amp;source=wedding">Try a connected plan</a>
+      </div>
+    </div>
+  </section>
+
   <!-- ============ VENDOR RESPONSE FLOW ============ -->
   <section id="vendor-flow" aria-labelledby="vendorFlowTitle">
     <div class="container">
@@ -228,18 +261,19 @@
       <div class="section-head center reveal">
         <p class="eyebrow" style="justify-content:center">✦ Inside your workspace</p>
         <h2>One screen. Every part of your wedding, at a glance.</h2>
-        <p>A quick look at the workspace — click around, it's a live preview of the layout you'll actually plan in.</p>
+        <p>A quick look at the workspace — click around to preview the layout you'll plan in. Renee and Kai's plan is a fictional interface example, not a customer account.</p>
       </div>
 
       <div class="preview-shell reveal">
         <div class="preview-topbar">
           <span class="dot d1"></span><span class="dot d2"></span><span class="dot d3"></span>
-          <span>omnyid.com/plan/emma-and-jack</span>
+          <span>omnyid.com/plan/renee-and-kai</span>
         </div>
         <div class="tab-row">
           <button class="tab-btn is-active" data-tab="overview">Overview</button>
           <button class="tab-btn" data-tab="timeline">Timeline</button>
           <button class="tab-btn" data-tab="budget">Budget</button>
+          <button class="tab-btn" data-tab="guests">Guests</button>
           <button class="tab-btn" data-tab="vendors">Vendors</button>
           <button class="tab-btn" data-tab="decisions">Decisions</button>
           <button class="tab-btn" data-tab="drafts">Drafts</button>
@@ -250,6 +284,7 @@
             <a href="#preview" class="is-active" data-tab="overview"><span class="dotmark"></span>Overview</a>
             <a href="#preview" data-tab="timeline"><span class="dotmark"></span>Timeline</a>
             <a href="#preview" data-tab="budget"><span class="dotmark"></span>Budget</a>
+            <a href="#preview" data-tab="guests"><span class="dotmark"></span>Guests &amp; seating</a>
             <a href="#preview" data-tab="vendors"><span class="dotmark"></span>Vendors</a>
             <a href="#preview" data-tab="decisions"><span class="dotmark"></span>Decisions</a>
             <a href="#preview" data-tab="drafts"><span class="dotmark"></span>Email drafts</a>
@@ -308,6 +343,26 @@
                   <span class="mock-tag warn">Hidden cost warning</span>
                   <p style="font-size:13.5px;color:var(--ink-soft);margin:14px 0 10px;">Catering deposit locked at quoted price.</p>
                   <span class="mock-tag">Confirmed</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="pane" data-pane="guests">
+              <div class="mock-grid">
+                <div class="mock-card">
+                  <h3>Guest replies</h3>
+                  <div class="mock-budget-total">42 <span>of 75 replied</span></div>
+                  <div class="mock-bar-row"><span class="label">Attending</span><div class="mock-bar-track"><div class="mock-bar-fill" data-width="52%" style="background:var(--sage);"></div></div><span class="amount">39</span></div>
+                  <div class="mock-bar-row"><span class="label">Need reply</span><div class="mock-bar-track"><div class="mock-bar-fill" data-width="44%" style="background:var(--gold);"></div></div><span class="amount">33</span></div>
+                </div>
+                <div class="mock-card">
+                  <h3>Seating and care</h3>
+                  <p style="font-size:13.5px;color:var(--ink-soft);margin-bottom:10px;">Six guests still need a table. Two dietary notes and one step-free access request are ready for review.</p>
+                  <span class="mock-tag warn">Needs attention</span>
+                </div>
+                <div class="mock-card full">
+                  <h3>One guest record, connected</h3>
+                  <p style="font-size:13.5px;color:var(--ink-soft);line-height:1.6;">RSVP status, household, meal choice, access needs and table assignment stay on the same guest record. Helpers only see the scope the couple grants.</p>
                 </div>
               </div>
             </div>
@@ -442,7 +497,7 @@
   <section>
     <div class="container">
       <div class="section-head center reveal">
-        <p class="eyebrow" style="justify-content:center">✦ Why couples choose OmnyID</p>
+        <p class="eyebrow" style="justify-content:center">✦ Why this planning approach helps</p>
         <h2>Everything a wedding touches, in one calm place</h2>
         <p>Not a rigid checklist app. A private planning partner that adapts to your wedding, your culture, and your pace while keeping every artifact searchable through OmnyID.</p>
       </div>
@@ -488,6 +543,20 @@
           </div>
           <h3>Nothing sent without you</h3>
           <p>Emails to vendors, celebrants and family are always drafts first. You read, adjust, and approve before anything leaves OmnyID.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon" style="background:var(--sage-pale);color:var(--sage-deep);">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg>
+          </div>
+          <h3>Invite the right people, with limits</h3>
+          <p>Bring in a partner, planner or family helper with a clear role and only the details they need. Private notes do not become shared by accident.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon" style="background:var(--rose-pale);color:var(--rose-deep);">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h18v16H3zM3 9h18M9 4v16"/></svg>
+          </div>
+          <h3>Guest replies and seating stay connected</h3>
+          <p>Households, RSVPs, meal choices, access needs and table assignments update one guest record rather than separate lists.</p>
         </div>
       </div>
     </div>
@@ -540,8 +609,8 @@
   <section style="padding-top:0;">
     <div class="container">
       <div class="section-head center reveal">
-        <p class="eyebrow" style="justify-content:center">✦ Real days, made calmer</p>
-        <h2>The moments this is all for</h2>
+        <p class="eyebrow" style="justify-content:center">✦ Keep sight of the day</p>
+        <h2>The moments all this planning is for</h2>
       </div>
       <div class="trio-strip reveal-stagger">
         <figure><img src="assets/images/zhouxing-lu-LvSDR31F_Vc-unsplash.jpg" alt="Aerial view of a bride and groom walking down the aisle at an outdoor garden ceremony" loading="lazy"></figure>
