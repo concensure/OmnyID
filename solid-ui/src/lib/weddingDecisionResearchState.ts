@@ -1,10 +1,11 @@
 // @locs-version: 1.0
 import { buildWeddingArtifactGenerationState, type WeddingGeneratedArtifact } from "@/lib/weddingArtifactGenerationState";
 import type { WeddingPlanningTaskItem } from "@/lib/weddingCalendarProjectionState";
+import { weddingGuestFinalCountChoices, weddingGuestFinalCountRecommendation } from "@/lib/weddingGuestFinalCountApprovalState";
 import type { WeddingNeedToKnowContextCard, WeddingResponseWorkspaceViewState, WeddingWorkspaceArtifactPreview } from "@/lib/weddingResponseWorkspaceViewState";
 
 export type WeddingDecisionResearchState = {
-  kind: "guest_logistics" | "hen_night" | "linked_report" | "funded_research";
+  kind: "guest_final_count" | "guest_logistics" | "hen_night" | "linked_report" | "funded_research";
   recommendation: string;
   detailMarkdown: string;
   existingArtifactId: string | null;
@@ -126,6 +127,24 @@ export function buildWeddingDecisionResearchState(input: {
 }): WeddingDecisionResearchState | null {
   const task = input.task;
   if (!task) return null;
+  const finalCountRecommendation = weddingGuestFinalCountRecommendation(task);
+  if (finalCountRecommendation) {
+    const choices = weddingGuestFinalCountChoices(task);
+    return {
+      kind: "guest_final_count",
+      recommendation: finalCountRecommendation,
+      detailMarkdown: [
+        "## Choose the count you can stand behind",
+        "",
+        "This approval records the final guest count in the Wedding ledger. It does not contact the venue or caterer by itself.",
+        "",
+        ...choices.flatMap((choice) => [`### ${choice.label}`, choice.riskLabel, ""]),
+        "Before approving, check the supplier's final-count deadline and whether later additions or reductions change the price.",
+      ].join("\n"),
+      existingArtifactId: null,
+      generatedArtifact: null,
+    };
+  }
   const taskText = `${task.title} ${task.notes ?? ""}`;
   if (/transport|access|guest logistics/i.test(taskText) && !/hen'?s night|hen party/i.test(taskText)) {
     const artifact = linkedOrMatchingArtifact(task, input.state.artifactPreviews, /transport|route|parking|accessib|travel|location|map/);

@@ -608,6 +608,13 @@ export function WeddingGuestOperationsCard(props: {
       <Show when={props.state.finalCountOptions.length > 0}>
         <div class="mt-3 rounded-2xl border border-slate-200 bg-white p-3">
           <p class="text-xs font-semibold text-sky-950/70">Final guest count options</p>
+          <Show when={props.state.approvedFinalCount}>
+            {(approval) => (
+              <p class="mt-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-950">
+                Approved final count: {approval().headcount} · {approval().optionLabel}
+              </p>
+            )}
+          </Show>
           <div class="mt-2 space-y-2">
             <For each={props.state.finalCountOptions}>
               {(option) => (

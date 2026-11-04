@@ -113,8 +113,9 @@ test("budget contributions support saved people and adding a selected contact", 
   assert.match(budgetTracker, /Saving a contribution adds that amount to the wedding budget available for planning/);
 });
 
-test("the upload control keeps a stable hover target", () => {
+test("the upload control keeps a stable hover target and opens its tooltip below", () => {
   assert.match(uploadFilesButton, /h-10 w-10 shrink-0/);
-  assert.match(uploadFilesButton, /absolute right-\[calc\(100%\+0\.5rem\)\]/);
+  assert.match(uploadFilesButton, /top-\[calc\(100%\+0\.5rem\)\]/);
+  assert.doesNotMatch(uploadFilesButton, /bottom-\[calc\(100%\+0\.5rem\)\]/);
   assert.doesNotMatch(uploadFilesButton, /hover:w-auto|focus-within:w-auto|group-hover:max-w/);
 });

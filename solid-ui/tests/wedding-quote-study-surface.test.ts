@@ -7,9 +7,10 @@ const root = resolve(import.meta.dirname, "../..");
 const read = (path: string) => readFile(resolve(root, path), "utf8");
 
 test("public quote study requires explicit consent and keeps analysis server-side", async () => {
-  const [page, script] = await Promise.all([
+  const [page, script, compose] = await Promise.all([
     read("wedding/blog/before-you-accept-that-wedding-quote.html"),
     read("wedding/assets/js/quote-study.js"),
+    read("docker-compose.oracle.minimal.yml"),
   ]);
 
   assert.match(page, /stored <strong>unencrypted<\/strong> in private SeaweedFS/i);
@@ -26,6 +27,7 @@ test("public quote study requires explicit consent and keeps analysis server-sid
   assert.match(script, /textContent/);
   assert.doesNotMatch(script, /resultBody\.innerHTML/);
   assert.doesNotMatch(script, /privacy notice is unavailable/i);
+  assert.match(compose, /OMNYID_WEDDING_QUOTE_STUDY_ENABLED: \$\{OMNYID_WEDDING_QUOTE_STUDY_ENABLED:-false\}/);
 });
 
 test("public directory and claim flow expose database-backed discovery without exact handles", async () => {

@@ -24,10 +24,15 @@ import {
   weddingVendorResearchQueryForDecision,
 } from "@/lib/weddingDecisionFocusDisplayState";
 import { decisionCardFromWeddingFocus, type DecisionCardModel } from "@/lib/decisionCardState";
+import {
+  weddingGuestFinalCountApprovalToAfpSendInput,
+  weddingGuestFinalCountChoices,
+} from "@/lib/weddingGuestFinalCountApprovalState";
 import type { useWeddingVendorOutreachOwner } from "@/lib/useWeddingVendorOutreachOwner";
 import type { WeddingResponseWorkspaceViewState } from "@/lib/weddingResponseWorkspaceViewState";
 import type { WeddingWorkspaceSidebarAction } from "@/lib/weddingWorkspaceActionState";
-import { loadWeddingTaskCompletion, WEDDING_TASK_COMPLETION_EVENT } from "@/lib/weddingTaskCompletionLocalState";
+import { loadWeddingTaskCompletion, saveWeddingTaskCompletion, WEDDING_TASK_COMPLETION_EVENT } from "@/lib/weddingTaskCompletionLocalState";
+import { weddingTaskCompletionToAfpSendInput } from "@/lib/weddingTaskCompletionProjectionState";
 import {
   dispatchWeddingVendorSearchLaunch,
   saveWeddingVendorSearchLaunch,
@@ -84,6 +89,9 @@ export function WeddingDecisionFocusCard(props: {
   const [rsvpFollowUpOpenId, setRsvpFollowUpOpenId] = createSignal<string | null>(null);
   const [expandedResearchItemId, setExpandedResearchItemId] = createSignal<string | null>(null);
   const [fundedResearch, setFundedResearch] = createSignal<Record<string, WeddingDecisionResearchState>>({});
+  const [fundedResearchStatus, setFundedResearchStatus] = createSignal<Record<string, "loading" | "failed">>({});
+  const [finalCountSelections, setFinalCountSelections] = createSignal<Record<string, string>>({});
+  const [finalCountApprovalBusyId, setFinalCountApprovalBusyId] = createSignal<string | null>(null);
   const fundedResearchAttempts = new Set<string>();
   const rsvpSetup = createMemo(() => weddingRsvpSetupFromAfpMessages(
     props.state.afpMessages,
@@ -132,19 +140,19 @@ export function WeddingDecisionFocusCard(props: {
     locallyHiddenIds: completedFocusIds(),
   }));
   createEffect(() => {
-    const researchKinds = new Set(["research", "transport", "hen_party", "weather_contingency", "decision"]);
     const context = props.state.contextCards.flatMap((card) => [
       card.planningContext.location,
       card.planningContext.atmosphereDescription,
       card.planningContext.vendorPreferences,
       ...(card.planningContext.topPriorities ?? []),
     ]).filter((value): value is string => Boolean(value?.trim())).slice(0, 12);
-    display().visibleFocusItems.slice(0, 2).forEach((item, queueRank) => {
+    display().queuedFocusItems.slice(0, 2).forEach((item, queueRank) => {
       const task = taskFor(item.id);
-      if (!task || !researchKinds.has(task.kind) || buildWeddingDecisionResearchState({ task, state: props.state })) return;
+      if (!needsFundedResearch(item, task)) return;
       const attemptKey = `${props.state.workspace.metadata.weddingPlanId}:${task.id}:${task.title}:${task.notes ?? ""}:${context.join("|")}`;
       if (fundedResearchAttempts.has(attemptKey)) return;
       fundedResearchAttempts.add(attemptKey);
+      setFundedResearchStatus((current) => ({ ...current, [item.id]: "loading" }));
       void requestFundedWeddingDecisionResearch({
         weddingPlanId: props.state.workspace.metadata.weddingPlanId,
         taskId: task.id,
@@ -161,7 +169,12 @@ export function WeddingDecisionFocusCard(props: {
           existingArtifactId: null,
           generatedArtifact: null,
         }}));
-      }).catch(() => undefined);
+        setFundedResearchStatus((current) => {
+          const next = { ...current };
+          delete next[item.id];
+          return next;
+        });
+      }).catch(() => setFundedResearchStatus((current) => ({ ...current, [item.id]: "failed" })));
     });
   });
   createEffect(() => {
@@ -231,6 +244,15 @@ export function WeddingDecisionFocusCard(props: {
   function researchFor(itemId: string) {
     return fundedResearch()[itemId] ?? buildWeddingDecisionResearchState({ task: taskFor(itemId), state: props.state });
   }
+  function needsFundedResearch(
+    item: (typeof props.state.personalOsProjection.decisionLoadRelief.focusItems)[number],
+    task: ReturnType<typeof taskFor>,
+  ): task is NonNullable<ReturnType<typeof taskFor>> {
+    return Boolean(task
+      && !isPendingRsvpFollowUp(item.id)
+      && !weddingVendorResearchQueryForDecision(item)
+      && !buildWeddingDecisionResearchState({ task, state: props.state }));
+  }
   function decisionModel(card: ReturnType<typeof decisionCardFromWeddingFocus>): DecisionCardModel {
     const item = display().itemCards.find((candidate) => candidate.id === card.id)?.item;
     if (!item) return card;
@@ -253,7 +275,45 @@ export function WeddingDecisionFocusCard(props: {
       verification: research.existingArtifactId
         ? { status: "partial", label: "Saved evidence available" }
         : { status: "partial", label: "Planning brief ready; live details to verify" },
+      actions: card.actions.some((action) => action.id === "assign")
+        ? card.actions
+        : [
+            card.actions[0]!,
+            { id: "assign", label: "Assign", role: "secondary", effect: "Opens assignment controls for this decision", intent: "assign" },
+            ...card.actions.slice(1),
+          ],
+    } : needsFundedResearch(item, taskFor(item.id)) ? {
+      ...card,
+      recommendation: fundedResearchStatus()[item.id] === "failed"
+        ? { summary: "An evidence-backed recommendation is not available yet. Nothing has been recommended or changed.", reasons: ["Try again later, or open the task to review the saved wedding details yourself."] }
+        : { summary: "Reviewing the saved wedding details for this decision…", reasons: ["OmnyID will show a recommendation only after the relevant evidence has been checked."] },
     } : card;
+    const finalCountChoices = weddingGuestFinalCountChoices(taskFor(item.id));
+    if (finalCountChoices.length > 0) {
+      const selected = finalCountSelections()[item.id];
+      return {
+        ...researchCard,
+        pattern: "approve_act",
+        patternSlots: {
+          ...researchCard.patternSlots,
+          options: finalCountChoices.map((choice) => ({ id: choice.id, name: choice.label, summary: choice.riskLabel })),
+        },
+        actions: [
+          {
+            id: "approve_guest_count",
+            label: finalCountApprovalBusyId() === item.id ? "Saving…" : "Approve guest count",
+            role: "primary",
+            effect: "Records the selected final guest count and completes this decision",
+            intent: "approve",
+            disabledReason: finalCountApprovalBusyId() === item.id
+              ? "The approval is being saved."
+              : selected ? null : "Choose a guest-count option first.",
+          },
+          { id: "assign", label: "Assign", role: "secondary", effect: "Opens assignment controls for this decision", intent: "assign" },
+          { id: "later", label: "Decide later", role: "dismiss", effect: "Moves this decision out of the current focus", intent: "defer" },
+        ],
+      };
+    }
     const artifact = comparisonFor(item);
     const recommended = artifact?.vendorComparisonCards.slice().sort((left, right) => left.rank - right.rank)[0];
     if (!artifact || !recommended) return researchCard;
@@ -277,6 +337,30 @@ export function WeddingDecisionFocusCard(props: {
         { id: "later", label: "Decide later", role: "dismiss", effect: "Moves this decision out of the current focus", intent: "defer" },
       ],
     };
+  }
+  async function approveFinalGuestCount(itemId: string): Promise<void> {
+    const task = taskFor(itemId);
+    const choice = weddingGuestFinalCountChoices(task).find((candidate) => candidate.id === finalCountSelections()[itemId]);
+    if (!task || !choice || !props.saveProjection || finalCountApprovalBusyId()) {
+      if (!props.saveProjection) setVendorSelectionNotice((current) => ({ ...current, [itemId]: "Guest-count saving is not connected in this view." }));
+      return;
+    }
+    const weddingPlanId = props.state.workspace.metadata.weddingPlanId;
+    const responseWorkspaceId = props.state.workspace.metadata.responseWorkspaceId;
+    setFinalCountApprovalBusyId(itemId);
+    setVendorSelectionNotice((current) => ({ ...current, [itemId]: `Saving ${choice.headcount} as the final guest count…` }));
+    try {
+      await props.saveProjection(weddingGuestFinalCountApprovalToAfpSendInput({ task, choice, weddingPlanId, responseWorkspaceId }));
+      const completion = saveWeddingTaskCompletion({ taskId: task.id, weddingPlanId, responseWorkspaceId, completed: true });
+      const completionInput = weddingTaskCompletionToAfpSendInput({ record: completion, title: task.title });
+      if (completionInput) await props.saveProjection(completionInput);
+      setVendorSelectionNotice((current) => ({ ...current, [itemId]: `Final guest count approved as ${choice.headcount}. Guest planning and the task list now use the same recorded decision.` }));
+      props.onRefreshWorkspace?.();
+    } catch {
+      setVendorSelectionNotice((current) => ({ ...current, [itemId]: "The final guest count was not saved. Nothing was changed; please try again." }));
+    } finally {
+      setFinalCountApprovalBusyId(null);
+    }
   }
   function toggleResearch(itemId: string) {
     if (!researchFor(itemId)) return;
@@ -392,16 +476,40 @@ export function WeddingDecisionFocusCard(props: {
                   const vendor = recommendedVendor();
                   return vendor ? props.vendorOutreach?.flows()[vendor.choiceId] ?? null : null;
                 };
+                const finalCountChoices = () => weddingGuestFinalCountChoices(taskFor(item.id));
                 return (
                 <div class="space-y-2">
                   <DecisionCard
                     card={decisionModel(decisionCardFromWeddingFocus(card))}
                     mode="standard"
                     showWhyItMatters={false}
+                    hero={finalCountChoices().length > 0 ? (
+                      <fieldset class="grid gap-2" aria-label="Choose the final guest count">
+                        <legend class="mb-1 text-xs font-semibold text-wedding-ink/70">Select the number to approve</legend>
+                        <For each={finalCountChoices()}>{(choice) => (
+                          <label class={`flex min-h-12 cursor-pointer items-start gap-3 rounded-lg border px-3 py-2 ${finalCountSelections()[item.id] === choice.id ? "border-wedding-primary bg-wedding-slate" : "border-wedding-border bg-white"}`}>
+                            <input
+                              type="radio"
+                              name={`wedding-final-count-${item.id}`}
+                              value={choice.id}
+                              checked={finalCountSelections()[item.id] === choice.id}
+                              onChange={() => setFinalCountSelections((current) => ({ ...current, [item.id]: choice.id }))}
+                              class="mt-1 h-4 w-4 shrink-0 accent-wedding-primary"
+                            />
+                            <span class="min-w-0">
+                              <span class="block break-words text-sm font-semibold text-wedding-ink">{choice.label}</span>
+                              <span class="mt-1 block break-words text-xs leading-5 text-wedding-ink/70">{choice.riskLabel}</span>
+                            </span>
+                          </label>
+                        )}</For>
+                      </fieldset>
+                    ) : undefined}
                     onRecommendationSelect={researchFor(item.id) ? () => toggleResearch(item.id) : undefined}
                     onAction={(action) => {
                       if (action.id === "later") {
                         deferItem(item);
+                      } else if (action.id === "approve_guest_count") {
+                        void approveFinalGuestCount(item.id);
                       } else if (action.id === "select_recommended" && comparison() && recommendedVendor()) {
                         setVendorSelectionNotice((current) => ({
                           ...current,

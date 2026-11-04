@@ -716,11 +716,11 @@ export function buildWeddingResponseWorkspaceViewState(input: WeddingResponseWor
   const persistedBoundaryObjects = input.boundaryObjects ?? null;
   const guestTrackingWithoutBudget = buildWeddingGuestTrackingState({
     artifacts,
-    boundaryObjects: persistedBoundaryObjects,
+    boundaryObjects: persistedBoundaryObjects, afpMessages: input.afpMessages, responseWorkspaceId,
   });
   const guestTracking = buildWeddingGuestTrackingState({
     artifacts,
-    boundaryObjects: persistedBoundaryObjects,
+    boundaryObjects: persistedBoundaryObjects, afpMessages: input.afpMessages, responseWorkspaceId,
     estimatedCostPerGuest: weddingEstimatedCostPerGuest({
       budgetTracking,
       guestTracking: guestTrackingWithoutBudget,

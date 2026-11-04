@@ -490,6 +490,22 @@ export function WeddingWorkspaceContextPanels(props: {
             onSave={saveMealChoices}
           />
         </section>
+        <section class="mt-4 rounded-[24px] border border-rose-100 bg-rose-50/55 p-4 shadow-card phone:rounded-none phone:border-x-0 phone:bg-transparent phone:px-0 phone:shadow-none" aria-labelledby="wedding-plan-inspiration-title">
+          <div class="mb-3">
+            <p class="text-xs font-semibold uppercase tracking-[0.12em] text-rose-900/65">Your style</p>
+            <h3 id="wedding-plan-inspiration-title" class="mt-1 text-base font-semibold text-rose-950">Inspiration</h3>
+            <p class="mt-1 text-sm leading-6 text-rose-950/70">Keep photos, links and the details that should guide planning in the same Plan view.</p>
+          </div>
+          <WeddingInspirationPanel state={props.state} saveProjection={props.saveProjection} onRefreshWorkspace={props.onRefreshWorkspace} />
+          <Show when={props.state.contextCards.length > 0}>
+            <div class="mt-3">
+              <WeddingImportantDetailsPanel cards={props.state.contextCards} metadata={props.state.workspace.metadata} saveProjection={props.saveProjection} onRefreshWorkspace={props.onRefreshWorkspace} onGenerateRecommendations={generateRecommendationSet} />
+            </div>
+          </Show>
+          <div class="mt-3">
+            <WeddingVisionPanel state={props.state} onSelectMenu={props.onSelectMenu} saveProjection={props.saveProjection} onRefreshWorkspace={props.onRefreshWorkspace} />
+          </div>
+        </section>
       </div>
 
       <div hidden={activeMenu() !== "guests" && activeMenu() !== "people"} class={activeMenu() === "people" ? "mt-3" : ""}>
@@ -548,33 +564,6 @@ export function WeddingWorkspaceContextPanels(props: {
             />
           </div>
         </Show>
-      </div>
-
-      <div hidden={activeMenu() !== "inspiration"}>
-        <WeddingInspirationPanel
-          state={props.state}
-          saveProjection={props.saveProjection}
-          onRefreshWorkspace={props.onRefreshWorkspace}
-        />
-        <Show when={props.state.contextCards.length > 0}>
-          <div class="mt-3">
-            <WeddingImportantDetailsPanel
-              cards={props.state.contextCards}
-              metadata={props.state.workspace.metadata}
-              saveProjection={props.saveProjection}
-              onRefreshWorkspace={props.onRefreshWorkspace}
-              onGenerateRecommendations={generateRecommendationSet}
-            />
-          </div>
-        </Show>
-        <div class="mt-3">
-          <WeddingVisionPanel
-            state={props.state}
-            onSelectMenu={props.onSelectMenu}
-            saveProjection={props.saveProjection}
-            onRefreshWorkspace={props.onRefreshWorkspace}
-          />
-        </div>
       </div>
 
       <div hidden={activeMenu() !== "seating"}>

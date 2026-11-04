@@ -5,7 +5,6 @@ import {
   deleteCalendarEvent,
   disconnectGoogleCalendar,
   fetchBacklinksForMessage,
-  fetchGoogleCalendarOAuthUrl,
   fetchGoogleCalendarStatus,
   listCalendarEvents,
   sendAfpMessage,
@@ -15,6 +14,8 @@ import {
   type DashboardBootstrap,
 } from "@/lib/api";
 import { type GoogleCalendarConnectionStatus } from "@/lib/googleCalendarConnectionState";
+import { startGoogleCalendarConnection } from "@/lib/googleCalendarConnectState";
+import { GoogleCalendarConnectNotice } from "@/components/GoogleCalendarConnectNotice";
 import { WeddingNavigationArrivalBanner } from "@/components/WeddingNavigationArrivalBanner";
 import { TiptapEditor } from "@/components/editor/TiptapEditor";
 import { navigateToView } from "@/lib/decisionosNavigation";
@@ -485,6 +486,7 @@ export function MonthlyCalendarView(props: {
   const [googleCalendarStatus, setGoogleCalendarStatus] = createSignal<GoogleCalendarConnectionStatus | null>(null);
   const [googleCalendarBusy, setGoogleCalendarBusy] = createSignal(false);
   const [googleCalendarNotice, setGoogleCalendarNotice] = createSignal<string | null>(null);
+  const [googleCalendarReauthRequired, setGoogleCalendarReauthRequired] = createSignal(false);
   const [compactViewport, setCompactViewport] = createSignal(false);
 
   const monthKey = createMemo(() => calendarMonthStartIso(year(), month()));
@@ -517,11 +519,11 @@ export function MonthlyCalendarView(props: {
     if (googleCalendarBusy()) return;
     setGoogleCalendarBusy(true);
     setGoogleCalendarNotice(null);
-    try {
-      const url = await fetchGoogleCalendarOAuthUrl();
-      window.location.assign(url);
-    } catch {
-      setGoogleCalendarNotice("Google Calendar couldn't connect just now. You can keep using the wedding calendar and try again later.");
+    setGoogleCalendarReauthRequired(false);
+    const failure = await startGoogleCalendarConnection((url) => window.location.assign(url));
+    if (failure) {
+      setGoogleCalendarNotice(failure.message);
+      setGoogleCalendarReauthRequired(failure.reauthRequired);
       setGoogleCalendarBusy(false);
     }
   }
@@ -1018,9 +1020,7 @@ export function MonthlyCalendarView(props: {
             </div>
           </div>
         </Show>
-        <Show when={googleCalendarNotice()}>
-          <p style={{ margin: "0 0 1em", "font-size": "0.78em", color: TOKEN.textSecondary }}>{googleCalendarNotice()}</p>
-        </Show>
+        <GoogleCalendarConnectNotice message={googleCalendarNotice()} reauthRequired={googleCalendarReauthRequired()} accent={TOKEN.accent} textColor={TOKEN.textSecondary} />
       </div>
 
       <div style={{ display: "flex", "flex-direction": compactViewport() ? "column" : "row", flex: compactViewport() ? "0 0 auto" : 1, "min-height": 0, overflow: compactViewport() ? "visible" : "hidden", "min-width": 0 }}>

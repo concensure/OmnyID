@@ -1,6 +1,8 @@
 // @locs-version: 2.0
 import type { WeddingArtifactInput } from "@/lib/weddingArtifactState";
+import type { AfpMessage } from "@/lib/api";
 import type { WeddingBoundaryLedgerObject } from "@/lib/weddingBoundaryLedgerState";
+import { weddingGuestFinalCountApprovalFromAfpMessages, type WeddingGuestFinalCountApproval } from "@/lib/weddingGuestFinalCountApprovalState";
 import type { WeddingPlanningTaskItem } from "@/lib/weddingCalendarProjectionState";
 import { normalizeWeddingPlanningMetadata } from "@/lib/weddingPlanningTemplateState";
 import {
@@ -22,6 +24,7 @@ export type WeddingGuestTrackingState = {
   missingContactCount: number;
   missingMealCount: number;
   finalCountOptions: WeddingGuestFinalCountOption[];
+  approvedFinalCount?: WeddingGuestFinalCountApproval | null;
   followUpTaskCandidates: WeddingGuestFollowUpTaskCandidate[];
   boundaryRuleLabels: string[];
   invitationScopeLabels: string[];
@@ -401,6 +404,8 @@ export function buildWeddingGuestTrackingState(input: {
   artifacts?: readonly WeddingArtifactInput[] | null;
   boundaryObjects?: readonly WeddingBoundaryLedgerObject[] | null;
   estimatedCostPerGuest?: number | null;
+  afpMessages?: readonly AfpMessage[] | null;
+  responseWorkspaceId?: string | null;
 }): WeddingGuestTrackingState {
   const guestArtifacts = (input.artifacts ?? []).filter((artifact) => artifact.kind === "guest_list");
   let guestRowCount = 0;
@@ -556,6 +561,7 @@ export function buildWeddingGuestTrackingState(input: {
     ? Math.round(input.estimatedCostPerGuest)
     : null;
   const options = guestRowCount > 0 ? finalCountOptions({ attendingCount, pendingCount, estimatedCostPerGuest: cost }) : [];
+  const approvedFinalCount = weddingGuestFinalCountApprovalFromAfpMessages(input.afpMessages, clean(input.responseWorkspaceId));
   const tasks = followUpTaskCandidates({ pendingCount, missingContactCount, missingMealCount });
   const ruleLabels = activeBoundaryRuleLabels(input.boundaryObjects);
   const scopeLabels = invitationScopeLabels(input.boundaryObjects);
@@ -573,6 +579,7 @@ export function buildWeddingGuestTrackingState(input: {
     missingContactCount,
     missingMealCount,
     finalCountOptions: options,
+    approvedFinalCount,
     followUpTaskCandidates: tasks,
     boundaryRuleLabels: ruleLabels,
     invitationScopeLabels: scopeLabels,

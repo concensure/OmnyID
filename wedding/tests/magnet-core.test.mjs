@@ -4,6 +4,7 @@ import test from "node:test";
 import vm from "node:vm";
 
 const source = await readFile(new URL("../assets/js/magnet-core.js", import.meta.url), "utf8");
+const countdownSource = await readFile(new URL("../assets/js/countdown.js", import.meta.url), "utf8");
 
 function core() {
   const window = { crypto: { randomUUID: () => "result-1" } };
@@ -52,6 +53,17 @@ test("blocked storage leaves the result usable and returns visible copy", () => 
   const saved = api.save(memoryStorage(true), "countdown", envelope);
   assert.equal(saved.ok, false);
   assert.match(saved.message, /result is ready/i);
+});
+
+test("countdown submits the schema accepted by the shared magnet envelope", () => {
+  const schema = countdownSource.match(/schema:\s*['"]([^'"]+)['"]/u)?.[1];
+  assert.equal(schema, "wedding_countdown");
+  assert.doesNotThrow(() => core().createEnvelope({
+    schema,
+    inputs: { wedding_date: "2027-11-20" },
+    result: { task_count: 65 },
+    origin: { page: "/wedding/wedding-planning-checklist-australia.html" },
+  }));
 });
 
 test("continue URL accepts only registered lead magnet sources", () => {

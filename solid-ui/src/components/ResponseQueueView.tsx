@@ -8,6 +8,7 @@ import { QueueDensityToggle } from "@/components/QueueDensityToggle";
 import { ResponseQueueSurface } from "@/components/ResponseQueueSurface";
 import { WeddingNavigationArrivalBanner } from "@/components/WeddingNavigationArrivalBanner";
 import { WorkspaceSetupBanner } from "@/components/WorkspaceSetupBanner";
+import { WeddingWorkspaceMoreMenu } from "@/components/WeddingWorkspaceMoreMenu";
 import {
   LazyWeddingResponseWorkspaceView,
   LazyWeddingRichResponseView,
@@ -216,10 +217,9 @@ import {
   type WeddingVendorSearchResultAction,
 } from "@/lib/weddingVendorSearchResultActionState";
 import { completedWeddingVendorSearchSession, editedWeddingVendorSearchSession, loadWeddingVendorSearchSession, saveWeddingVendorSearchSession } from "@/lib/weddingVendorSearchSessionState";
-import { weddingMenuKeyDownStep, weddingWorkspaceMenuItemsForEmail } from "@/lib/weddingWorkspaceDesktopMenuState";
-import { WeddingUploadFilesButton } from "@/components/WeddingUploadFilesButton";
+import { weddingMenuKeyDownStep, weddingWorkspaceMenuItemsForEmail, weddingWorkspaceMoreItemsForEmail } from "@/lib/weddingWorkspaceDesktopMenuState";
 import { WeddingSetupChecklist, type WeddingSetupChecklistItem } from "@/components/WeddingSetupChecklist";
-
+import { WeddingUploadFilesButton } from "@/components/WeddingUploadFilesButton";
 const RESPONSE_QUEUE_VIEW_CLASS =
   "view-enter min-w-0 space-y-4 rounded-[24px] border border-sky-100/80 bg-[linear-gradient(135deg,rgba(240,249,255,0.96),rgba(255,255,255,0.96))] p-3 shadow-[0_22px_70px_-36px_rgba(14,116,144,0.4)] backdrop-blur-sm phone:rounded-none phone:border-0 phone:bg-transparent phone:p-0 phone:shadow-none sm:rounded-[32px] sm:p-5";
 const RESPONSE_QUEUE_VIEW_HEADER_CLASS = "flex min-w-0 flex-wrap items-center justify-end gap-3";
@@ -231,7 +231,6 @@ function initialWeddingWorkspaceMenu(): WeddingWorkspaceMenuId {
   }
   return loadWeddingWorkspaceMenu();
 }
-
 function weddingSetupChecklistItems(
   state: WeddingResponseWorkspaceViewState,
   dateOrSeason: string,
@@ -267,7 +266,6 @@ function weddingSetupChecklistItems(
     },
   ];
 }
-
 function withWeddingAdminDataConsent(
   state: WeddingResponseWorkspaceViewState,
   enabled: boolean,
@@ -506,12 +504,13 @@ export function ResponseQueueView(props: {
   const weddingStorageUserId = createMemo(() => weddingAccountUser()?.id ?? null);
   const weddingStorageUserEmail = createMemo(() => weddingAccountUser()?.email ?? "");
   const weddingDesktopMenuItems = createMemo(() => weddingWorkspaceMenuItemsForEmail(weddingStorageUserEmail()));
+  const weddingMoreMenuItems = createMemo(() => weddingWorkspaceMoreItemsForEmail(weddingStorageUserEmail()));
   const weddingSignedIn = createMemo(() => props.signedIn ?? Boolean(
     weddingAccountUser() && weddingAccountUser()?.auth_provider !== "guest",
   ));
   const weddingVendorSmokeTestAvailable = createMemo(() => weddingSignedIn());
   createEffect(() => {
-    if (weddingWorkspaceMenu() === "advanced" && !weddingDesktopMenuItems().some((item) => item.id === "advanced")) {
+    if (weddingWorkspaceMenu() === "advanced" && !weddingMoreMenuItems().some((item) => item.id === "advanced")) {
       setWeddingWorkspaceMenu("home");
     }
   });
@@ -1974,6 +1973,7 @@ export function ResponseQueueView(props: {
             </For>
           </div>
           <div aria-label="Wedding planner controls" class="ml-auto flex shrink-0 items-center gap-2 overflow-visible">
+            <WeddingWorkspaceMoreMenu items={weddingMoreMenuItems()} onSelect={(item) => setWeddingWorkspaceMenu(item.id)} />
             <WeddingUploadFilesButton running={weddingImportRunning()} onChange={importWeddingFilesFromHeader} />
             <QueueDensityToggle
               density={viewState().density}

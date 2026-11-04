@@ -25,9 +25,6 @@ export function WeddingMobileMoreSheet(props: {
       { label: "Tasks", icon: "check-circle", menu: "tasks" },
       { label: "Who is helping", icon: "user-plus", menu: "helpers" },
     ] },
-    { label: "Ideas", items: [
-      { label: "Inspiration", icon: "search", menu: "inspiration" },
-    ] },
     { label: "Files", items: [
       { label: "Documents", icon: "table-cells", menu: "documents" },
     ] },

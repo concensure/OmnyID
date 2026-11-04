@@ -40,12 +40,14 @@ test("RSVP defaults names from profile and guest summary counts filter in place"
   assert.match(context, /activeMenu\(\) !== "guests" && activeMenu\(\) !== "people"/);
 });
 
-test("the More sheet exposes Guests, helpers, Documents and Inspiration without a parallel hub", () => {
+test("the More sheet exposes Guests, helpers and Documents while Inspiration stays inside Plan", () => {
   const more = read("src/components/WeddingMobileMoreSheet.tsx");
+  const context = read("src/components/WeddingWorkspaceContextPanels.tsx");
   assert.match(more, /Guests & RSVP/);
   assert.match(more, /Who is helping/);
   assert.match(more, /Documents/);
-  assert.match(more, /Inspiration/);
+  assert.doesNotMatch(more, /label: "Inspiration"/);
+  assert.match(context, /wedding-plan-inspiration-title/);
 });
 
 test("wedding projection uses the authenticated session before bootstrap arrives", () => {

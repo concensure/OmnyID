@@ -3413,7 +3413,7 @@ function App() {
         />
       </Show>
 
-      <GlassPanel id="workspace-shell" tabindex="-1" class={`mx-auto max-w-[1700px] p-0 sm:p-5 sm:pl-[76px] lg:p-8 lg:pl-[80px] ${weddingReturnContextActive() && activeView() === "response_queue" ? "phone:rounded-none phone:border-0 phone:bg-transparent phone:shadow-none" : ""}`}>
+      <GlassPanel id="workspace-shell" tabindex="-1" class={`mx-auto max-w-[1700px] p-0 sm:p-5 sm:pl-[68px] lg:p-8 lg:pl-[72px] ${weddingReturnContextActive() && activeView() === "response_queue" ? "phone:rounded-none phone:border-0 phone:bg-transparent phone:shadow-none" : ""}`}>
 
         {/* Fleet pane — slides in below nav when user clicks active/idle badge */}
         <Show when={fleetOpen()}>

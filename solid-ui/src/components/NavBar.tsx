@@ -934,7 +934,7 @@ export function NavBar(props: {
 
       {/* ── Left navigation rail ─────────────────────────────────────── */}
       <Show when={!isWatch()}>
-        <aside class="fixed left-0 top-0 bottom-0 z-[100] flex w-16 flex-col items-center border-r border-white/20 bg-white/75 py-3 backdrop-blur-2xl phone:hidden">
+        <aside class="fixed left-0 top-0 bottom-0 z-[100] flex w-14 flex-col items-center border-r border-white/20 bg-white/75 py-2 backdrop-blur-2xl phone:hidden">
 
           {/* OmnyID logo — navigates to home workspace grid */}
           <div class="group relative mb-2 flex w-full justify-center">
@@ -1324,7 +1324,7 @@ export function NavBar(props: {
       {/* More views drawer — slides in from left rail */}
       <Show when={showMoreMenu() && !isWatch()}>
         <div class="fixed inset-0 z-30" onClick={() => setShowMoreMenu(false)} />
-        <div class="fixed bottom-0 left-16 top-0 z-40 w-56 animate-fade-in border-r border-white/20 bg-white/92 shadow-panel backdrop-blur-2xl">
+        <div class="fixed bottom-0 left-14 top-0 z-40 w-56 animate-fade-in border-r border-white/20 bg-white/92 shadow-panel backdrop-blur-2xl">
           <div class="flex h-full flex-col py-5">
             <p class="mb-3 px-5 font-mono text-[9px] uppercase tracking-[0.2em] text-outline">More views</p>
             {MORE_VIEW_ITEMS.map((item) => (

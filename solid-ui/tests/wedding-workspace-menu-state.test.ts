@@ -72,15 +72,15 @@ test("loadWeddingWorkspaceMenu defaults to home and round-trips a saved tab", ()
   assert.equal(loadWeddingWorkspaceMenu(storage), "timeline");
 });
 
-test("legacy Vision menu values open Inspiration where the Vision summary lives", () => {
+test("legacy Vision and Inspiration menu values open Plan", () => {
   const storage = fakeStorage();
   saveWeddingWorkspaceMenu("vision", storage);
 
-  assert.equal(loadWeddingWorkspaceMenu(storage), "inspiration");
-  assert.equal(loadWeddingWorkspaceMenuFromUrl("?weddingMenu=vision"), "inspiration");
+  assert.equal(loadWeddingWorkspaceMenu(storage), "plan");
+  assert.equal(loadWeddingWorkspaceMenuFromUrl("?weddingMenu=vision"), "plan");
   assert.equal(
     weddingWorkspaceMenuIdFromEvent(new CustomEvent("x", { detail: { menu: "vision" } })),
-    "inspiration",
+    "plan",
   );
 });
 
@@ -97,7 +97,7 @@ test("loadWeddingWorkspaceMenuFromUrl accepts query or hash tabs", () => {
   assert.equal(loadWeddingWorkspaceMenuFromUrl("?weddingMenu=tasks"), "tasks");
   assert.equal(loadWeddingWorkspaceMenuFromUrl("?weddingMenu=documents"), "documents");
   assert.equal(loadWeddingWorkspaceMenuFromUrl("?weddingMenu=helpers"), "helpers");
-  assert.equal(loadWeddingWorkspaceMenuFromUrl("?weddingMenu=inspiration"), "inspiration");
+  assert.equal(loadWeddingWorkspaceMenuFromUrl("?weddingMenu=inspiration"), "plan");
   assert.equal(loadWeddingWorkspaceMenuFromUrl("", "#weddingMenu=timeline"), "timeline");
   assert.equal(loadWeddingWorkspaceMenuFromUrl("?weddingMenu=bad"), null);
 });

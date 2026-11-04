@@ -25,6 +25,7 @@ import type { AfpAttachment } from "@/lib/api";
 import type { WeddingVendorEnquiryPermissions } from "@/lib/weddingVendorEnquiryPermissionsState";
 import { WeddingTrustInfoTip } from "@/components/WeddingTrustInfoTip";
 import { WeddingConfirmDialog } from "@/components/WeddingConfirmDialog";
+import { WeddingVendorSecureResponseLink } from "@/components/WeddingVendorSecureResponseLink";
 
 function localToday(): string {
   const now = new Date();
@@ -242,6 +243,7 @@ export function WeddingVendorFollowUpPanel(props: {
                       </For>
                     </div>
                   </Show>
+                  <WeddingVendorSecureResponseLink messages={props.state.afpMessages} vendorId={card.vendorId} vendorName={card.vendorName} />
 
                   <Show
                     when={card.actionMode !== "reply_recorded"}

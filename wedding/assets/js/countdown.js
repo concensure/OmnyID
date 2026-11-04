@@ -61,7 +61,7 @@
       details.append(summary, gate); tasks.forEach(function (task) { details.appendChild(createTask(task, false)); }); stages.appendChild(details);
     });
     resultEnvelope = magnets.createEnvelope({
-      schema: 'personalised_wedding_countdown', engine_version: 'countdown-engine.v1', data_version: catalogue.schema,
+      schema: 'wedding_countdown', engine_version: 'countdown-engine.v1', data_version: catalogue.schema,
       inputs: { wedding_date: dateInput.value }, result: { completed_catalogue_tasks: doneIds, task_count: plan.totalCount },
       origin: { page: location.pathname, referrer_class: document.referrer ? 'referred' : 'direct' }
     });
