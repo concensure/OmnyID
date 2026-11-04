@@ -24,7 +24,7 @@ const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as Manifest;
 async function signIn(browser: Browser, email: string): Promise<{ context: BrowserContext; page: Page }> {
   const context = await browser.newContext({ viewport: { width: 375, height: 812 } });
   const page = await context.newPage();
-  await page.goto("/workspace/?open_auth=1", { waitUntil: "domcontentloaded" });
+  await page.goto("/workspace/?view=cost_dashboard&open_auth=1", { waitUntil: "domcontentloaded" });
   await page.getByLabel("Account email").fill(email);
   await page.getByLabel("Password").fill(password!);
   await page.getByRole("button", { name: "Sign in", exact: true }).last().click();
@@ -53,7 +53,6 @@ test("real Growth stack reconciles sources and preserves the operator boundary",
 
   const ordinary = await signIn(browser, manifest.ordinary_email);
   expect((await api(ordinary.page, "/admin/growth/overview")).status).toBe(403);
-  await ordinary.page.goto("/workspace/?view=cost_dashboard", { waitUntil: "networkidle" });
   await expect(ordinary.page.getByRole("heading", { name: "Campaign analytics" })).toBeHidden();
 
   const operator = await signIn(browser, manifest.operator_email);
@@ -101,8 +100,8 @@ test("real Growth stack reconciles sources and preserves the operator boundary",
     refunded_minor: manifest.expected_refunded_minor,
   });
 
-  await operator.page.goto("/workspace/?view=cost_dashboard", { waitUntil: "networkidle" });
   await expect(operator.page.getByRole("heading", { name: "Campaign analytics" })).toBeVisible();
+  await operator.page.getByRole("button", { name: "Refresh", exact: true }).click();
   await expect(operator.page.getByText("2", { exact: true }).first()).toBeVisible();
   await operator.page.getByRole("tab", { name: "Campaigns" }).click();
   await expect(operator.page.getByText("growth_pilot", { exact: true }).first()).toBeVisible();
