@@ -10,6 +10,9 @@ test("qualified Wedding proof and guest preview work at phone width", async ({ p
   await page.getByRole("button", { name: "Guests" }).click();
   await expect(page.getByRole("heading", { name: "Guest replies", exact: true })).toBeVisible();
   await expect(page.getByText("One guest record, connected")).toBeVisible();
+  await page.locator('[data-pane="guests"]').evaluate(async (element) => {
+    await Promise.all(element.getAnimations({ subtree: true }).map((animation) => animation.finished));
+  });
 
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(1);
