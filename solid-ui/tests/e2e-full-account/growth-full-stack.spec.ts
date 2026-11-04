@@ -35,6 +35,8 @@ async function signIn(browser: Browser, email: string): Promise<{ context: Brows
     if ((await dialog.count()) === 0) break;
     await page.keyboard.press("Escape");
   }
+  const deferUseCase = page.getByRole("button", { name: "Later", exact: true });
+  if (await deferUseCase.isVisible()) await deferUseCase.click();
   return { context, page };
 }
 
@@ -107,7 +109,6 @@ test("real Growth stack reconciles sources and preserves the operator boundary",
   });
 
   await expect(operator.page.getByRole("heading", { name: "Campaign analytics" })).toBeVisible();
-  await operator.page.getByRole("button", { name: "Refresh", exact: true }).click();
   await expect(operator.page.getByText("2", { exact: true }).first()).toBeVisible();
   await operator.page.getByRole("tab", { name: "Campaigns" }).click();
   await expect(operator.page.getByText("growth_pilot", { exact: true }).first()).toBeVisible();
