@@ -65,7 +65,7 @@ $serverEnvironment = @{
     OMNYID_ENABLE_WEBTRANSPORT = "false"
     OMNYID_COORD_DB_NOTIFY = "false"
     OMNYID_ADMIN_EMAILS = "growth-operator@omnyid.test"
-    OMNYID_GROWTH_ANALYTICS_ENABLED = "true"
+    OMNYID_GROWTH_ANALYTICS_ENABLED = "false"
     OMNYID_WEDDING_MEASUREMENT_ENABLED = "true"
     OMNYID_VENDOR_MAIL_ENABLED = "false"
     OMNYID_VENDOR_MAIL_INGRESS_ENABLED = "false"
@@ -127,6 +127,32 @@ try {
         -WorkingDirectory $repo -WindowStyle Hidden -PassThru -Wait -Environment $seedEnvironment `
         -RedirectStandardOutput (Join-Path $tempRoot "seed.out.log") -RedirectStandardError (Join-Path $tempRoot "seed.err.log")
     if ($seed.ExitCode -ne 0) { throw "Growth seeder failed: $(Get-Content (Join-Path $tempRoot 'seed.err.log') -Raw)" }
+
+    $auditBefore = (docker exec $container psql -U omnyid_test -d omnyid_test -tAc "SELECT COUNT(*) FROM growth_admin_audit").Trim()
+    $falseDefaultSession = [Microsoft.PowerShell.Commands.WebRequestSession]::new()
+    $loginBody = @{ email = "growth-operator@omnyid.test"; password = $password } | ConvertTo-Json -Compress
+    Invoke-WebRequest -UseBasicParsing -Uri "$apiOrigin/auth/login" -Method Post -ContentType "application/json" `
+        -Body $loginBody -WebSession $falseDefaultSession | Out-Null
+    $falseDefaultStatus = 0
+    try {
+        $falseDefaultReply = Invoke-WebRequest -UseBasicParsing -Uri "$apiOrigin/admin/growth/overview" `
+            -WebSession $falseDefaultSession
+        $falseDefaultStatus = [int]$falseDefaultReply.StatusCode
+    } catch {
+        $falseDefaultStatus = [int]$_.Exception.Response.StatusCode
+    }
+    if ($falseDefaultStatus -ne 404) { throw "Growth false-default route returned $falseDefaultStatus instead of 404" }
+    $auditAfter = (docker exec $container psql -U omnyid_test -d omnyid_test -tAc "SELECT COUNT(*) FROM growth_admin_audit").Trim()
+    if ($auditBefore -ne $auditAfter) { throw "Disabled Growth read wrote an admin-audit row" }
+
+    Stop-Child $server
+    $server = $null
+    $serverEnvironment.OMNYID_GROWTH_ANALYTICS_ENABLED = "true"
+    $server = Start-Process -FilePath (Join-Path $cargoTarget "debug\omnyid-homeserver.exe") `
+        -WorkingDirectory $repo -WindowStyle Hidden -PassThru -Environment $serverEnvironment `
+        -RedirectStandardOutput (Join-Path $tempRoot "server-enabled.out.log") `
+        -RedirectStandardError (Join-Path $tempRoot "server-enabled.err.log")
+    Wait-Http "$apiOrigin/auth/google/config"
 
     $uiEnvironment = @{ OMNYID_E2E_API_ORIGIN = $apiOrigin }
     $ui = Start-Process -FilePath "npm.cmd" -ArgumentList @("run", "preview", "--", "--host", "127.0.0.1", "--port", "$uiPort") `
