@@ -7383,3 +7383,24 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
   `Documents/verification/wed-332-assignment-research-release-2026-11-05.md`. The detached audit's
   remote report and exit marker completed, although its local PowerShell poller had to be stopped;
   investigate that poll-return bug separately. WED-333 can now start from this coordination state.
+
+# 2026-11-05 - WED-333 Invite Proposals first slice live (Codex, in progress)
+
+- Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
+  `agent/codex/WED-333`; application SHA
+  `8adf56f328d13873a0bfba90bcdab3ecc9ce6aae` is live on Oracle.
+- The existing Wedding Home vendor card now switches in place between Find vendors and Invite
+  Proposals. Invite Proposals projects a reusable brief from the same ledger, caps the current
+  comparison shortlist at five, previews field-level sharing and saves a private AFP/A2UI draft.
+  Budget and phone default off; saving is explicitly non-external and cannot set Enquired.
+- The supplied guidance was converted to a spec and dependency-ordered task plan under
+  `Documents/design/wedding planner/Invite proposals/`. It explicitly reuses search, outreach,
+  quote intelligence, Documents, lifecycle, booking and no-account response authorities.
+- A clean exact-SHA checkout passed typecheck, six focused tests, both line budgets, all 2,200
+  Wedding tests and the production build. Oracle provenance matches, workspace returns HTTP 200,
+  backup verification and restore drill pass. Only 7.3 GB of unused builder cache was pruned after
+  the first restore preflight found insufficient free space; root use is now 74%.
+- Still open: recipient eligibility, conversion to the existing permission-fingerprinted outreach
+  flow, partial-batch idempotency, structured vendor responses, comparison/booking closure and the
+  allowlisted multi-recipient rollout. These remain false-default; do not infer send authority from
+  the now-live private-draft UI.
