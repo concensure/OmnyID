@@ -352,6 +352,29 @@ mod tests {
         assert_eq!(rebuilt[0].registered_weddings, 1);
         assert_eq!(rebuilt[0].activated_weddings, 1);
         assert_eq!(rebuilt[2].returned_weddings_days_1_to_7, 1);
+        let facts = db.growth_period_facts(from, through).await.unwrap();
+        assert_eq!(facts.first_party_landing_sessions, 1);
+        assert_eq!(facts.registered_weddings, 1);
+        assert_eq!(facts.activated_acquired_weddings, 1);
+        assert_eq!(facts.returned_weddings_days_1_to_7, 1);
+        let campaigns = db
+            .growth_campaign_rows(from, through, 0, 20, None)
+            .await
+            .unwrap();
+        assert!(campaigns.iter().any(|row| {
+            row.source == "instagram"
+                && row.first_party_landing_sessions == 1
+                && row.registered_weddings == 1
+        }));
+        assert!(campaigns.iter().any(|row| {
+            row.source == "meta" && row.spend_aud_minor == 20_000 && row.meta_landing_views == 900
+        }));
+        let cohorts = db.growth_cohort_rows(from, through).await.unwrap();
+        assert_eq!(cohorts.len(), 1);
+        assert_eq!(cohorts[0].registered_weddings, 1);
+        let quality = db.growth_quality_summary(from, through).await.unwrap();
+        assert_eq!(quality.first_party_landing_views, 1);
+        assert_eq!(quality.meta_landing_views, 900);
 
         sqlx::query("DELETE FROM growth_daily_rollups")
             .execute(&db.pool)

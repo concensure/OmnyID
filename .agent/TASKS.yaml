@@ -99,6 +99,48 @@ tasks:
     acceptance: [all ratios use versioned numerator denominator maturity completeness and typed zero states, Sydney report windows are exact across daylight-saving transitions, current and previous periods are comparable, weekly signup cohorts and days-one-to-seven return exclude immature Weddings, partner joins duplicate source events and Meta landing views cannot inflate first-party denominators, incremental rollup and full rebuild produce identical rows, focused pure disposable-Postgres migration cargo-check and line-budget tests pass]
     progress: "Completed on the task branch. KPI results carry version, exact Sydney window, numerator, denominator, unit, completeness and typed available/provisional/unavailable state. Six current and equal-length previous metrics cover cost per first-party landing session, signup, seven-day activation, cost per activated Wedding, days-one-to-seven return and 30-day paid CAC. Migration 0142 adds content-free daily rollups plus a checkpoint; the incremental path recomputes the mutable trailing window and late payment/spend corrections. A fresh loopback-only tmpfs pgvector database applied the migrations and proved that full rebuild and incremental output match for first-party/Meta views, registration, activation, later-day return and A$200 spend. Five focused KPI tests, disposable Postgres parity, migration-catalog parity, compile and line budgets pass."
 
+  - id: GROWTH-07
+    title: Expose the Growth panel through authenticated operator APIs
+    status: done
+    owner: codex
+    branch: agent/codex/GROWTH-001
+    worktree: C:/Users/ozans/Desktop/projects/OmnyID-GROWTH-001
+    base_sha: ec0b1af7dc9d51c3e2df1127c5fd0adddc6ae983
+    depends_on: [GROWTH-06]
+    files: [src/server/**growth**, src/db/**growth**, src/server/mod.rs, Documents/verification/**, .agent/**]
+    acceptance: [every Growth route is false-default and reuses authenticated operator allowlisting, anonymous ordinary and cross-account callers fail closed, date ranges and pagination are bounded, overview campaign cohort benchmark quality and formula-safe export responses carry definitions numerators denominators completeness maturity filters and source freshness without AFP or private Wedding content, exports are operator audited, focused route DB migration compile and line-budget tests pass]
+    progress: "Implemented false-default operator-only overview, campaign, cohort, benchmark, quality and formula-safe audited CSV routes. Date range, page size and export rows are bounded; every response identifies growth-kpi-v1, Sydney time, filters, attribution model and coverage limits without AFP or Wedding content. Campaign queries visibly separate unmatched provider spend/Meta LPV from first-party evidence. A fresh tmpfs pgvector fixture passed aggregate/cohort/quality SQL, while the real test router proved anonymous 401, ordinary 403, operator 200, overlong range 400 and disabled 404. Compile and line budgets pass; production remains disabled and unchanged."
+
+  - id: GROWTH-08
+    title: Add the Growth dashboard to the existing operator Usage shell
+    status: in_progress
+    owner: codex
+    branch: agent/codex/GROWTH-001
+    worktree: C:/Users/ozans/Desktop/projects/OmnyID-GROWTH-001
+    depends_on: [GROWTH-07]
+    files: [solid-ui/src/**, solid-ui/tests/**, Documents/verification/**, .agent/**]
+    acceptance: [existing operator shell gains executive campaign cohort benchmark and quality views without a parallel admin app, unknown provisional and incomplete values never render as zero, filters preserve route and focus state, charts have tables, mobile 375px keyboard screen-reader and line-budget checks pass]
+
+  - id: GROWTH-09
+    title: Add revisioned Growth benchmarks diagnostics and audited export
+    status: ready
+    owner: codex
+    branch: agent/codex/GROWTH-001
+    worktree: C:/Users/ozans/Desktop/projects/OmnyID-GROWTH-001
+    depends_on: [GROWTH-07, GROWTH-08]
+    files: [postgres/migrations/**, src/db/**growth**, src/server/**growth**, solid-ui/src/**, solid-ui/tests/**, Documents/verification/**, .agent/**]
+    acceptance: [targets are revisioned and attributed to an operator, no fabricated benchmark or unqualified small-sample success verdict ships, Meta and first-party discrepancies remain separate, diagnostics show freshness exclusions unmatched spend maturity and payment completeness, filtered CSV is formula-safe definition-labelled and audited, focused DB API UI and line-budget checks pass]
+
+  - id: GROWTH-10
+    title: Run disposable Growth end-to-end shadow and release controls
+    status: ready
+    owner: codex
+    branch: agent/codex/GROWTH-001
+    worktree: C:/Users/ozans/Desktop/projects/OmnyID-GROWTH-001
+    depends_on: [GROWTH-09]
+    files: [scripts/**, solid-ui/e2e/**, Documents/verification/**, .agent/**]
+    acceptance: [real router UI and disposable Postgres fixtures reconcile paid direct signup partner activation return payment refund and duplicate import sources, hosted false-default shadow stores no content, anonymous and non-operator access fails, privacy security accessibility and mobile checks pass, clean exact-SHA candidate and runtime provenance are recorded, rollback disables the panel without deleting source records]
+
   - id: WED-329
     title: Complete the autonomous Batch 2 countdown catalogue and public planning checklist
     status: done

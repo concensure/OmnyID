@@ -2665,3 +2665,14 @@ subjective usability or a controlled external cohort.
 - The six-card comparison is assembled on the server from current and equal previous windows.
   Seven-day activation/return and 30-day paid CAC stay provisional until their cohorts mature;
   missing spend and zero denominators remain unavailable rather than looking like performance.
+
+# 2026-11-04 - GROWTH-07 admin API boundary
+
+- Growth analytics is absent unless `OMNYID_GROWTH_ANALYTICS_ENABLED` is explicitly true. Every
+  route still authenticates and checks the existing operator allowlist; navigation is not a gate.
+- API filters are server-resolved and bounded. Results carry the definition, Sydney window,
+  attribution model and coverage warning; raw AFP and private Wedding content are never returned.
+- Meta landing views and imported spend remain separate from first-party sessions until an exact
+  stored campaign key joins them. The dashboard must show unmatched rows, not guess attribution.
+- Exports are aggregate-only, formula-safe and operator audited. Benchmarks remain empty until an
+  operator creates a revisioned target; a generic industry target is not silently substituted.

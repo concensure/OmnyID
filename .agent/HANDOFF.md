@@ -7195,3 +7195,15 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
   same build and tests passed with incremental compilation disabled. The database container was
   removed.
 - Nothing was deployed. Next: GROWTH-07 authenticated operator API.
+## 2026-11-04 - GROWTH-07 authenticated Growth API (Codex, complete)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
+`agent/codex/GROWTH-001`; based on GROWTH-06 SHA
+`ec0b1af7dc9d51c3e2df1127c5fd0adddc6ae983`.
+
+- Added false-default, operator-only overview/campaign/cohort/benchmark/quality/export routes over
+  content-free Growth sources. Bounds, source coverage, exact definitions and export audit are
+  server enforced.
+- Disposable Postgres aggregate SQL and real-router 401/403/200/400/disabled-404 evidence pass;
+  the container was removed. Nothing was enabled or deployed.
+- Next: GROWTH-08 in the existing operator Usage shell.

@@ -129,7 +129,7 @@ mod feed_routes;
 mod file_upload_routes;
 mod finance_routes;
 mod geofence_routes;
-mod goal_routes; mod growth_spend_routes;
+mod goal_routes; mod growth_dashboard_routes; mod growth_spend_routes;
 mod ingest_routes;
 pub(crate) mod knowledge_routes;
 mod llm_resolution;
@@ -1388,7 +1388,7 @@ pub async fn run() {
         .merge(brief_routes::routes())
         .merge(feed_routes::routes())
         .merge(finance_routes::routes())
-        .merge(goal_routes::routes()).merge(growth_spend_routes::routes())
+        .merge(goal_routes::routes()).merge(growth_dashboard_routes::routes()).merge(growth_spend_routes::routes())
         .merge(conversion_routes::routes())
         .merge(ingest_routes::routes())
         .merge(practice_routes::routes())
@@ -1561,6 +1561,8 @@ pub async fn build_test_router(database_url: &str) -> Router {
         .route("/thread/{thread_id}", get(get_thread_http))
         .route("/actions/decision", post(record_action_decision_http))
         .route("/gateway/email", post(handle_gateway_email))
+        .merge(growth_dashboard_routes::routes())
+        .merge(growth_spend_routes::routes())
         .merge(practice_routes::routes())
         .merge(quotation_normalisation_routes::routes()).merge(quotation_routes::routes()).merge(quotation_response_capability_routes::routes())
         .merge(quotation_response_portal_routes::routes()).merge(quotation_vendor_response_routes::routes()).merge(quotation_vendor_attachment_routes::routes()).merge(quotation_vendor_revision_routes::routes()).merge(quotation_source_routes::routes())
