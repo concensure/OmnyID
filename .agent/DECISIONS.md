@@ -2659,3 +2659,9 @@ subjective usability or a controlled external cohort.
   the unit; duplicate source observations merge activity dates rather than adding denominators.
 - Meta landing views remain provider-reported context. Only deduplicated eligible first-party
   landing sessions may be the OmnyID cost-per-visit denominator.
+- Daily rollups retain only date-level counts and money minor units, never Wedding content or
+  identities. Incremental refresh always revisits the mutable trailing 30 days and reaches farther
+  back for payment or spend corrections recorded after its checkpoint.
+- The six-card comparison is assembled on the server from current and equal previous windows.
+  Seven-day activation/return and 30-day paid CAC stay provisional until their cohorts mature;
+  missing spend and zero denominators remain unavailable rather than looking like performance.

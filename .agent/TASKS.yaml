@@ -89,7 +89,7 @@ tasks:
 
   - id: GROWTH-06
     title: Calculate deterministic KPI cohorts and daily rollups
-    status: in_progress
+    status: done
     owner: codex
     branch: agent/codex/GROWTH-001
     worktree: C:/Users/ozans/Desktop/projects/OmnyID-GROWTH-001
@@ -97,7 +97,7 @@ tasks:
     depends_on: [GROWTH-02, GROWTH-03, GROWTH-04, GROWTH-05]
     files: [src/growth_analytics/**, src/db.rs, src/db/**growth**, src/db/migration_catalog.rs, postgres/migrations/**, Documents/marketing/analytics/**, Documents/verification/**, .agent/**]
     acceptance: [all ratios use versioned numerator denominator maturity completeness and typed zero states, Sydney report windows are exact across daylight-saving transitions, current and previous periods are comparable, weekly signup cohorts and days-one-to-seven return exclude immature Weddings, partner joins duplicate source events and Meta landing views cannot inflate first-party denominators, incremental rollup and full rebuild produce identical rows, focused pure disposable-Postgres migration cargo-check and line-budget tests pass]
-    progress: "The first pure slice adds exact Australia/Sydney daily, trailing and equal previous windows with 23/25-hour DST coverage; typed available/unavailable/provisional KPI results; exact AUD-minor cost per unit and basis-point rates; deduplicated weekly days-one-to-seven return cohorts that merge duplicate Wedding observations, exclude day zero and immature Weddings; and strict separation of Meta-reported from first-party landing views. Four focused tests pass. Migration-backed daily rollups, checkpoint/rebuild parity and complete current/previous KPI assembly remain open, so GROWTH-06 stays in progress."
+    progress: "Completed on the task branch. KPI results carry version, exact Sydney window, numerator, denominator, unit, completeness and typed available/provisional/unavailable state. Six current and equal-length previous metrics cover cost per first-party landing session, signup, seven-day activation, cost per activated Wedding, days-one-to-seven return and 30-day paid CAC. Migration 0142 adds content-free daily rollups plus a checkpoint; the incremental path recomputes the mutable trailing window and late payment/spend corrections. A fresh loopback-only tmpfs pgvector database applied the migrations and proved that full rebuild and incremental output match for first-party/Meta views, registration, activation, later-day return and A$200 spend. Five focused KPI tests, disposable Postgres parity, migration-catalog parity, compile and line budgets pass."
 
   - id: WED-329
     title: Complete the autonomous Batch 2 countdown catalogue and public planning checklist

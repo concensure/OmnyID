@@ -720,4 +720,9 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Immutable advertising spend imports, rows, corrections, and operator audit",
         include_str!("../../postgres/migrations/0141_growth_spend_import.sql"),
     ),
+    (
+        "0142_growth_daily_rollups",
+        "Content-free Sydney-time Growth daily rollups and projector checkpoint",
+        include_str!("../../postgres/migrations/0142_growth_daily_rollups.sql"),
+    ),
 ];

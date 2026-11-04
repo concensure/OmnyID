@@ -223,6 +223,128 @@ impl LandingViewCounts {
     }
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct GrowthPeriodFacts {
+    pub spend_aud_minor: i64,
+    pub spend_complete: bool,
+    pub first_party_landing_sessions: i64,
+    pub registered_weddings: i64,
+    pub mature_registered_weddings_7d: i64,
+    pub activated_within_7d: i64,
+    pub activated_acquired_weddings: i64,
+    pub mature_activated_weddings_7d: i64,
+    pub returned_weddings_days_1_to_7: i64,
+    pub mature_acquired_weddings_30d: i64,
+    pub paid_weddings_within_30d: i64,
+    pub latest_registration_matures_on: Option<NaiveDate>,
+    pub latest_activation_matures_on: Option<NaiveDate>,
+    pub latest_paid_matures_on: Option<NaiveDate>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct GrowthKpiSnapshot {
+    pub definition_version: &'static str,
+    pub window: ReportWindow,
+    pub cost_per_landing_session: KpiResult,
+    pub signup_rate: KpiResult,
+    pub activation_rate_7d: KpiResult,
+    pub cost_per_activated_wedding: KpiResult,
+    pub return_rate_days_1_to_7: KpiResult,
+    pub paid_cac_30d: KpiResult,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct GrowthKpiComparison {
+    pub current: GrowthKpiSnapshot,
+    pub previous: GrowthKpiSnapshot,
+}
+
+fn mature_rate(
+    numerator: i64,
+    mature_denominator: i64,
+    observed_denominator: i64,
+    latest_matures_on: Option<NaiveDate>,
+    report_date: NaiveDate,
+    zero_reason: &'static str,
+) -> KpiResult {
+    if mature_denominator <= 0 && observed_denominator > 0 {
+        return KpiResult::Provisional {
+            numerator,
+            denominator: mature_denominator,
+            mature_on: latest_matures_on.unwrap_or(report_date),
+        };
+    }
+    percentage_rate(numerator, mature_denominator, zero_reason)
+}
+
+pub fn growth_kpi_snapshot(
+    window: ReportWindow,
+    report_date: NaiveDate,
+    facts: &GrowthPeriodFacts,
+) -> GrowthKpiSnapshot {
+    GrowthKpiSnapshot {
+        definition_version: KPI_DEFINITION_VERSION,
+        window,
+        cost_per_landing_session: cost_per_unit(
+            facts.spend_aud_minor,
+            facts.first_party_landing_sessions,
+            facts.spend_complete,
+        ),
+        signup_rate: percentage_rate(
+            facts.registered_weddings,
+            facts.first_party_landing_sessions,
+            "no_eligible_landing_sessions",
+        ),
+        activation_rate_7d: mature_rate(
+            facts.activated_within_7d,
+            facts.mature_registered_weddings_7d,
+            facts.registered_weddings,
+            facts.latest_registration_matures_on,
+            report_date,
+            "no_mature_registered_weddings",
+        ),
+        cost_per_activated_wedding: cost_per_unit(
+            facts.spend_aud_minor,
+            facts.activated_acquired_weddings,
+            facts.spend_complete,
+        ),
+        return_rate_days_1_to_7: mature_rate(
+            facts.returned_weddings_days_1_to_7,
+            facts.mature_activated_weddings_7d,
+            facts.activated_acquired_weddings,
+            facts.latest_activation_matures_on,
+            report_date,
+            "no_mature_activated_weddings",
+        ),
+        paid_cac_30d: if facts.mature_acquired_weddings_30d <= 0 && facts.registered_weddings > 0 {
+            KpiResult::Provisional {
+                numerator: facts.spend_aud_minor,
+                denominator: facts.paid_weddings_within_30d,
+                mature_on: facts.latest_paid_matures_on.unwrap_or(report_date),
+            }
+        } else {
+            cost_per_unit(
+                facts.spend_aud_minor,
+                facts.paid_weddings_within_30d,
+                facts.spend_complete,
+            )
+        },
+    }
+}
+
+pub fn compare_growth_kpis(
+    current_window: ReportWindow,
+    report_date: NaiveDate,
+    current_facts: &GrowthPeriodFacts,
+    previous_facts: &GrowthPeriodFacts,
+) -> Option<GrowthKpiComparison> {
+    let previous = previous_window(&current_window)?;
+    Some(GrowthKpiComparison {
+        current: growth_kpi_snapshot(current_window, report_date, current_facts),
+        previous: growth_kpi_snapshot(previous, report_date, previous_facts),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -325,6 +447,82 @@ mod tests {
                 value: 200,
                 unit: "aud_minor_per_unit"
             }
+        );
+    }
+
+    #[test]
+    fn current_and_previous_kpis_keep_cost_maturity_and_zero_states_typed() {
+        let window = trailing_sydney_window(date("2026-11-01"), 7).unwrap();
+        let current = GrowthPeriodFacts {
+            spend_aud_minor: 20_000,
+            spend_complete: true,
+            first_party_landing_sessions: 100,
+            registered_weddings: 20,
+            mature_registered_weddings_7d: 10,
+            activated_within_7d: 10,
+            activated_acquired_weddings: 10,
+            mature_activated_weddings_7d: 0,
+            returned_weddings_days_1_to_7: 0,
+            mature_acquired_weddings_30d: 0,
+            paid_weddings_within_30d: 0,
+            latest_registration_matures_on: Some(date("2026-11-03")),
+            latest_activation_matures_on: Some(date("2026-11-08")),
+            latest_paid_matures_on: Some(date("2026-12-01")),
+        };
+        let previous = GrowthPeriodFacts {
+            spend_aud_minor: 0,
+            spend_complete: true,
+            first_party_landing_sessions: 0,
+            registered_weddings: 0,
+            mature_registered_weddings_7d: 0,
+            activated_within_7d: 0,
+            activated_acquired_weddings: 0,
+            mature_activated_weddings_7d: 0,
+            returned_weddings_days_1_to_7: 0,
+            mature_acquired_weddings_30d: 0,
+            paid_weddings_within_30d: 0,
+            latest_registration_matures_on: None,
+            latest_activation_matures_on: None,
+            latest_paid_matures_on: None,
+        };
+        let compared = compare_growth_kpis(window, date("2026-11-01"), &current, &previous)
+            .expect("equal previous window");
+        assert_eq!(
+            compared.current.cost_per_landing_session,
+            KpiResult::Available {
+                numerator: 20_000,
+                denominator: 100,
+                value: 200,
+                unit: "aud_minor_per_unit"
+            }
+        );
+        assert_eq!(
+            compared.current.cost_per_activated_wedding,
+            KpiResult::Available {
+                numerator: 20_000,
+                denominator: 10,
+                value: 2_000,
+                unit: "aud_minor_per_unit"
+            }
+        );
+        assert!(matches!(
+            compared.current.return_rate_days_1_to_7,
+            KpiResult::Provisional { .. }
+        ));
+        assert!(matches!(
+            compared.current.paid_cac_30d,
+            KpiResult::Provisional { .. }
+        ));
+        assert!(matches!(
+            compared.previous.signup_rate,
+            KpiResult::Unavailable {
+                reason: "no_eligible_landing_sessions",
+                ..
+            }
+        ));
+        assert_eq!(
+            compared.previous.window.end_date_exclusive,
+            date("2026-10-25")
         );
     }
 }

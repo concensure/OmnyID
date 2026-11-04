@@ -7181,3 +7181,17 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
   `Documents/verification/growth-06-kpi-engine-progress-2026-11-04.md`.
 - Still open: migration-backed daily rollups, incremental checkpoint/full rebuild parity, complete
   current/previous KPI assembly and disposable database verification. Do not mark GROWTH-06 done.
+## 2026-11-04 - GROWTH-06 deterministic KPI rollups (Codex, complete)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
+`agent/codex/GROWTH-001`; implementation based on `6d40083664edc16e67b156baf64231fad6c18873`.
+
+- Added migration-backed, content-free Sydney daily rollups with incremental checkpointing and
+  late spend/payment correction replay.
+- Added six typed current/previous KPI outputs and preserved maturity, completeness and exact
+  first-party versus Meta landing-view boundaries.
+- Five KPI tests, migration parity and a real disposable pgvector rebuild/incremental equality
+  fixture pass. The first `rustc` test link crashed with Windows `STATUS_ACCESS_VIOLATION`; the
+  same build and tests passed with incremental compilation disabled. The database container was
+  removed.
+- Nothing was deployed. Next: GROWTH-07 authenticated operator API.
