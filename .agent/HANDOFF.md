@@ -7370,3 +7370,16 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
   focused Rust tests, migration-catalog parity and disposable pgvector migration application. The
   next action is a clean detached exact-SHA build/deploy, hosted provenance/health verification,
   then WED-333 Invite Proposals specification and implementation.
+
+# 2026-11-05 - WED-332 completed Oracle release (Codex)
+
+- Application SHA `bc7ca659fe4421a3d7dd1d8fc65b1d40485eec5d` was built from clean detached
+  checkout `C:\temp\wt\omnyid-wed332-release-bc7ca65` and is live on Oracle. `SOURCE_COMMIT` and
+  `oracle-runtime-manifest.json` match, and migration 0144 exists in production.
+- The first restore preflight found a 300 MB capacity shortfall after the image build. Pruning only
+  4.85 GB of unused Docker builder cache reduced root use from 85 to 75 percent. A repeated full
+  proof passed backup verification, runtime-script integrity and the isolated restore drill.
+- Evidence is in
+  `Documents/verification/wed-332-assignment-research-release-2026-11-05.md`. The detached audit's
+  remote report and exit marker completed, although its local PowerShell poller had to be stopped;
+  investigate that poll-return bug separately. WED-333 can now start from this coordination state.

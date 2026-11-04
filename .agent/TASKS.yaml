@@ -17,7 +17,7 @@ lifecycle:
 tasks:
   - id: WED-332
     title: Deliver assigned Wedding research and repair journey and guest actions
-    status: in_progress
+    status: done
     owner: codex
     branch: agent/codex/WED-332
     worktree: C:/Users/ozans/Desktop/projects/OmnyID-GROWTH-001
@@ -25,7 +25,7 @@ tasks:
     depends_on: [WED-331]
     files: [solid-ui/src/components/Wedding**, solid-ui/src/lib/wedding**, solid-ui/tests/wedding-**, src/server/**wedding**, src/db/**, Documents/verification/**, .agent/**]
     acceptance: [only the current and immediately following eligible decision receive funded research and resolving or deferring the current decision advances the two-item research window by one, assigning an active Wedding task to another person sends the relevant saved research with the task email and also records a tenant-safe agent delivery when that email belongs to an OmnyID account, assignment delivery is idempotent and does not disclose another Wedding or unapproved private context, the selected journey stage uses the in-progress status colour while future stage circles use an accessible close-dash outline, Add attending guests opens the existing Guest RSVP quick actions in place, focused Rust and frontend tests all Wedding tests typecheck production build and line budgets pass, a clean exact-SHA Oracle release records matching provenance]
-    progress: "Implementation is complete pending exact-SHA Oracle release. A tested moving two-item helper keeps funded research to current plus next and advances by one after resolution or deferral; the server also rejects ranks above one. Explicit task assignment now saves the existing AFP responsibility record, emails the newest task-specific research attachment, and stores a recipient-tenant A2UI/AFP handoff for another registered OmnyID user without granting source-workspace access. Digest-only idempotent delivery receipts are migration-backed. The journey stepper uses the in-progress amber fill for selected/current stages and close dashed future outlines. Seating opens the existing Guest RSVP quick actions, including a stable empty-list target. Passed: 2,194 Wedding tests, typecheck, focused frontend tests, line budgets, production build, three Rust route tests, migration-catalog parity, and disposable pgvector migration application."
+    progress: "Application commit bc7ca659fe4421a3d7dd1d8fc65b1d40485eec5d is live on Oracle with matching SOURCE_COMMIT and runtime manifest. A tested moving two-item helper keeps funded research to current plus next and advances by one after resolution or deferral; the server also rejects ranks above one. Explicit task assignment saves the existing AFP responsibility record, emails the newest task-specific research attachment, and stores a recipient-tenant A2UI/AFP handoff for another registered OmnyID user without granting source-workspace access. Digest-only idempotent delivery receipts are migration-backed. Journey and RSVP actions are corrected. Passed: 2,194 Wedding tests, typecheck, focused frontend tests, line budgets, clean-checkout production build, focused Rust tests, migration-catalog parity, disposable migration application, hosted migration/provenance checks, backup verification and isolated restore drill. Unused Docker builder cache was pruned after the first restore preflight found a 300 MB free-space shortfall; the repeated full proof passed at 75 percent disk use."
 
   - id: WED-333
     title: Add an AFP-backed Invite Proposals vendor-search mode
