@@ -7168,3 +7168,16 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
   `Documents/verification/growth-05-spend-import-evidence-2026-11-04.md`.
 - No Meta API, Stripe API, production database or Oracle deployment was used. Next dependency is
   GROWTH-06 KPI/cohort/rollup over completed acquisition, activation, payment and spend sources.
+
+# 2026-11-04 - GROWTH-06 pure KPI slice (Codex, in progress)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
+`agent/codex/GROWTH-001`, base SHA `9e44301e106f7da21ba14beb48951d710e53ef2d`.
+
+- Added exact Sydney-time daily/trailing/previous windows and DST transition proof.
+- Added typed KPI states, exact cost/rate arithmetic, maturity handling, weekly days-one-to-seven
+  cohorts and first-party/Meta landing-view separation.
+- Four focused tests pass. Evidence:
+  `Documents/verification/growth-06-kpi-engine-progress-2026-11-04.md`.
+- Still open: migration-backed daily rollups, incremental checkpoint/full rebuild parity, complete
+  current/previous KPI assembly and disposable database verification. Do not mark GROWTH-06 done.

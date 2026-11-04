@@ -2648,3 +2648,14 @@ subjective usability or a controlled external cohort.
   source and date. Corrections append operator, time, deltas and reason; source rows never mutate.
 - CSV parsing executes nothing. Formula-like cells are prefixed for presentation/export, while
   size, row, column, cell, numeric, date and currency boundaries fail closed.
+
+# 2026-11-04 - GROWTH-06 KPI time and maturity boundary
+
+- Report dates are Australia/Sydney calendar boundaries resolved through IANA timezone rules, not
+  UTC dates or assumed 24-hour durations. Current and previous periods have equal calendar length.
+- A KPI always carries its numerator, denominator, unit, maturity and a typed available,
+  provisional or unavailable state. Zero denominators and missing inputs never become zero rates.
+- Days-one-to-seven return excludes activation day and immature Weddings. Canonical Wedding ID is
+  the unit; duplicate source observations merge activity dates rather than adding denominators.
+- Meta landing views remain provider-reported context. Only deduplicated eligible first-party
+  landing sessions may be the OmnyID cost-per-visit denominator.

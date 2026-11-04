@@ -87,6 +87,18 @@ tasks:
     acceptance: [bounded CSV parsing never executes spreadsheet content, preview reports mapping source currency conversion metadata row grain and validation errors before commit, duplicate files and duplicate source rows cannot double spend, unsupported identifiers remain at their available grain, mixed total and detail grains require an explicit non-double-counting selection, manual rows and corrections are append-only with operator time and reason, formula-like cells are neutralised in previews and exports, focused pure disposable-Postgres migration cargo-check and line-budget tests pass]
     progress: "Implemented bounded operator-only preview, commit, one-row manual entry and append-only correction endpoints over migration 0141. CSV parsing is capped at 5 MiB, 20,000 rows, 64 columns and 4,096-byte cells; it never executes spreadsheet content and neutralises formula-like preview/export values. Stable file and canonical row digests suppress retry and overlapping spend, mixed grains require an explicit exact-grain choice, non-AUD values retain reviewed conversion rate/source/date, and corrections retain operator/time/reason while refusing negative effective spend. 23 Growth tests, route limits, migration parity, cargo check, both line budgets and a real disposable tmpfs pgvector replay/correction test pass. No Meta API, production database or Oracle environment was used."
 
+  - id: GROWTH-06
+    title: Calculate deterministic KPI cohorts and daily rollups
+    status: in_progress
+    owner: codex
+    branch: agent/codex/GROWTH-001
+    worktree: C:/Users/ozans/Desktop/projects/OmnyID-GROWTH-001
+    base_sha: 9e44301e106f7da21ba14beb48951d710e53ef2d
+    depends_on: [GROWTH-02, GROWTH-03, GROWTH-04, GROWTH-05]
+    files: [src/growth_analytics/**, src/db.rs, src/db/**growth**, src/db/migration_catalog.rs, postgres/migrations/**, Documents/marketing/analytics/**, Documents/verification/**, .agent/**]
+    acceptance: [all ratios use versioned numerator denominator maturity completeness and typed zero states, Sydney report windows are exact across daylight-saving transitions, current and previous periods are comparable, weekly signup cohorts and days-one-to-seven return exclude immature Weddings, partner joins duplicate source events and Meta landing views cannot inflate first-party denominators, incremental rollup and full rebuild produce identical rows, focused pure disposable-Postgres migration cargo-check and line-budget tests pass]
+    progress: "The first pure slice adds exact Australia/Sydney daily, trailing and equal previous windows with 23/25-hour DST coverage; typed available/unavailable/provisional KPI results; exact AUD-minor cost per unit and basis-point rates; deduplicated weekly days-one-to-seven return cohorts that merge duplicate Wedding observations, exclude day zero and immature Weddings; and strict separation of Meta-reported from first-party landing views. Four focused tests pass. Migration-backed daily rollups, checkpoint/rebuild parity and complete current/previous KPI assembly remain open, so GROWTH-06 stays in progress."
+
   - id: WED-329
     title: Complete the autonomous Batch 2 countdown catalogue and public planning checklist
     status: done
