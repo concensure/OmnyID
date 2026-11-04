@@ -36,7 +36,7 @@ async function signIn(browser: Browser, email: string): Promise<{ context: Brows
     await page.keyboard.press("Escape");
   }
   const deferUseCase = page.getByRole("button", { name: "Later", exact: true });
-  if (await deferUseCase.isVisible()) await deferUseCase.click();
+  if (await deferUseCase.isVisible()) await deferUseCase.click({ force: true });
   return { context, page };
 }
 
