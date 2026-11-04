@@ -93,7 +93,7 @@ impl Db {
                 (SELECT COUNT(*)::bigint FROM wedding_site_sessions s
                  WHERE (s.first_seen AT TIME ZONE 'Australia/Sydney')::date = d.day),
                 (SELECT COUNT(DISTINCT e.visit_id)::bigint FROM wedding_site_events e
-                 WHERE e.event = 'landing_page_view'
+                 WHERE e.event IN ('omnyid_landing_view','wedding_landing_view')
                    AND (e.occurred_at AT TIME ZONE 'Australia/Sydney')::date = d.day),
                 (SELECT COUNT(DISTINCT link.wedding_plan_id)::bigint
                  FROM growth_identity_links link JOIN users u ON u.id = link.user_id
@@ -280,7 +280,7 @@ mod tests {
             },
             &[WeddingSiteEventWrite {
                 event_id: "rollupfixture001".into(),
-                event: "landing_page_view".into(),
+                event: "wedding_landing_view".into(),
                 page: "/wedding/".into(),
                 props: json!({"schema_version":"public-measurement.v1"}),
             }],

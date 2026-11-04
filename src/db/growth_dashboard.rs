@@ -404,7 +404,7 @@ impl Db {
               (SELECT MAX(committed_at)::text FROM growth_spend_imports) AS latest_import,
               (SELECT MAX(rebuilt_at)::text FROM growth_daily_rollups) AS latest_rollup,
               (SELECT COUNT(*)::bigint FROM wedding_site_events
-               WHERE event IN ('landing_page_view','omnyid_landing_view')
+               WHERE event IN ('omnyid_landing_view','wedding_landing_view')
                  AND (occurred_at AT TIME ZONE 'Australia/Sydney')::date BETWEEN $1 AND $2) AS first_party_lpv,
               (SELECT COALESCE(SUM(platform_landing_views),0)::bigint FROM growth_spend_rows
                WHERE spend_date BETWEEN $1 AND $2) AS meta_lpv,

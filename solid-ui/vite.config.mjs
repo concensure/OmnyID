@@ -7,6 +7,7 @@ const sdkRoot = resolve(import.meta.dirname, "../typescript-sdk/src");
 const apiProxyTarget = process.env.OMNYID_E2E_API_ORIGIN?.trim() || "http://127.0.0.1:8080";
 const apiProxy = {
   "/auth": { target: apiProxyTarget, changeOrigin: true },
+  "/admin": { target: apiProxyTarget, changeOrigin: true },
   "/dashboard": { target: apiProxyTarget, changeOrigin: true },
   "/agent": { target: apiProxyTarget, changeOrigin: true },
   "/runtime": { target: apiProxyTarget, changeOrigin: true },
