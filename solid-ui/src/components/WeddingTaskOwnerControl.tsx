@@ -1,7 +1,8 @@
 import { createEffect, createSignal, on, onCleanup, onMount, Show } from "solid-js";
 
-import { type SendAfpMessageInput } from "@/lib/api";
+import { readSession, type SendAfpMessageInput } from "@/lib/api";
 import { WeddingTaskOwnerPicker } from "@/components/WeddingTaskOwnerPicker";
+import { loadContacts } from "@/lib/contactsLocalState";
 import type { WeddingPlanningTaskItem } from "@/lib/weddingCalendarProjectionState";
 import {
   dispatchWeddingTaskResponsibilityChange,
@@ -11,6 +12,7 @@ import {
   weddingHelperResponsibilityToAfpSendInput,
   type WeddingTaskResponsibilityChange,
 } from "@/lib/weddingHelpersPanelState";
+import { runWeddingTaskAssignment } from "@/lib/weddingTaskAssignmentExecutionState";
 
 export function WeddingTaskOwnerControl(props: {
   task: WeddingPlanningTaskItem;
@@ -64,14 +66,21 @@ export function WeddingTaskOwnerControl(props: {
       return;
     }
     setSaving(true);
-    try {
-      await props.saveProjection(input);
-      setNotice(`${ownerLabel} is assigned.`);
-    } catch {
-      setNotice("Owner saved here. Account sync will retry when available.");
-    } finally {
-      setSaving(false);
-    }
+    const contact = loadContacts(props.contactUserId ?? readSession()?.user?.id ?? null).find(
+      (item) => item.name.trim().toLowerCase() === ownerLabel.toLowerCase(),
+    );
+    const result = await runWeddingTaskAssignment({
+      saveProjection: async (projection) => props.saveProjection!(projection),
+      projection: input,
+      weddingPlanId: props.weddingPlanId ?? "",
+      responseWorkspaceId: props.responseWorkspaceId,
+      task: props.task,
+      assignee: ownerLabel,
+      assigneeEmail: ownerLabel === "You" ? "" : contact?.email?.trim() ?? "",
+    });
+    setNotice(result.notice);
+    if (result.saved) props.onRefreshWorkspace?.();
+    setSaving(false);
   }
 
   return (

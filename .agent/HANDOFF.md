@@ -7352,3 +7352,21 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
   2,190 Wedding tests, production UI build, the SeaweedFS construction regression and four
   quote-study route tests pass. This handoff/task update is coordination-only and intentionally does
   not replace the tested production application SHA.
+
+# 2026-11-05 - WED-332 ready for exact-SHA Oracle release (Codex)
+
+- Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
+  `agent/codex/WED-332`; production still reports WED-331 application SHA
+  `b27a735f7d7f5e623fd6d72689867b29c49eada9` until this candidate is released.
+- Funded decision research now has an explicit moving current-and-next window. Assigning an active
+  task saves the existing AFP responsibility event, emails its newest task-specific research, and
+  adds a recipient-tenant A2UI/AFP handoff when the contact email belongs to another OmnyID account.
+  Delivery is rate-limited and idempotent, receipts retain only the email digest, and no Wedding
+  workspace access is granted.
+- The selected/current planning stage uses the same amber as In progress task rails; future stages
+  have close dashed outlines. Seating's Add attending guests action opens and focuses Guest RSVP
+  quick actions, including a useful empty-list state.
+- Passed: 2,194 Wedding tests, typecheck, focused UI tests, line budgets, production build, three
+  focused Rust tests, migration-catalog parity and disposable pgvector migration application. The
+  next action is a clean detached exact-SHA build/deploy, hosted provenance/health verification,
+  then WED-333 Invite Proposals specification and implementation.

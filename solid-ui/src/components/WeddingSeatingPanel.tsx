@@ -6,6 +6,7 @@ import { WeddingInfoTip } from "@/components/WeddingInfoTip";
 import { WeddingSeatingCanvas } from "@/components/WeddingSeatingCanvas";
 import { WeddingConfirmDialog } from "@/components/WeddingConfirmDialog";
 import { WeddingInlineHelpNote } from "@/components/WeddingInlineHelpNote";
+import { requestWeddingGuestRsvpQuickActions } from "@/lib/weddingGuestQuickActionsIntentState";
 import type { SendAfpMessageInput } from "@/lib/api";
 import type { WeddingResponseWorkspaceViewState } from "@/lib/weddingResponseWorkspaceViewState";
 import {
@@ -238,7 +239,14 @@ export function WeddingSeatingPanel(props: {
             data-magic-icon="seating"
             data-magic-label={props.state.seatingPlan.guestRowsConsidered > 0 ? "Draft seating plan" : "Add attending guests"}
             data-magic-id="wedding:seating:draft"
-            onClick={() => props.onSidebarAction(buildWeddingSeatingDraftSidebarAction(props.state.seatingPlan))}
+            onClick={() => {
+              if (props.state.seatingPlan.guestRowsConsidered > 0) {
+                props.onSidebarAction(buildWeddingSeatingDraftSidebarAction(props.state.seatingPlan));
+                return;
+              }
+              requestWeddingGuestRsvpQuickActions();
+              props.onSelectMenu?.("guests");
+            }}
           >
             {props.state.seatingPlan.guestRowsConsidered > 0 ? "Draft seating plan" : "Add attending guests"}
           </button>

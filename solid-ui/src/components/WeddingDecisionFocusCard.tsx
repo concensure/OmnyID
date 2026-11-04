@@ -7,7 +7,7 @@ import { WeddingVendorOutreachComposer } from "@/components/WeddingVendorOutreac
 import type { WeddingVendorChoiceSelectionSaveInput } from "@/components/WeddingArtifactDetailPanel";
 import { loadContacts, saveContacts, subscribeContactsChangedEvent, type Contact } from "@/lib/contactsLocalState";
 import { postAgentMessage, readSession, type SendAfpMessageInput } from "@/lib/api";
-import { buildWeddingDecisionResearchState } from "@/lib/weddingDecisionResearchState";
+import { buildWeddingDecisionResearchState, weddingDecisionResearchQueueWindow } from "@/lib/weddingDecisionResearchState";
 import type { WeddingDecisionResearchState } from "@/lib/weddingDecisionResearchState";
 import { requestFundedWeddingDecisionResearch } from "@/lib/weddingDecisionResearchApi";
 import {
@@ -146,7 +146,7 @@ export function WeddingDecisionFocusCard(props: {
       card.planningContext.vendorPreferences,
       ...(card.planningContext.topPriorities ?? []),
     ]).filter((value): value is string => Boolean(value?.trim())).slice(0, 12);
-    display().queuedFocusItems.slice(0, 2).forEach((item, queueRank) => {
+    weddingDecisionResearchQueueWindow(display().queuedFocusItems).forEach(({ item, queueRank }) => {
       const task = taskFor(item.id);
       if (!needsFundedResearch(item, task)) return;
       const attemptKey = `${props.state.workspace.metadata.weddingPlanId}:${task.id}:${task.title}:${task.notes ?? ""}:${context.join("|")}`;

@@ -4383,6 +4383,31 @@ export const sendGmailApprovedDraft = (
     method: "POST",
     bodyJson: body,
   }).then(normalizeGmailApprovedDraftSendResponse);
+export type WeddingTaskAssignmentDeliveryInput = {
+  wedding_plan_id: string;
+  response_workspace_id: string;
+  task_id: string;
+  task_title: string;
+  task_brief?: string;
+  due_label?: string;
+  assignee_name: string;
+  assignee_email: string;
+};
+export type WeddingTaskAssignmentDeliveryResponse = {
+  sent: boolean;
+  already_delivered: boolean;
+  research_attached: boolean;
+  agent_delivered: boolean;
+  provider_message_id?: string | null;
+  message?: string | null;
+};
+export const deliverWeddingTaskAssignment = (
+  body: WeddingTaskAssignmentDeliveryInput,
+): Promise<WeddingTaskAssignmentDeliveryResponse> =>
+  apiFetch<WeddingTaskAssignmentDeliveryResponse>("/wedding/task-assignment/deliver", {
+    method: "POST",
+    bodyJson: body,
+  });
 export const fetchBriefToday = (): Promise<BriefApiResponse | null> =>
   apiFetch<unknown>("/api/brief/today").then(normalizeBriefResponse);
 const fetchActiveGoalsCollection = async (limit?: number) => {

@@ -44,12 +44,21 @@ export function WeddingPlanningJourneyStepper(props: {
       <div class="overflow-x-auto pb-1 [scrollbar-width:none]">
         <div class="relative grid min-w-[48rem] grid-cols-6">
           <div class="absolute left-[8.333%] right-[8.333%] top-3 h-0.5 bg-wedding-border" aria-hidden="true" />
-          <For each={stageCounts()}>{(stage) => {
+          <For each={stageCounts()}>{(stage, stageIndex) => {
             const complete = () => stage.tasks.length > 0 && stage.done === stage.tasks.length;
             const current = () => stage.id === firstOpenStage();
+            const firstOpenIndex = () => stageCounts().findIndex((candidate) => candidate.id === firstOpenStage());
+            const selectedStage = () => selected() === stage.id;
+            const future = () => !complete() && firstOpenIndex() >= 0 && stageIndex() > firstOpenIndex() && !selectedStage();
             return (
               <button type="button" aria-pressed={selected() === stage.id} aria-label={`${stage.label}: ${stage.done} of ${stage.tasks.length} tasks done`} onClick={() => setSelected(stage.id)} class="relative z-10 flex min-h-16 min-w-0 flex-col items-center rounded-lg px-1 text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-primary">
-                <span class={`h-6 w-6 rounded-full border-2 ${complete() || current() || selected() === stage.id ? "border-wedding-primary bg-wedding-primary ring-4 ring-wedding-primary/10" : "border-wedding-border bg-wedding-card"}`} aria-hidden="true" />
+                <span class={`relative h-6 w-6 rounded-full ${selectedStage() || current() ? "bg-amber-500 ring-4 ring-amber-500/15" : complete() ? "bg-teal-600 ring-4 ring-teal-600/10" : future() ? "bg-wedding-card" : "border-2 border-wedding-border bg-wedding-card"}`} aria-hidden="true">
+                  <Show when={future()}>
+                    <svg class="absolute inset-0 h-6 w-6 text-wedding-ink/45" viewBox="0 0 24 24">
+                      <circle cx="12" cy="12" r="10.5" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="2 2" />
+                    </svg>
+                  </Show>
+                </span>
                 <span class={`mt-2 text-[11px] font-semibold leading-4 ${selected() === stage.id ? "text-wedding-primary" : "text-wedding-ink"}`}>{stage.label}</span>
               </button>
             );

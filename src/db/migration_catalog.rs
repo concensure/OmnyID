@@ -730,4 +730,9 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Append-only Growth targets and operator audit",
         include_str!("../../postgres/migrations/0143_growth_benchmark_revisions.sql"),
     ),
+    (
+        "0144_wedding_task_assignment_delivery",
+        "Idempotent Wedding task assignment email and recipient-agent delivery receipts",
+        include_str!("../../postgres/migrations/0144_wedding_task_assignment_delivery.sql"),
+    ),
 ];

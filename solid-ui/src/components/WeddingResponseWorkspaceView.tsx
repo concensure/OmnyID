@@ -18,6 +18,7 @@ import { A2UI_CARD_STATS_REQUEST_EVENT, type A2uiCardStatsRequestEventDetail } f
 import { runWeddingArtifactBrowserExport, runWeddingBundleBrowserExport, selectWeddingBundleExportPayload, weddingProjectionMetadataId, type WeddingBundleExportFormat } from "@/lib/weddingBrowserExportActions";
 import { weddingDecisionDeferralActionToAfpSendInput } from "@/lib/weddingDecisionDeferralAfpState";
 import { dispatchWeddingTaskResponsibilityChange, loadWeddingHelperLocalState, saveWeddingHelperLocalState, weddingHelperResponsibilityToAfpSendInput } from "@/lib/weddingHelpersPanelState";
+import { runWeddingTaskAssignment } from "@/lib/weddingTaskAssignmentExecutionState";
 import { runWeddingPreferenceConflictLifecycleAction } from "@/lib/weddingPreferenceConflictLifecycleExecutionState";
 import { decisionCardFromWeddingVendorComparison } from "@/lib/decisionCardState";
 import { approveWeddingApprovalRequestState, type WeddingApprovalRequestState } from "@/lib/weddingApprovalState";
@@ -68,7 +69,6 @@ function saveWeddingHomeSectionOrder(scope: string, order: readonly WeddingHomeS
     // Layout remains usable for the current page even when storage is unavailable.
   }
 }
-
 export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceViewProps) {
   onMount(() => installMobileFocusViewportListener());
   const state = () => props.state;
@@ -176,20 +176,17 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
   createEffect(() => {
     if (state().workspace.activeArtifact) setShowPlanningFiles(true);
   });
-
   createEffect(() => {
     const scope = homeLayoutStorageScope();
     if (homeLayoutScope() === scope) return;
     setHomeLayoutScope(scope);
     setHomeSectionOrder(loadWeddingHomeSectionOrder(scope));
   });
-
   createEffect(() => {
     const scope = homeLayoutScope();
     if (!scope) return;
     saveWeddingHomeSectionOrder(scope, homeSectionOrder());
   });
-
   onMount(() => {
     const unsubscribe = subscribeMagicActionEvent((detail) => {
       if (!detail.msgId?.startsWith("wedding:")) return;
@@ -200,7 +197,6 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
       element.click();
     });
     onCleanup(unsubscribe);
-
     const provideCardStats = (event: Event) => {
       const detail = (event as CustomEvent<A2uiCardStatsRequestEventDetail>).detail;
       if (!detail || typeof detail.respond !== "function") return;
@@ -213,11 +209,9 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
     window.addEventListener(A2UI_CARD_STATS_REQUEST_EVENT, provideCardStats);
     onCleanup(() => window.removeEventListener(A2UI_CARD_STATS_REQUEST_EVENT, provideCardStats));
   });
-
   onCleanup(() => {
     if (homeControlsHideTimer !== undefined) window.clearTimeout(homeControlsHideTimer);
   });
-
   createEffect(() => {
     const hasActiveUndo = Object.keys(quoteReplyUndoUntil()).length > 0;
     if (!hasActiveUndo) return;
@@ -319,12 +313,16 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
       const input = weddingHelperResponsibilityToAfpSendInput({ task, metadata: state().workspace.metadata, ownerLabel: assignee, consultedLabel: helperState.taskConsultedPeople[task.id], lastContactDate: helperState.taskLastContactDates[task.id], status: "open" });
       if (!input) { setExportNotice("This assignment could not be prepared."); return; }
       setExportNotice(`Assigning ${task.title} to ${assignee}...`);
-      void props.saveProjection(input)
-        .then(() => {
-          setExportNotice(`${task.title} assigned to ${assignee}.`);
-          props.onRefreshWorkspace?.();
-        })
-        .catch(() => setExportNotice(`Could not save the assignment for ${task.title}.`));
+      void runWeddingTaskAssignment({
+        saveProjection: async (projection) => props.saveProjection!(projection),
+        projection: input,
+        weddingPlanId: state().workspace.metadata.weddingPlanId,
+        responseWorkspaceId: state().workspace.metadata.responseWorkspaceId,
+        task, assignee,
+        assigneeEmail: typeof action.metadata?.assignee_email === "string" ? action.metadata.assignee_email.trim() : "",
+      }).then((result) => { setExportNotice(result.notice);
+        if (result.saved) props.onRefreshWorkspace?.();
+      });
       return;
     }
     if (runWeddingPreferenceConflictLifecycleAction({ action, metadata: state().workspace.metadata, saveProjection: props.saveProjection, onNotice: setExportNotice, onSaved: props.onRefreshWorkspace })) return;

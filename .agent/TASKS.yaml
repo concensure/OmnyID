@@ -15,6 +15,29 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-332
+    title: Deliver assigned Wedding research and repair journey and guest actions
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-332
+    worktree: C:/Users/ozans/Desktop/projects/OmnyID-GROWTH-001
+    base_sha: 511c09d72270534e806bff9b3faf34c973f3778d
+    depends_on: [WED-331]
+    files: [solid-ui/src/components/Wedding**, solid-ui/src/lib/wedding**, solid-ui/tests/wedding-**, src/server/**wedding**, src/db/**, Documents/verification/**, .agent/**]
+    acceptance: [only the current and immediately following eligible decision receive funded research and resolving or deferring the current decision advances the two-item research window by one, assigning an active Wedding task to another person sends the relevant saved research with the task email and also records a tenant-safe agent delivery when that email belongs to an OmnyID account, assignment delivery is idempotent and does not disclose another Wedding or unapproved private context, the selected journey stage uses the in-progress status colour while future stage circles use an accessible close-dash outline, Add attending guests opens the existing Guest RSVP quick actions in place, focused Rust and frontend tests all Wedding tests typecheck production build and line budgets pass, a clean exact-SHA Oracle release records matching provenance]
+    progress: "Implementation is complete pending exact-SHA Oracle release. A tested moving two-item helper keeps funded research to current plus next and advances by one after resolution or deferral; the server also rejects ranks above one. Explicit task assignment now saves the existing AFP responsibility record, emails the newest task-specific research attachment, and stores a recipient-tenant A2UI/AFP handoff for another registered OmnyID user without granting source-workspace access. Digest-only idempotent delivery receipts are migration-backed. The journey stepper uses the in-progress amber fill for selected/current stages and close dashed future outlines. Seating opens the existing Guest RSVP quick actions, including a stable empty-list target. Passed: 2,194 Wedding tests, typecheck, focused frontend tests, line budgets, production build, three Rust route tests, migration-catalog parity, and disposable pgvector migration application."
+
+  - id: WED-333
+    title: Add an AFP-backed Invite Proposals vendor-search mode
+    status: proposed
+    owner: codex
+    branch: agent/codex/WED-333
+    worktree: C:/Users/ozans/Desktop/projects/OmnyID-GROWTH-001
+    depends_on: [WED-332]
+    files: [Documents/design/wedding planner/Invite proposals/**, solid-ui/src/components/WeddingVendor**, solid-ui/src/lib/weddingVendor**, solid-ui/tests/wedding-vendor**, src/server/wedding_vendor_**, src/db/**, postgres/migrations/**, .agent/**]
+    acceptance: [the live vendor-search card switches accessibly between Find vendors and Invite Proposals without leaving Wedding Home, the supplied feature document is treated as guidance and the implementation reuses the existing account-scoped AFP vendor search enquiry quote response and booking authorities, couples preview and explicitly approve proposal invitations and shared context before any external action, matching replies and proposal evidence reproject through existing vendor lifecycle and Documents surfaces rather than a parallel inbox, unclaimed vendors use existing scoped referral access where applicable, mobile privacy abuse accessibility and false-default rollout boundaries are explicit, the companion spec and dependency-ordered task document stay below 1000 lines each and implementation begins with tested reusable contracts]
+    progress: "Queued behind WED-332 so the requested interaction fixes can be released independently before the larger proposal workflow begins."
+
   - id: GROWTH-00
     title: Freeze admin growth analytics contracts and source evidence
     status: done

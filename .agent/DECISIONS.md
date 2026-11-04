@@ -2746,3 +2746,16 @@ subjective usability or a controlled external cohort.
   provider data collection. It must not weaken those controls to make routing succeed.
 - Requests to `openai/gpt-5-mini` omit `temperature`, which that model does not advertise as a
   supported parameter. Structured JSON and bounded completion tokens remain explicit and tested.
+
+# 2026-11-05 - WED-332 bounded research window and explicit assignment delivery
+
+- Funded Wedding research is limited to the current decision and its immediate successor. Resolving
+  or deferring the current item advances that two-item window by one; it does not pre-research the
+  remaining queue.
+- Assign is the authority boundary for delivery. The existing account-scoped AFP responsibility
+  record is saved first, then a server route attaches the newest task-specific research to email.
+  When the address belongs to another OmnyID user, the same bounded handoff is also stored in that
+  recipient tenant with no source-workspace access grant.
+- Delivery fingerprints include the research revision. Exact retries are idempotent, while newly
+  generated research can be delivered as a new revision. Recipient email addresses are retained
+  only as digests in delivery receipts.
