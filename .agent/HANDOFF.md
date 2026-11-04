@@ -7333,3 +7333,22 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
   the corrected contract returns 200 with a provider request ID. All four route tests pass.
 - Next action: commit the provider-contract correction, repeat the exact-SHA release, and require a
   completed analysis plus successful immediate deletion before leaving the public feature enabled.
+
+# 2026-11-05 - WED-331 completed Oracle release (Codex)
+
+- Application SHA `b27a735f7d7f5e623fd6d72689867b29c49eada9` was built from a clean detached
+  checkout and released to Oracle. Hosted `SOURCE_COMMIT` and `oracle-runtime-manifest.json` match.
+  All core services run; backup verification, runtime-script integrity and the full restore drill
+  pass at 81 percent root use.
+- The public Countdown passed a hosted 375px Chromium future-date submission. The quote article
+  loaded without browser errors, reported ready and enabled its explicit Analyse action. The
+  no-account quotation response portal returns 200.
+- Hosted quote analysis is enabled. A consented fictional venue quote passed ClamAV and private
+  SeaweedFS storage, returned `completed` with normalized evidence, inclusions, exclusions, missing
+  terms, escalation risks, confidence and validity fields, and was then deleted using its private
+  receipt credential. The latest database record is `deleted` with its storage key cleared; zero
+  non-deleted study rows were created in the proof window.
+- Final exact-SHA evidence: typecheck, line budgets, 74-page public metadata/CSP/site checks, all
+  2,190 Wedding tests, production UI build, the SeaweedFS construction regression and four
+  quote-study route tests pass. This handoff/task update is coordination-only and intentionally does
+  not replace the tested production application SHA.
