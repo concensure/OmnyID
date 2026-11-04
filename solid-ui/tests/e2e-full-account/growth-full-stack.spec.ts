@@ -29,6 +29,8 @@ async function signIn(browser: Browser, email: string): Promise<{ context: Brows
   await page.getByLabel("Password").fill(password!);
   await page.getByRole("button", { name: "Sign in", exact: true }).last().click();
   await expect.poll(() => page.evaluate(() => sessionStorage.getItem("omnyid.preview.session"))).not.toBeNull();
+  const closeTour = page.getByRole("button", { name: "Close tour" });
+  if (await closeTour.isVisible()) await closeTour.click();
   return { context, page };
 }
 
