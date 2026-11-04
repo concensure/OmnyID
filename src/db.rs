@@ -21,7 +21,7 @@ mod migration_catalog;
 pub use migration_catalog::MIGRATIONS;
 mod growth_acquisition;
 mod growth_activation_projection;
-mod growth_payment_projection;
+mod growth_payment_projection; mod growth_spend_import;
 mod message_attachments;
 pub use message_attachments::StoredMessageAttachment;
 mod operational_retention;

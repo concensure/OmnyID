@@ -65,7 +65,7 @@ tasks:
 
   - id: GROWTH-04
     title: Reconcile signed Wedding payments and refunds
-    status: in_progress
+    status: done
     owner: codex
     branch: agent/codex/GROWTH-001
     worktree: C:/Users/ozans/Desktop/projects/OmnyID-GROWTH-001
@@ -73,7 +73,19 @@ tasks:
     depends_on: [GROWTH-00, GROWTH-02]
     files: [src/growth_analytics/**, src/db.rs, src/db/**growth**, src/server/billing.rs, src/db/migration_catalog.rs, postgres/migrations/**, Documents/marketing/analytics/**, Documents/verification/**, .agent/**]
     acceptance: [only signed accepted live-mode paid Wedding checkout events project revenue, checkout start test-mode malformed unbound and wrong-product events fail closed, exact configured price tax currency and canonical Wedding binding are stored without a hardcoded amount, duplicate success and refund webhook IDs are idempotent while transaction-level replay cannot double revenue, cumulative refunds update net revenue and paid state without deleting history, first qualifying purchase and 30-day maturity are deterministic per Wedding, payment and service cost inputs are append-only revisions and missing tax or cost fields report profitability incomplete, focused pure disposable-Postgres migration billing and line-budget checks pass]
-    progress: "Registered from clean GROWTH-03 handoff SHA c5b2ee0f144e3a21d0a6505e26c2e8af76d872a4. Implemented payment-v1 over the existing signed billing_events authority: live paid Wedding checkout success requires a tenant-owned canonical Wedding plus server-bound resolved Stripe price, and charge.refunded reconciles cumulative partial/full refunds by PaymentIntent without deleting success. Transaction uniqueness prevents distinct webhook IDs from double-counting; test mode, checkout start, wrong product, malformed or mismatched bindings fail closed. A Wedding summary exposes first purchase and 30-day maturity, while append-only variable-cost revisions and the pure margin function report incomplete when tax or any cost input is missing. 19 Growth tests, 21 billing tests, migration parity, cargo check, diff checks and both line budgets pass; large existing Rust files remain line-neutral and new files are under 999 lines. The implemented disposable-Postgres case remains unexecuted because Docker Desktop returned unable to start and the stale localhost listener could not be proven to be omnyid_test, so the task remains in progress and nothing was deployed or sent to Stripe."
+    progress: "Feature commit 733f394d7464ba8caeb9159fa7472cd10b943cc6 implements payment-v1 over signed billing_events: live paid Wedding checkout requires a tenant-owned canonical Wedding plus server-bound resolved Stripe price, while charge.refunded reconciles cumulative partial/full refunds by PaymentIntent without deleting success. Transaction uniqueness prevents distinct webhook IDs from double-counting; test mode, checkout start, wrong product, malformed or mismatched bindings fail closed. A Wedding summary exposes first purchase and 30-day maturity, while append-only variable-cost revisions and the pure margin function report incomplete when tax or any cost input is missing. Docker later recovered; a fresh loopback-only tmpfs pgvector database applied all 141 migrations and passed success replay, partial/full refund, test exclusion, maturity and cost checks after an exact BIGINT aggregate-cast fix. Focused Growth, billing, migration, cargo check and line-budget checks pass. Nothing was deployed or sent to Stripe."
+
+  - id: GROWTH-05
+    title: Import manual and Meta CSV advertising spend safely
+    status: done
+    owner: codex
+    branch: agent/codex/GROWTH-001
+    worktree: C:/Users/ozans/Desktop/projects/OmnyID-GROWTH-001
+    base_sha: 733f394d7464ba8caeb9159fa7472cd10b943cc6
+    depends_on: [GROWTH-00]
+    files: [src/growth_analytics/**, src/db.rs, src/db/**growth**, src/server/**growth**, src/db/migration_catalog.rs, postgres/migrations/**, Documents/marketing/analytics/**, Documents/verification/**, .agent/**]
+    acceptance: [bounded CSV parsing never executes spreadsheet content, preview reports mapping source currency conversion metadata row grain and validation errors before commit, duplicate files and duplicate source rows cannot double spend, unsupported identifiers remain at their available grain, mixed total and detail grains require an explicit non-double-counting selection, manual rows and corrections are append-only with operator time and reason, formula-like cells are neutralised in previews and exports, focused pure disposable-Postgres migration cargo-check and line-budget tests pass]
+    progress: "Implemented bounded operator-only preview, commit, one-row manual entry and append-only correction endpoints over migration 0141. CSV parsing is capped at 5 MiB, 20,000 rows, 64 columns and 4,096-byte cells; it never executes spreadsheet content and neutralises formula-like preview/export values. Stable file and canonical row digests suppress retry and overlapping spend, mixed grains require an explicit exact-grain choice, non-AUD values retain reviewed conversion rate/source/date, and corrections retain operator/time/reason while refusing negative effective spend. 23 Growth tests, route limits, migration parity, cargo check, both line budgets and a real disposable tmpfs pgvector replay/correction test pass. No Meta API, production database or Oracle environment was used."
 
   - id: WED-329
     title: Complete the autonomous Batch 2 countdown catalogue and public planning checklist

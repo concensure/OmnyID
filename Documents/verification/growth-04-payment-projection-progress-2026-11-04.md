@@ -35,14 +35,15 @@ Base SHA: `c5b2ee0f144e3a21d0a6505e26c2e8af76d872a4`
   the pre-existing 17k-line DB file and 1.7k-line billing file are line-neutral.
 - `git diff --check` passed.
 
-## Open verification
+## Disposable database verification completed
 
-The real disposable-Postgres scenario is implemented but not executed in this session. Docker
-Desktop returned `Docker Desktop is unable to start` before a tmpfs pgvector container could be
-created, and the remaining localhost listener could not be identified as the guarded
-`omnyid_test` database. It was deliberately not used. GROWTH-04 remains `in_progress` until the
-fresh container applies all migrations and proves success replay, partial/full refund, test-mode
-exclusion, maturity and incomplete cost revision end to end.
+Docker recovered later in the session. A fresh loopback-only `pgvector/pgvector:pg16` container
+named `omnyid-growth-db-20261104` used a tmpfs data directory and the guarded `omnyid_test`
+database. The first run exposed PostgreSQL's `SUM(BIGINT)` to `NUMERIC` promotion; migration 0140
+now casts exact minor-unit aggregates back to `BIGINT` so overflow fails instead of silently
+changing type. After recreating the database, the focused case applied all 141 migrations and
+passed success replay, transaction deduplication, partial/full refund, test-mode exclusion,
+maturity and incomplete-cost revision checks. The container was removed after the test.
 
 No Oracle deployment, Stripe API call, payment, refund, feature-flag change or production database
 mutation occurred.

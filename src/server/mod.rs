@@ -129,7 +129,7 @@ mod feed_routes;
 mod file_upload_routes;
 mod finance_routes;
 mod geofence_routes;
-mod goal_routes;
+mod goal_routes; mod growth_spend_routes;
 mod ingest_routes;
 pub(crate) mod knowledge_routes;
 mod llm_resolution;
@@ -1388,7 +1388,7 @@ pub async fn run() {
         .merge(brief_routes::routes())
         .merge(feed_routes::routes())
         .merge(finance_routes::routes())
-        .merge(goal_routes::routes())
+        .merge(goal_routes::routes()).merge(growth_spend_routes::routes())
         .merge(conversion_routes::routes())
         .merge(ingest_routes::routes())
         .merge(practice_routes::routes())

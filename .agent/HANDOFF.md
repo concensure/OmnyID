@@ -7146,3 +7146,25 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
   returned `Docker Desktop is unable to start`. The unidentified stale localhost listener was not
   used. Do not mark GROWTH-04 done until a fresh tmpfs `omnyid_test` container applies all 140
   migrations and passes the focused scenario. Nothing was deployed and no Stripe action occurred.
+
+# 2026-11-04 - GROWTH-04 closed and GROWTH-05 spend import complete (Codex)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
+`agent/codex/GROWTH-001`, GROWTH-05 base SHA
+`733f394d7464ba8caeb9159fa7472cd10b943cc6`.
+
+- Docker recovered. A fresh loopback-only `pgvector/pgvector:pg16` tmpfs container applied all 141
+  migrations and passed both GROWTH-04 payment/refund and GROWTH-05 spend replay/correction cases.
+  PostgreSQL aggregate promotion found by the real test was corrected with explicit exact
+  `BIGINT` minor-unit casts. The disposable container was removed.
+- GROWTH-05 adds immutable spend receipt/row/correction/audit storage and operator-only preview,
+  commit, one-row manual and correction routes. Commit always reparses bounded CSV server-side.
+- Stable file/row digests prevent duplicate spend; mixed aggregation grains require an explicit
+  exact-grain selection; source currency and reviewed AUD conversion metadata remain separate;
+  corrections are append-only and cannot make effective spend negative.
+- Passed: 23 Growth tests, route bounds/formula safety, both real database scenarios, migration
+  parity, `cargo check --lib`, line budgets, file limits and diff checks. Evidence:
+  `Documents/verification/growth-04-payment-projection-progress-2026-11-04.md` and
+  `Documents/verification/growth-05-spend-import-evidence-2026-11-04.md`.
+- No Meta API, Stripe API, production database or Oracle deployment was used. Next dependency is
+  GROWTH-06 KPI/cohort/rollup over completed acquisition, activation, payment and spend sources.

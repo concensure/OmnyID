@@ -69,9 +69,9 @@ SELECT
     MIN(tx.paid_at) <= MIN(u.created_at) + INTERVAL '30 days'
         AS first_purchase_within_30_days,
     COUNT(*) AS transaction_count,
-    SUM(tx.gross_minor) AS gross_minor,
-    SUM(tx.refunded_minor) AS refunded_minor,
-    SUM(tx.gross_minor - tx.refunded_minor) AS net_before_tax_minor,
+    SUM(tx.gross_minor)::BIGINT AS gross_minor,
+    SUM(tx.refunded_minor)::BIGINT AS refunded_minor,
+    SUM(tx.gross_minor - tx.refunded_minor)::BIGINT AS net_before_tax_minor,
     BOOL_OR(tx.status IN ('paid', 'partially_refunded')) AS currently_paid
 FROM growth_payment_transactions tx
 JOIN users u ON u.id = tx.owner_user_id

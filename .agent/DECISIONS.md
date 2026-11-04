@@ -2635,3 +2635,16 @@ subjective usability or a controlled external cohort.
 - Gross, tax when provided, cumulative refund, first purchase and 30-day maturity are reportable.
   Profitability is not: it remains explicitly incomplete until the effective append-only cost
   revision contains fixed payment cost, payment rate, service cost and the transaction has tax.
+
+# 2026-11-04 - GROWTH-05 advertising spend import boundary
+
+- A committed spend fact is an immutable, bounded CSV/manual source row plus reviewed conversion
+  metadata. The browser never supplies a trusted parsed row; commit reparses the bounded source.
+- SHA-256 identifies exact files and canonical source facts. Exact retries return the original
+  receipt and overlapping files skip existing facts, so a renamed upload cannot double spend.
+- Aggregation grain is explicit. Mixed account/campaign/ad-set/ad/creative/placement rows require
+  an operator to choose one exact grain; totals are not silently combined with their details.
+- Source currency and source amount remain intact. AUD is a separate reviewed value with rate,
+  source and date. Corrections append operator, time, deltas and reason; source rows never mutate.
+- CSV parsing executes nothing. Formula-like cells are prefixed for presentation/export, while
+  size, row, column, cell, numeric, date and currency boundaries fail closed.

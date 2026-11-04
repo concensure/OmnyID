@@ -715,4 +715,9 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Live Wedding payment, refund, maturity, and revisioned variable-cost projection",
         include_str!("../../postgres/migrations/0140_growth_payment_projection.sql"),
     ),
+    (
+        "0141_growth_spend_import",
+        "Immutable advertising spend imports, rows, corrections, and operator audit",
+        include_str!("../../postgres/migrations/0141_growth_spend_import.sql"),
+    ),
 ];
