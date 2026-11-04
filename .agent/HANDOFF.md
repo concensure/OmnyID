@@ -7234,3 +7234,18 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
   `Documents/verification/growth-09-targets-export-2026-11-04.md`.
 - No feature flag was enabled and nothing was deployed. Next: GROWTH-10 clean-SHA disposable
   end-to-end shadow and release controls.
+
+## 2026-11-04 - GROWTH-10 disposable full-stack candidate (Codex, review)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
+`agent/codex/GROWTH-001`; implementation SHA
+`3c8648238e6a9027ae3f4ef794c145b440d849a3`.
+
+- Added the guarded disposable stack, shared synthetic seeder and real-browser Growth journey.
+- The clean SHA built the homeserver and production UI, then passed flag-off no-write, access
+  isolation, exact funnel/campaign reconciliation, duplicate import, 375px overflow/focus and axe
+  checks against a loopback-only tmpfs Postgres database. Cleanup completed.
+- Evidence: `Documents/verification/growth-10-full-stack-shadow-2026-11-04.md`.
+- No Oracle release or flag change occurred. Hosted false-default/runtime/rollback evidence remains
+  a deployment-stage review item. Production stays false-default.
+- WED-330 is registered next to reconcile the Wedding fit assessment against current capabilities.

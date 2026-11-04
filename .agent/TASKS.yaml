@@ -135,13 +135,25 @@ tasks:
 
   - id: GROWTH-10
     title: Run disposable Growth end-to-end shadow and release controls
-    status: in_progress
+    status: review
     owner: codex
     branch: agent/codex/GROWTH-001
     worktree: C:/Users/ozans/Desktop/projects/OmnyID-GROWTH-001
     depends_on: [GROWTH-09]
     files: [scripts/**, solid-ui/e2e/**, Documents/verification/**, .agent/**]
     acceptance: [real router UI and disposable Postgres fixtures reconcile paid direct signup partner activation return payment refund and duplicate import sources, hosted false-default shadow stores no content, anonymous and non-operator access fails, privacy security accessibility and mobile checks pass, clean exact-SHA candidate and runtime provenance are recorded, rollback disables the panel without deleting source records]
+    progress: "Clean implementation SHA 3c8648238e6a9027ae3f4ef794c145b440d849a3 passed the complete disposable full-stack harness: a loopback-only tmpfs Postgres database, real registration/login/router, production UI, public landing measurement, AFP activation, return, paid/refund projection, duplicate CSV import, operator/non-operator/anonymous boundaries, flag-off 404 with no Growth audit write, and a flag-on desktop plus 375px Chromium/axe journey. External mail and provider integrations remained disabled and the container/processes were removed. Production remains false-default and unchanged; the hosted flag-off shadow, runtime SHA and rollback observation remain a deployment-stage review item rather than fabricated local evidence."
+
+  - id: WED-330
+    title: Reconcile public Wedding proof and change-planning fit
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-330
+    worktree: C:/Users/ozans/Desktop/projects/OmnyID-GROWTH-001
+    depends_on: [WED-329]
+    files: [wedding/**, solid-ui/src/**wedding**, solid-ui/tests/**wedding**, Documents/verification/**, .agent/**]
+    acceptance: [the November fit assessment is checked against current code rather than treated as product truth, unsupported popularity and undefined-limit claims are removed or made exact, public coverage is described honestly beyond Sydney without implying unsupported destination or legal capability, a clearly labelled fictional change-impact example demonstrates existing guest budget booking and notification evidence without posing as customer proof, current scoped collaboration regional directory guest seating stage and budget scenario capabilities are reused rather than duplicated, example people and stories are original composites and never testimonials, relevant public-site accessibility metadata tests Wedding tests typecheck build and line budgets pass]
+    progress: "Assessment triage found its trust critique already resolved in current source: invented testimonials and unsourced counters are absent and the claims ledger excludes them. Existing product code already covers scoped planner/helper roles, regional vendor data, guest/seating operations, six-stage planning, budget scenarios and booking refund evidence. Work is limited to unresolved truthful public proof and change-planning presentation; no customer-profile story will be copied or represented as a real user."
 
   - id: WED-329
     title: Complete the autonomous Batch 2 countdown catalogue and public planning checklist

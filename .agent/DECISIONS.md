@@ -2696,3 +2696,26 @@ subjective usability or a controlled external cohort.
   The panel exposes numerator, denominator, maturity and data-quality context alongside it.
 - Aggregate CSV export requires the same authenticated operator boundary as the panel and creates
   a dedicated audit receipt. First-party evidence and Meta-reported evidence remain separate.
+
+# 2026-11-04 - GROWTH-10 disposable release boundary
+
+- A release candidate is exercised through the real registration, session, router, database and
+  production UI surfaces. Component-only fixtures cannot substitute for this boundary.
+- The harness refuses non-loopback or non-`omnyid_test` databases, uses only synthetic
+  `@omnyid.test` accounts, disables external mail/provider integrations and owns cleanup of its
+  tmpfs database and child processes.
+- False-default is tested before enablement: the route must be absent and the Growth audit count
+  unchanged. Enabled tests then reuse canonical source routes/projectors instead of writing KPI
+  totals directly.
+- A passing disposable run is not hosted evidence. Oracle runtime provenance, flag-off storage
+  observation and rollback remain separate deployment-stage facts.
+
+# 2026-11-04 - WED-330 assessment boundary
+
+- Marketing assessments are discovery inputs, not implementation truth. Every proposed gap is
+  checked against the current Wedding AFP/A2UI/public-site implementation before work begins.
+- Fictional examples must be visibly labelled as examples and use original composite details;
+  they are never testimonials, usage claims or customer outcomes.
+- Replanning presentation must project existing guest, budget, booking, task and outreach
+  capabilities. It must not introduce a parallel Wedding plan or imply that OmnyID changes a
+  booking or sends a message without approval.
