@@ -2759,3 +2759,14 @@ subjective usability or a controlled external cohort.
 - Delivery fingerprints include the research revision. Exact retries are idempotent, while newly
   generated research can be delivered as a new revision. Recipient email addresses are retained
   only as digests in delivery receipts.
+
+# 2026-11-05 - WED-333 Invite Proposals reuses vendor workflow authorities
+
+- Invite Proposals is a mode of the existing Wedding Home vendor card, not a marketplace, second
+  inbox or parallel AFP system. Search state remains mounted when the couple switches modes.
+- Saving a proposal brief is a private ledger action. Its AFP/A2UI record is pending approval,
+  explicitly declares `external_action: false`, and cannot mark a vendor Enquired. A later slice
+  must convert each approved recipient into the existing permission-fingerprinted outreach thread.
+- A proposal batch is only a presentation convenience. Each vendor retains an isolated thread,
+  delivery receipt, response capability and lifecycle projection. Budget and phone sharing default
+  off; the first release caps selection at five recipients.

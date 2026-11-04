@@ -7,6 +7,7 @@ import { renderMarkdown } from "@/lib/markdownRenderer";
 import { WeddingVendorChoiceCard } from "@/components/WeddingVendorChoiceCard";
 import { WeddingPreferenceConfirmationChips } from "@/components/WeddingPreferenceConfirmationChips";
 import { WeddingDealBreakerEditor } from "@/components/WeddingDealBreakerEditor";
+import { WeddingInviteProposalsPanel } from "@/components/WeddingInviteProposalsPanel";
 import type { WeddingVendorChoiceCardData } from "@/components/WeddingVendorChoiceCard";
 import type { WeddingResponseWorkspaceViewProps } from "@/components/WeddingResponseWorkspaceViewTypes";
 import { decisionCardFromWeddingVendorComparison } from "@/lib/decisionCardState";
@@ -131,6 +132,7 @@ export function WeddingVendorSearchHomeSection(props: {
   const [lifecycleFilter, setLifecycleFilter] = createSignal<WeddingVendorLifecycleFilter>("all");
   const [expandedLifecycleVendorKey, setExpandedLifecycleVendorKey] = createSignal<string | null>(null);
   const [selectedLifecycleArtifactId, setSelectedLifecycleArtifactId] = createSignal<string | null>(null);
+  const [vendorMode, setVendorMode] = createSignal<"find" | "invite">("find");
   const lifecycleRecords = createMemo(() => {
     const comparison = props.result?.preview ?? props.result?.sourcePreview;
     const candidates = comparison?.vendorComparisonCards.map((card) => ({
@@ -257,6 +259,27 @@ export function WeddingVendorSearchHomeSection(props: {
   });
   return (
     <div data-wedding-surface="vendor-search" class="min-w-0 overflow-hidden rounded-xl border border-wedding-border bg-wedding-card px-3 py-4 shadow-wedding-card sm:px-5 sm:py-6">
+      <div class="grid grid-cols-2 gap-1 rounded-xl bg-wedding-slate p-1" role="tablist" aria-label="Vendor options">
+        <button
+          id="wedding-vendor-tab-find"
+          type="button"
+          role="tab"
+          aria-selected={vendorMode() === "find"}
+          aria-controls="wedding-vendor-panel-find"
+          class={`min-h-11 rounded-lg px-3 text-sm font-bold transition ${vendorMode() === "find" ? "bg-white text-wedding-primary shadow-sm" : "text-wedding-ink/70"}`}
+          onClick={() => setVendorMode("find")}
+        >Find vendors</button>
+        <button
+          id="wedding-vendor-tab-invite"
+          type="button"
+          role="tab"
+          aria-selected={vendorMode() === "invite"}
+          aria-controls="wedding-vendor-panel-invite"
+          class={`min-h-11 rounded-lg px-3 text-sm font-bold transition ${vendorMode() === "invite" ? "bg-white text-wedding-primary shadow-sm" : "text-wedding-ink/70"}`}
+          onClick={() => setVendorMode("invite")}
+        >Invite Proposals</button>
+      </div>
+      <div id="wedding-vendor-panel-find" role="tabpanel" aria-labelledby="wedding-vendor-tab-find" hidden={vendorMode() !== "find"}>
       <form
         onSubmit={(event) => {
           event.preventDefault();
@@ -274,7 +297,7 @@ export function WeddingVendorSearchHomeSection(props: {
       >
       <div class="min-w-0">
         <div class="flex min-w-0 flex-wrap items-center justify-between gap-2">
-          <p class="font-display text-[22px] font-semibold leading-7 tracking-[-.01em] text-wedding-ink">Find vendors</p>
+          <p class="mt-4 font-display text-[22px] font-semibold leading-7 tracking-[-.01em] text-wedding-ink">Search and compare</p>
           <div class="-mx-1 flex max-w-full snap-x gap-1 overflow-x-auto px-1 pb-1 text-xs [scrollbar-width:none]" aria-label="Show vendors by wedding status">
             <For each={lifecycleFilters}>{(filter) => <button type="button" class={`min-h-9 shrink-0 rounded-full border px-2.5 font-semibold ${lifecycleFilter() === filter.id ? "border-wedding-primary bg-wedding-page text-wedding-primary" : "border-wedding-border bg-white text-wedding-ink/65"}`} aria-pressed={lifecycleFilter() === filter.id} onClick={() => setLifecycleFilter(lifecycleFilter() === filter.id ? "all" : filter.id)}>{filter.label}{lifecycleCount(filter.id) ? ` ${lifecycleCount(filter.id)}` : ""}</button>}</For>
           </div>
@@ -525,6 +548,14 @@ export function WeddingVendorSearchHomeSection(props: {
       </Show>
       <Show when={visibleBlockedReason()}>
         {(reason) => <p class="mt-2 break-words text-xs leading-5 text-wedding-ink/70">{reason()}</p>}
+      </Show>
+      </div>
+      <Show when={vendorMode() === "invite"}>
+        <WeddingInviteProposalsPanel
+          workspace={workspace()}
+          preview={props.result?.preview ?? props.result?.sourcePreview ?? null}
+          onFindVendors={() => setVendorMode("find")}
+        />
       </Show>
     </div>
   );

@@ -29,14 +29,14 @@ tasks:
 
   - id: WED-333
     title: Add an AFP-backed Invite Proposals vendor-search mode
-    status: proposed
+    status: in_progress
     owner: codex
     branch: agent/codex/WED-333
     worktree: C:/Users/ozans/Desktop/projects/OmnyID-GROWTH-001
     depends_on: [WED-332]
-    files: [Documents/design/wedding planner/Invite proposals/**, solid-ui/src/components/WeddingVendor**, solid-ui/src/lib/weddingVendor**, solid-ui/tests/wedding-vendor**, src/server/wedding_vendor_**, src/db/**, postgres/migrations/**, .agent/**]
+    files: [Documents/design/wedding planner/Invite proposals/**, solid-ui/src/components/WeddingVendor**, solid-ui/src/lib/weddingVendor**, solid-ui/src/lib/weddingInvite**, solid-ui/tests/wedding-vendor**, solid-ui/tests/wedding-invite**, src/server/wedding_vendor_**, src/db/**, postgres/migrations/**, .agent/**]
     acceptance: [the live vendor-search card switches accessibly between Find vendors and Invite Proposals without leaving Wedding Home, the supplied feature document is treated as guidance and the implementation reuses the existing account-scoped AFP vendor search enquiry quote response and booking authorities, couples preview and explicitly approve proposal invitations and shared context before any external action, matching replies and proposal evidence reproject through existing vendor lifecycle and Documents surfaces rather than a parallel inbox, unclaimed vendors use existing scoped referral access where applicable, mobile privacy abuse accessibility and false-default rollout boundaries are explicit, the companion spec and dependency-ordered task document stay below 1000 lines each and implementation begins with tested reusable contracts]
-    progress: "Queued behind WED-332 so the requested interaction fixes can be released independently before the larger proposal workflow begins."
+    progress: "The companion spec and dependency-ordered plan reconcile the guide with existing vendor search, ranking V2, outreach approval, quote normalization, Documents, booking and no-account response authorities. The first tested slice adds accessible in-place Find vendors and Invite Proposals tabs; a ledger-derived brief; a five-recipient shortlist cap; explicit share controls with category budget and phone off by default; and a private AFP/A2UI draft marked pending approval and external_action false. Saving cannot contact vendors or set Enquired. Typecheck, six focused tests, both line budgets, all 2,200 Wedding tests and the production build pass. External invitation conversion, eligibility, delivery and response work remains dependency-ordered and false-default."
 
   - id: GROWTH-00
     title: Freeze admin growth analytics contracts and source evidence
