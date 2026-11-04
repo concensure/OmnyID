@@ -146,7 +146,7 @@ async fn seed_plan(
     include_return: bool,
 ) -> Result<()> {
     db.ensure_user_private_schema(user_id).await?;
-    db.upsert_wedding_user_onboarding_state(user_id, plan_id, "growth_e2e", "growth_e2e", None)
+    db.upsert_wedding_user_onboarding_state(user_id, plan_id, "wedding_site", "wedding_site", None)
         .await?;
     db.attach_same_session_acquisition_to_wedding(user_id, plan_id)
         .await?;
@@ -336,8 +336,8 @@ async fn main() -> Result<()> {
     db.upsert_wedding_user_onboarding_state(
         &partner_user.id,
         &paid_plan,
-        "growth_e2e_partner",
-        "growth_e2e",
+        "wedding_site",
+        "wedding_site",
         None,
     )
     .await?;
