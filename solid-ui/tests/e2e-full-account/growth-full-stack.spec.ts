@@ -109,7 +109,8 @@ test("real Growth stack reconciles sources and preserves the operator boundary",
   });
 
   await expect(operator.page.getByRole("heading", { name: "Campaign analytics" })).toBeVisible();
-  await expect(operator.page.getByText("2", { exact: true }).first()).toBeVisible();
+  const landingTile = operator.page.getByText("landing sessions", { exact: true }).locator("..");
+  await expect(landingTile.getByText(String(manifest.expected_landing_sessions), { exact: true })).toBeVisible();
   await operator.page.getByRole("tab", { name: "Campaigns" }).click();
   await expect(operator.page.getByText("growth_pilot", { exact: true }).first()).toBeVisible();
   const accessibility = await new AxeBuilder({ page: operator.page }).analyze();
