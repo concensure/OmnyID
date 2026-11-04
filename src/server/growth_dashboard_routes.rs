@@ -30,7 +30,10 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
         .route("/admin/growth/overview", get(overview_http))
         .route("/admin/growth/campaigns", get(campaigns_http))
         .route("/admin/growth/cohorts", get(cohorts_http))
-        .route("/admin/growth/benchmarks", get(benchmarks_http))
+        .route(
+            "/admin/growth/benchmarks",
+            get(benchmarks_http).post(create_benchmark_http),
+        )
         .route("/admin/growth/quality", get(quality_http))
         .route("/admin/growth/export.csv", get(export_http))
 }
@@ -53,6 +56,27 @@ struct ResolvedQuery {
     attribution_model: String,
     page: u32,
     page_size: u16,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct GrowthBenchmarkRequest {
+    kpi_key: String,
+    target_value: i64,
+    effective_from: NaiveDate,
+    effective_through: Option<NaiveDate>,
+    rationale: String,
+}
+
+fn benchmark_policy(key: &str) -> Option<(&'static str, &'static str)> {
+    match key {
+        "cost_per_landing_session" | "cost_per_activated_wedding" | "paid_cac_30d" => {
+            Some(("aud_minor_per_unit", "lower_is_better"))
+        }
+        "signup_rate" | "activation_rate_7d" | "return_rate_days_1_to_7" => {
+            Some(("basis_points", "higher_is_better"))
+        }
+        _ => None,
+    }
 }
 
 fn growth_enabled_value(value: Option<&str>) -> bool {
@@ -233,11 +257,69 @@ async fn benchmarks_http(
 ) -> Result<Json<Value>, (StatusCode, String)> {
     operator(&state, &headers).await?;
     let query = resolved_query(query)?;
+    let items = state
+        .db
+        .list_growth_benchmark_revisions(query.from, query.through)
+        .await
+        .map_err(readiness_error_to_http)?;
+    let notice = items
+        .is_empty()
+        .then_some("No operator target has been recorded. OmnyID does not fabricate benchmarks.");
     Ok(Json(json!({
         "meta": metadata(&query),
-        "items": [],
-        "notice": "No operator target has been recorded. OmnyID does not fabricate benchmarks."
+        "items": items,
+        "notice": notice
     })))
+}
+
+async fn create_benchmark_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(request): Json<GrowthBenchmarkRequest>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    let user = operator(&state, &headers).await?;
+    let key = request.kpi_key.trim();
+    let (unit, direction) =
+        benchmark_policy(key).ok_or((StatusCode::BAD_REQUEST, "unsupported KPI key".into()))?;
+    if request.target_value < 0 || (unit == "basis_points" && request.target_value > 10_000) {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "target is outside its KPI unit".into(),
+        ));
+    }
+    if request
+        .effective_through
+        .is_some_and(|through| through < request.effective_from)
+    {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "effective-through precedes effective-from".into(),
+        ));
+    }
+    let rationale = request.rationale.trim();
+    if !(10..=500).contains(&rationale.len()) {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "rationale must be 10 to 500 characters".into(),
+        ));
+    }
+    let revision = state
+        .db
+        .create_growth_benchmark_revision(
+            &user.id,
+            crate::db::GrowthBenchmarkWrite {
+                kpi_key: key,
+                target_value: request.target_value,
+                unit,
+                direction,
+                effective_from: request.effective_from,
+                effective_through: request.effective_through,
+                rationale,
+            },
+        )
+        .await
+        .map_err(readiness_error_to_http)?;
+    Ok(Json(json!({"revision":revision})))
 }
 
 async fn quality_http(
@@ -393,5 +475,18 @@ mod tests {
             page_size: None,
         };
         assert!(resolved_query(unknown).is_err());
+    }
+
+    #[test]
+    fn benchmark_policy_fixes_unit_and_direction_per_kpi() {
+        assert_eq!(
+            benchmark_policy("signup_rate"),
+            Some(("basis_points", "higher_is_better"))
+        );
+        assert_eq!(
+            benchmark_policy("paid_cac_30d"),
+            Some(("aud_minor_per_unit", "lower_is_better"))
+        );
+        assert_eq!(benchmark_policy("arbitrary_score"), None);
     }
 }

@@ -15,6 +15,11 @@ test("Growth panel keeps typed states and usable tabs at 375px", async ({ page }
   await page.keyboard.press("Enter");
   await expect(page.getByText("Unmatched spend")).toBeVisible();
   await expect(page.getByRole("tab", { name: "Data quality" })).toBeFocused();
+  await page.getByRole("tab", { name: "Benchmarks" }).click();
+  await page.getByLabel(/Target/).fill("25");
+  await page.getByLabel("Rationale").fill("Reviewed internal signup target.");
+  await page.getByRole("button", { name: "Save target revision" }).click();
+  await expect(page.getByText(/Saved percentage target/)).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
   const accessibility = await new AxeBuilder({ page }).analyze();
   expect(accessibility.violations.filter(({ impact }) => impact === "serious" || impact === "critical")).toEqual([]);

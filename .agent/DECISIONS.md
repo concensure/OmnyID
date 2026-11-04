@@ -2685,3 +2685,14 @@ subjective usability or a controlled external cohort.
   active evidence without replacing the focused tab control.
 - Unknown, provisional and unavailable are first-class labels. Tables are the canonical accessible
   representation; visual embellishment must not become the only way to read a result.
+
+# 2026-11-04 - GROWTH-09 benchmark and export boundary
+
+- Growth targets are append-only operator decisions, not external facts. Each revision records its
+  author, rationale, effective window and predecessor; the product ships no fabricated benchmark.
+- KPI units and comparison direction are server policy. Rate targets use basis points and cost
+  targets use AUD minor units per canonical denominator, so a client cannot reinterpret a target.
+- A target does not produce a success verdict for an unavailable, provisional or small sample.
+  The panel exposes numerator, denominator, maturity and data-quality context alongside it.
+- Aggregate CSV export requires the same authenticated operator boundary as the panel and creates
+  a dedicated audit receipt. First-party evidence and Meta-reported evidence remain separate.

@@ -7218,3 +7218,19 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
 - Typecheck, production build, state tests and 375px Chromium focus/overflow/axe proof pass. The
   pre-existing large Cost Dashboard file is smaller after helper extraction.
 - Nothing was enabled or deployed. Next: GROWTH-09 revisioned targets, diagnostics and export UI.
+
+## 2026-11-04 - GROWTH-09 targets, diagnostics and audited export (Codex, complete)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
+`agent/codex/GROWTH-001`; based on GROWTH-08 SHA
+`7670b0b07bfd72118f3da3423e25588d41572658`.
+
+- Added append-only operator target revisions, server-owned KPI units/directions, maturity
+  diagnostics, dedicated Growth admin audit receipts and authenticated formula-safe CSV download.
+- The existing operator panel now shows targets without inventing verdicts, flags small samples and
+  supports a revision rationale/effective date flow.
+- Fresh disposable Postgres real-router proof, migration parity, state tests, 375px Playwright,
+  typecheck and the production build pass. Evidence:
+  `Documents/verification/growth-09-targets-export-2026-11-04.md`.
+- No feature flag was enabled and nothing was deployed. Next: GROWTH-10 clean-SHA disposable
+  end-to-end shadow and release controls.

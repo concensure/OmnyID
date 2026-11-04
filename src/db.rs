@@ -24,7 +24,7 @@ mod growth_activation_projection;
 mod growth_daily_rollups;
 mod growth_dashboard;
 mod growth_payment_projection; mod growth_spend_import;
-pub use growth_dashboard::{GrowthCampaignRow, GrowthCohortRow, GrowthQualitySummary, validate_growth_date_range};
+pub use growth_dashboard::{GrowthBenchmarkRevision, GrowthBenchmarkWrite, GrowthCampaignRow, GrowthCohortRow, GrowthQualitySummary, validate_growth_date_range};
 mod message_attachments;
 pub use message_attachments::StoredMessageAttachment;
 mod operational_retention;

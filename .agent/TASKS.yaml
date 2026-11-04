@@ -124,17 +124,18 @@ tasks:
 
   - id: GROWTH-09
     title: Add revisioned Growth benchmarks diagnostics and audited export
-    status: in_progress
+    status: done
     owner: codex
     branch: agent/codex/GROWTH-001
     worktree: C:/Users/ozans/Desktop/projects/OmnyID-GROWTH-001
     depends_on: [GROWTH-07, GROWTH-08]
     files: [postgres/migrations/**, src/db/**growth**, src/server/**growth**, solid-ui/src/**, solid-ui/tests/**, Documents/verification/**, .agent/**]
     acceptance: [targets are revisioned and attributed to an operator, no fabricated benchmark or unqualified small-sample success verdict ships, Meta and first-party discrepancies remain separate, diagnostics show freshness exclusions unmatched spend maturity and payment completeness, filtered CSV is formula-safe definition-labelled and audited, focused DB API UI and line-budget checks pass]
+    progress: "Added append-only operator-attributed target revisions with server-fixed units/directions, maturity diagnostics, a dedicated Growth admin audit, authenticated formula-safe CSV download, small-sample warnings and target editing in the existing panel. Disposable real-router Postgres proof covers access, false-default behavior, retained superseding revisions and export audit; migration parity, state tests, 375px Playwright, typecheck and production build pass. Nothing was enabled or deployed."
 
   - id: GROWTH-10
     title: Run disposable Growth end-to-end shadow and release controls
-    status: ready
+    status: in_progress
     owner: codex
     branch: agent/codex/GROWTH-001
     worktree: C:/Users/ozans/Desktop/projects/OmnyID-GROWTH-001

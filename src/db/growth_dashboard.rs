@@ -1,6 +1,7 @@
 use chrono::{Days, NaiveDate};
 use serde::Serialize;
 use sqlx::Row;
+use ulid::Ulid;
 
 use super::Db;
 use crate::growth_analytics::GrowthPeriodFacts;
@@ -47,6 +48,33 @@ pub struct GrowthQualitySummary {
     pub payment_rows_missing_tax: i64,
     pub duplicate_events_discarded: Option<i64>,
     pub bot_or_test_events_excluded: Option<i64>,
+    pub immature_registered_weddings_7d: i64,
+    pub immature_activated_weddings_7d: i64,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct GrowthBenchmarkRevision {
+    pub id: String,
+    pub kpi_key: String,
+    pub target_value: i64,
+    pub unit: String,
+    pub direction: String,
+    pub effective_from: NaiveDate,
+    pub effective_through: Option<NaiveDate>,
+    pub rationale: String,
+    pub supersedes_id: Option<String>,
+    pub created_by_user_id: String,
+    pub created_at: String,
+}
+
+pub struct GrowthBenchmarkWrite<'a> {
+    pub kpi_key: &'a str,
+    pub target_value: i64,
+    pub unit: &'a str,
+    pub direction: &'a str,
+    pub effective_from: NaiveDate,
+    pub effective_through: Option<NaiveDate>,
+    pub rationale: &'a str,
 }
 
 impl Db {
@@ -240,14 +268,72 @@ impl Db {
         operator_user_id: &str,
         detail: serde_json::Value,
     ) -> Result<(), sqlx::Error> {
-        sqlx::query(
-            "INSERT INTO growth_spend_audit (action,operator_user_id,detail_json) VALUES ('export',$1,$2)",
-        )
+        sqlx::query("INSERT INTO growth_admin_audit (action,operator_user_id,detail_json) VALUES ('export',$1,$2)")
         .bind(operator_user_id)
         .bind(detail)
         .execute(&self.pool)
         .await?;
         Ok(())
+    }
+
+    pub async fn create_growth_benchmark_revision(
+        &self,
+        operator_user_id: &str,
+        write: GrowthBenchmarkWrite<'_>,
+    ) -> Result<GrowthBenchmarkRevision, sqlx::Error> {
+        let mut tx = self.pool.begin().await?;
+        let supersedes_id: Option<String> = sqlx::query_scalar(
+            "SELECT id FROM growth_benchmark_revisions WHERE kpi_key=$1 ORDER BY effective_from DESC,created_at DESC LIMIT 1 FOR UPDATE",
+        )
+        .bind(write.kpi_key)
+        .fetch_optional(&mut *tx)
+        .await?;
+        let id = Ulid::new().to_string();
+        let row = sqlx::query(
+            r#"INSERT INTO growth_benchmark_revisions
+               (id,kpi_key,target_value,unit,direction,effective_from,effective_through,rationale,supersedes_id,created_by_user_id)
+               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+               RETURNING id,kpi_key,target_value,unit,direction,effective_from,effective_through,rationale,supersedes_id,created_by_user_id,created_at::text"#,
+        )
+        .bind(&id)
+        .bind(write.kpi_key)
+        .bind(write.target_value)
+        .bind(write.unit)
+        .bind(write.direction)
+        .bind(write.effective_from)
+        .bind(write.effective_through)
+        .bind(write.rationale)
+        .bind(&supersedes_id)
+        .bind(operator_user_id)
+        .fetch_one(&mut *tx)
+        .await?;
+        sqlx::query("INSERT INTO growth_admin_audit (action,operator_user_id,detail_json) VALUES ('benchmark_created',$1,$2)")
+            .bind(operator_user_id)
+            .bind(serde_json::json!({"benchmark_id":id,"kpi_key":write.kpi_key,"supersedes_id":supersedes_id}))
+            .execute(&mut *tx).await?;
+        tx.commit().await?;
+        benchmark_from_row(&row)
+    }
+
+    pub async fn list_growth_benchmark_revisions(
+        &self,
+        from: NaiveDate,
+        through: NaiveDate,
+    ) -> Result<Vec<GrowthBenchmarkRevision>, sqlx::Error> {
+        sqlx::query(
+            r#"SELECT id,kpi_key,target_value,unit,direction,effective_from,effective_through,rationale,
+                      supersedes_id,created_by_user_id,created_at::text
+               FROM growth_benchmark_revisions
+               WHERE effective_from <= $2 AND (effective_through IS NULL OR effective_through >= $1)
+               ORDER BY kpi_key,effective_from DESC,created_at DESC"#,
+        )
+        .bind(from)
+        .bind(through)
+        .fetch_all(&self.pool)
+        .await?
+        .iter()
+        .map(benchmark_from_row)
+        .collect()
     }
 
     pub async fn growth_cohort_rows(
@@ -334,6 +420,15 @@ impl Db {
                WHERE (paid_at AT TIME ZONE 'Australia/Sydney')::date BETWEEN $1 AND $2) AS payment_rows,
               (SELECT COUNT(*)::bigint FROM growth_payment_transactions
                WHERE (paid_at AT TIME ZONE 'Australia/Sydney')::date BETWEEN $1 AND $2 AND tax_minor IS NULL) AS missing_tax
+              ,(SELECT COUNT(*)::bigint FROM growth_identity_links link JOIN users u ON u.id=link.user_id
+                WHERE link.wedding_plan_id IS NOT NULL
+                  AND (u.created_at AT TIME ZONE 'Australia/Sydney')::date BETWEEN $1 AND $2
+                  AND $2 < (u.created_at AT TIME ZONE 'Australia/Sydney')::date + 7) AS immature_registered
+              ,(SELECT COUNT(*)::bigint FROM growth_wedding_activations activation
+                JOIN growth_identity_links link ON link.user_id=activation.owner_user_id AND link.wedding_plan_id=activation.wedding_plan_id
+                JOIN users u ON u.id=link.user_id
+                WHERE (u.created_at AT TIME ZONE 'Australia/Sydney')::date BETWEEN $1 AND $2
+                  AND $2 < (activation.activated_at AT TIME ZONE 'Australia/Sydney')::date + 8) AS immature_activated
             "#,
         )
         .bind(from)
@@ -352,8 +447,26 @@ impl Db {
             payment_rows_missing_tax: row.try_get("missing_tax")?,
             duplicate_events_discarded: None,
             bot_or_test_events_excluded: None,
+            immature_registered_weddings_7d: row.try_get("immature_registered")?,
+            immature_activated_weddings_7d: row.try_get("immature_activated")?,
         })
     }
+}
+
+fn benchmark_from_row(row: &sqlx::postgres::PgRow) -> Result<GrowthBenchmarkRevision, sqlx::Error> {
+    Ok(GrowthBenchmarkRevision {
+        id: row.try_get("id")?,
+        kpi_key: row.try_get("kpi_key")?,
+        target_value: row.try_get("target_value")?,
+        unit: row.try_get("unit")?,
+        direction: row.try_get("direction")?,
+        effective_from: row.try_get("effective_from")?,
+        effective_through: row.try_get("effective_through")?,
+        rationale: row.try_get("rationale")?,
+        supersedes_id: row.try_get("supersedes_id")?,
+        created_by_user_id: row.try_get("created_by_user_id")?,
+        created_at: row.try_get("created_at")?,
+    })
 }
 
 pub fn validate_growth_date_range(from: NaiveDate, through: NaiveDate) -> Result<(), &'static str> {

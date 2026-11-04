@@ -1,4 +1,4 @@
-import { apiFetch } from "@/lib/api";
+import { API_BASE, apiFetch, sessionBearerToken } from "@/lib/api";
 
 export type GrowthTab = "executive" | "campaigns" | "cohorts" | "benchmarks" | "quality";
 
@@ -71,6 +71,21 @@ export type GrowthQuality = {
   payment_rows_missing_tax: number;
   duplicate_events_discarded: number | null;
   bot_or_test_events_excluded: number | null;
+  immature_registered_weddings_7d: number;
+  immature_activated_weddings_7d: number;
+};
+
+export type GrowthBenchmark = {
+  id: string;
+  kpi_key: string;
+  target_value: number;
+  unit: string;
+  direction: string;
+  effective_from: string;
+  effective_through: string | null;
+  rationale: string;
+  supersedes_id: string | null;
+  created_at: string;
 };
 
 type GrowthList<T> = { meta: GrowthMeta; items: T[]; notice?: string; has_more?: boolean };
@@ -175,6 +190,16 @@ function normalizeCohort(value: unknown): GrowthCohort {
   };
 }
 
+function normalizeBenchmark(value: unknown): GrowthBenchmark {
+  const source = record(value);
+  return {
+    id: text(source.id), kpi_key: text(source.kpi_key), target_value: numberValue(source.target_value),
+    unit: text(source.unit), direction: text(source.direction), effective_from: text(source.effective_from),
+    effective_through: nullableText(source.effective_through), rationale: text(source.rationale),
+    supersedes_id: nullableText(source.supersedes_id), created_at: text(source.created_at),
+  };
+}
+
 function query(from: string, through: string): string {
   return new URLSearchParams({ from, through, attribution_model: "first_touch" }).toString();
 }
@@ -197,8 +222,16 @@ export const fetchGrowthCohorts = (from: string, through: string) =>
 export const fetchGrowthBenchmarks = (from: string, through: string) =>
   apiFetch<unknown>(`/admin/growth/benchmarks?${query(from, through)}`).then((value) => {
     const source = record(value);
-    return { meta: meta(source.meta), items: Array.isArray(source.items) ? source.items : [], notice: text(source.notice) } satisfies GrowthList<unknown>;
+    return { meta: meta(source.meta), items: Array.isArray(source.items) ? source.items.map(normalizeBenchmark) : [], notice: text(source.notice) } satisfies GrowthList<GrowthBenchmark>;
   });
+
+export const saveGrowthBenchmark = (body: {
+  kpi_key: string;
+  target_value: number;
+  effective_from: string;
+  effective_through?: string | null;
+  rationale: string;
+}) => apiFetch<unknown>("/admin/growth/benchmarks", { method: "POST", bodyJson: body });
 
 export const fetchGrowthQuality = (from: string, through: string) =>
   apiFetch<unknown>(`/admin/growth/quality?${query(from, through)}`).then((value) => {
@@ -217,6 +250,8 @@ export const fetchGrowthQuality = (from: string, through: string) =>
         payment_rows: numberValue(quality.payment_rows), payment_rows_missing_tax: numberValue(quality.payment_rows_missing_tax),
         duplicate_events_discarded: nullableNumber(quality.duplicate_events_discarded),
         bot_or_test_events_excluded: nullableNumber(quality.bot_or_test_events_excluded),
+        immature_registered_weddings_7d: numberValue(quality.immature_registered_weddings_7d),
+        immature_activated_weddings_7d: numberValue(quality.immature_activated_weddings_7d),
       } satisfies GrowthQuality,
     };
   });
@@ -240,4 +275,16 @@ export function growthDateRange(days = 30): { from: string; through: string } {
   const from = new Date(through);
   from.setDate(from.getDate() - Math.max(0, days - 1));
   return { from: from.toISOString().slice(0, 10), through: through.toISOString().slice(0, 10) };
+}
+
+export async function downloadGrowthCampaignCsv(from: string, through: string): Promise<Blob> {
+  const headers = new Headers();
+  const token = sessionBearerToken();
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  const response = await fetch(`${API_BASE}/admin/growth/export.csv?${query(from, through)}`, {
+    headers,
+    credentials: "include",
+  });
+  if (!response.ok) throw new Error((await response.text()) || "Growth export failed");
+  return response.blob();
 }

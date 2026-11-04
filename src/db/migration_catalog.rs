@@ -725,4 +725,9 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Content-free Sydney-time Growth daily rollups and projector checkpoint",
         include_str!("../../postgres/migrations/0142_growth_daily_rollups.sql"),
     ),
+    (
+        "0143_growth_benchmark_revisions",
+        "Append-only Growth targets and operator audit",
+        include_str!("../../postgres/migrations/0143_growth_benchmark_revisions.sql"),
+    ),
 ];
