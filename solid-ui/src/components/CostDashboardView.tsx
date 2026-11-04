@@ -62,6 +62,8 @@ import {
 } from "@/lib/pricing";
 import { archiveOnlyActiveLabel, archiveOnlyToggleLabel, archiveOnlyWarningTitle } from "@/lib/storageMode";
 import { costDashboardMountedDateTimeLabel } from "@/lib/costDashboardViewState";
+import { costDashboardHasFiniteBytes as hasMountedFiniteBytes, costDashboardPlanLabel as formatPlan, costDashboardWarningText as readMountedWarningText } from "@/lib/costDashboardViewState";
+import { GrowthAnalyticsPanel } from "@/components/GrowthAnalyticsPanel";
 
 function money(value: number): string {
   return `$${value.toFixed(value >= 100 ? 0 : 2)}`;
@@ -77,25 +79,6 @@ function byteCountLabel(bytes: number): string {
     unitIndex += 1;
   }
   return `${value >= 10 || unitIndex === 0 ? value.toFixed(0) : value.toFixed(1)} ${units[unitIndex]}`;
-}
-
-function formatPlan(plan: string | null | undefined): string {
-  const raw = String(plan || "free").trim();
-  if (!raw) return "Free";
-  return raw
-    .split(/[_\s-]+/)
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
-}
-
-function readMountedWarningText(value: string | null | undefined): string | null {
-  const normalized = String(value ?? "").trim();
-  return normalized || null;
-}
-
-function hasMountedFiniteBytes(value: number | null | undefined): boolean {
-  return typeof value === "number" && Number.isFinite(value) && value >= 0;
 }
 
 function Gauge(props: {
@@ -720,6 +703,8 @@ export function CostDashboardView(props: { initialSnapshot?: DashboardBootstrap[
           </div>
         </Show>
       </div>
+
+      <GrowthAnalyticsPanel />
 
       <Show
         when={!loadError() || hasDashboardData()}

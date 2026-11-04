@@ -7207,3 +7207,14 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
 - Disposable Postgres aggregate SQL and real-router 401/403/200/400/disabled-404 evidence pass;
   the container was removed. Nothing was enabled or deployed.
 - Next: GROWTH-08 in the existing operator Usage shell.
+## 2026-11-04 - GROWTH-08 existing-shell dashboard (Codex, complete)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
+`agent/codex/GROWTH-001`; based on GROWTH-07 SHA
+`d606eb60a5e6ed9282b8488c4329d007f6b31f4c`.
+
+- Added a server-driven five-tab Growth panel to the existing Cost/Usage shell, with typed KPI
+  states, lazy details, responsive cards/tables and no client-side recalculation.
+- Typecheck, production build, state tests and 375px Chromium focus/overflow/axe proof pass. The
+  pre-existing large Cost Dashboard file is smaller after helper extraction.
+- Nothing was enabled or deployed. Next: GROWTH-09 revisioned targets, diagnostics and export UI.

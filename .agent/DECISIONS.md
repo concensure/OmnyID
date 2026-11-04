@@ -2676,3 +2676,12 @@ subjective usability or a controlled external cohort.
   stored campaign key joins them. The dashboard must show unmatched rows, not guess attribution.
 - Exports are aggregate-only, formula-safe and operator audited. Benchmarks remain empty until an
   operator creates a revisioned target; a generic industry target is not silently substituted.
+
+# 2026-11-04 - GROWTH-08 operator experience boundary
+
+- Growth analytics is a panel in the existing authenticated Cost/Usage shell, not a separate admin
+  product. The backend remains the calculation and permission authority.
+- Date inputs are drafts until Apply, and inactive detail tabs do not fetch. Refresh updates the
+  active evidence without replacing the focused tab control.
+- Unknown, provisional and unavailable are first-class labels. Tables are the canonical accessible
+  representation; visual embellishment must not become the only way to read a result.

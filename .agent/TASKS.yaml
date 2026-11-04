@@ -113,17 +113,18 @@ tasks:
 
   - id: GROWTH-08
     title: Add the Growth dashboard to the existing operator Usage shell
-    status: in_progress
+    status: done
     owner: codex
     branch: agent/codex/GROWTH-001
     worktree: C:/Users/ozans/Desktop/projects/OmnyID-GROWTH-001
     depends_on: [GROWTH-07]
     files: [solid-ui/src/**, solid-ui/tests/**, Documents/verification/**, .agent/**]
     acceptance: [existing operator shell gains executive campaign cohort benchmark and quality views without a parallel admin app, unknown provisional and incomplete values never render as zero, filters preserve route and focus state, charts have tables, mobile 375px keyboard screen-reader and line-budget checks pass]
+    progress: "Mounted a server-driven Growth panel in the existing Cost Dashboard/Usage shell. Executive, campaign, cohort, benchmark and quality tabs lazy-load only their aggregate endpoint; date drafts apply explicitly. Cards retain typed provisional/unavailable states, numerators/denominators and previous periods. Campaigns have mobile cards plus desktop tables; cohorts/funnel remain tabular. The panel hides for disabled/non-operator access and retains tab focus. Typecheck, production build, two state tests and a 375px Chromium/axe/focus/no-overflow test pass. The existing 1,038-line Cost Dashboard was reduced to 1,023 lines while adding the mount."
 
   - id: GROWTH-09
     title: Add revisioned Growth benchmarks diagnostics and audited export
-    status: ready
+    status: in_progress
     owner: codex
     branch: agent/codex/GROWTH-001
     worktree: C:/Users/ozans/Desktop/projects/OmnyID-GROWTH-001
