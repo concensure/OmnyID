@@ -286,7 +286,6 @@ async fn openrouter_chat(
             {"role": "user", "content": user_content}
         ],
         "max_completion_tokens": if json_output { 6000 } else { 12000 },
-        "temperature": 0,
         "provider": {"data_collection": "deny", "require_parameters": true}
     });
     if json_output {
@@ -933,5 +932,13 @@ mod tests {
             report["confidence_label"],
             "Treat this as a question list, not a complete total"
         );
+    }
+
+    #[test]
+    fn openrouter_request_uses_only_parameters_supported_by_gpt_five_mini() {
+        let source = include_str!("wedding_quote_study_routes.rs");
+        assert!(source.contains("\"model\": MODEL"));
+        assert!(source.contains("\"require_parameters\": true"));
+        assert!(!source.contains("\"temperature\""));
     }
 }

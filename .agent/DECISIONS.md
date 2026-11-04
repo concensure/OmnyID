@@ -2739,3 +2739,10 @@ subjective usability or a controlled external cohort.
 - The shared SeaweedFS client uses the SDK's current behaviour version, so uploads, downloads,
   exports, vendor photos and quote-study storage keep one tested configuration rather than each
   route creating a separate client.
+
+# 2026-11-05 - Quote study keeps strict OpenRouter routing with model-supported parameters
+
+- The quote-study route continues to require provider support for every request field and denies
+  provider data collection. It must not weaken those controls to make routing succeed.
+- Requests to `openai/gpt-5-mini` omit `temperature`, which that model does not advertise as a
+  supported parameter. Structured JSON and bounded completion tokens remain explicit and tested.

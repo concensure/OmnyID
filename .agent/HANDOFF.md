@@ -7317,3 +7317,19 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
 - Next action: create a new candidate commit, repeat the clean exact-SHA build and guarded Oracle
   deployment, then enable the flag only long enough to prove a completed synthetic analysis and
   receipt-authorised deletion. Keep it disabled if that proof does not pass.
+
+# 2026-11-05 - WED-331 quote-study provider contract follow-up (Codex, in progress)
+
+- Exact candidate `39b1ce9c2c5b7d9d8dbb8407df3912a7eecdaba7` passed clean Wedding CI/build,
+  the SeaweedFS regression and quote-route tests, then shipped with matching Oracle provenance.
+  Backup verification and the full restore drill passed.
+- A consented fictional upload then passed ClamAV, private SeaweedFS storage and receipt creation.
+  Receipt-authorised deletion succeeded immediately. Model analysis returned unavailable because
+  OpenRouter reported that no `openai/gpt-5-mini` endpoint supports every requested parameter.
+  The feature was returned to `false` after the synthetic object was deleted.
+- OpenRouter's model registry confirms the model supports structured output and
+  `max_completion_tokens`, but not `temperature`. The route no longer sends that unsupported field;
+  it retains `require_parameters: true` and `data_collection: deny`. A direct hosted request with
+  the corrected contract returns 200 with a provider request ID. All four route tests pass.
+- Next action: commit the provider-contract correction, repeat the exact-SHA release, and require a
+  completed analysis plus successful immediate deletion before leaving the public feature enabled.
