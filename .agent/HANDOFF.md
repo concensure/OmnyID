@@ -7270,3 +7270,31 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
   The browser test found and drove an AA contrast correction for warning pills.
 - Nothing was deployed. GROWTH-10 remains at review only because hosted flag-off provenance and
   rollback observation are not interchangeable with the completed local disposable proof.
+# 2026-11-05 - WED-331 Wedding interaction repairs (Codex, review)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
+`agent/codex/WED-331`, implementation commit
+`d5031bf6578d81b69c4ea2bc0e971326f5ef8167`.
+
+- Fixed the public Australian checklist's rejected result schema. A real 375px Chromium journey now
+  enters a future date, builds the countdown, reports no page error and keeps the result visible.
+- Narrowed the desktop rail and workspace offset, moved upload help below its stable button, removed
+  Inspiration as a separate destination, embedded the existing Inspiration/vision projection below
+  Plan, and grouped Documents plus operator-only Setup checks under one More control.
+- Calendar reconnection now distinguishes missing provider configuration from the existing
+  recent-sign-in security gate and offers a fresh sign-in path; the server gate was not weakened.
+- Current and next decision tasks request the existing bounded funded research. Loading/failure copy
+  no longer presents a generic recommendation as fact. The final-guest-count decision uses
+  couple-facing choices, an `approve_act` card, and writes both the scoped AFP approval and task
+  completion; Guests reprojects the approved count.
+- The couple follow-up surface can issue the existing secure quotation-response capability for an
+  active vendor-scoped grant. This lets an unclaimed vendor reply without an OmnyID account while
+  retaining expiry, revocation, one-time exchange and tenant/thread isolation.
+- The existing public quote-analysis article/tool remains discoverable. Its previously dropped
+  false-default compose flag is now passed to the homeserver, but no production activation was made.
+- Verification: typecheck and production build pass; public Wedding/CSP/metadata checks pass; both
+  line budgets pass; all 2,190 Wedding tests pass; the quote-study consent/signature/report tests
+  pass; and the disposable quotation-capability HTTP suite passes both tenant-bound one-time and
+  no-secret-logging cases. Nothing has been deployed from this commit yet; production still reports
+  WED-329. Next action is an exact-SHA clean release build, hosted dependency check, and either keep
+  quote study disabled or prove one synthetic upload/deletion before enabling it.

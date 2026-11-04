@@ -2719,3 +2719,14 @@ subjective usability or a controlled external cohort.
 - Replanning presentation must project existing guest, budget, booking, task and outreach
   capabilities. It must not introduce a parallel Wedding plan or imply that OmnyID changes a
   booking or sends a message without approval.
+# 2026-11-05 - WED-331 no-account vendor response and quote-study activation boundary
+
+- A vendor who has not claimed an OmnyID listing may respond through the existing quotation-response
+  portal only after the couple has an active, unexpired, unrevoked quotation-context grant for that
+  exact vendor and thread. The authenticated couple issues a one-time capability; the browser keeps
+  the raw token only long enough to copy the fragment URL. Claiming a listing is not an authority
+  prerequisite, but an unrelated vendor, thread or wedding cannot reuse the link.
+- The public quote-analysis page remains false-default. Compose now passes the existing
+  `OMNYID_WEDDING_QUOTE_STUDY_ENABLED` switch into the homeserver, but activation still requires a
+  hosted ClamAV, private SeaweedFS and OpenRouter readiness check plus one consented synthetic
+  upload/deletion proof. Presence of the page or server route alone is not release evidence.
