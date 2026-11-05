@@ -58,9 +58,19 @@ export async function uploadLicensedVendorPhoto(input: {
     headers,
     body,
   });
-  const payload = await response.json().catch(() => null) as Record<string, unknown> | null;
+  const responseText = await response.text();
+  let payload: Record<string, unknown> | null = null;
+  try {
+    payload = responseText ? JSON.parse(responseText) as Record<string, unknown> : null;
+  } catch {
+    payload = null;
+  }
   if (!response.ok || !payload || typeof payload.asset_id !== "string" || typeof payload.url !== "string" || typeof payload.photo_licence_id !== "string") {
-    throw new Error((typeof payload?.error === "string" && payload.error) || "Photo upload could not be completed.");
+    throw new Error(
+      (typeof payload?.error === "string" && payload.error)
+      || (responseText.trim() && responseText.length <= 240 ? responseText.trim() : "")
+      || "Photo upload could not be completed.",
+    );
   }
   return { asset_id: payload.asset_id, photo_licence_id: payload.photo_licence_id, url: payload.url };
 }

@@ -36,6 +36,7 @@
   "wedding-insurance-australia": { "stakeholders": ["couples", "insurers", "vendors"], "stage": "Plan & budget", "locations": ["Australia"], "emotions": ["anxiety", "security"] },
   "wedding-planner-cost-australia": { "stakeholders": ["couples", "wedding planners"], "stage": "Plan & budget", "locations": ["Australia"], "emotions": ["overwhelm", "clarity"] },
   "wedding-rain-plan-checklist": { "stakeholders": ["couples", "venues", "photographers", "celebrants"], "stage": "Final prep", "locations": ["NSW", "Australia"], "emotions": ["weather anxiety", "confidence"] },
+  "how-to-make-a-wedding-newspaper": { "stakeholders": ["couples", "printers", "guests"], "stage": "Details & invites", "locations": ["Australia"], "emotions": ["creativity", "joy"] },
   "wedding-songs-australia-ceremony-to-last-dance": { "stakeholders": ["couples", "celebrants", "DJs", "bands"], "stage": "Details & invites", "locations": ["Australia"], "emotions": ["creativity", "joy"] },
   "wedding-speech-length-and-structure": { "stakeholders": ["couples", "MCs", "wedding party", "guests"], "stage": "Final prep", "locations": [], "emotions": ["nerves", "confidence"] },
   "what-wedding-decor-would-you-diy": { "stakeholders": ["couples", "florists", "venues"], "stage": "Details & invites", "locations": [], "emotions": ["creativity", "joy"] },

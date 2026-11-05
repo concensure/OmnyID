@@ -10,17 +10,17 @@ pub(super) async fn search_wedding_vendor_directory(
 ) -> Result<Vec<WeddingVendorSearchSource>, sqlx::Error> {
     let mut sources = Vec::new();
     let mut seen_queries = BTreeSet::new();
+    // The couple sees only the ranked shortlist, but V2 needs more than the
+    // first five alphabetic category rows in order to react to style, setting
+    // and scale evidence. Keep this bounded so directory reuse stays cheap.
+    let candidate_limit = (limit.saturating_mul(6)).clamp(12, 48) as i64;
     for query in queries {
         for candidate in wedding_vendor_directory_search_terms(query) {
             if !seen_queries.insert(candidate.clone()) {
                 continue;
             }
             let records = db
-                .list_active_wedding_vendors_for_user(
-                    user_id,
-                    limit.clamp(1, 8) as i64,
-                    Some(&candidate),
-                )
+                .list_active_wedding_vendors_for_user(user_id, candidate_limit, Some(&candidate))
                 .await?;
             sources.extend(
                 records
@@ -32,8 +32,80 @@ pub(super) async fn search_wedding_vendor_directory(
     }
     Ok(dedupe_sources(sources)
         .into_iter()
-        .take(limit * queries.len().max(1))
+        .take(limit.saturating_mul(3).max(12) * queries.len().max(1))
         .collect())
+}
+
+const DISTINCTIVE_QUERY_TERMS: &[&str] = &[
+    "rustic",
+    "country",
+    "micro",
+    "intimate",
+    "coastal",
+    "beach",
+    "garden",
+    "natural",
+    "relaxed",
+    "romantic",
+    "modern",
+    "elegant",
+    "formal",
+    "industrial",
+    "boho",
+    "luxury",
+    "waterfront",
+    "ocean",
+    "harbour",
+    "barn",
+];
+
+/// Generic category rows are useful candidates, but they are not proof that a
+/// descriptive request has been answered. At least three cached vendors must
+/// carry one of the requested distinctive terms before paid/live discovery is
+/// skipped. V2 then ranks the combined evidence; this helper never declares a
+/// vendor suitable.
+pub(super) fn directory_sources_cover_query(
+    sources: &[WeddingVendorSearchSource],
+    query: &WeddingVendorSearchQueryRequest,
+    requested_limit: usize,
+) -> bool {
+    if sources.len() < requested_limit {
+        return false;
+    }
+    let query_key = query.query.to_ascii_lowercase();
+    let requested = DISTINCTIVE_QUERY_TERMS
+        .iter()
+        .filter(|term| {
+            query_key
+                .split(|character: char| !character.is_alphanumeric())
+                .any(|word| word == **term)
+        })
+        .copied()
+        .collect::<Vec<_>>();
+    if requested.is_empty() {
+        return true;
+    }
+    let needed = requested_limit.min(3);
+    sources
+        .iter()
+        .filter(|source| {
+            let evidence = format!(
+                "{} {} {} {}",
+                source.title,
+                source.snippet.as_deref().unwrap_or_default(),
+                source.address.as_deref().unwrap_or_default(),
+                source.service_area.as_deref().unwrap_or_default(),
+            )
+            .to_ascii_lowercase();
+            requested.iter().any(|term| {
+                evidence
+                    .split(|character: char| !character.is_alphanumeric())
+                    .any(|word| word == *term)
+            })
+        })
+        .take(needed)
+        .count()
+        >= needed
 }
 
 pub(super) fn wedding_vendor_directory_search_terms(

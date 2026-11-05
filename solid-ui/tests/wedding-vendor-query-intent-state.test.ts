@@ -41,6 +41,14 @@ test("descriptive venue wording becomes ranking preferences instead of provider-
   assert.equal(intent.preferences, "rustic; country; micro wedding");
 });
 
+test("individual musicians and singers use the existing music supplier category", () => {
+  const musician = weddingVendorQueryIntent("acoustic musician for our Sydney wedding");
+  const singer = weddingVendorQueryIntent("live singer and piano for the reception");
+  assert.equal(musician.category, "band");
+  assert.equal(musician.categoryLabel, "Music");
+  assert.equal(singer.category, "band");
+});
+
 test("query descriptors merge with saved Wedding preferences without duplication", () => {
   assert.deepEqual(
     mergeWeddingVendorPreferenceLabels(["rustic", "micro wedding"], "Photos, relaxed", "rustic; garden"),

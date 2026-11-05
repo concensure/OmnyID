@@ -12,7 +12,7 @@ const articles = readdirSync(blogRoot).filter((name) => name.endsWith('.html')).
 const catalogueRows = csv.trim().split(/\r?\n/).slice(1);
 const indexed = new Set(Array.from(index.matchAll(/href="blog\/([^"]+\.html)"/g), (match) => match[1]));
 const stages = new Set();
-const expectedArticleCount = 55;
+const expectedArticleCount = 56;
 
 if (articles.length !== expectedArticleCount) failures.push(`expected ${expectedArticleCount} articles, found ${articles.length}`);
 if (indexed.size !== articles.length) failures.push(`index has ${indexed.size} unique article links for ${articles.length} articles`);

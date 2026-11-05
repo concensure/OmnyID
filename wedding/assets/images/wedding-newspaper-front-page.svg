@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1260 540" role="img" aria-labelledby="t d">
+  <title id="t">Front page of a sample wedding newspaper</title>
+  <desc id="d">A newspaper called The Harbour Times with the headline Two Become One, a photo box, a weather forecast, a crossword and a classifieds column.</desc>
+  <rect width="1260" height="540" fill="#F4EADC"/>
+  <rect x="0" y="470" width="1260" height="70" fill="#E7DACB"/>
+  <g transform="rotate(-2.5 630 270)">
+    <rect x="212" y="46" width="836" height="560" rx="4" fill="#00000018" transform="translate(8 10)"/>
+    <rect x="212" y="46" width="836" height="560" rx="4" fill="#FFFDF8" stroke="#D9CBB8"/>
+    <text x="630" y="108" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="52" font-weight="700" fill="#2C241D">The Harbour Times</text>
+    <line x1="236" y1="122" x2="1024" y2="122" stroke="#2C241D" stroke-width="3"/>
+    <line x1="236" y1="128" x2="1024" y2="128" stroke="#2C241D" stroke-width="1"/>
+    <text x="236" y="150" font-family="Georgia, serif" font-size="13" fill="#6B5D50">VOL. 1 · NO. 1</text>
+    <text x="630" y="150" text-anchor="middle" font-family="Georgia, serif" font-size="13" fill="#6B5D50">SATURDAY 14 NOVEMBER 2026 · FREE FOR ALL GUESTS</text>
+    <text x="1024" y="150" text-anchor="end" font-family="Georgia, serif" font-size="13" fill="#6B5D50">LIMITED EDITION</text>
+    <line x1="236" y1="160" x2="1024" y2="160" stroke="#2C241D" stroke-width="1"/>
+
+    <text x="236" y="212" font-family="Georgia, serif" font-size="46" font-weight="700" fill="#2C241D">TWO BECOME ONE,</text>
+    <text x="236" y="258" font-family="Georgia, serif" font-size="46" font-weight="700" fill="#2C241D">DINNER AT SIX</text>
+    <text x="236" y="284" font-family="Georgia, serif" font-style="italic" font-size="16" fill="#6B5D50">Local couple say yes in front of everyone they love</text>
+
+    <rect x="236" y="300" width="330" height="220" fill="#EADBC8"/>
+    <circle cx="401" cy="372" r="26" fill="#C9A98A"/>
+    <path d="M345 520 q0 -92 56 -92 q56 0 56 92z" fill="#B58E6E"/>
+    <text x="401" y="504" text-anchor="middle" font-family="Georgia, serif" font-size="13" font-style="italic" fill="#2C241D">[ Your engagement photo here ]</text>
+    <rect x="236" y="528" width="330" height="1" fill="#D9CBB8"/>
+
+    <g fill="#6B5D50">
+      <rect x="590" y="206" width="210" height="6" rx="3"/><rect x="590" y="222" width="196" height="6" rx="3"/>
+      <rect x="590" y="238" width="210" height="6" rx="3"/><rect x="590" y="254" width="180" height="6" rx="3"/>
+      <rect x="590" y="270" width="205" height="6" rx="3"/><rect x="590" y="286" width="190" height="6" rx="3"/>
+      <rect x="590" y="302" width="210" height="6" rx="3"/><rect x="590" y="318" width="170" height="6" rx="3"/>
+      <rect x="590" y="334" width="205" height="6" rx="3"/><rect x="590" y="350" width="188" height="6" rx="3"/>
+      <rect x="590" y="366" width="210" height="6" rx="3"/><rect x="590" y="382" width="150" height="6" rx="3"/>
+    </g>
+
+    <rect x="590" y="408" width="210" height="112" fill="#0F5F5A"/>
+    <text x="695" y="434" text-anchor="middle" font-family="Georgia, serif" font-size="13" letter-spacing="2" fill="#FFFDF8">WEATHER</text>
+    <circle cx="640" cy="472" r="16" fill="#F2C14E"/>
+    <g stroke="#F2C14E" stroke-width="3" stroke-linecap="round"><path d="M640 446v-6M640 504v6M614 472h-6M666 472h6M622 454l-4-4M658 490l4 4M622 490l-4 4M658 454l4-4"/></g>
+    <text x="735" y="470" text-anchor="middle" font-family="Georgia, serif" font-size="30" font-weight="700" fill="#FFFDF8">24°</text>
+    <text x="695" y="500" text-anchor="middle" font-family="Georgia, serif" font-size="12" fill="#FFFDF8">Love, with a light breeze</text>
+
+    <line x1="822" y1="190" x2="822" y2="528" stroke="#D9CBB8"/>
+    <text x="846" y="214" font-family="Georgia, serif" font-size="15" font-weight="700" letter-spacing="1.5" fill="#2C241D">CLASSIFIEDS</text>
+    <line x1="846" y1="222" x2="1000" y2="222" stroke="#2C241D"/>
+    <g fill="#6B5D50" font-family="Georgia, serif" font-size="12">
+      <text x="846" y="246">WANTED: dance floor partners.</text>
+      <text x="846" y="266">Must own comfortable shoes.</text>
+      <text x="846" y="298">FOR SALE: one bachelor</text>
+      <text x="846" y="314">pad. Genuine reason: moved.</text>
+      <text x="846" y="346">LOST: single life. Last seen</text>
+      <text x="846" y="362">before the proposal.</text>
+    </g>
+    <g stroke="#2C241D" fill="#FFFDF8">
+      <rect x="846" y="396" width="26" height="26"/><rect x="872" y="396" width="26" height="26"/><rect x="898" y="396" width="26" height="26"/><rect x="924" y="396" width="26" height="26"/>
+      <rect x="846" y="422" width="26" height="26"/><rect x="872" y="422" width="26" height="26" fill="#2C241D"/><rect x="898" y="422" width="26" height="26"/><rect x="924" y="422" width="26" height="26"/>
+      <rect x="846" y="448" width="26" height="26"/><rect x="872" y="448" width="26" height="26"/><rect x="898" y="448" width="26" height="26" fill="#2C241D"/><rect x="924" y="448" width="26" height="26"/>
+    </g>
+    <text x="846" y="386" font-family="Georgia, serif" font-size="13" font-weight="700" letter-spacing="1.5" fill="#2C241D">CROSSWORD</text>
+    <text x="846" y="500" font-family="Georgia, serif" font-size="11" font-style="italic" fill="#6B5D50">Answers on page 4</text>
+  </g>
+</svg>
+

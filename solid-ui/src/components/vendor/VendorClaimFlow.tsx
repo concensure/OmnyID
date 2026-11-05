@@ -23,6 +23,8 @@ export function VendorClaimFlow() {
   const [claim, setClaim] = createSignal<VendorClaim | null>(null);
   const [busy, setBusy] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
+  const [claimNotice, setClaimNotice] = createSignal<string | null>(null);
+  const [needsSignIn, setNeedsSignIn] = createSignal(false);
   const [proposalEnabled, setProposalEnabled] = createSignal(false);
   const [showProposal, setShowProposal] = createSignal(false);
   const [category, setCategory] = createSignal("");
@@ -30,6 +32,17 @@ export function VendorClaimFlow() {
   const [websiteUrl, setWebsiteUrl] = createSignal("");
   const [businessEmail, setBusinessEmail] = createSignal("");
   let suggestionTimer: number | undefined;
+
+  const showRequestError = (reason: unknown, fallback: string) => {
+    const message = reason instanceof Error ? reason.message : fallback;
+    if (/unauthori[sz]ed|session.*(?:expired|missing)|sign[ -]?in/i.test(message)) {
+      setNeedsSignIn(true);
+      setError("Your vendor session has expired. Sign in again to continue with this listing.");
+      return;
+    }
+    setNeedsSignIn(false);
+    setError(message || fallback);
+  };
 
   const searchSuggestions = (value: string) => {
     setBusinessName(value);
@@ -55,10 +68,14 @@ export function VendorClaimFlow() {
     if (!slug) return;
     setBusy(true);
     setError(null);
+    setNeedsSignIn(false);
+    setClaimNotice(null);
     try {
-      setClaim(await getVendorClaim(slug));
+      const existing = await getVendorClaim(slug);
+      setClaim(existing);
+      if (!existing) setClaimNotice(`No ownership proof has been started for ${businessName().trim() || "this business"}. You can start one below.`);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Could not check this vendor claim.");
+      showRequestError(reason, "Could not check this vendor claim.");
     } finally {
       setBusy(false);
     }
@@ -71,11 +88,13 @@ export function VendorClaimFlow() {
     }
     setBusy(true);
     setError(null);
+    setNeedsSignIn(false);
+    setClaimNotice(null);
     try {
       setClaim(await startVendorClaim({ vendorSlug: slug, declaredRole: role() }));
       window.history.replaceState(null, "", `?vendor_slug=${encodeURIComponent(slug)}`);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Could not start this claim.");
+      showRequestError(reason, "Could not start this claim.");
     } finally {
       setBusy(false);
     }
@@ -83,6 +102,7 @@ export function VendorClaimFlow() {
   const propose = async () => {
     setBusy(true);
     setError(null);
+    setNeedsSignIn(false);
     try {
       const response = await proposeVendorListing({
         businessName: businessName(), category: category(), serviceArea: serviceArea(),
@@ -92,7 +112,7 @@ export function VendorClaimFlow() {
       setShowProposal(false);
       window.history.replaceState(null, "", `?vendor_slug=${encodeURIComponent(response.vendor_slug)}`);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Could not submit this listing for review.");
+      showRequestError(reason, "Could not submit this listing for review.");
     } finally {
       setBusy(false);
     }
@@ -156,6 +176,7 @@ export function VendorClaimFlow() {
             <button class="min-h-11 rounded-lg border border-wedding-accent px-4 font-bold text-wedding-accent" type="button" disabled={busy() || !vendorSlug()} onClick={() => void loadExisting()}>Check existing claim</button>
             <button class="min-h-11 rounded-lg bg-wedding-accent px-4 font-bold text-white disabled:opacity-60" type="button" disabled={busy() || !vendorSlug()} onClick={() => void begin()}>{busy() ? "Working…" : "Start ownership proof"}</button>
           </div>
+          <Show when={claimNotice()}>{(message) => <p class="mt-3 rounded-lg bg-wedding-surface p-3 text-sm text-wedding-muted" role="status">{message()}</p>}</Show>
         </section>
       </Show>
       <Show when={claim()}>
@@ -167,7 +188,10 @@ export function VendorClaimFlow() {
           </Show>
         </>}
       </Show>
-      <Show when={error()}>{(message) => <p class="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-800" role="alert">{message()}</p>}</Show>
+      <Show when={error()}>{(message) => <div class="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-800" role="alert">
+        <p>{message()}</p>
+        <Show when={needsSignIn()}><a class="mt-2 inline-flex min-h-11 items-center font-bold underline underline-offset-4" href={`/workspace/?auth=signin&source=vendor_claim${vendorSlug() ? `&vendor_slug=${encodeURIComponent(vendorSlug())}` : ""}`}>Sign in again</a></Show>
+      </div>}</Show>
     </main>
   );
 }

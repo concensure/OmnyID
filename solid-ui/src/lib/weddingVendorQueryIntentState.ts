@@ -19,7 +19,7 @@ const CATEGORY_PATTERNS: ReadonlyArray<readonly [RegExp, string, string]> = [
   [/\b(?:florist|florists|flowers|floral designer)s?\b/i, "floral_designer", "Floral designer"],
   [/\b(?:caterer|caterers|catering)\b/i, "caterer", "Caterer"],
   [/\b(?:celebrant|celebrants|officiant|officiants)\b/i, "officiant", "Celebrant"],
-  [/\b(?:band|bands|dj|djs|music)\b/i, "band", "Music"],
+  [/\b(?:band|bands|dj|djs|music|musician|musicians|singer|singers|live music|acoustic duo|acoustic trio)\b/i, "band", "Music"],
   [/\b(?:cake|cakes|cake baker|bakery)\b/i, "cake_baker", "Cake baker"],
   [/\b(?:hair stylist|hairdresser|hair styling)\b/i, "hair_stylist", "Hair stylist"],
   [/\b(?:makeup artist|make-up artist|makeup)\b/i, "makeup_artist", "Makeup artist"],

@@ -2814,3 +2814,13 @@ subjective usability or a controlled external cohort.
   contains no account identifiers, tokens, page text or private Wedding content, accepts only the
   fixed operator recipient, and uses a migration-backed weekly receipt to avoid duplicate sends.
   Credential reminders consume expiry-date metadata only, never credential values.
+
+# 2026-11-05 - WED-337 cached vendor count is not descriptive-query coverage
+
+- The vendor directory remains the first, low-cost candidate authority, but a count of generic
+  category rows does not prove that a descriptive request has been answered. Descriptive terms
+  must appear in evidence for at least three cached candidates before live discovery is skipped.
+- Ranking Policy V2 remains the sole final ranking authority. The coverage check decides only
+  whether to gather more evidence; it never declares suitability, availability or verification.
+- Vendor source verification and couple suitability remain separate. New directory records are
+  unclaimed and carry explicit pricing, availability and package caveats until vendors confirm them.

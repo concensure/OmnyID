@@ -745,4 +745,9 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Account-scoped persona presentation preferences and replay-safe weekly operator report receipts",
         include_str!("../../postgres/migrations/0146_agent_persona_ui_and_weekly_reports.sql"),
     ),
+    (
+        "0147_wedding_musician_vendor_listings",
+        "Claimable Sydney musician vendor listings and source-backed discovery attributes",
+        include_str!("../../postgres/migrations/0147_wedding_musician_vendor_listings.sql"),
+    ),
 ];

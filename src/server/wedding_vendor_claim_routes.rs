@@ -37,9 +37,9 @@ const MAX_QUERY_LENGTH: usize = 120;
 const DIRECTORY_PAGE_SIZE: i64 = 24;
 const DIRECTORY_MAX_PAGE_SIZE: i64 = 500;
 const CLAIM_SUGGESTION_LIMIT: usize = 8;
-pub(super) const PHOTO_LICENCE_VERSION: &str = "vendor-image-licence-2026-10-09";
+pub(super) const PHOTO_LICENCE_VERSION: &str = "vendor-image-licence-2026-11-05";
 pub(super) const PHOTO_LICENCE_SHA256: &str =
-    "fe8e9861793131444295de144dd8a20f5fe854dc9a91736de2598dccc7ebe8d8";
+    "af8f495ac66af43bd5b1ef155073a7af132262fb221d22226f13cfb5b1a7d84a";
 const PHOTO_LICENCE_CONSENT: &str = "I confirm that I have read and agree to the Vendor Image Licence Agreement, and that I am authorised to grant the licence above for all Images submitted.";
 
 pub(super) fn routes() -> Router<Arc<AppState>> {
@@ -190,7 +190,9 @@ async fn public_directory_http(
                     'source_label', 'Vendor supplied'
                 ) ORDER BY is_cover DESC, position ASC)
                 FROM wedding_vendor_owner_assets asset
-                WHERE asset.vendor_id = v.vendor_id AND asset.status = 'live'
+                WHERE asset.vendor_id = v.vendor_id
+                  AND asset.status = 'live'
+                  AND v.claim_status = 'verified'
             ), '[]'::jsonb) AS owner_photos
         FROM wedding_vendors v
         LEFT JOIN wedding_vendor_owner_profile p ON p.vendor_id = v.vendor_id
@@ -311,7 +313,9 @@ async fn public_vendor_http(
                     'source_label', 'Vendor supplied'
                 ) ORDER BY is_cover DESC, position ASC)
                 FROM wedding_vendor_owner_assets asset
-                WHERE asset.vendor_id = v.vendor_id AND asset.status = 'live'
+                WHERE asset.vendor_id = v.vendor_id
+                  AND asset.status = 'live'
+                  AND v.claim_status = 'verified'
             ), '[]'::jsonb) AS owner_photos
         FROM wedding_vendors v
         LEFT JOIN wedding_vendor_owner_profile p ON p.vendor_id = v.vendor_id
@@ -1002,6 +1006,7 @@ mod tests {
         valid_declared_role, valid_slug,
     };
     use axum::http::StatusCode;
+    use sha2::{Digest, Sha256};
 
     #[test]
     fn accepts_safe_listing_slugs_only() {
@@ -1030,8 +1035,14 @@ mod tests {
 
     #[test]
     fn photo_licence_receipt_is_pinned_to_the_current_document() {
-        assert_eq!(PHOTO_LICENCE_VERSION, "vendor-image-licence-2026-10-09");
-        assert_eq!(PHOTO_LICENCE_SHA256.len(), 64);
+        assert_eq!(PHOTO_LICENCE_VERSION, "vendor-image-licence-2026-11-05");
+        assert_eq!(
+            format!(
+                "{:x}",
+                Sha256::digest(include_bytes!("../../wedding/vendor-image-licence.html"))
+            ),
+            PHOTO_LICENCE_SHA256
+        );
         assert!(PHOTO_LICENCE_CONSENT.starts_with("I confirm that I have read"));
         assert!(PHOTO_LICENCE_CONSENT.contains("authorised to grant the licence"));
     }

@@ -29,7 +29,7 @@ use crate::wedding_shared_tool_metering::{
 };
 use attribute_catalog::PendingAttribute;
 use canonical_resolution::{EnrichInput, enrich_vendor_sources, write_pending_attributes};
-use directory::search_wedding_vendor_directory;
+use directory::{directory_sources_cover_query, search_wedding_vendor_directory};
 use photo_proxy::wedding_google_place_photo_http;
 use providers::{search_brave, search_exa, search_google_places};
 use receipt::merge_receipt;
@@ -638,7 +638,9 @@ async fn wedding_vendor_search_http(
         tag_new_sources(&mut sources, &mut tagged_upto, previous_query);
         previous_query = Some(query);
         provider_kinds.insert(query.provider_kind.clone());
-        if is_paid_vendor_search_provider(&query.provider_kind) && sources.len() >= limit {
+        if is_paid_vendor_search_provider(&query.provider_kind)
+            && directory_sources_cover_query(&sources, query, limit)
+        {
             paid_provider_queries_skipped_due_to_cache += 1;
             continue;
         }
@@ -1993,8 +1995,8 @@ fn env_lock() -> std::sync::MutexGuard<'static, ()> {
 #[cfg(test)]
 mod tests {
     use super::directory::{
-        is_real_vendor_directory_record, wedding_vendor_directory_search_terms,
-        wedding_vendor_record_to_search_source,
+        directory_sources_cover_query, is_real_vendor_directory_record,
+        wedding_vendor_directory_search_terms, wedding_vendor_record_to_search_source,
     };
     use super::*;
     use crate::db::WeddingVendorRecord;
@@ -2294,6 +2296,57 @@ mod tests {
                 "Sydney".to_string(),
             ]
         );
+    }
+
+    #[test]
+    fn descriptive_vendor_query_does_not_treat_generic_cached_rows_as_complete() {
+        let query = WeddingVendorSearchQueryRequest {
+            provider_kind: "google_places".to_string(),
+            category: Some("venue".to_string()),
+            query: "rustic country micro-wedding venues in Sydney".to_string(),
+            google_place_types: None,
+            overpass_tags: None,
+        };
+        let generic = (0..5)
+            .map(|index| WeddingVendorSearchSource {
+                title: format!("Sydney Venue {index}"),
+                url: format!("https://venue{index}.example"),
+                snippet: Some("Wedding venue in Sydney".to_string()),
+                provider: "Admin vendor database".to_string(),
+                ..WeddingVendorSearchSource::default()
+            })
+            .collect::<Vec<_>>();
+
+        assert!(!directory_sources_cover_query(&generic, &query, 5));
+    }
+
+    #[test]
+    fn descriptive_vendor_query_can_reuse_three_evidence_backed_cached_rows() {
+        let query = WeddingVendorSearchQueryRequest {
+            provider_kind: "google_places".to_string(),
+            category: Some("venue".to_string()),
+            query: "rustic country micro-wedding venues in Sydney".to_string(),
+            google_place_types: None,
+            overpass_tags: None,
+        };
+        let covered = (0..5)
+            .map(|index| WeddingVendorSearchSource {
+                title: format!("Country Venue {index}"),
+                url: format!("https://country{index}.example"),
+                snippet: Some(
+                    if index < 3 {
+                        "Rustic barn for intimate weddings"
+                    } else {
+                        "Sydney venue"
+                    }
+                    .to_string(),
+                ),
+                provider: "Admin vendor database".to_string(),
+                ..WeddingVendorSearchSource::default()
+            })
+            .collect::<Vec<_>>();
+
+        assert!(directory_sources_cover_query(&covered, &query, 5));
     }
 
     #[test]

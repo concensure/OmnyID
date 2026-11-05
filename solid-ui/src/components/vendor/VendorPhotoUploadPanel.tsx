@@ -70,7 +70,7 @@ export function VendorPhotoUploadPanel(props: {
         altText: altText(),
         isCover: isCover(),
       });
-      setSuccess("Photo published. It has been converted to WebP without EXIF metadata.");
+      setSuccess("Photo published. It is ready to appear on your verified listing.");
       await refreshPhotos();
       props.onPublished?.(uploaded.url);
     } catch (reason) {
@@ -96,7 +96,7 @@ export function VendorPhotoUploadPanel(props: {
                   <div class="space-y-2 p-2">
                     <Show when={photo.status === "live"} fallback={<p class="text-xs text-wedding-muted">Hidden; permanently removed after 14 days.</p>}>
                       <button
-                        class="min-h-10 w-full rounded-md border border-red-300 px-2 text-xs font-semibold text-red-700"
+                        class="min-h-11 w-full rounded-md border border-red-300 px-2 text-xs font-semibold text-red-700"
                         type="button"
                         disabled={busy()}
                         onClick={() => void (async () => {
@@ -159,7 +159,7 @@ export function VendorPhotoUploadPanel(props: {
             Make this the cover photo
           </label>
           <button
-            class="btn btn-primary mt-4 w-full"
+            class="mt-4 min-h-11 w-full rounded-lg bg-wedding-accent px-4 font-bold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
             type="button"
             disabled={!file() || busy()}
             onClick={() => void publish()}

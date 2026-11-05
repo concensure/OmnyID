@@ -5,7 +5,7 @@
 // @owner: omnyid
 import { createSignal, Show } from "solid-js";
 
-export const VENDOR_PHOTO_LICENCE_VERSION = "vendor-image-licence-2026-10-09";
+export const VENDOR_PHOTO_LICENCE_VERSION = "vendor-image-licence-2026-11-05";
 export const VENDOR_PHOTO_LICENCE_CONSENT = "I confirm that I have read and agree to the Vendor Image Licence Agreement, and that I am authorised to grant the licence above for all Images submitted.";
 
 const CLAUSES = [
@@ -16,7 +16,7 @@ const CLAUSES = [
     "continue hosting the Images on a read-only archive basis if the Vendor's listing is deactivated.",
   ]],
   ["2. Ownership", "The Vendor retains all ownership of and copyright in the Images. This agreement is a licence only — it does not transfer ownership. We may not sell the Images or license them to third parties for uses unrelated to the Platform."],
-  ["3. Licence Duration and Withdrawal", "The licence applies for as long as the Images appear on the Platform, and continues for cached, archived, or already-published marketing copies until removed. The Vendor may request removal of any Image at any time via [contact email]. We will remove Images from active display within 14 days of a written request."],
+  ["3. Licence Duration and Withdrawal", "The licence applies for as long as the Images appear on the Platform, and continues for cached, archived, or already-published marketing copies until removed. The Vendor may request removal of any Image at any time via privacy@omnyid.com. We will remove Images from active display within 14 days of a written request."],
   ["4. Vendor Warranties", "By submitting Images, the Vendor represents and warrants that:", [
     "the Vendor owns the Images, or holds a valid written licence from the copyright owner permitting this submission and licence grant;",
     "the submission, display, and use of the Images under this agreement does not infringe any third party’s copyright, trade mark, privacy, or other rights;",
@@ -81,7 +81,7 @@ export function VendorPhotoLicenceConsent(props: {
         />
         <span>{VENDOR_PHOTO_LICENCE_CONSENT}</span>
       </label>
-      <button type="button" class="btn btn-primary mt-4 w-full" disabled={!accepted() || props.disabled} onClick={() => props.onAccepted()}>
+      <button type="button" class="mt-4 min-h-11 w-full rounded-lg bg-wedding-accent px-4 font-bold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-50" disabled={!accepted() || props.disabled} onClick={() => props.onAccepted()}>
         I agree — continue to photo upload
       </button>
     </section>
