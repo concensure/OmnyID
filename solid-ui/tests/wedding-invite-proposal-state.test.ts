@@ -27,6 +27,7 @@ function state(): WeddingResponseWorkspaceViewState {
     budgetTracking: { budgetAllocation: [
       { categoryId: "photo_video", categoryLabel: "Photography & Video", amount: 6000 },
     ] },
+    ganttTimeline: { rows: [] },
   } as unknown as WeddingResponseWorkspaceViewState;
 }
 
@@ -68,6 +69,23 @@ test("proposal brief reuses wedding facts and relevant category allocation", () 
   assert.equal(brief.recipients[0]?.route, "authenticated_vendor");
   assert.equal(brief.recipients[1]?.eligible, false);
   assert.deepEqual(brief.missingFacts, []);
+});
+
+test("proposal brief prefers the canonical saved wedding date and newest complete context", () => {
+  const next = state();
+  next.ganttTimeline = { ...next.ganttTimeline, rows: [{ id: "wedding-day", title: "Wedding day", endLabel: "2028-02-12" }] } as WeddingResponseWorkspaceViewState["ganttTimeline"];
+  next.contextCards = [
+    { planningContext: { location: "Hunter Valley NSW", guestCount: 72 } },
+    { planningContext: { location: "Old location", guestCount: 90, topPriorities: ["Food"] } },
+  ] as WeddingResponseWorkspaceViewState["contextCards"];
+  const brief = buildWeddingInviteProposalBrief({
+    state: next, preview: preview(), vendorDirectory: directory(), category: "Wedding photographers",
+  });
+  assert.equal(brief.dateOrSeason, "2028-02-12");
+  assert.equal(brief.location, "Hunter Valley NSW");
+  assert.equal(brief.guestCount, "72");
+  assert.equal(brief.category, "Wedding photographers");
+  assert.match(brief.id, /wedding-photographers$/);
 });
 
 test("proposal sharing keeps budget and phone off by default", () => {

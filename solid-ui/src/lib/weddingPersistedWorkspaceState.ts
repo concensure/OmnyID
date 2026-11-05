@@ -851,8 +851,8 @@ export function buildWeddingPersistedWorkspaceState(input: {
   }));
   const contextItems = scopedMessages.flatMap((message) => {
     const item = messageToNeedToKnowContext(message, metadata);
-    return item ? [item] : [];
-  });
+    return item ? [{ item, timestamp: Date.parse(message.timestamp) || 0 }] : [];
+  }).sort((left, right) => right.timestamp - left.timestamp).map((entry) => entry.item);
   const approvalReceipts = scopedMessages.flatMap((message) => {
     const item = messageToApprovalReceipt(message);
     return item ? [item] : [];

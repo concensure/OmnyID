@@ -13,12 +13,24 @@ test("vendor home exposes accessible in-place Find and Invite tabs", () => {
   assert.match(homeSource, /hidden=\{vendorMode\(\) !== "find"\}/);
 });
 
-test("proposal panel labels the private draft boundary and explicit sharing controls", () => {
-  assert.match(panelSource, /No vendor has been contacted/);
-  assert.match(panelSource, /Saving this draft does not send it/);
+test("proposal panel publishes a category opportunity without a recipient picker", () => {
+  assert.match(panelSource, /Proposal opportunity published\. No vendor was contacted/);
+  assert.match(panelSource, /Publishing does not send an enquiry/);
   assert.match(panelSource, /Approximate category budget/);
   assert.match(panelSource, /Allow phone contact/);
-  assert.match(panelSource, /Save private draft/);
-  assert.match(panelSource, /disabled=\{!vendor\.eligible\}/);
-  assert.match(panelSource, /vendor\.eligibilityReason/);
+  assert.match(panelSource, /Publish opportunity/);
+  assert.match(panelSource, /Create secure vendor link/);
+  assert.doesNotMatch(panelSource, /Choose recipients/);
+  assert.doesNotMatch(panelSource, /What should vendors propose/);
+  assert.doesNotMatch(panelSource, /Still useful to add/);
+});
+
+test("proposal facts are actionable in place and the mobile panel is full bleed", () => {
+  assert.match(panelSource, /Change here/);
+  assert.match(panelSource, /Add here/);
+  assert.match(panelSource, /saveDate/);
+  assert.match(panelSource, /saveContextFact/);
+  assert.match(panelSource, /saveBudget/);
+  assert.match(panelSource, /class="-mx-3 mt-4 min-w-0 sm:mx-0"/);
+  assert.match(homeSource, /\{ id: "enquired", label: "Enquired" \}, \{ id: "proposals", label: "Proposals" \}/);
 });

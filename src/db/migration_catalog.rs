@@ -750,4 +750,9 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Claimable Sydney musician vendor listings and source-backed discovery attributes",
         include_str!("../../postgres/migrations/0147_wedding_musician_vendor_listings.sql"),
     ),
+    (
+        "0148_wedding_invite_proposal_opportunities",
+        "Category proposal opportunities, expiring referral capabilities, responses, and privacy-bounded metrics",
+        include_str!("../../postgres/migrations/0148_wedding_invite_proposal_opportunities.sql"),
+    ),
 ];

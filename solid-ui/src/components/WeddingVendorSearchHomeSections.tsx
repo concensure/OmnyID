@@ -1,5 +1,5 @@
 // @locs-version: 1.0
-import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
+import { createEffect, createMemo, createResource, createSignal, For, onCleanup, Show } from "solid-js";
 
 import { DecisionCard } from "@/components/DecisionCard";
 import { WeddingDashboardIcon, type WeddingDashboardIconId } from "@/components/WeddingDashboardIcons";
@@ -9,6 +9,7 @@ import { WeddingVendorLifecycleDetailPanel } from "@/components/WeddingVendorLif
 import { WeddingPreferenceConfirmationChips } from "@/components/WeddingPreferenceConfirmationChips";
 import { WeddingDealBreakerEditor } from "@/components/WeddingDealBreakerEditor";
 import { WeddingInviteProposalsPanel } from "@/components/WeddingInviteProposalsPanel";
+import { loadWeddingProposalOpportunities } from "@/lib/weddingInviteProposalOpportunityApi";
 import type { WeddingVendorChoiceCardData } from "@/components/WeddingVendorChoiceCard";
 import type { WeddingResponseWorkspaceViewProps } from "@/components/WeddingResponseWorkspaceViewTypes";
 import { decisionCardFromWeddingVendorComparison } from "@/lib/decisionCardState";
@@ -130,7 +131,9 @@ export function WeddingVendorSearchHomeSection(props: {
   const [fullResultExpanded, setFullResultExpanded] = createSignal(false);
   const [searchProgressIndex, setSearchProgressIndex] = createSignal(0);
   const [selectedChoiceIds, setSelectedChoiceIds] = createSignal<string[]>([]);
-  const [lifecycleFilter, setLifecycleFilter] = createSignal<WeddingVendorLifecycleFilter>("all");
+  type VendorHomeFilter = WeddingVendorLifecycleFilter | "proposals";
+  const [lifecycleFilter, setLifecycleFilter] = createSignal<VendorHomeFilter>("all");
+  const [proposalOpportunities] = createResource(loadWeddingProposalOpportunities);
   const [expandedLifecycleVendorKey, setExpandedLifecycleVendorKey] = createSignal<string | null>(null);
   const [selectedVendorCategory, setSelectedVendorCategory] = createSignal<string | null>(null);
   const [vendorMode, setVendorMode] = createSignal<"find" | "invite">("find");
@@ -144,8 +147,8 @@ export function WeddingVendorSearchHomeSection(props: {
     })) ?? [];
     return mergeWeddingVendorLifecycleCandidates(projectWeddingVendorLifecycle(workspace().state.afpMessages), candidates);
   });
-  const lifecycleFilters: ReadonlyArray<{ id: WeddingVendorLifecycleFilter; label: string }> = [
-    { id: "enquired", label: "Enquired" }, { id: "favourited", label: "Favourited" },
+  const lifecycleFilters: ReadonlyArray<{ id: VendorHomeFilter; label: string }> = [
+    { id: "enquired", label: "Enquired" }, { id: "proposals", label: "Proposals" }, { id: "favourited", label: "Favourited" },
     { id: "quote_received", label: "Quote received" }, { id: "booked", label: "Booked" },
   ];
   let previousResultArtifactId: string | null = null;
@@ -174,7 +177,7 @@ export function WeddingVendorSearchHomeSection(props: {
   const cardVendorKey = (card: WeddingVendorChoiceCardData) => card.vendorId?.trim() || card.choiceId;
   const visibleCards = (artifact: WeddingWorkspaceArtifactPreview) => artifact.vendorComparisonCards
     .filter((card) => !props.hiddenVendorIds?.includes(cardVendorKey(card)))
-    .filter((card) => lifecycleFilter() === "all" || weddingVendorLifecycleMatches(findWeddingVendorLifecycle({ records: lifecycleRecords(), vendorId: card.vendorId, vendorName: card.title }) ?? { key: "", vendorId: card.vendorId ?? null, vendorName: card.title, enquired: false, favourited: selectedForFollowUp(artifact, card.choiceId), quoteReceived: false, quoteAccepted: false, booked: false, reminderAt: null, followUpDismissed: false, followUpDismissedAt: null, sourceMessageIds: [] }, lifecycleFilter()))
+    .filter((card) => lifecycleFilter() === "all" || lifecycleFilter() === "proposals" || weddingVendorLifecycleMatches(findWeddingVendorLifecycle({ records: lifecycleRecords(), vendorId: card.vendorId, vendorName: card.title }) ?? { key: "", vendorId: card.vendorId ?? null, vendorName: card.title, enquired: false, favourited: selectedForFollowUp(artifact, card.choiceId), quoteReceived: false, quoteAccepted: false, booked: false, reminderAt: null, followUpDismissed: false, followUpDismissedAt: null, sourceMessageIds: [] }, lifecycleFilter() as WeddingVendorLifecycleFilter))
     .map((card) => weddingVendorCardWithCurrentPhoto(card, workspace().weddingVendorDirectory));
   const hiddenCards = (artifact: WeddingWorkspaceArtifactPreview) => artifact.vendorComparisonCards
     .filter((card) => props.hiddenVendorIds?.includes(cardVendorKey(card)));
@@ -198,8 +201,12 @@ export function WeddingVendorSearchHomeSection(props: {
     workspace().onRunLiveVendorSearch?.(options);
   }
   const isSelectedCategory = (query: string) => selectedVendorCategory()?.toLowerCase() === query.toLowerCase();
-  const lifecycleCount = (filter: WeddingVendorLifecycleFilter) => lifecycleRecords().filter((record) => weddingVendorLifecycleMatches(record, filter)).length;
-  const filteredLifecycleRecords = () => lifecycleRecords().filter((record) => weddingVendorLifecycleMatches(record, lifecycleFilter()));
+  const lifecycleCount = (filter: VendorHomeFilter) => filter === "proposals"
+    ? (proposalOpportunities()?.reduce((sum, item) => sum + item.responseCount, 0) ?? 0)
+    : lifecycleRecords().filter((record) => weddingVendorLifecycleMatches(record, filter)).length;
+  const filteredLifecycleRecords = () => lifecycleFilter() === "proposals"
+    ? []
+    : lifecycleRecords().filter((record) => weddingVendorLifecycleMatches(record, lifecycleFilter() as WeddingVendorLifecycleFilter));
   const vendorKey = (value: unknown) => typeof value === "string"
     ? value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()
     : "";
@@ -366,6 +373,16 @@ export function WeddingVendorSearchHomeSection(props: {
       </Show>
       <Show when={lifecycleFilter() !== "all"}>
         <div class="mt-3 grid gap-2" aria-live="polite">
+          <Show when={lifecycleFilter() === "proposals"}>
+            <Show when={(proposalOpportunities()?.length ?? 0) > 0} fallback={<p class="rounded-lg border border-wedding-border bg-white p-3 text-sm text-wedding-ink/70">No vendor proposals have arrived yet.</p>}>
+              <For each={proposalOpportunities()}>{(opportunity) => <button type="button" class="rounded-lg border border-wedding-border bg-white p-3 text-left" onClick={() => { setSelectedVendorCategory(opportunity.category); setVendorMode("invite"); }}>
+                <span class="block font-semibold text-wedding-ink">{opportunity.category}</span>
+                <span class="mt-1 block text-xs text-wedding-ink/65">{opportunity.responseCount} proposal{opportunity.responseCount === 1 ? "" : "s"} · {opportunity.claimedVendorViewCount} claimed-vendor views</span>
+                <span class="mt-1 block text-xs font-semibold text-wedding-secondary">Open proposal opportunity</span>
+              </button>}</For>
+            </Show>
+          </Show>
+          <Show when={lifecycleFilter() !== "proposals"}>
           <Show when={filteredLifecycleRecords().length > 0} fallback={<p class="rounded-lg border border-wedding-border bg-white p-3 text-sm text-wedding-ink/70">No vendors have this status yet.</p>}>
             <For each={filteredLifecycleRecords()}>{(vendor) => <article class="rounded-lg border border-wedding-border bg-white p-3">
               <div class="flex flex-wrap items-center justify-between gap-2">
@@ -406,6 +423,7 @@ export function WeddingVendorSearchHomeSection(props: {
                 </div>
               </Show>
             </article>}</For>
+          </Show>
           </Show>
         </div>
       </Show>
@@ -585,7 +603,8 @@ export function WeddingVendorSearchHomeSection(props: {
         <WeddingInviteProposalsPanel
           workspace={workspace()}
           preview={props.result?.preview ?? props.result?.sourcePreview ?? null}
-          onFindVendors={() => setVendorMode("find")}
+          selectedCategory={selectedVendorCategory()}
+          onSelectedCategoryChange={setSelectedVendorCategory}
         />
       </Show>
     </div>

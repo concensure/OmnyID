@@ -1,11 +1,16 @@
 # Invite Proposals dependency-ordered tasks
 
-Task: WED-333
+Tasks: WED-333 foundation, WED-338 category opportunity extension
 Companion: `invite-proposals-spec.md`
 
 The order below is a dependency graph, not permission to build a parallel
 system. Each slice must consume the existing Wedding AFP, A2UI, vendor search,
 outreach, Documents, quote, budget and booking authorities.
+
+IP-01 through IP-09 record the WED-333 named-recipient foundation. IP-10
+supersedes its recipient-picker presentation on Wedding Home with the current
+category-opportunity flow; the named-recipient approval boundary remains the
+authority if a couple later chooses to send an enquiry.
 
 ## IP-00 — Reconcile contracts and guidance
 
@@ -162,3 +167,70 @@ Depends on: IP-03 through IP-08
 
 Acceptance: release evidence names the exact full SHA and enabled cohort;
 general availability is a separate decision.
+
+## IP-10 — Replace recipient picker with category opportunities
+
+Depends on: IP-01 through IP-03
+
+- [x] Remove recipient selection from the Wedding Home Invite Proposals mode.
+- [x] Publish an account- and wedding-owned category opportunity behind the
+  existing false-default rollout flag and account allowlist.
+- [x] Match only verified claimed listings by category and service area.
+- [x] Keep publication distinct from an enquiry or external send.
+- [x] Add Proposals immediately after Enquired in the vendor lifecycle filters.
+- [x] Show the couple category-level response, claimed-vendor view and secure
+  link counts.
+
+Acceptance: publication creates one category opportunity and contacts no named
+vendor.
+
+## IP-11 — Canonical facts and in-place correction
+
+Depends on: IP-10
+
+- [x] Project the canonical planning-window wedding date.
+- [x] Merge the newest non-empty need-to-know facts for location and guests.
+- [x] Project the relevant allocation from the shared budget authority.
+- [x] Make date, location, guests and category budget actionable in place.
+- [x] Save corrections through their existing wedding AFP authorities.
+- [x] Remove recipient-picker and missing-fact instructional copy superseded by
+  the actionable fact cards.
+- [x] Make the panel full bleed on mobile without enlarging inner controls.
+
+Acceptance: these values do not become a second mutable profile and every edit
+reprojects from the same wedding ledger.
+
+## IP-12 — Claimed and unclaimed vendor response paths
+
+Depends on: IP-10
+
+- [x] Add a claimed-vendor opportunity surface to the existing vendor profile.
+- [x] Require a verified, active, claimed listing and matching service area.
+- [x] Generate 256-bit unclaimed-vendor capability URLs and store only digests.
+- [x] Expire links after 14 days and throttle view/reply requests per capability.
+- [x] Return no-store, no-referrer and no-index headers.
+- [x] Deduplicate reply retries by response fingerprint.
+- [x] Project one tenant-private AFP Documents artifact per accepted response.
+- [x] Record publish and close lifecycle transitions in the couple's existing
+  private AFP ledger while treating the global tables as routing projections.
+- [x] Close an opportunity and revoke all of its links atomically.
+
+Acceptance: neither path grants broader account access, cross-tenant mutation,
+or a public proposal record.
+
+## IP-13 — Aggregate administration and release proof
+
+Depends on: IP-10 through IP-12
+
+- [x] Show admin aggregate counts by category: waiting opportunities, replies,
+  claimed-vendor views and secure links created.
+- [x] Exclude couple identity, brief and response bodies from the admin rollup.
+- [x] Add unit coverage for category/location matching and share sanitisation.
+- [x] Add disposable-Postgres coverage for tenant isolation, hashed capability
+  storage, no-index headers, replay suppression, AFP projection and revocation.
+- [ ] Run the full Wedding CI suite and production build on the frozen commit.
+- [ ] Deploy migration and exact clean commit to Oracle; verify runtime marker,
+  health, UI assets and public-link headers.
+
+Acceptance: hosted evidence names one full SHA and production can be rolled back
+without losing existing tenant-private proposal records.

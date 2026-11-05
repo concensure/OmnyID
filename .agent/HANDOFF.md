@@ -7554,3 +7554,25 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
   deleted. Final root use is 82 percent with 8.2 GB available.
 - Evidence: `Documents/verification/wed-336-persona-subtasks-weekly-report-release-2026-11-05.md`.
   Credential-expiry dates remain blank until verified provider dates are available.
+
+# 2026-11-05 - WED-338 category proposal opportunity candidate (Codex)
+
+- Worktree: `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`; branch:
+  `agent/codex/WED-338`; clean released coordination base:
+  `f058e6fdbf41d2520471b06b0d3b123c97f81bd9`.
+- Invite Proposals now projects the canonical wedding date, newest relevant location/guest facts and
+  category allocation, edits each through its existing authority, and uses the full mobile width.
+  The recipient picker is replaced by a category opportunity and Proposals follows Enquired in the
+  Wedding vendor lifecycle filters.
+- Verified claimed vendors see only category/service-area matches. Unclaimed vendors can use a
+  digest-only, expiring, revocable, non-indexable capability. Responses create one tenant-private
+  AFP Documents artifact; replay creates no duplicate. Publish/close lifecycle is also recorded in
+  private AFP while migration 0148 provides routing and privacy-bounded aggregate metrics.
+- Passed before commit: typecheck; production build; 2,217 Wedding tests; both line budgets; cargo
+  check; two focused Rust unit tests; migration-catalog parity; and a fresh disposable-pgvector API
+  proof covering cross-tenant denial, token hashing, noindex headers, replay suppression, private AFP
+  response/lifecycle events, aggregate admin metrics and revocation.
+- Remaining action: commit, rebuild from a clean exact-SHA release checkout, deploy migration 0148
+  and application to Oracle, then verify runtime provenance, health, UI assets, route headers and
+  current backup/restore evidence. Keep the existing Invite Proposals rollout flag and account
+  allowlist; this change does not authorize general availability or unsolicited vendor email.

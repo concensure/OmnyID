@@ -7,6 +7,7 @@ import {
 import type { WeddingResponseWorkspaceViewState, WeddingWorkspaceArtifactPreview } from "@/lib/weddingResponseWorkspaceViewState";
 import { weddingVendorOutreachThreadId } from "@/lib/weddingVendorOutreachAfpState";
 import type { WeddingPlanningMetadata } from "@/lib/weddingPlanningTemplateState";
+import { weddingTimelineWeddingDateLabel } from "@/lib/weddingTimelineWeddingDateState";
 
 export const WEDDING_INVITE_PROPOSAL_RECIPIENT_LIMIT = 5;
 
@@ -67,18 +68,33 @@ export function buildWeddingInviteProposalBrief(input: {
   state: WeddingResponseWorkspaceViewState;
   preview?: WeddingWorkspaceArtifactPreview | null;
   vendorDirectory?: readonly WeddingVendor[] | null;
+  category?: string | null;
 }): WeddingInviteProposalBrief {
-  const planning = input.state.contextCards[0]?.planningContext ?? {};
+  const contexts = input.state.contextCards.map((card) => card.planningContext);
+  const firstValue = <K extends keyof NonNullable<(typeof contexts)[number]>>(key: K) =>
+    contexts.map((context) => context?.[key]).find((value) => (
+      Array.isArray(value) ? value.length > 0 : typeof value === "number" || Boolean(clean(value))
+    ));
+  const planning = {
+    dateOrSeason: firstValue("dateOrSeason"),
+    location: firstValue("location"),
+    guestCount: firstValue("guestCount"),
+    topPriorities: firstValue("topPriorities"),
+    atmosphereDescription: firstValue("atmosphereDescription"),
+  };
   const cards = input.preview?.vendorComparisonCards ?? [];
-  const category = clean(input.preview?.category) ?? clean(cards[0]?.category);
-  const dateOrSeason = clean(planning.dateOrSeason);
+  const category = clean(input.category) ?? clean(input.preview?.category) ?? clean(cards[0]?.category);
+  const dateOrSeason = clean(weddingTimelineWeddingDateLabel(input.state)) ?? clean(planning.dateOrSeason);
   const location = clean(planning.location);
-  const guestCount = clean(planning.guestCount);
+  const guestCount = typeof planning.guestCount === "number"
+    ? String(planning.guestCount)
+    : clean(planning.guestCount);
   const stylePriorities = [
     ...(planning.topPriorities ?? []),
     clean(planning.atmosphereDescription),
   ].filter((item): item is string => Boolean(item));
   const budget = categoryBudget(input.state, category);
+  const categoryKey = (category ?? "uncategorised").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
   const missingFacts = [
     !category ? "Vendor category" : null,
     !dateOrSeason ? "Wedding date or season" : null,
@@ -86,7 +102,7 @@ export function buildWeddingInviteProposalBrief(input: {
     !guestCount ? "Guest count" : null,
   ].filter((item): item is string => Boolean(item));
   return {
-    id: `proposal-${input.state.workspace.metadata.responseWorkspaceId}-${input.preview?.artifactId ?? "new"}`,
+    id: `proposal-${input.state.workspace.metadata.responseWorkspaceId}-${input.preview?.artifactId ?? "new"}-${categoryKey}`,
     category,
     dateOrSeason,
     location,

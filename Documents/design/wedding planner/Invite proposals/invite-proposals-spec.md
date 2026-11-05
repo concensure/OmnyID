@@ -1,22 +1,23 @@
 # Invite Proposals specification
 
-Status: implementation started
-Task: WED-333
+Status: category-opportunity implementation complete; hosted release pending
+Tasks: WED-333 foundation, WED-338 category opportunity extension
 Product surface: Wedding Home vendor card
 Source of truth: the account-scoped Wedding AFP ledger
 
 ## 1. Outcome
 
-Invite Proposals lets a couple describe a vendor need once, invite a small and
-controlled set of suitable vendors, and compare structured responses without
-creating another marketplace, inbox, quote store, or booking system.
+Invite Proposals lets a couple describe a vendor need once, publish it to the
+matching category of verified claimed vendors, and compare structured
+responses without creating another inbox, quote store, booking system, or AFP
+ledger. A couple can also give one unclaimed vendor an expiring private link.
 
 The existing vendor card has two modes:
 
 1. **Find vendors** searches and compares the directory.
-2. **Invite Proposals** prepares a reusable brief, selects recipients, previews
-   exactly what will be shared, and then uses the existing approval-gated
-   enquiry workflow.
+2. **Invite Proposals** prepares a reusable category brief, previews exactly
+   what will be shared, publishes it without contacting a named vendor, and
+   projects replies into the existing Documents and vendor lifecycle surfaces.
 
 The supplied feature document is product guidance. Existing OmnyID authorities
 win where its proposed nouns or flows differ from the implemented system.
@@ -76,32 +77,38 @@ Unknown material facts stay labelled unknown. The UI asks for only facts that
 materially affect a proposal. It must not invent values from defaults or other
 accounts.
 
-### 4.3 Recipient selection
+### 4.3 Category opportunity
 
-The couple may select vendors from their existing comparison/shortlist. The
-first release caps a proposal invitation at five recipients. Selection is not a
-send. Ineligible or missing-contact vendors remain visible with the reason and
-can use the existing scoped vendor response link when supported.
+The couple chooses the vendor category, not a recipient list. The server makes
+an open opportunity visible only to authenticated vendors whose verified,
+claimed, active listing has a compatible category and service area. Publishing
+does not send an enquiry and does not change a vendor to Enquired.
+
+For an unclaimed vendor, the couple can create a 256-bit random capability URL.
+Only its SHA-256 digest is stored. The link expires after 14 days, has no index
+or cache permission, is throttled, and is revoked when the couple closes the
+opportunity. It grants access only to the share-approved brief and one proposal
+submission surface; it is not a listing claim or account session.
 
 ### 4.4 Sharing preview
 
-Before an external action, the couple sees:
+Before publication, the couple sees:
 
-- each recipient;
-- exact message/brief;
+- the category;
+- exact brief;
 - every shared context field;
 - every attachment;
-- reply route;
 - whether phone contact is allowed; and
-- reminder behaviour.
+- that publication does not contact a vendor.
 
 Approximate category budget and phone sharing default off. Saving a private
-draft cannot imply that vendors were contacted. Sending requires the existing
-explicit approval action for the exact revision and permissions fingerprint.
+draft or publishing an opportunity cannot imply that vendors were contacted.
+Any later named-vendor enquiry continues to require the existing exact-content
+approval boundary.
 
 ### 4.5 Responses and comparison
 
-Vendor responses use existing conversation and Documents projections. A
+Vendor responses create a tenant-private AFP Documents projection. A
 structured proposal may contain price, inclusions, exclusions, assumptions,
 availability evidence, validity date, attachments and questions. Quote files
 are normalized once and reused until their source facts change.
@@ -128,7 +135,7 @@ new proposals inbox.
 
 ## 5. AFP objects and events
 
-### 5.1 Private proposal draft
+### 5.1 Private proposal draft and category opportunity
 
 Subtype: `wedding_vendor_proposal_invitation_draft`
 
@@ -137,7 +144,7 @@ Required content:
 - `wedding_plan_id` and `response_workspace_id`;
 - stable brief ID and revision;
 - vendor category and request text;
-- selected vendor IDs and display labels;
+- selected category and optional broad service location;
 - explicit sharing booleans;
 - source references for projected facts;
 - `approval_status: pending_user_approval`;
@@ -147,13 +154,20 @@ Required content:
 The draft routes only to the couple, decision queue and knowledge graph. It
 contains no provider receipt and does not set the vendor lifecycle to enquired.
 
-### 5.2 Approved invitations
+Every publish and close transition is first-class tenant-private AFP evidence.
+The server-side opportunity index is its operational routing projection and
+contains only routing and aggregate fields:
+owner, wedding/workspace IDs, category, broad location, the share-approved
+brief, status and expiry. Response content is written to the couple's private
+AFP schema. The global response row keeps only a fingerprint and routing IDs.
 
-Each recipient becomes an existing vendor outreach draft/thread. The approved
-send records the exact draft revision, permissions fingerprint, recipient,
-provider receipt and existing lifecycle event. Retries use the existing
-idempotency boundary. A batch is a presentation convenience, not one
-cross-vendor conversation.
+### 5.2 Named-vendor enquiries
+
+If a couple proceeds from a proposal to a named-vendor enquiry, the existing
+vendor outreach draft/thread records the exact revision, permission
+fingerprint, recipient and provider receipt. Retries use the existing
+idempotency boundary. The category opportunity is discovery, not permission to
+send externally.
 
 ### 5.3 Proposal response
 
@@ -168,7 +182,9 @@ second mutable source of truth.
   identity documents or private inspiration unless explicitly selected.
 - A vendor sees no other recipients.
 - Unclaimed-vendor capability URLs are random, expiring, revocable, single
-  purpose and never written to ordinary logs.
+  purpose, stored only as digests and never written to ordinary logs.
+- Public capability responses carry `no-store`, `no-referrer`, `noindex`,
+  `nofollow` and `noarchive` headers.
 - Attachments use the existing allowlist, size limits, ClamAV and private object
   storage path.
 - Forged, replayed, expired and cross-tenant responses fail closed.
@@ -182,7 +198,7 @@ The server/ledger owns semantic state and A2UI projects it. The mobile surface:
 
 - keeps 44px minimum targets;
 - uses a two-option tab list that fits at 320px;
-- uses stacked recipient cards and sharing controls;
+- uses stacked fact cards, category selection and sharing controls;
 - keeps primary action consequences explicit;
 - preserves focus when state changes;
 - announces save, error and selection-limit messages; and
@@ -190,8 +206,9 @@ The server/ledger owns semantic state and A2UI projects it. The mobile surface:
 
 ## 8. AI and token policy
 
-No LLM is needed to switch modes, project known facts, validate a brief, select
-recipients, save a draft, or compare exact structured fields.
+No LLM is needed to switch modes, project known facts, validate or publish a
+brief, match a claimed listing by category/service area, or compare exact
+structured fields.
 
 If the couple asks for wording help, use the existing funded AI gateway and the
 project-approved low-cost model (`google/gemini-3.5-flash-lite` through
@@ -202,11 +219,10 @@ revision in AFP. Never generate on each keystroke.
 
 ## 9. Rollout
 
-External multi-recipient send remains false-default until its existing provider,
-security, privacy and delivery evidence passes. A pilot uses an allowlist, at
-most 10 couples and 15 vendors, a five-recipient cap, and a 30-day observation
-window. Draft creation and local preview can ship independently because they do
-not contact vendors.
+Opportunity publication remains false-default and account-allowlisted. A pilot
+uses at most 10 couples and 15 claimed vendors over 30 days. Publication and
+private-link creation do not contact vendors automatically; named-vendor email
+continues to use the separately reviewed outreach policy.
 
 Pause new invitations when enough useful proposals exist. “Enough” is an
 explainable policy based on received comparable proposals, not an LLM guess.
@@ -217,12 +233,17 @@ explainable policy based on received comparable proposals, not an LLM guess.
 - A private brief is built from the same wedding ledger and clearly labels
   missing facts.
 - No vendor is contacted by saving or editing.
-- Recipient selection is capped and each vendor has its own eventual thread.
-- Exact recipients, content and shared fields are previewed before approval.
+- Claimed vendors see only open opportunities matching their category and
+  service area.
+- Exact category, content and shared fields are shown before publication.
 - Sent invitations reproject through existing Enquired/vendor follow-up state.
 - Vendor replies, proposal files and normalized quotes reproject through the
   existing conversation, Documents and quote comparison surfaces.
-- Unclaimed vendors use the existing scoped response capability.
+- Unclaimed vendors use an expiring, revocable, non-indexable scoped response
+  capability whose plaintext is never stored.
+- The couple can close an opportunity and revoke every link atomically.
+- Admin sees category-level counts for opportunities, replies, claimed-vendor
+  views and links created, without couple or proposal content.
 - Quote acceptance updates connected records without manual reconciliation.
 - Tenant isolation, replay, expiry, accessibility, mobile and false-default
   rollout tests pass.

@@ -25,6 +25,7 @@ import UsageAdminWeddingNewsletterPanel from "@/components/UsageAdminWeddingNews
 import UsageAdminWeddingWaitlistPanel from "@/components/UsageAdminWeddingWaitlistPanel";
 import UsageAdminWeddingBlogPublisher from "@/components/UsageAdminWeddingBlogPublisher";
 import UsageAdminWeddingQuoteStudyPanel from "@/components/UsageAdminWeddingQuoteStudyPanel";
+import UsageAdminWeddingProposalOpportunitiesPanel from "@/components/UsageAdminWeddingProposalOpportunitiesPanel";
 
 export type UsageOperatorSectionProps = {
   onKeyDown: (event: KeyboardEvent) => void;
@@ -148,6 +149,8 @@ export default function UsageOperatorSection(props: UsageOperatorSectionProps) {
       <UsageAdminWeddingBlogPublisher />
 
       <UsageAdminWeddingQuoteStudyPanel />
+
+      <UsageAdminWeddingProposalOpportunitiesPanel />
 
       <UsageOperatorUserFilterForm
         queryDraft={props.userFilterForm.queryDraft}

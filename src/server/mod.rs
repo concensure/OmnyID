@@ -180,7 +180,7 @@ mod wedding_ai_cost_policy;
 mod wedding_llm_ladder;
 mod wedding_boundary_routes;
 mod wedding_preference_routes; mod wedding_quote_study_routes; mod wedding_rsvp_capability_routes; mod wedding_rsvp_reminder_routes; mod wedding_rsvp_response_routes; mod wedding_runsheet_projection_routes; mod wedding_runsheet_share_routes;
-mod wedding_invite_proposal_routes;
+mod wedding_invite_proposal_opportunity_ledger; mod wedding_invite_proposal_opportunity_routes; mod wedding_invite_proposal_routes;
 #[cfg(test)]
 mod wedding_rsvp_capability_routes_tests;
 #[cfg(test)]
@@ -1424,7 +1424,7 @@ pub async fn run() {
         .merge(user_management_routes::routes())
         .merge(wedding_vendor_search_routes::routes())
         .merge(wedding_vendor_outreach_routes::routes())
-        .merge(wedding_invite_proposal_routes::routes())
+        .merge(wedding_invite_proposal_routes::routes()).merge(wedding_invite_proposal_opportunity_routes::routes())
         .merge(wedding_preference_routes::routes())
         .merge(wedding_rsvp_capability_routes::routes())
         .merge(wedding_rsvp_reminder_routes::routes())
@@ -1585,7 +1585,7 @@ pub async fn build_test_router(database_url: &str) -> Router {
         .merge(wedding_boundary_routes::routes())
         .merge(wedding_runsheet_projection_routes::routes())
         .merge(wedding_runsheet_share_routes::routes())
-        .merge(wedding_invite_proposal_routes::routes())
+        .merge(wedding_invite_proposal_routes::routes()).merge(wedding_invite_proposal_opportunity_routes::routes())
         .merge(planning_constraint_routes::routes()).merge(planning_constraint_capture_routes::routes()).merge(planning_constraint_evaluation_routes::routes()).merge(planning_constraint_intervention_routes::routes()).merge(planning_cost_tradeoff_routes::routes()).merge(planning_directory_evaluation_routes::routes()).merge(planning_milestone_routes::routes()).merge(planning_vendor_change_routes::routes())
         .layer(cors_layer())
         .layer(axum::middleware::from_fn(request_id_middleware))

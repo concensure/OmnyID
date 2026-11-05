@@ -1,31 +1,31 @@
-// @locs-version: 1.0
-import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
+// @locs-version: 2.0
+import { createEffect, createMemo, createResource, createSignal, For, Show } from "solid-js";
 
 import type { WeddingResponseWorkspaceViewProps } from "@/components/WeddingResponseWorkspaceViewTypes";
-import { recordWeddingVendorContact } from "@/lib/api";
-import { friendlyErrorText } from "@/lib/visibleErrorText";
 import {
-  approveAndSendWeddingInviteProposal,
-} from "@/lib/weddingInviteProposalApi";
-import type { WeddingWorkspaceArtifactPreview } from "@/lib/weddingResponseWorkspaceViewState";
+  buildWeddingBudgetAllocationProjectionInput,
+  emptyWeddingBudgetAllocationDraft,
+  WEDDING_BUDGET_AUTO_BALANCE_CATEGORY_ID,
+  WEDDING_BUDGET_CATEGORIES,
+  withWeddingBudgetAutoBalance,
+  type WeddingBudgetCategoryId,
+} from "@/lib/weddingBudgetAllocationState";
+import { weddingDecisionProjectionToAfpSendInput } from "@/lib/weddingDecisionAfpProjectionState";
 import {
-  approveWeddingInviteProposalBatch,
-  buildWeddingInviteProposalBatch,
-  type WeddingInviteProposalBatchItem,
-} from "@/lib/weddingInviteProposalBatchState";
+  closeWeddingProposalOpportunity,
+  createWeddingProposalShareLink,
+  loadWeddingProposalOpportunities,
+  publishWeddingProposalOpportunity,
+  type WeddingProposalOpportunity,
+} from "@/lib/weddingInviteProposalOpportunityApi";
 import {
   buildWeddingInviteProposalBrief,
   defaultWeddingInviteProposalSharing,
-  validateWeddingInviteProposalDraft,
-  weddingInviteProposalDraftToAfpSendInput,
-  WEDDING_INVITE_PROPOSAL_RECIPIENT_LIMIT,
   type WeddingInviteProposalSharing,
 } from "@/lib/weddingInviteProposalState";
-import {
-  weddingVendorOutreachDraftAfpSendInput,
-  weddingVendorOutreachSentAfpSendInput,
-  weddingVendorOutreachThreadId,
-} from "@/lib/weddingVendorOutreachAfpState";
+import { weddingNeedToKnowContextToAfpSendInput } from "@/lib/weddingNeedToKnowAfpProjectionState";
+import type { WeddingPlanningContext } from "@/lib/weddingNeedToKnowProbingState";
+import type { WeddingWorkspaceArtifactPreview } from "@/lib/weddingResponseWorkspaceViewState";
 
 const SHARE_OPTIONS: ReadonlyArray<{ key: keyof WeddingInviteProposalSharing; label: string }> = [
   { key: "dateOrSeason", label: "Wedding date or season" },
@@ -36,240 +36,274 @@ const SHARE_OPTIONS: ReadonlyArray<{ key: keyof WeddingInviteProposalSharing; la
   { key: "phoneContact", label: "Allow phone contact" },
 ];
 
-function budgetLabel(amount: number, currency: string): string {
-  return amount.toLocaleString("en-AU", { style: "currency", currency, maximumFractionDigits: 0 });
+const CATEGORY_OPTIONS = [
+  "Wedding venues", "Wedding photographers", "Wedding videographers", "Wedding celebrants",
+  "Wedding catering", "Wedding bands and DJs", "Wedding florists", "Wedding planners", "Wedding cakes",
+] as const;
+
+type FactEditor = "date" | "location" | "guests" | "budget" | null;
+const clean = (value: unknown) => typeof value === "string" ? value.trim() : "";
+const money = (amount: number, currency: string) => amount.toLocaleString("en-AU", {
+  style: "currency", currency, maximumFractionDigits: 0,
+});
+
+function budgetCategory(category: string | null): WeddingBudgetCategoryId | null {
+  const value = clean(category).toLowerCase();
+  if (/venue|ceremony/.test(value)) return "venue_ceremony";
+  if (/photo|video/.test(value)) return "photo_video";
+  if (/music|band|dj|entertain/.test(value)) return "entertainment_music";
+  if (/flower|decor|styling/.test(value)) return "flowers_decor";
+  if (/cater|food|drink/.test(value)) return "catering_drinks";
+  if (/cake/.test(value)) return "other_misc";
+  return null;
 }
 
 export function WeddingInviteProposalsPanel(props: {
   workspace: WeddingResponseWorkspaceViewProps;
   preview: WeddingWorkspaceArtifactPreview | null;
-  onFindVendors: () => void;
+  selectedCategory?: string | null;
+  onSelectedCategoryChange?: (category: string) => void;
 }) {
+  const [category, setCategory] = createSignal(props.selectedCategory ?? props.preview?.category ?? "");
   const brief = createMemo(() => buildWeddingInviteProposalBrief({
-    state: props.workspace.state,
-    preview: props.preview,
-    vendorDirectory: props.workspace.weddingVendorDirectory,
+    state: props.workspace.state, preview: props.preview,
+    vendorDirectory: props.workspace.weddingVendorDirectory, category: category(),
   }));
   const [requestText, setRequestText] = createSignal(props.workspace.vendorSearchQuery?.trim() ?? "");
-  const [selectedIds, setSelectedIds] = createSignal<string[]>([]);
   const [sharing, setSharing] = createSignal(defaultWeddingInviteProposalSharing(brief()));
-  const [saving, setSaving] = createSignal(false);
-  const [sending, setSending] = createSignal(false);
-  const [reviewing, setReviewing] = createSignal(false);
+  const [factEditor, setFactEditor] = createSignal<FactEditor>(null);
+  const [factValue, setFactValue] = createSignal("");
+  const [busy, setBusy] = createSignal(false);
   const [notice, setNotice] = createSignal<string | null>(null);
+  const [publishedId, setPublishedId] = createSignal<string | null>(null);
+  const [shareUrl, setShareUrl] = createSignal<string | null>(null);
+  const [opportunities, { refetch }] = createResource(loadWeddingProposalOpportunities);
   let previousBriefId = "";
 
+  createEffect(() => {
+    if (props.selectedCategory && props.selectedCategory !== category()) setCategory(props.selectedCategory);
+  });
   createEffect(() => {
     const current = brief();
     if (current.id === previousBriefId) return;
     previousBriefId = current.id;
     setSharing(defaultWeddingInviteProposalSharing(current));
-    setSelectedIds([]);
   });
 
-  const selectedRecipients = createMemo(() => brief().recipients.filter((item) => selectedIds().includes(item.choiceId)));
-  const validation = createMemo(() => validateWeddingInviteProposalDraft({
-    brief: brief(), requestText: requestText(), recipientChoiceIds: selectedIds(),
-  }));
-  const reviewItems = createMemo(() => buildWeddingInviteProposalBatch({
-    brief: brief(),
-    requestText: requestText(),
-    selectedChoiceIds: selectedIds(),
-    sharing: sharing(),
-  }));
+  const sharedContext = () => ({
+    date_or_season: sharing().dateOrSeason ? brief().dateOrSeason : null,
+    location: sharing().location ? brief().location : null,
+    guest_count: sharing().guestCount ? brief().guestCount : null,
+    style_priorities: sharing().stylePriorities ? brief().stylePriorities : [],
+    approximate_category_budget: sharing().approximateCategoryBudget ? brief().approximateCategoryBudget : null,
+    allow_phone_contact: sharing().phoneContact,
+  });
 
-  function toggleRecipient(choiceId: string) {
+  function chooseCategory(value: string) {
+    setCategory(value);
+    props.onSelectedCategoryChange?.(value);
     setNotice(null);
-    setReviewing(false);
-    setSelectedIds((current) => {
-      if (current.includes(choiceId)) return current.filter((id) => id !== choiceId);
-      if (current.length >= WEDDING_INVITE_PROPOSAL_RECIPIENT_LIMIT) {
-        setNotice(`Choose up to ${WEDDING_INVITE_PROPOSAL_RECIPIENT_LIMIT} vendors for one invitation.`);
-        return current;
-      }
-      return [...current, choiceId];
-    });
   }
 
-  async function saveDraft() {
-    const error = validation();
-    if (error || !props.workspace.saveProjection || saving()) {
-      setNotice(error ?? "Saving is not connected in this view.");
-      return;
+  function currentPlanningContext(): WeddingPlanningContext {
+    const cards = props.workspace.state.contextCards;
+    const value = <K extends keyof WeddingPlanningContext>(key: K) =>
+      cards.map((card) => card.planningContext?.[key]).find((candidate) => (
+        Array.isArray(candidate) ? candidate.length > 0 : typeof candidate === "number" || Boolean(clean(candidate))
+      ));
+    return {
+      dateOrSeason: brief().dateOrSeason,
+      location: value("location") as string | null | undefined,
+      guestCount: value("guestCount") as number | string | null | undefined,
+      budgetComfort: value("budgetComfort") as string | null | undefined,
+      topPriorities: value("topPriorities") as readonly string[] | null | undefined,
+      atmosphereDescription: value("atmosphereDescription") as string | null | undefined,
+      inspirationImageUrls: value("inspirationImageUrls") as readonly string[] | null | undefined,
+      familyOrStakeholderRoles: value("familyOrStakeholderRoles") as string | null | undefined,
+    };
+  }
+
+  async function saveContextFact(kind: "location" | "guests") {
+    if (!props.workspace.saveProjection || busy()) return;
+    const value = factValue().trim();
+    if (!value) { setNotice("Add a value before saving."); return; }
+    const planning = currentPlanningContext();
+    if (kind === "location") planning.location = value;
+    else {
+      const numeric = Number.parseInt(value, 10);
+      if (!Number.isInteger(numeric) || numeric < 1 || numeric > 10_000) {
+        setNotice("Enter a guest count between 1 and 10,000.");
+        return;
+      }
+      planning.guestCount = numeric;
     }
-    setSaving(true);
-    setNotice(null);
+    setBusy(true);
     try {
-      await props.workspace.saveProjection(weddingInviteProposalDraftToAfpSendInput({
-        brief: brief(), requestText: requestText(), recipientChoiceIds: selectedIds(),
-        sharing: sharing(), metadata: props.workspace.state.workspace.metadata,
+      await props.workspace.saveProjection(weddingNeedToKnowContextToAfpSendInput({
+        metadata: props.workspace.state.workspace.metadata, planningContext: planning,
+        answeredLabels: [
+          planning.dateOrSeason ? `Date: ${planning.dateOrSeason}` : "",
+          planning.location ? `Location: ${planning.location}` : "",
+          planning.guestCount ? `Guests: ${planning.guestCount}` : "",
+        ].filter(Boolean),
+        nextQuestionLabel: "Continue planning from these shared wedding details.",
+        readyForFirstRecommendations: Boolean(planning.location && planning.guestCount),
       }));
-      setNotice("Private draft saved. No vendor has been contacted.");
+      setNotice(kind === "location" ? "Wedding location updated." : "Guest count updated.");
+      setFactEditor(null);
       props.workspace.onRefreshWorkspace?.();
-    } catch {
-      setNotice("We couldn't save this draft. Check your connection and try again.");
-    } finally {
-      setSaving(false);
-    }
+    } catch { setNotice("That wedding detail could not be saved. Try again."); }
+    finally { setBusy(false); }
   }
 
-  function existingExactDraftId(item: WeddingInviteProposalBatchItem): string | null {
-    const messages = [...props.workspace.state.afpMessages].reverse();
-    const match = messages.find((message) => {
-      if ((message.kind ?? message.subtype) !== "wedding_vendor_outreach_draft") return false;
-      const content = message.content ?? {};
-      return content.choice_id === item.choiceId
-        && content.vendor_id === item.vendorId
-        && content.to === item.recipientEmail
-        && content.subject === item.flow.subject
-        && content.text === item.flow.bodyMarkdown;
-    });
-    return match?.id ?? null;
+  async function saveDate() {
+    if (!props.workspace.onSaveWeddingDate || busy() || !/^\d{4}-\d{2}-\d{2}$/.test(factValue())) return;
+    setBusy(true);
+    try {
+      await props.workspace.onSaveWeddingDate(factValue());
+      setNotice("Wedding date updated.");
+      setFactEditor(null);
+      props.workspace.onRefreshWorkspace?.();
+    } catch { setNotice("That wedding date could not be saved. Try again."); }
+    finally { setBusy(false); }
   }
 
-  async function approveAndSend() {
-    const error = validation();
-    if (error || !props.workspace.saveProjection || sending()) {
-      setNotice(error ?? "Sending is not connected in this view.");
+  async function saveBudget() {
+    if (!props.workspace.saveProjection || busy()) return;
+    const target = budgetCategory(category());
+    const amount = Number.parseInt(factValue(), 10);
+    const total = props.workspace.state.budgetTracking.budgetTargetAmount ?? 0;
+    if (!target || !Number.isInteger(amount) || amount < 0 || total <= 0) {
+      setNotice(total <= 0 ? "Set the total wedding budget first." : "Enter a valid category budget.");
       return;
     }
-    setSending(true);
-    setNotice(null);
+    const draft = emptyWeddingBudgetAllocationDraft("AUD");
+    draft.totalAmount = total;
+    for (const item of props.workspace.state.budgetTracking.budgetAllocation) draft.categoryAmounts[item.categoryId] = item.amount;
+    draft.categoryAmounts[target] = amount;
+    const nonBalanceTotal = WEDDING_BUDGET_CATEGORIES
+      .filter((item) => item.id !== WEDDING_BUDGET_AUTO_BALANCE_CATEGORY_ID)
+      .reduce((sum, item) => sum + draft.categoryAmounts[item.id], 0);
+    if (nonBalanceTotal > total) { setNotice("That category would exceed the total budget."); return; }
+    const balanced = withWeddingBudgetAutoBalance(draft);
+    setBusy(true);
     try {
-      const metadata = props.workspace.state.workspace.metadata;
-      const items = reviewItems();
-      const draftIds: string[] = [];
-      for (const item of items) {
-        const existingId = existingExactDraftId(item);
-        if (existingId) {
-          draftIds.push(existingId);
-          continue;
-        }
-        const projection = weddingVendorOutreachDraftAfpSendInput({
-          flow: item.flow,
-          metadata,
-          sourceArtifactId: brief().sourceArtifactId,
-          vendorId: item.vendorId,
-        });
-        if (!projection.id) throw new Error("The saved invitation draft has no stable message reference.");
-        await props.workspace.saveProjection(projection);
-        draftIds.push(projection.id);
-      }
-      const result = await approveAndSendWeddingInviteProposal({
-        wedding_plan_id: metadata.weddingPlanId,
-        brief_id: brief().id,
-        revision: 1,
-        category: brief().category ?? "",
-        location: brief().location,
-        draft_message_ids: draftIds,
-      });
-      const approvedItems = approveWeddingInviteProposalBatch(items);
-      for (const delivery of result.deliveries.filter((item) => item.status === "provider_accepted")) {
-        const item = approvedItems.find((candidate) => candidate.vendorId === delivery.vendorId);
-        if (!item) continue;
-        await props.workspace.saveProjection(weddingVendorOutreachSentAfpSendInput({
-          flow: item.flow,
-          metadata,
-          draftMessageId: delivery.draftMessageId,
-          providerReceipt: {
-            providerMessageId: delivery.providerMessageId,
-            clientMessageId: delivery.clientMessageId,
-          },
-          vendorId: item.vendorId,
-        }));
-        try {
-          await recordWeddingVendorContact(item.vendorId, {
-            contact_method: "agent_email_draft",
-            thread_id: weddingVendorOutreachThreadId({
-              responseWorkspaceId: metadata.responseWorkspaceId,
-              choiceId: item.choiceId,
-            }),
-            receipt_ref: delivery.clientMessageId,
-            follow_up_due_at: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
-          });
-        } catch {
-          // The durable sent AFP record is authoritative; contact scheduling can
-          // reproject on refresh if this secondary index is briefly unavailable.
-        }
-      }
-      const failed = result.deliveries.filter((item) => item.status === "failed").length;
-      setNotice(failed > 0
-        ? `${result.deliveries.length - failed} invitation${result.deliveries.length - failed === 1 ? "" : "s"} accepted by the provider; ${failed} still need retrying.`
-        : `${result.deliveries.length} invitation${result.deliveries.length === 1 ? "" : "s"} accepted by the provider. Delivery and replies are tracked separately.`);
+      const projection = buildWeddingBudgetAllocationProjectionInput(balanced, props.workspace.state.workspace.metadata);
+      await props.workspace.saveProjection(weddingDecisionProjectionToAfpSendInput(projection));
+      setNotice("Category budget updated; the remaining amount was rebalanced in Other.");
+      setFactEditor(null);
       props.workspace.onRefreshWorkspace?.();
-    } catch (caught) {
-      setNotice(friendlyErrorText(caught, "The invitation batch could not be sent. Your saved drafts are unchanged."));
-    } finally {
-      setSending(false);
-    }
+    } catch { setNotice("That category budget could not be saved. Try again."); }
+    finally { setBusy(false); }
   }
+
+  function openFact(kind: Exclude<FactEditor, null>, current: string | null) {
+    setFactEditor(kind); setFactValue(current ?? ""); setNotice(null);
+  }
+
+  async function publish() {
+    if (busy()) return;
+    if (!category().trim()) { setNotice("Choose the vendor category first."); return; }
+    if (!requestText().trim()) { setNotice("Add a short proposal brief first."); return; }
+    setBusy(true); setNotice(null);
+    try {
+      const result = await publishWeddingProposalOpportunity({
+        wedding_plan_id: props.workspace.state.workspace.metadata.weddingPlanId,
+        response_workspace_id: props.workspace.state.workspace.metadata.responseWorkspaceId,
+        brief_id: brief().id, category: category(), location: brief().location,
+        brief_text: requestText().trim(), shared_context: sharedContext(),
+      });
+      setPublishedId(result.opportunityId);
+      setNotice("Proposal opportunity published. No vendor was contacted.");
+      await refetch();
+    } catch { setNotice("The proposal opportunity could not be published. Your brief is unchanged."); }
+    finally { setBusy(false); }
+  }
+
+  async function createLink() {
+    const id = publishedId() ?? opportunities()?.[0]?.opportunityId;
+    if (!id || busy()) { setNotice("Publish the opportunity before creating a private link."); return; }
+    setBusy(true);
+    try {
+      const result = await createWeddingProposalShareLink(id);
+      setShareUrl(result.url);
+      setNotice("Secure link created. It expires in 14 days and is excluded from search engines.");
+      await refetch();
+    } catch { setNotice("The secure vendor link could not be created."); }
+    finally { setBusy(false); }
+  }
+
+  async function closeOpportunity(item: WeddingProposalOpportunity) {
+    if (busy() || item.status !== "open") return;
+    if (!window.confirm("Close this proposal opportunity? Existing vendor links will stop working and vendors will no longer be able to reply.")) return;
+    setBusy(true);
+    try {
+      await closeWeddingProposalOpportunity(item.opportunityId);
+      if (publishedId() === item.opportunityId) setPublishedId(null);
+      setShareUrl(null);
+      setNotice("Proposal opportunity closed and its secure vendor links were revoked.");
+      await refetch();
+    } catch { setNotice("The proposal opportunity could not be closed."); }
+    finally { setBusy(false); }
+  }
+
+  const factRows = () => [
+    { id: "date" as const, label: "Date", value: brief().dateOrSeason, editable: Boolean(props.workspace.onSaveWeddingDate) },
+    { id: "location" as const, label: "Location", value: brief().location, editable: Boolean(props.workspace.saveProjection) },
+    { id: "guests" as const, label: "Guests", value: brief().guestCount, editable: Boolean(props.workspace.saveProjection) },
+    { id: "budget" as const, label: "Category budget", value: brief().approximateCategoryBudget ? money(brief().approximateCategoryBudget!.amount, brief().approximateCategoryBudget!.currency) : null, editable: Boolean(props.workspace.saveProjection) },
+  ];
 
   return (
-    <section id="wedding-vendor-panel-invite" role="tabpanel" aria-labelledby="wedding-vendor-tab-invite" class="mt-4">
+    <section id="wedding-vendor-panel-invite" role="tabpanel" aria-labelledby="wedding-vendor-tab-invite" class="-mx-3 mt-4 min-w-0 sm:mx-0">
       <div class="rounded-xl border border-wedding-border bg-wedding-page p-3 sm:p-4">
         <p class="font-display text-xl font-semibold text-wedding-ink">Invite vendors to propose</p>
-        <p class="mt-1 text-sm leading-6 text-wedding-ink/70">Prepare one private brief, choose who may receive it, then review the exact invitation before anything is sent.</p>
+        <p class="mt-1 text-sm leading-6 text-wedding-ink/70">Publish one private category brief. Claimed matching vendors can respond, or you can share a secure expiring link with an unclaimed vendor.</p>
       </div>
-
-      <div class="mt-3 grid gap-3 lg:grid-cols-2">
-        <section class="rounded-xl border border-wedding-border bg-white p-3" aria-labelledby="proposal-brief-heading">
-          <h3 id="proposal-brief-heading" class="font-semibold text-wedding-ink">Your proposal brief</h3>
-          <label class="mt-3 block text-sm font-semibold text-wedding-ink">
-            What should vendors propose?
-            <textarea value={requestText()} onInput={(event) => setRequestText(event.currentTarget.value)} rows={4} class="mt-1 w-full rounded-lg border border-wedding-border bg-white p-3 text-base font-normal leading-6 outline-none focus:border-wedding-primary focus:ring-4 focus:ring-wedding-primary/15" placeholder="For example: a photography package covering preparation through speeches" />
-          </label>
-          <dl class="mt-3 grid gap-2 text-sm sm:grid-cols-2">
-            <For each={[
-              ["Category", brief().category], ["Date", brief().dateOrSeason],
-              ["Location", brief().location], ["Guests", brief().guestCount],
-              ["Category budget", brief().approximateCategoryBudget ? budgetLabel(brief().approximateCategoryBudget!.amount, brief().approximateCategoryBudget!.currency) : null],
-            ] as const}>{(item) => <div class="rounded-lg bg-wedding-slate p-2"><dt class="text-xs font-semibold uppercase tracking-wide text-wedding-ink/55">{item[0]}</dt><dd class="mt-1 break-words text-wedding-ink">{item[1] ?? "Not added yet"}</dd></div>}</For>
-          </dl>
-          <Show when={brief().missingFacts.length > 0}><p class="mt-3 text-xs leading-5 text-wedding-ink/70">Still useful to add: {brief().missingFacts.join(", ")}.</p></Show>
-        </section>
-
-        <section class="rounded-xl border border-wedding-border bg-white p-3" aria-labelledby="proposal-recipients-heading">
-          <h3 id="proposal-recipients-heading" class="font-semibold text-wedding-ink">Choose recipients</h3>
-          <p class="mt-1 text-xs leading-5 text-wedding-ink/65">Choose up to five vendors from this wedding's current comparison. Each eventual invitation keeps its own private thread.</p>
-          <Show when={brief().recipients.length > 0} fallback={<div class="mt-3 rounded-lg bg-wedding-slate p-3 text-sm text-wedding-ink/70">Find and compare vendors first, then return here to choose recipients.<button type="button" class="mt-2 block min-h-11 rounded-lg border border-wedding-secondary bg-white px-3 font-semibold text-wedding-secondary" onClick={props.onFindVendors}>Find vendors</button></div>}>
-            <div class="mt-3 grid gap-2"><For each={brief().recipients}>{(vendor) => <label class={`flex min-h-12 items-start gap-3 rounded-lg border p-3 text-sm ${vendor.eligible ? "border-wedding-border text-wedding-ink" : "border-wedding-border bg-wedding-slate text-wedding-ink/65"}`}><input type="checkbox" checked={selectedIds().includes(vendor.choiceId)} disabled={!vendor.eligible} onChange={() => toggleRecipient(vendor.choiceId)} class="mt-0.5 h-5 w-5 accent-wedding-primary disabled:cursor-not-allowed" /><span class="min-w-0"><span class="block break-words font-semibold">{vendor.vendorName}</span><span class="block text-xs text-wedding-ink/60">{vendor.category ?? "Vendor"} · {vendor.eligibilityLabel}</span><span class="mt-1 block text-xs leading-5 text-wedding-ink/60">{vendor.eligibilityReason}</span></span></label>}</For></div>
-          </Show>
-        </section>
-      </div>
-
+      <section class="mt-3 rounded-xl border border-wedding-border bg-white p-3" aria-labelledby="proposal-brief-heading">
+        <h3 id="proposal-brief-heading" class="font-semibold text-wedding-ink">Your proposal brief</h3>
+        <label class="mt-3 block text-sm font-semibold text-wedding-ink">Vendor category
+          <select value={category()} onChange={(event) => chooseCategory(event.currentTarget.value)} class="mt-1 min-h-11 w-full rounded-lg border border-wedding-border bg-white px-3 text-base font-normal">
+            <option value="">Choose a category</option>
+            <For each={CATEGORY_OPTIONS}>{(item) => <option value={item}>{item}</option>}</For>
+          </select>
+        </label>
+        <textarea aria-label="Proposal brief" value={requestText()} onInput={(event) => setRequestText(event.currentTarget.value)} rows={4} class="mt-3 w-full rounded-lg border border-wedding-border bg-white p-3 text-base leading-6 outline-none focus:border-wedding-primary focus:ring-4 focus:ring-wedding-primary/15" placeholder="For example: a photography package covering preparation through speeches" />
+        <dl class="mt-3 grid gap-2 sm:grid-cols-2">
+          <For each={factRows()}>{(item) => <button type="button" disabled={!item.editable} onClick={() => openFact(item.id, item.id === "budget" ? String(brief().approximateCategoryBudget?.amount ?? "") : item.value)} class="min-h-16 rounded-lg bg-wedding-slate p-3 text-left disabled:cursor-default">
+            <dt class="text-xs font-semibold uppercase tracking-wide text-wedding-ink/55">{item.label}</dt>
+            <dd class="mt-1 break-words text-sm font-semibold text-wedding-ink">{item.value ?? "Not added yet"}</dd>
+            <span class="mt-1 block text-xs text-wedding-secondary">{item.value ? "Change here" : "Add here"}</span>
+          </button>}</For>
+        </dl>
+        <Show when={factEditor()}>
+          <div class="mt-3 rounded-xl border border-wedding-primary/30 bg-wedding-page p-3">
+            <label class="text-sm font-semibold text-wedding-ink">
+              {factEditor() === "date" ? "Wedding date" : factEditor() === "location" ? "Wedding location" : factEditor() === "guests" ? "Guest count" : "Category budget"}
+              <input type={factEditor() === "date" ? "date" : factEditor() === "location" ? "text" : "number"} min={factEditor() === "guests" ? "1" : "0"} value={factValue()} onInput={(event) => setFactValue(event.currentTarget.value)} class="mt-1 min-h-11 w-full rounded-lg border border-wedding-border bg-white px-3 text-base" />
+            </label>
+            <div class="mt-3 flex flex-wrap gap-2">
+              <button type="button" disabled={busy()} onClick={() => void (factEditor() === "date" ? saveDate() : factEditor() === "location" ? saveContextFact("location") : factEditor() === "guests" ? saveContextFact("guests") : saveBudget())} class="min-h-11 rounded-lg bg-wedding-primary px-4 text-sm font-bold text-white disabled:opacity-50">Save</button>
+              <button type="button" onClick={() => setFactEditor(null)} class="min-h-11 rounded-lg border border-wedding-border bg-white px-4 text-sm font-semibold">Cancel</button>
+            </div>
+          </div>
+        </Show>
+      </section>
       <section class="mt-3 rounded-xl border border-wedding-border bg-white p-3" aria-labelledby="proposal-sharing-heading">
-        <h3 id="proposal-sharing-heading" class="font-semibold text-wedding-ink">Preview what may be shared</h3>
-        <p class="mt-1 text-xs leading-5 text-wedding-ink/65">Budget and phone contact stay off unless you choose them. Saving this draft does not send it.</p>
+        <h3 id="proposal-sharing-heading" class="font-semibold text-wedding-ink">Choose what vendors can see</h3>
+        <p class="mt-1 text-xs leading-5 text-wedding-ink/65">Budget and phone contact stay off unless you choose them. Publishing does not send an enquiry.</p>
         <div class="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3"><For each={SHARE_OPTIONS}>{(option) => <label class="flex min-h-11 items-center gap-2 rounded-lg bg-wedding-slate px-3 py-2 text-sm text-wedding-ink"><input type="checkbox" checked={sharing()[option.key]} onChange={(event) => setSharing((current) => ({ ...current, [option.key]: event.currentTarget.checked }))} class="h-5 w-5 accent-wedding-primary" />{option.label}</label>}</For></div>
-        <Show when={selectedRecipients().length > 0}><p class="mt-3 text-xs text-wedding-ink/70">Intended recipients: {selectedRecipients().map((item) => item.vendorName).join(", ")}.</p></Show>
         <div class="mt-4 flex flex-wrap items-center gap-3">
-          <button type="button" disabled={saving() || Boolean(validation()) || !props.workspace.saveProjection} class="min-h-11 rounded-lg bg-wedding-primary px-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-45" onClick={() => void saveDraft()}>{saving() ? "Saving…" : "Save private draft"}</button>
-          <button type="button" disabled={Boolean(validation())} class="min-h-11 rounded-lg border border-wedding-secondary bg-white px-4 text-sm font-bold text-wedding-secondary disabled:cursor-not-allowed disabled:opacity-45" aria-expanded={reviewing()} aria-controls="wedding-proposal-exact-preview" onClick={() => { setNotice(null); setReviewing((value) => !value); }}>{reviewing() ? "Hide invitation preview" : "Review exact invitations"}</button>
-          <p class="text-xs leading-5 text-wedding-ink/65">Sending will use the existing review-and-approve enquiry step.</p>
+          <button type="button" disabled={busy()} onClick={() => void publish()} class="min-h-11 rounded-lg bg-wedding-primary px-4 text-sm font-bold text-white disabled:opacity-50">{busy() ? "Saving…" : "Publish opportunity"}</button>
+          <button type="button" disabled={busy() || (!publishedId() && !(opportunities()?.length))} onClick={() => void createLink()} class="min-h-11 rounded-lg border border-wedding-secondary bg-white px-4 text-sm font-bold text-wedding-secondary disabled:opacity-45">Create secure vendor link</button>
         </div>
+        <Show when={shareUrl()}>{(url) => <div class="mt-3 rounded-lg bg-wedding-slate p-3"><p class="text-xs font-semibold text-wedding-ink">Private vendor link</p><div class="mt-2 flex flex-col gap-2 sm:flex-row"><input readonly value={url()} class="min-h-11 min-w-0 flex-1 rounded-lg border border-wedding-border bg-white px-3 text-sm" /><button type="button" class="min-h-11 rounded-lg border border-wedding-secondary bg-white px-3 text-sm font-semibold" onClick={() => void navigator.clipboard.writeText(url())}>Copy link</button></div></div>}</Show>
         <Show when={notice()}>{(message) => <p class="mt-3 rounded-lg border border-wedding-border bg-wedding-page p-2 text-sm text-wedding-ink" role="status" aria-live="polite">{message()}</p>}</Show>
       </section>
-      <Show when={reviewing()}>
-        <section id="wedding-proposal-exact-preview" class="mt-3 rounded-xl border border-wedding-border bg-white p-3" aria-labelledby="wedding-proposal-preview-heading">
-          <h3 id="wedding-proposal-preview-heading" class="font-semibold text-wedding-ink">Review every recipient and message</h3>
-          <p class="mt-1 text-xs leading-5 text-wedding-ink/65">These are separate private vendor threads. Reviewing does not send them, and editing the brief or sharing choices requires another review.</p>
-          <div class="mt-3 grid gap-3">
-            <For each={reviewItems()}>{(item, index) => <article class="rounded-lg border border-wedding-border bg-wedding-page p-3" aria-labelledby={`wedding-proposal-preview-${index()}`}>
-              <h4 id={`wedding-proposal-preview-${index()}`} class="font-semibold text-wedding-ink">{item.vendorName}</h4>
-              <p class="mt-1 break-all text-xs text-wedding-ink/65">To: {item.recipientEmail}</p>
-              <p class="mt-3 text-xs font-semibold uppercase tracking-wide text-wedding-ink/55">Subject</p>
-              <p class="mt-1 text-sm text-wedding-ink">{item.flow.subject}</p>
-              <p class="mt-3 text-xs font-semibold uppercase tracking-wide text-wedding-ink/55">Message</p>
-              <div class="mt-1 whitespace-pre-wrap text-sm leading-6 text-wedding-ink">{item.flow.bodyMarkdown}</div>
-            </article>}</For>
-          </div>
-          <div class="mt-4 rounded-lg bg-wedding-slate p-3 text-sm leading-6 text-wedding-ink/75">
-            <strong class="text-wedding-ink">No invitation has been sent.</strong> The final action will recheck each vendor on the server and ask for one explicit approval for this exact batch revision.
-          </div>
-          <div class="mt-4 flex flex-wrap items-center gap-3">
-            <button type="button" class="min-h-11 rounded-lg bg-wedding-primary px-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-45" disabled={sending() || reviewItems().length === 0 || !props.workspace.saveProjection} onClick={() => void approveAndSend()}>{sending() ? "Sending approved invitations…" : `Approve and send ${reviewItems().length} invitation${reviewItems().length === 1 ? "" : "s"}`}</button>
-            <p class="text-xs leading-5 text-wedding-ink/65">One approval applies only to the recipients and exact messages shown above.</p>
-          </div>
+      <Show when={(opportunities()?.length ?? 0) > 0}>
+        <section class="mt-3 rounded-xl border border-wedding-border bg-white p-3" aria-labelledby="proposal-open-heading">
+          <h3 id="proposal-open-heading" class="font-semibold text-wedding-ink">Your proposal opportunities</h3>
+          <div class="mt-3 grid gap-2"><For each={opportunities()}>{(item) => <article class="rounded-lg bg-wedding-slate p-3"><div class="flex flex-wrap items-start justify-between gap-2"><div><p class="font-semibold text-wedding-ink">{item.category}</p><p class="mt-1 text-xs text-wedding-ink/65">{item.location ?? "Location not shared"} · {item.status === "open" ? `expires ${new Date(item.expiresAt).toLocaleDateString()}` : "closed"}</p></div><span class="rounded-full bg-white px-2 py-1 text-xs font-semibold">{item.responseCount} proposal{item.responseCount === 1 ? "" : "s"}</span></div><p class="mt-2 text-xs text-wedding-ink/65">{item.claimedVendorViewCount} claimed-vendor views · {item.shareCount} secure links created</p><Show when={item.status === "open"}><button type="button" disabled={busy()} onClick={() => void closeOpportunity(item)} class="mt-3 min-h-11 rounded-lg border border-wedding-secondary bg-white px-3 text-sm font-semibold text-wedding-secondary disabled:opacity-50">Close and revoke links</button></Show></article>}</For></div>
         </section>
       </Show>
     </section>

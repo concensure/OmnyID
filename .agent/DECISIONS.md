@@ -2824,3 +2824,19 @@ subjective usability or a controlled external cohort.
   whether to gather more evidence; it never declares suitability, availability or verification.
 - Vendor source verification and couple suitability remain separate. New directory records are
   unclaimed and carry explicit pricing, availability and package caveats until vendors confirm them.
+
+# 2026-11-05 - WED-338 Invite Proposals publishes a category opportunity, not a recipient batch
+
+- The Wedding Home Invite Proposals mode no longer asks the couple to choose recipients. It
+  publishes a category and service-area opportunity. Only authenticated vendors with a verified,
+  active claimed listing in that category can discover it; publication is not an enquiry or send.
+- Publishing and closing are tenant-private AFP lifecycle events. The global opportunity, grant,
+  response-fingerprint and aggregate-event tables are operational routing projections, not a
+  parallel wedding ledger. Accepted proposal content is written only to the couple's private AFP
+  schema and reuses the Documents projection.
+- An unclaimed vendor gets a 256-bit bearer capability whose plaintext is returned once and never
+  stored. Its digest expires after 14 days, responses are replay-suppressed, public responses are
+  no-store/no-referrer/noindex, and closing an opportunity atomically revokes every grant.
+- Admin visibility is category-level counts only: open opportunities, replies, unique claimed-
+  vendor views and links created. Couple identity, brief text, response bodies and capability
+  values are excluded from the operator rollup.
