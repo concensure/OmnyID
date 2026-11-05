@@ -27,8 +27,8 @@ Depends on: IP-00
 - [x] Mark the saved event `pending_user_approval` and `external_action: false`.
 - [x] Include source references plus A2UI and Markdown views without secrets.
 - [x] Test known facts, privacy defaults, unknown recipients and the cap.
-- [ ] Add a server-side tenant-scope rejection test when the draft route gains
-  an external-recipient transition.
+- [x] Add a server-side tenant-scope rejection test for the external-recipient
+  transition.
 
 Acceptance: building/saving a brief cannot contact a vendor or mark one
 Enquired.
@@ -58,11 +58,12 @@ Depends on: IP-01, IP-02
   referral-capable vendor and ineligible vendor.
 - [x] Enforce category/service-area compatibility and suppression/opt-out.
 - [x] Return user-facing exclusion reasons without leaking internal policy.
-- [ ] Add per-wedding, vendor and destination rate limits.
+- [x] Add per-wedding, vendor and destination rate limits. Preview is free;
+  only a new approved fingerprint consumes quota.
 
-Current boundary: the UI policy fails closed and prevents ineligible vendors
-from entering a draft selection. The eventual external transition must re-run
-the same checks server-side and add the rate limits before IP-03 is complete.
+Current boundary: the UI policy fails closed and the approval route re-runs the
+same tenant, listing, category, service-area, suppression and channel checks on
+the server before any external transition.
 
 Acceptance: only eligible vendors can enter an approval request; exclusion is
 honest and inspectable.
@@ -71,13 +72,13 @@ honest and inspectable.
 
 Depends on: IP-03
 
-- [ ] Convert each selected recipient to the existing vendor outreach draft.
-- [ ] Reuse the current permissions fingerprint and exact-content preview.
-- [ ] Require one explicit approval for the displayed batch revision while
+- [x] Convert each selected recipient to the existing vendor outreach draft.
+- [x] Reuse the current permissions fingerprint and exact-content preview.
+- [x] Require one explicit approval for the displayed batch revision while
   retaining one idempotent delivery/thread per vendor.
-- [ ] Stop or safely resume a partial batch without duplicating sends.
-- [ ] Reproject successful sends through existing Enquired and follow-up state.
-- [ ] Test provider acceptance separately from delivery/receipt evidence.
+- [x] Stop or safely resume a partial batch without duplicating sends.
+- [x] Reproject successful sends through existing Enquired and follow-up state.
+- [x] Test provider acceptance separately from delivery/receipt evidence.
 
 Acceptance: no external action occurs before approval and retry cannot create a
 duplicate conversation.
@@ -86,18 +87,23 @@ duplicate conversation.
 
 Depends on: IP-04
 
-- [ ] Present Review proposal, Ask a question and Decline in the existing
-  vendor portal/thread.
-- [ ] Reuse the current expiring, revocable, scoped no-account capability when
-  the vendor has not claimed a listing.
+- [x] Reuse the existing vendor portal/thread and email-reply projection rather
+  than adding a proposal inbox.
+- [x] Let an unclaimed vendor receive and reply through its verified private
+  business email without creating an account. Keep the existing expiring,
+  revocable quote capability for a later quote transaction; do not imply that
+  an initial email already created a public response link.
 - [ ] Capture price, inclusions, exclusions, assumptions, availability evidence,
   validity and attachments as structured response evidence.
-- [ ] Keep vendor real identity and couple private identity separated by the
+- [x] Keep vendor real identity and couple private identity separated by the
   current relay policy.
-- [ ] Test cross-tenant, forged, expired, replayed and revoked access.
+- [x] Test cross-tenant and replay protection on the new batch transition;
+  forged, expired and revoked quote-capability coverage remains owned by the
+  existing quotation-response authority.
 
 Acceptance: claimed and unclaimed vendors can respond to only their invitation
-without gaining broader account access.
+without gaining broader account access. Rich structured proposal actions remain
+a post-pilot enhancement rather than a second response system.
 
 ## IP-06 — Normalize and compare proposals
 
@@ -145,7 +151,7 @@ traceable.
 
 Depends on: IP-03 through IP-08
 
-- [ ] Keep multi-recipient send disabled outside an allowlisted cohort.
+- [x] Keep multi-recipient send disabled outside an allowlisted cohort.
 - [ ] Run tenant-isolation, security/privacy, hosted accessibility and
   couple/vendor usability evidence on one frozen commit.
 - [ ] Observe up to 10 couples and 15 vendors for 30 days.

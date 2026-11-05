@@ -2,7 +2,17 @@
 import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
 
 import type { WeddingResponseWorkspaceViewProps } from "@/components/WeddingResponseWorkspaceViewTypes";
+import { recordWeddingVendorContact } from "@/lib/api";
+import { friendlyErrorText } from "@/lib/visibleErrorText";
+import {
+  approveAndSendWeddingInviteProposal,
+} from "@/lib/weddingInviteProposalApi";
 import type { WeddingWorkspaceArtifactPreview } from "@/lib/weddingResponseWorkspaceViewState";
+import {
+  approveWeddingInviteProposalBatch,
+  buildWeddingInviteProposalBatch,
+  type WeddingInviteProposalBatchItem,
+} from "@/lib/weddingInviteProposalBatchState";
 import {
   buildWeddingInviteProposalBrief,
   defaultWeddingInviteProposalSharing,
@@ -11,6 +21,11 @@ import {
   WEDDING_INVITE_PROPOSAL_RECIPIENT_LIMIT,
   type WeddingInviteProposalSharing,
 } from "@/lib/weddingInviteProposalState";
+import {
+  weddingVendorOutreachDraftAfpSendInput,
+  weddingVendorOutreachSentAfpSendInput,
+  weddingVendorOutreachThreadId,
+} from "@/lib/weddingVendorOutreachAfpState";
 
 const SHARE_OPTIONS: ReadonlyArray<{ key: keyof WeddingInviteProposalSharing; label: string }> = [
   { key: "dateOrSeason", label: "Wedding date or season" },
@@ -39,6 +54,8 @@ export function WeddingInviteProposalsPanel(props: {
   const [selectedIds, setSelectedIds] = createSignal<string[]>([]);
   const [sharing, setSharing] = createSignal(defaultWeddingInviteProposalSharing(brief()));
   const [saving, setSaving] = createSignal(false);
+  const [sending, setSending] = createSignal(false);
+  const [reviewing, setReviewing] = createSignal(false);
   const [notice, setNotice] = createSignal<string | null>(null);
   let previousBriefId = "";
 
@@ -54,9 +71,16 @@ export function WeddingInviteProposalsPanel(props: {
   const validation = createMemo(() => validateWeddingInviteProposalDraft({
     brief: brief(), requestText: requestText(), recipientChoiceIds: selectedIds(),
   }));
+  const reviewItems = createMemo(() => buildWeddingInviteProposalBatch({
+    brief: brief(),
+    requestText: requestText(),
+    selectedChoiceIds: selectedIds(),
+    sharing: sharing(),
+  }));
 
   function toggleRecipient(choiceId: string) {
     setNotice(null);
+    setReviewing(false);
     setSelectedIds((current) => {
       if (current.includes(choiceId)) return current.filter((id) => id !== choiceId);
       if (current.length >= WEDDING_INVITE_PROPOSAL_RECIPIENT_LIMIT) {
@@ -86,6 +110,97 @@ export function WeddingInviteProposalsPanel(props: {
       setNotice("We couldn't save this draft. Check your connection and try again.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  function existingExactDraftId(item: WeddingInviteProposalBatchItem): string | null {
+    const messages = [...props.workspace.state.afpMessages].reverse();
+    const match = messages.find((message) => {
+      if ((message.kind ?? message.subtype) !== "wedding_vendor_outreach_draft") return false;
+      const content = message.content ?? {};
+      return content.choice_id === item.choiceId
+        && content.vendor_id === item.vendorId
+        && content.to === item.recipientEmail
+        && content.subject === item.flow.subject
+        && content.text === item.flow.bodyMarkdown;
+    });
+    return match?.id ?? null;
+  }
+
+  async function approveAndSend() {
+    const error = validation();
+    if (error || !props.workspace.saveProjection || sending()) {
+      setNotice(error ?? "Sending is not connected in this view.");
+      return;
+    }
+    setSending(true);
+    setNotice(null);
+    try {
+      const metadata = props.workspace.state.workspace.metadata;
+      const items = reviewItems();
+      const draftIds: string[] = [];
+      for (const item of items) {
+        const existingId = existingExactDraftId(item);
+        if (existingId) {
+          draftIds.push(existingId);
+          continue;
+        }
+        const projection = weddingVendorOutreachDraftAfpSendInput({
+          flow: item.flow,
+          metadata,
+          sourceArtifactId: brief().sourceArtifactId,
+          vendorId: item.vendorId,
+        });
+        if (!projection.id) throw new Error("The saved invitation draft has no stable message reference.");
+        await props.workspace.saveProjection(projection);
+        draftIds.push(projection.id);
+      }
+      const result = await approveAndSendWeddingInviteProposal({
+        wedding_plan_id: metadata.weddingPlanId,
+        brief_id: brief().id,
+        revision: 1,
+        category: brief().category ?? "",
+        location: brief().location,
+        draft_message_ids: draftIds,
+      });
+      const approvedItems = approveWeddingInviteProposalBatch(items);
+      for (const delivery of result.deliveries.filter((item) => item.status === "provider_accepted")) {
+        const item = approvedItems.find((candidate) => candidate.vendorId === delivery.vendorId);
+        if (!item) continue;
+        await props.workspace.saveProjection(weddingVendorOutreachSentAfpSendInput({
+          flow: item.flow,
+          metadata,
+          draftMessageId: delivery.draftMessageId,
+          providerReceipt: {
+            providerMessageId: delivery.providerMessageId,
+            clientMessageId: delivery.clientMessageId,
+          },
+          vendorId: item.vendorId,
+        }));
+        try {
+          await recordWeddingVendorContact(item.vendorId, {
+            contact_method: "agent_email_draft",
+            thread_id: weddingVendorOutreachThreadId({
+              responseWorkspaceId: metadata.responseWorkspaceId,
+              choiceId: item.choiceId,
+            }),
+            receipt_ref: delivery.clientMessageId,
+            follow_up_due_at: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
+          });
+        } catch {
+          // The durable sent AFP record is authoritative; contact scheduling can
+          // reproject on refresh if this secondary index is briefly unavailable.
+        }
+      }
+      const failed = result.deliveries.filter((item) => item.status === "failed").length;
+      setNotice(failed > 0
+        ? `${result.deliveries.length - failed} invitation${result.deliveries.length - failed === 1 ? "" : "s"} accepted by the provider; ${failed} still need retrying.`
+        : `${result.deliveries.length} invitation${result.deliveries.length === 1 ? "" : "s"} accepted by the provider. Delivery and replies are tracked separately.`);
+      props.workspace.onRefreshWorkspace?.();
+    } catch (caught) {
+      setNotice(friendlyErrorText(caught, "The invitation batch could not be sent. Your saved drafts are unchanged."));
+    } finally {
+      setSending(false);
     }
   }
 
@@ -129,10 +244,34 @@ export function WeddingInviteProposalsPanel(props: {
         <Show when={selectedRecipients().length > 0}><p class="mt-3 text-xs text-wedding-ink/70">Intended recipients: {selectedRecipients().map((item) => item.vendorName).join(", ")}.</p></Show>
         <div class="mt-4 flex flex-wrap items-center gap-3">
           <button type="button" disabled={saving() || Boolean(validation()) || !props.workspace.saveProjection} class="min-h-11 rounded-lg bg-wedding-primary px-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-45" onClick={() => void saveDraft()}>{saving() ? "Saving…" : "Save private draft"}</button>
+          <button type="button" disabled={Boolean(validation())} class="min-h-11 rounded-lg border border-wedding-secondary bg-white px-4 text-sm font-bold text-wedding-secondary disabled:cursor-not-allowed disabled:opacity-45" aria-expanded={reviewing()} aria-controls="wedding-proposal-exact-preview" onClick={() => { setNotice(null); setReviewing((value) => !value); }}>{reviewing() ? "Hide invitation preview" : "Review exact invitations"}</button>
           <p class="text-xs leading-5 text-wedding-ink/65">Sending will use the existing review-and-approve enquiry step.</p>
         </div>
         <Show when={notice()}>{(message) => <p class="mt-3 rounded-lg border border-wedding-border bg-wedding-page p-2 text-sm text-wedding-ink" role="status" aria-live="polite">{message()}</p>}</Show>
       </section>
+      <Show when={reviewing()}>
+        <section id="wedding-proposal-exact-preview" class="mt-3 rounded-xl border border-wedding-border bg-white p-3" aria-labelledby="wedding-proposal-preview-heading">
+          <h3 id="wedding-proposal-preview-heading" class="font-semibold text-wedding-ink">Review every recipient and message</h3>
+          <p class="mt-1 text-xs leading-5 text-wedding-ink/65">These are separate private vendor threads. Reviewing does not send them, and editing the brief or sharing choices requires another review.</p>
+          <div class="mt-3 grid gap-3">
+            <For each={reviewItems()}>{(item, index) => <article class="rounded-lg border border-wedding-border bg-wedding-page p-3" aria-labelledby={`wedding-proposal-preview-${index()}`}>
+              <h4 id={`wedding-proposal-preview-${index()}`} class="font-semibold text-wedding-ink">{item.vendorName}</h4>
+              <p class="mt-1 break-all text-xs text-wedding-ink/65">To: {item.recipientEmail}</p>
+              <p class="mt-3 text-xs font-semibold uppercase tracking-wide text-wedding-ink/55">Subject</p>
+              <p class="mt-1 text-sm text-wedding-ink">{item.flow.subject}</p>
+              <p class="mt-3 text-xs font-semibold uppercase tracking-wide text-wedding-ink/55">Message</p>
+              <div class="mt-1 whitespace-pre-wrap text-sm leading-6 text-wedding-ink">{item.flow.bodyMarkdown}</div>
+            </article>}</For>
+          </div>
+          <div class="mt-4 rounded-lg bg-wedding-slate p-3 text-sm leading-6 text-wedding-ink/75">
+            <strong class="text-wedding-ink">No invitation has been sent.</strong> The final action will recheck each vendor on the server and ask for one explicit approval for this exact batch revision.
+          </div>
+          <div class="mt-4 flex flex-wrap items-center gap-3">
+            <button type="button" class="min-h-11 rounded-lg bg-wedding-primary px-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-45" disabled={sending() || reviewItems().length === 0 || !props.workspace.saveProjection} onClick={() => void approveAndSend()}>{sending() ? "Sending approved invitations…" : `Approve and send ${reviewItems().length} invitation${reviewItems().length === 1 ? "" : "s"}`}</button>
+            <p class="text-xs leading-5 text-wedding-ink/65">One approval applies only to the recipients and exact messages shown above.</p>
+          </div>
+        </section>
+      </Show>
     </section>
   );
 }

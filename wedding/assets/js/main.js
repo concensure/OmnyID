@@ -201,6 +201,8 @@
     var searchInput = filterRow.querySelector('[data-blog-search]');
     var searchStatus = document.querySelector('[data-blog-search-status]');
     var selectedCategory = 'all';
+    var blogGrid = document.querySelector('[data-blog-grid]');
+    if (blogGrid) blogGrid.classList.add('is-visible');
     function filterCards() {
       cards = document.querySelectorAll('.blog-card');
       var query = (searchInput && searchInput.value || '').trim().toLowerCase();
@@ -225,6 +227,7 @@
     });
     if (searchInput) searchInput.addEventListener('input', filterCards);
     document.addEventListener('wedding:blog-publications-loaded', filterCards);
+    filterCards();
   }
 
   /* ---------- sign-in / register bridge modal ---------- */

@@ -2792,3 +2792,13 @@ subjective usability or a controlled external cohort.
 - This browser projection is preparation evidence only. A future external transition must re-run
   eligibility server-side, check provider suppressions and enforce per-wedding, vendor and
   destination rate limits before it creates an approval request or delivery attempt.
+
+# 2026-11-05 - WED-333 approval spends quota only on a new external transition
+
+- Invite Proposals preview and preflight are read-only. They never consume per-wedding, vendor or
+  destination send quota; only the first approval of a new exact-content fingerprint does.
+- One approved batch retains an isolated outreach thread and stable Message-ID per vendor. A retry
+  first reconciles sent-mail evidence and cannot duplicate a successfully accepted message.
+- An unclaimed vendor's initial path is its verified private business email. The existing scoped
+  no-account quote capability is created only for a real quote transaction, so the UI must not
+  imply that the invitation email already includes a public vendor link.

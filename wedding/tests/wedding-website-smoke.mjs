@@ -47,6 +47,7 @@ const expectedPages = [
   'blog/caterer-questions-beyond-the-menu.html',
   'blog/photographer-and-videographer-questions-australia.html',
   'blog/florist-and-dj-questions-wedding.html',
+  'blog/wedding-songs-australia-ceremony-to-last-dance.html',
   'blog/buying-a-wedding-dress-online-australia.html',
   'blog/wedding-vendor-contract-checklist-australia.html',
   'blog/open-bar-cash-bar-or-tab-australia.html',

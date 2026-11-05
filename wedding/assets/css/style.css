@@ -689,7 +689,7 @@ main:focus{ outline:none; }
 .article-cover{ margin-top:36px; border-radius: var(--r-lg); overflow:hidden; aspect-ratio: 21/9; box-shadow: var(--shadow-lg); }
 .article-cover img{ width:100%; height:100%; object-fit:cover; }
 
-.article-body{ max-width: 720px; margin: 56px auto 0; font-size:17px; color: var(--ink); }
+.article-body{ max-width: 100%; margin: 56px auto 0; font-size:17px; color: var(--ink); }
 .article-body p{ margin-bottom:22px; color: var(--ink-soft); line-height:1.8; }
 .article-body h2{ font-size:26px; margin: 44px 0 16px; }
 .article-body h3{ font-size:20px; margin: 32px 0 12px; }

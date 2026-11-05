@@ -125,7 +125,7 @@ export function weddingInviteProposalRecipientEligibility(input: {
     return { eligible: true, route: "verified_email", label: "Verified business email", reason: "The proposal can use the verified business email after your approval.", vendor };
   }
   if (email) {
-    return { eligible: true, route: "unclaimed_referral", label: "Scoped vendor link", reason: "The vendor can receive a private, expiring proposal link without creating an account.", vendor };
+    return { eligible: true, route: "unclaimed_referral", label: "Private business email", reason: "The vendor can reply to this private enquiry without creating an account. A scoped response link is offered only when a quote transaction supports it.", vendor };
   }
   return { eligible: false, route: "ineligible", label: "No private delivery route", reason: "Add a supported business email or wait for the vendor to claim this listing.", vendor };
 }

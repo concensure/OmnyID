@@ -7455,3 +7455,19 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
 - Passed: 10 focused state/UI tests, typecheck, both line budgets, all 2,210 Wedding tests and two
   focused Rust directory tests. The first shared-target Rust compile took 16m47s; later focused
   tests reused it and completed in seconds.
+
+# 2026-11-05 - WED-333 approval pilot and WED-335 Wedding blog candidate (Codex)
+
+- Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
+  `agent/codex/WED-333`. The final SHA will be recorded after the two commits.
+- Invite Proposals now has server-side tenant and eligibility rechecks, quota-free preview,
+  bounded approval-time rate limits, an exact-content batch fingerprint, stable per-vendor
+  Message-IDs, sent-mail reconciliation and idempotent partial retry. Accepted sends reuse the
+  existing AFP outreach, Enquired and follow-up projections; delivery remains false-default and
+  allowlisted.
+- The Wedding blog index reveals cards on first load. The new Australian wedding-songs article is
+  catalogued, filtered, cross-linked and in the sitemap with inspected image descriptions and
+  full-width readable article content.
+- Passed before commit: Invite Proposals Rust unit/API integration and frontend tests, typecheck,
+  all 2,212 Wedding tests, production build and line budgets; Wedding website, catalogue, metadata
+  and CSP tests; and a 390x844 Chromium index/filter/article/overflow check.

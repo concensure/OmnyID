@@ -40,6 +40,7 @@ function Category-Key([string]$featured) {
         'budget|ring|contract' { return 'budget' }
         'legal|admin' { return 'legal' }
         'ai' { return 'ai-trust' }
+        'ceremony|reception|music' { return 'ceremony' }
         'vendor|venue' { return 'vendors' }
         'etiquette|guest|favour' { return 'etiquette' }
         default { return 'planning' }
@@ -132,10 +133,13 @@ foreach ($slug in ($articleSlugs | Where-Object { $_ -notin $existingSlugs })) {
     $image = $meta.image
     if ($image.StartsWith('../')) { $image = $image.Substring(3) }
     $keywords = Encode-Html (($meta.tags + @($meta.title, $meta.summary)) -join ' ')
+    $publishedLabel = try {
+        ([datetime]::Parse($meta.published, [Globalization.CultureInfo]::InvariantCulture)).ToString('d MMM yyyy', [Globalization.CultureInfo]::GetCultureInfo('en-AU'))
+    } catch { $meta.published }
     $newCards += @"
         <a class="blog-card" data-category="$($meta.category)" data-keywords="$keywords" href="blog/$slug.html">
           <div class="thumb"><img src="$(Encode-Html $image)" alt="$(Encode-Html $meta.image_alt)" loading="lazy"><span class="cat">$(Encode-Html $meta.featured)</span></div>
-          <div class="content"><span class="meta">$(Encode-Html $meta.read_time) · Published 29 Oct 2026</span><h3>$(Encode-Html $meta.title)</h3><p>$(Encode-Html $meta.summary)</p><span class="read-more">Read the guide →</span></div>
+          <div class="content"><span class="meta">$(Encode-Html $meta.read_time) · Updated $(Encode-Html $publishedLabel)</span><h3>$(Encode-Html $meta.title)</h3><p>$(Encode-Html $meta.summary)</p><span class="read-more">Read the guide →</span></div>
         </a>
 "@
 }

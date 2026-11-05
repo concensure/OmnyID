@@ -735,4 +735,9 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Idempotent Wedding task assignment email and recipient-agent delivery receipts",
         include_str!("../../postgres/migrations/0144_wedding_task_assignment_delivery.sql"),
     ),
+    (
+        "0145_wedding_invite_proposal_batches",
+        "Content-free approval batches and replay-safe per-vendor Invite Proposal delivery receipts",
+        include_str!("../../postgres/migrations/0145_wedding_invite_proposal_batches.sql"),
+    ),
 ];
