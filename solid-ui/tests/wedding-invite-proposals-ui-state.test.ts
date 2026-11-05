@@ -4,6 +4,7 @@ import test from "node:test";
 
 const homeSource = readFileSync(new URL("../src/components/WeddingVendorSearchHomeSections.tsx", import.meta.url), "utf8");
 const panelSource = readFileSync(new URL("../src/components/WeddingInviteProposalsPanel.tsx", import.meta.url), "utf8");
+const oracleComposeSource = readFileSync(new URL("../../docker-compose.oracle.minimal.yml", import.meta.url), "utf8");
 
 test("vendor home exposes accessible in-place Find and Invite tabs", () => {
   assert.match(homeSource, /role="tablist"/);
@@ -33,4 +34,15 @@ test("proposal facts are actionable in place and the mobile panel is full bleed"
   assert.match(panelSource, /saveBudget/);
   assert.match(panelSource, /class="-mx-3 mt-4 min-w-0 sm:mx-0"/);
   assert.match(homeSource, /\{ id: "enquired", label: "Enquired" \}, \{ id: "proposals", label: "Proposals" \}/);
+});
+
+test("Oracle forwards the false-default proposal rollout controls to the homeserver", () => {
+  assert.match(
+    oracleComposeSource,
+    /OMNYID_WEDDING_INVITE_PROPOSALS_ENABLED: \$\{OMNYID_WEDDING_INVITE_PROPOSALS_ENABLED:-false\}/,
+  );
+  assert.match(
+    oracleComposeSource,
+    /OMNYID_WEDDING_INVITE_PROPOSALS_ALLOWLIST: \$\{OMNYID_WEDDING_INVITE_PROPOSALS_ALLOWLIST:-\}/,
+  );
 });
