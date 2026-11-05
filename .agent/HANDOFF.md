@@ -7503,3 +7503,21 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
   parity and an authenticated disposable-pgvector API test that proved migration 0146's two tables
   and persona image column. Next: commit, rebuild from a clean exact-SHA checkout, deploy, confirm
   runtime provenance/migration and distinguish provider acceptance from inbox delivery.
+
+# 2026-11-05 - WED-336 Oracle release complete (Codex)
+
+- Application SHA `81b99015fa94712a85d3c2c8d0e9c4ea7b2cb06e` was deployed from clean
+  checkout `C:\temp\wt\omnyid-wed336-release-81b9901`; hosted `SOURCE_COMMIT` and
+  `oracle-runtime-manifest.json` match.
+- Migration 0146 is present. Sprout visibility, bounded persona images, parent-linked Wedding
+  subtasks, explicit-only child research and the celebrant-only catalogue are live.
+- The initial weekly attempt exposed a Compose contract gap and an expired Google OAuth/SMTP
+  fallback. The final candidate passes the reviewed Cloudflare transactional account and
+  file-backed token into the homeserver. The retried 2 November report has exactly one `accepted`
+  receipt for `concensure@gmail.com`; this proves provider acceptance, not inbox reading.
+- Exact-SHA production proof passes backup verification and the isolated restore drill. The cold
+  build first raised root use to 91 percent; only unused builder cache and five explicit old `/tmp`
+  release artifacts were removed. No volumes, backups, images in use or application data were
+  deleted. Final root use is 82 percent with 8.2 GB available.
+- Evidence: `Documents/verification/wed-336-persona-subtasks-weekly-report-release-2026-11-05.md`.
+  Credential-expiry dates remain blank until verified provider dates are available.
