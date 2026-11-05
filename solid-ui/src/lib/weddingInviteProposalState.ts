@@ -1,5 +1,9 @@
 // @locs-version: 1.0
-import type { SendAfpMessageInput } from "@/lib/api";
+import type { SendAfpMessageInput, WeddingVendor } from "@/lib/api";
+import {
+  weddingInviteProposalRecipientEligibility,
+  type WeddingInviteProposalRecipientRoute,
+} from "@/lib/weddingInviteProposalEligibilityState";
 import type { WeddingResponseWorkspaceViewState, WeddingWorkspaceArtifactPreview } from "@/lib/weddingResponseWorkspaceViewState";
 import { weddingVendorOutreachThreadId } from "@/lib/weddingVendorOutreachAfpState";
 import type { WeddingPlanningMetadata } from "@/lib/weddingPlanningTemplateState";
@@ -12,6 +16,10 @@ export type WeddingInviteProposalRecipient = {
   vendorName: string;
   category: string | null;
   email: string | null;
+  eligible: boolean;
+  route: WeddingInviteProposalRecipientRoute;
+  eligibilityLabel: string;
+  eligibilityReason: string;
 };
 
 export type WeddingInviteProposalSharing = {
@@ -58,6 +66,7 @@ function categoryBudget(state: WeddingResponseWorkspaceViewState, category: stri
 export function buildWeddingInviteProposalBrief(input: {
   state: WeddingResponseWorkspaceViewState;
   preview?: WeddingWorkspaceArtifactPreview | null;
+  vendorDirectory?: readonly WeddingVendor[] | null;
 }): WeddingInviteProposalBrief {
   const planning = input.state.contextCards[0]?.planningContext ?? {};
   const cards = input.preview?.vendorComparisonCards ?? [];
@@ -85,13 +94,31 @@ export function buildWeddingInviteProposalBrief(input: {
     stylePriorities: [...new Set(stylePriorities)].slice(0, 8),
     approximateCategoryBudget: budget,
     missingFacts,
-    recipients: cards.slice(0, WEDDING_INVITE_PROPOSAL_RECIPIENT_LIMIT).map((card) => ({
-      choiceId: card.choiceId,
-      vendorId: card.vendorId ?? null,
-      vendorName: card.title,
-      category: clean(card.category),
-      email: clean(card.email),
-    })),
+    recipients: cards.slice(0, WEDDING_INVITE_PROPOSAL_RECIPIENT_LIMIT).map((card) => {
+      const candidate = {
+        vendorId: card.vendorId ?? null,
+        vendorName: card.title,
+        category: clean(card.category),
+        email: clean(card.email),
+      };
+      const eligibility = weddingInviteProposalRecipientEligibility({
+        candidate,
+        vendorDirectory: input.vendorDirectory,
+        requestedCategory: category,
+        requestedLocation: location,
+      });
+      return {
+        choiceId: card.choiceId,
+        vendorId: candidate.vendorId,
+        vendorName: candidate.vendorName,
+        category: candidate.category,
+        email: clean(eligibility.vendor?.contactEmail) ?? candidate.email,
+        eligible: eligibility.eligible,
+        route: eligibility.route,
+        eligibilityLabel: eligibility.label,
+        eligibilityReason: eligibility.reason,
+      };
+    }),
     sourceArtifactId: input.preview?.artifactId ?? null,
   };
 }
@@ -119,6 +146,8 @@ export function validateWeddingInviteProposalDraft(input: {
   if (input.brief.recipients.filter((item) => input.recipientChoiceIds.includes(item.choiceId)).length !== count) {
     return "One or more selected vendors are not in this wedding shortlist.";
   }
+  const ineligible = input.brief.recipients.find((item) => input.recipientChoiceIds.includes(item.choiceId) && !item.eligible);
+  if (ineligible) return `${ineligible.vendorName} cannot be invited yet: ${ineligible.eligibilityReason}`;
   return null;
 }
 

@@ -53,12 +53,16 @@ told unambiguously that no vendor has been contacted.
 
 Depends on: IP-01, IP-02
 
-- [ ] Reuse directory ownership/contact evidence and listing claim state.
-- [ ] Distinguish direct authenticated vendor, verified contact, unclaimed
+- [x] Reuse directory ownership/contact evidence and listing claim state.
+- [x] Distinguish direct authenticated vendor, verified contact, unclaimed
   referral-capable vendor and ineligible vendor.
-- [ ] Enforce category/service-area compatibility and suppression/opt-out.
-- [ ] Return user-facing exclusion reasons without leaking internal policy.
+- [x] Enforce category/service-area compatibility and suppression/opt-out.
+- [x] Return user-facing exclusion reasons without leaking internal policy.
 - [ ] Add per-wedding, vendor and destination rate limits.
+
+Current boundary: the UI policy fails closed and prevents ineligible vendors
+from entering a draft selection. The eventual external transition must re-run
+the same checks server-side and add the rate limits before IP-03 is complete.
 
 Acceptance: only eligible vendors can enter an approval request; exclusion is
 honest and inspectable.

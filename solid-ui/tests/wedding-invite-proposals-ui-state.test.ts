@@ -19,5 +19,6 @@ test("proposal panel labels the private draft boundary and explicit sharing cont
   assert.match(panelSource, /Approximate category budget/);
   assert.match(panelSource, /Allow phone contact/);
   assert.match(panelSource, /Save private draft/);
+  assert.match(panelSource, /disabled=\{!vendor\.eligible\}/);
+  assert.match(panelSource, /vendor\.eligibilityReason/);
 });
-

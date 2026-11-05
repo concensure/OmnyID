@@ -30,7 +30,11 @@ export function WeddingInviteProposalsPanel(props: {
   preview: WeddingWorkspaceArtifactPreview | null;
   onFindVendors: () => void;
 }) {
-  const brief = createMemo(() => buildWeddingInviteProposalBrief({ state: props.workspace.state, preview: props.preview }));
+  const brief = createMemo(() => buildWeddingInviteProposalBrief({
+    state: props.workspace.state,
+    preview: props.preview,
+    vendorDirectory: props.workspace.weddingVendorDirectory,
+  }));
   const [requestText, setRequestText] = createSignal(props.workspace.vendorSearchQuery?.trim() ?? "");
   const [selectedIds, setSelectedIds] = createSignal<string[]>([]);
   const [sharing, setSharing] = createSignal(defaultWeddingInviteProposalSharing(brief()));
@@ -113,7 +117,7 @@ export function WeddingInviteProposalsPanel(props: {
           <h3 id="proposal-recipients-heading" class="font-semibold text-wedding-ink">Choose recipients</h3>
           <p class="mt-1 text-xs leading-5 text-wedding-ink/65">Choose up to five vendors from this wedding's current comparison. Each eventual invitation keeps its own private thread.</p>
           <Show when={brief().recipients.length > 0} fallback={<div class="mt-3 rounded-lg bg-wedding-slate p-3 text-sm text-wedding-ink/70">Find and compare vendors first, then return here to choose recipients.<button type="button" class="mt-2 block min-h-11 rounded-lg border border-wedding-secondary bg-white px-3 font-semibold text-wedding-secondary" onClick={props.onFindVendors}>Find vendors</button></div>}>
-            <div class="mt-3 grid gap-2"><For each={brief().recipients}>{(vendor) => <label class="flex min-h-12 items-center gap-3 rounded-lg border border-wedding-border p-3 text-sm text-wedding-ink"><input type="checkbox" checked={selectedIds().includes(vendor.choiceId)} onChange={() => toggleRecipient(vendor.choiceId)} class="h-5 w-5 accent-wedding-primary" /><span class="min-w-0"><span class="block break-words font-semibold">{vendor.vendorName}</span><span class="block text-xs text-wedding-ink/60">{vendor.category ?? "Vendor"}</span></span></label>}</For></div>
+            <div class="mt-3 grid gap-2"><For each={brief().recipients}>{(vendor) => <label class={`flex min-h-12 items-start gap-3 rounded-lg border p-3 text-sm ${vendor.eligible ? "border-wedding-border text-wedding-ink" : "border-wedding-border bg-wedding-slate text-wedding-ink/65"}`}><input type="checkbox" checked={selectedIds().includes(vendor.choiceId)} disabled={!vendor.eligible} onChange={() => toggleRecipient(vendor.choiceId)} class="mt-0.5 h-5 w-5 accent-wedding-primary disabled:cursor-not-allowed" /><span class="min-w-0"><span class="block break-words font-semibold">{vendor.vendorName}</span><span class="block text-xs text-wedding-ink/60">{vendor.category ?? "Vendor"} · {vendor.eligibilityLabel}</span><span class="mt-1 block text-xs leading-5 text-wedding-ink/60">{vendor.eligibilityReason}</span></span></label>}</For></div>
           </Show>
         </section>
       </div>
@@ -132,4 +136,3 @@ export function WeddingInviteProposalsPanel(props: {
     </section>
   );
 }
-

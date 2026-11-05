@@ -33,6 +33,8 @@ pub struct WeddingVendorRecord {
     pub source_label: Option<String>,
     pub source_checked_at: Option<String>,
     pub status: String,
+    pub claim_status: String,
+    pub linked_agent_id: Option<String>,
     pub notes: Option<String>,
     pub evidence: Value,
     pub caveat_labels: Vec<String>,

@@ -2781,3 +2781,14 @@ subjective usability or a controlled external cohort.
   booking; and only an explicit booking-confirmed ledger event may display Booking confirmed.
 - The lifecycle panel may compare another received quote in place, but the quote source and its
   normalized analysis remain reopenable through the existing Documents authority.
+
+# 2026-11-05 - WED-333 proposal eligibility consumes directory authority and fails closed
+
+- The authenticated route requires a verified vendor claim plus the existing verified agent link.
+  A verified business email is a separate route; an unclaimed listing with an email can use only
+  the existing scoped, expiring no-account capability. These states must not be conflated.
+- Inactive, disputed, opted-out, category-mismatched, explicitly interstate and no-channel vendors
+  cannot be selected. The UI explains the exclusion without leaking internal policy fields.
+- This browser projection is preparation evidence only. A future external transition must re-run
+  eligibility server-side, check provider suppressions and enforce per-wedding, vendor and
+  destination rate limits before it creates an approval request or delivery attempt.

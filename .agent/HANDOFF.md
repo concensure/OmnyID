@@ -7439,3 +7439,19 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
   `Documents/verification/wed-334-vendor-search-lifecycle-release-2026-11-05.md`. Resume WED-333
   from this coordination commit and keep proposal delivery false-default until IP-03/IP-04 are
   complete.
+
+# 2026-11-05 - WED-333 Invite Proposals eligibility slice (Codex, in progress)
+
+- Fast-forwarded `agent/codex/WED-333` through the completed WED-334 release coordination commit.
+- The authenticated Wedding vendor-directory response now includes its existing claim status and
+  verified agent-link identifier. Verified linked vendors are no longer omitted merely because
+  they do not publish a phone number or email address.
+- Invite Proposals classifies shortlist recipients as verified OmnyID vendor, verified business
+  email, scoped no-account vendor link or ineligible. Inactive, disputed, opted-out,
+  category-mismatched, explicitly interstate and no-channel records are disabled with a
+  couple-facing reason.
+- No external route, approval request or send was added. IP-03 still needs the server-side recheck
+  and per-wedding/vendor/destination rate limits; IP-04 remains blocked on that work.
+- Passed: 10 focused state/UI tests, typecheck, both line budgets, all 2,210 Wedding tests and two
+  focused Rust directory tests. The first shared-target Rust compile took 16m47s; later focused
+  tests reused it and completed in seconds.

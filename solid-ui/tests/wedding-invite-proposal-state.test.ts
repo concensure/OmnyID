@@ -7,6 +7,7 @@ import {
   validateWeddingInviteProposalDraft,
   weddingInviteProposalDraftToAfpSendInput,
 } from "../src/lib/weddingInviteProposalState.ts";
+import type { WeddingVendor } from "../src/lib/api.ts";
 import type { WeddingResponseWorkspaceViewState, WeddingWorkspaceArtifactPreview } from "../src/lib/weddingResponseWorkspaceViewState.ts";
 
 const metadata = {
@@ -40,18 +41,37 @@ function preview(): WeddingWorkspaceArtifactPreview {
   } as unknown as WeddingWorkspaceArtifactPreview;
 }
 
+function directory(): WeddingVendor[] {
+  return [
+    {
+      vendorId: "vendor-1", vendorSlug: "harbour-light-photo", vendorName: "Harbour Light Photo",
+      category: "photographer", serviceArea: "Sydney NSW", contactEmail: "studio@example.test",
+      status: "active", claimStatus: "verified", linkedAgentId: "agent-vendor-1",
+      evidence: { contact_email_verified: true }, caveatLabels: [], photos: [], rooms: [], userContact: null,
+    },
+    {
+      vendorId: "vendor-2", vendorSlug: "field-notes-photo", vendorName: "Field Notes Photo",
+      category: "photographer", serviceArea: "NSW", contactEmail: null,
+      status: "active", claimStatus: "unclaimed", linkedAgentId: null,
+      evidence: {}, caveatLabels: [], photos: [], rooms: [], userContact: null,
+    },
+  ] as unknown as WeddingVendor[];
+}
+
 test("proposal brief reuses wedding facts and relevant category allocation", () => {
-  const brief = buildWeddingInviteProposalBrief({ state: state(), preview: preview() });
+  const brief = buildWeddingInviteProposalBrief({ state: state(), preview: preview(), vendorDirectory: directory() });
   assert.equal(brief.dateOrSeason, "2027-11-20");
   assert.equal(brief.location, "Sydney NSW");
   assert.equal(brief.guestCount, "90");
   assert.deepEqual(brief.approximateCategoryBudget, { amount: 6000, currency: "AUD" });
   assert.equal(brief.recipients.length, 2);
+  assert.equal(brief.recipients[0]?.route, "authenticated_vendor");
+  assert.equal(brief.recipients[1]?.eligible, false);
   assert.deepEqual(brief.missingFacts, []);
 });
 
 test("proposal sharing keeps budget and phone off by default", () => {
-  const brief = buildWeddingInviteProposalBrief({ state: state(), preview: preview() });
+  const brief = buildWeddingInviteProposalBrief({ state: state(), preview: preview(), vendorDirectory: directory() });
   const sharing = defaultWeddingInviteProposalSharing(brief);
   assert.equal(sharing.dateOrSeason, true);
   assert.equal(sharing.location, true);
@@ -60,7 +80,7 @@ test("proposal sharing keeps budget and phone off by default", () => {
 });
 
 test("private draft records approval boundary without contacting vendors", () => {
-  const brief = buildWeddingInviteProposalBrief({ state: state(), preview: preview() });
+  const brief = buildWeddingInviteProposalBrief({ state: state(), preview: preview(), vendorDirectory: directory() });
   const message = weddingInviteProposalDraftToAfpSendInput({
     brief,
     requestText: "Please propose eight hours of documentary-style photography.",
@@ -80,7 +100,7 @@ test("private draft records approval boundary without contacting vendors", () =>
 });
 
 test("validation rejects unknown and over-cap recipient selections", () => {
-  const brief = buildWeddingInviteProposalBrief({ state: state(), preview: preview() });
+  const brief = buildWeddingInviteProposalBrief({ state: state(), preview: preview(), vendorDirectory: directory() });
   assert.match(validateWeddingInviteProposalDraft({ brief, requestText: "A proposal", recipientChoiceIds: ["other"] }) ?? "", /not in this wedding shortlist/);
   assert.match(validateWeddingInviteProposalDraft({ brief, requestText: "A proposal", recipientChoiceIds: ["1", "2", "3", "4", "5", "6"] }) ?? "", /up to 5/);
 });

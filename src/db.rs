@@ -4104,6 +4104,8 @@ impl Db {
                 source_label,
                 source_checked_at::text AS source_checked_at,
                 status,
+                claim_status,
+                NULL::text AS linked_agent_id,
                 notes,
                 evidence,
                 caveat_labels,
@@ -4195,6 +4197,8 @@ impl Db {
                     source_label: row.get("source_label"),
                     source_checked_at: row.get("source_checked_at"),
                     status: row.get("status"),
+                    claim_status: row.get("claim_status"),
+                    linked_agent_id: row.get("linked_agent_id"),
                     notes: row.get("notes"),
                     evidence: row.get("evidence"),
                     caveat_labels: row.get("caveat_labels"),
@@ -4232,6 +4236,8 @@ impl Db {
                 v.source_label,
                 v.source_checked_at::text AS source_checked_at,
                 v.status,
+                v.claim_status,
+                l.agent_id AS linked_agent_id,
                 v.notes,
                 v.evidence,
                 v.caveat_labels,
@@ -4254,11 +4260,14 @@ impl Db {
             LEFT JOIN wedding_vendor_user_contacts c
                 ON c.vendor_id = v.vendor_id
                 AND c.user_id = $1
+            LEFT JOIN wedding_vendor_agent_links l
+                ON l.vendor_id = v.vendor_id
             WHERE v.status = 'active'
                 AND (
                     c.contact_id IS NOT NULL
                     OR NULLIF(btrim(COALESCE(v.contact_phone, '')), '') IS NOT NULL
                     OR NULLIF(btrim(COALESCE(v.contact_email, '')), '') IS NOT NULL
+                    OR l.agent_id IS NOT NULL
                 )
                 AND (
                     $2::text IS NULL
@@ -4359,6 +4368,8 @@ impl Db {
                     source_label: row.get("source_label"),
                     source_checked_at: row.get("source_checked_at"),
                     status: row.get("status"),
+                    claim_status: row.get("claim_status"),
+                    linked_agent_id: row.get("linked_agent_id"),
                     notes: row.get("notes"),
                     evidence: row.get("evidence"),
                     caveat_labels: row.get("caveat_labels"),
@@ -4520,6 +4531,8 @@ impl Db {
             source_label: row.get("source_label"),
             source_checked_at: row.get("source_checked_at"),
             status: row.get("status"),
+            claim_status: "unclaimed".to_string(),
+            linked_agent_id: None,
             notes: row.get("notes"),
             evidence: row.get("evidence"),
             caveat_labels: row.get("caveat_labels"),

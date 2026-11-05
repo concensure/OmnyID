@@ -5678,6 +5678,8 @@ export type WeddingVendor = {
   sourceLabel: string | null;
   sourceCheckedAt: string | null;
   status: "active" | "hidden" | "archived" | string;
+  claimStatus: "unclaimed" | "claim_pending" | "claimed" | "verified" | "disputed" | string;
+  linkedAgentId: string | null;
   notes: string | null;
   evidence: Record<string, unknown>;
   caveatLabels: string[];
@@ -6139,6 +6141,8 @@ function normalizeWeddingVendor(value: unknown): WeddingVendor | null {
     sourceLabel: apiNullableString(value.source_label) ?? null,
     sourceCheckedAt: apiNullableString(value.source_checked_at) ?? null,
     status: apiString(value.status, "active"),
+    claimStatus: apiString(value.claim_status, "unclaimed"),
+    linkedAgentId: apiNullableString(value.linked_agent_id) ?? null,
     notes: apiNullableString(value.notes) ?? null,
     evidence: isRecord(value.evidence) ? value.evidence : {},
     caveatLabels: Array.isArray(value.caveat_labels) ? value.caveat_labels.filter((label): label is string => typeof label === "string") : [],
