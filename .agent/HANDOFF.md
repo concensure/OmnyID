@@ -7471,3 +7471,16 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
 - Passed before commit: Invite Proposals Rust unit/API integration and frontend tests, typecheck,
   all 2,212 Wedding tests, production build and line budgets; Wedding website, catalogue, metadata
   and CSP tests; and a 390x844 Chromium index/filter/article/overflow check.
+
+# 2026-11-05 - WED-333 / WED-335 Oracle release complete (Codex)
+
+- Application SHA `223951015609f9f41ec100f8b9538dfaf002f136` was tested and deployed from
+  clean detached checkout `C:\temp\wt\omnyid-wed333-release-2239510`.
+- Oracle `SOURCE_COMMIT` and `oracle-runtime-manifest.json` match. Migration 0145 exists and the
+  public blog index and wedding-songs article both return HTTP 200 through Cloudflare.
+- The cold build cache left insufficient restore headroom. Only 4.944 GB of unused Docker builder
+  cache was removed, returning root use to 79 percent; no images, volumes, backups or application
+  data were removed. The repeated synchronous proof passed backup verification and the isolated
+  restore drill.
+- Evidence: `Documents/verification/wed-333-wed-335-release-2026-11-05.md`. Invite Proposals stays
+  false-default and allowlisted; do not treat this pilot implementation as general availability.
