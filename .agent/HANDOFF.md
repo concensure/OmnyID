@@ -7576,3 +7576,23 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
   and application to Oracle, then verify runtime provenance, health, UI assets, route headers and
   current backup/restore evidence. Keep the existing Invite Proposals rollout flag and account
   allowlist; this change does not authorize general availability or unsolicited vendor email.
+
+# 2026-11-06 - WED-338 category proposal opportunities live (Codex, complete)
+
+- Application SHA `50837982047f4b197c31928fca5538c29517c79a` was tested from clean
+  checkout `C:\temp\wt\omnyid-wed338-release-5083798` and released to Oracle.
+  Hosted `SOURCE_COMMIT` and `oracle-runtime-manifest.json` match; migration 0148 is applied.
+- Date, location, guests and category budget now use canonical editable Wedding projections. The
+  recipient picker is replaced by a category opportunity; `Proposals` follows `Enquired`; eligible
+  claimed vendors and secure no-account capabilities feed one tenant-private AFP response flow.
+- The final release also forwards the false-default rollout controls through Compose and proxies all
+  four proposal route families through Caddy. Hosted unauthenticated couple/vendor/admin checks
+  return 401 and a malformed capability returns 404. Production is limited to three known
+  operator/test accounts, not general availability.
+- Exact candidate checks pass typecheck, both line budgets, 2,219 Wedding tests, public-site checks
+  and the production build. Unchanged Rust source passes cargo check, focused route/migration tests
+  and disposable-pgvector tenant/token/replay/revocation/AFP proof.
+- ClamAV's long-running container had lost `clamd` while retaining `freshclam`; restarting only that
+  container restored healthy scanning. Cold builds consumed restore headroom, so only unused Docker
+  builder cache was pruned. Final backup verification and isolated restore pass at 79 percent root
+  use. Evidence: `Documents/verification/wed-338-invite-proposal-opportunities-release-2026-11-06.md`.
