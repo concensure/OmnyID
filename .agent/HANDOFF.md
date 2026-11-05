@@ -7421,3 +7421,21 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
   checks. Production build, exact-SHA release and hosted proof are still pending.
 - WED-333 should resume from the eventual WED-334 release coordination SHA; do not reintroduce a
   proposal-specific inbox or lifecycle store.
+
+# 2026-11-05 - WED-334 vendor search and lifecycle repair live (Codex, complete)
+
+- Application SHA `04357129a4f407ad9974976f66ff6d0ac33ffd8e` was built from clean detached
+  checkout `C:\temp\wt\omnyid-wed334-release-0435712` and released to Oracle. Hosted
+  `SOURCE_COMMIT` and `oracle-runtime-manifest.json` match it; the public workspace returned HTTP
+  200.
+- Exact-SHA evidence passes typecheck, both line budgets, the 74-page public Wedding metadata/CSP
+  suite, all 2,206 Wedding tests and the production build. The earlier 320/390/1280 Chromium checks
+  cover query preservation, overflow and axe findings.
+- The initial post-deploy restore drill lacked 1.58 GiB of headroom after the cold image build. Only
+  6.605 GB of unused Docker builder cache was removed; no volumes, backups, running images or
+  application data were touched. The repeated full proof passes manifest verification, runtime
+  script integrity, backup verification and the isolated restore drill at 75 percent root use.
+- Evidence is in
+  `Documents/verification/wed-334-vendor-search-lifecycle-release-2026-11-05.md`. Resume WED-333
+  from this coordination commit and keep proposal delivery false-default until IP-03/IP-04 are
+  complete.
