@@ -1,3 +1,36 @@
+## 2026-11-05 - WED-337 vendor discovery, onboarding and newspaper release (Codex, complete)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
+`agent/codex/WED-337`; exact deployed application SHA
+`a3deb39343e4c81a00489b8209c573ec10ce4f97`. Clean release checkout:
+`C:\temp\wt\omnyid-wed337-release-a3deb39`.
+
+- Added Linda Dagher Music and Jessica Zammit to the existing claimable vendor
+  authority through idempotent migration 0147. Production has exactly two new
+  rows, three source attributes and both listings remain `unclaimed`.
+- Fixed the repeated-shortlist cause: descriptive requests now receive a
+  bounded wider directory pool, and a raw category count cannot suppress live
+  discovery unless at least three candidates carry the requested distinctive
+  evidence. Ranking Policy V2 remains the final suitability authority.
+- Reconciled the vendor-journey report against the current portal and fixed the
+  current verified-claim photo boundary, claim lookup feedback, button tokens,
+  bounded upload errors, licence identity/digest, expired-session recovery,
+  touch target and implementation-copy leak.
+- Published `wedding/blog/how-to-make-a-wedding-newspaper.html` with its index
+  card, metadata, taxonomy, catalogue, sitemap and public checks.
+- Exact-SHA typecheck, production build, line budgets, 2,215 Wedding tests,
+  public-site suites, focused frontend/Rust tests and disposable pgvector proof
+  passed. Oracle provenance matches the deployed SHA; the served bundle embeds
+  V2 `true`; hosted rustic and waterfront searches took different evidence
+  paths; and final backup/runtime proof passed with the restore drill skipped.
+- Root disk is 93% used with 3.5 GB free. A dangling-image-only prune reclaimed
+  nothing and did not touch volumes, backups, current images or rollback tags.
+  Optional future portal enhancements are multi-photo selection, ordering,
+  cover editing and removal undo; they do not block the verified single-photo
+  journey.
+
+Evidence: `Documents/verification/wed-337-vendor-discovery-onboarding-and-newspaper-2026-11-05.md`.
+
 ## 2026-11-01 - WED-314 Family request lifecycle (Codex, complete)
 
 Worktree `C:\Users\ozans\Desktop\projects\OmnyID-WED-286`, branch

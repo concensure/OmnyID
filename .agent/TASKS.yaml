@@ -17,7 +17,7 @@ lifecycle:
 tasks:
   - id: WED-337
     title: Add musician listings, publish the Wedding newspaper guide, and repair vendor discovery and onboarding
-    status: review
+    status: done
     owner: codex
     branch: agent/codex/WED-337
     worktree: C:/Users/ozans/Desktop/projects/OmnyID-GROWTH-001
@@ -25,7 +25,7 @@ tasks:
     depends_on: [WED-334, WED-335, WED-336]
     files: [solid-ui/src/components/Vendor**, solid-ui/src/components/WeddingVendor**, solid-ui/src/lib/weddingVendor**, solid-ui/tests/**vendor**, src/server/wedding_vendor_**, src/db/**vendor**, postgres/migrations/**, scripts/**vendor**, wedding/blog.html, wedding/blog/how-to-make-a-wedding-newspaper.html, wedding/assets/images/wedding-newspaper-**, wedding/sitemap.xml, wedding/tests/**, Documents/marketing/wedding planning/posts/blog/**, Documents/UX/2026-11-05-vendor-journey-ux-report.md, Documents/verification/**, .agent/**]
     acceptance: [Linda Dagher Music and Jessica Zammit exist exactly once in the production vendor authority with the supplied public business channels and can enter the existing secure claim flow, the Wedding newspaper article has a discoverable index card metadata taxonomy catalogue sitemap entry and passing public-site checks, Ranking Policy V2 is enabled and materially query-sensitive when venue evidence differs while preserving unknowns and tenant-scoped preferences, genuine current vendor onboarding failures from the UX report are fixed without weakening ownership proof or publishing pending owner assets, focused frontend Rust public-site and database tests plus typecheck production build and line budgets pass, a clean exact-SHA Oracle release records matching provenance and hosted evidence]
-    progress: "Candidate implementation is complete and locally verified: the idempotent migration retains exactly two unclaimed musician listings and three source attributes after replay; V2 receives a wider query-sensitive evidence pool; current vendor-portal defects were reconciled against the older report; and the newspaper article is indexed. Typecheck, build, line budgets, public-site checks, 2,215 Wedding tests, focused Rust tests and disposable pgvector ownership/migration proof pass. Pending clean exact-SHA Oracle release and hosted verification."
+    progress: "Application SHA a3deb39343e4c81a00489b8209c573ec10ce4f97 is live on Oracle with matching SOURCE_COMMIT and runtime manifest. Migration 0147 is applied once and production contains exactly two new unclaimed musician rows plus three source attributes. The served workspace bundle contains VITE_WEDDING_VENDOR_RANKING_POLICY_V2:true; a hosted rustic micro-wedding search called Brave and returned rustic-specific evidence while a waterfront search reused sufficient cached waterfront evidence. The newspaper article, index card, taxonomy and sitemap are live. The final quick production proof passed with current backup verification; the restore drill was deliberately skipped because this release did not change backup contracts. Typecheck, build, line budgets, public-site checks, 2,215 Wedding tests, focused Rust tests and disposable pgvector ownership/migration proof pass."
 
   - id: WED-336
     title: Personalise the agent control, add canonical Wedding subtasks, and send bounded weekly operations reports

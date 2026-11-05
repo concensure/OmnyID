@@ -61,4 +61,14 @@ The larger photo-manager improvements in the report—multi-select upload, reord
 - Public Wedding site, metadata, CSP, quiz, confirmation, blog catalogue, lead-magnet and countdown checks: passed.
 - Production frontend build: passed.
 
-Hosted deployment, production database counts, exact-SHA provenance, runtime health and query-sensitive hosted evidence are recorded in the WED-337 handoff after release.
+## Hosted release evidence
+
+- Released application SHA: `a3deb39343e4c81a00489b8209c573ec10ce4f97` from clean checkout `C:\temp\wt\omnyid-wed337-release-a3deb39`.
+- Oracle `SOURCE_COMMIT` and `oracle-runtime-manifest.json` both name that exact SHA.
+- Migration `0147_wedding_musician_vendor_listings` is applied once. Production contains exactly two matching vendor rows and three matching attribute rows; both claims are `unclaimed`.
+- `https://omnyid.com/wedding/directory/linda-dagher-music` and `https://omnyid.com/wedding/directory/jessica-zammit-music` return `200` with their business names and claim actions.
+- `https://omnyid.com/wedding/blog/how-to-make-a-wedding-newspaper.html` and its blog-index card return `200`.
+- Oracle has `VITE_WEDDING_VENDOR_RANKING_POLICY_V2=true`; the JavaScript served from `/srv/workspace` contains `VITE_WEDDING_VENDOR_RANKING_POLICY_V2:\"true\"`, and the served workspace index digest matches the final UI image.
+- An authenticated hosted `online_capable` search for “rustic country micro-wedding venues in Sydney” performed live discovery and returned The Rustic Nest Yarramalong as query-specific evidence. A waterfront-harbour search did not spend another provider call because at least three relevant cached waterfront candidates already covered it. The evidence paths therefore differ instead of treating any five category rows as equivalent query coverage.
+- Final production proof passed: homeserver and backup service running, backup manifest and script integrity passed, latest backup age zero days and backup verification passed. The restore drill was skipped because this release did not alter backup or restore contracts.
+- Root disk was 93% used with 3.5 GB free after the build. A bounded dangling-image prune reclaimed `0 B`; no volumes, backups, current images or rollback tags were removed.
