@@ -39,7 +39,7 @@ const DIRECTORY_MAX_PAGE_SIZE: i64 = 500;
 const CLAIM_SUGGESTION_LIMIT: usize = 8;
 pub(super) const PHOTO_LICENCE_VERSION: &str = "vendor-image-licence-2026-11-05";
 pub(super) const PHOTO_LICENCE_SHA256: &str =
-    "af8f495ac66af43bd5b1ef155073a7af132262fb221d22226f13cfb5b1a7d84a";
+    "42eac758dc316986695075fef70d444837b267e8f7ed7e29d19087c56f888fff";
 const PHOTO_LICENCE_CONSENT: &str = "I confirm that I have read and agree to the Vendor Image Licence Agreement, and that I am authorised to grant the licence above for all Images submitted.";
 
 pub(super) fn routes() -> Router<Arc<AppState>> {
