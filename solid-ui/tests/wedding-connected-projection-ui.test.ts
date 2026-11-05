@@ -25,7 +25,7 @@ test("vendor lifecycle rows open matched Documents and map guidance is a link", 
   assert.match(search, /onSelectArtifact/);
   assert.match(search, /onSelectMenu\?\.\("documents"\)/);
   assert.match(detail, /href=\{preview\.locationSearchUrl\}/);
-  assert.match(queue, /freeformQuery && !queryIntent\.category/);
+  assert.match(queue, /freeformQuery && !queryIntent\.category && !options\?\.category/);
 });
 
 test("RSVP defaults names from profile and guest summary counts filter in place", () => {

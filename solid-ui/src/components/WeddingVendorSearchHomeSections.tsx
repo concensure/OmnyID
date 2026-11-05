@@ -5,6 +5,7 @@ import { DecisionCard } from "@/components/DecisionCard";
 import { WeddingDashboardIcon, type WeddingDashboardIconId } from "@/components/WeddingDashboardIcons";
 import { renderMarkdown } from "@/lib/markdownRenderer";
 import { WeddingVendorChoiceCard } from "@/components/WeddingVendorChoiceCard";
+import { WeddingVendorLifecycleDetailPanel } from "@/components/WeddingVendorLifecycleDetailPanel";
 import { WeddingPreferenceConfirmationChips } from "@/components/WeddingPreferenceConfirmationChips";
 import { WeddingDealBreakerEditor } from "@/components/WeddingDealBreakerEditor";
 import { WeddingInviteProposalsPanel } from "@/components/WeddingInviteProposalsPanel";
@@ -131,8 +132,9 @@ export function WeddingVendorSearchHomeSection(props: {
   const [selectedChoiceIds, setSelectedChoiceIds] = createSignal<string[]>([]);
   const [lifecycleFilter, setLifecycleFilter] = createSignal<WeddingVendorLifecycleFilter>("all");
   const [expandedLifecycleVendorKey, setExpandedLifecycleVendorKey] = createSignal<string | null>(null);
-  const [selectedLifecycleArtifactId, setSelectedLifecycleArtifactId] = createSignal<string | null>(null);
+  const [selectedVendorCategory, setSelectedVendorCategory] = createSignal<string | null>(null);
   const [vendorMode, setVendorMode] = createSignal<"find" | "invite">("find");
+  let comparisonResultElement: HTMLDivElement | undefined;
   const lifecycleRecords = createMemo(() => {
     const comparison = props.result?.preview ?? props.result?.sourcePreview;
     const candidates = comparison?.vendorComparisonCards.map((card) => ({
@@ -183,17 +185,19 @@ export function WeddingVendorSearchHomeSection(props: {
   };
   const visibleBlockedReason = () => weddingVendorSearchBlockedCopy(workspace().vendorSearchBlockedReason);
   function runSearch(): void {
-    if (props.stayOnHome) workspace().onRunLiveVendorSearch?.({ stayOnHome: true });
-    else workspace().onRunLiveVendorSearch?.();
+    const category = selectedVendorCategory() ?? undefined;
+    if (props.stayOnHome) workspace().onRunLiveVendorSearch?.({ stayOnHome: true, category });
+    else workspace().onRunLiveVendorSearch?.({ category });
   }
   function runCategorySearch(event: MouseEvent, query: string): void {
     event.preventDefault();
     event.stopPropagation();
     if (searchDisabled()) return;
-    workspace().onVendorSearchQueryChange?.(query);
-    queueMicrotask(runSearch);
+    setSelectedVendorCategory(query);
+    const options = { stayOnHome: props.stayOnHome || undefined, category: query };
+    workspace().onRunLiveVendorSearch?.(options);
   }
-  const isSelectedCategory = (query: string) => workspace().vendorSearchQuery?.trim().toLowerCase() === query.toLowerCase();
+  const isSelectedCategory = (query: string) => selectedVendorCategory()?.toLowerCase() === query.toLowerCase();
   const lifecycleCount = (filter: WeddingVendorLifecycleFilter) => lifecycleRecords().filter((record) => weddingVendorLifecycleMatches(record, filter)).length;
   const filteredLifecycleRecords = () => lifecycleRecords().filter((record) => weddingVendorLifecycleMatches(record, lifecycleFilter()));
   const vendorKey = (value: unknown) => typeof value === "string"
@@ -236,7 +240,25 @@ export function WeddingVendorSearchHomeSection(props: {
   const toggleLifecycleVendor = (vendor: WeddingVendorLifecycleRecord) => {
     const opening = expandedLifecycleVendorKey() !== vendor.key;
     setExpandedLifecycleVendorKey(opening ? vendor.key : null);
-    setSelectedLifecycleArtifactId(opening ? lifecycleArtifact(vendor)?.artifactId ?? null : null);
+  };
+  const lifecycleImage = (vendor: WeddingVendorLifecycleRecord) => {
+    const directoryPhoto = directoryVendor(vendor)?.photos[0];
+    if (directoryPhoto?.photoUrl) return { url: directoryPhoto.photoUrl, alt: directoryPhoto.altText };
+    const key = vendorKey(vendor.vendorName);
+    for (const artifact of lifecycleArtifacts(vendor)) {
+      const card = artifact.vendorComparisonCards.find((item) => (
+        (vendor.vendorId && item.vendorId === vendor.vendorId) || vendorKey(item.title) === key
+      ));
+      if (card?.imageUrl) return { url: card.imageUrl, alt: card.imageAlt };
+    }
+    return { url: null, alt: null };
+  };
+  const weddingDateOrSeason = () => workspace().state.contextCards
+    .map((card) => card.planningContext.dateOrSeason?.trim())
+    .find(Boolean) ?? null;
+  const openLifecycleArtifact = (artifactId: string) => {
+    workspace().onSelectArtifact?.(artifactId);
+    workspace().onSelectMenu?.("documents");
   };
   const openLifecycleDocument = (vendor: WeddingVendorLifecycleRecord) => {
     const artifact = lifecycleArtifact(vendor);
@@ -256,6 +278,11 @@ export function WeddingVendorSearchHomeSection(props: {
       setSearchProgressIndex((index) => (index + 1) % SEARCH_PROGRESS_LABELS.length);
     }, 1600);
     onCleanup(() => window.clearInterval(timer));
+  });
+  createEffect(() => {
+    const artifactId = props.result?.action.artifactId;
+    if (!artifactId || !comparisonResultElement) return;
+    window.requestAnimationFrame(() => comparisonResultElement?.scrollIntoView({ behavior: "smooth", block: "start" }));
   });
   return (
     <div data-wedding-surface="vendor-search" class="min-w-0 overflow-hidden rounded-xl border border-wedding-border bg-wedding-card px-3 py-4 shadow-wedding-card sm:px-5 sm:py-6">
@@ -362,20 +389,20 @@ export function WeddingVendorSearchHomeSection(props: {
                       <Show when={entry().websiteUrl}>{(url) => <a class="font-semibold text-wedding-secondary underline" href={url()} target="_blank" rel="noreferrer">Vendor website</a>}</Show>
                     </div>}</Show>
                     <Show when={lifecycleMessages(vendor).length > 0}>
-                      <p class="mt-4 text-xs font-semibold uppercase tracking-wide text-wedding-ink/60">Conversation activity</p>
+                      <p class="mt-4 text-xs font-semibold uppercase tracking-wide text-wedding-ink/60">Conversation history</p>
                       <ul class="mt-2 space-y-2"><For each={lifecycleMessages(vendor)}>{(message) => <li class="rounded-lg border border-wedding-border bg-white px-3 py-2 text-xs text-wedding-ink"><span class="font-semibold capitalize">{lifecycleMessageLabel(message)}</span><span class="ml-2 text-wedding-ink/55">{new Date(message.timestamp).toLocaleDateString()}</span></li>}</For></ul>
                     </Show>
                   </section>
-                  <section class="min-w-0 rounded-lg border border-wedding-border bg-white p-3">
-                    <p class="text-xs font-semibold uppercase tracking-wide text-wedding-ink/60">Related documents</p>
-                    <Show when={lifecycleArtifacts(vendor).length > 0} fallback={<p class="mt-2 text-sm text-wedding-ink/65">No related document has been saved yet.</p>}>
-                      <div class="mt-2 flex gap-2 overflow-x-auto pb-1"><For each={lifecycleArtifacts(vendor)}>{(artifact) => <button type="button" class={`min-h-10 shrink-0 rounded-lg border px-3 text-left text-xs font-semibold ${selectedLifecycleArtifactId() === artifact.artifactId ? "border-wedding-primary bg-wedding-page text-wedding-primary" : "border-wedding-border bg-white text-wedding-ink"}`} onClick={() => setSelectedLifecycleArtifactId(artifact.artifactId)}>{artifact.title}</button>}</For></div>
-                      <Show when={lifecycleArtifacts(vendor).find((artifact) => artifact.artifactId === selectedLifecycleArtifactId()) ?? lifecycleArtifacts(vendor)[0]}>{(artifact) => <div class="mt-3 min-w-0">
-                        <div class="prose prose-sm max-w-none break-words text-wedding-ink" innerHTML={renderMarkdown(artifact().bodyText || artifact().emptyBodyLabel)} />
-                        <button type="button" class="mt-3 min-h-11 rounded-lg border border-wedding-secondary bg-white px-3 text-sm font-semibold text-wedding-secondary" onClick={() => { workspace().onSelectArtifact?.(artifact().artifactId); workspace().onSelectMenu?.("documents"); }}>Open in Documents</button>
-                      </div>}</Show>
-                    </Show>
-                  </section>
+                  <WeddingVendorLifecycleDetailPanel
+                    vendor={vendor}
+                    messages={lifecycleMessages(vendor)}
+                    artifacts={lifecycleArtifacts(vendor)}
+                    allArtifacts={workspace().state.artifactPreviews}
+                    imageUrl={lifecycleImage(vendor).url}
+                    imageAlt={lifecycleImage(vendor).alt}
+                    weddingDate={weddingDateOrSeason()}
+                    onOpenArtifact={openLifecycleArtifact}
+                  />
                 </div>
               </Show>
             </article>}</For>
@@ -383,12 +410,16 @@ export function WeddingVendorSearchHomeSection(props: {
         </div>
       </Show>
       <Show
+        when={!props.result}
+      >
+      <Show
         when={workspace().vendorSearchRunning}
         fallback={<Show when={visibleVendorSearchNotice()}>{(notice) => <p class="mt-4 break-words text-xs leading-5 text-wedding-ink/70">{notice()}</p>}</Show>}
       >
         <p class="mt-4 break-words text-xs font-medium leading-5 text-wedding-ink/70" role="status" aria-live="polite">
           {SEARCH_PROGRESS_LABELS[searchProgressIndex()]}
         </p>
+      </Show>
       </Show>
       <Show when={props.feedbackNotice}>
         <p class="mt-3 rounded-lg border border-wedding-border bg-wedding-slate px-3 py-2 text-xs text-wedding-ink" role="status">{props.feedbackNotice}</p>
@@ -409,7 +440,7 @@ export function WeddingVendorSearchHomeSection(props: {
       </Show>
       <Show when={props.result}>
         {(result) => (
-          <div class="mt-5 border-t border-wedding-border pt-4">
+          <div ref={comparisonResultElement} class="mt-5 scroll-mt-24 border-t border-wedding-border pt-4">
             <div class="mb-3">
               <WeddingDealBreakerEditor
                 messages={workspace().state.afpMessages}

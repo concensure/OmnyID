@@ -20,7 +20,7 @@ test("vendor search uses native form submission so Enter and the button share on
   assert.match(source, /<form[\s\S]*onSubmit=\{\(event\) => \{/);
   assert.match(source, /event\.preventDefault\(\)/);
   assert.match(source, /type="submit"/);
-  assert.match(source, /workspace\(\)\.onRunLiveVendorSearch\?\.\(\)/);
+  assert.match(source, /workspace\(\)\.onRunLiveVendorSearch\?\.\(\{ category \}\)/);
 });
 
 test("vendor search preserves native caret and word or sentence selection", () => {
@@ -47,12 +47,31 @@ test("full vendor search evidence expands and closes in place", () => {
   assert.match(source, /setFullResultExpanded\(false\)/);
 });
 
-test("vendor lifecycle filters reveal a vendor brief, conversation activity and selectable documents in place", () => {
+test("vendor lifecycle filters keep the vendor brief and mount evidence-backed workflow tabs in place", () => {
+  const panel = readFileSync(resolve(process.cwd(), "src/components/WeddingVendorLifecycleDetailPanel.tsx"), "utf8");
   assert.match(source, /About this vendor/);
-  assert.match(source, /Conversation activity/);
-  assert.match(source, /Related documents/);
-  assert.match(source, /selectedLifecycleArtifactId/);
+  assert.match(source, /Conversation history/);
+  assert.match(source, /WeddingVendorLifecycleDetailPanel/);
   assert.match(source, /View vendor, conversation and files/);
+  assert.match(panel, /label: "Message"/);
+  assert.match(panel, /label: "Quote"/);
+  assert.match(panel, /label: "Booking"/);
+  assert.match(panel, /Add another vendor quote/);
+  assert.match(panel, /Open original quote/);
+});
+
+test("category chips preserve visible wording and pass category as a separate search constraint", () => {
+  assert.doesNotMatch(source, /onVendorSearchQueryChange\?\.\(query\)/);
+  assert.match(source, /setSelectedVendorCategory\(query\)/);
+  assert.match(source, /onRunLiveVendorSearch\?\.\(options\)/);
+  assert.match(responseQueueSource, /const freeformQuery = currentWeddingVendorSearchQuery\(\)/);
+  assert.match(responseQueueSource, /options\?\.category \?\? queryIntent\.category/);
+});
+
+test("completed comparisons suppress the readiness-only notice and scroll the result into view", () => {
+  assert.match(source, /when=\{!props\.result\}/);
+  assert.match(source, /comparisonResultElement\?\.scrollIntoView/);
+  assert.match(source, /ref=\{comparisonResultElement\}/);
 });
 
 test("a manual vendor search remains on the vendor surface when it launches and completes", () => {

@@ -2770,3 +2770,14 @@ subjective usability or a controlled external cohort.
 - A proposal batch is only a presentation convenience. Each vendor retains an isolated thread,
   delivery receipt, response capability and lifecycle projection. Budget and phone sharing default
   off; the first release caps selection at five recipients.
+
+# 2026-11-05 - WED-334 category intent and lifecycle detail stay separate from visible query state
+
+- Vendor category chips are structured search constraints. They must not rewrite a couple's typed
+  search wording, and both the selected category and freeform descriptors feed the same search and
+  ranking execution.
+- Lifecycle detail is a projection over existing AFP messages, quote artifacts and booking events,
+  not a second vendor inbox or booking store. An unsent message is labelled Draft; a quote is not a
+  booking; and only an explicit booking-confirmed ledger event may display Booking confirmed.
+- The lifecycle panel may compare another received quote in place, but the quote source and its
+  normalized analysis remain reopenable through the existing Documents authority.

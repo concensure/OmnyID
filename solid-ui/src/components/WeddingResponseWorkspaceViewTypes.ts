@@ -50,7 +50,7 @@ export type WeddingResponseWorkspaceViewProps = {
   onReviewBlockedOutputs?: () => void;
   onOpenSavedOutputs?: () => void;
   onProviderSetup?: (view: ViewName) => void;
-  onRunLiveVendorSearch?: (options?: { stayOnHome?: boolean }) => void;
+  onRunLiveVendorSearch?: (options?: { stayOnHome?: boolean; category?: string }) => void;
   vendorSearchRunning?: boolean;
   vendorSearchNotice?: string | null;
   vendorSearchQuery?: string | null;

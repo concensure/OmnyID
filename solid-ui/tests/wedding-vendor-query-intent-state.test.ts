@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  mergeWeddingVendorPreferenceLabels,
   weddingVendorQueryGooglePlaceTypes,
   weddingVendorQueryIntent,
 } from "@/lib/weddingVendorQueryIntentState";
@@ -30,6 +31,21 @@ test("a short vendor name remains a private exact-name directory lookup", () => 
 
 test("query budget is displayed with an explicit AUD dollar sign", () => {
   assert.equal(weddingVendorQueryIntent("venue near Coogee for 90 guests under a 13900 budget").budgetComfort, "AUD $13900");
+});
+
+test("descriptive venue wording becomes ranking preferences instead of provider-only text", () => {
+  const intent = weddingVendorQueryIntent("rustic & country micro-wedding venues in Sydney");
+  assert.equal(intent.category, "venue");
+  assert.equal(intent.location, "Sydney");
+  assert.deepEqual(intent.priorities, ["rustic", "country", "micro wedding"]);
+  assert.equal(intent.preferences, "rustic; country; micro wedding");
+});
+
+test("query descriptors merge with saved Wedding preferences without duplication", () => {
+  assert.deepEqual(
+    mergeWeddingVendorPreferenceLabels(["rustic", "micro wedding"], "Photos, relaxed", "rustic; garden"),
+    ["rustic", "micro wedding", "Photos", "relaxed", "garden"],
+  );
 });
 
 test("a venue-scoped comparison excludes a known photographer category", () => {

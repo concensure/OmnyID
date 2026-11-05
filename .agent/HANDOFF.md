@@ -7404,3 +7404,20 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
   flow, partial-batch idempotency, structured vendor responses, comparison/booking closure and the
   allowlisted multi-recipient rollout. These remain false-default; do not infer send authority from
   the now-live private-draft UI.
+
+# 2026-11-05 - WED-334 vendor search and lifecycle repair candidate (Codex, in progress)
+
+- Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
+  `agent/codex/WED-334`, based on WED-333 coordination SHA `e17b4a793297a28bdc05bc93a8524bcfb5a40305`.
+- Category selection no longer replaces visible search wording. Freeform style and scale descriptors
+  such as rustic, country and micro wedding are retained and merged with saved Wedding preferences
+  for provider search and evidence-backed ranking.
+- A completed comparison suppresses the readiness-only notice and is brought into view. Lifecycle
+  rows retain About and Conversation history; the companion surface now uses one vendor photo and
+  Message, Quote and Booking tabs, including explicit drafts, original quote links, normalized quote
+  analysis, another-received-quote comparison, booking context and terms.
+- Passed: typecheck, 23 focused state/source tests, all 2,206 Wedding tests, public Wedding checks,
+  both line budgets, and a 320/390/1280 Chromium journey with query-preservation, overflow and axe
+  checks. Production build, exact-SHA release and hosted proof are still pending.
+- WED-333 should resume from the eventual WED-334 release coordination SHA; do not reintroduce a
+  proposal-specific inbox or lifecycle store.

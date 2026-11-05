@@ -149,7 +149,7 @@ import {
 } from "@/lib/weddingVendorSearchExecutorState";
 import { runWeddingVendorDirectoryFirstSearch } from "@/lib/weddingVendorDirectoryFirstSearchState";
 import { weddingVendorDirectorySearchPlans } from "@/lib/weddingVendorDirectorySearchPlanState";
-import { weddingVendorQueryGooglePlaceTypes, weddingVendorQueryIntent } from "@/lib/weddingVendorQueryIntentState";
+import { mergeWeddingVendorPreferenceLabels, weddingVendorQueryGooglePlaceTypes, weddingVendorQueryIntent } from "@/lib/weddingVendorQueryIntentState";
 import { useWeddingVendorShortlistLaunch } from "@/lib/useWeddingVendorShortlistLaunch";
 import { weddingVendorRankingPolicyV2Enabled } from "@/lib/weddingVendorRankingV2State";
 import { buildWeddingVendorSearchReadinessState } from "@/lib/weddingVendorSearchReadinessState";
@@ -1675,7 +1675,9 @@ export function ResponseQueueView(props: {
       const categoryLabels = weddingVendorSelectionLabels(
         scopedCategoryIds && scopedCategoryIds.length > 0 ? scopedCategoryIds : weddingFollowUpVendorIds(),
       );
-      const freeformQuery = options?.category ? "" : currentWeddingVendorSearchQuery();
+      // Category chips are structured constraints. They must not erase the
+      // couple's visible wording or stop that wording from shaping ranking.
+      const freeformQuery = currentWeddingVendorSearchQuery();
       const queryIntent = weddingVendorQueryIntent(freeformQuery);
       const directoryLookupOnly = Boolean(freeformQuery && queryIntent.exactNameLookup);
       const effectiveCategoryLabels = options?.category ? [options.category] : queryIntent.categoryLabel ? [queryIntent.categoryLabel] : categoryLabels.length > 0
@@ -1762,17 +1764,23 @@ export function ResponseQueueView(props: {
         return false;
       }
       const scopedQuery = Boolean(freeformQuery && !queryIntent.exactNameLookup);
+      const mergedPreferenceLabels = mergeWeddingVendorPreferenceLabels(
+        queryIntent.priorities,
+        weddingFollowUpPriorities(),
+        weddingFollowUpAtmosphere(),
+      );
+      const mergedPreferenceText = mergedPreferenceLabels.join("; ");
       const comparisonInput = {
-        metadata, preferences: scopedQuery ? queryIntent.preferences : [weddingFollowUpPriorities(), weddingFollowUpAtmosphere()].filter(Boolean).join("; "),
-        location: scopedQuery ? queryIntent.location : weddingFollowUpLocation(), dateOrSeason: weddingFollowUpDate(), guestCount: scopedQuery ? queryIntent.guestCount : weddingFollowUpGuests(),
-        budgetComfort: scopedQuery ? queryIntent.budgetComfort : weddingFollowUpBudget(), atmosphereDescription: scopedQuery ? queryIntent.atmosphere : weddingFollowUpAtmosphere(),
-        inspirationImageUrls: linesFromText(weddingFollowUpImageLinks()), topPriorities: scopedQuery ? queryIntent.priorities : linesFromText(weddingFollowUpPriorities()),
+        metadata, preferences: scopedQuery ? mergedPreferenceText || queryIntent.preferences : [weddingFollowUpPriorities(), weddingFollowUpAtmosphere()].filter(Boolean).join("; "),
+        location: scopedQuery ? queryIntent.location ?? weddingFollowUpLocation() : weddingFollowUpLocation(), dateOrSeason: weddingFollowUpDate(), guestCount: scopedQuery ? queryIntent.guestCount ?? weddingFollowUpGuests() : weddingFollowUpGuests(),
+        budgetComfort: scopedQuery ? queryIntent.budgetComfort ?? weddingFollowUpBudget() : weddingFollowUpBudget(), atmosphereDescription: scopedQuery ? queryIntent.atmosphere ?? weddingFollowUpAtmosphere() : weddingFollowUpAtmosphere(),
+        inspirationImageUrls: linesFromText(weddingFollowUpImageLinks()), topPriorities: scopedQuery ? mergedPreferenceLabels : linesFromText(weddingFollowUpPriorities()),
         vendorCategories: effectiveCategoryLabels,
         // A named directory lookup is not a category request. Treating it as
         // `Custom vendor search` filters out a real saved venue such as Mackay.
-        targetCategory: directoryLookupOnly || (freeformQuery && !queryIntent.category)
+        targetCategory: directoryLookupOnly || (freeformQuery && !queryIntent.category && !options?.category)
           ? null
-          : queryIntent.category ?? effectiveCategoryLabels[0] ?? null,
+          : options?.category ?? queryIntent.category ?? effectiveCategoryLabels[0] ?? null,
         requireExactlyThree: true,
         // An exact vendor-name lookup must be predictable and private: search
         // the existing directory only instead of turning a name into a broad

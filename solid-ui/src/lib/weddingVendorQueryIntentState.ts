@@ -34,6 +34,13 @@ function unique(values: readonly string[]): string[] {
   return [...new Set(values.map(clean).filter(Boolean))];
 }
 
+export function mergeWeddingVendorPreferenceLabels(...values: readonly unknown[]): string[] {
+  return unique(values.flatMap((value) => {
+    if (Array.isArray(value)) return value.filter((item): item is string => typeof item === "string");
+    return typeof value === "string" ? value.split(/[;,\n]+/) : [];
+  }));
+}
+
 function queryLocation(query: string): string | null {
   const match = query.match(/\b(?:in|around|within)\s+(.+?)(?=\s+(?:with|for|and\s+looking|that\s+)|[,.;]|$)/i);
   return clean(match?.[1]) || null;
@@ -56,6 +63,30 @@ function queryAtmosphere(query: string): string | null {
   return clean(match?.[1]) || null;
 }
 
+const DESCRIPTIVE_PREFERENCE_PATTERNS: ReadonlyArray<readonly [RegExp, string]> = [
+  [/\brustic\b/i, "rustic"],
+  [/\bcountry\b/i, "country"],
+  [/\bmicro(?:[- ]wedding)?\b/i, "micro wedding"],
+  [/\bintimate\b/i, "intimate"],
+  [/\bcoastal\b/i, "coastal"],
+  [/\bgarden\b/i, "garden"],
+  [/\bnatural\b/i, "natural"],
+  [/\brelaxed\b/i, "relaxed"],
+  [/\bromantic\b/i, "romantic"],
+  [/\bmodern\b/i, "modern"],
+  [/\belegant\b/i, "elegant"],
+  [/\bformal\b/i, "formal"],
+  [/\bindustrial\b/i, "industrial"],
+  [/\bboho\b/i, "boho"],
+  [/\blux(?:e|ury)\b/i, "luxury"],
+];
+
+function descriptivePreferences(query: string): string[] {
+  return DESCRIPTIVE_PREFERENCE_PATTERNS
+    .filter(([pattern]) => pattern.test(query))
+    .map(([, label]) => label);
+}
+
 function isExactNameLookup(query: string): boolean {
   const words = query.split(/\s+/).filter(Boolean);
   const contextual = /\b(?:wedding|find|search|looking|recommend|compare|near|around|within|guests?|people|budget|atmosphere|style|available)\b/i.test(query);
@@ -69,9 +100,11 @@ export function weddingVendorQueryIntent(value: unknown): WeddingVendorQueryInte
   const guestCount = queryGuestCount(query);
   const budgetComfort = queryBudget(query);
   const atmosphere = queryAtmosphere(query);
-  const priorities = unique([
+  const descriptors = descriptivePreferences(query);
+  const priorities = mergeWeddingVendorPreferenceLabels([
     /\b(?:near|by|close to|beside)\s+(?:the\s+)?beach\b/i.test(query) ? "Near the beach" : "",
     atmosphere ?? "",
+    ...descriptors.filter((descriptor) => !atmosphere?.toLowerCase().includes(descriptor)),
   ]);
   return {
     category: categoryMatch?.[1] ?? null,
