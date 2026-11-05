@@ -5,6 +5,7 @@ import test from "node:test";
 const homeSource = readFileSync(new URL("../src/components/WeddingVendorSearchHomeSections.tsx", import.meta.url), "utf8");
 const panelSource = readFileSync(new URL("../src/components/WeddingInviteProposalsPanel.tsx", import.meta.url), "utf8");
 const oracleComposeSource = readFileSync(new URL("../../docker-compose.oracle.minimal.yml", import.meta.url), "utf8");
+const caddySource = readFileSync(new URL("../../Caddyfile", import.meta.url), "utf8");
 
 test("vendor home exposes accessible in-place Find and Invite tabs", () => {
   assert.match(homeSource, /role="tablist"/);
@@ -45,4 +46,11 @@ test("Oracle forwards the false-default proposal rollout controls to the homeser
     oracleComposeSource,
     /OMNYID_WEDDING_INVITE_PROPOSALS_ALLOWLIST: \$\{OMNYID_WEDDING_INVITE_PROPOSALS_ALLOWLIST:-\}/,
   );
+});
+
+test("Caddy sends every proposal opportunity surface to the secured homeserver", () => {
+  assert.match(caddySource, /handle \/wedding\/invite-proposals\/\*/);
+  assert.match(caddySource, /handle \/wedding\/vendor\/proposal-opportunities\*/);
+  assert.match(caddySource, /handle \/api\/public\/wedding\/proposal-opportunities\/\*/);
+  assert.match(caddySource, /handle \/admin\/wedding\/proposal-opportunities/);
 });

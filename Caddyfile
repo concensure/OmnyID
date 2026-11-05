@@ -352,6 +352,24 @@
         import omnyid_proxy
     }
 
+    # Invite Proposals remains authenticated or capability-gated by the
+    # homeserver. These API paths must win before the static Wedding site.
+    handle /wedding/invite-proposals/* {
+        import omnyid_proxy
+    }
+
+    handle /wedding/vendor/proposal-opportunities* {
+        import omnyid_proxy
+    }
+
+    handle /api/public/wedding/proposal-opportunities/* {
+        import omnyid_proxy
+    }
+
+    handle /admin/wedding/proposal-opportunities {
+        import omnyid_proxy
+    }
+
     handle /wedding/live-evidence {
         import omnyid_proxy
     }
