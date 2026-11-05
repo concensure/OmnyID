@@ -501,6 +501,7 @@ mod tests {
             soul_md: "Keep visible wording concise.".to_string(),
             writing_style: "concise".to_string(),
             skills_json: serde_json::json!([]),
+            image_data_url: None,
             lora_confidence_score: 0.0,
             lora_genome_active: false,
             is_active: true,

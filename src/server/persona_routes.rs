@@ -17,8 +17,8 @@ use serde_json::Value;
 
 use super::*;
 use crate::agent_personas::{
-    AgentPersona, CreatePersonaRequest, UpdatePersonaRequest, sanitize_persona_name,
-    sanitize_persona_writing_style,
+    AgentPersona, CreatePersonaRequest, UpdateAgentUiPreferencesRequest, UpdatePersonaRequest,
+    sanitize_persona_image_data_url, sanitize_persona_name, sanitize_persona_writing_style,
 };
 
 fn persona_user_facing_text(
@@ -62,6 +62,35 @@ pub(super) async fn list_personas_http(
     })))
 }
 
+/// GET /agent/ui-preferences
+pub(super) async fn agent_ui_preferences_get_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    let user = authenticated_user(&state.db, &headers).await?;
+    let preferences = state
+        .db
+        .get_agent_ui_preferences(&user.id)
+        .await
+        .map_err(persona_error)?;
+    Ok(Json(serde_json::json!({ "preferences": preferences })))
+}
+
+/// PUT /agent/ui-preferences
+pub(super) async fn agent_ui_preferences_put_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(req): Json<UpdateAgentUiPreferencesRequest>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    let user = authenticated_user(&state.db, &headers).await?;
+    let preferences = state
+        .db
+        .update_agent_ui_preferences(&user.id, req.persona_fab_visible)
+        .await
+        .map_err(persona_error)?;
+    Ok(Json(serde_json::json!({ "preferences": preferences })))
+}
+
 /// POST /agent/personas
 pub(super) async fn create_persona_http(
     State(state): State<Arc<AppState>>,
@@ -87,6 +116,8 @@ pub(super) async fn create_persona_http(
             ));
         }
     }
+    sanitize_persona_image_data_url(req.image_data_url.as_deref())
+        .map_err(|error| (StatusCode::BAD_REQUEST, error))?;
     let persona = state
         .db
         .create_agent_persona(&user.id, &req)
@@ -129,6 +160,10 @@ pub(super) async fn update_persona_http(
             ));
         }
     }
+    if let Some(image_data_url) = req.image_data_url.as_ref() {
+        sanitize_persona_image_data_url(image_data_url.as_deref())
+            .map_err(|error| (StatusCode::BAD_REQUEST, error))?;
+    }
     let updated = state
         .db
         .update_agent_persona(&user.id, &persona_id, &req)
@@ -159,6 +194,7 @@ mod tests {
             soul_md: "Keep replies calm.".to_string(),
             writing_style: "warm".to_string(),
             skills_json: serde_json::json!(["email", "notes"]),
+            image_data_url: None,
             lora_confidence_score: 0.0,
             lora_genome_active: false,
             is_active: true,

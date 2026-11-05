@@ -33,7 +33,6 @@ export const WEDDING_VENDOR_LEAD_TIME_RULES: readonly WeddingVendorLeadTimeRule[
   { categoryId: "decor", label: "Decor", idealLeadMonths: [4, 6], hardDeadlineMonths: 2, rationale: "Design choices depend on the venue, palette and hire inventory." },
   { categoryId: "rental_company", label: "Rental company", idealLeadMonths: [4, 6], hardDeadlineMonths: 2, rationale: "Furniture and equipment inventory may be shared across events." },
   { categoryId: "videographer", label: "Videographer", idealLeadMonths: [9, 12], hardDeadlineMonths: 6, rationale: "Preferred styles and teams can have limited date availability." },
-  { categoryId: "officiant", label: "Marriage celebrant", idealLeadMonths: [9, 12], hardDeadlineMonths: 1, mustDecideFirst: true, rationale: "An authorised celebrant receives the NOIM and coordinates legal ceremony requirements." },
   { categoryId: "hair_stylist", label: "Hair stylist", idealLeadMonths: [4, 6], hardDeadlineMonths: 2, rationale: "Trials, travel and wedding-party coverage need a workable schedule." },
   { categoryId: "makeup_artist", label: "Makeup artist", idealLeadMonths: [4, 6], hardDeadlineMonths: 2, rationale: "Trials, travel and wedding-party coverage need a workable schedule." },
   { categoryId: "entertainment", label: "Entertainment", idealLeadMonths: [6, 9], hardDeadlineMonths: 3, rationale: "Specialist performers may have limited suitable dates." },
@@ -159,7 +158,7 @@ export function weddingCatalogueCoverageState() {
 }
 
 const coverage = weddingCatalogueCoverageState();
-export const WEDDING_COUNTDOWN_PUBLICATION_READY = coverage.taskCount >= 65
+export const WEDDING_COUNTDOWN_PUBLICATION_READY = coverage.taskCount >= 64
   && coverage.taskCount === coverage.uniqueTaskCount
   && coverage.vendorRuleCount === coverage.vendorTaskCount
   && coverage.stageCount === WEDDING_CATALOGUE_STAGES.length

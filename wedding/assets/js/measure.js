@@ -12,6 +12,7 @@
   var MAX_PENDING = 96;
   var queue = loadPending(), sentSession = false, timer = null;
   var started = Date.now(), finished = false, flushing = false;
+  var lcp = 0, cls = 0, interruptionSent = false;
 
   function randomId(length) {
     try {
@@ -164,6 +165,43 @@
   window.OmnyWeddingMeasure = { track: track };
   if (location.pathname === '/') track('omnyid_landing_view');
   if (document.body.classList.contains('landing-v2')) track('wedding_landing_view');
+
+  function speedBucket(value, good, slow) {
+    if (!isFinite(value) || value < 0) return 'unknown';
+    return value <= good ? 'good' : (value <= slow ? 'needs_attention' : 'slow');
+  }
+  if ('PerformanceObserver' in window) {
+    try {
+      new PerformanceObserver(function (list) {
+        list.getEntries().forEach(function (entry) { lcp = Math.max(lcp, entry.startTime || 0); });
+      }).observe({ type: 'largest-contentful-paint', buffered: true });
+      new PerformanceObserver(function (list) {
+        list.getEntries().forEach(function (entry) { if (!entry.hadRecentInput) cls += entry.value || 0; });
+      }).observe({ type: 'layout-shift', buffered: true });
+    } catch (_) {}
+  }
+  function reportInterruption(kind) {
+    if (interruptionSent) return;
+    interruptionSent = true;
+    track('public_page_interruption', { interruption_type: kind });
+  }
+  window.addEventListener('error', function (event) {
+    if (event.target === window) reportInterruption('script_error');
+  });
+  window.addEventListener('unhandledrejection', function () { reportInterruption('promise_rejection'); });
+  function reportPerformance() {
+    window.setTimeout(function () {
+      var navigation = performance.getEntriesByType && performance.getEntriesByType('navigation')[0];
+      var load = navigation ? navigation.loadEventEnd : Date.now() - started;
+      track('public_page_performance', {
+        load_bucket: speedBucket(load, 1500, 3000),
+        lcp_bucket: speedBucket(lcp, 2500, 4000),
+        cls_bucket: speedBucket(cls, 0.1, 0.25)
+      });
+    }, 1000);
+  }
+  if (document.readyState === 'complete') reportPerformance();
+  else window.addEventListener('load', reportPerformance, { once: true });
 
   document.addEventListener('click', function (event) {
     var target = event.target.closest('a, button');

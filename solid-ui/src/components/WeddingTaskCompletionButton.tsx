@@ -10,6 +10,13 @@ import {
 } from "@/lib/weddingTaskCompletionLocalState";
 import { weddingTaskCompletionToAfpSendInput } from "@/lib/weddingTaskCompletionProjectionState";
 
+function parentTaskId(task: WeddingPlanningTaskItem): string {
+  const metadata = task.metadata && typeof task.metadata === "object" && !Array.isArray(task.metadata)
+    ? task.metadata as Record<string, unknown>
+    : {};
+  return typeof metadata.parent_task_id === "string" ? metadata.parent_task_id.trim() : "";
+}
+
 export function WeddingTaskCompletionButton(props: {
   task: WeddingPlanningTaskItem;
   weddingPlanId: string;
@@ -39,7 +46,7 @@ export function WeddingTaskCompletionButton(props: {
     const record = saveWeddingTaskCompletion({ taskId: props.task.id, weddingPlanId: props.weddingPlanId, responseWorkspaceId: props.responseWorkspaceId, completed: !done() });
     if (!record) return;
     setDone(record.completed);
-    const input = weddingTaskCompletionToAfpSendInput({ record, title: props.task.title });
+    const input = weddingTaskCompletionToAfpSendInput({ record, title: props.task.title, parentTaskId: parentTaskId(props.task) });
     if (!input || !props.saveProjection) return;
     setBusy(true);
     try { await props.saveProjection(input); } finally { setBusy(false); }

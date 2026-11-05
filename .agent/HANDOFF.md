@@ -7484,3 +7484,22 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
   restore drill.
 - Evidence: `Documents/verification/wed-333-wed-335-release-2026-11-05.md`. Invite Proposals stays
   false-default and allowlisted; do not treat this pilot implementation as general availability.
+
+# 2026-11-05 - WED-336 persona, Wedding subtasks and weekly report candidate (Codex, review)
+
+- Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
+  `agent/codex/WED-336`, based on `7aa9727ca733ae705cd42fd828de267485d4ed5a`.
+- Users can minimise Sprout and restore it in mobile-friendly Agent Settings. Persona images are
+  cropped client-side and revalidated server-side with account-scoped persistence.
+- Expanded Wedding tasks expose deterministic or user-added child tasks. Children retain owner,
+  consult, due-date, completion, explicit research and removal actions while remaining excluded
+  from the top-level queue and automatic funded research. The duplicate officiant catalogue entry
+  is removed; the authorised celebrant and NOIM tasks remain.
+- A false-default Monday report sends the prior Sydney week's aggregate registration, activation,
+  engagement, public performance/interruption, Oracle disk and credential-expiry metadata to the
+  fixed operator address. Its database receipt makes provider attempts idempotent across replicas.
+- Passed on the working source: 2,214 Wedding tests, focused UI/state tests, public Wedding checks,
+  typecheck, both line budgets, production build, cargo check, focused Rust tests, migration-catalog
+  parity and an authenticated disposable-pgvector API test that proved migration 0146's two tables
+  and persona image column. Next: commit, rebuild from a clean exact-SHA checkout, deploy, confirm
+  runtime provenance/migration and distinguish provider acceptance from inbox delivery.

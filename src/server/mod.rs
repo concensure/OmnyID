@@ -1088,6 +1088,10 @@ pub async fn run() {
         start_archive_daemon(db.clone(), shutdown_rx.clone()),
         start_health_maintenance_daemon(db.clone(), shutdown_rx.clone()),
         start_vendor_email_quarantine_retention(db.clone(), shutdown_rx.clone()),
+        crate::weekly_operator_report::start_weekly_operator_report(
+            db.clone(),
+            shutdown_rx.clone(),
+        ),
     ];
     match start_sync_worker(db.pool.clone(), shutdown_rx.clone()).await {
         Ok(handle) => daemon_handles.push(handle),
@@ -1359,6 +1363,10 @@ pub async fn run() {
         .route(
             "/agent/personas",
             get(list_personas_http).post(create_persona_http),
+        )
+        .route(
+            "/agent/ui-preferences",
+            get(agent_ui_preferences_get_http).put(agent_ui_preferences_put_http),
         )
         .route(
             "/agent/personas/{id}",

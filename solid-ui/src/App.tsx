@@ -51,6 +51,7 @@ import {
   fetchDashboardBootstrap,
   fetchEncKey,
   getFleet,
+  getAgentUiPreferences,
   fetchLlmConfig,
   fetchObjectMessages,
   probeApiReachability,
@@ -84,6 +85,10 @@ import {
   uploadFilePayload,
   verifyEmailToken,
 } from "@/lib/api";
+import {
+  AGENT_PERSONA_FAB_VISIBILITY_EVENT,
+  agentPersonaFabVisibilityFromEvent,
+} from "@/lib/agentPersonaFabVisibilityState";
 import { sameSessionAcquisitionVisitId } from "@/lib/growthAcquisitionState";
 import { fleetStatusSummary } from "@/lib/agentFleetResponseState";
 import { buildSessionEndedNotice } from "@/lib/sessionRecoveryState";
@@ -1165,6 +1170,7 @@ function App() {
       || new URLSearchParams(window.location.search).get("from") === "quiz",
   });
   const [session, setSession] = createSignal(initialSession);
+  const [personaFabVisible, setPersonaFabVisible] = createSignal(true);
   // Declared early: userId/workspaceBootstrap are read synchronously by several
   // createMemo initializers further down (e.g. studyLensDashboard, weddingArrivalBanner),
   // and createMemo runs its computation immediately, so these must exist before those do.
@@ -1186,6 +1192,24 @@ function App() {
     return dashboardBootstrapHasSampleMessages(bootstrap);
   });
   const userId = createMemo(() => workspaceBootstrap()?.user.id ?? session()?.user?.id ?? "");
+  createEffect(() => {
+    const token = session()?.token;
+    if (!token) {
+      setPersonaFabVisible(true);
+      return;
+    }
+    void getAgentUiPreferences()
+      .then((preferences) => setPersonaFabVisible(preferences.persona_fab_visible))
+      .catch(() => setPersonaFabVisible(true));
+  });
+  onMount(() => {
+    const listener = (event: Event) => {
+      const visible = agentPersonaFabVisibilityFromEvent(event);
+      if (visible !== null) setPersonaFabVisible(visible);
+    };
+    window.addEventListener(AGENT_PERSONA_FAB_VISIBILITY_EVENT, listener);
+    onCleanup(() => window.removeEventListener(AGENT_PERSONA_FAB_VISIBILITY_EVENT, listener));
+  });
   const gmailRedirectStatus =
     typeof window !== "undefined"
       ? new URLSearchParams(window.location.search).get("gmail")
@@ -4387,7 +4411,7 @@ function App() {
       </GlassPanel>
 
       {/* Floating agent persona FAB */}
-      <Show when={Boolean(session()?.token)}>
+      <Show when={Boolean(session()?.token) && personaFabVisible()}>
         <AgentPersonaFAB
           signedIn={Boolean(session()?.token)}
           activeCount={fleetActiveCount()}

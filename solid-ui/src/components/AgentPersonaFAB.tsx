@@ -4,7 +4,8 @@
 // @stability: beta
 import { createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { EmptyState } from "@/components/EmptyState";
-import { listPersonas, type AgentPersona } from "@/lib/api";
+import { listPersonas, updateAgentUiPreferences, type AgentPersona } from "@/lib/api";
+import { dispatchAgentPersonaFabVisibility } from "@/lib/agentPersonaFabVisibilityState";
 import {
   PERSONA_TEMPLATES,
   type PersonaTemplate,
@@ -79,6 +80,7 @@ export function AgentPersonaFAB(props: {
   const [loadError, setLoadError] = createSignal<PersonaSwitcherFailureReceipt | null>(null);
   const [actionError, setActionError] = createSignal<PersonaSwitcherFailureReceipt | null>(null);
   const [actionNotice, setActionNotice] = createSignal<string | null>(null);
+  const [minimizing, setMinimizing] = createSignal(false);
   let longPressTimer: ReturnType<typeof setTimeout> | undefined;
   let didLongPress = false;
   const switcherBusy = createMemo(() => personaSwitcherBusy({
@@ -281,6 +283,24 @@ export function AgentPersonaFAB(props: {
     }
   }
 
+  async function minimizeSprout() {
+    if (minimizing() || switcherBusy()) return;
+    setMinimizing(true);
+    setActionError(null);
+    try {
+      await updateAgentUiPreferences(false);
+      closeSwitcher();
+      dispatchAgentPersonaFabVisibility(false);
+    } catch (error) {
+      setActionError(buildPersonaSwitcherFailureReceipt(
+        "Hide Sprout",
+        error instanceof Error ? error.message : "Could not save that setting.",
+      ));
+    } finally {
+      setMinimizing(false);
+    }
+  }
+
   const dotColor = () => {
     switch (currentAvatarAnimationState()) {
       case "busy":    return "bg-blue-400 animate-pulse";
@@ -316,8 +336,8 @@ export function AgentPersonaFAB(props: {
         {/* Panel: fluid width so it doesn't overflow on narrow screens */}
         <div class="fixed bottom-[4.75rem] right-6 phone:bottom-[calc(4.75rem+env(safe-area-inset-bottom))] phone:right-3 z-50 max-h-[min(32rem,calc(100dvh_-_6rem))] w-[min(25rem,_calc(100vw_-_1.5rem))] overflow-hidden rounded-3xl border border-white/45 bg-white/96 shadow-panel backdrop-blur-xl animate-fade-in">
           <div class="border-b border-outline/10 px-3.5 py-3">
-            <div class="flex items-start justify-between gap-3">
-              <div class="min-w-0">
+            <div class="flex flex-wrap items-start gap-2">
+              <div class="min-w-0 flex-1 basis-full sm:basis-auto">
                 <p class="font-mono text-[0.5625em] uppercase tracking-[0.2em] text-outline">
                   Swap agent persona
                 </p>
@@ -335,6 +355,14 @@ export function AgentPersonaFAB(props: {
                 class="rounded-xl px-2 py-1 text-[0.6875em] text-on-surface-variant transition hover:bg-on-surface/6 hover:text-on-surface"
               >
                 Settings
+              </button>
+              <button
+                type="button"
+                disabled={switcherBusy() || minimizing()}
+                onClick={() => void minimizeSprout()}
+                class="rounded-xl px-2 py-1 text-[0.6875em] text-on-surface-variant transition hover:bg-on-surface/6 hover:text-on-surface"
+              >
+                {minimizing() ? "Hiding…" : "Minimise"}
               </button>
               <button
                 type="button"
@@ -480,7 +508,12 @@ export function AgentPersonaFAB(props: {
                       persona.is_active ? "bg-primary/8 text-primary" : "text-on-surface"
                     }`}
                   >
-                    <span class="text-lg leading-none">{extractEmoji(persona.soul_md)}</span>
+                    <Show
+                      when={persona.image_data_url}
+                      fallback={<span class="text-lg leading-none">{extractEmoji(persona.soul_md)}</span>}
+                    >
+                      {(source) => <img src={source()} alt="" class="h-8 w-8 rounded-xl object-cover" />}
+                    </Show>
                     <div class="min-w-0 flex-1">
                       <p class="text-sm font-medium leading-snug">{persona.name}</p>
                       <p class="mt-0.5 text-[0.625em] text-on-surface-variant/65">
@@ -601,10 +634,12 @@ export function AgentPersonaFAB(props: {
             </svg>
           }
         >
-          <span class="text-xl leading-none select-none" aria-hidden="true">
-            {/* Prefer persona emoji; fall back to mood emoji */}
-            {active() ? extractEmoji(active()!.soul_md) : moodEmoji() ?? "🤖"}
-          </span>
+          <Show
+            when={active()?.image_data_url}
+            fallback={<span class="text-xl leading-none select-none" aria-hidden="true">{active() ? extractEmoji(active()!.soul_md) : moodEmoji() ?? "🤖"}</span>}
+          >
+            {(source) => <img src={source()} alt="" class="h-8 w-8 rounded-xl object-cover" />}
+          </Show>
         </Show>
 
         {/* Capability chip — shown in top-left when genome badges are earned */}

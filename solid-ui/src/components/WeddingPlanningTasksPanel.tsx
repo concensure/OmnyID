@@ -5,6 +5,7 @@ import { WeddingTaskComposer } from "@/components/WeddingTaskComposer";
 import { WeddingTaskCompletionButton } from "@/components/WeddingTaskCompletionButton";
 import { WeddingTaskOwnerControl } from "@/components/WeddingTaskOwnerControl";
 import { WeddingTaskContextHelp } from "@/components/WeddingTaskContextHelp";
+import { WeddingSubtasksPanel } from "@/components/WeddingSubtasksPanel";
 
 import type { SendAfpMessageInput } from "@/lib/api";
 import {
@@ -178,6 +179,13 @@ export function WeddingPlanningTasksPanel(props: {
                       )}</For>
                     </ol>
                   </Show>
+                  <WeddingSubtasksPanel
+                    parent={task}
+                    state={props.state}
+                    saveProjection={props.saveProjection}
+                    onRefreshWorkspace={props.onRefreshWorkspace}
+                    contactUserId={props.contactUserId}
+                  />
                 </div>
               </Show>
             </li>

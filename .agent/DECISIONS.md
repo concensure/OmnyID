@@ -2802,3 +2802,15 @@ subjective usability or a controlled external cohort.
 - An unclaimed vendor's initial path is its verified private business email. The existing scoped
   no-account quote capability is created only for a real quote transaction, so the UI must not
   imply that the invitation email already includes a public vendor link.
+
+# 2026-11-05 - WED-336 account-scoped persona presentation and bounded operations reporting
+
+- Hiding Sprout and choosing a persona image are account-scoped server preferences. The image is a
+  small validated WebP, JPEG or PNG data URL; local paths, SVG and remote image URLs are rejected.
+- Wedding subtasks are child task events in the existing AFP ledger, identified by
+  `parent_task_id`; they do not form a second task store. Suggestions are deterministic and never
+  enter funded research unless the user explicitly chooses Research for that child.
+- The weekly operator email reuses existing aggregate Growth and public Wedding measurements. It
+  contains no account identifiers, tokens, page text or private Wedding content, accepts only the
+  fixed operator recipient, and uses a migration-backed weekly receipt to avoid duplicate sends.
+  Credential reminders consume expiry-date metadata only, never credential values.

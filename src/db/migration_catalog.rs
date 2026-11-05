@@ -740,4 +740,9 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Content-free approval batches and replay-safe per-vendor Invite Proposal delivery receipts",
         include_str!("../../postgres/migrations/0145_wedding_invite_proposal_batches.sql"),
     ),
+    (
+        "0146_agent_persona_ui_and_weekly_reports",
+        "Account-scoped persona presentation preferences and replay-safe weekly operator report receipts",
+        include_str!("../../postgres/migrations/0146_agent_persona_ui_and_weekly_reports.sql"),
+    ),
 ];

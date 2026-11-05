@@ -1,5 +1,5 @@
 version: 1
-updated: 2026-11-04
+updated: 2026-11-05
 
 lifecycle:
   allowed_statuses:
@@ -15,6 +15,18 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-336
+    title: Personalise the agent control, add canonical Wedding subtasks, and send bounded weekly operations reports
+    status: review
+    owner: codex
+    branch: agent/codex/WED-336
+    worktree: C:/Users/ozans/Desktop/projects/OmnyID-GROWTH-001
+    base_sha: 7aa9727
+    depends_on: [WED-333, WED-335, GROWTH-09]
+    files: [solid-ui/src/components/Agent**, solid-ui/src/lib/persona**, solid-ui/src/lib/agent**, solid-ui/src/components/Wedding*Task**, solid-ui/src/lib/wedding*Task**, solid-ui/tests/**persona**, solid-ui/tests/**agent-settings**, solid-ui/tests/wedding-task**, src/server/**persona**, src/server/**growth**, src/db/**growth**, scripts/**weekly**, postgres/migrations/**, Documents/verification/**, .agent/**]
+    acceptance: [an authenticated user can minimise the floating persona control and restore it from Agent Settings with account-scoped persistence, Agent Settings remains usable without horizontal overflow at 320px and persona controls support an accessible bounded user-selected image without exposing local paths or another account image, prebuilt Wedding tasks do not duplicate officiant and celebrant work and retain the authorised celebrant task, every Wedding task can reveal canonical child tasks and add or remove a child with explicit confirmation while child tasks reuse owner research due-date completion and evidence actions, child tasks never enter the automatic funded-research window unless the user explicitly requests research, a privacy-bounded weekly report emails concensure@gmail.com aggregate registration activation engagement performance interruption Oracle disk and credential-rotation status without token values or private Wedding content, report delivery is idempotent configurable observable and tested, focused Rust and frontend tests all Wedding tests typecheck production build and line budgets pass, a clean exact-SHA Oracle release records matching provenance]
+    progress: "Release candidate implemented and locally verified. Sprout visibility and persona images are account-scoped; task children remain parent-linked AFP projections and require an explicit Research action; the officiant duplicate is removed while the authorised celebrant task remains. The false-default weekly daemon reuses Growth and Wedding measurement aggregates, stores only an idempotency receipt and accepts only concensure@gmail.com. Passed: 2,214 Wedding tests, public Wedding checks, typecheck, focused frontend and Rust tests, both line budgets, production build, cargo check, migration-catalog parity and disposable pgvector migration/API proof. Clean exact-SHA Oracle release and hosted delivery/provenance checks remain."
+
   - id: WED-332
     title: Deliver assigned Wedding research and repair journey and guest actions
     status: done

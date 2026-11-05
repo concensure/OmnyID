@@ -1388,8 +1388,8 @@ export function AgentSettingsView(props: {
   }
 
   return (
-    <div class="space-y-5">
-      <div class="glass-surface rounded-xl border border-white/40 p-6 shadow-panel">
+    <div class="min-w-0 space-y-5 overflow-x-hidden">
+      <div class="glass-surface min-w-0 rounded-xl border border-white/40 p-3 shadow-panel sm:p-6">
         <p class="font-mono text-[10px] uppercase tracking-[0.22em] text-outline">Agent Settings</p>
         <h3 class="mt-2 text-lg font-semibold text-on-surface">Your Master Agent</h3>
         <p class="mt-1 text-sm leading-6 text-on-surface-variant">
@@ -1651,7 +1651,7 @@ export function AgentSettingsView(props: {
             </SectionCard>
 
             {/* API management tab bar */}
-            <div role="tablist" aria-label="Agent settings sections" class="flex gap-0 border-b border-white/10">
+            <div role="tablist" aria-label="Agent settings sections" class="flex max-w-full gap-0 overflow-x-auto border-b border-white/10 pb-px [scrollbar-width:none]">
               {SETTINGS_TABS.map((tab) => {
                 const LABELS: Record<string, string> = {
                   llm: "LLM & APIs",
@@ -1667,7 +1667,7 @@ export function AgentSettingsView(props: {
                     aria-controls={`agent-settings-panel-${tab}`}
                     id={`agent-settings-tab-${tab}`}
                     tabIndex={settingsTab() === tab ? 0 : -1}
-                    class={`-mb-px border-b-2 px-4 py-2.5 text-xs font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
+                    class={`-mb-px min-h-11 shrink-0 border-b-2 px-3 py-2.5 text-xs font-medium transition sm:px-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
                       settingsTab() === tab
                         ? "border-primary text-primary"
                         : "border-transparent text-on-surface-variant hover:text-on-surface"
@@ -3466,7 +3466,7 @@ export function AgentSettingsView(props: {
             <AgentPreferencesPanel />
 
             {/* Agent Personas */}
-            <div class="glass-surface rounded-xl border border-white/40 p-6 shadow-panel">
+            <div class="glass-surface min-w-0 rounded-xl border border-white/40 p-3 shadow-panel sm:p-6">
               <AgentPersonasPanel />
             </div>
 

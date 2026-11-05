@@ -15,8 +15,8 @@ function engine() {
 test('public catalogue exposes the shared complete planner authority', () => {
   assert.equal(catalogue.schema, 'wedding-catalogue.v1');
   assert.equal(catalogue.publicationReady, true);
-  assert.equal(catalogue.tasks.length, 65);
-  assert.equal(catalogue.vendorLeadTimeRules.length, 31);
+  assert.equal(catalogue.tasks.length, 64);
+  assert.equal(catalogue.vendorLeadTimeRules.length, 30);
   assert.equal(catalogue.stages.length, 6);
 });
 
@@ -26,7 +26,7 @@ test('exact dates produce deterministic next actions across leap days and month 
   const second = api.buildPlan(catalogue, { weddingDate: '2028-02-29', today: '2027-02-28', doneIds: [] });
   assert.equal(first.ok, true);
   assert.deepEqual(first, second);
-  assert.equal(first.tasks.length, 65);
+  assert.equal(first.tasks.length, 64);
   assert.equal(first.noim.originalTargetDate, '2027-12-01');
   assert.ok(first.nextTasks.length <= 5);
 });
@@ -34,7 +34,7 @@ test('exact dates produce deterministic next actions across leap days and month 
 test('short plans keep every item and never display an incomplete task in the past', () => {
   const plan = engine().buildPlan(catalogue, { weddingDate: '2027-01-31', today: '2026-11-04', doneIds: ['set-budget'] });
   assert.equal(plan.compressedPlan, true);
-  assert.equal(plan.tasks.length, 65);
+  assert.equal(plan.tasks.length, 64);
   assert.ok(plan.catchUpTasks.length > 0);
   assert.ok(plan.tasks.filter((task) => !task.completed).every((task) => task.targetDate >= '2026-11-04'));
   assert.equal(plan.tasks.find((task) => task.id === 'set-budget').status, 'completed');

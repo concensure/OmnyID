@@ -20,11 +20,11 @@ test("wedding vendor lead-time table covers the shipped vendor checklist", () =>
   const coverage = weddingVendorLeadTimeCoverageState();
 
   assert.equal(coverage.checklistCount, WEDDING_VENDOR_CHECKLIST.length);
-  assert.equal(coverage.tableCount, WEDDING_VENDOR_CHECKLIST.length);
   assert.deepEqual(coverage.missingCategoryIds, []);
+  assert.equal(coverage.tableCount, WEDDING_VENDOR_CHECKLIST.length - 1);
+  assert.equal(buildWeddingVendorLeadTimeRecommendations({ weddingDateOrSeason: "2027-10-14" }).some((item) => item.categoryId === "officiant"), false);
   assert.deepEqual(weddingVendorMustDecideFirstCategories().map((category) => category.categoryId), [
     "venue",
-    "officiant",
   ]);
 });
 

@@ -398,7 +398,7 @@ function isSeededTimelineTask(task: WeddingPlanningTaskItem): boolean {
 function isUserFacingWeddingPlanningTask(task: WeddingPlanningTaskItem): boolean {
   const metadata = record(task.metadata);
   return !(
-    metadata.oracle_update_plan_task === true
+    metadata.wedding_subtask === true || Boolean(clean(metadata.parent_task_id)) || metadata.oracle_update_plan_task === true
     || metadata.production_remaining_work_task === true
     || metadata.background_automation_task === true
     || metadata.provider_handoff_task === true

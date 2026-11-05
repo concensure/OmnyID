@@ -8,6 +8,7 @@ export type WeddingTaskDateProjectionInput = {
   dueDate?: string | null;
   weddingPlanId?: string | null;
   responseWorkspaceId?: string | null;
+  parentTaskId?: string | null;
   sourceMessageId?: string | null;
   nowIso?: string | null;
 };
@@ -33,6 +34,7 @@ export function weddingTaskDateToAfpMessage(input: WeddingTaskDateProjectionInpu
 
   const nowIso = clean(input.nowIso) || new Date().toISOString();
   const title = clean(input.title) || "Wedding task date update";
+  const parentTaskId = clean(input.parentTaskId);
   const status = hasDate ? "dated" : "undated";
   const messageId = `afp-wedding-task-date:${safeWeddingLabel(weddingPlanId)}:${safeWeddingLabel(responseWorkspaceId)}:${safeWeddingLabel(taskId)}:${status}`;
   const references: AfpReference[] = [
@@ -70,6 +72,7 @@ export function weddingTaskDateToAfpMessage(input: WeddingTaskDateProjectionInpu
       status,
       wedding_plan_id: weddingPlanId,
       response_workspace_id: responseWorkspaceId,
+      parent_task_id: parentTaskId || null,
       source: "wedding_task_stage_view",
       agent_action: "rebuild_wedding_timeline_and_reminders",
       agent_action_requested: true,
@@ -80,6 +83,8 @@ export function weddingTaskDateToAfpMessage(input: WeddingTaskDateProjectionInpu
       wedding_plan_id: weddingPlanId,
       response_workspace_id: responseWorkspaceId,
       wedding_task_id: taskId,
+      parent_task_id: parentTaskId || null,
+      wedding_subtask: Boolean(parentTaskId),
       due_date: hasDate ? dueDate : null,
       agent_action_requested: true,
       agent_action: "rebuild_wedding_timeline_and_reminders",

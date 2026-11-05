@@ -6824,6 +6824,7 @@ export type AgentPersona = {
   writing_style: string;
   skills_json: string[];
   labels_json: string[];
+  image_data_url: string | null;
   lora_confidence_score: number;
   lora_genome_active: boolean;
   is_active: boolean;
@@ -6841,6 +6842,7 @@ export function normalizeAgentPersona(value: unknown): AgentPersona | null {
     writing_style: apiString(value.writing_style),
     skills_json: apiStringList(value.skills_json),
     labels_json: apiStringList(isRecord(value) && "labels_json" in value ? value.labels_json : value.skills_json),
+    image_data_url: typeof value.image_data_url === "string" ? value.image_data_url : null,
     lora_confidence_score: apiNumber(value.lora_confidence_score) ?? 0,
     lora_genome_active: apiBoolean(value.lora_genome_active),
     is_active: apiBoolean(value.is_active),
@@ -6868,10 +6870,10 @@ export function normalizePersonaResponse(value: unknown): { persona: AgentPerson
 export const listPersonas = () =>
   apiFetch<unknown>("/agent/personas").then(normalizePersonasResponse);
 
-export const createPersona = (d: { name: string; soul_md?: string; writing_style?: string; labels?: string[]; skills?: string[] }) =>
+export const createPersona = (d: { name: string; soul_md?: string; writing_style?: string; labels?: string[]; skills?: string[]; image_data_url?: string | null }) =>
   apiFetch<unknown>("/agent/personas", { method: "POST", bodyJson: d }).then(normalizePersonaResponse);
 
-export const updatePersona = (id: string, d: { name?: string; soul_md?: string; writing_style?: string; labels?: string[]; skills?: string[]; lora_confidence_score?: number }) =>
+export const updatePersona = (id: string, d: { name?: string; soul_md?: string; writing_style?: string; labels?: string[]; skills?: string[]; image_data_url?: string | null; lora_confidence_score?: number }) =>
   apiFetch<unknown>(`/agent/personas/${encodeURIComponent(id)}`, { method: "PUT", bodyJson: d }).then(normalizePersonaResponse);
 
 export const activatePersona = (id: string) =>
@@ -6881,6 +6883,28 @@ export const activatePersona = (id: string) =>
 export const deletePersona = (id: string) =>
   apiFetch<unknown>(`/agent/personas/${encodeURIComponent(id)}`, { method: "DELETE" })
     .then((value) => ({ deleted: messageIdFromResponse(value, "deleted") }));
+
+export type AgentUiPreferences = {
+  persona_fab_visible: boolean;
+  updated_at: string;
+};
+
+function normalizeAgentUiPreferences(value: unknown): AgentUiPreferences {
+  const preferences = isRecord(value) && isRecord(value.preferences) ? value.preferences : {};
+  return {
+    persona_fab_visible: !("persona_fab_visible" in preferences) || apiBoolean(preferences.persona_fab_visible),
+    updated_at: apiString(preferences.updated_at),
+  };
+}
+
+export const getAgentUiPreferences = () =>
+  apiFetch<unknown>("/agent/ui-preferences").then(normalizeAgentUiPreferences);
+
+export const updateAgentUiPreferences = (personaFabVisible: boolean) =>
+  apiFetch<unknown>("/agent/ui-preferences", {
+    method: "PUT",
+    bodyJson: { persona_fab_visible: personaFabVisible },
+  }).then(normalizeAgentUiPreferences);
 
 // ── Note creation (used by drag-and-drop) ─────────────────────────────────────
 

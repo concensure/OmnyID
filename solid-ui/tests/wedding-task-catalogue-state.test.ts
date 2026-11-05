@@ -37,10 +37,10 @@ test("the reconciled catalogue is complete enough for deterministic publication"
   assert.ok(WEDDING_CATALOGUE_WORKSPACE_TASKS.every((task) => task.sourceId.length > 0));
   assert.ok(WEDDING_CATALOGUE_WORKSPACE_TASKS.every((task) => task.whyItMatters.length > 20));
   assert.deepEqual(weddingCatalogueCoverageState(), {
-    taskCount: 65,
-    uniqueTaskCount: 65,
-    vendorRuleCount: 31,
-    vendorTaskCount: 31,
+    taskCount: 64,
+    uniqueTaskCount: 64,
+    vendorRuleCount: 30,
+    vendorTaskCount: 30,
     stageCount: 6,
     legalSourceCount: 3,
   });

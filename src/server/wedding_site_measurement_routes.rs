@@ -50,6 +50,8 @@ const EVENTS: &[&str] = &[
     "wedding_signup_clicked",
     "wedding_quiz_entry_clicked",
     "wedding_engaged_time",
+    "public_page_performance",
+    "public_page_interruption",
     "quiz_started",
     "quiz_completed",
     "quiz_shared",
@@ -75,6 +77,10 @@ const PROP_KEYS: &[&str] = &[
     "fields_accepted",
     "fields_prefilled",
     "questions_skipped",
+    "load_bucket",
+    "lcp_bucket",
+    "cls_bucket",
+    "interruption_type",
 ];
 const COUNT_PROP_KEYS: &[&str] = &[
     "fields_offered",
@@ -82,6 +88,8 @@ const COUNT_PROP_KEYS: &[&str] = &[
     "fields_prefilled",
     "questions_skipped",
 ];
+const PERFORMANCE_BUCKETS: &[&str] = &["good", "needs_attention", "slow", "unknown"];
+const INTERRUPTION_TYPES: &[&str] = &["script_error", "promise_rejection"];
 
 pub(super) fn routes() -> Router<Arc<AppState>> {
     Router::new()
@@ -201,6 +209,16 @@ fn validated_props(props: Map<String, Value>) -> Option<Value> {
         return None;
     }
     for (key, value) in &props {
+        if matches!(key.as_str(), "load_bucket" | "lcp_bucket" | "cls_bucket")
+            && !matches!(value, Value::String(value) if PERFORMANCE_BUCKETS.contains(&value.as_str()))
+        {
+            return None;
+        }
+        if key == "interruption_type"
+            && !matches!(value, Value::String(value) if INTERRUPTION_TYPES.contains(&value.as_str()))
+        {
+            return None;
+        }
         if COUNT_PROP_KEYS.contains(&key.as_str())
             && !matches!(value, Value::Number(number) if number.as_u64().is_some_and(|count| count <= 300))
         {
@@ -460,5 +478,24 @@ mod tests {
             Value::String("wedding_date=2027-11-20".to_string()),
         );
         assert!(validated_props(leaked_fact).is_none());
+    }
+
+    #[test]
+    fn performance_measurement_accepts_only_coarse_non_identifying_buckets() {
+        let mut props = Map::new();
+        props.insert("load_bucket".to_string(), Value::String("good".to_string()));
+        props.insert(
+            "lcp_bucket".to_string(),
+            Value::String("needs_attention".to_string()),
+        );
+        props.insert("cls_bucket".to_string(), Value::String("slow".to_string()));
+        assert!(validated_props(props).is_some());
+
+        let mut leak = Map::new();
+        leak.insert(
+            "interruption_type".to_string(),
+            Value::String("user@example.com".to_string()),
+        );
+        assert!(validated_props(leak).is_none());
     }
 }

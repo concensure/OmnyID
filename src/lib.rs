@@ -149,6 +149,7 @@ pub mod wedding_vendor_quote_orchestration;
 pub mod wedding_vendor_replay;
 pub mod wedding_lifecycle_email;
 pub mod wedding_quote_reading;
+pub mod weekly_operator_report;
 pub mod workflow_instance_contracts;
 pub mod workflow_supervisor;
 pub mod workflow_trace_events;

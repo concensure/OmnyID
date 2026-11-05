@@ -8,6 +8,7 @@ export type WeddingTaskCompletionProjectionInput = {
   title?: string | null;
   sourceMessageId?: string | null;
   nowIso?: string | null;
+  parentTaskId?: string | null;
 };
 
 function clean(value: unknown): string {
@@ -26,6 +27,7 @@ export function weddingTaskCompletionToAfpMessage(
   const responseWorkspaceId = clean(record.responseWorkspaceId);
   const messageId = `afp-wedding-task-completion:${safeWeddingLabel(weddingPlanId)}:${safeWeddingLabel(responseWorkspaceId)}:${safeWeddingLabel(taskId)}:${status}`;
   const title = clean(input.title) || "Wedding task status update";
+  const parentTaskId = clean(input.parentTaskId);
   const references: AfpReference[] = [
     {
       type: "wedding_plan",
@@ -79,6 +81,7 @@ export function weddingTaskCompletionToAfpMessage(
       reopened_at: record.completed ? null : record.savedAt,
       wedding_plan_id: weddingPlanId,
       response_workspace_id: responseWorkspaceId,
+      parent_task_id: parentTaskId || null,
       source: "wedding_task_stage_view",
       agent_action: record.completed ? "advance_unblocked_wedding_work" : "review_reopened_wedding_task",
       agent_action_requested: true,
@@ -89,6 +92,8 @@ export function weddingTaskCompletionToAfpMessage(
       wedding_plan_id: weddingPlanId,
       response_workspace_id: responseWorkspaceId,
       wedding_task_id: taskId,
+      parent_task_id: parentTaskId || null,
+      wedding_subtask: Boolean(parentTaskId),
       completion_saved_at: record.savedAt,
       agent_action_requested: true,
       agent_action: record.completed ? "advance_unblocked_wedding_work" : "review_reopened_wedding_task",

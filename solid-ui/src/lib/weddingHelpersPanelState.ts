@@ -505,6 +505,8 @@ export function weddingHelperResponsibilityToAfpMessage(
   const planLabel = safeWeddingLabel(metadata.weddingPlanId);
   const workspaceLabel = safeWeddingLabel(metadata.responseWorkspaceId);
   const taskLabel = safeWeddingLabel(taskId);
+  const taskMetadata = record(input.task.metadata);
+  const parentTaskId = clean(taskMetadata.parent_task_id);
   const references = [
     ref("wedding_plan", metadata.weddingPlanId, "Wedding plan"),
     ref("response_workspace", metadata.responseWorkspaceId, "Wedding workspace"),
@@ -562,6 +564,7 @@ export function weddingHelperResponsibilityToAfpMessage(
       priority_label: priorityLabel,
       wedding_plan_id: metadata.weddingPlanId,
       response_workspace_id: metadata.responseWorkspaceId,
+      parent_task_id: parentTaskId || null,
       agent_action_requested: true,
       agent_action: status === "done" ? "advance_unblocked_wedding_work" : "track_wedding_responsibility",
       summary: `${ownerLabel} owns "${taskTitle}".${consultedLabel ? ` Consult ${consultedLabel}.` : ""}`,
@@ -576,6 +579,8 @@ export function weddingHelperResponsibilityToAfpMessage(
       wedding_plan_id: metadata.weddingPlanId,
       response_workspace_id: metadata.responseWorkspaceId,
       wedding_task_id: taskId,
+      parent_task_id: parentTaskId || null,
+      wedding_subtask: Boolean(parentTaskId),
       helper_owner_label: ownerLabel,
       consulted_label: consultedLabel || null,
       last_contact_date: lastContactDate || null,

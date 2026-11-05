@@ -89,7 +89,7 @@ function monthDistance(from: Date, to: Date): number {
 }
 
 function canonicalLeadTimeCategories(): WeddingVendorLeadTimeCategory[] {
-  return WEDDING_VENDOR_CHECKLIST.map((item) => ({
+  return WEDDING_VENDOR_CHECKLIST.filter((item) => item.id !== "officiant").map((item) => ({
     categoryId: item.id,
     label: item.label,
     ...(LEAD_TIME_MONTHS[item.id] ?? { idealLeadMonths: [3, 6] as const, hardDeadlineMonths: 2 }),
@@ -103,7 +103,7 @@ export function weddingVendorLeadTimeCoverageState(): { checklistCount: number; 
   return {
     checklistCount: WEDDING_VENDOR_CHECKLIST.length,
     tableCount: WEDDING_VENDOR_LEAD_TIME_CATEGORIES.length,
-    missingCategoryIds: WEDDING_VENDOR_CHECKLIST.map((item) => item.id).filter((id) => !tableIds.has(id)),
+    missingCategoryIds: WEDDING_VENDOR_CHECKLIST.map((item) => item.id).filter((id) => id !== "officiant" && !tableIds.has(id)),
   };
 }
 

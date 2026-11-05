@@ -4,7 +4,9 @@ import { TiptapEditor } from "@/components/editor/TiptapEditor";
 import {
   createPersona,
   deletePersona,
+  getAgentUiPreferences,
   listPersonas,
+  updateAgentUiPreferences,
   updatePersona,
   type AgentPersona,
 } from "@/lib/api";
@@ -23,6 +25,8 @@ import {
   installedPersonaIdsByTemplate,
   personaSwitcherPreferredTab,
 } from "@/lib/personaSwitcherState";
+import { dispatchAgentPersonaFabVisibility } from "@/lib/agentPersonaFabVisibilityState";
+import { preparePersonaAvatar } from "@/lib/personaAvatarState";
 
 const WRITING_STYLES = [
   { value: "balanced", label: "Balanced" },
@@ -39,10 +43,11 @@ type EditState = {
   soul_md: string;
   writing_style: string;
   labels: string;
+  image_data_url: string | null;
 };
 
 function blankEdit(): EditState {
-  return { id: null, name: "", soul_md: "", writing_style: "balanced", labels: "" };
+  return { id: null, name: "", soul_md: "", writing_style: "balanced", labels: "", image_data_url: null };
 }
 
 const STYLE_COLORS: Record<string, string> = {
@@ -73,6 +78,9 @@ export function AgentPersonasPanel() {
   const [actionError, setActionError] = createSignal<PersonaSwitcherFailureReceipt | null>(null);
   const [panelTab, setPanelTab] = createSignal<"mine" | "templates">("mine");
   const [installing, setInstalling] = createSignal<string | null>(null);
+  const [personaFabVisible, setPersonaFabVisible] = createSignal(true);
+  const [savingFabPreference, setSavingFabPreference] = createSignal(false);
+  const [preparingImage, setPreparingImage] = createSignal(false);
   const installedPersonaIds = () => installedPersonaIdsByTemplate(PERSONA_TEMPLATES, personas());
   const actionBusy = () => personaPanelActionBusy({
     saving: saving(),
@@ -82,8 +90,8 @@ export function AgentPersonasPanel() {
     reloading: reloading(),
   });
 
-  async function reload() {
-    if (personaReloadBlocked({ loading: loading(), reloading: reloading(), signedIn: true })) return;
+  async function reload(options?: { initial?: boolean }) {
+    if (!options?.initial && personaReloadBlocked({ loading: loading(), reloading: reloading(), signedIn: true })) return;
     setReloading(true);
     setLoadError(null);
     try {
@@ -108,7 +116,30 @@ export function AgentPersonasPanel() {
     }
   }
 
-  onMount(reload);
+  onMount(() => {
+    void reload({ initial: true });
+    void getAgentUiPreferences()
+      .then((preferences) => setPersonaFabVisible(preferences.persona_fab_visible))
+      .catch(() => setPersonaFabVisible(true));
+  });
+
+  async function setFabVisibility(visible: boolean): Promise<void> {
+    if (savingFabPreference()) return;
+    setSavingFabPreference(true);
+    setActionError(null);
+    try {
+      const preferences = await updateAgentUiPreferences(visible);
+      setPersonaFabVisible(preferences.persona_fab_visible);
+      dispatchAgentPersonaFabVisibility(preferences.persona_fab_visible);
+    } catch (err) {
+      setActionError(buildPersonaSwitcherFailureReceipt(
+        "Save Sprout visibility",
+        err instanceof Error ? err.message : "Could not save that setting.",
+      ));
+    } finally {
+      setSavingFabPreference(false);
+    }
+  }
 
   async function handleSave() {
     const e = edit();
@@ -128,6 +159,7 @@ export function AgentPersonasPanel() {
           soul_md: e.soul_md,
           writing_style: e.writing_style,
           labels,
+          image_data_url: e.image_data_url,
         });
       } else {
         await createPersona({
@@ -135,6 +167,7 @@ export function AgentPersonasPanel() {
           soul_md: e.soul_md,
           writing_style: e.writing_style,
           labels,
+          image_data_url: e.image_data_url,
         });
       }
       setEdit(null);
@@ -218,9 +251,25 @@ export function AgentPersonasPanel() {
       soul_md: p.soul_md,
       writing_style: p.writing_style,
       labels: (p.labels_json ?? p.skills_json ?? []).join(", "),
+      image_data_url: p.image_data_url,
     });
     setFormError("");
     setActionError(null);
+  }
+
+  async function selectPersonaImage(file: File | undefined): Promise<void> {
+    const current = edit();
+    if (!file || !current || preparingImage()) return;
+    setPreparingImage(true);
+    setFormError("");
+    try {
+      const imageDataUrl = await preparePersonaAvatar(file);
+      setEdit({ ...current, image_data_url: imageDataUrl });
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : "That image could not be prepared.");
+    } finally {
+      setPreparingImage(false);
+    }
   }
 
   const inputClass =
@@ -237,8 +286,8 @@ export function AgentPersonasPanel() {
 
   return (
     <div class="space-y-4">
-      <div class="flex items-center justify-between">
-        <div>
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div class="min-w-0">
           <p class="text-sm font-semibold text-on-surface">Agent Personas</p>
           <p class="mt-0.5 text-xs text-on-surface-variant">
             Each persona changes how OmnyID sounds to you, not how AFP data is stored or how core orchestration works. Type{" "}
@@ -265,12 +314,31 @@ export function AgentPersonasPanel() {
         </Show>
       </div>
 
+      <div class="flex flex-col gap-3 rounded-xl border border-white/15 bg-white/[0.05] p-3 sm:flex-row sm:items-center sm:justify-between">
+        <div class="min-w-0">
+          <p class="text-sm font-semibold text-on-surface">Sprout shortcut</p>
+          <p class="mt-1 text-xs leading-5 text-on-surface-variant">
+            Show the floating persona shortcut. Hiding it does not stop agents or change the active persona.
+          </p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={personaFabVisible()}
+          disabled={savingFabPreference()}
+          class={`min-h-11 w-full shrink-0 rounded-lg border px-4 text-sm font-semibold transition sm:w-auto ${personaFabVisible() ? "border-primary bg-primary text-white" : "border-white/20 bg-white/5 text-on-surface"}`}
+          onClick={() => void setFabVisibility(!personaFabVisible())}
+        >
+          {savingFabPreference() ? "Saving…" : personaFabVisible() ? "Shown" : "Show Sprout"}
+        </button>
+      </div>
+
       <Show when={!edit()}>
-        <div class="flex gap-1 rounded-xl border border-white/10 bg-white/[0.03] p-1">
-          <button type="button" class={tabClass("mine")} disabled={actionBusy()} onClick={() => setPanelTab("mine")}>
+        <div class="grid grid-cols-2 gap-1 rounded-xl border border-white/10 bg-white/[0.03] p-1">
+          <button type="button" class={`${tabClass("mine")} min-w-0`} disabled={actionBusy()} onClick={() => setPanelTab("mine")}>
             My Personas {personas().length > 0 ? `(${personas().length})` : ""}
           </button>
-          <button type="button" class={tabClass("templates")} disabled={actionBusy()} onClick={() => setPanelTab("templates")}>
+          <button type="button" class={`${tabClass("templates")} min-w-0`} disabled={actionBusy()} onClick={() => setPanelTab("templates")}>
             Browse Templates ({PERSONA_TEMPLATES.length})
           </button>
         </div>
@@ -304,10 +372,31 @@ export function AgentPersonasPanel() {
 
       <Show when={edit()} keyed>
         {(e) => (
-          <div class="space-y-3 rounded-xl border border-primary/30 bg-primary/5 p-4">
+          <div class="min-w-0 space-y-3 rounded-xl border border-primary/30 bg-primary/5 p-3 sm:p-4">
             <p class="text-xs font-semibold text-primary">{e.id ? "Edit Persona" : "New Persona"}</p>
 
             <div class="space-y-2">
+              <div class="flex flex-col gap-3 rounded-lg border border-white/15 bg-white/5 p-3 sm:flex-row sm:items-center">
+                <Show
+                  when={e.image_data_url}
+                  fallback={<span class="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-2xl" aria-hidden="true">🤖</span>}
+                >
+                  {(source) => <img src={source()} alt="Selected persona" class="h-16 w-16 shrink-0 rounded-2xl object-cover" />}
+                </Show>
+                <div class="min-w-0 flex-1">
+                  <p class="text-xs font-semibold text-on-surface">Persona image</p>
+                  <p class="mt-1 text-[11px] leading-4 text-on-surface-variant">Choose a WebP, JPEG, or PNG. OmnyID crops it to a small square avatar.</p>
+                  <div class="mt-2 flex flex-col gap-2 min-[360px]:flex-row min-[360px]:flex-wrap">
+                    <label class="inline-flex min-h-11 cursor-pointer items-center justify-center rounded-lg border border-white/20 px-3 text-xs font-semibold text-on-surface">
+                      {preparingImage() ? "Preparing…" : "Choose image"}
+                      <input type="file" accept="image/webp,image/jpeg,image/png" class="sr-only" disabled={saving() || preparingImage()} onChange={(event) => void selectPersonaImage(event.currentTarget.files?.[0])} />
+                    </label>
+                    <Show when={e.image_data_url}>
+                      <button type="button" class={btnGhost} disabled={saving() || preparingImage()} onClick={() => setEdit({ ...e, image_data_url: null })}>Use default icon</button>
+                    </Show>
+                  </div>
+                </div>
+              </div>
               <input
                 class={inputClass}
                 placeholder="Persona name (e.g. Research Mode, Client-Facing)"
@@ -395,11 +484,11 @@ export function AgentPersonasPanel() {
               <p class="text-xs text-red-400">{formError()}</p>
             </Show>
 
-            <div class="flex gap-2">
-              <button type="button" class={btnPrimary} disabled={saving()} onClick={handleSave}>
+            <div class="flex flex-col gap-2 min-[360px]:flex-row">
+              <button type="button" class={`${btnPrimary} min-h-11`} disabled={saving()} onClick={handleSave}>
                 {saving() ? "Saving..." : "Save"}
               </button>
-              <button type="button" class={btnGhost} disabled={saving()} onClick={() => setEdit(null)}>
+              <button type="button" class={`${btnGhost} min-h-11`} disabled={saving()} onClick={() => setEdit(null)}>
                 Cancel
               </button>
             </div>
@@ -472,7 +561,10 @@ export function AgentPersonasPanel() {
                     p.is_active ? "border-primary/50 bg-primary/8" : "border-white/20 bg-white/10"
                   }`}
                 >
-                  <div class="flex items-start justify-between gap-3">
+                  <div class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <Show when={p.image_data_url}>
+                      {(source) => <img src={source()} alt="" class="h-12 w-12 shrink-0 rounded-xl object-cover" />}
+                    </Show>
                     <div class="min-w-0 flex-1">
                       <div class="flex flex-wrap items-center gap-2">
                         <p class="truncate text-sm font-semibold text-on-surface">{p.name}</p>
@@ -527,7 +619,7 @@ export function AgentPersonasPanel() {
                         </pre>
                       </Show>
                     </div>
-                    <div class="flex shrink-0 flex-col gap-1.5">
+                    <div class="grid shrink-0 grid-cols-2 gap-1.5 sm:flex sm:flex-col">
                       <Show when={!p.is_active}>
                         <button
                           type="button"
