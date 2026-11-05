@@ -137,6 +137,13 @@ services:
       OMNYID_VENDOR_MAIL_FROM_ADDRESS: ${OMNYID_VENDOR_MAIL_FROM_ADDRESS:-hello@omnyid.com}
       OMNYID_VENDOR_MAIL_CLOUDFLARE_ACCOUNT_ID: ${OMNYID_VENDOR_MAIL_CLOUDFLARE_ACCOUNT_ID:-}
       OMNYID_VENDOR_MAIL_CLOUDFLARE_API_TOKEN_FILE: ${OMNYID_VENDOR_MAIL_CLOUDFLARE_API_TOKEN_FILE:-/run/secrets/omnyid_vendor_mail_cloudflare_api_token}
+      # Platform-owned account and operator mail uses the same authenticated
+      # Cloudflare sender, but remains separate from vendor conversation mail.
+      # Keeping the explicit transactional names prevents an expired mailbox
+      # OAuth credential from silently becoming the delivery path.
+      OMNYID_TRANSACTIONAL_CLOUDFLARE_ACCOUNT_ID: ${OMNYID_TRANSACTIONAL_CLOUDFLARE_ACCOUNT_ID:-${OMNYID_VENDOR_MAIL_CLOUDFLARE_ACCOUNT_ID:-}}
+      OMNYID_TRANSACTIONAL_CLOUDFLARE_API_TOKEN_FILE: ${OMNYID_TRANSACTIONAL_CLOUDFLARE_API_TOKEN_FILE:-/run/secrets/omnyid_vendor_mail_cloudflare_api_token}
+      OMNYID_TRANSACTIONAL_FROM_ADDRESS: ${OMNYID_TRANSACTIONAL_FROM_ADDRESS:-hello@omnyid.com}
       OMNYID_VENDOR_MAIL_WORKER_SHARED_SECRET_FILE: ${OMNYID_VENDOR_MAIL_WORKER_SHARED_SECRET_FILE:-/run/secrets/omnyid_vendor_mail_worker_shared_secret}
       OMNYID_VENDOR_MAIL_WORKER_KEY_ID: ${OMNYID_VENDOR_MAIL_WORKER_KEY_ID:-primary-v1}
       OMNYID_VENDOR_MAIL_WORKER_PREVIOUS_SHARED_SECRET_FILE: ${OMNYID_VENDOR_MAIL_WORKER_PREVIOUS_SHARED_SECRET_FILE:-}
