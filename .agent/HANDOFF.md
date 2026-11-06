@@ -7624,3 +7624,11 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
   database accepted the corrected prerequisite twice with one canonical venue and two attached
   attributes. Freeze a replacement candidate, repeat exact-SHA build/deploy evidence, then apply the
   three ordered data loads and verify production category counts before marking WED-339 complete.
+- Replacement application SHA `13387ff029dd044e26a463975c3fcc2ac35f882a` is live with matching
+  `SOURCE_COMMIT`; hosted runtime, backup verification and isolated restore pass. The ordered loads and
+  a second unconventional replay completed, producing 57 new rows and the reviewed WILD LIFE evidence.
+  Hosted counts revealed six tag-only enrichments still used staged IDs rather than canonical slug owners.
+  `build_sql.py` and its generated cumulative SQL now resolve canonical ID first and stable slug second.
+  A disposable database with alternate staged IDs produces the exact expected eight category totals after
+  two replays. Freeze one final candidate containing that generator fix, deploy it, replay only the
+  cumulative unconventional SQL, verify hosted exact counts, and remove the release-specific SQL stage.

@@ -37,10 +37,17 @@ def attr(vid, key, value, src, notes=None, conf=0.8, checked_at="2026-11-05"):
             f"{q(LABEL)}, {retrieved_at}, {q(notes)})")
 
 
-def union_tags(vid, tags, src):
-    return (f"INSERT INTO wedding_vendor_attributes ({ATTR_COLS})\nSELECT {q(vid)}, 'style_tags', {j(tags)}, "
+def canonical_vendor_ref(vid, vendor_slug):
+    """Resolve staged/generated IDs to the canonical row that owns the slug."""
+    return ("(SELECT vendor_id FROM wedding_vendors "
+            f"WHERE vendor_id = {q(vid)} OR vendor_slug = {q(vendor_slug)} "
+            f"ORDER BY CASE WHEN vendor_id = {q(vid)} THEN 0 ELSE 1 END LIMIT 1)")
+
+
+def union_tags(vendor_ref, tags, src):
+    return (f"INSERT INTO wedding_vendor_attributes ({ATTR_COLS})\nSELECT {vendor_ref}, 'style_tags', {j(tags)}, "
             f"'known', 0.8, 'primary_official', {q(src)}, {q(LABEL)}, {TS}, NULL\n"
-            f"WHERE EXISTS (SELECT 1 FROM wedding_vendors WHERE vendor_id = {q(vid)})\n"
+            f"WHERE {vendor_ref} IS NOT NULL\n"
             "ON CONFLICT (vendor_id, attribute_key) DO UPDATE SET value = (\n"
             "    SELECT to_jsonb(ARRAY(SELECT DISTINCT x FROM jsonb_array_elements_text(\n"
             "        wedding_vendor_attributes.value || EXCLUDED.value) AS x)))\n"
@@ -87,24 +94,25 @@ lines = [
 
 for m in data["matched_existing"]:
     vid = m["db_vendor_id"] or "venue-" + slug(m["matches"])
+    vendor_ref = canonical_vendor_ref(vid, slug(m["matches"]))
     src = m["sources"][0]
     merged = ", ".join(
         f"{q(k)}, (SELECT to_jsonb(ARRAY(SELECT DISTINCT x FROM jsonb_array_elements_text("
         f"COALESCE(evidence->{q(k)}, '[]'::jsonb) || {j(m[k])}) AS x ORDER BY x)))"
         for k in ("special_category", "special_subtype"))
     lines.append(f"UPDATE wedding_vendors SET evidence = evidence || jsonb_build_object({merged}) "
-                 f"WHERE vendor_id = {q(vid)};")
+                 f"WHERE vendor_id = {vendor_ref};")
     for key, val in (m["fill_if_blank"] or {}).items():
         if key in ("address", "website_url", "contact_phone", "contact_email"):
             lines.append(f"UPDATE wedding_vendors SET {key} = {q(val)} "
-                         f"WHERE vendor_id = {q(vid)} AND COALESCE({key}, '') = '';")
+                         f"WHERE vendor_id = {vendor_ref} AND COALESCE({key}, '') = '';")
         if key in ("capacity_seated_max", "capacity_standing_max"):
             lines.append(
-                f"INSERT INTO wedding_vendor_attributes ({ATTR_COLS})\nSELECT {q(vid)}, {q(key)}, {j(val)}, 'known', "
+                f"INSERT INTO wedding_vendor_attributes ({ATTR_COLS})\nSELECT {vendor_ref}, {q(key)}, {j(val)}, 'known', "
                 f"0.8, 'primary_official', {q(src)}, {q(LABEL)}, {TS}, {q(m['capacity_note'])}\n"
-                f"WHERE EXISTS (SELECT 1 FROM wedding_vendors WHERE vendor_id = {q(vid)})\n"
+                f"WHERE {vendor_ref} IS NOT NULL\n"
                 "ON CONFLICT (vendor_id, attribute_key) DO NOTHING;")
-    lines.append(union_tags(vid, m["extra_style_tags"], src))
+    lines.append(union_tags(vendor_ref, m["extra_style_tags"], src))
 lines += ["", "COMMIT;", ""]
 OUT.write_text("\n".join(lines), encoding="utf-8")
 print(f"{len(vendors)} new venues, {len(data['matched_existing'])} matched -> {OUT}")
