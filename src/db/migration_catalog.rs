@@ -755,4 +755,9 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Category proposal opportunities, expiring referral capabilities, responses, and privacy-bounded metrics",
         include_str!("../../postgres/migrations/0148_wedding_invite_proposal_opportunities.sql"),
     ),
+    (
+        "0149_wedding_vendor_limited_specials",
+        "False-default vendor-controlled date-and-session specials with encrypted private pricing, safe management capabilities, enquiry links, and content-light audit",
+        include_str!("../../postgres/migrations/0149_wedding_vendor_limited_specials.sql"),
+    ),
 ];

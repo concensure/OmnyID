@@ -15,6 +15,18 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-340
+    title: Vendor-controlled limited-date specials, ranking integration, and map discovery
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-340
+    worktree: C:/Users/ozans/Desktop/projects/OmnyID-GROWTH-001
+    base_sha: 5af62704d32fce647b5c552b1fe509ca20b692c5
+    depends_on: [WED-332, WED-337, WED-338, WED-339]
+    files: [Documents/design/wedding planner/firsttable experience for vendors.md/**, postgres/migrations/**, src/server/wedding_vendor**, src/server/wedding_invite_proposal**, src/server/wedding_quotation**, src/server/mod.rs, src/db/migration_catalog.rs, solid-ui/src/components/WeddingVendor**, solid-ui/src/components/WeddingResponseWorkspaceView.tsx, solid-ui/src/lib/weddingVendor**, solid-ui/tests/wedding-vendor**, solid-ui/tests/wedding-response**, .agent/**]
+    acceptance: [The spec and dependency-ordered task plan explicitly reuse AFP A2UI Ranking Policy V2 vendor availability masked enquiry referral capability and quote components, vendors can publish scoped availability offers without exposing internal pricing rules or treating enquiry as a hold, private edit grants are high-entropy expiring revocable and separate from public viewing, stale or withdrawn offers fail closed and are audited, ranking may use availability and substantiated effective price but only top-three comparison results reveal date-special details, Limited Specials is a third vendor-discovery mode with date and category filters plus permission-gated location and Sydney fallback, the map uses vendor database coordinates and licensed photos with accessible non-map fallback and clusters, enquiries reuse the existing approval preview information-sharing email-mask AFP and registered-vendor delivery path, focused migration backend frontend security and tenant-isolation tests are recorded]
+    progress: "Produced the reuse-first implementation specification and dependency-ordered task plan. Phase 1 has begun with additive false-default migration 0149 for offers, date/space/session slots, encrypted private pricing, digest-only management grants, enquiry links and content-light events; plus a 584-line pure Rust policy for approved effective pricing, substantiated savings, top-three-only exact detail, stale confirmation, enquiry-not-hold, hold expiry, reconfirmation and optimistic revision conflicts. Six focused policy tests and embedded migration-catalog parity pass. Disposable PostgreSQL execution is still required because Docker Desktop could not start during the local verification attempt. Nothing was deployed and no production data changed."
+
   - id: WED-339
     title: Mobile decision focus, just-in-time vendor research, and unconventional venue release
     status: done

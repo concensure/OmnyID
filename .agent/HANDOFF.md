@@ -7651,3 +7651,23 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
 - Evidence: `Documents/verification/wed-339-mobile-decisions-unconventional-venues-release-2026-11-06.md`.
   Remaining product/data-hardening opportunities are in
   `Documents/issues/wedding planner/2026-11-06-wedding-planner-strengthening-report.md`.
+# 2026-11-06 - WED-340 limited-date specials Phase 1 start (Codex)
+
+- Continued from clean WED-339 coordination commit `5af62704d32fce647b5c552b1fe509ca20b692c5`
+  in `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch `agent/codex/WED-340`.
+- Added the requested reuse-first spec and dependency-ordered task plan under
+  `Documents/design/wedding planner/firsttable experience for vendors.md/`.
+- Existing authorities to reuse are documented: vendor directory/photos/rooms/coordinates, couple
+  availability evidence, Ranking Policy V2, secure proposal/quotation capabilities, masked enquiry
+  delivery, referral links, AFP lifecycle and Leaflet/OSM rendering.
+- Added false-default migration `0149_wedding_vendor_limited_specials`: scoped offers and slots,
+  ciphertext-only private pricing, digest-only grants/sessions, idempotent enquiry links and
+  content-light events. Applying it creates no live offer.
+- Added pure `wedding_vendor_special_offer` policy for approved effective pricing, unknown mandatory
+  costs, substantiated savings, top-three-only detail projection, fresh/stale discovery, enquiry vs
+  hold semantics, hold expiry, reconfirmation and optimistic revision checks.
+- Verification: six focused Rust policy tests pass; embedded migration catalogue parity passes; source
+  is 549 lines. Disposable PostgreSQL execution is not yet evidence because Docker Desktop reported it
+  could not start and remained unavailable after one hidden 60-second start attempt.
+- No release, production migration, vendor publication or external send occurred. Next action: restore
+  Docker, run migration 0149 twice with constraint assertions, then implement verified-vendor commands.

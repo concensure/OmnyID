@@ -2840,3 +2840,20 @@ subjective usability or a controlled external cohort.
 - Admin visibility is category-level counts only: open opportunities, replies, unique claimed-
   vendor views and links created. Couple identity, brief text, response bodies and capability
   values are excluded from the operator rollup.
+# 2026-11-06 — WED-340 separates vendor-published supply from couple availability evidence
+
+- `wedding_vendor_availability` remains append-only, couple/plan-scoped evidence
+  about a vendor. It is not a vendor calendar and will not store vendor-wide
+  offers.
+- Vendor limited-date specials use separate offer and slot records because a
+  useful opportunity is date + space + session + package, not a date alone.
+- Internal pricing is a separate ciphertext-only record. Public/couple queries
+  operate on venue-approved guidance and cannot serialize internal formulas.
+- Exact date/package/price detail is projected only after Ranking Policy V2
+  selects a vendor into the couple's top three. Base map markers disclose only
+  identity, approved media/location and that a special may apply.
+- An enquiry never creates a hold. Vendor confirmation, a provisional hold
+  with expiry, and a booking are separate explicit state transitions.
+- Limited Specials will reuse existing claim authority, secure capability,
+  Leaflet map, enquiry approval, masked mail, referral and AFP components.
+  Applying migration 0149 creates no active offer and enables no rollout flag.
