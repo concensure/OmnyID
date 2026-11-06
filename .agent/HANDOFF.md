@@ -7686,7 +7686,34 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
 - Pausing preserves active holds; withdrawal refuses an active hold; enquiry is still not a hold.
 - Verification: 13 focused Rust policy/route tests, `cargo check --lib` and embedded migration-catalog
   parity pass. New source files remain below 1,000 lines; the policy is 698 lines. `git diff --check` passes.
-  staging. Docker Desktop still cannot start, so migration replay and swapped-vendor API proof are not
+  Docker Desktop still cannot start, so migration replay and swapped-vendor API proof are not
   claimed. No deployment, production migration, active offer or external send occurred.
 - Next: replay migration 0149 twice in disposable PostgreSQL, add cross-vendor route tests, then build
   the expiring management capability and couple top-three discovery projection.
+
+# 2026-11-07 - WED-340 secure management-link slice (Codex)
+
+- Continued from clean feature commit `5c2bad754a224891ae8e33f040cef9d51b1fb262` in
+  `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001` on `agent/codex/WED-340`.
+- Extracted publish, offer-state and slot-state mutations into shared services.
+  Claimed vendors and management capabilities now use one state machine,
+  optimistic revisions, idempotency and content-light event records.
+- Added verified-owner/operator link issue, rotation and revocation plus public
+  exchange/read/command routes. Secrets have 256 bits of entropy, live only in
+  the URL fragment and one response, and are stored as HMAC-SHA-256 digests.
+  Exchange is one-time and creates a 30-minute HttpOnly/Strict cookie with a
+  separate CSRF token. Scope is derived from the grant, never the request.
+- Added a mobile vendor management projection for the single bound offer and
+  its date-specific capacity, minimum spend, per-head guidance, inclusions and
+  explicit publish/pause/reconfirm/withdraw/booked actions. It grants no account
+  access and clears the fragment after exchange.
+- Passed 20 focused Rust tests, all 2,224 Wedding tests, two focused frontend
+  contract tests, TypeScript typecheck, both line budgets, the production UI
+  build, `cargo check --lib`, migration-catalog parity and `git diff --check`.
+  The first final `cargo check` invocation hit a Windows rustc access violation
+  with no source diagnostic; the exact immediate retry passed. Docker Desktop
+  remains unavailable, so real
+  disposable-Postgres replay, concurrent exchange and swapped-vendor HTTP proof
+  are not claimed. Nothing was deployed or enabled.
+- Next: restore Docker for the missing adversarial database proof, then add the
+  Ranking Policy V2 top-three discovery projection and Limited Specials map.

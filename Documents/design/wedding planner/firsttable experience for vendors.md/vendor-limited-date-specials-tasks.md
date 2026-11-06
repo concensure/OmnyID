@@ -47,11 +47,11 @@ pricing state before the authoritative commands and safe projections exist.
 
 ## Phase 3 — secure management link
 
-- [ ] Reuse the invite-proposal/quotation capability primitives for a 256-bit,
+- [x] Reuse the invite-proposal/quotation capability primitives for a 256-bit,
   digest-only, expiring and revocable vendor-management grant.
-- [ ] Add short-lived exchange session, CSRF, replay protection, rate limits,
+- [x] Add short-lived exchange session, CSRF, replay protection, rate limits,
   no-store/noindex/no-referrer and generation rotation.
-- [ ] Route link and authenticated portal commands through the same service
+- [x] Route link and authenticated portal commands through the same service
   functions; do not implement two state machines.
 - [ ] Add forged token, expired, revoked, replay, scope escalation and
   cross-vendor tests.
@@ -151,3 +151,11 @@ per-head amount, inclusions and conditions. The vendor preview calculates the
 indicative total for a supplied guest count. Couple discovery, top-three search
 integration, the management capability and portal A2UI remain deliberately
 open; these routes do not make an offer public while the rollout flag is off.
+
+The third slice adds an offer-scoped management capability for verified owners
+or allowlisted operators to share with unclaimed vendors. The 256-bit secret is
+kept in the URL fragment, stored only as a keyed digest and exchanged once for
+a 30-minute HttpOnly session plus CSRF token. Creating a new generation rotates
+older links and consumes their sessions. The mobile vendor surface exposes only
+the bound offer and uses the same publish and state command services as the
+claimed portal. Disposable-database adversarial route proof remains open.

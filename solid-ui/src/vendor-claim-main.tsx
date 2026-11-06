@@ -2,6 +2,7 @@ import { render } from "solid-js/web";
 
 import { VendorClaimFlow } from "@/components/vendor/VendorClaimFlow";
 import { PublicVendorProposalFlow } from "@/components/vendor/PublicVendorProposalFlow";
+import { VendorSpecialManagementFlow } from "@/components/vendor/VendorSpecialManagementFlow";
 import { readSession } from "@/lib/api";
 import "./index.css";
 
@@ -10,9 +11,14 @@ if (!root) throw new Error("Vendor portal root is missing");
 const params = new URLSearchParams(window.location.search);
 const vendorSlug = (params.get("vendor_slug") ?? params.get("vendor") ?? "").trim().toLowerCase();
 const proposalToken = (params.get("proposal") ?? "").trim();
+const fragment = new URLSearchParams(window.location.hash.slice(1));
+const specialManagementToken = (fragment.get("special_management") ?? "").trim();
+const specialManagementActive = Boolean(specialManagementToken || sessionStorage.getItem("omnyid.vendorSpecials.csrf"));
 const signInHref = `/workspace/?auth=signin&source=vendor_claim${vendorSlug ? `&vendor_slug=${encodeURIComponent(vendorSlug)}` : ""}`;
 
-render(() => proposalToken
+render(() => specialManagementActive
+  ? <VendorSpecialManagementFlow token={specialManagementToken} />
+  : proposalToken
   ? <PublicVendorProposalFlow token={proposalToken} />
   : readSession()
   ? <VendorClaimFlow />

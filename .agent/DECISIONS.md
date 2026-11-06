@@ -2872,3 +2872,18 @@ subjective usability or a controlled external cohort.
   enquiry, hold, quote, booking or another couple-specific consequence.
 - Enquiry, provisional hold and booking remain separate states. Pausing cannot
   erase a hold, and an offer with an active hold cannot be withdrawn silently.
+
+# 2026-11-07 — WED-340 management links exchange once and share command services
+
+- A vendor management link contains a 256-bit secret in the URL fragment so it
+  is not sent in the initial HTTP request, referrer or ordinary server log. The
+  database stores only an HMAC-SHA-256 digest and short lookup prefix.
+- The link exchanges once for a 30-minute HttpOnly, Secure, SameSite=Strict
+  session and a separate CSRF secret. Reuse, expiry, revocation and rotation
+  fail with the same unavailable response; creating a generation consumes all
+  earlier offer-scoped sessions.
+- The capability never confers account access and cannot submit vendor or offer
+  identifiers. Its scope comes only from the server-side grant. Claimed portal
+  and link actions call the same optimistic, idempotent command services.
+- Operators may issue a link for an unclaimed listing only when both the
+  false-default rollout allowlist and existing operator authority permit it.

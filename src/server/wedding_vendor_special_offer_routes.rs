@@ -31,6 +31,8 @@ use super::{
 
 mod records;
 use records::*;
+mod capability;
+mod commands;
 mod privacy;
 
 const MAX_SLOTS_PER_OFFER: usize = 100;
@@ -55,6 +57,7 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
             "/wedding/vendor/special-offers/{offer_id}/slots/{slot_id}/state",
             post(change_slot_state_http),
         )
+        .merge(capability::routes())
         .layer(axum::middleware::from_fn(privacy::no_store))
 }
 
@@ -138,6 +141,23 @@ struct VendorAuthority {
     vendor_id: String,
     vendor_name: String,
     category: String,
+}
+
+#[derive(Clone, Copy)]
+struct CommandActor<'a> {
+    kind: &'static str,
+    user_id: Option<&'a str>,
+    source: &'static str,
+}
+
+impl<'a> CommandActor<'a> {
+    fn verified_vendor(user_id: &'a str) -> Self {
+        Self {
+            kind: "vendor_user",
+            user_id: Some(user_id),
+            source: "verified_vendor_portal",
+        }
+    }
 }
 
 fn clean(value: &str, limit: usize) -> String {
@@ -490,7 +510,7 @@ async fn create_offer_http(
         &offer_id,
         None,
         "created",
-        &user.id,
+        CommandActor::verified_vendor(&user.id),
         &idempotency_key,
         json!({"revision":1,"slot_count":slot_count}),
     )
@@ -620,71 +640,16 @@ async fn publish_offer_http(
     Json(request): Json<OfferCommandRequest>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let (user, vendor) = vendor_request_authority(&state, &headers, &request.vendor_slug).await?;
-    let dedupe = idempotency_key(&request.idempotency_key)?;
-    let mut tx = state.db.pool.begin().await.map_err(database_failure)?;
-    if event_exists(&mut tx, &offer_id, "published", &dedupe).await? {
-        tx.rollback().await.ok();
-        return Ok(Json(
-            json!({"offer_id":offer_id,"status":"active","replayed":true}),
-        ));
-    }
-    let offer_row = locked_offer(&mut tx, &vendor.vendor_id, &offer_id).await?;
-    let actual_revision: i64 = offer_row.get("revision");
-    if actual_revision != request.expected_revision as i64 {
-        return Err(policy_failure(SpecialOfferPolicyError::StaleRevision {
-            expected: request.expected_revision,
-            actual: actual_revision as u64,
-        }));
-    }
-    let slot_rows = sqlx::query(
-        "SELECT * FROM wedding_vendor_special_offer_slots WHERE offer_id=$1 AND vendor_id=$2 ORDER BY local_date FOR UPDATE",
-    )
-    .bind(&offer_id)
-    .bind(&vendor.vendor_id)
-    .fetch_all(&mut *tx)
-    .await
-    .map_err(database_failure)?;
-    let mut offer = offer_from_row(&offer_row)?;
-    offer.publication_state = SpecialOfferPublicationState::Active;
-    offer.approved_revision = Some(offer.revision);
-    let slots = slot_rows
-        .iter()
-        .map(slot_from_row)
-        .collect::<Result<Vec<_>, _>>()?;
-    validate_offer_for_publication(&offer, &slots, Utc::now()).map_err(policy_failure)?;
-    for slot in &slots {
-        approved_date_price_estimate(
-            &offer.pricing,
-            &slot.commercial_terms,
-            offer.guest_min.or(Some(1)),
-        )
-        .map_err(policy_failure)?;
-    }
-    sqlx::query(
-        "UPDATE wedding_vendor_special_offers SET publication_state='active',approved_by_user_id=$1,approved_at=NOW(),approved_revision=revision,updated_at=NOW() WHERE offer_id=$2 AND vendor_id=$3 AND revision=$4",
-    )
-    .bind(&user.id)
-    .bind(&offer_id)
-    .bind(&vendor.vendor_id)
-    .bind(actual_revision)
-    .execute(&mut *tx)
-    .await
-    .map_err(database_failure)?;
-    record_event(
-        &mut tx,
+    commands::publish_offer(
+        &state,
         &vendor.vendor_id,
         &offer_id,
-        None,
-        "published",
-        &user.id,
-        &dedupe,
-        json!({"revision":actual_revision}),
+        request.expected_revision,
+        &request.idempotency_key,
+        CommandActor::verified_vendor(&user.id),
     )
-    .await?;
-    tx.commit().await.map_err(database_failure)?;
-    Ok(Json(
-        json!({"offer_id":offer_id,"status":"active","replayed":false}),
-    ))
+    .await
+    .map(Json)
 }
 
 async fn change_offer_state_http(
@@ -697,118 +662,17 @@ async fn change_offer_state_http(
     let action = request
         .action
         .ok_or((StatusCode::BAD_REQUEST, "action is required.".into()))?;
-    let (state_name, event_kind) = match action {
-        OfferAction::Pause => ("paused", "paused"),
-        OfferAction::Withdraw => ("withdrawn", "withdrawn"),
-        OfferAction::Reconfirm => ("active", "reconfirmed"),
-    };
-    let dedupe = idempotency_key(&request.idempotency_key)?;
-    let mut tx = state.db.pool.begin().await.map_err(database_failure)?;
-    if event_exists(&mut tx, &offer_id, event_kind, &dedupe).await? {
-        tx.rollback().await.ok();
-        return Ok(Json(
-            json!({"offer_id":offer_id,"status":state_name,"replayed":true}),
-        ));
-    }
-    let offer = locked_offer(&mut tx, &vendor.vendor_id, &offer_id).await?;
-    let revision: i64 = offer.get("revision");
-    if revision != request.expected_revision as i64 {
-        return Err(policy_failure(SpecialOfferPolicyError::StaleRevision {
-            expected: request.expected_revision,
-            actual: revision as u64,
-        }));
-    }
-    let current_state: String = offer.get("publication_state");
-    let transition_allowed = match action {
-        OfferAction::Pause => current_state == "active",
-        OfferAction::Withdraw => current_state != "withdrawn" && current_state != "expired",
-        OfferAction::Reconfirm => matches!(current_state.as_str(), "active" | "paused"),
-    };
-    if !transition_allowed {
-        return Err((
-            StatusCode::CONFLICT,
-            "That offer state cannot use this action.".into(),
-        ));
-    }
-    let next_revision = revision + 1;
-    let approved_revision = (state_name == "active").then_some(next_revision);
-    sqlx::query(
-        "UPDATE wedding_vendor_special_offers SET publication_state=$1,revision=$2,approved_revision=$3,approved_by_user_id=CASE WHEN $1='active' THEN $4 ELSE approved_by_user_id END,approved_at=CASE WHEN $1='active' THEN NOW() ELSE approved_at END,updated_at=NOW() WHERE offer_id=$5 AND vendor_id=$6 AND revision=$7",
-    )
-    .bind(state_name)
-    .bind(next_revision)
-    .bind(approved_revision)
-    .bind(&user.id)
-    .bind(&offer_id)
-    .bind(&vendor.vendor_id)
-    .bind(revision)
-    .execute(&mut *tx)
-    .await
-    .map_err(database_failure)?;
-    match action {
-        OfferAction::Pause => {
-            sqlx::query(
-                "UPDATE wedding_vendor_special_offer_slots SET state='paused',revision=revision+1,updated_by_user_id=$1,updated_at=NOW() WHERE offer_id=$2 AND vendor_id=$3 AND state IN ('available','enquiry_received','stale')",
-            )
-            .bind(&user.id)
-            .bind(&offer_id)
-            .bind(&vendor.vendor_id)
-            .execute(&mut *tx)
-            .await
-            .map_err(database_failure)?;
-        }
-        OfferAction::Withdraw => {
-            let active_holds = sqlx::query_scalar::<_, i64>(
-                "SELECT COUNT(*) FROM wedding_vendor_special_offer_slots WHERE offer_id=$1 AND vendor_id=$2 AND state='provisional_hold' AND hold_expires_at>NOW()",
-            )
-            .bind(&offer_id)
-            .bind(&vendor.vendor_id)
-            .fetch_one(&mut *tx)
-            .await
-            .map_err(database_failure)?;
-            if active_holds > 0 {
-                return Err((
-                    StatusCode::CONFLICT,
-                    "Resolve the active provisional hold before withdrawing this offer.".into(),
-                ));
-            }
-            sqlx::query(
-                "UPDATE wedding_vendor_special_offer_slots SET state='withdrawn',hold_expires_at=NULL,revision=revision+1,updated_by_user_id=$1,updated_at=NOW() WHERE offer_id=$2 AND vendor_id=$3 AND state NOT IN ('booked','provisional_hold')",
-            )
-            .bind(&user.id)
-            .bind(&offer_id)
-            .bind(&vendor.vendor_id)
-            .execute(&mut *tx)
-            .await
-            .map_err(database_failure)?;
-        }
-        OfferAction::Reconfirm => {
-            sqlx::query(
-                "UPDATE wedding_vendor_special_offer_slots SET state='available',hold_expires_at=NULL,last_confirmed_at=NOW(),confirmation_expires_at=NOW()+INTERVAL '14 days',revision=revision+1,updated_by_user_id=$1,updated_at=NOW() WHERE offer_id=$2 AND vendor_id=$3 AND state IN ('available','enquiry_received','paused','stale')",
-            )
-            .bind(&user.id)
-            .bind(&offer_id)
-            .bind(&vendor.vendor_id)
-            .execute(&mut *tx)
-            .await
-            .map_err(database_failure)?;
-        }
-    }
-    record_event(
-        &mut tx,
+    commands::change_offer_state(
+        &state,
         &vendor.vendor_id,
         &offer_id,
-        None,
-        event_kind,
-        &user.id,
-        &dedupe,
-        json!({"revision":next_revision}),
+        request.expected_revision,
+        action,
+        &request.idempotency_key,
+        CommandActor::verified_vendor(&user.id),
     )
-    .await?;
-    tx.commit().await.map_err(database_failure)?;
-    Ok(Json(json!({
-        "offer_id":offer_id,"status":state_name,"revision":next_revision,"replayed":false
-    })))
+    .await
+    .map(Json)
 }
 
 async fn change_slot_state_http(
@@ -818,61 +682,16 @@ async fn change_slot_state_http(
     Json(request): Json<SlotCommandRequest>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let (user, vendor) = vendor_request_authority(&state, &headers, &request.vendor_slug).await?;
-    let (command, event_kind) = slot_command(&request)?;
-    let dedupe = idempotency_key(&request.idempotency_key)?;
-    let mut tx = state.db.pool.begin().await.map_err(database_failure)?;
-    if event_exists(&mut tx, &offer_id, event_kind, &dedupe).await? {
-        tx.rollback().await.ok();
-        return Ok(Json(
-            json!({"offer_id":offer_id,"slot_id":slot_id,"replayed":true}),
-        ));
-    }
-    locked_offer(&mut tx, &vendor.vendor_id, &offer_id).await?;
-    let row = sqlx::query(
-        "SELECT * FROM wedding_vendor_special_offer_slots WHERE slot_id=$1 AND offer_id=$2 AND vendor_id=$3 FOR UPDATE",
-    )
-    .bind(&slot_id)
-    .bind(&offer_id)
-    .bind(&vendor.vendor_id)
-    .fetch_optional(&mut *tx)
-    .await
-    .map_err(database_failure)?
-    .ok_or((StatusCode::NOT_FOUND, "Available date not found.".into()))?;
-    let slot = slot_from_row(&row)?;
-    let next = apply_special_slot_command(&slot, request.expected_revision, command, Utc::now())
-        .map_err(policy_failure)?;
-    sqlx::query(
-        "UPDATE wedding_vendor_special_offer_slots SET state=$1,hold_expires_at=$2,last_confirmed_at=$3,confirmation_expires_at=$4,revision=$5,updated_by_user_id=$6,updated_at=NOW() WHERE slot_id=$7 AND offer_id=$8 AND vendor_id=$9 AND revision=$10",
-    )
-    .bind(slot_state_name(next.state))
-    .bind(next.hold_expires_at)
-    .bind(next.last_confirmed_at)
-    .bind(next.confirmation_expires_at)
-    .bind(next.revision as i64)
-    .bind(&user.id)
-    .bind(&slot_id)
-    .bind(&offer_id)
-    .bind(&vendor.vendor_id)
-    .bind(request.expected_revision as i64)
-    .execute(&mut *tx)
-    .await
-    .map_err(database_failure)?;
-    record_event(
-        &mut tx,
+    commands::change_slot_state(
+        &state,
         &vendor.vendor_id,
         &offer_id,
-        Some(&slot_id),
-        event_kind,
-        &user.id,
-        &dedupe,
-        json!({"revision":next.revision}),
+        &slot_id,
+        &request,
+        CommandActor::verified_vendor(&user.id),
     )
-    .await?;
-    tx.commit().await.map_err(database_failure)?;
-    Ok(Json(json!({
-        "offer_id":offer_id,"slot_id":slot_id,"state":slot_state_name(next.state),
-        "revision":next.revision,"replayed":false
-    })))
+    .await
+    .map(Json)
 }
 
 fn slot_command(
@@ -942,7 +761,7 @@ async fn record_event(
     offer_id: &str,
     slot_id: Option<&str>,
     event_kind: &str,
-    user_id: &str,
+    actor: CommandActor<'_>,
     dedupe_key: &str,
     mut metadata: Value,
 ) -> Result<(), (StatusCode, String)> {
@@ -953,14 +772,16 @@ async fn record_event(
         );
     }
     sqlx::query(
-        "INSERT INTO wedding_vendor_special_offer_events (event_id,vendor_id,offer_id,slot_id,event_kind,actor_kind,actor_user_id,source_ref,dedupe_key,metadata) VALUES ($1,$2,$3,$4,$5,'vendor_user',$6,'verified_vendor_portal',$7,$8)",
+        "INSERT INTO wedding_vendor_special_offer_events (event_id,vendor_id,offer_id,slot_id,event_kind,actor_kind,actor_user_id,source_ref,dedupe_key,metadata) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",
     )
     .bind(Ulid::new().to_string())
     .bind(vendor_id)
     .bind(offer_id)
     .bind(slot_id)
     .bind(event_kind)
-    .bind(user_id)
+    .bind(actor.kind)
+    .bind(actor.user_id)
+    .bind(actor.source)
     .bind(dedupe_key)
     .bind(metadata)
     .execute(&mut **tx)
