@@ -7632,3 +7632,22 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
   A disposable database with alternate staged IDs produces the exact expected eight category totals after
   two replays. Freeze one final candidate containing that generator fix, deploy it, replay only the
   cumulative unconventional SQL, verify hosted exact counts, and remove the release-specific SQL stage.
+
+## 2026-11-06 - WED-339 completed and released (Codex)
+
+- Final application SHA `6a6dc45def278938a06fcbb85574d255a1bb3877` was built from clean detached
+  checkout `C:\temp\wt\omnyid-wed339-release-6a6dc45` and deployed to Oracle.
+  `SOURCE_COMMIT` and `oracle-runtime-manifest.json` both match the full SHA.
+- Exact candidate passed typecheck, both source-size budgets, public Wedding/security checks, all 2,222
+  Wedding tests and the production UI build. The focused mobile journey and 70 focused Rust search tests
+  passed on the feature candidate; subsequent commits changed only import resolution and generated SQL.
+- Authenticated hosted runtime proof, backup verification and isolated restore all pass. Only unused Docker
+  builder cache was pruned after the release (4.8 GB); root use is 82% with 8.0 GB free.
+- The cumulative unconventional import was replayed twice on production after the ordered prerequisites.
+  It is idempotent, contains 57 new rows and yields exact counts: boat 13, botanical 15, entertainment 15,
+  gallery 5, library 2, museum 8, warehouse 12 and zoo/aquarium 8.
+- WILD LIFE Sydney Zoo carries current official wedding evidence and remains marked verify-before-booking
+  for price, availability and current capacity. Release-specific SQL stages were removed.
+- Evidence: `Documents/verification/wed-339-mobile-decisions-unconventional-venues-release-2026-11-06.md`.
+  Remaining product/data-hardening opportunities are in
+  `Documents/issues/wedding planner/2026-11-06-wedding-planner-strengthening-report.md`.
