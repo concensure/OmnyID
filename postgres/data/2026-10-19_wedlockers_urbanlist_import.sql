@@ -68,6 +68,46 @@ VALUES
 ('venue-bosk-clontarf', 'bosk-clontarf', 'Bosk Clontarf', 'Venue', 'Clontarf, Northern Beaches NSW', 'Sandy Bay Road, Clontarf NSW 2093', NULL, NULL, NULL, 'https://www.wedlockers.com.au/b/bosk-events', 'Wedlockers/Urban List import 2026-10-15', '2026-10-15', 'active', NULL, '{"source": "wedlockers_urbanlist_import", "imported": "2026-10-15", "sources": ["https://www.wedlockers.com.au/b/bosk-events"], "flags": ["needs_contact_lookup"]}'::jsonb, ARRAY['wedlockers-import', 'verify-before-booking', 'needs_contact_lookup'])
 ON CONFLICT DO NOTHING;
 
+-- A previous venue load may already own the same slug under its canonical
+-- vendor_id. Resolve generated IDs to that canonical row before inserting
+-- evidence, and skip genuine enrichment-only misses. This keeps the operator
+-- load idempotent without creating duplicate or placeholder vendors.
+CREATE OR REPLACE FUNCTION pg_temp.wedlockers_resolve_vendor_attribute()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    resolved_vendor_id text;
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM wedding_vendors
+        WHERE vendor_id = NEW.vendor_id
+    ) THEN
+        RETURN NEW;
+    END IF;
+
+    SELECT vendor_id
+    INTO resolved_vendor_id
+    FROM wedding_vendors
+    WHERE vendor_slug = regexp_replace(NEW.vendor_id, '^venue-', '')
+    ORDER BY vendor_id
+    LIMIT 1;
+
+    IF resolved_vendor_id IS NULL THEN
+        RETURN NULL;
+    END IF;
+
+    NEW.vendor_id := resolved_vendor_id;
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER wedlockers_resolve_vendor_attribute_before_insert
+BEFORE INSERT ON wedding_vendor_attributes
+FOR EACH ROW
+EXECUTE FUNCTION pg_temp.wedlockers_resolve_vendor_attribute();
+
 INSERT INTO wedding_vendor_attributes (vendor_id, attribute_key, value, status, confidence, authority,
     source_url, source_label, retrieved_at, notes)
 VALUES
@@ -789,5 +829,8 @@ ON CONFLICT (vendor_id, attribute_key) DO UPDATE SET value = (
     SELECT to_jsonb(ARRAY(SELECT DISTINCT x FROM jsonb_array_elements_text(
         wedding_vendor_attributes.value || EXCLUDED.value) AS x)))
 WHERE jsonb_typeof(wedding_vendor_attributes.value) = 'array';
+
+DROP TRIGGER wedlockers_resolve_vendor_attribute_before_insert
+ON wedding_vendor_attributes;
 
 COMMIT;

@@ -7615,5 +7615,12 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
   rechecked against its current official page; unpublished capacity and pricing remain caveated.
 - Working-source checks pass: typecheck, public Wedding checks, both line budgets, all 2,222 Wedding
   tests, the production UI build, the focused source checks, the 375 x 812 Chromium vertical-swipe
-  journey and all 70 focused Rust vendor-search tests against `C:\cargo-target`. Oracle mutation and
-  exact-SHA release remain pending.
+  journey and all 70 focused Rust vendor-search tests against `C:\cargo-target`.
+- Candidate `10dd2b25c4d4e991fbdbfa4592eab14a4229b6b7` reached Oracle and passed hosted runtime,
+  backup verification and isolated restore after pruning only unused builder cache. WeddingNSW
+  committed. The following Wedlockers transaction safely rolled back when a generated ID collided
+  with an existing canonical slug owner (`The Rise Canoe Grounds`). The operator SQL now maps such
+  evidence to the canonical row and skips only genuinely absent enrichment targets. A disposable
+  database accepted the corrected prerequisite twice with one canonical venue and two attached
+  attributes. Freeze a replacement candidate, repeat exact-SHA build/deploy evidence, then apply the
+  three ordered data loads and verify production category counts before marking WED-339 complete.
