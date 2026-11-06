@@ -74,14 +74,14 @@ pricing state before the authoritative commands and safe projections exist.
 - [x] Show the date-specific indicative total as `max(minimum spend, guests ×
   per-head price)` plus only approved known mandatory charges, and explain when
   a guest count exceeds that date's capacity.
-- [ ] Add availability, freshness and effective-price evidence to Ranking
+- [x] Add availability, freshness and effective-price evidence to Ranking
   Policy V2 with confidence/unknown handling.
-  Fresh vendor-confirmed availability is now consumed by V2; effective price
-  remains open until it can be computed and disclosed inside the server-gated
-  top-three projection rather than leaked to every browser candidate.
+  The exact-date discovery route now performs the bounded server-side V2 stage
+  and computes approved price guidance before serializing at most three exact
+  details. Unknown price is uncertainty rather than a negative score.
 - [ ] Support explicit flexible-date windows and explain rank changes caused by
   a special date.
-- [ ] Attach exact slot/package details only after top-three selection.
+- [x] Attach exact slot/package details only after top-three selection.
 - [ ] Add fixed-date, flexible-date, over-budget-to-within-budget, unknown-cost,
   stale and commercial-influence regression tests.
 
@@ -90,7 +90,7 @@ pricing state before the authoritative commands and safe projections exist.
 - [x] Add authenticated `private, no-store` discovery query by date/category
   and optional location/radius.
 - [x] Return safe markers from vendor coordinates and licensed photos only.
-- [ ] Return exact offer details only for the ranked top three.
+- [x] Return exact offer details only for the ranked top three.
 - [x] Add pagination/bounds and server clustering inputs; do not expose a full
   calendar through repeated range probing.
 - [ ] Add cross-tenant and enumeration-resistance tests.

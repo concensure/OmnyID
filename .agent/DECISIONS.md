@@ -2934,3 +2934,22 @@ subjective usability or a controlled external cohort.
 - Zoom clusters are an accessible presentation of already-authorised markers,
   not another ranking or disclosure authority. Cluster expansion cannot fetch
   package terms, offer identifiers, wider date inventory or internal prices.
+
+# 2026-11-07 — WED-340 exact commercial guidance is a server-ranked top-three projection
+
+- Limited Specials runs the availability, personal-utility, evidence and
+  actionability stages on the server. The browser may provide bounded search
+  inputs but cannot nominate vendor IDs or assert rank.
+- Unknown distance, price, style or review evidence receives a neutral prior:
+  it is not treated as a failed requirement and does not gain an artificially
+  high score from a smaller denominator. Hard date/capacity failures remain
+  excluded before ranking.
+- The couple's category budget may affect utility and its explanation but is
+  never an input to the vendor's price calculation. Approved date terms alone
+  determine the indicative total.
+- Marker rows and candidates outside the current top three receive no package,
+  minimum-spend, per-head, inclusion or condition fields. Even top-three output
+  omits offer/slot IDs; enquiry creation must re-resolve and recheck the fresh
+  server record.
+- Coordinates, preference facet IDs and budget travel in an authenticated JSON
+  POST body, not a URL query string, to keep them out of ordinary access logs.

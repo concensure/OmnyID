@@ -646,6 +646,8 @@ export function WeddingVendorSearchHomeSection(props: {
             weddingDate={weddingDateOrSeason()}
             initialCategory={selectedVendorCategory()}
             initialGuestCount={weddingGuestCount()}
+            categoryBudgets={workspace().state.budgetTracking.budgetAllocation}
+            preferenceTerms={props.preferenceProfile?.facets.map((facet) => facet.facetId) ?? []}
             onPrepareEnquiry={prepareSpecialEnquiry}
           />
         </div>

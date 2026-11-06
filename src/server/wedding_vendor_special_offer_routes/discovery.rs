@@ -1,20 +1,25 @@
 //! Privacy-bounded couple discovery for one explicitly selected date.
 //!
-//! The response is marker data, not the vendor's calendar. It deliberately
-//! omits offer/slot identifiers, pricing, inclusions and private rules.
+//! The response is not the vendor's calendar. Marker data deliberately omits
+//! commercial terms; exact approved guidance is attached only to the three
+//! candidates selected by the server-side policy-v2 stage.
 
 use std::{sync::Arc, time::Duration};
 
 use axum::{
     Json, Router,
-    extract::{Query, State},
+    extract::State,
     http::{HeaderMap, StatusCode},
-    routing::get,
+    routing::post,
 };
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sqlx::Row;
+
+use crate::wedding_vendor_special_offer::{
+    ApprovedOfferPricing, DateSlotCommercialTerms, approved_date_price_estimate,
+};
 
 use super::super::{
     AppState, RateLimitPolicy,
@@ -27,7 +32,7 @@ const MAX_LIMIT: usize = 48;
 pub(super) fn routes() -> Router<Arc<AppState>> {
     Router::new().route(
         "/wedding/vendor-specials/discovery",
-        get(discover_specials_http),
+        post(discover_specials_http),
     )
 }
 
@@ -39,6 +44,8 @@ struct DiscoveryQuery {
     longitude: Option<f64>,
     radius_km: Option<f64>,
     guest_count: Option<u32>,
+    category_budget_cents: Option<i64>,
+    preference_terms: Option<String>,
     limit: Option<usize>,
 }
 
@@ -68,8 +75,44 @@ struct DiscoveryMarker {
 struct DiscoveryResponse {
     selected_date: String,
     category: Option<String>,
+    ranking_policy_version: &'static str,
     markers: Vec<DiscoveryMarker>,
+    top_choices: Vec<RankedSpecialDetail>,
     truncated: bool,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct RankedSpecialDetail {
+    vendor_id: String,
+    rank: usize,
+    title: String,
+    summary: String,
+    space_label: Option<String>,
+    session_label: Option<String>,
+    maximum_capacity: Option<u32>,
+    currency: String,
+    minimum_spend_cents: Option<i64>,
+    indicative_per_head_cents: Option<i64>,
+    indicative_total_cents: Option<i64>,
+    budget_fit_eligible: bool,
+    unknown_costs: bool,
+    inclusions: Vec<String>,
+    exclusions: Vec<String>,
+    public_conditions: Option<String>,
+    reason_labels: Vec<String>,
+    indicative_only: bool,
+}
+
+#[derive(Clone, Debug)]
+struct RankingCandidate {
+    detail: RankedSpecialDetail,
+    distance_km: Option<f64>,
+    radius_km: f64,
+    rating: Option<f64>,
+    review_count: Option<i64>,
+    style_tags: Vec<String>,
+    preference_terms: Vec<String>,
+    category_budget_cents: Option<i64>,
 }
 
 fn rollout_allowed(email: &str) -> bool {
@@ -125,10 +168,142 @@ fn approximate_distance_km(from: Option<(f64, f64)>, to: (f64, f64)) -> Option<f
     Some((latitude_km.powi(2) + longitude_km.powi(2)).sqrt())
 }
 
+fn bounded_terms(value: Option<&str>) -> Vec<String> {
+    value
+        .unwrap_or_default()
+        .split(',')
+        .map(|value| {
+            value
+                .trim()
+                .to_ascii_lowercase()
+                .chars()
+                .filter(|character| character.is_ascii_alphanumeric() || *character == '_')
+                .take(48)
+                .collect::<String>()
+        })
+        .filter(|value| !value.is_empty())
+        .take(16)
+        .collect()
+}
+
+fn non_empty(value: String) -> Option<String> {
+    (!value.trim().is_empty()).then_some(value)
+}
+
+fn budget_utility(price: i64, budget: i64) -> f64 {
+    if price < 0 || budget <= 0 {
+        return 0.0;
+    }
+    let ratio = price as f64 / budget as f64;
+    if ratio <= 0.70 {
+        1.0
+    } else if ratio <= 0.80 {
+        0.85
+    } else if ratio <= 0.95 {
+        0.60
+    } else if ratio <= 1.05 {
+        0.30
+    } else if ratio <= 1.20 {
+        0.10
+    } else {
+        0.0
+    }
+}
+
+fn ranking_score(candidate: &RankingCandidate) -> f64 {
+    // Availability is known for every row entering this ranker. Unknown
+    // dimensions receive a neutral prior rather than a zero or an inflated
+    // score from a smaller denominator. Their uncertainty stays visible.
+    let mut weighted = 0.65;
+    if let Some(distance) = candidate.distance_km {
+        let utility = (1.0 - distance / candidate.radius_km.max(1.0)).clamp(0.0, 1.0);
+        weighted += 0.20 * (utility - 0.5);
+    }
+    if !candidate.preference_terms.is_empty() && !candidate.style_tags.is_empty() {
+        let matches = candidate
+            .preference_terms
+            .iter()
+            .filter(|term| {
+                candidate
+                    .style_tags
+                    .iter()
+                    .any(|tag| tag.to_ascii_lowercase().contains(term.as_str()))
+            })
+            .count();
+        let utility = matches as f64 / candidate.preference_terms.len() as f64;
+        weighted += 0.20 * (utility - 0.5);
+    }
+    if let Some((total, budget)) = candidate
+        .detail
+        .indicative_total_cents
+        .zip(candidate.category_budget_cents)
+        .filter(|_| candidate.detail.budget_fit_eligible)
+    {
+        weighted += 0.20 * (budget_utility(total, budget) - 0.5);
+    }
+    if let Some(rating) = candidate.rating {
+        let reviews = candidate.review_count.unwrap_or(0).max(0) as f64;
+        let confidence = reviews / (reviews + 50.0);
+        let quality = ((rating - 3.5) / 1.5).clamp(0.0, 1.0);
+        let utility = quality * confidence + 0.5 * (1.0 - confidence);
+        weighted += 0.10 * (utility - 0.5);
+    }
+    weighted.clamp(0.0, 1.0)
+}
+
+fn rank_top_three(mut candidates: Vec<RankingCandidate>) -> Vec<RankedSpecialDetail> {
+    candidates.sort_by(|left, right| {
+        ranking_score(right)
+            .total_cmp(&ranking_score(left))
+            .then_with(|| left.detail.vendor_id.cmp(&right.detail.vendor_id))
+    });
+    candidates
+        .into_iter()
+        .take(3)
+        .enumerate()
+        .map(|(index, mut candidate)| {
+            candidate.detail.rank = index + 1;
+            candidate.detail.reason_labels = ranking_reason_labels(&candidate);
+            candidate.detail
+        })
+        .collect()
+}
+
+fn ranking_reason_labels(candidate: &RankingCandidate) -> Vec<String> {
+    let mut labels = vec!["Vendor-confirmed opening on your selected date".to_string()];
+    if candidate
+        .detail
+        .indicative_total_cents
+        .zip(candidate.category_budget_cents)
+        .is_some_and(|(total, budget)| candidate.detail.budget_fit_eligible && total <= budget)
+    {
+        labels.push("Approved indicative total is within your category budget".to_string());
+    }
+    let matched = candidate
+        .preference_terms
+        .iter()
+        .filter(|term| {
+            candidate
+                .style_tags
+                .iter()
+                .any(|tag| tag.to_ascii_lowercase().contains(term.as_str()))
+        })
+        .take(3)
+        .cloned()
+        .collect::<Vec<_>>();
+    if !matched.is_empty() {
+        labels.push(format!("Matches your {} preferences", matched.join(", ")));
+    }
+    if let Some(distance) = candidate.distance_km {
+        labels.push(format!("About {:.0} km from the selected area", distance));
+    }
+    labels.into_iter().take(4).collect()
+}
+
 async fn discover_specials_http(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
-    Query(query): Query<DiscoveryQuery>,
+    Json(query): Json<DiscoveryQuery>,
 ) -> Result<Json<DiscoveryResponse>, (StatusCode, String)> {
     enforce_rate_limit(
         &state,
@@ -155,6 +330,16 @@ async fn discover_specials_http(
             "guest_count must not exceed 5000".into(),
         ));
     }
+    let category_budget_cents = query
+        .category_budget_cents
+        .filter(|value| (0..=1_000_000_000_00).contains(value));
+    if query.category_budget_cents.is_some() && category_budget_cents.is_none() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "category_budget_cents is outside the supported range".into(),
+        ));
+    }
+    let preference_terms = bounded_terms(query.preference_terms.as_deref());
     let requested_limit = query.limit.unwrap_or(DEFAULT_LIMIT).clamp(1, MAX_LIMIT);
     let sql_limit = i64::try_from(requested_limit + 1).unwrap_or((MAX_LIMIT + 1) as i64);
 
@@ -169,6 +354,19 @@ async fn discover_specials_http(
                   COALESCE((reviews_google.value #>> '{}')::bigint,
                            (reviews_easy.value #>> '{}')::bigint) AS review_count,
                   photo.photo_url,photo.alt_text,
+                  offer.title AS offer_title,offer.summary AS offer_summary,
+                  offer.currency,offer.fixed_total_cents,offer.per_guest_cents,
+                  offer.hire_fee_cents,offer.minimum_spend_cents AS offer_minimum_spend_cents,
+                  offer.mandatory_charges_cents,offer.mandatory_charges_known,
+                  offer.mandatory_charges_summary,offer.estimate_min_cents,
+                  offer.estimate_max_cents,offer.reference_price_cents,
+                  offer.savings_basis_label,offer.savings_evidence_ref,
+                  offer.inclusions AS offer_inclusions,offer.exclusions,
+                  offer.public_conditions AS offer_public_conditions,
+                  slot.space_label,slot.session_label,slot.maximum_capacity,
+                  slot.minimum_spend_cents AS slot_minimum_spend_cents,
+                  slot.indicative_per_head_cents,slot.inclusions AS slot_inclusions,
+                  slot.public_conditions AS slot_public_conditions,
                   slot.last_confirmed_at,slot.confirmation_expires_at
            FROM wedding_vendor_special_offer_slots slot
            JOIN wedding_vendor_special_offers offer
@@ -238,52 +436,122 @@ async fn discover_specials_http(
     })?;
 
     let truncated = rows.len() > requested_limit;
-    let markers = rows
-        .into_iter()
-        .take(requested_limit)
-        .map(|row| {
-            let style_tags = row
-                .get::<Option<Value>, _>("style_tags")
-                .and_then(|value| value.as_array().cloned())
-                .unwrap_or_default()
-                .into_iter()
-                .filter_map(|value| value.as_str().map(ToOwned::to_owned))
-                .take(12)
-                .collect();
-            let confirmed: chrono::DateTime<chrono::Utc> = row.get("last_confirmed_at");
-            let expires: chrono::DateTime<chrono::Utc> = row.get("confirmation_expires_at");
-            let marker_latitude = row.get("latitude");
-            let marker_longitude = row.get("longitude");
-            DiscoveryMarker {
-                vendor_id: row.get("vendor_id"),
-                vendor_name: row.get("vendor_name"),
-                category: row.get("category"),
-                locality: row.get("service_area"),
-                address: row.get("address"),
-                description: row.get("notes"),
-                latitude: marker_latitude,
-                longitude: marker_longitude,
-                photo_url: row.get("photo_url"),
-                photo_alt: row.get("alt_text"),
-                style_tags,
-                rating: row.get("rating"),
-                review_count: row.get("review_count"),
-                available_on_date: selected_date.to_string(),
-                last_confirmed_at: confirmed.to_rfc3339(),
-                confirmation_expires_at: expires.to_rfc3339(),
+    let mut markers = Vec::new();
+    let mut ranking_candidates = Vec::new();
+    for row in rows.into_iter().take(requested_limit) {
+        let style_tags = row
+            .get::<Option<Value>, _>("style_tags")
+            .and_then(|value| value.as_array().cloned())
+            .unwrap_or_default()
+            .into_iter()
+            .filter_map(|value| value.as_str().map(ToOwned::to_owned))
+            .take(12)
+            .collect::<Vec<_>>();
+        let confirmed: chrono::DateTime<chrono::Utc> = row.get("last_confirmed_at");
+        let expires: chrono::DateTime<chrono::Utc> = row.get("confirmation_expires_at");
+        let marker_latitude = row.get("latitude");
+        let marker_longitude = row.get("longitude");
+        let distance_km =
+            approximate_distance_km(latitude.zip(longitude), (marker_latitude, marker_longitude))
+                .map(|distance| (distance * 10.0).round() / 10.0);
+        let vendor_id: String = row.get("vendor_id");
+        let rating = row.get("rating");
+        let review_count = row.get("review_count");
+        let pricing = ApprovedOfferPricing {
+            currency: row.get("currency"),
+            fixed_total_cents: row.get("fixed_total_cents"),
+            per_guest_cents: row.get("per_guest_cents"),
+            hire_fee_cents: row.get("hire_fee_cents"),
+            minimum_spend_cents: row.get("offer_minimum_spend_cents"),
+            mandatory_charges_cents: row.get("mandatory_charges_cents"),
+            mandatory_charges_known: row.get("mandatory_charges_known"),
+            mandatory_charges_summary: row.get("mandatory_charges_summary"),
+            estimate_min_cents: row.get("estimate_min_cents"),
+            estimate_max_cents: row.get("estimate_max_cents"),
+            reference_price_cents: row.get("reference_price_cents"),
+            savings_basis_label: row.get("savings_basis_label"),
+            savings_evidence_ref: row.get("savings_evidence_ref"),
+        };
+        let slot_inclusions: Vec<String> = row.get("slot_inclusions");
+        let offer_inclusions: Vec<String> = row.get("offer_inclusions");
+        let terms = DateSlotCommercialTerms {
+            maximum_capacity: row
+                .get::<Option<i32>, _>("maximum_capacity")
+                .map(|value| value as u32),
+            minimum_spend_cents: row.get("slot_minimum_spend_cents"),
+            indicative_per_head_cents: row.get("indicative_per_head_cents"),
+            inclusions: slot_inclusions.clone(),
+            public_conditions: row.get("slot_public_conditions"),
+        };
+        let estimate = approved_date_price_estimate(&pricing, &terms, query.guest_count).ok();
+        ranking_candidates.push(RankingCandidate {
+            detail: RankedSpecialDetail {
+                vendor_id: vendor_id.clone(),
+                rank: 0,
+                title: row.get("offer_title"),
+                summary: row.get("offer_summary"),
+                space_label: non_empty(row.get("space_label")),
+                session_label: non_empty(row.get("session_label")),
+                maximum_capacity: terms.maximum_capacity,
+                currency: pricing.currency.clone(),
+                minimum_spend_cents: terms.minimum_spend_cents.or(pricing.minimum_spend_cents),
+                indicative_per_head_cents: terms
+                    .indicative_per_head_cents
+                    .or(pricing.per_guest_cents),
+                indicative_total_cents: estimate.as_ref().and_then(|value| value.high_cents),
+                budget_fit_eligible: estimate
+                    .as_ref()
+                    .is_some_and(|value| value.budget_fit_eligible),
+                unknown_costs: estimate.as_ref().is_none_or(|value| value.unknown_costs),
+                inclusions: if slot_inclusions.is_empty() {
+                    offer_inclusions
+                } else {
+                    slot_inclusions
+                },
+                exclusions: row.get("exclusions"),
+                public_conditions: terms
+                    .public_conditions
+                    .clone()
+                    .or_else(|| row.get("offer_public_conditions")),
+                reason_labels: Vec::new(),
                 indicative_only: true,
-                distance_km: approximate_distance_km(
-                    latitude.zip(longitude),
-                    (marker_latitude, marker_longitude),
-                )
-                .map(|distance| (distance * 10.0).round() / 10.0),
-            }
-        })
-        .collect();
+            },
+            distance_km,
+            radius_km,
+            rating,
+            review_count,
+            style_tags: style_tags.clone(),
+            preference_terms: preference_terms.clone(),
+            category_budget_cents,
+        });
+        markers.push(DiscoveryMarker {
+            vendor_id,
+            vendor_name: row.get("vendor_name"),
+            category: row.get("category"),
+            locality: row.get("service_area"),
+            address: row.get("address"),
+            description: row.get("notes"),
+            latitude: marker_latitude,
+            longitude: marker_longitude,
+            photo_url: row.get("photo_url"),
+            photo_alt: row.get("alt_text"),
+            style_tags,
+            rating,
+            review_count,
+            available_on_date: selected_date.to_string(),
+            last_confirmed_at: confirmed.to_rfc3339(),
+            confirmation_expires_at: expires.to_rfc3339(),
+            indicative_only: true,
+            distance_km,
+        });
+    }
+    let top_choices = rank_top_three(ranking_candidates);
     Ok(Json(DiscoveryResponse {
         selected_date: selected_date.to_string(),
         category,
+        ranking_policy_version: "2",
         markers,
+        top_choices,
         truncated,
     }))
 }
@@ -291,6 +559,43 @@ async fn discover_specials_http(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn ranking_candidate(
+        vendor_id: &str,
+        distance_km: Option<f64>,
+        total: Option<i64>,
+        styles: &[&str],
+    ) -> RankingCandidate {
+        RankingCandidate {
+            detail: RankedSpecialDetail {
+                vendor_id: vendor_id.into(),
+                rank: 0,
+                title: format!("{vendor_id} package"),
+                summary: "Approved guidance".into(),
+                space_label: None,
+                session_label: None,
+                maximum_capacity: Some(100),
+                currency: "AUD".into(),
+                minimum_spend_cents: Some(1_000_000),
+                indicative_per_head_cents: Some(15_000),
+                indicative_total_cents: total,
+                budget_fit_eligible: total.is_some(),
+                unknown_costs: total.is_none(),
+                inclusions: vec!["Room hire".into()],
+                exclusions: Vec::new(),
+                public_conditions: None,
+                reason_labels: Vec::new(),
+                indicative_only: true,
+            },
+            distance_km,
+            radius_km: 75.0,
+            rating: Some(4.7),
+            review_count: Some(80),
+            style_tags: styles.iter().map(|value| (*value).into()).collect(),
+            preference_terms: vec!["garden".into()],
+            category_budget_cents: Some(1_500_000),
+        }
+    }
 
     #[test]
     fn category_is_bounded_and_singularized() {
@@ -344,5 +649,32 @@ mod tests {
             location_filter(Some(-33.86), Some(151.2), None).unwrap(),
             (Some(-33.86), Some(151.2), 75.0)
         );
+    }
+
+    #[test]
+    fn server_ranker_reveals_at_most_three_and_rewards_known_personal_fit() {
+        let ranked = rank_top_three(vec![
+            ranking_candidate("far", Some(70.0), Some(2_000_000), &[]),
+            ranking_candidate("garden", Some(5.0), Some(1_400_000), &["garden"]),
+            ranking_candidate("unknown-price", Some(10.0), None, &["garden"]),
+            ranking_candidate("fourth", Some(25.0), Some(1_500_000), &[]),
+        ]);
+        assert_eq!(ranked.len(), 3);
+        assert_eq!(ranked[0].vendor_id, "garden");
+        assert_eq!(ranked[0].rank, 1);
+        assert!(
+            ranked[0]
+                .reason_labels
+                .iter()
+                .any(|value| value.contains("preferences"))
+        );
+        assert!(!ranked.iter().any(|value| value.vendor_id == "far"));
+    }
+
+    #[test]
+    fn unknown_dimensions_are_not_scored_as_failures() {
+        let unknown = ranking_candidate("unknown", None, None, &[]);
+        assert!(ranking_score(&unknown) > 0.0);
+        assert!(unknown.detail.unknown_costs);
     }
 }

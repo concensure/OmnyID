@@ -23,12 +23,21 @@ test("limited-special discovery drops malformed markers and normalises safe exac
       },
       { vendor_id: "missing-coordinates", vendor_name: "Unsafe" },
     ],
+    top_choices: [{
+      vendor_id: "venue-a", rank: 1, title: "Quiet Saturday package", summary: "Approved guidance",
+      currency: "AUD", minimum_spend_cents: 1_400_000, indicative_per_head_cents: 18_000,
+      indicative_total_cents: 1_590_000, budget_fit_eligible: true, unknown_costs: false,
+      inclusions: ["Room hire", "Staffing"], exclusions: [], reason_labels: ["Date confirmed"], indicative_only: true,
+    }],
   });
   assert.equal(result.markers.length, 1);
   assert.equal(result.markers[0].vendorName, "Harbour House");
   assert.deepEqual(result.markers[0].styleTags, ["waterfront", "modern"]);
   assert.equal(result.markers[0].availableOnDate, "2027-11-20");
   assert.equal(result.markers[0].distanceKm, 3.2);
+  assert.equal(result.topChoices.length, 1);
+  assert.equal(result.topChoices[0].indicativeTotalCents, 1_590_000);
+  assert.deepEqual(result.topChoices[0].inclusions, ["Room hire", "Staffing"]);
 });
 
 test("Limited Specials uses a third mode, full marker name and one synchronized detail card", async () => {
@@ -44,13 +53,19 @@ test("Limited Specials uses a third mode, full marker name and one synchronized 
   assert.match(map, /wedding-special-map-cluster/);
   assert.match(map, /radiusKm/);
   assert.match(map, /guestCount/);
+  assert.match(map, /selectedDetail/);
+  assert.match(map, /Exact package and price guidance appears only when this venue is in your current top three/);
   assert.match(map, /Availability is indicative and subject to vendor confirmation/);
   assert.match(map, /onPrepareEnquiry\(item\)/);
   assert.match(map, /aria-label={`Availability for/);
   assert.match(api, /wedding\/vendor-specials\/discovery/);
-  for (const forbidden of ["minimum_spend", "per_head", "inclusions", "offer_id", "slot_id"]) {
-    assert.doesNotMatch(server, new RegExp(`DiscoveryMarker[\\s\\S]{0,800}${forbidden}`));
-  }
+  assert.match(api, /method: "POST"/);
+  assert.doesNotMatch(api, /URLSearchParams/);
+  const markerContract = server.match(/struct DiscoveryMarker \{[\s\S]*?\n\}/)?.[0] ?? "";
+  assert.ok(markerContract);
+  for (const forbidden of ["minimum_spend", "per_head", "inclusions", "offer_id", "slot_id"]) assert.doesNotMatch(markerContract, new RegExp(forbidden));
   assert.match(server, /photo_licence_id IS NOT NULL/);
   assert.match(server, /slot\.local_date=\$1/);
+  assert.match(server, /rank_top_three/);
+  assert.match(server, /approved_date_price_estimate/);
 });

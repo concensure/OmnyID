@@ -25,8 +25,31 @@ export type WeddingVendorSpecialMarker = {
 export type WeddingVendorSpecialDiscovery = {
   selectedDate: string;
   category: string | null;
+  rankingPolicyVersion: "2" | null;
   markers: WeddingVendorSpecialMarker[];
+  topChoices: WeddingVendorRankedSpecialDetail[];
   truncated: boolean;
+};
+
+export type WeddingVendorRankedSpecialDetail = {
+  vendorId: string;
+  rank: number;
+  title: string;
+  summary: string;
+  spaceLabel: string | null;
+  sessionLabel: string | null;
+  maximumCapacity: number | null;
+  currency: string;
+  minimumSpendCents: number | null;
+  indicativePerHeadCents: number | null;
+  indicativeTotalCents: number | null;
+  budgetFitEligible: boolean;
+  unknownCosts: boolean;
+  inclusions: string[];
+  exclusions: string[];
+  publicConditions: string | null;
+  reasonLabels: string[];
+  indicativeOnly: true;
 };
 
 const text = (value: unknown) => typeof value === "string" ? value.trim() : "";
@@ -68,10 +91,43 @@ export function normalizeWeddingVendorSpecialDiscovery(value: unknown): WeddingV
   return {
     selectedDate: text(record.selected_date),
     category: optionalText(record.category),
+    rankingPolicyVersion: text(record.ranking_policy_version) === "2" ? "2" : null,
     markers: Array.isArray(record.markers)
       ? record.markers.map(normalizeWeddingVendorSpecialMarker).filter((item): item is WeddingVendorSpecialMarker => Boolean(item))
       : [],
+    topChoices: Array.isArray(record.top_choices)
+      ? record.top_choices.map(normalizeWeddingVendorRankedSpecialDetail).filter((item): item is WeddingVendorRankedSpecialDetail => Boolean(item))
+      : [],
     truncated: record.truncated === true,
+  };
+}
+
+export function normalizeWeddingVendorRankedSpecialDetail(value: unknown): WeddingVendorRankedSpecialDetail | null {
+  if (!isRecord(value)) return null;
+  const vendorId = text(value.vendor_id);
+  const rank = number(value.rank);
+  const title = text(value.title);
+  if (!vendorId || rank === null || rank < 1 || rank > 3 || !title) return null;
+  const strings = (candidate: unknown) => Array.isArray(candidate) ? candidate.map(text).filter(Boolean).slice(0, 40) : [];
+  return {
+    vendorId,
+    rank,
+    title,
+    summary: text(value.summary),
+    spaceLabel: optionalText(value.space_label),
+    sessionLabel: optionalText(value.session_label),
+    maximumCapacity: number(value.maximum_capacity),
+    currency: text(value.currency) || "AUD",
+    minimumSpendCents: number(value.minimum_spend_cents),
+    indicativePerHeadCents: number(value.indicative_per_head_cents),
+    indicativeTotalCents: number(value.indicative_total_cents),
+    budgetFitEligible: value.budget_fit_eligible === true,
+    unknownCosts: value.unknown_costs !== false,
+    inclusions: strings(value.inclusions),
+    exclusions: strings(value.exclusions),
+    publicConditions: optionalText(value.public_conditions),
+    reasonLabels: strings(value.reason_labels).slice(0, 4),
+    indicativeOnly: true,
   };
 }
 
@@ -82,15 +138,23 @@ export async function loadWeddingVendorSpecials(input: {
   longitude?: number;
   radiusKm?: number;
   guestCount?: number | null;
+  categoryBudgetCents?: number | null;
+  preferenceTerms?: readonly string[];
   limit?: number;
 }) {
-  const query = new URLSearchParams({ date: input.date, category: input.category });
-  if (typeof input.latitude === "number" && typeof input.longitude === "number") {
-    query.set("latitude", String(input.latitude));
-    query.set("longitude", String(input.longitude));
-    query.set("radius_km", String(input.radiusKm ?? 75));
-  }
-  if (typeof input.guestCount === "number" && input.guestCount > 0) query.set("guest_count", String(Math.round(input.guestCount)));
-  if (input.limit) query.set("limit", String(input.limit));
-  return normalizeWeddingVendorSpecialDiscovery(await apiFetch<unknown>(`/wedding/vendor-specials/discovery?${query}`));
+  const location = typeof input.latitude === "number" && typeof input.longitude === "number"
+    ? { latitude: input.latitude, longitude: input.longitude, radius_km: input.radiusKm ?? 75 }
+    : {};
+  return normalizeWeddingVendorSpecialDiscovery(await apiFetch<unknown>("/wedding/vendor-specials/discovery", {
+    method: "POST",
+    body: JSON.stringify({
+      date: input.date,
+      category: input.category,
+      ...location,
+      guest_count: typeof input.guestCount === "number" && input.guestCount > 0 ? Math.round(input.guestCount) : null,
+      category_budget_cents: typeof input.categoryBudgetCents === "number" && input.categoryBudgetCents >= 0 ? Math.round(input.categoryBudgetCents) : null,
+      preference_terms: input.preferenceTerms?.slice(0, 16).join(",") || null,
+      limit: input.limit ?? null,
+    }),
+  }));
 }

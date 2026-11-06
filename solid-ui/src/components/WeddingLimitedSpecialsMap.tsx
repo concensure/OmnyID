@@ -4,6 +4,7 @@ import type * as Leaflet from "leaflet";
 import { OSM_TILE_CONFIG } from "@/lib/mapConfig";
 import {
   loadWeddingVendorSpecials,
+  type WeddingVendorRankedSpecialDetail,
   type WeddingVendorSpecialMarker,
 } from "@/lib/weddingVendorSpecialDiscoveryApi";
 
@@ -40,6 +41,8 @@ export function WeddingLimitedSpecialsMap(props: {
   weddingDate?: string | null;
   initialCategory?: string | null;
   initialGuestCount?: number | null;
+  categoryBudgets?: readonly { categoryId: string; amount: number }[];
+  preferenceTerms?: readonly string[];
   onPrepareEnquiry: (marker: WeddingVendorSpecialMarker) => void;
 }) {
   const [date, setDate] = createSignal(validDate(props.weddingDate));
@@ -50,8 +53,14 @@ export function WeddingLimitedSpecialsMap(props: {
   const [searchCenter, setSearchCenter] = createSignal<{ latitude: number; longitude: number }>({ latitude: SYDNEY[0], longitude: SYDNEY[1] });
   const [radiusKm, setRadiusKm] = createSignal(75);
   const [guestCount, setGuestCount] = createSignal<number | null>(props.initialGuestCount ?? null);
+  const categoryBudgetCents = createMemo(() => {
+    const id = ({ Venue: "venue_ceremony", Celebrant: "venue_ceremony", Planner: "other_misc", Photographer: "photo_video", Florist: "flowers_decor", Musician: "entertainment_music", Cake: "catering_drinks" } as Record<string, string>)[category()] ?? "other_misc";
+    const amount = props.categoryBudgets?.find((item) => item.categoryId === id)?.amount;
+    return typeof amount === "number" && amount > 0 ? Math.round(amount * 100) : null;
+  });
   const [query] = createResource(() => ({
     date: date(), category: category(), ...searchCenter(), radiusKm: radiusKm(), guestCount: guestCount(),
+    categoryBudgetCents: categoryBudgetCents(), preferenceTerms: props.preferenceTerms,
   }), loadWeddingVendorSpecials);
   let mapElement: HTMLDivElement | undefined;
   let map: Leaflet.Map | undefined;
@@ -59,8 +68,14 @@ export function WeddingLimitedSpecialsMap(props: {
   let layer: Leaflet.LayerGroup | undefined;
 
   const markers = () => query()?.markers ?? [];
-  const selected = createMemo(() => markers().find((item) => item.vendorId === selectedId()) ?? markers()[0] ?? null);
+  const selected = createMemo(() => markers().find((item) => item.vendorId === selectedId())
+    ?? markers().find((item) => item.vendorId === query()?.topChoices[0]?.vendorId)
+    ?? markers()[0]
+    ?? null);
+  const selectedDetail = createMemo<WeddingVendorRankedSpecialDetail | null>(() => query()?.topChoices.find((item) => item.vendorId === selected()?.vendorId) ?? null);
   const calendar = createMemo(() => monthDays(selected()?.availableOnDate ?? date()));
+
+  const money = (cents: number, currency: string) => new Intl.NumberFormat("en-AU", { style: "currency", currency, maximumFractionDigits: 0 }).format(cents / 100);
 
   onMount(async () => {
     try {
@@ -212,6 +227,24 @@ export function WeddingLimitedSpecialsMap(props: {
               <Show when={item.distanceKm !== null}><p class="mt-1 text-xs font-semibold text-wedding-ink/60">About {item.distanceKm} km from the map centre</p></Show>
               <Show when={item.rating !== null}><p class="mt-3 text-sm font-semibold text-wedding-ink">★ {item.rating?.toFixed(1)} <span class="font-normal text-wedding-ink/65">{item.reviewCount ? `from ${item.reviewCount} reviews` : "published rating"}</span></p></Show>
               <div class="mt-3 flex flex-wrap gap-2"><For each={item.styleTags}>{(tag) => <span class="rounded-full bg-wedding-slate px-2.5 py-1 text-xs font-semibold text-wedding-ink/70">{tag}</span>}</For></div>
+              <Show when={selectedDetail()} keyed fallback={<p class="mt-4 rounded-lg bg-wedding-slate p-3 text-xs leading-5 text-wedding-ink/65">Vendor-confirmed availability is shown here. Exact package and price guidance appears only when this venue is in your current top three.</p>}>{(detail) => (
+                <section class="mt-4 rounded-xl border border-wedding-primary/25 bg-wedding-primary/5 p-3" aria-label="Top-three limited special details">
+                  <p class="text-xs font-bold uppercase tracking-[.12em] text-wedding-primary">#{detail.rank} current match · Indicative</p>
+                  <h4 class="mt-1 font-semibold text-wedding-ink">{detail.title}</h4>
+                  <p class="mt-1 text-sm leading-5 text-wedding-ink/70">{detail.summary}</p>
+                  <Show when={detail.spaceLabel || detail.sessionLabel}><p class="mt-2 text-xs font-semibold text-wedding-ink/70">{[detail.spaceLabel, detail.sessionLabel].filter(Boolean).join(" · ")}</p></Show>
+                  <Show when={detail.indicativeTotalCents !== null}><p class="mt-3 text-lg font-bold text-wedding-ink">About {money(detail.indicativeTotalCents!, detail.currency)} <span class="text-xs font-normal text-wedding-ink/60">for {guestCount() ?? "your"} guests</span></p></Show>
+                  <div class="mt-2 flex flex-wrap gap-2 text-xs text-wedding-ink/70">
+                    <Show when={detail.indicativePerHeadCents !== null}><span>{money(detail.indicativePerHeadCents!, detail.currency)} per head</span></Show>
+                    <Show when={detail.minimumSpendCents !== null}><span>· Minimum spend {money(detail.minimumSpendCents!, detail.currency)}</span></Show>
+                    <Show when={detail.maximumCapacity !== null}><span>· Up to {detail.maximumCapacity} guests</span></Show>
+                  </div>
+                  <Show when={detail.inclusions.length > 0}><p class="mt-2 text-xs leading-5 text-wedding-ink/70"><strong>Includes:</strong> {detail.inclusions.slice(0, 5).join(", ")}</p></Show>
+                  <Show when={detail.publicConditions}><p class="mt-1 text-xs leading-5 text-wedding-ink/65">{detail.publicConditions}</p></Show>
+                  <ul class="mt-2 grid gap-1 text-xs text-wedding-ink/70"><For each={detail.reasonLabels}>{(label) => <li>✓ {label}</li>}</For></ul>
+                  <Show when={detail.unknownCosts}><p class="mt-2 text-xs font-semibold text-amber-800">Some mandatory costs are still unconfirmed, so this is not a final quote.</p></Show>
+                </section>
+              )}</Show>
             </div>
             <section class="rounded-xl border border-wedding-border bg-wedding-page p-3" aria-label={`Availability for ${calendar().label}`}>
               <p class="font-semibold text-wedding-ink">{calendar().label}</p>

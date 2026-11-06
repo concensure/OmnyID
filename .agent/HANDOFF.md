@@ -7785,3 +7785,30 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
   execution and adversarial cross-tenant HTTP evidence remain unclaimed.
   Server-authoritative top-three commercial detail and hosted false-default
   rollout also remain open. Nothing was deployed or enabled.
+
+# 2026-11-07 - WED-340 server-ranked top-three commercial reveal (Codex)
+
+- Continued from clean commit `8d703c3811a847e4ca4b86a3cdc95450e3b79048`
+  in `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001` on
+  `agent/codex/WED-340`.
+- The authenticated discovery endpoint now accepts its privacy-sensitive
+  filters in a JSON POST body. It computes approved exact-date price guidance
+  internally and runs a bounded Policy V2 stage over availability, distance,
+  category-budget fit, preference facets and review evidence.
+- Unknown dimensions use a neutral prior. Only three server-selected vendors
+  receive package summary, date-specific capacity, minimum spend, per-head
+  guidance, indicative total, inclusions, exclusions, conditions and
+  couple-facing rank reasons. Marker rows and all other candidates still omit
+  commercial terms and all output omits offer/slot identifiers.
+- The selected venue card shows the exact guidance only for a current top-three
+  result, explains unknown mandatory costs and otherwise states that full terms
+  remain gated. Price derives only from vendor-approved terms, never the
+  couple's budget.
+- Passed five focused Rust rank/privacy tests after one Windows rustc access-
+  violation retry, focused frontend contracts, TypeScript typecheck, all 2,227
+  Wedding tests, both line budgets, production build, `cargo check --lib` with
+  `C:\cargo-target`, and `git diff --check`.
+- Docker Desktop remains unavailable, so disposable-Postgres SQL execution and
+  adversarial cross-tenant HTTP proof are not claimed. Enquiry revalidation,
+  slot-envelope linkage, lifecycle automation, portal/admin UI and hosted
+  false-default rollout remain open. Nothing was deployed or enabled.
