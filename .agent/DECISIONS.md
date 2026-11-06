@@ -2857,3 +2857,18 @@ subjective usability or a controlled external cohort.
 - Limited Specials will reuse existing claim authority, secure capability,
   Leaflet map, enquiry approval, masked mail, referral and AFP components.
   Applying migration 0149 creates no active offer and enables no rollout flag.
+
+# 2026-11-07 — WED-340 commercial terms belong to the available date
+
+- Offer-level commercial facts are defaults. Each date + space + session can
+  carry its own maximum capacity, minimum spend, indicative per-head amount,
+  inclusions and public conditions because quiet-date terms can differ.
+- The indicative total is calculated from vendor-approved facts as
+  `max(minimum spend, guests × per-head price)` plus only known approved fees.
+  The couple's category budget is never used to set or alter that price.
+- Vendor command routes require the existing verified claimed-listing authority
+  and a false-default account allowlist. Vendor-wide supply uses versioned
+  operational events; a couple AFP event begins only when a couple creates an
+  enquiry, hold, quote, booking or another couple-specific consequence.
+- Enquiry, provisional hold and booking remain separate states. Pausing cannot
+  erase a hold, and an offer with an active hold cannot be withdrawn silently.

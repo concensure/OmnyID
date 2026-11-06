@@ -8,6 +8,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_wedding_vendor_rooms_room_vendor
 CREATE TABLE IF NOT EXISTS wedding_vendor_special_offers (
     offer_id TEXT PRIMARY KEY,
     vendor_id TEXT NOT NULL REFERENCES wedding_vendors(vendor_id) ON DELETE CASCADE,
+    creation_idempotency_key TEXT NOT NULL CHECK (
+        char_length(creation_idempotency_key) BETWEEN 8 AND 160
+    ),
     room_id TEXT,
     category TEXT NOT NULL CHECK (char_length(category) BETWEEN 1 AND 120),
     title TEXT NOT NULL CHECK (char_length(title) BETWEEN 1 AND 160),
@@ -68,6 +71,9 @@ CREATE TABLE IF NOT EXISTS wedding_vendor_special_offers (
     )
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS uq_wedding_vendor_special_offer_creation
+    ON wedding_vendor_special_offers (vendor_id, creation_idempotency_key);
+
 CREATE INDEX IF NOT EXISTS idx_wedding_vendor_special_offers_vendor
     ON wedding_vendor_special_offers (vendor_id, publication_state, updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_wedding_vendor_special_offers_discovery
@@ -98,6 +104,17 @@ CREATE TABLE IF NOT EXISTS wedding_vendor_special_offer_slots (
     ends_at TIME,
     space_label TEXT NOT NULL DEFAULT '' CHECK (char_length(space_label) <= 160),
     session_label TEXT NOT NULL DEFAULT '' CHECK (char_length(session_label) <= 160),
+    maximum_capacity INTEGER CHECK (maximum_capacity IS NULL OR maximum_capacity > 0),
+    minimum_spend_cents BIGINT CHECK (
+        minimum_spend_cents IS NULL OR minimum_spend_cents >= 0
+    ),
+    indicative_per_head_cents BIGINT CHECK (
+        indicative_per_head_cents IS NULL OR indicative_per_head_cents >= 0
+    ),
+    inclusions TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
+    public_conditions TEXT CHECK (
+        public_conditions IS NULL OR char_length(public_conditions) <= 1200
+    ),
     state TEXT NOT NULL DEFAULT 'available' CHECK (state IN (
         'available', 'enquiry_received', 'provisional_hold', 'booked',
         'paused', 'withdrawn', 'stale'

@@ -68,6 +68,15 @@ table.
 - optional comparison basis and evidence reference for a savings claim;
 - created/updated/approved timestamps and optimistic revision number.
 
+Each date/space/session slot may override the offer defaults with its own
+maximum capacity, minimum spend, indicative price per head, inclusions and
+public conditions. This is necessary because a quiet weekday, winter date or
+particular room may have different commercial terms from another date under
+the same offer. The couple-facing indicative total is the greater of minimum
+spend and price-per-head multiplied by the selected guest count, plus only
+approved known mandatory charges. The couple's budget is never an input to
+that calculation.
+
 Internal formulas, margins, negotiation notes and unpublished rate cards belong
 in `wedding_vendor_special_offer_private_pricing`, encrypted or access-restricted
 to the verified vendor and authorised operator. Couple/public list queries must
@@ -81,6 +90,8 @@ session being offered:
 - `slot_id`, `offer_id`, `vendor_id`;
 - local date, IANA timezone, optional start/end local time;
 - room/space and session label;
+- date-specific maximum capacity, minimum spend, indicative price per head,
+  inclusions and public conditions, with offer-level values as defaults;
 - state: `available`, `enquiry_received`, `provisional_hold`, `booked`,
   `paused`, `withdrawn`, `stale`;
 - hold expiry where relevant;

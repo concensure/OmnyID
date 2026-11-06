@@ -7666,8 +7666,27 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
 - Added pure `wedding_vendor_special_offer` policy for approved effective pricing, unknown mandatory
   costs, substantiated savings, top-three-only detail projection, fresh/stale discovery, enquiry vs
   hold semantics, hold expiry, reconfirmation and optimistic revision checks.
-- Verification: six focused Rust policy tests pass; embedded migration catalogue parity passes; source
-  is 549 lines. Disposable PostgreSQL execution is not yet evidence because Docker Desktop reported it
+- Verification: six focused Rust policy tests pass; embedded migration catalogue parity passes; the
+  initial policy source is 584 lines. Disposable PostgreSQL execution is not yet evidence because Docker Desktop reported it
   could not start and remained unavailable after one hidden 60-second start attempt.
 - No release, production migration, vendor publication or external send occurred. Next action: restore
   Docker, run migration 0149 twice with constraint assertions, then implement verified-vendor commands.
+
+# 2026-11-07 - WED-340 verified-vendor command slice (Codex)
+
+- Continued from clean feature commit `705f057d73196c620dfbae31f6972f1391f6bd77` in
+  `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001` on `agent/codex/WED-340`.
+- Migration 0149 now stores a bounded idempotency key and date-specific maximum capacity, minimum
+  spend, indicative per-head price, inclusions and public conditions. Offer values remain defaults.
+- Added a false-default, account-allowlisted route module that reuses verified listing ownership for
+  list/create/publish/pause/withdraw/reconfirm and slot hold/booked/pause/withdraw/reconfirm commands.
+  All writes use vendor scoping, expected revisions, idempotency and content-light versioned events.
+- Vendor preview accepts a guest count and returns the approved indicative total and capacity fit.
+  Pricing never consumes the couple's budget. Exact couple-facing date details remain top-three gated.
+- Pausing preserves active holds; withdrawal refuses an active hold; enquiry is still not a hold.
+- Verification: 13 focused Rust policy/route tests, `cargo check --lib` and embedded migration-catalog
+  parity pass. New source files remain below 1,000 lines; the policy is 698 lines. `git diff --check` passes.
+  staging. Docker Desktop still cannot start, so migration replay and swapped-vendor API proof are not
+  claimed. No deployment, production migration, active offer or external send occurred.
+- Next: replay migration 0149 twice in disposable PostgreSQL, add cross-vendor route tests, then build
+  the expiring management capability and couple top-three discovery projection.

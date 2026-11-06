@@ -7,6 +7,8 @@ use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 
 pub const WEDDING_VENDOR_SPECIAL_OFFER_SCHEMA_VERSION: &str = "wedding.vendor_special_offer.v1";
+pub const WEDDING_VENDOR_SPECIAL_OFFER_EVENT_VERSION: &str =
+    "wedding.vendor_special_offer.event.v1";
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -97,11 +99,21 @@ pub struct SpecialOfferSlotRecord {
     pub timezone: String,
     pub space_label: String,
     pub session_label: String,
+    pub commercial_terms: DateSlotCommercialTerms,
     pub state: SpecialOfferSlotState,
     pub hold_expires_at: Option<DateTime<Utc>>,
     pub last_confirmed_at: DateTime<Utc>,
     pub confirmation_expires_at: DateTime<Utc>,
     pub revision: u64,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+pub struct DateSlotCommercialTerms {
+    pub maximum_capacity: Option<u32>,
+    pub minimum_spend_cents: Option<i64>,
+    pub indicative_per_head_cents: Option<i64>,
+    pub inclusions: Vec<String>,
+    pub public_conditions: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -114,6 +126,8 @@ pub struct CoupleSpecialOfferDetail {
     pub session_label: String,
     pub title: String,
     pub summary: String,
+    pub selected_guest_count: Option<u32>,
+    pub maximum_capacity: Option<u32>,
     pub pricing: ApprovedPriceEstimate,
     pub inclusions: Vec<String>,
     pub exclusions: Vec<String>,
@@ -136,6 +150,7 @@ pub enum SpecialOfferPolicyError {
     InvalidEstimateRange,
     UnsubstantiatedSavingsClaim,
     GuestCountOutsideOffer,
+    GuestCountOutsideDateCapacity,
     NoApprovedPrice,
     OfferNotActive,
     OfferRevisionNotApproved,
@@ -207,7 +222,9 @@ pub fn approved_price_estimate(
         }),
         (None, None) => pricing.hire_fee_cents,
     };
-    let structured = structured.map(|value| value.max(pricing.minimum_spend_cents.unwrap_or(0)));
+    let structured = structured
+        .or(pricing.minimum_spend_cents)
+        .map(|value| value.max(pricing.minimum_spend_cents.unwrap_or(0)));
     let structured =
         structured.map(|value| value.saturating_add(pricing.mandatory_charges_cents.unwrap_or(0)));
 
@@ -241,6 +258,45 @@ pub fn approved_price_estimate(
         savings_evidence_ref: substantiated_savings_cents
             .and_then(|_| pricing.savings_evidence_ref.clone()),
     })
+}
+
+pub fn pricing_for_date(
+    offer: &ApprovedOfferPricing,
+    terms: &DateSlotCommercialTerms,
+) -> Result<ApprovedOfferPricing, SpecialOfferPolicyError> {
+    if terms
+        .minimum_spend_cents
+        .into_iter()
+        .chain(terms.indicative_per_head_cents)
+        .any(|value| value < 0)
+    {
+        return Err(SpecialOfferPolicyError::NegativeMoney);
+    }
+    let mut pricing = offer.clone();
+    if terms.minimum_spend_cents.is_some() {
+        pricing.minimum_spend_cents = terms.minimum_spend_cents;
+    }
+    if terms.indicative_per_head_cents.is_some() {
+        pricing.per_guest_cents = terms.indicative_per_head_cents;
+        pricing.fixed_total_cents = None;
+    }
+    validate_approved_pricing(&pricing)?;
+    Ok(pricing)
+}
+
+pub fn approved_date_price_estimate(
+    offer: &ApprovedOfferPricing,
+    terms: &DateSlotCommercialTerms,
+    guest_count: Option<u32>,
+) -> Result<ApprovedPriceEstimate, SpecialOfferPolicyError> {
+    if terms
+        .maximum_capacity
+        .zip(guest_count)
+        .is_some_and(|(capacity, guests)| guests > capacity)
+    {
+        return Err(SpecialOfferPolicyError::GuestCountOutsideDateCapacity);
+    }
+    approved_price_estimate(&pricing_for_date(offer, terms)?, guest_count)
 }
 
 pub fn validate_offer_for_publication(
@@ -298,10 +354,24 @@ pub fn project_couple_special_marker(
             session_label: slot.session_label.clone(),
             title: offer.title.clone(),
             summary: offer.summary.clone(),
-            pricing: approved_price_estimate(&offer.pricing, guest_count)?,
-            inclusions: offer.inclusions.clone(),
+            selected_guest_count: guest_count,
+            maximum_capacity: slot.commercial_terms.maximum_capacity.or(offer.guest_max),
+            pricing: approved_date_price_estimate(
+                &offer.pricing,
+                &slot.commercial_terms,
+                guest_count,
+            )?,
+            inclusions: if slot.commercial_terms.inclusions.is_empty() {
+                offer.inclusions.clone()
+            } else {
+                slot.commercial_terms.inclusions.clone()
+            },
             exclusions: offer.exclusions.clone(),
-            public_conditions: offer.public_conditions.clone(),
+            public_conditions: slot
+                .commercial_terms
+                .public_conditions
+                .clone()
+                .or_else(|| offer.public_conditions.clone()),
         })
     } else {
         None
@@ -489,6 +559,13 @@ mod tests {
             timezone: "Australia/Sydney".to_string(),
             space_label: "Garden room".to_string(),
             session_label: "Evening".to_string(),
+            commercial_terms: DateSlotCommercialTerms {
+                maximum_capacity: Some(90),
+                minimum_spend_cents: Some(1_400_000),
+                indicative_per_head_cents: Some(18_000),
+                inclusions: vec!["Room hire".to_string(), "Staffing".to_string()],
+                public_conditions: Some("Indicative and subject to confirmation".to_string()),
+            },
             state: SpecialOfferSlotState::Available,
             hold_expires_at: None,
             last_confirmed_at: now(),
@@ -503,6 +580,43 @@ mod tests {
         assert_eq!(estimate.high_cents, Some(1_750_000));
         assert_eq!(estimate.ranking_total_cents, Some(1_750_000));
         assert_eq!(estimate.substantiated_savings_cents, Some(250_000));
+    }
+
+    #[test]
+    fn date_terms_calculate_the_indicative_total_for_selected_guests() {
+        let estimate =
+            approved_date_price_estimate(&pricing(), &slot().commercial_terms, Some(80)).unwrap();
+        assert_eq!(estimate.high_cents, Some(1_590_000));
+        assert_eq!(estimate.ranking_total_cents, Some(1_590_000));
+    }
+
+    #[test]
+    fn date_minimum_spend_is_still_an_estimate_without_per_head_pricing() {
+        let terms = DateSlotCommercialTerms {
+            maximum_capacity: Some(100),
+            minimum_spend_cents: Some(900_000),
+            indicative_per_head_cents: None,
+            inclusions: vec![],
+            public_conditions: None,
+        };
+        let mut base = pricing();
+        base.fixed_total_cents = None;
+        base.per_guest_cents = None;
+        base.hire_fee_cents = None;
+        assert_eq!(
+            approved_date_price_estimate(&base, &terms, Some(60))
+                .unwrap()
+                .high_cents,
+            Some(950_000)
+        );
+    }
+
+    #[test]
+    fn selected_guests_cannot_exceed_the_dates_capacity() {
+        assert_eq!(
+            approved_date_price_estimate(&pricing(), &slot().commercial_terms, Some(91)),
+            Err(SpecialOfferPolicyError::GuestCountOutsideDateCapacity)
+        );
     }
 
     #[test]

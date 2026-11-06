@@ -15,7 +15,7 @@ pricing state before the authoritative commands and safe projections exist.
 - [x] Define the boundary between couple availability evidence and
   vendor-published supply.
 - [x] Define public, couple-private, vendor-private and admin projections.
-- [ ] Add architecture decision and schema/event version constants.
+- [x] Add architecture decision and schema/event version constants.
 
 ## Phase 1 — persistence and pure policy
 
@@ -36,10 +36,13 @@ pricing state before the authoritative commands and safe projections exist.
 ## Phase 2 — verified vendor commands
 
 - [ ] Reuse claim/ownership authority to list and edit only the caller's vendor.
-- [ ] Create offer/slot draft commands with bounded fields and idempotency keys.
-- [ ] Add preview, explicit approval/publish, pause, withdraw and reconfirm.
+- [x] Create offer/slot draft commands with bounded fields and idempotency keys.
+- [x] Let each date/space/session carry maximum capacity, minimum spend,
+  indicative price per head, inclusions and public conditions, with offer-level
+  values serving only as defaults.
+- [x] Add preview, explicit approval/publish, pause, withdraw and reconfirm.
 - [ ] Add enquiry-received, provisional-hold, hold-expiry and booked commands.
-- [ ] Record actor, source, revision and AFP/operational event for every command.
+- [x] Record actor, source, revision and AFP/operational event for every command.
 - [ ] Add cross-vendor and swapped-ID adversarial tests.
 
 ## Phase 3 — secure management link
@@ -65,8 +68,11 @@ pricing state before the authoritative commands and safe projections exist.
 ## Phase 5 — ranking and top-three reveal
 
 - [ ] Extend canonical search source with server-verified active offer summary.
-- [ ] Compute approved effective price for selected date/guest count without
+- [x] Compute approved effective price for selected date/guest count without
   budget-based price discrimination.
+- [x] Show the date-specific indicative total as `max(minimum spend, guests ×
+  per-head price)` plus only approved known mandatory charges, and explain when
+  a guest count exceeds that date's capacity.
 - [ ] Add availability, freshness and effective-price evidence to Ranking
   Policy V2 with confidence/unknown handling.
 - [ ] Support explicit flexible-date windows and explain rank changes caused by
@@ -134,7 +140,14 @@ pricing state before the authoritative commands and safe projections exist.
 - [ ] Freeze exact SHA, build from a clean release checkout, deploy and record
   runtime/backup/restore evidence before cohort activation.
 
-## Initial implementation slice
+## Implemented slices
 
 WED-340 begins with Phase 1: additive schema, pure state policy and safe
 projection tests. No public offer is enabled merely by applying the migration.
+
+The second slice adds allowlisted verified-vendor list/create/publish and state
+commands. Date rows carry their own capacity, minimum spend, indicative
+per-head amount, inclusions and conditions. The vendor preview calculates the
+indicative total for a supplied guest count. Couple discovery, top-three search
+integration, the management capability and portal A2UI remain deliberately
+open; these routes do not make an offer public while the rollout flag is off.

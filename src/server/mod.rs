@@ -192,6 +192,7 @@ mod wedding_site_measurement_routes;
 mod wedding_blog_routes;
 mod vendor_email_worker_auth; mod vendor_email_worker_ingress; mod wedding_message_attachment; mod wedding_outbound_attachment; mod wedding_vendor_claim_routes; mod wedding_vendor_directory_page; mod wedding_vendor_listing_proposal_routes; mod wedding_vendor_sender_identity_routes;
 mod wedding_vendor_enrichment; mod wedding_vendor_outreach_routes;
+mod wedding_vendor_special_offer_routes;
 mod wedding_vendor_outreach_generation;
 mod wedding_vendor_ownership_routes;
 mod wedding_vendor_photo_routes;
@@ -1424,6 +1425,7 @@ pub async fn run() {
         .merge(user_management_routes::routes())
         .merge(wedding_vendor_search_routes::routes())
         .merge(wedding_vendor_outreach_routes::routes())
+        .merge(wedding_vendor_special_offer_routes::routes())
         .merge(wedding_invite_proposal_routes::routes()).merge(wedding_invite_proposal_opportunity_routes::routes())
         .merge(wedding_preference_routes::routes())
         .merge(wedding_rsvp_capability_routes::routes())
@@ -1586,6 +1588,7 @@ pub async fn build_test_router(database_url: &str) -> Router {
         .merge(wedding_runsheet_projection_routes::routes())
         .merge(wedding_runsheet_share_routes::routes())
         .merge(wedding_invite_proposal_routes::routes()).merge(wedding_invite_proposal_opportunity_routes::routes())
+        .merge(wedding_vendor_special_offer_routes::routes())
         .merge(planning_constraint_routes::routes()).merge(planning_constraint_capture_routes::routes()).merge(planning_constraint_evaluation_routes::routes()).merge(planning_constraint_intervention_routes::routes()).merge(planning_cost_tradeoff_routes::routes()).merge(planning_directory_evaluation_routes::routes()).merge(planning_milestone_routes::routes()).merge(planning_vendor_change_routes::routes())
         .layer(cors_layer())
         .layer(axum::middleware::from_fn(request_id_middleware))
