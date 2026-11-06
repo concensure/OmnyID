@@ -648,6 +648,47 @@ body[data-search-open] [data-search-host] {
 }
 .md-prose a:hover, .md-link:hover { opacity: 0.75; }
 
+/* Wedding Limited Specials: licensed circular thumbnails and an untruncated
+   venue-name tooltip. The separate overlay in the component keeps the same
+   name visible even when a Leaflet tooltip reaches the map edge. */
+.wedding-special-map-marker {
+  background: transparent;
+  border: 0;
+}
+.wedding-special-map-marker__inner {
+  display: flex;
+  width: 46px;
+  height: 46px;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 3px solid #fff;
+  border-radius: 999px;
+  background: #176f67;
+  color: #fff;
+  font-weight: 800;
+  box-shadow: 0 3px 12px rgba(21, 61, 58, 0.32);
+}
+.wedding-special-map-marker__inner img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.wedding-special-map-tooltip {
+  max-width: none !important;
+  white-space: nowrap !important;
+  overflow: visible !important;
+  border: 0 !important;
+  border-radius: 8px !important;
+  background: #173d39 !important;
+  color: #fff !important;
+  font-weight: 700;
+  box-shadow: 0 4px 14px rgba(21, 61, 58, 0.28) !important;
+}
+.wedding-special-map-tooltip::before {
+  border-top-color: #173d39 !important;
+}
+
 /* ── Swipe-reveal action tray (T7) ──────────────────────────────────────────── */
 [data-swipe-tray] {
   position: absolute;

@@ -9,7 +9,9 @@ import { WeddingVendorLifecycleDetailPanel } from "@/components/WeddingVendorLif
 import { WeddingPreferenceConfirmationChips } from "@/components/WeddingPreferenceConfirmationChips";
 import { WeddingDealBreakerEditor } from "@/components/WeddingDealBreakerEditor";
 import { WeddingInviteProposalsPanel } from "@/components/WeddingInviteProposalsPanel";
+import { WeddingLimitedSpecialsMap } from "@/components/WeddingLimitedSpecialsMap";
 import { loadWeddingProposalOpportunities } from "@/lib/weddingInviteProposalOpportunityApi";
+import type { WeddingVendorSpecialMarker } from "@/lib/weddingVendorSpecialDiscoveryApi";
 import type { WeddingVendorChoiceCardData } from "@/components/WeddingVendorChoiceCard";
 import type { WeddingResponseWorkspaceViewProps } from "@/components/WeddingResponseWorkspaceViewTypes";
 import { decisionCardFromWeddingVendorComparison } from "@/lib/decisionCardState";
@@ -136,7 +138,7 @@ export function WeddingVendorSearchHomeSection(props: {
   const [proposalOpportunities] = createResource(loadWeddingProposalOpportunities);
   const [expandedLifecycleVendorKey, setExpandedLifecycleVendorKey] = createSignal<string | null>(null);
   const [selectedVendorCategory, setSelectedVendorCategory] = createSignal<string | null>(null);
-  const [vendorMode, setVendorMode] = createSignal<"find" | "invite">("find");
+  const [vendorMode, setVendorMode] = createSignal<"find" | "invite" | "specials">("find");
   let comparisonResultElement: HTMLDivElement | undefined;
   const lifecycleRecords = createMemo(() => {
     const comparison = props.result?.preview ?? props.result?.sourcePreview;
@@ -263,6 +265,25 @@ export function WeddingVendorSearchHomeSection(props: {
   const weddingDateOrSeason = () => workspace().state.contextCards
     .map((card) => card.planningContext.dateOrSeason?.trim())
     .find(Boolean) ?? null;
+  const prepareSpecialEnquiry = (marker: WeddingVendorSpecialMarker) => {
+    const preview = props.result?.preview ?? props.result?.sourcePreview;
+    const card = preview?.vendorComparisonCards.find((item) => item.vendorId === marker.vendorId);
+    if (preview && card && props.result?.action.artifactId) {
+      void props.outreach.onContactVendor(
+        card,
+        props.result.action.artifactId,
+        "CHECK_AVAILABILITY_AND_REQUEST_QUOTE",
+      );
+      return;
+    }
+    setVendorMode("find");
+    setSelectedVendorCategory(marker.category);
+    workspace().onVendorSearchQueryChange?.(`${marker.vendorName} for ${marker.availableOnDate}`);
+    queueMicrotask(() => workspace().onRunLiveVendorSearch?.({
+      stayOnHome: props.stayOnHome || undefined,
+      category: marker.category,
+    }));
+  };
   const openLifecycleArtifact = (artifactId: string) => {
     workspace().onSelectArtifact?.(artifactId);
     workspace().onSelectMenu?.("documents");
@@ -293,7 +314,7 @@ export function WeddingVendorSearchHomeSection(props: {
   });
   return (
     <div data-wedding-surface="vendor-search" class="min-w-0 overflow-hidden rounded-xl border border-wedding-border bg-wedding-card px-3 py-4 shadow-wedding-card sm:px-5 sm:py-6">
-      <div class="grid grid-cols-2 gap-1 rounded-xl bg-wedding-slate p-1" role="tablist" aria-label="Vendor options">
+      <div class="grid grid-cols-3 gap-1 rounded-xl bg-wedding-slate p-1" role="tablist" aria-label="Vendor options">
         <button
           id="wedding-vendor-tab-find"
           type="button"
@@ -312,6 +333,15 @@ export function WeddingVendorSearchHomeSection(props: {
           class={`min-h-11 rounded-lg px-3 text-sm font-bold transition ${vendorMode() === "invite" ? "bg-white text-wedding-primary shadow-sm" : "text-wedding-ink/70"}`}
           onClick={() => setVendorMode("invite")}
         >Invite Proposals</button>
+        <button
+          id="wedding-vendor-tab-specials"
+          type="button"
+          role="tab"
+          aria-selected={vendorMode() === "specials"}
+          aria-controls="wedding-vendor-panel-specials"
+          class={`min-h-11 rounded-lg px-2 text-xs font-bold transition sm:px-3 sm:text-sm ${vendorMode() === "specials" ? "bg-white text-wedding-primary shadow-sm" : "text-wedding-ink/70"}`}
+          onClick={() => setVendorMode("specials")}
+        >Limited Specials</button>
       </div>
       <div id="wedding-vendor-panel-find" role="tabpanel" aria-labelledby="wedding-vendor-tab-find" hidden={vendorMode() !== "find"}>
       <form
@@ -606,6 +636,15 @@ export function WeddingVendorSearchHomeSection(props: {
           selectedCategory={selectedVendorCategory()}
           onSelectedCategoryChange={setSelectedVendorCategory}
         />
+      </Show>
+      <Show when={vendorMode() === "specials"}>
+        <div id="wedding-vendor-panel-specials" role="tabpanel" aria-labelledby="wedding-vendor-tab-specials">
+          <WeddingLimitedSpecialsMap
+            weddingDate={weddingDateOrSeason()}
+            initialCategory={selectedVendorCategory()}
+            onPrepareEnquiry={prepareSpecialEnquiry}
+          />
+        </div>
       </Show>
     </div>
   );

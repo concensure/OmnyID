@@ -27,16 +27,17 @@ declare module "leaflet" {
   export interface PolylineOptions { color?: string; weight?: number; opacity?: number; dashArray?: string; }
   export interface CircleOptions { radius?: number; color?: string; fillColor?: string; fillOpacity?: number; weight?: number; dashArray?: string; }
   export interface CircleMarkerOptions { radius?: number; color?: string; fillColor?: string; fillOpacity?: number; }
-  export interface MarkerOptions { title?: string; icon?: DivIcon | Icon; }
+  export interface MarkerOptions { title?: string; icon?: DivIcon | Icon; keyboard?: boolean; }
   export interface IconOptions { html?: string; className?: string; iconSize?: [number, number]; iconAnchor?: [number, number]; popupAnchor?: [number, number]; }
   export interface DivIcon { options: IconOptions; }
   export interface Icon { options: IconOptions; }
   export interface LatLng { lat: number; lng: number; alt?: number; distanceTo(other: LatLng): number; }
   export interface Circle extends Layer { bindPopup(content: string): this; openPopup(): this; setRadius(radius: number): this; }
-  export interface Layer { addTo(map: Map): this; remove(): this; }
+  export interface Layer { addTo(map: Map | LayerGroup): this; remove(): this; }
   export interface Path extends Layer { bindPopup(content: string): this; openPopup(): this; }
   export interface Marker extends Layer {
     bindPopup(content: string): this;
+    bindTooltip(content: string, options?: { direction?: string; offset?: [number, number]; className?: string; opacity?: number }): this;
     openPopup(): this;
     setLatLng(latlng: LatLngExpression): this;
     on(event: string, handler: (e: LeafletMouseEvent) => void): this;
@@ -45,13 +46,15 @@ declare module "leaflet" {
   export interface CircleMarker extends Path {}
   export interface Map {
     remove(): void;
-    fitBounds(bounds: LatLngBoundsExpression, opts?: { padding?: [number, number] }): this;
+    fitBounds(bounds: LatLngBoundsExpression, opts?: { padding?: [number, number]; maxZoom?: number }): this;
     setView(center: LatLngExpression, zoom?: number): this;
     on(event: string, handler: (e: LeafletMouseEvent) => void): this;
   }
+  export interface LayerGroup extends Layer { clearLayers(): this; }
   export function map(el: HTMLElement, opts?: MapOptions): Map;
   export function tileLayer(url: string, opts?: TileLayerOptions): Layer & { addTo(map: Map): Layer };
   export function marker(latlng: LatLngExpression, opts?: MarkerOptions): Marker;
+  export function layerGroup(): LayerGroup;
   export function polyline(latlngs: LatLngExpression[], opts?: PolylineOptions): Polyline;
   export function circleMarker(latlng: LatLngExpression, opts?: CircleMarkerOptions): CircleMarker;
   export function circle(latlng: LatLngExpression, opts?: CircleOptions): Circle;

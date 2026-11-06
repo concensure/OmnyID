@@ -87,9 +87,9 @@ pricing state before the authoritative commands and safe projections exist.
 
 ## Phase 6 — couple discovery API
 
-- [ ] Add authenticated `private, no-store` discovery query by date/category
+- [x] Add authenticated `private, no-store` discovery query by date/category
   and optional location/radius.
-- [ ] Return safe markers from vendor coordinates and licensed photos only.
+- [x] Return safe markers from vendor coordinates and licensed photos only.
 - [ ] Return exact offer details only for the ranked top three.
 - [ ] Add pagination/bounds and server clustering inputs; do not expose a full
   calendar through repeated range probing.
@@ -97,17 +97,17 @@ pricing state before the authoritative commands and safe projections exist.
 
 ## Phase 7 — Limited Specials A2UI surface
 
-- [ ] Add `Limited Specials` as the third option beside Find Vendors and Invite
+- [x] Add `Limited Specials` as the third option beside Find Vendors and Invite
   Proposals using the existing vendor home component.
-- [ ] Prefill the date filter from canonical Wedding context without rewriting
+- [x] Prefill the date filter from canonical Wedding context without rewriting
   it when the filter changes.
-- [ ] Add category dropdown and explicit `Use my location`; default to Sydney
+- [x] Add category dropdown and explicit `Use my location`; default to Sydney
   and handle denied/unsupported geolocation calmly.
 - [ ] Reuse Leaflet/OSM provider configuration and add clustered circular photo
   markers with category fallback icons.
-- [ ] Add synchronized accessible results list, keyboard operation, visible
+- [x] Add synchronized accessible results list, keyboard operation, visible
   attribution, loading/empty/failure states and mobile full-width layout.
-- [ ] Show freshness and “indicative, subject to vendor confirmation” beside
+- [x] Show freshness and “indicative, subject to vendor confirmation” beside
   every actionable result.
 
 ## Phase 8 — enquiry reuse

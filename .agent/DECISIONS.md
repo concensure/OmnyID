@@ -2905,3 +2905,18 @@ subjective usability or a controlled external cohort.
 - Discovery has a separate false-default flag and account allowlist from vendor
   management, so enabling vendor editing does not silently expose offers to
   couples.
+
+# 2026-11-07 — WED-340 map discovery is an exact-date view, not a vendor calendar
+
+- Limited Specials may return a bounded marker only when an active, approved,
+  fresh slot matches the one date the authenticated couple explicitly queried.
+  Repeated range queries and full date inventory are not part of this contract.
+- Marker data is limited to directory identity, coordinates, locality, safe
+  description, style tags, aggregate rating and a photo backed by the existing
+  live owner-photo licence receipt. Package terms, price and internal IDs stay
+  behind the later server-validated top-three projection.
+- The month calendar is a visual context for that one confirmed date. It must
+  not imply that unmarked days are unavailable, and it always carries the
+  indicative/subject-to-confirmation warning.
+- Hover is supplementary: Leaflet markers retain keyboard titles and the same
+  selection is exposed through an accessible list and detail card below.

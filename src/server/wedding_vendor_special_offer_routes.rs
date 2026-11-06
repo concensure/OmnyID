@@ -33,6 +33,7 @@ mod records;
 use records::*;
 mod capability;
 mod commands;
+mod discovery;
 mod privacy;
 
 const MAX_SLOTS_PER_OFFER: usize = 100;
@@ -57,6 +58,7 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
             "/wedding/vendor/special-offers/{offer_id}/slots/{slot_id}/state",
             post(change_slot_state_http),
         )
+        .merge(discovery::routes())
         .merge(capability::routes())
         .layer(axum::middleware::from_fn(privacy::no_store))
 }

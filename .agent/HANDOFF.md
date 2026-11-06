@@ -7740,3 +7740,27 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
   invokes canonical server ranking and returns exact effective price and terms
   for only its current top three; then add the accessible Limited Specials
   list/map surface.
+
+# 2026-11-07 - WED-340 exact-date Limited Specials map slice (Codex)
+
+- Continued in `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001` on
+  `agent/codex/WED-340` from clean commit
+  `a634710d6e8eac94f3fe6f3ce632b38b33d05e17`.
+- Added the third `Limited Specials` vendor mode. Date and category filters use
+  the canonical wedding date as a non-mutating default; geolocation is only
+  requested after an explicit action and otherwise remains centred on Sydney.
+- The authenticated, rate-limited, private/no-store endpoint returns at most 48
+  exact-date markers. Only coordinate-backed vendors and licence-receipted live
+  owner photos qualify. Offer/slot IDs, price, inclusions, conditions and wider
+  date inventory are absent.
+- Pointer hover/focus shows the complete venue name without clipping. Selecting
+  a marker or accessible list item opens one card below the map with photo,
+  description, tags, aggregate review evidence, freshness, a wedding-month
+  calendar marking only the searched date, and an Enquire action that reuses
+  the existing vendor search/outreach flow.
+- Added the pinned Leaflet 1.9.4 runtime. Passed focused UI contracts, all 2,227
+  Wedding tests, TypeScript typecheck, both line budgets, production build,
+  `cargo check --lib` using `C:\cargo-target`, and `git diff --check`.
+- Still open: server-authoritative top-three exact commercial detail/price,
+  map clustering, disposable-Postgres query execution, cross-tenant HTTP proof
+  and hosted rollout. Nothing was deployed or enabled.
