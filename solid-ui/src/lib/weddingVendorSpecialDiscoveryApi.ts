@@ -19,6 +19,7 @@ export type WeddingVendorSpecialMarker = {
   lastConfirmedAt: string;
   confirmationExpiresAt: string;
   indicativeOnly: true;
+  distanceKm: number | null;
 };
 
 export type WeddingVendorSpecialDiscovery = {
@@ -58,6 +59,7 @@ export function normalizeWeddingVendorSpecialMarker(value: unknown): WeddingVend
     lastConfirmedAt: text(value.last_confirmed_at),
     confirmationExpiresAt: text(value.confirmation_expires_at),
     indicativeOnly: true,
+    distanceKm: number(value.distance_km),
   };
 }
 
@@ -73,8 +75,22 @@ export function normalizeWeddingVendorSpecialDiscovery(value: unknown): WeddingV
   };
 }
 
-export async function loadWeddingVendorSpecials(input: { date: string; category: string; limit?: number }) {
+export async function loadWeddingVendorSpecials(input: {
+  date: string;
+  category: string;
+  latitude?: number;
+  longitude?: number;
+  radiusKm?: number;
+  guestCount?: number | null;
+  limit?: number;
+}) {
   const query = new URLSearchParams({ date: input.date, category: input.category });
+  if (typeof input.latitude === "number" && typeof input.longitude === "number") {
+    query.set("latitude", String(input.latitude));
+    query.set("longitude", String(input.longitude));
+    query.set("radius_km", String(input.radiusKm ?? 75));
+  }
+  if (typeof input.guestCount === "number" && input.guestCount > 0) query.set("guest_count", String(Math.round(input.guestCount)));
   if (input.limit) query.set("limit", String(input.limit));
   return normalizeWeddingVendorSpecialDiscovery(await apiFetch<unknown>(`/wedding/vendor-specials/discovery?${query}`));
 }

@@ -674,6 +674,19 @@ body[data-search-open] [data-search-host] {
   height: 100%;
   object-fit: cover;
 }
+.wedding-special-map-cluster {
+  display: flex;
+  width: 48px;
+  height: 48px;
+  align-items: center;
+  justify-content: center;
+  border: 3px solid #fff;
+  border-radius: 999px;
+  background: #176f67;
+  color: #fff;
+  font-weight: 800;
+  box-shadow: 0 3px 12px rgba(21, 61, 58, 0.32);
+}
 .wedding-special-map-tooltip {
   max-width: none !important;
   white-space: nowrap !important;

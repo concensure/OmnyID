@@ -16,6 +16,7 @@ test("limited-special discovery drops malformed markers and normalises safe exac
       {
         vendor_id: "venue-a", vendor_name: "Harbour House", category: "Venue",
         locality: "Sydney", latitude: -33.86, longitude: 151.2,
+        distance_km: 3.2,
         style_tags: ["waterfront", "modern"], rating: 4.8, review_count: 42,
         available_on_date: "2027-11-20", last_confirmed_at: "2026-11-07T00:00:00Z",
         confirmation_expires_at: "2026-11-21T00:00:00Z", indicative_only: true,
@@ -27,6 +28,7 @@ test("limited-special discovery drops malformed markers and normalises safe exac
   assert.equal(result.markers[0].vendorName, "Harbour House");
   assert.deepEqual(result.markers[0].styleTags, ["waterfront", "modern"]);
   assert.equal(result.markers[0].availableOnDate, "2027-11-20");
+  assert.equal(result.markers[0].distanceKm, 3.2);
 });
 
 test("Limited Specials uses a third mode, full marker name and one synchronized detail card", async () => {
@@ -39,6 +41,9 @@ test("Limited Specials uses a third mode, full marker name and one synchronized 
   assert.match(home, /Limited Specials/);
   assert.match(map, /hoveredName/);
   assert.match(map, /wedding-special-map-tooltip/);
+  assert.match(map, /wedding-special-map-cluster/);
+  assert.match(map, /radiusKm/);
+  assert.match(map, /guestCount/);
   assert.match(map, /Availability is indicative and subject to vendor confirmation/);
   assert.match(map, /onPrepareEnquiry\(item\)/);
   assert.match(map, /aria-label={`Availability for/);

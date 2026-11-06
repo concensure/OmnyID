@@ -265,6 +265,9 @@ export function WeddingVendorSearchHomeSection(props: {
   const weddingDateOrSeason = () => workspace().state.contextCards
     .map((card) => card.planningContext.dateOrSeason?.trim())
     .find(Boolean) ?? null;
+  const weddingGuestCount = () => workspace().state.contextCards
+    .map((card) => Number(card.planningContext.guestCount))
+    .find((value) => Number.isFinite(value) && value > 0) ?? null;
   const prepareSpecialEnquiry = (marker: WeddingVendorSpecialMarker) => {
     const preview = props.result?.preview ?? props.result?.sourcePreview;
     const card = preview?.vendorComparisonCards.find((item) => item.vendorId === marker.vendorId);
@@ -642,6 +645,7 @@ export function WeddingVendorSearchHomeSection(props: {
           <WeddingLimitedSpecialsMap
             weddingDate={weddingDateOrSeason()}
             initialCategory={selectedVendorCategory()}
+            initialGuestCount={weddingGuestCount()}
             onPrepareEnquiry={prepareSpecialEnquiry}
           />
         </div>

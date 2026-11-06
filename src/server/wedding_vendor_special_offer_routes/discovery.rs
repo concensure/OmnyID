@@ -35,6 +35,10 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
 struct DiscoveryQuery {
     date: String,
     category: Option<String>,
+    latitude: Option<f64>,
+    longitude: Option<f64>,
+    radius_km: Option<f64>,
+    guest_count: Option<u32>,
     limit: Option<usize>,
 }
 
@@ -57,6 +61,7 @@ struct DiscoveryMarker {
     last_confirmed_at: String,
     confirmation_expires_at: String,
     indicative_only: bool,
+    distance_km: Option<f64>,
 }
 
 #[derive(Debug, Serialize)]
@@ -83,6 +88,43 @@ fn clean_category(value: Option<String>) -> Option<String> {
         .map(|value| value.trim_end_matches('s').to_string())
 }
 
+fn location_filter(
+    latitude: Option<f64>,
+    longitude: Option<f64>,
+    radius_km: Option<f64>,
+) -> Result<(Option<f64>, Option<f64>, f64), (StatusCode, String)> {
+    if latitude.is_some() != longitude.is_some() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "latitude and longitude must be supplied together".into(),
+        ));
+    }
+    if let Some(value) = latitude.filter(|value| (-90.0..=90.0).contains(value)) {
+        let longitude = longitude
+            .filter(|value| (-180.0..=180.0).contains(value))
+            .ok_or((StatusCode::BAD_REQUEST, "invalid longitude".into()))?;
+        let radius = radius_km.unwrap_or(75.0);
+        if !radius.is_finite() || !(1.0..=500.0).contains(&radius) {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                "radius_km must be between 1 and 500".into(),
+            ));
+        }
+        return Ok((Some(value), Some(longitude), radius));
+    }
+    if latitude.is_some() {
+        return Err((StatusCode::BAD_REQUEST, "invalid latitude".into()));
+    }
+    Ok((None, None, 75.0))
+}
+
+fn approximate_distance_km(from: Option<(f64, f64)>, to: (f64, f64)) -> Option<f64> {
+    let (from_lat, from_lng) = from?;
+    let latitude_km = (to.0 - from_lat) * 111.0;
+    let longitude_km = (to.1 - from_lng) * 111.0 * from_lat.to_radians().cos();
+    Some((latitude_km.powi(2) + longitude_km.powi(2)).sqrt())
+}
+
 async fn discover_specials_http(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -104,6 +146,15 @@ async fn discover_specials_http(
     let selected_date = NaiveDate::parse_from_str(query.date.trim(), "%Y-%m-%d")
         .map_err(|_| (StatusCode::BAD_REQUEST, "date must use YYYY-MM-DD".into()))?;
     let category = clean_category(query.category);
+    let (latitude, longitude, radius_km) =
+        location_filter(query.latitude, query.longitude, query.radius_km)?;
+    let guest_count = query.guest_count.map(i64::from);
+    if guest_count.is_some_and(|count| count > 5_000) {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "guest_count must not exceed 5000".into(),
+        ));
+    }
     let requested_limit = query.limit.unwrap_or(DEFAULT_LIMIT).clamp(1, MAX_LIMIT);
     let sql_limit = i64::try_from(requested_limit + 1).unwrap_or((MAX_LIMIT + 1) as i64);
 
@@ -161,11 +212,23 @@ async fn discover_specials_http(
              AND (offer.valid_from IS NULL OR offer.valid_from<=$1)
              AND (offer.valid_until IS NULL OR offer.valid_until>=$1)
              AND ($2::text IS NULL OR lower(v.category)=lower($2))
+             AND ($3::double precision IS NULL OR (
+               power(((lat.value #>> '{}')::double precision-$3)*111.0,2)
+               + power(((lng.value #>> '{}')::double precision-$4)*111.0*cos(radians($3)),2)
+                 <= power($5,2)
+             ))
+             AND ($6::bigint IS NULL OR offer.guest_min IS NULL OR offer.guest_min<=$6)
+             AND ($6::bigint IS NULL OR offer.guest_max IS NULL OR offer.guest_max>=$6)
+             AND ($6::bigint IS NULL OR slot.maximum_capacity IS NULL OR slot.maximum_capacity>=$6)
            ORDER BY v.vendor_id,slot.last_confirmed_at DESC,slot.slot_id
-           LIMIT $3"#,
+           LIMIT $7"#,
     )
     .bind(selected_date)
     .bind(category.as_deref())
+    .bind(latitude)
+    .bind(longitude)
+    .bind(radius_km)
+    .bind(guest_count)
     .bind(sql_limit)
     .fetch_all(&state.db.pool)
     .await
@@ -189,6 +252,8 @@ async fn discover_specials_http(
                 .collect();
             let confirmed: chrono::DateTime<chrono::Utc> = row.get("last_confirmed_at");
             let expires: chrono::DateTime<chrono::Utc> = row.get("confirmation_expires_at");
+            let marker_latitude = row.get("latitude");
+            let marker_longitude = row.get("longitude");
             DiscoveryMarker {
                 vendor_id: row.get("vendor_id"),
                 vendor_name: row.get("vendor_name"),
@@ -196,8 +261,8 @@ async fn discover_specials_http(
                 locality: row.get("service_area"),
                 address: row.get("address"),
                 description: row.get("notes"),
-                latitude: row.get("latitude"),
-                longitude: row.get("longitude"),
+                latitude: marker_latitude,
+                longitude: marker_longitude,
                 photo_url: row.get("photo_url"),
                 photo_alt: row.get("alt_text"),
                 style_tags,
@@ -207,6 +272,11 @@ async fn discover_specials_http(
                 last_confirmed_at: confirmed.to_rfc3339(),
                 confirmation_expires_at: expires.to_rfc3339(),
                 indicative_only: true,
+                distance_km: approximate_distance_km(
+                    latitude.zip(longitude),
+                    (marker_latitude, marker_longitude),
+                )
+                .map(|distance| (distance * 10.0).round() / 10.0),
             }
         })
         .collect();
@@ -251,6 +321,7 @@ mod tests {
             last_confirmed_at: "2026-11-07T00:00:00Z".into(),
             confirmation_expires_at: "2026-11-21T00:00:00Z".into(),
             indicative_only: true,
+            distance_km: Some(3.2),
         };
         let serialized = serde_json::to_string(&marker).unwrap();
         for forbidden in [
@@ -262,5 +333,16 @@ mod tests {
         ] {
             assert!(!serialized.contains(forbidden), "leaked {forbidden}");
         }
+    }
+
+    #[test]
+    fn location_filter_requires_a_bounded_coordinate_pair() {
+        assert!(location_filter(Some(-33.86), None, Some(50.0)).is_err());
+        assert!(location_filter(Some(-133.0), Some(151.2), Some(50.0)).is_err());
+        assert!(location_filter(Some(-33.86), Some(151.2), Some(900.0)).is_err());
+        assert_eq!(
+            location_filter(Some(-33.86), Some(151.2), None).unwrap(),
+            (Some(-33.86), Some(151.2), 75.0)
+        );
     }
 }

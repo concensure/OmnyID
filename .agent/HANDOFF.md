@@ -7764,3 +7764,24 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
 - Still open: server-authoritative top-three exact commercial detail/price,
   map clustering, disposable-Postgres query execution, cross-tenant HTTP proof
   and hosted rollout. Nothing was deployed or enabled.
+
+# 2026-11-07 - WED-340 bounded map feasibility and clustering slice (Codex)
+
+- Continued from clean commit `961b5d39ae7974c4243b39052e81118fb2afd031`
+  in `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001` on
+  `agent/codex/WED-340`.
+- Limited Specials now sends location, radius and canonical guest count to the
+  authenticated discovery route. The server validates coordinate pairs,
+  bounds radius and guest values, excludes hard capacity failures and applies
+  the distance filter before returning markers.
+- The server returns only a rounded approximate distance. The map adds
+  zoom-aware count clusters while preserving circular photo markers, complete
+  individual venue names, keyboard list selection and the existing detail
+  card. Cluster state is presentation-only and does not broaden disclosure.
+- Passed all 2,227 Wedding tests, focused Limited Specials contracts,
+  TypeScript typecheck, both line budgets, production build, `cargo check
+  --lib` with `C:\cargo-target`, and `git diff --check`.
+- Docker Desktop reports that it cannot start, so disposable-Postgres query
+  execution and adversarial cross-tenant HTTP evidence remain unclaimed.
+  Server-authoritative top-three commercial detail and hosted false-default
+  rollout also remain open. Nothing was deployed or enabled.

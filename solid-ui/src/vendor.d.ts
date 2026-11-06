@@ -46,6 +46,7 @@ declare module "leaflet" {
   export interface CircleMarker extends Path {}
   export interface Map {
     remove(): void;
+    getZoom(): number;
     fitBounds(bounds: LatLngBoundsExpression, opts?: { padding?: [number, number]; maxZoom?: number }): this;
     setView(center: LatLngExpression, zoom?: number): this;
     on(event: string, handler: (e: LeafletMouseEvent) => void): this;

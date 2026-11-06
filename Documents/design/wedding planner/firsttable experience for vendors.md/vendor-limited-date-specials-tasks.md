@@ -91,7 +91,7 @@ pricing state before the authoritative commands and safe projections exist.
   and optional location/radius.
 - [x] Return safe markers from vendor coordinates and licensed photos only.
 - [ ] Return exact offer details only for the ranked top three.
-- [ ] Add pagination/bounds and server clustering inputs; do not expose a full
+- [x] Add pagination/bounds and server clustering inputs; do not expose a full
   calendar through repeated range probing.
 - [ ] Add cross-tenant and enumeration-resistance tests.
 
@@ -103,7 +103,7 @@ pricing state before the authoritative commands and safe projections exist.
   it when the filter changes.
 - [x] Add category dropdown and explicit `Use my location`; default to Sydney
   and handle denied/unsupported geolocation calmly.
-- [ ] Reuse Leaflet/OSM provider configuration and add clustered circular photo
+- [x] Reuse Leaflet/OSM provider configuration and add clustered circular photo
   markers with category fallback icons.
 - [x] Add synchronized accessible results list, keyboard operation, visible
   attribution, loading/empty/failure states and mobile full-width layout.

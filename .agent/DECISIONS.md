@@ -2920,3 +2920,17 @@ subjective usability or a controlled external cohort.
   indicative/subject-to-confirmation warning.
 - Hover is supplementary: Leaflet markers retain keyboard titles and the same
   selection is exposed through an accessible list and detail card below.
+
+# 2026-11-07 — WED-340 location and guest filters are server feasibility gates
+
+- Sydney, radius and the canonical guest count are search inputs only. Using or
+  changing them in Limited Specials must not mutate the couple's profile,
+  wedding date, guest ledger or vendor records.
+- Radius and hard capacity feasibility are enforced in the authenticated
+  server query. A browser cannot recover distant or capacity-incompatible
+  offers merely by hiding controls or altering client-side marker data.
+- Approximate distance is calculated from stored vendor coordinates and the
+  query centre, rounded for display and never presented as travel time.
+- Zoom clusters are an accessible presentation of already-authorised markers,
+  not another ranking or disclosure authority. Cluster expansion cannot fetch
+  package terms, offer identifiers, wider date inventory or internal prices.

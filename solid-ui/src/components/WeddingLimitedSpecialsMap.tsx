@@ -39,6 +39,7 @@ function monthDays(dateText: string) {
 export function WeddingLimitedSpecialsMap(props: {
   weddingDate?: string | null;
   initialCategory?: string | null;
+  initialGuestCount?: number | null;
   onPrepareEnquiry: (marker: WeddingVendorSpecialMarker) => void;
 }) {
   const [date, setDate] = createSignal(validDate(props.weddingDate));
@@ -46,7 +47,12 @@ export function WeddingLimitedSpecialsMap(props: {
   const [selectedId, setSelectedId] = createSignal<string | null>(null);
   const [hoveredName, setHoveredName] = createSignal<string | null>(null);
   const [locationNote, setLocationNote] = createSignal("Showing Sydney by default.");
-  const [query] = createResource(() => ({ date: date(), category: category() }), loadWeddingVendorSpecials);
+  const [searchCenter, setSearchCenter] = createSignal<{ latitude: number; longitude: number }>({ latitude: SYDNEY[0], longitude: SYDNEY[1] });
+  const [radiusKm, setRadiusKm] = createSignal(75);
+  const [guestCount, setGuestCount] = createSignal<number | null>(props.initialGuestCount ?? null);
+  const [query] = createResource(() => ({
+    date: date(), category: category(), ...searchCenter(), radiusKm: radiusKm(), guestCount: guestCount(),
+  }), loadWeddingVendorSpecials);
   let mapElement: HTMLDivElement | undefined;
   let map: Leaflet.Map | undefined;
   let leaflet: typeof Leaflet | undefined;
@@ -69,7 +75,8 @@ export function WeddingLimitedSpecialsMap(props: {
         subdomains: ["a", "b", "c"],
       }).addTo(map);
       layer = L.layerGroup().addTo(map);
-      renderMarkers();
+      map.on("zoomend", () => renderMarkers(false));
+      renderMarkers(true);
     } catch {
       setLocationNote("The map could not load. The accessible venue list is still available below.");
     }
@@ -77,7 +84,7 @@ export function WeddingLimitedSpecialsMap(props: {
 
   createEffect(() => {
     markers();
-    renderMarkers();
+    renderMarkers(true);
     if (selectedId() && !markers().some((item) => item.vendorId === selectedId())) setSelectedId(null);
   });
 
@@ -94,11 +101,32 @@ export function WeddingLimitedSpecialsMap(props: {
     });
   }
 
-  function renderMarkers() {
+  function renderMarkers(fitBounds: boolean) {
     if (!leaflet || !map || !layer) return;
     layer.clearLayers();
     const bounds: [number, number][] = [];
+    const zoom = map.getZoom();
+    const cellSize = zoom >= 12 ? 0 : zoom >= 10 ? 0.08 : 0.18;
+    const groups = new Map<string, WeddingVendorSpecialMarker[]>();
     for (const item of markers()) {
+      const key = cellSize === 0 ? item.vendorId : `${Math.floor(item.latitude / cellSize)}:${Math.floor(item.longitude / cellSize)}`;
+      groups.set(key, [...(groups.get(key) ?? []), item]);
+    }
+    for (const group of groups.values()) {
+      if (group.length > 1) {
+        const latitude = group.reduce((sum, item) => sum + item.latitude, 0) / group.length;
+        const longitude = group.reduce((sum, item) => sum + item.longitude, 0) / group.length;
+        const icon = leaflet.divIcon({ className: "wedding-special-map-marker", html: `<span class="wedding-special-map-cluster">${group.length}</span>`, iconSize: [48, 48], iconAnchor: [24, 24] });
+        const cluster = leaflet.marker([latitude, longitude], { icon, keyboard: true, title: `${group.length} venues` }).addTo(layer);
+        const names = group.map((item) => item.vendorName).join(", ");
+        cluster.bindTooltip(escapeHtml(names), { direction: "top", offset: [0, -24], className: "wedding-special-map-tooltip", opacity: 1 });
+        cluster.on("mouseover focus", () => setHoveredName(names));
+        cluster.on("mouseout blur", () => setHoveredName(null));
+        cluster.on("click", () => map?.setView([latitude, longitude], Math.min(14, zoom + 2)));
+        for (const item of group) bounds.push([item.latitude, item.longitude]);
+        continue;
+      }
+      const item = group[0];
       const marker = leaflet.marker([item.latitude, item.longitude], {
         icon: markerIcon(leaflet, item), keyboard: true, title: item.vendorName,
       }).addTo(layer);
@@ -110,8 +138,8 @@ export function WeddingLimitedSpecialsMap(props: {
       marker.on("click", () => setSelectedId(item.vendorId));
       bounds.push([item.latitude, item.longitude]);
     }
-    if (bounds.length === 1) map.setView(bounds[0], 13);
-    else if (bounds.length > 1) map.fitBounds(bounds, { padding: [35, 35], maxZoom: 13 });
+    if (fitBounds && bounds.length === 1) map.setView(bounds[0], 13);
+    else if (fitBounds && bounds.length > 1) map.fitBounds(bounds, { padding: [35, 35], maxZoom: 13 });
   }
 
   function useMyLocation() {
@@ -123,6 +151,7 @@ export function WeddingLimitedSpecialsMap(props: {
     navigator.geolocation.getCurrentPosition(
       (position) => {
         map?.setView([position.coords.latitude, position.coords.longitude], 11);
+        setSearchCenter({ latitude: position.coords.latitude, longitude: position.coords.longitude });
         setLocationNote("Map centred near your current location. Your coordinates were not saved.");
       },
       () => setLocationNote("Location was not shared, so the map remains available without it."),
@@ -132,9 +161,17 @@ export function WeddingLimitedSpecialsMap(props: {
 
   return (
     <section class="mt-4 min-w-0" aria-labelledby="limited-specials-heading">
-      <div class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end">
+      <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(8rem,.65fr)_minmax(8rem,.65fr)_auto] lg:items-end">
         <label class="grid gap-1 text-sm font-semibold text-wedding-ink">Wedding date
           <input class="h-11 rounded-lg border border-wedding-border bg-white px-3 font-normal" type="date" value={date()} onInput={(event) => setDate(event.currentTarget.value)} />
+        </label>
+        <label class="grid gap-1 text-sm font-semibold text-wedding-ink">Guests
+          <input class="h-11 rounded-lg border border-wedding-border bg-white px-3 font-normal" type="number" min="1" max="5000" inputmode="numeric" value={guestCount() ?? ""} placeholder="Optional" onInput={(event) => setGuestCount(event.currentTarget.value ? Number(event.currentTarget.value) : null)} />
+        </label>
+        <label class="grid gap-1 text-sm font-semibold text-wedding-ink">Distance
+          <select class="h-11 rounded-lg border border-wedding-border bg-white px-3 font-normal" value={radiusKm()} onChange={(event) => setRadiusKm(Number(event.currentTarget.value))}>
+            <option value="25">25 km</option><option value="50">50 km</option><option value="75">75 km</option><option value="150">150 km</option><option value="300">300 km</option>
+          </select>
         </label>
         <label class="grid gap-1 text-sm font-semibold text-wedding-ink">Vendor category
           <select class="h-11 rounded-lg border border-wedding-border bg-white px-3 font-normal" value={category()} onChange={(event) => setCategory(event.currentTarget.value)}>
@@ -172,6 +209,7 @@ export function WeddingLimitedSpecialsMap(props: {
               <h3 id="limited-special-vendor-name" class="mt-1 break-words font-display text-2xl font-semibold text-wedding-ink">{item.vendorName}</h3>
               <p class="mt-2 text-sm leading-6 text-wedding-ink/75">{item.description || `${item.vendorName} has vendor-confirmed availability for the selected date. Ask for current package details before relying on it.`}</p>
               <Show when={item.address}><p class="mt-2 text-sm text-wedding-ink/65">{item.address}</p></Show>
+              <Show when={item.distanceKm !== null}><p class="mt-1 text-xs font-semibold text-wedding-ink/60">About {item.distanceKm} km from the map centre</p></Show>
               <Show when={item.rating !== null}><p class="mt-3 text-sm font-semibold text-wedding-ink">★ {item.rating?.toFixed(1)} <span class="font-normal text-wedding-ink/65">{item.reviewCount ? `from ${item.reviewCount} reviews` : "published rating"}</span></p></Show>
               <div class="mt-3 flex flex-wrap gap-2"><For each={item.styleTags}>{(tag) => <span class="rounded-full bg-wedding-slate px-2.5 py-1 text-xs font-semibold text-wedding-ink/70">{tag}</span>}</For></div>
             </div>
