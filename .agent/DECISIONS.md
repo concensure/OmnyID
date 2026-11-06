@@ -2887,3 +2887,21 @@ subjective usability or a controlled external cohort.
   and link actions call the same optimistic, idempotent command services.
 - Operators may issue a link for an unclaimed listing only when both the
   false-default rollout allowlist and existing operator authority permit it.
+
+# 2026-11-07 — WED-340 search receives a safe special signal before exact details
+
+- The canonical vendor-search request may carry the couple's exact selected
+  date and guest count. A season, vague date or absent count stays unknown; the
+  server does not invent a date or party size.
+- Before top-three selection, a vendor special contributes only a fresh,
+  vendor-confirmed availability signal. The browser does not receive offer or
+  slot identifiers, package copy, price, inclusions, conditions or other dates.
+- Stale, paused, withdrawn, unpublished, unapproved, out-of-range and
+  over-capacity slots fail closed in the server query. Ranking Policy V2 may
+  use the surviving availability fact, with a couple-facing explanation.
+- Effective special pricing must be computed and returned by the later
+  server-validated top-three projection. Sending every candidate's price to a
+  client-side ranker and merely hiding it in the UI is not an acceptable gate.
+- Discovery has a separate false-default flag and account allowlist from vendor
+  management, so enabling vendor editing does not silently expose offers to
+  couples.

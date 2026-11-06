@@ -15,6 +15,7 @@ mod providers;
 mod receipt;
 mod source_classification;
 mod source_policy;
+mod special_offer_evidence;
 
 use super::*;
 use crate::admin_tool_secrets::{
@@ -29,6 +30,7 @@ use crate::wedding_shared_tool_metering::{
 };
 use attribute_catalog::PendingAttribute;
 use canonical_resolution::{EnrichInput, enrich_vendor_sources, write_pending_attributes};
+use chrono::NaiveDate;
 use directory::{directory_sources_cover_query, search_wedding_vendor_directory};
 use photo_proxy::wedding_google_place_photo_http;
 use providers::{search_brave, search_exa, search_google_places};
@@ -45,6 +47,8 @@ struct WeddingVendorSearchRequest {
     source_policy: Option<String>,
     material_fingerprint: Option<String>,
     ranking_policy_version: Option<String>,
+    selected_date: Option<String>,
+    guest_count: Option<u32>,
 }
 
 #[derive(serde::Deserialize, Clone)]
@@ -87,6 +91,8 @@ struct WeddingVendorSearchSource {
     availability: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     rooms: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    limited_special: Option<Value>,
     #[serde(skip)]
     vendor_slug: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -572,6 +578,40 @@ async fn wedding_vendor_search_http(
         Err(err) => failed_messages.push(format!("Admin vendor database lookup failed: {err}")),
     }
 
+    let selected_date = req
+        .selected_date
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(|value| NaiveDate::parse_from_str(value, "%Y-%m-%d"))
+        .transpose()
+        .map_err(|_| {
+            (
+                StatusCode::BAD_REQUEST,
+                "selected_date must use YYYY-MM-DD.".to_string(),
+            )
+        })?;
+    let mut limited_special_count = 0usize;
+    if let Some(date) = selected_date
+        && special_offer_evidence::discovery_rollout_allowed(&user.email)
+    {
+        match special_offer_evidence::attach_active_special_evidence(
+            &state.db,
+            &mut sources,
+            date,
+            req.guest_count,
+        )
+        .await
+        {
+            Ok(count) => limited_special_count = count,
+            Err(error) => {
+                tracing::warn!(%error, "Limited-date Wedding evidence lookup failed");
+                failed_messages
+                    .push("Limited-date availability could not be checked just now.".to_string());
+            }
+        }
+    }
+
     if source_policy == WeddingVendorSourcePolicy::DirectoryOnly {
         let directory_count = sources.len();
         if let Some((plan_id, category, fingerprint, policy_version)) = claim {
@@ -622,6 +662,7 @@ async fn wedding_vendor_search_http(
                 "vendor_categories": categories.iter().cloned().collect::<Vec<_>>(),
                 "external_search_performed": false,
                 "failed_messages": failed_messages,
+                "limited_special_evidence_count": limited_special_count,
             }),
         }));
     }
@@ -921,8 +962,27 @@ async fn wedding_vendor_search_http(
         &mut failed_messages,
     )
     .await;
-    let (sources, persisted_source_count, enrichment_receipt) =
+    let (mut sources, persisted_source_count, enrichment_receipt) =
         (enriched.sources, enriched.persisted_count, enriched.receipt);
+    if let Some(date) = selected_date
+        && special_offer_evidence::discovery_rollout_allowed(&user.email)
+    {
+        match special_offer_evidence::attach_active_special_evidence(
+            &state.db,
+            &mut sources,
+            date,
+            req.guest_count,
+        )
+        .await
+        {
+            Ok(count) => limited_special_count = count,
+            Err(error) => {
+                tracing::warn!(%error, "Limited-date Wedding evidence refresh failed");
+                failed_messages
+                    .push("Limited-date availability could not be refreshed just now.".to_string());
+            }
+        }
+    }
     let provider_label = if provider_labels.is_empty() {
         None
     } else {
@@ -1026,6 +1086,7 @@ async fn wedding_vendor_search_http(
                 "source_provider_labels": provider_labels.iter().cloned().collect::<Vec<_>>(),
                 "failed_messages": failed_messages,
                 "closed_places_filtered": closed_places_filtered,
+                "limited_special_evidence_count": limited_special_count,
             }),
             enrichment_receipt,
         ),

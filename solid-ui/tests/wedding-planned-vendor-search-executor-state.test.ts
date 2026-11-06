@@ -171,9 +171,13 @@ test("planned vendor search batch port factory calls backend search and normaliz
   let observedMaxResults = 0;
   let observedQueryCount = 0;
   let observedNoticeProvider = "";
+  let observedDate = "";
+  let observedGuestCount = 0;
   const port = weddingVendorSearchBatchPortFromApiSearch({
     workspaceId: "response_workspace:vendors",
     maxResultsPerQuery: 5,
+    selectedDate: "2027-07-12",
+    guestCount: 90,
     onResponse: (response) => {
       observedNoticeProvider = response.provider_label ?? "";
     },
@@ -181,6 +185,8 @@ test("planned vendor search batch port factory calls backend search and normaliz
       observedWorkspaceId = body.workspace_id ?? "";
       observedMaxResults = body.max_results_per_query ?? 0;
       observedQueryCount = body.queries.length;
+      observedDate = body.selected_date ?? "";
+      observedGuestCount = body.guest_count ?? 0;
       return {
         ok: true,
         status: "executed",
@@ -207,6 +213,8 @@ test("planned vendor search batch port factory calls backend search and normaliz
   assert.equal(observedWorkspaceId, "response_workspace:vendors");
   assert.equal(observedMaxResults, 5);
   assert.equal(observedQueryCount, 2);
+  assert.equal(observedDate, "2027-07-12");
+  assert.equal(observedGuestCount, 90);
   assert.equal(observedNoticeProvider, "Google Places");
   assert.equal(result.ok, true);
   assert.equal(result.providerLabel, "Google Places");

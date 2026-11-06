@@ -341,13 +341,25 @@ test("server evidence normalises to only the keys that are present", () => {
       broken: { status: "bogus" },
     },
     availability: { state: "enquiry_sent", checked_at: "2026-09-30T00:00:00Z" },
+    limited_special: { available_on_date: "2027-07-12", last_confirmed_at: "2026-09-30T00:00:00Z", confirmation_expires_at: "2026-10-14T00:00:00Z", indicative_only: true },
   });
   assert.equal(evidence.vendor_id, "v1");
   assert.equal(evidence.attributes?.capacity_seated_max?.value, 140);
   assert.equal(evidence.attributes?.pets_allowed?.status, "unknown");
   assert.equal(evidence.attributes?.broken, undefined);
   assert.equal(evidence.availability?.state, "enquiry_sent");
+  assert.equal(evidence.limited_special?.available_on_date, "2027-07-12");
   assert.equal(normalizeWeddingVendorSourceEvidence({ availability: { state: "maybe" } }).availability, undefined);
+  assert.equal(normalizeWeddingVendorSourceEvidence({ limited_special: { available_on_date: "soon" } }).limited_special, undefined);
+});
+
+test("fresh limited-date evidence makes availability actionable without exposing package terms", () => {
+  const result = rankWeddingVendorCandidates({ sources: [source("special", {
+    availability: availability("confirmed_available", "2026-10-14T00:00:00Z"),
+    limited_special: { available_on_date: "2027-07-12", last_confirmed_at: "2026-09-30T00:00:00Z", confirmation_expires_at: "2026-10-14T00:00:00Z", indicative_only: true },
+  })], requirements: venueSearch, rankingPolicy: "2", now: NOW });
+  assert.equal(result.bookable[0]?.availabilityLabel, "Vendor-confirmed opening · details available if shortlisted");
+  assert.ok(result.bookable[0]?.rationaleLabels.includes("Vendor recently confirmed an opening on your selected date"));
 });
 
 test("card fields default legacy cards to an unrecorded availability and read saved ones", () => {

@@ -153,6 +153,7 @@ import { weddingVendorDirectorySearchPlans } from "@/lib/weddingVendorDirectoryS
 import { mergeWeddingVendorPreferenceLabels, weddingVendorQueryGooglePlaceTypes, weddingVendorQueryIntent } from "@/lib/weddingVendorQueryIntentState";
 import { useWeddingVendorShortlistLaunch } from "@/lib/useWeddingVendorShortlistLaunch";
 import { weddingVendorRankingPolicyV2Enabled } from "@/lib/weddingVendorRankingV2State";
+import { parseGuestCount } from "@/lib/weddingVendorRankingState";
 import { buildWeddingVendorSearchReadinessState } from "@/lib/weddingVendorSearchReadinessState";
 import {
   weddingConfiguredVendorSearchProviderKinds,
@@ -225,6 +226,15 @@ const RESPONSE_QUEUE_VIEW_CLASS =
   "view-enter min-w-0 space-y-4 rounded-[24px] border border-sky-100/80 bg-[linear-gradient(135deg,rgba(240,249,255,0.96),rgba(255,255,255,0.96))] p-3 shadow-[0_22px_70px_-36px_rgba(14,116,144,0.4)] backdrop-blur-sm phone:rounded-none phone:border-0 phone:bg-transparent phone:p-0 phone:shadow-none sm:rounded-[32px] sm:p-5";
 const RESPONSE_QUEUE_VIEW_HEADER_CLASS = "flex min-w-0 flex-wrap items-center justify-end gap-3";
 const RESPONSE_QUEUE_VIEW_TITLE_TAG = "h1" as const;
+function exactWeddingVendorSearchDate(value: string | null | undefined): string | null {
+  const text = value?.trim() ?? "";
+  const iso = text.match(/\b(20\d{2}-\d{2}-\d{2})\b/)?.[1];
+  if (iso && Number.isFinite(Date.parse(`${iso}T00:00:00Z`))) return iso;
+  if (!/\b\d{1,2}\s+[A-Za-z]{3,9}\s+20\d{2}\b/.test(text)) return null;
+  const parsed = new Date(text);
+  return Number.isFinite(parsed.getTime()) ? parsed.toISOString().slice(0, 10) : null;
+}
+function weddingVendorSearchGuestCount(value: string | null | undefined): number | null { return parseGuestCount(value); }
 function initialWeddingWorkspaceMenu(): WeddingWorkspaceMenuId {
   if (typeof window !== "undefined") {
     const urlMenu = loadWeddingWorkspaceMenuFromUrl(window.location.search, window.location.hash);
@@ -1813,6 +1823,7 @@ export function ResponseQueueView(props: {
           batchPort: weddingVendorSearchBatchPortFromApiSearch({
             search: searchWeddingVendors, workspaceId: metadata.responseWorkspaceId, weddingPlanId: metadata.weddingPlanId,
             maxResultsPerQuery: 5, sourcePolicy, materialFingerprint: options?.materialFingerprint, rankingPolicyVersion: weddingVendorRankingPolicyV2Enabled(import.meta.env) ? "2" : "1",
+            selectedDate: exactWeddingVendorSearchDate(comparisonInput.dateOrSeason), guestCount: weddingVendorSearchGuestCount(comparisonInput.guestCount),
             onResponse: (response) => { responseNotice = buildWeddingVendorSearchNoticeState({
               ok: response.ok, message: response.message, sourceCount: response.source_count,
               providerLabel: response.provider_label, receiptMetadata: response.receipt_metadata,

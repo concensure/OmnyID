@@ -4605,6 +4605,8 @@ export const searchWeddingVendors = (body: {
   source_policy?: "directory_only" | "online_capable";
   material_fingerprint?: string | null;
   ranking_policy_version?: string | null;
+  selected_date?: string | null;
+  guest_count?: number | null;
 }): Promise<WeddingVendorSearchApiResponse> =>
   apiFetch<unknown>("/wedding/vendor-search", {
     method: "POST",

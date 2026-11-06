@@ -7717,3 +7717,26 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
   are not claimed. Nothing was deployed or enabled.
 - Next: restore Docker for the missing adversarial database proof, then add the
   Ranking Policy V2 top-three discovery projection and Limited Specials map.
+
+# 2026-11-07 - WED-340 safe search-evidence slice (Codex)
+
+- Continued from clean commit `2c7174d14b10895184d55addfdae1af12722616d`
+  in `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001` on
+  `agent/codex/WED-340`.
+- Extended the existing vendor-search request with an exact selected date and
+  parsed guest count. The server checks active, approved, fresh slots and hard
+  guest/capacity limits, then attaches only a generic vendor-confirmed opening
+  to matching directory sources behind a separate false-default allowlist.
+- Ranking Policy V2 treats that signal as actionable availability and gives a
+  user-facing reason. No offer/slot ID, package title, price, inclusion,
+  condition or wider calendar is serialized before top-three selection.
+- Passed all 2,225 Wedding tests, TypeScript typecheck, both line budgets,
+  production UI build, `cargo check --lib` and `git diff --check`.
+- The focused Rust unit-test command was stopped after prolonged Windows code
+  generation exceeded 6 GB; the production module passes cargo check, while
+  its two new pure tests are authored but not claimed executed. Docker-backed
+  query execution is still open.
+- Next: build an authenticated private/no-store discovery projection that
+  invokes canonical server ranking and returns exact effective price and terms
+  for only its current top three; then add the accessible Limited Specials
+  list/map surface.

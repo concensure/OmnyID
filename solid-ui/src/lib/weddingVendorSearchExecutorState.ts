@@ -89,6 +89,8 @@ export type WeddingVendorSearchApiBatchRequestLike = {
   source_policy?: "directory_only" | "online_capable";
   material_fingerprint?: string | null;
   ranking_policy_version?: string | null;
+  selected_date?: string | null;
+  guest_count?: number | null;
 };
 
 export type WeddingVendorSearchApiBatchSearchPort = (
@@ -249,6 +251,8 @@ export function weddingVendorSearchBatchPortFromApiSearch(input: {
   sourcePolicy?: "directory_only" | "online_capable";
   materialFingerprint?: string | null;
   rankingPolicyVersion?: string | null;
+  selectedDate?: string | null;
+  guestCount?: number | null;
   onResponse?: (response: WeddingVendorSearchApiBatchResponseLike) => void;
 }): WeddingVendorSearchPlannedBatchPort {
   let claimSent = false;
@@ -262,6 +266,8 @@ export function weddingVendorSearchBatchPortFromApiSearch(input: {
       ...(maxResultsPerQuery && maxResultsPerQuery > 0 ? { max_results_per_query: maxResultsPerQuery } : {}),
       ...(input.sourcePolicy ? { source_policy: input.sourcePolicy } : {}),
       ...(claim ? { material_fingerprint: claim, ranking_policy_version: input.rankingPolicyVersion ?? "1" } : {}),
+      ...(input.selectedDate ? { selected_date: input.selectedDate } : {}),
+      ...(typeof input.guestCount === "number" && input.guestCount >= 0 ? { guest_count: input.guestCount } : {}),
       queries: weddingVendorSearchApiQueriesFromProviderQueries(queries),
     });
     input.onResponse?.(response);

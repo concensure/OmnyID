@@ -82,6 +82,14 @@ export type WeddingVendorSourceEvidence = {
   attributes?: Record<string, WeddingVendorAttributeEvidence> | null;
   availability?: WeddingVendorAvailabilityEvidence | null;
   rooms?: WeddingVendorRoomEvidence[] | null;
+  limited_special?: WeddingVendorLimitedSpecialEvidence | null;
+};
+
+export type WeddingVendorLimitedSpecialEvidence = {
+  available_on_date: string;
+  last_confirmed_at: string;
+  confirmation_expires_at: string;
+  indicative_only: true;
 };
 
 export type WeddingVendorRankingSource = WeddingVendorSourceEvidence & {
@@ -279,6 +287,15 @@ function normalizeAvailability(value: unknown): WeddingVendorAvailabilityEvidenc
   };
 }
 
+function normalizeLimitedSpecial(value: unknown): WeddingVendorLimitedSpecialEvidence | null {
+  const raw = asRecord(value);
+  const availableOnDate = clean(raw.available_on_date);
+  const lastConfirmedAt = clean(raw.last_confirmed_at);
+  const confirmationExpiresAt = clean(raw.confirmation_expires_at);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(availableOnDate) || !lastConfirmedAt || !confirmationExpiresAt || raw.indicative_only !== true) return null;
+  return { available_on_date: availableOnDate, last_confirmed_at: lastConfirmedAt, confirmation_expires_at: confirmationExpiresAt, indicative_only: true };
+}
+
 /** Returns only the evidence keys actually present, so sources without evidence stay unchanged. */
 export function normalizeWeddingVendorSourceEvidence(record: Record<string, unknown>): WeddingVendorSourceEvidence {
   const evidence: WeddingVendorSourceEvidence = {};
@@ -292,6 +309,7 @@ export function normalizeWeddingVendorSourceEvidence(record: Record<string, unkn
   const attributes = normalizeAttributes(record.attributes);
   const availability = normalizeAvailability(record.availability);
   const rooms = normalizeWeddingVendorRooms(record.rooms);
+  const limitedSpecial = normalizeLimitedSpecial(record.limited_special);
   if (vendorId) evidence.vendor_id = vendorId;
   if (sourceKind) evidence.source_kind = sourceKind;
   if (category) evidence.category = category;
@@ -302,6 +320,7 @@ export function normalizeWeddingVendorSourceEvidence(record: Record<string, unkn
   if (attributes) evidence.attributes = attributes;
   if (availability) evidence.availability = availability;
   if (rooms) evidence.rooms = rooms;
+  if (limitedSpecial) evidence.limited_special = limitedSpecial;
   return evidence;
 }
 
@@ -653,6 +672,7 @@ function effectiveAvailability(source: WeddingVendorRankingSource, now: Date): {
   if (Number.isFinite(validUntil) && validUntil < now.getTime()) {
     return { state: "unknown", label: "Availability needs re-checking" };
   }
+  if (availability.state === "confirmed_available" && source.limited_special) return { state: availability.state, label: "Vendor-confirmed opening · details available if shortlisted" };
   return { state: availability.state, label: AVAILABILITY_LABELS[availability.state] };
 }
 
@@ -843,6 +863,7 @@ function rankCandidate(
     situationFitLabel: situationFitLabel(components),
     verificationLabel: "",
     rationaleLabels: [
+      ...(source.limited_special ? ["Vendor recently confirmed an opening on your selected date"] : []),
       ...components.filter((item) => item.known && item.value >= 0.6).map((item) => `${item.label} looks strong`),
     ],
     group,

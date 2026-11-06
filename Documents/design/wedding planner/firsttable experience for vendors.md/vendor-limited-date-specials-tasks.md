@@ -67,7 +67,8 @@ pricing state before the authoritative commands and safe projections exist.
 
 ## Phase 5 — ranking and top-three reveal
 
-- [ ] Extend canonical search source with server-verified active offer summary.
+- [x] Extend canonical search source with a server-verified, privacy-bounded
+  active-offer signal for the couple's exact selected date.
 - [x] Compute approved effective price for selected date/guest count without
   budget-based price discrimination.
 - [x] Show the date-specific indicative total as `max(minimum spend, guests ×
@@ -75,6 +76,9 @@ pricing state before the authoritative commands and safe projections exist.
   a guest count exceeds that date's capacity.
 - [ ] Add availability, freshness and effective-price evidence to Ranking
   Policy V2 with confidence/unknown handling.
+  Fresh vendor-confirmed availability is now consumed by V2; effective price
+  remains open until it can be computed and disclosed inside the server-gated
+  top-three projection rather than leaked to every browser candidate.
 - [ ] Support explicit flexible-date windows and explain rank changes caused by
   a special date.
 - [ ] Attach exact slot/package details only after top-three selection.
@@ -159,3 +163,12 @@ a 30-minute HttpOnly session plus CSRF token. Creating a new generation rotates
 older links and consumes their sessions. The mobile vendor surface exposes only
 the bound offer and uses the same publish and state command services as the
 claimed portal. Disposable-database adversarial route proof remains open.
+
+The fourth slice carries an exact canonical date and guest count through the
+existing search request. When a separate false-default discovery rollout is
+allowlisted, the server attaches only a fresh vendor-confirmed opening signal
+to matching directory candidates. Stale, withdrawn, unpublished, out-of-range
+and over-capacity rows do not project. Ranking Policy V2 treats the signal as
+actionable availability and explains it in couple-facing language. Offer and
+slot identifiers, title, pricing, inclusions, conditions and the wider calendar
+remain absent pending the authenticated server-side top-three reveal.
