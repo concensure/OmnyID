@@ -1,0 +1,2401 @@
+{
+ "generated": "2026-10-15",
+ "new_venues": [
+  {
+   "vendor_name": "The Rise Canoe Grounds",
+   "category": "Venue",
+   "service_area": "Canoelands, Hills/Hawkesbury NSW",
+   "address": "17 Canoelands Road, Canoelands NSW 2157",
+   "website_url": "https://www.therisecanoegrounds.com.au/weddings",
+   "contact_phone": null,
+   "contact_email": null,
+   "capacity_seated_max": null,
+   "capacity_standing_max": null,
+   "price_note": null,
+   "style_tags": [
+    "rustic",
+    "semi-rural",
+    "boutique farm",
+    "garden ceremony",
+    "custom chapel",
+    "fire pit",
+    "mountain views",
+    "relaxed",
+    "country",
+    "bush backdrop"
+   ],
+   "editorial_summary": "Small semi-rural farm venue with an outdoor garden, a purpose-built chapel and a fire pit for the evening, framed by mountain views. Rustic and relaxed in feel, with a local bakery as the on-site catering partner.",
+   "sources": [
+    "https://www.theurbanlist.com/sydney/a-list/wedding-venues-sydney"
+   ],
+   "flags": [
+    "needs_contact_lookup"
+   ],
+   "source_checked_at": "2026-10-15"
+  },
+  {
+   "vendor_name": "Art Gallery of NSW",
+   "category": "Venue",
+   "service_area": "The Domain, Sydney CBD NSW",
+   "address": "Art Gallery Road, The Domain, Sydney NSW 2000",
+   "website_url": "https://www.artgallery.nsw.gov.au/visit/venue-hire/",
+   "contact_phone": "02 9225 1702",
+   "contact_email": null,
+   "capacity_seated_max": 116,
+   "capacity_standing_max": 300,
+   "price_note": "from $205pp (third-party)",
+   "style_tags": [
+    "cultural",
+    "art-filled",
+    "gallery",
+    "harbour views",
+    "Woolloomooloo views",
+    "next to Botanic Gardens",
+    "city",
+    "elegant",
+    "unique",
+    "seasonal menus"
+   ],
+   "editorial_summary": "Wedding receptions among the artworks beside the Botanic Gardens, with rare outlooks over Woolloomooloo and the harbour. Two reception areas suit up to about 250 guests, with seasonal menus from the gallery's caterer. Hire fees help fund the gallery's community programs.",
+   "sources": [
+    "https://www.theurbanlist.com/sydney/a-list/wedding-venues-sydney",
+    "https://www.wedlockers.com.au/b/art-gallery-of-nsw"
+   ],
+   "flags": [
+    "no_public_email_enquiry_form"
+   ],
+   "source_checked_at": "2026-10-15"
+  },
+  {
+   "vendor_name": "Restaurant Hubert",
+   "category": "Venue",
+   "service_area": "Sydney CBD NSW",
+   "address": "15 Bligh Street, Sydney NSW 2000",
+   "website_url": "https://swillhouse.com/venues/restaurant-hubert/",
+   "contact_phone": "02 8302 2322",
+   "contact_email": "events@restauranthubert.com",
+   "capacity_seated_max": null,
+   "capacity_standing_max": 200,
+   "price_note": null,
+   "style_tags": [
+    "French",
+    "speakeasy",
+    "underground",
+    "vintage",
+    "live jazz",
+    "martinis",
+    "moody",
+    "intimate",
+    "exclusive hire",
+    "CBD",
+    "romantic"
+   ],
+   "editorial_summary": "Candlelit French dining room below street level with a vintage speakeasy mood, live jazz and classic cocktails. Four exclusive-hire spaces, and the whole restaurant can take up to about 200 guests. Suits couples after a moody, glamorous city celebration.",
+   "sources": [
+    "https://www.theurbanlist.com/sydney/a-list/wedding-venues-sydney"
+   ],
+   "flags": [
+    "phone_from_site_may_be_reservations"
+   ],
+   "source_checked_at": "2026-10-15"
+  },
+  {
+   "vendor_name": "The Eveleigh",
+   "category": "Venue",
+   "service_area": "South Eveleigh, Inner Sydney NSW",
+   "address": "Bay 3, 2 Locomotive Street, South Eveleigh NSW 2015",
+   "website_url": "https://thegrounds.com.au/venues/the-eveleigh/",
+   "contact_phone": null,
+   "contact_email": null,
+   "capacity_seated_max": 340,
+   "capacity_standing_max": 550,
+   "price_note": null,
+   "style_tags": [
+    "heritage",
+    "railway workshops",
+    "steam-era",
+    "grand staircase",
+    "vintage chandeliers",
+    "marble and brass",
+    "industrial elegance",
+    "high ceilings",
+    "large guest list",
+    "bridal suite",
+    "glamorous"
+   ],
+   "editorial_summary": "Grand function space inside restored locomotive workshops, mixing steam-age glamour with sleek modern lines. A sweeping staircase and balcony give a dramatic entrance, with vintage chandeliers, marble and brass details and very high ceilings. Takes roughly 200 to 600 guests, with a bridal suite and in-house sound.",
+   "sources": [
+    "https://www.theurbanlist.com/sydney/a-list/wedding-venues-sydney",
+    "https://www.wedlockers.com.au/b/the-grounds-of-everleigh"
+   ],
+   "flags": [
+    "needs_contact_lookup",
+    "enquiry_form_https://thegrounds.com.au/contact-us/",
+    "wedlockers_name_The_Grounds_of_Everleigh_is_same_venue"
+   ],
+   "source_checked_at": "2026-10-15"
+  },
+  {
+   "vendor_name": "Henry Deane",
+   "category": "Venue",
+   "service_area": "Millers Point, Sydney NSW",
+   "address": "35 Bettington Street, Millers Point NSW 2000",
+   "website_url": "https://hotelpalisade.com.au/henrydeane/",
+   "contact_phone": "(02) 9018 0123",
+   "contact_email": "groupbookings@hotelpalisade.com",
+   "capacity_seated_max": 50,
+   "capacity_standing_max": null,
+   "price_note": null,
+   "style_tags": [
+    "rooftop",
+    "Harbour Bridge views",
+    "harbour views",
+    "intimate",
+    "boutique hotel",
+    "heritage Millers Point",
+    "small wedding",
+    "cocktail lounge",
+    "two levels",
+    "romantic"
+   ],
+   "editorial_summary": "Two-level rooftop-style lounge on top of Hotel Palisade with some of the best Harbour Bridge views in the city. Very intimate, with the largest room holding about 50 guests, and the hotel's eight rooms make a small wedding weekend easy.",
+   "sources": [
+    "https://www.theurbanlist.com/sydney/a-list/wedding-venues-sydney"
+   ],
+   "flags": [],
+   "source_checked_at": "2026-10-15"
+  },
+  {
+   "vendor_name": "Crystalbrook Albion",
+   "category": "Venue",
+   "service_area": "Surry Hills, Sydney NSW",
+   "address": "21 Little Albion Street, Surry Hills NSW 2010",
+   "website_url": "https://crystalbrookcollection.com/albion",
+   "contact_phone": "1300 002 050",
+   "contact_email": "sales@crystalbrookcollection.com",
+   "capacity_seated_max": null,
+   "capacity_standing_max": null,
+   "price_note": null,
+   "style_tags": [
+    "boutique hotel",
+    "exclusive hire",
+    "whole hotel",
+    "rooftop terrace",
+    "Surry Hills",
+    "pet friendly",
+    "everyone under one roof",
+    "urban",
+    "intimate",
+    "stay-over"
+   ],
+   "editorial_summary": "Boutique 35-room hotel in Surry Hills that can be hired exclusively, with a rooftop terrace and round-the-clock service. Guests sleep under the same roof, and pets are welcome. Good for a small, laid-back city wedding weekend.",
+   "sources": [
+    "https://www.theurbanlist.com/sydney/a-list/wedding-venues-sydney"
+   ],
+   "flags": [
+    "email_is_group_sales_address"
+   ],
+   "source_checked_at": "2026-10-15"
+  },
+  {
+   "vendor_name": "Baba's Place",
+   "category": "Venue",
+   "service_area": "Marrickville, Inner West Sydney NSW",
+   "address": "20 Sloane Street, Marrickville NSW 2204",
+   "website_url": "https://www.babasplace.com.au/space-hire",
+   "contact_phone": null,
+   "contact_email": "info@babasplace.com.au",
+   "capacity_seated_max": 70,
+   "capacity_standing_max": null,
+   "price_note": null,
+   "style_tags": [
+    "colourful",
+    "quirky",
+    "warehouse",
+    "eclectic",
+    "inner west",
+    "Marrickville",
+    "relaxed",
+    "Sunday hire",
+    "small reception",
+    "creative",
+    "fun"
+   ],
+   "editorial_summary": "Bright, quirky warehouse-style space in Marrickville, hired out on Sundays or by arrangement. Suits relaxed, creative receptions of 50 to 70 guests with a catered lunch or dinner.",
+   "sources": [
+    "https://www.theurbanlist.com/sydney/a-list/wedding-venues-sydney"
+   ],
+   "flags": [
+    "phone_not_found"
+   ],
+   "source_checked_at": "2026-10-15"
+  },
+  {
+   "vendor_name": "Bopp & Tone",
+   "category": "Venue",
+   "service_area": "Sydney CBD NSW",
+   "address": "60 Carrington Street, Sydney NSW 2000",
+   "website_url": "https://boppandtone.com.au/groups-events/",
+   "contact_phone": "(02) 9299 9997",
+   "contact_email": "book@boppandtone.com.au",
+   "capacity_seated_max": 28,
+   "capacity_standing_max": 100,
+   "price_note": null,
+   "style_tags": [
+    "old-world glamour",
+    "cocktail bar",
+    "private dining room",
+    "speakeasy mood",
+    "CBD",
+    "jazzy",
+    "semi-private",
+    "intimate",
+    "glamorous",
+    "evening"
+   ],
+   "editorial_summary": "Glamorous old-world bar and restaurant with private and semi-private rooms. The private dining room seats up to 28, and the whole venue can be hired for around 40 to 100 guests. A good fit for cocktail-led evening celebrations.",
+   "sources": [
+    "https://www.theurbanlist.com/sydney/a-list/wedding-venues-sydney"
+   ],
+   "flags": [],
+   "source_checked_at": "2026-10-15"
+  },
+  {
+   "vendor_name": "Chiswick",
+   "category": "Venue",
+   "service_area": "Woollahra, Eastern Suburbs Sydney NSW",
+   "address": "65 Ocean Street, Woollahra NSW 2025",
+   "website_url": "https://chiswickwoollahra.com.au/weddings",
+   "contact_phone": "02 8388 8688",
+   "contact_email": "res.chiswickrestaurant@solotel.com.au",
+   "capacity_seated_max": 70,
+   "capacity_standing_max": 70,
+   "price_note": "from $110pp (third-party)",
+   "style_tags": [
+    "garden",
+    "kitchen garden",
+    "romantic",
+    "intimate",
+    "paddock to plate",
+    "seasonal",
+    "Woollahra",
+    "relaxed polished",
+    "lawn",
+    "private dining"
+   ],
+   "editorial_summary": "Romantic garden restaurant in Woollahra with lawns and a kitchen garden. Drinks and canapes outdoors after the ceremony, then dinner indoors on a seasonal paddock-to-plate menu. Private dining takes about 40 and the main room around 70.",
+   "sources": [
+    "https://www.theurbanlist.com/sydney/a-list/wedding-venues-sydney",
+    "https://www.wedlockers.com.au/b/chiswick"
+   ],
+   "flags": [
+    "contact_is_general_venue_address"
+   ],
+   "source_checked_at": "2026-10-15"
+  },
+  {
+   "vendor_name": "Kittyhawk",
+   "category": "Venue",
+   "service_area": "Sydney CBD NSW",
+   "address": "16 Phillip Lane, Sydney NSW 2000",
+   "website_url": "https://www.facebook.com/thekittyhawk/",
+   "contact_phone": null,
+   "contact_email": null,
+   "capacity_seated_max": 85,
+   "capacity_standing_max": 175,
+   "price_note": "$129-265pp (third-party)",
+   "style_tags": [
+    "moody",
+    "old-world",
+    "French",
+    "cocktail bar",
+    "Paris 1944 theme",
+    "hip hop and soul nights",
+    "private spaces",
+    "CBD",
+    "party",
+    "late night"
+   ],
+   "editorial_summary": "Moody, old-world cocktail bar and French restaurant themed around liberated Paris, with several private spaces. Reopened with a livelier music-and-tequila personality. Holds 25 to 175 guests with bar sections or dedicated table service.",
+   "sources": [
+    "https://www.theurbanlist.com/sydney/a-list/wedding-venues-sydney",
+    "https://www.wedlockers.com.au/b/kittyhawk"
+   ],
+   "flags": [
+    "needs_contact_lookup"
+   ],
+   "source_checked_at": "2026-10-15"
+  },
+  {
+   "vendor_name": "Lindesay",
+   "category": "Venue",
+   "service_area": "Darling Point, Eastern Suburbs Sydney NSW",
+   "address": "1 Carthona Avenue, Darling Point NSW 2027",
+   "website_url": "https://www.nationaltrust.org.au/places/lindesay/venue-hire/",
+   "contact_phone": "(02) 9363 2401",
+   "contact_email": "lindesay@nationaltrust.com.au",
+   "capacity_seated_max": null,
+   "capacity_standing_max": 100,
+   "price_note": null,
+   "style_tags": [
+    "1830s mansion",
+    "Gothic Revival",
+    "harbour views",
+    "manicured gardens",
+    "heritage",
+    "sandstone courtyard",
+    "marquee",
+    "exclusive access",
+    "leafy",
+    "romantic",
+    "circular drive"
+   ],
+   "editorial_summary": "Elegant 1830s Gothic Revival mansion above the harbour in leafy Darling Point, with manicured gardens, a sandstone courtyard and room for a marquee. Hired exclusively, with period interiors and a sweeping driveway for a grand arrival. About 10 to 100 guests.",
+   "sources": [
+    "https://www.theurbanlist.com/sydney/a-list/wedding-venues-sydney",
+    "https://www.wedlockers.com.au/b/lindesay"
+   ],
+   "flags": [],
+   "source_checked_at": "2026-10-15"
+  },
+  {
+   "vendor_name": "Ursula's",
+   "category": "Venue",
+   "service_area": "Paddington, Eastern Suburbs Sydney NSW",
+   "address": "92 Hargrave Street, Paddington NSW 2021",
+   "website_url": "https://ursulas.com.au/",
+   "contact_phone": null,
+   "contact_email": "info@ursulas.com.au",
+   "capacity_seated_max": 12,
+   "capacity_standing_max": null,
+   "price_note": null,
+   "style_tags": [
+    "private dining",
+    "light-filled",
+    "terrace house",
+    "Paddington",
+    "refined",
+    "tiny wedding",
+    "intimate dinner",
+    "wine guidance"
+   ],
+   "editorial_summary": "Refined, sunlit private dining room on the upper floor of a Paddington terrace, seating up to 12. Made for tiny weddings and elopement dinners, with custom menus and wine advice from the restaurant team.",
+   "sources": [
+    "https://www.theurbanlist.com/sydney/a-list/wedding-venues-sydney"
+   ],
+   "flags": [
+    "phone_not_found"
+   ],
+   "source_checked_at": "2026-10-15"
+  },
+  {
+   "vendor_name": "State Library of NSW",
+   "category": "Venue",
+   "service_area": "Macquarie Street, Sydney CBD NSW",
+   "address": "1 Shakespeare Place, Sydney NSW 2000",
+   "website_url": "https://www.sl.nsw.gov.au/about/services/venue-hire/weddings",
+   "contact_phone": "(02) 9273 1414",
+   "contact_email": "venue.hire@sl.nsw.gov.au",
+   "capacity_seated_max": null,
+   "capacity_standing_max": 200,
+   "price_note": null,
+   "style_tags": [
+    "heritage",
+    "historic library",
+    "Mitchell Building",
+    "grand",
+    "scholarly",
+    "elegant",
+    "CBD",
+    "Botanic Gardens nearby",
+    "intimate or grand"
+   ],
+   "editorial_summary": "Historic rooms inside the Mitchell Building, available for ceremonies and receptions from about 8 up to 200 guests. A grand, bookish backdrop beside the Botanic Gardens, with in-house caterers.",
+   "sources": [
+    "https://www.theurbanlist.com/sydney/a-list/wedding-venues-sydney"
+   ],
+   "flags": [],
+   "source_checked_at": "2026-10-15"
+  },
+  {
+   "vendor_name": "Royal Botanic Garden Sydney (Palm House and lawns)",
+   "category": "Venue",
+   "service_area": "Sydney CBD NSW",
+   "address": "Mrs Macquaries Road, Sydney NSW 2000",
+   "website_url": "https://www.botanicgardens.org.au/venues-and-lawns",
+   "contact_phone": "+61 2 9231 8111",
+   "contact_email": null,
+   "capacity_seated_max": null,
+   "capacity_standing_max": null,
+   "price_note": null,
+   "style_tags": [
+    "botanic garden",
+    "Opera House views",
+    "Harbour Bridge views",
+    "heritage Palm House",
+    "lawns",
+    "fig trees",
+    "marquee",
+    "natural",
+    "Lion's Gate Lodge",
+    "ceremony in the gardens"
+   ],
+   "editorial_summary": "Garden lawns, a retro Palm House and heritage lodges beside the harbour, with outlooks to the Opera House and Harbour Bridge. Keep it natural or add a marquee and furniture. Phone is the garden's general line, not a dedicated venue-hire line.",
+   "sources": [
+    "https://www.theurbanlist.com/sydney/a-list/wedding-venues-sydney"
+   ],
+   "flags": [
+    "contact_is_general_line",
+    "needs_events_contact"
+   ],
+   "source_checked_at": "2026-10-15"
+  },
+  {
+   "vendor_name": "No 92",
+   "category": "Venue",
+   "service_area": "Glebe, Inner West Sydney NSW",
+   "address": "92 Glebe Point Road, Glebe NSW 2037",
+   "website_url": "https://no92gpr.com.au/events",
+   "contact_phone": null,
+   "contact_email": null,
+   "capacity_seated_max": 60,
+   "capacity_standing_max": null,
+   "price_note": null,
+   "style_tags": [
+    "restored terrace",
+    "Victorian",
+    "wine bar",
+    "courtyard",
+    "Mexican-inspired food",
+    "grand salon",
+    "Glebe",
+    "small wedding",
+    "in-house florals",
+    "candlelit"
+   ],
+   "editorial_summary": "Restored two-storey Victorian terrace with a wine bar, courtyard and a grand salon, serving Mexican-inspired food. Works for small to medium weddings of around 20 to 60, with in-house floral packages and full setup.",
+   "sources": [
+    "https://www.theurbanlist.com/sydney/a-list/wedding-venues-sydney"
+   ],
+   "flags": [
+    "needs_contact_lookup"
+   ],
+   "source_checked_at": "2026-10-15"
+  },
+  {
+   "vendor_name": "Somerley House",
+   "category": "Venue",
+   "service_area": "Sutton Forest, Southern Highlands NSW",
+   "address": "7207 Illawarra Highway, Sutton Forest NSW 2577",
+   "website_url": "https://somerleyhouse.com.au/home/",
+   "contact_phone": "0410 250 301",
+   "contact_email": "enquiries@somerleys.com",
+   "capacity_seated_max": null,
+   "capacity_standing_max": null,
+   "price_note": null,
+   "style_tags": [
+    "Victorian estate",
+    "1875",
+    "tree-lined drive",
+    "heritage Garden Room",
+    "chandeliers",
+    "grounds",
+    "Southern Highlands",
+    "atmospheric",
+    "country house",
+    "about an hour from Sydney"
+   ],
+   "editorial_summary": "Victorian country estate dating to 1875, approached by a tree-lined drive, with big grounds and a heritage Garden Room lit by chandeliers. Atmospheric and old-world, about an hour from Sydney in the Southern Highlands.",
+   "sources": [
+    "https://www.theurbanlist.com/sydney/a-list/wedding-venues-sydney"
+   ],
+   "flags": [],
+   "source_checked_at": "2026-10-15"
+  },
+  {
+   "vendor_name": "Growwild Wildflower Farm",
+   "category": "Venue",
+   "service_area": "Alpine, Southern Highlands NSW",
+   "address": "916 Old Hume Highway, Alpine NSW 2575",
+   "website_url": "https://www.growwild.com.au/",
+   "contact_phone": "0447 101 190",
+   "contact_email": "jane@growwild.com.au",
+   "capacity_seated_max": null,
+   "capacity_standing_max": 150,
+   "price_note": "hire from $6,500 (third-party)",
+   "style_tags": [
+    "wildflower farm",
+    "25 acres",
+    "secluded gardens",
+    "Secret Valley ceremony",
+    "romantic barn",
+    "festoon-lit marquee",
+    "blank canvas",
+    "food trucks welcome",
+    "bridal suite",
+    "exclusive use",
+    "Southern Highlands"
+   ],
+   "editorial_summary": "Secluded 25-acre wildflower farm near Bowral with an exclusive-use package: a garden ceremony site in a hidden valley, a small barn, a garden marquee with a festoon-lit courtyard and a bridal suite. A blank canvas for relaxed, personal weddings, from food trucks to cocktail styles.",
+   "sources": [
+    "https://www.wedlockers.com.au/b/growwild-wildflower-farm-1"
+   ],
+   "flags": [],
+   "source_checked_at": "2026-10-15"
+  },
+  {
+   "vendor_name": "Chapel Hill Retreat",
+   "category": "Venue",
+   "service_area": "Berambing, Blue Mountains NSW",
+   "address": "36 Berambing Crest, Berambing NSW 2758",
+   "website_url": "https://www.chapelhillretreat.com.au/",
+   "contact_phone": "(02) 4567 2156",
+   "contact_email": "events@chapelhillretreat.com.au",
+   "capacity_seated_max": 150,
+   "capacity_standing_max": null,
+   "price_note": "from $95pp (third-party)",
+   "style_tags": [
+    "Blue Mountains",
+    "valley views",
+    "bush cathedral",
+    "stained-glass chapel",
+    "fireplace",
+    "chandeliers",
+    "tipi or marquee",
+    "35 acres",
+    "on-site accommodation",
+    "affordable packages",
+    "elopements"
+   ],
+   "editorial_summary": "Scenic 35-acre mountain retreat with six ceremony sites, including an open deck, a natural bush cathedral and a stained-glass chapel. The reception room has a fireplace, chandeliers and valley views, and cottages sleep 34. Affordable packages from elopements to 150 guests.",
+   "sources": [
+    "https://www.wedlockers.com.au/b/chapel-hill-retreat"
+   ],
+   "flags": [
+    "accommodation_on_site"
+   ],
+   "source_checked_at": "2026-10-15"
+  },
+  {
+   "vendor_name": "Berry Hill",
+   "category": "Venue",
+   "service_area": "Leets Vale, Hawkesbury NSW",
+   "address": "1832 River Road, Leets Vale NSW 2775",
+   "website_url": "https://berryhill.com.au/",
+   "contact_phone": null,
+   "contact_email": "hello@berryhill.com.au",
+   "capacity_seated_max": null,
+   "capacity_standing_max": 150,
+   "price_note": "3-day package from $12,300 (third-party)",
+   "style_tags": [
+    "Hawkesbury River",
+    "75 acres",
+    "riverbank",
+    "bush",
+    "casuarinas",
+    "blank canvas",
+    "BYO catering and alcohol",
+    "eco-resort",
+    "private celebration",
+    "gum-covered hills"
+   ],
+   "editorial_summary": "Riverside 75-acre property on the Hawkesbury with casuarinas and bush-covered hills, feeling far from the city yet within 90 minutes. A blank canvas where you bring your own suppliers, with an in-house event team to help as much as you like.",
+   "sources": [
+    "https://www.wedlockers.com.au/b/berry-hill"
+   ],
+   "flags": [
+    "phone_not_found",
+    "accommodation_on_site"
+   ],
+   "source_checked_at": "2026-10-15"
+  },
+  {
+   "vendor_name": "Doltone House Western Sydney",
+   "category": "Venue",
+   "service_area": "Bossley Park, Western Sydney NSW",
+   "address": "121-133 Prairie Vale Road, Bossley Park NSW 2176",
+   "website_url": "https://www.doltonehouse.com.au/venues/western-sydney",
+   "contact_phone": "+61 2 8571 0622",
+   "contact_email": "info@doltonehouse.com.au",
+   "capacity_seated_max": 750,
+   "capacity_standing_max": 950,
+   "price_note": "from $130pp (third-party)",
+   "style_tags": [
+    "western Sydney",
+    "grand",
+    "designer spaces",
+    "gold textured walls",
+    "high ceilings",
+    "large guest list",
+    "free parking",
+    "glamorous",
+    "three rooms",
+    "up to 950"
+   ],
+   "editorial_summary": "Three designer function spaces, the largest with high ceilings and gold-textured walls, taking about 750 seated or 950 cocktail. Free on-site parking and a grand foyer suit very large celebrations in Sydney's west.",
+   "sources": [
+    "https://www.wedlockers.com.au/b/doltone-house-western-sydney"
+   ],
+   "flags": [
+    "shared_group_contact"
+   ],
+   "source_checked_at": "2026-10-15"
+  },
+  {
+   "vendor_name": "Doltone House Sylvania Waters",
+   "category": "Venue",
+   "service_area": "Sylvania Waters, Sutherland Shire NSW",
+   "address": "223 Belgrave Esplanade, Sylvania Waters NSW 2224",
+   "website_url": "https://www.doltonehouse.com.au/venues/sylvania-waters",
+   "contact_phone": "+61 2 8571 0622",
+   "contact_email": "info@doltonehouse.com.au",
+   "capacity_seated_max": null,
+   "capacity_standing_max": 600,
+   "price_note": "from $90pp (third-party)",
+   "style_tags": [
+    "Gwawley Bay",
+    "waterside",
+    "garden",
+    "parterre gardens",
+    "floor-to-ceiling windows",
+    "arched detailing",
+    "bright",
+    "four rooms",
+    "Sutherland Shire",
+    "private retreat"
+   ],
+   "editorial_summary": "Waterside venue on Gwawley Bay with four reception rooms and two garden areas for 10 to 600 guests. One newly renovated room has white arches, polished concrete and floor-to-ceiling windows over leafy gardens.",
+   "sources": [
+    "https://www.wedlockers.com.au/b/doltone-house-sylvania-waters"
+   ],
+   "flags": [
+    "shared_group_contact"
+   ],
+   "source_checked_at": "2026-10-15"
+  },
+  {
+   "vendor_name": "Saints Event Centre",
+   "category": "Venue",
+   "service_area": "North St Marys, Western Sydney NSW",
+   "address": "Boronia Road, North St Marys NSW 2760",
+   "website_url": "https://stmarysleagues.com.au",
+   "contact_phone": "(02) 9677 7703",
+   "contact_email": "events@saintsrl.com.au",
+   "capacity_seated_max": null,
+   "capacity_standing_max": 500,
+   "price_note": "from $55pp (third-party)",
+   "style_tags": [
+    "western Sydney",
+    "league club",
+    "traditional or contemporary",
+    "affordable",
+    "large guest list",
+    "decor and favours help",
+    "friendly events team",
+    "20 to 500 guests"
+   ],
+   "editorial_summary": "Big, budget-friendly club event centre in St Marys that handles everything from catering to decorations and favours. Tailored packages for traditional or modern weddings, 20 to 500 guests. Email was found on a third-party listing; phone is from the Wedlockers description.",
+   "sources": [
+    "https://www.wedlockers.com.au/b/saints-event-centre"
+   ],
+   "flags": [
+    "email_unverified_third_party"
+   ],
+   "source_checked_at": "2026-10-15"
+  },
+  {
+   "vendor_name": "Sydney Opera House",
+   "category": "Venue",
+   "service_area": "Bennelong Point, Sydney NSW",
+   "address": "1 Macquarie Street, Sydney NSW 2000",
+   "website_url": "https://www.sydneyoperahouse.com/venue-hire/weddings",
+   "contact_phone": null,
+   "contact_email": null,
+   "capacity_seated_max": null,
+   "capacity_standing_max": 1000,
+   "price_note": "from $265pp (third-party)",
+   "style_tags": [
+    "iconic",
+    "harbour views",
+    "Utzon Room",
+    "Yallamundi Rooms",
+    "all weather",
+    "landmark",
+    "spectacular",
+    "world heritage",
+    "sit-down or cocktail",
+    "Botanic Gardens views"
+   ],
+   "editorial_summary": "Weddings in the landmark itself: flexible all-weather rooms with dramatic harbour outlooks, an intimate Utzon Room beside the tapestry, and larger foyers for big cocktail parties. About 50 to 1000 guests.",
+   "sources": [
+    "https://www.wedlockers.com.au/b/sydney-opera-house"
+   ],
+   "flags": [
+    "needs_events_contact"
+   ],
+   "source_checked_at": "2026-10-15"
+  },
+  {
+   "vendor_name": "Seadeck Sydney",
+   "category": "Venue",
+   "service_area": "King Street Wharf, Sydney Harbour NSW",
+   "address": "Lime Street, Sydney NSW 2000",
+   "website_url": "https://www.seadeck.com.au/",
+   "contact_phone": "(02) 8203 7700",
+   "contact_email": "bookings@seadeck.com.au",
+   "capacity_seated_max": null,
+   "capacity_standing_max": 420,
+   "price_note": "vessel hire $14,000 (third-party)",
+   "style_tags": [
+    "floating",
+    "harbour",
+    "Mediterranean feel",
+    "all weather awning",
+    "built-in stage",
+    "three bars",
+    "lounge areas",
+    "party",
+    "day or night",
+    "character"
+   ],
+   "editorial_summary": "Bright, full-of-character floating venue on the harbour with a stage, three bars, lounges and an all-weather awning. Day or evening receptions for roughly 100 to 400 guests with a Mediterranean holiday mood.",
+   "sources": [
+    "https://www.wedlockers.com.au/b/seadeck-sydney"
+   ],
+   "flags": [],
+   "source_checked_at": "2026-10-15"
+  },
+  {
+   "vendor_name": "Leuralla Amphitheatre (Blue Mountains Weddings)",
+   "category": "Venue",
+   "service_area": "Leura, Blue Mountains NSW",
+   "address": "41 Olympian Parade, Leura NSW 2780",
+   "website_url": "https://www.bluemountainsweddings.com.au/",
+   "contact_phone": null,
+   "contact_email": null,
+   "capacity_seated_max": 200,
+   "capacity_standing_max": 200,
+   "price_note": null,
+   "style_tags": [
+    "amphitheatre",
+    "Blue Mountains",
+    "elopement",
+    "micro wedding",
+    "all-inclusive packages",
+    "garden",
+    "local couple run",
+    "intimate or 200 guests",
+    "fairytale"
+   ],
+   "editorial_summary": "Exclusive-use mountain amphitheatre run by a local couple who offer all-inclusive packages from tiny elopements to 200-guest weddings. Warm, personal and fairytale in spirit.",
+   "sources": [
+    "https://www.wedlockers.com.au/b/blue-mountains-weddings"
+   ],
+   "flags": [
+    "phone_email_not_found"
+   ],
+   "source_checked_at": "2026-10-15"
+  },
+  {
+   "vendor_name": "Promenade Bondi Beach",
+   "category": "Venue",
+   "service_area": "Bondi Beach, Eastern Suburbs Sydney NSW",
+   "address": "4A Queen Elizabeth Drive, Bondi Beach NSW 2026",
+   "website_url": null,
+   "contact_phone": null,
+   "contact_email": null,
+   "capacity_seated_max": 60,
+   "capacity_standing_max": 80,
+   "price_note": "from $148pp (third-party)",
+   "style_tags": [
+    "Bondi",
+    "beachfront",
+    "relaxed elegance",
+    "coastal",
+    "sustainable local produce",
+    "Pavilion",
+    "private dining room",
+    "sunrise to sunset",
+    "small wedding",
+    "beach views"
+   ],
+   "editorial_summary": "Casual-elegant restaurant by Bondi Pavilion with beach views, sustainable local produce and coastal textures. Dining room hire up to 60 guests, 80 with the full space, or a private room for 20.",
+   "sources": [
+    "https://www.wedlockers.com.au/b/promenade-bondi-beach"
+   ],
+   "flags": [
+    "needs_contact_lookup"
+   ],
+   "source_checked_at": "2026-10-15"
+  },
+  {
+   "vendor_name": "Four Seasons Hotel Sydney",
+   "category": "Venue",
+   "service_area": "The Rocks, Sydney NSW",
+   "address": "199 George Street, The Rocks NSW 2000",
+   "website_url": "https://www.fourseasons.com/sydney/",
+   "contact_phone": null,
+   "contact_email": null,
+   "capacity_seated_max": null,
+   "capacity_standing_max": 900,
+   "price_note": "from $220pp (third-party)",
+   "style_tags": [
+    "luxury",
+    "5-star",
+    "harbour edge",
+    "iconic views",
+    "in-house wedding specialists",
+    "intimate package",
+    "customised traditions",
+    "ballroom",
+    "The Rocks"
+   ],
+   "editorial_summary": "Five-star hotel on the harbour edge in The Rocks, with in-house wedding specialists, customisable packages (including an intimate one with a menu tasting) and ballrooms for about 250 to 900 guests.",
+   "sources": [
+    "https://www.wedlockers.com.au/b/four-seasons-hotel-sydney"
+   ],
+   "flags": [
+    "needs_contact_lookup"
+   ],
+   "source_checked_at": "2026-10-15"
+  },
+  {
+   "vendor_name": "Ovolo Woolloomooloo",
+   "category": "Venue",
+   "service_area": "Woolloomooloo, Sydney NSW",
+   "address": "6 Cowper Wharf Road, Woolloomooloo NSW 2011",
+   "website_url": "https://www.ovolohotels.com/ovolo-woolloomooloo/",
+   "contact_phone": null,
+   "contact_email": null,
+   "capacity_seated_max": 300,
+   "capacity_standing_max": null,
+   "price_note": null,
+   "style_tags": [
+    "heritage wharf",
+    "over the water",
+    "quirky",
+    "pink chapel-like room",
+    "pastel murals",
+    "industrial chic",
+    "exposed timber beams",
+    "harbour views",
+    "you-nique weddings",
+    "creative"
+   ],
+   "editorial_summary": "Playful heritage wharf over the harbour: a pink chapel-like room, a pastel-mural Burbs Room with copper pillars, and an industrial Piper Room with old timber beams. Ceremonies happen on the 100-year-old wharf itself. 30 to 300 guests.",
+   "sources": [
+    "https://www.wedlockers.com.au/b/ovolo-woolloomooloo"
+   ],
+   "flags": [
+    "needs_contact_lookup"
+   ],
+   "source_checked_at": "2026-10-15"
+  },
+  {
+   "vendor_name": "Springfield House",
+   "category": "Venue",
+   "service_area": "Dural, North West Sydney NSW",
+   "address": "245 New Line Road, Dural NSW 2158",
+   "website_url": "https://www.springfieldhouse.com.au/",
+   "contact_phone": "02 9651 2144",
+   "contact_email": "info@springfieldhouse.com.au",
+   "capacity_seated_max": null,
+   "capacity_standing_max": 450,
+   "price_note": "$160-320pp (third-party)",
+   "style_tags": [
+    "5 acres",
+    "manicured gardens",
+    "countryside style",
+    "garden ceremony",
+    "enchanting",
+    "tranquil",
+    "charming",
+    "North West Sydney",
+    "large capacity"
+   ],
+   "editorial_summary": "Charming garden estate on five landscaped acres in the Hills district, known for countryside-style garden ceremonies. Peaceful and storybook, with space for around 150 to 450 guests.",
+   "sources": [
+    "https://www.wedlockers.com.au/b/springfield-house-function-centre"
+   ],
+   "flags": [],
+   "source_checked_at": "2026-10-15"
+  },
+  {
+   "vendor_name": "University of Sydney Refectory",
+   "category": "Venue",
+   "service_area": "Camperdown, Inner West Sydney NSW",
+   "address": "Science Road, Camperdown NSW 2050",
+   "website_url": "https://www.sydney.edu.au/campus-life/venues.html",
+   "contact_phone": null,
+   "contact_email": null,
+   "capacity_seated_max": 220,
+   "capacity_standing_max": 500,
+   "price_note": "from $200pp (third-party)",
+   "style_tags": [
+    "sandstone",
+    "heritage",
+    "university grounds",
+    "gardens",
+    "gothic",
+    "character",
+    "central",
+    "best-kept secret",
+    "large cocktail party"
+   ],
+   "editorial_summary": "Heritage sandstone spaces across the University grounds, with gardens and plenty of character. The Refectory takes about 220 seated or 500 cocktail; smaller rooms from 18 guests.",
+   "sources": [
+    "https://www.wedlockers.com.au/b/university-of-sydney"
+   ],
+   "flags": [
+    "needs_contact_lookup"
+   ],
+   "source_checked_at": "2026-10-15"
+  },
+  {
+   "vendor_name": "Lana",
+   "category": "Venue",
+   "service_area": "Circular Quay, Sydney NSW",
+   "address": "Level 1, 5-7 Young Street, Sydney NSW 2000",
+   "website_url": "https://www.lana.sydney/",
+   "contact_phone": null,
+   "contact_email": "lana@hinchcliffhouse.com",
+   "capacity_seated_max": 75,
+   "capacity_standing_max": 100,
+   "price_note": null,
+   "style_tags": [
+    "Italian with Asian twist",
+    "private level",
+    "DJ deck",
+    "AV included",
+    "seasonal menu",
+    "energetic",
+    "sophisticated and fun",
+    "Circular Quay",
+    "cocktail party",
+    "historic Hinchcliff House"
+   ],
+   "editorial_summary": "Private first-floor restaurant in historic Hinchcliff House at Circular Quay. Needs little styling, with a DJ deck and AV built in, a seasonal Italian-with-a-twist menu and a lively mood. 75 seated or 100 cocktail.",
+   "sources": [
+    "https://www.wedlockers.com.au/b/lana-sydney"
+   ],
+   "flags": [
+    "shares_building_with_Grana_Privato"
+   ],
+   "source_checked_at": "2026-10-15"
+  },
+  {
+   "vendor_name": "Grana Privato, Hinchcliff House",
+   "category": "Venue",
+   "service_area": "Circular Quay, Sydney NSW",
+   "address": "Top floor, 5-7 Young Street, Sydney NSW 2000",
+   "website_url": "https://www.lana.sydney/",
+   "contact_phone": null,
+   "contact_email": "lana@hinchcliffhouse.com",
+   "capacity_seated_max": null,
+   "capacity_standing_max": 200,
+   "price_note": null,
+   "style_tags": [
+    "exposed brick",
+    "wooden beams",
+    "original windows",
+    "natural light",
+    "top floor",
+    "cocktail receptions",
+    "private dinners",
+    "shared table",
+    "city",
+    "warm industrial"
+   ],
+   "editorial_summary": "Top-floor event space in Hinchcliff House with exposed brick, timber beams and original windows letting in lots of light. Good for cocktail receptions and shared-table dinners for about 140 to 200 guests. Contact is the Hinchcliff House email shared with Lana.",
+   "sources": [
+    "https://www.wedlockers.com.au/b/grana-privato-hinchcliff-house"
+   ],
+   "flags": [
+    "shared_contact_with_Lana"
+   ],
+   "source_checked_at": "2026-10-15"
+  },
+  {
+   "vendor_name": "The Highline Venue",
+   "category": "Venue",
+   "service_area": "Bankstown, South West Sydney NSW",
+   "address": "Level 3, 462 Chapel Road, Bankstown NSW 2200",
+   "website_url": "https://highlineevents.com.au/",
+   "contact_phone": null,
+   "contact_email": null,
+   "capacity_seated_max": null,
+   "capacity_standing_max": 1340,
+   "price_note": "all-inclusive or BYO",
+   "style_tags": [
+    "ballrooms",
+    "glamorous",
+    "elegant",
+    "large weddings",
+    "free underground parking",
+    "quality catering",
+    "multicultural",
+    "south west Sydney",
+    "up to 1340"
+   ],
+   "editorial_summary": "Large-scale ballroom venue with glamorous rooms and underground parking for 350-plus cars, suited to very big multicultural weddings of up to about 1,340 guests.",
+   "sources": [
+    "https://www.wedlockers.com.au/b/the-highline-venue"
+   ],
+   "flags": [
+    "phone_unverified_1800898889_zoominfo"
+   ],
+   "source_checked_at": "2026-10-15"
+  },
+  {
+   "vendor_name": "Hazel Kitchen & Bar",
+   "category": "Venue",
+   "service_area": "Gymea, Sutherland Shire NSW",
+   "address": "Hazelhurst Arts Centre, 782 Kingsway, Gymea NSW 2227",
+   "website_url": null,
+   "contact_phone": null,
+   "contact_email": null,
+   "capacity_seated_max": 120,
+   "capacity_standing_max": 180,
+   "price_note": "$175pp (third-party)",
+   "style_tags": [
+    "Art Deco heritage",
+    "European elegance",
+    "garden ceremony",
+    "arts centre grounds",
+    "lawns and gardens",
+    "Sutherland Shire",
+    "artistic",
+    "shared celebration"
+   ],
+   "editorial_summary": "Elegant restaurant in the Art Deco Hazelhurst Arts Centre, with lawns and garden ceremony spaces and a European-influenced feel. About 120 seated or 180 cocktail.",
+   "sources": [
+    "https://www.wedlockers.com.au/b/hazel-kitchen-and-bar"
+   ],
+   "flags": [
+    "needs_contact_lookup"
+   ],
+   "source_checked_at": "2026-10-15"
+  },
+  {
+   "vendor_name": "Aqua Dining",
+   "category": "Venue",
+   "service_area": "Milsons Point, Lower North Shore NSW",
+   "address": "Corner Northcliff and Paul Streets, Milsons Point NSW 2061",
+   "website_url": "https://srghospitality.com.au/venue/aqua/",
+   "contact_phone": "(02) 9964 9998",
+   "contact_email": "reservations@aquadining.com.au",
+   "capacity_seated_max": 108,
+   "capacity_standing_max": 120,
+   "price_note": "$240-270pp (third-party)",
+   "style_tags": [
+    "Sydney Harbour views",
+    "Italian",
+    "Luna Park",
+    "above the pool",
+    "waterfront",
+    "elegant dining",
+    "private dining room"
+   ],
+   "editorial_summary": "Italian dining room above the North Sydney pool with unobstructed harbour views, for 10 to 120 guests in a private room or whole venue. Flag: the operator page says it is closed for renovation and due to reopen in 2026, so confirm it is trading.",
+   "sources": [
+    "https://www.wedlockers.com.au/b/aqua-dining"
+   ],
+   "flags": [
+    "verify_trading",
+    "email_is_reservations"
+   ],
+   "source_checked_at": "2026-10-15"
+  },
+  {
+   "vendor_name": "Laurelbank",
+   "category": "Venue",
+   "service_area": "Willoughby, Lower North Shore NSW",
+   "address": "85 Penshurst Street, Willoughby NSW 2068",
+   "website_url": "https://www.laurelbank.com.au/",
+   "contact_phone": null,
+   "contact_email": null,
+   "capacity_seated_max": 130,
+   "capacity_standing_max": 150,
+   "price_note": null,
+   "style_tags": [
+    "heritage house",
+    "verandas",
+    "garden",
+    "historic trees",
+    "lawn reception",
+    "indoor option",
+    "North Shore",
+    "lush",
+    "central"
+   ],
+   "editorial_summary": "Heritage house with verandas and shady old trees on the North Shore, offering indoor receptions or a flat lawn, with several ceremony spots in the garden. About 130 to 150 guests.",
+   "sources": [
+    "https://www.wedlockers.com.au/b/laurelbank"
+   ],
+   "flags": [
+    "needs_contact_lookup"
+   ],
+   "source_checked_at": "2026-10-15"
+  },
+  {
+   "vendor_name": "Clovelly Surf Life Saving Club",
+   "category": "Venue",
+   "service_area": "Clovelly, Eastern Suburbs Sydney NSW",
+   "address": "Donnellan Circuit, Clovelly NSW 2031",
+   "website_url": "https://clovellysurfclub.com.au/",
+   "contact_phone": "02 9665 1441",
+   "contact_email": "admin@clovellysurfclub.com.au",
+   "capacity_seated_max": 90,
+   "capacity_standing_max": 200,
+   "price_note": "$150-160pp (third-party)",
+   "style_tags": [
+    "beachfront",
+    "panoramic ocean views",
+    "indoor-outdoor",
+    "coastal",
+    "hidden gem",
+    "surf club",
+    "Clovelly Beach",
+    "relaxed"
+   ],
+   "editorial_summary": "Surf club perched above Clovelly Beach with sweeping ocean views and a mix of indoor and outdoor space. About 90 seated or 200 cocktail. Contact is the club's general admin line.",
+   "sources": [
+    "https://www.wedlockers.com.au/b/clovelly-surf-club"
+   ],
+   "flags": [
+    "contact_is_general_club_address"
+   ],
+   "source_checked_at": "2026-10-15"
+  },
+  {
+   "vendor_name": "Sofitel Sydney Wentworth",
+   "category": "Venue",
+   "service_area": "Sydney CBD NSW",
+   "address": "61-101 Phillip Street, Sydney NSW 2000",
+   "website_url": "https://all.accor.com/hotel/1202/index.en.shtml",
+   "contact_phone": null,
+   "contact_email": null,
+   "capacity_seated_max": null,
+   "capacity_standing_max": 700,
+   "price_note": "$179-259pp (third-party)",
+   "style_tags": [
+    "French elegance",
+    "5-star",
+    "iconic hotel",
+    "ballroom",
+    "weddings since 1966",
+    "CBD",
+    "three venues",
+    "classic",
+    "luxury"
+   ],
+   "editorial_summary": "Landmark five-star CBD hotel with French-inspired elegance that has hosted weddings since 1966. Three reception venues from intimate family dinners to a ballroom gala of about 450 guests.",
+   "sources": [
+    "https://www.wedlockers.com.au/b/sofitel-sydney-wentworth"
+   ],
+   "flags": [
+    "needs_contact_lookup"
+   ],
+   "source_checked_at": "2026-10-15"
+  },
+  {
+   "vendor_name": "ArtHouse Hotel",
+   "category": "Venue",
+   "service_area": "Sydney CBD NSW",
+   "address": "275 Pitt Street, Sydney NSW 2000",
+   "website_url": "https://arthousehotel.com.au/",
+   "contact_phone": "(02) 9284 1200",
+   "contact_email": "info@ahhotel.com.au",
+   "capacity_seated_max": null,
+   "capacity_standing_max": 300,
+   "price_note": null,
+   "style_tags": [
+    "heritage 1836",
+    "skylights",
+    "glass floors",
+    "high ceilings",
+    "art and music",
+    "unique",
+    "grand designs",
+    "CBD",
+    "19th century"
+   ],
+   "editorial_summary": "Heritage-listed 1836 building with high ceilings, skylights and glass floors, known for art and music. A distinctive city venue for roughly 40 to 300 guests.",
+   "sources": [
+    "https://www.wedlockers.com.au/b/arthouse-hotel"
+   ],
+   "flags": [
+    "contact_is_general_hotel"
+   ],
+   "source_checked_at": "2026-10-15"
+  },
+  {
+   "vendor_name": "Ripples Chowder Bay",
+   "category": "Venue",
+   "service_area": "Chowder Bay, Mosman NSW",
+   "address": "Chowder Bay Road, Mosman NSW 2088",
+   "website_url": "https://www.rippleschowderbay.com.au/",
+   "contact_phone": "(02) 9960 3000",
+   "contact_email": "chowderbay@ripplescafe.com.au",
+   "capacity_seated_max": null,
+   "capacity_standing_max": 200,
+   "price_note": null,
+   "style_tags": [
+    "harbour",
+    "waterfront",
+    "romantic",
+    "classic charm",
+    "modern elegance",
+    "Chowder Bay",
+    "Mosman",
+    "dedicated team"
+   ],
+   "editorial_summary": "Waterfront venue on Chowder Bay blending classic charm and modern polish, with a dedicated wedding team. Romantic harbour setting for up to about 200 guests.",
+   "sources": [
+    "https://www.wedlockers.com.au/b/ripples-chowder-bay"
+   ],
+   "flags": [
+    "contact_may_be_cafe_address"
+   ],
+   "source_checked_at": "2026-10-15"
+  },
+  {
+   "vendor_name": "The Royal Exchange of Sydney",
+   "category": "Venue",
+   "service_area": "Sydney CBD NSW",
+   "address": "1 Gresham Street, Sydney NSW 2000",
+   "website_url": null,
+   "contact_phone": null,
+   "contact_email": null,
+   "capacity_seated_max": null,
+   "capacity_standing_max": 150,
+   "price_note": null,
+   "style_tags": [
+    "classic",
+    "elegant",
+    "light-filled bar",
+    "open-air courtyard",
+    "Botanic Gardens nearby",
+    "CBD",
+    "dining room",
+    "10 to 150 guests"
+   ],
+   "editorial_summary": "Classically styled CBD venue with a light-filled bar, open-air courtyard and a formal dining room. Couples can marry in the nearby Botanic Gardens or on site. Anything from 10 to roughly 150 guests.",
+   "sources": [
+    "https://www.wedlockers.com.au/b/the-royal-exchange-of-sydney"
+   ],
+   "flags": [
+    "needs_contact_lookup"
+   ],
+   "source_checked_at": "2026-10-15"
+  },
+  {
+   "vendor_name": "Atura Blacktown",
+   "category": "Venue",
+   "service_area": "Prospect, Western Sydney NSW",
+   "address": "32 Cricketers Arms Road, Prospect NSW 2148",
+   "website_url": "https://www.aturahotels.com/accommodation/sydney-nsw/blacktown/meetings-events/weddings/",
+   "contact_phone": null,
+   "contact_email": null,
+   "capacity_seated_max": 150,
+   "capacity_standing_max": 200,
+   "price_note": "from $110pp (third-party)",
+   "style_tags": [
+    "industrial",
+    "art-inspired",
+    "oasis among gum trees",
+    "pool deck",
+    "hotel",
+    "ceremony to wedding night in one place",
+    "urban",
+    "western Sydney"
+   ],
+   "editorial_summary": "Art-inspired, industrial-style hotel among gum trees where ceremony, photos, reception and the wedding night happen in one place. Ballroom takes about 150 seated or 200 cocktail, plus an outdoor pool deck.",
+   "sources": [
+    "https://www.wedlockers.com.au/b/atura-blacktown"
+   ],
+   "flags": [
+    "needs_contact_lookup",
+    "accommodation_on_site"
+   ],
+   "source_checked_at": "2026-10-15"
+  },
+  {
+   "vendor_name": "The Australian Hotel and Brewery",
+   "category": "Venue",
+   "service_area": "Rouse Hill, North West Sydney NSW",
+   "address": "350 Annangrove Road, Rouse Hill NSW 2155",
+   "website_url": null,
+   "contact_phone": null,
+   "contact_email": null,
+   "capacity_seated_max": 90,
+   "capacity_standing_max": 180,
+   "price_note": "min spend from $3,500 (third-party)",
+   "style_tags": [
+    "pub",
+    "brewery",
+    "relaxed",
+    "Australian",
+    "function spaces",
+    "engagement parties",
+    "casual reception",
+    "North West Sydney"
+   ],
+   "editorial_summary": "Roomy pub-and-brewery function spaces for casual receptions and engagement parties for 40 to 300 guests, or the whole hotel for up to 1,400. Relaxed rather than formal.",
+   "sources": [
+    "https://www.wedlockers.com.au/b/the-australian-hotel-and-brewery"
+   ],
+   "flags": [
+    "needs_contact_lookup",
+    "weddings_not_confirmed_by_venue"
+   ],
+   "source_checked_at": "2026-10-15"
+  },
+  {
+   "vendor_name": "Botanic House",
+   "category": "Venue",
+   "service_area": "Royal Botanic Garden, Sydney NSW",
+   "address": "1 Mrs Macquaries Road, Sydney NSW 2000",
+   "website_url": "https://www.botanichouse.com.au/",
+   "contact_phone": "1300 558 980",
+   "contact_email": "reservations@botanichouse.com.au",
+   "capacity_seated_max": 150,
+   "capacity_standing_max": 250,
+   "price_note": "$180-295pp (third-party)",
+   "style_tags": [
+    "botanic garden",
+    "open-air dining",
+    "greenery",
+    "high glass windows",
+    "harbour glimpses",
+    "tree canopy",
+    "all-inclusive",
+    "grazing stations",
+    "garden luxe"
+   ],
+   "editorial_summary": "Open-plan glasshouse-style dining room in the Botanic Garden, with tall windows opening to greenery, big overhanging trees and glimpses of the harbour. All-inclusive packages with grazing stations. About 150 seated or 250 cocktail.",
+   "sources": [
+    "https://www.wedlockers.com.au/b/botanic-house"
+   ],
+   "flags": [
+    "email_is_reservations"
+   ],
+   "source_checked_at": "2026-10-15"
+  },
+  {
+   "vendor_name": "Killcare Surf Life Saving Club",
+   "category": "Venue",
+   "service_area": "Killcare, Central Coast NSW",
+   "address": "81 Beach Drive, Killcare NSW 2257",
+   "website_url": null,
+   "contact_phone": null,
+   "contact_email": null,
+   "capacity_seated_max": 120,
+   "capacity_standing_max": 150,
+   "price_note": "DIY/BYO (third-party)",
+   "style_tags": [
+    "beachfront",
+    "waterfront",
+    "surf club",
+    "BYO and DIY",
+    "balcony views",
+    "Bouddi National Park views",
+    "Central Coast",
+    "relaxed",
+    "hidden secret"
+   ],
+   "editorial_summary": "Beachfront surf club function room with a full-length balcony over Killcare Beach toward Bouddi National Park. A rare DIY-friendly venue where you bring your caterer and style it yourself.",
+   "sources": [
+    "https://www.wedlockers.com.au/b/killcare-surf-club"
+   ],
+   "flags": [
+    "needs_contact_lookup"
+   ],
+   "source_checked_at": "2026-10-15"
+  },
+  {
+   "vendor_name": "Oliveto Ristorante & Bar",
+   "category": "Venue",
+   "service_area": "Rhodes, Inner West Sydney NSW",
+   "address": "443 Concord Road, Rhodes NSW 2138",
+   "website_url": "https://www.oliveto.com.au/",
+   "contact_phone": "(02) 8765 0006",
+   "contact_email": "enquiries@oliveto.com.au",
+   "capacity_seated_max": 250,
+   "capacity_standing_max": null,
+   "price_note": "from $160pp (third-party)",
+   "style_tags": [
+    "waterfront",
+    "Brays Bay Reserve",
+    "parkland",
+    "harbour views",
+    "Italian cuisine",
+    "glass doors",
+    "one-stop",
+    "chic evening or casual lunch"
+   ],
+   "editorial_summary": "Italian restaurant on Brays Bay Reserve with glass doors opening to parkland and water views. Works for chic evening weddings or casual lunches, with a team that manages the day end to end. About 24 to 250 guests.",
+   "sources": [
+    "https://www.wedlockers.com.au/b/oliveto-ristorante-and-bar"
+   ],
+   "flags": [],
+   "source_checked_at": "2026-10-15"
+  },
+  {
+   "vendor_name": "Pilu at Freshwater",
+   "category": "Venue",
+   "service_area": "Freshwater, Northern Beaches NSW",
+   "address": "Moore Road, Freshwater NSW 2096",
+   "website_url": "https://www.pilu.com.au/",
+   "contact_phone": "(02) 9938 3331",
+   "contact_email": "dining@pilu.com.au",
+   "capacity_seated_max": 60,
+   "capacity_standing_max": 100,
+   "price_note": "from $150pp (third-party)",
+   "style_tags": [
+    "ocean views",
+    "Amalfi-coast feel",
+    "private garden",
+    "Hamptons-style beach house",
+    "heritage",
+    "Sardinian",
+    "intimate",
+    "award-winning food",
+    "Northern Beaches"
+   ],
+   "editorial_summary": "Heritage Hamptons-style beach house above Freshwater with ocean views and a private garden that feels like Italy's Amalfi coast. Award-winning Sardinian cooking and tailored packages for small weddings.",
+   "sources": [
+    "https://www.wedlockers.com.au/b/pilu-at-freshwater"
+   ],
+   "flags": [
+    "email_is_dining_enquiries"
+   ],
+   "source_checked_at": "2026-10-15"
+  },
+  {
+   "vendor_name": "Camperdown Commons",
+   "category": "Venue",
+   "service_area": "Camperdown, Inner West Sydney NSW",
+   "address": "31A Mallett Street, Camperdown NSW 2050",
+   "website_url": "https://www.camperdowncommons.com.au/",
+   "contact_phone": null,
+   "contact_email": "bookings@commons.com.au",
+   "capacity_seated_max": null,
+   "capacity_standing_max": 300,
+   "price_note": "$167-194pp (third-party)",
+   "style_tags": [
+    "urban oasis",
+    "urban farm",
+    "indoor and outdoor",
+    "inner west",
+    "city escape",
+    "unique",
+    "greenery"
+   ],
+   "editorial_summary": "Urban-farm event space in the heart of the inner west with indoor and outdoor areas, for roughly 60 to 300 guests, a leafy oasis in the city.",
+   "sources": [
+    "https://www.wedlockers.com.au/b/camperdown-commons"
+   ],
+   "flags": [
+    "phone_not_found"
+   ],
+   "source_checked_at": "2026-10-15"
+  },
+  {
+   "vendor_name": "Searock Grill",
+   "category": "Venue",
+   "service_area": "Circular Quay, Sydney NSW",
+   "address": "Shop 15, 5 Macquarie Street (Opera Quays), Sydney NSW 2000",
+   "website_url": null,
+   "contact_phone": null,
+   "contact_email": null,
+   "capacity_seated_max": 45,
+   "capacity_standing_max": 55,
+   "price_note": "Wine Room set menu about $115pp (third-party)",
+   "style_tags": [
+    "Harbour Bridge views",
+    "Circular Quay",
+    "steak and seafood",
+    "private dining room",
+    "terrace",
+    "hidden gem",
+    "feature wall",
+    "greenery",
+    "small wedding"
+   ],
+   "editorial_summary": "Steak-and-seafood restaurant at Circular Quay with a hidden private dining room (about 45) and a harbour-view terrace. Good for small, bespoke weddings with the Harbour Bridge on the horizon.",
+   "sources": [
+    "https://www.wedlockers.com.au/b/searock-grill"
+   ],
+   "flags": [
+    "needs_contact_lookup"
+   ],
+   "source_checked_at": "2026-10-15"
+  },
+  {
+   "vendor_name": "O Bar & Dining",
+   "category": "Venue",
+   "service_area": "Sydney CBD NSW",
+   "address": "264 George Street, Sydney NSW 2000",
+   "website_url": "https://www.obardining.com.au/",
+   "contact_phone": "02 9247 9777",
+   "contact_email": "reservations@obardining.com.au",
+   "capacity_seated_max": null,
+   "capacity_standing_max": 120,
+   "price_note": null,
+   "style_tags": [
+    "360-degree views",
+    "rotating",
+    "skyline",
+    "sky-high",
+    "private dining room",
+    "contemporary opulence",
+    "bespoke menus",
+    "exclusive"
+   ],
+   "editorial_summary": "Elegant high-level restaurant with 360-degree skyline and harbour views, with a private dining room for intimate weddings. About 28 to 120 guests, with bespoke menus.",
+   "sources": [
+    "https://www.wedlockers.com.au/b/o-bar-and-dining"
+   ],
+   "flags": [
+    "email_is_reservations"
+   ],
+   "source_checked_at": "2026-10-15"
+  },
+  {
+   "vendor_name": "Allegro Function Centre",
+   "category": "Venue",
+   "service_area": "Kenthurst, Hills District NSW",
+   "address": "1 Porters Road, Kenthurst NSW 2156",
+   "website_url": "https://www.allegrofunctioncentre.com.au/",
+   "contact_phone": "(02) 9654 1443",
+   "contact_email": "info@allegrofunctioncentre.com.au",
+   "capacity_seated_max": 200,
+   "capacity_standing_max": 300,
+   "price_note": null,
+   "style_tags": [
+    "Mediterranean villa",
+    "towering gums",
+    "O'Hara's Valley",
+    "private gardens",
+    "terrace bar",
+    "candelabras",
+    "open fireplace",
+    "grand piano",
+    "family-run",
+    "Hills District"
+   ],
+   "editorial_summary": "Mediterranean-style villa among tall gums in a quiet valley, with private gardens, a terrace bar and a candlelit dining room with an open fireplace and grand piano. Family-run with a complete wedding service for 200 to 300 guests.",
+   "sources": [
+    "https://www.wedlockers.com.au/b/allegro"
+   ],
+   "flags": [],
+   "source_checked_at": "2026-10-15"
+  },
+  {
+   "vendor_name": "Roslyn Packer Theatre",
+   "category": "Venue",
+   "service_area": "Walsh Bay, Sydney NSW",
+   "address": "22 Hickson Road, Millers Point NSW 2000",
+   "website_url": "https://www.sydneytheatre.com.au/discover/venue-hire",
+   "contact_phone": "(02) 9250 1908",
+   "contact_email": null,
+   "capacity_seated_max": 110,
+   "capacity_standing_max": 200,
+   "price_note": "DIY/BYO",
+   "style_tags": [
+    "wharf",
+    "industrial",
+    "brick",
+    "ironbark beams",
+    "high ceilings",
+    "harbourside",
+    "arty",
+    "Richard Wherrett Studio",
+    "Walsh Bay",
+    "contemporary industrial"
+   ],
+   "editorial_summary": "Harbourside theatre precinct with a ground-floor studio of exposed brick, ironbark beams and high ceilings, giving an arty warehouse feel. About 110 seated or 200 standing. Phone is the venue-hire team's line.",
+   "sources": [
+    "https://www.wedlockers.com.au/b/roslyn-packer-theatre"
+   ],
+   "flags": [
+    "email_not_found"
+   ],
+   "source_checked_at": "2026-10-15"
+  },
+  {
+   "vendor_name": "The Freedom Hub",
+   "category": "Venue",
+   "service_area": "Waterloo, Inner Sydney NSW",
+   "address": "283 Young Street, Waterloo NSW 2017",
+   "website_url": "https://thefreedomhub.org/",
+   "contact_phone": "0432 619 702",
+   "contact_email": "events@thefreedomhub.org",
+   "capacity_seated_max": 100,
+   "capacity_standing_max": 150,
+   "price_note": "hire from $2,000 (third-party)",
+   "style_tags": [
+    "urban warehouse",
+    "ethical wedding venue",
+    "feel-good",
+    "profits support survivors",
+    "industrial",
+    "blank canvas",
+    "Waterloo",
+    "socially conscious"
+   ],
+   "editorial_summary": "Large urban warehouse space whose event profits support survivors of modern slavery and trafficking, an ethical-wedding choice. About 100 seated or 150 cocktail.",
+   "sources": [
+    "https://www.wedlockers.com.au/b/the-freedom-hub"
+   ],
+   "flags": [
+    "contact_from_org_site_verify"
+   ],
+   "source_checked_at": "2026-10-15"
+  },
+  {
+   "vendor_name": "Aria Sydney",
+   "category": "Venue",
+   "service_area": "Circular Quay, Sydney NSW",
+   "address": "1 Macquarie Street, Sydney NSW 2000",
+   "website_url": "https://www.ariasydney.com.au/",
+   "contact_phone": "(02) 9240 2255",
+   "contact_email": "res.ariasydney@solotel.com.au",
+   "capacity_seated_max": null,
+   "capacity_standing_max": 100,
+   "price_note": null,
+   "style_tags": [
+    "Opera House views",
+    "Harbour Bridge views",
+    "floor-to-ceiling glass",
+    "Circular Quay",
+    "fine dining",
+    "spectacular",
+    "signature",
+    "30 to 100 guests"
+   ],
+   "editorial_summary": "Fine-dining restaurant beside the Opera House with floor-to-ceiling glass facing Circular Quay and the Harbour Bridge. Dedicated event spaces for roughly 30 to 100 guests.",
+   "sources": [
+    "https://www.wedlockers.com.au/b/aria-sydney"
+   ],
+   "flags": [
+    "email_is_reservations"
+   ],
+   "source_checked_at": "2026-10-15"
+  },
+  {
+   "vendor_name": "Audley Dance Hall",
+   "category": "Venue",
+   "service_area": "Royal National Park, Sydney South NSW",
+   "address": "2 Lady Carrington Drive, Royal National Park NSW 2233",
+   "website_url": "https://www.audleydancehall.com.au/",
+   "contact_phone": "02 9542 6222",
+   "contact_email": null,
+   "capacity_seated_max": 200,
+   "capacity_standing_max": 250,
+   "price_note": null,
+   "style_tags": [
+    "heritage-listed",
+    "national park",
+    "Hacking River",
+    "long sloping verandah",
+    "timber dance floor",
+    "blank canvas",
+    "rustic or elegant",
+    "riverside",
+    "bush"
+   ],
+   "editorial_summary": "Heritage-listed dance hall in Royal National Park with a long verandah over the grounds and Hacking River and a full timber dance floor. A blank canvas that can go rustic, elegant or clean and modern, seating up to about 200.",
+   "sources": [
+    "https://www.wedlockers.com.au/b/audley-dance-hall"
+   ],
+   "flags": [
+    "email_not_found"
+   ],
+   "source_checked_at": "2026-10-15"
+  },
+  {
+   "vendor_name": "The Calyx",
+   "category": "Venue",
+   "service_area": "Royal Botanic Garden, Sydney NSW",
+   "address": "Mrs Macquaries Road, Sydney NSW 2000",
+   "website_url": "https://www.botanicgardens.org.au/venues-and-lawns/the-calyx",
+   "contact_phone": "+61 2 9231 8111",
+   "contact_email": null,
+   "capacity_seated_max": null,
+   "capacity_standing_max": 400,
+   "price_note": "hire from $6,425 (third-party)",
+   "style_tags": [
+    "botanic garden",
+    "striking architecture",
+    "vertical garden",
+    "terrace",
+    "show-stopping",
+    "flexible",
+    "garden",
+    "modern"
+   ],
+   "editorial_summary": "Modern glass pavilion in the Botanic Garden with the largest vertical plant wall in the Southern Hemisphere and a terrace. Flexible from intimate to about 400 guests. Phone is the gardens' general line.",
+   "sources": [
+    "https://www.wedlockers.com.au/b/the-calyx"
+   ],
+   "flags": [
+    "contact_is_general_line"
+   ],
+   "source_checked_at": "2026-10-15"
+  },
+  {
+   "vendor_name": "Ormeggio at the Spit",
+   "category": "Venue",
+   "service_area": "Mosman, Middle Harbour NSW",
+   "address": "D'Albora Marina, Spit Road, Mosman NSW 2088",
+   "website_url": "https://www.ormeggio.com.au/",
+   "contact_phone": "02 9969 4088",
+   "contact_email": "info@ormeggio.com.au",
+   "capacity_seated_max": 100,
+   "capacity_standing_max": null,
+   "price_note": "$224-284pp (third-party)",
+   "style_tags": [
+    "Middle Harbour",
+    "Pearl Bay",
+    "waterfront",
+    "boutique",
+    "private",
+    "relaxed",
+    "Italian",
+    "award-winning",
+    "intimate",
+    "marina"
+   ],
+   "editorial_summary": "Relaxed, private boutique waterfront venue on Middle Harbour with views over Pearl Bay and award-winning Italian food. Best for intimate receptions around 90 to 100 guests.",
+   "sources": [
+    "https://www.wedlockers.com.au/b/ormeggio-at-the-spit"
+   ],
+   "flags": [
+    "email_is_general_info"
+   ],
+   "source_checked_at": "2026-10-15"
+  },
+  {
+   "vendor_name": "The Sydney Boulevard Hotel",
+   "category": "Venue",
+   "service_area": "Woolloomooloo, Sydney NSW",
+   "address": "90 William Street, Woolloomooloo NSW 2011",
+   "website_url": "https://www.sydneyboulevard.com.au/",
+   "contact_phone": "+61 2 9383 7222",
+   "contact_email": "hc494-re@accor.com",
+   "capacity_seated_max": 350,
+   "capacity_standing_max": 450,
+   "price_note": null,
+   "style_tags": [
+    "25th floor",
+    "harbour views",
+    "Opera House views",
+    "Botanic Garden views",
+    "pillarless ballroom",
+    "hotel",
+    "stylish",
+    "dramatic backdrop"
+   ],
+   "editorial_summary": "Hotel with a 25th-floor reception room framed by harbour, Opera House and Botanic Garden views (about 200 guests), plus a pillarless ballroom for up to 350 seated.",
+   "sources": [
+    "https://www.wedlockers.com.au/b/the-sydney-boulevard-hotel"
+   ],
+   "flags": [
+    "email_is_hotel_reservations_address"
+   ],
+   "source_checked_at": "2026-10-15"
+  },
+  {
+   "vendor_name": "Bosk Clontarf",
+   "category": "Venue",
+   "service_area": "Clontarf, Northern Beaches NSW",
+   "address": "Sandy Bay Road, Clontarf NSW 2093",
+   "website_url": null,
+   "contact_phone": null,
+   "contact_email": null,
+   "capacity_seated_max": 70,
+   "capacity_standing_max": 100,
+   "price_note": null,
+   "style_tags": [
+    "Moreton Bay fig",
+    "waterside",
+    "Clontarf Reserve",
+    "coastal luxury",
+    "ocean outlook",
+    "trees all around",
+    "seasonal menus",
+    "bespoke packages"
+   ],
+   "editorial_summary": "Waterside venue tucked under a huge Moreton Bay fig in Clontarf Reserve, with luxe coastal interiors, seasonal menus and bespoke packages. About 70 seated indoors, 100 cocktail.",
+   "sources": [
+    "https://www.wedlockers.com.au/b/bosk-events"
+   ],
+   "flags": [
+    "needs_contact_lookup"
+   ],
+   "source_checked_at": "2026-10-15"
+  }
+ ],
+ "existing_venue_additions": [
+  {
+   "db_vendor_id": "venue-the-old-clare-hotel",
+   "db_vendor_name": "The Old Clare Hotel",
+   "extra_style_tags": [
+    "unconventional",
+    "rooftop bar",
+    "glass canopy",
+    "pool",
+    "boutique hotel",
+    "Chippendale"
+   ],
+   "extra_description": "Venue for non-traditional weddings with a rooftop bar under a glass canopy beside a pool; the boutique hotel lets guests stay over."
+  },
+  {
+   "db_vendor_id": "venue-events-by-alpha",
+   "db_vendor_name": "Events by Alpha",
+   "extra_style_tags": [
+    "Victorian building",
+    "exposed brick",
+    "high ceilings",
+    "5 to 700 guests",
+    "CBD"
+   ],
+   "extra_description": "Historic Victorian CBD building with brick walls and tall ceilings, hosts 5 to 700 guests with a wedding coordinator. Same venue as Urban List's Alpha Events."
+  },
+  {
+   "db_vendor_id": "venue-kensington-street-venues",
+   "db_vendor_name": "Kensington Street Venues",
+   "extra_style_tags": [
+    "Olio",
+    "arched windows",
+    "exposed brick",
+    "light-filled",
+    "Italian menu",
+    "Chippendale"
+   ],
+   "extra_description": "Includes Olio on Kensington Street: a bright contemporary dining room with arched windows and brick, Italian menu, around 75-85 seated or 120 standing."
+  },
+  {
+   "db_vendor_id": "venue-estate-vaucluse-house",
+   "db_vendor_name": "Estate Vaucluse House",
+   "extra_style_tags": [
+    "10 hectares",
+    "harbour's edge",
+    "sandstone",
+    "ponds",
+    "market garden produce",
+    "alfresco ceremonies",
+    "country-estate feel"
+   ],
+   "extra_description": "Manor on 10 hectares of gardens at the harbour's edge, with sandstone architecture, ponds and alfresco ceremonies; menus can use produce from its own market garden."
+  },
+  {
+   "db_vendor_id": "venue-hopewood-house",
+   "db_vendor_name": "Hopewood House",
+   "extra_style_tags": [
+    "11 acres",
+    "hedge maze",
+    "aviary",
+    "lawns",
+    "wedding planning service",
+    "Bowral"
+   ],
+   "extra_description": "Privately owned 11-acre estate in Bowral with lawns, gardens, a hedge maze and aviary, plus an on-site wedding planning service, about 90 minutes from Sydney."
+  },
+  {
+   "db_vendor_id": "venue-redleaf",
+   "db_vendor_name": "Redleaf",
+   "extra_style_tags": [
+    "100 acres",
+    "Italian-style villa",
+    "pool",
+    "exclusive use",
+    "marquee up to 200",
+    "Wollombi"
+   ],
+   "extra_description": "Private 100-acre estate with an Italian-style villa, gardens and pool, available for exclusive use with marquees up to 200 guests."
+  },
+  {
+   "db_vendor_id": "venue-taronga-zoo-sydney",
+   "db_vendor_name": "Taronga Zoo Sydney",
+   "extra_style_tags": [
+    "Harbour Bridge views",
+    "Opera House views",
+    "sunset",
+    "exclusive photo locations",
+    "Gili Rooftop",
+    "N'Galawa Terrace",
+    "friendly animals"
+   ],
+   "extra_description": "Event spaces with sunset views of the bridge, Opera House and skyline, exclusive photo spots and the odd wild onlooker. Gili Rooftop: 60 seated/80 standing; N'Galawa Terrace: 150 seated/250 cocktail."
+  },
+  {
+   "db_vendor_id": "venue-jonahs",
+   "db_vendor_name": "Jonah's",
+   "extra_style_tags": [
+    "cliff-top garden",
+    "Whale Beach",
+    "Palm Beach nearby",
+    "boutique hotel",
+    "award-winning restaurant",
+    "ocean views"
+   ],
+   "extra_description": "Cliff-top garden above Whale Beach for ceremonies and canapes, then dinner in the awarded restaurant, with an indoor wet-weather ceremony space."
+  },
+  {
+   "db_vendor_id": "venue-lords-estate-heritage-chapel-gardens",
+   "db_vendor_name": "Lords Estate Heritage Chapel & Gardens",
+   "extra_style_tags": [
+    "140-year-old chapel",
+    "private chapel",
+    "country gardens",
+    "urban meadow",
+    "marquee lawn",
+    "all denominations"
+   ],
+   "extra_description": "Restored 140-year-old private chapel in wild-style gardens with an urban meadow for photos; receptions up to about 50 inside or a marquee on the lawn for more."
+  },
+  {
+   "db_vendor_id": "venue-doltone-house-darling-island",
+   "db_vendor_name": "Doltone House Darling Island",
+   "extra_style_tags": [
+    "green-rated building",
+    "glass facade",
+    "waterside promenade",
+    "boat access",
+    "skyline views",
+    "up to 750 seated"
+   ],
+   "extra_description": "Waterfront venue in an award-winning green building with a glass facade onto a promenade and skyline views, seating up to 750."
+  },
+  {
+   "db_vendor_id": "venue-doltone-house-jones-bay-wharf",
+   "db_vendor_name": "Doltone House - Jones Bay Wharf",
+   "extra_style_tags": [
+    "finger wharf",
+    "heritage",
+    "private deck",
+    "Harbour Bridge views",
+    "up to 680 seated"
+   ],
+   "extra_description": "Restored heritage finger wharf with a full-length private deck and bridge views; the main hall seats up to 680 or splits into two."
+  },
+  {
+   "db_vendor_id": "venue-the-australian-botanic-garden-mount-annan",
+   "db_vendor_name": "The Australian Botanic Garden Mount Annan",
+   "extra_style_tags": [
+    "416 hectares",
+    "native flora",
+    "botanic garden",
+    "45 minutes from CBD",
+    "nature",
+    "science and conservation"
+   ],
+   "extra_description": "Huge native botanic garden 45 minutes from the CBD offering ceremony spots among Australian flora; hire fees reportedly $865-1,250."
+  },
+  {
+   "db_vendor_id": "venue-pier-one-sydney-harbour",
+   "db_vendor_name": "Pier One Sydney Harbour",
+   "extra_style_tags": [
+    "fairy lights",
+    "sunset over water",
+    "Harbour Bridge backdrop",
+    "three venues",
+    "five-star catering"
+   ],
+   "extra_description": "Waterside wedding venues under fairy lights with Harbour Bridge sunsets and flexible planning packages."
+  },
+  {
+   "db_vendor_id": "venue-manly-pavilion",
+   "db_vendor_name": "Manly Pavilion",
+   "extra_style_tags": [
+    "Northern Beaches",
+    "West Esplanade",
+    "sit-down or canape",
+    "beachside"
+   ],
+   "extra_description": "Northern Beaches venue for sit-down or canape receptions."
+  },
+  {
+   "db_vendor_id": "venue-q-station",
+   "db_vendor_name": "Q Station",
+   "extra_style_tags": [
+    "33 hectares",
+    "national park",
+    "Glasshouse",
+    "Governor Bourke Ballroom",
+    "skyline views to Manly Cove",
+    "ceremony options"
+   ],
+   "extra_description": "Harbour National Park site with 33 hectares of ceremony and reception spots, from a cocktail-style Glasshouse to a formal ballroom."
+  },
+  {
+   "db_vendor_id": "venue-watersedge-at-campbells-stores",
+   "db_vendor_name": "Watersedge at Campbell's Stores",
+   "extra_style_tags": [
+    "Harbour Bridge views",
+    "Opera House views",
+    "stylists",
+    "The Rocks"
+   ],
+   "extra_description": "Heart-of-Sydney waterfront venue facing the bridge and Opera House, with a team that guides styling and menus."
+  },
+  {
+   "db_vendor_id": "venue-watsons-bay-boutique-hotel",
+   "db_vendor_name": "Watsons Bay Boutique Hotel",
+   "extra_style_tags": [
+    "harbourfront",
+    "32 boutique suites",
+    "seaside",
+    "stay-over"
+   ],
+   "extra_description": "Harbourfront wedding spaces with 32 boutique suites for guests, led by an experienced events team."
+  },
+  {
+   "db_vendor_id": "venue-orso-bayside",
+   "db_vendor_name": "Orso Bayside",
+   "extra_style_tags": [
+    "own beach",
+    "wharf and jetty",
+    "pelicans",
+    "Middle Harbour",
+    "Spit Bridge",
+    "50 to 250 guests"
+   ],
+   "extra_description": "Middle Harbour waterfront with its own beach, wharf, jetty and deck beside the Spit Bridge, plus a resident family of pelicans; 50-250 guests. Wedlockers calls it Orso Weddings Mosman."
+  },
+  {
+   "db_vendor_id": "venue-long-reef-golf-club",
+   "db_vendor_name": "Long Reef Golf Club",
+   "extra_style_tags": [
+    "Fishermans Beach cove",
+    "private beach",
+    "views to Central Coast and Manly",
+    "headland"
+   ],
+   "extra_description": "Secluded cove beach setting by Long Reef headland with views from the Central Coast to Manly."
+  },
+  {
+   "db_vendor_id": "venue-manly-16ft-skiff-sailing-club",
+   "db_vendor_name": "Manly 16ft Skiff Sailing Club",
+   "extra_style_tags": [
+    "romantic sunsets",
+    "live music",
+    "cocktail or set menu",
+    "harbour water views"
+   ],
+   "extra_description": "Sunset-lit harbour water views with packages from cocktail style to traditional set menu, including canapes and live music."
+  },
+  {
+   "db_vendor_id": "venue-athol-hall",
+   "db_vendor_name": "Athol Hall",
+   "extra_style_tags": [
+    "refurbished heritage",
+    "skyline views",
+    "Ashton Park",
+    "ceremony photos reception in one place"
+   ],
+   "extra_description": "Refurbished heritage hall in Ashton Park with skyline, Opera House and bridge views; ceremony, photos and reception all on site."
+  },
+  {
+   "db_vendor_id": "venue-the-grounds-of-alexandria",
+   "db_vendor_name": "The Grounds of Alexandria",
+   "extra_style_tags": [
+    "indoor and outdoor gardens",
+    "micro weddings to large",
+    "sit-down or cocktail"
+   ],
+   "extra_description": "Garden-led venue with indoor and outdoor spaces from elopements of 12 to big banquets."
+  },
+  {
+   "db_vendor_id": "venue-three-williams",
+   "db_vendor_name": "Three Williams",
+   "extra_style_tags": [
+    "warehouse feel",
+    "exposed brick",
+    "leather bench seating",
+    "raw wood",
+    "below street level"
+   ],
+   "extra_description": "Minimal, warehouse-style room just below street level with raw timber, original brick and leather seating."
+  },
+  {
+   "db_vendor_id": "venue-stix-farm-by-pearl",
+   "db_vendor_name": "Stix Farm by PEARL",
+   "extra_style_tags": [
+    "Hawkesbury River banks",
+    "working farm",
+    "kitchen garden",
+    "paddocks",
+    "orchards",
+    "Moreton Bay figs",
+    "75 minutes from Sydney"
+   ],
+   "extra_description": "Riverfront working farm on the Hawkesbury with paddocks, orchards, kitchen garden and native bush, relaxed yet refined."
+  },
+  {
+   "db_vendor_id": "venue-cropley-house",
+   "db_vendor_name": "Cropley House",
+   "extra_style_tags": [
+    "historic mansion",
+    "five acres",
+    "wisteria balcony",
+    "garden",
+    "reopened 2018",
+    "boarding school history"
+   ],
+   "extra_description": "Restored two-storey mansion on five acres with a wisteria-lined balcony and garden."
+  },
+  {
+   "db_vendor_id": "venue-public-dining-room",
+   "db_vendor_name": "Public Dining Room",
+   "extra_style_tags": [
+    "Balmoral Beach",
+    "shoreline",
+    "loved reception venue"
+   ],
+   "extra_description": "Well-loved reception venue on the shores of Balmoral Beach."
+  },
+  {
+   "db_vendor_id": "venue-sergeants-mess",
+   "db_vendor_name": "Sergeants' Mess",
+   "extra_style_tags": [
+    "bushland",
+    "Chowder Bay",
+    "harbour deck",
+    "glamorous interior",
+    "views to Camp Cove and Watsons Bay"
+   ],
+   "extra_description": "Bushland-surrounded venue on Chowder Bay with a big harbour deck and glamorous interior."
+  },
+  {
+   "db_vendor_id": "venue-gunners-barracks",
+   "db_vendor_name": "Gunners' Barracks",
+   "extra_style_tags": [
+    "three outdoor ceremony locations",
+    "waterfront",
+    "harbour views",
+    "luxurious"
+   ],
+   "extra_description": "Luxurious waterfront venue with three exclusive outdoor ceremony spots and harbour views."
+  },
+  {
+   "db_vendor_id": "venue-the-tea-room-qvb",
+   "db_vendor_name": "The Tea Room QVB",
+   "extra_style_tags": [
+    "palatial ceilings",
+    "Baccarat chandeliers",
+    "opulent",
+    "fairytale",
+    "stylists"
+   ],
+   "extra_description": "Opulent heritage tea room with palatial ceilings and crystal chandeliers, with in-house stylists."
+  },
+  {
+   "db_vendor_id": "venue-the-botanica-vaucluse",
+   "db_vendor_name": "The Botanica Vaucluse",
+   "extra_style_tags": [
+    "local natural produce",
+    "edible garden",
+    "seasonal",
+    "restaurant"
+   ],
+   "extra_description": "Garden-led restaurant growing some of the ingredients it serves, with a seasonal menu."
+  },
+  {
+   "db_vendor_id": "venue-gledswood-homestead-winery",
+   "db_vendor_name": "Gledswood Homestead & Winery",
+   "extra_style_tags": [
+    "circa 1810",
+    "Macarthur",
+    "elegant gardens",
+    "romantic",
+    "up to 450"
+   ],
+   "extra_description": "Romantic 1810 homestead and winery in the Macarthur area, informal to elegant, up to 450 guests."
+  },
+  {
+   "db_vendor_id": "venue-the-boathouse-shelly-beach",
+   "db_vendor_name": "The Boathouse Shelly Beach",
+   "extra_style_tags": [
+    "Shelly Beach",
+    "private setting",
+    "beautiful water views"
+   ],
+   "extra_description": "Private setting on Shelly Beach with water views."
+  },
+  {
+   "db_vendor_id": "venue-st-george-sailing-club",
+   "db_vendor_name": "St George Sailing Club",
+   "extra_style_tags": [
+    "overwater",
+    "sandy shore ceremony",
+    "modern coastal",
+    "Georges River",
+    "150 seated 250 cocktail"
+   ],
+   "extra_description": "Overwater event pavilion on the Georges River with ceremonies on the pavilion or sandy shore, modern-coastal feel."
+  },
+  {
+   "db_vendor_id": "venue-dockside-cockle-bay-wharf",
+   "db_vendor_name": "Dockside (Cockle Bay Wharf)",
+   "extra_style_tags": [
+    "Cockle Bay Wharf",
+    "three event spaces",
+    "waterfront",
+    "nearly 40 years experience",
+    "Darling Harbour"
+   ],
+   "extra_description": "Three waterfront spaces on Darling Harbour backed by nearly 40 years of wedding experience."
+  },
+  {
+   "db_vendor_id": "venue-crown-towers",
+   "db_vendor_name": "Crown Towers",
+   "extra_style_tags": [
+    "Pearl Ballroom",
+    "chandeliers",
+    "luxury",
+    "high ceilings",
+    "pre-function views"
+   ],
+   "extra_description": "Modern-luxury Pearl Ballroom with metallic chandeliers and pre-function views, up to 320 seated."
+  },
+  {
+   "db_vendor_id": "venue-foys-kirribilli",
+   "db_vendor_name": "Foys Kirribilli",
+   "extra_style_tags": [
+    "Kirribilli",
+    "harbour",
+    "Bird & Bear Group"
+   ],
+   "extra_description": "Harbourside Kirribilli venue run by the Bird and Bear Group."
+  },
+  {
+   "db_vendor_id": "venue-esplanade-events-cronulla-rsl-cronulla-surf-life-saving-club",
+   "db_vendor_name": "Esplanade Events (Cronulla RSL & Cronulla Surf Life Saving Club)",
+   "extra_style_tags": [
+    "Sutherland Shire",
+    "most sought after",
+    "wedding specialist",
+    "flexible pricing"
+   ],
+   "extra_description": "Works with every budget; wedding specialist on hand across Cronulla RSL and the surf club."
+  },
+  {
+   "db_vendor_id": "venue-the-surry-rooftop-rydges-sydney-central",
+   "db_vendor_name": "The Surry Rooftop (Rydges Sydney Central)",
+   "extra_style_tags": [
+    "enclosed rooftop",
+    "two private terraces",
+    "Surry Hills views",
+    "private bar",
+    "accommodation on site",
+    "exclusive floor"
+   ],
+   "extra_description": "Enclosed rooftop with two terraces, private bar and onsite accommodation."
+  },
+  {
+   "db_vendor_id": "venue-bellevue-cottage-by-antoine",
+   "db_vendor_name": "Bellevue Cottage By Antoine",
+   "extra_style_tags": [
+    "Blackwattle Bay",
+    "French",
+    "terrace",
+    "nostalgic charm",
+    "food lovers"
+   ],
+   "extra_description": "Nostalgic French-leaning cottage on Blackwattle Bay with a sunny terrace, ideal for food lovers."
+  },
+  {
+   "db_vendor_id": "venue-the-boathouse-rose-bay",
+   "db_vendor_name": "The Boathouse Rose Bay",
+   "extra_style_tags": [
+    "Rose Bay House",
+    "upper level",
+    "canape or sit down",
+    "exclusive hire"
+   ],
+   "extra_description": "Exclusive upper-level space for canape or sit-down weddings at Rose Bay House."
+  },
+  {
+   "db_vendor_id": "venue-biviano-s-restaurant-dural",
+   "db_vendor_name": "Biviano's Restaurant Dural",
+   "extra_style_tags": [
+    "four custom event spaces",
+    "contemporary",
+    "gala",
+    "Dural"
+   ],
+   "extra_description": "Four custom-designed event spaces in Dural, from intimate to extravagant."
+  },
+  {
+   "db_vendor_id": "venue-the-william-inglis-hotel-at-riverside-stables",
+   "db_vendor_name": "The William Inglis Hotel at Riverside Stables",
+   "extra_style_tags": [
+    "rural soul",
+    "23 event spaces",
+    "144 rooms",
+    "MGallery",
+    "Riverside Stables"
+   ],
+   "extra_description": "Rural-soul hotel with over 23 event spaces and 144 rooms, bespoke full-service planning."
+  },
+  {
+   "db_vendor_id": "venue-intercontinental-sydney-double-bay",
+   "db_vendor_name": "InterContinental Sydney Double Bay",
+   "extra_style_tags": [
+    "bayside village",
+    "luxurious",
+    "tailored to culture and budget"
+   ],
+   "extra_description": "Bayside-village luxury hotel with spacious event spaces and tailored events, up to 495 guests."
+  },
+  {
+   "db_vendor_id": "venue-ivy-ballroom",
+   "db_vendor_name": "Ivy Ballroom",
+   "extra_style_tags": [
+    "grand staircase",
+    "garden terrace",
+    "candlelit backdrop",
+    "statement entrance"
+   ],
+   "extra_description": "Show-stopping ballroom with a grand staircase entrance, garden terrace and candlelit bridal table backdrop."
+  },
+  {
+   "db_vendor_id": "venue-burnt-orange-mosman",
+   "db_vendor_name": "Burnt Orange - Mosman",
+   "extra_style_tags": [
+    "1920s golf clubhouse",
+    "wrap-around balcony",
+    "harbour views",
+    "Middle Head bushland",
+    "Signals Room"
+   ],
+   "extra_description": "1920s former golf clubhouse with wrap-around balcony, harbour views and secluded Middle Head bush; two event spaces."
+  },
+  {
+   "db_vendor_id": "venue-san-martin-akuna-bay",
+   "db_vendor_name": "San Martin Akuna Bay",
+   "extra_style_tags": [
+    "Ku-ring-gai Chase National Park",
+    "waterfront",
+    "destination wedding"
+   ],
+   "extra_description": "Waterfront destination venue inside the national park."
+  },
+  {
+   "db_vendor_id": "venue-the-coast-chapel-little-bay",
+   "db_vendor_name": "The Coast Chapel, Little Bay",
+   "extra_style_tags": [
+    "geometric design",
+    "stained glass",
+    "360-degree ocean views",
+    "interdenominational",
+    "oceanside"
+   ],
+   "extra_description": "Iconic oceanside chapel with geometric architecture, stained glass and 360-degree Pacific views, seating 80 inside."
+  }
+ ]
+}

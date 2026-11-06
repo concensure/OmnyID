@@ -7,6 +7,7 @@ import { DecisionCard } from "@/components/DecisionCard";
 import { QueueClearedZenState } from "@/components/QueueClearedZenState";
 import { WeddingHomeOverviewGrid } from "@/components/WeddingHomeOverviewGrid";
 import { WeddingVendorDeckCard } from "@/components/WeddingVendorDeckCard";
+import type { WeddingVendorChoiceSelectionSaveInput } from "@/components/WeddingArtifactDetailPanel";
 import type { SendAfpMessageInput } from "@/lib/api";
 import { decisionTriageToAfpSendInput } from "@/lib/decisionTriageAfpState";
 import { buildDecisionTriageProjectionState } from "@/lib/decisionTriageProjectionState";
@@ -17,6 +18,7 @@ import {
 } from "@/lib/weddingDecisionFocusDisplayState";
 import { buildWeddingDecisionDeferSidebarAction } from "@/lib/weddingDecisionFocusActionState";
 import type { WeddingResponseWorkspaceViewState } from "@/lib/weddingResponseWorkspaceViewState";
+import type { WeddingPersonalOsRankedItem } from "@/lib/weddingPersonalOsProjectionState";
 import type { WeddingWorkspaceSidebarAction } from "@/lib/weddingWorkspaceActionState";
 import type { WeddingWorkspaceMenuId } from "@/lib/weddingWorkspaceMenuState";
 import {
@@ -41,7 +43,8 @@ import type { WeddingVendorChoiceCardData } from "@/components/WeddingVendorChoi
 import type { WeddingVendorChoiceIntent } from "@/lib/weddingVendorChoiceActionState";
 import type { WeddingVendorEnquiryPermissions } from "@/lib/weddingVendorEnquiryPermissionsState";
 import { friendlyErrorText } from "@/lib/visibleErrorText";
-import { buildWeddingDecisionResearchState } from "@/lib/weddingDecisionResearchState";
+import { requestFundedWeddingDecisionResearch } from "@/lib/weddingDecisionResearchApi";
+import { buildWeddingDecisionResearchState, weddingDecisionResearchQueueWindow, type WeddingDecisionResearchState } from "@/lib/weddingDecisionResearchState";
 import { loadWeddingTaskCompletion, WEDDING_TASK_COMPLETION_EVENT } from "@/lib/weddingTaskCompletionLocalState";
 import {
   dispatchWeddingVendorSearchLaunch,
@@ -66,6 +69,7 @@ export function WeddingMobileFocusHome(props: {
   vendorOutreachFlows?: readonly WeddingVendorOutreachFlowState[];
   gmailConnected?: boolean;
   onContactVendor?: (card: WeddingVendorChoiceCardData, artifactId: string, intent: WeddingVendorChoiceIntent) => void;
+  onVendorChoiceSelected?: (input: WeddingVendorChoiceSelectionSaveInput) => void;
   onOutreachBodyChange?: (choiceId: string, bodyMarkdown: string) => void;
   onOutreachRecipientChange?: (choiceId: string, email: string) => void;
   onOutreachAttachmentsChange?: (choiceId: string, attachments: AfpAttachment[]) => void;
@@ -83,6 +87,10 @@ export function WeddingMobileFocusHome(props: {
   const [pendingTriage, setPendingTriage] = createSignal<PendingTriage | null>(null);
   const [notice, setNotice] = createSignal<string | null>(null);
   const [completionRevision, setCompletionRevision] = createSignal(0);
+  const [fundedResearch, setFundedResearch] = createSignal<Record<string, WeddingDecisionResearchState>>({});
+  const [fundedResearchStatus, setFundedResearchStatus] = createSignal<Record<string, "loading" | "failed">>({});
+  const fundedResearchAttempts = new Set<string>();
+  const vendorPrefetchAttempts = new Set<string>();
   const persistedTriage = createMemo(() => buildDecisionTriageProjectionState(props.state.afpMessages));
   const completedFocusIds = createMemo(() => {
     completionRevision();
@@ -104,10 +112,45 @@ export function WeddingMobileFocusHome(props: {
   const taskForDecision = (itemId: string) => props.state.planningTaskItems.find(
     (task) => task.id === itemId.replace(/^task:/, ""),
   ) ?? null;
-  const researchForDecision = (itemId: string) => buildWeddingDecisionResearchState({
-    task: taskForDecision(itemId),
-    state: props.state,
+  const savedResearchContext = () => props.state.contextCards.flatMap((card) => [
+    card.planningContext.location,
+    card.planningContext.atmosphereDescription,
+    card.planningContext.vendorPreferences,
+    ...(card.planningContext.topPriorities ?? []),
+  ]).filter((value): value is string => Boolean(value?.trim())).slice(0, 12);
+  const builtResearchForDecision = (itemId: string) => buildWeddingDecisionResearchState({
+    task: taskForDecision(itemId), state: props.state,
   });
+  const researchForDecision = (itemId: string) => fundedResearch()[itemId] ?? builtResearchForDecision(itemId);
+  const vendorShortlistForDecision = (item: Pick<WeddingPersonalOsRankedItem, "title" | "evidenceLabels">) => {
+    const query = weddingVendorResearchQueryForDecision(item);
+    if (!query) return null;
+    const terms = query.toLowerCase().replace(/\bwedding\b|\bvendors?\b/g, " ").split(/[^a-z0-9]+/)
+      .filter((term) => term.length >= 4)
+      .map((term) => term.replace(/s$/, ""));
+    return props.state.artifactPreviews.find((artifact) => {
+      if (artifact.vendorComparisonCards.length < 3) return false;
+      const evidence = [artifact.title, artifact.category, ...artifact.vendorComparisonCards.flatMap((card) => [
+        card.category ?? "", card.title, ...(card.facetLabels ?? []),
+      ])].join(" ").toLowerCase();
+      return terms.some((term) => evidence.includes(term));
+    }) ?? null;
+  };
+  const vendorRecommendation = (item: Pick<WeddingPersonalOsRankedItem, "title" | "evidenceLabels">) => {
+    const artifact = vendorShortlistForDecision(item);
+    const cards = artifact?.vendorComparisonCards.slice().sort((left, right) => left.rank - right.rank).slice(0, 3) ?? [];
+    const top = cards[0];
+    if (!artifact || !top) return null;
+    const otherNames = cards.slice(1).map((card) => card.title);
+    const comparison = otherNames.length > 0 ? ` ahead of ${otherNames.join(" and ")}` : "";
+    const why = [top.situationFit, top.preferenceMatch, artifact.vendorComparisonHandoff?.recommendationLabel]
+      .find((value): value is string => Boolean(value?.trim()));
+    return {
+      artifact,
+      cards,
+      summary: `${top.title} is the current top match${comparison}.${why ? ` ${why}` : ""}`,
+    };
+  };
   const decisions = createMemo(() => {
     const ranked = rankFocusDeckItems(display().queuedItemCards.map((card) => ({
       id: card.id,
@@ -126,8 +169,22 @@ export function WeddingMobileFocusHome(props: {
     // front of the couple and the one immediately behind it are enriched.
     const researchEligibleIds = mobileDecisionResearchEligibleIds(ranked);
     return ranked.map((item) => {
-      const research = researchEligibleIds.has(item.id) ? researchForDecision(item.id) : null;
-      if (!research) return item;
+      if (!researchEligibleIds.has(item.id)) return item;
+      const decision = display().queuedItemCards.find((card) => card.id === item.id)?.item;
+      const vendor = decision ? vendorRecommendation(decision) : null;
+      if (vendor) return {
+        ...item,
+        recommendedActionLabel: vendor.summary,
+        evidenceLabels: Array.from(new Set([...item.evidenceLabels, "Source-backed top-three vendor comparison", "Saved wedding preferences"])),
+        vendorComparison: { artifactId: vendor.artifact.artifactId, cards: vendor.cards },
+      };
+      const research = researchForDecision(item.id);
+      if (!research) {
+        const status = fundedResearchStatus()[item.id];
+        if (status === "loading") return { ...item, recommendedActionLabel: "Checking the saved wedding details and preparing the recommendation…" };
+        if (status === "failed") return { ...item, recommendedActionLabel: "Research could not be completed yet; no recommendation has been approved." };
+        return item;
+      }
       return {
         ...item,
         recommendedActionLabel: research.recommendation,
@@ -137,6 +194,64 @@ export function WeddingMobileFocusHome(props: {
         ])),
       };
     });
+  });
+  const needsFundedResearch = (item: WeddingPersonalOsRankedItem) => {
+    const task = taskForDecision(item.id);
+    return Boolean(task
+      && !/pending RSVP/i.test(task.title)
+      && !weddingVendorResearchQueryForDecision(item)
+      && !builtResearchForDecision(item.id));
+  };
+  createEffect(() => {
+    const context = savedResearchContext();
+    weddingDecisionResearchQueueWindow(display().queuedFocusItems).forEach(({ item, queueRank }) => {
+      const task = taskForDecision(item.id);
+      if (!task || !needsFundedResearch(item)) return;
+      const attemptKey = `${props.state.workspace.metadata.weddingPlanId}:${task.id}:${task.title}:${task.notes ?? ""}:${context.join("|")}`;
+      if (fundedResearchAttempts.has(attemptKey)) return;
+      fundedResearchAttempts.add(attemptKey);
+      setFundedResearchStatus((current) => ({ ...current, [item.id]: "loading" }));
+      void requestFundedWeddingDecisionResearch({
+        weddingPlanId: props.state.workspace.metadata.weddingPlanId,
+        taskId: task.id,
+        title: task.title,
+        notes: task.notes,
+        context,
+        queueRank,
+      }).then((result) => {
+        if (!result.recommendation || !result.reportMarkdown) return;
+        setFundedResearch((current) => ({ ...current, [item.id]: {
+          kind: "funded_research",
+          recommendation: result.recommendation,
+          detailMarkdown: result.reportMarkdown,
+          existingArtifactId: null,
+          generatedArtifact: null,
+        } }));
+        setFundedResearchStatus((current) => {
+          const next = { ...current };
+          delete next[item.id];
+          return next;
+        });
+      }).catch(() => setFundedResearchStatus((current) => ({ ...current, [item.id]: "failed" })));
+    });
+  });
+  createEffect(() => {
+    for (const { item } of weddingDecisionResearchQueueWindow(display().queuedFocusItems)) {
+      const query = weddingVendorResearchQueryForDecision(item);
+      if (!query || vendorShortlistForDecision(item)) continue;
+      const attemptKey = `${props.state.workspace.metadata.weddingPlanId}:${item.id}:${query}`;
+      if (vendorPrefetchAttempts.has(attemptKey)) continue;
+      vendorPrefetchAttempts.add(attemptKey);
+      const launch = saveWeddingVendorSearchLaunch(query, {
+        source: "wedding_home",
+        runImmediately: true,
+        background: true,
+        category: query.replace(/^wedding\s+/i, ""),
+        sourceDecisionId: item.id,
+      });
+      if (launch) dispatchWeddingVendorSearchLaunch(launch);
+      break;
+    }
   });
   const responses = createMemo(() => rankFocusDeckItems(props.state.activeVendorQuoteReplyFlows
     .filter((flow) => !hiddenIds().has(flow.id))
@@ -176,6 +291,12 @@ export function WeddingMobileFocusHome(props: {
     mobileFocusMode();
     setPosition(0);
     setPendingApproval(null);
+  });
+  createEffect(() => {
+    const mode = mobileFocusMode();
+    const sectionId = mobileFocusSingleCardSectionId();
+    if (sectionId || (mode !== "decisions" && mode !== "responses")) return;
+    queueMicrotask(() => document.querySelector<HTMLElement>("[data-wedding-mobile-scroll-root]")?.scrollTo({ top: 0 }));
   });
   const cleanup = installMobileFocusViewportListener();
   onCleanup(cleanup);
@@ -265,10 +386,47 @@ export function WeddingMobileFocusHome(props: {
       return;
     }
     if (item.kind === "decision") {
+      if (method === "swipe") {
+        approveDecisionImmediately(item, method);
+        return;
+      }
       openDecisionSurface(item);
       return;
     }
     setPendingApproval({ item, method });
+  }
+
+  function approveDecisionImmediately(item: FocusDeckItem, method: InputMethod) {
+    const decision = decisionItemFor(item.id);
+    if (!decision) return;
+    const comparison = item.vendorComparison;
+    const recommended = comparison?.cards.slice().sort((left, right) => left.rank - right.rank)[0];
+    const artifact = comparison
+      ? props.state.artifactPreviews.find((candidate) => candidate.artifactId === comparison.artifactId)
+      : null;
+    // A supplier decision is safe to approve by gesture only after the
+    // evidence-backed shortlist exists. Never turn a fast swipe during a
+    // provider delay into approval of a generic task fallback.
+    if (weddingVendorResearchQueryForDecision(decision) && (!artifact || !recommended)) {
+      openVendorResearch(item);
+      setNotice("The source-backed shortlist is still being prepared. It will appear here before you choose a vendor.");
+      return;
+    }
+    if (artifact && recommended) {
+      props.onVendorChoiceSelected?.({
+        artifact,
+        optionId: recommended.choiceId,
+        optionLabel: recommended.title,
+        contact: recommended,
+        selected: true,
+      });
+    }
+    void triage("approve", item, method, () => {
+      rememberTriage("approve", decision.id);
+      setNotice(recommended
+        ? `${recommended.title} is saved as your preferred option. No enquiry was sent.`
+        : "Recommendation approved. Here is the next decision that still needs you.");
+    });
   }
 
   function confirmApproval() {
@@ -343,16 +501,7 @@ export function WeddingMobileFocusHome(props: {
 
   function hasVendorShortlist(item: FocusDeckItem): boolean {
     const decision = decisionItemFor(item.id);
-    const query = decision ? weddingVendorResearchQueryForDecision(decision) : null;
-    if (!query) return false;
-    const categoryWord = query.replace(/^wedding\s+/i, "").replace(/s$/, "").toLowerCase();
-    return props.state.artifactPreviews.some((artifact) => {
-      if (artifact.vendorComparisonCards.length === 0) return false;
-      const evidence = [artifact.title, artifact.category, ...artifact.vendorComparisonCards.flatMap((card) => [
-        card.category ?? "", card.title, ...(card.facetLabels ?? []),
-      ])].join(" ").toLowerCase();
-      return evidence.includes(categoryWord);
-    });
+    return Boolean(decision && vendorShortlistForDecision(decision));
   }
 
   function primaryActionLabel(item: FocusDeckItem): string {
@@ -393,6 +542,7 @@ export function WeddingMobileFocusHome(props: {
 
   const currentTitle = () => "";
   const selectedSection = createMemo(() => props.homeSections.find((section) => section.id === mobileFocusSingleCardSectionId()) ?? null);
+  const decisionSurfaceOpen = () => selectedSection()?.id === "decision_focus";
   const clearDecisionView = () => !selectedSection()
     && !pendingApproval()
     && !notice()
@@ -401,12 +551,12 @@ export function WeddingMobileFocusHome(props: {
 
   return (
     <MobileFocusHome
-      title={selectedSection()?.title ?? currentTitle()}
+      title={decisionSurfaceOpen() ? "" : selectedSection()?.title ?? currentTitle()}
       attentionCount={hiddenAttentionCount({
         responseCount: responses().length,
         overdueDecisionCount: decisions().filter((item) => item.dueAt && Date.parse(item.dueAt) <= Date.now()).length,
       })}
-      immersive={clearDecisionView() || (!selectedSection() && mobileFocusMode() !== "overview")}
+      immersive={clearDecisionView() || decisionSurfaceOpen() || (!selectedSection() && mobileFocusMode() !== "overview")}
     >
       <Show when={notice()}>
         {(message) => (
@@ -488,7 +638,7 @@ export function WeddingMobileFocusHome(props: {
               <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 19l-7-7 7-7" /></svg>
               Home
             </button>
-            <div class="min-h-0 flex-1 overflow-auto pb-44">{section().render()}</div>
+            <div class="min-h-0 min-w-0 flex-1 overflow-auto pb-3">{section().render()}</div>
           </div>
         )}
       </Show>
@@ -507,7 +657,7 @@ function DeckCard(props: {
         mode="standard"
         showActions
         onAction={props.onOpen}
-        class="shadow-none"
+        class="h-full w-full rounded-none border-x-0 shadow-none"
       />
     </div>
   );

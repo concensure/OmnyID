@@ -964,6 +964,7 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
             onAcknowledgeQuoteReply={acknowledgeQuoteReplyBudgetImpact}
             vendorOutreachFlows={Object.values(vendorOutreach.flows())} gmailConnected={Boolean(props.gmailStatus?.connected)}
             onContactVendor={(card, artifactId, intent) => void vendorOutreach.onContactVendor(card, artifactId, intent)} onOutreachBodyChange={vendorOutreach.onOutreachBodyChange} onOutreachAttachmentsChange={vendorOutreach.onOutreachAttachmentsChange}
+            onVendorChoiceSelected={(input) => saveVendorChoiceSelection(input, { refreshWorkspace: false, surfaceNotice: false })}
             onOutreachRecipientChange={vendorOutreach.onOutreachRecipientChange} onOutreachPermissionsChange={vendorOutreach.onOutreachPermissionsChange} onRetryOutreach={vendorOutreach.onRetryOutreach}
             onSendOutreach={(choiceId) => void vendorOutreach.onSendOutreach(choiceId)} onCancelOutreach={vendorOutreach.onCancelOutreach} onConnectGmailForOutreach={() => void vendorOutreach.onConnectGmailForOutreach()}
           />}>

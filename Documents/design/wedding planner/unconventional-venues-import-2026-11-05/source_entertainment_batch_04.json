@@ -1,0 +1,643 @@
+[
+  {
+    "vendor_name": "Golden Age Cinema & Bar",
+    "special_category": [
+      "entertainment"
+    ],
+    "special_subtype": [
+      "private cinema",
+      "cinema bar",
+      "heritage screening room"
+    ],
+    "service_area": "Surry Hills, Inner Sydney NSW",
+    "address": "Lower Ground, Paramount House, 80 Commonwealth Street, Surry Hills NSW 2010",
+    "website_url": "https://ourgoldenage.com.au/venue-hire",
+    "contact_phone": null,
+    "contact_email": "hello@ourgoldenage.com.au",
+    "capacity_seated_max": 56,
+    "capacity_standing_max": 70,
+    "capacity_note": "Cinema: 56 seated, up to 70 standing (website and 2024 hire kit agree). Bar: 42 seated; the website says 60 standing but the 2024 hire kit says 70, so the lower figure (60) applies to the bar. The hire kit lists wedding ceremonies among the cinema uses and says the bar suits celebrations and cocktail functions. Cinema and bar can be booked separately or together.",
+    "price_note": "Not published on the website. Prices are via the enquiry form or the downloadable Venue Hire Kit (2024 PDF), which contains no price figures.",
+    "style_tags": [
+      "cinema",
+      "unconventional",
+      "surry hills",
+      "inner sydney",
+      "heritage",
+      "1940s",
+      "art deco",
+      "paramount house",
+      "intimate",
+      "micro wedding",
+      "cinema bar",
+      "velvet"
+    ],
+    "editorial_summary": "A restored 1940s Paramount Pictures screening room beneath Paramount House, paired with a velvet-and-brass lower-ground bar. It suits small ceremonies and cocktail-style receptions for roughly 56 to 70 guests, with the option to screen a film or video as part of the day. Daytime and select evening slots only, because the venue trades to the public most evenings and weekend afternoons.",
+    "sources": [
+      "https://ourgoldenage.com.au/venue-hire",
+      "https://ourgoldenage.com.au/contact",
+      "https://dl.dropboxusercontent.com/scl/fi/b85ltwkwct4v1so08jtq8/Golden-Age-Events-Hire-Kit_2024.pdf"
+    ],
+    "flags": [
+      "phone_not_published",
+      "price_not_published",
+      "limited_availability_public_trading",
+      "capacity_conflict_bar_standing",
+      "wedding_mention_in_hire_kit_only",
+      "catering_in_house_available",
+      "byo_not_stated"
+    ]
+  },
+  {
+    "vendor_name": "James Theatre Dungog",
+    "special_category": [
+      "entertainment"
+    ],
+    "special_subtype": [
+      "historic cinema",
+      "community theatre",
+      "function hall"
+    ],
+    "service_area": "Dungog, Hunter Region NSW",
+    "address": "6 Brown Street, Dungog NSW 2420",
+    "website_url": "https://www.jamestheatre.com.au/hire",
+    "contact_phone": null,
+    "contact_email": "contact@jamestheatre.com.au",
+    "capacity_seated_max": null,
+    "capacity_standing_max": null,
+    "capacity_note": "Capacity is not published. The hire page describes a divisible auditorium, two cinema screens, a tiered cinema seating area, a large dance floor, movable tables and chairs, a stage, a kiosk and a food preparation area. Floor plans are in the site photo gallery.",
+    "price_note": "Hirings start at $55 (incl GST) per two hours for a small not-for-profit meeting; tables $11 and chairs $1.65 each (incl GST). Wedding hire pricing is not published.",
+    "style_tags": [
+      "cinema",
+      "unconventional",
+      "dungog",
+      "hunter region",
+      "regional nsw",
+      "heritage",
+      "oldest cinema",
+      "spanish mission",
+      "community run",
+      "dance floor",
+      "garden"
+    ],
+    "editorial_summary": "A volunteer-run heritage picture house in Dungog, billed as the oldest purpose-built cinema still operating in Australia, with a Spanish Mission facade and a stage and supper room from the 1930s. It can be hired for weddings and parties, with a dance floor, a modern kitchen area and an outdoor barbecue garden alongside the cinema seating. A good rustic-heritage option for couples happy to travel to the Hunter.",
+    "sources": [
+      "https://www.jamestheatre.com.au/hire",
+      "https://www.jamestheatre.com.au/about",
+      "https://www.jamestheatre.com.au/contact"
+    ],
+    "flags": [
+      "outside_sydney",
+      "phone_not_published",
+      "capacity_not_published",
+      "wedding_price_not_published",
+      "email_from_about_page_button",
+      "needs_contact_lookup"
+    ]
+  },
+  {
+    "vendor_name": "The Roxy Theatre Bingara",
+    "special_category": [
+      "entertainment"
+    ],
+    "special_subtype": [
+      "historic cinema",
+      "art deco theatre",
+      "function centre"
+    ],
+    "service_area": "Bingara, Gwydir Shire, North West Slopes NSW",
+    "address": "74 Maitland Street, Bingara NSW 2404",
+    "website_url": "https://visitgwydir.com.au/the-roxy-theatre/",
+    "contact_phone": "(02) 6724 0066",
+    "contact_email": "btourism@gwydir.nsw.gov.au",
+    "capacity_seated_max": null,
+    "capacity_standing_max": null,
+    "capacity_note": "No capacity figures on the official page. Contact is the Bingara Visitor Information Centre, which handles bookings.",
+    "price_note": "Hire prices not published. The page lists only theatre and Greek Cafe Museum tours at $10 per person (two people minimum).",
+    "style_tags": [
+      "cinema",
+      "unconventional",
+      "bingara",
+      "regional nsw",
+      "north west nsw",
+      "art deco",
+      "1936",
+      "heritage listed",
+      "greek cafe",
+      "council run"
+    ],
+    "editorial_summary": "A 1936 Art Deco picture palace on Bingara's main street, restored and reopened in 2004 and now state heritage listed. The council's page says it works as a function centre for events from birthdays and weddings to conferences, alongside its cinema and performing-arts program. Wedding specifics such as ceremony spaces and numbers are not spelled out, so an enquiry is needed.",
+    "sources": [
+      "https://visitgwydir.com.au/the-roxy-theatre/",
+      "https://www.roxybingara.com.au/functions/"
+    ],
+    "flags": [
+      "outside_sydney",
+      "generic_wedding_statement_only",
+      "capacity_not_published",
+      "price_not_published",
+      "email_is_visitor_centre_general",
+      "needs_contact_lookup",
+      "verify_weddings_accepted"
+    ]
+  },
+  {
+    "vendor_name": "Kingpin North Strathfield (Room 300)",
+    "special_category": [
+      "entertainment"
+    ],
+    "special_subtype": [
+      "bowling alley",
+      "arcade"
+    ],
+    "service_area": "North Strathfield, Inner West NSW",
+    "address": "3-5 George St, North Strathfield NSW 2137",
+    "website_url": "https://www.kingpinbowling.com.au/venues/nsw/north-strathfield",
+    "contact_phone": "(02) 4063 1514",
+    "contact_email": null,
+    "capacity_seated_max": null,
+    "capacity_standing_max": null,
+    "capacity_note": "Official page states Room 300 has a 60 person capacity with 3 private bowling lanes and a private karaoke room; it does not say whether that is seated or standing, so both fields are left null. The wider venue has 16 lanes, laser tag, darts, a pool table and arcade games. Room 300 availability is by enquiry.",
+    "price_note": "Not published on the official site; hire is by enquiry form or phone. Third-party listings quote minimum spends but those are not used here.",
+    "style_tags": [
+      "bowling",
+      "arcade",
+      "unconventional",
+      "North Strathfield",
+      "Inner West",
+      "heritage factory",
+      "private function room"
+    ],
+    "editorial_summary": "A converted 1908 biscuit-factory building in Sydney's inner west with a private function room that has its own bowling lanes and karaoke. Weddings are not named anywhere on the official pages, so it reads more as a playful engagement, rehearsal-dinner or casual reception space for a small guest list. Enquiries go through the venue's events team.",
+    "sources": [
+      "https://www.kingpinbowling.com.au/venues/nsw/north-strathfield",
+      "https://kingpinbowling.com.au/parties-and-events/corporate-parties",
+      "https://www.kingpinplay.com/en-au/parties-and-events/group-events/"
+    ],
+    "flags": [
+      "verify_weddings_accepted",
+      "email_missing_form_only",
+      "capacity_type_unspecified",
+      "price_not_published",
+      "other_kingpin_nsw_sites_not_checked"
+    ]
+  },
+  {
+    "vendor_name": "Archie Brothers Cirque Electriq Alexandria",
+    "special_category": [
+      "entertainment"
+    ],
+    "special_subtype": [
+      "arcade bar",
+      "bowling alley"
+    ],
+    "service_area": "Alexandria, Inner South NSW",
+    "address": "75 O'Riordan Street, Alexandria NSW 2015",
+    "website_url": "https://www.archiebrothers.com.au/parties/exclusive-hire",
+    "contact_phone": "1300 888 386",
+    "contact_email": null,
+    "capacity_seated_max": null,
+    "capacity_standing_max": null,
+    "capacity_note": "Capacity is not stated on the official exclusive-hire or Alexandria pages. Exclusive hire covers the whole venue: arcade and carnival games, bowling, bumper cars, a cocktail bar and kitchen. Other NSW Archie Brothers sites (Chatswood, Castle Towers, Entertainment Quarter, Penrith, Wollongong) use the same enquiry process and are not recorded separately.",
+    "price_note": "Not published; booking is by online form, enquiry or phone.",
+    "style_tags": [
+      "arcade",
+      "bowling",
+      "unconventional",
+      "Alexandria",
+      "Inner South",
+      "circus theme",
+      "exclusive hire"
+    ],
+    "editorial_summary": "A circus-themed arcade, bowling and cocktail venue that can be booked out entirely, giving a group private access to the games and the bar. The official copy mentions corporate, Christmas, birthday, hen and buck events but not weddings, so any wedding use needs to be raised with the venue directly. It would suit a high-energy after-party or casual celebration rather than a formal ceremony.",
+    "sources": [
+      "https://www.archiebrothers.com.au/parties/exclusive-hire",
+      "https://www.archiebrothers.com.au/locations/alexandria",
+      "https://www.archiebrothers.com.au/"
+    ],
+    "flags": [
+      "verify_weddings_accepted",
+      "email_missing_form_only",
+      "capacity_not_published",
+      "price_not_published",
+      "address_map_link_shows_55_doody_st",
+      "other_nsw_sites_not_recorded"
+    ]
+  },
+  {
+    "vendor_name": "Fortress Sydney",
+    "special_category": [
+      "entertainment"
+    ],
+    "special_subtype": [
+      "arcade bar",
+      "gaming tavern"
+    ],
+    "service_area": "Chippendale, Inner Sydney NSW",
+    "address": "Level 2, 28 Broadway, Chippendale NSW 2008",
+    "website_url": "https://fortress.games/functions",
+    "contact_phone": "(02) 8609 3336",
+    "contact_email": "hi@fortress.games",
+    "capacity_seated_max": 100,
+    "capacity_standing_max": 360,
+    "capacity_note": "Official function-spaces table for Sydney: Arena cocktail 360, banquet 100, theatre 156, cabaret 70; Tavern semi-exclusive 70, full restaurant seated and standing 380; 2315 Bar (Sydney only, retro arcades and LED pool table) 70 cocktail. The functions page also says groups of 10 to 1,000 are hosted across the two cities, which exceeds the Sydney room figures, so the lower per-room Arena figures are stored.",
+    "price_note": "Official functions page says packages start from $43 per person; no room hire or minimum spend figures are published.",
+    "style_tags": [
+      "arcade",
+      "unconventional",
+      "Chippendale",
+      "Inner Sydney",
+      "medieval tavern",
+      "gaming",
+      "private function room"
+    ],
+    "editorial_summary": "A medieval-tavern games venue in Central Park with an esports arena, a themed restaurant and bar, and a neon upstairs cocktail room with retro arcade machines that can be hired privately. The events team offers food and drink packages and AV support, and the listed use cases are corporate, party and social events with no mention of weddings. Worth considering for a geeky, fantasy-leaning reception once the venue confirms it takes weddings.",
+    "sources": [
+      "https://fortress.games/functions",
+      "https://fortress.games/locations"
+    ],
+    "flags": [
+      "verify_weddings_accepted",
+      "capacity_figures_vary_by_space",
+      "minimum_spend_not_published",
+      "arcade_only_in_2315_bar_in_sydney"
+    ]
+  },
+  {
+    "vendor_name": "Astro's Arcade Bar",
+    "special_category": [
+      "entertainment"
+    ],
+    "special_subtype": [
+      "arcade bar"
+    ],
+    "service_area": "Newtown, Inner West NSW",
+    "address": "22 King St, Newtown NSW 2042",
+    "website_url": "https://www.astrosarcadebar.com/venue-hire",
+    "contact_phone": null,
+    "contact_email": "info@astros-co.com",
+    "capacity_seated_max": null,
+    "capacity_standing_max": null,
+    "capacity_note": "No capacity figures are published; the venue-hire form simply asks for an approximate guest count and a preferred date. The venue trades Tuesday to Sunday with Sunday opening 1pm to 7pm.",
+    "price_note": "Not published; enquiry form only.",
+    "style_tags": [
+      "arcade",
+      "unconventional",
+      "Newtown",
+      "Inner West",
+      "retro games",
+      "pop culture",
+      "all ages"
+    ],
+    "editorial_summary": "A retro arcade bar on King Street in Newtown with local beer, trivia and comedy nights, and a venue-hire enquiry form for private events. The site's navigation includes a Weddings tab, but it points to an expired external website, so there is no wedding information to rely on. Treat it as a quirky small-scale option and ask directly whether a wedding or reception is possible.",
+    "sources": [
+      "https://www.astrosarcadebar.com/",
+      "https://www.astrosarcadebar.com/venue-hire"
+    ],
+    "flags": [
+      "verify_weddings_accepted",
+      "needs_contact_lookup",
+      "weddings_nav_link_dead",
+      "capacity_not_published",
+      "price_not_published",
+      "website_footer_copyright_2024"
+    ]
+  },
+  {
+    "vendor_name": "Arcade Bar & Club",
+    "special_category": [
+      "entertainment"
+    ],
+    "special_subtype": [
+      "arcade bar",
+      "nightclub"
+    ],
+    "service_area": "Sydney CBD, Sydney NSW",
+    "address": "16 O'Connell Street, Sydney NSW 2000",
+    "website_url": "https://arcadesydney.com.au/events-functions/",
+    "contact_phone": "0439 410 433",
+    "contact_email": "hello@arcadesydney.com.au",
+    "capacity_seated_max": null,
+    "capacity_standing_max": null,
+    "capacity_note": "The official site describes three interconnected spaces (Uptown, Midtown, Downtown) that can be used separately or combined, but publishes no capacity numbers. Third-party listings give conflicting figures, so none are used.",
+    "price_note": "Not published; food and beverage packages are offered and a walkthrough can be arranged on enquiry.",
+    "style_tags": [
+      "arcade",
+      "unconventional",
+      "Sydney CBD",
+      "Art Deco",
+      "heritage building",
+      "nightlife"
+    ],
+    "editorial_summary": "A heritage-building bar and club in the CBD that is now positioned as a refined New York-inspired dining and nightlife space with three connectable rooms, premium add-ons such as photobooths and ceiling projections, and tailored food and drink packages. The current official site does not mention arcade games or weddings; its listed event types are birthdays, Christmas, end of financial year and brand events. Include only as a possible stylish after-party or reception space pending confirmation of weddings and the arcade element.",
+    "sources": [
+      "https://arcadesydney.com.au/",
+      "https://arcadesydney.com.au/events-functions/",
+      "https://arcadesydney.com.au/contact/"
+    ],
+    "flags": [
+      "verify_weddings_accepted",
+      "arcade_games_unconfirmed_on_official_site",
+      "capacity_not_published",
+      "price_not_published",
+      "phone_is_mobile_number"
+    ]
+  },
+  {
+    "vendor_name": "Holey Moley Golf Club Sydney",
+    "special_category": [
+      "entertainment"
+    ],
+    "special_subtype": [
+      "mini golf",
+      "cocktail bar",
+      "karaoke",
+      "arcade"
+    ],
+    "service_area": "Darlinghurst, Inner Sydney NSW",
+    "address": "Lot 1&2, 82-94 Darlinghurst Road, Potts Point NSW 2011",
+    "website_url": "https://holeymoley.com.au/parties/exclusive-hire",
+    "contact_phone": "1300 727 833",
+    "contact_email": null,
+    "capacity_seated_max": null,
+    "capacity_standing_max": null,
+    "capacity_note": "No capacity figures published on the exclusive hire page or the Darlinghurst location page. Exclusive hire gives the whole venue (two mini golf courses, bar, other on-site activities) to one group. The Alexandria site (75 O'Riordan Street, Alexandria NSW 2015) takes exclusive hire through the same page and phone line and is covered by this record.",
+    "price_note": "Not published. Enquiry form or phone only. Standard public pricing (e.g. 18 holes $42 Thu-Sun) is not an exclusive hire price.",
+    "style_tags": [
+      "Alexandria",
+      "Darlinghurst",
+      "Inner Sydney",
+      "Inner West",
+      "Potts Point",
+      "entertainment",
+      "exclusive hire",
+      "mini golf",
+      "playful",
+      "unconventional"
+    ],
+    "editorial_summary": "A pop-culture themed two-course mini golf bar in the Darlinghurst strip that can be taken over entirely by one party. The brand's hire page names weddings among the occasions it handles, so a relaxed, game-led reception or celebration is on the table.",
+    "sources": [
+      "https://holeymoley.com.au/parties/exclusive-hire",
+      "https://holeymoley.com.au/locations/darlinghurst"
+    ],
+    "flags": [
+      "needs_contact_lookup",
+      "email_missing_form_only",
+      "capacity_not_published",
+      "price_not_published",
+      "multi_site_single_record",
+      "address_listed_as_darlinghurst_but_postcode_potts_point"
+    ]
+  },
+  {
+    "vendor_name": "Hijinx Hotel Alexandria",
+    "special_category": [
+      "entertainment"
+    ],
+    "special_subtype": [
+      "challenge rooms",
+      "escape-style rooms",
+      "themed bar"
+    ],
+    "service_area": "Alexandria, Inner West Sydney NSW",
+    "address": "75 O'Riordan Street, Alexandria NSW 2015",
+    "website_url": "https://hijinxhotel.com.au/parties/exclusive-hire",
+    "contact_phone": "1300 897 224",
+    "contact_email": null,
+    "capacity_seated_max": null,
+    "capacity_standing_max": null,
+    "capacity_note": "No capacity figures published. Exclusive hire covers the whole venue: challenge rooms, bar and restaurant with a private host.",
+    "price_note": "Exclusive hire pricing not published. Social party packages list Deluxe $52 pp and Premier Suite $80 pp (1h30m, one activity) - these are not wedding prices.",
+    "style_tags": [
+      "unconventional",
+      "entertainment",
+      "challenge rooms",
+      "quirky",
+      "Alexandria",
+      "Inner West",
+      "exclusive hire"
+    ],
+    "editorial_summary": "A themed 'hotel' of puzzle and challenge rooms that can be booked out in full, bar and restaurant included. Weddings are not named on the hire page, which talks about any event, so it suits an engagement party or casual celebration until a wedding booking is confirmed.",
+    "sources": [
+      "https://hijinxhotel.com.au/parties/exclusive-hire",
+      "https://hijinxhotel.com.au/parties/social-parties",
+      "https://hijinxhotel.com.au/locations/alexandria",
+      "https://holeymoley.com.au/locations/darlinghurst"
+    ],
+    "flags": [
+      "verify_weddings_accepted",
+      "needs_contact_lookup",
+      "email_missing_form_only",
+      "postcode_inferred",
+      "capacity_not_published",
+      "price_not_published"
+    ]
+  },
+  {
+    "vendor_name": "Sydney Opera House - Yallamundi Rooms and Utzon Room",
+    "special_category": [
+      "entertainment"
+    ],
+    "special_subtype": [
+      "theatre",
+      "performing arts centre",
+      "harbour landmark"
+    ],
+    "service_area": "Bennelong Point, Sydney CBD NSW",
+    "address": "Bennelong Point, Sydney NSW 2000",
+    "website_url": "https://www.sydneyoperahouse.com/venue-hire/functions-events-venue-hire/yallamundi-rooms",
+    "contact_phone": "1300 764 849",
+    "contact_email": "functions@sydneyoperahouse.com",
+    "capacity_seated_max": 150,
+    "capacity_standing_max": 350,
+    "capacity_note": "Yallamundi Rooms page gives seated 150 to 180 and cocktail 350 to 400 (lower figures stored; a capacity PDF lists 180 dining and 400 cocktail for the full layout, and dining with a stage or dance floor at 150). Utzon Room page states up to 200 people.",
+    "price_note": "Venue hire fees not published. A Winter Weddings offer reduces hire fees for weddings (or receptions only) held 1 June to 31 August 2027 or 2028, terms apply.",
+    "style_tags": [
+      "unconventional",
+      "entertainment",
+      "theatre",
+      "iconic",
+      "harbour views",
+      "Sydney CBD",
+      "Bennelong Point",
+      "landmark"
+    ],
+    "editorial_summary": "The Opera House runs wedding and reception hire from the Yallamundi Rooms, which can be one large space or split into three, with a private entrance and an outdoor terrace. The smaller harbour-facing Utzon Room is also offered for catered functions, and the foyers can be hired on a limited basis around performances.",
+    "sources": [
+      "https://www.sydneyoperahouse.com/venue-hire/functions-events-venue-hire/yallamundi-rooms",
+      "https://www.sydneyoperahouse.com/venue-hire/functions-events-venue-hire",
+      "https://www.sydneyoperahouse.com/visit/our-venues/utzon-room"
+    ],
+    "flags": [
+      "exclusive_caterer",
+      "capacity_conflict",
+      "price_not_published",
+      "foyer_spaces_limited_availability",
+      "enquiry_via_form"
+    ]
+  },
+  {
+    "vendor_name": "Sydney Tower Eye",
+    "special_category": [
+      "entertainment"
+    ],
+    "special_subtype": [
+      "observation deck",
+      "SKYWALK"
+    ],
+    "service_area": "Sydney CBD NSW",
+    "address": "108 Market Street, Sydney NSW 2000",
+    "website_url": "https://www.sydneytowereye.com.au/events/proposals-weddings",
+    "contact_phone": "0419 726 459",
+    "contact_email": "events@merlinentertainments.com.au",
+    "capacity_seated_max": null,
+    "capacity_standing_max": null,
+    "capacity_note": "No wedding capacity published on the official site. The SKYWALK is shown as temporarily unavailable until 12 November 2026.",
+    "price_note": "Not published. Events are handled by Merlin Venues Sydney via enquiry.",
+    "style_tags": [
+      "unconventional",
+      "entertainment",
+      "observation deck",
+      "skyline views",
+      "Sydney CBD",
+      "SKYWALK"
+    ],
+    "editorial_summary": "A skyline observation deck whose events page promotes proposals and weddings on the Observation Deck or the outdoor SKYWALK, and showcases a past SKYWALK wedding. Everything runs through the Merlin Venues events team, so guest numbers and cost have to be quoted case by case.",
+    "sources": [
+      "https://www.sydneytowereye.com.au/events/proposals-weddings",
+      "https://www.sydneytowereye.com.au/events",
+      "https://www.sydneytowereye.com.au/",
+      "https://www.merlinevents.com.au/our-venues/sydney-nsw-venues/sydney-tower-eye/"
+    ],
+    "flags": [
+      "capacity_not_published",
+      "price_not_published",
+      "skywalk_temporarily_unavailable",
+      "postcode_from_structured_data"
+    ]
+  },
+  {
+    "vendor_name": "Madame Tussauds Sydney",
+    "special_category": [
+      "entertainment"
+    ],
+    "special_subtype": [
+      "wax museum",
+      "attraction",
+      "dance floor"
+    ],
+    "service_area": "Darling Harbour, Sydney CBD NSW",
+    "address": "1-5 Wheat Road, Darling Harbour NSW 2000",
+    "website_url": "https://www.merlinevents.com.au/your-event/private-events/weddings/",
+    "contact_phone": "02 9066 4095",
+    "contact_email": "merlin@bespokecatering.net.au",
+    "capacity_seated_max": 100,
+    "capacity_standing_max": 300,
+    "capacity_note": "Venue page lists Music zone cocktail 180 / sit down 100 and A-List zone cocktail 300 / sit down 50; whole venue stated as roughly 750 people. Lowest practical single-zone maximums are stored.",
+    "price_note": "Not published.",
+    "style_tags": [
+      "unconventional",
+      "entertainment",
+      "wax museum",
+      "celebrity",
+      "Darling Harbour",
+      "Sydney CBD",
+      "first dance"
+    ],
+    "editorial_summary": "Merlin's wedding page lists Madame Tussauds as a place to have a first dance among the wax figures, with ceremony, sit-down or cocktail formats. The venue has a stage-equipped Music zone and a projection-lit A-List zone for different group sizes.",
+    "sources": [
+      "https://www.merlinevents.com.au/your-event/private-events/weddings/",
+      "https://www.merlinevents.com.au/our-venues/sydney-nsw-venues/madame-tussauds-sydney/",
+      "https://www.merlinevents.com.au/about-us/about-us/contact-us/",
+      "https://www.madametussauds.com/sydney/"
+    ],
+    "flags": [
+      "capacity_conflict",
+      "price_not_published",
+      "contact_is_merlin_catering_line",
+      "venue_page_lists_corporate_uses_only"
+    ]
+  },
+  {
+    "vendor_name": "Escape Hunt Sydney - Loft on George",
+    "special_category": [
+      "entertainment"
+    ],
+    "special_subtype": [
+      "escape room",
+      "function loft"
+    ],
+    "service_area": "Sydney CBD NSW",
+    "address": "Level 4, 393 George Street, Sydney NSW 2000",
+    "website_url": "https://escapehunt.com/au/sydney/packages/party-venue-hire/",
+    "contact_phone": "+61 2 9299 3929",
+    "contact_email": null,
+    "capacity_seated_max": null,
+    "capacity_standing_max": null,
+    "capacity_note": "No capacities on the page. Loft on George (level 7, above the escape rooms) has a main space, balconies and a conference space, bookable individually or as the whole venue.",
+    "price_note": "Not published on the web page; venue hire and catering PDFs exist but were not readable. Venue hire fee is waived on a drinks package for the space matching group size.",
+    "style_tags": [
+      "unconventional",
+      "entertainment",
+      "escape room",
+      "CBD",
+      "George Street",
+      "licensed"
+    ],
+    "editorial_summary": "A licensed function loft above a city escape room operator, hireable in part or in full for parties and functions. Weddings are not mentioned, so it is a lead for a small reception or engagement party only after the venue confirms.",
+    "sources": [
+      "https://escapehunt.com/au/sydney/packages/party-venue-hire/"
+    ],
+    "flags": [
+      "verify_weddings_accepted",
+      "needs_contact_lookup",
+      "email_missing_form_only",
+      "capacity_not_published",
+      "price_not_published",
+      "address_level_conflict"
+    ]
+  },
+  {
+    "vendor_name": "Strike Bowling King Street Wharf",
+    "special_category": [
+      "entertainment"
+    ],
+    "special_subtype": [
+      "bowling alley",
+      "arcade bar"
+    ],
+    "service_area": "Darling Harbour, Sydney CBD NSW",
+    "address": "22 The Promenade, King Street Wharf, Darling Harbour, Sydney NSW 2000",
+    "website_url": "https://strikebowling.com.au/parties/exclusive-hire",
+    "contact_phone": null,
+    "contact_email": null,
+    "capacity_seated_max": 80,
+    "capacity_standing_max": null,
+    "capacity_note": "The Darling Harbour location page says the venue seats up to 80 people including front bar tables and the outdoor area. The exclusive-hire page says each venue differs in size and that maximum capacity is shown during booking, so standing capacity is not published. Other NSW Strike sites on the same exclusive-hire programme: Macquarie Centre, 4 Waterloo Rd, North Ryde NSW 2113; Mandarin Centre, Level 4/65 Albert Ave, Chatswood NSW 2067; Alexandria; Entertainment Quarter (207/122 Lang Rd, Sydney NSW 2021); Castle Hill; Penrith; Charlestown; Wollongong. They share one enquiry form and have no separate contact details, so they are covered by this single record.",
+    "price_note": "Not published; exclusive hire is quoted through the enquiry form and the concierge team.",
+    "style_tags": [
+      "bowling",
+      "arcade",
+      "unconventional",
+      "Darling Harbour",
+      "Sydney CBD",
+      "waterfront",
+      "exclusive hire",
+      "multi-site"
+    ],
+    "editorial_summary": "Strike offers whole-venue exclusive hire including the lanes, a private bar, arcade games and other activities, with a personal host and a pizza-and-burger style menu. Its own page lists birthdays, engagements and celebratory bashes but never says weddings, so a wedding enquiry should be confirmed first. Harbour-side King Street Wharf is the best-placed site for a casual celebration; the group's other Sydney sites follow the same model.",
+    "sources": [
+      "https://strikebowling.com.au/parties/exclusive-hire",
+      "https://strikebowling.com.au/parties/how-to-book",
+      "https://strikebowling.com.au/locations/strike-darling-harbour"
+    ],
+    "flags": [
+      "verify_weddings_accepted",
+      "needs_contact_lookup",
+      "email_missing_form_only",
+      "multi_site_single_record",
+      "price_not_published",
+      "standing_capacity_not_published"
+    ]
+  }
+]

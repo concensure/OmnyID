@@ -7596,3 +7596,24 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
   container restored healthy scanning. Cold builds consumed restore headroom, so only unused Docker
   builder cache was pruned. Final backup verification and isolated restore pass at 79 percent root
   use. Evidence: `Documents/verification/wed-338-invite-proposal-opportunities-release-2026-11-06.md`.
+
+# 2026-11-06 - WED-339 mobile decisions and unconventional venues candidate (Codex)
+
+- Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
+  `agent/codex/WED-339`, based on `a4e1ed9ad7d343d0341c7edd73c938a3953298c7`.
+- Mobile Today now gives its decision deck the available viewport above the shorter safe-area nav.
+  Gesture guidance appears above the first card only, mobile omits the desktop Decision focus title,
+  and a previous Today scroll cannot leave the focused deck off-screen.
+- The current and immediate-next decisions alone receive funded research. Supplier decisions reuse
+  the existing live search and Ranking Policy V2 to prepare exactly three options. A downward swipe
+  saves the present top option as preferred without sending an enquiry; if evidence is still loading,
+  it opens the in-place shortlist instead of approving a generic fallback.
+- Added reproducible WeddingNSW and Wedlockers/Urban List prerequisites plus the cumulative
+  unconventional-venue import: 57 new rows and 20 non-overwriting enrichments. A disposable database
+  accepted the ordered load twice and produced boat 13, warehouse 12, museum 8, gallery 5, library 2,
+  entertainment 15, botanical 15 and zoo/aquarium 8. WILD LIFE Sydney Zoo's wedding offer was
+  rechecked against its current official page; unpublished capacity and pricing remain caveated.
+- Working-source checks pass: typecheck, public Wedding checks, both line budgets, all 2,222 Wedding
+  tests, the production UI build, the focused source checks, the 375 x 812 Chromium vertical-swipe
+  journey and all 70 focused Rust vendor-search tests against `C:\cargo-target`. Oracle mutation and
+  exact-SHA release remain pending.

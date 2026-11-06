@@ -164,22 +164,43 @@ export function decisionCardFromWeddingFocus(card: WeddingDecisionFocusItemCard)
 
 export function decisionCardFromFocusDeckItem(item: FocusDeckItem): DecisionCardModel {
   const evidence = evidenceFromLabels(item.evidenceLabels, `focus:${item.id}`);
+  const vendorCards = item.vendorComparison?.cards.slice().sort((left, right) => left.rank - right.rank).slice(0, 3) ?? [];
+  const recommendedVendor = vendorCards[0];
   return {
     schema: "content.decision_card",
-    pattern: item.kind === "response" ? "approve_act" : "review",
+    pattern: vendorCards.length > 0 ? "choose" : item.kind === "response" ? "approve_act" : "review",
     patternVersion: "1.0",
     id: item.id,
     title: item.title,
     domain: "wedding",
     pressure: "medium",
     whyItMatters: item.whyNowLabel,
-    recommendation: evidence.length > 0 ? { summary: item.recommendedActionLabel, reasons: [item.whyNowLabel] } : null,
-    actions: [{ id: "review", label: item.kind === "response" ? "Open agent draft" : "Review", role: "primary", effect: "Opens the guarded review flow", intent: "review" }],
+    recommendation: evidence.length > 0 ? {
+      summary: item.recommendedActionLabel,
+      reasons: recommendedVendor
+        ? [recommendedVendor.situationFit || recommendedVendor.preferenceMatch || item.whyNowLabel]
+        : [item.whyNowLabel],
+    } : null,
+    actions: [{
+      id: "review",
+      label: item.kind === "response" ? "Open agent draft" : vendorCards.length > 0 ? "Open shortlist" : "Open task",
+      role: "primary",
+      effect: vendorCards.length > 0 ? "Opens the source-backed three-vendor comparison" : "Opens the guarded review flow",
+      intent: "review",
+    }],
     evidence,
     timeSensitivity: item.dueAt ? { label: "Time-sensitive", at: item.dueAt } : null,
     visual: { kind: "none" },
     unknowns: evidence.length === 0 ? ["No source evidence is attached yet."] : [],
-    patternSlots: { payloadPreview: item.recommendedActionLabel },
+    patternSlots: {
+      payloadPreview: item.recommendedActionLabel,
+      options: vendorCards.map((vendor, index) => ({
+        id: vendor.choiceId,
+        name: vendor.title,
+        summary: vendor.situationFit || vendor.preferenceMatch,
+        recommended: index === 0,
+      })),
+    },
     verification: evidence.length > 0 ? { status: "partial", label: `${evidence.length} evidence signal${evidence.length === 1 ? "" : "s"}` } : { status: "unverified", label: "Evidence pending" },
   };
 }

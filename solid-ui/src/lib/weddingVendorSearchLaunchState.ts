@@ -8,6 +8,10 @@ export type WeddingVendorSearchLaunchState = {
   query: string;
   source: "master_search" | "wedding_home";
   savedAt: string;
+  runImmediately?: boolean;
+  background?: boolean;
+  category?: string | null;
+  sourceDecisionId?: string | null;
 };
 
 export type WeddingVendorSearchIntakeQueryInput = {
@@ -139,7 +143,19 @@ function normalizeLaunch(value: unknown): WeddingVendorSearchLaunchState | null 
   const savedAt = typeof raw.savedAt === "string" && raw.savedAt.trim()
     ? raw.savedAt.trim()
     : new Date().toISOString();
-  return { query, source, savedAt };
+  return {
+    query,
+    source,
+    savedAt,
+    ...(raw.runImmediately === true ? { runImmediately: true } : {}),
+    ...(raw.background === true ? { background: true } : {}),
+    ...(typeof raw.category === "string" && normalizeWeddingVendorSearchLaunchQuery(raw.category)
+      ? { category: normalizeWeddingVendorSearchLaunchQuery(raw.category) }
+      : {}),
+    ...(typeof raw.sourceDecisionId === "string" && raw.sourceDecisionId.trim()
+      ? { sourceDecisionId: raw.sourceDecisionId.trim().slice(0, 200) }
+      : {}),
+  };
 }
 
 export function saveWeddingVendorSearchLaunch(
@@ -148,6 +164,10 @@ export function saveWeddingVendorSearchLaunch(
     storage?: Storage | null;
     nowIso?: string | null;
     source?: WeddingVendorSearchLaunchState["source"];
+    runImmediately?: boolean;
+    background?: boolean;
+    category?: string | null;
+    sourceDecisionId?: string | null;
   },
 ): WeddingVendorSearchLaunchState | null {
   const normalizedQuery = normalizeWeddingVendorSearchLaunchQuery(query);
@@ -156,6 +176,14 @@ export function saveWeddingVendorSearchLaunch(
     query: normalizedQuery,
     source: input?.source ?? "master_search",
     savedAt: input?.nowIso?.trim() || new Date().toISOString(),
+    ...(input?.runImmediately === true ? { runImmediately: true } : {}),
+    ...(input?.background === true ? { background: true } : {}),
+    ...(normalizeWeddingVendorSearchLaunchQuery(input?.category)
+      ? { category: normalizeWeddingVendorSearchLaunchQuery(input?.category) }
+      : {}),
+    ...(input?.sourceDecisionId?.trim()
+      ? { sourceDecisionId: input.sourceDecisionId.trim().slice(0, 200) }
+      : {}),
   };
   return withStorage(storageOrNull(input?.storage), null, (target) => {
     target.setItem(WEDDING_VENDOR_SEARCH_LAUNCH_KEY, JSON.stringify(launch));

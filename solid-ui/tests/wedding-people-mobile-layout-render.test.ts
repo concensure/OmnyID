@@ -35,6 +35,6 @@ test("People action cards are equal-height whole-card controls with bottom-align
   assert.doesNotMatch(peopleHub, /bg-amber-900/);
 });
 
-test("mobile pages reserve space above the tab bar and floating Sprout control", () => {
-  assert.match(mobilePage, /pb-\[calc\(10rem\+env\(safe-area-inset-bottom\)\)\]/);
+test("mobile pages reserve only the compact tab-bar safe area", () => {
+  assert.match(mobilePage, /pb-\[calc\(3\.75rem\+env\(safe-area-inset-bottom\)\)\]/);
 });

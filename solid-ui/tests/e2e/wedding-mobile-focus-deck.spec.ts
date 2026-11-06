@@ -19,9 +19,11 @@ test("mobile vertical swipes perform the action they advertise", async ({ page }
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto("/workspace/e2e/wedding-mobile-focus-deck.html", { waitUntil: "networkidle" });
   await expect(page.getByText("Research photographers", { exact: true })).toBeVisible();
+  await expect(page.getByText("Swipe up for later, swipe down to approve", { exact: true })).toBeVisible();
 
   await verticalSwipe(page, "down");
   await expect(page.getByRole("status")).toHaveText("Opened Search vendors by swipe");
+  await expect(page.getByText("Swipe up for later, swipe down to approve", { exact: true })).toHaveCount(0);
 
   await page.reload({ waitUntil: "networkidle" });
   await verticalSwipe(page, "up");

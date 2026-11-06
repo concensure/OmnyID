@@ -70,6 +70,21 @@ test("RSVP and research tasks expose consequence-specific primary actions", () =
   assert.equal(hens.compareLabel, "View research");
 });
 
+test("vendor scheduling decisions request the correct source-backed shortlist", () => {
+  assert.equal(
+    weddingVendorResearchQueryForDecision(item({
+      title: "Schedule hair and make up trial and final beauty timeline",
+      sourceSurface: "tasks",
+      evidenceLabels: ["personal style", "soft colour palette"],
+    })),
+    "wedding hair stylists",
+  );
+  assert.equal(
+    weddingVendorResearchQueryForDecision(item({ title: "Research photographers", sourceSurface: "tasks" })),
+    "wedding photographers",
+  );
+});
+
 test("buildWeddingDecisionFocusSidebarAction routes task focus to Tasks with compact metadata", () => {
   const action = buildWeddingDecisionFocusSidebarAction({
     summaryLabel: "Focus on 2 wedding decisions now; 1 can wait.",

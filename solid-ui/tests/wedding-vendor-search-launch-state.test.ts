@@ -207,3 +207,27 @@ test("dispatchWeddingVendorSearchLaunch emits normalized launch details", () => 
     savedAt: "2026-09-29T00:00:00.000Z",
   });
 });
+
+test("background decision launches retain their category and run intent", () => {
+  const storage = memoryStorage();
+  const launch = saveWeddingVendorSearchLaunch("wedding hair and makeup artists", {
+    storage,
+    source: "wedding_home",
+    nowIso: "2026-11-06T00:00:00.000Z",
+    runImmediately: true,
+    background: true,
+    category: "hair and makeup artists",
+    sourceDecisionId: "task:beauty-timeline",
+  });
+
+  assert.deepEqual(launch, {
+    query: "wedding hair and makeup artists",
+    source: "wedding_home",
+    savedAt: "2026-11-06T00:00:00.000Z",
+    runImmediately: true,
+    background: true,
+    category: "hair and makeup artists",
+    sourceDecisionId: "task:beauty-timeline",
+  });
+  assert.deepEqual(loadWeddingVendorSearchLaunch(storage), launch);
+});

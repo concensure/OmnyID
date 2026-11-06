@@ -127,6 +127,7 @@ import {
   buildWeddingVendorSearchNoticeState,
 } from "@/lib/weddingVendorSearchNoticeState";
 import {
+  clearWeddingVendorSearchLaunch,
   consumeWeddingVendorSearchLaunch,
   WEDDING_VENDOR_SEARCH_LAUNCH_EVENT,
   weddingVendorSearchApproximateLocationFromTimezone,
@@ -423,8 +424,17 @@ export function ResponseQueueView(props: {
     // A vendor-search launch is an explicit request to work in the vendor
     // surface.  Sending it home hides the entered query and makes a first
     // search look as though it was lost until the user opens Vendors again.
-    setWeddingWorkspaceMenu("response_queue");
-    setWeddingVendorSearchNotice("Vendor search is ready. Review the query, then run live search when you are ready.");
+    if (!launch?.background) setWeddingWorkspaceMenu("response_queue");
+    setWeddingVendorSearchNotice(launch?.runImmediately
+      ? "Preparing a source-backed shortlist for the next wedding decision…"
+      : "Vendor search is ready. Review the query, then run live search when you are ready.");
+    if (launch?.runImmediately) {
+      queueMicrotask(() => void runLiveWeddingVendorSearch({
+        stayOnHome: true,
+        category: launch.category ?? undefined,
+        background: launch.background === true,
+      }));
+    }
   }
 
   function updateWeddingVendorSearchQueryFromInput(query: string) {
@@ -1134,6 +1144,7 @@ export function ResponseQueueView(props: {
 
     const vendorSearchLaunchHandler = (event: Event) => {
       applyWeddingVendorSearchLaunch(weddingVendorSearchLaunchFromEvent(event));
+      clearWeddingVendorSearchLaunch();
     };
     window.addEventListener(WEDDING_VENDOR_SEARCH_LAUNCH_EVENT, vendorSearchLaunchHandler);
     onCleanup(() => window.removeEventListener(WEDDING_VENDOR_SEARCH_LAUNCH_EVENT, vendorSearchLaunchHandler));

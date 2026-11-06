@@ -30,6 +30,7 @@ export function MobileFocusDeck(props: {
   const [exiting, setExiting] = createSignal(false);
   const [offset, setOffset] = createSignal({ x: 0, y: 0 });
   const [announcement, setAnnouncement] = createSignal("");
+  const [showGestureHint, setShowGestureHint] = createSignal(true);
   const item = createMemo(() => props.items[Math.min(Math.max(0, props.position), props.items.length - 1)]);
   const atEnd = () => props.position >= props.items.length || props.items.length === 0;
   const primaryActionLabel = () => {
@@ -49,7 +50,7 @@ export function MobileFocusDeck(props: {
   });
   const edgeLabel = () => {
     const direction = action();
-    if (direction === "approve") return primaryActionLabel();
+    if (direction === "approve") return "Approve";
     if (direction === "defer") return "Later";
     if (offset().x < 0) return "Previous";
     return "Next";
@@ -67,10 +68,12 @@ export function MobileFocusDeck(props: {
   const commit = async (direction: ReturnType<typeof action>, method: InputMethod) => {
     const active = item();
     if (!direction) return;
+    setShowGestureHint(false);
     if (direction === "prev") navigate(-1);
     if (direction === "next") navigate(1);
-    // Approval is deliberately two-step. The parent opens a confirmation and
-    // advances only after the person has explicitly confirmed that decision.
+    // The parent owns the consequence: a swipe may execute the presented
+    // recommendation immediately, while a visible button can open its review
+    // surface before anything external is sent.
     if (direction === "approve" && active) {
       setAnnouncement(`${primaryActionLabel()} opened for ${active.title}.`);
       props.onApprove(active, method);
@@ -149,6 +152,9 @@ export function MobileFocusDeck(props: {
     <section class="flex min-h-0 flex-1 flex-col overscroll-contain" role="region" aria-roledescription="deck" aria-label={`${props.label} deck`} tabIndex={0} onKeyDown={keyDown}>
       <p class="sr-only" aria-live="polite">{announcement()}</p>
       <Show when={!atEnd()} fallback={<div class="flex min-h-0 flex-1 items-center">{props.renderEnd()}</div>}>
+        <Show when={showGestureHint() && props.position === 0}>
+          <p class="shrink-0 px-3 pb-2 pt-1 text-center text-xs font-medium text-wedding-muted" aria-hidden="true">Swipe up for later, swipe down to approve</p>
+        </Show>
         <div class="relative min-h-0 flex-1 overflow-hidden">
           <div class="pointer-events-none absolute inset-x-3 top-3 z-10 rounded-full bg-white px-3 py-2 text-center text-xs font-semibold text-wedding-text shadow-card transition-opacity" style={{ opacity: String(progress() >= 0.3 ? 1 : 0) }}>
             {edgeLabel()}<Show when={progress() >= 1}> ✓</Show>
@@ -172,12 +178,13 @@ export function MobileFocusDeck(props: {
             <Show keyed when={item()}>{(current) => props.renderCard(current)}</Show>
           </div>
         </div>
-        <div class="flex items-center justify-between pt-2">
-          <Show when={!props.sequential} fallback={<span class="h-11 w-11" aria-hidden="true" />}><button type="button" class={ICON_BUTTON_CLASS} aria-label={`Previous ${props.label.toLowerCase()}`} onClick={() => navigate(-1)}><DeckIcon d="M15 19l-7-7 7-7" /></button></Show>
-          <p class="text-xs text-wedding-muted" aria-hidden="true">Swipe up for later, down to {primaryActionLabel().toLowerCase()}</p>
-          <Show when={!props.sequential} fallback={<span class="h-11 w-11" aria-hidden="true" />}><button type="button" class={ICON_BUTTON_CLASS} aria-label={`Next ${props.label.toLowerCase()}`} onClick={() => navigate(1)}><DeckIcon d="M9 5l7 7-7 7" /></button></Show>
-        </div>
-        <nav class="flex gap-2 pt-1 pb-[max(0.75rem,env(safe-area-inset-bottom))]" aria-label={`${props.label} actions`}>
+        <Show when={!props.sequential}>
+          <div class="flex items-center justify-between pt-2">
+            <button type="button" class={ICON_BUTTON_CLASS} aria-label={`Previous ${props.label.toLowerCase()}`} onClick={() => navigate(-1)}><DeckIcon d="M15 19l-7-7 7-7" /></button>
+            <button type="button" class={ICON_BUTTON_CLASS} aria-label={`Next ${props.label.toLowerCase()}`} onClick={() => navigate(1)}><DeckIcon d="M9 5l7 7-7 7" /></button>
+          </div>
+        </Show>
+        <nav class="flex shrink-0 gap-2 px-2 pb-2 pt-2" aria-label={`${props.label} actions`}>
           <button type="button" class="inline-flex min-h-12 items-center justify-center gap-1.5 rounded-lg border border-wedding-muted bg-white px-4 text-sm font-semibold text-wedding-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-accent focus-visible:ring-offset-2" onClick={() => commit("defer", "button")}><DeckIcon d="M12 6v6l4 2M12 21a9 9 0 100-18 9 9 0 000 18z" />Later</button>
           <button type="button" class="inline-flex min-h-12 flex-1 items-center justify-center gap-1.5 rounded-lg border-2 border-wedding-cta bg-white px-4 text-sm font-bold text-wedding-text hover:bg-wedding-surface-blush focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-accent focus-visible:ring-offset-2" aria-label={primaryActionLabel()} onClick={() => commit("approve", "button")}><DeckIcon d="M5 13l4 4L19 7" />{primaryActionLabel()}</button>
         </nav>

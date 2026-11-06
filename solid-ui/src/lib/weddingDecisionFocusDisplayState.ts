@@ -91,12 +91,23 @@ export function weddingVendorResearchQueryForDecision(item: Pick<WeddingPersonal
   // Do not hijack a payment, contract, or calendar decision merely because it
   // mentions a venue or caterer. Other categories become research work only
   // when the decision itself is about finding or choosing that supplier.
-  if (!/\b(choose|find|research|search|shortlist|compare|select|book)\b/.test(text)
+  const isSupplierAction = /\b(choose|find|research|search|shortlist|compare|select|book)\b/.test(text)
+    || (/\b(schedule|arrange|trial)\b/.test(text) && /\b(hair|makeup|make-up|beauty|stylist|artist)\b/.test(text));
+  if (!isSupplierAction
     && !/vendor research timing|vendor search freshness/.test(text)) return null;
-  if (/\b(photo|photographer|photography)\b/.test(text)) return "wedding photographers";
-  if (/\b(florist|floral|flowers?)\b/.test(text)) return "wedding florists";
-  if (/\b(caterer|catering|menu)\b/.test(text)) return "wedding caterers";
-  if (/\b(venue|reception)\b/.test(text)) return "wedding venues";
+  if (/\b(photo|photographers?|photography)\b/.test(text)) return "wedding photographers";
+  if (/\b(video|videographers?|videography)\b/.test(text)) return "wedding videographers";
+  if (/\b(florists?|floral|flowers?)\b/.test(text)) return "wedding florists";
+  if (/\b(caterers?|catering|menus?)\b/.test(text)) return "wedding caterers";
+  if (/\b(hair|hairdressers?|hair stylists?|hairstylists?)\b/.test(text)) return "wedding hair stylists";
+  if (/\b(makeup|make-up|beauty|makeup artists?)\b/.test(text)) return "wedding makeup artists";
+  if (/\b(celebrants?|officiants?)\b/.test(text)) return "authorised wedding celebrants";
+  if (/\b(djs?|bands?|live music|musicians?)\b/.test(text)) return "wedding music vendors";
+  if (/\b(cakes?|bakers?|bakery)\b/.test(text)) return "wedding cake bakers";
+  if (/\b(planners?|coordinators?)\b/.test(text)) return "wedding planners";
+  if (/\b(transport|cars?|limousines?|shuttles?)\b/.test(text)) return "wedding transport vendors";
+  if (/\b(stationery|invitations?|signage|calligraphers?)\b/.test(text)) return "wedding stationery vendors";
+  if (/\b(venues?|reception)\b/.test(text)) return "wedding venues";
   return null;
 }
 

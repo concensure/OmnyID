@@ -17,7 +17,7 @@ test("mobile Documents uses one coherent toolbar, privacy row, and export card",
   assert.match(documentsPanel, /rounded-2xl border border-slate-200 bg-white/);
   assert.match(documentsPanel, /Export plan/);
   assert.match(documentsPanel, /wedding:documents:download-plan/);
-  assert.match(mobilePage, /pb-\[calc\(10rem\+env\(safe-area-inset-bottom\)\)\]/);
+  assert.match(mobilePage, /pb-\[calc\(3\.75rem\+env\(safe-area-inset-bottom\)\)\]/);
 });
 
 test("mobile wedding surfaces remove redundant chrome without removing actions", () => {
@@ -26,7 +26,7 @@ test("mobile wedding surfaces remove redundant chrome without removing actions",
   assert.match(mobileDeck, /phone:rounded-none phone:border-0 phone:bg-transparent phone:px-0 phone:shadow-none/);
   assert.match(mobileDeck, /!props\.sequential && event\.key === "ArrowRight"/);
   assert.match(mobileFocus, /label=\{mobileFocusMode\(\) === "responses" \? "Response" : "Decision"\}[\s\S]*sequential/);
-  assert.match(mobileFocus, /immersive=\{clearDecisionView\(\) \|\| \(!selectedSection\(\) && mobileFocusMode\(\) !== "overview"\)\}/);
+  assert.match(mobileFocus, /decisionSurfaceOpen\(\) \|\| \(!selectedSection\(\) && mobileFocusMode\(\) !== "overview"\)/);
   assert.doesNotMatch(mobileFocus, /Decision"\} \$\{Math\.min\(position/);
   assert.match(mobileDeck, /primaryActionLabel/);
   assert.doesNotMatch(mobileDeck, />Approve<\/button>/);
@@ -34,6 +34,13 @@ test("mobile wedding surfaces remove redundant chrome without removing actions",
   assert.match(mobileFocus, /setMobileFocusSingleCardSectionId\("vendor_search"\)/);
   assert.match(mobileFocus, /hasVendorShortlist\(item\) \? "Open shortlist" : "Search vendors"/);
   assert.match(mobileFocus, /display\(\)\.queuedItemCards\.find/);
+  assert.match(mobileDeck, /showGestureHint\(\) && props\.position === 0/);
+  assert.match(mobileDeck, /Swipe up for later, swipe down to approve/);
+  assert.doesNotMatch(mobileDeck, /Swipe up for later, down to approve/);
+  assert.match(mobileFocus, /method === "swipe"[\s\S]*approveDecisionImmediately/);
+  assert.match(mobileFocus, /weddingVendorResearchQueryForDecision\(decision\) && \(!artifact \|\| !recommended\)/);
+  assert.match(mobileFocus, /shortlist is still being prepared/);
+  assert.match(mobileFocus, /decisionSurfaceOpen\(\) \? ""/);
 });
 
 test("operator-only vendor provider setup and technical freshness copy stay out of decision cards", () => {

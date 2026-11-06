@@ -15,6 +15,18 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-339
+    title: Mobile decision focus, just-in-time vendor research, and unconventional venue release
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-339
+    worktree: C:/Users/ozans/Desktop/projects/OmnyID-GROWTH-001
+    base_sha: a4e1ed9ad7d343d0341c7edd73c938a3953298c7
+    depends_on: [WED-332, WED-337, WED-338]
+    files: [solid-ui/src/components/WeddingDecision**, solid-ui/src/components/WeddingMobile**, solid-ui/src/components/Wedding**, solid-ui/src/lib/wedding**, solid-ui/tests/wedding-**, src/server/wedding**, src/server/proactive**, src/server/wedding_vendor_search_routes/attribute_catalog.rs, postgres/data/2026-10-15_weddingnsw_import.sql, postgres/data/2026-10-19_wedlockers_urbanlist_import.sql, postgres/data/2026-11-05_unconventional_venues_import.sql, Documents/design/wedding planner/weddingnsw-import/**, Documents/design/wedding planner/venue-import-2026-10-15/**, Documents/design/wedding planner/unconventional-venues-import-2026-11-05/**, Documents/issues/wedding planner/**, Documents/verification/**, .agent/**]
+    acceptance: [The mobile decision surface remains wholly above a shorter bottom navigation and uses the available viewport width without outer gutters, the first decision alone explains swipe gestures at the top and mobile omits Decision focus, upward deferral and downward approval work from any Today-page scroll position and downward approval executes the recommendation immediately, vendor-search and scheduling decisions precompute only the current and immediate-next evidence-backed three-option shortlist and expose its top personalised choice plus an in-place comparison/action surface, other mobile Wedding views lose only redundant outer gutters while preserving safe areas and in-place secondary surfaces, the unconventional venue import and prerequisites are tested idempotently and applied to Oracle with special-category counts recorded and WILD LIFE Sydney Zoo backed by current official evidence, focused frontend Rust database security full Wedding typecheck build and line-budget checks pass, a short Wedding strengthening report and exact-SHA Oracle release evidence are recorded]
+    progress: "Implemented mobile full-width decision deck and compact safe-area navigation; first-card top-only swipe guidance; down-swipe immediate AFP approval with recommended vendor selection; mobile current-and-next funded research; current-and-next background Policy V2 exactly-three vendor shortlists and in-place review; expanded category routing including hair, makeup, photography, video, florals, catering, celebrants, music, cake, planning, transport, stationery and venue. Added reviewed WeddingNSW/Wedlockers prerequisites and 57-new/20-enrichment unconventional import with current official WILD LIFE Sydney Zoo evidence. Disposable Postgres applied the ordered loads and the cumulative import twice; exact category totals passed. Typecheck, targeted mobile browser swipe test, public Wedding checks, production UI build, both line budgets, all 2,222 Wedding tests and all 70 focused Rust vendor-search tests pass. Oracle mutation and exact-SHA release remain pending."
+
   - id: WED-338
     title: Turn Invite Proposals into a category opportunity with shared projections and secure vendor access
     status: done

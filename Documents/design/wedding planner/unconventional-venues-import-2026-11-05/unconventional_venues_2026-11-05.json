@@ -1,0 +1,3332 @@
+{
+  "generated": "2026-11-05",
+  "new_venues": [
+    {
+      "vendor_name": "Clearview Sydney Harbour Cruises",
+      "special_category": [
+        "boat"
+      ],
+      "special_subtype": [
+        "glass boat"
+      ],
+      "service_area": "King Street Wharf, Sydney NSW",
+      "address": "32 The Promenade, King Street Wharf 5, Sydney NSW 2000",
+      "website_url": "https://www.clearviewsydneyharbourcruises.com.au/wedding-venues",
+      "contact_phone": "(02) 8296 7353",
+      "contact_email": "hello@clearviewcruises.com.au",
+      "capacity_seated_max": 260,
+      "capacity_standing_max": 440,
+      "capacity_note": "Ceremony and reception or reception only: up to 260 seated or 440 cocktail. Intimate weddings up to 50 seated on the private mezzanine.",
+      "price_note": "No base price published; package lengths 3h, 4h and 5.5h, 20% deposit. Ask for a quote.",
+      "style_tags": [
+        "boat",
+        "glass boat",
+        "unconventional",
+        "harbour cruise",
+        "on-water ceremony",
+        "harbour views",
+        "waterfront",
+        "Sydney Harbour",
+        "King Street Wharf",
+        "glamorous",
+        "all-inclusive",
+        "no BYO"
+      ],
+      "editorial_summary": "A glass-roofed vessel that sails the harbour for the whole wedding, with the ceremony, canapés and dinner all on board. The in-house chef and crew run the day, and a smaller private upper level suits intimate groups. Alcohol must come from the boat (no BYO).",
+      "sources": [
+        "https://www.clearviewsydneyharbourcruises.com.au/wedding-venues",
+        "https://www.clearviewsydneyharbourcruises.com.au/contact-us"
+      ],
+      "flags": [
+        "operator_is_australian_cruise_group",
+        "no_byo"
+      ],
+      "category": "Venue",
+      "source_checked_at": "2026-11-05"
+    },
+    {
+      "vendor_name": "Sydney Harbour Escapes",
+      "special_category": [
+        "boat"
+      ],
+      "special_subtype": [
+        "fleet charter",
+        "superyacht",
+        "catamaran",
+        "ferry"
+      ],
+      "service_area": "Woolwich, Sydney NSW",
+      "address": "2C Margaret Street, Woolwich NSW 2111",
+      "website_url": "https://www.sydneyharbourescapes.com.au/wedding-boat-charters",
+      "contact_phone": "(02) 9328 4748",
+      "contact_email": null,
+      "capacity_seated_max": 440,
+      "capacity_standing_max": 950,
+      "capacity_note": "Largest vessel (Starship Sydney): 440 at tables, 950 cocktail. Fleet runs from 10-guest to 950-guest boats.",
+      "price_note": "Hourly charter, typically 4-hour minimum: from about $1,440 for the smallest boat to $10,000 for large superyachts; 50% deposit. Third-party operator figures, confirm before booking.",
+      "style_tags": [
+        "boat",
+        "superyacht",
+        "yacht charter",
+        "catamaran",
+        "ferry",
+        "unconventional",
+        "harbour cruise",
+        "on-water ceremony",
+        "Sydney Harbour",
+        "waterfront",
+        "all sizes",
+        "BYO on some boats",
+        "wedding coordinator"
+      ],
+      "editorial_summary": "A charter company with eleven vessels from a 10-guest cruiser to a 950-guest function boat, including a classic ferry and a superyacht. Each wedding gets a coordinator, ceremonies on board are allowed, and some boats allow your own food and drink. Pick-ups are possible from many harbour wharves.",
+      "sources": [
+        "https://www.sydneyharbourescapes.com.au/wedding-boat-charters",
+        "https://boat.sydneyharbourescapes.com.au/contact-us/"
+      ],
+      "flags": [
+        "needs_contact_lookup",
+        "email_missing_form_only",
+        "charter_fleet_multiple_vessels"
+      ],
+      "category": "Venue",
+      "source_checked_at": "2026-11-05"
+    },
+    {
+      "vendor_name": "All Occasion Cruises",
+      "special_category": [
+        "boat"
+      ],
+      "special_subtype": [
+        "fleet charter",
+        "catamaran",
+        "superyacht"
+      ],
+      "service_area": "Pyrmont, Sydney NSW",
+      "address": "5/11 Bank Street, Pyrmont NSW 2009",
+      "website_url": "https://aocruises.com.au/wedding-cruise-sydney/",
+      "contact_phone": "(02) 9809 5499",
+      "contact_email": "info@aocruises.com.au",
+      "capacity_seated_max": 280,
+      "capacity_standing_max": 750,
+      "capacity_note": "Largest vessel (Bella Vista): 280 seated, 750 cocktail. Smaller options from 36 guests (yachts) to 200 (Aussie Magic catamaran).",
+      "price_note": "Hourly rates published per vessel, roughly $975 to $3,250 per hour; a 5-hour wedding package is offered, price on request.",
+      "style_tags": [
+        "boat",
+        "catamaran",
+        "superyacht",
+        "yacht charter",
+        "unconventional",
+        "harbour cruise",
+        "sky deck ceremony",
+        "Sydney Harbour",
+        "waterfront",
+        "glamorous",
+        "all sizes"
+      ],
+      "editorial_summary": "A harbour charter operator whose five-hour wedding package covers a vessel with wraparound decks, a sky deck for the ceremony and photos, and a private upper bar. Fleet choices range from 36-guest yachts to a 750-guest cocktail boat.",
+      "sources": [
+        "https://aocruises.com.au/wedding-cruise-sydney/"
+      ],
+      "flags": [
+        "charter_fleet_multiple_vessels"
+      ],
+      "category": "Venue",
+      "source_checked_at": "2026-11-05"
+    },
+    {
+      "vendor_name": "Sydney Harbour Tall Ships",
+      "special_category": [
+        "boat"
+      ],
+      "special_subtype": [
+        "tall ship",
+        "historic vessel"
+      ],
+      "service_area": "The Rocks, Sydney NSW",
+      "address": "Campbell's Cove Wharf 2 Pontoon, The Rocks NSW 2000",
+      "website_url": "https://sydneytallships.com.au/cruise/weddings-ceremonies/",
+      "contact_phone": "(02) 8015 5571",
+      "contact_email": "info@sydneytallships.com.au",
+      "capacity_seated_max": null,
+      "capacity_standing_max": null,
+      "capacity_note": "Capacity not published; described as suitable for large groups.",
+      "price_note": null,
+      "style_tags": [
+        "boat",
+        "tall ship",
+        "historic vessel",
+        "timber ship",
+        "unconventional",
+        "romantic",
+        "on-water ceremony",
+        "Sydney Harbour",
+        "The Rocks",
+        "waterfront",
+        "quirky",
+        "LGBTQ+ friendly",
+        "photos only option"
+      ],
+      "editorial_summary": "Traditional timber tall ships sailing from The Rocks, offered for ceremonies, receptions, guest transfers or a photos-only sail. A floating dance floor and live music or DJ are available. Fleet names, capacity and pricing are not published, so these need an enquiry.",
+      "sources": [
+        "https://sydneytallships.com.au/cruise/weddings-ceremonies/"
+      ],
+      "flags": [
+        "capacity_not_published",
+        "verify_availability",
+        "second_phone_wedding_line_0283104780"
+      ],
+      "category": "Venue",
+      "source_checked_at": "2026-11-05"
+    },
+    {
+      "vendor_name": "Fantasea Cruising",
+      "special_category": [
+        "boat"
+      ],
+      "special_subtype": [
+        "fleet charter",
+        "ferry"
+      ],
+      "service_area": "Darling Harbour, Sydney NSW",
+      "address": "2b Pier 26, Darling Harbour, Sydney NSW 2000",
+      "website_url": "https://www.fantasea.com.au/wedding-reception/",
+      "contact_phone": "1800 326 822",
+      "contact_email": "charters@fantasea.com.au",
+      "capacity_seated_max": null,
+      "capacity_standing_max": null,
+      "capacity_note": "Largest vessel (Fantasea Catalina) holds up to 399 in total; seated/standing split not published.",
+      "price_note": "No prices published; quote on request.",
+      "style_tags": [
+        "boat",
+        "ferry",
+        "harbour cruise",
+        "unconventional",
+        "Sydney Harbour",
+        "Darling Harbour",
+        "Circular Quay",
+        "waterfront",
+        "flexible setup",
+        "multiple wharf pick-ups"
+      ],
+      "editorial_summary": "A Sydney Harbour charter fleet departing from Darling Harbour or Circular Quay, with vessels from about 30 up to 399 guests. Setup is flexible and pick-up is possible from several wharves; pricing is quoted per enquiry.",
+      "sources": [
+        "https://www.fantasea.com.au/wedding-reception/",
+        "https://www.fantasea.com.au/contact-us/"
+      ],
+      "flags": [
+        "capacity_split_not_published",
+        "email_decoded_from_cloudflare",
+        "charter_fleet_multiple_vessels",
+        "second_departure_circular_quay_wharf_6"
+      ],
+      "category": "Venue",
+      "source_checked_at": "2026-11-05"
+    },
+    {
+      "vendor_name": "Prestige Harbour Cruises",
+      "special_category": [
+        "boat"
+      ],
+      "special_subtype": [
+        "fleet charter",
+        "tall ship",
+        "historic vessel",
+        "superyacht"
+      ],
+      "service_area": "Sydney Harbour, Sydney NSW",
+      "address": null,
+      "website_url": "https://prestigeharbourcruises.com.au/wedding-ceremony/boat-hire",
+      "contact_phone": "(02) 8015 7275",
+      "contact_email": null,
+      "capacity_seated_max": null,
+      "capacity_standing_max": null,
+      "capacity_note": "Listing spans vessels from 14 to about 300 guests; per-vessel seated/standing not published.",
+      "price_note": "Hourly rates from about $330 (small boats) up to $3,600 (large superyachts); includes classic timber boats around $600-$850 per hour.",
+      "style_tags": [
+        "boat",
+        "tall ship",
+        "historic vessel",
+        "classic ferry",
+        "superyacht",
+        "unconventional",
+        "Sydney Harbour",
+        "on-water ceremony",
+        "waterfront",
+        "all sizes",
+        "boat marketplace"
+      ],
+      "editorial_summary": "A boat-hire marketplace listing dozens of Sydney vessels, including a square-rigged tall ship, a classic ferry and a 1960s timber cruiser alongside modern catamarans and superyachts. Useful for comparing options, but capacity and ceremony rules differ per vessel.",
+      "sources": [
+        "https://prestigeharbourcruises.com.au/wedding-ceremony/boat-hire",
+        "https://prestigeharbourcruises.com.au/contact"
+      ],
+      "flags": [
+        "needs_contact_lookup",
+        "marketplace_not_single_vessel",
+        "no_street_address",
+        "email_missing_form_only"
+      ],
+      "category": "Venue",
+      "source_checked_at": "2026-11-05"
+    },
+    {
+      "vendor_name": "Sydney Harbour Yacht Charter",
+      "special_category": [
+        "boat"
+      ],
+      "special_subtype": [
+        "superyacht",
+        "yacht",
+        "overnight"
+      ],
+      "service_area": "Sydney Harbour, Sydney NSW",
+      "address": null,
+      "website_url": "https://www.sydneyharbouryachtcharter.com.au/cruises/wedding-cruises/",
+      "contact_phone": "0409 224 739",
+      "contact_email": "info@shyc.com.au",
+      "capacity_seated_max": null,
+      "capacity_standing_max": null,
+      "capacity_note": "Largest named vessel (Ghost II) up to 110 guests; Legacy up to 80 standing or 24 seated. Most vessels are 36 guests or fewer.",
+      "price_note": null,
+      "style_tags": [
+        "boat",
+        "superyacht",
+        "yacht",
+        "luxury",
+        "intimate",
+        "unconventional",
+        "on-water ceremony",
+        "overnight charter",
+        "Sydney Harbour",
+        "Pittwater",
+        "waterfront",
+        "glamorous",
+        "elopements"
+      ],
+      "editorial_summary": "A superyacht and luxury yacht charter business offering intimate on-deck ceremonies, small receptions and overnight wedding charters, on Sydney Harbour and also Pittwater. Pricing is tailored per package and not published.",
+      "sources": [
+        "https://www.sydneyharbouryachtcharter.com.au/cruises/wedding-cruises/",
+        "https://www.sydneyharbouryachtcharter.com.au/contact/"
+      ],
+      "flags": [
+        "needs_contact_lookup",
+        "no_street_address",
+        "verify_trading",
+        "email_decoded_from_cloudflare",
+        "charter_fleet_multiple_vessels"
+      ],
+      "category": "Venue",
+      "source_checked_at": "2026-11-05"
+    },
+    {
+      "vendor_name": "Sydney Harbour Exclusive",
+      "special_category": [
+        "boat"
+      ],
+      "special_subtype": [
+        "fleet charter",
+        "superyacht",
+        "glass boat"
+      ],
+      "service_area": "Sydney Harbour, Sydney NSW",
+      "address": null,
+      "website_url": "https://www.sydneyharbourexclusive.com/charter-hire-events/wedding-boat-hire/",
+      "contact_phone": "(02) 9380 9111",
+      "contact_email": "info@sydneyharbourexclusive.com",
+      "capacity_seated_max": null,
+      "capacity_standing_max": 950,
+      "capacity_note": "Fleet capacity from about 20 to 950 people (The Starship); seated numbers per vessel not published.",
+      "price_note": "Hourly rates published per vessel from about $1,200 to $5,000 per hour (some plus GST); minimum hours not stated.",
+      "style_tags": [
+        "boat",
+        "superyacht",
+        "luxury",
+        "glass boat",
+        "unconventional",
+        "harbour cruise",
+        "ceremony on deck",
+        "Sydney Harbour",
+        "waterfront",
+        "glamorous",
+        "BYO florist or stylist",
+        "celebrant welcome"
+      ],
+      "editorial_summary": "A luxury yacht and function-boat charter company, established in 2010, handling ceremonies on deck, receptions or both. Couples can bring their own florist or stylist, and live music, DJs or fireworks can be added.",
+      "sources": [
+        "https://www.sydneyharbourexclusive.com/charter-hire-events/wedding-boat-hire/"
+      ],
+      "flags": [
+        "no_street_address",
+        "charter_fleet_multiple_vessels"
+      ],
+      "category": "Venue",
+      "source_checked_at": "2026-11-05"
+    },
+    {
+      "vendor_name": "Sydney Yacht Club (boat charter)",
+      "special_category": [
+        "boat"
+      ],
+      "special_subtype": [
+        "fleet charter",
+        "yacht",
+        "catamaran"
+      ],
+      "service_area": "Sydney Harbour, Sydney NSW",
+      "address": null,
+      "website_url": "https://sydyachtclub.com.au/",
+      "contact_phone": "0426 260 615",
+      "contact_email": "info@sydyachtclub.com.au",
+      "capacity_seated_max": null,
+      "capacity_standing_max": null,
+      "capacity_note": "Groups from 1 to 950 guests across the fleet; per-vessel capacity not published on the home page.",
+      "price_note": "No prices published; deposit and bond required. BYO food and drink on most boats with a surcharge.",
+      "style_tags": [
+        "boat",
+        "yacht",
+        "catamaran",
+        "luxury",
+        "unconventional",
+        "Sydney Harbour",
+        "waterfront",
+        "BYO",
+        "BYO chef welcome",
+        "all sizes",
+        "CBD wharf pick-up"
+      ],
+      "editorial_summary": "A charter agency matching couples with luxury yachts, catamarans and function boats for groups of any size. Most boats allow BYO food and drink for a surcharge, and all central wharves are available for pick-up. Not a members' club despite the name.",
+      "sources": [
+        "https://sydyachtclub.com.au/"
+      ],
+      "flags": [
+        "no_street_address",
+        "charter_broker",
+        "name_not_a_club",
+        "pricing_not_published"
+      ],
+      "category": "Venue",
+      "source_checked_at": "2026-11-05"
+    },
+    {
+      "vendor_name": "Sydney Catamaran Hire",
+      "special_category": [
+        "boat"
+      ],
+      "special_subtype": [
+        "catamaran"
+      ],
+      "service_area": "Sydney Harbour, Sydney NSW",
+      "address": null,
+      "website_url": "https://www.sydneycatamaranhire.com.au/cruise-options/wedding-cruises/",
+      "contact_phone": "(02) 9090 4484",
+      "contact_email": "info@sydneycatamaranhire.com.au",
+      "capacity_seated_max": null,
+      "capacity_standing_max": null,
+      "capacity_note": "Boats take up to about 43-44 guests; seated/standing split not stated.",
+      "price_note": "From $700 per hour with a 4-hour minimum. BYO food and drink welcome.",
+      "style_tags": [
+        "boat",
+        "catamaran",
+        "intimate",
+        "unconventional",
+        "Sydney Harbour",
+        "Opera House views",
+        "Harbour Bridge views",
+        "waterfront",
+        "BYO",
+        "small wedding",
+        "relaxed"
+      ],
+      "editorial_summary": "Small catamarans for intimate harbour weddings of up to about 43 guests, with the Opera House and Harbour Bridge as the backdrop. Couples may bring their own food and drink or use partner caterers, and decorations can be arranged.",
+      "sources": [
+        "https://www.sydneycatamaranhire.com.au/cruise-options/wedding-cruises/"
+      ],
+      "flags": [
+        "no_street_address",
+        "small_groups_only"
+      ],
+      "category": "Venue",
+      "source_checked_at": "2026-11-05"
+    },
+    {
+      "vendor_name": "Boatique Sydney Boat Hire",
+      "special_category": [
+        "boat"
+      ],
+      "special_subtype": [
+        "fleet charter",
+        "superyacht",
+        "catamaran"
+      ],
+      "service_area": "King Street Wharf, Sydney NSW",
+      "address": null,
+      "website_url": "https://boatiquesydneyboathire.com.au/wedding-boat-hire/",
+      "contact_phone": "0432 428 297",
+      "contact_email": null,
+      "capacity_seated_max": null,
+      "capacity_standing_max": null,
+      "capacity_note": "Sixteen vessels from about 33 to 400 guests; seated/standing split not stated.",
+      "price_note": "Hourly rates from $700 to about $3,300; 5-hour small-wedding reception tables from about $1,750 to $5,000. Catering from $45 per person; BYO is stated to cut costs. Couples must book their own celebrant.",
+      "style_tags": [
+        "boat",
+        "catamaran",
+        "superyacht",
+        "unconventional",
+        "Sydney Harbour",
+        "on-water ceremony",
+        "upper-deck ceremony",
+        "waterfront",
+        "BYO cake",
+        "King Street Wharf",
+        "all sizes"
+      ],
+      "editorial_summary": "A boat-hire booking service with sixteen Sydney vessels, mostly departing from King Street Wharf, where the ceremony usually happens on the upper deck. It publishes per-person cost guides, but the couple supplies their own registered celebrant.",
+      "sources": [
+        "https://boatiquesydneyboathire.com.au/wedding-boat-hire/"
+      ],
+      "flags": [
+        "needs_contact_lookup",
+        "email_missing_form_only",
+        "no_street_address",
+        "charter_broker"
+      ],
+      "category": "Venue",
+      "source_checked_at": "2026-11-05"
+    },
+    {
+      "vendor_name": "Eastcoast Sailing",
+      "special_category": [
+        "boat"
+      ],
+      "special_subtype": [
+        "fleet charter",
+        "catamaran"
+      ],
+      "service_area": "Sydney Harbour, Sydney NSW",
+      "address": null,
+      "website_url": "https://eastcoastsailing.com.au/catamaran-hire-sydney/",
+      "contact_phone": "1300 883 023",
+      "contact_email": null,
+      "capacity_seated_max": null,
+      "capacity_standing_max": null,
+      "capacity_note": "Over 55 catamarans for 12 to 240 guests; function boats listed at 80-185 guests. Seated/standing split not stated.",
+      "price_note": "From $325 per hour with skipper, crew and fuel; function catamarans from about $650-$1,250 per hour.",
+      "style_tags": [
+        "boat",
+        "catamaran",
+        "unconventional",
+        "Sydney Harbour",
+        "waterfront",
+        "all sizes",
+        "function boat",
+        "relaxed"
+      ],
+      "editorial_summary": "A large catamaran charter company with more than fifty boats for 12 to 240 guests, including function catamarans listed as suitable for weddings. Quotes come back with several matched vessels and ballpark pricing.",
+      "sources": [
+        "https://eastcoastsailing.com.au/catamaran-hire-sydney/"
+      ],
+      "flags": [
+        "needs_contact_lookup",
+        "email_missing_form_only",
+        "no_street_address",
+        "fetch_truncated_fleet_list",
+        "ceremony_policy_not_stated"
+      ],
+      "category": "Venue",
+      "source_checked_at": "2026-11-05"
+    },
+    {
+      "vendor_name": "Blue Mountains Botanic Garden Mount Tomah",
+      "special_category": [
+        "botanical"
+      ],
+      "special_subtype": [
+        "botanic garden",
+        "cool-climate garden",
+        "mountain lookout",
+        "rooftop garden"
+      ],
+      "service_area": "Mount Tomah, Blue Mountains NSW",
+      "address": "Bells Line of Road, Mount Tomah NSW 2758",
+      "website_url": "https://www.botanicgardens.org.au/venues-and-lawns/all-venues-and-lawns/waratah-room",
+      "contact_phone": "+61 2 9231 8111",
+      "contact_email": null,
+      "capacity_seated_max": 60,
+      "capacity_standing_max": 100,
+      "capacity_note": "Waratah Room seats 60; the Signature Botanic Wedding Package allows up to 100 standing. The Formal Garden page says up to 120 for hire while its package text says 100 standing or 60 seated, so the lower figures are stored. Viewing Deck package is up to 50; Camellia Garden and DeFerranti Pavilion up to 30.",
+      "price_note": "2026-27 official rates: Signature Botanic Wedding Package $4,700 (3 hour ceremony, 5 hour reception in the Waratah Room); Blooms, Views and Vows Package $4,900 (observation platform and Visitor Centre, 5 hours from 4pm, up to 50); Formal Garden ceremony $2,100 for 3 hours; Camellia Garden $600 for 1.5 hours; bond $500; extra hours $430. Wedding photography permit $315 unless included in a package.",
+      "style_tags": [
+        "botanical",
+        "unconventional",
+        "Blue Mountains",
+        "mountain views",
+        "rooftop garden",
+        "Mount Tomah",
+        "cool climate"
+      ],
+      "editorial_summary": "A cool-climate botanic garden high in the Blue Mountains offering several ceremony settings, a reception room with a kitchenette and, newly, exclusive hire of its rooftop lookout and visitor centre at sunset. Packages are tiered by group size, from intimate to around a hundred guests.",
+      "sources": [
+        "https://www.botanicgardens.org.au/venues-and-lawns/all-venues-and-lawns/waratah-room",
+        "http://www.botanicgardens.org.au/venues-and-lawns/all-venues-and-lawns/formal-garden",
+        "https://www.botanicgardens.org.au/venues-and-lawns/all-venues-and-lawns/viewing-deck-and-visitor-centre",
+        "https://www.botanicgardens.org.au/venues-and-lawns/all-venues-and-lawns/camellia-garden-and-deferranti-pavilion",
+        "https://www.botanicgardens.org.au/mount-tomah"
+      ],
+      "flags": [
+        "email_missing_form_only",
+        "capacity_conflict",
+        "permit_required",
+        "limited_wheelchair_access"
+      ],
+      "category": "Venue",
+      "source_checked_at": "2026-11-05"
+    },
+    {
+      "vendor_name": "Chinese Garden of Friendship Darling Harbour",
+      "special_category": [
+        "botanical"
+      ],
+      "special_subtype": [
+        "chinese garden",
+        "pavilions",
+        "public garden"
+      ],
+      "service_area": "Darling Harbour, Sydney NSW",
+      "address": "Pier St, cnr Harbour St, Darling Harbour NSW 2000",
+      "website_url": "https://www.darlingharbour.com/precincts/chinese-garden/weddings,-functions,-filming-and-photography-at-th",
+      "contact_phone": "02 9240 8888",
+      "contact_email": "functions@property.nsw.gov.au",
+      "capacity_seated_max": 100,
+      "capacity_standing_max": 180,
+      "capacity_note": "Whole-garden evening function: 100 seated, 180 cocktail. Daytime ceremony pavilions are smaller: Peace Boat Pavilion 30 standing/12 seated, Water Pavilion 50/48, Hall of Longevity 100/48, counting all attendees including celebrant and photographers.",
+      "price_note": "2026 sheets: ceremony pavilion hire 3 hours $780 (Peace Boat), $980 (Water), $1,280 (Hall of Longevity), GST incl, $280 holding deposit. Exclusive evening hire of the lower garden $6,000 (5.30pm to midnight, $1,500 deposit), extra hours $1,200. Furniture in pavilions included free.",
+      "style_tags": [
+        "botanical",
+        "unconventional",
+        "Chinese garden",
+        "pagoda pavilions",
+        "waterfront city",
+        "Darling Harbour",
+        "Sydney CBD"
+      ],
+      "editorial_summary": "A classical Chinese garden with pavilions, bridges and reflective pools right beside Darling Harbour, bookable for daytime ceremonies or an exclusive evening function. Each pavilion has its own size, and catering is arranged through the on-site teahouse operator.",
+      "sources": [
+        "https://www.darlingharbour.com/precincts/chinese-garden/weddings,-functions,-filming-and-photography-at-th",
+        "https://www.darlingharbour.com/getmedia/087dc737-2d09-4ddb-8666-70f5ac52465d/wedding-ceremony-2026.pdf",
+        "https://www.darlingharbour.com/getmedia/37e70e6d-0097-47b1-a4d8-f5c78163e964/venue-hire-2026.pdf",
+        "https://www.darlingharbour.com/getmedia/1ea42305-d979-49fd-9618-6293715475df/evening-functions-2026.pdf"
+      ],
+      "flags": [
+        "postcode_inferred",
+        "exclusive_caterer",
+        "verify_external_caterers_allowed",
+        "pedestrian_access_only",
+        "alcohol_and_music_cease_1030pm_evening"
+      ],
+      "category": "Venue",
+      "source_checked_at": "2026-11-05"
+    },
+    {
+      "vendor_name": "Wollongong Botanic Garden",
+      "special_category": [
+        "botanical"
+      ],
+      "special_subtype": [
+        "botanic garden",
+        "rose garden",
+        "glasshouse",
+        "ceremony lawns"
+      ],
+      "service_area": "Keiraville, Illawarra NSW",
+      "address": "Murphys Avenue, Keiraville NSW 2500",
+      "website_url": "https://wollongongbotanicgarden.com.au/events/weddings",
+      "contact_phone": "02 4227 7667",
+      "contact_email": "botanicgarden@wollongong.nsw.gov.au",
+      "capacity_seated_max": 150,
+      "capacity_standing_max": null,
+      "capacity_note": "Rose Garden ceremony page states up to 150 guests; capacities for other ceremony spaces (Arid Collection, Temple Garden, Turpentine Lawn, Woodland Garden and Meadow) were not read. Ceremonies only; no reception option seen.",
+      "price_note": "Official fees page (2026-27, GST incl): exclusive use of a garden collection section for weddings $735 per hour, Rose Garden function package (30 white chairs, signing table, cloth) $218, refundable bond $485. Ceremony bookings include one hour setup and one hour pack-down at no charge. Entry is free.",
+      "style_tags": [
+        "botanical",
+        "unconventional",
+        "rose garden",
+        "gazebo",
+        "Mount Keira",
+        "Wollongong",
+        "Illawarra"
+      ],
+      "editorial_summary": "A council-run botanic garden at the foot of Mount Keira with several ceremony settings, including a rose garden with a gazebo and a red-desert arid collection. Couples hire a section by the hour for the ceremony, and wedding photos in the garden need no permit.",
+      "sources": [
+        "https://wollongongbotanicgarden.com.au/events/weddings",
+        "https://wollongongbotanicgarden.com.au/events/weddings/rose-garden",
+        "https://wollongongbotanicgarden.com.au/events/fees-and-charges",
+        "https://wollongongbotanicgarden.com.au/visit/hours-and-location"
+      ],
+      "flags": [
+        "ceremony_only",
+        "postcode_inferred",
+        "no_alcohol_on_site",
+        "rose_garden_closed_july_to_september"
+      ],
+      "category": "Venue",
+      "source_checked_at": "2026-11-05"
+    },
+    {
+      "vendor_name": "Hunter Region Botanic Gardens",
+      "special_category": [
+        "botanical"
+      ],
+      "special_subtype": [
+        "botanic garden",
+        "bush chapel",
+        "rotunda",
+        "lily pond"
+      ],
+      "service_area": "Heatherbrae, Hunter NSW",
+      "address": "2100 Pacific Highway, Heatherbrae NSW 2324",
+      "website_url": "https://www.huntergardens.org.au/weddings/",
+      "contact_phone": "(02) 4987 1655",
+      "contact_email": "events@huntergardens.org.au",
+      "capacity_seated_max": null,
+      "capacity_standing_max": null,
+      "capacity_note": "Capacities per ceremony spot are not stated on the official pages. The site structured data lists a different phone (02 4987 1140); the wedding page number is stored.",
+      "price_note": "Not published; wedding packages are under review and the events team quotes current prices, including new elopement packages. Bookings are essential and fees apply.",
+      "style_tags": [
+        "botanical",
+        "unconventional",
+        "bush chapel",
+        "Victorian rotunda",
+        "lily pond",
+        "Heatherbrae",
+        "Hunter",
+        "Port Stephens"
+      ],
+      "editorial_summary": "A community-run botanic garden beside the Pacific Highway with a Victorian-style rotunda on the lawn, a bush chapel grove and a lily pond for ceremonies. The gardens describe outdoor receptions and catering as flexible, with details by enquiry.",
+      "sources": [
+        "https://www.huntergardens.org.au/weddings/",
+        "https://www.huntergardens.org.au/?p=600",
+        "https://www.huntergardens.org.au/"
+      ],
+      "flags": [
+        "capacity_unknown",
+        "price_not_published",
+        "phone_conflict_verify"
+      ],
+      "category": "Venue",
+      "source_checked_at": "2026-11-05"
+    },
+    {
+      "vendor_name": "Auburn Botanic Gardens",
+      "special_category": [
+        "botanical"
+      ],
+      "special_subtype": [
+        "botanic garden",
+        "japanese garden",
+        "scented garden",
+        "rose garden"
+      ],
+      "service_area": "Auburn, Western Sydney NSW",
+      "address": "99 Chiswick Road, Auburn NSW 2144",
+      "website_url": "https://www.cumberland.nsw.gov.au/auburn-botanic-gardens",
+      "contact_phone": "(02) 8757 9000",
+      "contact_email": "council@cumberland.nsw.gov.au",
+      "capacity_seated_max": null,
+      "capacity_standing_max": null,
+      "capacity_note": "No capacity stated in the council pages or FAQ. Minimum booking is 1.5 hours with a 30 minute gap between events; tables and chairs must be hired in and set on paved surfaces.",
+      "price_note": "Not published on the pages read; fees and bond are quoted in the council's online booking system. Extra non-resident entry charges may apply if more guests attend than booked.",
+      "style_tags": [
+        "botanical",
+        "unconventional",
+        "japanese garden",
+        "sunken rose garden",
+        "scented garden",
+        "Auburn",
+        "Western Sydney"
+      ],
+      "editorial_summary": "A council botanic garden with themed sections such as a Japanese garden, scented garden and sunken rose garden that couples can book for ceremonies and photos. Receptions, marquees and food are not allowed on site, so a separate reception venue is needed.",
+      "sources": [
+        "https://www.cumberland.nsw.gov.au/auburn-botanic-gardens",
+        "https://www.cumberland.nsw.gov.au/sites/default/files/inline-files/auburn-botanic-gardens-faqs.pdf"
+      ],
+      "flags": [
+        "ceremony_only",
+        "postcode_inferred",
+        "price_not_published",
+        "exclusive_use_not_guaranteed",
+        "no_marquees",
+        "no_food_on_site",
+        "email_is_general_council"
+      ],
+      "category": "Venue",
+      "source_checked_at": "2026-11-05"
+    },
+    {
+      "vendor_name": "Fagan Park Galston",
+      "special_category": [
+        "botanical"
+      ],
+      "special_subtype": [
+        "themed gardens",
+        "public garden",
+        "lake gardens"
+      ],
+      "service_area": "Galston, Hills District NSW",
+      "address": "38-48 Arcadia Road, Galston NSW 2159",
+      "website_url": "https://www.hornsby.nsw.gov.au/faganpark",
+      "contact_phone": "(02) 9847 6666",
+      "contact_email": "hsc@hornsby.nsw.gov.au",
+      "capacity_seated_max": null,
+      "capacity_standing_max": null,
+      "capacity_note": "No ceremony capacity stated. Bookings are for a two-hour block, ceremony only, 9am to 3.30pm weekdays and 10am to 3.30pm weekends; marquees are not allowed.",
+      "price_note": "Not read; the council links a Fagan Park fees and charges PDF that could not be opened.",
+      "style_tags": [
+        "botanical",
+        "unconventional",
+        "themed gardens",
+        "Japanese garden",
+        "Dutch garden",
+        "lakeside",
+        "Galston",
+        "Hills District"
+      ],
+      "editorial_summary": "A council park made up of themed gardens, among them Japanese, Dutch, English and Mediterranean sections beside a lake, that can be booked for outdoor ceremonies. Receptions and parties are not available, so the day would need a separate venue after the vows.",
+      "sources": [
+        "https://www.hornsby.nsw.gov.au/faganpark"
+      ],
+      "flags": [
+        "ceremony_only",
+        "price_not_read",
+        "no_marquees",
+        "email_is_general_council",
+        "no_reception"
+      ],
+      "category": "Venue",
+      "source_checked_at": "2026-11-05"
+    },
+    {
+      "vendor_name": "Lisgar Gardens Hornsby",
+      "special_category": [
+        "botanical"
+      ],
+      "special_subtype": [
+        "public garden",
+        "japanese garden",
+        "formal lawn",
+        "pavilion"
+      ],
+      "service_area": "Hornsby, Upper North Shore NSW",
+      "address": "Lisgar Road, Hornsby NSW 2077",
+      "website_url": "https://www.hornsby.nsw.gov.au/lifestyle/sports-and-recreation/parks-and-playgrounds/lisgar-gardens",
+      "contact_phone": "(02) 9847 6666",
+      "contact_email": "hsc@hornsby.nsw.gov.au",
+      "capacity_seated_max": null,
+      "capacity_standing_max": null,
+      "capacity_note": "Capacity is shown only in the council booking system and was not read. Bookings run up to three hours; the page states the venue is not suitable for parties or any form of catering.",
+      "price_note": "Not published on the page read; the council links a fees and charges PDF.",
+      "style_tags": [
+        "botanical",
+        "unconventional",
+        "formal lawn",
+        "pavilion",
+        "Hornsby",
+        "Upper North Shore"
+      ],
+      "editorial_summary": "A small council garden with a pavilion and formal lawn that Hornsby Shire takes bookings for weddings and photos. It suits a short ceremony only, since parties and catering are ruled out.",
+      "sources": [
+        "https://www.hornsby.nsw.gov.au/lifestyle/sports-and-recreation/parks-and-playgrounds/lisgar-gardens"
+      ],
+      "flags": [
+        "ceremony_only",
+        "capacity_unknown",
+        "price_not_published",
+        "no_catering",
+        "email_is_general_council"
+      ],
+      "category": "Venue",
+      "source_checked_at": "2026-11-05"
+    },
+    {
+      "vendor_name": "Everglades House and Gardens",
+      "special_category": [
+        "botanical"
+      ],
+      "special_subtype": [
+        "historic garden",
+        "terraced garden",
+        "national trust"
+      ],
+      "service_area": "Leura, Blue Mountains NSW",
+      "address": "37 Everglades Avenue, Leura NSW 2780",
+      "website_url": "https://www.nationaltrust.org.au/places/everglades-house-gardens/venue-hire/",
+      "contact_phone": "(02) 4784 1938",
+      "contact_email": "everglades@nationaltrust.com.au",
+      "capacity_seated_max": 120,
+      "capacity_standing_max": null,
+      "capacity_note": "Wedding ceremonies are listed for 120 guests; private events are 50 seated or 60 standing. The venue stays open to the public during bookings.",
+      "price_note": "Ceremony hire from $2,600 for FY2027 (GST incl), covering 2 hours between 9am and 5pm.",
+      "style_tags": [
+        "botanical",
+        "unconventional",
+        "historic garden",
+        "1930s gardens",
+        "Leura",
+        "Blue Mountains"
+      ],
+      "editorial_summary": "A heritage English-style garden run by the National Trust in the Blue Mountains, available for wedding ceremonies in daytime hours. The official page says receptions and accommodation are not offered, so it works as a ceremony location paired with a separate reception.",
+      "sources": [
+        "https://www.nationaltrust.org.au/places/everglades-house-gardens/venue-hire/"
+      ],
+      "flags": [
+        "ceremony_only",
+        "no_reception",
+        "open_to_public_during_booking",
+        "caterer_rules_unknown"
+      ],
+      "category": "Venue",
+      "source_checked_at": "2026-11-05"
+    },
+    {
+      "vendor_name": "Campbell Rhododendron Gardens",
+      "special_category": [
+        "botanical"
+      ],
+      "special_subtype": [
+        "rhododendron garden",
+        "volunteer-run garden",
+        "ceremony sites"
+      ],
+      "service_area": "Blackheath, Blue Mountains NSW",
+      "address": "Bacchante St, Blackheath NSW 2785",
+      "website_url": "https://www.rhodogarden.org.au/booking-information",
+      "contact_phone": "+61 2 4787 8965",
+      "contact_email": null,
+      "capacity_seated_max": 100,
+      "capacity_standing_max": null,
+      "capacity_note": "Ceremonies are priced in two bands, up to 50 guests and up to 100 guests; 100 is the maximum. The sealed car park holds about 40 cars.",
+      "price_note": "Total booking fee $300 for up to 50 guests or $500 for up to 100 guests; 50% deposit to secure the date and the balance one month before. Cancellation more than 30 days out refunds the deposit less a $55 fee.",
+      "style_tags": [
+        "botanical",
+        "unconventional",
+        "rhododendrons",
+        "Blackheath",
+        "Blue Mountains",
+        "spring blooms"
+      ],
+      "editorial_summary": "A volunteer-run rhododendron garden near Blackheath that reserves a chosen site for a wedding ceremony while staying open to the public. Fees are set by guest band and gates close early in cooler months, so timing needs planning.",
+      "sources": [
+        "https://www.rhodogarden.org.au/hire",
+        "https://www.rhodogarden.org.au/booking-information",
+        "https://www.rhodogarden.org.au/wedding-faq"
+      ],
+      "flags": [
+        "ceremony_only",
+        "email_missing_form_only",
+        "postcode_inferred",
+        "catering_alcohol_rules_unknown",
+        "no_sheltered_site_reported",
+        "voicemail_phone"
+      ],
+      "category": "Venue",
+      "source_checked_at": "2026-11-05"
+    },
+    {
+      "vendor_name": "Illawarra Rhododendron and Rainforest Gardens",
+      "special_category": [
+        "botanical"
+      ],
+      "special_subtype": [
+        "rhododendron garden",
+        "rainforest garden",
+        "volunteer-run garden"
+      ],
+      "service_area": "Mount Pleasant, Illawarra NSW",
+      "address": "Parrish Avenue, Mount Pleasant NSW 2519",
+      "website_url": "https://irrg.au",
+      "contact_phone": "0490 069 360",
+      "contact_email": "bookings@irrg.au",
+      "capacity_seated_max": null,
+      "capacity_standing_max": null,
+      "capacity_note": "No capacity stated on the official page. Weddings must be booked in advance and can be held on public open days or on normally closed days by arrangement.",
+      "price_note": "Not published; wedding and photo-shoot fees are given by the bookings volunteer.",
+      "style_tags": [
+        "botanical",
+        "unconventional",
+        "rhododendrons",
+        "rainforest",
+        "Mount Pleasant",
+        "Illawarra",
+        "escarpment"
+      ],
+      "editorial_summary": "A volunteer-run garden on the Illawarra escarpment with rhododendron and rainforest plantings, bookable for weddings on open days or by arrangement on closed days. Fees and site options come from a bookings volunteer.",
+      "sources": [
+        "https://irrg.au"
+      ],
+      "flags": [
+        "capacity_unknown",
+        "price_not_published",
+        "catering_rules_unknown",
+        "ceremony_vs_reception_unknown"
+      ],
+      "category": "Venue",
+      "source_checked_at": "2026-11-05"
+    },
+    {
+      "vendor_name": "Gosford Edogawa Commemorative Garden",
+      "special_category": [
+        "botanical"
+      ],
+      "special_subtype": [
+        "japanese garden",
+        "public garden",
+        "koi pavilion"
+      ],
+      "service_area": "East Gosford, Central Coast NSW",
+      "address": "36 Webb Street, East Gosford NSW 2250",
+      "website_url": "https://www.centralcoast.nsw.gov.au/recreation/planning-events/weddings",
+      "contact_phone": "02 4304 7550",
+      "contact_email": "gallery@centralcoast.nsw.gov.au",
+      "capacity_seated_max": null,
+      "capacity_standing_max": 150,
+      "capacity_note": "Council says the outdoor space suits wedding parties of up to 150. Ceremonies are normally in the Koi Pavilion, which suits small intimate weddings; only a signing table and a maximum of 10 chairs are provided.",
+      "price_note": "Not published on the council wedding page read.",
+      "style_tags": [
+        "botanical",
+        "unconventional",
+        "japanese garden",
+        "koi pavilion",
+        "gallery gardens",
+        "East Gosford",
+        "Central Coast"
+      ],
+      "editorial_summary": "A Japanese garden beside Gosford Regional Gallery where weddings are usually held in the Koi Pavilion. Public access continues during opening hours, bookings are short, and the on-site cafe is the named caterer for functions.",
+      "sources": [
+        "https://www.centralcoast.nsw.gov.au/recreation/planning-events/weddings"
+      ],
+      "flags": [
+        "address_from_search_result_verify",
+        "price_not_published",
+        "exclusive_use_not_guaranteed",
+        "exclusive_caterer",
+        "short_booking_1_5_hours"
+      ],
+      "category": "Venue",
+      "source_checked_at": "2026-11-05"
+    },
+    {
+      "vendor_name": "SEA LIFE Sydney Aquarium",
+      "special_category": [
+        "zoo_aquarium"
+      ],
+      "special_subtype": [
+        "aquarium"
+      ],
+      "service_area": "Darling Harbour, Sydney CBD NSW",
+      "address": "1-5 Wheat Road, Darling Harbour, NSW 2000",
+      "website_url": "https://www.visitsealife.com/sydney/tickets-passes/events-and-functions/private-events/weddings/",
+      "contact_phone": "02 9066 4095",
+      "contact_email": "merlin@bespokecatering.net.au",
+      "capacity_seated_max": 160,
+      "capacity_standing_max": 280,
+      "capacity_note": "Per private-hire space: Dugong Island 200 cocktail / 160 sit-down; Day and Night on the Reef 280 cocktail / 85 sit-down; Jurassic Seas 100 cocktail / 50 sit-down. The page also says the whole venue holds around 1000 (unit labelled 'px'); the lower per-space figures are stored. The Day and Night on the Reef zone was noted as under renovation on the Merlin weddings page.",
+      "price_note": "Not published on the official site; an event packages brochure PDF is linked but could not be read.",
+      "style_tags": [
+        "aquarium",
+        "unconventional",
+        "underwater ceremony",
+        "marine displays",
+        "Darling Harbour",
+        "Sydney CBD",
+        "waterfront",
+        "ceremony and reception"
+      ],
+      "editorial_summary": "Darling Harbour aquarium that offers weddings among its marine displays, with the Merlin venues page describing underwater-style ceremonies, sit-down banquets and cocktail receptions. Three private-hire zones suit different guest counts, from an intimate 50 seated up to a few hundred standing. Enquiries go through the shared Merlin events line and caterer.",
+      "sources": [
+        "https://www.merlinvenues.com.au/your-event/private-events/weddings/",
+        "https://www.merlinvenues.com.au/our-venues/sydney-nsw-venues/sea-life-sydney/",
+        "https://www.merlinvenues.com.au/about-us/about-us/contact-us/",
+        "https://www.visitsealife.com/sydney/tickets-passes/events-and-functions/private-events/weddings/",
+        "https://www.visitsealife.com/sydney/plan-your-day/before-you-visit/directions-parking/getting-here/"
+      ],
+      "flags": [
+        "contact_is_merlin_shared_line",
+        "capacity_conflict",
+        "catering_partner_bespoke",
+        "prices_not_published",
+        "space_under_renovation"
+      ],
+      "category": "Venue",
+      "source_checked_at": "2026-11-05"
+    },
+    {
+      "vendor_name": "WILD LIFE Sydney Zoo",
+      "special_category": [
+        "zoo_aquarium"
+      ],
+      "special_subtype": [
+        "zoo"
+      ],
+      "service_area": "Darling Harbour, Sydney CBD NSW",
+      "address": "1-5 Wheat Road, Darling Harbour, Sydney NSW 2000",
+      "website_url": "https://wildlifesydney.com.au/events/private-events/weddings",
+      "source_checked_at": "2026-11-06",
+      "contact_phone": "02 9066 4095",
+      "contact_email": "merlin@bespokecatering.net.au",
+      "capacity_seated_max": 80,
+      "capacity_standing_max": 120,
+      "capacity_note": "Koala Rooftop: 120 cocktail / 80 sit-down. Croc Deck: 80 cocktail / 50 sit-down. The venue page also states a whole-venue maximum of around 450 (labelled 'px'); the lower per-space figures are stored.",
+      "price_note": "Not published on the official site.",
+      "style_tags": [
+        "zoo",
+        "wildlife",
+        "unconventional",
+        "koalas",
+        "indoor wildlife",
+        "Darling Harbour",
+        "Sydney CBD",
+        "waterfront",
+        "rooftop"
+      ],
+      "editorial_summary": "WILD LIFE Sydney Zoo's current official wedding page confirms weddings in Darling Harbour, from small celebrations to larger events, with pre-set packages, tailored options and an experienced planning team. Bespoke Catering is the named catering partner and the published wedding enquiry address is merlin@bespokecatering.net.au. Capacity and price still need reconfirming because the current page does not publish them.",
+      "sources": [
+        "https://wildlifesydney.com.au/events/private-events/weddings",
+        "https://wildlifesydney.com.au/",
+        "https://www.merlinvenues.com.au/your-event/private-events/weddings/",
+        "https://www.merlinvenues.com.au/our-venues/sydney-nsw-venues/wild-life-sydney-zoo/",
+        "https://www.merlinvenues.com.au/about-us/about-us/contact-us/"
+      ],
+      "flags": [
+        "contact_is_merlin_shared_line",
+        "capacity_conflict",
+        "catering_partner_bespoke",
+        "prices_not_published",
+        "wedding_offer_verified_2026_11_06",
+        "capacity_requires_reconfirmation"
+      ],
+      "category": "Venue"
+    },
+    {
+      "vendor_name": "Sydney Zoo",
+      "special_category": [
+        "zoo_aquarium"
+      ],
+      "special_subtype": [
+        "zoo"
+      ],
+      "service_area": "Bungarribee, Western Sydney NSW",
+      "address": "700 Great Western Highway, Bungarribee NSW 2767",
+      "website_url": "https://sydneyzoo.com/functions",
+      "contact_phone": "02 7202 2560",
+      "contact_email": "info@sydneyzoo.com",
+      "capacity_seated_max": 350,
+      "capacity_standing_max": 750,
+      "capacity_note": "Largest space is Primate Boulevard: 350 seated / 750 cocktail. Lion Deck 200 seated / 400 cocktail; Boulevard Function Room 200 seated / 350 cocktail; Meerkat Wing 100 seated / 130 cocktail; Tiger Pool 90 seated / 70 cocktail (listed as given). Minimum 50 attendees; minimum spends apply to all spaces.",
+      "price_note": "Not published; the terms say minimum spends apply to every space, prices include GST and holiday surcharges may apply.",
+      "style_tags": [
+        "zoo",
+        "wildlife",
+        "unconventional",
+        "lions",
+        "tigers",
+        "Bungarribee",
+        "Eastern Creek",
+        "Western Sydney",
+        "free parking",
+        "wheelchair accessible"
+      ],
+      "editorial_summary": "Western Sydney zoo that lists wedding receptions among its social functions, with spaces overlooking lion and tiger habitats. Space options range from a 90-seat Tiger Pool to the 350-seat Primate Boulevard. The zoo is the sole caterer, wedding packages include a security guard, and bridal photos in the grounds are limited to one hour.",
+      "sources": [
+        "https://sydneyzoo.com/functions",
+        "https://sydneyzoo.com/about/contact-us"
+      ],
+      "flags": [
+        "exclusive_caterer",
+        "email_general_only",
+        "prices_not_published",
+        "wedding_subpages_not_loading",
+        "capacity_conflict"
+      ],
+      "category": "Venue",
+      "source_checked_at": "2026-11-05"
+    },
+    {
+      "vendor_name": "Australian Reptile Park",
+      "special_category": [
+        "zoo_aquarium"
+      ],
+      "special_subtype": [
+        "wildlife park"
+      ],
+      "service_area": "Somersby, Central Coast NSW",
+      "address": "Pacific Highway, Somersby, NSW 2250",
+      "website_url": "https://www.reptilepark.com.au/about/functions-and-events/arp-weddings",
+      "contact_phone": "02 4340 1022",
+      "contact_email": "sales@reptilepark.com.au",
+      "capacity_seated_max": null,
+      "capacity_standing_max": null,
+      "capacity_note": "Guest capacities are not published on the wedding page.",
+      "price_note": "Not published on the official site.",
+      "style_tags": [
+        "wildlife park",
+        "reptiles",
+        "unconventional",
+        "outdoor ceremony",
+        "bush setting",
+        "Somersby",
+        "Central Coast",
+        "animal encounters",
+        "undercover reception"
+      ],
+      "editorial_summary": "A Central Coast wildlife park offering outdoor ceremonies among eucalypts and lawns, with undercover options for wet weather. The reception space is covered and set up for dining and dancing, and couples can add animal photos, private reptile shows or encounters. A functions team handles planning and supplier suggestions.",
+      "sources": [
+        "https://www.reptilepark.com.au/",
+        "https://www.reptilepark.com.au/about/functions-and-events/arp-weddings"
+      ],
+      "flags": [
+        "capacity_not_published",
+        "prices_not_published",
+        "street_number_missing"
+      ],
+      "category": "Venue",
+      "source_checked_at": "2026-11-05"
+    },
+    {
+      "vendor_name": "Taronga Western Plains Zoo",
+      "special_category": [
+        "zoo_aquarium"
+      ],
+      "special_subtype": [
+        "zoo"
+      ],
+      "service_area": "Dubbo, Central West NSW",
+      "address": "Obley Road, Dubbo, NSW 2830",
+      "website_url": "https://www.taronga.org.au/dubbo-zoo/function-venue-hire/weddings/",
+      "contact_phone": "(02) 6881 1438",
+      "contact_email": "savannahfc@zoo.nsw.gov.au",
+      "capacity_seated_max": null,
+      "capacity_standing_max": null,
+      "capacity_note": "Seating capacity of the Savannah Function Centre is not stated. Reception and ceremony-and-reception packages require a minimum of 50 guests; the Elope at the Zoo package is limited to 25 guests. The ceremony setup includes 50 chairs.",
+      "price_note": "From the official September 2024 package PDF: reception only $1,500 hire; ceremony and reception $2,500 hire; Elope at the Zoo $3,000 (3 hours, max 25 guests); photography session $750. Catering two courses $99 pp, three courses $119 pp, canapes $28 pp, grazing board $15 pp, kids menu $35 per child under 12. Prices may have changed since.",
+      "style_tags": [
+        "zoo",
+        "wildlife",
+        "safari",
+        "unconventional",
+        "lake views",
+        "Dubbo",
+        "Central West",
+        "regional NSW",
+        "elopement",
+        "accommodation on site",
+        "ceremony and reception"
+      ],
+      "editorial_summary": "A large open-range zoo in Dubbo that hosts weddings with several ceremony locations in its grounds and receptions at the lakeside Savannah Function Centre. Three packages are offered: reception only, ceremony and reception, and a small elopement. Guests can stay on site at Zoofari Lodge or the Savannah Cabins.",
+      "sources": [
+        "https://www.taronga.org.au/dubbo-zoo/function-venue-hire/weddings/",
+        "https://taronga.org.au/western-plains-zoo/function-venue-hire/weddings",
+        "https://www.taronga.org.au/siteassets/tzwp/files/twpz-wedding-package-2-compressed.pdf"
+      ],
+      "flags": [
+        "postcode_inferred",
+        "capacity_not_published",
+        "price_from_sept_2024_pdf"
+      ],
+      "category": "Venue",
+      "source_checked_at": "2026-11-05"
+    },
+    {
+      "vendor_name": "Featherdale Wildlife Park",
+      "special_category": [
+        "zoo_aquarium"
+      ],
+      "special_subtype": [
+        "wildlife park"
+      ],
+      "service_area": "Doonside, Western Sydney NSW",
+      "address": "217 Kildare Road, Doonside, NSW 2767",
+      "website_url": "https://www.featherdale.com.au/events/",
+      "contact_phone": null,
+      "contact_email": null,
+      "capacity_seated_max": 90,
+      "capacity_standing_max": 110,
+      "capacity_note": "The Drover's Hut seats 90 inside or outside and takes 110 grazing style. Keeper's Courtyard seats up to 60 at picnic tables; two picnic areas seat 50 each. Events are daytime only and only acoustic music is allowed in the Drover's Hut.",
+      "price_note": "Not published on the page; Exclusive Hire and Group Packages PDFs are linked but were not read.",
+      "style_tags": [
+        "wildlife park",
+        "unconventional",
+        "Australian native animals",
+        "Doonside",
+        "Blacktown",
+        "Western Sydney",
+        "daytime events",
+        "private hire"
+      ],
+      "editorial_summary": "Native-animal park in western Sydney that rents out its Drover's Hut, courtyard and picnic areas for private functions and exclusive-hire days. The events page names corporate events, birthdays and celebrations but not weddings, so a wedding enquiry would need to be confirmed. Daytime events only, with acoustic music indoors.",
+      "sources": [
+        "https://www.featherdale.com.au/",
+        "https://www.featherdale.com.au/events/"
+      ],
+      "flags": [
+        "verify_weddings_accepted",
+        "needs_contact_lookup",
+        "email_missing_form_only",
+        "prices_not_published"
+      ],
+      "category": "Venue",
+      "source_checked_at": "2026-11-05"
+    },
+    {
+      "vendor_name": "Mogo Wildlife Park",
+      "special_category": [
+        "zoo_aquarium"
+      ],
+      "special_subtype": [
+        "zoo"
+      ],
+      "service_area": "Mogo, South Coast NSW",
+      "address": "222 Tomakin Road, Mogo, NSW 2536",
+      "website_url": "https://mogowildlifepark.com.au/events/",
+      "contact_phone": null,
+      "contact_email": null,
+      "capacity_seated_max": 100,
+      "capacity_standing_max": 300,
+      "capacity_note": "Function and Events Centre (by Primate Island): 100 seated indoors or cocktail style; up to 300 using the outdoor verandahs and picnic areas. Grassy Glade up to 200 with marquees/tables (weather dependent). Main Cafe terrace 50 seated or about 100 standing; Tiger Deck 50. Whole-park exclusive hire is available.",
+      "price_note": "Not published on the events page; Event Day Packages (Exclusive Hire) and Group Packages PDFs are linked but were not read.",
+      "style_tags": [
+        "zoo",
+        "wildlife",
+        "unconventional",
+        "exclusive hire",
+        "Mogo",
+        "South Coast",
+        "Batemans Bay",
+        "regional NSW",
+        "marquee"
+      ],
+      "editorial_summary": "South Coast zoo that offers private function spaces, from a terrace and deck to a 100-seat events centre and a lawn that can take marquees. Couples can book the whole park for an exclusive-hire day. The events page does not name weddings, so confirm ceremonies and receptions are accepted.",
+      "sources": [
+        "https://mogowildlifepark.com.au/",
+        "https://mogowildlifepark.com.au/events/"
+      ],
+      "flags": [
+        "verify_weddings_accepted",
+        "needs_contact_lookup",
+        "email_missing_form_only",
+        "prices_not_published"
+      ],
+      "category": "Venue",
+      "source_checked_at": "2026-11-05"
+    },
+    {
+      "vendor_name": "James Theatre Dungog",
+      "special_category": [
+        "entertainment"
+      ],
+      "special_subtype": [
+        "historic cinema",
+        "community theatre",
+        "function hall"
+      ],
+      "service_area": "Dungog, Hunter Region NSW",
+      "address": "6 Brown Street, Dungog NSW 2420",
+      "website_url": "https://www.jamestheatre.com.au/hire",
+      "contact_phone": null,
+      "contact_email": "contact@jamestheatre.com.au",
+      "capacity_seated_max": null,
+      "capacity_standing_max": null,
+      "capacity_note": "Capacity is not published. The hire page describes a divisible auditorium, two cinema screens, a tiered cinema seating area, a large dance floor, movable tables and chairs, a stage, a kiosk and a food preparation area. Floor plans are in the site photo gallery.",
+      "price_note": "Hirings start at $55 (incl GST) per two hours for a small not-for-profit meeting; tables $11 and chairs $1.65 each (incl GST). Wedding hire pricing is not published.",
+      "style_tags": [
+        "cinema",
+        "unconventional",
+        "dungog",
+        "hunter region",
+        "regional nsw",
+        "heritage",
+        "oldest cinema",
+        "spanish mission",
+        "community run",
+        "dance floor",
+        "garden"
+      ],
+      "editorial_summary": "A volunteer-run heritage picture house in Dungog, billed as the oldest purpose-built cinema still operating in Australia, with a Spanish Mission facade and a stage and supper room from the 1930s. It can be hired for weddings and parties, with a dance floor, a modern kitchen area and an outdoor barbecue garden alongside the cinema seating. A good rustic-heritage option for couples happy to travel to the Hunter.",
+      "sources": [
+        "https://www.jamestheatre.com.au/hire",
+        "https://www.jamestheatre.com.au/about",
+        "https://www.jamestheatre.com.au/contact"
+      ],
+      "flags": [
+        "outside_sydney",
+        "phone_not_published",
+        "capacity_not_published",
+        "wedding_price_not_published",
+        "email_from_about_page_button",
+        "needs_contact_lookup"
+      ],
+      "category": "Venue",
+      "source_checked_at": "2026-11-05"
+    },
+    {
+      "vendor_name": "The Roxy Theatre Bingara",
+      "special_category": [
+        "entertainment"
+      ],
+      "special_subtype": [
+        "historic cinema",
+        "art deco theatre",
+        "function centre"
+      ],
+      "service_area": "Bingara, Gwydir Shire, North West Slopes NSW",
+      "address": "74 Maitland Street, Bingara NSW 2404",
+      "website_url": "https://visitgwydir.com.au/the-roxy-theatre/",
+      "contact_phone": "(02) 6724 0066",
+      "contact_email": "btourism@gwydir.nsw.gov.au",
+      "capacity_seated_max": null,
+      "capacity_standing_max": null,
+      "capacity_note": "No capacity figures on the official page. Contact is the Bingara Visitor Information Centre, which handles bookings.",
+      "price_note": "Hire prices not published. The page lists only theatre and Greek Cafe Museum tours at $10 per person (two people minimum).",
+      "style_tags": [
+        "cinema",
+        "unconventional",
+        "bingara",
+        "regional nsw",
+        "north west nsw",
+        "art deco",
+        "1936",
+        "heritage listed",
+        "greek cafe",
+        "council run"
+      ],
+      "editorial_summary": "A 1936 Art Deco picture palace on Bingara's main street, restored and reopened in 2004 and now state heritage listed. The council's page says it works as a function centre for events from birthdays and weddings to conferences, alongside its cinema and performing-arts program. Wedding specifics such as ceremony spaces and numbers are not spelled out, so an enquiry is needed.",
+      "sources": [
+        "https://visitgwydir.com.au/the-roxy-theatre/",
+        "https://www.roxybingara.com.au/functions/"
+      ],
+      "flags": [
+        "outside_sydney",
+        "generic_wedding_statement_only",
+        "capacity_not_published",
+        "price_not_published",
+        "email_is_visitor_centre_general",
+        "needs_contact_lookup",
+        "verify_weddings_accepted"
+      ],
+      "category": "Venue",
+      "source_checked_at": "2026-11-05"
+    },
+    {
+      "vendor_name": "Kingpin North Strathfield (Room 300)",
+      "special_category": [
+        "entertainment"
+      ],
+      "special_subtype": [
+        "bowling alley",
+        "arcade"
+      ],
+      "service_area": "North Strathfield, Inner West NSW",
+      "address": "3-5 George St, North Strathfield NSW 2137",
+      "website_url": "https://www.kingpinbowling.com.au/venues/nsw/north-strathfield",
+      "contact_phone": "(02) 4063 1514",
+      "contact_email": null,
+      "capacity_seated_max": null,
+      "capacity_standing_max": null,
+      "capacity_note": "Official page states Room 300 has a 60 person capacity with 3 private bowling lanes and a private karaoke room; it does not say whether that is seated or standing, so both fields are left null. The wider venue has 16 lanes, laser tag, darts, a pool table and arcade games. Room 300 availability is by enquiry.",
+      "price_note": "Not published on the official site; hire is by enquiry form or phone. Third-party listings quote minimum spends but those are not used here.",
+      "style_tags": [
+        "bowling",
+        "arcade",
+        "unconventional",
+        "North Strathfield",
+        "Inner West",
+        "heritage factory",
+        "private function room"
+      ],
+      "editorial_summary": "A converted 1908 biscuit-factory building in Sydney's inner west with a private function room that has its own bowling lanes and karaoke. Weddings are not named anywhere on the official pages, so it reads more as a playful engagement, rehearsal-dinner or casual reception space for a small guest list. Enquiries go through the venue's events team.",
+      "sources": [
+        "https://www.kingpinbowling.com.au/venues/nsw/north-strathfield",
+        "https://kingpinbowling.com.au/parties-and-events/corporate-parties",
+        "https://www.kingpinplay.com/en-au/parties-and-events/group-events/"
+      ],
+      "flags": [
+        "verify_weddings_accepted",
+        "email_missing_form_only",
+        "capacity_type_unspecified",
+        "price_not_published",
+        "other_kingpin_nsw_sites_not_checked"
+      ],
+      "category": "Venue",
+      "source_checked_at": "2026-11-05"
+    },
+    {
+      "vendor_name": "Archie Brothers Cirque Electriq Alexandria",
+      "special_category": [
+        "entertainment"
+      ],
+      "special_subtype": [
+        "arcade bar",
+        "bowling alley"
+      ],
+      "service_area": "Alexandria, Inner South NSW",
+      "address": "75 O'Riordan Street, Alexandria NSW 2015",
+      "website_url": "https://www.archiebrothers.com.au/parties/exclusive-hire",
+      "contact_phone": "1300 888 386",
+      "contact_email": null,
+      "capacity_seated_max": null,
+      "capacity_standing_max": null,
+      "capacity_note": "Capacity is not stated on the official exclusive-hire or Alexandria pages. Exclusive hire covers the whole venue: arcade and carnival games, bowling, bumper cars, a cocktail bar and kitchen. Other NSW Archie Brothers sites (Chatswood, Castle Towers, Entertainment Quarter, Penrith, Wollongong) use the same enquiry process and are not recorded separately.",
+      "price_note": "Not published; booking is by online form, enquiry or phone.",
+      "style_tags": [
+        "arcade",
+        "bowling",
+        "unconventional",
+        "Alexandria",
+        "Inner South",
+        "circus theme",
+        "exclusive hire"
+      ],
+      "editorial_summary": "A circus-themed arcade, bowling and cocktail venue that can be booked out entirely, giving a group private access to the games and the bar. The official copy mentions corporate, Christmas, birthday, hen and buck events but not weddings, so any wedding use needs to be raised with the venue directly. It would suit a high-energy after-party or casual celebration rather than a formal ceremony.",
+      "sources": [
+        "https://www.archiebrothers.com.au/parties/exclusive-hire",
+        "https://www.archiebrothers.com.au/locations/alexandria",
+        "https://www.archiebrothers.com.au/"
+      ],
+      "flags": [
+        "verify_weddings_accepted",
+        "email_missing_form_only",
+        "capacity_not_published",
+        "price_not_published",
+        "address_map_link_shows_55_doody_st",
+        "other_nsw_sites_not_recorded"
+      ],
+      "category": "Venue",
+      "source_checked_at": "2026-11-05"
+    },
+    {
+      "vendor_name": "Fortress Sydney",
+      "special_category": [
+        "entertainment"
+      ],
+      "special_subtype": [
+        "arcade bar",
+        "gaming tavern"
+      ],
+      "service_area": "Chippendale, Inner Sydney NSW",
+      "address": "Level 2, 28 Broadway, Chippendale NSW 2008",
+      "website_url": "https://fortress.games/functions",
+      "contact_phone": "(02) 8609 3336",
+      "contact_email": "hi@fortress.games",
+      "capacity_seated_max": 100,
+      "capacity_standing_max": 360,
+      "capacity_note": "Official function-spaces table for Sydney: Arena cocktail 360, banquet 100, theatre 156, cabaret 70; Tavern semi-exclusive 70, full restaurant seated and standing 380; 2315 Bar (Sydney only, retro arcades and LED pool table) 70 cocktail. The functions page also says groups of 10 to 1,000 are hosted across the two cities, which exceeds the Sydney room figures, so the lower per-room Arena figures are stored.",
+      "price_note": "Official functions page says packages start from $43 per person; no room hire or minimum spend figures are published.",
+      "style_tags": [
+        "arcade",
+        "unconventional",
+        "Chippendale",
+        "Inner Sydney",
+        "medieval tavern",
+        "gaming",
+        "private function room"
+      ],
+      "editorial_summary": "A medieval-tavern games venue in Central Park with an esports arena, a themed restaurant and bar, and a neon upstairs cocktail room with retro arcade machines that can be hired privately. The events team offers food and drink packages and AV support, and the listed use cases are corporate, party and social events with no mention of weddings. Worth considering for a geeky, fantasy-leaning reception once the venue confirms it takes weddings.",
+      "sources": [
+        "https://fortress.games/functions",
+        "https://fortress.games/locations"
+      ],
+      "flags": [
+        "verify_weddings_accepted",
+        "capacity_figures_vary_by_space",
+        "minimum_spend_not_published",
+        "arcade_only_in_2315_bar_in_sydney"
+      ],
+      "category": "Venue",
+      "source_checked_at": "2026-11-05"
+    },
+    {
+      "vendor_name": "Astro's Arcade Bar",
+      "special_category": [
+        "entertainment"
+      ],
+      "special_subtype": [
+        "arcade bar"
+      ],
+      "service_area": "Newtown, Inner West NSW",
+      "address": "22 King St, Newtown NSW 2042",
+      "website_url": "https://www.astrosarcadebar.com/venue-hire",
+      "contact_phone": null,
+      "contact_email": "info@astros-co.com",
+      "capacity_seated_max": null,
+      "capacity_standing_max": null,
+      "capacity_note": "No capacity figures are published; the venue-hire form simply asks for an approximate guest count and a preferred date. The venue trades Tuesday to Sunday with Sunday opening 1pm to 7pm.",
+      "price_note": "Not published; enquiry form only.",
+      "style_tags": [
+        "arcade",
+        "unconventional",
+        "Newtown",
+        "Inner West",
+        "retro games",
+        "pop culture",
+        "all ages"
+      ],
+      "editorial_summary": "A retro arcade bar on King Street in Newtown with local beer, trivia and comedy nights, and a venue-hire enquiry form for private events. The site's navigation includes a Weddings tab, but it points to an expired external website, so there is no wedding information to rely on. Treat it as a quirky small-scale option and ask directly whether a wedding or reception is possible.",
+      "sources": [
+        "https://www.astrosarcadebar.com/",
+        "https://www.astrosarcadebar.com/venue-hire"
+      ],
+      "flags": [
+        "verify_weddings_accepted",
+        "needs_contact_lookup",
+        "weddings_nav_link_dead",
+        "capacity_not_published",
+        "price_not_published",
+        "website_footer_copyright_2024"
+      ],
+      "category": "Venue",
+      "source_checked_at": "2026-11-05"
+    },
+    {
+      "vendor_name": "Arcade Bar & Club",
+      "special_category": [
+        "entertainment"
+      ],
+      "special_subtype": [
+        "arcade bar",
+        "nightclub"
+      ],
+      "service_area": "Sydney CBD, Sydney NSW",
+      "address": "16 O'Connell Street, Sydney NSW 2000",
+      "website_url": "https://arcadesydney.com.au/events-functions/",
+      "contact_phone": "0439 410 433",
+      "contact_email": "hello@arcadesydney.com.au",
+      "capacity_seated_max": null,
+      "capacity_standing_max": null,
+      "capacity_note": "The official site describes three interconnected spaces (Uptown, Midtown, Downtown) that can be used separately or combined, but publishes no capacity numbers. Third-party listings give conflicting figures, so none are used.",
+      "price_note": "Not published; food and beverage packages are offered and a walkthrough can be arranged on enquiry.",
+      "style_tags": [
+        "arcade",
+        "unconventional",
+        "Sydney CBD",
+        "Art Deco",
+        "heritage building",
+        "nightlife"
+      ],
+      "editorial_summary": "A heritage-building bar and club in the CBD that is now positioned as a refined New York-inspired dining and nightlife space with three connectable rooms, premium add-ons such as photobooths and ceiling projections, and tailored food and drink packages. The current official site does not mention arcade games or weddings; its listed event types are birthdays, Christmas, end of financial year and brand events. Include only as a possible stylish after-party or reception space pending confirmation of weddings and the arcade element.",
+      "sources": [
+        "https://arcadesydney.com.au/",
+        "https://arcadesydney.com.au/events-functions/",
+        "https://arcadesydney.com.au/contact/"
+      ],
+      "flags": [
+        "verify_weddings_accepted",
+        "arcade_games_unconfirmed_on_official_site",
+        "capacity_not_published",
+        "price_not_published",
+        "phone_is_mobile_number"
+      ],
+      "category": "Venue",
+      "source_checked_at": "2026-11-05"
+    },
+    {
+      "vendor_name": "Holey Moley Golf Club Sydney",
+      "special_category": [
+        "entertainment"
+      ],
+      "special_subtype": [
+        "mini golf",
+        "cocktail bar",
+        "karaoke",
+        "arcade"
+      ],
+      "service_area": "Darlinghurst, Inner Sydney NSW",
+      "address": "Lot 1&2, 82-94 Darlinghurst Road, Potts Point NSW 2011",
+      "website_url": "https://holeymoley.com.au/parties/exclusive-hire",
+      "contact_phone": "1300 727 833",
+      "contact_email": null,
+      "capacity_seated_max": null,
+      "capacity_standing_max": null,
+      "capacity_note": "No capacity figures published on the exclusive hire page or the Darlinghurst location page. Exclusive hire gives the whole venue (two mini golf courses, bar, other on-site activities) to one group. The Alexandria site (75 O'Riordan Street, Alexandria NSW 2015) takes exclusive hire through the same page and phone line and is covered by this record.",
+      "price_note": "Not published. Enquiry form or phone only. Standard public pricing (e.g. 18 holes $42 Thu-Sun) is not an exclusive hire price.",
+      "style_tags": [
+        "Alexandria",
+        "Darlinghurst",
+        "Inner Sydney",
+        "Inner West",
+        "Potts Point",
+        "entertainment",
+        "exclusive hire",
+        "mini golf",
+        "playful",
+        "unconventional"
+      ],
+      "editorial_summary": "A pop-culture themed two-course mini golf bar in the Darlinghurst strip that can be taken over entirely by one party. The brand's hire page names weddings among the occasions it handles, so a relaxed, game-led reception or celebration is on the table.",
+      "sources": [
+        "https://holeymoley.com.au/parties/exclusive-hire",
+        "https://holeymoley.com.au/locations/darlinghurst"
+      ],
+      "flags": [
+        "needs_contact_lookup",
+        "email_missing_form_only",
+        "capacity_not_published",
+        "price_not_published",
+        "multi_site_single_record",
+        "address_listed_as_darlinghurst_but_postcode_potts_point"
+      ],
+      "category": "Venue",
+      "source_checked_at": "2026-11-05"
+    },
+    {
+      "vendor_name": "Hijinx Hotel Alexandria",
+      "special_category": [
+        "entertainment"
+      ],
+      "special_subtype": [
+        "challenge rooms",
+        "escape-style rooms",
+        "themed bar"
+      ],
+      "service_area": "Alexandria, Inner West Sydney NSW",
+      "address": "75 O'Riordan Street, Alexandria NSW 2015",
+      "website_url": "https://hijinxhotel.com.au/parties/exclusive-hire",
+      "contact_phone": "1300 897 224",
+      "contact_email": null,
+      "capacity_seated_max": null,
+      "capacity_standing_max": null,
+      "capacity_note": "No capacity figures published. Exclusive hire covers the whole venue: challenge rooms, bar and restaurant with a private host.",
+      "price_note": "Exclusive hire pricing not published. Social party packages list Deluxe $52 pp and Premier Suite $80 pp (1h30m, one activity) - these are not wedding prices.",
+      "style_tags": [
+        "unconventional",
+        "entertainment",
+        "challenge rooms",
+        "quirky",
+        "Alexandria",
+        "Inner West",
+        "exclusive hire"
+      ],
+      "editorial_summary": "A themed 'hotel' of puzzle and challenge rooms that can be booked out in full, bar and restaurant included. Weddings are not named on the hire page, which talks about any event, so it suits an engagement party or casual celebration until a wedding booking is confirmed.",
+      "sources": [
+        "https://hijinxhotel.com.au/parties/exclusive-hire",
+        "https://hijinxhotel.com.au/parties/social-parties",
+        "https://hijinxhotel.com.au/locations/alexandria",
+        "https://holeymoley.com.au/locations/darlinghurst"
+      ],
+      "flags": [
+        "verify_weddings_accepted",
+        "needs_contact_lookup",
+        "email_missing_form_only",
+        "postcode_inferred",
+        "capacity_not_published",
+        "price_not_published"
+      ],
+      "category": "Venue",
+      "source_checked_at": "2026-11-05"
+    },
+    {
+      "vendor_name": "Sydney Tower Eye",
+      "special_category": [
+        "entertainment"
+      ],
+      "special_subtype": [
+        "observation deck",
+        "SKYWALK"
+      ],
+      "service_area": "Sydney CBD NSW",
+      "address": "108 Market Street, Sydney NSW 2000",
+      "website_url": "https://www.sydneytowereye.com.au/events/proposals-weddings",
+      "contact_phone": "0419 726 459",
+      "contact_email": "events@merlinentertainments.com.au",
+      "capacity_seated_max": null,
+      "capacity_standing_max": null,
+      "capacity_note": "No wedding capacity published on the official site. The SKYWALK is shown as temporarily unavailable until 12 November 2026.",
+      "price_note": "Not published. Events are handled by Merlin Venues Sydney via enquiry.",
+      "style_tags": [
+        "unconventional",
+        "entertainment",
+        "observation deck",
+        "skyline views",
+        "Sydney CBD",
+        "SKYWALK"
+      ],
+      "editorial_summary": "A skyline observation deck whose events page promotes proposals and weddings on the Observation Deck or the outdoor SKYWALK, and showcases a past SKYWALK wedding. Everything runs through the Merlin Venues events team, so guest numbers and cost have to be quoted case by case.",
+      "sources": [
+        "https://www.sydneytowereye.com.au/events/proposals-weddings",
+        "https://www.sydneytowereye.com.au/events",
+        "https://www.sydneytowereye.com.au/",
+        "https://www.merlinevents.com.au/our-venues/sydney-nsw-venues/sydney-tower-eye/"
+      ],
+      "flags": [
+        "capacity_not_published",
+        "price_not_published",
+        "skywalk_temporarily_unavailable",
+        "postcode_from_structured_data"
+      ],
+      "category": "Venue",
+      "source_checked_at": "2026-11-05"
+    },
+    {
+      "vendor_name": "Madame Tussauds Sydney",
+      "special_category": [
+        "entertainment"
+      ],
+      "special_subtype": [
+        "wax museum",
+        "attraction",
+        "dance floor"
+      ],
+      "service_area": "Darling Harbour, Sydney CBD NSW",
+      "address": "1-5 Wheat Road, Darling Harbour NSW 2000",
+      "website_url": "https://www.merlinevents.com.au/your-event/private-events/weddings/",
+      "contact_phone": "02 9066 4095",
+      "contact_email": "merlin@bespokecatering.net.au",
+      "capacity_seated_max": 100,
+      "capacity_standing_max": 300,
+      "capacity_note": "Venue page lists Music zone cocktail 180 / sit down 100 and A-List zone cocktail 300 / sit down 50; whole venue stated as roughly 750 people. Lowest practical single-zone maximums are stored.",
+      "price_note": "Not published.",
+      "style_tags": [
+        "unconventional",
+        "entertainment",
+        "wax museum",
+        "celebrity",
+        "Darling Harbour",
+        "Sydney CBD",
+        "first dance"
+      ],
+      "editorial_summary": "Merlin's wedding page lists Madame Tussauds as a place to have a first dance among the wax figures, with ceremony, sit-down or cocktail formats. The venue has a stage-equipped Music zone and a projection-lit A-List zone for different group sizes.",
+      "sources": [
+        "https://www.merlinevents.com.au/your-event/private-events/weddings/",
+        "https://www.merlinevents.com.au/our-venues/sydney-nsw-venues/madame-tussauds-sydney/",
+        "https://www.merlinevents.com.au/about-us/about-us/contact-us/",
+        "https://www.madametussauds.com/sydney/"
+      ],
+      "flags": [
+        "capacity_conflict",
+        "price_not_published",
+        "contact_is_merlin_catering_line",
+        "venue_page_lists_corporate_uses_only"
+      ],
+      "category": "Venue",
+      "source_checked_at": "2026-11-05"
+    },
+    {
+      "vendor_name": "Escape Hunt Sydney - Loft on George",
+      "special_category": [
+        "entertainment"
+      ],
+      "special_subtype": [
+        "escape room",
+        "function loft"
+      ],
+      "service_area": "Sydney CBD NSW",
+      "address": "Level 4, 393 George Street, Sydney NSW 2000",
+      "website_url": "https://escapehunt.com/au/sydney/packages/party-venue-hire/",
+      "contact_phone": "+61 2 9299 3929",
+      "contact_email": null,
+      "capacity_seated_max": null,
+      "capacity_standing_max": null,
+      "capacity_note": "No capacities on the page. Loft on George (level 7, above the escape rooms) has a main space, balconies and a conference space, bookable individually or as the whole venue.",
+      "price_note": "Not published on the web page; venue hire and catering PDFs exist but were not readable. Venue hire fee is waived on a drinks package for the space matching group size.",
+      "style_tags": [
+        "unconventional",
+        "entertainment",
+        "escape room",
+        "CBD",
+        "George Street",
+        "licensed"
+      ],
+      "editorial_summary": "A licensed function loft above a city escape room operator, hireable in part or in full for parties and functions. Weddings are not mentioned, so it is a lead for a small reception or engagement party only after the venue confirms.",
+      "sources": [
+        "https://escapehunt.com/au/sydney/packages/party-venue-hire/"
+      ],
+      "flags": [
+        "verify_weddings_accepted",
+        "needs_contact_lookup",
+        "email_missing_form_only",
+        "capacity_not_published",
+        "price_not_published",
+        "address_level_conflict"
+      ],
+      "category": "Venue",
+      "source_checked_at": "2026-11-05"
+    },
+    {
+      "vendor_name": "Strike Bowling King Street Wharf",
+      "special_category": [
+        "entertainment"
+      ],
+      "special_subtype": [
+        "bowling alley",
+        "arcade bar"
+      ],
+      "service_area": "Darling Harbour, Sydney CBD NSW",
+      "address": "22 The Promenade, King Street Wharf, Darling Harbour, Sydney NSW 2000",
+      "website_url": "https://strikebowling.com.au/parties/exclusive-hire",
+      "contact_phone": null,
+      "contact_email": null,
+      "capacity_seated_max": 80,
+      "capacity_standing_max": null,
+      "capacity_note": "The Darling Harbour location page says the venue seats up to 80 people including front bar tables and the outdoor area. The exclusive-hire page says each venue differs in size and that maximum capacity is shown during booking, so standing capacity is not published. Other NSW Strike sites on the same exclusive-hire programme: Macquarie Centre, 4 Waterloo Rd, North Ryde NSW 2113; Mandarin Centre, Level 4/65 Albert Ave, Chatswood NSW 2067; Alexandria; Entertainment Quarter (207/122 Lang Rd, Sydney NSW 2021); Castle Hill; Penrith; Charlestown; Wollongong. They share one enquiry form and have no separate contact details, so they are covered by this single record.",
+      "price_note": "Not published; exclusive hire is quoted through the enquiry form and the concierge team.",
+      "style_tags": [
+        "bowling",
+        "arcade",
+        "unconventional",
+        "Darling Harbour",
+        "Sydney CBD",
+        "waterfront",
+        "exclusive hire",
+        "multi-site"
+      ],
+      "editorial_summary": "Strike offers whole-venue exclusive hire including the lanes, a private bar, arcade games and other activities, with a personal host and a pizza-and-burger style menu. Its own page lists birthdays, engagements and celebratory bashes but never says weddings, so a wedding enquiry should be confirmed first. Harbour-side King Street Wharf is the best-placed site for a casual celebration; the group's other Sydney sites follow the same model.",
+      "sources": [
+        "https://strikebowling.com.au/parties/exclusive-hire",
+        "https://strikebowling.com.au/parties/how-to-book",
+        "https://strikebowling.com.au/locations/strike-darling-harbour"
+      ],
+      "flags": [
+        "verify_weddings_accepted",
+        "needs_contact_lookup",
+        "email_missing_form_only",
+        "multi_site_single_record",
+        "price_not_published",
+        "standing_capacity_not_published"
+      ],
+      "category": "Venue",
+      "source_checked_at": "2026-11-05"
+    },
+    {
+      "vendor_name": "Australian Museum",
+      "special_category": [
+        "museum"
+      ],
+      "special_subtype": [
+        "natural history museum",
+        "heritage building"
+      ],
+      "service_area": "Sydney CBD, NSW",
+      "address": "1 William Street, Sydney NSW 2010",
+      "website_url": "https://australian.museum/visit/venue-hire/wedding-venues/",
+      "contact_phone": "(02) 9320 6336",
+      "contact_email": "functions@australian.museum",
+      "capacity_seated_max": 270,
+      "capacity_standing_max": 550,
+      "capacity_note": "Hintze Hall 270 seated / 550 drinks; Harbour View Room 1 (rooftop) 120 seated / 200; Westpac Long Gallery 80 seated / 150 (no amplified music or dancing); Wild Planet 60 seated / 200; Harbour View Room 2 50 seated / 100.",
+      "price_note": "No prices published. The Fresh Collective is the exclusive caterer.",
+      "style_tags": [
+        "museum",
+        "natural history",
+        "heritage",
+        "sandstone",
+        "grand hall",
+        "rooftop",
+        "harbour views",
+        "unconventional",
+        "CBD",
+        "Hyde Park",
+        "ceremony and reception",
+        "exclusive caterer",
+        "Wild Planet",
+        "conversation starter"
+      ],
+      "editorial_summary": "A sandstone natural history museum in the city with five hire spaces, from a grand central hall to a rooftop room with harbour views and a gallery lined with animal displays. Ceremonies and receptions are both offered, though the caterer is fixed and the long gallery bans amplified music and dancing.",
+      "sources": [
+        "https://australian.museum/visit/venue-hire/wedding-venues/",
+        "https://australian.museum/visit/functions-venues/"
+      ],
+      "flags": [
+        "exclusive_caterer",
+        "ceremony_capacity_not_stated"
+      ],
+      "category": "Venue",
+      "source_checked_at": "2026-11-05"
+    },
+    {
+      "vendor_name": "Australian National Maritime Museum",
+      "special_category": [
+        "museum"
+      ],
+      "special_subtype": [
+        "maritime museum",
+        "waterfront",
+        "warship"
+      ],
+      "service_area": "Darling Harbour, Sydney NSW",
+      "address": "2 Murray Street, Darling Harbour, Sydney NSW 2000",
+      "website_url": "https://www.sea.museum/venues/weddings",
+      "contact_phone": "(02) 9298 3777",
+      "contact_email": "info@sea.museum",
+      "capacity_seated_max": 270,
+      "capacity_standing_max": 400,
+      "capacity_note": "Ben Lexcen Terrace 270 seated / 400 cocktail; Lighthouse Gallery 250 / 400; Terrace Room 130 / 250; HMAS Vampire 50 / 120. The caterer's own page lists HarbourWatch North at 650 cocktail. A 2021 brochure gave ceremony capacities of 100 (boardwalk and terrace); current ceremony numbers need confirming.",
+      "price_note": "No prices published. SRG Hospitality is the in-house caterer; corkage applies to BYO drinks; extra fees for room flips and bars over 200 guests.",
+      "style_tags": [
+        "museum",
+        "maritime",
+        "waterfront",
+        "Darling Harbour",
+        "warship",
+        "rooftop terrace",
+        "harbour views",
+        "unconventional",
+        "boardwalk ceremony",
+        "city views",
+        "in-house caterer",
+        "ceremony and reception"
+      ],
+      "editorial_summary": "A waterfront museum on Darling Harbour where couples can marry on the boardwalk or terrace and hold the reception in galleries, a rooftop room or on board a decommissioned navy destroyer. Catering runs through an in-house partner. Contacts here are the museum's general line because no current venue-specific number is published.",
+      "sources": [
+        "https://www.sea.museum/venues/weddings",
+        "https://www.sea.museum/en/about/contact-us",
+        "https://srghospitality.com.au/venue/srg-at-the-australian-national-maritime-museum/"
+      ],
+      "flags": [
+        "contact_is_general_museum_line",
+        "possible_venues_email_venues_at_sea_museum_unverified",
+        "capacity_conflict_between_sources",
+        "ceremony_capacity_unconfirmed"
+      ],
+      "category": "Venue",
+      "source_checked_at": "2026-11-05"
+    },
+    {
+      "vendor_name": "Museum of Contemporary Art Australia (MCA)",
+      "special_category": [
+        "museum",
+        "gallery"
+      ],
+      "special_subtype": [
+        "contemporary art museum",
+        "harbourfront",
+        "rooftop"
+      ],
+      "service_area": "The Rocks, Sydney NSW",
+      "address": "140 George Street, The Rocks, Sydney NSW 2000",
+      "website_url": "https://www.mca.com.au/venue-hire/weddings-mca/",
+      "contact_phone": "(02) 8229 0500",
+      "contact_email": "mcavenues@thebiggroup.com.au",
+      "capacity_seated_max": 300,
+      "capacity_standing_max": 750,
+      "capacity_note": "Foundation Hall 100-300 seated / 150-750 cocktail (wedding 100-240); Harbourside Room 100-200 seated / 100-300; Quayside Room 50-120 / 50-200; Sculpture Terrace up to 60 for a wedding.",
+      "price_note": "No prices published; The Big Group is the exclusive caterer. Couples booking a reception get exclusive in-gallery photo access (extra fee).",
+      "style_tags": [
+        "museum",
+        "gallery",
+        "contemporary art",
+        "harbourfront",
+        "Opera House views",
+        "Harbour Bridge views",
+        "rooftop terrace",
+        "ballroom",
+        "The Rocks",
+        "unconventional",
+        "photo in gallery",
+        "exclusive caterer",
+        "glamorous"
+      ],
+      "editorial_summary": "A contemporary art museum on Circular Quay with a former harbour-authority ballroom, two rooftop rooms and a sculpture terrace, all facing the Opera House and Harbour Bridge. Couples booking a reception can add private photos among the artworks. Catering is through one exclusive provider.",
+      "sources": [
+        "https://www.mca.com.au/venue-hire/weddings-mca/",
+        "https://www.mca.com.au/venue-hire/foundation-hall/",
+        "https://www.mca.com.au/venue-hire/harbourside-room/"
+      ],
+      "flags": [
+        "exclusive_caterer"
+      ],
+      "category": "Venue",
+      "source_checked_at": "2026-11-05"
+    },
+    {
+      "vendor_name": "Hyde Park Barracks Museum",
+      "special_category": [
+        "museum"
+      ],
+      "special_subtype": [
+        "convict heritage",
+        "world heritage building",
+        "courtyard marquee"
+      ],
+      "service_area": "Sydney CBD, NSW",
+      "address": "Queens Square, Macquarie Street, Sydney NSW 2000",
+      "website_url": "https://mhnsw.au/venue-hire/hyde-park-barracks/content/hyde-park-barracks-weddings/",
+      "contact_phone": "(02) 8239 2311",
+      "contact_email": "venues@mhnsw.au",
+      "capacity_seated_max": 250,
+      "capacity_standing_max": 500,
+      "capacity_note": "Southern Courtyard marquee: 250 long banquet / 210 round tables / 500 cocktail, including the wedding party. Ceremony only inside your own marquee for cocktail receptions; sit-down dinners need an offsite ceremony.",
+      "price_note": "No prices published; a wedding package is on request, hire is charged over three days (set-up, event, pack-down) plus a bond. Pearl Catering is the on-site partner; Gold Licence caterers by application.",
+      "style_tags": [
+        "museum",
+        "heritage",
+        "convict history",
+        "World Heritage",
+        "sandstone courtyard",
+        "marquee reception",
+        "CBD",
+        "Macquarie Street",
+        "historic",
+        "unconventional",
+        "evening events",
+        "large guest list"
+      ],
+      "editorial_summary": "A Georgian sandstone barracks museum on Macquarie Street with a courtyard where a marquee reception is built for up to 500 standing or 250 seated. Evenings only, and a seated dinner needs the ceremony held elsewhere, such as at The Mint.",
+      "sources": [
+        "https://mhnsw.au/venue-hire/hyde-park-barracks/content/hyde-park-barracks-weddings/",
+        "https://mhnsw.au/visit-us/hyde-park-barracks/"
+      ],
+      "flags": [
+        "shared_venue_hire_team_mhnsw",
+        "reception_only_marquee"
+      ],
+      "category": "Venue",
+      "source_checked_at": "2026-11-05"
+    },
+    {
+      "vendor_name": "Elizabeth Bay House",
+      "special_category": [
+        "museum"
+      ],
+      "special_subtype": [
+        "historic house museum",
+        "colonial house"
+      ],
+      "service_area": "Elizabeth Bay, Sydney NSW",
+      "address": "7 Onslow Avenue, Elizabeth Bay NSW 2011",
+      "website_url": "https://mhnsw.au/venue-hire/elizabeth-bay-house/content/elizabeth-bay-house-weddings/",
+      "contact_phone": "(02) 9356 3022",
+      "contact_email": "venues@mhnsw.au",
+      "capacity_seated_max": 40,
+      "capacity_standing_max": 100,
+      "capacity_note": "Ceremony: 100 in the Saloon, 40 in the Dining Room. Hall and Saloon 40 seated (oval banquet) / 100 cocktail; Cellar 36 seated / 40 cocktail. All events finish by 10:30pm; upstairs wedding room is not accessible.",
+      "price_note": "Hire fee not published; overtime from $465 inc GST per hour. 50% deposit within 14 days. Gold Licence caterer panel; BYO alcohol not allowed; florals and styling need approval a month ahead.",
+      "style_tags": [
+        "museum",
+        "historic house",
+        "colonial",
+        "harbour views",
+        "domed saloon",
+        "sweeping staircase",
+        "intimate",
+        "small wedding",
+        "Elizabeth Bay",
+        "heritage",
+        "unconventional",
+        "ceremony and reception",
+        "10:30pm finish"
+      ],
+      "editorial_summary": "An 1830s harbourside house museum with a domed saloon and a sweeping staircase, hosting small ceremonies and receptions of up to about 100 guests. Strict heritage rules apply: no BYO alcohol, no open flames, approved caterers only, and a finish by 10:30pm.",
+      "sources": [
+        "https://mhnsw.au/venue-hire/elizabeth-bay-house/content/elizabeth-bay-house-weddings/",
+        "https://mhnsw.au/visit-us/elizabeth-bay-house/"
+      ],
+      "flags": [
+        "shared_venue_hire_team_mhnsw",
+        "upstairs_not_accessible"
+      ],
+      "category": "Venue",
+      "source_checked_at": "2026-11-05"
+    },
+    {
+      "vendor_name": "Penrith Regional Gallery & The Lewers Bequest",
+      "special_category": [
+        "gallery"
+      ],
+      "special_subtype": [
+        "regional art gallery",
+        "sculpture gardens",
+        "heritage gardens"
+      ],
+      "service_area": "Emu Plains, Penrith NSW",
+      "address": "86 River Road, Emu Plains NSW 2750",
+      "website_url": "https://www.penrithregionalgallery.com.au/hire-our-venue/weddings-special-events/",
+      "contact_phone": "(02) 4735 1100",
+      "contact_email": "galleryfunctions@ppandva.com.au",
+      "capacity_seated_max": 100,
+      "capacity_standing_max": 120,
+      "capacity_note": "100 sit-down or 120 canapes; minimum 40 guests. Private hire 4:00pm-10:30pm with a 3-hour minimum; bar closes about 9:30pm.",
+      "price_note": "Catering packages from $60 per person (cafe is the required caterer, no BYO, cake service $4pp); photography access $220 for 4 hours; no separate hire fee listed.",
+      "style_tags": [
+        "gallery",
+        "art gallery",
+        "sculpture garden",
+        "heritage gardens",
+        "riverside",
+        "Nepean River",
+        "garden ceremony",
+        "canopy reception",
+        "Penrith",
+        "Western Sydney",
+        "intimate",
+        "romantic",
+        "exclusive caterer",
+        "unconventional"
+      ],
+      "editorial_summary": "Two acres of heritage gardens beside the Nepean River, filled with sculpture and mosaics, with a garden ceremony and a covered sandstone-and-cedar canopy reception beside a regional gallery. Private evening hire for 40 to about 100 guests, with the on-site cafe as the required caterer.",
+      "sources": [
+        "https://www.penrithregionalgallery.com.au/hire-our-venue/weddings-special-events/",
+        "https://www.penrithregionalgallery.com.au/about-us/contact-us"
+      ],
+      "flags": [
+        "exclusive_caterer",
+        "email_conflict_penrith_city_snippet_unverified"
+      ],
+      "category": "Venue",
+      "source_checked_at": "2026-11-05"
+    },
+    {
+      "vendor_name": "Campbelltown Arts Centre",
+      "special_category": [
+        "gallery"
+      ],
+      "special_subtype": [
+        "contemporary arts centre",
+        "performance studio",
+        "sculpture gardens"
+      ],
+      "service_area": "Campbelltown, Macarthur NSW",
+      "address": "1 Art Gallery Road, Campbelltown NSW 2560",
+      "website_url": "https://www.campbelltown.nsw.gov.au/Services-and-Facilities/Facilities-for-Hire/Campbelltown-Arts-Centre-Performance-Studio",
+      "contact_phone": "(02) 4645 4100",
+      "contact_email": "artscentre@campbelltown.nsw.gov.au",
+      "capacity_seated_max": 180,
+      "capacity_standing_max": 350,
+      "capacity_note": "Performance Studio: up to 180 seated (tiered bank lists 200 seats) / 350 standing. Sculpture Gardens hireable by the half or full day, capacity not stated. Hire window 8:30am-4:30pm unless extended for a fee.",
+      "price_note": "Fees are in the council 2026-27 fees and charges PDF; amounts not read.",
+      "style_tags": [
+        "gallery",
+        "arts centre",
+        "contemporary art",
+        "sculpture gardens",
+        "performance studio",
+        "air conditioned",
+        "daytime wedding",
+        "Campbelltown",
+        "Macarthur",
+        "Western Sydney",
+        "unconventional",
+        "tiered seating"
+      ],
+      "editorial_summary": "A council-run contemporary arts centre whose air-conditioned performance studio and sculpture gardens can be hired for functions, with the studio page naming weddings. Daytime hire by default, so it suits a lunch or afternoon celebration; ceremony and catering rules are not published.",
+      "sources": [
+        "https://www.campbelltown.nsw.gov.au/Services-and-Facilities/Facilities-for-Hire/Campbelltown-Arts-Centre-Performance-Studio",
+        "https://www.campbelltown.nsw.gov.au/Services-and-Facilities/Facilities-for-Hire/Campbelltown-Arts-Centre-Sculpture-Gardens"
+      ],
+      "flags": [
+        "verify_weddings_accepted",
+        "weddings_named_on_studio_page_only",
+        "catering_rules_not_stated",
+        "daytime_hire_window"
+      ],
+      "category": "Venue",
+      "source_checked_at": "2026-11-05"
+    },
+    {
+      "vendor_name": "Barnet Long Room at Customs House",
+      "special_category": [
+        "library"
+      ],
+      "special_subtype": [
+        "customs house library building",
+        "function room",
+        "harbour views"
+      ],
+      "service_area": "Circular Quay, Sydney NSW",
+      "address": "31 Alfred Street, Sydney NSW 2000",
+      "website_url": "https://www.cityofsydney.nsw.gov.au/hireable-indoor-spaces/barnet-long-room-customs-house",
+      "contact_phone": "(02) 9265 9189",
+      "contact_email": "council@cityofsydney.nsw.gov.au",
+      "capacity_seated_max": null,
+      "capacity_standing_max": null,
+      "capacity_note": "About 200 guests in total across four linked spaces (balcony, boardroom, pre-function lounge, main hall); seated/standing split not stated.",
+      "price_note": "Minimum hire: $2,272 standard (8 hours), $2,650 evening (5 hours), $1,700 half day (4 hours). Food and drink must come from the caterer nominated by the City of Sydney; no BYO.",
+      "style_tags": [
+        "library building",
+        "Customs House",
+        "heritage",
+        "Circular Quay",
+        "harbour views",
+        "function room",
+        "stage",
+        "exclusive caterer",
+        "CBD",
+        "historic",
+        "unconventional"
+      ],
+      "editorial_summary": "A first-floor function room in the heritage Customs House above Circular Quay, listed by the City of Sydney with weddings among permitted uses. It has permanent staging at each end and harbour views, but all catering goes through the council's nominated caterer. Ceremony rules are not stated.",
+      "sources": [
+        "https://www.cityofsydney.nsw.gov.au/hireable-indoor-spaces/barnet-long-room-customs-house",
+        "https://www.cityofsydney.nsw.gov.au/libraries/customs-house-library"
+      ],
+      "flags": [
+        "exclusive_caterer",
+        "contact_is_general_council",
+        "ceremony_not_stated",
+        "capacity_split_not_published",
+        "library_itself_not_for_hire"
+      ],
+      "category": "Venue",
+      "source_checked_at": "2026-11-05"
+    },
+    {
+      "vendor_name": "3Danks",
+      "special_category": [
+        "warehouse"
+      ],
+      "special_subtype": [
+        "industrial warehouse",
+        "blank canvas"
+      ],
+      "service_area": "Waterloo, Sydney NSW",
+      "address": "3 Danks Street, Waterloo NSW 2017",
+      "website_url": "https://www.3danks.com.au/weddings",
+      "contact_phone": "(02) 5022 1109",
+      "contact_email": "hello@3danks.com.au",
+      "capacity_seated_max": 270,
+      "capacity_standing_max": 400,
+      "capacity_note": "Whole venue: 270 seated dinner, 400 standing cocktail, 342 theatre-style ceremony seats. Amplified music ends 9:30pm; bump-out can continue later.",
+      "price_note": "Full-venue hire from $3,300 + GST with a $500-$1,000 bond; dance-floor flooring in The Gantry is $500 + GST extra. No wedding package; you choose your own caterer, celebrant, florist and styling.",
+      "style_tags": [
+        "warehouse",
+        "industrial",
+        "blank canvas",
+        "exposed beams",
+        "high ceilings",
+        "mezzanine",
+        "ceremony and reception",
+        "BYO celebrant",
+        "own caterer",
+        "urban",
+        "Waterloo",
+        "dry hire",
+        "full kitchen"
+      ],
+      "editorial_summary": "An 890 square metre open-plan warehouse complex whose main hall has a tall ceiling and a mezzanine, hired as a blank canvas for ceremony and reception in one place. Couples bring their own caterer, styling and music, with a full kitchen on site. Amplified music has to stop by 9:30pm.",
+      "sources": [
+        "https://www.3danks.com.au/weddings",
+        "https://www.3danks.com.au/info"
+      ],
+      "flags": [
+        "dry_hire_blank_canvas"
+      ],
+      "category": "Venue",
+      "source_checked_at": "2026-11-05"
+    },
+    {
+      "vendor_name": "Nauti Studios Sydney",
+      "special_category": [
+        "warehouse"
+      ],
+      "special_subtype": [
+        "industrial warehouse",
+        "creative studio",
+        "greenhouse"
+      ],
+      "service_area": "Forest Lodge, Sydney NSW",
+      "address": "189B St Johns Road, Forest Lodge NSW 2037",
+      "website_url": "https://nautistudios.com.au/wedding-reception-hire-sydney-glebe",
+      "contact_phone": "0401 456 263",
+      "contact_email": "admin@nautistudios.com",
+      "capacity_seated_max": null,
+      "capacity_standing_max": null,
+      "capacity_note": "The Deep about 140 guests, The Greenhouse about 44, both together 183; seated/standing split not stated. Hire runs 7am-9pm (setup from 6am).",
+      "price_note": "The Deep for weddings 1,000 half day / 2,000 full day; The Greenhouse 400 / 700; both 1,500 / 2,600 (currency not stated, weekend minimum 4 hours). Cleaning and extra fees may apply.",
+      "style_tags": [
+        "warehouse",
+        "industrial",
+        "creative studio",
+        "blank canvas",
+        "greenhouse",
+        "white brick",
+        "BYO",
+        "own caterer",
+        "outdoor deck",
+        "affordable",
+        "non-profit",
+        "Inner West",
+        "Glebe",
+        "intimate",
+        "drive-in access"
+      ],
+      "editorial_summary": "A converted industrial studio with a large concrete-floored hall and a smaller light-filled greenhouse room, plus an outdoor deck, run as a non-profit. Outside caterers and BYO food and drink are welcome, so it suits a hands-on, budget-conscious wedding of up to about 180 guests.",
+      "sources": [
+        "https://nautistudios.com.au/wedding-reception-hire-sydney-glebe",
+        "https://nautistudios.com.au/contact"
+      ],
+      "flags": [
+        "dry_hire_blank_canvas",
+        "currency_not_stated"
+      ],
+      "category": "Venue",
+      "source_checked_at": "2026-11-05"
+    },
+    {
+      "vendor_name": "Unexpected Guest Distillery",
+      "special_category": [
+        "warehouse"
+      ],
+      "special_subtype": [
+        "distillery",
+        "converted workshop"
+      ],
+      "service_area": "Marrickville, Sydney NSW",
+      "address": "12 Cadogan Street, Marrickville NSW 2204",
+      "website_url": "https://www.unexpectedguest.com.au/pages/private-events",
+      "contact_phone": null,
+      "contact_email": "venue@unexpectedguestgin.com",
+      "capacity_seated_max": null,
+      "capacity_standing_max": null,
+      "capacity_note": "Capacity, ceremony rules and pricing not published; private hire is offered seven days a week.",
+      "price_note": null,
+      "style_tags": [
+        "distillery",
+        "gin bar",
+        "converted workshop",
+        "industrial",
+        "quirky",
+        "unconventional",
+        "Marrickville",
+        "Inner West",
+        "cocktails",
+        "intimate",
+        "relaxed",
+        "copper still",
+        "engagement party",
+        "mobile Kombi bar"
+      ],
+      "editorial_summary": "A gin distillery and bar in a reimagined mechanic's workshop, with a terrazzo bar and copper still, taking private hire for weddings, engagements and masterclasses. A vintage Kombi mobile bar can also travel to other NSW wedding venues. Capacity and prices are quote-only.",
+      "sources": [
+        "https://www.unexpectedguest.com.au/pages/private-events",
+        "https://www.unexpectedguest.com.au/pages/hire-the-kombi"
+      ],
+      "flags": [
+        "needs_contact_lookup",
+        "phone_not_published",
+        "postcode_inferred",
+        "capacity_not_published",
+        "email_is_bookings_over_12_people"
+      ],
+      "category": "Venue",
+      "source_checked_at": "2026-11-05"
+    },
+    {
+      "vendor_name": "Cockatoo Island (Harbour Trust)",
+      "special_category": [
+        "warehouse"
+      ],
+      "special_subtype": [
+        "industrial heritage",
+        "shipyard sheds",
+        "island"
+      ],
+      "service_area": "Cockatoo Island, Sydney Harbour NSW",
+      "address": "Cockatoo Island (Wareamah), Sydney Harbour NSW",
+      "website_url": "https://www.harbourtrust.gov.au/venue-hire/event-venues/",
+      "contact_phone": null,
+      "contact_email": "licensing@harbourtrust.gov.au",
+      "capacity_seated_max": null,
+      "capacity_standing_max": null,
+      "capacity_note": "Ceremony on Biloela Lawn: 100 guests (FAQ; venue guide says 200 standing). Indoor halls: Turbine Shop 850 seated / 2,000 cocktail; Naval Store 150 seated / 200 cocktail. Wedding bookings on the lawn must be paired with a reception at one of the island's two cafes.",
+      "price_note": "Price on application. Ceremony hire is a 2-hour exclusive slot; no catering at the ceremony and only one celebratory drink per guest, supplied by the couple.",
+      "style_tags": [
+        "industrial heritage",
+        "shipyard",
+        "island",
+        "ferry access",
+        "harbour views",
+        "unconventional",
+        "raw",
+        "steel and sandstone",
+        "outdoor ceremony",
+        "Sydney Harbour",
+        "convict heritage",
+        "photogenic",
+        "dry hire"
+      ],
+      "editorial_summary": "A heritage island in the harbour with old shipyard workshops, cranes and sandstone. Wedding ceremonies are held on Biloela Lawn for up to about 100 guests, with a reception at one of the island's cafes, while the large industrial halls are hired as dry spaces for bigger events. Reached by ferry, with no street address.",
+      "sources": [
+        "https://www.harbourtrust.gov.au/venue-hire/event-venues/",
+        "https://www.harbourtrust.gov.au/media/ylmbekwv/faq-wedding-ceremony-location.pdf",
+        "https://www.harbourtrust.gov.au/media/q0zbozc5/ht_venue-guide_cockatoo-island.pdf"
+      ],
+      "flags": [
+        "needs_contact_lookup",
+        "phone_not_published",
+        "no_street_address",
+        "ferry_access",
+        "ceremony_lawn_only",
+        "fee_unreadable"
+      ],
+      "category": "Venue",
+      "source_checked_at": "2026-11-05"
+    },
+    {
+      "vendor_name": "Carriageworks",
+      "special_category": [
+        "warehouse"
+      ],
+      "special_subtype": [
+        "industrial heritage",
+        "railway workshops"
+      ],
+      "service_area": "Eveleigh, Sydney NSW",
+      "address": "245 Wilson Street, Eveleigh NSW 2015",
+      "website_url": "https://carriageworks.com.au/venues/",
+      "contact_phone": "(02) 8571 9099",
+      "contact_email": "venues@carriageworks.com.au",
+      "capacity_seated_max": null,
+      "capacity_standing_max": null,
+      "capacity_note": "Spaces range from Elston Room (150 banquet, 300 standing) and Bay 21 (250 banquet, 300 cocktail) to Bays 22-24 (1,500 banquet, 3,600 standing).",
+      "price_note": "No prices published; quoted from a production schedule. Exclusive catering panel applies (BYO caterer not stated).",
+      "style_tags": [
+        "industrial heritage",
+        "railway workshops",
+        "warehouse",
+        "exposed brick",
+        "high ceilings",
+        "polished concrete",
+        "arts precinct",
+        "large guest list",
+        "Eveleigh",
+        "raw",
+        "blank canvas",
+        "catering panel"
+      ],
+      "editorial_summary": "A big 19th-century railway workshop complex turned arts centre, with raw brick bays, apex ceilings and polished concrete halls that couples have used for weddings and receptions. Best for large guest lists and heavy styling; the venue works from an exclusive caterer panel and quotes each event individually.",
+      "sources": [
+        "https://carriageworks.com.au/venues/",
+        "https://carriageworks.com.au/wp-content/uploads/Carriageworks-Venue-Guide.pdf"
+      ],
+      "flags": [
+        "verify_weddings_accepted",
+        "weddings_not_stated_on_site",
+        "postcode_inferred",
+        "exclusive_caterer_panel"
+      ],
+      "category": "Venue",
+      "source_checked_at": "2026-11-05"
+    },
+    {
+      "vendor_name": "White Bay Cruise Terminal",
+      "special_category": [
+        "warehouse"
+      ],
+      "special_subtype": [
+        "industrial waterfront",
+        "cruise terminal"
+      ],
+      "service_area": "Rozelle, Sydney NSW",
+      "address": null,
+      "website_url": "https://www.portauthoritynsw.com.au/venues/white-bay-cruise-terminal-wbct",
+      "contact_phone": "(02) 9296 4999",
+      "contact_email": "enquiries@portauthoritynsw.com.au",
+      "capacity_seated_max": null,
+      "capacity_standing_max": null,
+      "capacity_note": "3,500 square metre hall with 12m ceilings; page lists 1,250 banquet / 2,500 cocktail but also says use is currently capped at 500 people. Treat 500 as the limit until confirmed.",
+      "price_note": "Rate card published as a PDF; not read. Hire is limited to non-ship days.",
+      "style_tags": [
+        "industrial",
+        "waterfront",
+        "cruise terminal",
+        "high ceilings",
+        "concrete",
+        "blank canvas",
+        "large guest list",
+        "city skyline views",
+        "Rozelle",
+        "urban",
+        "car park on site"
+      ],
+      "editorial_summary": "A vast industrial-chic waterfront terminal with 12 metre ceilings and city views, hired as an empty shell for galas and large events and, per wedding guides, occasionally weddings. Couples bring in all catering, styling and production. Current hire is capped at 500 people.",
+      "sources": [
+        "https://www.portauthoritynsw.com.au/venues/white-bay-cruise-terminal-wbct",
+        "https://www.portauthoritynsw.com.au/doing-business/venue-hire/white-bay-cruise-terminal-venue-hire"
+      ],
+      "flags": [
+        "verify_weddings_accepted",
+        "weddings_not_stated_on_site",
+        "no_street_address",
+        "contact_is_general_port_authority",
+        "capacity_conflict_500_vs_2500"
+      ],
+      "category": "Venue",
+      "source_checked_at": "2026-11-05"
+    }
+  ],
+  "matched_existing": [
+    {
+      "source": "Harbourside Cruises",
+      "matches": "Harbourside Cruises",
+      "db_vendor_id": null,
+      "origin": "weddingnsw-import",
+      "by": "name",
+      "special_category": [
+        "boat"
+      ],
+      "special_subtype": [
+        "catamaran"
+      ],
+      "extra_style_tags": [
+        "boat",
+        "catamaran",
+        "unconventional",
+        "harbour cruise",
+        "on-water ceremony",
+        "celebrant available",
+        "Sydney Harbour",
+        "Pyrmont",
+        "waterfront",
+        "all-inclusive",
+        "DJ included"
+      ],
+      "extra_description": "A single catamaran running four-hour reception cruises with food, drinks, DJ and styling items included in a per-person package. A celebrant can be arranged for a ceremony on deck or inside. Best for larger weddings because of the 70-guest minimum.",
+      "fill_if_blank": {
+        "address": "37 Bank Street, Pyrmont NSW 2009",
+        "website_url": "https://harboursidecruises.com.au/wedding-cruises-sydney/",
+        "contact_phone": "(02) 9002 5778",
+        "capacity_seated_max": 130,
+        "capacity_standing_max": 200
+      },
+      "capacity_note": "Harbour Spirit: 130 formal dining (140 on the contact page), 200 cocktail; minimum 70 guests.",
+      "price_note": "Reception packages from $179 per person with a 70-guest minimum; decorations and wharf fees extra.",
+      "sources": [
+        "https://harboursidecruises.com.au/wedding-cruises-sydney/",
+        "https://harboursidecruises.com.au/contact-us/"
+      ],
+      "flags": [
+        "needs_contact_lookup",
+        "email_missing_form_only",
+        "minimum_70_guests"
+      ]
+    },
+    {
+      "source": "Royal Botanic Garden Sydney (Palm House and lawns)",
+      "matches": "Royal Botanic Garden Sydney (Palm House and lawns)",
+      "db_vendor_id": null,
+      "origin": "venue-import-2026-10-15",
+      "by": "name",
+      "special_category": [
+        "botanical"
+      ],
+      "special_subtype": [
+        "botanic garden",
+        "glasshouse",
+        "heritage garden"
+      ],
+      "extra_style_tags": [
+        "botanical",
+        "unconventional",
+        "glasshouse",
+        "harbour views",
+        "heritage",
+        "Sydney CBD",
+        "Sydney"
+      ],
+      "extra_description": "Sydney's oldest glasshouse sits in the middle of the city's harbourside botanic garden and can be booked as an empty shell for a ceremony or reception. Couples bring in their own caterer, furniture and styling, and several nearby lawns and pavilions work for outdoor vows.",
+      "fill_if_blank": {
+        "address": "Mrs Macquaries Rd, Sydney NSW 2000",
+        "website_url": "https://www.botanicgardens.org.au/venues-and-lawns/all-venues-and-lawns/palm-house-and-lawn",
+        "contact_phone": "+61 2 9231 8111",
+        "capacity_seated_max": 120
+      },
+      "capacity_note": "Palm House is listed for up to 120 guests and is hired empty, with no furniture. Lawn and pavilion ceremony spaces are separate hires and their capacities were not read on the official pages.",
+      "price_note": "Palm House 2026-27 (GST incl): $2,300 for 4 hours, $3,600 full day (8am to midnight), $390 per extra hour, $1,000 bond, $190 cleaning fee, $330 cancellation fee, ranger $75 per hour (4 hour minimum), parking permit $102. Wedding photography permit included. Lawn pricing not read.",
+      "sources": [
+        "https://www.botanicgardens.org.au/venues-and-lawns/all-venues-and-lawns/palm-house-and-lawn",
+        "https://www.botanicgardens.org.au/venue-hire/weddings-gardens"
+      ],
+      "flags": [
+        "email_missing_form_only",
+        "permit_required",
+        "lawn_capacities_not_read"
+      ]
+    },
+    {
+      "source": "The Calyx",
+      "matches": "The Calyx",
+      "db_vendor_id": null,
+      "origin": "venue-import-2026-10-15",
+      "by": "name",
+      "special_category": [
+        "botanical"
+      ],
+      "special_subtype": [
+        "botanic garden",
+        "glasshouse",
+        "conservatory",
+        "living green wall"
+      ],
+      "extra_style_tags": [
+        "botanical",
+        "unconventional",
+        "glasshouse",
+        "living green wall",
+        "contemporary",
+        "city skyline",
+        "Sydney CBD",
+        "Sydney"
+      ],
+      "extra_description": "A contemporary glasshouse venue inside the Royal Botanic Garden with an indoor living wall, a function space and a terrace overlooking the lawns. The brochure presents Laissez-Faire Catering as the dining provider, and photography permits and garden buggies for guests are part of the offer.",
+      "fill_if_blank": {
+        "address": "Mrs Macquaries Rd, Sydney NSW 2000",
+        "website_url": "https://www.botanicgardens.org.au/venues-and-lawns/all-venues-and-lawns/calyx",
+        "contact_phone": "+61 2 9231 8111",
+        "capacity_seated_max": 200,
+        "capacity_standing_max": 400
+      },
+      "capacity_note": "Official page and the 2026 wedding brochure agree on 200 banquet and 400 cocktail. Older third-party material quotes different figures, which were ignored.",
+      "price_note": "Venue hire listed from $7,250 on the official page. The 2026 brochure lists catering packages only: seated from $205 per person, cocktail from $185 per person, minimum 80 adult guests; venue hire and security are extra and confirmed on booking.",
+      "sources": [
+        "https://www.botanicgardens.org.au/venues-and-lawns/all-venues-and-lawns/calyx",
+        "https://www.botanicgardens.org.au/sites/default/files/2026-02/The%20Calyx%20Weddings%2C%20Royal%20Botanic%20Garden%20Sydney%202026.pdf"
+      ],
+      "flags": [
+        "exclusive_caterer",
+        "verify_external_caterers_allowed",
+        "email_missing_form_only"
+      ]
+    },
+    {
+      "source": "Botanic House",
+      "matches": "Botanic House",
+      "db_vendor_id": null,
+      "origin": "venue-import-2026-10-15",
+      "by": "name",
+      "special_category": [
+        "botanical"
+      ],
+      "special_subtype": [
+        "botanic garden",
+        "garden restaurant",
+        "terrace"
+      ],
+      "extra_style_tags": [
+        "botanical",
+        "unconventional",
+        "garden views",
+        "harbour glimpses",
+        "Royal Botanic Garden",
+        "Sydney CBD",
+        "Sydney"
+      ],
+      "extra_description": "A restaurant venue set within the Royal Botanic Garden with open-air dining, a large open-plan room and a terrace with glimpses of the harbour. Exclusive hire is offered, and the Farm Cove Eatery space can host the ceremony or pre-dinner drinks.",
+      "fill_if_blank": {
+        "address": "1 Mrs Macquaries Rd, Sydney NSW 2000",
+        "website_url": "https://botanichouse.com.au/events/weddings/",
+        "contact_phone": "1300 558 980",
+        "contact_email": "twg.events@trippaswhitegroup.com.au",
+        "capacity_seated_max": 150,
+        "capacity_standing_max": 200
+      },
+      "capacity_note": "Official wedding page states 150 seated and 200 cocktail.",
+      "price_note": "Not published; the enquiry form asks for an estimated budget. The front deck for arrival drinks carries additional fees.",
+      "sources": [
+        "https://botanichouse.com.au/events/weddings/",
+        "https://botanichouse.com.au/contact/"
+      ],
+      "flags": [
+        "exclusive_caterer",
+        "price_not_published"
+      ]
+    },
+    {
+      "source": "The Australian Botanic Garden Mount Annan",
+      "matches": "The Australian Botanic Garden Mount Annan",
+      "db_vendor_id": "venue-the-australian-botanic-garden-mount-annan",
+      "origin": "db",
+      "by": "name",
+      "special_category": [
+        "botanical"
+      ],
+      "special_subtype": [
+        "botanic garden",
+        "native garden",
+        "lakeside lawn",
+        "arboretum"
+      ],
+      "extra_style_tags": [
+        "botanical",
+        "unconventional",
+        "native plants",
+        "lakeside",
+        "marquee lawn",
+        "Mount Annan",
+        "South West Sydney"
+      ],
+      "extra_description": "A large native botanic garden with around fifteen wedding spaces, from a rainforest-style ceremony garden to open lawns for marquees and a hall with a kitchen. Self-catering or external caterers are allowed, and ceremonies include a short photography permit.",
+      "fill_if_blank": {
+        "address": "362 Narellan Road, Mount Annan NSW 2567",
+        "website_url": "https://www.botanicgardens.org.au/discover-and-learn/watch-listen-read/hold-your-wedding-australian-botanic-garden-mount-annan",
+        "contact_phone": "+61 2 9231 8111",
+        "capacity_seated_max": 200,
+        "capacity_standing_max": 600
+      },
+      "capacity_note": "Official FAQ lists per-space capacities: Marquee Lawn 600, Lakeside Lawn 400, Telopea Gallery 200, Lakeside Pavilion 200, Bowden Centre 120 (only space with a kitchen), Connections Garden 70, The Undercroft 50. A third-party listing shows 130 for Connections Garden; the lower official 70 is stored.",
+      "price_note": "The official wedding article says reception spaces, indoor or outdoor, are all under $5,000; no itemised prices read. Extras such as ranger escorts, extra hours and wet-weather backup carry unpublished fees.",
+      "sources": [
+        "https://www.botanicgardens.org.au/discover-and-learn/watch-listen-read/hold-your-wedding-australian-botanic-garden-mount-annan",
+        "http://www.botanicgardens.org.au/venues-and-lawns/venue-hire-australian-botanic-garden-faqs",
+        "https://www.botanicgardens.org.au/mount-annan"
+      ],
+      "flags": [
+        "email_missing_form_only",
+        "permit_required",
+        "byo_alcohol_supervision_required",
+        "exclusive_use_not_guaranteed",
+        "price_partial"
+      ]
+    },
+    {
+      "source": "Taronga Zoo Sydney",
+      "matches": "Taronga Zoo Sydney",
+      "db_vendor_id": "venue-taronga-zoo-sydney",
+      "origin": "db",
+      "by": "name",
+      "special_category": [
+        "zoo_aquarium"
+      ],
+      "special_subtype": [
+        "zoo"
+      ],
+      "extra_style_tags": [
+        "zoo",
+        "wildlife",
+        "unconventional",
+        "harbour views",
+        "Sydney Harbour National Park",
+        "Mosman",
+        "Lower North Shore",
+        "ceremony and reception",
+        "accommodation on site"
+      ],
+      "extra_description": "A working zoo on the Mosman foreshore that stages weddings against Sydney Harbour, the skyline and animal habitats. Couples can marry at the Bird Amphitheatre, Condor Lawns or African Savannah, then celebrate in indoor reception rooms such as the Dalang Ballroom, N'galawa Terrace or Gili Rooftop. Enquiries and catering run through the zoo's events and catering partner, Trippas White Group.",
+      "fill_if_blank": {
+        "address": "2A Bradleys Head Road, Mosman, NSW 2088",
+        "website_url": "https://www.taronga.org.au/sydney-zoo/function-venue-hire/weddings",
+        "contact_phone": "02 9978 4641",
+        "contact_email": "tarongacentre@trippaswhitegroup.com.au",
+        "capacity_seated_max": 250,
+        "capacity_standing_max": 300
+      },
+      "capacity_note": "Largest reception space is Dalang Ballroom: 250 seated, 300 cocktail. N'galawa Terrace 150 seated / 200 cocktail; Gili Rooftop 60 seated / 80 cocktail. Ceremony spaces: Bird Amphitheatre 300 guests, Condor Lawns 150 guests, African Savannah 100 guests. The lawn-spaces page lists Condor Lawns at 100 cocktail (lower figure is for a cocktail function, ceremony page says 150). Harbour View Lawns 150 cocktail.",
+      "price_note": "Hire and menu prices not published on the official site. A limited-time '50% Off Venue Hire' promotion was advertised (terms not read), and a Micro Wedding Package and downloadable Wedding Kit are offered.",
+      "sources": [
+        "https://www.taronga.org.au/sydney-zoo/function-venue-hire/weddings",
+        "https://taronga.org.au/sydney-zoo/functions-and-venue-hire",
+        "https://events-taronga.com.au/spaces/wedding-ceremonies/",
+        "https://events-taronga.com.au/spaces/the-dalang-ballroom/",
+        "https://events-taronga.com.au/spaces/the-ngalawa-terrace/",
+        "https://events-taronga.com.au/spaces/the-gili-rooftop/",
+        "https://events-taronga.com.au/spaces/lawn-event-spaces/",
+        "https://events-taronga.com.au/events/weddings/",
+        "https://events-taronga.com.au/contact/"
+      ],
+      "flags": [
+        "capacity_conflict",
+        "catering_partner_trippas_white",
+        "prices_not_published"
+      ]
+    },
+    {
+      "source": "Golden Age Cinema & Bar",
+      "matches": "Golden Age Cinema & Bar",
+      "db_vendor_id": "venue-golden-age-cinema-bar",
+      "origin": "db",
+      "by": "name",
+      "special_category": [
+        "entertainment"
+      ],
+      "special_subtype": [
+        "private cinema",
+        "cinema bar",
+        "heritage screening room"
+      ],
+      "extra_style_tags": [
+        "cinema",
+        "unconventional",
+        "surry hills",
+        "inner sydney",
+        "heritage",
+        "1940s",
+        "art deco",
+        "paramount house",
+        "intimate",
+        "micro wedding",
+        "cinema bar",
+        "velvet"
+      ],
+      "extra_description": "A restored 1940s Paramount Pictures screening room beneath Paramount House, paired with a velvet-and-brass lower-ground bar. It suits small ceremonies and cocktail-style receptions for roughly 56 to 70 guests, with the option to screen a film or video as part of the day. Daytime and select evening slots only, because the venue trades to the public most evenings and weekend afternoons.",
+      "fill_if_blank": {
+        "address": "Lower Ground, Paramount House, 80 Commonwealth Street, Surry Hills NSW 2010",
+        "website_url": "https://ourgoldenage.com.au/venue-hire",
+        "contact_email": "hello@ourgoldenage.com.au",
+        "capacity_seated_max": 56,
+        "capacity_standing_max": 70
+      },
+      "capacity_note": "Cinema: 56 seated, up to 70 standing (website and 2024 hire kit agree). Bar: 42 seated; the website says 60 standing but the 2024 hire kit says 70, so the lower figure (60) applies to the bar. The hire kit lists wedding ceremonies among the cinema uses and says the bar suits celebrations and cocktail functions. Cinema and bar can be booked separately or together.",
+      "price_note": "Not published on the website. Prices are via the enquiry form or the downloadable Venue Hire Kit (2024 PDF), which contains no price figures.",
+      "sources": [
+        "https://ourgoldenage.com.au/venue-hire",
+        "https://ourgoldenage.com.au/contact",
+        "https://dl.dropboxusercontent.com/scl/fi/b85ltwkwct4v1so08jtq8/Golden-Age-Events-Hire-Kit_2024.pdf"
+      ],
+      "flags": [
+        "phone_not_published",
+        "price_not_published",
+        "limited_availability_public_trading",
+        "capacity_conflict_bar_standing",
+        "wedding_mention_in_hire_kit_only",
+        "catering_in_house_available",
+        "byo_not_stated"
+      ]
+    },
+    {
+      "source": "Sydney Opera House - Yallamundi Rooms and Utzon Room",
+      "matches": "Sydney Opera House",
+      "db_vendor_id": null,
+      "origin": "venue-import-2026-10-15",
+      "by": "host",
+      "special_category": [
+        "entertainment"
+      ],
+      "special_subtype": [
+        "theatre",
+        "performing arts centre",
+        "harbour landmark"
+      ],
+      "extra_style_tags": [
+        "unconventional",
+        "entertainment",
+        "theatre",
+        "iconic",
+        "harbour views",
+        "Sydney CBD",
+        "Bennelong Point",
+        "landmark"
+      ],
+      "extra_description": "The Opera House runs wedding and reception hire from the Yallamundi Rooms, which can be one large space or split into three, with a private entrance and an outdoor terrace. The smaller harbour-facing Utzon Room is also offered for catered functions, and the foyers can be hired on a limited basis around performances.",
+      "fill_if_blank": {
+        "address": "Bennelong Point, Sydney NSW 2000",
+        "website_url": "https://www.sydneyoperahouse.com/venue-hire/functions-events-venue-hire/yallamundi-rooms",
+        "contact_phone": "1300 764 849",
+        "contact_email": "functions@sydneyoperahouse.com",
+        "capacity_seated_max": 150,
+        "capacity_standing_max": 350
+      },
+      "capacity_note": "Yallamundi Rooms page gives seated 150 to 180 and cocktail 350 to 400 (lower figures stored; a capacity PDF lists 180 dining and 400 cocktail for the full layout, and dining with a stage or dance floor at 150). Utzon Room page states up to 200 people.",
+      "price_note": "Venue hire fees not published. A Winter Weddings offer reduces hire fees for weddings (or receptions only) held 1 June to 31 August 2027 or 2028, terms apply.",
+      "sources": [
+        "https://www.sydneyoperahouse.com/venue-hire/functions-events-venue-hire/yallamundi-rooms",
+        "https://www.sydneyoperahouse.com/venue-hire/functions-events-venue-hire",
+        "https://www.sydneyoperahouse.com/visit/our-venues/utzon-room"
+      ],
+      "flags": [
+        "exclusive_caterer",
+        "capacity_conflict",
+        "price_not_published",
+        "foyer_spaces_limited_availability",
+        "enquiry_via_form"
+      ]
+    },
+    {
+      "source": "The Mint",
+      "matches": "The Mint",
+      "db_vendor_id": "venue-the-mint",
+      "origin": "db",
+      "by": "name",
+      "special_category": [
+        "museum"
+      ],
+      "special_subtype": [
+        "historic house museum",
+        "colonial mint"
+      ],
+      "extra_style_tags": [
+        "museum",
+        "heritage",
+        "historic",
+        "courtyard ceremony",
+        "CBD",
+        "Macquarie Street"
+      ],
+      "extra_description": "A colonial-era mint run by Museums of History NSW, with a courtyard and lawn ceremony area for up to 180 guests and a wet-weather bar for 100.",
+      "fill_if_blank": {},
+      "capacity_note": null,
+      "price_note": null,
+      "sources": [
+        "https://mhnsw.au/venue-hire/the-mint/content/mint-weddings/"
+      ],
+      "flags": [
+        "tag_only_existing_venue"
+      ]
+    },
+    {
+      "source": "Estate Vaucluse House",
+      "matches": "Estate Vaucluse House",
+      "db_vendor_id": "venue-estate-vaucluse-house",
+      "origin": "db",
+      "by": "name",
+      "special_category": [
+        "museum"
+      ],
+      "special_subtype": [
+        "historic house museum"
+      ],
+      "extra_style_tags": [
+        "museum",
+        "historic house",
+        "heritage",
+        "gardens",
+        "Vaucluse"
+      ],
+      "extra_description": "A Gothic Revival house museum with gardens, run by Museums of History NSW and booked through the same venue team as The Mint.",
+      "fill_if_blank": {},
+      "capacity_note": null,
+      "price_note": null,
+      "sources": [
+        "https://mhnsw.au/venue-hire/vaucluse-house/content/vaucluse-house-weddings/"
+      ],
+      "flags": [
+        "tag_only_existing_venue",
+        "shared_venue_hire_team_mhnsw"
+      ]
+    },
+    {
+      "source": "Art Gallery of NSW",
+      "matches": "Art Gallery of NSW",
+      "db_vendor_id": null,
+      "origin": "venue-import-2026-10-15",
+      "by": "name",
+      "special_category": [
+        "gallery"
+      ],
+      "special_subtype": [
+        "state art gallery"
+      ],
+      "extra_style_tags": [
+        "gallery",
+        "art gallery",
+        "contemporary art",
+        "Domain",
+        "harbour views",
+        "unconventional"
+      ],
+      "extra_description": "The state art gallery, offering a restaurant and function space, Sydney Modern Hall for up to about 250, and short exclusive ceremonies alongside a reception.",
+      "fill_if_blank": {},
+      "capacity_note": null,
+      "price_note": null,
+      "sources": [
+        "https://www.artgallery.nsw.gov.au/visit/venue-hire/spaces/"
+      ],
+      "flags": [
+        "tag_only_existing_venue"
+      ]
+    },
+    {
+      "source": "State Library of NSW",
+      "matches": "State Library of NSW",
+      "db_vendor_id": null,
+      "origin": "venue-import-2026-10-15",
+      "by": "name",
+      "special_category": [
+        "library"
+      ],
+      "special_subtype": [
+        "heritage reading room"
+      ],
+      "extra_style_tags": [
+        "library",
+        "heritage",
+        "reading room",
+        "Macquarie Street",
+        "historic",
+        "books",
+        "unconventional",
+        "exclusive caterer"
+      ],
+      "extra_description": "A heritage library whose historic Mitchell building hosts weddings in the Friends Room (a former reading room) and Gallery Room; catering is through an exclusive contractor and wedding photography is outside opening hours.",
+      "fill_if_blank": {},
+      "capacity_note": null,
+      "price_note": null,
+      "sources": [
+        "https://www.sl.nsw.gov.au/about/services/venue-hire"
+      ],
+      "flags": [
+        "tag_only_existing_venue"
+      ]
+    },
+    {
+      "source": "Hazel Kitchen & Bar",
+      "matches": "Hazel Kitchen & Bar",
+      "db_vendor_id": null,
+      "origin": "venue-import-2026-10-15",
+      "by": "name",
+      "special_category": [
+        "gallery"
+      ],
+      "special_subtype": [
+        "arts centre",
+        "heritage cottage",
+        "gallery restaurant"
+      ],
+      "extra_style_tags": [
+        "gallery",
+        "arts centre",
+        "art deco",
+        "heritage cottage",
+        "gardens",
+        "garden ceremony",
+        "restaurant venue",
+        "marble bar",
+        "exclusive use",
+        "dog friendly gardens",
+        "Gymea",
+        "Sutherland Shire",
+        "romantic",
+        "unconventional"
+      ],
+      "extra_description": "A restaurant and reception space inside a regional arts centre built around an Art Deco cottage and gardens, with a garden ceremony option and exclusive use on the wedding day. The restaurant is the caterer; the council hires the gardens for ceremonies separately.",
+      "fill_if_blank": {
+        "address": "782 Kingsway, Gymea NSW 2227",
+        "website_url": "https://www.hazelgymea.com/weddings/",
+        "contact_phone": "0409 658 357",
+        "capacity_seated_max": 120,
+        "capacity_standing_max": 180
+      },
+      "capacity_note": "Venue pages disagree: up to 130 seated / 180 cocktail on the weddings page, 120 / 200 in the FAQ; Garden Room up to 50. Lower figures stored.",
+      "price_note": "Packages by enquiry; weekend 10% surcharge. Council garden ceremony hire is $620 for 2 hours (GST incl., valid to 30 June 2027) plus staffing $87 per hour and $215 cleaning.",
+      "sources": [
+        "https://www.hazelgymea.com/weddings/",
+        "https://www.hazelgymea.com/faq/",
+        "https://hazelhurst.sutherlandshire.nsw.gov.au/about-us/venue-and-garden-hire/hazelhurst-gardens"
+      ],
+      "flags": [
+        "needs_contact_lookup",
+        "postcode_inferred",
+        "capacity_conflict_between_pages",
+        "email_missing_form_only",
+        "council_garden_hire_separate_from_restaurant"
+      ]
+    },
+    {
+      "source": "Rouse Hill Estate",
+      "matches": "Rouse Hill Estate",
+      "db_vendor_id": "venue-rouse-hill-estate",
+      "origin": "db",
+      "by": "name",
+      "special_category": [
+        "museum"
+      ],
+      "special_subtype": [
+        "historic farm estate",
+        "colonial homestead"
+      ],
+      "extra_style_tags": [
+        "museum",
+        "historic farm",
+        "colonial",
+        "gardens",
+        "rustic",
+        "carriage loop ceremony",
+        "heritage",
+        "Hills District",
+        "mountain views",
+        "vintage farm machinery"
+      ],
+      "extra_description": "A 13-hectare colonial house-and-farm museum run by Museums of History NSW. Ceremonies of up to 80 guests are held on the carriage loop, in the summerhouse or the Stables, with approved Gold Licence caterers only and heritage rules on red wine and menus.",
+      "fill_if_blank": {},
+      "capacity_note": null,
+      "price_note": null,
+      "sources": [
+        "https://www.mhnsw.au/venue-hire/rouse-hill-estate/content/rouse-hill-weddings/"
+      ],
+      "flags": [
+        "tag_only_existing_venue",
+        "shared_venue_hire_team_mhnsw"
+      ]
+    },
+    {
+      "source": "Three Blue Ducks Rosebery",
+      "matches": "Three Blue Ducks Rosebery",
+      "db_vendor_id": "venue-three-blue-ducks-rosebery",
+      "origin": "db",
+      "by": "name",
+      "special_category": [
+        "warehouse"
+      ],
+      "special_subtype": [
+        "restored warehouse"
+      ],
+      "extra_style_tags": [
+        "warehouse",
+        "industrial",
+        "exposed brick",
+        "timber beams",
+        "concrete floors",
+        "high ceilings"
+      ],
+      "extra_description": "A restored warehouse at The Cannery with exposed timber beams, raw brickwork and concrete floors under high ceilings.",
+      "fill_if_blank": {},
+      "capacity_note": null,
+      "price_note": null,
+      "sources": [
+        "https://threeblueducks.com/rosebery"
+      ],
+      "flags": [
+        "tag_only_existing_venue"
+      ]
+    },
+    {
+      "source": "Kensington Street Venues",
+      "matches": "Kensington Street Venues",
+      "db_vendor_id": "venue-kensington-street-venues",
+      "origin": "db",
+      "by": "name",
+      "special_category": [
+        "warehouse"
+      ],
+      "special_subtype": [
+        "restored warehouse"
+      ],
+      "extra_style_tags": [
+        "warehouse",
+        "industrial",
+        "exposed brick",
+        "oak floors",
+        "arched windows",
+        "Chippendale"
+      ],
+      "extra_description": "The Olio room sits on the second floor of the restored Old Rum Store, with exposed brick walls, arched windows and light oak floors.",
+      "fill_if_blank": {},
+      "capacity_note": null,
+      "price_note": null,
+      "sources": [
+        "https://www.kensingtonstreet.com.au"
+      ],
+      "flags": [
+        "tag_only_existing_venue"
+      ]
+    },
+    {
+      "source": "Events by Alpha",
+      "matches": "Events by Alpha",
+      "db_vendor_id": "venue-events-by-alpha",
+      "origin": "db",
+      "by": "name",
+      "special_category": [
+        "warehouse"
+      ],
+      "special_subtype": [
+        "historic building"
+      ],
+      "extra_style_tags": [
+        "industrial",
+        "exposed brick",
+        "historic building",
+        "rustic",
+        "CBD"
+      ],
+      "extra_description": "A space in an old CBD building whose standout feature is its exposed historic brickwork.",
+      "fill_if_blank": {},
+      "capacity_note": null,
+      "price_note": null,
+      "sources": [
+        "https://www.238castlereagh.com.au/eventsbyalpha"
+      ],
+      "flags": [
+        "tag_only_existing_venue",
+        "industrial_fit_is_loose"
+      ]
+    },
+    {
+      "source": "The Grounds of Alexandria",
+      "matches": "The Grounds of Alexandria",
+      "db_vendor_id": "venue-the-grounds-of-alexandria",
+      "origin": "db",
+      "by": "name",
+      "special_category": [
+        "warehouse"
+      ],
+      "special_subtype": [
+        "industrial warehouse complex"
+      ],
+      "extra_style_tags": [
+        "industrial",
+        "warehouse",
+        "industrial meets lush",
+        "Alexandria"
+      ],
+      "extra_description": "A former industrial site mixing warehouse spaces with lush planting across the Atrium, the Garden and Linseed House.",
+      "fill_if_blank": {},
+      "capacity_note": null,
+      "price_note": null,
+      "sources": [
+        "https://thegrounds.com.au/"
+      ],
+      "flags": [
+        "tag_only_existing_venue"
+      ]
+    },
+    {
+      "source": "Doltone House - Jones Bay Wharf",
+      "matches": "Doltone House - Jones Bay Wharf",
+      "db_vendor_id": "venue-doltone-house-jones-bay-wharf",
+      "origin": "db",
+      "by": "name",
+      "special_category": [
+        "warehouse"
+      ],
+      "special_subtype": [
+        "loft",
+        "finger wharf"
+      ],
+      "extra_style_tags": [
+        "loft",
+        "exposed brick",
+        "industrial",
+        "wraparound deck",
+        "harbour views",
+        "boutique"
+      ],
+      "extra_description": "The SoHo and Loft rooms are New York-style lofts on a heritage wharf, with exposed brick, floor-to-ceiling windows and a wraparound deck; SoHo holds up to 80 seated or 100 cocktail.",
+      "fill_if_blank": {},
+      "capacity_note": null,
+      "price_note": null,
+      "sources": [
+        "https://doltonehouse.com.au/space/soho/?type=wedding"
+      ],
+      "flags": [
+        "tag_only_existing_venue",
+        "only_some_rooms_are_loft_style"
+      ]
+    },
+    {
+      "source": "The Freedom Hub",
+      "matches": "The Freedom Hub",
+      "db_vendor_id": null,
+      "origin": "venue-import-2026-10-15",
+      "by": "name",
+      "special_category": [
+        "warehouse"
+      ],
+      "special_subtype": [
+        "historic warehouse"
+      ],
+      "extra_style_tags": [
+        "warehouse",
+        "industrial",
+        "exposed brick",
+        "high ceilings",
+        "natural light",
+        "social enterprise"
+      ],
+      "extra_description": "A repurposed historic warehouse with exposed brick, high ceilings and plenty of daylight, run by an anti-slavery organisation.",
+      "fill_if_blank": {},
+      "capacity_note": null,
+      "price_note": null,
+      "sources": [
+        "https://thefreedomhub.org/"
+      ],
+      "flags": [
+        "tag_only_existing_venue"
+      ]
+    }
+  ]
+}
