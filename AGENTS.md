@@ -188,3 +188,20 @@ kinds include:
 
 The point is compact, inspectable state: task, actor, commit, changed contract,
 evidence, timestamp, and next action.
+
+## Shared Vendor Directory Crawler
+
+Use `scripts/vendor_crawl/vendor_crawl.py` instead of creating a new one-off
+scraper when collecting Wedding vendor information from directories or vendor
+websites. The stdlib-only tool observes robots.txt, applies a per-host delay,
+uses a resumable cache, extracts structured contacts, social links, images and
+text offline, and emits bounded digests instead of raw pages.
+
+- Read `scripts/vendor_crawl/README.md` before running a job.
+- Start with `python -I scripts/vendor_crawl/vendor_crawl.py probe <url>` and
+  then use `run <job-folder> ...` for a reviewed batch.
+- Keep each job folder beside its import handoff under
+  `Documents/design/wedding planner/`.
+- Never log in, submit forms, evade bot protection or solve challenges. Record
+  blocked and JavaScript-only pages for review, and write descriptions in the
+  project's own words.

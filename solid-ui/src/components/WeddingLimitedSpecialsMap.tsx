@@ -43,9 +43,10 @@ export function WeddingLimitedSpecialsMap(props: {
   initialGuestCount?: number | null;
   categoryBudgets?: readonly { categoryId: string; amount: number }[];
   preferenceTerms?: readonly string[];
-  onPrepareEnquiry: (marker: WeddingVendorSpecialMarker) => void;
+  onPrepareEnquiry: (marker: WeddingVendorSpecialMarker, detail: WeddingVendorRankedSpecialDetail | null) => void;
 }) {
   const [date, setDate] = createSignal(validDate(props.weddingDate));
+  const [dateTo, setDateTo] = createSignal("");
   const [category, setCategory] = createSignal(props.initialCategory?.replace(/^wedding\s+/i, "").replace(/s$/i, "") || "Venue");
   const [selectedId, setSelectedId] = createSignal<string | null>(null);
   const [hoveredName, setHoveredName] = createSignal<string | null>(null);
@@ -59,7 +60,7 @@ export function WeddingLimitedSpecialsMap(props: {
     return typeof amount === "number" && amount > 0 ? Math.round(amount * 100) : null;
   });
   const [query] = createResource(() => ({
-    date: date(), category: category(), ...searchCenter(), radiusKm: radiusKm(), guestCount: guestCount(),
+    date: date(), dateTo: dateTo() || null, category: category(), ...searchCenter(), radiusKm: radiusKm(), guestCount: guestCount(),
     categoryBudgetCents: categoryBudgetCents(), preferenceTerms: props.preferenceTerms,
   }), loadWeddingVendorSpecials);
   let mapElement: HTMLDivElement | undefined;
@@ -176,9 +177,12 @@ export function WeddingLimitedSpecialsMap(props: {
 
   return (
     <section class="mt-4 min-w-0" aria-labelledby="limited-specials-heading">
-      <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(8rem,.65fr)_minmax(8rem,.65fr)_auto] lg:items-end">
+      <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-[repeat(5,minmax(8rem,1fr))_auto] xl:items-end">
         <label class="grid gap-1 text-sm font-semibold text-wedding-ink">Wedding date
           <input class="h-11 rounded-lg border border-wedding-border bg-white px-3 font-normal" type="date" value={date()} onInput={(event) => setDate(event.currentTarget.value)} />
+        </label>
+        <label class="grid gap-1 text-sm font-semibold text-wedding-ink">Flexible through <span class="font-normal text-wedding-ink/55">(optional, up to 31 days)</span>
+          <input class="h-11 rounded-lg border border-wedding-border bg-white px-3 font-normal" type="date" min={date()} max={new Date(new Date(`${date()}T12:00:00`).getTime() + 31 * 86400000).toISOString().slice(0, 10)} value={dateTo()} onInput={(event) => setDateTo(event.currentTarget.value)} />
         </label>
         <label class="grid gap-1 text-sm font-semibold text-wedding-ink">Guests
           <input class="h-11 rounded-lg border border-wedding-border bg-white px-3 font-normal" type="number" min="1" max="5000" inputmode="numeric" value={guestCount() ?? ""} placeholder="Optional" onInput={(event) => setGuestCount(event.currentTarget.value ? Number(event.currentTarget.value) : null)} />
@@ -230,6 +234,7 @@ export function WeddingLimitedSpecialsMap(props: {
               <Show when={selectedDetail()} keyed fallback={<p class="mt-4 rounded-lg bg-wedding-slate p-3 text-xs leading-5 text-wedding-ink/65">Vendor-confirmed availability is shown here. Exact package and price guidance appears only when this venue is in your current top three.</p>}>{(detail) => (
                 <section class="mt-4 rounded-xl border border-wedding-primary/25 bg-wedding-primary/5 p-3" aria-label="Top-three limited special details">
                   <p class="text-xs font-bold uppercase tracking-[.12em] text-wedding-primary">#{detail.rank} current match · Indicative</p>
+                  <Show when={detail.specialDate && detail.specialDate !== date()}><p class="mt-1 text-xs font-semibold text-wedding-primary">Special date: {new Date(`${detail.specialDate}T12:00:00`).toLocaleDateString("en-AU", { day: "numeric", month: "long", year: "numeric" })}</p></Show>
                   <h4 class="mt-1 font-semibold text-wedding-ink">{detail.title}</h4>
                   <p class="mt-1 text-sm leading-5 text-wedding-ink/70">{detail.summary}</p>
                   <Show when={detail.spaceLabel || detail.sessionLabel}><p class="mt-2 text-xs font-semibold text-wedding-ink/70">{[detail.spaceLabel, detail.sessionLabel].filter(Boolean).join(" · ")}</p></Show>
@@ -255,7 +260,7 @@ export function WeddingLimitedSpecialsMap(props: {
               </div>
               <p class="mt-3 text-xs leading-5 text-wedding-ink/70"><span class="font-bold text-wedding-primary">{new Date(`${item.availableOnDate}T12:00:00`).toLocaleDateString("en-AU", { day: "numeric", month: "long", year: "numeric" })}</span> is vendor-confirmed. Package and price remain subject to confirmation.</p>
               <p class="mt-1 text-[11px] leading-4 text-wedding-ink/55">Last reconfirmed {new Date(item.lastConfirmedAt).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" })}.</p>
-              <button type="button" class="mt-3 min-h-11 w-full rounded-lg bg-wedding-primary px-4 text-sm font-bold text-white" onClick={() => props.onPrepareEnquiry(item)}>Enquire</button>
+              <button type="button" class="mt-3 min-h-11 w-full rounded-lg bg-wedding-primary px-4 text-sm font-bold text-white" onClick={() => props.onPrepareEnquiry(item, selectedDetail())}>Prepare enquiry</button>
             </section>
           </div>
         </article>

@@ -30,11 +30,13 @@ const MAX_GRANT_DAYS: i64 = 14;
 const UNAVAILABLE: &str = "This management link is unavailable.";
 const COOKIE_NAME: &str = "omnyid_wvs_session";
 
-const ALLOWED_OPERATIONS: [&str; 9] = [
+const ALLOWED_OPERATIONS: [&str; 11] = [
+    "offer_edit",
     "offer_publish",
     "offer_pause",
     "offer_withdraw",
     "offer_reconfirm",
+    "slot_record_enquiry",
     "slot_place_hold",
     "slot_mark_booked",
     "slot_pause",
@@ -89,10 +91,12 @@ struct ExchangeRequest {
 #[derive(Clone, Copy, Debug, Deserialize)]
 #[serde(rename_all = "snake_case")]
 enum CapabilityOperation {
+    OfferEdit,
     OfferPublish,
     OfferPause,
     OfferWithdraw,
     OfferReconfirm,
+    SlotRecordEnquiry,
     SlotPlaceHold,
     SlotMarkBooked,
     SlotPause,
@@ -103,10 +107,12 @@ enum CapabilityOperation {
 impl CapabilityOperation {
     fn name(self) -> &'static str {
         match self {
+            Self::OfferEdit => "offer_edit",
             Self::OfferPublish => "offer_publish",
             Self::OfferPause => "offer_pause",
             Self::OfferWithdraw => "offer_withdraw",
             Self::OfferReconfirm => "offer_reconfirm",
+            Self::SlotRecordEnquiry => "slot_record_enquiry",
             Self::SlotPlaceHold => "slot_place_hold",
             Self::SlotMarkBooked => "slot_mark_booked",
             Self::SlotPause => "slot_pause",
@@ -125,6 +131,24 @@ struct CapabilityCommandRequest {
     slot_id: Option<String>,
     hold_expires_at: Option<String>,
     confirmation_expires_at: Option<String>,
+    edit: Option<CapabilityEditRequest>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CapabilityEditRequest {
+    title: String,
+    summary: String,
+    slot_revision: u64,
+    local_date: String,
+    timezone: String,
+    space_label: Option<String>,
+    session_label: Option<String>,
+    maximum_capacity: Option<u32>,
+    minimum_spend_cents: Option<i64>,
+    indicative_per_head_cents: Option<i64>,
+    inclusions: Vec<String>,
+    public_conditions: Option<String>,
 }
 
 struct SessionAuthority {
@@ -539,7 +563,7 @@ async fn read_session_http(
     .await
     .map_err(|_| unavailable())?;
     let slots = sqlx::query(
-        "SELECT slot_id,local_date,timezone,starts_at,ends_at,space_label,session_label,state,maximum_capacity,minimum_spend_cents,indicative_per_head_cents,inclusions,public_conditions,last_confirmed_at,confirmation_expires_at,revision FROM wedding_vendor_special_offer_slots WHERE offer_id=$1 AND vendor_id=$2 ORDER BY local_date,starts_at NULLS FIRST",
+        "SELECT slot.*,(SELECT COUNT(*) FROM wedding_vendor_special_offer_enquiries enquiry WHERE enquiry.slot_id=slot.slot_id) AS affected_enquiry_count FROM wedding_vendor_special_offer_slots slot WHERE offer_id=$1 AND vendor_id=$2 ORDER BY local_date,starts_at NULLS FIRST",
     )
     .bind(&authority.offer_id)
     .bind(&authority.vendor_id)
@@ -559,7 +583,9 @@ async fn read_session_http(
         "indicative_per_head_cents":row.get::<Option<i64>,_>("indicative_per_head_cents"),
         "inclusions":row.get::<Vec<String>,_>("inclusions"),
         "public_conditions":row.get::<Option<String>,_>("public_conditions"),
-        "revision":row.get::<i64,_>("revision")
+        "revision":row.get::<i64,_>("revision"),
+        "affected_enquiry_count":row.get::<i64,_>("affected_enquiry_count"),
+        "operator_warning":if matches!(row.get::<String,_>("state").as_str(), "stale" | "paused" | "withdrawn") && row.get::<i64,_>("affected_enquiry_count") > 0 { Some("This date is hidden from discovery and has affected enquiries to review.") } else { None::<&str> }
     }))
     .collect::<Vec<_>>();
     Ok(Json(json!({
@@ -572,6 +598,8 @@ async fn read_session_http(
             "summary":offer.get::<String,_>("summary"),
             "publication_state":offer.get::<String,_>("publication_state"),
             "currency":offer.get::<String,_>("currency"),
+            "inclusions":offer.get::<Vec<String>,_>("inclusions"),
+            "public_conditions":offer.get::<Option<String>,_>("public_conditions"),
             "revision":offer.get::<i64,_>("revision"),
             "slots":slots
         },
@@ -606,6 +634,45 @@ async fn command_http(
         source: "vendor_special_management_link",
     };
     let value = match request.operation {
+        CapabilityOperation::OfferEdit => {
+            let slot_id = request.slot_id.as_deref().ok_or((
+                StatusCode::BAD_REQUEST,
+                "Choose an available date to edit.".into(),
+            ))?;
+            let edit = request.edit.ok_or((
+                StatusCode::BAD_REQUEST,
+                "Add the updated offer details.".into(),
+            ))?;
+            let title = required(&edit.title, "title", 160)?;
+            let summary = required(&edit.summary, "summary", 1_200)?;
+            let slot = validate_slot_request(DateSlotDraftRequest {
+                local_date: edit.local_date,
+                timezone: edit.timezone,
+                starts_at: None,
+                ends_at: None,
+                space_label: edit.space_label,
+                session_label: edit.session_label,
+                maximum_capacity: edit.maximum_capacity,
+                minimum_spend_cents: edit.minimum_spend_cents,
+                indicative_per_head_cents: edit.indicative_per_head_cents,
+                inclusions: edit.inclusions,
+                public_conditions: edit.public_conditions,
+            })?;
+            commands::edit_offer(
+                &state,
+                &authority.vendor_id,
+                &authority.offer_id,
+                slot_id,
+                request.expected_revision,
+                edit.slot_revision,
+                title,
+                summary,
+                slot,
+                &request.idempotency_key,
+                actor,
+            )
+            .await?
+        }
         CapabilityOperation::OfferPublish => {
             commands::publish_offer(
                 &state,
@@ -643,11 +710,13 @@ async fn command_http(
                 "Choose an available date for this action.".into(),
             ))?;
             let action = match operation {
+                CapabilityOperation::SlotRecordEnquiry => VendorSlotAction::RecordEnquiry,
                 CapabilityOperation::SlotPlaceHold => VendorSlotAction::PlaceHold,
                 CapabilityOperation::SlotMarkBooked => VendorSlotAction::MarkBooked,
                 CapabilityOperation::SlotPause => VendorSlotAction::Pause,
                 CapabilityOperation::SlotWithdraw => VendorSlotAction::Withdraw,
                 CapabilityOperation::SlotReconfirm => VendorSlotAction::Reconfirm,
+                CapabilityOperation::OfferEdit => unreachable!(),
                 _ => unreachable!(),
             };
             let slot_request = SlotCommandRequest {

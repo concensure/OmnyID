@@ -23,9 +23,9 @@ pricing state before the authoritative commands and safe projections exist.
   offer-enquiry links and append-only events.
 - [x] Add indexes for active/fresh date-category discovery and vendor portal
   management without enabling public enumeration.
-- [ ] Add migration-catalog parity and disposable Postgres migration tests.
-  Catalogue parity passes; the disposable PostgreSQL execution remains open
-  because the local Docker Desktop daemon could not start on 2026-11-06.
+- [x] Add migration-catalog parity and disposable Postgres migration tests.
+  Migrations 0149 through 0151 replay twice on disposable pgvector without
+  duplicating authority, and the maintenance transition test uses that harness.
 - [x] Implement pure validation/state-transition policy: draft → active,
   available/enquiry/hold/booked, stale auto-pause, hold expiry, withdrawal and
   optimistic revision conflicts.
@@ -35,15 +35,15 @@ pricing state before the authoritative commands and safe projections exist.
 
 ## Phase 2 — verified vendor commands
 
-- [ ] Reuse claim/ownership authority to list and edit only the caller's vendor.
+- [x] Reuse claim/ownership authority to list and edit only the caller's vendor.
 - [x] Create offer/slot draft commands with bounded fields and idempotency keys.
 - [x] Let each date/space/session carry maximum capacity, minimum spend,
   indicative price per head, inclusions and public conditions, with offer-level
   values serving only as defaults.
 - [x] Add preview, explicit approval/publish, pause, withdraw and reconfirm.
-- [ ] Add enquiry-received, provisional-hold, hold-expiry and booked commands.
+- [x] Add enquiry-received, provisional-hold, hold-expiry and booked commands.
 - [x] Record actor, source, revision and AFP/operational event for every command.
-- [ ] Add cross-vendor and swapped-ID adversarial tests.
+- [x] Add cross-vendor and swapped-ID adversarial guards and tests.
 
 ## Phase 3 — secure management link
 
@@ -53,16 +53,17 @@ pricing state before the authoritative commands and safe projections exist.
   no-store/noindex/no-referrer and generation rotation.
 - [x] Route link and authenticated portal commands through the same service
   functions; do not implement two state machines.
-- [ ] Add forged token, expired, revoked, replay, scope escalation and
+- [x] Add forged token, expired, revoked, replay, scope escalation and
   cross-vendor tests.
 
 ## Phase 4 — stale and failure automation
 
-- [ ] Add bounded worker to mark expired confirmations stale and expire holds.
-- [ ] Do not write repeated no-op AFP/audit events.
-- [ ] Pause affected discovery immediately and project open-enquiry warnings.
-- [ ] Add delivery/update failure projection and operator retry controls.
-- [ ] Add retention for high-volume operational events without deleting AFP
+- [x] Add bounded worker to mark expired confirmations stale and expire holds.
+- [x] Do not write repeated no-op AFP/audit events.
+- [x] Pause affected discovery immediately and project open-enquiry warnings.
+- [x] Add delivery/update failure projection. Retry remains couple-owned so an
+  operator cannot turn a previous approval into another external send.
+- [x] Add retention for high-volume operational events without deleting AFP
   authority records.
 
 ## Phase 5 — ranking and top-three reveal
@@ -79,10 +80,10 @@ pricing state before the authoritative commands and safe projections exist.
   The exact-date discovery route now performs the bounded server-side V2 stage
   and computes approved price guidance before serializing at most three exact
   details. Unknown price is uncertainty rather than a negative score.
-- [ ] Support explicit flexible-date windows and explain rank changes caused by
+- [x] Support explicit flexible-date windows and explain rank changes caused by
   a special date.
 - [x] Attach exact slot/package details only after top-three selection.
-- [ ] Add fixed-date, flexible-date, over-budget-to-within-budget, unknown-cost,
+- [x] Add fixed-date, flexible-date, over-budget-to-within-budget, unknown-cost,
   stale and commercial-influence regression tests.
 
 ## Phase 6 — couple discovery API
@@ -93,7 +94,7 @@ pricing state before the authoritative commands and safe projections exist.
 - [x] Return exact offer details only for the ranked top three.
 - [x] Add pagination/bounds and server clustering inputs; do not expose a full
   calendar through repeated range probing.
-- [ ] Add cross-tenant and enumeration-resistance tests.
+- [x] Add cross-tenant and enumeration-resistance guards and tests.
 
 ## Phase 7 — Limited Specials A2UI surface
 
@@ -112,31 +113,32 @@ pricing state before the authoritative commands and safe projections exist.
 
 ## Phase 8 — enquiry reuse
 
-- [ ] Map `Prepare enquiry` to the existing vendor-card consequence state.
-- [ ] Recheck slot revision/state server-side before opening approval.
-- [ ] Prefill offer/date/space plus canonical guests, category budget,
+- [x] Map `Prepare enquiry` to the existing vendor-card consequence state.
+- [x] Recheck slot revision/state server-side immediately before provider send.
+- [x] Prefill offer/date/space plus canonical guests, category budget,
   requirements and sharing controls.
-- [ ] On explicit approval, create one idempotent existing enquiry envelope and
+- [x] On explicit approval, create one idempotent existing enquiry envelope and
   link it to offer/slot.
-- [ ] Reuse couple mask, provider delivery, registered-vendor AFP delivery and
+- [x] Reuse couple mask, provider delivery, registered-vendor AFP delivery and
   unclaimed-vendor referral capability.
-- [ ] Test duplicate/retry, unavailable-after-preview, provider failure,
-  actual receipt and correlated reply.
+- [x] Test duplicate/retry, unavailable-after-preview and provider failure.
+  Actual receipt and correlated reply remain hosted acceptance evidence rather
+  than a separate Limited-Specials mail implementation.
 
 ## Phase 9 — vendor portal A2UI
 
-- [ ] Add compact offer list, create/edit, slot controls, freshness and affected
+- [x] Add compact offer list, create/edit, slot controls, freshness and affected
   enquiry counts to the existing vendor portal.
-- [ ] Add preview of exact public/couple projections and private pricing
+- [x] Add preview of exact public/couple projections and private pricing
   boundary.
-- [ ] Add large confirmation dialogs for withdraw/booked and conflict recovery.
-- [ ] Keep mobile actions reachable, labelled and touch-friendly.
+- [x] Add large confirmation dialogs for hold/withdraw/booked and conflict recovery.
+- [x] Keep mobile actions reachable, labelled and touch-friendly.
 
 ## Phase 10 — admin, outcome and pilot
 
-- [ ] Add admin category/status/freshness/failure aggregates without secret or
+- [x] Add admin category/status/freshness/failure aggregates without secret or
   couple content.
-- [ ] Connect quote/tour/hold/booking/lost/unknown outcomes to existing AFP
+- [x] Connect quote/tour/hold/booking/lost/unknown outcomes to existing AFP
   conversation and booking projections.
 - [ ] Prove one-venue pilot end to end with publication flags false by default.
 - [ ] Complete security/privacy/accessibility review, legal copy approval,
@@ -172,3 +174,18 @@ and over-capacity rows do not project. Ranking Policy V2 treats the signal as
 actionable availability and explains it in couple-facing language. Offer and
 slot identifiers, title, pricing, inclusions, conditions and the wider calendar
 remain absent pending the authenticated server-side top-three reveal.
+
+The completion slice adds the authenticated top-three reveal and synchronized
+map/detail card, a 31-day bounded flexible-date window, verified-vendor and
+link-only mobile editors, explicit 48-hour (maximum seven-day) provisional
+holds, expiry/staleness maintenance, content-light failure/admin projections,
+and the existing explicitly-approved enquiry path. The AFP draft and sent
+receipt carry the exact offer, slot and revision. A private outcome projection
+joins later quote, tour, hold, booking and lost evidence by the same tenant and
+conversation thread. It does not copy message bodies or create a second
+booking ledger.
+
+The implementation remains false-default. The final two Phase 10 checkboxes are
+activation evidence: a real participating vendor pilot and feature-specific
+hosted acceptance review. They do not justify bypassing the allowlist or
+inventing a vendor publication during deployment.

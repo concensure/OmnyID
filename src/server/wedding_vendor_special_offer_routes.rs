@@ -34,11 +34,13 @@ use records::*;
 mod capability;
 mod commands;
 mod discovery;
+mod enquiry;
 mod privacy;
 
 const MAX_SLOTS_PER_OFFER: usize = 100;
 const MAX_INCLUSIONS: usize = 40;
 const CONFIRMATION_DAYS: i64 = 14;
+const MAX_HOLD_DAYS: i64 = 7;
 
 pub(super) fn routes() -> Router<Arc<AppState>> {
     Router::new()
@@ -51,6 +53,10 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
             post(publish_offer_http),
         )
         .route(
+            "/wedding/vendor/special-offers/{offer_id}/edit",
+            post(edit_offer_http),
+        )
+        .route(
             "/wedding/vendor/special-offers/{offer_id}/state",
             post(change_offer_state_http),
         )
@@ -58,9 +64,69 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
             "/wedding/vendor/special-offers/{offer_id}/slots/{slot_id}/state",
             post(change_slot_state_http),
         )
+        .route(
+            "/wedding/vendor-specials/enquiries/link",
+            post(enquiry::link_special_enquiry_http),
+        )
+        .route(
+            "/wedding/vendor-specials/enquiries/recheck",
+            post(enquiry::recheck_special_enquiry_http),
+        )
+        .route(
+            "/wedding/vendor-specials/enquiries/delivery-failure",
+            post(enquiry::record_special_delivery_failure_http),
+        )
+        .route("/admin/wedding/vendor-specials", get(admin_metrics_http))
         .merge(discovery::routes())
         .merge(capability::routes())
         .layer(axum::middleware::from_fn(privacy::no_store))
+}
+
+async fn admin_metrics_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    let user = authenticated_user(&state.db, &headers).await?;
+    if !super::cost_controls::operator_access_allowed(&user.email) {
+        return Err((StatusCode::FORBIDDEN, "Operator access is required.".into()));
+    }
+    let rows = sqlx::query(
+        r#"SELECT offer.category,
+                  COUNT(DISTINCT offer.offer_id)::bigint AS offers,
+                  COUNT(DISTINCT offer.offer_id) FILTER (WHERE offer.publication_state='active')::bigint AS active_offers,
+                  COUNT(DISTINCT slot.slot_id) FILTER (WHERE slot.state IN ('available','enquiry_received') AND slot.confirmation_expires_at>NOW())::bigint AS fresh_dates,
+                  COUNT(DISTINCT slot.slot_id) FILTER (WHERE slot.state='stale' OR slot.confirmation_expires_at<=NOW())::bigint AS stale_dates,
+                  COUNT(DISTINCT enquiry.link_id)::bigint AS enquiries,
+                  COUNT(DISTINCT event.event_id) FILTER (WHERE event.event_kind='delivery_failed')::bigint AS delivery_failures
+             FROM wedding_vendor_special_offers offer
+             LEFT JOIN wedding_vendor_special_offer_slots slot ON slot.offer_id=offer.offer_id
+             LEFT JOIN wedding_vendor_special_offer_enquiries enquiry ON enquiry.offer_id=offer.offer_id
+             LEFT JOIN wedding_vendor_special_offer_events event ON event.offer_id=offer.offer_id
+            GROUP BY offer.category ORDER BY active_offers DESC,offer.category"#,
+    )
+    .fetch_all(&state.db.pool)
+    .await
+    .map_err(database_failure)?;
+    let outcomes = sqlx::query(
+        "SELECT outcome,COUNT(*)::bigint AS count FROM wedding_vendor_special_offer_outcome_projection GROUP BY outcome ORDER BY outcome",
+    )
+    .fetch_all(&state.db.pool)
+    .await
+    .map_err(database_failure)?;
+    Ok(Json(
+        json!({"categories": rows.into_iter().map(|row| json!({
+        "category":row.get::<String,_>("category"),
+        "offers":row.get::<i64,_>("offers"),
+        "active_offers":row.get::<i64,_>("active_offers"),
+        "fresh_dates":row.get::<i64,_>("fresh_dates"),
+        "stale_dates":row.get::<i64,_>("stale_dates"),
+        "enquiries":row.get::<i64,_>("enquiries"),
+        "delivery_failures":row.get::<i64,_>("delivery_failures")
+    })).collect::<Vec<_>>(), "outcomes": outcomes.into_iter().map(|row| json!({
+        "outcome":row.get::<String,_>("outcome"),
+        "count":row.get::<i64,_>("count")
+    })).collect::<Vec<_>>() }),
+    ))
 }
 
 #[derive(Debug, Deserialize)]
@@ -110,6 +176,18 @@ struct OfferCommandRequest {
     action: Option<OfferAction>,
 }
 
+#[derive(Debug, Deserialize)]
+struct EditOfferRequest {
+    vendor_slug: String,
+    idempotency_key: String,
+    expected_offer_revision: u64,
+    slot_id: String,
+    expected_slot_revision: u64,
+    title: String,
+    summary: String,
+    slot: DateSlotDraftRequest,
+}
+
 #[derive(Clone, Copy, Debug, Deserialize)]
 #[serde(rename_all = "snake_case")]
 enum OfferAction {
@@ -131,6 +209,7 @@ struct SlotCommandRequest {
 #[derive(Clone, Copy, Debug, Deserialize)]
 #[serde(rename_all = "snake_case")]
 enum VendorSlotAction {
+    RecordEnquiry,
     PlaceHold,
     MarkBooked,
     Pause,
@@ -158,6 +237,14 @@ impl<'a> CommandActor<'a> {
             kind: "vendor_user",
             user_id: Some(user_id),
             source: "verified_vendor_portal",
+        }
+    }
+
+    fn couple(user_id: &'a str) -> Self {
+        Self {
+            kind: "couple",
+            user_id: Some(user_id),
+            source: "approved_vendor_enquiry",
         }
     }
 }
@@ -579,7 +666,7 @@ async fn list_offers_http(
     for offer in offers {
         let offer_id: String = offer.get("offer_id");
         let slots = sqlx::query(
-            "SELECT * FROM wedding_vendor_special_offer_slots WHERE offer_id=$1 AND vendor_id=$2 ORDER BY local_date,starts_at NULLS FIRST",
+            "SELECT slot.*,(SELECT COUNT(*) FROM wedding_vendor_special_offer_enquiries enquiry WHERE enquiry.slot_id=slot.slot_id) AS affected_enquiry_count FROM wedding_vendor_special_offer_slots slot WHERE offer_id=$1 AND vendor_id=$2 ORDER BY local_date,starts_at NULLS FIRST",
         )
         .bind(&offer_id)
         .bind(&vendor.vendor_id)
@@ -596,6 +683,8 @@ async fn list_offers_http(
             "summary":offer.get::<String,_>("summary"),
             "publication_state":offer.get::<String,_>("publication_state"),
             "currency":offer.get::<String,_>("currency"),
+            "inclusions":offer.get::<Vec<String>,_>("inclusions"),
+            "public_conditions":offer.get::<Option<String>,_>("public_conditions"),
             "revision":offer.get::<i64,_>("revision"),"slots":slot_items
         }));
     }
@@ -632,6 +721,8 @@ fn vendor_slot_json(
         "indicative_only":true,
         "availability_notice":"Subject to vendor confirmation",
         "revision":row.get::<i64,_>("revision")
+        ,"affected_enquiry_count":row.try_get::<i64,_>("affected_enquiry_count").unwrap_or(0)
+        ,"operator_warning":if matches!(row.get::<String,_>("state").as_str(), "stale" | "paused" | "withdrawn") && row.try_get::<i64,_>("affected_enquiry_count").unwrap_or(0) > 0 { Some("This date is hidden from discovery and has affected enquiries to review.") } else { None::<&str> }
     })
 }
 
@@ -647,6 +738,33 @@ async fn publish_offer_http(
         &vendor.vendor_id,
         &offer_id,
         request.expected_revision,
+        &request.idempotency_key,
+        CommandActor::verified_vendor(&user.id),
+    )
+    .await
+    .map(Json)
+}
+
+async fn edit_offer_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(offer_id): Path<String>,
+    Json(request): Json<EditOfferRequest>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    let (user, vendor) = vendor_request_authority(&state, &headers, &request.vendor_slug).await?;
+    let title = required(&request.title, "title", 160)?;
+    let summary = required(&request.summary, "summary", 1_200)?;
+    let slot = validate_slot_request(request.slot)?;
+    commands::edit_offer(
+        &state,
+        &vendor.vendor_id,
+        &offer_id,
+        &request.slot_id,
+        request.expected_offer_revision,
+        request.expected_slot_revision,
+        title,
+        summary,
+        slot,
         &request.idempotency_key,
         CommandActor::verified_vendor(&user.id),
     )
@@ -700,12 +818,20 @@ fn slot_command(
     request: &SlotCommandRequest,
 ) -> Result<(SpecialSlotCommand, &'static str), (StatusCode, String)> {
     match request.action {
-        VendorSlotAction::PlaceHold => Ok((
-            SpecialSlotCommand::PlaceHold {
-                expires_at: parse_timestamp(request.hold_expires_at.as_deref(), "hold_expires_at")?,
-            },
-            "hold_created",
-        )),
+        VendorSlotAction::RecordEnquiry => {
+            Ok((SpecialSlotCommand::RecordEnquiry, "enquiry_received"))
+        }
+        VendorSlotAction::PlaceHold => {
+            let expires_at =
+                parse_timestamp(request.hold_expires_at.as_deref(), "hold_expires_at")?;
+            if expires_at > Utc::now() + ChronoDuration::days(MAX_HOLD_DAYS) {
+                return Err((
+                    StatusCode::BAD_REQUEST,
+                    format!("A provisional hold cannot exceed {MAX_HOLD_DAYS} days."),
+                ));
+            }
+            Ok((SpecialSlotCommand::PlaceHold { expires_at }, "hold_created"))
+        }
         VendorSlotAction::MarkBooked => Ok((SpecialSlotCommand::MarkBooked, "booked")),
         VendorSlotAction::Pause => Ok((SpecialSlotCommand::Pause, "paused")),
         VendorSlotAction::Withdraw => Ok((SpecialSlotCommand::Withdraw, "withdrawn")),

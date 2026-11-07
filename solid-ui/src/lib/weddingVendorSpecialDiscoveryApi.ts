@@ -24,6 +24,7 @@ export type WeddingVendorSpecialMarker = {
 
 export type WeddingVendorSpecialDiscovery = {
   selectedDate: string;
+  selectedDateTo: string;
   category: string | null;
   rankingPolicyVersion: "2" | null;
   markers: WeddingVendorSpecialMarker[];
@@ -33,7 +34,11 @@ export type WeddingVendorSpecialDiscovery = {
 
 export type WeddingVendorRankedSpecialDetail = {
   vendorId: string;
+  offerId: string;
+  slotId: string;
+  slotRevision: number;
   rank: number;
+  specialDate: string;
   title: string;
   summary: string;
   spaceLabel: string | null;
@@ -86,10 +91,63 @@ export function normalizeWeddingVendorSpecialMarker(value: unknown): WeddingVend
   };
 }
 
+export type WeddingVendorSpecialEnquiryContext = {
+  offerId: string;
+  slotId: string;
+  slotRevision: number;
+};
+
+export async function recheckWeddingVendorSpecialEnquiry(input: WeddingVendorSpecialEnquiryContext) {
+  return apiFetch<{ status: "current"; slot_revision: number }>("/wedding/vendor-specials/enquiries/recheck", {
+    method: "POST",
+    body: JSON.stringify({
+      offer_id: input.offerId,
+      slot_id: input.slotId,
+      expected_slot_revision: input.slotRevision,
+    }),
+  });
+}
+
+export async function linkWeddingVendorSpecialEnquiry(input: WeddingVendorSpecialEnquiryContext & {
+  weddingPlanId: string;
+  enquiryEnvelopeRef: string;
+  idempotencyKey: string;
+}) {
+  return apiFetch<{ status: "linked"; link_id?: string; replayed: boolean }>("/wedding/vendor-specials/enquiries/link", {
+    method: "POST",
+    body: JSON.stringify({
+      offer_id: input.offerId,
+      slot_id: input.slotId,
+      expected_slot_revision: input.slotRevision,
+      wedding_plan_id: input.weddingPlanId,
+      enquiry_envelope_ref: input.enquiryEnvelopeRef,
+      idempotency_key: input.idempotencyKey,
+    }),
+  });
+}
+
+export async function recordWeddingVendorSpecialDeliveryFailure(input: WeddingVendorSpecialEnquiryContext & {
+  idempotencyKey: string;
+  weddingPlanId: string;
+  reasonCode?: "provider_rejected" | "provider_unavailable" | "network_error";
+}) {
+  return apiFetch<{ status: "recorded"; replayed: boolean }>("/wedding/vendor-specials/enquiries/delivery-failure", {
+    method: "POST",
+    body: JSON.stringify({
+      offer_id: input.offerId,
+      slot_id: input.slotId,
+      idempotency_key: input.idempotencyKey,
+      wedding_plan_id: input.weddingPlanId,
+      reason_code: input.reasonCode ?? "provider_unavailable",
+    }),
+  });
+}
+
 export function normalizeWeddingVendorSpecialDiscovery(value: unknown): WeddingVendorSpecialDiscovery {
   const record = isRecord(value) ? value : {};
   return {
     selectedDate: text(record.selected_date),
+    selectedDateTo: text(record.selected_date_to) || text(record.selected_date),
     category: optionalText(record.category),
     rankingPolicyVersion: text(record.ranking_policy_version) === "2" ? "2" : null,
     markers: Array.isArray(record.markers)
@@ -105,13 +163,20 @@ export function normalizeWeddingVendorSpecialDiscovery(value: unknown): WeddingV
 export function normalizeWeddingVendorRankedSpecialDetail(value: unknown): WeddingVendorRankedSpecialDetail | null {
   if (!isRecord(value)) return null;
   const vendorId = text(value.vendor_id);
+  const offerId = text(value.offer_id);
+  const slotId = text(value.slot_id);
+  const slotRevision = number(value.slot_revision);
   const rank = number(value.rank);
   const title = text(value.title);
-  if (!vendorId || rank === null || rank < 1 || rank > 3 || !title) return null;
+  if (!vendorId || !offerId || !slotId || slotRevision === null || slotRevision < 1 || rank === null || rank < 1 || rank > 3 || !title) return null;
   const strings = (candidate: unknown) => Array.isArray(candidate) ? candidate.map(text).filter(Boolean).slice(0, 40) : [];
   return {
     vendorId,
+    offerId,
+    slotId,
+    slotRevision,
     rank,
+    specialDate: text(value.special_date),
     title,
     summary: text(value.summary),
     spaceLabel: optionalText(value.space_label),
@@ -133,6 +198,7 @@ export function normalizeWeddingVendorRankedSpecialDetail(value: unknown): Weddi
 
 export async function loadWeddingVendorSpecials(input: {
   date: string;
+  dateTo?: string | null;
   category: string;
   latitude?: number;
   longitude?: number;
@@ -149,6 +215,7 @@ export async function loadWeddingVendorSpecials(input: {
     method: "POST",
     body: JSON.stringify({
       date: input.date,
+      date_to: input.dateTo || null,
       category: input.category,
       ...location,
       guest_count: typeof input.guestCount === "number" && input.guestCount > 0 ? Math.round(input.guestCount) : null,

@@ -186,6 +186,8 @@ pub(crate) struct CreateRequest {
     pub(crate) household_id: String,
     pub(crate) invitation_ids: Vec<String>,
     pub(crate) expires_at: String,
+    #[serde(default)]
+    pub(crate) request_contact_details: bool,
 }
 
 #[derive(Serialize)]
@@ -242,6 +244,7 @@ async fn create_http(
         invitation_ids: request.invitation_ids,
         token_digest,
         expires_at,
+        request_contact_details: request.request_contact_details,
     };
     let grant = state
         .db
@@ -371,6 +374,16 @@ struct PublicResponseRequest {
     #[serde(default)]
     private_answer_question_ids: Vec<String>,
     private_answers_ciphertext: Option<String>,
+    contact_details: Option<GuestContactDetails>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct GuestContactDetails {
+    display_name: String,
+    email: String,
+    phone: String,
+    relationship_to_couple: String,
 }
 
 async fn respond_http(
@@ -412,6 +425,15 @@ async fn respond_http(
         answers: request.answers,
         private_answer_question_ids: request.private_answer_question_ids,
         private_answers_ciphertext: request.private_answers_ciphertext,
+        contact_details: request.contact_details.map(|details| {
+            super::wedding_rsvp_response_routes::GuestContactDetails {
+                display_name: details.display_name,
+                email: details.email,
+                phone: details.phone,
+                relationship_to_couple: details.relationship_to_couple,
+            }
+        }),
+        contact_details_authorized: authority.request_contact_details,
     };
     let result: RecordResponseReply = record_guest_response_for_user(
         &state.db,

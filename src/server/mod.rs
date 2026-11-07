@@ -1089,6 +1089,10 @@ pub async fn run() {
         start_archive_daemon(db.clone(), shutdown_rx.clone()),
         start_health_maintenance_daemon(db.clone(), shutdown_rx.clone()),
         start_vendor_email_quarantine_retention(db.clone(), shutdown_rx.clone()),
+        crate::wedding_vendor_special_offer_maintenance::start_vendor_special_offer_maintenance(
+            db.clone(),
+            shutdown_rx.clone(),
+        ),
         crate::weekly_operator_report::start_weekly_operator_report(
             db.clone(),
             shutdown_rx.clone(),

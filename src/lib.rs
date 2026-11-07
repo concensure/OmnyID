@@ -148,6 +148,7 @@ pub mod wedding_vendor_email_contract;
 pub mod wedding_vendor_quote_orchestration;
 pub mod wedding_vendor_replay;
 pub mod wedding_vendor_special_offer;
+pub mod wedding_vendor_special_offer_maintenance;
 pub mod wedding_lifecycle_email;
 pub mod wedding_quote_reading;
 pub mod weekly_operator_report;

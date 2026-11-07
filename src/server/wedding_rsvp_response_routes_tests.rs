@@ -1,6 +1,6 @@
 use super::wedding_rsvp_capability_routes::token_digest;
 use super::wedding_rsvp_response_routes::{
-    Attendance, CapabilityProof, InvitationAuthority, RecordResponseRequest,
+    Attendance, CapabilityProof, GuestContactDetails, InvitationAuthority, RecordResponseRequest,
     record_guest_response_for_user, record_response_for_user, validate_controlled_answers,
     validate_expected_revision, validate_invitation_scope, validate_request,
 };
@@ -45,6 +45,8 @@ fn request() -> RecordResponseRequest {
         answers: Default::default(),
         private_answer_question_ids: vec![],
         private_answers_ciphertext: Some("encrypted:v1:opaque-envelope".into()),
+        contact_details: None,
+        contact_details_authorized: false,
     }
 }
 
@@ -90,6 +92,40 @@ fn rejects_empty_or_oversized_private_answer_envelopes() {
     plaintext.private_answers_ciphertext = Some("Guest has a severe nut allergy".into());
     assert_eq!(
         validate_request(&plaintext).unwrap_err().0,
+        StatusCode::BAD_REQUEST
+    );
+}
+
+#[test]
+fn contact_details_require_capability_authority_and_essential_fields() {
+    let details = GuestContactDetails {
+        display_name: "Alex Guest".into(),
+        email: "alex@example.com".into(),
+        phone: "+61 400 000 000".into(),
+        relationship_to_couple: "Friend".into(),
+    };
+    let mut forged = request();
+    forged.contact_details = Some(details.clone());
+    assert_eq!(
+        validate_request(&forged).unwrap_err().0,
+        StatusCode::BAD_REQUEST
+    );
+
+    let mut missing = request();
+    missing.contact_details_authorized = true;
+    assert_eq!(
+        validate_request(&missing).unwrap_err().0,
+        StatusCode::BAD_REQUEST
+    );
+
+    let mut valid = request();
+    valid.contact_details_authorized = true;
+    valid.contact_details = Some(details);
+    assert!(validate_request(&valid).is_ok());
+
+    valid.contact_details.as_mut().unwrap().phone = "call me maybe".into();
+    assert_eq!(
+        validate_request(&valid).unwrap_err().0,
         StatusCode::BAD_REQUEST
     );
 }
@@ -318,6 +354,13 @@ async fn disposable_postgres_proves_public_capability_submission_and_revoke_race
     public_request
         .answers
         .insert("meal_choice".into(), "Vegetarian".into());
+    public_request.contact_details_authorized = true;
+    public_request.contact_details = Some(GuestContactDetails {
+        display_name: "Alex Rivera".into(),
+        email: "alex.rivera@example.com".into(),
+        phone: "+61 400 555 010".into(),
+        relationship_to_couple: "Friend".into(),
+    });
     public_request.idempotency_key = format!("guest-rsvp:{unique}");
     insert_public_scope(&db, &table, &public_request).await;
 
@@ -334,6 +377,7 @@ async fn disposable_postgres_proves_public_capability_submission_and_revoke_race
             invitation_ids: vec![public_request.invitation_id.clone()],
             token_digest: digest.clone(),
             expires_at: Utc::now() + ChronoDuration::days(2),
+            request_contact_details: true,
         },
     )
     .await
@@ -361,6 +405,14 @@ async fn disposable_postgres_proves_public_capability_submission_and_revoke_race
         json!("Vegetarian")
     );
     assert!(!saved.response.to_string().contains("allergy"));
+    let contact_email: Option<String> = sqlx::query_scalar(&format!(
+        "SELECT content->>'contact_email' FROM {table} WHERE kind='wedding_boundary_guest_profile' AND content->>'person_id'=$1 ORDER BY timestamp DESC,id DESC LIMIT 1"
+    ))
+    .bind(&public_request.person_id)
+    .fetch_one(&db.pool)
+    .await
+    .expect("load guest-confirmed contact profile");
+    assert_eq!(contact_email.as_deref(), Some("alex.rivera@example.com"));
 
     db.revoke_wedding_rsvp_capability_grant(&owner, &grant_id)
         .await

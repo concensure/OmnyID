@@ -1,8 +1,12 @@
+import { apiFetch } from "@/lib/api";
+
 export type VendorSpecialOperation =
+  | "offer_edit"
   | "offer_publish"
   | "offer_pause"
   | "offer_withdraw"
   | "offer_reconfirm"
+  | "slot_record_enquiry"
   | "slot_place_hold"
   | "slot_mark_booked"
   | "slot_pause"
@@ -22,6 +26,8 @@ export type VendorSpecialSlot = {
   inclusions: string[];
   public_conditions: string | null;
   revision: number;
+  affected_enquiry_count?: number;
+  operator_warning?: string | null;
 };
 
 export type VendorSpecialSession = {
@@ -35,6 +41,8 @@ export type VendorSpecialSession = {
     summary: string;
     publication_state: string;
     currency: string;
+    inclusions: string[];
+    public_conditions: string | null;
     revision: number;
     slots: VendorSpecialSlot[];
   };
@@ -46,6 +54,121 @@ async function responseJson<T>(response: Response): Promise<T> {
   const body = await response.json().catch(() => ({})) as { error?: string };
   if (!response.ok) throw new Error(body.error || "This management link is unavailable.");
   return body as T;
+}
+
+export type VendorSpecialOffer = VendorSpecialSession["offer"];
+
+export async function listClaimedVendorSpecials(vendorSlug: string, guestCount?: number) {
+  const params = new URLSearchParams({ vendor_slug: vendorSlug });
+  if (guestCount) params.set("guest_count", String(guestCount));
+  const value = await apiFetch<{ items?: VendorSpecialOffer[] }>(`/wedding/vendor/special-offers?${params}`);
+  return Array.isArray(value.items) ? value.items : [];
+}
+
+export async function createClaimedVendorSpecial(input: {
+  vendorSlug: string;
+  title: string;
+  summary: string;
+  date: string;
+  maximumCapacity: number | null;
+  minimumSpendCents: number | null;
+  indicativePerHeadCents: number | null;
+  inclusions: string[];
+  publicConditions: string | null;
+}) {
+  return apiFetch<Record<string, unknown>>("/wedding/vendor/special-offers", {
+    method: "POST",
+    body: JSON.stringify({
+      vendor_slug: input.vendorSlug,
+      idempotency_key: `vendor-special-${crypto.randomUUID()}`,
+      room_id: null,
+      title: input.title,
+      summary: input.summary,
+      offer_type: input.indicativePerHeadCents !== null ? "per_head" : "minimum_spend",
+      guest_min: null,
+      guest_max: input.maximumCapacity,
+      pricing: {
+        currency: "AUD", fixed_total_cents: null, per_guest_cents: input.indicativePerHeadCents,
+        hire_fee_cents: null, minimum_spend_cents: input.minimumSpendCents,
+        mandatory_charges_cents: 0, mandatory_charges_known: true,
+        mandatory_charges_summary: "No additional mandatory charge supplied",
+        estimate_min_cents: null, estimate_max_cents: null, reference_price_cents: null,
+        savings_basis_label: null, savings_evidence_ref: null,
+      },
+      inclusions: input.inclusions,
+      exclusions: [],
+      public_conditions: input.publicConditions,
+      approved_package_version: null,
+      slots: [{
+        local_date: input.date, timezone: "Australia/Sydney", starts_at: null, ends_at: null,
+        space_label: null, session_label: null, maximum_capacity: input.maximumCapacity,
+        minimum_spend_cents: input.minimumSpendCents, indicative_per_head_cents: input.indicativePerHeadCents,
+        inclusions: input.inclusions, public_conditions: input.publicConditions,
+      }],
+    }),
+  });
+}
+
+export async function editClaimedVendorSpecial(input: {
+  vendorSlug: string;
+  offer: VendorSpecialOffer;
+  slot: VendorSpecialSlot;
+  title: string;
+  summary: string;
+  date: string;
+  maximumCapacity: number | null;
+  minimumSpendCents: number | null;
+  indicativePerHeadCents: number | null;
+  inclusions: string[];
+  publicConditions: string | null;
+}) {
+  return apiFetch<Record<string, unknown>>(`/wedding/vendor/special-offers/${encodeURIComponent(input.offer.offer_id)}/edit`, {
+    method: "POST",
+    body: JSON.stringify({
+      vendor_slug: input.vendorSlug,
+      idempotency_key: `vendor-special-edit-${crypto.randomUUID()}`,
+      expected_offer_revision: input.offer.revision,
+      slot_id: input.slot.slot_id,
+      expected_slot_revision: input.slot.revision,
+      title: input.title,
+      summary: input.summary,
+      slot: {
+        local_date: input.date, timezone: input.slot.timezone || "Australia/Sydney",
+        starts_at: null, ends_at: null, space_label: input.slot.space_label || null,
+        session_label: input.slot.session_label || null, maximum_capacity: input.maximumCapacity,
+        minimum_spend_cents: input.minimumSpendCents,
+        indicative_per_head_cents: input.indicativePerHeadCents,
+        inclusions: input.inclusions, public_conditions: input.publicConditions,
+      },
+    }),
+  });
+}
+
+export async function commandClaimedVendorOffer(input: { vendorSlug: string; offerId: string; revision: number; action: "publish" | "pause" | "withdraw" | "reconfirm" }) {
+  const path = input.action === "publish" ? "publish" : "state";
+  return apiFetch<Record<string, unknown>>(`/wedding/vendor/special-offers/${encodeURIComponent(input.offerId)}/${path}`, {
+    method: "POST",
+    body: JSON.stringify({
+      vendor_slug: input.vendorSlug,
+      idempotency_key: `vendor-special-${input.action}-${crypto.randomUUID()}`,
+      expected_revision: input.revision,
+      action: input.action === "publish" ? null : input.action,
+    }),
+  });
+}
+
+export async function commandClaimedVendorSlot(input: { vendorSlug: string; offerId: string; slotId: string; revision: number; action: "place_hold" | "mark_booked" | "pause" | "withdraw" | "reconfirm"; holdExpiresAt?: string }) {
+  return apiFetch<Record<string, unknown>>(`/wedding/vendor/special-offers/${encodeURIComponent(input.offerId)}/slots/${encodeURIComponent(input.slotId)}/state`, {
+    method: "POST",
+    body: JSON.stringify({
+      vendor_slug: input.vendorSlug,
+      idempotency_key: `vendor-special-${input.action}-${crypto.randomUUID()}`,
+      expected_revision: input.revision,
+      action: input.action,
+      hold_expires_at: input.holdExpiresAt ?? null,
+      confirmation_expires_at: null,
+    }),
+  });
 }
 
 export async function exchangeVendorSpecialLink(token: string) {
@@ -73,6 +196,12 @@ export async function commandVendorSpecial(input: {
   idempotencyKey: string;
   slotId?: string;
   holdExpiresAt?: string;
+  edit?: {
+    title: string; summary: string; slotRevision: number; localDate: string; timezone: string;
+    spaceLabel: string | null; sessionLabel: string | null; maximumCapacity: number | null;
+    minimumSpendCents: number | null; indicativePerHeadCents: number | null;
+    inclusions: string[]; publicConditions: string | null;
+  };
 }) {
   const response = await fetch(`${endpoint}/command`, {
     method: "POST",
@@ -87,6 +216,15 @@ export async function commandVendorSpecial(input: {
       idempotency_key: input.idempotencyKey,
       slot_id: input.slotId,
       hold_expires_at: input.holdExpiresAt,
+      edit: input.edit ? {
+        title: input.edit.title, summary: input.edit.summary,
+        slot_revision: input.edit.slotRevision, local_date: input.edit.localDate,
+        timezone: input.edit.timezone, space_label: input.edit.spaceLabel,
+        session_label: input.edit.sessionLabel, maximum_capacity: input.edit.maximumCapacity,
+        minimum_spend_cents: input.edit.minimumSpendCents,
+        indicative_per_head_cents: input.edit.indicativePerHeadCents,
+        inclusions: input.edit.inclusions, public_conditions: input.edit.publicConditions,
+      } : undefined,
     }),
   });
   return responseJson<Record<string, unknown>>(response);

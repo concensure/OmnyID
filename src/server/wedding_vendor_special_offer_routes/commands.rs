@@ -2,6 +2,138 @@
 
 use super::*;
 
+#[allow(clippy::too_many_arguments)]
+pub(super) async fn edit_offer(
+    state: &AppState,
+    vendor_id: &str,
+    offer_id: &str,
+    slot_id: &str,
+    expected_offer_revision: u64,
+    expected_slot_revision: u64,
+    title: String,
+    summary: String,
+    slot: ValidatedSlotDraft,
+    raw_dedupe: &str,
+    actor: CommandActor<'_>,
+) -> Result<Value, (StatusCode, String)> {
+    let dedupe = idempotency_key(raw_dedupe)?;
+    let mut tx = state.db.pool.begin().await.map_err(database_failure)?;
+    if event_exists(&mut tx, offer_id, "updated", &dedupe).await? {
+        tx.rollback().await.ok();
+        return Ok(json!({"offer_id":offer_id,"slot_id":slot_id,"replayed":true}));
+    }
+    let offer = locked_offer(&mut tx, vendor_id, offer_id).await?;
+    let offer_revision = offer.get::<i64, _>("revision");
+    let publication_state = offer.get::<String, _>("publication_state");
+    if offer_revision != expected_offer_revision as i64 {
+        return Err(policy_failure(SpecialOfferPolicyError::StaleRevision {
+            expected: expected_offer_revision,
+            actual: offer_revision as u64,
+        }));
+    }
+    if !matches!(publication_state.as_str(), "draft" | "paused") {
+        return Err((
+            StatusCode::CONFLICT,
+            "Pause this offer before editing its date or price.".into(),
+        ));
+    }
+    let slot_row = sqlx::query(
+        "SELECT revision,state FROM wedding_vendor_special_offer_slots WHERE slot_id=$1 AND offer_id=$2 AND vendor_id=$3 FOR UPDATE",
+    )
+    .bind(slot_id)
+    .bind(offer_id)
+    .bind(vendor_id)
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(database_failure)?
+    .ok_or((StatusCode::NOT_FOUND, "Available date not found.".into()))?;
+    let slot_revision = slot_row.get::<i64, _>("revision");
+    if slot_revision != expected_slot_revision as i64 {
+        return Err(policy_failure(SpecialOfferPolicyError::StaleRevision {
+            expected: expected_slot_revision,
+            actual: slot_revision as u64,
+        }));
+    }
+    if matches!(
+        slot_row.get::<String, _>("state").as_str(),
+        "booked" | "provisional_hold"
+    ) {
+        return Err((
+            StatusCode::CONFLICT,
+            "A held or booked date cannot be edited.".into(),
+        ));
+    }
+    let offer_type = if slot.terms.indicative_per_head_cents.is_some() {
+        "per_head"
+    } else {
+        "minimum_spend"
+    };
+    sqlx::query(
+        r#"UPDATE wedding_vendor_special_offers
+              SET title=$1,summary=$2,offer_type=$3,guest_max=$4,per_guest_cents=$5,
+                  minimum_spend_cents=$6,inclusions=$7,public_conditions=$8,
+                  revision=revision+1,approved_revision=NULL,updated_at=NOW()
+            WHERE offer_id=$9 AND vendor_id=$10 AND revision=$11"#,
+    )
+    .bind(title)
+    .bind(summary)
+    .bind(offer_type)
+    .bind(slot.terms.maximum_capacity.map(|value| value as i32))
+    .bind(slot.terms.indicative_per_head_cents)
+    .bind(slot.terms.minimum_spend_cents)
+    .bind(&slot.terms.inclusions)
+    .bind(&slot.terms.public_conditions)
+    .bind(offer_id)
+    .bind(vendor_id)
+    .bind(offer_revision)
+    .execute(&mut *tx)
+    .await
+    .map_err(database_failure)?;
+    sqlx::query(
+        r#"UPDATE wedding_vendor_special_offer_slots
+              SET local_date=$1,timezone=$2,starts_at=$3,ends_at=$4,space_label=$5,
+                  session_label=$6,maximum_capacity=$7,minimum_spend_cents=$8,
+                  indicative_per_head_cents=$9,inclusions=$10,public_conditions=$11,
+                  revision=revision+1,updated_by_user_id=$12,updated_at=NOW()
+            WHERE slot_id=$13 AND offer_id=$14 AND vendor_id=$15 AND revision=$16"#,
+    )
+    .bind(slot.local_date)
+    .bind(slot.timezone)
+    .bind(slot.starts_at)
+    .bind(slot.ends_at)
+    .bind(slot.space_label)
+    .bind(slot.session_label)
+    .bind(slot.terms.maximum_capacity.map(|value| value as i32))
+    .bind(slot.terms.minimum_spend_cents)
+    .bind(slot.terms.indicative_per_head_cents)
+    .bind(slot.terms.inclusions)
+    .bind(slot.terms.public_conditions)
+    .bind(actor.user_id)
+    .bind(slot_id)
+    .bind(offer_id)
+    .bind(vendor_id)
+    .bind(slot_revision)
+    .execute(&mut *tx)
+    .await
+    .map_err(database_failure)?;
+    record_event(
+        &mut tx,
+        vendor_id,
+        offer_id,
+        Some(slot_id),
+        "updated",
+        actor,
+        &dedupe,
+        json!({"offer_revision":offer_revision + 1,"slot_revision":slot_revision + 1}),
+    )
+    .await?;
+    tx.commit().await.map_err(database_failure)?;
+    Ok(json!({
+        "offer_id":offer_id,"slot_id":slot_id,"offer_revision":offer_revision + 1,
+        "slot_revision":slot_revision + 1,"replayed":false
+    }))
+}
+
 pub(super) async fn publish_offer(
     state: &AppState,
     vendor_id: &str,

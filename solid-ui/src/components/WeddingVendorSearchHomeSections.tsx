@@ -11,7 +11,7 @@ import { WeddingDealBreakerEditor } from "@/components/WeddingDealBreakerEditor"
 import { WeddingInviteProposalsPanel } from "@/components/WeddingInviteProposalsPanel";
 import { WeddingLimitedSpecialsMap } from "@/components/WeddingLimitedSpecialsMap";
 import { loadWeddingProposalOpportunities } from "@/lib/weddingInviteProposalOpportunityApi";
-import type { WeddingVendorSpecialMarker } from "@/lib/weddingVendorSpecialDiscoveryApi";
+import type { WeddingVendorRankedSpecialDetail, WeddingVendorSpecialMarker } from "@/lib/weddingVendorSpecialDiscoveryApi";
 import type { WeddingVendorChoiceCardData } from "@/components/WeddingVendorChoiceCard";
 import type { WeddingResponseWorkspaceViewProps } from "@/components/WeddingResponseWorkspaceViewTypes";
 import { decisionCardFromWeddingVendorComparison } from "@/lib/decisionCardState";
@@ -268,7 +268,7 @@ export function WeddingVendorSearchHomeSection(props: {
   const weddingGuestCount = () => workspace().state.contextCards
     .map((card) => Number(card.planningContext.guestCount))
     .find((value) => Number.isFinite(value) && value > 0) ?? null;
-  const prepareSpecialEnquiry = (marker: WeddingVendorSpecialMarker) => {
+  const prepareSpecialEnquiry = (marker: WeddingVendorSpecialMarker, detail: WeddingVendorRankedSpecialDetail | null) => {
     const preview = props.result?.preview ?? props.result?.sourcePreview;
     const card = preview?.vendorComparisonCards.find((item) => item.vendorId === marker.vendorId);
     if (preview && card && props.result?.action.artifactId) {
@@ -276,6 +276,8 @@ export function WeddingVendorSearchHomeSection(props: {
         card,
         props.result.action.artifactId,
         "CHECK_AVAILABILITY_AND_REQUEST_QUOTE",
+        false,
+        detail ? { offerId: detail.offerId, slotId: detail.slotId, slotRevision: detail.slotRevision } : null,
       );
       return;
     }

@@ -18,6 +18,10 @@ type GuestDraft = {
   privateAnswers: Record<string, string>;
   dietaryCategory: string;
   dietaryDetail: string;
+  contactName: string;
+  contactEmail: string;
+  contactPhone: string;
+  relationshipToCouple: string;
 };
 
 function initialAttendance(invitation: WeddingRsvpCapabilityInvitation): Attendance {
@@ -27,7 +31,14 @@ function initialAttendance(invitation: WeddingRsvpCapabilityInvitation): Attenda
 }
 
 function initialDraft(invitation: WeddingRsvpCapabilityInvitation): GuestDraft {
-  return { attendance: initialAttendance(invitation), answers: {}, privateAnswers: {}, dietaryCategory: "", dietaryDetail: "" };
+  return {
+    attendance: initialAttendance(invitation), answers: {}, privateAnswers: {}, dietaryCategory: "", dietaryDetail: "",
+    // The public capability never returns the couple's private contact record.
+    // Name is already part of the invitation; the guest supplies the other
+    // details explicitly when the couple requests them.
+    contactName: invitation.display_name, contactEmail: "",
+    contactPhone: "", relationshipToCouple: "",
+  };
 }
 
 function encodedEnvelope(value: unknown): string {
@@ -130,6 +141,20 @@ function WeddingRsvpPage() {
         focusField(`attendance-${invitation.invitation_id}`);
         return;
       }
+      if (currentScope.request_contact_details) {
+        const requested = [
+          ["name", draft.contactName, `contact-name-${invitation.invitation_id}`],
+          ["email", draft.contactEmail, `contact-email-${invitation.invitation_id}`],
+          ["phone", draft.contactPhone, `contact-phone-${invitation.invitation_id}`],
+          ["relationship", draft.relationshipToCouple, `contact-relationship-${invitation.invitation_id}`],
+        ] as const;
+        const missing = requested.find(([, value]) => !value.trim());
+        if (missing) {
+          setNotice(`Add ${missing[0]} for ${invitation.display_name}.`);
+          focusField(missing[2]);
+          return;
+        }
+      }
       if (draft.attendance === "not_attending") continue;
       for (const question of attendeeQuestions().filter((item) => item.required)) {
         const present = question.id === "dietary_requirements"
@@ -187,6 +212,10 @@ function WeddingRsvpPage() {
           answers: draft.attendance === "attending" ? draft.answers : {},
           privateAnswerQuestionIds: privatePayload.ids,
           privateAnswersCiphertext: privatePayload.ciphertext,
+          contactDetails: currentScope.request_contact_details ? {
+            displayName: draft.contactName.trim(), email: draft.contactEmail.trim().toLowerCase(),
+            phone: draft.contactPhone.trim(), relationshipToCouple: draft.relationshipToCouple.trim(),
+          } : null,
         });
         const revision = Number(result.response.revision);
         if (Number.isSafeInteger(revision)) invitation.response_revision = revision;
@@ -224,6 +253,18 @@ function WeddingRsvpPage() {
                   const draft = () => drafts()[invitation.invitation_id] ?? initialDraft(invitation);
                   return <fieldset id={`attendance-${invitation.invitation_id}`} tabindex="-1" class="min-w-0 rounded-2xl border border-teal-100 p-4">
                     <legend class="px-1 text-base font-bold">{invitation.display_name}</legend>
+                    <Show when={loaded().request_contact_details}>
+                      <div class="mb-4 rounded-xl border border-teal-200 bg-teal-50/60 p-3">
+                        <p class="text-sm font-bold text-teal-950">Your contact details</p>
+                        <p class="mt-1 text-xs leading-5 text-teal-900/75">The couple asked you to confirm these details for invitations and day-of updates. They stay in this wedding's private guest list.</p>
+                        <div class="mt-3 grid gap-3 sm:grid-cols-2">
+                          <label class="text-sm font-semibold">Name<input id={`contact-name-${invitation.invitation_id}`} maxlength="160" class="mt-1 min-h-12 w-full rounded-xl border border-teal-200 bg-white px-3 font-normal" value={draft().contactName} onInput={(event) => updateDraft(invitation.invitation_id, (current) => ({ ...current, contactName: event.currentTarget.value }))} /></label>
+                          <label class="text-sm font-semibold">Relationship to the couple<input id={`contact-relationship-${invitation.invitation_id}`} maxlength="80" class="mt-1 min-h-12 w-full rounded-xl border border-teal-200 bg-white px-3 font-normal" value={draft().relationshipToCouple} onInput={(event) => updateDraft(invitation.invitation_id, (current) => ({ ...current, relationshipToCouple: event.currentTarget.value }))} placeholder="Friend, parent, cousin…" /></label>
+                          <label class="text-sm font-semibold">Email<input id={`contact-email-${invitation.invitation_id}`} type="email" autocomplete="email" maxlength="254" class="mt-1 min-h-12 w-full rounded-xl border border-teal-200 bg-white px-3 font-normal" value={draft().contactEmail} onInput={(event) => updateDraft(invitation.invitation_id, (current) => ({ ...current, contactEmail: event.currentTarget.value }))} /></label>
+                          <label class="text-sm font-semibold">Phone<input id={`contact-phone-${invitation.invitation_id}`} type="tel" autocomplete="tel" maxlength="40" class="mt-1 min-h-12 w-full rounded-xl border border-teal-200 bg-white px-3 font-normal" value={draft().contactPhone} onInput={(event) => updateDraft(invitation.invitation_id, (current) => ({ ...current, contactPhone: event.currentTarget.value }))} /></label>
+                        </div>
+                      </div>
+                    </Show>
                     <div class="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2"><label class="flex min-h-12 items-center gap-3 rounded-xl border border-teal-200 p-3 font-semibold"><input type="radio" name={`attendance-${invitation.invitation_id}`} class="h-5 w-5 accent-teal-800" checked={draft().attendance === "attending"} onChange={() => updateDraft(invitation.invitation_id, (current) => ({ ...current, attendance: "attending" }))} />Attending</label><label class="flex min-h-12 items-center gap-3 rounded-xl border border-teal-200 p-3 font-semibold"><input type="radio" name={`attendance-${invitation.invitation_id}`} class="h-5 w-5 accent-teal-800" checked={draft().attendance === "not_attending"} onChange={() => updateDraft(invitation.invitation_id, (current) => ({ ...current, attendance: "not_attending", answers: {}, privateAnswers: {}, dietaryCategory: "", dietaryDetail: "" }))} />Not attending</label></div>
                     <Show when={draft().attendance === "attending"}><div class="mt-4 grid gap-4">
                       <For each={attendeeQuestions()}>{(question) => <Show when={question.id === "meal_choice"} fallback={<Show when={question.id === "dietary_requirements"} fallback={<PrivateQuestion question={question} value={draft().privateAnswers[question.id] ?? ""} onInput={(value) => updateDraft(invitation.invitation_id, (current) => ({ ...current, privateAnswers: { ...current.privateAnswers, [question.id]: value } }))} />}>
@@ -240,7 +281,7 @@ function WeddingRsvpPage() {
               <button type="button" class="mt-4 min-h-12 w-full rounded-xl bg-teal-800 px-4 font-bold text-white" onClick={review}>Review RSVP</button>
             </section>
           </Show>
-          <Show when={phase() === "review" || phase() === "submitting"}><section class="mt-4 rounded-2xl border border-teal-100 bg-white p-5"><h2 id="review-title" tabindex="-1" class="text-xl font-bold focus:outline-none">Review before sending</h2><p class="mt-1 text-sm text-teal-800">Only the answers shown here will be submitted. Private answers remain encrypted for the couple.</p><div class="mt-4 grid gap-3"><For each={loaded().invitations}>{(invitation) => { const draft = () => drafts()[invitation.invitation_id]!; return <div class="rounded-xl border border-teal-100 p-3"><p class="font-bold">{invitation.display_name}</p><p class="mt-1 text-sm">{draft().attendance === "attending" ? "Attending" : "Not attending"}</p><Show when={draft().attendance === "attending"}><For each={attendeeQuestions()}>{(question) => <p class="mt-1 break-words text-sm text-teal-900/75"><strong>{questionLabel(question)}:</strong> {question.id === "dietary_requirements" ? draft().dietaryCategory || "Not answered" : question.sensitive ? draft().privateAnswers[question.id] || "Not answered" : draft().answers[question.id] || "Not answered"}</p>}</For></Show></div>; }}</For></div><Show when={notice()}><p role="status" class="mt-4 text-sm">{notice()}</p></Show><div class="mt-4 grid gap-2 sm:grid-cols-2"><button type="button" disabled={phase() === "submitting"} class="min-h-12 rounded-xl border-2 border-teal-700 font-bold text-teal-900" onClick={() => setPhase("answer")}>Edit answers</button><button type="button" disabled={phase() === "submitting"} class="min-h-12 rounded-xl bg-teal-800 font-bold text-white disabled:bg-teal-300" onClick={() => void submit()}>{phase() === "submitting" ? "Saving…" : "Submit RSVP"}</button></div></section></Show>
+          <Show when={phase() === "review" || phase() === "submitting"}><section class="mt-4 rounded-2xl border border-teal-100 bg-white p-5"><h2 id="review-title" tabindex="-1" class="text-xl font-bold focus:outline-none">Review before sending</h2><p class="mt-1 text-sm text-teal-800">Only the answers shown here will be submitted. Private answers remain encrypted for the couple.</p><div class="mt-4 grid gap-3"><For each={loaded().invitations}>{(invitation) => { const draft = () => drafts()[invitation.invitation_id]!; return <div class="rounded-xl border border-teal-100 p-3"><p class="font-bold">{invitation.display_name}</p><p class="mt-1 text-sm">{draft().attendance === "attending" ? "Attending" : "Not attending"}</p><Show when={loaded().request_contact_details}><p class="mt-2 text-sm text-teal-900/75"><strong>Contact:</strong> {draft().contactName} · {draft().relationshipToCouple} · {draft().contactEmail} · {draft().contactPhone}</p></Show><Show when={draft().attendance === "attending"}><For each={attendeeQuestions()}>{(question) => <p class="mt-1 break-words text-sm text-teal-900/75"><strong>{questionLabel(question)}:</strong> {question.id === "dietary_requirements" ? draft().dietaryCategory || "Not answered" : question.sensitive ? draft().privateAnswers[question.id] || "Not answered" : draft().answers[question.id] || "Not answered"}</p>}</For></Show></div>; }}</For></div><Show when={notice()}><p role="status" class="mt-4 text-sm">{notice()}</p></Show><div class="mt-4 grid gap-2 sm:grid-cols-2"><button type="button" disabled={phase() === "submitting"} class="min-h-12 rounded-xl border-2 border-teal-700 font-bold text-teal-900" onClick={() => setPhase("answer")}>Edit answers</button><button type="button" disabled={phase() === "submitting"} class="min-h-12 rounded-xl bg-teal-800 font-bold text-white disabled:bg-teal-300" onClick={() => void submit()}>{phase() === "submitting" ? "Saving…" : "Submit RSVP"}</button></div></section></Show>
           <Show when={phase() === "receipt"}><section class="mt-4 rounded-2xl border border-emerald-200 bg-white p-5"><h2 id="receipt-title" tabindex="-1" class="text-2xl font-bold focus:outline-none">Thank you — RSVP received</h2><p class="mt-2 text-sm leading-6 text-teal-900/75">{notice()}</p><button type="button" class="mt-4 min-h-12 rounded-xl border-2 border-teal-700 px-4 font-bold text-teal-900" onClick={() => { setPhase("answer"); setNotice("Update the answers, then review and submit the amendment."); }}>Amend response</button></section></Show>
           <p class="my-5 text-center text-xs text-teal-800">Private RSVP powered by OmnyID · No account required</p>
         </>}</Match>

@@ -79,6 +79,7 @@ export function weddingVendorOutreachDraftAfpSendInput(input: {
   editorHtml?: string | null;
   createdAt?: string | null;
   actionIntent?: WeddingVendorChoiceIntent | null;
+  specialContext?: { offerId: string; slotId: string; slotRevision: number } | null;
 }): SendAfpMessageInput {
   const isResponse = input.flow.choiceId.startsWith("response:");
   const timestamp = timestampOrNow(input.createdAt);
@@ -132,6 +133,11 @@ export function weddingVendorOutreachDraftAfpSendInput(input: {
       source_artifact_id: input.sourceArtifactId ?? null,
       action_intent: input.actionIntent ?? "CHECK_AVAILABILITY_AND_REQUEST_QUOTE",
       attachment_count: input.flow.attachments.length,
+      limited_special: input.specialContext ? {
+        offer_id: input.specialContext.offerId,
+        slot_id: input.specialContext.slotId,
+        slot_revision: input.specialContext.slotRevision,
+      } : null,
     },
     views: [{
       format: "email",
@@ -145,6 +151,9 @@ export function weddingVendorOutreachDraftAfpSendInput(input: {
       ...sourceReferences,
       ...(input.flow.draftMessageId
         ? [{ type: "supersedes_wedding_email_draft", target: input.flow.draftMessageId, label: "Previous draft revision" }]
+        : []),
+      ...(input.specialContext
+        ? [{ type: "wedding_vendor_special_offer", target: input.specialContext.offerId, label: "Limited-date special reviewed for this enquiry" }]
         : []),
     ],
     supertags: uniqueStrings([
@@ -165,6 +174,9 @@ export function weddingVendorOutreachDraftAfpSendInput(input: {
       revision,
       model: input.flow.generation?.model ?? "not_generated",
       estimated_cost_usd: input.flow.generation?.estimatedCostUsd ?? 0,
+      limited_special_offer_id: input.specialContext?.offerId ?? null,
+      limited_special_slot_id: input.specialContext?.slotId ?? null,
+      limited_special_slot_revision: input.specialContext?.slotRevision ?? null,
     },
     store_in_relational: true,
   };
@@ -178,6 +190,7 @@ export function weddingVendorOutreachSentAfpSendInput(input: {
   vendorId?: string | null;
   createdAt?: string | null;
   actionIntent?: WeddingVendorChoiceIntent | null;
+  specialContext?: { offerId: string; slotId: string; slotRevision: number } | null;
 }): SendAfpMessageInput {
   const isResponse = input.flow.choiceId.startsWith("response:");
   const timestamp = timestampOrNow(input.createdAt);
@@ -215,13 +228,23 @@ export function weddingVendorOutreachSentAfpSendInput(input: {
       permissions: input.flow.permissions,
       approval_status: "approved_and_sent",
       approved_draft_revision: Math.max(1, input.flow.revision + (input.flow.hasUnpersistedChanges ? 1 : 0)),
+      limited_special: input.specialContext ? {
+        offer_id: input.specialContext.offerId,
+        slot_id: input.specialContext.slotId,
+        slot_revision: input.specialContext.slotRevision,
+      } : null,
     },
     views: [{
       format: "email",
       content: { to, subject, text },
     }],
     attachments: input.flow.attachments,
-    references: [{ type: isResponse ? "wedding_vendor_response_draft" : "wedding_vendor_outreach_draft", target: input.draftMessageId, label: isResponse ? "Vendor response draft" : "Outreach draft" }],
+    references: [
+      { type: isResponse ? "wedding_vendor_response_draft" : "wedding_vendor_outreach_draft", target: input.draftMessageId, label: isResponse ? "Vendor response draft" : "Outreach draft" },
+      ...(input.specialContext
+        ? [{ type: "wedding_vendor_special_offer", target: input.specialContext.offerId, label: "Limited-date special used for this enquiry" }]
+        : []),
+    ],
     supertags: uniqueStrings([
       ...input.metadata.supertags,
       isResponse ? "wedding_vendor_response" : "wedding_vendor_outreach",
@@ -242,6 +265,9 @@ export function weddingVendorOutreachSentAfpSendInput(input: {
       allow_phone_contact: input.flow.permissions.allowPhoneContact,
       remind_unanswered: input.flow.permissions.remindUnanswered,
       action_intent: input.actionIntent ?? "CHECK_AVAILABILITY_AND_REQUEST_QUOTE",
+      limited_special_offer_id: input.specialContext?.offerId ?? null,
+      limited_special_slot_id: input.specialContext?.slotId ?? null,
+      limited_special_slot_revision: input.specialContext?.slotRevision ?? null,
     },
     store_in_relational: true,
   };

@@ -7812,3 +7812,27 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
   adversarial cross-tenant HTTP proof are not claimed. Enquiry revalidation,
   slot-envelope linkage, lifecycle automation, portal/admin UI and hosted
   false-default rollout remain open. Nothing was deployed or enabled.
+
+# 2026-11-08 - WED-340/WED-341 release candidate (Codex)
+
+- Continued in `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001` on
+  `agent/codex/WED-340` from `f39e43d43d0ebc6c91d5beb08a10839572baec3d`.
+- Completed the false-default Limited Specials implementation: shared claimed
+  and link-vendor mutations, date terms and holds, bounded maintenance,
+  server-ranked top-three commercial reveal, pre-send revision recheck,
+  existing enquiry/AFP-thread reuse, outcome projection, and aggregate-only
+  operator metrics. No public cohort is enabled merely by deploying it.
+- Added the reviewed 35-florist import, guarded the existing Best Buds category
+  move to `Florist`, and committed the modular vendor crawler with safety and
+  provenance instructions. The cumulative SQL passed two disposable pgvector
+  replays without overwriting operator or vendor-reply evidence.
+- Extended the existing expiring household RSVP capability to optionally ask
+  each named guest for essential contact details. The couple can open a native
+  reviewed email draft to the saved guest address. The public capability never
+  returns that saved email or phone; guest-entered bounded values append to the
+  same tenant AFP guest-profile projection.
+- Passed TypeScript typecheck, both line budgets, public Wedding smoke checks,
+  all 2,230 Wedding tests, production UI build, `cargo check --lib`, 28 focused
+  Limited Specials Rust tests, and three independent disposable-pgvector RSVP
+  isolation/replay/concurrency proofs. Exact clean-SHA release, production
+  florist load, Oracle provenance and hosted false-default smoke are next.

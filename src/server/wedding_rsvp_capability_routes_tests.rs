@@ -17,7 +17,10 @@ async fn drop_test_schema(db: &Db, schema: &str) {
         {
             Ok(_) => return,
             Err(error)
-                if error.as_database_error().is_some_and(|value| value.code().as_deref() == Some("40P01")) && attempt < 7 =>
+                if error
+                    .as_database_error()
+                    .is_some_and(|value| value.code().as_deref() == Some("40P01"))
+                    && attempt < 7 =>
             {
                 tokio::time::sleep(std::time::Duration::from_millis(100 * (attempt + 1))).await;
             }
@@ -34,6 +37,7 @@ fn create_request(expires_at: String) -> CreateRequest {
         household_id: "wedding_household:primary:rivera".into(),
         invitation_ids: vec!["wedding_invitation:primary:alex:ceremony".into()],
         expires_at,
+        request_contact_details: false,
     }
 }
 
@@ -216,6 +220,7 @@ async fn disposable_postgres_proves_capability_isolation_rotation_and_revocation
                 token_digest: token_digest(&token_for(&format!("{unique}:invalid")))
                     .expect("invalid scope digest"),
                 expires_at,
+                request_contact_details: false,
             },
         )
         .await
@@ -237,6 +242,7 @@ async fn disposable_postgres_proves_capability_isolation_rotation_and_revocation
                 invitation_ids: vec![invitation_id.into()],
                 token_digest: digest_one.clone(),
                 expires_at,
+                request_contact_details: false,
             },
         )
         .await
@@ -289,6 +295,7 @@ async fn disposable_postgres_proves_capability_isolation_rotation_and_revocation
                 invitation_ids: vec![invitation_id.into()],
                 token_digest: digest_one.clone(),
                 expires_at,
+                request_contact_details: false,
             },
         )
         .await;
@@ -345,6 +352,7 @@ async fn disposable_postgres_proves_capability_isolation_rotation_and_revocation
             invitation_ids: vec![invitation_id.into()],
             token_digest: digest_three.clone(),
             expires_at,
+            request_contact_details: false,
         },
     )
     .await

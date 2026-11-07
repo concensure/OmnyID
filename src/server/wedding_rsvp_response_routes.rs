@@ -63,6 +63,19 @@ pub(crate) struct RecordResponseRequest {
     #[serde(default)]
     pub private_answer_question_ids: Vec<String>,
     pub private_answers_ciphertext: Option<String>,
+    #[serde(default)]
+    pub contact_details: Option<GuestContactDetails>,
+    #[serde(skip)]
+    pub contact_details_authorized: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct GuestContactDetails {
+    pub display_name: String,
+    pub email: String,
+    pub phone: String,
+    pub relationship_to_couple: String,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -188,6 +201,45 @@ pub(crate) fn validate_request(
         })
     {
         return Err(bad_request("The private RSVP answer envelope is invalid."));
+    }
+    if request.contact_details.is_some() && !request.contact_details_authorized {
+        return Err(bad_request(
+            "This RSVP link did not request contact details.",
+        ));
+    }
+    if request.contact_details_authorized && request.contact_details.is_none() {
+        return Err(bad_request(
+            "Add the requested contact details before submitting.",
+        ));
+    }
+    if let Some(details) = request.contact_details.as_ref() {
+        let display_name = details.display_name.trim();
+        let email = details.email.trim();
+        let phone = details.phone.trim();
+        let relationship = details.relationship_to_couple.trim();
+        let email_valid = email.len() <= 254
+            && !email.chars().any(char::is_control)
+            && !email.contains(char::is_whitespace)
+            && email
+                .rsplit_once('@')
+                .is_some_and(|(local, domain)| !local.is_empty() && domain.contains('.'));
+        let phone_valid = (5..=40).contains(&phone.chars().count())
+            && phone
+                .chars()
+                .all(|value| value.is_ascii_digit() || "+-() .".contains(value));
+        if display_name.is_empty()
+            || display_name.chars().count() > 160
+            || display_name.chars().any(char::is_control)
+            || !email_valid
+            || !phone_valid
+            || relationship.is_empty()
+            || relationship.chars().count() > 80
+            || relationship.chars().any(char::is_control)
+        {
+            return Err(bad_request(
+                "Review the requested name, email, phone and relationship.",
+            ));
+        }
     }
     Ok(())
 }
@@ -387,6 +439,7 @@ fn request_fingerprint(request: &RecordResponseRequest) -> String {
         "answers": request.answers,
         "private_answer_question_ids": request.private_answer_question_ids,
         "private_answers_ciphertext": request.private_answers_ciphertext,
+        "contact_details": request.contact_details,
     });
     hex::encode(Sha256::digest(canonical.to_string().as_bytes()))
 }
@@ -581,6 +634,92 @@ async fn insert_message(
     Ok(())
 }
 
+async fn append_guest_contact_successor(
+    tx: &mut Transaction<'_, Postgres>,
+    table: &str,
+    request: &RecordResponseRequest,
+    source: ResponseSource,
+) -> Result<bool, (StatusCode, String)> {
+    let Some(details) = request.contact_details.as_ref() else {
+        return Ok(false);
+    };
+    if !matches!(source, ResponseSource::Guest) {
+        return Err(bad_request(
+            "Only the protected guest link can submit guest contact details.",
+        ));
+    }
+    let scope = metadata_scope_clause("m", 2, 3);
+    let query = format!(
+        "SELECT m.content FROM {table} m WHERE m.kind='wedding_boundary_guest_profile' AND m.content->>'person_id'=$1 AND {scope} ORDER BY m.timestamp DESC,m.id DESC LIMIT 1 FOR UPDATE"
+    );
+    let mut profile = sqlx::query_scalar::<_, Value>(&query)
+        .bind(&request.person_id)
+        .bind(&request.wedding_plan_id)
+        .bind(&request.response_workspace_id)
+        .fetch_optional(&mut **tx)
+        .await
+        .map_err(store_error)?
+        .ok_or((
+            StatusCode::FORBIDDEN,
+            "That guest profile is not available.".into(),
+        ))?;
+    let object = profile
+        .as_object_mut()
+        .ok_or_else(|| bad_request("That guest profile is invalid."))?;
+    object.insert("display_name".into(), json!(details.display_name.trim()));
+    object.insert("title".into(), json!(details.display_name.trim()));
+    object.insert(
+        "contact_email".into(),
+        json!(details.email.trim().to_ascii_lowercase()),
+    );
+    object.insert("contact_phone".into(), json!(details.phone.trim()));
+    object.insert(
+        "contact_label".into(),
+        json!(details.email.trim().to_ascii_lowercase()),
+    );
+    object.insert(
+        "relationship_label".into(),
+        json!(details.relationship_to_couple.trim()),
+    );
+    object.insert(
+        "contact_details_source".into(),
+        json!("guest_protected_link"),
+    );
+    object.insert(
+        "contact_details_updated_at".into(),
+        json!(Utc::now().to_rfc3339()),
+    );
+    let next_revision = object.get("revision").and_then(Value::as_i64).unwrap_or(1) + 1;
+    object.insert("revision".into(), json!(next_revision));
+    insert_message(
+        tx,
+        table,
+        &Ulid::new().to_string(),
+        &format!("wedding_guests:{}", request.response_workspace_id),
+        "wedding_boundary_guest_profile",
+        &profile,
+        &json!({
+            "template":"wedding_planning",
+            "weddingPlanId":request.wedding_plan_id,
+            "responseWorkspaceId":request.response_workspace_id,
+            "origin":"protected_guest_contact_details",
+            "idempotency_key":request.idempotency_key,
+            "model_calls":0
+        }),
+        &json!([
+            {"type":"request_targets_guest","target":request.person_id,"label":"Guest"},
+            {"type":"rsvp_for_invitation","target":request.invitation_id,"label":"Invitation"}
+        ]),
+        &[
+            "template:wedding_planning".into(),
+            "wedding_guest:contact_details".into(),
+            "privacy:couple_only".into(),
+        ],
+    )
+    .await?;
+    Ok(true)
+}
+
 async fn record_response_http(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -726,6 +865,20 @@ async fn record_response_for_user_with_source(
         "encrypted_private_payload": request.private_answers_ciphertext,
         "request_fingerprint": request_fingerprint(&request),
     });
+    let contact_details_updated =
+        append_guest_contact_successor(&mut tx, &table, &request, source).await?;
+    let mut effects = vec![
+        "guest_attendance_updated",
+        "guest_view_summary_updated",
+        "wedding_home_guest_tile_updated",
+        "final_guest_count_recalculation_requested",
+    ];
+    if contact_details_updated {
+        effects.extend([
+            "guest_contact_details_updated",
+            "contact_projection_refresh_requested",
+        ]);
+    }
     let receipt = json!({
         "kind": RECEIPT_KIND,
         "contract_version": 1,
@@ -733,12 +886,7 @@ async fn record_response_for_user_with_source(
         "response_id": response_id,
         "invitation_id": request.invitation_id,
         "revision": revision,
-        "effects": [
-            "guest_attendance_updated",
-            "guest_view_summary_updated",
-            "wedding_home_guest_tile_updated",
-            "final_guest_count_recalculation_requested"
-        ],
+        "effects": effects,
         "explanation": "The guest response, RSVP summary, Home guest tile and final-count readiness now use this answer.",
         "created_at": responded_at,
     });

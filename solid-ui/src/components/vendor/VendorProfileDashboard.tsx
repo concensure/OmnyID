@@ -6,6 +6,7 @@ import { createResource, createSignal, Show } from "solid-js";
 import { VendorPhotoUploadPanel } from "@/components/vendor/VendorPhotoUploadPanel";
 import { VendorQuotationResponsePanel } from "@/components/vendor/VendorQuotationResponsePanel";
 import { VendorProposalOpportunitiesPanel } from "@/components/vendor/VendorProposalOpportunitiesPanel";
+import { VendorSpecialOffersPanel } from "@/components/vendor/VendorSpecialOffersPanel";
 import {
   getVendorOwnerProfile,
   updateVendorOwnerProfile,
@@ -108,6 +109,7 @@ export function VendorProfileDashboard(props: { vendorSlug: string }) {
         </section>
 
         <section><h2 class="mb-3 text-lg font-semibold">Gallery photos</h2><VendorPhotoUploadPanel vendorSlug={props.vendorSlug} onPublished={() => void refetch()} /></section>
+        <VendorSpecialOffersPanel vendorSlug={props.vendorSlug} />
         <VendorProposalOpportunitiesPanel vendorSlug={props.vendorSlug} />
         <VendorQuotationResponsePanel />
       </>}</Show>

@@ -24,7 +24,8 @@ test("limited-special discovery drops malformed markers and normalises safe exac
       { vendor_id: "missing-coordinates", vendor_name: "Unsafe" },
     ],
     top_choices: [{
-      vendor_id: "venue-a", rank: 1, title: "Quiet Saturday package", summary: "Approved guidance",
+      vendor_id: "venue-a", offer_id: "offer-a", slot_id: "slot-a", slot_revision: 3,
+      rank: 1, title: "Quiet Saturday package", summary: "Approved guidance",
       currency: "AUD", minimum_spend_cents: 1_400_000, indicative_per_head_cents: 18_000,
       indicative_total_cents: 1_590_000, budget_fit_eligible: true, unknown_costs: false,
       inclusions: ["Room hire", "Staffing"], exclusions: [], reason_labels: ["Date confirmed"], indicative_only: true,
@@ -56,7 +57,7 @@ test("Limited Specials uses a third mode, full marker name and one synchronized 
   assert.match(map, /selectedDetail/);
   assert.match(map, /Exact package and price guidance appears only when this venue is in your current top three/);
   assert.match(map, /Availability is indicative and subject to vendor confirmation/);
-  assert.match(map, /onPrepareEnquiry\(item\)/);
+  assert.match(map, /onPrepareEnquiry\(item, selectedDetail\(\)\)/);
   assert.match(map, /aria-label={`Availability for/);
   assert.match(api, /wedding\/vendor-specials\/discovery/);
   assert.match(api, /method: "POST"/);
@@ -65,7 +66,37 @@ test("Limited Specials uses a third mode, full marker name and one synchronized 
   assert.ok(markerContract);
   for (const forbidden of ["minimum_spend", "per_head", "inclusions", "offer_id", "slot_id"]) assert.doesNotMatch(markerContract, new RegExp(forbidden));
   assert.match(server, /photo_licence_id IS NOT NULL/);
-  assert.match(server, /slot\.local_date=\$1/);
+  assert.match(server, /slot\.local_date BETWEEN \$1 AND \$2/);
   assert.match(server, /rank_top_three/);
   assert.match(server, /approved_date_price_estimate/);
+});
+
+test("claimed and link-only vendors can maintain bounded date terms while enquiries reuse approval", async () => {
+  const [claimed, linked, api, owner, afp, server, capability, migration, admin] = await Promise.all([
+    read("solid-ui/src/components/vendor/VendorSpecialOffersPanel.tsx"),
+    read("solid-ui/src/components/vendor/VendorSpecialManagementFlow.tsx"),
+    read("solid-ui/src/lib/vendorSpecialsApi.ts"),
+    read("solid-ui/src/lib/useWeddingVendorOutreachOwner.ts"),
+    read("solid-ui/src/lib/weddingVendorOutreachAfpState.ts"),
+    read("src/server/wedding_vendor_special_offer_routes/enquiry.rs"),
+    read("src/server/wedding_vendor_special_offer_routes/capability.rs"),
+    read("postgres/migrations/0151_wedding_vendor_special_offer_updates.sql"),
+    read("solid-ui/src/components/UsageAdminWeddingSpecialsPanel.tsx"),
+  ]);
+  assert.match(claimed, /Edit draft/);
+  assert.match(claimed, /Maximum capacity/);
+  assert.match(linked, /Edit date and terms/);
+  assert.match(api, /offer_edit/);
+  assert.match(capability, /CapabilityOperation::OfferEdit/);
+  assert.match(owner, /recheckWeddingVendorSpecialEnquiry/);
+  assert.match(owner, /linkWeddingVendorSpecialEnquiry/);
+  assert.match(afp, /wedding_vendor_special_offer/);
+  assert.match(afp, /limited_special_slot_revision/);
+  assert.match(server, /wedding_vendor_outreach_sent/);
+  assert.match(server, /owner_user_id=\$1/);
+  assert.match(server, /FOR UPDATE OF slot/);
+  assert.match(claimed, /Hold 48 hours/);
+  assert.match(migration, /wedding_vendor_special_offer_outcome_projection/);
+  assert.match(migration, /wedding_vendor_quote_received/);
+  assert.match(admin, /Limited Special outcomes/);
 });

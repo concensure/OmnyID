@@ -2948,8 +2948,38 @@ subjective usability or a controlled external cohort.
   never an input to the vendor's price calculation. Approved date terms alone
   determine the indicative total.
 - Marker rows and candidates outside the current top three receive no package,
-  minimum-spend, per-head, inclusion or condition fields. Even top-three output
-  omits offer/slot IDs; enquiry creation must re-resolve and recheck the fresh
-  server record.
+  minimum-spend, per-head, inclusion, condition or inventory identifier fields.
+  The authenticated top-three detail carries opaque offer/slot IDs and the
+  exact revision solely so pre-send approval can recheck and bind the receipt;
+  those IDs confer no authority and stale/swapped values fail closed.
 - Coordinates, preference facet IDs and budget travel in an authenticated JSON
   POST body, not a URL query string, to keep them out of ordinary access logs.
+
+# 2026-11-07 — WED-340 outcomes reconcile through AFP; operators do not resend
+
+- A Limited Special enquiry reuses the ordinary explicit-preview vendor send.
+  Its private draft and sent AFP records carry the exact offer, slot and slot
+  revision; the server accepts a link only after finding that tenant's matching
+  persisted provider receipt and conversation thread.
+- Quote, tour, hold, booking, lost and unknown states are a read projection over
+  that conversation plus authoritative slot state. Message bodies and private
+  pricing are not copied into the operational special-offer tables.
+- Delivery failures are bounded, content-light and visible as operator counts.
+  An operator cannot retry a couple's message: retry remains in the existing
+  couple-owned approval flow so an old approval cannot become a new send.
+- Provisional holds are explicit vendor actions, hidden from discovery, expire
+  automatically, and may not exceed seven days. Current UI uses a clear 48-hour
+  hold action.
+
+# 2026-11-07 — WED-341 guest detail requests extend protected RSVP links
+
+- The couple may ask a named household to confirm name, email, phone and
+  relationship in the same expiring, revocable RSVP capability. No second
+  public contact form or guest store is introduced.
+- Invitation previews remain free of contact addresses. After link creation,
+  the private couple UI resolves the already-saved guest email and opens a
+  reviewed native mail draft; OmnyID does not turn the RSVP feature into an
+  outbound relay.
+- Guest-supplied fields are accepted only when the server-stored capability
+  requested them and are appended as a successor guest-profile AFP record in
+  the same tenant ledger. Other households cannot be addressed by the token.

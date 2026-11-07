@@ -1,7 +1,7 @@
-use super::{Db, tenant_schema_name};
+use super::{tenant_schema_name, Db};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use sqlx::{Postgres, Row, Transaction};
 use std::collections::{HashMap, HashSet};
 
@@ -14,6 +14,7 @@ pub struct WeddingRsvpCapabilityGrantCreate {
     pub invitation_ids: Vec<String>,
     pub token_digest: String,
     pub expires_at: DateTime<Utc>,
+    pub request_contact_details: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -37,6 +38,7 @@ pub struct WeddingRsvpCapabilityGrantSummary {
     pub open_count: i64,
     pub last_opened_at: Option<String>,
     pub created_at: String,
+    pub request_contact_details: bool,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
@@ -79,6 +81,7 @@ pub struct WeddingRsvpCapabilityScope {
     pub encryption_public_key_hex: String,
     pub questions: Vec<WeddingRsvpCapabilityQuestion>,
     pub expires_at: String,
+    pub request_contact_details: bool,
     pub invitations: Vec<WeddingRsvpCapabilityInvitation>,
 }
 
@@ -88,6 +91,7 @@ pub struct WeddingRsvpCapabilitySubmissionAuthority {
     pub owner_user_id: String,
     pub wedding_plan_id: String,
     pub response_workspace_id: String,
+    pub request_contact_details: bool,
 }
 
 fn summary(row: &sqlx::postgres::PgRow) -> Result<WeddingRsvpCapabilityGrantSummary, sqlx::Error> {
@@ -104,12 +108,13 @@ fn summary(row: &sqlx::postgres::PgRow) -> Result<WeddingRsvpCapabilityGrantSumm
         open_count: row.try_get("open_count")?,
         last_opened_at: row.try_get("last_opened_at")?,
         created_at: row.try_get("created_at")?,
+        request_contact_details: row.try_get("request_contact_details")?,
     })
 }
 
 fn grant_select(where_clause: &str) -> String {
     format!(
-        "SELECT grant_id,wedding_plan_id,response_workspace_id,household_id,invitation_ids,expires_at::text,revoked_at::text,replaced_by_grant_id,open_count,last_opened_at::text,created_at::text FROM wedding_rsvp_capability_grants WHERE {where_clause}"
+        "SELECT grant_id,wedding_plan_id,response_workspace_id,household_id,invitation_ids,expires_at::text,revoked_at::text,replaced_by_grant_id,open_count,last_opened_at::text,created_at::text,request_contact_details FROM wedding_rsvp_capability_grants WHERE {where_clause}"
     )
 }
 
@@ -461,7 +466,7 @@ impl Db {
         invitation_id: &str,
     ) -> Result<Option<WeddingRsvpCapabilitySubmissionAuthority>, sqlx::Error> {
         let Some(row) = sqlx::query(
-            "SELECT grant_id,owner_user_id,wedding_plan_id,response_workspace_id,invitation_ids FROM wedding_rsvp_capability_grants WHERE token_digest=$1 AND revoked_at IS NULL AND expires_at>NOW()",
+            "SELECT grant_id,owner_user_id,wedding_plan_id,response_workspace_id,invitation_ids,request_contact_details FROM wedding_rsvp_capability_grants WHERE token_digest=$1 AND revoked_at IS NULL AND expires_at>NOW()",
         )
         .bind(token_digest)
         .fetch_optional(&self.pool)
@@ -479,6 +484,7 @@ impl Db {
             owner_user_id: row.try_get("owner_user_id")?,
             wedding_plan_id: row.try_get("wedding_plan_id")?,
             response_workspace_id: row.try_get("response_workspace_id")?,
+            request_contact_details: row.try_get("request_contact_details")?,
         }))
     }
 
@@ -519,7 +525,7 @@ impl Db {
             return Ok(None);
         }
         sqlx::query(
-            "INSERT INTO wedding_rsvp_capability_grants (grant_id,owner_user_id,wedding_plan_id,response_workspace_id,household_id,invitation_ids,token_digest,expires_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)",
+            "INSERT INTO wedding_rsvp_capability_grants (grant_id,owner_user_id,wedding_plan_id,response_workspace_id,household_id,invitation_ids,token_digest,expires_at,request_contact_details) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)",
         )
         .bind(&input.grant_id)
         .bind(owner_user_id)
@@ -529,6 +535,7 @@ impl Db {
         .bind(serde_json::to_value(&input.invitation_ids).unwrap_or(Value::Array(vec![])))
         .bind(&input.token_digest)
         .bind(input.expires_at)
+        .bind(input.request_contact_details)
         .execute(&mut *tx)
         .await?;
         let row = sqlx::query(&grant_select("grant_id=$1"))
@@ -617,7 +624,7 @@ impl Db {
         self.ensure_user_private_schema(owner_user_id).await?;
         let mut tx = self.pool.begin().await?;
         let Some(source) = sqlx::query(
-            "SELECT wedding_plan_id,response_workspace_id,household_id,invitation_ids FROM wedding_rsvp_capability_grants WHERE grant_id=$1 AND owner_user_id=$2 AND revoked_at IS NULL AND expires_at>NOW() FOR UPDATE",
+            "SELECT wedding_plan_id,response_workspace_id,household_id,invitation_ids,request_contact_details FROM wedding_rsvp_capability_grants WHERE grant_id=$1 AND owner_user_id=$2 AND revoked_at IS NULL AND expires_at>NOW() FOR UPDATE",
         )
         .bind(&input.source_grant_id)
         .bind(owner_user_id)
@@ -632,6 +639,7 @@ impl Db {
         let invitation_ids =
             serde_json::from_value::<Vec<String>>(source.try_get("invitation_ids")?)
                 .unwrap_or_default();
+        let request_contact_details: bool = source.try_get("request_contact_details")?;
         if invitation_scope(
             &mut tx,
             owner_user_id,
@@ -646,7 +654,7 @@ impl Db {
             return Ok(None);
         }
         sqlx::query(
-            "INSERT INTO wedding_rsvp_capability_grants (grant_id,owner_user_id,wedding_plan_id,response_workspace_id,household_id,invitation_ids,token_digest,expires_at,rotated_from_grant_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)",
+            "INSERT INTO wedding_rsvp_capability_grants (grant_id,owner_user_id,wedding_plan_id,response_workspace_id,household_id,invitation_ids,token_digest,expires_at,rotated_from_grant_id,request_contact_details) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",
         )
         .bind(&input.grant_id)
         .bind(owner_user_id)
@@ -657,6 +665,7 @@ impl Db {
         .bind(&input.token_digest)
         .bind(input.expires_at)
         .bind(&input.source_grant_id)
+        .bind(request_contact_details)
         .execute(&mut *tx)
         .await?;
         sqlx::query(
@@ -707,7 +716,7 @@ impl Db {
     ) -> Result<Option<WeddingRsvpCapabilityScope>, sqlx::Error> {
         let mut tx = self.pool.begin().await?;
         let Some(row) = sqlx::query(
-            "SELECT grant_id,owner_user_id,wedding_plan_id,response_workspace_id,household_id,invitation_ids,expires_at FROM wedding_rsvp_capability_grants WHERE token_digest=$1 FOR UPDATE",
+            "SELECT grant_id,owner_user_id,wedding_plan_id,response_workspace_id,household_id,invitation_ids,expires_at,request_contact_details FROM wedding_rsvp_capability_grants WHERE token_digest=$1 FOR UPDATE",
         )
         .bind(token_digest)
         .fetch_optional(&mut *tx)
@@ -761,6 +770,7 @@ impl Db {
         let household_id: String = row.try_get("household_id")?;
         let invitation_ids = serde_json::from_value::<Vec<String>>(row.try_get("invitation_ids")?)
             .unwrap_or_default();
+        let request_contact_details: bool = row.try_get("request_contact_details")?;
         let Some(invitations) = invitation_scope(
             &mut tx,
             &owner_user_id,
@@ -829,6 +839,7 @@ impl Db {
             encryption_public_key_hex,
             questions,
             expires_at: expires_at.to_rfc3339(),
+            request_contact_details,
             invitations,
         }))
     }

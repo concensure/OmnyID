@@ -70,3 +70,22 @@ fn allowlist_policy_is_false_without_an_enabled_flag() {
         "vendor@example.com"
     ));
 }
+
+#[test]
+fn provisional_holds_require_a_bounded_expiry() {
+    let missing = SlotCommandRequest {
+        vendor_slug: "vendor".into(),
+        idempotency_key: "hold-missing-expiry".into(),
+        expected_revision: 1,
+        action: VendorSlotAction::PlaceHold,
+        hold_expires_at: None,
+        confirmation_expires_at: None,
+    };
+    assert!(slot_command(&missing).is_err());
+
+    let excessive = SlotCommandRequest {
+        hold_expires_at: Some((Utc::now() + ChronoDuration::days(MAX_HOLD_DAYS + 1)).to_rfc3339()),
+        ..missing
+    };
+    assert!(slot_command(&excessive).is_err());
+}

@@ -39,6 +39,7 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
 #[derive(Debug, Deserialize)]
 struct DiscoveryQuery {
     date: String,
+    date_to: Option<String>,
     category: Option<String>,
     latitude: Option<f64>,
     longitude: Option<f64>,
@@ -74,6 +75,7 @@ struct DiscoveryMarker {
 #[derive(Debug, Serialize)]
 struct DiscoveryResponse {
     selected_date: String,
+    selected_date_to: String,
     category: Option<String>,
     ranking_policy_version: &'static str,
     markers: Vec<DiscoveryMarker>,
@@ -84,7 +86,11 @@ struct DiscoveryResponse {
 #[derive(Clone, Debug, Serialize)]
 struct RankedSpecialDetail {
     vendor_id: String,
+    offer_id: String,
+    slot_id: String,
+    slot_revision: i64,
     rank: usize,
+    special_date: String,
     title: String,
     summary: String,
     space_label: Option<String>,
@@ -113,9 +119,10 @@ struct RankingCandidate {
     style_tags: Vec<String>,
     preference_terms: Vec<String>,
     category_budget_cents: Option<i64>,
+    flexible_window: bool,
 }
 
-fn rollout_allowed(email: &str) -> bool {
+pub(super) fn rollout_allowed(email: &str) -> bool {
     std::env::var("OMNYID_WEDDING_VENDOR_SPECIALS_DISCOVERY_ENABLED").as_deref() == Ok("true")
         && std::env::var("OMNYID_WEDDING_VENDOR_SPECIALS_DISCOVERY_ALLOWLIST")
             .unwrap_or_default()
@@ -270,7 +277,14 @@ fn rank_top_three(mut candidates: Vec<RankingCandidate>) -> Vec<RankedSpecialDet
 }
 
 fn ranking_reason_labels(candidate: &RankingCandidate) -> Vec<String> {
-    let mut labels = vec!["Vendor-confirmed opening on your selected date".to_string()];
+    let mut labels = vec![if candidate.flexible_window {
+        format!(
+            "A vendor-confirmed special on {} improved this match",
+            candidate.detail.special_date
+        )
+    } else {
+        "Vendor-confirmed opening on your selected date".to_string()
+    }];
     if candidate
         .detail
         .indicative_total_cents
@@ -320,6 +334,27 @@ async fn discover_specials_http(
     }
     let selected_date = NaiveDate::parse_from_str(query.date.trim(), "%Y-%m-%d")
         .map_err(|_| (StatusCode::BAD_REQUEST, "date must use YYYY-MM-DD".into()))?;
+    let selected_date_to = query
+        .date_to
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(|value| NaiveDate::parse_from_str(value, "%Y-%m-%d"))
+        .transpose()
+        .map_err(|_| {
+            (
+                StatusCode::BAD_REQUEST,
+                "date_to must use YYYY-MM-DD".into(),
+            )
+        })?
+        .unwrap_or(selected_date);
+    let window_days = (selected_date_to - selected_date).num_days();
+    if !(0..=31).contains(&window_days) {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "The flexible-date window must be between 0 and 31 days.".into(),
+        ));
+    }
     let category = clean_category(query.category);
     let (latitude, longitude, radius_km) =
         location_filter(query.latitude, query.longitude, query.radius_km)?;
@@ -354,6 +389,7 @@ async fn discover_specials_http(
                   COALESCE((reviews_google.value #>> '{}')::bigint,
                            (reviews_easy.value #>> '{}')::bigint) AS review_count,
                   photo.photo_url,photo.alt_text,
+                  offer.offer_id,slot.slot_id,slot.revision AS slot_revision,
                   offer.title AS offer_title,offer.summary AS offer_summary,
                   offer.currency,offer.fixed_total_cents,offer.per_guest_cents,
                   offer.hire_fee_cents,offer.minimum_spend_cents AS offer_minimum_spend_cents,
@@ -363,7 +399,7 @@ async fn discover_specials_http(
                   offer.savings_basis_label,offer.savings_evidence_ref,
                   offer.inclusions AS offer_inclusions,offer.exclusions,
                   offer.public_conditions AS offer_public_conditions,
-                  slot.space_label,slot.session_label,slot.maximum_capacity,
+                  slot.local_date,slot.space_label,slot.session_label,slot.maximum_capacity,
                   slot.minimum_spend_cents AS slot_minimum_spend_cents,
                   slot.indicative_per_head_cents,slot.inclusions AS slot_inclusions,
                   slot.public_conditions AS slot_public_conditions,
@@ -402,26 +438,27 @@ async fn discover_specials_http(
              ORDER BY asset.is_cover DESC,asset.position,asset.asset_id
              LIMIT 1
            ) photo ON TRUE
-           WHERE slot.local_date=$1
+           WHERE slot.local_date BETWEEN $1 AND $2
              AND slot.state IN ('available','enquiry_received')
              AND slot.confirmation_expires_at>NOW()
              AND offer.publication_state='active'
              AND offer.approved_revision=offer.revision
-             AND (offer.valid_from IS NULL OR offer.valid_from<=$1)
-             AND (offer.valid_until IS NULL OR offer.valid_until>=$1)
-             AND ($2::text IS NULL OR lower(v.category)=lower($2))
-             AND ($3::double precision IS NULL OR (
-               power(((lat.value #>> '{}')::double precision-$3)*111.0,2)
-               + power(((lng.value #>> '{}')::double precision-$4)*111.0*cos(radians($3)),2)
-                 <= power($5,2)
+             AND (offer.valid_from IS NULL OR offer.valid_from<=slot.local_date)
+             AND (offer.valid_until IS NULL OR offer.valid_until>=slot.local_date)
+             AND ($3::text IS NULL OR lower(v.category)=lower($3))
+             AND ($4::double precision IS NULL OR (
+               power(((lat.value #>> '{}')::double precision-$4)*111.0,2)
+               + power(((lng.value #>> '{}')::double precision-$5)*111.0*cos(radians($4)),2)
+                 <= power($6,2)
              ))
-             AND ($6::bigint IS NULL OR offer.guest_min IS NULL OR offer.guest_min<=$6)
-             AND ($6::bigint IS NULL OR offer.guest_max IS NULL OR offer.guest_max>=$6)
-             AND ($6::bigint IS NULL OR slot.maximum_capacity IS NULL OR slot.maximum_capacity>=$6)
-           ORDER BY v.vendor_id,slot.last_confirmed_at DESC,slot.slot_id
-           LIMIT $7"#,
+             AND ($7::bigint IS NULL OR offer.guest_min IS NULL OR offer.guest_min<=$7)
+             AND ($7::bigint IS NULL OR offer.guest_max IS NULL OR offer.guest_max>=$7)
+             AND ($7::bigint IS NULL OR slot.maximum_capacity IS NULL OR slot.maximum_capacity>=$7)
+           ORDER BY v.vendor_id,ABS(slot.local_date-$1),slot.last_confirmed_at DESC,slot.slot_id
+           LIMIT $8"#,
     )
     .bind(selected_date)
+    .bind(selected_date_to)
     .bind(category.as_deref())
     .bind(latitude)
     .bind(longitude)
@@ -455,6 +492,7 @@ async fn discover_specials_http(
             approximate_distance_km(latitude.zip(longitude), (marker_latitude, marker_longitude))
                 .map(|distance| (distance * 10.0).round() / 10.0);
         let vendor_id: String = row.get("vendor_id");
+        let special_date: NaiveDate = row.get("local_date");
         let rating = row.get("rating");
         let review_count = row.get("review_count");
         let pricing = ApprovedOfferPricing {
@@ -487,7 +525,11 @@ async fn discover_specials_http(
         ranking_candidates.push(RankingCandidate {
             detail: RankedSpecialDetail {
                 vendor_id: vendor_id.clone(),
+                offer_id: row.get("offer_id"),
+                slot_id: row.get("slot_id"),
+                slot_revision: row.get("slot_revision"),
                 rank: 0,
+                special_date: special_date.to_string(),
                 title: row.get("offer_title"),
                 summary: row.get("offer_summary"),
                 space_label: non_empty(row.get("space_label")),
@@ -523,6 +565,7 @@ async fn discover_specials_http(
             style_tags: style_tags.clone(),
             preference_terms: preference_terms.clone(),
             category_budget_cents,
+            flexible_window: window_days > 0,
         });
         markers.push(DiscoveryMarker {
             vendor_id,
@@ -538,7 +581,7 @@ async fn discover_specials_http(
             style_tags,
             rating,
             review_count,
-            available_on_date: selected_date.to_string(),
+            available_on_date: special_date.to_string(),
             last_confirmed_at: confirmed.to_rfc3339(),
             confirmation_expires_at: expires.to_rfc3339(),
             indicative_only: true,
@@ -548,6 +591,7 @@ async fn discover_specials_http(
     let top_choices = rank_top_three(ranking_candidates);
     Ok(Json(DiscoveryResponse {
         selected_date: selected_date.to_string(),
+        selected_date_to: selected_date_to.to_string(),
         category,
         ranking_policy_version: "2",
         markers,
@@ -569,7 +613,11 @@ mod tests {
         RankingCandidate {
             detail: RankedSpecialDetail {
                 vendor_id: vendor_id.into(),
+                offer_id: format!("offer-{vendor_id}"),
+                slot_id: format!("slot-{vendor_id}"),
+                slot_revision: 1,
                 rank: 0,
+                special_date: "2027-11-20".into(),
                 title: format!("{vendor_id} package"),
                 summary: "Approved guidance".into(),
                 space_label: None,
@@ -594,6 +642,7 @@ mod tests {
             style_tags: styles.iter().map(|value| (*value).into()).collect(),
             preference_terms: vec!["garden".into()],
             category_budget_cents: Some(1_500_000),
+            flexible_window: false,
         }
     }
 
@@ -676,5 +725,14 @@ mod tests {
         let unknown = ranking_candidate("unknown", None, None, &[]);
         assert!(ranking_score(&unknown) > 0.0);
         assert!(unknown.detail.unknown_costs);
+    }
+
+    #[test]
+    fn flexible_date_reason_names_the_vendor_confirmed_special_date() {
+        let mut candidate = ranking_candidate("flexible", Some(5.0), Some(1_200_000), &["garden"]);
+        candidate.flexible_window = true;
+        candidate.detail.special_date = "2027-11-24".into();
+        let ranked = rank_top_three(vec![candidate]);
+        assert!(ranked[0].reason_labels[0].contains("2027-11-24"));
     }
 }

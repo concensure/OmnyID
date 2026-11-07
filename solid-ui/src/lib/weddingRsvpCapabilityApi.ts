@@ -38,6 +38,7 @@ export type WeddingRsvpCapabilityScope = {
   encryption_public_key_hex: string;
   questions: WeddingRsvpCapabilityQuestion[];
   expires_at: string;
+  request_contact_details: boolean;
   invitations: WeddingRsvpCapabilityInvitation[];
 };
 
@@ -53,6 +54,7 @@ export type WeddingRsvpCapabilityGrant = {
   open_count: number;
   last_opened_at?: string | null;
   created_at: string;
+  request_contact_details: boolean;
 };
 
 export function loadWeddingRsvpCapabilityStatus() {
@@ -69,6 +71,7 @@ export function createWeddingRsvpCapability(input: {
   householdId: string;
   invitationIds: string[];
   expiresAt: string;
+  requestContactDetails?: boolean;
 }) {
   return apiFetch<{ grant: WeddingRsvpCapabilityGrant; token: string }>("/wedding/rsvp/capabilities", {
     method: "POST",
@@ -78,6 +81,7 @@ export function createWeddingRsvpCapability(input: {
       household_id: input.householdId,
       invitation_ids: input.invitationIds,
       expires_at: input.expiresAt,
+      request_contact_details: input.requestContactDetails === true,
     },
   });
 }
@@ -116,6 +120,12 @@ export function submitWeddingRsvpCapabilityResponse(input: {
   answers: Record<string, string>;
   privateAnswerQuestionIds: string[];
   privateAnswersCiphertext?: string | null;
+  contactDetails?: {
+    displayName: string;
+    email: string;
+    phone: string;
+    relationshipToCouple: string;
+  } | null;
 }) {
   return publicRsvpFetch<{ replayed: boolean; explanation: string; response: Record<string, unknown>; impact_receipt: Record<string, unknown> }>("/wedding/rsvp/capabilities/respond", {
     token: input.token,
@@ -128,5 +138,11 @@ export function submitWeddingRsvpCapabilityResponse(input: {
     answers: input.answers,
     private_answer_question_ids: input.privateAnswerQuestionIds,
     private_answers_ciphertext: input.privateAnswersCiphertext ?? null,
+    contact_details: input.contactDetails ? {
+      display_name: input.contactDetails.displayName,
+      email: input.contactDetails.email,
+      phone: input.contactDetails.phone,
+      relationship_to_couple: input.contactDetails.relationshipToCouple,
+    } : null,
   });
 }

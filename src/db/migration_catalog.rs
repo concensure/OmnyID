@@ -760,4 +760,14 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "False-default vendor-controlled date-and-session specials with encrypted private pricing, safe management capabilities, enquiry links, and content-light audit",
         include_str!("../../postgres/migrations/0149_wedding_vendor_limited_specials.sql"),
     ),
+    (
+        "0150_wedding_rsvp_contact_detail_requests",
+        "Explicit household RSVP contact-detail requests using the existing expiring capability",
+        include_str!("../../postgres/migrations/0150_wedding_rsvp_contact_detail_requests.sql"),
+    ),
+    (
+        "0151_wedding_vendor_special_offer_updates",
+        "Auditable verified-vendor edits for draft and paused Limited Specials",
+        include_str!("../../postgres/migrations/0151_wedding_vendor_special_offer_updates.sql"),
+    ),
 ];
