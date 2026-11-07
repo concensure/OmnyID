@@ -2999,3 +2999,17 @@ subjective usability or a controlled external cohort.
 - The selected special date enters the ordinary draft/approval pipeline and respects the same
   per-enquiry date-sharing control. The email send, AFP receipt and special-slot linkage remain
   separate idempotent facts.
+## 2026-11-08: Limited Specials availability and shortlist reactions remain evidence-scoped AFP projections
+
+WED-343 presents an open vendor calendar date as dated evidence, not as a
+couple-specific availability confirmation, temporary hold, or booking. Those
+four states use distinct labels and authorities. Missing capacity, price or
+accessibility evidence remains `unknown`; it is never converted into a failed
+requirement or a permanent green suitability badge.
+
+Interested, favourite, concerned-with-reason and need-more-information are
+append-only `wedding_vendor_shortlist_preference` events in the existing
+account-scoped Wedding AFP ledger. A favourite also projects into the existing
+vendor lifecycle filter. Quote comparison continues to read the canonical
+quote artifacts and links extracted totals and inclusions back to their source
+artifact; it does not create a second quote or vendor store.

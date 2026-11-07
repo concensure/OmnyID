@@ -1,6 +1,7 @@
 import { createEffect, createMemo, createResource, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import type * as Leaflet from "leaflet";
 
+import { WeddingLimitedSpecialVenueCard } from "@/components/WeddingLimitedSpecialVenueCard";
 import { OSM_TILE_CONFIG } from "@/lib/mapConfig";
 import { friendlyErrorText } from "@/lib/visibleErrorText";
 import {
@@ -8,6 +9,10 @@ import {
   type WeddingVendorRankedSpecialDetail,
   type WeddingVendorSpecialMarker,
 } from "@/lib/weddingVendorSpecialDiscoveryApi";
+import type {
+  WeddingVendorShortlistPreference,
+  WeddingVendorShortlistPreferenceRecord,
+} from "@/lib/weddingVendorShortlistPreferenceState";
 
 const SYDNEY: [number, number] = [-33.8688, 151.2093];
 const CATEGORIES = [
@@ -29,25 +34,15 @@ function escapeHtml(value: string): string {
   })[character] ?? character);
 }
 
-function monthDays(dateText: string) {
-  const [year, month] = dateText.split("-").map(Number);
-  const first = new Date(year, month - 1, 1);
-  const count = new Date(year, month, 0).getDate();
-  return {
-    label: first.toLocaleDateString("en-AU", { month: "long", year: "numeric" }),
-    blanks: Array.from({ length: (first.getDay() + 6) % 7 }),
-    days: Array.from({ length: count }, (_, index) => index + 1),
-    selectedDay: Number(dateText.slice(8, 10)),
-  };
-}
-
 export function WeddingLimitedSpecialsMap(props: {
   weddingDate?: string | null;
   initialCategory?: string | null;
   initialGuestCount?: number | null;
   categoryBudgets?: readonly { categoryId: string; amount: number }[];
   preferenceTerms?: readonly string[];
+  shortlistPreferences?: ReadonlyMap<string, WeddingVendorShortlistPreferenceRecord>;
   onPrepareEnquiry: (marker: WeddingVendorSpecialMarker, detail: WeddingVendorRankedSpecialDetail | null) => void;
+  onSavePreference?: (marker: WeddingVendorSpecialMarker, preference: WeddingVendorShortlistPreference, reason: string | null) => Promise<void> | void;
 }) {
   const [date, setDate] = createSignal(validDate(props.weddingDate));
   const [dateTo, setDateTo] = createSignal("");
@@ -78,10 +73,6 @@ export function WeddingLimitedSpecialsMap(props: {
     ?? markers()[0]
     ?? null);
   const selectedDetail = createMemo<WeddingVendorRankedSpecialDetail | null>(() => query()?.topChoices.find((item) => item.vendorId === selected()?.vendorId) ?? null);
-  const calendar = createMemo(() => monthDays(selected()?.availableOnDate ?? date()));
-  const selectedAvailableDays = createMemo(() => new Set((selected()?.availableDates ?? []).filter((value) => value.slice(0, 7) === (selected()?.availableOnDate ?? date()).slice(0, 7)).map((value) => Number(value.slice(8, 10)))));
-
-  const money = (cents: number, currency: string) => new Intl.NumberFormat("en-AU", { style: "currency", currency, maximumFractionDigits: 0 }).format(cents / 100);
 
   onMount(async () => {
     try {
@@ -199,6 +190,7 @@ export function WeddingLimitedSpecialsMap(props: {
         </label>
         <label class="grid gap-1 text-sm font-semibold text-wedding-ink">Vendor category
           <select class="h-11 rounded-lg border border-wedding-border bg-white px-3 font-normal" value={category()} onChange={(event) => setCategory(event.currentTarget.value)}>
+            <option value="">All categories</option>
             <For each={CATEGORIES}>{(item) => <option value={item}>{item}</option>}</For>
           </select>
         </label>
@@ -215,7 +207,10 @@ export function WeddingLimitedSpecialsMap(props: {
       <p class="mt-2 text-xs text-wedding-ink/65">Availability is indicative and subject to vendor confirmation. The map shows only the date you searched, not a vendor’s private calendar.</p>
 
       <Show when={!query.loading && !query.error && markers().length === 0}>
-        <p class="mt-4 rounded-lg border border-wedding-border bg-white p-4 text-sm text-wedding-ink/70">No vendor-confirmed specials match this date and category yet. Try another date or category.</p>
+        <div class="mt-4 rounded-lg border border-wedding-border bg-white p-4 text-sm text-wedding-ink/70">
+          <p>No vendor-confirmed specials match this date and category yet. Missing availability is unknown, not evidence that vendors are unavailable.</p>
+          <button type="button" class="mt-3 min-h-11 rounded-lg border border-wedding-secondary bg-white px-3 font-bold text-wedding-secondary" onClick={() => setCategory("")}>Show all vendor categories</button>
+        </div>
       </Show>
       <Show when={markers().length > 0}>
         <div class="mt-4 flex snap-x gap-2 overflow-x-auto pb-2" aria-label="Limited-special vendors">
@@ -223,54 +218,14 @@ export function WeddingLimitedSpecialsMap(props: {
         </div>
       </Show>
 
-      <Show when={selected()} keyed>{(item) => (
-        <article class="mt-4 overflow-hidden rounded-xl border border-wedding-border bg-white shadow-wedding-card" aria-labelledby="limited-special-vendor-name">
-          <Show when={item.photoUrl} fallback={<div class="flex h-40 items-center justify-center bg-wedding-slate text-4xl font-bold text-wedding-primary" aria-hidden="true">{item.vendorName.slice(0, 1)}</div>}>
-            {(url) => <img class="h-48 w-full object-cover" src={url()} alt={item.photoAlt || `${item.vendorName} venue`} loading="lazy" />}
-          </Show>
-          <div class="grid gap-5 p-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(17rem,.65fr)]">
-            <div class="min-w-0">
-              <p class="text-xs font-bold uppercase tracking-[.12em] text-wedding-primary">{item.category} · {item.locality}</p>
-              <h3 id="limited-special-vendor-name" class="mt-1 break-words font-display text-2xl font-semibold text-wedding-ink">{item.vendorName}</h3>
-              <p class="mt-2 text-sm leading-6 text-wedding-ink/75">{item.description || `${item.vendorName} has vendor-confirmed availability for the selected date. Ask for current package details before relying on it.`}</p>
-              <Show when={item.address}><p class="mt-2 text-sm text-wedding-ink/65">{item.address}</p></Show>
-              <Show when={item.distanceKm !== null}><p class="mt-1 text-xs font-semibold text-wedding-ink/60">About {item.distanceKm} km from the map centre</p></Show>
-              <Show when={item.rating !== null}><p class="mt-3 text-sm font-semibold text-wedding-ink">★ {item.rating?.toFixed(1)} <span class="font-normal text-wedding-ink/65">{item.reviewCount ? `from ${item.reviewCount} reviews` : "published rating"}</span></p></Show>
-              <div class="mt-3 flex flex-wrap gap-2"><For each={item.styleTags}>{(tag) => <span class="rounded-full bg-wedding-slate px-2.5 py-1 text-xs font-semibold text-wedding-ink/70">{tag}</span>}</For></div>
-              <Show when={selectedDetail()} keyed fallback={<p class="mt-4 rounded-lg bg-wedding-slate p-3 text-xs leading-5 text-wedding-ink/65">Vendor-confirmed availability is shown here. Exact package and price guidance appears only when this venue is in your current top three.</p>}>{(detail) => (
-                <section class="mt-4 rounded-xl border border-wedding-primary/25 bg-wedding-primary/5 p-3" aria-label="Top-three limited special details">
-                  <p class="text-xs font-bold uppercase tracking-[.12em] text-wedding-primary">#{detail.rank} current match · Indicative</p>
-                  <Show when={detail.specialDate && detail.specialDate !== date()}><p class="mt-1 text-xs font-semibold text-wedding-primary">Special date: {new Date(`${detail.specialDate}T12:00:00`).toLocaleDateString("en-AU", { day: "numeric", month: "long", year: "numeric" })}</p></Show>
-                  <h4 class="mt-1 font-semibold text-wedding-ink">{detail.title}</h4>
-                  <p class="mt-1 text-sm leading-5 text-wedding-ink/70">{detail.summary}</p>
-                  <Show when={detail.spaceLabel || detail.sessionLabel}><p class="mt-2 text-xs font-semibold text-wedding-ink/70">{[detail.spaceLabel, detail.sessionLabel].filter(Boolean).join(" · ")}</p></Show>
-                  <Show when={detail.indicativeTotalCents !== null}><p class="mt-3 text-lg font-bold text-wedding-ink">About {money(detail.indicativeTotalCents!, detail.currency)} <span class="text-xs font-normal text-wedding-ink/60">for {guestCount() ?? "your"} guests</span></p></Show>
-                  <div class="mt-2 flex flex-wrap gap-2 text-xs text-wedding-ink/70">
-                    <Show when={detail.indicativePerHeadCents !== null}><span>{money(detail.indicativePerHeadCents!, detail.currency)} per head</span></Show>
-                    <Show when={detail.minimumSpendCents !== null}><span>· Minimum spend {money(detail.minimumSpendCents!, detail.currency)}</span></Show>
-                    <Show when={detail.maximumCapacity !== null}><span>· Up to {detail.maximumCapacity} guests</span></Show>
-                  </div>
-                  <Show when={detail.inclusions.length > 0}><p class="mt-2 text-xs leading-5 text-wedding-ink/70"><strong>Includes:</strong> {detail.inclusions.slice(0, 5).join(", ")}</p></Show>
-                  <Show when={detail.publicConditions}><p class="mt-1 text-xs leading-5 text-wedding-ink/65">{detail.publicConditions}</p></Show>
-                  <ul class="mt-2 grid gap-1 text-xs text-wedding-ink/70"><For each={detail.reasonLabels}>{(label) => <li>✓ {label}</li>}</For></ul>
-                  <Show when={detail.unknownCosts}><p class="mt-2 text-xs font-semibold text-amber-800">Some mandatory costs are still unconfirmed, so this is not a final quote.</p></Show>
-                </section>
-              )}</Show>
-            </div>
-            <section class="rounded-xl border border-wedding-border bg-wedding-page p-3" aria-label={`Availability for ${calendar().label}`}>
-              <p class="font-semibold text-wedding-ink">{calendar().label}</p>
-              <div class="mt-3 grid grid-cols-7 gap-1 text-center text-[11px]"><For each={["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]}>{(day) => <span class="font-semibold text-wedding-ink/55">{day}</span>}</For></div>
-              <div class="mt-1 grid grid-cols-7 gap-1 text-center text-xs">
-                <For each={calendar().blanks}>{() => <span aria-hidden="true" />}</For>
-                <For each={calendar().days}>{(day) => <span class={`flex aspect-square items-center justify-center rounded-full ${selectedAvailableDays().has(day) ? "bg-wedding-primary font-bold text-white ring-2 ring-wedding-primary/20 ring-offset-2" : "text-wedding-ink/60"}`} aria-label={selectedAvailableDays().has(day) ? `${calendar().label} ${day}, vendor-confirmed special may apply` : undefined}>{day}</span>}</For>
-              </div>
-              <p class="mt-3 text-xs leading-5 text-wedding-ink/70"><span class="font-bold text-wedding-primary">{item.availableDates.length} matching date{item.availableDates.length === 1 ? "" : "s"}</span> in the searched window. Package, price and final availability remain subject to confirmation.</p>
-              <p class="mt-1 text-[11px] leading-4 text-wedding-ink/55">Last reconfirmed {new Date(item.lastConfirmedAt).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" })}.</p>
-              <button type="button" class="mt-3 min-h-11 w-full rounded-lg bg-wedding-primary px-4 text-sm font-bold text-white" onClick={() => props.onPrepareEnquiry(item, selectedDetail())}>Prepare enquiry</button>
-            </section>
-          </div>
-        </article>
-      )}</Show>
+      <Show when={selected()} keyed>{(item) => <WeddingLimitedSpecialVenueCard
+        marker={item}
+        detail={selectedDetail()}
+        guestCount={guestCount()}
+        shortlistPreference={props.shortlistPreferences?.get(item.vendorId) ?? null}
+        onPrepareEnquiry={() => props.onPrepareEnquiry(item, selectedDetail())}
+        onSavePreference={props.onSavePreference ? (preference, reason) => props.onSavePreference?.(item, preference, reason) : undefined}
+      />}</Show>
     </section>
   );
 }

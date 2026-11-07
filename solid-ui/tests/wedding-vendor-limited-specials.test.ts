@@ -44,9 +44,10 @@ test("limited-special discovery drops malformed markers and normalises safe exac
 });
 
 test("Limited Specials uses a third mode, full marker name and one synchronized detail card", async () => {
-  const [home, map, api, server, caddy, deploy] = await Promise.all([
+  const [home, map, card, api, server, caddy, deploy] = await Promise.all([
     read("solid-ui/src/components/WeddingVendorSearchHomeSections.tsx"),
     read("solid-ui/src/components/WeddingLimitedSpecialsMap.tsx"),
+    read("solid-ui/src/components/WeddingLimitedSpecialVenueCard.tsx"),
     read("solid-ui/src/lib/weddingVendorSpecialDiscoveryApi.ts"),
     read("src/server/wedding_vendor_special_offer_routes/discovery.rs"),
     read("Caddyfile"),
@@ -59,11 +60,11 @@ test("Limited Specials uses a third mode, full marker name and one synchronized 
   assert.match(map, /radiusKm/);
   assert.match(map, /guestCount/);
   assert.match(map, /selectedDetail/);
-  assert.match(map, /selectedAvailableDays/);
-  assert.match(map, /Exact package and price guidance appears only when this venue is in your current top three/);
+  assert.match(card, /availableDays/);
+  assert.match(card, /Commercial terms shown only for a current top-three match|priceCertaintyLabel/);
   assert.match(map, /Availability is indicative and subject to vendor confirmation/);
   assert.match(map, /onPrepareEnquiry\(item, selectedDetail\(\)\)/);
-  assert.match(map, /aria-label={`Availability for/);
+  assert.match(card, /aria-label={`Availability for/);
   assert.match(api, /wedding\/vendor-specials\/discovery/);
   assert.match(api, /method: "POST"/);
   assert.doesNotMatch(api, /URLSearchParams/);

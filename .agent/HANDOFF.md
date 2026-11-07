@@ -7885,3 +7885,28 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
 - No production flag or allowlist was enabled. Next: commit, build/deploy from a clean exact-SHA
   release checkout, verify Oracle provenance and health, then record hosted false-default Growth and
   Limited Specials evidence.
+## 2026-11-08 - WED-343 evidence-first specials and quote comparison (Codex, complete)
+
+- Continued in `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001` on
+  `agent/codex/WED-343` from deployed SHA
+  `e8a1057593cfccd26798ea1769b3caca7e0d68a5`.
+- Replaced the dense selected Limited Special detail with a reusable card that
+  shows one representative photo, vendor and locality, capacity/service
+  coverage, price basis and certainty, dated availability source/freshness,
+  one factual couple-fit reason, explicit unknowns, and clear View details,
+  Save and Prepare enquiry actions.
+- Availability labels distinguish calendar-open evidence, event-specific
+  vendor confirmation, temporary hold and confirmed booking. The public
+  discovery result remains calendar evidence only; no hold or booking is
+  inferred.
+- Added AFP-backed shared-shortlist reactions: interested, favourite,
+  concerned with a bounded reason, and need more information. Favourites reuse
+  the existing lifecycle filter instead of a parallel list.
+- The existing vendor Quote tab now renders normalized quote intelligence and
+  a removable comparison of up to three received quotes. Meaningful
+  differences are highlighted, unknowns remain explicit, and extracted price
+  and inclusion cells open the canonical source artifact for checking or
+  correction.
+- Passed TypeScript typecheck, 23 focused tests, both line budgets, all 2,234
+  Wedding tests, production UI build and `git diff --check`. No rollout flag,
+  allowlist or production data was changed.

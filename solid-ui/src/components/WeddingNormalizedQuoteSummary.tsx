@@ -4,7 +4,7 @@ import type { WeddingArtifactQuotePreview } from "@/lib/weddingArtifactPreviewSt
 import { buildWeddingNormalizedQuoteState } from "@/lib/weddingNormalizedQuoteState";
 import { WeddingTrustInfoTip } from "@/components/WeddingTrustInfoTip";
 
-export function WeddingNormalizedQuoteSummary(props: { quote: WeddingArtifactQuotePreview; compact?: boolean }) {
+export function WeddingNormalizedQuoteSummary(props: { quote: WeddingArtifactQuotePreview; compact?: boolean; onOpenSource?: () => void }) {
   const state = () => buildWeddingNormalizedQuoteState(props.quote);
   const statusClass = () => state().completeness === "complete"
     ? "bg-emerald-100 text-emerald-950"
@@ -16,7 +16,7 @@ export function WeddingNormalizedQuoteSummary(props: { quote: WeddingArtifactQuo
       <section class="rounded-lg border border-wedding-border bg-white p-3">
         <h5 class="text-xs font-bold uppercase tracking-[0.08em] text-wedding-ink/65">{title}</h5>
         <ul class="mt-2 space-y-1">
-          <For each={items}>{(item) => <li class="break-words text-sm leading-5 text-wedding-ink/80">{item}</li>}</For>
+          <For each={items}>{(item) => <li class="break-words text-sm leading-5 text-wedding-ink/80">{item}<Show when={props.onOpenSource}><button type="button" class="ml-2 min-h-9 align-middle text-xs font-bold text-wedding-secondary underline" onClick={() => props.onOpenSource?.()}>Source</button></Show></li>}</For>
         </ul>
       </section>
     </Show>
@@ -32,6 +32,7 @@ export function WeddingNormalizedQuoteSummary(props: { quote: WeddingArtifactQuo
         <div class="text-right">
           <p class="text-xl font-extrabold text-wedding-ink">{state().comparableTotalLabel}</p>
           <span class={`mt-1 inline-flex rounded-lg px-2 py-1 text-xs font-bold ${statusClass()}`}>{state().completenessLabel}</span>
+          <Show when={props.onOpenSource}><button type="button" class="mt-2 block min-h-9 text-xs font-bold text-wedding-secondary underline" onClick={() => props.onOpenSource?.()}>View price source or correct</button></Show>
         </div>
       </div>
       <dl class="mt-4 grid gap-2 sm:grid-cols-3">

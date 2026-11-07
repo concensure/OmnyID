@@ -15,6 +15,18 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-343
+    title: Evidence-first Limited Specials cards, shared shortlist, and quote comparison access
+    status: done
+    owner: codex
+    branch: agent/codex/WED-343
+    worktree: C:/Users/ozans/Desktop/projects/OmnyID-GROWTH-001
+    base_sha: e8a1057593cfccd26798ea1769b3caca7e0d68a5
+    depends_on: [WED-340, WED-342, GROWTH-10]
+    files: [solid-ui/src/components/WeddingLimitedSpecialsMap.tsx, solid-ui/src/components/WeddingVendor**, solid-ui/src/components/vendor/**, solid-ui/src/lib/weddingVendor**, solid-ui/src/lib/vendorSpecialsApi.ts, solid-ui/src/lib/weddingQuotation**, solid-ui/tests/wedding-**, src/server/wedding_vendor_special_offer_routes/**, src/server/wedding_quotation**, Documents/verification/**, .agent/**]
+    acceptance: [Limited Specials detail cards use one representative image and consistent evidence fields for identity location capacity price basis certainty availability state source freshness and one concise couple-fit reason, availability distinguishes calendar-open vendor-confirmed temporary-hold and confirmed-booking states without permanent badges, unknown evidence remains distinct from a failed requirement, couples can save and express interested favourite concerned-with-reason or need-more-information through the existing account-scoped AFP vendor lifecycle, the comparison view starts with three removable options highlights meaningful differences and never ranks incomparable estimates solely by amount, every extracted quote amount inclusion and correction can open its source quote or message, the existing quote-intelligence comparison is reachable from the frontend quote comparison surface, smaller directory filters avoid routine empty-state traps, focused frontend backend privacy typecheck build and line-budget checks pass]
+    progress: "Completed from deployed clean SHA e8a1057593cfccd26798ea1769b3caca7e0d68a5. Limited Specials now uses a reusable evidence card with one photo, location, capacity/coverage, price basis and certainty, dated availability source/freshness, concise couple-fit reasoning, explicit unknowns and View details/Save actions. Shared shortlist reactions append to the existing account-scoped AFP ledger and favourites project into the existing lifecycle filter. The Quote tab now renders normalized quote intelligence and compares up to three removable quotes, highlighting differences without amount-only ranking and linking extracted price/inclusion cells to the source artifact for review or correction. Empty special results can widen to all categories. Typecheck, 23 focused tests, both line budgets, all 2,234 Wedding tests and the production build pass. No rollout flag or allowlist was changed."
+
   - id: WED-342
     title: Complete mobile decision evidence and Limited Specials end-to-end reliability
     status: review

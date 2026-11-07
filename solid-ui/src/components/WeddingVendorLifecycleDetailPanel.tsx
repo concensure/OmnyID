@@ -2,6 +2,8 @@
 import { createMemo, createSignal, For, Show } from "solid-js";
 
 import { WeddingDashboardIcon } from "@/components/WeddingDashboardIcons";
+import { WeddingNormalizedQuoteSummary } from "@/components/WeddingNormalizedQuoteSummary";
+import { WeddingQuoteEvidenceComparison } from "@/components/WeddingQuoteEvidenceComparison";
 import { renderMarkdown } from "@/lib/markdownRenderer";
 import type { AfpMessage } from "@/lib/api";
 import type { WeddingWorkspaceArtifactPreview } from "@/lib/weddingResponseWorkspaceViewState";
@@ -39,6 +41,7 @@ function QuoteDocument(props: {
       <p><span class="font-semibold text-wedding-ink">Deposit:</span> {item().depositLabel || "Not stated"}</p>
       <p><span class="font-semibold text-wedding-ink">Valid until:</span> {item().validUntil || "Not stated"}</p>
     </div>}</Show>
+    <Show when={quote()}>{(item) => <div class="mt-3"><WeddingNormalizedQuoteSummary quote={item()} compact onOpenSource={() => props.onOpenArtifact(props.artifact.artifactId)} /></div>}</Show>
     <div class="prose prose-sm mt-3 max-h-80 max-w-none overflow-y-auto break-words text-wedding-ink" innerHTML={renderMarkdown(props.artifact.bodyText || props.artifact.emptyBodyLabel)} />
     <div class="mt-3 flex flex-wrap gap-2">
       <button type="button" class="min-h-11 rounded-lg border border-wedding-secondary bg-white px-3 text-sm font-semibold text-wedding-secondary" onClick={() => props.onOpenArtifact(props.artifact.artifactId)}>Open in Documents</button>
@@ -61,7 +64,7 @@ export function WeddingVendorLifecycleDetailPanel(props: {
   const [quotePickerOpen, setQuotePickerOpen] = createSignal(false);
   const [quoteSearch, setQuoteSearch] = createSignal("");
   const [selectedQuoteId, setSelectedQuoteId] = createSignal<string | null>(null);
-  const [comparisonQuoteId, setComparisonQuoteId] = createSignal<string | null>(null);
+  const [comparisonQuoteIds, setComparisonQuoteIds] = createSignal<string[]>([]);
   const messageRows = createMemo(() => weddingVendorLifecycleMessageRows(props.messages));
   const quoteArtifacts = createMemo(() => weddingVendorQuoteArtifacts(props.artifacts));
   const selectedQuote = createMemo(() => quoteArtifacts().find((item) => item.artifactId === selectedQuoteId()) ?? quoteArtifacts()[0] ?? null);
@@ -77,9 +80,18 @@ export function WeddingVendorLifecycleDetailPanel(props: {
       return !query || `${artifact.title} ${quote?.vendorName ?? ""}`.toLowerCase().includes(query);
     });
   });
-  const comparisonQuote = createMemo(() => otherQuotes().find((item) => item.artifactId === comparisonQuoteId())
-    ?? weddingVendorQuoteArtifacts(props.allArtifacts).find((item) => item.artifactId === comparisonQuoteId())
-    ?? null);
+  const comparisonQuotes = createMemo(() => comparisonQuoteIds()
+    .map((id) => weddingVendorQuoteArtifacts(props.allArtifacts).find((item) => item.artifactId === id))
+    .filter((item): item is WeddingWorkspaceArtifactPreview => Boolean(item))
+    .slice(0, 2));
+  const comparisonArtifacts = createMemo(() => [selectedQuote(), ...comparisonQuotes()]
+    .filter((item): item is WeddingWorkspaceArtifactPreview => Boolean(item))
+    .slice(0, 3));
+  function toggleComparisonQuote(artifactId: string) {
+    setComparisonQuoteIds((current) => current.includes(artifactId)
+      ? current.filter((id) => id !== artifactId)
+      : [...current, artifactId].slice(-2));
+  }
   const termsArtifacts = createMemo(() => weddingVendorTermsArtifacts(props.artifacts));
   const booking = createMemo(() => weddingVendorLifecycleBookingSummary(props.vendor));
   const tabs: ReadonlyArray<{ id: DetailTab; label: string }> = [
@@ -130,15 +142,12 @@ export function WeddingVendorLifecycleDetailPanel(props: {
             <label class="block text-sm font-semibold text-wedding-ink">Find a received quote
               <input class="mt-1 min-h-11 w-full rounded-lg border border-wedding-border bg-white px-3" type="search" value={quoteSearch()} onInput={(event) => setQuoteSearch(event.currentTarget.value)} placeholder="Search vendor or quote title" />
             </label>
-            <label class="mt-3 block text-sm font-semibold text-wedding-ink">Quote to compare
-              <select class="mt-1 min-h-11 w-full rounded-lg border border-wedding-border bg-white px-3" value={comparisonQuoteId() ?? ""} onChange={(event) => setComparisonQuoteId(event.currentTarget.value || null)}>
-                <option value="">Choose a received quote</option>
-                <For each={otherQuotes()}>{(artifact) => <option value={artifact.artifactId}>{artifact.title}</option>}</For>
-              </select>
-            </label>
+            <fieldset class="mt-3"><legend class="text-sm font-semibold text-wedding-ink">Quotes to compare <span class="font-normal text-wedding-ink/55">(up to two more)</span></legend>
+              <div class="mt-2 grid gap-2"><For each={otherQuotes()}>{(artifact) => <label class="flex min-h-11 items-center gap-2 rounded-lg border border-wedding-border bg-white px-3 text-sm text-wedding-ink"><input type="checkbox" checked={comparisonQuoteIds().includes(artifact.artifactId)} onChange={() => toggleComparisonQuote(artifact.artifactId)} />{artifact.title}</label>}</For></div>
+            </fieldset>
             <Show when={otherQuotes().length === 0}><p class="mt-2 text-xs text-wedding-ink/65">No other received quote matches this search.</p></Show>
           </div></Show>
-          <Show when={comparisonQuote()}>{(artifact) => <div class="mt-4 border-t border-wedding-border pt-4"><p class="mb-2 text-xs font-bold uppercase tracking-wide text-wedding-ink/60">Added to this comparison</p><QuoteDocument artifact={artifact()} onOpenArtifact={props.onOpenArtifact} /></div>}</Show>
+          <WeddingQuoteEvidenceComparison artifacts={comparisonArtifacts()} onOpenArtifact={props.onOpenArtifact} />
         </Show>
       </div>
 

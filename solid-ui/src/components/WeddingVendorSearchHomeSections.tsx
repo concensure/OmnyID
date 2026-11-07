@@ -36,6 +36,11 @@ import {
   type WeddingVendorLifecycleFilter,
   type WeddingVendorLifecycleRecord,
 } from "@/lib/weddingVendorLifecycleState";
+import {
+  projectWeddingVendorShortlistPreferences,
+  weddingVendorShortlistPreferenceToAfpSendInput,
+  type WeddingVendorShortlistPreference,
+} from "@/lib/weddingVendorShortlistPreferenceState";
 
 type VendorSearchAction = NonNullable<WeddingResponseWorkspaceViewProps["vendorSearchResultAction"]>;
 type VendorOutreachOwner = ReturnType<typeof useWeddingVendorOutreachOwner>;
@@ -150,6 +155,7 @@ export function WeddingVendorSearchHomeSection(props: {
     })) ?? [];
     return mergeWeddingVendorLifecycleCandidates(projectWeddingVendorLifecycle(workspace().state.afpMessages), candidates);
   });
+  const shortlistPreferences = createMemo(() => projectWeddingVendorShortlistPreferences(workspace().state.afpMessages));
   const lifecycleFilters: ReadonlyArray<{ id: VendorHomeFilter; label: string }> = [
     { id: "enquired", label: "Enquired" }, { id: "proposals", label: "Proposals" }, { id: "favourited", label: "Favourited" },
     { id: "quote_received", label: "Quote received" }, { id: "booked", label: "Booked" },
@@ -297,6 +303,18 @@ export function WeddingVendorSearchHomeSection(props: {
       category: marker.category,
     }));
   };
+  async function saveSpecialPreference(marker: WeddingVendorSpecialMarker, preference: WeddingVendorShortlistPreference, reason: string | null) {
+    if (!workspace().saveProjection) throw new Error("Account saving is unavailable");
+    await workspace().saveProjection!(weddingVendorShortlistPreferenceToAfpSendInput({
+      metadata: workspace().state.workspace.metadata,
+      vendorId: marker.vendorId,
+      vendorName: marker.vendorName,
+      preference,
+      reason,
+      source: "limited_specials",
+    }));
+    workspace().onRefreshWorkspace?.();
+  }
   createEffect(() => {
     const pending = pendingSpecialEnquiry();
     const preview = props.result?.preview ?? props.result?.sourcePreview;
@@ -675,7 +693,9 @@ export function WeddingVendorSearchHomeSection(props: {
             initialGuestCount={weddingGuestCount()}
             categoryBudgets={workspace().state.budgetTracking.budgetAllocation}
             preferenceTerms={props.preferenceProfile?.facets.map((facet) => facet.facetId) ?? []}
+            shortlistPreferences={shortlistPreferences()}
             onPrepareEnquiry={prepareSpecialEnquiry}
+            onSavePreference={saveSpecialPreference}
           />
         </div>
       </Show>

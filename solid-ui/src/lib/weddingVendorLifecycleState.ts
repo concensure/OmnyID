@@ -99,6 +99,10 @@ export function projectWeddingVendorLifecycle(messages: readonly AfpMessage[]): 
       current.favourited = message.content.selected_for_follow_up === true;
       current.favouriteChangedAt = timestamp(message);
     }
+    if (hasKind(kinds, "wedding_vendor_shortlist_preference") && timestamp(message) >= current.favouriteChangedAt) {
+      current.favourited = clean(message.content.preference) === "favourite";
+      current.favouriteChangedAt = timestamp(message);
+    }
     current.vendorId = current.vendorId ?? vendor.vendorId;
     if (current.vendorName === "Wedding vendor" && vendor.vendorName) current.vendorName = vendor.vendorName;
     current.sourceMessageIds.push(message.id);
