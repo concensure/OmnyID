@@ -129,6 +129,7 @@ import {
 import {
   clearWeddingVendorSearchLaunch,
   consumeWeddingVendorSearchLaunch,
+  dispatchWeddingVendorSearchLaunchResult,
   WEDDING_VENDOR_SEARCH_LAUNCH_EVENT,
   weddingVendorSearchApproximateLocationFromTimezone,
   weddingVendorSearchEffectiveQueryState,
@@ -439,12 +440,28 @@ export function ResponseQueueView(props: {
       ? "Preparing a source-backed shortlist for the next wedding decision…"
       : "Vendor search is ready. Review the query, then run live search when you are ready.");
     if (launch?.runImmediately) {
-      queueMicrotask(() => void runLiveWeddingVendorSearch({
-        stayOnHome: true,
-        category: launch.category ?? undefined,
-        background: launch.background === true,
-      }));
+      queueMicrotask(() => runWeddingVendorSearchLaunch(launch));
     }
+  }
+
+  function runWeddingVendorSearchLaunch(launch: WeddingVendorSearchLaunchState, waitCount = 0): void {
+    // Current and next decisions can become eligible while an earlier search
+    // is still saving. Queue the later launch rather than silently dropping it.
+    if (weddingVendorSearchRunning()) {
+      if (waitCount >= 120) {
+        if (launch.sourceDecisionId) dispatchWeddingVendorSearchLaunchResult({ sourceDecisionId: launch.sourceDecisionId, ok: false });
+        return;
+      }
+      window.setTimeout(() => runWeddingVendorSearchLaunch(launch, waitCount + 1), 500);
+      return;
+    }
+    void runLiveWeddingVendorSearch({
+      stayOnHome: true,
+      category: launch.category ?? undefined,
+      background: launch.background === true,
+    }).then((ok) => {
+      if (launch.sourceDecisionId) dispatchWeddingVendorSearchLaunchResult({ sourceDecisionId: launch.sourceDecisionId, ok });
+    });
   }
 
   function updateWeddingVendorSearchQueryFromInput(query: string) {

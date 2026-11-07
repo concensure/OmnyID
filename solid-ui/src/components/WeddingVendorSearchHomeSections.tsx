@@ -139,6 +139,7 @@ export function WeddingVendorSearchHomeSection(props: {
   const [expandedLifecycleVendorKey, setExpandedLifecycleVendorKey] = createSignal<string | null>(null);
   const [selectedVendorCategory, setSelectedVendorCategory] = createSignal<string | null>(null);
   const [vendorMode, setVendorMode] = createSignal<"find" | "invite" | "specials">("find");
+  const [pendingSpecialEnquiry, setPendingSpecialEnquiry] = createSignal<{ marker: WeddingVendorSpecialMarker; detail: WeddingVendorRankedSpecialDetail | null } | null>(null);
   let comparisonResultElement: HTMLDivElement | undefined;
   const lifecycleRecords = createMemo(() => {
     const comparison = props.result?.preview ?? props.result?.sourcePreview;
@@ -276,11 +277,18 @@ export function WeddingVendorSearchHomeSection(props: {
         card,
         props.result.action.artifactId,
         "CHECK_AVAILABILITY_AND_REQUEST_QUOTE",
-        false,
-        detail ? { offerId: detail.offerId, slotId: detail.slotId, slotRevision: detail.slotRevision } : null,
+        true,
+        {
+          offerId: detail?.offerId ?? null,
+          slotId: detail?.slotId ?? null,
+          slotRevision: detail?.slotRevision ?? null,
+          specialDate: detail?.specialDate || marker.availableOnDate,
+          offerTitle: detail?.title ?? null,
+        },
       );
       return;
     }
+    setPendingSpecialEnquiry({ marker, detail });
     setVendorMode("find");
     setSelectedVendorCategory(marker.category);
     workspace().onVendorSearchQueryChange?.(`${marker.vendorName} for ${marker.availableOnDate}`);
@@ -289,6 +297,23 @@ export function WeddingVendorSearchHomeSection(props: {
       category: marker.category,
     }));
   };
+  createEffect(() => {
+    const pending = pendingSpecialEnquiry();
+    const preview = props.result?.preview ?? props.result?.sourcePreview;
+    const artifactId = props.result?.action.artifactId;
+    if (!pending || !preview || !artifactId) return;
+    const card = preview.vendorComparisonCards.find((item) => item.vendorId === pending.marker.vendorId
+      || vendorKey(item.title) === vendorKey(pending.marker.vendorName));
+    if (!card) return;
+    setPendingSpecialEnquiry(null);
+    void props.outreach.onContactVendor(card, artifactId, "CHECK_AVAILABILITY_AND_REQUEST_QUOTE", true, {
+      offerId: pending.detail?.offerId ?? null,
+      slotId: pending.detail?.slotId ?? null,
+      slotRevision: pending.detail?.slotRevision ?? null,
+      specialDate: pending.detail?.specialDate || pending.marker.availableOnDate,
+      offerTitle: pending.detail?.title ?? null,
+    });
+  });
   const openLifecycleArtifact = (artifactId: string) => {
     workspace().onSelectArtifact?.(artifactId);
     workspace().onSelectMenu?.("documents");

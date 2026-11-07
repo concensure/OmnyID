@@ -17,7 +17,7 @@ test("mobile Documents uses one coherent toolbar, privacy row, and export card",
   assert.match(documentsPanel, /rounded-2xl border border-slate-200 bg-white/);
   assert.match(documentsPanel, /Export plan/);
   assert.match(documentsPanel, /wedding:documents:download-plan/);
-  assert.match(mobilePage, /pb-\[calc\(3\.75rem\+env\(safe-area-inset-bottom\)\)\]/);
+  assert.match(mobilePage, /pb-\[calc\(3\.5rem\+env\(safe-area-inset-bottom\)\)\]/);
 });
 
 test("mobile wedding surfaces remove redundant chrome without removing actions", () => {

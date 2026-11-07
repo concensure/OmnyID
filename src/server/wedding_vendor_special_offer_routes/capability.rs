@@ -30,7 +30,7 @@ const MAX_GRANT_DAYS: i64 = 14;
 const UNAVAILABLE: &str = "This management link is unavailable.";
 const COOKIE_NAME: &str = "omnyid_wvs_session";
 
-const ALLOWED_OPERATIONS: [&str; 11] = [
+const ALLOWED_OPERATIONS: [&str; 12] = [
     "offer_edit",
     "offer_publish",
     "offer_pause",
@@ -39,6 +39,7 @@ const ALLOWED_OPERATIONS: [&str; 11] = [
     "slot_record_enquiry",
     "slot_place_hold",
     "slot_mark_booked",
+    "slot_reopen_cancelled_booking",
     "slot_pause",
     "slot_withdraw",
     "slot_reconfirm",
@@ -99,6 +100,7 @@ enum CapabilityOperation {
     SlotRecordEnquiry,
     SlotPlaceHold,
     SlotMarkBooked,
+    SlotReopenCancelledBooking,
     SlotPause,
     SlotWithdraw,
     SlotReconfirm,
@@ -115,6 +117,7 @@ impl CapabilityOperation {
             Self::SlotRecordEnquiry => "slot_record_enquiry",
             Self::SlotPlaceHold => "slot_place_hold",
             Self::SlotMarkBooked => "slot_mark_booked",
+            Self::SlotReopenCancelledBooking => "slot_reopen_cancelled_booking",
             Self::SlotPause => "slot_pause",
             Self::SlotWithdraw => "slot_withdraw",
             Self::SlotReconfirm => "slot_reconfirm",
@@ -131,6 +134,7 @@ struct CapabilityCommandRequest {
     slot_id: Option<String>,
     hold_expires_at: Option<String>,
     confirmation_expires_at: Option<String>,
+    reason: Option<String>,
     edit: Option<CapabilityEditRequest>,
 }
 
@@ -142,6 +146,8 @@ struct CapabilityEditRequest {
     slot_revision: u64,
     local_date: String,
     timezone: String,
+    starts_at: Option<String>,
+    ends_at: Option<String>,
     space_label: Option<String>,
     session_label: Option<String>,
     maximum_capacity: Option<u32>,
@@ -235,7 +241,20 @@ fn grant_exchange_allowed(
     expires_at: chrono::DateTime<Utc>,
     now: chrono::DateTime<Utc>,
 ) -> bool {
-    status == "active" && revoked_at.is_none() && expires_at > now
+    matches!(status, "active" | "exchanged") && revoked_at.is_none() && expires_at > now
+}
+
+fn management_base_url() -> String {
+    let value = std::env::var("OMNYID_BASE_URL").unwrap_or_else(|_| "https://omnyid.com".into());
+    let trimmed = value.trim().trim_end_matches('/');
+    if trimmed.starts_with("https://")
+        || trimmed.starts_with("http://127.0.0.1")
+        || trimmed.starts_with("http://localhost")
+    {
+        trimmed.to_string()
+    } else {
+        "https://omnyid.com".into()
+    }
 }
 
 async fn grant_issuer_authority(
@@ -352,12 +371,12 @@ async fn create_grant_http(
     tx.commit().await.map_err(database_failure)?;
     Ok(Json(json!({
         "grant_id":grant_id,
-        "management_url":format!("https://omnyid.com/workspace/vendor.html#special_management={token}"),
+        "management_url":format!("{}/workspace/vendor.html#special_management={token}", management_base_url()),
         "allowed_operations":operations,
         "generation":generation,
         "expires_at":expires_at.to_rfc3339(),
         "rotated_previous_links":!rotated.is_empty(),
-        "notice":"This private link is shown once. It can manage only this offer until it expires or is revoked."
+        "notice":"This private link is shown once. It can be reopened to manage only this offer until it expires, is rotated or is revoked."
     })))
 }
 
@@ -434,9 +453,13 @@ async fn exchange_http(
         grant_expiry,
         now,
     ) {
-        if grant.get::<String, _>("status") == "active" && grant_expiry <= now {
+        if matches!(
+            grant.get::<String, _>("status").as_str(),
+            "active" | "exchanged"
+        ) && grant_expiry <= now
+        {
             sqlx::query(
-                "UPDATE wedding_vendor_special_offer_grants SET status='expired' WHERE grant_id=$1 AND status='active'",
+                "UPDATE wedding_vendor_special_offer_grants SET status='expired' WHERE grant_id=$1 AND status IN ('active','exchanged')",
             )
             .bind(&grant_id)
             .execute(&mut *tx)
@@ -448,7 +471,7 @@ async fn exchange_http(
     }
     let session_expiry = expires_at.min(grant_expiry);
     let exchanged = sqlx::query(
-        "UPDATE wedding_vendor_special_offer_grants SET status='exchanged',exchanged_at=NOW() WHERE grant_id=$1 AND status='active'",
+        "UPDATE wedding_vendor_special_offer_grants SET status='exchanged',exchanged_at=COALESCE(exchanged_at,NOW()) WHERE grant_id=$1 AND status IN ('active','exchanged')",
     )
     .bind(&grant_id)
     .execute(&mut *tx)
@@ -648,8 +671,8 @@ async fn command_http(
             let slot = validate_slot_request(DateSlotDraftRequest {
                 local_date: edit.local_date,
                 timezone: edit.timezone,
-                starts_at: None,
-                ends_at: None,
+                starts_at: edit.starts_at,
+                ends_at: edit.ends_at,
                 space_label: edit.space_label,
                 session_label: edit.session_label,
                 maximum_capacity: edit.maximum_capacity,
@@ -713,6 +736,9 @@ async fn command_http(
                 CapabilityOperation::SlotRecordEnquiry => VendorSlotAction::RecordEnquiry,
                 CapabilityOperation::SlotPlaceHold => VendorSlotAction::PlaceHold,
                 CapabilityOperation::SlotMarkBooked => VendorSlotAction::MarkBooked,
+                CapabilityOperation::SlotReopenCancelledBooking => {
+                    VendorSlotAction::ReopenCancelledBooking
+                }
                 CapabilityOperation::SlotPause => VendorSlotAction::Pause,
                 CapabilityOperation::SlotWithdraw => VendorSlotAction::Withdraw,
                 CapabilityOperation::SlotReconfirm => VendorSlotAction::Reconfirm,
@@ -726,6 +752,7 @@ async fn command_http(
                 action,
                 hold_expires_at: request.hold_expires_at,
                 confirmation_expires_at: request.confirmation_expires_at,
+                reason: request.reason,
             };
             commands::change_slot_state(
                 &state,
@@ -804,7 +831,7 @@ mod tests {
     }
 
     #[test]
-    fn expired_revoked_and_replayed_grants_fail_closed() {
+    fn active_or_reopened_grants_work_only_before_expiry_or_revocation() {
         let now = Utc::now();
         assert!(grant_exchange_allowed(
             "active",
@@ -824,8 +851,14 @@ mod tests {
             now + ChronoDuration::minutes(1),
             now
         ));
-        assert!(!grant_exchange_allowed(
+        assert!(grant_exchange_allowed(
             "exchanged",
+            None,
+            now + ChronoDuration::minutes(1),
+            now
+        ));
+        assert!(!grant_exchange_allowed(
+            "rotated",
             None,
             now + ChronoDuration::minutes(1),
             now

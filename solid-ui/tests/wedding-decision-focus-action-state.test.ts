@@ -44,7 +44,7 @@ test("decision focus presents one card while retaining the complete ranked queue
   assert.equal(display.visibleFocusItems.length, WEDDING_VISIBLE_DECISION_LIMIT);
   assert.equal(display.queuedFocusItems.length, 4);
   assert.equal(display.remainingCount, 3);
-  assert.equal(display.itemCards[0]?.recommendedActionLabel, "Research wedding ring jewellers before choosing");
+  assert.equal(display.itemCards[0]?.recommendedActionLabel, "Preparing a source-backed shortlist from your saved wedding preferences…");
   assert.equal(display.itemCards[0]?.compareLabel, "Research vendors");
   assert.equal(weddingVendorResearchQueryForDecision(rings), "wedding ring jewellers");
 });

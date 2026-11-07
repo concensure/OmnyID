@@ -5,6 +5,7 @@ import {
   clearWeddingVendorSearchLaunch,
   consumeWeddingVendorSearchLaunch,
   dispatchWeddingVendorSearchLaunch,
+  dispatchWeddingVendorSearchLaunchResult,
   isWeddingVendorSearchIntent,
   loadWeddingVendorSearchLaunch,
   saveWeddingVendorSearchLaunch,
@@ -15,6 +16,7 @@ import {
   weddingVendorSearchQueryFromIntake,
   weddingAutomaticShortlistEnabled,
   weddingVendorSearchLaunchFromEvent,
+  weddingVendorSearchLaunchResultFromEvent,
 } from "../src/lib/weddingVendorSearchLaunchState.ts";
 
 test("automatic shortlist kill switch defaults on and accepts explicit off values", () => {
@@ -230,4 +232,14 @@ test("background decision launches retain their category and run intent", () => 
     sourceDecisionId: "task:beauty-timeline",
   });
   assert.deepEqual(loadWeddingVendorSearchLaunch(storage), launch);
+});
+
+test("background shortlist completion is correlated to the source decision", () => {
+  const target = new EventTarget() as Window;
+  let captured: unknown = null;
+  target.addEventListener("omnyid:wedding-vendor-search-launch-result", (event) => {
+    captured = weddingVendorSearchLaunchResultFromEvent(event);
+  });
+  dispatchWeddingVendorSearchLaunchResult({ sourceDecisionId: "task:beauty-timeline", ok: false }, target);
+  assert.deepEqual(captured, { sourceDecisionId: "task:beauty-timeline", ok: false });
 });

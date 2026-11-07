@@ -7866,3 +7866,22 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
   false-default until a real participating-vendor pilot plus feature-specific
   security/privacy/accessibility, legal-copy and vendor/couple acceptance are
   recorded; those are activation gates, not code-release blockers.
+# 2026-11-08 - WED-342 Limited Specials reliability release candidate (Codex)
+
+- Continued from clean `67dfa78f09d61848bb1081c653365b2aafcf0b7b` in
+  `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001` on `agent/codex/WED-340`.
+- Reduced the mobile Wedding tab bar while retaining 44px targets. Vendor decisions now queue rather
+  than drop overlapping current/next searches, use the canonical category parser, and keep the card
+  in a truthful loading or failed state until the correlated Ranking Policy V2 result is projected.
+- Reconciled the 2026-11-08 Limited Specials audit. Major fixes cover production routing, reusable
+  bounded staff links, map/rank/calendar accuracy, expiry warnings, safe edits and reconfirmation,
+  reason-audited reopening of cancelled bookings, unknown mandatory costs, date-specific approved
+  enquiries and transient idempotent linkage retry. Deliberate security/product boundaries are
+  recorded in `Documents/verification/WED-342-limited-specials-audit-disposition-2026-11-08.md`.
+- Passed: 40 focused frontend tests, 28 focused Rust tests, `cargo check --lib`, typecheck, both line
+  budgets, all 2,231 Wedding tests, the production UI build, Caddy validation and the real Chromium
+  mobile swipe journey. The first browser attempt was infrastructure-only (missing updated Chromium);
+  after installing the matching Playwright browser, the journey passed.
+- No production flag or allowlist was enabled. Next: commit, build/deploy from a clean exact-SHA
+  release checkout, verify Oracle provenance and health, then record hosted false-default Growth and
+  Limited Specials evidence.

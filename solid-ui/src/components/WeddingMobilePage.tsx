@@ -28,7 +28,7 @@ export function WeddingMobilePage(props: {
         />
       </Show>
       <Show when={props.activeMenu ?? props.title} keyed>{(_menu) => (
-        <section class="wedding-mobile-content wedding-mobile-tab-content min-w-0 px-0 pb-[calc(3.75rem+env(safe-area-inset-bottom))] sm:contents">
+        <section class="wedding-mobile-content wedding-mobile-tab-content min-w-0 px-0 pb-[calc(3.5rem+env(safe-area-inset-bottom))] sm:contents">
           <Show when={props.title || props.subtitle}>
             <div class="mb-4 mt-1 sm:hidden">
               <Show when={props.title}><h1 data-wedding-mobile-large-title class="break-words font-display text-wed-large font-semibold text-wedding-ink">{props.title}</h1></Show>

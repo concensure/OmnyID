@@ -3,6 +3,7 @@ import type { SendAfpMessageInput } from "@/lib/api";
 import { safeWeddingLabel, type WeddingPlanningMetadata } from "@/lib/weddingPlanningTemplateState";
 import type { WeddingVendorOutreachFlowState } from "@/lib/weddingVendorOutreachFlowState";
 import type { WeddingVendorChoiceIntent } from "@/lib/weddingVendorChoiceActionState";
+import type { WeddingVendorSpecialEnquiryContext } from "@/lib/weddingVendorSpecialDiscoveryApi";
 
 function clean(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
@@ -79,7 +80,7 @@ export function weddingVendorOutreachDraftAfpSendInput(input: {
   editorHtml?: string | null;
   createdAt?: string | null;
   actionIntent?: WeddingVendorChoiceIntent | null;
-  specialContext?: { offerId: string; slotId: string; slotRevision: number } | null;
+  specialContext?: WeddingVendorSpecialEnquiryContext | null;
 }): SendAfpMessageInput {
   const isResponse = input.flow.choiceId.startsWith("response:");
   const timestamp = timestampOrNow(input.createdAt);
@@ -137,6 +138,8 @@ export function weddingVendorOutreachDraftAfpSendInput(input: {
         offer_id: input.specialContext.offerId,
         slot_id: input.specialContext.slotId,
         slot_revision: input.specialContext.slotRevision,
+        special_date: input.specialContext.specialDate,
+        offer_title: input.specialContext.offerTitle,
       } : null,
     },
     views: [{
@@ -152,7 +155,7 @@ export function weddingVendorOutreachDraftAfpSendInput(input: {
       ...(input.flow.draftMessageId
         ? [{ type: "supersedes_wedding_email_draft", target: input.flow.draftMessageId, label: "Previous draft revision" }]
         : []),
-      ...(input.specialContext
+      ...(input.specialContext?.offerId
         ? [{ type: "wedding_vendor_special_offer", target: input.specialContext.offerId, label: "Limited-date special reviewed for this enquiry" }]
         : []),
     ],
@@ -177,6 +180,7 @@ export function weddingVendorOutreachDraftAfpSendInput(input: {
       limited_special_offer_id: input.specialContext?.offerId ?? null,
       limited_special_slot_id: input.specialContext?.slotId ?? null,
       limited_special_slot_revision: input.specialContext?.slotRevision ?? null,
+      limited_special_date: input.specialContext?.specialDate ?? null,
     },
     store_in_relational: true,
   };
@@ -190,7 +194,7 @@ export function weddingVendorOutreachSentAfpSendInput(input: {
   vendorId?: string | null;
   createdAt?: string | null;
   actionIntent?: WeddingVendorChoiceIntent | null;
-  specialContext?: { offerId: string; slotId: string; slotRevision: number } | null;
+  specialContext?: WeddingVendorSpecialEnquiryContext | null;
 }): SendAfpMessageInput {
   const isResponse = input.flow.choiceId.startsWith("response:");
   const timestamp = timestampOrNow(input.createdAt);
@@ -232,6 +236,8 @@ export function weddingVendorOutreachSentAfpSendInput(input: {
         offer_id: input.specialContext.offerId,
         slot_id: input.specialContext.slotId,
         slot_revision: input.specialContext.slotRevision,
+        special_date: input.specialContext.specialDate,
+        offer_title: input.specialContext.offerTitle,
       } : null,
     },
     views: [{
@@ -241,7 +247,7 @@ export function weddingVendorOutreachSentAfpSendInput(input: {
     attachments: input.flow.attachments,
     references: [
       { type: isResponse ? "wedding_vendor_response_draft" : "wedding_vendor_outreach_draft", target: input.draftMessageId, label: isResponse ? "Vendor response draft" : "Outreach draft" },
-      ...(input.specialContext
+      ...(input.specialContext?.offerId
         ? [{ type: "wedding_vendor_special_offer", target: input.specialContext.offerId, label: "Limited-date special used for this enquiry" }]
         : []),
     ],
@@ -268,6 +274,7 @@ export function weddingVendorOutreachSentAfpSendInput(input: {
       limited_special_offer_id: input.specialContext?.offerId ?? null,
       limited_special_slot_id: input.specialContext?.slotId ?? null,
       limited_special_slot_revision: input.specialContext?.slotRevision ?? null,
+      limited_special_date: input.specialContext?.specialDate ?? null,
     },
     store_in_relational: true,
   };

@@ -113,6 +113,17 @@ async fn admin_metrics_http(
     .fetch_all(&state.db.pool)
     .await
     .map_err(database_failure)?;
+    let coverage = sqlx::query(
+        r#"SELECT COUNT(*)::bigint AS active_vendors,
+                  COUNT(*) FILTER (WHERE
+                    EXISTS (SELECT 1 FROM wedding_vendor_attributes a WHERE a.vendor_id=v.vendor_id AND a.attribute_key='latitude' AND a.status IN ('known','estimated') AND jsonb_typeof(a.value)='number')
+                    AND EXISTS (SELECT 1 FROM wedding_vendor_attributes a WHERE a.vendor_id=v.vendor_id AND a.attribute_key='longitude' AND a.status IN ('known','estimated') AND jsonb_typeof(a.value)='number')
+                  )::bigint AS mapped_vendors
+             FROM wedding_vendors v WHERE v.status='active'"#,
+    )
+    .fetch_one(&state.db.pool)
+    .await
+    .map_err(database_failure)?;
     Ok(Json(
         json!({"categories": rows.into_iter().map(|row| json!({
         "category":row.get::<String,_>("category"),
@@ -125,7 +136,10 @@ async fn admin_metrics_http(
     })).collect::<Vec<_>>(), "outcomes": outcomes.into_iter().map(|row| json!({
         "outcome":row.get::<String,_>("outcome"),
         "count":row.get::<i64,_>("count")
-    })).collect::<Vec<_>>() }),
+    })).collect::<Vec<_>>(), "map_coverage": {
+        "active_vendors":coverage.get::<i64,_>("active_vendors"),
+        "mapped_vendors":coverage.get::<i64,_>("mapped_vendors")
+    } }),
     ))
 }
 
@@ -204,6 +218,7 @@ struct SlotCommandRequest {
     action: VendorSlotAction,
     hold_expires_at: Option<String>,
     confirmation_expires_at: Option<String>,
+    reason: Option<String>,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize)]
@@ -212,6 +227,7 @@ enum VendorSlotAction {
     RecordEnquiry,
     PlaceHold,
     MarkBooked,
+    ReopenCancelledBooking,
     Pause,
     Withdraw,
     Reconfirm,
@@ -706,6 +722,8 @@ fn vendor_slot_json(
         "slot_id":row.get::<String,_>("slot_id"),
         "local_date":row.get::<NaiveDate,_>("local_date").to_string(),
         "timezone":row.get::<String,_>("timezone"),
+        "starts_at":row.get::<Option<NaiveTime>,_>("starts_at").map(|value| value.format("%H:%M").to_string()),
+        "ends_at":row.get::<Option<NaiveTime>,_>("ends_at").map(|value| value.format("%H:%M").to_string()),
         "space_label":row.get::<String,_>("space_label"),
         "session_label":row.get::<String,_>("session_label"),
         "state":row.get::<String,_>("state"),
@@ -720,9 +738,11 @@ fn vendor_slot_json(
         "budget_fit_eligible":estimate.as_ref().is_some_and(|value| value.budget_fit_eligible),
         "indicative_only":true,
         "availability_notice":"Subject to vendor confirmation",
+        "last_confirmed_at":row.get::<chrono::DateTime<Utc>,_>("last_confirmed_at"),
+        "confirmation_expires_at":row.get::<chrono::DateTime<Utc>,_>("confirmation_expires_at"),
         "revision":row.get::<i64,_>("revision")
         ,"affected_enquiry_count":row.try_get::<i64,_>("affected_enquiry_count").unwrap_or(0)
-        ,"operator_warning":if matches!(row.get::<String,_>("state").as_str(), "stale" | "paused" | "withdrawn") && row.try_get::<i64,_>("affected_enquiry_count").unwrap_or(0) > 0 { Some("This date is hidden from discovery and has affected enquiries to review.") } else { None::<&str> }
+        ,"operator_warning":if matches!(row.get::<String,_>("state").as_str(), "stale" | "paused" | "withdrawn") && row.try_get::<i64,_>("affected_enquiry_count").unwrap_or(0) > 0 { Some("This date is hidden from discovery and has affected enquiries to review.") } else if row.get::<chrono::DateTime<Utc>,_>("confirmation_expires_at") <= Utc::now() + ChronoDuration::days(3) && matches!(row.get::<String,_>("state").as_str(), "available" | "enquiry_received") { Some("Availability confirmation expires within three days. Reconfirm it to keep this date visible.") } else { None::<&str> }
     })
 }
 
@@ -833,6 +853,26 @@ fn slot_command(
             Ok((SpecialSlotCommand::PlaceHold { expires_at }, "hold_created"))
         }
         VendorSlotAction::MarkBooked => Ok((SpecialSlotCommand::MarkBooked, "booked")),
+        VendorSlotAction::ReopenCancelledBooking => {
+            let reason = required(request.reason.as_deref().unwrap_or_default(), "reason", 500)?;
+            if reason.chars().count() < 10 {
+                return Err((
+                    StatusCode::BAD_REQUEST,
+                    "Briefly explain why the booking was cancelled or entered by mistake.".into(),
+                ));
+            }
+            Ok((
+                SpecialSlotCommand::ReopenCancelledBooking {
+                    expires_at: request
+                        .confirmation_expires_at
+                        .as_deref()
+                        .map(|value| parse_timestamp(Some(value), "confirmation_expires_at"))
+                        .transpose()?
+                        .unwrap_or_else(|| Utc::now() + ChronoDuration::days(CONFIRMATION_DAYS)),
+                },
+                "cancelled_booking_reopened",
+            ))
+        }
         VendorSlotAction::Pause => Ok((SpecialSlotCommand::Pause, "paused")),
         VendorSlotAction::Withdraw => Ok((SpecialSlotCommand::Withdraw, "withdrawn")),
         VendorSlotAction::Reconfirm => Ok((

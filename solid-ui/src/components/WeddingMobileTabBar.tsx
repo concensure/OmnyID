@@ -40,7 +40,7 @@ export function WeddingMobileTabBar(props: {
     <>
       <nav
         aria-label="Wedding planner"
-        class={`fixed inset-x-0 bottom-0 z-30 h-[calc(3.25rem+env(safe-area-inset-bottom))] border-t border-wedding-border bg-wedding-card/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl transition-transform sm:hidden ${keyboardOpen() ? "translate-y-full pointer-events-none" : "translate-y-0"}`}
+        class={`fixed inset-x-0 bottom-0 z-30 h-[calc(3rem+env(safe-area-inset-bottom))] border-t border-wedding-border bg-wedding-card/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl transition-transform sm:hidden ${keyboardOpen() ? "translate-y-full pointer-events-none" : "translate-y-0"}`}
       >
         <div class="grid h-full grid-cols-5" role="tablist" aria-label="Wedding planner sections">
           <For each={WEDDING_MOBILE_TABS}>{(tab) => {
@@ -51,10 +51,10 @@ export function WeddingMobileTabBar(props: {
                 role="tab"
                 aria-selected={active()}
                 aria-current={active() ? "page" : undefined}
-                class={`flex min-h-11 min-w-0 flex-col items-center justify-center gap-0.5 text-[0.7rem] font-medium active:bg-wedding-slate ${active() ? "text-wedding-primary" : "text-wedding-ink/65"}`}
+                class={`flex min-h-11 min-w-0 flex-col items-center justify-center gap-0 text-[0.65rem] font-medium leading-tight active:bg-wedding-slate ${active() ? "text-wedding-primary" : "text-wedding-ink/65"}`}
                 onClick={() => select(tab.menu)}
               >
-                <WeddingDashboardIcon id={tab.icon} class="h-[1.35rem] w-[1.35rem]" />
+                <WeddingDashboardIcon id={tab.icon} class="h-[1.2rem] w-[1.2rem]" />
                 <span class="truncate">{tab.label}</span>
               </button>
             );

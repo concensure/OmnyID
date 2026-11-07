@@ -36,5 +36,5 @@ test("People action cards are equal-height whole-card controls with bottom-align
 });
 
 test("mobile pages reserve only the compact tab-bar safe area", () => {
-  assert.match(mobilePage, /pb-\[calc\(3\.75rem\+env\(safe-area-inset-bottom\)\)\]/);
+  assert.match(mobilePage, /pb-\[calc\(3\.5rem\+env\(safe-area-inset-bottom\)\)\]/);
 });

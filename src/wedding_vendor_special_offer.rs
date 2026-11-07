@@ -391,6 +391,7 @@ pub enum SpecialSlotCommand {
     PlaceHold { expires_at: DateTime<Utc> },
     ExpireHold,
     MarkBooked,
+    ReopenCancelledBooking { expires_at: DateTime<Utc> },
     Pause,
     Withdraw,
     MarkStale,
@@ -453,6 +454,17 @@ pub fn apply_special_slot_command(
         {
             next.state = SpecialOfferSlotState::Booked;
             next.hold_expires_at = None;
+        }
+        SpecialSlotCommand::ReopenCancelledBooking { expires_at }
+            if slot.state == SpecialOfferSlotState::Booked =>
+        {
+            if expires_at <= now {
+                return Err(SpecialOfferPolicyError::InvalidExpiry);
+            }
+            next.state = SpecialOfferSlotState::Available;
+            next.hold_expires_at = None;
+            next.last_confirmed_at = now;
+            next.confirmation_expires_at = expires_at;
         }
         SpecialSlotCommand::Pause
             if matches!(
@@ -677,6 +689,19 @@ mod tests {
         )
         .unwrap();
         assert_eq!(reopened.state, SpecialOfferSlotState::Available);
+
+        let booked =
+            apply_special_slot_command(&slot(), 4, SpecialSlotCommand::MarkBooked, now()).unwrap();
+        let cancelled = apply_special_slot_command(
+            &booked,
+            booked.revision,
+            SpecialSlotCommand::ReopenCancelledBooking {
+                expires_at: now() + Duration::days(14),
+            },
+            now(),
+        )
+        .unwrap();
+        assert_eq!(cancelled.state, SpecialOfferSlotState::Available);
     }
 
     #[test]

@@ -80,6 +80,7 @@ fn provisional_holds_require_a_bounded_expiry() {
         action: VendorSlotAction::PlaceHold,
         hold_expires_at: None,
         confirmation_expires_at: None,
+        reason: None,
     };
     assert!(slot_command(&missing).is_err());
 

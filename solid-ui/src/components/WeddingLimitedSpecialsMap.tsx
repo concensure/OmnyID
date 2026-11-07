@@ -2,6 +2,7 @@ import { createEffect, createMemo, createResource, createSignal, For, onCleanup,
 import type * as Leaflet from "leaflet";
 
 import { OSM_TILE_CONFIG } from "@/lib/mapConfig";
+import { friendlyErrorText } from "@/lib/visibleErrorText";
 import {
   loadWeddingVendorSpecials,
   type WeddingVendorRankedSpecialDetail,
@@ -9,7 +10,10 @@ import {
 } from "@/lib/weddingVendorSpecialDiscoveryApi";
 
 const SYDNEY: [number, number] = [-33.8688, 151.2093];
-const CATEGORIES = ["Venue", "Photographer", "Florist", "Planner", "Celebrant", "Musician", "Cake"];
+const CATEGORIES = [
+  "Venue", "Photographer", "Videographer", "Florist", "Caterer", "Planner",
+  "Celebrant", "DJ & Band", "Musician", "Hair & Makeup", "Cake Baker",
+];
 
 function validDate(value: string | null | undefined): string {
   const match = value?.match(/\b(20\d{2})-(\d{2})-(\d{2})\b/);
@@ -75,6 +79,7 @@ export function WeddingLimitedSpecialsMap(props: {
     ?? null);
   const selectedDetail = createMemo<WeddingVendorRankedSpecialDetail | null>(() => query()?.topChoices.find((item) => item.vendorId === selected()?.vendorId) ?? null);
   const calendar = createMemo(() => monthDays(selected()?.availableOnDate ?? date()));
+  const selectedAvailableDays = createMemo(() => new Set((selected()?.availableDates ?? []).filter((value) => value.slice(0, 7) === (selected()?.availableOnDate ?? date()).slice(0, 7)).map((value) => Number(value.slice(8, 10)))));
 
   const money = (cents: number, currency: string) => new Intl.NumberFormat("en-AU", { style: "currency", currency, maximumFractionDigits: 0 }).format(cents / 100);
 
@@ -201,7 +206,8 @@ export function WeddingLimitedSpecialsMap(props: {
       </div>
       <p class="mt-2 text-xs leading-5 text-wedding-ink/65">{locationNote()}</p>
       <Show when={query.loading}><p class="mt-4 rounded-lg bg-wedding-slate p-3 text-sm" role="status">Checking vendor-confirmed dates…</p></Show>
-      <Show when={query.error}><p class="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm" role="alert">Limited Specials are not available for this account yet.</p></Show>
+      <Show when={query.error}>{(error) => <p class="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm" role="alert">{friendlyErrorText(error(), "Limited Specials could not be refreshed. Check the date and try again.")}</p>}</Show>
+      <Show when={query()?.truncated}><p class="mt-3 rounded-lg bg-wedding-slate p-3 text-xs text-wedding-ink/70">Showing the strongest {markers().length} map results. Narrow the date, distance or category to see a smaller set.</p></Show>
       <div class="relative mt-3 overflow-hidden rounded-xl border border-wedding-border bg-wedding-slate">
         <Show when={hoveredName()}>{(name) => <div class="pointer-events-none absolute left-3 right-3 top-3 z-[500] mx-auto w-fit max-w-[calc(100%-1.5rem)] rounded-lg bg-wedding-ink px-3 py-2 text-center text-sm font-bold text-white shadow-lg">{name()}</div>}</Show>
         <div ref={mapElement} class="h-[22rem] w-full" aria-label="Map of vendors with a confirmed special on the selected date" />
@@ -256,9 +262,9 @@ export function WeddingLimitedSpecialsMap(props: {
               <div class="mt-3 grid grid-cols-7 gap-1 text-center text-[11px]"><For each={["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]}>{(day) => <span class="font-semibold text-wedding-ink/55">{day}</span>}</For></div>
               <div class="mt-1 grid grid-cols-7 gap-1 text-center text-xs">
                 <For each={calendar().blanks}>{() => <span aria-hidden="true" />}</For>
-                <For each={calendar().days}>{(day) => <span class={`flex aspect-square items-center justify-center rounded-full ${day === calendar().selectedDay ? "bg-wedding-primary font-bold text-white ring-2 ring-wedding-primary/20 ring-offset-2" : "text-wedding-ink/60"}`} aria-label={day === calendar().selectedDay ? `${item.availableOnDate}, vendor-confirmed special may apply` : undefined}>{day}</span>}</For>
+                <For each={calendar().days}>{(day) => <span class={`flex aspect-square items-center justify-center rounded-full ${selectedAvailableDays().has(day) ? "bg-wedding-primary font-bold text-white ring-2 ring-wedding-primary/20 ring-offset-2" : "text-wedding-ink/60"}`} aria-label={selectedAvailableDays().has(day) ? `${calendar().label} ${day}, vendor-confirmed special may apply` : undefined}>{day}</span>}</For>
               </div>
-              <p class="mt-3 text-xs leading-5 text-wedding-ink/70"><span class="font-bold text-wedding-primary">{new Date(`${item.availableOnDate}T12:00:00`).toLocaleDateString("en-AU", { day: "numeric", month: "long", year: "numeric" })}</span> is vendor-confirmed. Package and price remain subject to confirmation.</p>
+              <p class="mt-3 text-xs leading-5 text-wedding-ink/70"><span class="font-bold text-wedding-primary">{item.availableDates.length} matching date{item.availableDates.length === 1 ? "" : "s"}</span> in the searched window. Package, price and final availability remain subject to confirmation.</p>
               <p class="mt-1 text-[11px] leading-4 text-wedding-ink/55">Last reconfirmed {new Date(item.lastConfirmedAt).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" })}.</p>
               <button type="button" class="mt-3 min-h-11 w-full rounded-lg bg-wedding-primary px-4 text-sm font-bold text-white" onClick={() => props.onPrepareEnquiry(item, selectedDetail())}>Prepare enquiry</button>
             </section>

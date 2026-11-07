@@ -22,6 +22,7 @@ test("vendor special management exchanges a fragment secret into a scoped sessio
   assert.match(api, /"x-csrf-token"/);
   assert.match(flow, /history\.replaceState/);
   assert.match(api, /account_access: false/);
+  assert.match(api, /await response\.text\(\)/);
   assert.match(flow, /confirm\("Withdraw this offer/);
   assert.match(flow, /Subject|indicative|Availability remains indicative/i);
   assert.match(page, /name="robots" content="noindex,nofollow,noarchive"/);
@@ -35,7 +36,7 @@ test("vendor special management exposes date commercial facts and explicit actio
   for (const label of ["Capacity", "Minimum spend", "Per head", "Inclusions"]) {
     assert.match(flow, new RegExp(label));
   }
-  for (const action of ["Publish offer", "Pause offer", "Reconfirm dates", "Mark booked", "Withdraw date"]) {
+  for (const action of ["Publish offer", "Pause offer", "Reconfirm dates", "Mark booked", "Reopen cancelled booking", "Withdraw date"]) {
     assert.match(flow, new RegExp(action));
   }
 });

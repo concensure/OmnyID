@@ -3,6 +3,7 @@ import { customEventRecordDetail } from "@/lib/eventDetail";
 
 export const WEDDING_VENDOR_SEARCH_LAUNCH_KEY = "omnyid.wedding-vendor-search-launch";
 export const WEDDING_VENDOR_SEARCH_LAUNCH_EVENT = "omnyid:wedding-vendor-search-launch";
+export const WEDDING_VENDOR_SEARCH_LAUNCH_RESULT_EVENT = "omnyid:wedding-vendor-search-launch-result";
 
 export type WeddingVendorSearchLaunchState = {
   query: string;
@@ -12,6 +13,11 @@ export type WeddingVendorSearchLaunchState = {
   background?: boolean;
   category?: string | null;
   sourceDecisionId?: string | null;
+};
+
+export type WeddingVendorSearchLaunchResult = {
+  sourceDecisionId: string;
+  ok: boolean;
 };
 
 export type WeddingVendorSearchIntakeQueryInput = {
@@ -232,4 +238,22 @@ export function dispatchWeddingVendorSearchLaunch(
 
 export function weddingVendorSearchLaunchFromEvent(event: Event): WeddingVendorSearchLaunchState | null {
   return normalizeLaunch(customEventRecordDetail(event));
+}
+
+export function dispatchWeddingVendorSearchLaunchResult(
+  result: WeddingVendorSearchLaunchResult,
+  target: Window = window,
+): void {
+  if (!result.sourceDecisionId.trim()) return;
+  target.dispatchEvent(new CustomEvent(WEDDING_VENDOR_SEARCH_LAUNCH_RESULT_EVENT, {
+    detail: { sourceDecisionId: result.sourceDecisionId.trim().slice(0, 200), ok: result.ok },
+  }));
+}
+
+export function weddingVendorSearchLaunchResultFromEvent(event: Event): WeddingVendorSearchLaunchResult | null {
+  const detail = customEventRecordDetail(event);
+  if (!detail) return null;
+  const sourceDecisionId = typeof detail.sourceDecisionId === "string" ? detail.sourceDecisionId.trim().slice(0, 200) : "";
+  if (!sourceDecisionId || typeof detail.ok !== "boolean") return null;
+  return { sourceDecisionId, ok: detail.ok };
 }

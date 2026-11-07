@@ -27,6 +27,7 @@ import {
   linkWeddingVendorSpecialEnquiry,
   recordWeddingVendorSpecialDeliveryFailure,
   recheckWeddingVendorSpecialEnquiry,
+  weddingVendorSpecialLinkContext,
   type WeddingVendorSpecialEnquiryContext,
 } from "@/lib/weddingVendorSpecialDiscoveryApi";
 import { projectWeddingVendorOutreachFlows } from "@/lib/weddingVendorOutreachProjectionState";
@@ -222,6 +223,34 @@ export function useWeddingVendorOutreachOwner(input: {
     ) ?? null;
   }
 
+  function specialDateLabel(value: string): string {
+    const date = new Date(`${value}T12:00:00`);
+    return Number.isNaN(date.getTime())
+      ? value
+      : date.toLocaleDateString("en-AU", { day: "numeric", month: "long", year: "numeric" });
+  }
+
+  function withSpecialEnquiryContext(body: string, specialContext: WeddingVendorSpecialEnquiryContext | null): string {
+    if (!specialContext?.specialDate) return body;
+    const date = specialDateLabel(specialContext.specialDate);
+    if (body.toLowerCase().includes(date.toLowerCase()) || body.includes(specialContext.specialDate)) return body;
+    const detail = specialContext.offerTitle ? `, including the “${specialContext.offerTitle}” option` : "";
+    return `${body.trim()}\n\nWe are enquiring about your indicated availability for ${date}${detail}. Please confirm that the date and indicative terms are still current.`;
+  }
+
+  async function linkSpecialEnquiryWithRetry(input: Parameters<typeof linkWeddingVendorSpecialEnquiry>[0]) {
+    let lastError: unknown;
+    for (const delayMs of [0, 400, 1_200]) {
+      if (delayMs > 0) await new Promise<void>((resolve) => window.setTimeout(resolve, delayMs));
+      try {
+        return await linkWeddingVendorSpecialEnquiry(input);
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    throw lastError;
+  }
+
   async function onContactVendor(
     card: WeddingVendorChoiceCardData,
     artifactId: string,
@@ -268,6 +297,7 @@ export function useWeddingVendorOutreachOwner(input: {
         couple.budget_category_amount = categoryBudget.amount;
         couple.budget_currency = "AUD";
       }
+      if (specialContext?.specialDate) couple.date_or_season = specialDateLabel(specialContext.specialDate);
       if (!existing.permissions.shareDateOrSeason) couple.date_or_season = null;
       if (!existing.permissions.shareLocation) couple.location = null;
       if (!existing.permissions.shareGuestCount) couple.guest_count = null;
@@ -302,9 +332,16 @@ export function useWeddingVendorOutreachOwner(input: {
       const saveProjection = input.saveProjection();
       if (!flow || flow.stage !== "drafting") return;
       if (!saveProjection) throw new Error("Could not save the draft yet. Reconnect the wedding workspace and try again.");
+      const sharedSpecialContext = existing.permissions.shareDateOrSeason ? specialContext : null;
+      const contextualBody = withSpecialEnquiryContext(
+        formatWeddingVendorOutreachForDisplay(result.bodyMarkdown, couple.couple_names),
+        sharedSpecialContext,
+      );
       const persistedFlow = weddingVendorOutreachDraftSucceeded(flow, {
-        subject: result.subject,
-        bodyMarkdown: formatWeddingVendorOutreachForDisplay(result.bodyMarkdown, couple.couple_names),
+        subject: sharedSpecialContext?.specialDate && !result.subject.includes(sharedSpecialContext.specialDate)
+          ? `${result.subject} — ${specialDateLabel(sharedSpecialContext.specialDate)}`
+          : result.subject,
+        bodyMarkdown: contextualBody,
         bodyHtml: null,
         groundedOnLabels,
         groundedOnFields: result.groundedOn,
@@ -453,10 +490,11 @@ export function useWeddingVendorOutreachOwner(input: {
     }
     setVendorOutreachFlows((current) => ({ ...current, [choiceId]: weddingVendorOutreachStartSending(flow) }));
     const specialContext = vendorOutreachSpecialContexts()[choiceId];
+    const linkedSpecialContext = weddingVendorSpecialLinkContext(specialContext);
     const metadata = input.state().workspace.metadata;
     let providerAttempted = false;
     try {
-      if (specialContext) await recheckWeddingVendorSpecialEnquiry(specialContext);
+      if (linkedSpecialContext) await recheckWeddingVendorSpecialEnquiry(linkedSpecialContext);
       const directoryVendor = outreachDirectoryVendorMatch(flow.vendorName);
       const html = flow.bodyHtml ?? renderMarkdown(flow.bodyMarkdown);
       const draftProjection = weddingVendorOutreachDraftAfpSendInput({
@@ -488,10 +526,10 @@ export function useWeddingVendorOutreachOwner(input: {
         specialContext,
       });
       await saveProjection(sentProjection);
-      if (specialContext && sendResult.clientMessageId) {
+      if (linkedSpecialContext && sendResult.clientMessageId) {
         try {
-          await linkWeddingVendorSpecialEnquiry({
-            ...specialContext,
+          await linkSpecialEnquiryWithRetry({
+            ...linkedSpecialContext,
             weddingPlanId: metadata.weddingPlanId,
             enquiryEnvelopeRef: sendResult.clientMessageId,
             idempotencyKey: `special-enquiry:${specialContext.slotId}:${sendResult.clientMessageId}`,
@@ -525,9 +563,9 @@ export function useWeddingVendorOutreachOwner(input: {
       }));
       input.onRefreshWorkspace()?.();
     } catch (error) {
-      if (specialContext && providerAttempted) {
+      if (linkedSpecialContext && providerAttempted) {
         void recordWeddingVendorSpecialDeliveryFailure({
-          ...specialContext,
+          ...linkedSpecialContext,
           idempotencyKey: `special-delivery-failure:${specialContext.slotId}:${crypto.randomUUID()}`,
           weddingPlanId: metadata.weddingPlanId,
         }).catch(() => undefined);

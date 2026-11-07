@@ -4,7 +4,7 @@
 //! commercial terms; exact approved guidance is attached only to the three
 //! candidates selected by the server-side policy-v2 stage.
 
-use std::{sync::Arc, time::Duration};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use axum::{
     Json, Router,
@@ -28,6 +28,7 @@ use super::super::{
 
 const DEFAULT_LIMIT: usize = 36;
 const MAX_LIMIT: usize = 48;
+const MAX_RANKING_CANDIDATES: usize = 500;
 
 pub(super) fn routes() -> Router<Arc<AppState>> {
     Router::new().route(
@@ -66,6 +67,7 @@ struct DiscoveryMarker {
     rating: Option<f64>,
     review_count: Option<i64>,
     available_on_date: String,
+    available_dates: Vec<String>,
     last_confirmed_at: String,
     confirmation_expires_at: String,
     indicative_only: bool,
@@ -376,7 +378,10 @@ async fn discover_specials_http(
     }
     let preference_terms = bounded_terms(query.preference_terms.as_deref());
     let requested_limit = query.limit.unwrap_or(DEFAULT_LIMIT).clamp(1, MAX_LIMIT);
-    let sql_limit = i64::try_from(requested_limit + 1).unwrap_or((MAX_LIMIT + 1) as i64);
+    // Rank across a larger bounded candidate pool before trimming the map.
+    // Applying the display limit by vendor id first can discard a materially
+    // better preference/budget/location match.
+    let sql_limit = i64::try_from(MAX_RANKING_CANDIDATES + 1).unwrap_or(501);
 
     let rows = sqlx::query(
         r#"SELECT DISTINCT ON (v.vendor_id)
@@ -403,7 +408,24 @@ async fn discover_specials_http(
                   slot.minimum_spend_cents AS slot_minimum_spend_cents,
                   slot.indicative_per_head_cents,slot.inclusions AS slot_inclusions,
                   slot.public_conditions AS slot_public_conditions,
-                  slot.last_confirmed_at,slot.confirmation_expires_at
+                  slot.last_confirmed_at,slot.confirmation_expires_at,
+                  ARRAY(
+                    SELECT candidate.local_date::text
+                    FROM wedding_vendor_special_offer_slots candidate
+                    JOIN wedding_vendor_special_offers candidate_offer
+                      ON candidate_offer.offer_id=candidate.offer_id AND candidate_offer.vendor_id=candidate.vendor_id
+                    WHERE candidate.vendor_id=v.vendor_id
+                      AND candidate.local_date BETWEEN $1 AND $2
+                      AND candidate.state IN ('available','enquiry_received')
+                      AND candidate.confirmation_expires_at>NOW()
+                      AND candidate_offer.publication_state='active'
+                      AND candidate_offer.approved_revision=candidate_offer.revision
+                      AND ($7::bigint IS NULL OR candidate_offer.guest_min IS NULL OR candidate_offer.guest_min<=$7)
+                      AND ($7::bigint IS NULL OR candidate_offer.guest_max IS NULL OR candidate_offer.guest_max>=$7)
+                      AND ($7::bigint IS NULL OR candidate.maximum_capacity IS NULL OR candidate.maximum_capacity>=$7)
+                    ORDER BY candidate.local_date
+                    LIMIT 32
+                  ) AS available_dates
            FROM wedding_vendor_special_offer_slots slot
            JOIN wedding_vendor_special_offers offer
              ON offer.offer_id=slot.offer_id AND offer.vendor_id=slot.vendor_id
@@ -475,7 +497,7 @@ async fn discover_specials_http(
     let truncated = rows.len() > requested_limit;
     let mut markers = Vec::new();
     let mut ranking_candidates = Vec::new();
-    for row in rows.into_iter().take(requested_limit) {
+    for row in rows.into_iter().take(MAX_RANKING_CANDIDATES) {
         let style_tags = row
             .get::<Option<Value>, _>("style_tags")
             .and_then(|value| value.as_array().cloned())
@@ -582,6 +604,7 @@ async fn discover_specials_http(
             rating,
             review_count,
             available_on_date: special_date.to_string(),
+            available_dates: row.get("available_dates"),
             last_confirmed_at: confirmed.to_rfc3339(),
             confirmation_expires_at: expires.to_rfc3339(),
             indicative_only: true,
@@ -589,6 +612,24 @@ async fn discover_specials_http(
         });
     }
     let top_choices = rank_top_three(ranking_candidates);
+    let top_ranks = top_choices
+        .iter()
+        .map(|item| (item.vendor_id.as_str(), item.rank))
+        .collect::<HashMap<_, _>>();
+    markers.sort_by(|left, right| {
+        top_ranks
+            .get(left.vendor_id.as_str())
+            .copied()
+            .unwrap_or(usize::MAX)
+            .cmp(
+                &top_ranks
+                    .get(right.vendor_id.as_str())
+                    .copied()
+                    .unwrap_or(usize::MAX),
+            )
+            .then_with(|| left.vendor_name.cmp(&right.vendor_name))
+    });
+    markers.truncate(requested_limit);
     Ok(Json(DiscoveryResponse {
         selected_date: selected_date.to_string(),
         selected_date_to: selected_date_to.to_string(),
@@ -672,6 +713,7 @@ mod tests {
             rating: Some(4.8),
             review_count: Some(42),
             available_on_date: "2027-11-20".into(),
+            available_dates: vec!["2027-11-20".into()],
             last_confirmed_at: "2026-11-07T00:00:00Z".into(),
             confirmation_expires_at: "2026-11-21T00:00:00Z".into(),
             indicative_only: true,

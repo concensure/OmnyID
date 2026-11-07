@@ -16,6 +16,7 @@ export type WeddingVendorSpecialMarker = {
   rating: number | null;
   reviewCount: number | null;
   availableOnDate: string;
+  availableDates: string[];
   lastConfirmedAt: string;
   confirmationExpiresAt: string;
   indicativeOnly: true;
@@ -84,6 +85,9 @@ export function normalizeWeddingVendorSpecialMarker(value: unknown): WeddingVend
     rating: number(value.rating),
     reviewCount: number(value.review_count),
     availableOnDate,
+    availableDates: Array.isArray(value.available_dates)
+      ? value.available_dates.map(text).filter(Boolean).slice(0, 32)
+      : [availableOnDate],
     lastConfirmedAt: text(value.last_confirmed_at),
     confirmationExpiresAt: text(value.confirmation_expires_at),
     indicativeOnly: true,
@@ -92,12 +96,26 @@ export function normalizeWeddingVendorSpecialMarker(value: unknown): WeddingVend
 }
 
 export type WeddingVendorSpecialEnquiryContext = {
+  offerId: string | null;
+  slotId: string | null;
+  slotRevision: number | null;
+  specialDate: string;
+  offerTitle: string | null;
+};
+
+export type WeddingVendorSpecialLinkContext = WeddingVendorSpecialEnquiryContext & {
   offerId: string;
   slotId: string;
   slotRevision: number;
 };
 
-export async function recheckWeddingVendorSpecialEnquiry(input: WeddingVendorSpecialEnquiryContext) {
+export function weddingVendorSpecialLinkContext(input: WeddingVendorSpecialEnquiryContext | null | undefined): WeddingVendorSpecialLinkContext | null {
+  return input?.offerId && input.slotId && typeof input.slotRevision === "number"
+    ? { ...input, offerId: input.offerId, slotId: input.slotId, slotRevision: input.slotRevision }
+    : null;
+}
+
+export async function recheckWeddingVendorSpecialEnquiry(input: WeddingVendorSpecialLinkContext) {
   return apiFetch<{ status: "current"; slot_revision: number }>("/wedding/vendor-specials/enquiries/recheck", {
     method: "POST",
     body: JSON.stringify({
@@ -108,7 +126,7 @@ export async function recheckWeddingVendorSpecialEnquiry(input: WeddingVendorSpe
   });
 }
 
-export async function linkWeddingVendorSpecialEnquiry(input: WeddingVendorSpecialEnquiryContext & {
+export async function linkWeddingVendorSpecialEnquiry(input: WeddingVendorSpecialLinkContext & {
   weddingPlanId: string;
   enquiryEnvelopeRef: string;
   idempotencyKey: string;
@@ -126,7 +144,7 @@ export async function linkWeddingVendorSpecialEnquiry(input: WeddingVendorSpecia
   });
 }
 
-export async function recordWeddingVendorSpecialDeliveryFailure(input: WeddingVendorSpecialEnquiryContext & {
+export async function recordWeddingVendorSpecialDeliveryFailure(input: WeddingVendorSpecialLinkContext & {
   idempotencyKey: string;
   weddingPlanId: string;
   reasonCode?: "provider_rejected" | "provider_unavailable" | "network_error";

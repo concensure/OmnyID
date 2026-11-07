@@ -19,6 +19,7 @@ test("limited-special discovery drops malformed markers and normalises safe exac
         distance_km: 3.2,
         style_tags: ["waterfront", "modern"], rating: 4.8, review_count: 42,
         available_on_date: "2027-11-20", last_confirmed_at: "2026-11-07T00:00:00Z",
+        available_dates: ["2027-11-20", "2027-11-27"],
         confirmation_expires_at: "2026-11-21T00:00:00Z", indicative_only: true,
       },
       { vendor_id: "missing-coordinates", vendor_name: "Unsafe" },
@@ -35,6 +36,7 @@ test("limited-special discovery drops malformed markers and normalises safe exac
   assert.equal(result.markers[0].vendorName, "Harbour House");
   assert.deepEqual(result.markers[0].styleTags, ["waterfront", "modern"]);
   assert.equal(result.markers[0].availableOnDate, "2027-11-20");
+  assert.deepEqual(result.markers[0].availableDates, ["2027-11-20", "2027-11-27"]);
   assert.equal(result.markers[0].distanceKm, 3.2);
   assert.equal(result.topChoices.length, 1);
   assert.equal(result.topChoices[0].indicativeTotalCents, 1_590_000);
@@ -42,11 +44,13 @@ test("limited-special discovery drops malformed markers and normalises safe exac
 });
 
 test("Limited Specials uses a third mode, full marker name and one synchronized detail card", async () => {
-  const [home, map, api, server] = await Promise.all([
+  const [home, map, api, server, caddy, deploy] = await Promise.all([
     read("solid-ui/src/components/WeddingVendorSearchHomeSections.tsx"),
     read("solid-ui/src/components/WeddingLimitedSpecialsMap.tsx"),
     read("solid-ui/src/lib/weddingVendorSpecialDiscoveryApi.ts"),
     read("src/server/wedding_vendor_special_offer_routes/discovery.rs"),
+    read("Caddyfile"),
+    read("scripts/deploy-oracle.ps1"),
   ]);
   assert.match(home, /Limited Specials/);
   assert.match(map, /hoveredName/);
@@ -55,6 +59,7 @@ test("Limited Specials uses a third mode, full marker name and one synchronized 
   assert.match(map, /radiusKm/);
   assert.match(map, /guestCount/);
   assert.match(map, /selectedDetail/);
+  assert.match(map, /selectedAvailableDays/);
   assert.match(map, /Exact package and price guidance appears only when this venue is in your current top three/);
   assert.match(map, /Availability is indicative and subject to vendor confirmation/);
   assert.match(map, /onPrepareEnquiry\(item, selectedDetail\(\)\)/);
@@ -68,7 +73,12 @@ test("Limited Specials uses a third mode, full marker name and one synchronized 
   assert.match(server, /photo_licence_id IS NOT NULL/);
   assert.match(server, /slot\.local_date BETWEEN \$1 AND \$2/);
   assert.match(server, /rank_top_three/);
+  assert.match(server, /MAX_RANKING_CANDIDATES/);
   assert.match(server, /approved_date_price_estimate/);
+  assert.match(caddy, /handle \/wedding\/vendor-specials\/\*/);
+  assert.match(caddy, /handle \/wedding\/vendor\/special-offers\*/);
+  assert.match(deploy, /staged Caddyfile is missing the Limited Specials/);
+  assert.match(deploy, /running Caddyfile is missing the Limited Specials/);
 });
 
 test("claimed and link-only vendors can maintain bounded date terms while enquiries reuse approval", async () => {
@@ -90,12 +100,19 @@ test("claimed and link-only vendors can maintain bounded date terms while enquir
   assert.match(capability, /CapabilityOperation::OfferEdit/);
   assert.match(owner, /recheckWeddingVendorSpecialEnquiry/);
   assert.match(owner, /linkWeddingVendorSpecialEnquiry/);
+  assert.match(owner, /linkSpecialEnquiryWithRetry/);
   assert.match(afp, /wedding_vendor_special_offer/);
   assert.match(afp, /limited_special_slot_revision/);
   assert.match(server, /wedding_vendor_outreach_sent/);
   assert.match(server, /owner_user_id=\$1/);
   assert.match(server, /FOR UPDATE OF slot/);
   assert.match(claimed, /Hold 48 hours/);
+  assert.match(claimed, /Create staff link/);
+  assert.match(claimed, /mandatory charges/);
+  assert.match(claimed, /Reopen cancelled booking/);
+  assert.match(linked, /Confirmed until/);
+  assert.match(api, /slot_reopen_cancelled_booking/);
+  assert.match(capability, /SlotReopenCancelledBooking/);
   assert.match(migration, /wedding_vendor_special_offer_outcome_projection/);
   assert.match(migration, /wedding_vendor_quote_received/);
   assert.match(admin, /Limited Special outcomes/);

@@ -1,6 +1,7 @@
 //! Shared state-changing services for both claimed-vendor and capability routes.
 
 use super::*;
+use crate::wedding_vendor_special_offer::SpecialOfferSlotState;
 
 #[allow(clippy::too_many_arguments)]
 pub(super) async fn edit_offer(
@@ -63,26 +64,14 @@ pub(super) async fn edit_offer(
             "A held or booked date cannot be edited.".into(),
         ));
     }
-    let offer_type = if slot.terms.indicative_per_head_cents.is_some() {
-        "per_head"
-    } else {
-        "minimum_spend"
-    };
     sqlx::query(
         r#"UPDATE wedding_vendor_special_offers
-              SET title=$1,summary=$2,offer_type=$3,guest_max=$4,per_guest_cents=$5,
-                  minimum_spend_cents=$6,inclusions=$7,public_conditions=$8,
+              SET title=$1,summary=$2,
                   revision=revision+1,approved_revision=NULL,updated_at=NOW()
-            WHERE offer_id=$9 AND vendor_id=$10 AND revision=$11"#,
+            WHERE offer_id=$3 AND vendor_id=$4 AND revision=$5"#,
     )
     .bind(title)
     .bind(summary)
-    .bind(offer_type)
-    .bind(slot.terms.maximum_capacity.map(|value| value as i32))
-    .bind(slot.terms.indicative_per_head_cents)
-    .bind(slot.terms.minimum_spend_cents)
-    .bind(&slot.terms.inclusions)
-    .bind(&slot.terms.public_conditions)
     .bind(offer_id)
     .bind(vendor_id)
     .bind(offer_revision)
@@ -246,6 +235,48 @@ pub(super) async fn change_offer_state(
         ));
     }
     let next_revision = revision + 1;
+    if matches!(action, OfferAction::Reconfirm) {
+        let slot_rows = sqlx::query(
+            "SELECT * FROM wedding_vendor_special_offer_slots WHERE offer_id=$1 AND vendor_id=$2 ORDER BY local_date FOR UPDATE",
+        )
+        .bind(offer_id)
+        .bind(vendor_id)
+        .fetch_all(&mut *tx)
+        .await
+        .map_err(database_failure)?;
+        let now = Utc::now();
+        let mut candidate_offer = offer_from_row(&offer)?;
+        candidate_offer.publication_state = SpecialOfferPublicationState::Active;
+        candidate_offer.revision = next_revision as u64;
+        candidate_offer.approved_revision = Some(next_revision as u64);
+        let mut candidate_slots = slot_rows
+            .iter()
+            .map(slot_from_row)
+            .collect::<Result<Vec<_>, _>>()?;
+        for slot in &mut candidate_slots {
+            if matches!(
+                slot.state,
+                SpecialOfferSlotState::Available
+                    | SpecialOfferSlotState::EnquiryReceived
+                    | SpecialOfferSlotState::Paused
+                    | SpecialOfferSlotState::Stale
+            ) {
+                slot.state = SpecialOfferSlotState::Available;
+                slot.last_confirmed_at = now;
+                slot.confirmation_expires_at = now + ChronoDuration::days(CONFIRMATION_DAYS);
+            }
+        }
+        validate_offer_for_publication(&candidate_offer, &candidate_slots, now)
+            .map_err(policy_failure)?;
+        for slot in &candidate_slots {
+            approved_date_price_estimate(
+                &candidate_offer.pricing,
+                &slot.commercial_terms,
+                candidate_offer.guest_min.or(Some(1)),
+            )
+            .map_err(policy_failure)?;
+        }
+    }
     let approved_revision = (state_name == "active").then_some(next_revision);
     sqlx::query(
         "UPDATE wedding_vendor_special_offers SET publication_state=$1,revision=$2,approved_revision=$3,approved_by_user_id=CASE WHEN $1='active' THEN $4 ELSE approved_by_user_id END,approved_at=CASE WHEN $1='active' THEN NOW() ELSE approved_at END,updated_at=NOW() WHERE offer_id=$5 AND vendor_id=$6 AND revision=$7",
@@ -373,7 +404,10 @@ pub(super) async fn change_slot_state(
         event_kind,
         actor,
         &dedupe,
-        json!({"revision":next.revision}),
+        json!({
+            "revision": next.revision,
+            "reason": request.reason.as_deref().map(|value| clean(value, 500)),
+        }),
     )
     .await?;
     tx.commit().await.map_err(database_failure)?;

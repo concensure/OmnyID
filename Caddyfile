@@ -352,6 +352,22 @@
         import omnyid_proxy
     }
 
+    # Limited Specials has authenticated couple discovery, claimed-vendor
+    # management and post-send enquiry correlation routes. These must win over
+    # the static /wedding/* site handler below. Public capability sessions are
+    # already covered by the earlier /api/* proxy.
+    handle /wedding/vendor-specials/* {
+        import omnyid_proxy
+    }
+
+    handle /wedding/vendor/special-offers* {
+        import omnyid_proxy
+    }
+
+    handle /admin/wedding/vendor-specials {
+        import omnyid_proxy
+    }
+
     # Invite Proposals remains authenticated or capability-gated by the
     # homeserver. These API paths must win before the static Wedding site.
     handle /wedding/invite-proposals/* {

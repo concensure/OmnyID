@@ -2983,3 +2983,19 @@ subjective usability or a controlled external cohort.
 - Guest-supplied fields are accepted only when the server-stored capability
   requested them and are appended as a successor guest-profile AFP record in
   the same tenant ledger. Other households cannot be addressed by the token.
+## 2026-11-08 - WED-342 Limited Specials uses verified, bounded availability authority
+
+- A Limited Special remains vendor-authored indicative availability, not a booking guarantee. Exact
+  commercial terms and inventory identifiers are revealed only for the couple's top three ranked
+  matches; broader map markers disclose only current indicative availability.
+- Private management links are reusable only until a bounded expiry, rotation or revocation. Each
+  exchange creates a short-lived, CSRF-bound, operation-scoped session and grants no account access.
+- A booked date can return to availability only through the explicit cancelled-booking transition,
+  with a retained reason, fresh confirmation window and append-only event. Silent state reversal is
+  forbidden.
+- Discovery ranks a bounded candidate pool before applying the UI display limit. Missing evidence is
+  unknown rather than a negative match, and unknown mandatory costs cannot support a budget-fit
+  claim.
+- The selected special date enters the ordinary draft/approval pipeline and respects the same
+  per-enquiry date-sharing control. The email send, AFP receipt and special-slot linkage remain
+  separate idempotent facts.

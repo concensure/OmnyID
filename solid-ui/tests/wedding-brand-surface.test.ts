@@ -68,6 +68,9 @@ test("home uses task-bound journey and preserves the separate mobile navigation 
   assert.match(journey, /weddingJourneyGroups/);
   assert.match(mobilePage, /WeddingMobileTabBar/);
   assert.match(mobilePage, /bg-wedding-page/);
+  const mobileTabs = read("src/components/WeddingMobileTabBar.tsx");
+  assert.match(mobileTabs, /calc\(3rem\+env\(safe-area-inset-bottom\)\)/);
+  assert.match(mobileTabs, /min-h-11/);
 });
 
 test("wedding decisions expose best fit, checked facts, risk notes, and rectangular actions", () => {

@@ -15,6 +15,18 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-342
+    title: Complete mobile decision evidence and Limited Specials end-to-end reliability
+    status: review
+    owner: codex
+    branch: agent/codex/WED-340
+    worktree: C:/Users/ozans/Desktop/projects/OmnyID-GROWTH-001
+    base_sha: 67dfa78f09d61848bb1081c653365b2aafcf0b7b
+    depends_on: [WED-339, WED-340, GROWTH-10]
+    files: [solid-ui/src/components/WeddingMobile**, solid-ui/src/components/WeddingDecision**, solid-ui/src/components/WeddingLimited**, solid-ui/src/components/vendor/**, solid-ui/src/lib/weddingVendor**, solid-ui/src/lib/vendorSpecialsApi.ts, solid-ui/tests/wedding-**, src/server/wedding_vendor_special_offer_routes/**, src/server/wedding_vendor_search_routes/**, src/server/wedding_vendor_outreach_routes/**, src/server/mod.rs, Caddyfile, docker-compose.oracle.minimal.yml, postgres/migrations/**, Documents/issues/wedding planner/2026-11-08_limited-specials-availability-calendar-audit.md, Documents/verification/**, .agent/**]
+    acceptance: [the mobile bottom navigation is visually shorter while retaining accessible touch targets and the focused decision deck remains wholly visible above it, the active and immediate-next vendor decision trigger the existing funded Ranking Policy V2 research pipeline and show a short evidence-backed top recommendation rather than a generic research instruction, Limited Specials management discovery calendar enquiry and audit paths use shared canonical projections with actionable errors complete date context and no hidden parallel state, genuine gaps in the 2026-11-08 audit are fixed or explicitly dispositioned with evidence while false-default and allowlist controls remain intact, the remaining Growth hosted false-default shadow and exact-SHA rollback evidence are recorded, focused frontend Rust migration security full Wedding typecheck build and line-budget checks pass, a clean exact-SHA Oracle release records matching provenance and hosted health]
+    progress: "Release candidate prepared from 67dfa78f09d61848bb1081c653365b2aafcf0b7b. The compact mobile navigation retains 44px touch targets; current/next vendor decisions now queue canonical Ranking Policy V2 searches and replace generic hair-stylist copy only with correlated source-backed results. Limited Specials audit gaps were reconciled across Caddy routing, staff links, actionable errors, categories, coordinate coverage, rank-before-trim, multi-date calendar display, edit/reconfirm safety, reason-audited booking reopen, expiry warnings, mandatory-charge truth and date-specific AFP enquiry linkage with bounded retry. Focused frontend tests, 28 Rust tests, cargo check, typecheck, both line budgets, all 2,231 Wedding tests, production build, Caddy validation and a real Chromium mobile swipe journey pass. Clean exact-SHA Oracle deploy and hosted false-default/provenance checks remain."
+
   - id: WED-341
     title: Import reviewed florists and extend RSVP with guest contact-detail requests
     status: done

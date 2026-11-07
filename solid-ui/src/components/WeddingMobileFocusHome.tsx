@@ -49,6 +49,8 @@ import { loadWeddingTaskCompletion, WEDDING_TASK_COMPLETION_EVENT } from "@/lib/
 import {
   dispatchWeddingVendorSearchLaunch,
   saveWeddingVendorSearchLaunch,
+  weddingVendorSearchLaunchResultFromEvent,
+  WEDDING_VENDOR_SEARCH_LAUNCH_RESULT_EVENT,
 } from "@/lib/weddingVendorSearchLaunchState";
 
 type HomeSection = { id: string; title: string; render: () => JSX.Element };
@@ -180,7 +182,10 @@ export function WeddingMobileFocusHome(props: {
       };
       const research = researchForDecision(item.id);
       if (!research) {
+        const vendorQuery = decision ? weddingVendorResearchQueryForDecision(decision) : null;
         const status = fundedResearchStatus()[item.id];
+        if (vendorQuery && status === "loading") return { ...item, recommendedActionLabel: "Checking live vendor evidence and ranking three matches for your wedding…" };
+        if (vendorQuery && status === "failed") return { ...item, recommendedActionLabel: "The live shortlist could not be refreshed yet; no vendor recommendation has been approved." };
         if (status === "loading") return { ...item, recommendedActionLabel: "Checking the saved wedding details and preparing the recommendation…" };
         if (status === "failed") return { ...item, recommendedActionLabel: "Research could not be completed yet; no recommendation has been approved." };
         return item;
@@ -242,11 +247,11 @@ export function WeddingMobileFocusHome(props: {
       const attemptKey = `${props.state.workspace.metadata.weddingPlanId}:${item.id}:${query}`;
       if (vendorPrefetchAttempts.has(attemptKey)) continue;
       vendorPrefetchAttempts.add(attemptKey);
+      setFundedResearchStatus((current) => ({ ...current, [item.id]: "loading" }));
       const launch = saveWeddingVendorSearchLaunch(query, {
         source: "wedding_home",
         runImmediately: true,
         background: true,
-        category: query.replace(/^wedding\s+/i, ""),
         sourceDecisionId: item.id,
       });
       if (launch) dispatchWeddingVendorSearchLaunch(launch);
@@ -276,8 +281,21 @@ export function WeddingMobileFocusHome(props: {
 
   onMount(() => {
     const listener = () => setCompletionRevision((value) => value + 1);
+    const vendorResultListener = (event: Event) => {
+      const result = weddingVendorSearchLaunchResultFromEvent(event);
+      if (!result) return;
+      setFundedResearchStatus((current) => {
+        const next = { ...current };
+        if (!result.ok) next[result.sourceDecisionId] = "failed";
+        return next;
+      });
+    };
     window.addEventListener(WEDDING_TASK_COMPLETION_EVENT, listener);
-    onCleanup(() => window.removeEventListener(WEDDING_TASK_COMPLETION_EVENT, listener));
+    window.addEventListener(WEDDING_VENDOR_SEARCH_LAUNCH_RESULT_EVENT, vendorResultListener);
+    onCleanup(() => {
+      window.removeEventListener(WEDDING_TASK_COMPLETION_EVENT, listener);
+      window.removeEventListener(WEDDING_VENDOR_SEARCH_LAUNCH_RESULT_EVENT, vendorResultListener);
+    });
   });
 
   createEffect(() => {
