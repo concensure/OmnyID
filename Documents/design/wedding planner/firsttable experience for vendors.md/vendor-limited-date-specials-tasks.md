@@ -143,7 +143,7 @@ pricing state before the authoritative commands and safe projections exist.
 - [ ] Prove one-venue pilot end to end with publication flags false by default.
 - [ ] Complete security/privacy/accessibility review, legal copy approval,
   hosted shadow run, controlled email receipt and vendor/couple usability.
-- [ ] Freeze exact SHA, build from a clean release checkout, deploy and record
+- [x] Freeze exact SHA, build from a clean release checkout, deploy and record
   runtime/backup/restore evidence before cohort activation.
 
 ## Implemented slices
@@ -185,7 +185,10 @@ joins later quote, tour, hold, booking and lost evidence by the same tenant and
 conversation thread. It does not copy message bodies or create a second
 booking ledger.
 
-The implementation remains false-default. The final two Phase 10 checkboxes are
-activation evidence: a real participating vendor pilot and feature-specific
-hosted acceptance review. They do not justify bypassing the allowlist or
-inventing a vendor publication during deployment.
+The implementation remains false-default. Application SHA
+`77c1b05e059d0a0113e7a6c7d1f83dadd63ec48d` was built from a clean detached
+checkout and deployed with matching `SOURCE_COMMIT` and runtime manifest.
+Backup verification and an isolated restore drill pass. The two remaining
+Phase 10 checkboxes are activation evidence: a real participating vendor pilot
+and feature-specific hosted acceptance review. They do not justify bypassing
+the allowlist or inventing a vendor publication during deployment.

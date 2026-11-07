@@ -4,7 +4,7 @@
 
 - Source worktree: `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`
 - Branch: `agent/codex/WED-340`
-- Exact application SHA: pending clean release commit
+- Exact application SHA: `77c1b05e059d0a0113e7a6c7d1f83dadd63ec48d`
 - Public activation: false-default; a participating-vendor pilot remains an
   allowlisted rollout gate.
 
@@ -16,8 +16,9 @@
   contact bases.
 - The SQL inserts new vendors with `ON CONFLICT DO NOTHING`. Attribute updates
   cannot overwrite `operator` or `vendor_reply` authority.
-- The existing exact `best-buds-sydney-florist` row changes from
-  `Floral Designer` to `Florist` only when ID, name and old category all match.
+- The existing exact `best-buds-sydney-florist` seed-detail row changes from
+  `Floral Designer` to `Florist` only when slug, name and old category all
+  match. It is not duplicated into the live-vendor table.
 - Disposable pgvector accepted two consecutive SQL runs: 35 new active
   florists, 35 distinct IDs, Best Buds in `Florist`, and 151 source attributes.
 
@@ -77,5 +78,31 @@
 
 ## Release evidence
 
-Pending the clean exact-SHA build, Oracle deployment, idempotent production
-florist load, provenance check and hosted false-default smoke.
+- Built and tested from clean detached checkout
+  `C:\temp\wt\omnyid-wed340-release-77c1b05` at the exact application SHA.
+- Oracle `SOURCE_COMMIT` and `oracle-runtime-manifest.json` both contain the
+  exact 40-character application SHA. The public workspace returns HTTP 200.
+- Migrations 0150 and 0151 are present: the RSVP contact flag, private enquiry
+  thread field and outcome view all exist. The RSVP flag default is `false`.
+- Production contains 35 distinct florist rows from
+  `florists_import_2026_11_06` and 151 related source attributes. The corrected
+  cumulative SQL was replayed twice without duplication. The canonical Best
+  Buds seed-detail category is `Florist`.
+- Both Limited Specials rollout flags are `false`, both allowlists are empty,
+  there are zero offers, and an anonymous discovery POST returns 404 with no
+  response body. Deploying the code therefore published no offer or cohort.
+- The file-backed capability pepper was created directly on Oracle with
+  root-owned mode 0600; its value was never printed or copied locally.
+- Canonical production proof generated 2026-11-07T14:02:49Z reports runtime
+  manifest verification, backup archive verification and the isolated restore
+  drill all passing. Homeserver, Caddy, ClamAV, Postgres and backup services
+  remained running.
+- Backup retention had accumulated 28 full generations. After resolving every
+  deletion target under `/var/backups/omnyid`, the three newest generations
+  were retained and 25 older generations were removed. Root disk use is now
+  48% with about 24 GB free.
+
+Public activation remains deliberately separate: a participating-vendor pilot
+and the feature-specific security/privacy/accessibility, legal-copy and
+vendor/couple acceptance evidence are still required before enabling either
+rollout flag.

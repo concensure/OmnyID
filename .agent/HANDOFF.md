@@ -7836,3 +7836,33 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
   Limited Specials Rust tests, and three independent disposable-pgvector RSVP
   isolation/replay/concurrency proofs. Exact clean-SHA release, production
   florist load, Oracle provenance and hosted false-default smoke are next.
+
+# 2026-11-08 - WED-340/WED-341 released false-default (Codex)
+
+- Application SHA `77c1b05e059d0a0113e7a6c7d1f83dadd63ec48d` was built and tested from clean
+  detached checkout `C:\temp\wt\omnyid-wed340-release-77c1b05`, then deployed to
+  Oracle. `SOURCE_COMMIT` and `oracle-runtime-manifest.json` match the full SHA.
+- Production schema contains migrations 0150/0151. Hosted smoke confirms both
+  Limited Specials flags are false, both allowlists are empty, there are zero
+  offers and anonymous discovery is refused with an empty 404. No cohort or
+  vendor offer was activated by the release.
+- Production contains exactly 35 reviewed florist imports and 151 source
+  attributes. The corrected cumulative SQL was replayed twice. Best Buds lives
+  in `wedding_vendor_seed_details`, where its guarded category is now `Florist`;
+  the generator and future operator SQL target that canonical authority.
+- Canonical production proof passed manifest and script integrity, backup
+  verification and an isolated restore drill. The prior detached Windows
+  poller failed to consume a successful completion marker, so the proof was
+  repeated synchronously and emitted canonical JSON/Markdown evidence.
+- Before the proof, `/var/backups/omnyid` held 28 complete generations (19 GB).
+  Every deletion target was resolved beneath that exact directory; the three
+  newest generations were retained and 25 older generations removed. Root
+  disk use fell to 48% with about 24 GB free. No volume or running image was
+  removed.
+- A required Limited Specials capability pepper was generated only on Oracle
+  in a root-owned 0600 file and was not printed or copied locally. ClamAV was
+  restarted after its pre-existing unhealthy socket state and is healthy.
+- WED-340/WED-341 autonomous implementation is complete. Keep the rollout
+  false-default until a real participating-vendor pilot plus feature-specific
+  security/privacy/accessibility, legal-copy and vendor/couple acceptance are
+  recorded; those are activation gates, not code-release blockers.

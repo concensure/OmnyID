@@ -35,7 +35,7 @@ all match. It cannot rename or recategorise a different listing.
 ## Matching
 Pool = the 17 `Florist` rows in `postgres/data/2026-10-07_vendor_directory_expansion.sql` + Best Buds (`Floral Designer`, migration 0085).
 Rule: normalised name, website host or last 8 phone digits. **Zero matches**; the existing rows are mostly delivery shops and none overlap.
-- **Category vocabulary:** existing rows use `Florist`; Best Buds originally used `Floral Designer`. WED-341 moves only that exact
+- **Category vocabulary:** existing rows use `Florist`; Best Buds originally used `Floral Designer` in `wedding_vendor_seed_details`. WED-341 moves only that exact
   canonical listing to `Florist`, keeping one directory category and stable vendor ID.
 - **Possible addition, not made:** Flowers at Kirribilli is now "Lush Flower Co Kirribilli" per a Wheree listing. The DB already has Lush
   Flower Co (Neutral Bay); same group is likely but unconfirmed, so no record or merge was created.
