@@ -655,7 +655,7 @@ async fn read_session_http(
     .await?;
     let authority = session_authority(&state, &headers, false).await?;
     let offer = sqlx::query(
-        "SELECT offer_id,title,summary,publication_state,currency,revision,updated_at FROM wedding_vendor_special_offers WHERE offer_id=$1 AND vendor_id=$2",
+        "SELECT offer_id,title,summary,publication_state,currency,inclusions,public_conditions,revision,updated_at FROM wedding_vendor_special_offers WHERE offer_id=$1 AND vendor_id=$2",
     )
     .bind(&authority.offer_id)
     .bind(&authority.vendor_id)

@@ -239,6 +239,14 @@ fn idempotency_key(reminder: &ApprovedReminder) -> String {
     ))
 }
 
+fn deterministic_message_id(key: &str) -> String {
+    // AFP message ids use the 26-character Crockford/ULID shape. A raw SHA-256
+    // prefix can begin above `7`, which is not a valid ULID timestamp and is
+    // rejected by the shared message store. Prefixing the first 25 hex digits
+    // with zero keeps the id deterministic while remaining a valid AFP id.
+    format!("0{}", &key[..25]).to_ascii_uppercase()
+}
+
 fn metadata(reminder: &ApprovedReminder) -> Value {
     json!({
         "template": "wedding_planning",
@@ -304,7 +312,7 @@ fn reservation_message(thread_id: &str, reminder: &ApprovedReminder, key: &str) 
     );
     // The database insert is the concurrency boundary: simultaneous requests
     // for the same exact approval resolve to one deterministic transport ID.
-    message.id = key[..26].to_ascii_uppercase();
+    message.id = deterministic_message_id(key);
     message
 }
 
@@ -688,7 +696,9 @@ mod tests {
         let key = idempotency_key(&reminder);
         let reservation = reservation_message("01JTHREAD00000000000000000", &reminder, &key);
         assert_eq!(kind(&reservation), RESERVATION_KIND);
-        assert_eq!(reservation.id, key[..26].to_ascii_uppercase());
+        assert_eq!(reservation.id, deterministic_message_id(&key));
+        assert_eq!(reservation.id.len(), 26);
+        assert!(reservation.id.starts_with('0'));
         let retry = lifecycle_message(
             "01JTHREAD00000000000000000",
             &reservation.id,
