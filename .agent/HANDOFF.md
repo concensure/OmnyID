@@ -1,3 +1,32 @@
+## 2026-11-09 - WED-345 hosted wedding reliability release (Codex, complete)
+
+- Released clean application SHA `7ae96fa2a67fe14c941657ddeb5fec31f7981c88`
+  from `C:\temp\wt\omnyid-wed345-release-7ae96fa`. Oracle
+  `SOURCE_COMMIT` and `oracle-runtime-manifest.json` match it.
+- Fixed and released the requested Wedding reliability surfaces: delayed More
+  dismissal; non-admin Setup Checks/Cost Dashboard guards; safe original-file
+  previews; helper rollout wiring; canonical RSVP defaults and inline events;
+  full seating navigation/edit/assignment controls; scoped Limited Specials
+  failure handling; browser-memory Chat decryption; and an absolute Google
+  Calendar OAuth return path.
+- Ran an actual Cloudflare provider send to the reviewed Casper address. The
+  provider accepted it, the exact replay was suppressed, and the tenant AFP
+  ledger held one reservation, one receipt and one retry decision. Mailbox-open
+  confirmation remains an operator observation because this run had no Gmail
+  mailbox credential.
+- Exercised the claimed-vendor portal and a fresh expiring availability link:
+  one-time exchange, scoped session/CSRF, `vendor_confirmed` to
+  `calendar_open`, then restoration to `vendor_confirmed`. Limited Specials
+  discovery opened under Ranking Policy V2. Helper/delegate capabilities were
+  true only for the reviewed account cohort.
+- Removed the synthetic vendor, offer, claim, grants and AFP fixture rows after
+  recording evidence. No test vendor remains in the directory.
+- Tests: 2,241 Wedding tests, TypeScript, both line budgets, production Vite
+  build and focused Rust provider/OAuth/startup tests passed. The synchronous
+  production proof passed manifest, runtime-script and backup verification;
+  restore drill skipped. Details:
+  `Documents/verification/wed-345-hosted-wedding-workflows-2026-11-09.md`.
+
 ## 2026-11-05 - WED-337 vendor discovery, onboarding and newspaper release (Codex, complete)
 
 Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
