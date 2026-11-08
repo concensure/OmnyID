@@ -10951,8 +10951,6 @@ fn stripe_production_config_present() -> bool {
         "STRIPE_PRO_PRICE_ID",
         "STRIPE_CHECKOUT_PRICE_ID",
         "STRIPE_PRODUCT_ID",
-        "OMNYID_WORKSPACE_BASE_URL",
-        "OMNYID_UI_BASE_URL",
     ]
     .iter()
     .any(|name| env_var_present(name))
@@ -30736,6 +30734,38 @@ mod tests {
             std::env::remove_var("OMNYID_ENV");
             std::env::remove_var("DATABASE_URL");
             std::env::remove_var("OMNYID_DELEGATION_MASTER_KEY_HEX");
+        }
+    }
+
+    #[test]
+    fn workspace_url_alone_does_not_enable_stripe_startup_policy() {
+        let _guard = env_test_lock().lock().expect("env test lock");
+        unsafe {
+            std::env::set_var("OMNYID_ENV", "production");
+            std::env::set_var(
+                "DATABASE_URL",
+                "postgres://omnyid_prod:secret@db.internal:5432/omnyid_prod",
+            );
+            std::env::set_var("OMNYID_DELEGATION_MASTER_KEY_HEX", "1".repeat(64));
+            std::env::set_var("OMNYID_WORKSPACE_BASE_URL", "https://omnyid.com");
+            std::env::remove_var("OMNYID_STRIPE_SECRET_KEY");
+            std::env::remove_var("OMNYID_STRIPE_WEBHOOK_SECRET");
+            std::env::remove_var("OMNYID_STRIPE_PRO_PRICE_ID");
+            std::env::remove_var("OMNYID_STRIPE_CHECKOUT_PRICE_ID");
+            std::env::remove_var("OMNYID_STRIPE_WEDDING_PRODUCT_ID");
+            std::env::remove_var("STRIPE_SECRET_KEY");
+            std::env::remove_var("STRIPE_PRO_PRICE_ID");
+            std::env::remove_var("STRIPE_CHECKOUT_PRICE_ID");
+            std::env::remove_var("STRIPE_PRODUCT_ID");
+        }
+
+        assert!(super::validate_startup_deployment_policy().is_ok());
+
+        unsafe {
+            std::env::remove_var("OMNYID_ENV");
+            std::env::remove_var("DATABASE_URL");
+            std::env::remove_var("OMNYID_DELEGATION_MASTER_KEY_HEX");
+            std::env::remove_var("OMNYID_WORKSPACE_BASE_URL");
         }
     }
 
