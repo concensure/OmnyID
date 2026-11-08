@@ -249,6 +249,7 @@ fn deterministic_message_id(key: &str) -> String {
 
 fn metadata(reminder: &ApprovedReminder) -> Value {
     json!({
+        "store": true,
         "template": "wedding_planning",
         "weddingPlanId": reminder.wedding_plan_id,
         "responseWorkspaceId": reminder.response_workspace_id,
@@ -699,6 +700,8 @@ mod tests {
         assert_eq!(reservation.id, deterministic_message_id(&key));
         assert_eq!(reservation.id.len(), 26);
         assert!(reservation.id.starts_with('0'));
+        assert_eq!(reservation.metadata.as_ref().and_then(|value| value.get("store")).and_then(Value::as_bool), Some(true));
+        assert!(super::super::validate_proto_message(&super::super::app_to_proto(reservation.clone())));
         let retry = lifecycle_message(
             "01JTHREAD00000000000000000",
             &reservation.id,
