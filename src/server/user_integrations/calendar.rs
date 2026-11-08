@@ -15,7 +15,9 @@ pub(super) fn calendar_google_oauth_redirect_target(status: &str) -> String {
     let suffix = format!("/workspace/?calendar={status}");
     std::env::var("OMNYID_WORKSPACE_BASE_URL")
         .ok()
+        .filter(|value| !value.trim().is_empty())
         .or_else(|| std::env::var("OMNYID_UI_BASE_URL").ok())
+        .filter(|value| !value.trim().is_empty())
         .or_else(derive_workspace_base_url_from_homeserver)
         .map(|base| format!("{}{}", base.trim_end_matches('/'), suffix))
         // This callback is served from api.omnyid.com. A relative fallback

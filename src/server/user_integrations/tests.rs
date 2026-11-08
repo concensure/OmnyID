@@ -62,14 +62,21 @@ fn gmail_connection_changes_require_recent_sign_in() {
 fn calendar_oauth_redirect_never_falls_back_to_the_api_host() {
     let _guard = env_lock().lock().expect("env lock");
     unsafe {
-        std::env::remove_var("OMNYID_WORKSPACE_BASE_URL");
-        std::env::remove_var("OMNYID_UI_BASE_URL");
-        std::env::remove_var("OMNYID_HOMESERVER_URL");
+        // Compose forwards optional values as empty strings. They must not
+        // shadow the derivable public workspace origin.
+        std::env::set_var("OMNYID_WORKSPACE_BASE_URL", "");
+        std::env::set_var("OMNYID_UI_BASE_URL", "");
+        std::env::set_var("OMNYID_HOMESERVER_URL", "https://api.omnyid.com");
     }
     assert_eq!(
         calendar_google_oauth_redirect_target("error"),
         "https://omnyid.com/workspace/?calendar=error"
     );
+    unsafe {
+        std::env::remove_var("OMNYID_WORKSPACE_BASE_URL");
+        std::env::remove_var("OMNYID_UI_BASE_URL");
+        std::env::remove_var("OMNYID_HOMESERVER_URL");
+    }
 }
 
 #[test]
