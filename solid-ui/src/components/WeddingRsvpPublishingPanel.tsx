@@ -41,11 +41,14 @@ export function WeddingRsvpPublishingPanel(props: {
   const [expiry, setExpiry] = createSignal(futureExpiry());
   const [confirmed, setConfirmed] = createSignal(false);
   const [requestContactDetails, setRequestContactDetails] = createSignal(false);
+  const [loomUrl, setLoomUrl] = createSignal("");
   const [busy, setBusy] = createSignal(false);
   const [notice, setNotice] = createSignal("");
   const [createdLink, setCreatedLink] = createSignal("");
   const [createdRecipients, setCreatedRecipients] = createSignal<Array<{ displayName: string; email: string }>>([]);
   const [createdContactRequest, setCreatedContactRequest] = createSignal(false);
+  const [createdLoomUrl, setCreatedLoomUrl] = createSignal("");
+  const priorLoomUrls = createMemo(() => [...new Set(grants().flatMap((grant) => grant.loom_video_url ? [grant.loom_video_url] : []))]);
 
   onMount(async () => {
     try {
@@ -86,6 +89,7 @@ export function WeddingRsvpPublishingPanel(props: {
         invitationIds: household.recipients.map((recipient) => recipient.invitationId),
         expiresAt: expiryIso(expiry()),
         requestContactDetails: requestContactDetails(),
+        loomVideoUrl: loomUrl(),
       });
       setGrants((current) => [created.grant, ...current]);
       setCreatedLink(weddingRsvpProtectedLink(created.token));
@@ -94,6 +98,7 @@ export function WeddingRsvpPublishingPanel(props: {
         return email ? [{ displayName: recipient.displayName, email }] : [];
       }));
       setCreatedContactRequest(requestContactDetails());
+      setCreatedLoomUrl(loomUrl().trim());
       setNotice("Protected link created. It has not been sent to anyone.");
       setSelectedHousehold(null);
       setConfirmed(false);
@@ -133,7 +138,8 @@ export function WeddingRsvpPublishingPanel(props: {
     const detailRequest = createdContactRequest()
       ? "Please also confirm your name, email, phone number and relationship to us. "
       : "";
-    const body = `Hi ${recipient.displayName},\n\nPlease use this protected link to reply for ${props.setup.eventLabel}. ${detailRequest}Only the people named on your invitation are shown.\n\n${createdLink()}\n\nThank you.`;
+    const video = createdLoomUrl() ? `We also recorded a short hello for you: ${createdLoomUrl()}\n\n` : "";
+    const body = `Hi ${recipient.displayName},\n\n${video}Please use this protected link to reply for ${props.setup.eventLabel}. ${detailRequest}Only the people named on your invitation are shown.\n\n${createdLink()}\n\nThank you.`;
     return `mailto:${encodeURIComponent(recipient.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   }
 
@@ -165,6 +171,8 @@ export function WeddingRsvpPublishingPanel(props: {
         <p class="mt-1 text-xs leading-5 text-teal-950/70">This creates one household-scoped link for {props.setup.eventLabel}. It does not email, text or notify anyone.</p>
         <label class="mt-3 block text-xs font-semibold text-teal-950/75">Link expires<input type="date" min={new Date().toISOString().slice(0, 10)} value={expiry()} onInput={(event) => setExpiry(event.currentTarget.value)} class="mt-1 min-h-11 w-full rounded-lg border border-teal-200 bg-white px-3 text-sm" /></label>
         <label class="mt-3 flex min-h-11 items-start gap-2 rounded-lg border border-teal-100 bg-white px-3 py-2 text-xs font-semibold text-teal-950"><input type="checkbox" class="mt-0.5 h-5 w-5 accent-teal-800" checked={requestContactDetails()} onChange={(event) => setRequestContactDetails(event.currentTarget.checked)} /><span>Ask each named guest to confirm their name, email, phone and relationship to us in the same protected RSVP.</span></label>
+        <label class="mt-3 block text-xs font-semibold text-teal-950/75">Optional Loom video<input type="url" list="wedding-rsvp-loom-history" placeholder="https://www.loom.com/share/…" value={loomUrl()} onInput={(event) => setLoomUrl(event.currentTarget.value)} class="mt-1 min-h-11 w-full rounded-lg border border-teal-200 bg-white px-3 text-sm font-normal" /><span class="mt-1 block font-normal leading-5">Paste a public Loom share link. <a class="font-semibold underline" href="https://www.loom.com/record" target="_blank" rel="noreferrer">Create a video in Loom</a>.</span></label>
+        <datalist id="wedding-rsvp-loom-history"><For each={priorLoomUrls()}>{(url) => <option value={url} />}</For></datalist>
         <label class="mt-3 flex min-h-11 items-start gap-2 text-xs font-semibold text-teal-950"><input type="checkbox" class="mt-0.5 h-5 w-5 accent-teal-800" checked={confirmed()} onChange={(event) => setConfirmed(event.currentTarget.checked)} />I checked the named recipients, event and expiry. I understand this only creates a link.</label>
         <div class="mt-3 grid gap-2 sm:grid-cols-2"><button type="button" class="min-h-11 rounded-lg border border-teal-200 bg-white font-semibold text-teal-950" onClick={() => { setSelectedHousehold(null); setConfirmed(false); setRequestContactDetails(false); }}>Cancel</button><button type="button" disabled={!confirmed() || busy()} class="min-h-11 rounded-lg bg-teal-800 font-semibold text-white disabled:bg-teal-300" onClick={() => void createLink()}>{busy() ? "Creating…" : "Confirm and create link"}</button></div>
       </div>

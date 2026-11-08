@@ -1,4 +1,6 @@
-use super::wedding_rsvp_capability_routes::{CreateRequest, token_digest, validate_create};
+use super::wedding_rsvp_capability_routes::{
+    CreateRequest, token_digest, validate_create, validated_loom_url,
+};
 use crate::db::{Db, WeddingRsvpCapabilityGrantCreate, WeddingRsvpCapabilityGrantRotation};
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use chrono::{Duration as ChronoDuration, Utc};
@@ -38,6 +40,7 @@ fn create_request(expires_at: String) -> CreateRequest {
         invitation_ids: vec!["wedding_invitation:primary:alex:ceremony".into()],
         expires_at,
         request_contact_details: false,
+        loom_video_url: None,
     }
 }
 
@@ -48,6 +51,15 @@ fn capability_tokens_require_exactly_256_bits() {
     assert_eq!(digest.len(), 64);
     assert!(token_digest(&URL_SAFE_NO_PAD.encode([7_u8; 31])).is_none());
     assert!(token_digest("not a capability token").is_none());
+}
+
+#[test]
+fn rsvp_video_accepts_only_https_loom_share_or_embed_links() {
+    assert_eq!(validated_loom_url(None).unwrap(), None);
+    assert!(validated_loom_url(Some("https://www.loom.com/share/abc_123")).is_ok());
+    assert!(validated_loom_url(Some("https://loom.com/embed/abc-123")).is_ok());
+    assert!(validated_loom_url(Some("http://www.loom.com/share/abc")).is_err());
+    assert!(validated_loom_url(Some("https://example.com/share/abc")).is_err());
 }
 
 #[test]
@@ -221,6 +233,7 @@ async fn disposable_postgres_proves_capability_isolation_rotation_and_revocation
                     .expect("invalid scope digest"),
                 expires_at,
                 request_contact_details: false,
+                loom_video_url: None,
             },
         )
         .await
@@ -243,6 +256,7 @@ async fn disposable_postgres_proves_capability_isolation_rotation_and_revocation
                 token_digest: digest_one.clone(),
                 expires_at,
                 request_contact_details: false,
+                loom_video_url: None,
             },
         )
         .await
@@ -296,6 +310,7 @@ async fn disposable_postgres_proves_capability_isolation_rotation_and_revocation
                 token_digest: digest_one.clone(),
                 expires_at,
                 request_contact_details: false,
+                loom_video_url: None,
             },
         )
         .await;
@@ -353,6 +368,7 @@ async fn disposable_postgres_proves_capability_isolation_rotation_and_revocation
             token_digest: digest_three.clone(),
             expires_at,
             request_contact_details: false,
+            loom_video_url: None,
         },
     )
     .await

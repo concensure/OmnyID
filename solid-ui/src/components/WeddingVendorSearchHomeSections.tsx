@@ -144,6 +144,7 @@ export function WeddingVendorSearchHomeSection(props: {
   const [expandedLifecycleVendorKey, setExpandedLifecycleVendorKey] = createSignal<string | null>(null);
   const [selectedVendorCategory, setSelectedVendorCategory] = createSignal<string | null>(null);
   const [vendorMode, setVendorMode] = createSignal<"find" | "invite" | "specials">("find");
+  const [allMobileCategories, setAllMobileCategories] = createSignal(false);
   const [pendingSpecialEnquiry, setPendingSpecialEnquiry] = createSignal<{ marker: WeddingVendorSpecialMarker; detail: WeddingVendorRankedSpecialDetail | null } | null>(null);
   let comparisonResultElement: HTMLDivElement | undefined;
   const lifecycleRecords = createMemo(() => {
@@ -433,7 +434,7 @@ export function WeddingVendorSearchHomeSection(props: {
       </label>
       </div>
       </form>
-      <div class="-mx-3 mt-3 flex snap-x gap-2 overflow-x-auto px-3 pb-2 pr-8 [scrollbar-width:none] sm:mx-0 sm:px-0 sm:pr-0" aria-label="Popular vendor types">
+      <div class="-mx-3 mt-3 hidden snap-x gap-2 overflow-x-auto px-3 pb-2 pr-8 [scrollbar-width:none] sm:mx-0 sm:flex sm:px-0 sm:pr-0" aria-label="Vendor categories">
         <For each={VENDOR_CATEGORY_CHIPS}>{(chip) => (
           <button
             type="button"
@@ -445,6 +446,10 @@ export function WeddingVendorSearchHomeSection(props: {
             <WeddingDashboardIcon id={chip.icon} class="h-4 w-4" />{chip.label}
           </button>
         )}</For>
+      </div>
+      <div class="mt-3 sm:hidden" aria-label="Vendor categories">
+        <div class="grid grid-cols-3 gap-2"><For each={VENDOR_CATEGORY_CHIPS.slice(0, 2)}>{(chip) => <button type="button" class={`flex min-h-11 min-w-0 items-center justify-center gap-1 rounded-lg border px-2 text-xs font-semibold ${isSelectedCategory(chip.query) ? "border-wedding-primary bg-wedding-primary text-wedding-page" : "border-wedding-border bg-white text-wedding-ink"}`} disabled={searchDisabled()} aria-pressed={isSelectedCategory(chip.query)} onClick={(event) => runCategorySearch(event, chip.query)}><WeddingDashboardIcon id={chip.icon} class="h-4 w-4 shrink-0" /><span class="truncate">{chip.label}</span></button>}</For><button type="button" class="min-h-11 rounded-lg border border-wedding-border bg-white px-2 text-xs font-semibold text-wedding-primary" aria-expanded={allMobileCategories()} onClick={() => setAllMobileCategories((value) => !value)}>{allMobileCategories() ? "Show less" : "See all"}</button></div>
+        <Show when={allMobileCategories()}><div class="mt-2 grid grid-cols-2 gap-2 rounded-xl border border-wedding-border bg-wedding-page p-2"><For each={VENDOR_CATEGORY_CHIPS.slice(2)}>{(chip) => <button type="button" class={`flex min-h-11 min-w-0 items-center gap-2 rounded-lg border px-3 text-left text-sm font-semibold ${isSelectedCategory(chip.query) ? "border-wedding-primary bg-wedding-primary text-wedding-page" : "border-wedding-border bg-white text-wedding-ink"}`} disabled={searchDisabled()} aria-pressed={isSelectedCategory(chip.query)} onClick={(event) => runCategorySearch(event, chip.query)}><WeddingDashboardIcon id={chip.icon} class="h-4 w-4 shrink-0" /><span class="min-w-0 break-words">{chip.label}</span></button>}</For></div></Show>
       </div>
       <Show when={!props.result && !workspace().vendorSearchRunning}>
         <p class="mt-2 text-[13px] leading-[18px] text-wedding-ink/70">Real vendors near you. We show where each result came from.</p>

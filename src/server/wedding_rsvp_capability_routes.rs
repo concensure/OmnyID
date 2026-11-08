@@ -188,6 +188,24 @@ pub(crate) struct CreateRequest {
     pub(crate) expires_at: String,
     #[serde(default)]
     pub(crate) request_contact_details: bool,
+    pub(crate) loom_video_url: Option<String>,
+}
+
+pub(crate) fn validated_loom_url(
+    value: Option<&str>,
+) -> Result<Option<String>, (StatusCode, String)> {
+    let Some(value) = value.map(str::trim).filter(|value| !value.is_empty()) else {
+        return Ok(None);
+    };
+    let parsed =
+        reqwest::Url::parse(value).map_err(|_| bad_request("Use a valid Loom share link."))?;
+    let host = parsed.host_str().unwrap_or_default().to_ascii_lowercase();
+    let allowed_host = matches!(host.as_str(), "loom.com" | "www.loom.com");
+    let allowed_path = parsed.path().starts_with("/share/") || parsed.path().starts_with("/embed/");
+    if parsed.scheme() != "https" || !allowed_host || !allowed_path || value.len() > 500 {
+        return Err(bad_request("Use an HTTPS loom.com share link."));
+    }
+    Ok(Some(value.to_string()))
 }
 
 #[derive(Serialize)]
@@ -235,6 +253,7 @@ async fn create_http(
         return Err(unavailable());
     }
     let expires_at = validate_create(&request, Utc::now())?;
+    let loom_video_url = validated_loom_url(request.loom_video_url.as_deref())?;
     let (token, token_digest) = new_token();
     let input = WeddingRsvpCapabilityGrantCreate {
         grant_id: format!("rsvp-capability-{}", Ulid::new()),
@@ -245,6 +264,7 @@ async fn create_http(
         token_digest,
         expires_at,
         request_contact_details: request.request_contact_details,
+        loom_video_url,
     };
     let grant = state
         .db

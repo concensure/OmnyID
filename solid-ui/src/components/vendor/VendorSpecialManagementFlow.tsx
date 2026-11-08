@@ -2,6 +2,7 @@ import { createSignal, For, onMount, Show } from "solid-js";
 
 import {
   commandVendorSpecial,
+  attributeVendorSpecialSignup,
   exchangeVendorSpecialLink,
   getVendorSpecialSession,
   type VendorSpecialOperation,
@@ -60,6 +61,8 @@ export function VendorSpecialManagementFlow(props: { token: string }) {
     try {
       if (props.token) {
         const exchanged = await exchangeVendorSpecialLink(props.token);
+        localStorage.setItem("omnyid.vendorSpecials.referralGrantId", exchanged.referral_grant_id);
+        void attributeVendorSpecialSignup(exchanged.referral_grant_id).catch(() => undefined);
         sessionStorage.setItem(csrfStorageKey, exchanged.csrf_token);
         setCsrfToken(exchanged.csrf_token);
         history.replaceState(null, "", `${location.pathname}${location.search}`);
@@ -147,7 +150,7 @@ export function VendorSpecialManagementFlow(props: { token: string }) {
         </header>
         <div class="space-y-3">
           <For each={current.offer.slots}>{(slot) => <article class="rounded-xl border border-wedding-muted p-4">
-            <div class="flex flex-wrap items-start justify-between gap-3"><div><h3 class="font-bold">{new Date(`${slot.local_date}T12:00:00`).toLocaleDateString("en-AU", { dateStyle: "long" })}</h3><p class="text-sm text-wedding-muted">{[slot.space_label, slot.session_label].filter(Boolean).join(" · ") || "Date-wide offer"}</p></div><span class="text-sm font-semibold capitalize">{slot.state.replaceAll("_", " ")}</span></div>
+            <div class="flex flex-wrap items-start justify-between gap-3"><div><h3 class="font-bold">{new Date(`${slot.local_date}T12:00:00`).toLocaleDateString("en-AU", { dateStyle: "long" })}</h3><p class="text-sm text-wedding-muted">{[slot.space_label, slot.session_label].filter(Boolean).join(" · ") || "Date-wide offer"}</p></div><span class="text-sm font-semibold">{slot.state === "provisional_hold" ? "Temporary hold · 48 hours" : slot.state === "booked" ? "Confirmed booking" : slot.availability_scope === "vendor_confirmed" ? "Vendor confirmed" : "Calendar open"}</span></div>
             <dl class="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
               <div><dt class="text-wedding-muted">Capacity</dt><dd class="font-semibold">{slot.maximum_capacity ?? "Not provided"}</dd></div>
               <div><dt class="text-wedding-muted">Minimum spend</dt><dd class="font-semibold">{money(slot.minimum_spend_cents, current.offer.currency)}</dd></div>
@@ -157,7 +160,9 @@ export function VendorSpecialManagementFlow(props: { token: string }) {
             <Show when={slot.public_conditions}><p class="mt-3 text-sm">{slot.public_conditions}</p></Show>
             <p class="mt-2 text-xs text-wedding-muted">Confirmed until {new Date(slot.confirmation_expires_at).toLocaleDateString("en-AU", { dateStyle: "medium" })}</p>
             <div class="mt-4 flex flex-wrap gap-2">
-              <Show when={permitted("slot_reconfirm") && !["booked", "provisional_hold"].includes(slot.state)}><button disabled={busy()} class="min-h-11 rounded-lg bg-wedding-accent px-4 font-bold text-white disabled:opacity-50" onClick={() => void run("slot_reconfirm", slot.revision, slot)}>Confirm available</button></Show>
+              <Show when={permitted("slot_calendar_open") && !["booked", "provisional_hold"].includes(slot.state)}><button disabled={busy()} class="min-h-11 rounded-lg border border-wedding-muted px-4 font-semibold disabled:opacity-50" onClick={() => void run("slot_calendar_open", slot.revision, slot)}>Set calendar open</button></Show>
+              <Show when={permitted("slot_confirm_availability") && !["booked", "provisional_hold"].includes(slot.state)}><button disabled={busy()} class="min-h-11 rounded-lg bg-wedding-accent px-4 font-bold text-white disabled:opacity-50" onClick={() => void run("slot_confirm_availability", slot.revision, slot)}>Vendor confirm date</button></Show>
+              <Show when={permitted("slot_reconfirm") && !permitted("slot_calendar_open") && !permitted("slot_confirm_availability") && !["booked", "provisional_hold"].includes(slot.state)}><button disabled={busy()} class="min-h-11 rounded-lg bg-wedding-accent px-4 font-bold text-white disabled:opacity-50" onClick={() => void run("slot_reconfirm", slot.revision, slot)}>Confirm available</button></Show>
               <Show when={permitted("slot_place_hold") && slot.state === "enquiry_received"}><button disabled={busy()} class="min-h-11 rounded-lg border border-wedding-muted px-4 font-semibold disabled:opacity-50" onClick={() => confirm("Hold this date for 48 hours? New couples will not see it during the hold.") && void run("slot_place_hold", slot.revision, slot)}>Hold 48 hours</button></Show>
               <Show when={permitted("slot_pause") && !["booked", "withdrawn"].includes(slot.state)}><button disabled={busy()} class="min-h-11 rounded-lg border border-wedding-muted px-4 font-semibold disabled:opacity-50" onClick={() => void run("slot_pause", slot.revision, slot)}>Pause date</button></Show>
               <Show when={permitted("slot_mark_booked") && !["booked", "withdrawn"].includes(slot.state)}><button disabled={busy()} class="min-h-11 rounded-lg border border-wedding-muted px-4 font-semibold disabled:opacity-50" onClick={() => confirm("Mark this date booked? It will no longer appear available.") && void run("slot_mark_booked", slot.revision, slot)}>Mark booked</button></Show>

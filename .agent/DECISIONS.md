@@ -3013,3 +3013,17 @@ account-scoped Wedding AFP ledger. A favourite also projects into the existing
 vendor lifecycle filter. Quote comparison continues to read the canonical
 quote artifacts and links extracted totals and inclusions back to their source
 artifact; it does not create a second quote or vendor store.
+## 2026-11-08 — WED-344 vendor-link adoption is content-light and availability remains scoped evidence
+
+- Operator-created calendar links reuse the existing 256-bit digest-only,
+  expiring, revocable vendor-offer capability. A QR is generated locally from
+  the one-time displayed link; no QR service receives the bearer secret.
+- Link visits count unique exchanged sessions. A signup attribution is accepted
+  only when both the account and its claim were created after that exact grant,
+  so an existing claimed vendor revisiting a link is not reported as a signup.
+- `calendar_open`, direct `vendor_confirmed`, a bounded provisional hold and a
+  confirmed booking remain four different authorities and couple-facing
+  labels. An open calendar never becomes a booking or permanent green badge.
+- An optional Loom greeting is stored on the existing household-scoped RSVP
+  capability, not guest answers or a new message system. Only HTTPS Loom share
+  or embed URLs are accepted, and prior suggestions remain owner scoped.

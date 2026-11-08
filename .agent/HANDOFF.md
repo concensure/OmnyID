@@ -7910,3 +7910,30 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
 - Passed TypeScript typecheck, 23 focused tests, both line budgets, all 2,234
   Wedding tests, production UI build and `git diff --check`. No rollout flag,
   allowlist or production data was changed.
+## 2026-11-08 - WED-344 vendor adoption, availability evidence and RSVP Loom (Codex, complete)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
+`agent/codex/WED-344`, based on clean WED-343 SHA
+`ede9be0c9308e18d793b5534b6e0d106889efa45`.
+
+- The operator Limited Specials dashboard now shows recent claim status/date,
+  generated links, unique exchanged-link visits and new-account signups
+  attributed per vendor. Operators can select a vendor with an existing
+  availability offer and generate its private link plus a browser-local QR.
+- Vendor link and portal controls use one state machine for calendar open,
+  direct vendor confirmation, 48-hour hold and confirmed booking. Search
+  evidence and couple labels preserve the distinction; older issued links keep
+  their legacy confirm action.
+- Protected RSVP links accept an optional validated Loom greeting, expose it
+  safely to that household, include it in the couple's reviewed email draft,
+  and suggest earlier owner-scoped Loom links. Mobile vendor categories now
+  start with Venue, Photographer and `See all`.
+- Added migration 0152 and focused static contracts. Tests passed: `cargo
+  check --lib`; 28 Limited Specials Rust tests; seven RSVP capability Rust
+  tests; migration-catalog test; TypeScript; production Vite build; 2,238
+  Wedding tests; seven focused UI contracts; two line-budget tests. One first
+  Rust retry hit a Windows compiler illegal-instruction before tests; a clean
+  non-incremental retry passed all 28 tests.
+- No deployment was requested in WED-344. Phase 10 still needs a real
+  participating-vendor hosted pilot and external acceptance evidence; feature
+  flags and allowlists must remain false-default until that authority exists.

@@ -242,6 +242,7 @@ function WeddingRsvpPage() {
             <p class="text-sm font-semibold text-teal-700">{loaded().host_label}</p>
             <h1 class="mt-1 text-2xl font-bold sm:text-3xl">RSVP for {loaded().event_label}</h1>
             <p class="mt-2 text-sm text-teal-800">Please respond by <time datetime={loaded().response_deadline}>{new Date(`${loaded().response_deadline}T12:00:00`).toLocaleDateString(undefined, { dateStyle: "long" })}</time>.</p>
+            <Show when={loaded().loom_video_url}>{(url) => <a class="mt-4 inline-flex min-h-11 items-center rounded-xl border border-teal-300 px-4 text-sm font-bold text-teal-900" href={url()} target="_blank" rel="noreferrer">Watch the couple's short video</a>}</Show>
           </header>
           <Show when={phase() === "answer"}>
             <section class="mt-4 rounded-2xl border border-teal-100 bg-white p-4 sm:p-6" aria-labelledby="people-title">

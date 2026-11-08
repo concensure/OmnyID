@@ -31,6 +31,7 @@ use super::{
 
 mod records;
 use records::*;
+mod admin;
 mod capability;
 mod commands;
 mod discovery;
@@ -76,71 +77,10 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
             "/wedding/vendor-specials/enquiries/delivery-failure",
             post(enquiry::record_special_delivery_failure_http),
         )
-        .route("/admin/wedding/vendor-specials", get(admin_metrics_http))
+        .merge(admin::routes())
         .merge(discovery::routes())
         .merge(capability::routes())
         .layer(axum::middleware::from_fn(privacy::no_store))
-}
-
-async fn admin_metrics_http(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-) -> Result<Json<Value>, (StatusCode, String)> {
-    let user = authenticated_user(&state.db, &headers).await?;
-    if !super::cost_controls::operator_access_allowed(&user.email) {
-        return Err((StatusCode::FORBIDDEN, "Operator access is required.".into()));
-    }
-    let rows = sqlx::query(
-        r#"SELECT offer.category,
-                  COUNT(DISTINCT offer.offer_id)::bigint AS offers,
-                  COUNT(DISTINCT offer.offer_id) FILTER (WHERE offer.publication_state='active')::bigint AS active_offers,
-                  COUNT(DISTINCT slot.slot_id) FILTER (WHERE slot.state IN ('available','enquiry_received') AND slot.confirmation_expires_at>NOW())::bigint AS fresh_dates,
-                  COUNT(DISTINCT slot.slot_id) FILTER (WHERE slot.state='stale' OR slot.confirmation_expires_at<=NOW())::bigint AS stale_dates,
-                  COUNT(DISTINCT enquiry.link_id)::bigint AS enquiries,
-                  COUNT(DISTINCT event.event_id) FILTER (WHERE event.event_kind='delivery_failed')::bigint AS delivery_failures
-             FROM wedding_vendor_special_offers offer
-             LEFT JOIN wedding_vendor_special_offer_slots slot ON slot.offer_id=offer.offer_id
-             LEFT JOIN wedding_vendor_special_offer_enquiries enquiry ON enquiry.offer_id=offer.offer_id
-             LEFT JOIN wedding_vendor_special_offer_events event ON event.offer_id=offer.offer_id
-            GROUP BY offer.category ORDER BY active_offers DESC,offer.category"#,
-    )
-    .fetch_all(&state.db.pool)
-    .await
-    .map_err(database_failure)?;
-    let outcomes = sqlx::query(
-        "SELECT outcome,COUNT(*)::bigint AS count FROM wedding_vendor_special_offer_outcome_projection GROUP BY outcome ORDER BY outcome",
-    )
-    .fetch_all(&state.db.pool)
-    .await
-    .map_err(database_failure)?;
-    let coverage = sqlx::query(
-        r#"SELECT COUNT(*)::bigint AS active_vendors,
-                  COUNT(*) FILTER (WHERE
-                    EXISTS (SELECT 1 FROM wedding_vendor_attributes a WHERE a.vendor_id=v.vendor_id AND a.attribute_key='latitude' AND a.status IN ('known','estimated') AND jsonb_typeof(a.value)='number')
-                    AND EXISTS (SELECT 1 FROM wedding_vendor_attributes a WHERE a.vendor_id=v.vendor_id AND a.attribute_key='longitude' AND a.status IN ('known','estimated') AND jsonb_typeof(a.value)='number')
-                  )::bigint AS mapped_vendors
-             FROM wedding_vendors v WHERE v.status='active'"#,
-    )
-    .fetch_one(&state.db.pool)
-    .await
-    .map_err(database_failure)?;
-    Ok(Json(
-        json!({"categories": rows.into_iter().map(|row| json!({
-        "category":row.get::<String,_>("category"),
-        "offers":row.get::<i64,_>("offers"),
-        "active_offers":row.get::<i64,_>("active_offers"),
-        "fresh_dates":row.get::<i64,_>("fresh_dates"),
-        "stale_dates":row.get::<i64,_>("stale_dates"),
-        "enquiries":row.get::<i64,_>("enquiries"),
-        "delivery_failures":row.get::<i64,_>("delivery_failures")
-    })).collect::<Vec<_>>(), "outcomes": outcomes.into_iter().map(|row| json!({
-        "outcome":row.get::<String,_>("outcome"),
-        "count":row.get::<i64,_>("count")
-    })).collect::<Vec<_>>(), "map_coverage": {
-        "active_vendors":coverage.get::<i64,_>("active_vendors"),
-        "mapped_vendors":coverage.get::<i64,_>("mapped_vendors")
-    } }),
-    ))
 }
 
 #[derive(Debug, Deserialize)]
@@ -224,6 +164,8 @@ struct SlotCommandRequest {
 #[derive(Clone, Copy, Debug, Deserialize)]
 #[serde(rename_all = "snake_case")]
 enum VendorSlotAction {
+    CalendarOpen,
+    ConfirmAvailability,
     RecordEnquiry,
     PlaceHold,
     MarkBooked,
@@ -727,6 +669,8 @@ fn vendor_slot_json(
         "space_label":row.get::<String,_>("space_label"),
         "session_label":row.get::<String,_>("session_label"),
         "state":row.get::<String,_>("state"),
+        "availability_scope":row.get::<String,_>("availability_scope"),
+        "availability_scope_updated_at":row.get::<chrono::DateTime<Utc>,_>("availability_scope_updated_at"),
         "maximum_capacity":terms.maximum_capacity,
         "minimum_spend_cents":terms.minimum_spend_cents,
         "indicative_per_head_cents":terms.indicative_per_head_cents,
@@ -838,6 +782,18 @@ fn slot_command(
     request: &SlotCommandRequest,
 ) -> Result<(SpecialSlotCommand, &'static str), (StatusCode, String)> {
     match request.action {
+        VendorSlotAction::CalendarOpen => Ok((
+            SpecialSlotCommand::Reconfirm {
+                expires_at: Utc::now() + ChronoDuration::days(CONFIRMATION_DAYS),
+            },
+            "calendar_opened",
+        )),
+        VendorSlotAction::ConfirmAvailability => Ok((
+            SpecialSlotCommand::Reconfirm {
+                expires_at: Utc::now() + ChronoDuration::days(CONFIRMATION_DAYS),
+            },
+            "availability_confirmed",
+        )),
         VendorSlotAction::RecordEnquiry => {
             Ok((SpecialSlotCommand::RecordEnquiry, "enquiry_received"))
         }

@@ -1,7 +1,7 @@
-use super::{tenant_schema_name, Db};
+use super::{Db, tenant_schema_name};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sqlx::{Postgres, Row, Transaction};
 use std::collections::{HashMap, HashSet};
 
@@ -15,6 +15,7 @@ pub struct WeddingRsvpCapabilityGrantCreate {
     pub token_digest: String,
     pub expires_at: DateTime<Utc>,
     pub request_contact_details: bool,
+    pub loom_video_url: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -39,6 +40,7 @@ pub struct WeddingRsvpCapabilityGrantSummary {
     pub last_opened_at: Option<String>,
     pub created_at: String,
     pub request_contact_details: bool,
+    pub loom_video_url: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
@@ -82,6 +84,7 @@ pub struct WeddingRsvpCapabilityScope {
     pub questions: Vec<WeddingRsvpCapabilityQuestion>,
     pub expires_at: String,
     pub request_contact_details: bool,
+    pub loom_video_url: Option<String>,
     pub invitations: Vec<WeddingRsvpCapabilityInvitation>,
 }
 
@@ -109,12 +112,13 @@ fn summary(row: &sqlx::postgres::PgRow) -> Result<WeddingRsvpCapabilityGrantSumm
         last_opened_at: row.try_get("last_opened_at")?,
         created_at: row.try_get("created_at")?,
         request_contact_details: row.try_get("request_contact_details")?,
+        loom_video_url: row.try_get("loom_video_url")?,
     })
 }
 
 fn grant_select(where_clause: &str) -> String {
     format!(
-        "SELECT grant_id,wedding_plan_id,response_workspace_id,household_id,invitation_ids,expires_at::text,revoked_at::text,replaced_by_grant_id,open_count,last_opened_at::text,created_at::text,request_contact_details FROM wedding_rsvp_capability_grants WHERE {where_clause}"
+        "SELECT grant_id,wedding_plan_id,response_workspace_id,household_id,invitation_ids,expires_at::text,revoked_at::text,replaced_by_grant_id,open_count,last_opened_at::text,created_at::text,request_contact_details,loom_video_url FROM wedding_rsvp_capability_grants WHERE {where_clause}"
     )
 }
 
@@ -525,7 +529,7 @@ impl Db {
             return Ok(None);
         }
         sqlx::query(
-            "INSERT INTO wedding_rsvp_capability_grants (grant_id,owner_user_id,wedding_plan_id,response_workspace_id,household_id,invitation_ids,token_digest,expires_at,request_contact_details) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)",
+            "INSERT INTO wedding_rsvp_capability_grants (grant_id,owner_user_id,wedding_plan_id,response_workspace_id,household_id,invitation_ids,token_digest,expires_at,request_contact_details,loom_video_url) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",
         )
         .bind(&input.grant_id)
         .bind(owner_user_id)
@@ -536,6 +540,7 @@ impl Db {
         .bind(&input.token_digest)
         .bind(input.expires_at)
         .bind(input.request_contact_details)
+        .bind(input.loom_video_url)
         .execute(&mut *tx)
         .await?;
         let row = sqlx::query(&grant_select("grant_id=$1"))
@@ -624,7 +629,7 @@ impl Db {
         self.ensure_user_private_schema(owner_user_id).await?;
         let mut tx = self.pool.begin().await?;
         let Some(source) = sqlx::query(
-            "SELECT wedding_plan_id,response_workspace_id,household_id,invitation_ids,request_contact_details FROM wedding_rsvp_capability_grants WHERE grant_id=$1 AND owner_user_id=$2 AND revoked_at IS NULL AND expires_at>NOW() FOR UPDATE",
+            "SELECT wedding_plan_id,response_workspace_id,household_id,invitation_ids,request_contact_details,loom_video_url FROM wedding_rsvp_capability_grants WHERE grant_id=$1 AND owner_user_id=$2 AND revoked_at IS NULL AND expires_at>NOW() FOR UPDATE",
         )
         .bind(&input.source_grant_id)
         .bind(owner_user_id)
@@ -640,6 +645,7 @@ impl Db {
             serde_json::from_value::<Vec<String>>(source.try_get("invitation_ids")?)
                 .unwrap_or_default();
         let request_contact_details: bool = source.try_get("request_contact_details")?;
+        let loom_video_url: Option<String> = source.try_get("loom_video_url")?;
         if invitation_scope(
             &mut tx,
             owner_user_id,
@@ -654,7 +660,7 @@ impl Db {
             return Ok(None);
         }
         sqlx::query(
-            "INSERT INTO wedding_rsvp_capability_grants (grant_id,owner_user_id,wedding_plan_id,response_workspace_id,household_id,invitation_ids,token_digest,expires_at,rotated_from_grant_id,request_contact_details) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",
+            "INSERT INTO wedding_rsvp_capability_grants (grant_id,owner_user_id,wedding_plan_id,response_workspace_id,household_id,invitation_ids,token_digest,expires_at,rotated_from_grant_id,request_contact_details,loom_video_url) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)",
         )
         .bind(&input.grant_id)
         .bind(owner_user_id)
@@ -666,6 +672,7 @@ impl Db {
         .bind(input.expires_at)
         .bind(&input.source_grant_id)
         .bind(request_contact_details)
+        .bind(loom_video_url)
         .execute(&mut *tx)
         .await?;
         sqlx::query(
@@ -716,7 +723,7 @@ impl Db {
     ) -> Result<Option<WeddingRsvpCapabilityScope>, sqlx::Error> {
         let mut tx = self.pool.begin().await?;
         let Some(row) = sqlx::query(
-            "SELECT grant_id,owner_user_id,wedding_plan_id,response_workspace_id,household_id,invitation_ids,expires_at,request_contact_details FROM wedding_rsvp_capability_grants WHERE token_digest=$1 FOR UPDATE",
+            "SELECT grant_id,owner_user_id,wedding_plan_id,response_workspace_id,household_id,invitation_ids,expires_at,request_contact_details,loom_video_url FROM wedding_rsvp_capability_grants WHERE token_digest=$1 FOR UPDATE",
         )
         .bind(token_digest)
         .fetch_optional(&mut *tx)
@@ -771,6 +778,7 @@ impl Db {
         let invitation_ids = serde_json::from_value::<Vec<String>>(row.try_get("invitation_ids")?)
             .unwrap_or_default();
         let request_contact_details: bool = row.try_get("request_contact_details")?;
+        let loom_video_url: Option<String> = row.try_get("loom_video_url")?;
         let Some(invitations) = invitation_scope(
             &mut tx,
             &owner_user_id,
@@ -840,6 +848,7 @@ impl Db {
             questions,
             expires_at: expires_at.to_rfc3339(),
             request_contact_details,
+            loom_video_url,
             invitations,
         }))
     }

@@ -7,6 +7,8 @@ export type VendorSpecialOperation =
   | "offer_withdraw"
   | "offer_reconfirm"
   | "slot_record_enquiry"
+  | "slot_calendar_open"
+  | "slot_confirm_availability"
   | "slot_place_hold"
   | "slot_mark_booked"
   | "slot_reopen_cancelled_booking"
@@ -23,6 +25,8 @@ export type VendorSpecialSlot = {
   space_label: string;
   session_label: string;
   state: string;
+  availability_scope: "calendar_open" | "vendor_confirmed";
+  availability_scope_updated_at: string;
   maximum_capacity: number | null;
   minimum_spend_cents: number | null;
   indicative_per_head_cents: number | null;
@@ -145,6 +149,7 @@ export async function createClaimedVendorSpecialManagementLink(input: {
       allowed_operations: [
         "offer_edit", "offer_publish", "offer_pause", "offer_reconfirm",
         "slot_place_hold", "slot_mark_booked", "slot_pause", "slot_withdraw", "slot_reconfirm",
+        "slot_calendar_open", "slot_confirm_availability",
         "slot_reopen_cancelled_booking",
       ],
     }),
@@ -199,7 +204,7 @@ export async function commandClaimedVendorOffer(input: { vendorSlug: string; off
   });
 }
 
-export async function commandClaimedVendorSlot(input: { vendorSlug: string; offerId: string; slotId: string; revision: number; action: "place_hold" | "mark_booked" | "reopen_cancelled_booking" | "pause" | "withdraw" | "reconfirm"; holdExpiresAt?: string; reason?: string }) {
+export async function commandClaimedVendorSlot(input: { vendorSlug: string; offerId: string; slotId: string; revision: number; action: "calendar_open" | "confirm_availability" | "place_hold" | "mark_booked" | "reopen_cancelled_booking" | "pause" | "withdraw" | "reconfirm"; holdExpiresAt?: string; reason?: string }) {
   return apiFetch<Record<string, unknown>>(`/wedding/vendor/special-offers/${encodeURIComponent(input.offerId)}/slots/${encodeURIComponent(input.slotId)}/state`, {
     method: "POST",
     body: JSON.stringify({
@@ -221,7 +226,14 @@ export async function exchangeVendorSpecialLink(token: string) {
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ token }),
   });
-  return responseJson<{ csrf_token: string; expires_at: string; account_access: false }>(response);
+  return responseJson<{ csrf_token: string; expires_at: string; account_access: false; referral_grant_id: string }>(response);
+}
+
+export async function attributeVendorSpecialSignup(grantId: string) {
+  return apiFetch<{ attributed: boolean; grant_id: string }>("/wedding/vendor-specials/manage/attribute-signup", {
+    method: "POST",
+    bodyJson: { grant_id: grantId },
+  });
 }
 
 export async function getVendorSpecialSession() {

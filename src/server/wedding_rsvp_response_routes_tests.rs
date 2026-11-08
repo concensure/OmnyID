@@ -378,6 +378,7 @@ async fn disposable_postgres_proves_public_capability_submission_and_revoke_race
             token_digest: digest.clone(),
             expires_at: Utc::now() + ChronoDuration::days(2),
             request_contact_details: true,
+            loom_video_url: None,
         },
     )
     .await

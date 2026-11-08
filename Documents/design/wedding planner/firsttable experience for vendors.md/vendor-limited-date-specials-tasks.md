@@ -146,6 +146,24 @@ pricing state before the authoritative commands and safe projections exist.
 - [x] Freeze exact SHA, build from a clean release checkout, deploy and record
   runtime/backup/restore evidence before cohort activation.
 
+## Phase 11 — operator adoption and evidence-state controls
+
+- [x] Show recent vendor claims, per-vendor generated-link counts, unique
+  exchanged-link visits and genuinely new account signups attributed to a link
+  in the existing operator dashboard without exposing bearer secrets.
+- [x] Let an operator select a vendor with an availability offer and issue the
+  same expiring, revocable, operation-scoped management capability used by the
+  vendor portal. Generate the shareable QR code locally in the admin browser.
+- [x] Let the vendor distinguish calendar-open evidence from a direct vendor
+  confirmation, while preserving the existing bounded 48-hour hold and
+  confirmed-booking transitions.
+- [x] Keep the couple projection explicit: calendar open, vendor confirmed,
+  temporary hold and confirmed booking are separate dated evidence states.
+- [x] Extend protected RSVP invitations with an optional validated Loom share
+  link and account-scoped suggestions from prior invitations.
+- [x] Keep mobile category discovery compact with Venue, Photographer and a
+  `See all` expansion into the full existing category catalogue.
+
 ## Implemented slices
 
 WED-340 begins with Phase 1: additive schema, pure state policy and safe

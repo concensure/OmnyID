@@ -15,6 +15,18 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-344
+    title: Operate vendor calendar links, attribute vendor adoption, add RSVP Loom video, and simplify mobile vendor categories
+    status: done
+    owner: codex
+    branch: agent/codex/WED-344
+    worktree: C:/Users/ozans/Desktop/projects/OmnyID-GROWTH-001
+    base_sha: ede9be0c9308e18d793b5534b6e0d106889efa45
+    depends_on: [WED-303, WED-337, WED-340, WED-343]
+    files: [postgres/migrations/**, src/server/wedding_vendor_special_offer_routes/**, src/server/wedding_vendor_ownership_routes**, src/server/wedding_rsvp**, src/db/migration_catalog.rs, solid-ui/src/components/UsageAdminWeddingSpecialsPanel.tsx, solid-ui/src/components/vendor/**, solid-ui/src/components/WeddingGuest**, solid-ui/src/components/WeddingVendorSearchHomeSections.tsx, solid-ui/src/lib/vendorSpecialsApi.ts, solid-ui/src/lib/weddingRsvp**, solid-ui/tests/wedding-**, Documents/verification/**, .agent/**]
+    acceptance: [operator dashboard lists new vendor signups and per-vendor management-link status without exposing bearer secrets, operator can select one vendor and generate a high-entropy expiring revocable calendar-management link plus a client-side QR representation, visits and completed vendor signups are attributed to each individual link using content-light replay-safe events, vendor calendar management can set a date to calendar open event-specific vendor confirmed bounded 48-hour hold or confirmed booking using the existing special slot authority and those states mirror couple-facing labels without equating calendar evidence with booking, RSVP invitation setup accepts an optional validated Loom HTTPS share URL and suggests prior account-scoped Loom URLs without leaking them to other weddings, Loom creation opens the official Loom recording surface, mobile vendor categories initially show Venue Photographer and See all then expand into the full structured category grid without replacing the query, focused database API tenant security frontend accessibility typecheck Wedding build and line-budget checks pass]
+    progress: "Complete in the WED-344 working tree. Added content-light per-vendor claim/link/session/signup adoption projection, operator-issued digest-only management links with client-side QR generation, explicit calendar-open versus vendor-confirmed evidence commands while retaining hold/booking authority, account-scoped optional Loom greetings in the existing RSVP capability, and the mobile Venue/Photographer/See all category pattern. Passed cargo check; 28 Limited Specials tests; 7 RSVP tests; migration catalogue; TypeScript; production UI build; 2,238 Wedding tests; focused UI contracts; and both line budgets. The remaining one-venue hosted pilot and external reviews are Phase 10 rollout evidence, not missing implementation."
+
   - id: WED-343
     title: Evidence-first Limited Specials cards, shared shortlist, and quote comparison access
     status: done

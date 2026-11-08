@@ -396,6 +396,19 @@ pub(super) async fn change_slot_state(
     .execute(&mut *tx)
     .await
     .map_err(database_failure)?;
+    match request.action {
+        VendorSlotAction::CalendarOpen | VendorSlotAction::ConfirmAvailability => {
+            let scope = if matches!(request.action, VendorSlotAction::ConfirmAvailability) {
+                "vendor_confirmed"
+            } else {
+                "calendar_open"
+            };
+            sqlx::query("UPDATE wedding_vendor_special_offer_slots SET availability_scope=$1,availability_scope_updated_at=NOW() WHERE slot_id=$2 AND offer_id=$3 AND vendor_id=$4")
+                .bind(scope).bind(slot_id).bind(offer_id).bind(vendor_id)
+                .execute(&mut *tx).await.map_err(database_failure)?;
+        }
+        _ => {}
+    }
     record_event(
         &mut tx,
         vendor_id,

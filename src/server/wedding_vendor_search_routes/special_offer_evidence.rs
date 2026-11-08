@@ -14,6 +14,7 @@ use crate::db::Db;
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct SafeSpecialEvidence {
     vendor_id: String,
+    availability_scope: String,
     last_confirmed_at: DateTime<Utc>,
     confirmation_expires_at: DateTime<Utc>,
 }
@@ -50,7 +51,7 @@ pub(super) async fn attach_active_special_evidence(
     let guest_count = guest_count.map(i64::from);
     let rows = sqlx::query(
         r#"SELECT DISTINCT ON (slot.vendor_id)
-                  slot.vendor_id,slot.last_confirmed_at,slot.confirmation_expires_at
+                  slot.vendor_id,slot.availability_scope,slot.last_confirmed_at,slot.confirmation_expires_at
            FROM wedding_vendor_special_offer_slots slot
            JOIN wedding_vendor_special_offers offer
              ON offer.offer_id=slot.offer_id AND offer.vendor_id=slot.vendor_id
@@ -76,6 +77,7 @@ pub(super) async fn attach_active_special_evidence(
         .into_iter()
         .map(|row| SafeSpecialEvidence {
             vendor_id: row.get("vendor_id"),
+            availability_scope: row.get("availability_scope"),
             last_confirmed_at: row.get("last_confirmed_at"),
             confirmation_expires_at: row.get("confirmation_expires_at"),
         })
@@ -98,14 +100,14 @@ fn annotate_sources(
             continue;
         };
         source.availability = Some(json!({
-            "state":"confirmed_available",
+            "state":if item.availability_scope == "vendor_confirmed" { "confirmed_available" } else { "likely_available" },
             "date_from":selected_date.to_string(),
             "date_to":selected_date.to_string(),
             "confidence":1.0,
             "checked_at":item.last_confirmed_at.to_rfc3339(),
             "valid_until":item.confirmation_expires_at.to_rfc3339(),
             "source":"vendor_limited_special",
-            "notes":"Vendor-confirmed opening. Exact package details are shown only if this vendor reaches your current top three."
+            "notes":if item.availability_scope == "vendor_confirmed" { "The vendor directly confirmed this opening. Exact package details are shown only if this vendor reaches your current top three." } else { "The vendor calendar shows this date open; an enquiry is still needed. Exact package details are shown only if this vendor reaches your current top three." }
         }));
         source.limited_special = Some(json!({
             "available_on_date":selected_date.to_string(),
@@ -158,6 +160,7 @@ mod tests {
             NaiveDate::from_ymd_opt(2027, 7, 12).unwrap(),
             &[SafeSpecialEvidence {
                 vendor_id: "vendor-a".to_string(),
+                availability_scope: "vendor_confirmed".to_string(),
                 last_confirmed_at: now,
                 confirmation_expires_at: now + chrono::Duration::days(7),
             }],

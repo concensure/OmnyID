@@ -770,4 +770,11 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Auditable verified-vendor edits for draft and paused Limited Specials",
         include_str!("../../postgres/migrations/0151_wedding_vendor_special_offer_updates.sql"),
     ),
+    (
+        "0152_wedding_vendor_special_link_analytics_and_rsvp_video",
+        "Content-light vendor management-link adoption, explicit availability evidence, and optional Loom RSVP greetings",
+        include_str!(
+            "../../postgres/migrations/0152_wedding_vendor_special_link_analytics_and_rsvp_video.sql"
+        ),
+    ),
 ];

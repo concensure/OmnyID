@@ -39,6 +39,7 @@ export type WeddingRsvpCapabilityScope = {
   questions: WeddingRsvpCapabilityQuestion[];
   expires_at: string;
   request_contact_details: boolean;
+  loom_video_url?: string | null;
   invitations: WeddingRsvpCapabilityInvitation[];
 };
 
@@ -55,6 +56,7 @@ export type WeddingRsvpCapabilityGrant = {
   last_opened_at?: string | null;
   created_at: string;
   request_contact_details: boolean;
+  loom_video_url?: string | null;
 };
 
 export function loadWeddingRsvpCapabilityStatus() {
@@ -72,6 +74,7 @@ export function createWeddingRsvpCapability(input: {
   invitationIds: string[];
   expiresAt: string;
   requestContactDetails?: boolean;
+  loomVideoUrl?: string | null;
 }) {
   return apiFetch<{ grant: WeddingRsvpCapabilityGrant; token: string }>("/wedding/rsvp/capabilities", {
     method: "POST",
@@ -82,6 +85,7 @@ export function createWeddingRsvpCapability(input: {
       invitation_ids: input.invitationIds,
       expires_at: input.expiresAt,
       request_contact_details: input.requestContactDetails === true,
+      loom_video_url: input.loomVideoUrl?.trim() || null,
     },
   });
 }

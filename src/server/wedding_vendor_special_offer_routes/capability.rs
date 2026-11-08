@@ -30,13 +30,15 @@ const MAX_GRANT_DAYS: i64 = 14;
 const UNAVAILABLE: &str = "This management link is unavailable.";
 const COOKIE_NAME: &str = "omnyid_wvs_session";
 
-const ALLOWED_OPERATIONS: [&str; 12] = [
+pub(super) const ALL_OPERATIONS: [&str; 14] = [
     "offer_edit",
     "offer_publish",
     "offer_pause",
     "offer_withdraw",
     "offer_reconfirm",
     "slot_record_enquiry",
+    "slot_calendar_open",
+    "slot_confirm_availability",
     "slot_place_hold",
     "slot_mark_booked",
     "slot_reopen_cancelled_booking",
@@ -66,6 +68,10 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
         .route(
             "/api/public/wedding/vendor-specials/manage/command",
             post(command_http),
+        )
+        .route(
+            "/wedding/vendor-specials/manage/attribute-signup",
+            post(attribute_signup_http),
         )
 }
 
@@ -98,6 +104,8 @@ enum CapabilityOperation {
     OfferWithdraw,
     OfferReconfirm,
     SlotRecordEnquiry,
+    SlotCalendarOpen,
+    SlotConfirmAvailability,
     SlotPlaceHold,
     SlotMarkBooked,
     SlotReopenCancelledBooking,
@@ -115,6 +123,8 @@ impl CapabilityOperation {
             Self::OfferWithdraw => "offer_withdraw",
             Self::OfferReconfirm => "offer_reconfirm",
             Self::SlotRecordEnquiry => "slot_record_enquiry",
+            Self::SlotCalendarOpen => "slot_calendar_open",
+            Self::SlotConfirmAvailability => "slot_confirm_availability",
             Self::SlotPlaceHold => "slot_place_hold",
             Self::SlotMarkBooked => "slot_mark_booked",
             Self::SlotReopenCancelledBooking => "slot_reopen_cancelled_booking",
@@ -222,10 +232,10 @@ fn validated_operations(values: Vec<String>) -> Result<Vec<String>, (StatusCode,
         .filter(|value| !value.is_empty())
         .collect::<BTreeSet<_>>();
     if operations.is_empty()
-        || operations.len() > ALLOWED_OPERATIONS.len()
+        || operations.len() > ALL_OPERATIONS.len()
         || operations
             .iter()
-            .any(|value| !ALLOWED_OPERATIONS.contains(&value.as_str()))
+            .any(|value| !ALL_OPERATIONS.contains(&value.as_str()))
     {
         return Err((
             StatusCode::BAD_REQUEST,
@@ -308,14 +318,33 @@ async fn create_grant_http(
     Path(offer_id): Path<String>,
     Json(request): Json<CreateGrantRequest>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
+    let (user, vendor_id) =
+        grant_issuer_authority(&state, &headers, &request.vendor_slug, &offer_id).await?;
+    issue_grant(
+        &state,
+        &user.id,
+        &vendor_id,
+        &offer_id,
+        request.allowed_operations,
+        request.expires_in_days.unwrap_or(7),
+    )
+    .await
+    .map(Json)
+}
+
+pub(super) async fn issue_grant(
+    state: &AppState,
+    created_by_user_id: &str,
+    vendor_id: &str,
+    offer_id: &str,
+    requested_operations: Vec<String>,
+    days: i64,
+) -> Result<Value, (StatusCode, String)> {
     let pepper = pepper().ok_or((
         StatusCode::SERVICE_UNAVAILABLE,
         "Secure management links are not configured.".into(),
     ))?;
-    let (user, vendor_id) =
-        grant_issuer_authority(&state, &headers, &request.vendor_slug, &offer_id).await?;
-    let operations = validated_operations(request.allowed_operations)?;
-    let days = request.expires_in_days.unwrap_or(7);
+    let operations = validated_operations(requested_operations)?;
     if !(1..=MAX_GRANT_DAYS).contains(&days) {
         return Err((
             StatusCode::BAD_REQUEST,
@@ -364,12 +393,12 @@ async fn create_grant_http(
     .bind(json!(operations))
     .bind(generation)
     .bind(expires_at)
-    .bind(&user.id)
+    .bind(created_by_user_id)
     .execute(&mut *tx)
     .await
     .map_err(database_failure)?;
     tx.commit().await.map_err(database_failure)?;
-    Ok(Json(json!({
+    Ok(json!({
         "grant_id":grant_id,
         "management_url":format!("{}/workspace/vendor.html#special_management={token}", management_base_url()),
         "allowed_operations":operations,
@@ -377,7 +406,7 @@ async fn create_grant_http(
         "expires_at":expires_at.to_rfc3339(),
         "rotated_previous_links":!rotated.is_empty(),
         "notice":"This private link is shown once. It can be reopened to manage only this offer until it expires, is rotated or is revoked."
-    })))
+    }))
 }
 
 async fn revoke_grant_http(
@@ -498,6 +527,7 @@ async fn exchange_http(
     );
     let mut response = Json(json!({
         "session_id":session_id,
+        "referral_grant_id":grant_id,
         "csrf_token":csrf_secret,
         "expires_at":session_expiry.to_rfc3339(),
         "generation":grant.get::<i32,_>("generation"),
@@ -509,6 +539,53 @@ async fn exchange_http(
         HeaderValue::from_str(&cookie).map_err(|_| unavailable())?,
     );
     Ok(response)
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct AttributionRequest {
+    grant_id: String,
+}
+
+async fn attribute_signup_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(request): Json<AttributionRequest>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    enforce_rate_limit(
+        &state,
+        authenticated_rate_limit_key("vendor-special-attribution", &headers),
+        RateLimitPolicy {
+            max_requests: 12,
+            window: Duration::from_secs(60),
+        },
+    )
+    .await?;
+    let user = authenticated_user(&state.db, &headers).await?;
+    let row = sqlx::query(
+        r#"SELECT g.vendor_id,c.claim_id
+        FROM wedding_vendor_special_offer_grants g
+        JOIN users u ON u.id=$2 AND u.created_at>=g.created_at
+        JOIN wedding_vendor_claims c ON c.vendor_id=g.vendor_id AND c.user_id=u.id AND c.created_at>=g.created_at
+        WHERE g.grant_id=$1 AND g.exchanged_at IS NOT NULL
+          AND c.status IN ('started','published','verified')
+        ORDER BY c.created_at DESC LIMIT 1"#,
+    )
+    .bind(clean(&request.grant_id, 160))
+    .bind(&user.id)
+    .fetch_optional(&state.db.pool)
+    .await
+    .map_err(database_failure)?
+    .ok_or((
+        StatusCode::CONFLICT,
+        "Complete or resume this vendor's listing claim before attribution.".into(),
+    ))?;
+    let vendor_id: String = row.get("vendor_id");
+    let claim_id: String = row.get("claim_id");
+    sqlx::query("INSERT INTO wedding_vendor_special_offer_grant_attributions (grant_id,vendor_id,user_id,claim_id) VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING")
+        .bind(&request.grant_id).bind(&vendor_id).bind(&user.id).bind(&claim_id)
+        .execute(&state.db.pool).await.map_err(database_failure)?;
+    Ok(Json(json!({"attributed":true,"grant_id":request.grant_id})))
 }
 
 fn cookie(headers: &HeaderMap) -> Option<&str> {
@@ -601,6 +678,8 @@ async fn read_session_http(
         "space_label":row.get::<String,_>("space_label"),
         "session_label":row.get::<String,_>("session_label"),
         "state":row.get::<String,_>("state"),
+        "availability_scope":row.get::<String,_>("availability_scope"),
+        "availability_scope_updated_at":row.get::<chrono::DateTime<Utc>,_>("availability_scope_updated_at").to_rfc3339(),
         "maximum_capacity":row.get::<Option<i32>,_>("maximum_capacity"),
         "minimum_spend_cents":row.get::<Option<i64>,_>("minimum_spend_cents"),
         "indicative_per_head_cents":row.get::<Option<i64>,_>("indicative_per_head_cents"),
@@ -734,6 +813,10 @@ async fn command_http(
             ))?;
             let action = match operation {
                 CapabilityOperation::SlotRecordEnquiry => VendorSlotAction::RecordEnquiry,
+                CapabilityOperation::SlotCalendarOpen => VendorSlotAction::CalendarOpen,
+                CapabilityOperation::SlotConfirmAvailability => {
+                    VendorSlotAction::ConfirmAvailability
+                }
                 CapabilityOperation::SlotPlaceHold => VendorSlotAction::PlaceHold,
                 CapabilityOperation::SlotMarkBooked => VendorSlotAction::MarkBooked,
                 CapabilityOperation::SlotReopenCancelledBooking => {
