@@ -74,6 +74,7 @@ export function WeddingBudgetTrackerCard(props: {
   contributorPeople?: readonly string[];
   contactUserId?: string | null;
   onOpenArtifact?: (artifactId: string) => void;
+  onAddQuotes?: () => void;
 }) {
   const currency = props.state.lineItems[0]?.currency ?? "AUD";
   const [draft, setDraft] = createSignal<WeddingBudgetAllocationDraft>(
@@ -309,10 +310,11 @@ export function WeddingBudgetTrackerCard(props: {
           <p class="text-xs font-semibold text-rose-950/65">At risk</p>
           <p class="mt-1 break-words text-lg font-semibold text-rose-950">{moneyLabel(props.state.insights.atRiskAmount, currency)}</p>
         </div>
-        <div class="rounded-2xl border border-amber-100 bg-amber-50/75 px-2.5 py-2">
+        <button type="button" class="rounded-2xl border border-amber-100 bg-amber-50/75 px-2.5 py-2 text-left transition hover:border-amber-300 hover:bg-amber-50 focus:outline-none focus:ring-2 focus:ring-amber-500" onClick={() => props.onAddQuotes?.()} aria-label="Open quote upload and message chooser">
           <p class="text-xs font-semibold text-amber-950/65">Forecast range</p>
           <p class="mt-1 break-words text-sm font-semibold leading-5 text-amber-950">{props.state.insights.forecastRangeLabel}</p>
-        </div>
+          <p class="mt-1 text-xs font-semibold text-amber-900 underline">Add or review quotes</p>
+        </button>
       </div>
 
       <div class="mt-3 rounded-xl border border-wedding-border bg-white p-3">

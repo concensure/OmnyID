@@ -17,7 +17,7 @@ The controlled recipient was `casper.wu01@gmail.com`. The fixture contained one 
 3. A second identical request returned `replayed=true`, the same idempotency digest and the same provider receipt. It did not make a second provider call.
 4. The account ledger contained exactly one reservation, one provider-accepted receipt and one no-automatic-retry decision for the approval.
 
-This proves authenticated provider acceptance and duplicate suppression. It does not prove that a human opened the Gmail inbox: no Gmail mailbox credential or authorised mailbox API was available to this run. The controlled email subject was `RSVP reminder for Controlled vendor delivery test`, so the account operator can independently confirm receipt without sharing mailbox access.
+This proves authenticated provider acceptance and duplicate suppression. The account operator subsequently confirmed in the WED-346 continuation on 2026-11-09 that Gmail received the controlled message. That is independent human mailbox-receipt evidence; no mailbox credential, message content or private header was shared with the implementation run.
 
 ## Vendor availability exercise
 

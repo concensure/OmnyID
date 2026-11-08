@@ -1,5 +1,5 @@
 // @locs-version: 2.1
-import { createMemo, For, Show } from "solid-js";
+import { createMemo, createSignal, For, Show } from "solid-js";
 
 import type { SendAfpMessageInput } from "@/lib/api";
 import type {
@@ -106,11 +106,13 @@ export function WeddingWorkspaceContextPanels(props: {
   onRefreshWorkspace?: () => void;
   onSelectMenu?: (menu: WeddingWorkspaceMenuId) => void;
   onOpenArtifact?: (artifactId: string) => void;
+  onImportFiles?: (files: FileList) => void;
   onOpenSavedOutputs?: () => void;
   onSaveWeddingDate?: (date: string) => Promise<void> | void;
   onSidebarAction: (action: WeddingWorkspaceSidebarAction) => void;
 }) {
   const activeMenu = () => props.activeMenu ?? "home";
+  const [quoteIntakeRequest, setQuoteIntakeRequest] = createSignal(0);
   const peopleAggregate = createMemo(() => buildWeddingPeopleAggregateState(props.state));
   const planAggregate = createMemo(() => buildWeddingPlanAggregateState(props.state, {
     sharePlanOpen: props.sharePlanOpen,
@@ -420,6 +422,10 @@ export function WeddingWorkspaceContextPanels(props: {
         <WeddingBudgetEvidenceHub
           state={props.state}
           onOpenArtifact={props.onOpenArtifact}
+          onImportFiles={props.onImportFiles}
+          saveProjection={props.saveProjection}
+          onRefreshWorkspace={props.onRefreshWorkspace}
+          openIntakeRequest={quoteIntakeRequest()}
         />
         <WeddingBudgetTrackerCard
           state={props.state.budgetTracking}
@@ -432,6 +438,7 @@ export function WeddingWorkspaceContextPanels(props: {
           contributorPeople={props.state.helperContactNames}
           contactUserId={props.contactUserId}
           onOpenArtifact={props.onOpenArtifact}
+          onAddQuotes={() => setQuoteIntakeRequest((value) => value + 1)}
         />
       </div>
 

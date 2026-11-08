@@ -91,3 +91,14 @@ test("budget hub keeps Documents canonical and uses mobile-contained tabs", () =
   assert.match(hub, /role="tablist"/);
   assert.match(workspace, /props\.onSelectMenu\?\.\("documents"\)/);
 });
+
+test("budget hub exposes one upload, message recovery, reading and comparison surface", () => {
+  const hub = readFileSync(resolve(process.cwd(), "src/components/WeddingBudgetEvidenceHub.tsx"), "utf8");
+  const tracker = readFileSync(resolve(process.cwd(), "src/components/WeddingBudgetTrackerCard.tsx"), "utf8");
+  assert.match(hub, /Upload quote files/);
+  assert.match(hub, /Choose a vendor message/);
+  assert.match(hub, /Reading mode/);
+  assert.match(hub, /Compare selected quotes/);
+  assert.match(hub, /\.pdf,\.doc,\.docx,\.txt,\.md/);
+  assert.match(tracker, /Open quote upload and message chooser/);
+});

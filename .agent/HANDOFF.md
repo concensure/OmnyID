@@ -1,3 +1,31 @@
+## 2026-11-09 - WED-346 quote intake and RSVP seating continuation (Codex, complete)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
+`agent/codex/WED-346`, based on `59501fbe42e81271dacb1e3b19c31900e5d344d6`.
+
+- Extended Budget at a glance rather than adding a parallel quote store.
+  Quotes accepts multiple PDF/DOC/DOCX/TXT/Markdown uploads through the
+  existing Documents import, identifies likely vendor email/agent messages,
+  and records a user classification as a source reference without copying the
+  message body. Extracted quotes have list, normalized reading and up-to-four
+  comparison modes with source links.
+- Made Forecast range open the same quote intake surface.
+- Preserved natural Master Agent questions such as “Anything I should follow
+  up next week?” instead of displaying or submitting Boolean-expanded prose.
+- Continued the existing seating canvas with a wedding-scoped three-step guide,
+  seated/unassigned/table counts, accessible placement feedback and a way to
+  return selected seated guests to the unassigned list.
+- Added `rsvp-guest-coordination-seating-spec.md` and its dependency-ordered
+  task plan. They reuse RSVP, guest, Family Boundaries, provider approval and
+  seating AFP authorities; broader response reconciliation/reminder phases
+  remain explicitly planned rather than being claimed complete.
+- The operator confirmed Gmail received the WED-345 controlled message; its
+  evidence report now records that independent observation.
+- Verification: TypeScript; 23 focused search/quote/budget/seating tests; all
+  2,244 Wedding tests; both line-budget tests; and production Vite build pass.
+  The build required `NODE_OPTIONS=--max-old-space-size=8192`; the default
+  process exited during transform without a compiler diagnostic.
+
 ## 2026-11-09 - WED-345 hosted wedding reliability release (Codex, complete)
 
 - Released clean application SHA `7ae96fa2a67fe14c941657ddeb5fec31f7981c88`
@@ -11,9 +39,9 @@
   Calendar OAuth return path.
 - Ran an actual Cloudflare provider send to the reviewed Casper address. The
   provider accepted it, the exact replay was suppressed, and the tenant AFP
-  ledger held one reservation, one receipt and one retry decision. Mailbox-open
-  confirmation remains an operator observation because this run had no Gmail
-  mailbox credential.
+  ledger held one reservation, one receipt and one retry decision. The operator
+  subsequently confirmed Gmail receipt on 2026-11-09 without sharing mailbox
+  credentials or message content.
 - Exercised the claimed-vendor portal and a fresh expiring availability link:
   one-time exchange, scoped session/CSRF, `vendor_confirmed` to
   `calendar_open`, then restoration to `vendor_confirmed`. Limited Specials

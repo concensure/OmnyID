@@ -1,5 +1,5 @@
 version: 1
-updated: 2026-11-08
+updated: 2026-11-09
 
 lifecycle:
   allowed_statuses:
@@ -15,6 +15,18 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-346
+    title: Unify Wedding quote intake and comparison, preserve natural Master Agent queries, and harden first-use seating
+    status: done
+    owner: codex
+    branch: agent/codex/WED-346
+    worktree: C:/Users/ozans/Desktop/projects/OmnyID-GROWTH-001
+    base_sha: 59501fbe42e81271dacb1e3b19c31900e5d344d6
+    depends_on: [WED-315, WED-343, WED-345]
+    files: [solid-ui/src/components/WeddingBudget**, solid-ui/src/components/WeddingVisualSeatingPlan**, solid-ui/src/components/**Master**, solid-ui/src/lib/weddingQuotation**, solid-ui/src/lib/**search**, solid-ui/tests/wedding-**, src/server/wedding_quotation**, src/server/**search**, Documents/design/wedding planner/RSVP/**, Documents/verification/**, .agent/**]
+    acceptance: [the Budget quotes filter can ingest one or more supported quote files through the existing document and quote-intelligence path, vendor email and agent-message candidates can be explicitly classified as quotes without copying content into a parallel store, available quotes support list reading-focus and side-by-side normalized comparison modes with source links, the forecast-range prompt opens the same quote intake surface, the Master Agent displays and submits the user's natural query without leaking an internal Boolean retrieval expression or changing relative dates, the existing seating canvas gains clear first-use guidance and accessible intuitive controls without a parallel seating model, RSVP seating requirements are reconciled into an AFP-backed spec and dependency-ordered task plan, focused frontend backend privacy accessibility build and line-budget checks pass]
+    progress: "Completed from clean hosted-evidence SHA 59501fbe42e81271dacb1e3b19c31900e5d344d6. The Budget evidence hub now accepts multiple supported quote uploads through the existing Documents pipeline, recovers likely vendor email/agent messages as reference-only quote sources, and offers list, normalized reading and up-to-four quote comparison modes; Forecast range opens the same surface. Conversational Master Agent questions remain natural text. The seating canvas adds wedding-scoped first-use guidance, progress, accessible placement feedback and unassign controls on the existing seating authority. The RSVP guest-coordination/seating spec and dependency plan preserve AFP/A2UI/Family Boundaries. Typecheck, 23 focused tests, 2,244 Wedding tests, both line budgets and an 8 GiB Node production build pass. Gmail receipt for WED-345 was independently confirmed by the operator."
+
   - id: WED-345
     title: Hosted vendor-specials pilot and wedding workspace reliability release
     status: done

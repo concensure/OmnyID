@@ -1,3 +1,19 @@
+## 2026-11-09: Quote recovery references messages; Guest Coordination projects existing authorities
+
+WED-346 keeps quote uploads in the existing Documents and quote-intelligence
+pipeline. If an inbound vendor email or Agent message was not recognized, the
+couple may append a `wedding_vendor_quote_source_classified` AFP record that
+references the original message. It does not copy the body or create a second
+quote document. Reading and comparison remain projections of extracted,
+source-linked artifacts.
+
+The RSVP/seating continuation presents Guest Coordination as a joined
+experience over the current RSVP, guest, Family Boundaries and seating AFP
+authorities. Deterministic rules own deadlines, entitlements, capacity and
+reminder eligibility. An LLM is reserved for ambiguous text or an explicitly
+requested diplomatic draft, which remains source-referenced, metered,
+revisioned and approval-bound.
+
 ## 2026-11-01: Family requests remain drafts until an explicit server transition
 
 Couple-captured Family requests are AFP drafts, not decisions or pending

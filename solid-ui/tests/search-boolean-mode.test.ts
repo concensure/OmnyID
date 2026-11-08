@@ -44,3 +44,10 @@ test("searchSubmissionText preserves natural-language agent requests", () => {
     "plan a family trip to Tokyo from Sydney for five days",
   );
 });
+
+test("searchSubmissionText preserves conversational follow-up questions", () => {
+  assert.equal(
+    searchSubmissionText("Anything I should follow up next week?", "all"),
+    "Anything I should follow up next week?",
+  );
+});

@@ -39,6 +39,8 @@ export function WeddingSeatingCanvas(props: {
   const [pan, setPan] = createSignal({ x: 0, y: 0 });
   const [panMode, setPanMode] = createSignal(false);
   const [fullscreen, setFullscreen] = createSignal(false);
+  const [showGuide, setShowGuide] = createSignal(true);
+  const [canvasNotice, setCanvasNotice] = createSignal("Select a guest to begin.");
   let viewport: HTMLDivElement | undefined;
   let initializedFor = "";
   let panStart: { clientX: number; clientY: number; x: number; y: number } | null = null;
@@ -63,6 +65,9 @@ export function WeddingSeatingCanvas(props: {
     setPan({ x: 0, y: 0 });
   };
   onMount(() => {
+    try {
+      setShowGuide(localStorage.getItem(`omnyid.wedding.seating.guide.${props.workspaceId}`) !== "dismissed");
+    } catch { /* storage is optional */ }
     fitCanvas();
     const observer = new ResizeObserver(fitCanvas);
     if (viewport) observer.observe(viewport);
@@ -91,7 +96,23 @@ export function WeddingSeatingCanvas(props: {
         return person ? [{ personId, personLabel: person.label, tableId, tableLabel: table.label, score: 0, reasonLabels: ["Placed by the couple on the seating canvas."] }] : [];
       }),
     ]);
+    setCanvasNotice(accepted.length > 0
+      ? `${accepted.length} guest${accepted.length === 1 ? "" : "s"} placed at ${table.label}.`
+      : `${table.label} is full. Move a guest or choose another table.`);
     setSelectedPersonIds([]);
+  }
+
+  function unseatSelected(): void {
+    const ids = selectedPersonIds();
+    if (ids.length === 0) return;
+    setAssignments((current) => current.filter((assignment) => !ids.includes(assignment.personId)));
+    setCanvasNotice(`${ids.length} guest${ids.length === 1 ? "" : "s"} moved back to the unassigned list.`);
+    setSelectedPersonIds([]);
+  }
+
+  function dismissGuide(): void {
+    setShowGuide(false);
+    try { localStorage.setItem(`omnyid.wedding.seating.guide.${props.workspaceId}`, "dismissed"); } catch { /* storage is optional */ }
   }
 
   function renameTable(tableId: string, label: string): void {
@@ -136,8 +157,15 @@ export function WeddingSeatingCanvas(props: {
   return <section class={`${fullscreen() ? "fixed inset-0 z-[6000] overflow-auto bg-white p-4" : "mt-3 rounded-xl border border-wedding-border bg-wedding-card p-3"}`} aria-labelledby="seating-canvas-title">
     <div class="flex flex-wrap items-start justify-between gap-2"><div><h3 id="seating-canvas-title" class="text-sm font-semibold text-wedding-ink">Visual seating plan</h3><p class="mt-1 text-xs leading-5 text-wedding-ink/65">Select one or more guests, then tap or drag them onto a table. Drag table cards to arrange the room.</p></div><div class="flex flex-wrap gap-2"><button type="button" class="min-h-10 rounded-lg border border-wedding-border bg-white px-3 text-xs font-semibold" onClick={() => addTable("round")}>+ Round table</button><button type="button" class="min-h-10 rounded-lg border border-wedding-border bg-white px-3 text-xs font-semibold" onClick={() => addTable("long")}>+ Long table</button><button type="button" class="min-h-10 rounded-lg border border-wedding-border bg-white px-3 text-xs font-semibold" onClick={() => setFullscreen((value) => !value)}>{fullscreen() ? "Exit full screen" : "Full screen"}</button></div></div>
     <WeddingInlineHelpNote class="mt-3">Use Fit to show every table. Pan and zoom with the controls; turn Pan on before dragging the room itself.</WeddingInlineHelpNote>
+    <Show when={showGuide()}>
+      <div class="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3" aria-label="Seating plan quick start">
+        <div class="flex items-start justify-between gap-3"><div><p class="text-sm font-semibold text-emerald-950">First time here? Seat guests in three steps</p><ol class="mt-2 grid gap-2 text-sm text-emerald-950/80 sm:grid-cols-3"><li><strong>1.</strong> Select one or more names.</li><li><strong>2.</strong> Tap a table, or drag the names onto it.</li><li><strong>3.</strong> Move tables into place, then save.</li></ol></div><button type="button" class="min-h-10 shrink-0 rounded-lg border border-emerald-700 px-3 text-xs font-semibold text-emerald-950" onClick={dismissGuide}>Got it</button></div>
+      </div>
+    </Show>
+    <div class="mt-3 flex flex-wrap items-center gap-2 text-xs" aria-label="Seating progress"><span class="rounded-lg bg-wedding-page px-2 py-1 font-semibold">{assignments().length} seated</span><span class="rounded-lg bg-wedding-page px-2 py-1 font-semibold">{unassigned().length} unassigned</span><span class="rounded-lg bg-wedding-page px-2 py-1 font-semibold">{tables().length} tables</span></div>
+    <p class="sr-only" aria-live="polite">{canvasNotice()}</p>
     <div class="mt-3 grid gap-3 lg:grid-cols-[minmax(12rem,17rem)_minmax(0,1fr)]">
-      <aside class="max-h-[32rem] overflow-auto rounded-xl border border-wedding-border bg-wedding-page p-3"><div class="flex items-center justify-between gap-2"><p class="text-xs font-semibold">Guest list</p><span class="text-[11px] text-wedding-ink/60">{selectedPersonIds().length} selected</span></div><div class="mt-2 flex flex-wrap gap-2"><For each={unassigned()}>{(person) => guestButton(person)}</For></div><Show when={unassigned().length === 0}><p class="mt-2 text-xs text-wedding-ink/65">Every guest is assigned. Select a seated name to move them.</p></Show></aside>
+      <aside class="max-h-[32rem] overflow-auto rounded-xl border border-wedding-border bg-wedding-page p-3"><div class="flex items-center justify-between gap-2"><p class="text-xs font-semibold">Guest list</p><span class="text-[11px] text-wedding-ink/60">{selectedPersonIds().length} selected</span></div><div class="mt-2 flex flex-wrap gap-2"><For each={unassigned()}>{(person) => guestButton(person)}</For></div><Show when={unassigned().length === 0}><p class="mt-2 text-xs text-wedding-ink/65">Every guest is assigned. Select a seated name to move them.</p></Show><Show when={selectedPersonIds().length > 0}><div class="mt-3 flex flex-wrap gap-2"><button type="button" class="min-h-10 rounded-lg border border-wedding-border bg-white px-3 text-xs font-semibold" onClick={() => setSelectedPersonIds([])}>Clear selection</button><Show when={selectedPersonIds().some((id) => assignedIds().has(id))}><button type="button" class="min-h-10 rounded-lg border border-amber-300 bg-amber-50 px-3 text-xs font-semibold text-amber-950" onClick={unseatSelected}>Move to unassigned</button></Show></div></Show></aside>
       <div class="min-w-0"><div class="mb-2 flex flex-wrap gap-2"><button type="button" class="min-h-10 rounded-lg border bg-white px-3 text-xs font-semibold" onClick={fitCanvas}>Fit</button><button type="button" class="min-h-10 rounded-lg border bg-white px-3 text-xs font-semibold" onClick={() => setZoom((value) => Math.min(1.8, value + 0.15))}>Zoom in</button><button type="button" class="min-h-10 rounded-lg border bg-white px-3 text-xs font-semibold" onClick={() => setZoom((value) => Math.max(0.32, value - 0.15))}>Zoom out</button><button type="button" aria-pressed={panMode()} class={`min-h-10 rounded-lg border px-3 text-xs font-semibold ${panMode() ? "bg-wedding-primary text-white" : "bg-white"}`} onClick={() => setPanMode((value) => !value)}>Pan {panMode() ? "on" : "off"}</button></div>
         <div ref={viewport} class={`${fullscreen() ? "h-[calc(100dvh-14rem)]" : "h-[28rem]"} relative overflow-hidden rounded-xl border border-wedding-border bg-[radial-gradient(circle_at_center,_rgba(20,83,45,0.08)_1px,_transparent_1px)] bg-[length:18px_18px] touch-none`} aria-label="Reception floor canvas" onWheel={(event) => { event.preventDefault(); setZoom((value) => Math.max(0.32, Math.min(1.8, value + (event.deltaY < 0 ? 0.08 : -0.08)))); }} onPointerDown={(event) => { if (!panMode() || event.target !== event.currentTarget) return; panStart = { clientX: event.clientX, clientY: event.clientY, ...pan() }; event.currentTarget.setPointerCapture(event.pointerId); }} onPointerMove={(event) => { if (!panStart) return; setPan({ x: panStart.x + event.clientX - panStart.clientX, y: panStart.y + event.clientY - panStart.clientY }); }} onPointerUp={() => { panStart = null; }} onPointerCancel={() => { panStart = null; }}>
           <div class="absolute left-1/2 top-1/2 h-[560px] w-[900px] origin-center" style={{ transform: `translate(calc(-50% + ${pan().x}px), calc(-50% + ${pan().y}px)) scale(${zoom()})` }}>

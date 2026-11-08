@@ -1081,6 +1081,7 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
           contactUserId={props.contactUserId}
           onSelectMenu={props.onSelectMenu}
           onOpenArtifact={openArtifactFromContext}
+          onImportFiles={props.onImportFiles}
           onOpenSavedOutputs={props.onOpenSavedOutputs}
           onSaveWeddingDate={props.onSaveWeddingDate}
           onSidebarAction={handleSidebarAction}
