@@ -11,14 +11,16 @@ use super::*;
 
 const GOOGLE_CALENDAR_SCOPES: &str = "https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/userinfo.email";
 
-fn calendar_google_oauth_redirect_target(status: &str) -> String {
+pub(super) fn calendar_google_oauth_redirect_target(status: &str) -> String {
     let suffix = format!("/workspace/?calendar={status}");
     std::env::var("OMNYID_WORKSPACE_BASE_URL")
         .ok()
         .or_else(|| std::env::var("OMNYID_UI_BASE_URL").ok())
         .or_else(derive_workspace_base_url_from_homeserver)
         .map(|base| format!("{}{}", base.trim_end_matches('/'), suffix))
-        .unwrap_or(suffix)
+        // This callback is served from api.omnyid.com. A relative fallback
+        // would send the browser to api.omnyid.com/workspace (404).
+        .unwrap_or_else(|| format!("https://omnyid.com{suffix}"))
 }
 
 fn calendar_google_oauth_redirect_uri() -> Result<String, (StatusCode, String)> {

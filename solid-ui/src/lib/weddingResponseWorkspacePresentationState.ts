@@ -61,9 +61,28 @@ import type {
   WeddingWorkspaceFilterKind,
   WeddingWorkspaceRecommendationCard,
 } from "@/lib/weddingResponseWorkspaceViewState";
+import type { AfpAttachment } from "@/lib/api";
 
 function clean(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function originalAttachmentForArtifact(metadata: Record<string, unknown>): AfpAttachment | null {
+  const id = clean(metadata.originalUploadAttachmentId ?? metadata.original_upload_attachment_id);
+  const name = clean(metadata.originalUploadFileName ?? metadata.original_upload_file_name);
+  const storage = metadata.originalUploadStorage ?? metadata.original_upload_storage;
+  if (!id || !name || !storage || typeof storage !== "object" || Array.isArray(storage)) return null;
+  return {
+    id,
+    name,
+    mime_type: clean(metadata.originalUploadMimeType ?? metadata.original_upload_mime_type) || "application/octet-stream",
+    size_bytes: typeof (metadata.originalUploadSizeBytes ?? metadata.original_upload_size_bytes) === "number"
+      ? Number(metadata.originalUploadSizeBytes ?? metadata.original_upload_size_bytes)
+      : 0,
+    storage: storage as Record<string, unknown>,
+    encryption: { scheme: "server-managed-private" },
+    sha256: clean(metadata.originalUploadSha256 ?? metadata.original_upload_sha256) || undefined,
+  };
 }
 
 function usableSourceUrls(values: readonly unknown[] | null | undefined): string[] {
@@ -649,6 +668,7 @@ export function previewForArtifact(
     a2uiContent: a2uiContentForArtifact(inputMetadata),
     evidenceSummary: evidenceSummaryForArtifact(artifact),
     bodyText,
+    originalAttachment: originalAttachmentForArtifact(inputMetadata),
     preview: buildWeddingArtifactPreviewState({
       artifactKind: artifact.kind,
       bodyText,

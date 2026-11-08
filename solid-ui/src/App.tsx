@@ -2551,6 +2551,16 @@ function App() {
           })),
           runLocalSemanticRouterPreview(query),
         ]);
+        const decrypt = await loadDecryptModule();
+        if (!decrypt.isDecryptReady() && session()?.token) {
+          try {
+            const keys = await fetchEncKey();
+            await decrypt.initDecrypt(keys.enc_key_hex);
+          } catch {
+            // Keep ciphertext-aware placeholders if this device cannot unlock the account key.
+          }
+        }
+        payload.messages = decrypt.decryptMessages(payload.messages);
         setCommandResult(null);
         setObjectSearchResult(payload);
         objectSearchRouterPreview.set(localPreview);
@@ -3431,6 +3441,7 @@ function App() {
           advanced={advanced()}
           paraViewEnabled={paraViewEnabled()}
           studyLensEnabled={studyLensEnabled()}
+          adminAccount={session()?.user?.email?.trim().toLowerCase() === "concensure@gmail.com"}
           hideTrigger={activeView() === "response_queue" && (loadWeddingEntrySource(userId()) === "wedding_site" || (primaryUseCaseProfile()?.kind === "wedding_planning" && primaryUseCaseProfile()?.status === "active"))}
           userId={userId()}
           onSelectApp={selectKnownView}

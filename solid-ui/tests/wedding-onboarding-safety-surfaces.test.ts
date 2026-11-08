@@ -17,7 +17,41 @@ test("seating instructions are persistent and material saves are confirmed", () 
   const canvas = read("../src/components/WeddingSeatingCanvas.tsx");
   assert.match(panel, /Click or tap a guest/);
   assert.match(panel, /Apply this seating change/);
-  assert.match(canvas, /Click any guest and then a table/);
+  assert.match(canvas, /Select one or more guests, then tap or drag them onto a table/);
+  assert.match(canvas, /Full screen/);
+  assert.match(canvas, /Zoom in/);
+  assert.match(canvas, /setPointerCapture/);
+  assert.match(canvas, /Table name for/);
+  assert.match(canvas, /selectedPersonIds/);
+});
+
+test("RSVP setup offers deadline guidance, couple names and an inline event form", () => {
+  const setup = read("../src/components/WeddingRsvpSetupPanel.tsx");
+  assert.match(setup, /suggestedWeddingRsvpDeadline/);
+  assert.match(setup, /Six weeks before the wedding is a practical default/);
+  assert.match(setup, /props\.defaultHostLabel\?\.trim\(\)/);
+  assert.match(setup, /Add an event/);
+  assert.match(setup, /setCustomEvents/);
+});
+
+test("uploaded Wedding documents retain an original-format preview surface", () => {
+  const detail = read("../src/components/WeddingArtifactDetailPanel.tsx");
+  const attachments = read("../src/components/renderers/AttachmentsRenderer.tsx");
+  const projection = read("../src/lib/weddingResponseWorkspacePresentationState.ts");
+  assert.match(detail, /Original uploaded file/);
+  assert.match(detail, /originalAttachment/);
+  assert.match(attachments, /application\/vnd\.openxmlformats-officedocument\.wordprocessingml\.document/);
+  assert.match(attachments, /application\/msword/);
+  assert.match(attachments, /application\/pdf/);
+  assert.match(attachments, /text\/markdown/);
+  assert.match(projection, /originalAttachment/);
+});
+
+test("Wedding overflow navigation closes after a one-second idle hover", () => {
+  const menu = read("../src/components/WeddingWorkspaceMoreMenu.tsx");
+  assert.match(menu, /setTimeout\(\(\) => setOpen\(false\), 1_000\)/);
+  assert.match(menu, /onMouseLeave=\{scheduleClose\}/);
+  assert.match(menu, /onMouseEnter=\{cancelClose\}/);
 });
 
 test("operator blog uploads are database-backed and require a publish confirmation", () => {

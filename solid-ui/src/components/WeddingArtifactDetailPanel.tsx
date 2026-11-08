@@ -6,7 +6,7 @@ import { WeddingApprovalPreviewPanel } from "@/components/WeddingApprovalPreview
 import { WeddingNormalizedQuoteSummary } from "@/components/WeddingNormalizedQuoteSummary";
 import type { WeddingApprovalExecutionState } from "@/lib/weddingApprovalExecutionState";
 import type { WeddingApprovalRequestState } from "@/lib/weddingApprovalState";
-import type { AfpAttachment, WeddingVendor } from "@/lib/api";
+import type { AfpAttachment, AfpMessage, WeddingVendor } from "@/lib/api";
 import { weddingVendorCardWithCurrentPhoto } from "@/lib/weddingVendorCardMediaState";
 import {
   buildWeddingComparisonColumns,
@@ -41,6 +41,26 @@ function uniqueStrings(values: readonly string[]): string[] {
     result.push(cleanValue);
   }
   return result;
+}
+
+function originalAttachmentMessage(artifact: WeddingWorkspaceArtifactPreview): AfpMessage | null {
+  const attachment = artifact.originalAttachment;
+  if (!attachment) return null;
+  return {
+    id: `${artifact.artifactId}:original-upload`,
+    thread_id: artifact.artifactId,
+    from: "user://couple",
+    to: ["agent://wedding-planning"],
+    timestamp: new Date(artifact.createdAt).toISOString(),
+    type: "file",
+    kind: "wedding_original_upload",
+    content: { title: attachment.name },
+    metadata: { private_original: true },
+    attachments: [attachment],
+    views: [{ format: "attachments", content: { title: attachment.name }, priority: 1 }],
+    references: [],
+    supertags: ["wedding_import", "private_original"],
+  };
 }
 
 function approvalTagClass(state: string): string {
@@ -740,6 +760,12 @@ export function WeddingArtifactDetailPanel(props: {
                 </div>
               </Show>
             </Show>
+            <Show when={originalAttachmentMessage(preview())}>{(message) => (
+              <div class="mt-4 rounded-2xl border border-slate-200 bg-slate-50/80 p-3">
+                <p class="mb-2 text-sm font-semibold text-slate-950">Original uploaded file</p>
+                <AttachmentsRenderer message={message()} />
+              </div>
+            )}</Show>
             <Show when={preview().bodyText} fallback={
               <p class="mt-4 rounded-2xl border border-slate-200/80 bg-slate-50/80 px-4 py-3 text-sm leading-6 text-on-surface-variant">
                 {preview().emptyBodyLabel}

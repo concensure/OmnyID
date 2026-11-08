@@ -1,6 +1,6 @@
 // @locs-version: 2.0
 import type { WeddingArtifactInput, WeddingArtifactSourceLink, WeddingArtifactSummary } from "@/lib/weddingArtifactState";
-import type { AfpMessage } from "@/lib/api";
+import type { AfpAttachment, AfpMessage } from "@/lib/api";
 import type { WeddingVendorRankingCardFields } from "@/lib/weddingVendorRankingState";
 import type { WeddingIntegrationReadinessState, WeddingApprovalRequestState } from "@/lib/weddingApprovalState";
 import {
@@ -231,6 +231,7 @@ export type WeddingWorkspaceArtifactPreview = {
   a2uiContent: Record<string, unknown> | null;
   evidenceSummary: WeddingArtifactEvidenceSummary;
   bodyText: string | null;
+  originalAttachment: AfpAttachment | null;
   preview: WeddingArtifactPreviewState | null;
   exportManifest: WeddingArtifactExportManifest;
   approvalRequest: WeddingApprovalRequestState | null;

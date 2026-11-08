@@ -29,9 +29,19 @@ function dateAfterToday(days: number): string {
   return date.toISOString().slice(0, 10);
 }
 
+export function suggestedWeddingRsvpDeadline(weddingDate?: string | null): string {
+  const exactDate = weddingDate?.match(/\b(20\d{2}-\d{2}-\d{2})\b/)?.[1];
+  if (!exactDate) return dateAfterToday(28);
+  const wedding = new Date(`${exactDate}T12:00:00`);
+  const suggestion = new Date(wedding.getTime() - 42 * 86_400_000);
+  const today = new Date(`${new Date().toISOString().slice(0, 10)}T12:00:00`);
+  return suggestion > today ? suggestion.toISOString().slice(0, 10) : dateAfterToday(28);
+}
+
 export function WeddingRsvpSetupPanel(props: {
   current: WeddingRsvpSetupState | null;
   defaultHostLabel?: string | null;
+  weddingDate?: string | null;
   guestTracking: WeddingGuestTrackingState;
   metadata?: unknown;
   mealChoiceState?: WeddingMealChoiceState;
@@ -45,8 +55,9 @@ export function WeddingRsvpSetupPanel(props: {
   onSave?: (setup: WeddingRsvpSetupState) => Promise<string>;
 }) {
   const metadata = normalizeWeddingPlanningMetadata(props.metadata);
+  const [customEvents, setCustomEvents] = createSignal<Array<{ id: string; label: string; invitationCount: number }>>([]);
   const eventOptions = createMemo(() => {
-    const options = weddingRsvpSetupEventOptions(props.guestTracking);
+    const options = [...weddingRsvpSetupEventOptions(props.guestTracking), ...customEvents()];
     if (!props.current || options.some((event) => event.id === props.current?.eventId)) return options;
     return [{
       id: props.current.eventId,
@@ -58,7 +69,8 @@ export function WeddingRsvpSetupPanel(props: {
   const currentRequiredIds = props.current?.questions.filter((question) => question.required).map((question) => question.id) ?? ["attendance"];
   const [eventChoice, setEventChoice] = createSignal(props.current?.eventId ?? eventOptions()[0]?.id ?? "new_event");
   const [newEventLabel, setNewEventLabel] = createSignal("Wedding day");
-  const [deadline, setDeadline] = createSignal(props.current?.responseDeadline ?? dateAfterToday(28));
+  const [newEventDate, setNewEventDate] = createSignal("");
+  const [deadline, setDeadline] = createSignal(props.current?.responseDeadline ?? suggestedWeddingRsvpDeadline(props.weddingDate));
   const savedHostLabel = props.current?.hostLabel?.trim() ?? "";
   const [hostLabel, setHostLabel] = createSignal(
     savedHostLabel && savedHostLabel.toLowerCase() !== "the couple"
@@ -92,6 +104,20 @@ export function WeddingRsvpSetupPanel(props: {
   const eventId = () => eventChoice() === "new_event"
     ? `wedding_event:${safeWeddingLabel(metadata.responseWorkspaceId)}:${safeWeddingLabel(eventLabel()) || "event"}`
     : eventChoice();
+  const addEvent = () => {
+    const label = newEventLabel().trim();
+    if (!label) {
+      setNotice("Name the event before adding it.");
+      return;
+    }
+    const id = `wedding_event:${safeWeddingLabel(metadata.responseWorkspaceId)}:${safeWeddingLabel(label)}:${Date.now()}`;
+    const displayLabel = newEventDate() ? `${label} · ${newEventDate()}` : label;
+    setCustomEvents((current) => [...current, { id, label: displayLabel, invitationCount: 0 }]);
+    setEventChoice(id);
+    setNewEventLabel("");
+    setNewEventDate("");
+    setNotice(`${label} was added to this RSVP setup.`);
+  };
   const draft = createMemo(() => buildWeddingRsvpSetupDraft({
     eventId: eventId(),
     eventLabel: eventLabel(),
@@ -197,7 +223,7 @@ export function WeddingRsvpSetupPanel(props: {
           </select>
         </label>
         <label class="min-w-0 text-xs font-semibold text-teal-950/75">
-          RSVP deadline
+          <span class="inline-flex items-center gap-1.5">RSVP deadline <span class="inline-flex h-5 w-5 items-center justify-center rounded-full border border-teal-300 bg-white text-[11px]" title="Six weeks before the wedding is a practical default: it leaves time to chase missing replies and give final numbers to the venue. Use an earlier date if your venue or travel plans require it." aria-label="RSVP deadline guidance">i</span></span>
           <input type="date" min={new Date().toISOString().slice(0, 10)} class="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-teal-950 focus:border-teal-500 focus:ring-2 focus:ring-teal-100" value={deadline()} onInput={(event) => setDeadline(event.currentTarget.value)} />
         </label>
       </div>
@@ -206,10 +232,14 @@ export function WeddingRsvpSetupPanel(props: {
         <input maxlength="120" class="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-teal-950 focus:border-teal-500 focus:ring-2 focus:ring-teal-100" value={hostLabel()} onInput={(event) => setHostLabel(event.currentTarget.value)} placeholder="Priya and Daniel" />
       </label>
       <Show when={eventChoice() === "new_event"}>
-        <label class="mt-3 block min-w-0 text-xs font-semibold text-teal-950/75">
-          Event name
-          <input maxlength="120" class="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-teal-950 focus:border-teal-500 focus:ring-2 focus:ring-teal-100" value={newEventLabel()} onInput={(event) => setNewEventLabel(event.currentTarget.value)} placeholder="Recovery brunch" />
-        </label>
+        <fieldset class="mt-3 rounded-xl border border-teal-100 bg-white p-3">
+          <legend class="px-1 text-xs font-semibold text-teal-950">Add an event</legend>
+          <div class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(10rem,0.55fr)_auto] sm:items-end">
+            <label class="min-w-0 text-xs font-semibold text-teal-950/75">Event name<input maxlength="120" class="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-teal-950" value={newEventLabel()} onInput={(event) => setNewEventLabel(event.currentTarget.value)} placeholder="Recovery brunch" /></label>
+            <label class="min-w-0 text-xs font-semibold text-teal-950/75">Event date <span class="font-normal">(optional)</span><input type="date" class="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-teal-950" value={newEventDate()} onInput={(event) => setNewEventDate(event.currentTarget.value)} /></label>
+            <button type="button" class="min-h-11 rounded-lg bg-teal-800 px-4 text-sm font-semibold text-white" onClick={addEvent}>Add event</button>
+          </div>
+        </fieldset>
       </Show>
 
       <fieldset class="mt-4">

@@ -11,12 +11,17 @@ import {
   type AttachmentsRendererFailureReceipt,
 } from "@/lib/attachmentsRendererFailureState";
 import { GenesisLogoAnimation } from "@/components/GenesisLogoAnimation";
+import { sanitizeMarkdownHtml } from "@/lib/htmlSanitizer";
+import { fetchFileLibrary } from "@/lib/api";
 
 const PREVIEWABLE_MIME = new Set([
   "application/pdf",
   "text/csv",
   "application/csv",
   "text/plain",
+  "text/markdown",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 ]);
 
 const AUDIO_PREVIEWABLE_MIME_PREFIXES = ["audio/"] as const;
@@ -36,6 +41,8 @@ type PreviewState =
   | { kind: "pdf"; url: string; name: string }
   | { kind: "csv"; rows: string[][]; name: string }
   | { kind: "text"; content: string; name: string }
+  | { kind: "html"; content: string; name: string }
+  | { kind: "office"; url: string; name: string }
   | { kind: "error"; receipt: AttachmentsRendererFailureReceipt };
 
 type InlineAudioState =
@@ -108,7 +115,7 @@ function isPreviewable(attachment: AfpAttachment): boolean {
   const mime = attachment.mime_type ?? "";
   if (PREVIEWABLE_MIME.has(mime)) return true;
   const lowerName = attachment.name?.toLowerCase() ?? "";
-  return lowerName.endsWith(".csv") || lowerName.endsWith(".txt") || lowerName.endsWith(".pdf");
+  return [".csv", ".txt", ".md", ".pdf", ".doc", ".docx"].some((extension) => lowerName.endsWith(extension));
 }
 
 function isAudioPreviewable(attachment: AfpAttachment): boolean {
@@ -296,7 +303,22 @@ export function AttachmentsRenderer(props: { message: AfpMessage }) {
   async function openPreview(attachment: AfpAttachment) {
     setPreview({ attId: attachment.id, state: { kind: "loading" } });
     try {
-      const bytes = await readAttachmentPreviewBytes(attachment);
+      let previewAttachment = attachment;
+      let bytes: ArrayBuffer;
+      try {
+        bytes = await readAttachmentPreviewBytes(previewAttachment);
+      } catch (initialError) {
+        // Stored Wedding artifacts can outlive their short-lived signed URL.
+        // Refresh only through the authenticated, tenant-scoped file library.
+        const library = await fetchFileLibrary({ query: attachment.name, limit: 50 });
+        const refreshed = library.items.find((item) => item.id === attachment.id);
+        if (!refreshed?.download_url) throw initialError;
+        previewAttachment = {
+          ...attachment,
+          storage: { ...attachment.storage, download_url: refreshed.download_url },
+        };
+        bytes = await readAttachmentPreviewBytes(previewAttachment);
+      }
 
       const mime = attachment.mime_type ?? "";
       const lowerName = attachment.name?.toLowerCase() ?? "";
@@ -318,6 +340,20 @@ export function AttachmentsRenderer(props: { message: AfpMessage }) {
         return;
       }
 
+      if (mime.includes("officedocument.wordprocessingml.document") || lowerName.endsWith(".docx")) {
+        const mammoth = await import("mammoth");
+        const result = await mammoth.convertToHtml({ arrayBuffer: bytes });
+        setPreview({ attId: attachment.id, state: { kind: "html", content: sanitizeMarkdownHtml(result.value), name: attachment.name } });
+        return;
+      }
+
+      if (mime === "application/msword" || lowerName.endsWith(".doc")) {
+        const directUrl = attachmentPreviewDownloadUrl(previewAttachment);
+        if (!directUrl) throw new Error("This legacy Word file needs a downloadable source before it can be previewed.");
+        setPreview({ attId: attachment.id, state: { kind: "office", url: directUrl, name: attachment.name } });
+        return;
+      }
+
       const text = new TextDecoder().decode(bytes);
       setPreview({ attId: attachment.id, state: { kind: "text", content: text, name: attachment.name } });
     } catch (error) {
@@ -336,7 +372,7 @@ export function AttachmentsRenderer(props: { message: AfpMessage }) {
 
   function closePreview() {
     const previewValue = preview();
-    if (previewValue?.state.kind === "pdf") URL.revokeObjectURL(previewValue.state.url);
+    if (previewValue?.state.kind === "pdf" && previewValue.state.url.startsWith("blob:")) URL.revokeObjectURL(previewValue.state.url);
     setPreview(null);
   }
 
@@ -521,6 +557,14 @@ export function AttachmentsRenderer(props: { message: AfpMessage }) {
                   <pre class="whitespace-pre-wrap font-mono text-xs leading-relaxed text-on-surface-variant">
                     {(modalState.previewValue.state as { content: string }).content}
                   </pre>
+                </Show>
+                <Show when={modalState.kind === "html"}>
+                  <div class="md-prose rounded-lg bg-white p-4 text-sm leading-6 text-on-surface" innerHTML={(modalState.previewValue.state as { content: string }).content} />
+                </Show>
+                <Show when={modalState.kind === "office"}>
+                  <object data={(modalState.previewValue.state as { url: string }).url} class="min-h-[65vh] w-full rounded-lg bg-white" aria-label="Word document preview">
+                    <a class="text-primary underline" href={(modalState.previewValue.state as { url: string }).url} target="_blank" rel="noreferrer">Open the original Word document</a>
+                  </object>
                 </Show>
               </div>
             </div>

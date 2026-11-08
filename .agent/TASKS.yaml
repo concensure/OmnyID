@@ -15,6 +15,18 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-345
+    title: Hosted vendor-specials pilot and wedding workspace reliability release
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-345
+    worktree: C:/Users/ozans/Desktop/projects/OmnyID-GROWTH-001
+    base_sha: 856a61d8ea59212f99ab9e5e563176d1c3300956
+    depends_on: [WED-293, WED-303, WED-315, WED-340, WED-344]
+    files: [src/server/wedding_vendor_special_offer_routes/**, src/server/wedding_vendor_outreach_routes**, src/server/user_integrations/**, src/server/wedding_rsvp**, src/db/**, postgres/migrations/**, solid-ui/src/components/**, solid-ui/src/lib/**, solid-ui/tests/**, docker-compose.oracle.minimal.yml, Caddyfile, scripts/**, Documents/verification/**, .agent/**]
+    acceptance: [a real controlled couple-to-casper vendor enquiry records provider acceptance and vendor receipt evidence without exposing credentials or message content, claimed vendors have an authenticated availability-calendar management surface and an operator-issued capability is exercised end to end, Limited Specials opens without taking down navigation and reviewed allowlist flags are enabled only for the controlled cohort, couple navigation hides admin-only setup and cost surfaces and transient More choices dismiss after one second without hover, Documents previews txt pdf doc docx and md safely in place, helper access rollout is deliberately authorised or gives an actionable scoped explanation, RSVP defaults derive from canonical names and date guidance and add-event works in place, seating canvas supports fit pan zoom fullscreen table rename and single or multi-guest drag assignment, chat decrypts account messages in browser memory consistently with Threads, Google Calendar callback is routed and returns to workspace instead of a 404, exact-SHA tests build deploy backup provenance health and hosted smoke pass]
+    progress: "Started from clean WED-344 commit 856a61d8ea59212f99ab9e5e563176d1c3300956. Production reproduction and provider evidence precede rollout activation; secrets must remain file-backed and redacted."
+
   - id: WED-344
     title: Operate vendor calendar links, attribute vendor adoption, add RSVP Loom video, and simplify mobile vendor categories
     status: done

@@ -64,6 +64,7 @@ export type MobileNavigationOptions = {
   advanced: boolean;
   paraViewEnabled: boolean;
   studyLensEnabled: boolean;
+  adminAccount?: boolean;
   query?: string;
 };
 
@@ -75,6 +76,7 @@ export function mobileNavigationGroups(options: MobileNavigationOptions): Mobile
       if (item.requiresAdvanced && !options.advanced) return false;
       if (item.requiresPara && !options.paraViewEnabled) return false;
       if (item.requiresStudy && !options.studyLensEnabled) return false;
+      if (item.id === "cost_dashboard" && options.adminAccount !== true) return false;
       return !query || `${item.label} ${item.keywords ?? ""}`.toLocaleLowerCase().includes(query);
     }),
   })).filter((group) => group.items.length > 0);

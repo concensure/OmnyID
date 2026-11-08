@@ -48,6 +48,7 @@ export function MobileHomeMenuSheet(props: {
   advanced: boolean;
   paraViewEnabled: boolean;
   studyLensEnabled: boolean;
+  adminAccount?: boolean;
   hideTrigger?: boolean;
   userId?: string | null;
   onSelectApp: (view: ViewName) => void;
@@ -57,6 +58,7 @@ export function MobileHomeMenuSheet(props: {
     advanced: props.advanced,
     paraViewEnabled: props.paraViewEnabled,
     studyLensEnabled: props.studyLensEnabled,
+    adminAccount: props.adminAccount,
     query: query(),
   }));
   let dialog: HTMLElement | undefined;

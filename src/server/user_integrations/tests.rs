@@ -6,6 +6,7 @@
 use super::calendar::{
     calendar_google_oauth_client_id_configured, calendar_google_oauth_client_secret_configured,
     calendar_google_oauth_client_source, calendar_google_oauth_is_fully_configured,
+    calendar_google_oauth_redirect_target,
 };
 use super::{
     gmail_access_token_from_token_response, gmail_connection_change_requires_recent_session,
@@ -55,6 +56,20 @@ fn gmail_oauth_redirect_target_defaults_to_workspace_relative_path() {
 #[test]
 fn gmail_connection_changes_require_recent_sign_in() {
     assert!(gmail_connection_change_requires_recent_session());
+}
+
+#[test]
+fn calendar_oauth_redirect_never_falls_back_to_the_api_host() {
+    let _guard = env_lock().lock().expect("env lock");
+    unsafe {
+        std::env::remove_var("OMNYID_WORKSPACE_BASE_URL");
+        std::env::remove_var("OMNYID_UI_BASE_URL");
+        std::env::remove_var("OMNYID_HOMESERVER_URL");
+    }
+    assert_eq!(
+        calendar_google_oauth_redirect_target("error"),
+        "https://omnyid.com/workspace/?calendar=error"
+    );
 }
 
 #[test]

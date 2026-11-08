@@ -14,9 +14,14 @@ test("mobile navigation exposes every standard desktop destination", () => {
   for (const required of [
     "home", "search", "threads", "workflows", "email", "note", "calendar", "database",
     "templates", "reports", "diary", "discover", "contacts", "space_feed", "public_feed",
-    "knowledge_graph", "sovereignty_audit", "files", "decision_queue", "cost_dashboard",
+    "knowledge_graph", "sovereignty_audit", "files", "decision_queue",
     "cofounder_studio", "connected_apps", "pulse", "goals", "agent_settings",
   ]) assert.ok(ids.includes(required as never), `${required} should be available on mobile`);
+});
+
+test("mobile navigation keeps the cost dashboard admin-only", () => {
+  assert.equal(visibleIds().includes("cost_dashboard"), false);
+  assert.equal(visibleIds({ adminAccount: true }).includes("cost_dashboard"), true);
 });
 
 test("mobile navigation honors feature visibility without invalid routes", () => {

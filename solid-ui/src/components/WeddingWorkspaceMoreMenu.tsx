@@ -1,4 +1,4 @@
-import { createSignal, For, Show } from "solid-js";
+import { createSignal, For, onCleanup, Show } from "solid-js";
 
 import { RailIcon } from "@/components/RailIcons";
 import type { WeddingWorkspaceDesktopMenuItem } from "@/lib/weddingWorkspaceDesktopMenuState";
@@ -8,8 +8,20 @@ export function WeddingWorkspaceMoreMenu(props: {
   onSelect: (item: WeddingWorkspaceDesktopMenuItem) => void;
 }) {
   const [open, setOpen] = createSignal(false);
+  let closeTimer: number | undefined;
+  const cancelClose = () => {
+    if (closeTimer !== undefined) window.clearTimeout(closeTimer);
+    closeTimer = undefined;
+  };
+  const scheduleClose = () => {
+    cancelClose();
+    closeTimer = window.setTimeout(() => setOpen(false), 1_000);
+  };
+  onCleanup(cancelClose);
   return (
-    <div class="relative">
+    <div class="relative" onMouseEnter={cancelClose} onMouseLeave={scheduleClose} onFocusIn={cancelClose} onFocusOut={(event) => {
+      if (!event.currentTarget.contains(event.relatedTarget as Node | null)) scheduleClose();
+    }}>
       <button type="button" aria-haspopup="menu" aria-expanded={open()} class="inline-flex min-h-10 items-center gap-2 rounded-full border border-slate-200 bg-slate-50/80 px-3 text-xs font-semibold text-slate-800 transition hover:border-slate-300" onClick={() => setOpen((value) => !value)}>
         <span class="relative inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/80"><RailIcon id="more" /></span><span>More</span>
       </button>

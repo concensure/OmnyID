@@ -1,5 +1,5 @@
 // @locs-version: 1.0
-import { createEffect, createMemo, createResource, createSignal, For, onCleanup, Show } from "solid-js";
+import { createEffect, createMemo, createResource, createSignal, ErrorBoundary, For, onCleanup, Show } from "solid-js";
 
 import { DecisionCard } from "@/components/DecisionCard";
 import { WeddingDashboardIcon, type WeddingDashboardIconId } from "@/components/WeddingDashboardIcons";
@@ -692,16 +692,18 @@ export function WeddingVendorSearchHomeSection(props: {
       </Show>
       <Show when={vendorMode() === "specials"}>
         <div id="wedding-vendor-panel-specials" role="tabpanel" aria-labelledby="wedding-vendor-tab-specials">
-          <WeddingLimitedSpecialsMap
-            weddingDate={weddingDateOrSeason()}
-            initialCategory={selectedVendorCategory()}
-            initialGuestCount={weddingGuestCount()}
-            categoryBudgets={workspace().state.budgetTracking.budgetAllocation}
-            preferenceTerms={props.preferenceProfile?.facets.map((facet) => facet.facetId) ?? []}
-            shortlistPreferences={shortlistPreferences()}
-            onPrepareEnquiry={prepareSpecialEnquiry}
-            onSavePreference={saveSpecialPreference}
-          />
+          <ErrorBoundary fallback={(_error, reset) => <div class="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950" role="alert"><p class="font-semibold">Limited Specials could not open.</p><p class="mt-1 leading-6">The rest of your planner is still available. Retry this map without reloading the workspace.</p><button type="button" class="mt-3 min-h-11 rounded-lg border border-amber-400 bg-white px-4 font-semibold" onClick={reset}>Retry Limited Specials</button></div>}>
+            <WeddingLimitedSpecialsMap
+              weddingDate={weddingDateOrSeason()}
+              initialCategory={selectedVendorCategory()}
+              initialGuestCount={weddingGuestCount()}
+              categoryBudgets={workspace().state.budgetTracking.budgetAllocation}
+              preferenceTerms={props.preferenceProfile?.facets.map((facet) => facet.facetId) ?? []}
+              shortlistPreferences={shortlistPreferences()}
+              onPrepareEnquiry={prepareSpecialEnquiry}
+              onSavePreference={saveSpecialPreference}
+            />
+          </ErrorBoundary>
         </div>
       </Show>
     </div>

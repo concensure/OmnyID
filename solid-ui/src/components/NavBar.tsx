@@ -454,10 +454,13 @@ export function NavBar(props: {
   );
   const [cheatSheetPos, setCheatSheetPos] = createSignal<{ top: number; left: number } | null>(null);
   const [showMoreMenu, setShowMoreMenu] = createSignal(false);
+  const isAdminAccount = () => readSession()?.user?.email?.trim().toLowerCase() === "concensure@gmail.com";
   const expandedViewItems = createMemo(() =>
-    props.paraViewEnabled
-      ? EXPANDED_VIEW_ITEMS
-      : EXPANDED_VIEW_ITEMS.filter((item) => item.id !== "para"),
+    EXPANDED_VIEW_ITEMS.filter((item) => {
+      if (!props.paraViewEnabled && item.id === "para") return false;
+      if (!isAdminAccount() && item.id === "cost_dashboard") return false;
+      return true;
+    }),
   );
   function normalizedSessionTrailEntries(entries: readonly SessionViewTrailEntry[]): SessionViewTrailEntry[] {
     return props.paraViewEnabled
