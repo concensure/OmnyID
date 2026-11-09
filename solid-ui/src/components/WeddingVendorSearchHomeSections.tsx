@@ -42,6 +42,7 @@ import {
   weddingVendorShortlistPreferenceToAfpSendInput,
   type WeddingVendorShortlistPreference,
 } from "@/lib/weddingVendorShortlistPreferenceState";
+import { weddingVendorRankingCardFieldsFromRecord } from "@/lib/weddingVendorRankingState";
 
 type VendorSearchAction = NonNullable<WeddingResponseWorkspaceViewProps["vendorSearchResultAction"]>;
 type VendorOutreachOwner = ReturnType<typeof useWeddingVendorOutreachOwner>;
@@ -72,6 +73,40 @@ const MORE_VENDOR_CATEGORY_CHIPS: ReadonlyArray<{ label: string; query: string; 
   { label: "Jewellers", query: "wedding jewellers", icon: "shield-check" },
 ];
 const VENDOR_CATEGORY_CHIPS = [...CORE_VENDOR_CATEGORY_CHIPS, ...MORE_VENDOR_CATEGORY_CHIPS] as const;
+
+function limitedSpecialOutreachCard(input: {
+  vendorId: string;
+  vendorName: string;
+  category: string;
+  date: string;
+}, vendor: WeddingVendor | null): WeddingVendorChoiceCardData {
+  return {
+    choiceId: `limited-specials:${input.vendorId}:${input.date}`,
+    rank: 0,
+    comparisonCount: 1,
+    title: input.vendorName,
+    category: input.category,
+    imageUrl: vendor?.photos[0]?.photoUrl ?? null,
+    imageAlt: vendor?.photos[0]?.altText ?? null,
+    scoreLabel: "",
+    provider: vendor?.sourceLabel ?? "Wedding vendor directory",
+    sourceUrl: vendor?.sourceUrl ?? null,
+    websiteUrl: vendor?.websiteUrl ?? null,
+    mapUrl: null,
+    instagramUrl: null,
+    email: vendor?.contactEmail ?? null,
+    phone: vendor?.contactPhone ?? null,
+    address: vendor?.address ?? null,
+    rationaleLabels: [`Date enquiry for ${input.date}`],
+    preferenceMatch: "",
+    situationFit: "Date availability still needs vendor confirmation.",
+    verificationLabel: "Availability not yet confirmed",
+    checkedFactsCount: 0,
+    anchorRows: [],
+    verifyQuestions: ["Could you confirm availability and the current terms for this date?"],
+    ...weddingVendorRankingCardFieldsFromRecord({ vendor_id: input.vendorId }),
+  };
+}
 
 // Keep typing local to the field. Updating the persisted wedding query on each
 // keystroke rebuilds the home surface and can move the viewport under the user.
@@ -158,8 +193,9 @@ export function WeddingVendorSearchHomeSection(props: {
   const [vendorMode, setVendorMode] = createSignal<"find" | "invite" | "specials">("find");
   const [allMobileCategories, setAllMobileCategories] = createSignal(false);
   const [allDesktopCategories, setAllDesktopCategories] = createSignal(false);
-  const [pendingSpecialEnquiry, setPendingSpecialEnquiry] = createSignal<{ vendorId: string; vendorName: string; category: string; date: string; detail: WeddingVendorRankedSpecialDetail | null } | null>(null);
+  const [directSpecialEnquiryCard, setDirectSpecialEnquiryCard] = createSignal<WeddingVendorChoiceCardData | null>(null);
   let comparisonResultElement: HTMLDivElement | undefined;
+  let directSpecialEnquiryElement: HTMLDivElement | undefined;
   const lifecycleRecords = createMemo(() => {
     const comparison = props.result?.preview ?? props.result?.sourcePreview;
     const candidates = comparison?.vendorComparisonCards.map((card) => ({
@@ -291,31 +327,24 @@ export function WeddingVendorSearchHomeSection(props: {
     .find((value) => Number.isFinite(value) && value > 0) ?? null;
   const prepareDateEnquiry = (input: { vendorId: string; vendorName: string; category: string; date: string }, detail: WeddingVendorRankedSpecialDetail | null = null) => {
     const preview = props.result?.preview ?? props.result?.sourcePreview;
-    const card = preview?.vendorComparisonCards.find((item) => item.vendorId === input.vendorId || vendorKey(item.title) === vendorKey(input.vendorName));
-    if (preview && card && props.result?.action.artifactId) {
-      void props.outreach.onContactVendor(
-        card,
-        props.result.action.artifactId,
-        "CHECK_AVAILABILITY_AND_REQUEST_QUOTE",
-        true,
-        {
-          offerId: detail?.offerId ?? null,
-          slotId: detail?.slotId ?? null,
-          slotRevision: detail?.slotRevision ?? null,
-          specialDate: detail?.specialDate || input.date,
-          offerTitle: detail?.title ?? null,
-        },
-      );
-      return;
-    }
-    setPendingSpecialEnquiry({ ...input, detail });
-    setVendorMode("find");
-    setSelectedVendorCategory(input.category);
-    workspace().onVendorSearchQueryChange?.(`${input.vendorName} availability for ${input.date}`);
-    queueMicrotask(() => workspace().onRunLiveVendorSearch?.({
-      stayOnHome: props.stayOnHome || undefined,
-      category: input.category,
-    }));
+    const previewCard = preview?.vendorComparisonCards.find((item) => item.vendorId === input.vendorId || vendorKey(item.title) === vendorKey(input.vendorName));
+    const directoryMatch = workspace().weddingVendorDirectory?.find((item) => item.vendorId === input.vendorId || vendorKey(item.vendorName) === vendorKey(input.vendorName)) ?? null;
+    const card = previewCard ?? limitedSpecialOutreachCard(input, directoryMatch);
+    setDirectSpecialEnquiryCard(card);
+    void props.outreach.onContactVendor(
+      card,
+      props.result?.action.artifactId ?? `limited-specials:${input.date}`,
+      "CHECK_AVAILABILITY_AND_REQUEST_QUOTE",
+      true,
+      {
+        offerId: detail?.offerId ?? null,
+        slotId: detail?.slotId ?? null,
+        slotRevision: detail?.slotRevision ?? null,
+        specialDate: detail?.specialDate || input.date,
+        offerTitle: detail?.title ?? null,
+      },
+    );
+    queueMicrotask(() => directSpecialEnquiryElement?.scrollIntoView({ behavior: "smooth", block: "start" }));
   };
   const prepareSpecialEnquiry = (marker: WeddingVendorSpecialMarker, detail: WeddingVendorRankedSpecialDetail | null) => prepareDateEnquiry({ vendorId: marker.vendorId, vendorName: marker.vendorName, category: marker.category, date: detail?.specialDate || marker.availableOnDate }, detail);
   const prepareDirectoryDateEnquiry = (vendor: WeddingVendor, date: string) => prepareDateEnquiry({ vendorId: vendor.vendorId, vendorName: vendor.vendorName, category: vendor.category, date });
@@ -331,23 +360,6 @@ export function WeddingVendorSearchHomeSection(props: {
     }));
     workspace().onRefreshWorkspace?.();
   }
-  createEffect(() => {
-    const pending = pendingSpecialEnquiry();
-    const preview = props.result?.preview ?? props.result?.sourcePreview;
-    const artifactId = props.result?.action.artifactId;
-    if (!pending || !preview || !artifactId) return;
-    const card = preview.vendorComparisonCards.find((item) => item.vendorId === pending.vendorId
-      || vendorKey(item.title) === vendorKey(pending.vendorName));
-    if (!card) return;
-    setPendingSpecialEnquiry(null);
-    void props.outreach.onContactVendor(card, artifactId, "CHECK_AVAILABILITY_AND_REQUEST_QUOTE", true, {
-      offerId: pending.detail?.offerId ?? null,
-      slotId: pending.detail?.slotId ?? null,
-      slotRevision: pending.detail?.slotRevision ?? null,
-      specialDate: pending.detail?.specialDate || pending.date,
-      offerTitle: pending.detail?.title ?? null,
-    });
-  });
   const openLifecycleArtifact = (artifactId: string) => {
     workspace().onSelectArtifact?.(artifactId);
     workspace().onSelectMenu?.("documents");
@@ -724,6 +736,28 @@ export function WeddingVendorSearchHomeSection(props: {
               onPrepareDateEnquiry={prepareDirectoryDateEnquiry}
               onSavePreference={saveSpecialPreference}
             />
+            <Show when={directSpecialEnquiryCard()} keyed>{(card) => (
+              <div ref={directSpecialEnquiryElement} class="mt-4 scroll-mt-4 rounded-xl border border-wedding-primary/30 bg-wedding-page p-3" aria-live="polite">
+                <h3 class="font-display text-xl font-semibold text-wedding-ink">Review this date enquiry</h3>
+                <p class="mt-1 text-sm leading-6 text-wedding-ink/70">Check the generated message, recipient and information-sharing choices below. Nothing is sent until you select Send enquiry.</p>
+                <div class="mt-3">
+                  <WeddingVendorChoiceCard
+                    card={card}
+                    outreachFlow={props.outreach.flows()[card.choiceId] ?? null}
+                    gmailConnected={Boolean(workspace().gmailStatus?.connected)}
+                    onContactVendor={(choice, intent) => void props.outreach.onContactVendor(choice, `limited-specials:${card.choiceId}`, intent, true)}
+                    onOutreachBodyChange={props.outreach.onOutreachBodyChange}
+                    onOutreachRecipientChange={props.outreach.onOutreachRecipientChange}
+                    onOutreachAttachmentsChange={props.outreach.onOutreachAttachmentsChange}
+                    onOutreachPermissionsChange={props.outreach.onOutreachPermissionsChange}
+                    onSendOutreach={(choiceId) => void props.outreach.onSendOutreach(choiceId)}
+                    onCancelOutreach={props.outreach.onCancelOutreach}
+                    onRetryOutreach={props.outreach.onRetryOutreach}
+                    onConnectGmailForOutreach={() => void props.outreach.onConnectGmailForOutreach()}
+                  />
+                </div>
+              </div>
+            )}</Show>
           </ErrorBoundary>
         </div>
       </Show>

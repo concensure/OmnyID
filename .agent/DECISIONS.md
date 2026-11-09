@@ -3119,3 +3119,22 @@ artifact; it does not create a second quote or vendor store.
 - An optional Loom greeting is stored on the existing household-scoped RSVP
   capability, not guest answers or a new message system. Only HTTPS Loom share
   or embed URLs are accepted, and prior suggestions remain owner scoped.
+# 2026-11-10: Coupled public quote assets are versioned and missing prices remain unknown
+
+WED-351 treats the public quote page HTML, deterministic engine, controller and
+component CSS as one browser contract. Their URLs carry the same release token
+so an older cached controller cannot operate a newer DOM. The non-user
+honeypot is also hidden in HTML, rather than relying on CSS alone.
+
+A quote without a stated or user-applied core package price has a `null`
+estimated total. It is never formatted as A$0, used to name a cheaper vendor or
+divided into a per-guest figure. Explicit analysis may apply only
+source-validated, high-confidence fields that are still unset; ambiguous terms
+remain choices and every applied value remains editable and source-linked.
+
+Limited Specials permits map images only from OpenStreetMap's tile hosts under
+the workspace CSP. Filter edits are draft state until the couple selects
+`Update map`, avoiding resource churn on each keystroke. Date enquiries build a
+directory-backed choice card and reuse the existing reviewed vendor-outreach
+composer and information permissions in place; they do not navigate through a
+synthetic vendor search or introduce another send path.

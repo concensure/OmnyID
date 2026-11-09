@@ -134,7 +134,10 @@
 
     const statedFields = [item.pricingModel !== "unclear", item.perHeadRate != null, item.quoteGuests != null, item.packageTotal != null, item.fixedFee != null, item.minimumSpend != null, item.gst !== "not_stated", item.servicePct != null, item.includedHours != null, item.overtimeRate != null, Boolean(item.paymentSchedule)].filter(Boolean).length;
     return {
-      estimatedTotal: subtotal,
+      // A missing core price is unknown, not a zero-dollar wedding. Keep the
+      // arithmetic working internally for gap detection, but do not expose a
+      // total until a stated base amount exists.
+      estimatedTotal: baseKnown ? subtotal : null,
       lines,
       unknowns: unique(unknowns),
       assumptions: unique(assumptions),

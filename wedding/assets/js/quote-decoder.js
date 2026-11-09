@@ -6,6 +6,7 @@
   if (!form || !engine) return;
 
   const money = new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD", maximumFractionDigits: 2 });
+  const totalText = (result) => result.estimatedTotal == null ? "Not enough pricing stated" : money.format(result.estimatedTotal);
   const CACHE_KEY = "omnyid.wedding.quoteExtractionCache.v2";
   const fieldConfig = [
     ["pricing_model", "Pricing model", "select", [["unclear", "Not stated / unclear"], ["per_head", "Per-head package"], ["fixed", "Fixed or whole-package"], ["minimum_spend", "Minimum spend"], ["hybrid", "Fixed plus per-head"]]],
@@ -152,8 +153,16 @@
     renderLineItems(prefix);
     renderSuggestions(prefix, result);
     for (const [key, item] of Object.entries(result.fields || {})) {
+      const control = field(formName(prefix, key));
+      const current = String(control?.value ?? "").trim();
+      const stillUnset = current === "" || current === "unclear" || current === "not_stated";
+      if (item.state === "extracted" && item.confidence === "high" && item.value != null && stillUnset) {
+        setControl(prefix, key, item.value, item.source_snippet);
+      }
       const state = document.querySelector(`[data-field-state="${prefix}:${key}"]`);
-      if (state) state.textContent = item.state === "extracted" ? "Extracted — review before applying" : item.state === "ambiguous" ? "Ambiguous — choose before applying" : "Not stated in quote";
+      if (state) state.textContent = item.state === "extracted" && item.confidence === "high" && stillUnset
+        ? "Applied from quoted source — review or correct"
+        : item.state === "extracted" ? "Extracted — review before applying" : item.state === "ambiguous" ? "Ambiguous — choose before applying" : "Not stated in quote";
     }
     const changes = engine.compareFields(previous, result);
     const changeHost = document.querySelector(`[data-changes="${prefix}"]`);
@@ -182,7 +191,7 @@
         if (!response.ok) throw new Error((await response.text()) || "The analysis service is temporarily unavailable.");
         result = await response.json();
         cache.entries.push({ key, result, saved_at: new Date().toISOString() });
-        status.textContent = "Analysis ready. Review the source snippets before applying suggestions.";
+        status.textContent = "Analysis ready. High-confidence stated terms were applied; review their source snippets and correct anything that differs from the quote.";
       }
       cache.lastBySide = { ...(cache.lastBySide || {}), [prefix]: key };
       cacheWrite(cache);
@@ -222,7 +231,7 @@
   }
 
   function renderFormula(item, result) {
-    return `<section class="quote-formula magnet-card"><h3>${escapeHtml(item.label)}</h3><p class="quote-total-label">Estimated total from stated terms</p><strong class="quote-total">${money.format(result.estimatedTotal)}</strong><ol>${result.lines.map((line) => `<li><span>${escapeHtml(line.label)} <small>${escapeHtml(line.basis)} · ${escapeHtml(line.kind)}</small></span><strong>${money.format(line.amount)}</strong></li>`).join("") || "<li>No priced terms entered yet.</li>"}</ol>${result.assumptions.length ? `<p class="quote-assumption"><strong>Calculation assumptions:</strong> ${escapeHtml(result.assumptions.join(" "))}</p>` : ""}</section>`;
+    return `<section class="quote-formula magnet-card"><h3>${escapeHtml(item.label)}</h3><p class="quote-total-label">Estimated total from stated terms</p><strong class="quote-total">${escapeHtml(totalText(result))}</strong><ol>${result.lines.map((line) => `<li><span>${escapeHtml(line.label)} <small>${escapeHtml(line.basis)} · ${escapeHtml(line.kind)}</small></span><strong>${money.format(line.amount)}</strong></li>`).join("") || "<li>No core package price has been stated or applied yet.</li>"}</ol>${result.assumptions.length ? `<p class="quote-assumption"><strong>Calculation assumptions:</strong> ${escapeHtml(result.assumptions.join(" "))}</p>` : ""}</section>`;
   }
 
   function renderComparison() {
@@ -245,8 +254,8 @@
     const inclusions = [...new Set(items.flatMap((item) => item.inclusions))];
     const rows = [
       ["Pricing model", (item) => item.pricingModel.replaceAll("_", " "), ""],
-      ["Estimated total from stated terms", (item) => money.format(results[item.prefix].estimatedTotal), ""],
-      ["Effective stated cost per guest", (item) => money.format(results[item.prefix].estimatedTotal / guests), ""],
+      ["Estimated total from stated terms", (item) => totalText(results[item.prefix]), (item) => results[item.prefix].estimatedTotal == null ? "unknown" : ""],
+      ["Effective stated cost per guest", (item) => results[item.prefix].estimatedTotal == null ? "Not enough pricing stated" : money.format(results[item.prefix].estimatedTotal / guests), (item) => results[item.prefix].estimatedTotal == null ? "unknown" : ""],
       ["Commercial terms stated", (item) => `${results[item.prefix].statedFields} of ${results[item.prefix].totalFields}`, ""],
       ["Unknown or unanswered", (item) => `${results[item.prefix].unknowns.length} item${results[item.prefix].unknowns.length === 1 ? "" : "s"}`, "unknown"],
       ["GST", (item) => item.gst === "included" ? "Included" : item.gst === "excluded" ? "Added in formula" : "Not stated / unclear", (item) => ["included", "excluded"].includes(item.gst) ? "included" : "unknown"],
@@ -255,11 +264,17 @@
     document.querySelector("[data-result-body]").innerHTML = rows.map(([label, getter, kind]) => `<tr><th scope="row">${escapeHtml(label)}</th>${items.map((item) => { const cellKind = typeof kind === "function" ? kind(item) : kind; return `<td><span class="${cellKind === "unknown" ? "quote-unknown" : cellKind === "included" ? "quote-included" : ""}">${escapeHtml(getter(item))}</span></td>`; }).join("")}</tr>`).join("");
     document.querySelector("[data-formulas]").innerHTML = items.map((item) => renderFormula(item, results[item.prefix])).join("");
     const summary = document.querySelector("[data-quote-summary]");
-    if (bActive) {
+    if (bActive && results.a.estimatedTotal != null && results.b.estimatedTotal != null) {
       const difference = Math.abs(results.a.estimatedTotal - results.b.estimatedTotal);
       const lower = results.a.estimatedTotal <= results.b.estimatedTotal ? allItems[0].label : allItems[1].label;
       summary.textContent = `At ${guests} guests, ${lower} is ${money.format(difference)} lower on the figures currently stated or entered. Proposal A has ${results.a.unknowns.length} unknown(s); Proposal B has ${results.b.unknowns.length}. This is a difference summary, not a recommendation.`;
-    } else summary.textContent = `At ${guests} guests, ${allItems[0].label} has an estimated ${money.format(results.a.estimatedTotal)} from stated or entered terms, with ${results.a.unknowns.length} unknown(s). Add Proposal B when another quote is available.`;
+    } else if (bActive) {
+      summary.textContent = `A fair cost difference cannot be calculated yet because ${[results.a.estimatedTotal == null ? allItems[0].label : null, results.b.estimatedTotal == null ? allItems[1].label : null].filter(Boolean).join(" and ")} has no stated or applied core package price. Review each quote's extracted terms and missing questions below.`;
+    } else if (results.a.estimatedTotal != null) {
+      summary.textContent = `At ${guests} guests, ${allItems[0].label} has an estimated ${money.format(results.a.estimatedTotal)} from stated or entered terms, with ${results.a.unknowns.length} unknown(s). Add Proposal B when another quote is available.`;
+    } else {
+      summary.textContent = `${allItems[0].label} does not yet contain enough stated or applied pricing to estimate a total. Analyse the quote or enter its commercial terms, then compare again.`;
+    }
     const result = document.querySelector("[data-quote-result]"); result.hidden = false; result.focus({ preventScroll: true }); result.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 

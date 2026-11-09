@@ -38,6 +38,10 @@ const unknownResult = engine.calculate(unknownGst, 80, 6);
 assert.equal(unknownResult.estimatedTotal, 10_000, 'unknown GST must not be silently added');
 assert.ok(unknownResult.unknowns.includes('GST treatment'));
 
+const noCorePrice = engine.blankProposal('c');
+const noCoreResult = engine.calculate(noCorePrice, 100, 6);
+assert.equal(noCoreResult.estimatedTotal, null, 'missing pricing must remain unknown rather than becoming zero');
+
 const changed = engine.compareFields(
   { fields: { per_head_rate: { value: 98 } }, line_items: [] },
   { fields: { per_head_rate: { value: 88 } }, line_items: [] },

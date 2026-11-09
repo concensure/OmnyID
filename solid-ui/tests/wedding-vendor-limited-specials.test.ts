@@ -59,6 +59,9 @@ test("Limited Specials uses a third mode, full marker name and one synchronized 
   assert.match(map, /wedding-special-map-cluster/);
   assert.match(map, /radiusKm/);
   assert.match(map, /guestCount/);
+  assert.match(map, /appliedFilters/);
+  assert.match(map, /Update map/);
+  assert.match(map, /invalidateSize/);
   assert.match(map, /selectedDetail/);
   assert.match(card, /availableDays/);
   assert.match(card, /Commercial terms shown only for a current top-three match|priceCertaintyLabel/);
@@ -80,6 +83,7 @@ test("Limited Specials uses a third mode, full marker name and one synchronized 
   assert.match(server, /approved_date_price_estimate/);
   assert.match(caddy, /handle \/wedding\/vendor-specials\/\*/);
   assert.match(caddy, /handle \/wedding\/vendor\/special-offers\*/);
+  assert.match(caddy, /https:\/\/\*\.tile\.openstreetmap\.org/);
   assert.match(deploy, /staged Caddyfile is missing the Limited Specials/);
   assert.match(deploy, /running Caddyfile is missing the Limited Specials/);
 });
@@ -96,7 +100,10 @@ test("Limited Specials keeps an enquiry path when discovery is empty or unavaila
   assert.match(map, /normalizedVendorCategory/);
   assert.match(map, /includes\("celebrant"\).*return "Celebrant"/);
   assert.match(home, /prepareDirectoryDateEnquiry/);
-  assert.match(home, /availability for/);
+  assert.match(home, /limitedSpecialOutreachCard/);
+  assert.match(home, /Review this date enquiry/);
+  assert.match(home, /Nothing is sent until you select Send enquiry/);
+  assert.match(home, /onOutreachPermissionsChange/);
 });
 
 test("claimed and link-only vendors can maintain bounded date terms while enquiries reuse approval", async () => {

@@ -79,10 +79,11 @@ export function WeddingLimitedSpecialsMap(props: {
     const amount = props.categoryBudgets?.find((item) => item.categoryId === id)?.amount;
     return typeof amount === "number" && amount > 0 ? Math.round(amount * 100) : null;
   });
-  const [query, { refetch }] = createResource(() => ({
+  const [appliedFilters, setAppliedFilters] = createSignal({
     date: date(), dateTo: dateTo() || null, category: category(), ...searchCenter(), radiusKm: radiusKm(), guestCount: guestCount(),
     categoryBudgetCents: categoryBudgetCents(), preferenceTerms: props.preferenceTerms,
-  }), loadWeddingVendorSpecials);
+  });
+  const [query, { refetch }] = createResource(appliedFilters, loadWeddingVendorSpecials);
   let mapElement: HTMLDivElement | undefined;
   let map: Leaflet.Map | undefined;
   let leaflet: typeof Leaflet | undefined;
@@ -114,14 +115,20 @@ export function WeddingLimitedSpecialsMap(props: {
       await import("leaflet/dist/leaflet.css" as string);
       if (!mapElement) return;
       map = L.map(mapElement, { center: SYDNEY, zoom: 10, zoomControl: true, scrollWheelZoom: false });
-      L.tileLayer(OSM_TILE_CONFIG.tile_url_template, {
+      const tiles = L.tileLayer(OSM_TILE_CONFIG.tile_url_template, {
         attribution: OSM_TILE_CONFIG.attribution,
         maxZoom: OSM_TILE_CONFIG.max_zoom,
         subdomains: ["a", "b", "c"],
       }).addTo(map);
+      const tileEvents = tiles as unknown as { on: (event: string, handler: () => void) => void };
+      tileEvents.on("load", () => setLocationNote((note) => note.includes("could not load") ? "Showing Sydney by default." : note));
+      tileEvents.on("tileerror", () => setLocationNote("The map background could not load. Venue results remain available below."));
       layer = L.layerGroup().addTo(map);
       map.on("zoomend", () => renderMarkers(false));
-      renderMarkers(true);
+      window.requestAnimationFrame(() => {
+        (map as unknown as { invalidateSize: () => void } | undefined)?.invalidateSize();
+        renderMarkers(true);
+      });
     } catch {
       setLocationNote("The map could not load. The accessible venue list is still available below.");
     }
@@ -196,12 +203,32 @@ export function WeddingLimitedSpecialsMap(props: {
     navigator.geolocation.getCurrentPosition(
       (position) => {
         map?.setView([position.coords.latitude, position.coords.longitude], 11);
-        setSearchCenter({ latitude: position.coords.latitude, longitude: position.coords.longitude });
+        const center = { latitude: position.coords.latitude, longitude: position.coords.longitude };
+        setSearchCenter(center);
+        applyFilters(center);
         setLocationNote("Map centred near your current location. Your coordinates were not saved.");
       },
       () => setLocationNote("Location was not shared, so the map remains available without it."),
       { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 },
     );
+  }
+
+  function applyFilters(center = searchCenter(), categoryOverride = category()) {
+    setAppliedFilters({
+      date: date(),
+      dateTo: dateTo() || null,
+      category: categoryOverride,
+      ...center,
+      radiusKm: radiusKm(),
+      guestCount: guestCount(),
+      categoryBudgetCents: categoryBudgetCents(),
+      preferenceTerms: props.preferenceTerms,
+    });
+  }
+
+  function showAllCategories() {
+    setCategory("");
+    applyFilters(searchCenter(), "");
   }
 
   return (
@@ -227,7 +254,10 @@ export function WeddingLimitedSpecialsMap(props: {
             <For each={CATEGORIES}>{(item) => <option value={item}>{item}</option>}</For>
           </select>
         </label>
-        <button type="button" class="min-h-11 rounded-lg border border-wedding-secondary bg-white px-3 text-sm font-bold text-wedding-secondary" onClick={useMyLocation}>Use my location</button>
+        <div class="flex flex-wrap gap-2 xl:flex-col">
+          <button type="button" class="min-h-11 rounded-lg bg-wedding-primary px-3 text-sm font-bold text-white" onClick={() => applyFilters()}>Update map</button>
+          <button type="button" class="min-h-11 rounded-lg border border-wedding-secondary bg-white px-3 text-sm font-bold text-wedding-secondary" onClick={useMyLocation}>Use my location</button>
+        </div>
       </div>
       <p class="mt-2 text-xs leading-5 text-wedding-ink/65">{locationNote()}</p>
       <Show when={query.loading}><p class="mt-4 rounded-lg bg-wedding-slate p-3 text-sm" role="status">Checking vendor-confirmed dates…</p></Show>
@@ -242,7 +272,7 @@ export function WeddingLimitedSpecialsMap(props: {
       <Show when={!query.loading && markers().length === 0}>
         <div class="mt-4 rounded-lg border border-wedding-border bg-white p-4 text-sm text-wedding-ink/70">
           <p>No vendor-confirmed specials match this date and category yet. Missing availability is unknown, not evidence that vendors are unavailable.</p>
-          <button type="button" class="mt-3 min-h-11 rounded-lg border border-wedding-secondary bg-white px-3 font-bold text-wedding-secondary" onClick={() => setCategory("")}>Show all vendor categories</button>
+          <button type="button" class="mt-3 min-h-11 rounded-lg border border-wedding-secondary bg-white px-3 font-bold text-wedding-secondary" onClick={showAllCategories}>Show all vendor categories</button>
           <div class="mt-4 border-t border-wedding-border pt-4">
             <p class="font-semibold text-wedding-ink">Enquire about this date anyway</p>
             <p class="mt-1 text-xs leading-5">Choose a directory vendor. OmnyID will prepare the normal reviewed enquiry for {new Date(`${date()}T12:00:00`).toLocaleDateString("en-AU", { day: "numeric", month: "long", year: "numeric" })}; it will not book or hold the date.</p>

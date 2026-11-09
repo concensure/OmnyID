@@ -30,6 +30,11 @@ try {
     }) });
   });
   await page.goto(`${origin}/wedding/compare-wedding-venue-quotes.html`, { waitUntil: 'domcontentloaded' });
+  if (await page.locator('[name=company]').isVisible()) throw new Error('Quote honeypot became a visible blank field');
+  if (await page.locator('[data-selection-target=a] option').count() < 10) throw new Error('Selection mapping options did not initialise');
+  await page.locator('[data-add-line=a]').click();
+  if (await page.locator('[data-line-items=a] tbody tr').count() !== 1) throw new Error('Manual line item action did not initialise');
+  await page.locator('[data-remove-line="a:0"]').click();
   await page.evaluate(() => localStorage.removeItem('omnyid.wedding.quoteExtractionCache.v2'));
   const quote = 'Dinner package for 120 guests x $275.00. GST included. Beverage pricing is not stated.';
   await page.locator('[name=a_label]').fill('Wharf Bend sample');
@@ -38,8 +43,7 @@ try {
   await page.locator('[data-analyse=a]').click();
   await page.locator('[data-suggestions=a] .quote-suggestion').first().waitFor();
   if (extractionRequests !== 1) throw new Error(`Expected one extraction request, saw ${extractionRequests}`);
-  await page.locator('[data-apply-high=a]').click();
-  if (await page.locator('[name=a_per_head_rate]').inputValue() !== '275') throw new Error('Per-head rate was not applied');
+  if (await page.locator('[name=a_per_head_rate]').inputValue() !== '275') throw new Error('High-confidence per-head rate was not applied after explicit analysis');
   if (await page.locator('[name=a_whole_package_amount]').inputValue() !== '') throw new Error('Component subtotal became whole-package amount');
   await page.locator('[data-analyse=a]').click();
   if (extractionRequests !== 1) throw new Error('Unchanged quote did not use browser cache');
@@ -50,6 +54,23 @@ try {
   if (!formula.includes('$27,500.00')) throw new Error(`Expected deterministic 100 × $275 total, received ${formula}`);
   if (!summary.includes('unknown')) throw new Error(`Missing-term summary not visible: ${summary}`);
   if (!await page.locator('text=Not stated in quote').count()) throw new Error('Not-stated extraction state is absent');
+
+  await page.locator('[name=b_label]').fill('Terms-only sample');
+  await page.locator('[name=b_text]').fill('GST treatment and the package total are not stated in this proposal.');
+  await page.locator('[data-selection-target=b]').selectOption('gst');
+  await page.locator('[name=b_text]').evaluate((textarea) => {
+    const start = textarea.value.indexOf('GST treatment');
+    textarea.setSelectionRange(start, start + 'GST treatment'.length);
+  });
+  await page.locator('[data-extract-selection=b]').click();
+  if (await page.locator('[name=b_gst]').inputValue() !== 'unclear') throw new Error('Extract-from-selection did not map the chosen source');
+  await page.locator('[data-quote-decoder]').evaluate((form) => form.requestSubmit());
+  const comparisonText = await page.locator('[data-quote-result]').innerText();
+  if (!comparisonText.includes('Not enough pricing stated')) throw new Error(`Unknown core price was not explained: ${comparisonText}`);
+  if (comparisonText.includes('undefined')) throw new Error(`Comparison rendered an undefined value: ${comparisonText}`);
+  await page.locator('[data-clear-analysis=a]').click();
+  if (!await page.locator('[data-analysis-status=a]').innerText().then((text) => text.includes('cleared'))) throw new Error('Clear saved analysis did not provide feedback');
+  if (await page.locator('[data-suggestions=a] > *').count() !== 0) throw new Error('Clear saved analysis left stale suggestions visible');
   const overflows = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
   if (overflows) {
     const offenders = await page.evaluate(() => [...document.querySelectorAll('body *')]
