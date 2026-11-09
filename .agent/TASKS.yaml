@@ -17,7 +17,7 @@ lifecycle:
 tasks:
   - id: WED-351
     title: Repair the hosted quote decoder and complete the Limited Specials interaction path
-    status: in_progress
+    status: done
     owner: codex
     branch: agent/codex/WED-351
     worktree: C:/Users/ozans/Desktop/projects/OmnyID-GROWTH-001
@@ -25,7 +25,7 @@ tasks:
     depends_on: [WED-350, WED-348]
     files: [wedding/compare-wedding-venue-quotes.html, wedding/assets/js/quote-decoder*.js, wedding/assets/css/quote-decoder.css, wedding/tests/**quote**, solid-ui/src/components/WeddingLimitedSpecialsMap*, solid-ui/src/components/WeddingVendorSearchHomeSections*, solid-ui/src/components/WeddingSpecialVenueCard*, solid-ui/src/lib/vendorSpecialsApi.ts, solid-ui/tests/wedding-*, Documents/verification/**, .agent/**]
     acceptance: [the hosted quote page loads one compatible version of its HTML CSS engine and controller, all quote controls initialize and work, an absent total is shown as unknown rather than zero, comparisons explain stated differences and never render undefined, Limited Specials renders an actual accessible map without full-page form submissions, guest and category controls update in place, date enquiry opens the existing reviewed inline draft and sharing controls, all-category expansion works, focused browser frontend backend build exact-SHA deployment provenance and hosted checks pass]
-    progress: "Implemented one versioned quote-page asset contract, an HTML-hidden honeypot, working analysis/clear/selection/line-item actions, automatic application of only source-validated high-confidence terms, and null-safe comparisons that never present missing prices as zero or undefined. Limited Specials now permits the required OpenStreetMap tile host, applies filters explicitly without per-keystroke resource refresh, expands all categories immediately, and reuses the existing inline reviewed outreach composer with sharing controls instead of navigating to vendor search. Focused type, engine, browser and Limited Specials tests pass; full exact-SHA verification and release remain."
+    progress: "Released exact application SHA 4277e50bdfc7775a881439719d7357a133097fac to Oracle. The quote page now uses one versioned HTML/CSS/engine/controller contract; its honeypot stays hidden and analysis, clear, selection extraction, line-item and comparison controls work in hosted Chromium. Missing prices remain unknown rather than A$0 or undefined, and only source-validated high-confidence unset fields auto-apply. Limited Specials permits OpenStreetMap tiles, waits for explicit Update map rather than refreshing per field edit, expands all categories, and opens the existing reviewed draft and sharing controls in place. Exact-SHA Wedding CI passes all 2,249 tests, production build and local/hosted browser smoke pass, SOURCE_COMMIT and runtime manifest match, and the final Oracle/backup proof passes. The pre-existing unhealthy ClamAV scanner was restarted and verified healthy before Caddy and the homeserver resumed."
 
   - id: WED-350
     title: Enlarge public desktop pages and make the venue quote decoder source-grounded and calculation-safe

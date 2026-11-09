@@ -8105,3 +8105,27 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
 - No deployment was requested in WED-344. Phase 10 still needs a real
   participating-vendor hosted pilot and external acceptance evidence; feature
   flags and allowlists must remain false-default until that authority exists.
+## 2026-11-10 - WED-351 quote controls and Limited Specials repair (Codex, complete)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
+`agent/codex/WED-351`; exact deployed application SHA
+`4277e50bdfc7775a881439719d7357a133097fac`. Clean release checkout:
+`C:\temp\wt\omnyid-wed351-release-4277e50`.
+
+- Coupled the public quote HTML, CSS, engine and controller with one asset
+  version, hid the honeypot in HTML, and repaired analysis, clear, source
+  selection, line-item and comparison interactions.
+- Missing core prices now remain unknown. Hosted Chromium confirms the page
+  does not show A$0 or `undefined`, protects component subtotals, and works at
+  mobile and desktop widths.
+- Limited Specials now loads OpenStreetMap tiles under a narrow CSP, applies
+  filter drafts only on **Update map**, expands all categories, and opens the
+  existing reviewed date-enquiry composer and sharing controls in place.
+- Exact-SHA `npm run test:wedding:ci` passes all 2,249 tests and the production
+  build passes with a 12 GiB Node heap. Local and hosted browser smoke pass.
+- Oracle `SOURCE_COMMIT` and runtime manifest match. The pre-existing ClamAV
+  scanning daemon was unhealthy while its updater remained alive; restarting
+  only that stateless scanner restored healthy status before Caddy/homeserver
+  start. Final production and backup proof passes (restore drill skipped), at
+  81% root/var use. Evidence:
+  `Documents/verification/wed-351-quote-specials-repair-2026-11-10.md`.
