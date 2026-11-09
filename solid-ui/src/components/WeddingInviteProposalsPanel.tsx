@@ -2,6 +2,7 @@
 import { createEffect, createMemo, createResource, createSignal, For, Show } from "solid-js";
 
 import type { WeddingResponseWorkspaceViewProps } from "@/components/WeddingResponseWorkspaceViewTypes";
+import { australianWeddingLocationSuggestions } from "@/lib/australianWeddingLocationSuggestionState";
 import {
   buildWeddingBudgetAllocationProjectionInput,
   emptyWeddingBudgetAllocationDraft,
@@ -79,6 +80,9 @@ export function WeddingInviteProposalsPanel(props: {
   const [shareUrl, setShareUrl] = createSignal<string | null>(null);
   const [opportunities, { refetch }] = createResource(loadWeddingProposalOpportunities);
   let previousBriefId = "";
+  const locationSuggestions = createMemo(() => factEditor() === "location"
+    ? australianWeddingLocationSuggestions(factValue(), props.workspace.weddingVendorDirectory ?? [])
+    : []);
 
   createEffect(() => {
     if (props.selectedCategory && props.selectedCategory !== category()) setCategory(props.selectedCategory);
@@ -280,8 +284,13 @@ export function WeddingInviteProposalsPanel(props: {
           <div class="mt-3 rounded-xl border border-wedding-primary/30 bg-wedding-page p-3">
             <label class="text-sm font-semibold text-wedding-ink">
               {factEditor() === "date" ? "Wedding date" : factEditor() === "location" ? "Wedding location" : factEditor() === "guests" ? "Guest count" : "Category budget"}
-              <input type={factEditor() === "date" ? "date" : factEditor() === "location" ? "text" : "number"} min={factEditor() === "guests" ? "1" : "0"} value={factValue()} onInput={(event) => setFactValue(event.currentTarget.value)} class="mt-1 min-h-11 w-full rounded-lg border border-wedding-border bg-white px-3 text-base" />
+              <input type={factEditor() === "date" ? "date" : factEditor() === "location" ? "search" : "number"} min={factEditor() === "guests" ? "1" : "0"} value={factValue()} onInput={(event) => setFactValue(event.currentTarget.value)} autocomplete="off" aria-autocomplete={factEditor() === "location" ? "list" : undefined} aria-controls={factEditor() === "location" ? "wedding-proposal-location-options" : undefined} placeholder={factEditor() === "location" ? "Suburb or city" : undefined} class="mt-1 min-h-11 w-full rounded-lg border border-wedding-border bg-white px-3 text-base" />
             </label>
+            <Show when={factEditor() === "location" && locationSuggestions().length > 0}>
+              <div id="wedding-proposal-location-options" role="listbox" aria-label="Australian location suggestions" class="mt-2 grid max-h-56 gap-1 overflow-y-auto rounded-lg border border-wedding-border bg-white p-1 shadow-lg">
+                <For each={locationSuggestions()}>{(suggestion) => <button type="button" role="option" aria-selected={factValue() === suggestion.label} class="min-h-11 rounded-lg px-3 py-2 text-left text-sm hover:bg-wedding-page focus:bg-wedding-page" onClick={() => setFactValue(suggestion.label)}><span class="font-semibold text-wedding-ink">{suggestion.locality}</span> <span class="font-bold text-wedding-secondary">{suggestion.state}</span></button>}</For>
+              </div>
+            </Show>
             <div class="mt-3 flex flex-wrap gap-2">
               <button type="button" disabled={busy()} onClick={() => void (factEditor() === "date" ? saveDate() : factEditor() === "location" ? saveContextFact("location") : factEditor() === "guests" ? saveContextFact("guests") : saveBudget())} class="min-h-11 rounded-lg bg-wedding-primary px-4 text-sm font-bold text-white disabled:opacity-50">Save</button>
               <button type="button" onClick={() => setFactEditor(null)} class="min-h-11 rounded-lg border border-wedding-border bg-white px-4 text-sm font-semibold">Cancel</button>

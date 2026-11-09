@@ -1,3 +1,18 @@
+## 2026-11-09: Missing Limited Specials evidence remains actionable, not unavailable
+
+Limited Specials treats an empty result or temporary discovery failure as
+unknown availability. The map stays open and lets the couple select a directory
+vendor and prepare the existing reviewed, approval-bound enquiry for the chosen
+date. It does not create a booking, hold or availability claim. Discovery and
+special-enquiry JSON requests use the shared authenticated `bodyJson` API
+contract so the server receives an explicit JSON content type.
+
+Invite Proposals location suggestions are a bounded local index of Australian
+cities/regions plus locations derived from the current vendor directory. Every
+choice includes a state to disambiguate repeated suburb names. The suggestion
+index is navigation assistance only; the saved wedding location remains the
+existing account-scoped AFP context fact.
+
 ## 2026-11-09: Limited Specials release authority and vendor portal reuse
 
 The owner explicitly accepted and authorised the Limited Specials release in

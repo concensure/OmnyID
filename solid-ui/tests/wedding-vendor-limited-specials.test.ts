@@ -67,6 +67,8 @@ test("Limited Specials uses a third mode, full marker name and one synchronized 
   assert.match(card, /aria-label={`Availability for/);
   assert.match(api, /wedding\/vendor-specials\/discovery/);
   assert.match(api, /method: "POST"/);
+  assert.match(api, /bodyJson:/);
+  assert.doesNotMatch(api, /body: JSON\.stringify/);
   assert.doesNotMatch(api, /URLSearchParams/);
   const markerContract = server.match(/struct DiscoveryMarker \{[\s\S]*?\n\}/)?.[0] ?? "";
   assert.ok(markerContract);
@@ -80,6 +82,21 @@ test("Limited Specials uses a third mode, full marker name and one synchronized 
   assert.match(caddy, /handle \/wedding\/vendor\/special-offers\*/);
   assert.match(deploy, /staged Caddyfile is missing the Limited Specials/);
   assert.match(deploy, /running Caddyfile is missing the Limited Specials/);
+});
+
+test("Limited Specials keeps an enquiry path when discovery is empty or unavailable", async () => {
+  const [map, home] = await Promise.all([
+    read("solid-ui/src/components/WeddingLimitedSpecialsMap.tsx"),
+    read("solid-ui/src/components/WeddingVendorSearchHomeSections.tsx"),
+  ]);
+  assert.match(map, /query\.error \? null : query\(\)/);
+  assert.match(map, /Enquire about this date anyway/);
+  assert.match(map, /Prepare date enquiry/);
+  assert.match(map, /onPrepareDateEnquiry/);
+  assert.match(map, /normalizedVendorCategory/);
+  assert.match(map, /includes\("celebrant"\).*return "Celebrant"/);
+  assert.match(home, /prepareDirectoryDateEnquiry/);
+  assert.match(home, /availability for/);
 });
 
 test("claimed and link-only vendors can maintain bounded date terms while enquiries reuse approval", async () => {

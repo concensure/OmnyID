@@ -118,11 +118,11 @@ export function weddingVendorSpecialLinkContext(input: WeddingVendorSpecialEnqui
 export async function recheckWeddingVendorSpecialEnquiry(input: WeddingVendorSpecialLinkContext) {
   return apiFetch<{ status: "current"; slot_revision: number }>("/wedding/vendor-specials/enquiries/recheck", {
     method: "POST",
-    body: JSON.stringify({
+    bodyJson: {
       offer_id: input.offerId,
       slot_id: input.slotId,
       expected_slot_revision: input.slotRevision,
-    }),
+    },
   });
 }
 
@@ -133,14 +133,14 @@ export async function linkWeddingVendorSpecialEnquiry(input: WeddingVendorSpecia
 }) {
   return apiFetch<{ status: "linked"; link_id?: string; replayed: boolean }>("/wedding/vendor-specials/enquiries/link", {
     method: "POST",
-    body: JSON.stringify({
+    bodyJson: {
       offer_id: input.offerId,
       slot_id: input.slotId,
       expected_slot_revision: input.slotRevision,
       wedding_plan_id: input.weddingPlanId,
       enquiry_envelope_ref: input.enquiryEnvelopeRef,
       idempotency_key: input.idempotencyKey,
-    }),
+    },
   });
 }
 
@@ -151,13 +151,13 @@ export async function recordWeddingVendorSpecialDeliveryFailure(input: WeddingVe
 }) {
   return apiFetch<{ status: "recorded"; replayed: boolean }>("/wedding/vendor-specials/enquiries/delivery-failure", {
     method: "POST",
-    body: JSON.stringify({
+    bodyJson: {
       offer_id: input.offerId,
       slot_id: input.slotId,
       idempotency_key: input.idempotencyKey,
       wedding_plan_id: input.weddingPlanId,
       reason_code: input.reasonCode ?? "provider_unavailable",
-    }),
+    },
   });
 }
 
@@ -231,7 +231,7 @@ export async function loadWeddingVendorSpecials(input: {
     : {};
   return normalizeWeddingVendorSpecialDiscovery(await apiFetch<unknown>("/wedding/vendor-specials/discovery", {
     method: "POST",
-    body: JSON.stringify({
+    bodyJson: {
       date: input.date,
       date_to: input.dateTo || null,
       category: input.category,
@@ -240,6 +240,6 @@ export async function loadWeddingVendorSpecials(input: {
       category_budget_cents: typeof input.categoryBudgetCents === "number" && input.categoryBudgetCents >= 0 ? Math.round(input.categoryBudgetCents) : null,
       preference_terms: input.preferenceTerms?.slice(0, 16).join(",") || null,
       limit: input.limit ?? null,
-    }),
+    },
   }));
 }

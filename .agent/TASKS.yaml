@@ -15,9 +15,21 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-348
+    title: Make Limited Specials resilient, add date enquiries and location/category discovery controls
+    status: review
+    owner: codex
+    branch: agent/codex/WED-348
+    worktree: C:/Users/ozans/Desktop/projects/OmnyID-GROWTH-001
+    base_sha: b0d08b0ffc2c9ff3e4be571e7103bf3f74024a85
+    depends_on: [WED-337, WED-340, WED-342, WED-347]
+    files: [solid-ui/src/components/WeddingLimitedSpecialsMap*, solid-ui/src/components/WeddingInviteProposals*, solid-ui/src/components/WeddingVendorSearchHomeSections*, solid-ui/src/lib/vendorSpecialsApi.ts, solid-ui/src/lib/**location**, solid-ui/tests/wedding-*, src/server/wedding_vendor_special_offer_routes/**, Documents/verification/**, .agent/**]
+    acceptance: [Limited Specials opens as an empty but useful date-enquiry surface when no eligible offers exist and does not disable the rest of the planner, selecting a venue and date prepares and sends through the existing reviewed enquiry workflow, one controlled 6HEAD enquiry for 30 November 2026 reaches concensure@gmail.com with provider evidence, Invite Proposals location uses the canonical wedding location and offers local fuzzy Australian city/suburb suggestions labelled with state, desktop vendor categories expose a compact More control without replacing the search query, focused tenant privacy accessibility frontend backend build exact-SHA deploy provenance health and hosted smoke pass]
+    progress: "Reproduced the hosted failure in a real signed-in Chromium session: discovery returned HTTP 415 because the client used a string body without the JSON content type. All four special-enquiry JSON calls now use bodyJson; failures remain inside the map and no-result discovery offers the existing reviewed date-enquiry path. Invite Proposals has state-labelled fuzzy Australian locations, and desktop categories have More. A controlled 6HEAD/30 Nov 2026 sample was accepted by Cloudflare for concensure@gmail.com. Typecheck, 2,249 Wedding tests and both line budgets pass. Exact-SHA build, deploy and hosted smoke remain."
+
   - id: WED-347
     title: Release Limited Specials, publish the venue quote decoder, and launch vendors into one management portal
-    status: review
+    status: done
     owner: codex
     branch: agent/codex/WED-347
     worktree: C:/Users/ozans/Desktop/projects/OmnyID-GROWTH-001
@@ -25,7 +37,7 @@ tasks:
     depends_on: [WED-340, WED-343, WED-344, WED-345, WED-346]
     files: [wedding/compare-wedding-venue-quotes.html, wedding/assets/js/quote-decoder.js, wedding/assets/css/style.css, wedding/tests/wedding-website-smoke.mjs, solid-ui/src/vendor-claim-main.tsx, solid-ui/src/components/vendor/**, solid-ui/src/lib/vendor**, solid-ui/tests/wedding-vendor**, Documents/design/wedding planner/vendor side/**, Documents/testing/venue-quote-samples/**, docker-compose.oracle.minimal.yml, scripts/**, .agent/**]
     acceptance: [the reviewed Limited Specials release authority is recorded and production controls expose it only through authenticated tenant-safe paths, the public venue quote decoder compares one or two manually entered proposals without uploading files or treating missing terms as zero and works at mobile width, new vendor-source registrations return directly to the existing vendor portal instead of generic study onboarding, the portal coherently exposes existing claim contact photo publication availability-link enquiry and quotation authorities without a competing store, a dependency-ordered vendor portal task plan records reused implemented and deferred capabilities, exact-SHA tests build deploy provenance health and hosted smoke pass]
-    progress: "Implemented from clean WED-346 SHA 81bfac1ca64f38ed7570b25b92f2e2f6a399c7d7 after the owner explicitly accepted and authorised the Limited Specials release. Added a browser-local venue quote decoder and mobile Chromium proof, vendor verification-source return routing, and a five-section portal shell over the existing ownership/profile/photo/availability/proposal/quote authorities. All 2,248 Wedding tests, public metadata/site smoke, typecheck, both line budgets, focused Rust auth and special-offer tests, and the production UI build pass. Exact-SHA Oracle release remains." 
+    progress: "Released exact application SHA b0d08b0ffc2c9ff3e4be571e7103bf3f74024a85 to Oracle from a clean detached worktree. SOURCE_COMMIT and oracle-runtime-manifest.json match it; health, readiness, static/runtime parity, vendor-source authentication, quote decoder, and Limited Specials flag/route proof passed."
 
   - id: WED-346
     title: Unify Wedding quote intake and comparison, preserve natural Master Agent queries, and harden first-use seating

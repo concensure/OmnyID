@@ -35,6 +35,12 @@ test("proposal facts are actionable in place and the mobile panel is full bleed"
   assert.match(panelSource, /saveBudget/);
   assert.match(panelSource, /class="-mx-3 mt-4 min-w-0 sm:mx-0"/);
   assert.match(homeSource, /\{ id: "enquired", label: "Enquired" \}, \{ id: "proposals", label: "Proposals" \}/);
+  assert.match(panelSource, /australianWeddingLocationSuggestions/);
+  assert.match(panelSource, /Australian location suggestions/);
+  assert.match(panelSource, /suggestion\.state/);
+  assert.match(homeSource, /allDesktopCategories/);
+  assert.match(homeSource, /allDesktopCategories\(\) \? "Less" : "More"/);
+  assert.match(homeSource, /MORE_VENDOR_CATEGORY_CHIPS/);
 });
 
 test("Oracle forwards the false-default proposal rollout controls to the homeserver", () => {

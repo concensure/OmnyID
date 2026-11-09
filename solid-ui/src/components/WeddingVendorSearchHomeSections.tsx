@@ -10,6 +10,7 @@ import { WeddingPreferenceConfirmationChips } from "@/components/WeddingPreferen
 import { WeddingDealBreakerEditor } from "@/components/WeddingDealBreakerEditor";
 import { WeddingInviteProposalsPanel } from "@/components/WeddingInviteProposalsPanel";
 import { WeddingLimitedSpecialsMap } from "@/components/WeddingLimitedSpecialsMap";
+import type { WeddingVendor } from "@/lib/api";
 import { loadWeddingProposalOpportunities } from "@/lib/weddingInviteProposalOpportunityApi";
 import type { WeddingVendorRankedSpecialDetail, WeddingVendorSpecialMarker } from "@/lib/weddingVendorSpecialDiscoveryApi";
 import type { WeddingVendorChoiceCardData } from "@/components/WeddingVendorChoiceCard";
@@ -51,7 +52,7 @@ const SEARCH_PROGRESS_LABELS = [
   "Finding your strongest matches…",
 ] as const;
 
-const VENDOR_CATEGORY_CHIPS: ReadonlyArray<{ label: string; query: string; icon: WeddingDashboardIconId }> = [
+const CORE_VENDOR_CATEGORY_CHIPS: ReadonlyArray<{ label: string; query: string; icon: WeddingDashboardIconId }> = [
   { label: "Venues", query: "wedding venues", icon: "calendar-days" },
   { label: "Photographers", query: "wedding photographers", icon: "search" },
   { label: "Bands & DJs", query: "wedding bands and DJs", icon: "users" },
@@ -60,6 +61,17 @@ const VENDOR_CATEGORY_CHIPS: ReadonlyArray<{ label: string; query: string; icon:
   { label: "Celebrants", query: "authorised wedding celebrants", icon: "user-plus" },
   { label: "Cake", query: "wedding cakes", icon: "clock" },
 ];
+const MORE_VENDOR_CATEGORY_CHIPS: ReadonlyArray<{ label: string; query: string; icon: WeddingDashboardIconId }> = [
+  { label: "Videographers", query: "wedding videographers", icon: "search" },
+  { label: "Caterers", query: "wedding caterers", icon: "users" },
+  { label: "Musicians", query: "wedding musicians", icon: "users" },
+  { label: "Hair & Makeup", query: "wedding hair and makeup", icon: "user-plus" },
+  { label: "Styling & Decor", query: "wedding styling and decor", icon: "shield-check" },
+  { label: "Transport", query: "wedding transport", icon: "calendar-days" },
+  { label: "Stationery", query: "wedding stationery and invitations", icon: "check-circle" },
+  { label: "Jewellers", query: "wedding jewellers", icon: "shield-check" },
+];
+const VENDOR_CATEGORY_CHIPS = [...CORE_VENDOR_CATEGORY_CHIPS, ...MORE_VENDOR_CATEGORY_CHIPS] as const;
 
 // Keep typing local to the field. Updating the persisted wedding query on each
 // keystroke rebuilds the home surface and can move the viewport under the user.
@@ -145,7 +157,8 @@ export function WeddingVendorSearchHomeSection(props: {
   const [selectedVendorCategory, setSelectedVendorCategory] = createSignal<string | null>(null);
   const [vendorMode, setVendorMode] = createSignal<"find" | "invite" | "specials">("find");
   const [allMobileCategories, setAllMobileCategories] = createSignal(false);
-  const [pendingSpecialEnquiry, setPendingSpecialEnquiry] = createSignal<{ marker: WeddingVendorSpecialMarker; detail: WeddingVendorRankedSpecialDetail | null } | null>(null);
+  const [allDesktopCategories, setAllDesktopCategories] = createSignal(false);
+  const [pendingSpecialEnquiry, setPendingSpecialEnquiry] = createSignal<{ vendorId: string; vendorName: string; category: string; date: string; detail: WeddingVendorRankedSpecialDetail | null } | null>(null);
   let comparisonResultElement: HTMLDivElement | undefined;
   const lifecycleRecords = createMemo(() => {
     const comparison = props.result?.preview ?? props.result?.sourcePreview;
@@ -276,9 +289,9 @@ export function WeddingVendorSearchHomeSection(props: {
   const weddingGuestCount = () => workspace().state.contextCards
     .map((card) => Number(card.planningContext.guestCount))
     .find((value) => Number.isFinite(value) && value > 0) ?? null;
-  const prepareSpecialEnquiry = (marker: WeddingVendorSpecialMarker, detail: WeddingVendorRankedSpecialDetail | null) => {
+  const prepareDateEnquiry = (input: { vendorId: string; vendorName: string; category: string; date: string }, detail: WeddingVendorRankedSpecialDetail | null = null) => {
     const preview = props.result?.preview ?? props.result?.sourcePreview;
-    const card = preview?.vendorComparisonCards.find((item) => item.vendorId === marker.vendorId);
+    const card = preview?.vendorComparisonCards.find((item) => item.vendorId === input.vendorId || vendorKey(item.title) === vendorKey(input.vendorName));
     if (preview && card && props.result?.action.artifactId) {
       void props.outreach.onContactVendor(
         card,
@@ -289,21 +302,23 @@ export function WeddingVendorSearchHomeSection(props: {
           offerId: detail?.offerId ?? null,
           slotId: detail?.slotId ?? null,
           slotRevision: detail?.slotRevision ?? null,
-          specialDate: detail?.specialDate || marker.availableOnDate,
+          specialDate: detail?.specialDate || input.date,
           offerTitle: detail?.title ?? null,
         },
       );
       return;
     }
-    setPendingSpecialEnquiry({ marker, detail });
+    setPendingSpecialEnquiry({ ...input, detail });
     setVendorMode("find");
-    setSelectedVendorCategory(marker.category);
-    workspace().onVendorSearchQueryChange?.(`${marker.vendorName} for ${marker.availableOnDate}`);
+    setSelectedVendorCategory(input.category);
+    workspace().onVendorSearchQueryChange?.(`${input.vendorName} availability for ${input.date}`);
     queueMicrotask(() => workspace().onRunLiveVendorSearch?.({
       stayOnHome: props.stayOnHome || undefined,
-      category: marker.category,
+      category: input.category,
     }));
   };
+  const prepareSpecialEnquiry = (marker: WeddingVendorSpecialMarker, detail: WeddingVendorRankedSpecialDetail | null) => prepareDateEnquiry({ vendorId: marker.vendorId, vendorName: marker.vendorName, category: marker.category, date: detail?.specialDate || marker.availableOnDate }, detail);
+  const prepareDirectoryDateEnquiry = (vendor: WeddingVendor, date: string) => prepareDateEnquiry({ vendorId: vendor.vendorId, vendorName: vendor.vendorName, category: vendor.category, date });
   async function saveSpecialPreference(marker: WeddingVendorSpecialMarker, preference: WeddingVendorShortlistPreference, reason: string | null) {
     if (!workspace().saveProjection) throw new Error("Account saving is unavailable");
     await workspace().saveProjection!(weddingVendorShortlistPreferenceToAfpSendInput({
@@ -321,15 +336,15 @@ export function WeddingVendorSearchHomeSection(props: {
     const preview = props.result?.preview ?? props.result?.sourcePreview;
     const artifactId = props.result?.action.artifactId;
     if (!pending || !preview || !artifactId) return;
-    const card = preview.vendorComparisonCards.find((item) => item.vendorId === pending.marker.vendorId
-      || vendorKey(item.title) === vendorKey(pending.marker.vendorName));
+    const card = preview.vendorComparisonCards.find((item) => item.vendorId === pending.vendorId
+      || vendorKey(item.title) === vendorKey(pending.vendorName));
     if (!card) return;
     setPendingSpecialEnquiry(null);
     void props.outreach.onContactVendor(card, artifactId, "CHECK_AVAILABILITY_AND_REQUEST_QUOTE", true, {
       offerId: pending.detail?.offerId ?? null,
       slotId: pending.detail?.slotId ?? null,
       slotRevision: pending.detail?.slotRevision ?? null,
-      specialDate: pending.detail?.specialDate || pending.marker.availableOnDate,
+      specialDate: pending.detail?.specialDate || pending.date,
       offerTitle: pending.detail?.title ?? null,
     });
   });
@@ -434,8 +449,9 @@ export function WeddingVendorSearchHomeSection(props: {
       </label>
       </div>
       </form>
-      <div class="-mx-3 mt-3 hidden snap-x gap-2 overflow-x-auto px-3 pb-2 pr-8 [scrollbar-width:none] sm:mx-0 sm:flex sm:px-0 sm:pr-0" aria-label="Vendor categories">
-        <For each={VENDOR_CATEGORY_CHIPS}>{(chip) => (
+      <div class="mt-3 hidden sm:block" aria-label="Vendor categories">
+        <div class="flex snap-x flex-wrap gap-2 overflow-x-auto pb-2 [scrollbar-width:none]">
+        <For each={CORE_VENDOR_CATEGORY_CHIPS}>{(chip) => (
           <button
             type="button"
             class={`inline-flex min-h-11 shrink-0 snap-start items-center gap-1.5 rounded-lg border px-3 text-sm font-semibold transition duration-100 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-primary focus-visible:ring-offset-2 disabled:opacity-45 ${isSelectedCategory(chip.query) ? "border-wedding-primary bg-wedding-primary text-wedding-page" : "border-wedding-border bg-white text-wedding-ink hover:border-wedding-primary hover:text-wedding-primary"}`}
@@ -446,6 +462,9 @@ export function WeddingVendorSearchHomeSection(props: {
             <WeddingDashboardIcon id={chip.icon} class="h-4 w-4" />{chip.label}
           </button>
         )}</For>
+        <button type="button" class="inline-flex min-h-11 shrink-0 items-center rounded-full border border-wedding-border bg-white px-3 text-sm font-semibold text-wedding-primary hover:border-wedding-primary" aria-expanded={allDesktopCategories()} onClick={() => setAllDesktopCategories((value) => !value)}>{allDesktopCategories() ? "Less" : "More"}</button>
+        </div>
+        <Show when={allDesktopCategories()}><div class="mt-1 flex flex-wrap gap-2 rounded-xl border border-wedding-border bg-wedding-page p-2"><For each={MORE_VENDOR_CATEGORY_CHIPS}>{(chip) => <button type="button" class={`inline-flex min-h-11 items-center gap-1.5 rounded-lg border px-3 text-sm font-semibold ${isSelectedCategory(chip.query) ? "border-wedding-primary bg-wedding-primary text-wedding-page" : "border-wedding-border bg-white text-wedding-ink hover:border-wedding-primary"}`} disabled={searchDisabled()} aria-pressed={isSelectedCategory(chip.query)} onClick={(event) => runCategorySearch(event, chip.query)}><WeddingDashboardIcon id={chip.icon} class="h-4 w-4" />{chip.label}</button>}</For></div></Show>
       </div>
       <div class="mt-3 sm:hidden" aria-label="Vendor categories">
         <div class="grid grid-cols-3 gap-2"><For each={VENDOR_CATEGORY_CHIPS.slice(0, 2)}>{(chip) => <button type="button" class={`flex min-h-11 min-w-0 items-center justify-center gap-1 rounded-lg border px-2 text-xs font-semibold ${isSelectedCategory(chip.query) ? "border-wedding-primary bg-wedding-primary text-wedding-page" : "border-wedding-border bg-white text-wedding-ink"}`} disabled={searchDisabled()} aria-pressed={isSelectedCategory(chip.query)} onClick={(event) => runCategorySearch(event, chip.query)}><WeddingDashboardIcon id={chip.icon} class="h-4 w-4 shrink-0" /><span class="truncate">{chip.label}</span></button>}</For><button type="button" class="min-h-11 rounded-lg border border-wedding-border bg-white px-2 text-xs font-semibold text-wedding-primary" aria-expanded={allMobileCategories()} onClick={() => setAllMobileCategories((value) => !value)}>{allMobileCategories() ? "Show less" : "See all"}</button></div>
@@ -700,7 +719,9 @@ export function WeddingVendorSearchHomeSection(props: {
               categoryBudgets={workspace().state.budgetTracking.budgetAllocation}
               preferenceTerms={props.preferenceProfile?.facets.map((facet) => facet.facetId) ?? []}
               shortlistPreferences={shortlistPreferences()}
+              vendors={workspace().weddingVendorDirectory}
               onPrepareEnquiry={prepareSpecialEnquiry}
+              onPrepareDateEnquiry={prepareDirectoryDateEnquiry}
               onSavePreference={saveSpecialPreference}
             />
           </ErrorBoundary>
