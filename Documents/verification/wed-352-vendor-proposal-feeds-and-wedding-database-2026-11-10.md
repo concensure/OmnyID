@@ -1,8 +1,11 @@
 # WED-352 vendor proposal feeds and Wedding database projections
 
-Date: 2026-11-10  
-Branch: `agent/codex/WED-352`  
-Application commit: `ce0cada97dd6e2fe4c17da4c6a8ca08947050dc0`  
+Date: 2026-11-10
+
+Branch: `agent/codex/WED-352`
+
+Application commit: `ce0cada97dd6e2fe4c17da4c6a8ca08947050dc0`
+
 Clean release checkout: `C:\temp\wt\omnyid-wed352-release-ce0cada`
 
 ## Delivered
@@ -68,4 +71,3 @@ Clean release checkout: `C:\temp\wt\omnyid-wed352-release-ce0cada`
   both 79%.
 - Proof artifacts are outside the repository under
   `C:\temp\wt\proofs\wed352-release-ce0cada`.
-
