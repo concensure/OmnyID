@@ -1303,6 +1303,7 @@ function App() {
   // this same workspace sign-in form instead of a separate static one.
   const deepLinkParams = new URLSearchParams(window.location.search);
   const pendingAuthSource = deepLinkParams.get("source");
+  const pendingVendorAuthSource = pendingAuthSource === "vendor_claim" || pendingAuthSource === "vendor";
   const pendingWeddingQuizHandoff = deepLinkParams.get("from") === "quiz"
     || pendingAuthSource === "wedding_quiz";
   const pendingVendorSlug = (deepLinkParams.get("vendor_slug") ?? deepLinkParams.get("vendor") ?? "").trim().toLowerCase(), vendorPortalUrlFromDeepLink = () => `/workspace/vendor.html${pendingVendorSlug ? `?vendor_slug=${encodeURIComponent(pendingVendorSlug)}` : ""}`;
@@ -1514,7 +1515,7 @@ function App() {
 
   // Honour wedding and vendor deep links when a session is already active.
   onMount(() => {
-    if (pendingAuthSource === "vendor_claim" && readSession()?.token) return void window.location.replace(vendorPortalUrlFromDeepLink());
+    if (pendingVendorAuthSource && readSession()?.token) return void window.location.replace(vendorPortalUrlFromDeepLink());
     if (!shouldLaunchWeddingTemplateFromDeepLink() || !readSession()?.token) return;
     launchWeddingTemplateFromDeepLink();
   });
@@ -3007,13 +3008,17 @@ function App() {
           window.history.replaceState({}, "", "/?open_auth=1");
           return;
         }
+        let verifiedExperience: "generic" | "wedding" | "vendor" = "generic";
         try {
           const verification = await verifyEmailToken(token);
+          verifiedExperience = verification.experience;
           setAuthNotice({
             tone: "success",
             text: verification.experience === "wedding"
               ? "Email verified. Sign in to begin your wedding plan."
-              : "Email verified. You can sign in now.",
+              : verification.experience === "vendor"
+                ? "Email verified. Sign in to manage your vendor listing."
+                : "Email verified. You can sign in now.",
           });
         } catch (error) {
           const message = error instanceof Error ? error.message : "Verification failed.";
@@ -3022,7 +3027,7 @@ function App() {
             text: message || "Verification failed.",
           });
         } finally {
-          window.history.replaceState({}, "", "/?open_auth=1");
+          window.history.replaceState({}, "", verifiedExperience === "vendor" ? "/?open_auth=1&source=vendor_claim" : "/?open_auth=1");
         }
       })();
     }
@@ -3267,7 +3272,7 @@ function App() {
             setShowAuthModal(false);
             setAuthNotice(null);
             setServerOffline(false);
-            if (pendingAuthSource === "vendor_claim") return void window.location.assign(vendorPortalUrlFromDeepLink());
+            if (pendingVendorAuthSource) return void window.location.assign(vendorPortalUrlFromDeepLink());
             const loginUserId = readSession()?.user?.id ?? "";
             if (loginUserId && loadShouldShowGuidedTour(loginUserId)) setShowTour(true);
             void loadDashboard();

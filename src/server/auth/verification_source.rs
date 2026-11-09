@@ -1,5 +1,6 @@
 const WEDDING_EXACT_SOURCES: [&str; 2] = ["wedding", "wedding_quiz"];
 const WEDDING_TOKEN_PREFIX: &str = "wedding_";
+const VENDOR_TOKEN_PREFIX: &str = "vendor_";
 const GENERIC_TOKEN_PREFIX: &str = "generic_";
 
 pub(super) fn is_wedding_source(source: Option<&str>) -> bool {
@@ -9,8 +10,17 @@ pub(super) fn is_wedding_source(source: Option<&str>) -> bool {
         || normalized.starts_with("listicle_")
 }
 
+pub(super) fn is_vendor_source(source: Option<&str>) -> bool {
+    matches!(
+        source.unwrap_or_default().trim().to_ascii_lowercase().as_str(),
+        "vendor" | "vendor_claim" | "vendor_portal"
+    )
+}
+
 pub(super) fn verification_url(base_url: &str, raw_token: &str, source: Option<&str>) -> String {
-    let experience = if is_wedding_source(source) {
+    let experience = if is_vendor_source(source) {
+        "vendor"
+    } else if is_wedding_source(source) {
         "wedding"
     } else {
         "generic"
@@ -19,7 +29,9 @@ pub(super) fn verification_url(base_url: &str, raw_token: &str, source: Option<&
 }
 
 pub(super) fn verification_token_id(source: Option<&str>) -> String {
-    let prefix = if is_wedding_source(source) {
+    let prefix = if is_vendor_source(source) {
+        VENDOR_TOKEN_PREFIX
+    } else if is_wedding_source(source) {
         WEDDING_TOKEN_PREFIX
     } else {
         GENERIC_TOKEN_PREFIX
@@ -42,7 +54,9 @@ pub(super) fn verification_email_body(name: &str, url: &str, source: Option<&str
 }
 
 pub(super) fn token_experience(token_id: &str) -> &'static str {
-    if token_id.starts_with(WEDDING_TOKEN_PREFIX) {
+    if token_id.starts_with(VENDOR_TOKEN_PREFIX) {
+        "vendor"
+    } else if token_id.starts_with(WEDDING_TOKEN_PREFIX) {
         "wedding"
     } else {
         "generic"
@@ -69,6 +83,17 @@ mod tests {
     }
 
     #[test]
+    fn vendor_claim_source_returns_to_the_bounded_vendor_experience() {
+        for source in ["vendor", "vendor_claim", "vendor_portal"] {
+            assert_eq!(
+                verification_url("https://omnyid.com", "safe-token", Some(source)),
+                "https://omnyid.com/verify-email?token=safe-token&source=vendor",
+            );
+            assert!(verification_token_id(Some(source)).starts_with(VENDOR_TOKEN_PREFIX));
+        }
+    }
+
+    #[test]
     fn unknown_or_missing_sources_fail_closed_to_generic() {
         for source in [
             None,
@@ -87,9 +112,11 @@ mod tests {
     fn token_id_persists_the_bounded_server_side_experience() {
         let wedding_id = verification_token_id(Some("wedding_quiz"));
         let generic_id = verification_token_id(Some("vendor_acquisition"));
+        let vendor_id = verification_token_id(Some("vendor_claim"));
 
         assert!(wedding_id.starts_with(WEDDING_TOKEN_PREFIX));
         assert_eq!(token_experience(&wedding_id), "wedding");
+        assert_eq!(token_experience(&vendor_id), "vendor");
         assert!(generic_id.starts_with(GENERIC_TOKEN_PREFIX));
         assert_eq!(token_experience(&generic_id), "generic");
         assert_eq!(token_experience("legacy-token-without-prefix"), "generic");

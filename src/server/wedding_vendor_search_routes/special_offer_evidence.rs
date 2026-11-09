@@ -32,7 +32,7 @@ fn rollout_allowed_from(enabled: bool, allowlist: &str, email: &str) -> bool {
         && allowlist
             .split(',')
             .map(|value| value.trim().to_ascii_lowercase())
-            .any(|value| !value.is_empty() && value == email.trim().to_ascii_lowercase())
+            .any(|value| value == "*" || (!value.is_empty() && value == email.trim().to_ascii_lowercase()))
 }
 
 pub(super) async fn attach_active_special_evidence(
@@ -149,6 +149,7 @@ mod tests {
             " Other@example.com, COUPLE@example.com ",
             "couple@example.com"
         ));
+        assert!(rollout_allowed_from(true, "*", "any-authenticated@example.com"));
     }
 
     #[test]

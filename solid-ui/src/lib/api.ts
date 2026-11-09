@@ -4076,7 +4076,7 @@ export const probeApiReachability = async (): Promise<ApiReachability> => {
 export type VerifyEmailResponse = {
   ok: boolean;
   email_verified: boolean;
-  experience: "generic" | "wedding";
+  experience: "generic" | "wedding" | "vendor";
 };
 
 export const verifyEmailToken = (token: string): Promise<VerifyEmailResponse> =>
@@ -4088,7 +4088,7 @@ export const verifyEmailToken = (token: string): Promise<VerifyEmailResponse> =>
     return {
       ok: apiBoolean(value.ok),
       email_verified: apiBoolean(value.email_verified),
-      experience: value.experience === "wedding" ? "wedding" : "generic",
+      experience: value.experience === "wedding" ? "wedding" : value.experience === "vendor" ? "vendor" : "generic",
     };
   });
 export const authenticateWithGoogleIdToken = (idToken: string, acquisitionVisitId?: string | null): Promise<AuthApiResponse> =>

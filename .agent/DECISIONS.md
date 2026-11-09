@@ -1,3 +1,25 @@
+## 2026-11-09: Limited Specials release authority and vendor portal reuse
+
+The owner explicitly accepted and authorised the Limited Specials release in
+WED-347. A literal `*` is therefore an allowed production cohort value only
+while the corresponding management or discovery feature flag is also true.
+It does not bypass authentication, verified ownership, tenant scope, rate
+limits, revisions, capability expiry or revocation. False remains the default
+for a missing or disabled flag.
+
+Vendor acquisition keeps the shared account and verification service but uses
+the bounded `vendor` verification experience. A verified vendor-source login
+returns to `/workspace/vendor.html`; it does not enter generic study onboarding.
+The management portal is a shell over the canonical claim, owner profile,
+licensed photo, special-date, proposal, conversation and quotation authorities,
+not another vendor CRM or ledger. Field-level publication revisions remain a
+named follow-up rather than an unsupported first-release control.
+
+The public venue quote decoder is deterministic browser code. Proposal text and
+local text files are not uploaded; missing terms remain unknown, pasted-field
+suggestions require an explicit Apply action, and the result describes stated
+differences rather than recommending a venue.
+
 ## 2026-11-09: Quote recovery references messages; Guest Coordination projects existing authorities
 
 WED-346 keeps quote uploads in the existing Documents and quote-intelligence

@@ -130,7 +130,7 @@ pub(super) fn rollout_allowed(email: &str) -> bool {
             .unwrap_or_default()
             .split(',')
             .map(|value| value.trim().to_ascii_lowercase())
-            .any(|value| !value.is_empty() && value == email.trim().to_ascii_lowercase())
+            .any(|value| value == "*" || (!value.is_empty() && value == email.trim().to_ascii_lowercase()))
 }
 
 fn clean_category(value: Option<String>) -> Option<String> {

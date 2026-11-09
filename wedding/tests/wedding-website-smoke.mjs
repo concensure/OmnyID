@@ -17,6 +17,7 @@ const robots = readFileSync(robotsPath, 'utf8');
 const sitemap = readFileSync(sitemapPath, 'utf8');
 const vendorAcquisitionHtml = readFileSync(vendorAcquisitionPage, 'utf8');
 const weddingJs = readFileSync(resolve(root, 'assets', 'js', 'main.js'), 'utf8');
+const quoteDecoderJs = readFileSync(resolve(root, 'assets', 'js', 'quote-decoder.js'), 'utf8');
 const landingConfig = readFileSync(resolve(root, 'assets', 'js', 'landing-config.js'), 'utf8');
 const landingContext = readFileSync(resolve(root, 'assets', 'js', 'landing-context.js'), 'utf8');
 const expectedPages = [
@@ -27,6 +28,7 @@ const expectedPages = [
   'privacy.html',
   'user-guide.html',
   'animal-quiz.html',
+  'compare-wedding-venue-quotes.html',
   'wedding-cost-calculator.html',
   'wedding-planning-checklist-australia.html',
   'get-wedding-vendors-to-reply/index.html',
@@ -464,6 +466,16 @@ if (!docsHtml.includes('id="wedding-couples"') || !docsHtml.includes('href="/wed
 const calculator = htmlByPath.get(normalize(resolve(root, 'wedding-cost-calculator.html'))) ?? '';
 for (const methodCopy of ['How the budget method works', 'Target total', '100%', 'Adjustment band', 'Model version:']) {
   if (!calculator.includes(methodCopy)) failures.push(`wedding-cost-calculator.html: published method is missing "${methodCopy}"`);
+}
+const quoteDecoder = htmlByPath.get(normalize(resolve(root, 'compare-wedding-venue-quotes.html'))) ?? '';
+for (const required of ['proposals stay on this device', 'Not stated', 'Compare stated terms', 'assets/js/quote-decoder.js']) {
+  if (!quoteDecoder.includes(required)) failures.push(`compare-wedding-venue-quotes.html: missing ${required}`);
+}
+if (!quoteDecoderJs.includes('window.OmnyVenueQuoteDecoder = { costAt }') || !quoteDecoderJs.toLowerCase().includes('nothing was uploaded')) {
+  failures.push('quote-decoder.js: local deterministic engine or honest unsupported-file fallback is missing');
+}
+if (/fetch\s*\(|XMLHttpRequest|sendBeacon/.test(quoteDecoderJs)) {
+  failures.push('quote-decoder.js: proposal data must not leave the browser');
 }
 for (const context of ['starting', 'vendors', 'guests', 'final']) {
   if (!new RegExp(`${context}:[\\s\\S]*?retrieval:[\\s\\S]*?question:[\\s\\S]*?directAnswer:[\\s\\S]*?destinationPath:`).test(landingConfig)) failures.push(`landing-config.js: ${context} context lacks non-visible retrieval metadata`);

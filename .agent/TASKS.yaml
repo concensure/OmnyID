@@ -15,6 +15,18 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-347
+    title: Release Limited Specials, publish the venue quote decoder, and launch vendors into one management portal
+    status: review
+    owner: codex
+    branch: agent/codex/WED-347
+    worktree: C:/Users/ozans/Desktop/projects/OmnyID-GROWTH-001
+    base_sha: 81bfac1ca64f38ed7570b25b92f2e2f6a399c7d7
+    depends_on: [WED-340, WED-343, WED-344, WED-345, WED-346]
+    files: [wedding/compare-wedding-venue-quotes.html, wedding/assets/js/quote-decoder.js, wedding/assets/css/style.css, wedding/tests/wedding-website-smoke.mjs, solid-ui/src/vendor-claim-main.tsx, solid-ui/src/components/vendor/**, solid-ui/src/lib/vendor**, solid-ui/tests/wedding-vendor**, Documents/design/wedding planner/vendor side/**, Documents/testing/venue-quote-samples/**, docker-compose.oracle.minimal.yml, scripts/**, .agent/**]
+    acceptance: [the reviewed Limited Specials release authority is recorded and production controls expose it only through authenticated tenant-safe paths, the public venue quote decoder compares one or two manually entered proposals without uploading files or treating missing terms as zero and works at mobile width, new vendor-source registrations return directly to the existing vendor portal instead of generic study onboarding, the portal coherently exposes existing claim contact photo publication availability-link enquiry and quotation authorities without a competing store, a dependency-ordered vendor portal task plan records reused implemented and deferred capabilities, exact-SHA tests build deploy provenance health and hosted smoke pass]
+    progress: "Implemented from clean WED-346 SHA 81bfac1ca64f38ed7570b25b92f2e2f6a399c7d7 after the owner explicitly accepted and authorised the Limited Specials release. Added a browser-local venue quote decoder and mobile Chromium proof, vendor verification-source return routing, and a five-section portal shell over the existing ownership/profile/photo/availability/proposal/quote authorities. All 2,248 Wedding tests, public metadata/site smoke, typecheck, both line budgets, focused Rust auth and special-offer tests, and the production UI build pass. Exact-SHA Oracle release remains." 
+
   - id: WED-346
     title: Unify Wedding quote intake and comparison, preserve natural Master Agent queries, and harden first-use seating
     status: done

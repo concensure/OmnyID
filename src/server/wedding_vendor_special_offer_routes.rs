@@ -266,7 +266,7 @@ fn rollout_allowed_from(enabled: bool, allowlist: &str, email: &str) -> bool {
         && allowlist
             .split(',')
             .map(|value| value.trim().to_ascii_lowercase())
-            .any(|value| !value.is_empty() && value == email.trim().to_ascii_lowercase())
+            .any(|value| value == "*" || (!value.is_empty() && value == email.trim().to_ascii_lowercase()))
 }
 
 async fn vendor_authority(

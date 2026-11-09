@@ -1,7 +1,7 @@
 // @module-id: wedding.vendor-profile-dashboard
 // @primary-capability: verified-vendor-profile-quick-actions-and-preview
 // @locs-version: 1.0
-import { createResource, createSignal, Show } from "solid-js";
+import { createMemo, createResource, createSignal, For, Show } from "solid-js";
 
 import { VendorPhotoUploadPanel } from "@/components/vendor/VendorPhotoUploadPanel";
 import { VendorQuotationResponsePanel } from "@/components/vendor/VendorQuotationResponsePanel";
@@ -22,6 +22,17 @@ export function VendorProfileDashboard(props: { vendorSlug: string }) {
   const [busy, setBusy] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
   const [saved, setSaved] = createSignal(false);
+  const initialSection = new URLSearchParams(window.location.search).get("section");
+  const allowedSections = ["overview", "availability", "enquiries", "profile", "settings"] as const;
+  type Section = typeof allowedSections[number];
+  const [section, setSection] = createSignal<Section>(allowedSections.includes(initialSection as Section) ? initialSection as Section : "overview");
+  const navigation = [
+    { id: "overview" as const, label: "Overview" },
+    { id: "availability" as const, label: "Availability" },
+    { id: "enquiries" as const, label: "Enquiries" },
+    { id: "profile" as const, label: "Public profile" },
+    { id: "settings" as const, label: "Settings" },
+  ];
 
   const edit = (key: keyof EditableProfile, value: string) => {
     const source = draft() ?? profile();
@@ -56,6 +67,24 @@ export function VendorProfileDashboard(props: { vendorSlug: string }) {
   }
 
   const value = (key: keyof EditableProfile) => String(draft()?.[key] ?? profile()?.[key] ?? "");
+  const changeSection = (next: Section) => {
+    setSection(next);
+    const url = new URL(window.location.href);
+    url.searchParams.set("section", next);
+    window.history.replaceState(null, "", `${url.pathname}${url.search}`);
+  };
+  const nextActions = createMemo(() => {
+    const current = profile();
+    if (!current) return [];
+    const actions: { label: string; section: Section; detail: string }[] = [];
+    if (current.completion_percent < 100) actions.push({ label: "Complete public profile", section: "profile", detail: `${current.completion_percent}% complete` });
+    if (current.photo_count < 3) actions.push({ label: "Add service photos", section: "profile", detail: `${current.photo_count} published` });
+    actions.push(
+      { label: "Check available dates", section: "availability", detail: "Publish or update date evidence" },
+      { label: "Review enquiries", section: "enquiries", detail: "Messages, proposals and quotes" },
+    );
+    return actions;
+  });
 
   return (
     <div class="mt-6 grid gap-6">
@@ -78,7 +107,22 @@ export function VendorProfileDashboard(props: { vendorSlug: string }) {
           </div>
         </section>
 
-        <section class="rounded-xl border border-wedding-muted bg-white p-5 shadow-sm" aria-labelledby="profile-editor-title">
+        <nav class="overflow-x-auto rounded-xl border border-wedding-muted bg-white p-2 shadow-sm" aria-label="Vendor management">
+          <div class="flex min-w-max gap-1" role="tablist" aria-label="Vendor portal sections">
+            <For each={navigation}>{(item) => <button type="button" role="tab" aria-selected={section() === item.id} class={`min-h-11 rounded-lg px-4 text-sm font-bold ${section() === item.id ? "bg-wedding-accent text-white" : "text-wedding-text hover:bg-wedding-surface"}`} onClick={() => changeSection(item.id)}>{item.label}</button>}</For>
+          </div>
+        </nav>
+
+        <Show when={section() === "overview"}>
+          <section class="rounded-xl border border-wedding-muted bg-white p-5 shadow-sm" aria-labelledby="vendor-overview-title">
+            <p class="text-xs font-bold uppercase tracking-[0.16em] text-wedding-accent">Management portal</p>
+            <h2 id="vendor-overview-title" class="mt-1 text-xl font-semibold">Keep the listing useful and enquiries moving</h2>
+            <p class="mt-2 text-sm leading-6 text-wedding-muted">Contact details, public photos, date evidence, proposals, messages and quotes stay connected to this verified business.</p>
+            <div class="mt-4 grid gap-3 sm:grid-cols-2"><For each={nextActions()}>{(item) => <button type="button" class="min-h-24 rounded-xl border border-wedding-muted bg-wedding-surface p-4 text-left hover:border-wedding-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-wedding-accent" onClick={() => changeSection(item.section)}><span class="block font-bold">{item.label}</span><span class="mt-1 block text-sm text-wedding-muted">{item.detail}</span></button>}</For></div>
+          </section>
+        </Show>
+
+        <Show when={section() === "profile"}><section class="rounded-xl border border-wedding-muted bg-white p-5 shadow-sm" aria-labelledby="profile-editor-title">
           <h2 id="profile-editor-title" class="text-lg font-semibold">Quick profile updates</h2>
           <p class="mt-1 text-sm text-wedding-muted">We’ve pre-filled what is already on the listing. Your verified updates are stored separately from source records.</p>
           <label class="mt-4 block text-sm font-medium">Business description
@@ -94,24 +138,20 @@ export function VendorProfileDashboard(props: { vendorSlug: string }) {
           <button type="button" class="mt-4 min-h-11 rounded-lg bg-wedding-accent px-5 font-bold text-white disabled:opacity-50" disabled={!draft() || busy()} onClick={() => void save()}>{busy() ? "Saving…" : "Save profile"}</button>
           <Show when={saved()}><p class="mt-3 text-sm text-emerald-800" role="status">Profile saved and preview updated.</p></Show>
           <Show when={error()}>{(message) => <p class="mt-3 text-sm text-red-800" role="alert">{message()}</p>}</Show>
-        </section>
+        </section></Show>
 
-        <section class="rounded-xl border border-wedding-muted bg-wedding-surface p-5" aria-labelledby="profile-preview-title">
+        <Show when={section() === "profile"}><section class="rounded-xl border border-wedding-muted bg-wedding-surface p-5" aria-labelledby="profile-preview-title">
           <p class="text-xs font-bold uppercase tracking-[0.16em] text-wedding-accent">Couple-facing preview</p>
           <h2 id="profile-preview-title" class="mt-1 text-xl font-semibold">{current().vendor_name} <span class="text-sm text-emerald-800">✓ Verified</span></h2>
           <p class="mt-2 text-sm leading-6 text-wedding-muted">{value("description") || "Add a description to help couples understand your service."}</p>
           <dl class="mt-4 grid gap-2 text-sm sm:grid-cols-2"><div><dt class="font-semibold">Area</dt><dd>{current().service_area}</dd></div><div><dt class="font-semibold">Contact</dt><dd>{value("contact_email") || value("contact_phone") || "Add public contact details"}</dd></div></dl>
-          <div class="mt-4 grid gap-2 sm:grid-cols-3" aria-label="Optional profile upgrades">
-            <span class="rounded-lg border border-dashed border-wedding-muted bg-white p-3 text-xs text-wedding-muted">Direct messaging · planned</span>
-            <span class="rounded-lg border border-dashed border-wedding-muted bg-white p-3 text-xs text-wedding-muted">Featured placement · optional plan</span>
-            <span class="rounded-lg border border-dashed border-wedding-muted bg-white p-3 text-xs text-wedding-muted">Video embeds · optional plan</span>
-          </div>
+          <p class="mt-4 rounded-lg bg-white p-3 text-xs leading-5 text-wedding-muted">Eligible saved fields and licensed live photos feed the existing public directory and comparison-card projections. Verification, independent reviews and ranking methodology remain platform-controlled.</p>
         </section>
 
-        <section><h2 class="mb-3 text-lg font-semibold">Gallery photos</h2><VendorPhotoUploadPanel vendorSlug={props.vendorSlug} onPublished={() => void refetch()} /></section>
-        <VendorSpecialOffersPanel vendorSlug={props.vendorSlug} />
-        <VendorProposalOpportunitiesPanel vendorSlug={props.vendorSlug} />
-        <VendorQuotationResponsePanel />
+        <section><h2 class="mb-3 text-lg font-semibold">Gallery photos</h2><VendorPhotoUploadPanel vendorSlug={props.vendorSlug} onPublished={() => void refetch()} /></section></Show>
+        <Show when={section() === "availability"}><section class="rounded-xl border border-wedding-muted bg-wedding-surface p-4"><h2 class="text-xl font-semibold">Availability</h2><p class="mt-1 text-sm leading-6 text-wedding-muted">Manage indicative dates here or create a scoped staff link. Calendar-open, vendor-confirmed, temporary hold and confirmed booking remain different evidence states.</p></section><VendorSpecialOffersPanel vendorSlug={props.vendorSlug} /></Show>
+        <Show when={section() === "enquiries"}><section class="rounded-xl border border-wedding-muted bg-wedding-surface p-4"><h2 class="text-xl font-semibold">Enquiries and quotes</h2><p class="mt-1 text-sm leading-6 text-wedding-muted">Review authorised couple context, respond in the existing conversation and prepare an itemised quote. A draft is never sent without your approval.</p></section><VendorProposalOpportunitiesPanel vendorSlug={props.vendorSlug} /><VendorQuotationResponsePanel /></Show>
+        <Show when={section() === "settings"}><section class="rounded-xl border border-wedding-muted bg-white p-5 shadow-sm" aria-labelledby="vendor-settings-title"><h2 id="vendor-settings-title" class="text-xl font-semibold">Business access and settings</h2><dl class="mt-4 grid gap-3 text-sm sm:grid-cols-2"><div class="rounded-lg bg-wedding-surface p-3"><dt class="font-bold">Ownership</dt><dd class="mt-1 text-wedding-muted">Verified for {current().vendor_name}</dd></div><div class="rounded-lg bg-wedding-surface p-3"><dt class="font-bold">Staff calendar access</dt><dd class="mt-1 text-wedding-muted">Create and rotate scoped links from Availability.</dd></div><div class="rounded-lg bg-wedding-surface p-3"><dt class="font-bold">Public information</dt><dd class="mt-1 text-wedding-muted">Edit eligible fields and previews in Public profile.</dd></div><div class="rounded-lg bg-wedding-surface p-3"><dt class="font-bold">Security</dt><dd class="mt-1 text-wedding-muted">Account, billing and owner changes remain outside staff links.</dd></div></dl></section></Show>
       </>}</Show>
     </div>
   );
