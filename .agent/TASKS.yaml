@@ -15,6 +15,17 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-350
+    title: Enlarge public desktop pages and make the venue quote decoder source-grounded and calculation-safe
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-350
+    worktree: C:/Users/ozans/Desktop/projects/OmnyID-GROWTH-001
+    base_sha: a50f1a36e5de673494105231427866e250af11aa
+    depends_on: [WED-349, WED-347]
+    files: [docs/index.html, wedding/assets/css/style.css, wedding/assets/css/quote-decoder.css, wedding/compare-wedding-venue-quotes.html, wedding/assets/js/quote-decoder*.js, wedding/tests/**quote**, src/server/wedding_quote_decoder_routes.rs, src/server/openrouter_funded_inference.rs, src/server/mod.rs, Caddyfile, Documents/marketing/wedding planning/posts/magnet/**, .agent/**]
+    acceptance: [desktop omnyid.com renders one comfortable scale step larger while mobile remains unchanged, desktop public Wedding pages render two scale steps larger without horizontal overflow, the quote decoder uses an explicit privacy-disclosed bounded contextual extraction request instead of regex guesses, extracted fields and line items carry exact source snippets and extracted not-stated or ambiguous states, no component subtotal silently becomes a whole-package total, all arithmetic GST service minimum spend and comparison totals are deterministic and auditable, users can inspect source suggestions resolve genuine ambiguities edit line items see missing-term questions and compare differences, repeat analysis is locally cached by content digest and reports changed commercial terms, existing manual comparison remains usable when inference is declined or unavailable, specification task plan budget-reality-check follow-up tests build exact-SHA deployment provenance and hosted checks are recorded]
+
   - id: WED-349
     title: Publish the venue quote decoder and separate consented public analytics from private Wedding data sharing
     status: done
