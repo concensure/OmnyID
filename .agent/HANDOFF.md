@@ -8129,3 +8129,40 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
   start. Final production and backup proof passes (restore drill skipped), at
   81% root/var use. Evidence:
   `Documents/verification/wed-351-quote-specials-repair-2026-11-10.md`.
+## 2026-11-10 - WED-352 protected vendor proposal feeds and Wedding database projections (Codex, complete)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
+`agent/codex/WED-352`; exact deployed application SHA
+`ce0cada97dd6e2fe4c17da4c6a8ca08947050dc0`. Clean release checkout:
+`C:\temp\wt\omnyid-wed352-release-ce0cada`.
+
+- Added operator- and claimant-issued vendor lead feeds for Invite Proposals.
+  Links are listing-bound, 256-bit/digest-only, 30-day, rotating, revocable,
+  rate-limited and re-authorised on each request. Vendors need no account to
+  view matching published briefs or privately return a proposal, suitable date
+  or notify-couple request.
+- Extended the existing tenant-private response projection rather than adding a
+  parallel lead store. Notify requests are explicitly tagged for downstream
+  planner handling; available dates remain evidence rather than bookings.
+- The operator dashboard now exposes the requested support list of submitted
+  intents and their shared email/date/location/guest context, plus vendor link
+  generation/revocation. It does not query unrelated private wedding content.
+- Database now opens an account-scoped, read-only Wedding plan on Budget and
+  projects Budget, Timeline and Seating from the same AFP ledger. Custom
+  databases and the run-sheet profile are unchanged.
+- Tests passed: Rust check; disposable-Postgres route integration; TypeScript;
+  eight focused UI tests; two line-budget tests; 2,252 Wedding tests; and the
+  production UI build. The first direct focused Node command omitted the repo's
+  alias hook and failed resolution; the standard hooked command passed all
+  eight tests.
+- The first hosted candidate exposed missing privacy headers on rejected bearer
+  errors. That edge was fixed with route-level security middleware and a
+  regression assertion, then a new clean exact-SHA candidate was deployed.
+- Hosted proof: invalid tokens return 404 with no-store/no-referrer/noindex;
+  migration 0154 schema exists; all required services run; `SOURCE_COMMIT` and
+  runtime manifest match; backup verification and restore drill pass; root and
+  `/var` use are 79%. The first deploy wrapper's detached Windows SSH poll
+  remained attached after its remote audit had already passed; the superseding
+  release used direct proof and completed normally.
+- Evidence:
+  `Documents/verification/wed-352-vendor-proposal-feeds-and-wedding-database-2026-11-10.md`.
