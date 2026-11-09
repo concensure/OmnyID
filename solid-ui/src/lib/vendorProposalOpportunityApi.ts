@@ -10,6 +10,13 @@ export type VendorProposalOpportunity = {
   expiresAt: string;
 };
 
+export type VendorProposalLeadFeed = {
+  vendorId: string;
+  vendorName: string;
+  expiresAt: string;
+  opportunities: VendorProposalOpportunity[];
+};
+
 const clean = (value: unknown) => typeof value === "string" ? value.trim() : "";
 
 function normalize(value: unknown): VendorProposalOpportunity | null {
@@ -71,5 +78,51 @@ export async function submitPublicVendorProposal(input: {
       valid_until: input.validUntil,
     }),
   });
+  if (!response.ok) throw new Error(await response.text());
+}
+
+export async function createClaimedVendorProposalLeadLink(vendorSlug: string): Promise<{ url: string; expiresAt: string }> {
+  const result = await apiFetch<Record<string, unknown>>("/wedding/vendor/proposal-lead-link", {
+    method: "POST", bodyJson: { vendor_slug: vendorSlug },
+  });
+  return { url: clean(result.url), expiresAt: clean(result.expires_at) };
+}
+
+export async function revokeClaimedVendorProposalLeadLink(vendorSlug: string): Promise<void> {
+  await apiFetch("/wedding/vendor/proposal-lead-link/revoke", {
+    method: "POST", bodyJson: { vendor_slug: vendorSlug },
+  });
+}
+
+export async function loadPublicVendorProposalLeadFeed(token: string): Promise<VendorProposalLeadFeed> {
+  const response = await fetch(`/api/public/wedding/proposal-leads/${encodeURIComponent(token)}`, {
+    credentials: "omit", cache: "no-store", referrerPolicy: "no-referrer",
+  });
+  if (!response.ok) throw new Error(await response.text());
+  const result = await response.json() as unknown;
+  const record = isRecord(result) ? result : {};
+  return {
+    vendorId: clean(record.vendor_id), vendorName: clean(record.vendor_name), expiresAt: clean(record.expires_at),
+    opportunities: (Array.isArray(record.opportunities) ? record.opportunities : []).flatMap((value) => {
+      const item = normalize(value); return item ? [item] : [];
+    }),
+  };
+}
+
+export async function submitPublicVendorLeadResponse(input: {
+  token: string; opportunityId: string; responseKind: "proposal" | "available_date" | "notify_couple";
+  message: string; availableDate?: string; amount?: number; currency?: string; validUntil?: string;
+}): Promise<void> {
+  const response = await fetch(
+    `/api/public/wedding/proposal-leads/${encodeURIComponent(input.token)}/${encodeURIComponent(input.opportunityId)}/responses`,
+    {
+      method: "POST", credentials: "omit", cache: "no-store", referrerPolicy: "no-referrer",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        response_kind: input.responseKind, message: input.message, available_date: input.availableDate,
+        amount: input.amount, currency: input.currency, valid_until: input.validUntil,
+      }),
+    },
+  );
   if (!response.ok) throw new Error(await response.text());
 }

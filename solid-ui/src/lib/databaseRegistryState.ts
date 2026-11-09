@@ -167,6 +167,22 @@ export function projectDatabaseDefinitions(input: {
     });
   }
 
+  const weddingPlanId = discoverWeddingPlanId(input.messages);
+  if (weddingPlanId) {
+    const databaseId = `database:wedding-plan:${weddingPlanId}`;
+    definitions.set(databaseId, {
+      databaseId,
+      name: "Wedding plan",
+      defaultTable: "budget",
+      profileId: "wedding_plan_projection.v1",
+      weddingPlanId,
+      revision: 1,
+      archived: false,
+      archiveRevision: 0,
+      legacy: false,
+    });
+  }
+
   if (input.hasLegacyRecords || definitions.size === 0) {
     definitions.set(LEGACY_DATABASE_ID, {
       databaseId: LEGACY_DATABASE_ID,
@@ -207,6 +223,8 @@ export function reconcileSelectedDatabaseId(
 ): string | null {
   const current = definitions.find((definition) => definition.databaseId === selectedDatabaseId);
   if (current) return current.databaseId;
+  const weddingProjection = definitions.find((definition) => definition.profileId === "wedding_plan_projection.v1" && !definition.archived);
+  if (weddingProjection) return weddingProjection.databaseId;
   return definitions.find((definition) => !definition.archived)?.databaseId
     ?? definitions[0]?.databaseId
     ?? null;

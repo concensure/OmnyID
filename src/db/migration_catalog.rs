@@ -782,4 +782,9 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Auditable false-default consent for content-free Wedding product statistics",
         include_str!("../../postgres/migrations/0153_wedding_admin_data_consent_audit.sql"),
     ),
+    (
+        "0154_wedding_invite_proposal_vendor_feeds",
+        "Expiring vendor-bound Invite Proposal lead feeds and typed private responses",
+        include_str!("../../postgres/migrations/0154_wedding_invite_proposal_vendor_feeds.sql"),
+    ),
 ];

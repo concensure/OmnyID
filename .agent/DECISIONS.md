@@ -3138,3 +3138,27 @@ the workspace CSP. Filter edits are draft state until the couple selects
 directory-backed choice card and reuse the existing reviewed vendor-outreach
 composer and information permissions in place; they do not navigate through a
 synthetic vendor search or introduce another send path.
+
+# 2026-11-10 — WED-352 vendor lead feeds are listing-bound capabilities and Wedding databases are projections
+
+- A vendor proposal lead URL is a 256-bit capability bound to one active vendor
+  listing. Only an operator or that listing's verified claimant may issue or
+  revoke it. The plaintext token is shown once in a URL fragment; only its
+  digest is stored. A new link revokes the old one and every request rechecks
+  expiry, revocation, listing status, category and service-area eligibility.
+- The unauthenticated feed grants no account access and returns only the brief
+  and context the couple explicitly published through Invite Proposals. It is
+  no-store, no-referrer and noindex, and token-scoped rate limits protect both
+  reads and replies. Proposals, indicative suitable dates and requests to
+  notify the couple all reuse the existing response row plus tenant-private AFP
+  document; an offered date remains evidence, never a hold or booking.
+- WED-338's aggregate-only operator projection is superseded only for the
+  authenticated operator surface requested for proposal support. It may show
+  the account email and the submitted category, date, location, guest count and
+  brief, but must not query or expose unrelated messages, documents, budget or
+  wedding history.
+- The Database Wedding plan is synthetic and read-only. Budget, Timeline and
+  Seating rows are calculated from the same account-scoped Wedding AFP messages
+  each time the view renders; no database records are written. The projected
+  database opens on Budget by default while user-created databases and the
+  existing run-sheet profile remain independently available.

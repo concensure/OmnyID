@@ -118,14 +118,20 @@ async fn opportunity_is_tenant_scoped_deduplicated_and_revocable() {
     }
     let db = Db::new(&db_url).await.expect("database");
     let (owner_id, owner_auth) = seed_user(&db, owner_email).await;
-    let (_other_id, other_auth) =
+    let (vendor_user_id, other_auth) =
         seed_user(&db, format!("opportunity-other-{suffix}@omnyid.test")).await;
     let (_operator_id, operator_auth) = seed_user(&db, operator_email).await;
     let plan_id = format!("wedding_plan:{suffix}");
     let workspace_id = format!("wedding_response_workspace:{suffix}");
+    let category_label = format!("Wedding photographers {suffix}");
+    let location_label = format!("Synthetic-{suffix} NSW");
     sqlx::query("INSERT INTO wedding_user_onboarding_state (user_id,wedding_plan_id,intake_variant,entry_source) VALUES ($1,$2,'wedding_site','wedding_site')")
         .bind(&owner_id).bind(&plan_id).execute(&db.pool).await.expect("onboarding state");
     let app = omnyid_homeserver::server::build_test_router(&db_url).await;
+    let vendor_id = format!("proposal-vendor-{suffix}");
+    let vendor_slug = format!("synthetic-photo-{suffix}");
+    sqlx::query("INSERT INTO wedding_vendors (vendor_id,vendor_slug,vendor_name,category,service_area,status,claim_status,claimed_by_user_id,verified_at) VALUES ($1,$2,'Synthetic Photo Co','Photographer',$3,'active','verified',$4,NOW())")
+        .bind(&vendor_id).bind(&vendor_slug).bind(&location_label).bind(&vendor_user_id).execute(&db.pool).await.expect("vendor listing");
 
     let (status, _, published) = request(
         &app,
@@ -134,8 +140,8 @@ async fn opportunity_is_tenant_scoped_deduplicated_and_revocable() {
         Some(&owner_auth),
         json!({
             "wedding_plan_id":plan_id,"response_workspace_id":workspace_id,
-            "brief_id":format!("brief-{suffix}"),"category":"Wedding photographers",
-            "location":"Sydney NSW","brief_text":"Documentary coverage through speeches",
+            "brief_id":format!("brief-{suffix}"),"category":category_label.clone(),
+            "location":location_label.clone(),"brief_text":"Documentary coverage through speeches",
             "shared_context":{"date_or_season":"2027-11-20","guest_count":90,"phone":"must-not-leak"}
         }),
     ).await;
@@ -217,6 +223,64 @@ async fn opportunity_is_tenant_scoped_deduplicated_and_revocable() {
         .fetch_one(&db.pool).await.expect("private artifact count");
     assert_eq!(artifact_count, 1);
 
+    let (status, _, feed_link) = request(
+        &app,
+        "POST",
+        "/wedding/vendor/proposal-lead-link",
+        Some(&other_auth),
+        json!({"vendor_slug":vendor_slug}),
+    )
+    .await;
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "claimed vendor lead link: {feed_link}"
+    );
+    let feed_token = feed_link["url"]
+        .as_str()
+        .expect("feed URL")
+        .split("proposal_feed=")
+        .nth(1)
+        .expect("feed token");
+    let stored_feed_digest: String = sqlx::query_scalar(
+        "SELECT token_digest FROM wedding_invite_proposal_vendor_feed_grants WHERE vendor_id=$1 AND revoked_at IS NULL",
+    ).bind(&vendor_id).fetch_one(&db.pool).await.expect("feed digest");
+    assert_ne!(stored_feed_digest, feed_token);
+    let feed_uri = format!("/api/public/wedding/proposal-leads/{feed_token}");
+    let (status, headers, feed) = request(&app, "GET", &feed_uri, None, json!({})).await;
+    assert_eq!(status, StatusCode::OK, "vendor lead feed: {feed}");
+    assert_eq!(
+        headers
+            .get("x-robots-tag")
+            .and_then(|value| value.to_str().ok()),
+        Some("noindex, nofollow, noarchive")
+    );
+    assert_eq!(feed["vendor_name"], "Synthetic Photo Co");
+    assert!(feed["opportunities"].as_array().is_some_and(|rows| {
+        rows.iter()
+            .any(|row| row["opportunity_id"] == opportunity_id)
+    }));
+    let (status, _, vendor_reply) = request(
+        &app,
+        "POST",
+        &format!("{feed_uri}/{opportunity_id}/responses"),
+        None,
+        json!({
+            "response_kind":"available_date","available_date":"2027-11-20",
+            "message":"We can offer this date, subject to a couple-specific confirmation."
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "vendor feed reply: {vendor_reply}");
+    let stored_kind: (String, Option<chrono::NaiveDate>) = sqlx::query_as(
+        "SELECT response_kind,available_date FROM wedding_invite_proposal_responses WHERE opportunity_id=$1 AND channel='vendor_feed'",
+    ).bind(opportunity_id).fetch_one(&db.pool).await.expect("vendor feed response");
+    assert_eq!(stored_kind.0, "available_date");
+    assert_eq!(
+        stored_kind.1.map(|date| date.to_string()).as_deref(),
+        Some("2027-11-20")
+    );
+
     let (status, _, metrics) = request(
         &app,
         "GET",
@@ -228,8 +292,43 @@ async fn opportunity_is_tenant_scoped_deduplicated_and_revocable() {
     assert_eq!(status, StatusCode::OK, "admin metrics: {metrics}");
     assert!(metrics["categories"].as_array().is_some_and(|rows| {
         rows.iter()
-            .any(|row| row["category"] == "Wedding photographers" && row["replies"] == 1)
+            .any(|row| row["category"] == category_label && row["replies"] == 2)
     }));
+    assert!(
+        metrics["opportunities"]
+            .as_array()
+            .is_some_and(|rows| rows.iter().any(|row| {
+                row["couple_email"]
+                    .as_str()
+                    .is_some_and(|email| email.starts_with("opportunity-owner-"))
+                    && row["shared_context"]["guest_count"] == 90
+            }))
+    );
+    assert!(
+        metrics["vendors"]
+            .as_array()
+            .is_some_and(|rows| rows.iter().any(|row| row["vendor_slug"] == vendor_slug))
+    );
+
+    let (status, _, operator_link) = request(
+        &app,
+        "POST",
+        "/admin/wedding/proposal-lead-link",
+        Some(&operator_auth),
+        json!({"vendor_slug":vendor_slug}),
+    )
+    .await;
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "operator vendor link: {operator_link}"
+    );
+    let (status, _, _) = request(&app, "GET", &feed_uri, None, json!({})).await;
+    assert_eq!(
+        status,
+        StatusCode::NOT_FOUND,
+        "rotating a feed link must revoke the prior bearer token"
+    );
 
     let (status, _, closed) = request(
         &app,

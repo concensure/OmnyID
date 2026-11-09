@@ -15,7 +15,7 @@ use axum::{
 };
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use chacha20poly1305::aead::{OsRng, rand_core::RngCore};
-use chrono::{DateTime, Duration as ChronoDuration, Utc};
+use chrono::{DateTime, Duration as ChronoDuration, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -36,6 +36,7 @@ const MAX_BRIEF_CHARS: usize = 8_000;
 const MAX_RESPONSE_CHARS: usize = 12_000;
 const OPPORTUNITY_DAYS: i64 = 45;
 const SHARE_DAYS: i64 = 14;
+const VENDOR_FEED_DAYS: i64 = 30;
 
 pub(super) fn routes() -> Router<Arc<AppState>> {
     Router::new()
@@ -60,12 +61,36 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
             post(claimed_vendor_response_http),
         )
         .route(
+            "/wedding/vendor/proposal-lead-link",
+            post(claimed_vendor_feed_link_http),
+        )
+        .route(
+            "/wedding/vendor/proposal-lead-link/revoke",
+            post(claimed_vendor_feed_revoke_http),
+        )
+        .route(
             "/api/public/wedding/proposal-opportunities/{token}",
             get(public_opportunity_http).post(public_response_http),
         )
         .route(
+            "/api/public/wedding/proposal-leads/{token}",
+            get(public_vendor_feed_http),
+        )
+        .route(
+            "/api/public/wedding/proposal-leads/{token}/{opportunity_id}/responses",
+            post(public_vendor_feed_response_http),
+        )
+        .route(
             "/admin/wedding/proposal-opportunities",
             get(admin_opportunity_metrics_http),
+        )
+        .route(
+            "/admin/wedding/proposal-lead-link",
+            post(admin_vendor_feed_link_http),
+        )
+        .route(
+            "/admin/wedding/proposal-lead-link/revoke",
+            post(admin_vendor_feed_revoke_http),
         )
 }
 
@@ -99,6 +124,21 @@ struct PublicResponseRequest {
     business_name: String,
     business_email: String,
     message: String,
+    amount: Option<f64>,
+    currency: Option<String>,
+    valid_until: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct VendorFeedLinkRequest {
+    vendor_slug: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct VendorFeedResponseRequest {
+    response_kind: String,
+    message: String,
+    available_date: Option<String>,
     amount: Option<f64>,
     currency: Option<String>,
     valid_until: Option<String>,
@@ -658,6 +698,245 @@ async fn vendor_authority(
         .ok_or((StatusCode::FORBIDDEN, "A verified claimed listing is required.".into()))
 }
 
+async fn active_vendor_by_slug(
+    state: &AppState,
+    slug: &str,
+) -> Result<sqlx::postgres::PgRow, (StatusCode, String)> {
+    sqlx::query(
+        "SELECT vendor_id,vendor_slug,vendor_name,category,service_area,contact_email FROM wedding_vendors WHERE vendor_slug=$1 AND status='active'",
+    )
+    .bind(slug)
+    .fetch_optional(&state.db.pool)
+    .await
+    .map_err(|_| (StatusCode::SERVICE_UNAVAILABLE, "The vendor listing could not be checked.".into()))?
+    .ok_or((StatusCode::NOT_FOUND, "That active vendor listing was not found.".into()))
+}
+
+async fn create_vendor_feed_link(
+    state: &AppState,
+    vendor: &sqlx::postgres::PgRow,
+    issuer_user_id: &str,
+    authority: &str,
+) -> Result<Value, (StatusCode, String)> {
+    let vendor_id: String = vendor.get("vendor_id");
+    let mut entropy = [0_u8; 32];
+    OsRng.fill_bytes(&mut entropy);
+    let token = URL_SAFE_NO_PAD.encode(entropy);
+    let grant_id = format!("proposal-feed-{}", Ulid::new());
+    let expires_at = Utc::now() + ChronoDuration::days(VENDOR_FEED_DAYS);
+    let mut tx = state.db.pool.begin().await.map_err(|_| {
+        (
+            StatusCode::SERVICE_UNAVAILABLE,
+            "The vendor lead link could not be started.".into(),
+        )
+    })?;
+    sqlx::query(
+        "UPDATE wedding_invite_proposal_vendor_feed_grants SET revoked_at=NOW() WHERE vendor_id=$1 AND revoked_at IS NULL",
+    )
+    .bind(&vendor_id)
+    .execute(&mut *tx)
+    .await
+    .map_err(|_| (StatusCode::SERVICE_UNAVAILABLE, "The earlier vendor lead link could not be revoked.".into()))?;
+    sqlx::query(
+        "INSERT INTO wedding_invite_proposal_vendor_feed_grants (grant_id,vendor_id,issued_by_user_id,authority,token_digest,expires_at) VALUES ($1,$2,$3,$4,$5,$6)",
+    )
+    .bind(&grant_id)
+    .bind(&vendor_id)
+    .bind(issuer_user_id)
+    .bind(authority)
+    .bind(digest(&token))
+    .bind(expires_at)
+    .execute(&mut *tx)
+    .await
+    .map_err(|_| (StatusCode::SERVICE_UNAVAILABLE, "The vendor lead link could not be saved.".into()))?;
+    tx.commit().await.map_err(|_| {
+        (
+            StatusCode::SERVICE_UNAVAILABLE,
+            "The vendor lead link could not be committed.".into(),
+        )
+    })?;
+    Ok(json!({
+        "url": format!("https://omnyid.com/workspace/vendor.html#proposal_feed={token}"),
+        "vendor_id": vendor_id,
+        "vendor_name": vendor.get::<String,_>("vendor_name"),
+        "expires_at": expires_at.to_rfc3339(),
+        "notice": "This private link is bound to one vendor listing. Creating another link revokes it."
+    }))
+}
+
+async fn revoke_vendor_feed_link(
+    state: &AppState,
+    vendor_id: &str,
+) -> Result<Value, (StatusCode, String)> {
+    let revoked = sqlx::query(
+        "UPDATE wedding_invite_proposal_vendor_feed_grants SET revoked_at=NOW() WHERE vendor_id=$1 AND revoked_at IS NULL RETURNING grant_id",
+    )
+    .bind(vendor_id)
+    .fetch_all(&state.db.pool)
+    .await
+    .map_err(|_| (StatusCode::SERVICE_UNAVAILABLE, "The vendor lead link could not be revoked.".into()))?;
+    Ok(json!({"revoked":true,"revoked_count":revoked.len()}))
+}
+
+async fn claimed_vendor_feed_link_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(request): Json<VendorFeedLinkRequest>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    let user = authenticated_user(&state.db, &headers).await?;
+    let vendor = vendor_authority(&state, &user.id, &clean(&request.vendor_slug, 160)).await?;
+    Ok(Json(
+        create_vendor_feed_link(&state, &vendor, &user.id, "claimed_vendor").await?,
+    ))
+}
+
+async fn claimed_vendor_feed_revoke_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(request): Json<VendorFeedLinkRequest>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    let user = authenticated_user(&state.db, &headers).await?;
+    let vendor = vendor_authority(&state, &user.id, &clean(&request.vendor_slug, 160)).await?;
+    Ok(Json(
+        revoke_vendor_feed_link(&state, vendor.get::<String, _>("vendor_id").as_str()).await?,
+    ))
+}
+
+async fn admin_vendor_feed_link_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(request): Json<VendorFeedLinkRequest>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    let user = authenticated_user(&state.db, &headers).await?;
+    if !super::cost_controls::operator_access_allowed(&user.email) {
+        return Err((StatusCode::FORBIDDEN, "Operator access is required.".into()));
+    }
+    let vendor = active_vendor_by_slug(&state, &clean(&request.vendor_slug, 160)).await?;
+    Ok(Json(
+        create_vendor_feed_link(&state, &vendor, &user.id, "operator").await?,
+    ))
+}
+
+async fn admin_vendor_feed_revoke_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(request): Json<VendorFeedLinkRequest>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    let user = authenticated_user(&state.db, &headers).await?;
+    if !super::cost_controls::operator_access_allowed(&user.email) {
+        return Err((StatusCode::FORBIDDEN, "Operator access is required.".into()));
+    }
+    let vendor = active_vendor_by_slug(&state, &clean(&request.vendor_slug, 160)).await?;
+    Ok(Json(
+        revoke_vendor_feed_link(&state, vendor.get::<String, _>("vendor_id").as_str()).await?,
+    ))
+}
+
+async fn vendor_feed_authority(
+    state: &AppState,
+    token: &str,
+) -> Result<sqlx::postgres::PgRow, (StatusCode, String)> {
+    if URL_SAFE_NO_PAD
+        .decode(token.trim())
+        .ok()
+        .filter(|bytes| bytes.len() == 32)
+        .is_none()
+    {
+        return Err((
+            StatusCode::NOT_FOUND,
+            "This vendor lead link is not available.".into(),
+        ));
+    }
+    sqlx::query(
+        r#"SELECT g.grant_id,g.vendor_id,v.vendor_slug,v.vendor_name,v.category,v.service_area,
+                  v.contact_email,g.expires_at::text
+             FROM wedding_invite_proposal_vendor_feed_grants g
+             JOIN wedding_vendors v ON v.vendor_id=g.vendor_id
+            WHERE g.token_digest=$1 AND g.revoked_at IS NULL AND g.expires_at>NOW()
+              AND v.status='active'"#,
+    )
+    .bind(digest(token.trim()))
+    .fetch_optional(&state.db.pool)
+    .await
+    .map_err(|_| {
+        (
+            StatusCode::SERVICE_UNAVAILABLE,
+            "The vendor lead link could not be checked.".into(),
+        )
+    })?
+    .ok_or((
+        StatusCode::NOT_FOUND,
+        "This vendor lead link has expired or was revoked.".into(),
+    ))
+}
+
+async fn matching_vendor_feed_opportunities(
+    state: &AppState,
+    vendor: &sqlx::postgres::PgRow,
+) -> Result<Vec<Value>, (StatusCode, String)> {
+    let category: String = vendor.get("category");
+    let service_area: String = vendor.get("service_area");
+    let rows = sqlx::query(
+        r#"SELECT o.opportunity_id,o.category,o.location,o.brief_text,o.shared_context,o.expires_at::text,
+                  COUNT(r.response_id)::bigint response_count
+             FROM wedding_invite_proposal_opportunities o
+             LEFT JOIN wedding_invite_proposal_responses r ON r.opportunity_id=o.opportunity_id AND r.vendor_id=$1
+            WHERE o.status='open' AND o.expires_at>NOW()
+            GROUP BY o.opportunity_id ORDER BY o.created_at DESC LIMIT 100"#,
+    )
+    .bind(vendor.get::<String,_>("vendor_id"))
+    .fetch_all(&state.db.pool)
+    .await
+    .map_err(|_| (StatusCode::SERVICE_UNAVAILABLE, "Proposal leads could not be loaded.".into()))?;
+    Ok(rows
+        .into_iter()
+        .filter_map(|row| {
+            let row_category: String = row.get("category");
+            let location: Option<String> = row.get("location");
+            if category_group(&row_category) != category_group(&category)
+                || !location_compatible(&service_area, location.as_deref())
+            {
+                return None;
+            }
+            Some(json!({
+                "opportunity_id":row.get::<String,_>("opportunity_id"),"category":row_category,
+                "location":location,"brief_text":row.get::<String,_>("brief_text"),
+                "shared_context":row.get::<Value,_>("shared_context"),
+                "expires_at":row.get::<String,_>("expires_at"),
+                "response_count":row.get::<i64,_>("response_count")
+            }))
+        })
+        .collect())
+}
+
+async fn public_vendor_feed_http(
+    State(state): State<Arc<AppState>>,
+    Path(token): Path<String>,
+) -> Result<impl IntoResponse, (StatusCode, String)> {
+    enforce_rate_limit(
+        &state,
+        format!("proposal-feed-view:{}", digest(token.trim())),
+        RateLimitPolicy {
+            max_requests: 40,
+            window: Duration::from_secs(3600),
+        },
+    )
+    .await?;
+    let vendor = vendor_feed_authority(&state, &token).await?;
+    let opportunities = matching_vendor_feed_opportunities(&state, &vendor).await?;
+    sqlx::query("UPDATE wedding_invite_proposal_vendor_feed_grants SET last_viewed_at=NOW() WHERE token_digest=$1")
+        .bind(digest(token.trim())).execute(&state.db.pool).await.ok();
+    Ok((
+        no_store_headers(),
+        Json(json!({
+            "vendor_id":vendor.get::<String,_>("vendor_id"),
+            "vendor_name":vendor.get::<String,_>("vendor_name"),
+            "expires_at":vendor.get::<String,_>("expires_at"),
+            "opportunities":opportunities
+        })),
+    ))
+}
+
 async fn claimed_vendor_opportunities_http(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -720,6 +999,8 @@ async fn store_response(
     vendor_name: &str,
     business_email: Option<&str>,
     channel: &str,
+    response_kind: &str,
+    available_date: Option<&str>,
     message: &str,
     amount: Option<f64>,
     currency: Option<&str>,
@@ -744,6 +1025,23 @@ async fn store_response(
     let valid_until = valid_until
         .map(|value| clean(value, 10))
         .filter(|value| valid_iso_date(value));
+    let response_kind = match response_kind {
+        "available_date" => "available_date",
+        "notify_couple" => "notify_couple",
+        _ => "proposal",
+    };
+    let available_date = available_date
+        .map(|value| clean(value, 10))
+        .filter(|value| valid_iso_date(value));
+    let available_date_db = available_date
+        .as_deref()
+        .and_then(|value| NaiveDate::parse_from_str(value, "%Y-%m-%d").ok());
+    if response_kind == "available_date" && available_date_db.is_none() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Choose the suitable date being offered.".into(),
+        ));
+    }
     let email_digest = business_email.map(|value| digest(&value.trim().to_ascii_lowercase()));
     let fingerprint = digest(
         &json!([
@@ -754,7 +1052,9 @@ async fn store_response(
             message,
             amount,
             currency,
-            valid_until
+            valid_until,
+            response_kind,
+            available_date
         ])
         .to_string(),
     );
@@ -770,8 +1070,13 @@ async fn store_response(
             )
         })?;
     let table = format!("\"{}\".messages", tenant_schema_name(&owner_user_id));
+    let response_title = match response_kind {
+        "available_date" => format!("Available date from {vendor_name}"),
+        "notify_couple" => format!("Follow-up request from {vendor_name}"),
+        _ => format!("Proposal from {vendor_name}"),
+    };
     let markdown = [
-        format!("# Proposal from {vendor_name}"),
+        format!("# {response_title}"),
         String::new(),
         format!("**Category:** {category}"),
         amount
@@ -780,6 +1085,10 @@ async fn store_response(
         valid_until
             .as_ref()
             .map(|value| format!("**Valid until:** {value}"))
+            .unwrap_or_default(),
+        available_date
+            .as_ref()
+            .map(|value| format!("**Suitable available date:** {value}"))
             .unwrap_or_default(),
         String::new(),
         message.clone(),
@@ -790,9 +1099,11 @@ async fn store_response(
     let now = Utc::now();
     let content = json!({
         "kind":"wedding_vendor_proposal_response","artifact_id":response_id,
-        "artifact_kind":"vendor_table","title":format!("{vendor_name} proposal"),
+        "artifact_kind":"vendor_table","title":response_title,
         "markdown":markdown,"vendor_id":vendor_id,"vendor_name":vendor_name,
         "category":category,"amount":amount,"currency":currency,"valid_until":valid_until,
+        "response_kind":response_kind,"available_date":available_date,
+        "notification_requested":response_kind == "notify_couple",
         "business_email":business_email,"opportunity_id":opportunity_id,
         "wedding_plan_id":wedding_plan_id,"response_workspace_id":workspace_id,
         "source_labels":["Vendor proposal"],"approval_state":"review",
@@ -801,7 +1112,8 @@ async fn store_response(
         "template":"wedding_planning","weddingPlanId":wedding_plan_id,
         "responseWorkspaceId":workspace_id,"origin":"wedding_invite_proposal",
         "vendor_id":vendor_id,"vendor_name":vendor_name,"opportunity_id":opportunity_id,
-        "model_calls":0,"privacy_scope":"tenant_private"
+        "model_calls":0,"privacy_scope":"tenant_private",
+        "notification_requested":response_kind == "notify_couple"
     });
     let mut tx = state.db.pool.begin().await.map_err(|_| {
         (
@@ -810,8 +1122,8 @@ async fn store_response(
         )
     })?;
     let inserted = sqlx::query_scalar::<_, String>(
-        "INSERT INTO wedding_invite_proposal_responses (response_id,opportunity_id,owner_user_id,vendor_id,channel,response_fingerprint) VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT (opportunity_id,response_fingerprint) DO NOTHING RETURNING response_id",
-    ).bind(&response_id).bind(&opportunity_id).bind(&owner_user_id).bind(vendor_id).bind(channel).bind(&fingerprint)
+        "INSERT INTO wedding_invite_proposal_responses (response_id,opportunity_id,owner_user_id,vendor_id,channel,response_kind,available_date,response_fingerprint) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT (opportunity_id,response_fingerprint) DO NOTHING RETURNING response_id",
+    ).bind(&response_id).bind(&opportunity_id).bind(&owner_user_id).bind(vendor_id).bind(channel).bind(response_kind).bind(available_date_db).bind(&fingerprint)
         .fetch_optional(&mut *tx).await.map_err(|_| (StatusCode::SERVICE_UNAVAILABLE, "The proposal response could not be saved.".into()))?;
     if inserted.is_some() {
         let query = format!(
@@ -822,7 +1134,11 @@ async fn store_response(
             .bind("system://wedding-vendor-proposal").bind(json!(["agent://wedding-planning","agent://knowledge-graph"]))
             .bind(now).bind(&content).bind(&metadata)
             .bind(json!([{"type":"proposal_opportunity","target":opportunity_id,"label":"Invite Proposals opportunity"}]))
-            .bind(vec!["template:wedding_planning","wedding_vendor_proposal","vendor_response"])
+            .bind(if response_kind == "notify_couple" {
+                vec!["template:wedding_planning","wedding_vendor_proposal","vendor_response","wedding_vendor_notify_request"]
+            } else {
+                vec!["template:wedding_planning","wedding_vendor_proposal","vendor_response"]
+            })
             .execute(&mut *tx).await.map_err(|_| (StatusCode::SERVICE_UNAVAILABLE, "The private proposal document could not be saved.".into()))?;
         event(
             &mut tx,
@@ -877,6 +1193,8 @@ async fn claimed_vendor_response_http(
             vendor.get::<String, _>("vendor_name").as_str(),
             None,
             "claimed_vendor",
+            "proposal",
+            None,
             &request.message,
             request.amount,
             request.currency.as_deref(),
@@ -914,6 +1232,61 @@ async fn public_response_http(
         &request.business_name,
         Some(request.business_email.trim()),
         "secure_referral",
+        "proposal",
+        None,
+        &request.message,
+        request.amount,
+        request.currency.as_deref(),
+        request.valid_until.as_deref(),
+    )
+    .await?;
+    Ok((no_store_headers(), Json(result)))
+}
+
+async fn public_vendor_feed_response_http(
+    State(state): State<Arc<AppState>>,
+    Path((token, opportunity_id)): Path<(String, String)>,
+    Json(request): Json<VendorFeedResponseRequest>,
+) -> Result<impl IntoResponse, (StatusCode, String)> {
+    enforce_rate_limit(
+        &state,
+        format!("proposal-feed-response:{}", digest(token.trim())),
+        RateLimitPolicy {
+            max_requests: 12,
+            window: Duration::from_secs(3600),
+        },
+    )
+    .await?;
+    let vendor = vendor_feed_authority(&state, &token).await?;
+    let row = sqlx::query(
+        "SELECT opportunity_id,owner_user_id,wedding_plan_id,response_workspace_id,category,location FROM wedding_invite_proposal_opportunities WHERE opportunity_id=$1 AND status='open' AND expires_at>NOW()",
+    )
+    .bind(&opportunity_id)
+    .fetch_optional(&state.db.pool)
+    .await
+    .map_err(|_| (StatusCode::SERVICE_UNAVAILABLE, "The proposal lead could not be loaded.".into()))?
+    .ok_or((StatusCode::NOT_FOUND, "This proposal lead is no longer open.".into()))?;
+    if category_group(row.get::<String, _>("category").as_str())
+        != category_group(vendor.get::<String, _>("category").as_str())
+        || !location_compatible(
+            vendor.get::<String, _>("service_area").as_str(),
+            row.get::<Option<String>, _>("location").as_deref(),
+        )
+    {
+        return Err((
+            StatusCode::FORBIDDEN,
+            "This lead does not match this vendor link.".into(),
+        ));
+    }
+    let result = store_response(
+        &state,
+        &row,
+        Some(vendor.get::<String, _>("vendor_id").as_str()),
+        vendor.get::<String, _>("vendor_name").as_str(),
+        vendor.get::<Option<String>, _>("contact_email").as_deref(),
+        "vendor_feed",
+        &request.response_kind,
+        request.available_date.as_deref(),
         &request.message,
         request.amount,
         request.currency.as_deref(),
@@ -926,7 +1299,7 @@ async fn public_response_http(
 async fn admin_opportunity_metrics_http(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
-) -> Result<Json<Value>, (StatusCode, String)> {
+) -> Result<impl IntoResponse, (StatusCode, String)> {
     let user = authenticated_user(&state.db, &headers).await?;
     if !super::cost_controls::operator_access_allowed(&user.email) {
         return Err((StatusCode::FORBIDDEN, "Operator access is required.".into()));
@@ -944,11 +1317,73 @@ async fn admin_opportunity_metrics_http(
           GROUP BY o.category ORDER BY opportunities DESC,o.category"#,
     ).fetch_all(&state.db.pool).await
         .map_err(|_| (StatusCode::SERVICE_UNAVAILABLE, "Proposal metrics could not be loaded.".into()))?;
-    Ok(Json(json!({"categories":rows.into_iter().map(|row| json!({
+    let categories = rows.into_iter().map(|row| json!({
         "category":row.get::<String,_>("category"),"opportunities":row.get::<i64,_>("opportunities"),
         "replies":row.get::<i64,_>("replies"),"claimed_vendor_views":row.get::<i64,_>("claimed_vendor_views"),
         "shares":row.get::<i64,_>("shares")
-    })).collect::<Vec<_>>() })))
+    })).collect::<Vec<_>>();
+    let opportunity_rows = sqlx::query(
+        r#"SELECT o.opportunity_id,o.category,o.location,o.brief_text,o.shared_context,
+                  CASE WHEN o.status='open' AND o.expires_at<=NOW() THEN 'expired' ELSE o.status END status,
+                  o.expires_at::text,o.created_at::text,u.email,
+                  COUNT(DISTINCT r.response_id)::bigint response_count,
+                  COUNT(DISTINCT e.event_id) FILTER (WHERE e.event_kind IN ('claimed_vendor_view','secure_link_view'))::bigint vendor_view_count
+             FROM wedding_invite_proposal_opportunities o
+             JOIN users u ON u.id=o.owner_user_id
+             LEFT JOIN wedding_invite_proposal_responses r ON r.opportunity_id=o.opportunity_id
+             LEFT JOIN wedding_invite_proposal_events e ON e.opportunity_id=o.opportunity_id
+            GROUP BY o.opportunity_id,u.email
+            ORDER BY o.created_at DESC LIMIT 250"#,
+    )
+    .fetch_all(&state.db.pool)
+    .await
+    .map_err(|_| (StatusCode::SERVICE_UNAVAILABLE, "Proposal intents could not be loaded.".into()))?;
+    let opportunities = opportunity_rows
+        .into_iter()
+        .map(|row| {
+            json!({
+                "opportunity_id":row.get::<String,_>("opportunity_id"),
+                "couple_email":row.get::<String,_>("email"),
+                "category":row.get::<String,_>("category"),
+                "location":row.get::<Option<String>,_>("location"),
+                "brief_text":row.get::<String,_>("brief_text"),
+                "shared_context":row.get::<Value,_>("shared_context"),
+                "status":row.get::<String,_>("status"),
+                "created_at":row.get::<String,_>("created_at"),
+                "expires_at":row.get::<String,_>("expires_at"),
+                "response_count":row.get::<i64,_>("response_count"),
+                "vendor_view_count":row.get::<i64,_>("vendor_view_count")
+            })
+        })
+        .collect::<Vec<_>>();
+    let vendor_rows = sqlx::query(
+        r#"SELECT v.vendor_id,v.vendor_slug,v.vendor_name,v.category,v.service_area,v.claim_status,
+                  g.expires_at::text feed_expires_at,g.revoked_at::text feed_revoked_at,g.last_viewed_at::text feed_last_viewed_at
+             FROM wedding_vendors v
+             LEFT JOIN LATERAL (
+                 SELECT expires_at,revoked_at,last_viewed_at
+                   FROM wedding_invite_proposal_vendor_feed_grants
+                  WHERE vendor_id=v.vendor_id ORDER BY created_at DESC LIMIT 1
+             ) g ON TRUE
+            WHERE v.status='active' ORDER BY v.vendor_name LIMIT 500"#,
+    )
+    .fetch_all(&state.db.pool)
+    .await
+    .map_err(|_| (StatusCode::SERVICE_UNAVAILABLE, "Vendor link choices could not be loaded.".into()))?;
+    let vendors = vendor_rows.into_iter().map(|row| json!({
+        "vendor_id":row.get::<String,_>("vendor_id"),"vendor_slug":row.get::<String,_>("vendor_slug"),
+        "vendor_name":row.get::<String,_>("vendor_name"),"category":row.get::<String,_>("category"),
+        "service_area":row.get::<String,_>("service_area"),"claim_status":row.get::<String,_>("claim_status"),
+        "feed_expires_at":row.get::<Option<String>,_>("feed_expires_at"),
+        "feed_revoked_at":row.get::<Option<String>,_>("feed_revoked_at"),
+        "feed_last_viewed_at":row.get::<Option<String>,_>("feed_last_viewed_at")
+    })).collect::<Vec<_>>();
+    Ok((
+        no_store_headers(),
+        Json(json!({
+            "categories":categories,"opportunities":opportunities,"vendors":vendors
+        })),
+    ))
 }
 
 #[cfg(test)]

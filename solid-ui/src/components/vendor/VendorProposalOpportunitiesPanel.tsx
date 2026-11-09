@@ -1,7 +1,9 @@
 import { createResource, createSignal, For, Show } from "solid-js";
 
 import {
+  createClaimedVendorProposalLeadLink,
   loadClaimedVendorProposalOpportunities,
+  revokeClaimedVendorProposalLeadLink,
   submitClaimedVendorProposal,
   type VendorProposalOpportunity,
 } from "@/lib/vendorProposalOpportunityApi";
@@ -14,6 +16,27 @@ export function VendorProposalOpportunitiesPanel(props: { vendorSlug: string }) 
   const [validUntil, setValidUntil] = createSignal("");
   const [busy, setBusy] = createSignal(false);
   const [notice, setNotice] = createSignal<string | null>(null);
+  const [leadLink, setLeadLink] = createSignal("");
+  const [linkBusy, setLinkBusy] = createSignal(false);
+
+  async function createLeadLink() {
+    if (linkBusy()) return;
+    setLinkBusy(true); setNotice(null);
+    try {
+      const result = await createClaimedVendorProposalLeadLink(props.vendorSlug);
+      setLeadLink(result.url);
+      setNotice(`Private lead link ready until ${new Date(result.expiresAt).toLocaleDateString()}. Copy it now; OmnyID does not retain the bearer token.`);
+    } catch { setNotice("The private lead link could not be created."); }
+    finally { setLinkBusy(false); }
+  }
+
+  async function revokeLeadLink() {
+    if (linkBusy()) return;
+    setLinkBusy(true); setNotice(null);
+    try { await revokeClaimedVendorProposalLeadLink(props.vendorSlug); setLeadLink(""); setNotice("The private lead link was revoked."); }
+    catch { setNotice("The private lead link could not be revoked."); }
+    finally { setLinkBusy(false); }
+  }
 
   async function submit() {
     const opportunity = selected();
@@ -36,6 +59,12 @@ export function VendorProposalOpportunitiesPanel(props: { vendorSlug: string }) 
     <section class="rounded-xl border border-wedding-muted bg-white p-5 shadow-sm" aria-labelledby="vendor-proposal-opportunities-title">
       <h2 id="vendor-proposal-opportunities-title" class="text-lg font-semibold">Proposal opportunities</h2>
       <p class="mt-1 text-sm leading-6 text-wedding-muted">These private briefs match your verified listing category and service area. The couple sees only the details they chose to share.</p>
+      <div class="mt-3 rounded-xl bg-wedding-surface p-3">
+        <p class="text-sm font-semibold">Private lead view</p>
+        <p class="mt-1 text-xs leading-5 text-wedding-muted">Create a 30-day link for this listing. It can review matching open briefs and reply, but cannot access your account. A new link revokes the old one.</p>
+        <Show when={leadLink()}>{(url) => <label class="mt-2 block text-xs font-semibold">One-time displayed link<input readOnly value={url()} onFocus={(event) => event.currentTarget.select()} class="mt-1 min-h-11 w-full rounded-lg border border-wedding-muted bg-white px-3 font-normal" /></label>}</Show>
+        <div class="mt-2 flex flex-wrap gap-2"><button type="button" disabled={linkBusy()} class="min-h-11 rounded-lg border border-wedding-accent px-3 text-sm font-semibold text-wedding-accent disabled:opacity-50" onClick={() => void createLeadLink()}>{linkBusy() ? "Working…" : "Create private lead link"}</button><button type="button" disabled={linkBusy()} class="min-h-11 rounded-lg border border-wedding-muted px-3 text-sm font-semibold disabled:opacity-50" onClick={() => void revokeLeadLink()}>Revoke current link</button></div>
+      </div>
       <Show when={items.loading}><p class="mt-4 text-sm" role="status">Checking for matching opportunities…</p></Show>
       <Show when={!items.loading && (items()?.length ?? 0) === 0}><p class="mt-4 rounded-lg bg-wedding-surface p-3 text-sm">No matching proposal opportunities are open right now.</p></Show>
       <div class="mt-4 grid gap-3"><For each={items()}>{(item) => <article class="rounded-xl border border-wedding-muted p-4">

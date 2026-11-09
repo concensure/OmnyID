@@ -99,3 +99,20 @@ test("wedding run-sheet profile is offered only when an accessible plan referenc
     ["wedding_runsheet.v1", "plan-2027"],
   ]);
 });
+
+test("wedding accounts open the ledger-backed planning database before unrelated databases", () => {
+  const projected = projectDatabaseDefinitions({
+    messages: [{
+      id: "wedding-context",
+      type: "task",
+      timestamp: "2026-11-10T00:00:00Z",
+      content: { kind: "task", wedding_plan_id: "plan-2027", response_workspace_id: "workspace-2027" },
+    }],
+    accountId: "account-1",
+    hasLegacyRecords: false,
+  });
+  const planning = projected.find((entry) => entry.profileId === "wedding_plan_projection.v1");
+  assert.equal(planning?.defaultTable, "budget");
+  assert.equal(planning?.weddingPlanId, "plan-2027");
+  assert.equal(reconcileSelectedDatabaseId(projected, null), planning?.databaseId);
+});

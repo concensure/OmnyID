@@ -74,6 +74,7 @@ import {
   type WeddingRunSheetBufferSuggestion,
 } from "@/lib/weddingRunSheetIntelligenceState";
 import { applyQueueFontSize } from "@/lib/queueDensityLocalState";
+import { projectWeddingPlanningDatabaseRecords } from "@/lib/weddingPlanningDatabaseProjectionState";
 
 type DensityBucket = "compact" | "comfortable" | "spacious";
 
@@ -155,7 +156,10 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
             m.content.kind === "database_record_update")),
       );
 
-    return databaseRecordsFromMessages(messages);
+    return [
+      ...projectWeddingPlanningDatabaseRecords(props.bootstrap?.messages ?? []),
+      ...databaseRecordsFromMessages(messages),
+    ];
   });
 
   const definitions = createMemo(() => projectDatabaseDefinitions({
@@ -180,7 +184,7 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
     if (definition && definition.databaseId !== lastSelectedDatabaseId) {
       lastSelectedDatabaseId = definition.databaseId;
       setTableName(definition.defaultTable);
-      setActiveTable(null);
+      setActiveTable(definition.profileId === "wedding_plan_projection.v1" ? definition.defaultTable : null);
       setSelectedRowIds([]);
     }
   });
@@ -198,7 +202,9 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
       ? weddingRunSheetEffectiveRows(selected)
       : selected;
   });
-  const databaseReadOnly = createMemo(() => Boolean(selectedDefinition()?.archived || (
+  const databaseReadOnly = createMemo(() => Boolean(
+    selectedDefinition()?.profileId === "wedding_plan_projection.v1"
+    || selectedDefinition()?.archived || (
     selectedProfilePlugin()?.toolbarKind === "wedding_run_sheet" && runSheetOffline()
   )));
   const rawRunSheetRows = createMemo(() => selectedProfilePlugin()?.toolbarKind === "wedding_run_sheet"
@@ -623,7 +629,9 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
         densityMode={densityMode()}
         fullscreen={fullscreen()}
         readOnly={databaseReadOnly()}
-        readOnlyReason={runSheetOffline() ? "This offline copy is read-only until OmnyID reconnects." : undefined}
+        readOnlyReason={selectedDefinition()?.profileId === "wedding_plan_projection.v1"
+          ? "Budget, Timeline and Seating are live read-only views of the same Wedding ledger. Update them in their planning views; no second copy is stored here."
+          : runSheetOffline() ? "This offline copy is read-only until OmnyID reconnects." : undefined}
         onSelect={selectDatabase}
         onNameInput={setDatabaseName}
         onNameCommit={() => void commitDatabaseName()}
@@ -651,6 +659,13 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
         onImport={() => setShowImport(true)}
         onArchiveToggle={() => setShowLifecycleConfirm(true)}
       />
+
+      <Show when={selectedDefinition()?.profileId === "wedding_plan_projection.v1"}>
+        <section class="rounded-xl border border-primary/15 bg-primary/5 p-4" aria-label="Wedding planning database projection">
+          <p class="font-semibold text-on-surface">Wedding plan, projected once</p>
+          <p class="mt-1 text-sm leading-6 text-on-surface-variant">These tables read the account-scoped Wedding ledger directly. Budget decisions, timeline tasks and seating changes appear here without manual reconciliation or duplicate records.</p>
+        </section>
+      </Show>
 
       <Show when={selectedDefinition()?.profileId === "wedding_runsheet.v1" && selectedDefinition()?.weddingPlanId}>
         {(weddingPlanId) => (
