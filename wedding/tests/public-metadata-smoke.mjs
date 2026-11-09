@@ -34,7 +34,19 @@ function validate(url, file) {
     return;
   }
   const html = readFileSync(file, 'utf8');
+  const weddingPage = new URL(url).pathname.startsWith('/wedding/');
   if (!/<html\s+lang=["']en-AU["']/i.test(html)) failures.push(`${url}: lang must be en-AU`);
+  if (weddingPage) {
+    if (!html.includes('type="text/plain" data-omnyid-consent="analytics" src="https://analytics.ahrefs.com/analytics.js"')) {
+      failures.push(`${url}: consent-gated Ahrefs declaration is missing`);
+    }
+    if (!html.includes('src="/wedding/assets/js/privacy-preferences.js"')) {
+      failures.push(`${url}: privacy preference controller is missing`);
+    }
+    if (/<script\s+src=["']https:\/\/analytics\.ahrefs\.com\/analytics\.js/i.test(html)) {
+      failures.push(`${url}: Ahrefs must not execute before the optional analytics choice`);
+    }
+  }
   if (!html.includes(`<link rel="canonical" href="${url}">`)) failures.push(`${url}: canonical must self-reference`);
   for (const property of ['og:type', 'og:locale', 'og:url', 'og:title', 'og:description', 'og:image']) {
     if (!html.includes(`property="${property}"`)) failures.push(`${url}: missing ${property}`);

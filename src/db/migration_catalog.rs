@@ -777,4 +777,9 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
             "../../postgres/migrations/0152_wedding_vendor_special_link_analytics_and_rsvp_video.sql"
         ),
     ),
+    (
+        "0153_wedding_admin_data_consent_audit",
+        "Auditable false-default consent for content-free Wedding product statistics",
+        include_str!("../../postgres/migrations/0153_wedding_admin_data_consent_audit.sql"),
+    ),
 ];

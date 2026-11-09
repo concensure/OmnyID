@@ -915,13 +915,33 @@ pub(super) async fn wedding_onboarding_state_upsert_http(
             tracing::warn!(user_id = %user.id, %error, "Wedding acquisition link could not be attached");
         }
     }
-    let projection = if onboarding_state.created_at == onboarding_state.updated_at {
-        state.db.reconcile_growth_activation_for_user(&user.id).await
+    if onboarding_state.admin_data_consent {
+        if let Err(error) = state
+            .db
+            .reconcile_growth_activation_for_user(&user.id)
+            .await
+        {
+            tracing::warn!(user_id = %user.id, %error, "Consented Growth activation reconciliation will retry from its cursor");
+        }
     } else {
-        state.db.project_growth_activation_for_user(&user.id, 100).await
-    };
-    if let Err(error) = projection {
-        tracing::warn!(user_id = %user.id, %error, "Growth activation reconciliation will retry from its cursor");
+        match state
+            .db
+            .remove_growth_activation_for_wedding(&user.id, &wedding_plan_id)
+            .await
+        {
+            Ok(Some(from)) => {
+                let through = chrono::Utc::now()
+                    .with_timezone(&chrono_tz::Australia::Sydney)
+                    .date_naive();
+                if let Err(error) = state.db.rebuild_growth_daily_rollups(from, through).await {
+                    tracing::warn!(user_id = %user.id, %error, "Growth aggregate rebuild after consent withdrawal will retry");
+                }
+            }
+            Ok(None) => {}
+            Err(error) => {
+                tracing::warn!(user_id = %user.id, %error, "Growth projection withdrawal cleanup will retry");
+            }
+        }
     }
     Ok(Json(
         serde_json::json!({ "onboarding_state": onboarding_state }),

@@ -303,6 +303,25 @@ fn migration_list_includes_operator_runtime_remediation_receipt_completion() {
 }
 
 #[test]
+fn migration_list_includes_false_default_wedding_statistics_consent_audit() {
+    let migration = super::MIGRATIONS
+        .iter()
+        .find(|entry| entry.0 == "0153_wedding_admin_data_consent_audit")
+        .expect("Wedding product-statistics consent audit migration present");
+    assert!(
+        migration
+            .2
+            .contains("CREATE TABLE IF NOT EXISTS wedding_admin_data_consent_events")
+    );
+    assert!(migration.2.contains("enabled BOOLEAN NOT NULL"));
+    assert!(
+        migration
+            .2
+            .contains("REVOKE ALL ON wedding_admin_data_consent_events FROM PUBLIC")
+    );
+}
+
+#[test]
 fn normalized_claim_ref_type_collapses_common_semantic_aliases() {
     assert_eq!(normalized_claim_ref_type("supports"), "supports");
     assert_eq!(normalized_claim_ref_type("supported_by"), "supports");

@@ -20,6 +20,8 @@ const weddingJs = readFileSync(resolve(root, 'assets', 'js', 'main.js'), 'utf8')
 const quoteDecoderJs = readFileSync(resolve(root, 'assets', 'js', 'quote-decoder.js'), 'utf8');
 const landingConfig = readFileSync(resolve(root, 'assets', 'js', 'landing-config.js'), 'utf8');
 const landingContext = readFileSync(resolve(root, 'assets', 'js', 'landing-context.js'), 'utf8');
+const privacyPreferences = readFileSync(resolve(root, 'assets', 'js', 'privacy-preferences.js'), 'utf8');
+const caddyfile = readFileSync(resolve(projectRoot, 'Caddyfile'), 'utf8');
 const expectedPages = [
   'blog.html',
   'disclosures.html',
@@ -128,6 +130,9 @@ function isWorkspaceAppLink(url) {
 function targetPath(fromFile, rawUrl) {
   const clean = rawUrl.split('#')[0].split('?')[0];
   if (!clean) return fromFile;
+  if (clean.startsWith('/wedding/')) {
+    return resolve(root, clean.slice('/wedding/'.length));
+  }
   try {
     return resolve(dirname(fromFile), decodeURIComponent(clean));
   } catch {
@@ -152,6 +157,15 @@ const listiclePages = [
 ];
 const standalonePages = new Set(['newsletter-unsubscribe.html', ...listiclePages]);
 const failures = [];
+if (!privacyPreferences.includes('omnyid.public.privacy.v1') || !privacyPreferences.includes('data-omnyid-consent="analytics"')) {
+  failures.push('privacy-preferences.js: versioned optional analytics control is missing');
+}
+if (!privacyPreferences.includes('globalPrivacyControl') || !privacyPreferences.includes('doNotTrack')) {
+  failures.push('privacy-preferences.js: browser privacy signals are not honoured');
+}
+if (!caddyfile.includes('handle /wedding/wedding/compare-wedding-venue-quotes.html') || !caddyfile.includes('redir * /wedding/compare-wedding-venue-quotes.html 308')) {
+  failures.push('Caddyfile: doubled quote-decoder URL must redirect to its canonical page');
+}
 const htmlByPath = new Map([[normalize(docsIndex), docsHtml]]);
 const pages = htmlFiles(root);
 

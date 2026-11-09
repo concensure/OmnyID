@@ -1,3 +1,23 @@
+## 2026-11-09: Public analytics and private Wedding statistics require separate consent
+
+Public Wedding analytics is optional and false by default. Essential public
+tools never depend on that choice. The consent controller honors Global
+Privacy Control and Do Not Track and activates both the bounded first-party
+measurement script and Ahrefs only after an Analytics opt-in. Ahrefs remains a
+separate third-party processor; cookie-free does not mean anonymous.
+
+Signed-in product statistics use a separate, unticked, wedding-scoped choice.
+Only durable content-free AFP event types may project into the operator growth
+tables. Plan/message contents, monetary values, guest counts, files and vendor
+choice remain excluded. Withdrawal removes the plan-level growth projection
+and rebuilds affected aggregate rollups. It does not grant administrators
+access to private Wedding content.
+
+Adding the consent controller changed the byte-pinned public Vendor Image
+Licence document. Its version and digest therefore advance together; existing
+receipts retain their recorded version while new photo submissions must consent
+to the current bytes.
+
 ## 2026-11-09: Missing Limited Specials evidence remains actionable, not unavailable
 
 Limited Specials treats an empty result or temporary discovery failure as

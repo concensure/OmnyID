@@ -1,6 +1,4 @@
 // @locs-version: 2.0
-import { Show } from "solid-js";
-
 import type { WeddingAdminDataConsentState } from "@/lib/weddingAdminDataConsentState";
 
 export function WeddingAdminDataConsentCard(props: {
@@ -18,18 +16,9 @@ export function WeddingAdminDataConsentCard(props: {
       <p class="mt-2 rounded-2xl border border-rose-100 bg-rose-50/70 px-2.5 py-2 text-[10px] leading-4 text-rose-950/75">
         {props.state.hoverMessage}
       </p>
-      <Show when={props.state.adminPacket}>
-        {(packet) => (
-          <div class="mt-2 flex flex-wrap gap-1.5">
-            <span class="max-w-full break-words rounded-full border border-rose-100 bg-white/75 px-2 py-1 text-[10px] text-rose-900/80">
-              anonymized: {packet().anonymized ? "yes" : "no"}
-            </span>
-            <span class="max-w-full break-words rounded-full border border-rose-100 bg-white/75 px-2 py-1 text-[10px] text-rose-900/80">
-              {packet().submittedResponseCount} response file{packet().submittedResponseCount === 1 ? "" : "s"}
-            </span>
-          </div>
-        )}
-      </Show>
+      <p class="mt-2 text-[10px] leading-4 text-rose-950/75">
+        Counts only: {props.state.includedLabels.join(", ")}. Excludes {props.state.excludedLabels.join(", ")}.
+      </p>
     </div>
   );
 }

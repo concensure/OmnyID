@@ -37,9 +37,9 @@ const MAX_QUERY_LENGTH: usize = 120;
 const DIRECTORY_PAGE_SIZE: i64 = 24;
 const DIRECTORY_MAX_PAGE_SIZE: i64 = 500;
 const CLAIM_SUGGESTION_LIMIT: usize = 8;
-pub(super) const PHOTO_LICENCE_VERSION: &str = "vendor-image-licence-2026-11-05";
+pub(super) const PHOTO_LICENCE_VERSION: &str = "vendor-image-licence-2026-11-09";
 pub(super) const PHOTO_LICENCE_SHA256: &str =
-    "42eac758dc316986695075fef70d444837b267e8f7ed7e29d19087c56f888fff";
+    "03b1fa11efedc62062d5fa1ca7e6afe680af3aa83596ebb96c2a69a348274838";
 const PHOTO_LICENCE_CONSENT: &str = "I confirm that I have read and agree to the Vendor Image Licence Agreement, and that I am authorised to grant the licence above for all Images submitted.";
 
 pub(super) fn routes() -> Router<Arc<AppState>> {
@@ -1035,7 +1035,7 @@ mod tests {
 
     #[test]
     fn photo_licence_receipt_is_pinned_to_the_current_document() {
-        assert_eq!(PHOTO_LICENCE_VERSION, "vendor-image-licence-2026-11-05");
+        assert_eq!(PHOTO_LICENCE_VERSION, "vendor-image-licence-2026-11-09");
         assert_eq!(
             format!(
                 "{:x}",

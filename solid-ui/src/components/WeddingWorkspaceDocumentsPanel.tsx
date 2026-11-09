@@ -163,6 +163,14 @@ export function WeddingWorkspaceDocumentsPanel(props: WeddingWorkspaceDocumentsP
             <span class="mt-1 block text-xs leading-5 text-slate-600">
               {props.state.adminDataConsent.statusLabel}
             </span>
+            <a
+              class="mt-1 inline-block text-xs font-semibold text-slate-700 underline underline-offset-2"
+              href="/wedding/privacy.html#product-statistics"
+              target="_blank"
+              rel="noopener"
+            >
+              Product statistics notice
+            </a>
           </span>
         </label>
       </div>

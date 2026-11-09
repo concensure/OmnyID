@@ -15,6 +15,17 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-349
+    title: Publish the venue quote decoder and separate consented public analytics from private Wedding data sharing
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-349
+    worktree: C:/Users/ozans/Desktop/projects/OmnyID-GROWTH-001
+    base_sha: 3a019eb
+    depends_on: [WED-329, WED-347, GROWTH-07]
+    files: [Caddyfile, wedding/**, solid-ui/src/components/WeddingSiteIntakeWizard.tsx, solid-ui/src/components/WeddingWorkspaceDocumentsPanel.tsx, solid-ui/src/components/vendor/VendorPhotoLicenceConsent.tsx, solid-ui/src/lib/weddingAdminDataConsentState.ts, solid-ui/tests/**consent**, src/db/wedding_onboarding_state.rs, src/db/growth_activation_projection.rs, src/server/user_management_routes/wedding_admin.rs, src/server/wedding_vendor_claim_routes.rs, postgres/migrations/**, Documents/issues/**, Documents/verification/**, .agent/**]
+    acceptance: [the canonical public quote decoder and the reported doubled Wedding URL both resolve without duplicate canonical content, Ahrefs is available on public Wedding pages only after a clear optional analytics choice and essential service remains available when declined, analytics preferences are changeable and honor Global Privacy Control and Do Not Track, onboarding admin-data sharing remains unticked and separate from public analytics and withdrawal prevents or removes consent-dependent admin growth projections, aggregate progression excludes message content budget guest count documents and free text, privacy copy states the observed data provider retention and technical limitations without claiming legal compliance, focused consent payload route public-site build exact-SHA deployment provenance and hosted checks pass]
+
   - id: WED-348
     title: Make Limited Specials resilient, add date enquiries and location/category discovery controls
     status: done

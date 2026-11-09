@@ -2,6 +2,9 @@
 use super::Db;
 use serde::{Deserialize, Serialize};
 use sqlx::Row;
+use ulid::Ulid;
+
+pub const WEDDING_ADMIN_DATA_CONSENT_NOTICE_VERSION: &str = "wedding-admin-product-statistics-v2";
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct WeddingUserOnboardingStateRecord {
@@ -62,6 +65,14 @@ impl Db {
         entry_source: &str,
         admin_data_consent: Option<bool>,
     ) -> Result<WeddingUserOnboardingStateRecord, sqlx::Error> {
+        let mut transaction = self.pool.begin().await?;
+        let previous = sqlx::query_scalar::<_, bool>(
+            "SELECT admin_data_consent FROM wedding_user_onboarding_state WHERE user_id=$1 AND wedding_plan_id=$2 FOR UPDATE",
+        )
+        .bind(user_id)
+        .bind(wedding_plan_id)
+        .fetch_optional(&mut *transaction)
+        .await?;
         let row = sqlx::query(
             r#"
             INSERT INTO wedding_user_onboarding_state (
@@ -91,8 +102,24 @@ impl Db {
         .bind(intake_variant)
         .bind(entry_source)
         .bind(admin_data_consent)
-        .fetch_one(&self.pool)
+        .fetch_one(&mut *transaction)
         .await?;
+
+        if let Some(enabled) = admin_data_consent
+            && previous != Some(enabled)
+        {
+            sqlx::query(
+                "INSERT INTO wedding_admin_data_consent_events (consent_event_id,user_id,wedding_plan_id,enabled,notice_version) VALUES ($1,$2,$3,$4,$5)",
+            )
+            .bind(format!("consent_{}", Ulid::new().to_string().to_lowercase()))
+            .bind(user_id)
+            .bind(wedding_plan_id)
+            .bind(enabled)
+            .bind(WEDDING_ADMIN_DATA_CONSENT_NOTICE_VERSION)
+            .execute(&mut *transaction)
+            .await?;
+        }
+        transaction.commit().await?;
 
         Ok(WeddingUserOnboardingStateRecord {
             user_id: row.get("user_id"),

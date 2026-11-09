@@ -428,6 +428,11 @@
         redir * /wedding/ 308
     }
 
+    # Preserve old/shared doubled Wedding links without publishing duplicate content.
+    handle /wedding/wedding/compare-wedding-venue-quotes.html {
+        redir * /wedding/compare-wedding-venue-quotes.html 308
+    }
+
     handle /wedding/* {
         uri strip_prefix /wedding
         root * /srv/wedding
@@ -436,7 +441,7 @@
         }
         rewrite @weddingdirindex /index.html
         file_server
-        header Content-Security-Policy "default-src 'self'; script-src 'self' 'sha256-SR9l2aM5D8u7/lfDfy6rn64kmM0ej8dys/tlvPEWTEQ=' https://accounts.google.com/gsi/client https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https://images.unsplash.com https://lh3.googleusercontent.com https://*.googleusercontent.com; connect-src 'self' https://api.omnyid.com https://static.cloudflareinsights.com; font-src 'self' data: https://fonts.gstatic.com; frame-src https://accounts.google.com/gsi/; frame-ancestors 'none'; object-src 'none'"
+        header Content-Security-Policy "default-src 'self'; script-src 'self' 'sha256-SR9l2aM5D8u7/lfDfy6rn64kmM0ej8dys/tlvPEWTEQ=' https://accounts.google.com/gsi/client https://static.cloudflareinsights.com https://analytics.ahrefs.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https://images.unsplash.com https://lh3.googleusercontent.com https://*.googleusercontent.com; connect-src 'self' https://api.omnyid.com https://static.cloudflareinsights.com https://analytics.ahrefs.com; font-src 'self' data: https://fonts.gstatic.com; frame-src https://accounts.google.com/gsi/; frame-ancestors 'none'; object-src 'none'"
     }
 
     # `/srv/docs` is a deployment input, not a public-document repository.

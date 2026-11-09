@@ -676,9 +676,10 @@ export function WeddingSiteIntakeWizard(props: {
               onChange={(event) => props.onAdminDataConsentChange(event.currentTarget.checked)}
             />
             <span>
-              <span class="block font-semibold">Share anonymized wedding planning data with admin</span>
+              <span class="block font-semibold">Share content-free progress statistics with OmnyID</span>
               <span class="mt-1 block text-xs leading-5 text-wedding-ink/70">
-                Optional. Names, direct contact details, guest identities, and private documents are excluded. You can change this later in Documents.
+                Optional and unticked by default. Authorised administrators can count whether this wedding completes onboarding, saves a vendor or resolves a decision. Names, contact details, messages, drafts, budget, guest count, quiz answers, files and vendor choices are excluded. Declining does not change your planner. You can change this later in Documents.
+                {" "}<a class="font-semibold underline underline-offset-2" href="/wedding/privacy.html#product-statistics" target="_blank" rel="noopener">Read the separate product statistics notice</a>.
               </span>
             </span>
           </label>

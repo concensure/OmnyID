@@ -97,8 +97,8 @@ test("buildWeddingResponseWorkspaceViewState creates category rail and active ar
   assert.ok(state.activePreview?.metadataLabels.includes("Harbour House"));
   assert.equal(state.personalOsProjection.hasWeddingPersonalOsSignal, true);
   assert.equal(state.adminDataConsent.enabled, true);
-  assert.equal(state.adminDataConsent.adminPacket?.anonymized, true);
-  assert.equal(state.adminDataConsent.adminPacket?.submittedResponseCount, 2);
+  assert.equal(state.adminDataConsent.enabled, true);
+  assert.ok(state.adminDataConsent.excludedLabels.includes("message or draft text"));
   assert.equal(state.collaboration.productionReady, false);
   assert.equal(state.collaboration.invites[0]?.roleLabel, "Wedding planner");
   assert.ok(state.collaboration.blockerLabels.includes("Workspace ACL backend not connected"));

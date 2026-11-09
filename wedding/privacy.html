@@ -22,6 +22,10 @@
 <meta name="twitter:image" content="https://omnyid.com/wedding/assets/logo/omnyid-logo.png">
 <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://omnyid.com/#organization","name":"OmnyID Pty Ltd","url":"https://omnyid.com","logo":"https://omnyid.com/wedding/assets/logo/omnyid-logo.png"},{"@type":"SoftwareApplication","@id":"https://omnyid.com/wedding/#application","name":"OmnyID Wedding","applicationCategory":"LifestyleApplication","operatingSystem":"Web","url":"https://omnyid.com/wedding/","description":"A connected wedding planning workspace for Australian couples.","publisher":{"@id":"https://omnyid.com/#organization"}},{"@type":"WebPage","@id":"https://omnyid.com/wedding/privacy.html#webpage","name":"Privacy Policy — OmnyID Weddings","description":"We do not sell or transfer your data. Read how OmnyID Weddings collects, uses, protects, and lets you control your wedding planning information.","url":"https://omnyid.com/wedding/privacy.html","inLanguage":"en-AU","isPartOf":{"@id":"https://omnyid.com/wedding/#application"}}]}</script>
 <!-- omnyid-seo:end -->
+<!-- omnyid-privacy-analytics:start -->
+<script type="text/plain" data-omnyid-consent="analytics" src="https://analytics.ahrefs.com/analytics.js" data-key="jit7I+YdeLLab0kVcNUTdw" async></script>
+<script src="/wedding/assets/js/privacy-preferences.js" defer></script>
+<!-- omnyid-privacy-analytics:end -->
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to main content</a>
@@ -116,14 +120,17 @@
         <p>You can ask for the free Wedding Day Binder on this website without creating an account. We collect your email address to send the download links once, plus the request time, delivery status, whether you requested planning tips, and any broad campaign tags in the link that brought you here. We keep that request record for up to 12 months.</p>
         <p><strong>Planning tips are optional and double opt-in.</strong> We only add the address to the planning-tips list if you tick the separate box and then use the confirmation link in the binder email. The binder does not depend on consent to tips. Every tips email includes an unsubscribe option.</p>
 
-        <h2 id="measure">4. How we measure this website</h2>
-        <p>We count how this website is used so we can understand which channels bring couples here and which pages need clearer wording. We do this without cookies, advertising pixels or fingerprinting.</p>
+        <h2 id="measure">4. Optional website analytics</h2>
+        <p>Public Wedding pages offer an optional Analytics choice. Analytics is off until you allow it, and declining does not limit the website, quote tools, account creation or your planner. You can reopen <button type="button" class="legal-inline-button" onclick="window.OmnyPrivacy && window.OmnyPrivacy.open()">Privacy choices</button> at any time. Global Privacy Control and Do Not Track keep analytics off.</p>
+        <p><strong>First-party measurement.</strong> When allowed, we count how this website is used so we can understand which channels bring couples here and which pages need clearer wording. This measurement uses no cookie, advertising identifier or fingerprint.</p>
         <ul>
           <li>We record allowlisted page and section views, buttons used, a broad screen-size class, the first two letters of browser language, and engaged time rounded to five-second buckets.</li>
           <li>We record allowlisted campaign tags, whether an advertising click ID was present but never its value, and a broad referrer class. Where relevant, we keep only the referring host, never its path or query.</li>
           <li>We never put names, email addresses, form content, quiz answers or persistent identifiers in these events.</li>
         </ul>
-        <p>A random visit number exists only in session storage for the current tab. Global Privacy Control and Do Not Track are honoured: when either signal is active, the browser sends no measurement events. We retain measurement records for up to 14 months.</p>
+        <p>A random visit number exists only in session storage for the current tab. Identifiable first-party event rows are deleted after 30 days; aggregate day-level counts may be retained for trend reporting.</p>
+        <p><strong>Ahrefs Web Analytics.</strong> When allowed, the page also loads Ahrefs. Ahrefs says its Web Analytics product uses no cookies, does not store raw IP addresses with analytics data, and does not track a visitor across days. It receives the page URL and parameters, referrer, browser and device information, screen size, language, and a city/country estimate derived from the request IP. It creates a daily pseudonymous visitor number and automatically counts page views, link clicks and form submissions. OmnyID uses the resulting aggregate reports to improve public pages, not to inspect wedding plans. Ahrefs is a separate provider and may process data outside Australia under its own privacy terms.</p>
+        <p>Changing Analytics from allowed to off reloads the page so no further optional events are sent. It cannot recall events already transmitted before withdrawal. The authenticated planner-data choice described below is separate: allowing public website analytics never permits administrators to read or analyse a wedding plan.</p>
         <p><strong>IP addresses and technical logs.</strong> Cloudflare processes network information to deliver and protect the site under its own privacy terms. Our application briefly records an IP address and timestamp to protect public forms and sign-in from abuse. These rate-limit records are deleted automatically within 48 hours.</p>
 
         <h2 id="quiz">5. The Wedding Animal Quiz</h2>
@@ -143,8 +150,13 @@
         </ul>
         <p>You can review and revoke any active share from your workspace settings at any time.</p>
 
+        <h3 id="product-statistics">Optional planner improvement statistics</h3>
+        <p>During Wedding onboarding, an unticked choice asks whether authorised OmnyID administrators may use content-free progress statistics from that wedding. If enabled, the aggregate reporting can count durable actions such as completing the intake, saving a vendor, or resolving a decision. It excludes names, contact details, message and draft text, budgets, guest counts, quiz answers, files, private notes and the selected vendor itself.</p>
+        <p>This choice is stored against the signed-in user and wedding, not the browser. Declining does not change the planner. It can be changed in Documents; turning it off stops new private-plan progress events entering the administrator projection and removes that wedding's plan-level progress rows. Account, security, billing and delivery records that OmnyID must operate or retain are governed separately.</p>
+
         <h2 id="security">8. Security &amp; encryption</h2>
-        <p>Your data is encrypted in transit and at rest. Sensitive content — like family notes or cultural and religious details — is stored as encrypted content, with only safe, non-identifying labels used for search and organisation. Access to production data is limited to the engineers who need it to keep the service running, and all access is logged.</p>
+        <p>Connections to OmnyID use encryption in transit, and production databases, object storage and credentials are protected by infrastructure access controls and encryption at rest. Some sensitive content is additionally stored in encrypted envelopes. This is not a promise that every field is end-to-end encrypted: the service must process some content and operational metadata to provide search, imports, email, automation and account functions, and server-managed integrations can use server-held encryption keys.</p>
+        <p>Where a workflow uses a recipient-held encryption key, the server does not receive that recipient's private key. Other records — including account and plan identifiers, timestamps, event types, delivery information and content-free product statistics allowed by the separate opt-in — remain available to authorised service processes. Production access is restricted to authorised operators who need it to run and protect the service.</p>
 
         <h2 id="retention">9. Retention &amp; deletion</h2>
         <p>Your workspace stays available after your wedding so you can revisit it whenever you like — we don't auto-delete your plan. If you close your account, we delete your personal data within 30 days, except where we're required to retain limited records (such as billing history) for legal or tax purposes.</p>

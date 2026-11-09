@@ -17,6 +17,34 @@ pub struct GrowthActivationProjectionResult {
 }
 
 impl Db {
+    pub async fn remove_growth_activation_for_wedding(
+        &self,
+        owner_user_id: &str,
+        wedding_plan_id: &str,
+    ) -> Result<Option<chrono::NaiveDate>, sqlx::Error> {
+        let mut transaction = self.pool.begin().await?;
+        let earliest = sqlx::query_scalar::<_, Option<chrono::NaiveDate>>(
+            "SELECT MIN((created_at AT TIME ZONE 'Australia/Sydney')::date) FROM growth_weddings WHERE owner_user_id=$1 AND wedding_plan_id=$2",
+        )
+        .bind(owner_user_id)
+        .bind(wedding_plan_id)
+        .fetch_one(&mut *transaction)
+        .await?;
+        sqlx::query("DELETE FROM growth_weddings WHERE owner_user_id=$1 AND wedding_plan_id=$2")
+            .bind(owner_user_id)
+            .bind(wedding_plan_id)
+            .execute(&mut *transaction)
+            .await?;
+        sqlx::query(
+            "UPDATE growth_activation_projector_cursors SET last_timestamp='epoch',last_message_id='',updated_at=NOW() WHERE owner_user_id=$1",
+        )
+        .bind(owner_user_id)
+        .execute(&mut *transaction)
+        .await?;
+        transaction.commit().await?;
+        Ok(earliest)
+    }
+
     pub async fn reconcile_growth_activation_for_user(
         &self,
         owner_user_id: &str,
@@ -84,7 +112,7 @@ impl Db {
                 continue;
             };
             let authorised = sqlx::query_scalar::<_, bool>(
-                "SELECT EXISTS(SELECT 1 FROM wedding_user_onboarding_state WHERE user_id=$1 AND wedding_plan_id=$2) OR EXISTS(SELECT 1 FROM growth_identity_links WHERE user_id=$1 AND wedding_plan_id=$2 AND expires_at>NOW())",
+                "SELECT EXISTS(SELECT 1 FROM wedding_user_onboarding_state WHERE user_id=$1 AND wedding_plan_id=$2 AND admin_data_consent=TRUE)",
             )
             .bind(owner_user_id)
             .bind(&source.wedding_plan_id)
@@ -224,7 +252,7 @@ mod tests {
             &plan,
             "wedding_site",
             "wedding_site",
-            None,
+            Some(true),
         )
         .await
         .expect("authorise plan");
@@ -319,6 +347,40 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(unchanged, 2);
+
+        db.upsert_wedding_user_onboarding_state(
+            &owner.id,
+            &plan,
+            "wedding_site",
+            "wedding_site",
+            Some(false),
+        )
+        .await
+        .unwrap();
+        assert!(
+            db.remove_growth_activation_for_wedding(&owner.id, &plan)
+                .await
+                .unwrap()
+                .is_some()
+        );
+        let withdrawn_count: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM growth_activation_sources WHERE owner_user_id=$1 AND wedding_plan_id=$2",
+        )
+        .bind(&owner.id)
+        .bind(&plan)
+        .fetch_one(&db.pool)
+        .await
+        .unwrap();
+        assert_eq!(withdrawn_count, 0);
+        let consent_events: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM wedding_admin_data_consent_events WHERE user_id=$1 AND wedding_plan_id=$2",
+        )
+        .bind(&owner.id)
+        .bind(&plan)
+        .fetch_one(&db.pool)
+        .await
+        .unwrap();
+        assert_eq!(consent_events, 2);
 
         insert_source(
             &db,

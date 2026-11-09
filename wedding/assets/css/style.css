@@ -792,3 +792,13 @@ body.no-scroll{ overflow:hidden; }
 .price-badge{ white-space:nowrap; }
 .price-card.is-featured .btn-primary{ background: var(--rose-deep); }
 .price-card.is-featured .btn-primary:hover{ background: #7F3E4B; }
+.legal-inline-button {
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 0.16em;
+}

@@ -5,7 +5,7 @@
 // @owner: omnyid
 import { createSignal, Show } from "solid-js";
 
-export const VENDOR_PHOTO_LICENCE_VERSION = "vendor-image-licence-2026-11-05";
+export const VENDOR_PHOTO_LICENCE_VERSION = "vendor-image-licence-2026-11-09";
 export const VENDOR_PHOTO_LICENCE_CONSENT = "I confirm that I have read and agree to the Vendor Image Licence Agreement, and that I am authorised to grant the licence above for all Images submitted.";
 
 const CLAUSES = [

@@ -740,6 +740,7 @@ export function ResponseQueueView(props: {
     weddingIntakeActive() ? weddingTemplateLaunch() : null
   ));
   function updateWeddingAdminDataConsent(enabled: boolean): void {
+    const previous = weddingAdminDataConsentEnabled();
     setWeddingAdminDataConsentEnabled(enabled);
     const launch = weddingTemplateLaunch();
     const intent = weddingNavigationIntent();
@@ -750,9 +751,14 @@ export function ResponseQueueView(props: {
       ?? weddingIntakeVariant()
       ?? (loadWeddingEntrySource(weddingStorageUserId()) === "wedding_site" ? "wedding_site" : "generic");
     const entrySource = loadWeddingEntrySource(weddingStorageUserId()) ?? "generic";
-    void saveWeddingOnboardingState(planId, variant, entrySource, enabled).catch(() => {
-      toast.error("That data-sharing choice could not be saved. Please try again.");
-    });
+    void saveWeddingOnboardingState(planId, variant, entrySource, enabled)
+      .then((response) => {
+        setWeddingAdminDataConsentEnabled(response.onboardingState?.adminDataConsent === true);
+      })
+      .catch(() => {
+        setWeddingAdminDataConsentEnabled(previous);
+        toast.error("That product-statistics choice could not be saved. Please try again.");
+      });
   }
   const weddingTemplateFollowUp = createMemo(() => {
     const intent = weddingNavigationIntent();
