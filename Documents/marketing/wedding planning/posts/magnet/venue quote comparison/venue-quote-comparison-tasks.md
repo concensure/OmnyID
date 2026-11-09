@@ -1,6 +1,6 @@
 # Venue Quote Comparison v2 — dependency-ordered tasks
 
-Status: active under WED-350
+Status: completed and released under WED-350 on 10 November 2026
 
 | ID | Task | Depends on | Acceptance |
 |---|---|---|---|
@@ -25,4 +25,3 @@ Status: active under WED-350
 - Public-tool results are not persisted as AFP records. Import into an account
   remains an explicit later action through the canonical quote authority.
 - The model does not decide which venue to book and does not perform arithmetic.
-

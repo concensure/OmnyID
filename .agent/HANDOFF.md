@@ -1,3 +1,38 @@
+## 2026-11-10 - WED-350 source-grounded venue quote comparison (Codex, complete)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
+`agent/codex/WED-350`; exact deployed application SHA
+`f5a9f971cdcfe8bfc85b7c74492162d26aa61e98`. Clean release checkout:
+`C:\temp\wt\omnyid-wed350-release-f5a9f97`.
+
+- Enlarged desktop `omnyid.com` to 1.1 scale and public Wedding pages to 1.2;
+  the breakpoint leaves phone scale unchanged. Chromium confirms the quote
+  page has no horizontal overflow at 390px.
+- Replaced public regex guesses with an explicit, privacy-disclosed,
+  source-grounded extraction route. Exact server-side snippet/type/range
+  validation, three evidence states, commercial terms, editable line items,
+  ambiguity choices, source navigation, local structured cache and re-paste
+  changes are implemented. Manual comparison still works without inference.
+- All totals are deterministic. The hosted synthetic `120 guests x A$275`
+  smoke returned pricing model `per_head`, rate 275, guest count 120 and
+  `whole_package_amount=not_found`. The public server reported no retention.
+- OpenRouter is mounted from a root-owned mode-0600 Oracle secret file. Funded
+  inference is enabled under the existing hard A$50 weekly ceiling. Usage
+  accounting no longer stores prompt-derived fingerprints.
+- Added the dedicated v2 spec/task plan and recorded the already-published
+  Budget Reality Check source contract in the requested magnet folder.
+- Exact-SHA evidence: two focused Rust route tests pass; Wedding CI passes both
+  line budgets and all 2,249 tests; production Vite build passes; browser smoke
+  proves explicit activation, local cache, component-total protection, mobile
+  layout and both desktop scales.
+- Oracle `SOURCE_COMMIT` and `oracle-runtime-manifest.json` match the deployed
+  SHA. Final production proof reports homeserver and backup running, manifest
+  verification and backup verification passing, and 79% root/var use. The
+  restore drill was deliberately skipped in the final quick proof; the deploy
+  wrapper's detached post-proof was interrupted after it failed to return, as
+  in WED-349. Evidence is under
+  `C:\temp\wt\proofs\wed350-release-f5a9f97`.
+
 ## 2026-11-09 - WED-349 consented analytics and quote-decoder release (Codex, complete)
 
 Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch

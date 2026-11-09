@@ -1,3 +1,22 @@
+## 2026-11-10 — Quote models extract evidence; deterministic code calculates money
+
+- The public venue quote tool may send proposal text to the configured model
+  only after the visitor selects **Analyse quote** beside an explicit
+  processing disclosure. Paste, manual entry and comparison alone remain
+  browser-local.
+- The model returns typed raw facts plus exact contiguous source snippets. The
+  server rejects unsupported values and ungrounded suggestions. It never
+  supplies arithmetic used as authority.
+- Per-head multiplication, minimum-spend floors, service-charge assumptions,
+  overtime and GST are calculated by deterministic browser code with a visible
+  formula. A component subtotal cannot populate the whole-package amount.
+- Public extraction is bounded by request size, persistent burst/day limits,
+  the shared funded-inference gate and an A$50 weekly maximum. Cost records use
+  a unique operational reference rather than a prompt-derived fingerprint.
+- The public server does not persist proposal text or structured extraction.
+  A bounded browser cache stores structured output by a one-way content digest;
+  analytics receives none of the quote text, values or results.
+
 ## 2026-11-09: Public analytics and private Wedding statistics require separate consent
 
 Public Wedding analytics is optional and false by default. Essential public
