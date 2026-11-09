@@ -17,7 +17,7 @@ lifecycle:
 tasks:
   - id: WED-349
     title: Publish the venue quote decoder and separate consented public analytics from private Wedding data sharing
-    status: in_progress
+    status: done
     owner: codex
     branch: agent/codex/WED-349
     worktree: C:/Users/ozans/Desktop/projects/OmnyID-GROWTH-001
@@ -25,6 +25,7 @@ tasks:
     depends_on: [WED-329, WED-347, GROWTH-07]
     files: [Caddyfile, wedding/**, solid-ui/src/components/WeddingSiteIntakeWizard.tsx, solid-ui/src/components/WeddingWorkspaceDocumentsPanel.tsx, solid-ui/src/components/vendor/VendorPhotoLicenceConsent.tsx, solid-ui/src/lib/weddingAdminDataConsentState.ts, solid-ui/tests/**consent**, src/db/wedding_onboarding_state.rs, src/db/growth_activation_projection.rs, src/server/user_management_routes/wedding_admin.rs, src/server/wedding_vendor_claim_routes.rs, postgres/migrations/**, Documents/issues/**, Documents/verification/**, .agent/**]
     acceptance: [the canonical public quote decoder and the reported doubled Wedding URL both resolve without duplicate canonical content, Ahrefs is available on public Wedding pages only after a clear optional analytics choice and essential service remains available when declined, analytics preferences are changeable and honor Global Privacy Control and Do Not Track, onboarding admin-data sharing remains unticked and separate from public analytics and withdrawal prevents or removes consent-dependent admin growth projections, aggregate progression excludes message content budget guest count documents and free text, privacy copy states the observed data provider retention and technical limitations without claiming legal compliance, focused consent payload route public-site build exact-SHA deployment provenance and hosted checks pass]
+    progress: "Released exact application SHA 9d1c6341ca69fd55d004239d2a974f02d42a9d00 to Oracle. The doubled quote-decoder URL returns 308 to its live canonical 200 page. All public Wedding pages declare Ahrefs inertly and the controller loads it only after a separate Analytics opt-in; decline, withdrawal, GPC and DNT leave essential tools usable. The signed-in admin-statistics choice remains separate, unticked and content-free, records consent revisions, removes plan projections on withdrawal, and excludes content, values, guest counts, files and vendor choice. Exact-SHA Wedding CI and production build pass; hosted consent browser smoke, CSP, SOURCE_COMMIT, runtime manifest, backup verification and restore drill pass. Full Rust has 2,721 passing tests and four unrelated brittle source-text failures in untouched modules; local Docker was unavailable for the disposable PostgreSQL consent integration check."
 
   - id: WED-348
     title: Make Limited Specials resilient, add date enquiries and location/category discovery controls

@@ -1,3 +1,45 @@
+## 2026-11-09 - WED-349 consented analytics and quote-decoder release (Codex, complete)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
+`agent/codex/WED-349`; exact deployed application SHA
+`9d1c6341ca69fd55d004239d2a974f02d42a9d00`. Clean release checkout:
+`C:\temp\wt\omnyid-wed349-release-9d1c634`.
+
+- Added a permanent redirect from the reported doubled Wedding quote-decoder
+  path to the existing canonical page. Hosted checks return 308 then 200.
+- Added one privacy-preference controller across the public Wedding site.
+  Essential service is always available; optional Analytics is false by
+  default, changeable, and disabled by GPC/DNT. Both first-party measurement
+  and the Ahrefs declaration remain inert until opt-in.
+- Kept public-site analytics separate from the signed-in, wedding-scoped
+  `Share content-free progress statistics with OmnyID` choice. It is unticked,
+  records consent revisions, limits growth projection to four content-free AFP
+  event kinds, excludes private values/content, and deletes the plan projection
+  plus rebuilds aggregates on withdrawal.
+- Updated the public privacy explanation and wrote the evidence/limitations
+  audit at
+  `Documents/issues/wedding planner/2026-11-09-wedding-consent-analytics-privacy-audit.md`.
+  It describes observed boundaries and questions for an Australian privacy
+  professional; it does not declare legal compliance.
+- Exact-SHA `npm run test:wedding:ci` and `npm run build` pass. Hosted privacy
+  browser smoke confirms no Ahrefs request before consent, essential quote-tool
+  use while declined, one load after opt-in, withdrawal, and GPC enforcement.
+  CSP permits Ahrefs only so the consent controller can activate it.
+- Full Rust result: 2,721 passed, 4 failed, 1 ignored. The four failures are
+  brittle source-text assertions in untouched auth, conversion, orchestration
+  and integration-alias modules. The one task-caused Vendor Image Licence
+  digest failure was corrected and its focused test passes. Docker Desktop's
+  local engine was unavailable, so the disposable PostgreSQL consent
+  integration test was not exercised locally; migration catalog tests pass and
+  production accepted migration 0153.
+- Oracle `SOURCE_COMMIT` and `oracle-runtime-manifest.json` match the exact SHA.
+  The detached machine audit reports homeserver and backup service running,
+  manifest and backup verification passing, restore drill passing, and 75%
+  root/var use. The local deploy wrapper failed to collect the already-complete
+  detached result and was stopped after hosted verification; the untouched
+  machine output and hashes are preserved under
+  `C:\temp\wt\proofs\wed349-release-9d1c634\postdeploy-detached`.
+
 ## 2026-11-09 - WED-348 Limited Specials recovery (Codex, complete)
 
 Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
