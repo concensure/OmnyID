@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Compare Wedding Venue Quotes Australia — OmnyID Weddings</title>
-<meta name="description" content="Put one or two wedding venue proposals into the same format. Compare stated costs, inclusions, missing terms and follow-up questions locally on your device.">
+<meta name="description" content="Put one or two wedding venue proposals into the same format. Review source-grounded commercial terms, deterministic event totals, inclusions, missing terms and follow-up questions.">
 <link rel="icon" type="image/png" href="assets/logo/omnyid-mark.png">
 <link rel="stylesheet" href="assets/css/style.css">
 <link rel="stylesheet" href="assets/css/magnet.css">
@@ -14,11 +14,11 @@
 <meta property="og:locale" content="en_AU">
 <meta property="og:url" content="https://omnyid.com/wedding/compare-wedding-venue-quotes.html">
 <meta property="og:title" content="Compare Wedding Venue Quotes Australia — OmnyID Weddings">
-<meta property="og:description" content="Compare stated costs, inclusions and unanswered questions without uploading your venue proposals.">
+<meta property="og:description" content="Compare source-grounded costs, inclusions and unanswered questions with an auditable event-total formula.">
 <meta property="og:image" content="https://omnyid.com/wedding/assets/logo/omnyid-logo.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Compare Wedding Venue Quotes Australia — OmnyID Weddings">
-<meta name="twitter:description" content="Compare stated costs, inclusions and unanswered questions without uploading your venue proposals.">
+<meta name="twitter:description" content="Compare source-grounded costs, inclusions and unanswered questions with an auditable event-total formula.">
 <meta name="twitter:image" content="https://omnyid.com/wedding/assets/logo/omnyid-logo.png">
 <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://omnyid.com/#organization","name":"OmnyID Pty Ltd","url":"https://omnyid.com"},{"@type":"SoftwareApplication","name":"Wedding Venue Quote Decoder","applicationCategory":"LifestyleApplication","operatingSystem":"Web","url":"https://omnyid.com/wedding/compare-wedding-venue-quotes.html","isAccessibleForFree":true,"publisher":{"@id":"https://omnyid.com/#organization"}},{"@type":"WebPage","name":"Compare Wedding Venue Quotes Australia","url":"https://omnyid.com/wedding/compare-wedding-venue-quotes.html","inLanguage":"en-AU"}]}</script>
 <!-- omnyid-privacy-analytics:start -->
@@ -36,10 +36,10 @@
 </div></header>
 
 <main id="main"><section class="magnet-shell quote-shell" aria-labelledby="quote-title">
-  <p class="eyebrow">Free · no account · proposals stay on this device</p>
+  <p class="eyebrow">Free · no account · manual comparison stays on this device</p>
   <h1 id="quote-title">Compare wedding venue quotes without building another spreadsheet</h1>
   <p class="magnet-lede">Put one or two proposals into the same format. The decoder totals only what is stated, keeps unknown costs visible, and prepares the questions that make the comparison fairer.</p>
-  <div class="quote-privacy" role="note"><strong>Private by design:</strong> this page does not upload proposal text, venue names or amounts. A file is read only in your browser. “Not stated” is never treated as free or zero.</div>
+  <div class="quote-privacy" role="note"><strong>You choose when AI reads a quote.</strong> Pasting and manual comparison stay in your browser. If you select <em>Analyse quote</em>, that proposal text is sent once through OmnyID to its configured model provider to identify commercial terms. OmnyID does not retain the proposal text or extraction on this public tool server, and asks the provider not to retain it. Manual entry remains available. “Not stated” is never treated as free or zero. <a href="privacy.html#quote-extraction">How this processing works</a>.</div>
 
   <form data-quote-decoder novalidate>
     <section class="magnet-card" aria-labelledby="comparison-settings-title">
@@ -50,47 +50,34 @@
       </div>
     </section>
 
+    <input class="quote-honeypot" name="company" tabindex="-1" autocomplete="off" aria-hidden="true">
     <div class="quote-columns">
       <section class="quote-proposal magnet-card" data-proposal="a" aria-labelledby="proposal-a-title">
         <h2 id="proposal-a-title">Proposal A</h2>
         <label class="magnet-field">Venue label<input name="a_label" maxlength="100" placeholder="Venue name (kept on this device)"></label>
-        <label class="magnet-field">Paste proposal text<textarea name="a_text" rows="7" placeholder="Paste the wording from the proposal"></textarea></label>
-        <div class="quote-local-file"><label class="magnet-link-button" for="a_file">Choose local text file</label><input id="a_file" name="a_file" type="file" accept=".txt,.md,.pdf,.doc,.docx,text/plain,text/markdown"><span data-file-status="a">TXT and Markdown are read locally. For PDF or Word, paste the text for now.</span></div>
-        <button class="magnet-link-button" type="button" data-scan="a">Find possible terms</button>
-        <div class="quote-suggestions" data-suggestions="a" aria-live="polite"></div>
-        <details open><summary>Pricing</summary><div class="quote-fields">
-          <label class="magnet-field">Pricing model<select name="a_model"><option value="per_head">Per-head package</option><option value="hire_plus">Hire plus per-head catering</option><option value="minimum">Minimum spend</option><option value="all_inclusive">All-inclusive total</option></select></label>
-          <label class="magnet-field">Core amount (AUD)<input name="a_core" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Not stated"></label>
-          <label class="magnet-field">Minimum spend (AUD)<input name="a_minimum" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Not stated"></label>
-          <label class="magnet-field">Separate drinks per guest<input name="a_drinks" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Not stated"></label>
-          <label class="magnet-field">GST<select name="a_gst"><option value="not_stated">Not stated</option><option value="included">Included</option><option value="excluded">Excluded</option></select></label>
-          <label class="magnet-field">Service charge (%)<input name="a_service" type="number" min="0" max="100" step="0.1" inputmode="decimal" placeholder="Not stated"></label>
-          <label class="magnet-field">Hours included<input name="a_hours" type="number" min="0" max="24" step="0.5" inputmode="decimal" placeholder="Not stated"></label>
-          <label class="magnet-field">Overtime per hour<input name="a_overtime" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Not stated"></label>
-          <label class="magnet-field">Other stated fixed costs<input name="a_extras" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0"></label>
-        </div></details>
-        <details><summary>Key inclusions</summary><div class="quote-inclusions" data-inclusions="a"></div></details>
+        <label class="magnet-field">Paste proposal text<textarea name="a_text" rows="9" placeholder="Paste the wording from the proposal"></textarea></label>
+        <div class="quote-local-file"><label class="magnet-link-button" for="a_file">Choose local text file</label><input id="a_file" name="a_file" type="file" accept=".txt,.md,text/plain,text/markdown"><span data-file-status="a">TXT and Markdown are read locally. For PDF or Word, paste the text for now.</span></div>
+        <div class="quote-analysis-actions"><button class="magnet-button" type="button" data-analyse="a">Analyse quote</button><button class="magnet-link-button" type="button" data-clear-analysis="a">Clear saved analysis</button></div>
+        <p class="quote-analysis-status" data-analysis-status="a" role="status" aria-live="polite">Not analysed. Manual fields remain available.</p>
+        <div class="quote-suggestions" data-suggestions="a"></div>
+        <div class="quote-selection-tool"><label class="magnet-field">Map selected quote text to<select data-selection-target="a"></select></label><button class="magnet-link-button" type="button" data-extract-selection="a">Extract from selection</button></div>
+        <details open><summary>Commercial terms</summary><div class="quote-fields" data-commercial-fields="a"></div></details>
+        <details open><summary>Line items and inclusions</summary><div class="quote-line-items" data-line-items="a"></div><button class="magnet-link-button" type="button" data-add-line="a">Add line item</button></details>
+        <div class="quote-change-list" data-changes="a" hidden></div>
       </section>
 
       <section class="quote-proposal magnet-card" data-proposal="b" aria-labelledby="proposal-b-title">
         <h2 id="proposal-b-title">Proposal B <span class="quote-optional">optional</span></h2>
         <label class="magnet-field">Venue label<input name="b_label" maxlength="100" placeholder="Venue name (kept on this device)"></label>
-        <label class="magnet-field">Paste proposal text<textarea name="b_text" rows="7" placeholder="Paste the wording from the second proposal"></textarea></label>
-        <div class="quote-local-file"><label class="magnet-link-button" for="b_file">Choose local text file</label><input id="b_file" name="b_file" type="file" accept=".txt,.md,.pdf,.doc,.docx,text/plain,text/markdown"><span data-file-status="b">TXT and Markdown are read locally. For PDF or Word, paste the text for now.</span></div>
-        <button class="magnet-link-button" type="button" data-scan="b">Find possible terms</button>
-        <div class="quote-suggestions" data-suggestions="b" aria-live="polite"></div>
-        <details open><summary>Pricing</summary><div class="quote-fields">
-          <label class="magnet-field">Pricing model<select name="b_model"><option value="per_head">Per-head package</option><option value="hire_plus">Hire plus per-head catering</option><option value="minimum">Minimum spend</option><option value="all_inclusive">All-inclusive total</option></select></label>
-          <label class="magnet-field">Core amount (AUD)<input name="b_core" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Not stated"></label>
-          <label class="magnet-field">Minimum spend (AUD)<input name="b_minimum" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Not stated"></label>
-          <label class="magnet-field">Separate drinks per guest<input name="b_drinks" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Not stated"></label>
-          <label class="magnet-field">GST<select name="b_gst"><option value="not_stated">Not stated</option><option value="included">Included</option><option value="excluded">Excluded</option></select></label>
-          <label class="magnet-field">Service charge (%)<input name="b_service" type="number" min="0" max="100" step="0.1" inputmode="decimal" placeholder="Not stated"></label>
-          <label class="magnet-field">Hours included<input name="b_hours" type="number" min="0" max="24" step="0.5" inputmode="decimal" placeholder="Not stated"></label>
-          <label class="magnet-field">Overtime per hour<input name="b_overtime" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Not stated"></label>
-          <label class="magnet-field">Other stated fixed costs<input name="b_extras" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0"></label>
-        </div></details>
-        <details><summary>Key inclusions</summary><div class="quote-inclusions" data-inclusions="b"></div></details>
+        <label class="magnet-field">Paste proposal text<textarea name="b_text" rows="9" placeholder="Paste the wording from the second proposal"></textarea></label>
+        <div class="quote-local-file"><label class="magnet-link-button" for="b_file">Choose local text file</label><input id="b_file" name="b_file" type="file" accept=".txt,.md,text/plain,text/markdown"><span data-file-status="b">TXT and Markdown are read locally. For PDF or Word, paste the text for now.</span></div>
+        <div class="quote-analysis-actions"><button class="magnet-button" type="button" data-analyse="b">Analyse quote</button><button class="magnet-link-button" type="button" data-clear-analysis="b">Clear saved analysis</button></div>
+        <p class="quote-analysis-status" data-analysis-status="b" role="status" aria-live="polite">Not analysed. Manual fields remain available.</p>
+        <div class="quote-suggestions" data-suggestions="b"></div>
+        <div class="quote-selection-tool"><label class="magnet-field">Map selected quote text to<select data-selection-target="b"></select></label><button class="magnet-link-button" type="button" data-extract-selection="b">Extract from selection</button></div>
+        <details open><summary>Commercial terms</summary><div class="quote-fields" data-commercial-fields="b"></div></details>
+        <details open><summary>Line items and inclusions</summary><div class="quote-line-items" data-line-items="b"></div><button class="magnet-link-button" type="button" data-add-line="b">Add line item</button></details>
+        <div class="quote-change-list" data-changes="b" hidden></div>
       </section>
     </div>
     <button class="magnet-button quote-compare" type="submit">Compare stated terms</button>
@@ -100,6 +87,7 @@
   <section class="magnet-result" data-quote-result hidden tabindex="-1" aria-labelledby="quote-result-title">
     <h2 id="quote-result-title">What the proposals actually state</h2>
     <p data-quote-summary></p>
+    <div class="quote-formula-columns" data-formulas></div>
     <div class="magnet-table-wrap"><table class="magnet-table"><thead><tr><th scope="col">Decision factor</th><th scope="col" data-result-label="a">Proposal A</th><th scope="col" data-result-label="b">Proposal B</th></tr></thead><tbody data-result-body></tbody></table></div>
     <div class="quote-question-columns"><section class="magnet-card"><h3 data-question-title="a">Questions for Proposal A</h3><ul data-questions="a"></ul><button class="magnet-link-button" type="button" data-copy="a">Copy follow-up</button></section><section class="magnet-card" data-question-card="b"><h3 data-question-title="b">Questions for Proposal B</h3><ul data-questions="b"></ul><button class="magnet-link-button" type="button" data-copy="b">Copy follow-up</button></section></div>
     <div class="magnet-actions"><button class="magnet-link-button" type="button" data-print>Print comparison</button></div>
@@ -110,8 +98,9 @@
 </section></main>
 
 <footer class="site-footer"><div class="container"><div class="footer-bottom"><span>© <span data-year></span> OmnyID. All rights reserved.</span><span><a href="privacy.html">Privacy</a> · <a href="disclosures.html">Disclosures</a> · <a href="../workspace/vendor.html?source=vendor_claim" data-vendor-login>Vendor login</a></span></div></div></footer>
-<div class="signin-modal" id="signinModal" aria-hidden="true"><div class="signin-overlay" data-close-signin></div><div class="signin-panel" role="dialog" aria-modal="true" aria-labelledby="signinTitle"><button class="signin-close" type="button" data-close-signin aria-label="Close">&times;</button><p class="eyebrow">Continue to your workspace</p><h2 id="signinTitle">Keep the comparison with your wedding plan</h2><p class="signin-lede">Sign in or create a free account. You choose what to add; this page does not upload the proposal text.</p><div class="signin-options"><div class="signin-option"><a class="btn btn-primary btn-block" href="../workspace/?auth=register&amp;source=wedding&amp;from=quote-decoder">Create free account</a><a class="btn btn-outline btn-block" href="../workspace/?auth=signin&amp;source=wedding&amp;from=quote-decoder">Sign in</a></div></div><button type="button" class="link-btn" data-close-signin>Not now</button></div></div>
+<div class="signin-modal" id="signinModal" aria-hidden="true"><div class="signin-overlay" data-close-signin></div><div class="signin-panel" role="dialog" aria-modal="true" aria-labelledby="signinTitle"><button class="signin-close" type="button" data-close-signin aria-label="Close">&times;</button><p class="eyebrow">Continue to your workspace</p><h2 id="signinTitle">Keep the comparison with your wedding plan</h2><p class="signin-lede">Sign in or create a free account. You choose what to add; this public page does not save proposal text to your account.</p><div class="signin-options"><div class="signin-option"><a class="btn btn-primary btn-block" href="../workspace/?auth=register&amp;source=wedding&amp;from=quote-decoder">Create free account</a><a class="btn btn-outline btn-block" href="../workspace/?auth=signin&amp;source=wedding&amp;from=quote-decoder">Sign in</a></div></div><button type="button" class="link-btn" data-close-signin>Not now</button></div></div>
 <script src="assets/js/main.js"></script>
+<script src="assets/js/quote-decoder-engine.js"></script>
 <script src="assets/js/quote-decoder.js"></script>
 </body>
 </html>

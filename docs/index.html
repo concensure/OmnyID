@@ -23,6 +23,12 @@
       scroll-behavior: smooth;
     }
 
+    /* Desktop reading comfort: one browser-zoom-sized step, without changing
+       the phone layout or the user's own browser zoom preference. */
+    @media (min-width: 1024px) {
+      html { zoom: 1.1; }
+    }
+
     body {
       background:
         radial-gradient(circle at top left, rgba(217, 107, 57, 0.08), transparent 30%),

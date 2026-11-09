@@ -179,7 +179,7 @@ mod wedding_task_assignment_routes;
 mod wedding_ai_cost_policy;
 mod wedding_llm_ladder;
 mod wedding_boundary_routes;
-mod wedding_preference_routes; mod wedding_quote_study_routes; mod wedding_rsvp_capability_routes; mod wedding_rsvp_reminder_routes; mod wedding_rsvp_response_routes; mod wedding_runsheet_projection_routes; mod wedding_runsheet_share_routes;
+mod wedding_preference_routes; mod wedding_quote_decoder_routes; mod wedding_quote_study_routes; mod wedding_rsvp_capability_routes; mod wedding_rsvp_reminder_routes; mod wedding_rsvp_response_routes; mod wedding_runsheet_projection_routes; mod wedding_runsheet_share_routes;
 mod wedding_invite_proposal_opportunity_ledger; mod wedding_invite_proposal_opportunity_routes; mod wedding_invite_proposal_routes;
 #[cfg(test)]
 mod wedding_rsvp_capability_routes_tests;
@@ -1447,7 +1447,7 @@ pub async fn run() {
         .merge(wedding_site_measurement_routes::routes())
         .merge(wedding_blog_routes::routes())
         .merge(public_contact_routes::routes())
-        .merge(wedding_quote_study_routes::routes()).merge(vendor_email_worker_ingress::routes()).merge(wedding_vendor_claim_routes::routes()).merge(wedding_vendor_directory_page::routes()).merge(wedding_vendor_listing_proposal_routes::routes()).merge(wedding_vendor_ownership_routes::routes()).merge(wedding_vendor_sender_identity_routes::routes())
+        .merge(wedding_quote_decoder_routes::routes()).merge(wedding_quote_study_routes::routes()).merge(vendor_email_worker_ingress::routes()).merge(wedding_vendor_claim_routes::routes()).merge(wedding_vendor_directory_page::routes()).merge(wedding_vendor_listing_proposal_routes::routes()).merge(wedding_vendor_ownership_routes::routes()).merge(wedding_vendor_sender_identity_routes::routes())
         .merge(wedding_vendor_photo_routes::routes())
         .layer(cors_layer())
         .layer(axum::middleware::from_fn(request_id_middleware))
@@ -1584,7 +1584,7 @@ pub async fn build_test_router(database_url: &str) -> Router {
         .merge(practice_routes::routes())
         .merge(quotation_normalisation_routes::routes()).merge(quotation_routes::routes()).merge(quotation_response_capability_routes::routes())
         .merge(quotation_response_portal_routes::routes()).merge(quotation_vendor_response_routes::routes()).merge(quotation_vendor_attachment_routes::routes()).merge(quotation_vendor_revision_routes::routes()).merge(quotation_source_routes::routes())
-        .merge(wedding_quote_study_routes::routes()).merge(vendor_email_worker_ingress::routes()).merge(wedding_vendor_claim_routes::routes()).merge(wedding_vendor_directory_page::routes()).merge(wedding_vendor_listing_proposal_routes::routes()).merge(wedding_vendor_ownership_routes::routes()).merge(wedding_vendor_sender_identity_routes::routes()).merge(wedding_vendor_photo_routes::routes())
+        .merge(wedding_quote_decoder_routes::routes()).merge(wedding_quote_study_routes::routes()).merge(vendor_email_worker_ingress::routes()).merge(wedding_vendor_claim_routes::routes()).merge(wedding_vendor_directory_page::routes()).merge(wedding_vendor_listing_proposal_routes::routes()).merge(wedding_vendor_ownership_routes::routes()).merge(wedding_vendor_sender_identity_routes::routes()).merge(wedding_vendor_photo_routes::routes())
         .merge(wedding_rsvp_capability_routes::routes())
         .merge(wedding_rsvp_reminder_routes::routes())
         .merge(wedding_rsvp_response_routes::routes())

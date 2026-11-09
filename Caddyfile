@@ -327,6 +327,12 @@
         import omnyid_proxy
     }
 
+    # Explicit, rate-limited contextual extraction for the public venue quote
+    # decoder. The static page remains useful without this optional request.
+    handle /wedding/quote-extract {
+        import omnyid_proxy
+    }
+
     handle /wedding/provider-capabilities {
         import omnyid_proxy
     }

@@ -74,6 +74,9 @@
 /* ---------- reset ---------- */
 *, *::before, *::after{ box-sizing: border-box; }
 html{ scroll-behavior: smooth; }
+/* Public Wedding pages use a deliberately roomier desktop reading scale.
+   Mobile remains 1:1 so viewport width and touch layouts are unchanged. */
+@media (min-width: 1024px){ html{ zoom:1.2; } }
 body{
   margin:0;
   background: var(--cream);

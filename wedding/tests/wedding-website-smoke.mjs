@@ -18,6 +18,7 @@ const sitemap = readFileSync(sitemapPath, 'utf8');
 const vendorAcquisitionHtml = readFileSync(vendorAcquisitionPage, 'utf8');
 const weddingJs = readFileSync(resolve(root, 'assets', 'js', 'main.js'), 'utf8');
 const quoteDecoderJs = readFileSync(resolve(root, 'assets', 'js', 'quote-decoder.js'), 'utf8');
+const quoteDecoderEngine = readFileSync(resolve(root, 'assets', 'js', 'quote-decoder-engine.js'), 'utf8');
 const landingConfig = readFileSync(resolve(root, 'assets', 'js', 'landing-config.js'), 'utf8');
 const landingContext = readFileSync(resolve(root, 'assets', 'js', 'landing-context.js'), 'utf8');
 const privacyPreferences = readFileSync(resolve(root, 'assets', 'js', 'privacy-preferences.js'), 'utf8');
@@ -482,14 +483,20 @@ for (const methodCopy of ['How the budget method works', 'Target total', '100%',
   if (!calculator.includes(methodCopy)) failures.push(`wedding-cost-calculator.html: published method is missing "${methodCopy}"`);
 }
 const quoteDecoder = htmlByPath.get(normalize(resolve(root, 'compare-wedding-venue-quotes.html'))) ?? '';
-for (const required of ['proposals stay on this device', 'Not stated', 'Compare stated terms', 'assets/js/quote-decoder.js']) {
+for (const required of ['manual comparison stays on this device', 'Not stated', 'Compare stated terms', 'assets/js/quote-decoder-engine.js', 'assets/js/quote-decoder.js', 'Analyse quote']) {
   if (!quoteDecoder.includes(required)) failures.push(`compare-wedding-venue-quotes.html: missing ${required}`);
 }
-if (!quoteDecoderJs.includes('window.OmnyVenueQuoteDecoder = { costAt }') || !quoteDecoderJs.toLowerCase().includes('nothing was uploaded')) {
-  failures.push('quote-decoder.js: local deterministic engine or honest unsupported-file fallback is missing');
+if (!quoteDecoderJs.includes('/wedding/quote-extract') || !quoteDecoderJs.includes('No new model request was made') || !quoteDecoderJs.includes('Not stated in quote')) {
+  failures.push('quote-decoder.js: explicit contextual extraction, local cache, or three-state evidence is missing');
 }
-if (/fetch\s*\(|XMLHttpRequest|sendBeacon/.test(quoteDecoderJs)) {
-  failures.push('quote-decoder.js: proposal data must not leave the browser');
+if (!quoteDecoderEngine.includes('Estimated total') && !quoteDecoderEngine.includes('estimatedTotal')) {
+  failures.push('quote-decoder-engine.js: deterministic total calculation is missing');
+}
+if (!caddyfile.includes('handle /wedding/quote-extract')) {
+  failures.push('Caddyfile: contextual quote extraction route must precede the static Wedding handler');
+}
+if (!quoteDecoder.includes('does not retain the proposal text') || !quoteDecoder.includes('Manual entry remains available')) {
+  failures.push('compare-wedding-venue-quotes.html: model-processing disclosure or manual fallback is missing');
 }
 for (const context of ['starting', 'vendors', 'guests', 'final']) {
   if (!new RegExp(`${context}:[\\s\\S]*?retrieval:[\\s\\S]*?question:[\\s\\S]*?directAnswer:[\\s\\S]*?destinationPath:`).test(landingConfig)) failures.push(`landing-config.js: ${context} context lacks non-visible retrieval metadata`);

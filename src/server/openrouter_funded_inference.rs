@@ -68,8 +68,10 @@ async fn reserve(pool: &PgPool, request: &FundedInferenceRequest<'_>) -> Result<
         return Err("The weekly funded research allowance has been reached.".to_string());
     }
     let id = format!("funded-ai-{}", Ulid::new());
+    // The usage ledger needs a unique request reference for cost accounting,
+    // not a stable fingerprint of potentially private prompt content.
     let fingerprint = hex::encode(Sha256::digest(
-        format!("{}:{}", request.feature, request.prompt).as_bytes(),
+        format!("{}:{}:{}", request.feature, request.abuse_id, id).as_bytes(),
     ));
     sqlx::query(
         "INSERT INTO platform_funded_ai_usage
