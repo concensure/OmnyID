@@ -15,6 +15,18 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-352
+    title: Add protected vendor proposal lead feeds and project Wedding truth into Database
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-352
+    worktree: C:/Users/ozans/Desktop/projects/OmnyID-GROWTH-001
+    base_sha: d297b3e
+    depends_on: [WED-338, WED-351]
+    files: [src/server/wedding_invite_proposal_opportunity_routes.rs, src/server/mod.rs, postgres/migrations/**, solid-ui/src/components/vendor/**Proposal**, solid-ui/src/components/admin/**Proposal**, solid-ui/src/components/database/**, solid-ui/src/lib/database*, solid-ui/tests/**proposal**, solid-ui/tests/**database**, Documents/verification/**, .agent/**]
+    acceptance: [an admin or authorised claimed vendor can issue an expiring revocable digest-only vendor lead-feed link without granting account access, the link lists only currently eligible matching Invite Proposal intents and allows a private proposal suitable date or notify-couple response through the existing tenant AFP response projection, the admin sees an operator-only intent list with couple email category date location guests response counts and status and can select a vendor to generate its link, all bearer responses are bounded rate-limited no-store noindex and replay-safe, Database opens directly to a Wedding Budget or Timeline projection and offers Budget Timeline and Seating as read-only views of the existing account-scoped ledger rather than copied records, focused privacy route frontend backend build exact-SHA deployment provenance and hosted checks pass]
+    progress: "Claimed from the clean WED-351 release head. Reusing the existing Invite Proposal opportunity response and AFP projection contracts plus the existing Database registry rather than introducing parallel proposal or planning stores."
+
   - id: WED-351
     title: Repair the hosted quote decoder and complete the Limited Specials interaction path
     status: done
