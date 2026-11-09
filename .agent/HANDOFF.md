@@ -1,4 +1,4 @@
-## 2026-11-09 - WED-348 Limited Specials recovery candidate (Codex, release pending)
+## 2026-11-09 - WED-348 Limited Specials recovery (Codex, complete)
 
 Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
 `agent/codex/WED-348`, based on deployed SHA
@@ -18,9 +18,19 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
 - Sent the authorised controlled 6HEAD enquiry for 30 November 2026 to
   `concensure@gmail.com`; Cloudflare accepted it. Redacted evidence is in
   `Documents/verification/wed-348-limited-specials-date-enquiry-2026-11-09.md`.
-- Verification so far: TypeScript, 2,249 Wedding tests, two line-budget tests,
-  and focused Limited Specials/Invite Proposals/location tests pass. Exact-SHA
-  production build, deploy, provenance/health and hosted browser smoke remain.
+- Released exact application SHA
+  `8ddf8832b241fa1f00c5e12912da19bc52460626` from clean detached worktree
+  `C:\temp\wt\omnyid-wed348-release-8ddf883`. Oracle `SOURCE_COMMIT` and
+  `oracle-runtime-manifest.json` match. Production proof and backup verification
+  pass. Exact-SHA TypeScript, 2,249 Wedding tests, two line-budget tests and the
+  production build pass.
+- Authenticated hosted discovery now returns 200 JSON for the request shape that
+  failed with 415. The live bundle contains the fallback enquiry, Ryde NSW and
+  desktop More controls. Production has active directory vendor `6HEAD Sydney`.
+- The controlled account's fresh headless browser session rendered the generic
+  response queue rather than Wedding visual navigation. Do not represent this
+  run as a complete visual click-through; retain it as account/deep-link
+  regression evidence in the next account-boundary/onboarding task.
 
 ## 2026-11-09 - WED-346 quote intake and RSVP seating continuation (Codex, complete)
 

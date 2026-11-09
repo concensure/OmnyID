@@ -17,7 +17,7 @@ lifecycle:
 tasks:
   - id: WED-348
     title: Make Limited Specials resilient, add date enquiries and location/category discovery controls
-    status: review
+    status: done
     owner: codex
     branch: agent/codex/WED-348
     worktree: C:/Users/ozans/Desktop/projects/OmnyID-GROWTH-001
@@ -25,7 +25,7 @@ tasks:
     depends_on: [WED-337, WED-340, WED-342, WED-347]
     files: [solid-ui/src/components/WeddingLimitedSpecialsMap*, solid-ui/src/components/WeddingInviteProposals*, solid-ui/src/components/WeddingVendorSearchHomeSections*, solid-ui/src/lib/vendorSpecialsApi.ts, solid-ui/src/lib/**location**, solid-ui/tests/wedding-*, src/server/wedding_vendor_special_offer_routes/**, Documents/verification/**, .agent/**]
     acceptance: [Limited Specials opens as an empty but useful date-enquiry surface when no eligible offers exist and does not disable the rest of the planner, selecting a venue and date prepares and sends through the existing reviewed enquiry workflow, one controlled 6HEAD enquiry for 30 November 2026 reaches concensure@gmail.com with provider evidence, Invite Proposals location uses the canonical wedding location and offers local fuzzy Australian city/suburb suggestions labelled with state, desktop vendor categories expose a compact More control without replacing the search query, focused tenant privacy accessibility frontend backend build exact-SHA deploy provenance health and hosted smoke pass]
-    progress: "Reproduced the hosted failure in a real signed-in Chromium session: discovery returned HTTP 415 because the client used a string body without the JSON content type. All four special-enquiry JSON calls now use bodyJson; failures remain inside the map and no-result discovery offers the existing reviewed date-enquiry path. Invite Proposals has state-labelled fuzzy Australian locations, and desktop categories have More. A controlled 6HEAD/30 Nov 2026 sample was accepted by Cloudflare for concensure@gmail.com. Typecheck, 2,249 Wedding tests and both line budgets pass. Exact-SHA build, deploy and hosted smoke remain."
+    progress: "Released exact application SHA 8ddf8832b241fa1f00c5e12912da19bc52460626 to Oracle. Reproduced and fixed the hosted HTTP 415 JSON-content-type defect across discovery and enquiry lifecycle calls; failure/no-result states now retain the reviewed directory date-enquiry path. Invite Proposals has state-labelled fuzzy Australian locations and desktop categories have More. Cloudflare accepted the controlled 6HEAD/30 Nov 2026 sample for concensure@gmail.com, and production confirms 6HEAD Sydney is active. Exact-SHA typecheck, 2,249 Wedding tests, line budgets, build, provenance, backup/health proof, authenticated discovery 200 and deployed-bundle checks pass. The fresh headless account exposed the generic response queue rather than Wedding visual navigation, recorded separately for account/deep-link regression work."
 
   - id: WED-347
     title: Release Limited Specials, publish the venue quote decoder, and launch vendors into one management portal

@@ -53,5 +53,27 @@ Those are separate observations.
 - Source and Wedding line budgets: 2 passed, 0 failed
 - Focused location, Invite Proposals and Limited Specials tests: pass
 
-Exact-SHA build, Oracle provenance/health and the post-release hosted browser
-check are recorded in the WED-348 handoff once the release candidate is live.
+## Exact-SHA release and hosted verification
+
+Application commit `8ddf8832b241fa1f00c5e12912da19bc52460626` was built from a clean detached
+worktree and released to Oracle. Both `SOURCE_COMMIT` and
+`oracle-runtime-manifest.json` report that full SHA. The post-deploy production
+proof passed; homeserver and backup services were running and backup
+verification passed. The restore drill was not repeated because the same
+deployment preflight had already passed it.
+
+An authenticated Chromium request using the controlled Casper account sent the
+same JSON discovery shape that previously returned 415. Production returned
+`200 application/json`. The deployed Wedding chunk was also fetched and
+verified to contain the no-specials date-enquiry surface, the state-labelled
+Ryde suggestion, expanded desktop categories and the discovery contract.
+
+The controlled account's fresh headless session landed in the generic response
+queue rather than rendering the Wedding navigation, so this run does not claim
+a visual click-through of the complete panel. That account/deep-link behavior
+is separate from the discovery endpoint correction and should remain visible
+in later account-onboarding regression work.
+
+A read-only production directory check confirmed `6HEAD Sydney` exists as an
+active venue, so the new directory fallback can target the named vendor rather
+than relying on a synthetic entry.
