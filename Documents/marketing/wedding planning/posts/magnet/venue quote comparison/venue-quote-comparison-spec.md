@@ -19,7 +19,7 @@ not equivalent to a comprehensive quote.
 
 - Extend `wedding/compare-wedding-venue-quotes.html`; do not add a competing
   calculator or quote store.
-- Reuse the server's platform-funded OpenRouter gate, weekly A$50-equivalent
+- Reuse the server's platform-funded OpenRouter gate, weekly USD 50
   configured ceiling, provider data-collection denial, server-held credential
   and persistent abuse rate limiter.
 - Reuse the existing quote normal form when a signed-in visitor later imports
@@ -178,4 +178,3 @@ Clear-cache control must be available. Cache failure must not block the tool.
   produces a field-level diff.
 - Desktop and mobile browser smoke, Wedding site tests, Rust route tests,
   production build, exact-SHA deployment and hosted checks pass.
-

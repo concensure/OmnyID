@@ -32,7 +32,7 @@ before deployment.
   `not_found`, and `retained_by_omnyid` was false.
 - Oracle `SOURCE_COMMIT` and runtime manifest both equal the application SHA.
 - The OpenRouter credential is mounted from a root-owned mode-0600 secret
-  file. The funded-inference flag is true and weekly maximum is A$50.
+  file. The funded-inference flag is true and weekly maximum is USD 50.
 - Final Oracle proof passed: homeserver and backup running, runtime manifest
   verified and current backup verified. Root and `/var` usage were 79%.
   Restore drill was skipped in this quick final proof.

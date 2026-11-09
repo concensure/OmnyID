@@ -17,7 +17,7 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
   smoke returned pricing model `per_head`, rate 275, guest count 120 and
   `whole_package_amount=not_found`. The public server reported no retention.
 - OpenRouter is mounted from a root-owned mode-0600 Oracle secret file. Funded
-  inference is enabled under the existing hard A$50 weekly ceiling. Usage
+  inference is enabled under the existing hard USD 50 weekly ceiling. Usage
   accounting no longer stores prompt-derived fingerprints.
 - Added the dedicated v2 spec/task plan and recorded the already-published
   Budget Reality Check source contract in the requested magnet folder.

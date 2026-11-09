@@ -11,7 +11,7 @@
   overtime and GST are calculated by deterministic browser code with a visible
   formula. A component subtotal cannot populate the whole-package amount.
 - Public extraction is bounded by request size, persistent burst/day limits,
-  the shared funded-inference gate and an A$50 weekly maximum. Cost records use
+  the shared funded-inference gate and a USD 50 weekly maximum. Cost records use
   a unique operational reference rather than a prompt-derived fingerprint.
 - The public server does not persist proposal text or structured extraction.
   A bounded browser cache stores structured output by a one-way content digest;
