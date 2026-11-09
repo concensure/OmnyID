@@ -323,11 +323,23 @@ async fn opportunity_is_tenant_scoped_deduplicated_and_revocable() {
         StatusCode::OK,
         "operator vendor link: {operator_link}"
     );
-    let (status, _, _) = request(&app, "GET", &feed_uri, None, json!({})).await;
+    let (status, revoked_headers, _) = request(&app, "GET", &feed_uri, None, json!({})).await;
     assert_eq!(
         status,
         StatusCode::NOT_FOUND,
         "rotating a feed link must revoke the prior bearer token"
+    );
+    assert_eq!(
+        revoked_headers
+            .get("cache-control")
+            .and_then(|value| value.to_str().ok()),
+        Some("no-store, private, max-age=0")
+    );
+    assert_eq!(
+        revoked_headers
+            .get("x-robots-tag")
+            .and_then(|value| value.to_str().ok()),
+        Some("noindex, nofollow, noarchive")
     );
 
     let (status, _, closed) = request(

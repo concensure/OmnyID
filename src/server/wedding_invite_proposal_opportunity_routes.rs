@@ -8,9 +8,10 @@ use std::{sync::Arc, time::Duration};
 
 use axum::{
     Json, Router,
-    extract::{Path, Query, State},
+    extract::{Path, Query, Request, State},
     http::{HeaderMap, HeaderValue, StatusCode, header},
-    response::IntoResponse,
+    middleware::{self, Next},
+    response::{IntoResponse, Response},
     routing::{get, post},
 };
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
@@ -92,6 +93,7 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
             "/admin/wedding/proposal-lead-link/revoke",
             post(admin_vendor_feed_revoke_http),
         )
+        .route_layer(middleware::from_fn(proposal_security_headers))
 }
 
 #[derive(Debug, Deserialize)]
@@ -634,6 +636,16 @@ fn no_store_headers() -> HeaderMap {
         HeaderValue::from_static("no-referrer"),
     );
     headers
+}
+
+async fn proposal_security_headers(request: Request, next: Next) -> Response {
+    let mut response = next.run(request).await;
+    for (name, value) in no_store_headers() {
+        if let Some(name) = name {
+            response.headers_mut().insert(name, value);
+        }
+    }
+    response
 }
 
 async fn public_opportunity_http(
