@@ -12,6 +12,7 @@ import { WeddingProjectionApprovalCard } from "@/components/WeddingProjectionApp
 import { WeddingResilienceCardList } from "@/components/WeddingResilienceCardList";
 import { WeddingVendorFollowUpPanel } from "@/components/WeddingVendorFollowUpPanel";
 import { WeddingVendorQuoteReplyCard } from "@/components/WeddingVendorQuoteReplyCard";
+import { WeddingHomePhotoCards } from "@/components/WeddingHomePhotoCards";
 import type { WeddingResponseWorkspaceViewProps } from "@/components/WeddingResponseWorkspaceViewTypes";
 import type { useWeddingVendorOutreachOwner } from "@/lib/useWeddingVendorOutreachOwner";
 import type { useWeddingPreferenceFeedbackOwner } from "@/lib/useWeddingPreferenceFeedbackOwner";
@@ -137,6 +138,12 @@ export function buildWeddingHomeSections(input: WeddingHomeSectionRegistryInput)
       title: "Approval queue",
       visible: Boolean(state().projectionQueue),
       render: () => <WeddingProjectionApprovalCard state={state().projectionQueue} save={workspace.saveProjection} storage={workspace.projectionStorage} onDispatched={workspace.onProjectionDispatched} onReviewBlocked={workspace.onReviewBlockedOutputs} />,
+    },
+    {
+      id: "photos",
+      title: "Wedding photos",
+      visible: true,
+      render: () => <WeddingHomePhotoCards userId={workspace.contactUserId} />,
     },
   ];
 }

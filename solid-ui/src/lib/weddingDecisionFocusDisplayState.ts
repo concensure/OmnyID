@@ -55,6 +55,15 @@ function checkedLabel(item: WeddingPersonalOsRankedItem): string {
 }
 
 function recommendedActionLabel(item: WeddingPersonalOsRankedItem): string {
+  const comparisonLabels = Array.isArray(item.actionMetadata?.vendor_comparison_top_choice_labels)
+    ? item.actionMetadata.vendor_comparison_top_choice_labels.filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+    : [];
+  if (comparisonLabels.length > 0) {
+    const category = Array.isArray(item.actionMetadata?.vendor_search_categories)
+      ? item.actionMetadata.vendor_search_categories.find((value): value is string => typeof value === "string" && value.trim().length > 0)
+      : null;
+    return `${comparisonLabels[0]} is the current recommended ${category?.replace(/_/g, " ") || "vendor"}; open the comparison to check the fit and alternatives.`;
+  }
   if (/pending RSVP/i.test(item.title)) return "Send a warm, contextual RSVP reminder to the guest";
   if (/hen'?s night|hen party/i.test(item.title)) return "Use a preference-matched activity brief to choose the format before collecting money";
   if (/transport|access|guest logistics/i.test(item.title)) return "Review the saved route, access and transport findings before finalising guest logistics";

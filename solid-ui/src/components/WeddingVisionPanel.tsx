@@ -13,6 +13,7 @@ import { buildWeddingVisionTagButtonState } from "@/lib/weddingVisionTagButtonSt
 import type { WeddingResponseWorkspaceViewState } from "@/lib/weddingResponseWorkspaceViewState";
 import type { WeddingWorkspaceMenuId } from "@/lib/weddingWorkspaceMenuState";
 import { parseWeddingFeelTagInput } from "@/lib/weddingVisionFeelTagState";
+import { weddingAccountScopedStorageKey } from "@/lib/weddingLocalAccountScope";
 
 function Rating(props: { count: number }) {
   return <span aria-label={`${props.count} out of 5`}>{props.count}/5</span>;
@@ -64,8 +65,8 @@ export function WeddingVisionPanel(props: {
   const [localFeelTagActions, setLocalFeelTagActions] = createSignal<Record<string, "affirm" | "remove">>({});
   const [overrideRefresh, setOverrideRefresh] = createSignal(0);
   const workspaceId = () => props.state.workspace.metadata.responseWorkspaceId;
-  const notesStorageKey = () => `omnyid:wedding_vision_notes:v1:${workspaceId()}`;
-  const storageKey = () => `omnyid:wedding_vision_override:${workspaceId()}`;
+  const notesStorageKey = () => weddingAccountScopedStorageKey(`omnyid:wedding_vision_notes:v1:${workspaceId()}`);
+  const storageKey = () => weddingAccountScopedStorageKey(`omnyid:wedding_vision_override:${workspaceId()}`);
   const storedOverride = () => {
     overrideRefresh();
     try {

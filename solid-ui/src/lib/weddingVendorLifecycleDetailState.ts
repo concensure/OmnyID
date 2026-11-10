@@ -80,10 +80,16 @@ export function weddingVendorQuoteArtifacts(
 export function weddingVendorTermsArtifacts(
   artifacts: readonly WeddingWorkspaceArtifactPreview[],
 ): WeddingWorkspaceArtifactPreview[] {
-  const explicit = artifacts.filter((artifact) => /contract|booking|terms|conditions/i.test(
-    `${artifact.title} ${artifact.category} ${artifact.bodyText ?? ""}`,
-  ));
-  return (explicit.length > 0 ? explicit : weddingVendorQuoteArtifacts(artifacts)).slice(0, 3);
+  const seen = new Set<string>();
+  const explicit = artifacts.filter((artifact) => {
+    if (/vendor search notes|top vendor comparison/i.test(`${artifact.title} ${artifact.category}`)) return false;
+    if (!/contract|booking|terms|conditions/i.test(`${artifact.title} ${artifact.category} ${artifact.bodyText ?? ""}`)) return false;
+    const key = `${artifact.artifactId}:${artifact.bodyText ?? ""}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  return explicit.slice(0, 3);
 }
 
 export function weddingVendorLifecycleBookingSummary(

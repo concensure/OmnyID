@@ -22,7 +22,7 @@ test("mobile Documents uses one coherent toolbar, privacy row, and export card",
 
 test("mobile wedding surfaces remove redundant chrome without removing actions", () => {
   assert.match(workspaceView, /phone:rounded-none phone:border-0 phone:bg-transparent phone:shadow-none/);
-  assert.match(workspaceView, /hidden min-h-11[\s\S]*sm:inline-flex/);
+  assert.doesNotMatch(workspaceView, /< Wedding Home/);
   assert.match(mobileDeck, /phone:rounded-none phone:border-0 phone:bg-transparent phone:px-0 phone:shadow-none/);
   assert.match(mobileDeck, /!props\.sequential && event\.key === "ArrowRight"/);
   assert.match(mobileFocus, /label=\{mobileFocusMode\(\) === "responses" \? "Response" : "Decision"\}[\s\S]*sequential/);

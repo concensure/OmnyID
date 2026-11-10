@@ -10,7 +10,8 @@ import {
   type WeddingGuestOperationsLocalDraftGuest,
 } from "@/lib/weddingGuestOperationsLocalState";
 import { weddingGuestOperationsDisplayCounts } from "@/lib/weddingGuestOperationsDisplayState";
-import type { WeddingGuestTrackingState } from "@/lib/weddingGuestTrackingState";
+import type { WeddingGuestTrackingRow, WeddingGuestTrackingState } from "@/lib/weddingGuestTrackingState";
+import type { WeddingRsvpResponseRow } from "@/lib/weddingRsvpResponseState";
 import { friendlyErrorText } from "@/lib/visibleErrorText";
 import {
   consumeWeddingGuestRsvpQuickActionsIntent,
@@ -101,6 +102,8 @@ export function WeddingGuestOperationsCard(props: {
   const [saveNotice, setSaveNotice] = createSignal<string | null>(null);
   const [showAddedGuests, setShowAddedGuests] = createSignal(false);
   const [editingDraftIndex, setEditingDraftIndex] = createSignal<number | null>(null);
+  const [editingGuestId, setEditingGuestId] = createSignal<string | null>(null);
+  const [expandedGuestAlertId, setExpandedGuestAlertId] = createSignal<string | null>(null);
   const [guestFilter, setGuestFilter] = createSignal<GuestRsvpStatus | "Replied" | "Needs" | null>(null);
   const displayCounts = createMemo(() => weddingGuestOperationsDisplayCounts(props.state, draftGuests()));
   const responseRowsByGuestId = createMemo(() => new Map(
@@ -108,7 +111,7 @@ export function WeddingGuestOperationsCard(props: {
   ));
   const guestRows = createMemo(() => (props.state.guestRows ?? []).map((row) => ({
     ...row,
-    rsvpStatus: rsvpOverrides()[row.id] ?? row.rsvpStatus,
+    rsvpStatus: (rsvpOverrides()[row.id] ?? row.rsvpStatus) as GuestRsvpStatus,
     locallyChanged: Boolean(rsvpOverrides()[row.id]),
     responseDetail: responseRowsByGuestId().get(row.id) ?? null,
   })));
@@ -119,6 +122,13 @@ export function WeddingGuestOperationsCard(props: {
     return guest.rsvpStatus === guestFilter();
   }));
   const toggleGuestFilter = (filter: GuestRsvpStatus | "Replied" | "Needs") => setGuestFilter((current) => current === filter ? null : filter);
+  const editSavedGuest = (guest: WeddingGuestTrackingRow & { responseDetail: WeddingRsvpResponseRow | null }) => {
+    setGuestName(guest.displayName); setGuestGroup(guest.householdLabel); setGuestRsvp(guest.rsvpStatus);
+    setGuestContact(guest.contactLabel ?? ""); setGuestReminderPermission(guest.rsvpReminderPermission === true);
+    setGuestMeal(guest.mealPreference ?? ""); setGuestDietary(guest.dietaryNote ?? ""); setGuestAccessibility(guest.accessibilityNote ?? "");
+    setEditingGuestId(guest.id); setEditingDraftIndex(null); setActivePanel("guest"); setManualMealChoice(false);
+    requestAnimationFrame(() => quickActionsElement?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  };
   const saveLocalState = (next: {
     guests?: WeddingGuestOperationsLocalDraftGuest[];
     rules?: string[];
@@ -202,16 +212,21 @@ export function WeddingGuestOperationsCard(props: {
           mealPreference: guestMeal(),
           dietaryNote: guestDietary(),
           accessibilityNote: guestAccessibility(),
+          personId: (props.state.guestRows ?? []).find((guest) => guest.id === editingGuestId())?.personId ?? undefined,
+          invitationId: (props.state.guestRows ?? []).find((guest) => guest.id === editingGuestId())?.eventResponses[0]?.invitationId,
+          eventId: (props.state.guestRows ?? []).find((guest) => guest.id === editingGuestId())?.eventResponses[0]?.eventId,
+          responseRevision: (props.state.guestRows ?? []).find((guest) => guest.id === editingGuestId())?.eventResponses[0]?.revision ?? undefined,
         })
         : "Guest draft saved on this device. Account saving is not connected yet.";
       const draft = { name, group, rsvp: guestRsvp() };
       const existingIndex = editingDraftIndex();
-      const nextGuests = existingIndex === null
+      const nextGuests = editingGuestId() ? draftGuests() : existingIndex === null
         ? [...draftGuests(), draft].slice(-80)
         : draftGuests().map((guest, index) => index === existingIndex ? draft : guest);
       setDraftGuests(nextGuests);
       saveLocalState({ guests: nextGuests });
       setEditingDraftIndex(null);
+      setEditingGuestId(null);
       setShowAddedGuests(true);
       setGuestName("");
       setGuestGroup("");
@@ -599,10 +614,11 @@ export function WeddingGuestOperationsCard(props: {
                     </p>
                   </Show>
                   <Show when={(guest.responseDetail?.missingDetailLabels.length ?? 0) > 0}>
-                    <p class="mt-2 break-words text-xs font-semibold leading-4 text-amber-900">
-                      {guest.responseDetail?.missingDetailLabels.join(" · ")}
-                    </p>
+                    <div class="mt-2 flex flex-wrap gap-1.5">
+                      <For each={guest.responseDetail?.missingDetailLabels ?? []}>{(label) => <button type="button" class="break-words rounded-full border border-amber-300 bg-amber-50 px-2 py-1 text-xs font-semibold leading-4 text-amber-900 underline underline-offset-2" onClick={() => editSavedGuest(guest)}>{label}</button>}</For>
+                    </div>
                   </Show>
+                  <Show when={guest.responseDetail?.changeSummary}>{(summary) => <div class="mt-2"><button type="button" aria-expanded={expandedGuestAlertId() === guest.id} class="inline-flex items-center gap-1 rounded-full border border-rose-300 bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-900" onClick={() => setExpandedGuestAlertId((current) => current === guest.id ? null : guest.id)}><WeddingDashboardIcon id="alert-circle" class="h-4 w-4" />RSVP changed</button><Show when={expandedGuestAlertId() === guest.id}><p class="mt-2 rounded-lg bg-rose-50 p-2 text-xs leading-5 text-rose-950">{summary()}</p></Show></div>}</Show>
                   <Show when={guest.responseDetail?.privacyLabel}>
                     <p class="mt-1 break-words text-xs leading-4 text-sky-950/75">
                       {guest.responseDetail?.privacyLabel}

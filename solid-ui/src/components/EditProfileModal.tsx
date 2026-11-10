@@ -263,7 +263,7 @@ export function EditProfileModal(props: { onClose: () => void; showWeddingUpgrad
           </section>
 
           <Show when={props.showWeddingUpgrade}>
-          <div class="rounded-2xl border border-primary/25 bg-primary/7 p-4">
+          <div class="rounded-2xl border border-primary/25 bg-white p-4 shadow-sm">
             <p class="text-sm font-semibold text-on-surface">OmnyID Wedding</p>
             <p class="mt-1 text-xs leading-5 text-on-surface-variant">
               Upgrade once for AUD 39 to receive 100 MB of storage and fewer API throttles while you plan.

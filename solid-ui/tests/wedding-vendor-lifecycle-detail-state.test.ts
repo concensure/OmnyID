@@ -45,8 +45,10 @@ const artifact = (id: string, title: string, preview: WeddingWorkspaceArtifactPr
 test("quote and booking projections retain source documents and explicit terms", () => {
   const quote = artifact("new", "Harbour quote", { kind: "quote", vendorName: "Harbour Room", amount: 12000, amountLabel: "$12,000", currency: "AUD", budgetDeltaAmount: null, budgetDeltaLabel: null, inclusions: [], validUntil: null, attachmentUrl: "/quote.pdf" });
   const terms = artifact("terms", "Harbour booking terms", { kind: "document", summaryLines: [] }, "Cancellation terms");
+  const notes = artifact("notes", "Vendor search notes", { kind: "document", summaryLines: [] }, "# Vendor search notes\n\n| Vendor | Match |\n| --- | --- |\n| Harbour | Strong |\n");
+  const duplicateTerms = { ...terms };
   assert.deepEqual(weddingVendorQuoteArtifacts([terms, quote]).map((item) => item.artifactId), ["new"]);
-  assert.deepEqual(weddingVendorTermsArtifacts([quote, terms]).map((item) => item.artifactId), ["terms"]);
+  assert.deepEqual(weddingVendorTermsArtifacts([quote, notes, terms, duplicateTerms]).map((item) => item.artifactId), ["terms"]);
   assert.equal(weddingVendorLifecycleBookingSummary({
     key: "harbour", vendorId: null, vendorName: "Harbour Room", enquired: true, favourited: true,
     quoteReceived: true, quoteAccepted: true, booked: false, reminderAt: null, followUpDismissed: false,

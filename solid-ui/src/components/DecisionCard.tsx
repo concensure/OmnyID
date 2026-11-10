@@ -118,8 +118,8 @@ export function DecisionCard(props: {
         </Show>
       </Show>
       <Show when={props.showActions !== false}>
-      <div class="mt-3 flex flex-wrap gap-2">
-        <For each={regularActions()}>
+      <div class="mt-3 flex items-end justify-between gap-2">
+        <div class="flex min-w-0 flex-wrap gap-2"><For each={regularActions()}>
           {(action) => (
             <button
               type="button"
@@ -131,22 +131,20 @@ export function DecisionCard(props: {
               {action.label}
             </button>
           )}
-        </For>
-      </div>
-      <Show when={whyAction()}>{(action) => (
-        <div class="mt-3 flex justify-end">
+        </For></div>
+        <Show when={whyAction()}>{(action) => (
           <button
             type="button"
             disabled={Boolean(action().disabledReason)}
             title={action().disabledReason ?? "Show Me Why"}
             aria-label="Show Me Why"
-            class={`inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border text-lg font-bold transition disabled:cursor-not-allowed disabled:opacity-45 ${wedding() ? "border-wedding-secondary bg-white text-wedding-secondary hover:bg-wedding-slate" : "border-current/15 bg-white/75"}`}
+            class={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-45 ${wedding() ? "border-wedding-secondary bg-white text-wedding-secondary hover:bg-wedding-slate" : "border-current/15 bg-white/75"}`}
             onClick={(event) => runAction(event, action())}
           >
             ?
           </button>
-        </div>
       )}</Show>
+      </div>
       </Show>
     </article>
   );

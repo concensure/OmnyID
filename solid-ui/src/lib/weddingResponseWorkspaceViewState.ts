@@ -74,6 +74,7 @@ import {
   buildWeddingPersonalOsProjectionState,
   type WeddingPersonalOsProjectionState,
 } from "@/lib/weddingPersonalOsProjectionState";
+import { buildWeddingSetupDecisionItems } from "@/lib/weddingSetupDecisionState";
 import {
   type WeddingOracleUpdatePlanState,
   buildWeddingResponseWorkspaceProductionReadinessState,
@@ -415,7 +416,6 @@ function isClosedVendorPursuitTask(task: WeddingPlanningTaskItem): boolean {
       && task.reviewStatus === "ignored"
     );
 }
-
 function closedVendorPursuitLineItemIds(taskItems: readonly WeddingPlanningTaskItem[]): Set<string> {
   const ids = new Set<string>();
   for (const task of taskItems) {
@@ -438,7 +438,6 @@ function uniqueHelperNames(values: readonly unknown[]): string[] {
   }
   return result.slice(0, 40);
 }
-
 function parsedDocumentAttachmentEvidenceFromAfpMessages(
   messages: readonly AfpMessage[] | null | undefined,
 ): Map<string, string[]> {
@@ -870,7 +869,9 @@ export function buildWeddingResponseWorkspaceViewState(input: WeddingResponseWor
   });
   const vendorPursuitLogTaskItems = projectionTaskItems.filter(isClosedVendorPursuitTask);
   const vendorPursuitLogCards = buildWeddingVendorPursuitLogCards(vendorPursuitLogTaskItems);
+  const setupDecisionItems = buildWeddingSetupDecisionItems({ hasWeddingDate: Boolean(planningWindow.weddingDate), hasBudgetTarget: budgetTracking.budgetTargetAmount !== null, guestCount: guestTracking.guestRowCount });
   const personalOsProjection = buildWeddingPersonalOsProjectionState({
+    setupItems: setupDecisionItems,
     taskItems: userFacingProjectionTaskItems,
     scheduleItems: projectionScheduleItems,
     decisionItems: activeDecisions,

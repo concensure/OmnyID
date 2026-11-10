@@ -221,7 +221,6 @@ import {
 } from "@/lib/weddingVendorSearchResultActionState";
 import { completedWeddingVendorSearchSession, editedWeddingVendorSearchSession, loadWeddingVendorSearchSession, saveWeddingVendorSearchSession } from "@/lib/weddingVendorSearchSessionState";
 import { weddingMenuKeyDownStep, weddingWorkspaceMenuItemsForEmail, weddingWorkspaceMoreItemsForEmail } from "@/lib/weddingWorkspaceDesktopMenuState";
-import { WeddingSetupChecklist, type WeddingSetupChecklistItem } from "@/components/WeddingSetupChecklist";
 import { WeddingUploadFilesButton } from "@/components/WeddingUploadFilesButton";
 const RESPONSE_QUEUE_VIEW_CLASS =
   "view-enter min-w-0 space-y-4 rounded-[24px] border border-sky-100/80 bg-[linear-gradient(135deg,rgba(240,249,255,0.96),rgba(255,255,255,0.96))] p-3 shadow-[0_22px_70px_-36px_rgba(14,116,144,0.4)] backdrop-blur-sm phone:rounded-none phone:border-0 phone:bg-transparent phone:p-0 phone:shadow-none sm:rounded-[32px] sm:p-5";
@@ -242,41 +241,6 @@ function initialWeddingWorkspaceMenu(): WeddingWorkspaceMenuId {
     if (urlMenu) return urlMenu;
   }
   return loadWeddingWorkspaceMenu();
-}
-function weddingSetupChecklistItems(
-  state: WeddingResponseWorkspaceViewState,
-  dateOrSeason: string,
-): WeddingSetupChecklistItem[] {
-  return [
-    {
-      id: "date",
-      label: "Add the wedding date",
-      detail: "Starts the countdown and timeline.",
-      complete: Boolean(parseWeddingDateInput(dateOrSeason)),
-      destination: "timeline",
-    },
-    {
-      id: "budget",
-      label: "Set a budget",
-      detail: "Shows how much is left after quotes.",
-      complete: state.budgetTracking.budgetTargetAmount !== null,
-      destination: "budget",
-    },
-    {
-      id: "guests",
-      label: "Start the guest list",
-      detail: "Unlocks RSVPs, meals, and seating.",
-      complete: state.guestTracking.guestRowCount > 0,
-      destination: "guests",
-    },
-    {
-      id: "helpers",
-      label: "Choose who is helping",
-      detail: "Keeps tasks and permissions clear.",
-      complete: state.delegation.items.length > 0,
-      destination: "helpers",
-    },
-  ];
 }
 function withWeddingAdminDataConsent(
   state: WeddingResponseWorkspaceViewState,
@@ -1958,13 +1922,6 @@ export function ResponseQueueView(props: {
       responseSurfaceCompactMode: queueDensityIsCompact(currentDensity),
     };
   });
-  const weddingSetupChecklist = createMemo(() => {
-    const state = weddingWorkspace();
-    return state ? weddingSetupChecklistItems(state, weddingFollowUpDate()) : [];
-  });
-  const incompleteWeddingSetupChecklist = createMemo(() => weddingSetupChecklist().filter((item) => !item.complete));
-  const essentialWeddingSetupIncomplete = createMemo(() => weddingSetupChecklist()
-    .some((item) => (item.id === "date" || item.id === "budget") && !item.complete));
 
   return (
     <div class={RESPONSE_QUEUE_VIEW_CLASS}>
@@ -2066,14 +2023,6 @@ export function ResponseQueueView(props: {
           /></div>
       </Show>
 
-      <Show when={weddingWorkspace() && weddingWorkspaceMenu() === "home" && essentialWeddingSetupIncomplete() && incompleteWeddingSetupChecklist().length > 0}>
-        <WeddingSetupChecklist
-          items={weddingSetupChecklist()}
-          initialDate={parseWeddingDateInput(weddingFollowUpDate()) ?? ""}
-          onNavigate={(destination) => setWeddingWorkspaceMenu(destination as WeddingWorkspaceMenuId)}
-          onSaveDate={async (date) => { setWeddingFollowUpDate(date); await saveWeddingDate(date); }}
-        />
-      </Show>
 
       {/* Suppressed while an intake form is the active next step — its "Open wedding
           documents" copy assumes a response already exists, which isn't true yet here. */}

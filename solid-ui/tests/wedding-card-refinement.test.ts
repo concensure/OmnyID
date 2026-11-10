@@ -13,7 +13,8 @@ test("wedding decision card separates the why control and removes queue prose", 
   ]);
   assert.match(decision, /action\.id !== "why"/);
   assert.match(decision, /aria-label="Show Me Why"/);
-  assert.match(decision, /flex justify-end/);
+  assert.match(decision, /flex items-end justify-between/);
+  assert.match(decision, /h-9 w-9/);
   assert.doesNotMatch(focus, /display\(\)\.summaryLabel/);
 });
 
@@ -43,4 +44,17 @@ test("overview assignment remains in place and overview notes use AFP", async ()
   assert.match(noteState, /type: "note"/);
   assert.match(noteState, /subtype: "wedding_overview_note"/);
   assert.match(noteState, /store_in_relational: true/);
+});
+
+test("decision research exposes real vendor contact actions and an in-place OpenStreetMap", async () => {
+  const [detail, map] = await Promise.all([
+    read("solid-ui/src/components/WeddingDecisionResearchDetail.tsx"),
+    read("solid-ui/src/components/WeddingVendorInlineMap.tsx"),
+  ]);
+  assert.match(detail, />Website</);
+  assert.match(detail, /onEmailVendor/);
+  assert.match(detail, /href={`tel:/);
+  assert.match(detail, /WeddingVendorInlineMap/);
+  assert.match(map, /nominatim\.openstreetmap\.org/);
+  assert.match(map, /openstreetmap\.org\/export\/embed/);
 });

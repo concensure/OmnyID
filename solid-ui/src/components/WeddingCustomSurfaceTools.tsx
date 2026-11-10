@@ -11,9 +11,10 @@ import {
   type WeddingCustomSurfaceItem,
 } from "@/lib/weddingCustomSurfaceState";
 import type { WeddingWorkspaceMenuId } from "@/lib/weddingWorkspaceMenuState";
+import { weddingAccountScopedStorageKey } from "@/lib/weddingLocalAccountScope";
 
 function customWorkspaceStorageKey(scope: string): string {
-  return `omnyid:wedding_custom_surface:${scope}`;
+  return weddingAccountScopedStorageKey(`omnyid:wedding_custom_surface:${scope}`);
 }
 
 function loadCustomWorkspaceItems(scope: string): WeddingCustomSurfaceItem[] {

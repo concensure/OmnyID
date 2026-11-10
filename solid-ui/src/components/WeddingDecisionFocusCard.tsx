@@ -471,9 +471,13 @@ export function WeddingDecisionFocusCard(props: {
                 const expandedTask = () => expandedTaskId() === item.id ? taskFor(item.id) : null;
                 const comparison = () => comparisonFor(item);
                 const recommendedVendor = () => comparison()?.vendorComparisonCards.slice().sort((left, right) => left.rank - right.rank)[0] ?? null;
-                const recommendedFlow = () => {
-                  const vendor = recommendedVendor();
-                  return vendor ? props.vendorOutreach?.flows()[vendor.choiceId] ?? null : null;
+                const activeOutreach = () => {
+                  const vendors = comparison()?.vendorComparisonCards ?? [];
+                  for (const vendor of vendors) {
+                    const flow = props.vendorOutreach?.flows()[vendor.choiceId] ?? null;
+                    if (flow) return { vendor, flow };
+                  }
+                  return null;
                 };
                 const finalCountChoices = () => weddingGuestFinalCountChoices(taskFor(item.id));
                 return (
@@ -606,6 +610,12 @@ export function WeddingDecisionFocusCard(props: {
                       research={research()}
                       saveProjection={props.saveProjection}
                       onRefreshWorkspace={props.onRefreshWorkspace}
+                      vendors={comparison()?.vendorComparisonCards}
+                      onEmailVendor={(vendor) => {
+                        const artifact = comparison();
+                        if (!artifact || !props.vendorOutreach) return;
+                        void props.vendorOutreach.onContactVendor(vendor, artifact.artifactId, "CHECK_AVAILABILITY_AND_REQUEST_QUOTE");
+                      }}
                       onClose={() => setExpandedResearchItemId(null)}
                       onOpenDocuments={(artifactId) => props.onSidebarAction({
                           kind: "open_workspace_menu",
@@ -628,10 +638,11 @@ export function WeddingDecisionFocusCard(props: {
                       </section>
                     )}
                   </Show>
-                  <Show when={recommendedFlow()}>
-                    {(visibleFlow) => {
-                      const choice = recommendedVendor()!;
-                      return <div class="rounded-xl border border-pink-100 bg-white/85 p-3"><WeddingVendorOutreachComposer flow={visibleFlow()} busy={visibleFlow().stage === "drafting" || visibleFlow().stage === "sending"} gmailConnected={Boolean(props.gmailConnected)} onBodyChange={(body) => props.vendorOutreach!.onOutreachBodyChange(choice.choiceId, body)} onRecipientChange={(email) => props.vendorOutreach!.onOutreachRecipientChange(choice.choiceId, email)} onAttachmentsChange={(attachments) => props.vendorOutreach!.onOutreachAttachmentsChange(choice.choiceId, attachments)} onPermissionsChange={(permissions) => props.vendorOutreach!.onOutreachPermissionsChange(choice.choiceId, permissions)} onRegenerateDraft={() => props.vendorOutreach!.onRetryOutreach(choice.choiceId)} onSend={() => void props.vendorOutreach!.onSendOutreach(choice.choiceId)} onCancel={() => props.vendorOutreach!.onCancelOutreach(choice.choiceId)} onRetryDraft={() => props.vendorOutreach!.onRetryOutreach(choice.choiceId)} onConnectGmail={() => props.vendorOutreach!.onConnectGmailForOutreach()} /></div>;
+                  <Show when={activeOutreach()}>
+                    {(active) => {
+                      const choice = active().vendor;
+                      const visibleFlow = active().flow;
+                      return <div class="rounded-xl border border-pink-100 bg-white/85 p-3"><WeddingVendorOutreachComposer flow={visibleFlow} busy={visibleFlow.stage === "drafting" || visibleFlow.stage === "sending"} gmailConnected={Boolean(props.gmailConnected)} onBodyChange={(body) => props.vendorOutreach!.onOutreachBodyChange(choice.choiceId, body)} onRecipientChange={(email) => props.vendorOutreach!.onOutreachRecipientChange(choice.choiceId, email)} onAttachmentsChange={(attachments) => props.vendorOutreach!.onOutreachAttachmentsChange(choice.choiceId, attachments)} onPermissionsChange={(permissions) => props.vendorOutreach!.onOutreachPermissionsChange(choice.choiceId, permissions)} onRegenerateDraft={() => props.vendorOutreach!.onRetryOutreach(choice.choiceId)} onSend={() => void props.vendorOutreach!.onSendOutreach(choice.choiceId)} onCancel={() => props.vendorOutreach!.onCancelOutreach(choice.choiceId)} onRetryDraft={() => props.vendorOutreach!.onRetryOutreach(choice.choiceId)} onConnectGmail={() => props.vendorOutreach!.onConnectGmailForOutreach()} /></div>;
                     }}
                   </Show>
                   <Show when={expandedWhyItemId() === item.id}>

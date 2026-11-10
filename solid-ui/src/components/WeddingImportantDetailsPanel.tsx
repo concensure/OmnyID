@@ -8,6 +8,7 @@ import {
 } from "@/lib/weddingCustomSurfaceState";
 import type { WeddingResponseWorkspaceViewState } from "@/lib/weddingResponseWorkspaceViewState";
 import { weddingImportantDetailsActionLabel } from "@/lib/weddingRecommendationGenerationActionState";
+import { weddingAccountScopedStorageKey } from "@/lib/weddingLocalAccountScope";
 
 export function WeddingImportantDetailsPanel(props: {
   cards: WeddingResponseWorkspaceViewState["contextCards"];
@@ -21,7 +22,7 @@ export function WeddingImportantDetailsPanel(props: {
   const [saveNotice, setSaveNotice] = createSignal<string | null>(null);
 
   function cardKey(card: WeddingResponseWorkspaceViewState["contextCards"][number]): string {
-    return `omnyid:wedding_important_detail:${card.title}`;
+    return weddingAccountScopedStorageKey(`omnyid:wedding_important_detail:${card.title}`);
   }
 
   function visibleLabels(card: WeddingResponseWorkspaceViewState["contextCards"][number]): string[] {

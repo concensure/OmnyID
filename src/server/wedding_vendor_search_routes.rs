@@ -2609,13 +2609,9 @@ mod tests {
             source.photo_url.as_deref(),
             Some("https://images.unsplash.com/photo-1507504031003-b417219a0fde")
         );
-        assert!(
-            source
-                .snippet
-                .as_deref()
-                .unwrap_or_default()
-                .contains("saved in OmnyID's shared wedding vendor database")
-        );
+        let snippet = source.snippet.as_deref().unwrap_or_default();
+        assert!(snippet.contains("Florist"));
+        assert!(!snippet.contains("shared wedding vendor database"));
     }
 
     #[test]

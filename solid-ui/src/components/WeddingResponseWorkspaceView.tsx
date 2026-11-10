@@ -52,7 +52,8 @@ import { useWeddingPreferenceFeedbackOwner } from "@/lib/useWeddingPreferenceFee
 import { installMobileFocusViewportListener, isMobileFocusViewport } from "@/lib/mobileFocusHomeState";
 import { useWeddingApprovalExecution } from "@/lib/useWeddingApprovalExecution";
 import { buildWeddingHomeSections, WeddingHomeSectionRegistry } from "@/lib/weddingHomeSectionRegistry";
-function weddingHomeLayoutStorageKey(scope: string): string { return `omnyid:wedding_home_card_order:${scope}`; }
+import { weddingAccountScopedStorageKey } from "@/lib/weddingLocalAccountScope";
+function weddingHomeLayoutStorageKey(scope: string): string { return weddingAccountScopedStorageKey(`omnyid:wedding_home_card_order:${scope}`); }
 function loadWeddingHomeSectionOrder(scope: string): WeddingHomeSectionId[] {
   if (typeof localStorage === "undefined") return [...WEDDING_HOME_SECTION_IDS];
   try {
@@ -941,15 +942,6 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
           {(notice) => <div class="mb-3 rounded-xl border border-wedding-muted bg-wedding-surface-blush px-4 py-3 text-sm text-wedding-ink" role="status">
             {notice()} <button type="button" class="ml-2 font-semibold text-wedding-accent underline" onClick={() => { setLeadMagnetImportNotice(null); props.onSelectMenu?.("home"); }}>Review</button><button type="button" class="ml-2 font-semibold text-wedding-accent underline" onClick={() => setLeadMagnetImportNotice(null)}>Got it</button>
           </div>}
-        </Show>
-        <Show when={activeMenu() !== "home"}>
-          <button
-            type="button"
-            class="mb-3 hidden min-h-11 items-center gap-1 rounded-lg border border-wedding-muted bg-white pl-2 pr-3 text-sm font-semibold text-wedding-accent transition hover:bg-wedding-surface-blush sm:inline-flex"
-            onClick={() => props.onSelectMenu?.("home")}
-          >
-            <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 19l-7-7 7-7" /></svg>Wedding Home
-          </button>
         </Show>
         <Show when={activeMenu() === "home"}>
           <Show when={!isMobileFocusViewport()} fallback={<WeddingMobileFocusHome

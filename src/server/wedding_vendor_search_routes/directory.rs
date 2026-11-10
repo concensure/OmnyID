@@ -170,13 +170,7 @@ pub(super) fn wedding_vendor_record_to_search_source(
     WeddingVendorSearchSource {
         title: record.vendor_name,
         url,
-        snippet: if snippet.is_empty() {
-            Some("Saved in OmnyID's shared wedding vendor database.".to_string())
-        } else {
-            Some(format!(
-                "{snippet} - saved in OmnyID's shared wedding vendor database."
-            ))
-        },
+        snippet: (!snippet.is_empty()).then_some(snippet),
         provider: "Admin vendor database".to_string(),
         website_url: record.website_url.clone(),
         map_url: record

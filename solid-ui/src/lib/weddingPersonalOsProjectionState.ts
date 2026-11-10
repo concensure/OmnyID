@@ -527,6 +527,7 @@ function decisionLoadReliefLabels(
 }
 
 export function buildWeddingPersonalOsProjectionState(input: {
+  setupItems?: readonly WeddingPersonalOsRankedItem[] | null;
   taskItems?: readonly WeddingPlanningTaskItem[] | null;
   scheduleItems?: readonly WeddingPlanningScheduleItem[] | null;
   decisionItems?: readonly WeddingDecisionProjectionInput[] | null;
@@ -538,6 +539,7 @@ export function buildWeddingPersonalOsProjectionState(input: {
 }): WeddingPersonalOsProjectionState {
   const now = input.now ?? new Date();
   const candidateItems = [
+    ...(input.setupItems ?? []),
     ...(input.taskItems ?? []).map((item) => taskItem(item, now)),
     ...(input.scheduleItems ?? []).map((item) => scheduleItem(item, now)),
     ...(input.decisionItems ?? []).map(decisionItem),

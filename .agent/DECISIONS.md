@@ -3202,3 +3202,23 @@ synthetic vendor search or introduce another send path.
 - The vendor management portal first-release boundary is complete. Field-level
   publication revisions, named-resource/bulk calendars and vendor-team
   entitlements remain explicit P1 work rather than implied browser controls.
+
+# 2026-11-11 — WED-357 setup and decorative UI never become parallel planning truth
+
+- Missing wedding date, budget target and first guest are ranked PersonalOS
+  decisions derived from the current account projection. They replace the
+  separate setup checklist; accepting or opening them continues to use the
+  existing Timeline, Budget and Guest authorities.
+- Vision overrides, Today layout, custom planning items, important-detail
+  edits, seating guidance and optional Today photo cards use the authenticated
+  Wedding account namespace even when two accounts share starter plan or
+  workspace identifiers. No authenticated surface reads another account's
+  legacy browser key.
+- Today photo cards are optional presentation state rather than wedding facts.
+  Images are compressed in the browser, stored only in the signed-in account's
+  browser namespace and rendered contain-fit. Durable decisions, guest data,
+  vendor status and planning evidence remain AFP-backed.
+- Vendor research contact actions operate on the compared vendor evidence:
+  website opens the recorded URL, email enters the existing approved enquiry
+  composer, phone uses the recorded dial target, and address resolves into an
+  in-place OpenStreetMap surface. No contact field is inferred.

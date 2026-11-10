@@ -255,6 +255,18 @@ export function contactSummaryLabel(choice: WeddingVendorRankedCandidate): strin
   return labels.length > 0 ? labels.join(", ") : "Open source to verify contact details";
 }
 
+function contactSummaryMarkdown(choice: WeddingVendorRankedCandidate): string {
+  const links = [
+    choice.websiteUrl && usableSourceUrl({ url: choice.websiteUrl }) ? `[website](${choice.websiteUrl})` : null,
+    choice.instagramUrl && usableSourceUrl({ url: choice.instagramUrl }) ? `[Instagram](${choice.instagramUrl})` : null,
+    choice.email ? `[email](mailto:${choice.email}?subject=${encodeURIComponent(`Wedding enquiry for ${choice.title}`)})` : null,
+    choice.phone ? `[phone](tel:${choice.phone.replace(/[^+\d]/g, "")})` : null,
+    choice.address ? `[address](https://www.openstreetmap.org/search?query=${encodeURIComponent(choice.address)})` : null,
+    choice.mapUrl && usableSourceUrl({ url: choice.mapUrl }) ? `[map](${choice.mapUrl})` : null,
+  ].filter((value): value is string => Boolean(value));
+  return links.length > 0 ? links.join(", ") : "No contact details found";
+}
+
 function compactPreferenceSignalLabel(signals: readonly string[]): string | null {
   const labels = signals
     .map((signal) => {
@@ -392,7 +404,7 @@ function candidateTable(choices: readonly WeddingVendorRankedCandidate[]): strin
       scoreLabelFor(choice),
       choice.availabilityLabel,
       [choice.priorityMatchLabel, ...choice.rationaleLabels.slice(0, 2)].join("; "),
-      contactSummaryLabel(choice),
+      contactSummaryMarkdown(choice),
       choice.verificationLabel,
       choice.url,
     ].join(" | ") + " |"),

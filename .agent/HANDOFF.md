@@ -8284,3 +8284,34 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
   usage are 80%.
 - Evidence: `Documents/verification/wed-356-wedding-card-refinement-2026-11-10.md`
   and `C:\temp\wt\proofs\wed356-e2a1e81\postdeploy`.
+
+# 2026-11-11 — WED-357 release candidate (Codex)
+
+- Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
+  `agent/codex/WED-357`, based on deployed evidence SHA
+  `ad55eb4a721a9dd4ca3458395a8a36bd853ae8ac`.
+- Vendor category chips now use category-specific icons and Musicians uses its
+  canonical query. Desktop no longer shows the redundant Wedding Home return.
+  Vendor lifecycle booking terms exclude duplicate search/comparison notes;
+  rendered research contacts open the recorded website, existing enquiry
+  composer, dial target and an in-place OpenStreetMap address surface.
+- Decision recommendations use the actual top vendor and comparison context.
+  Show Me Why remains lower-right but is smaller and baseline-aligned.
+- Date, budget and guest setup are account-derived decisions, with date and
+  budget first, and the decision surface is first on Today. The separate setup
+  checklist was removed.
+- RSVP missing meal/details and changed-response alerts open in place. Seating
+  tables move with animation-frame updates; guests render around tables and
+  can be dropped between seats or onto another table with snap feedback.
+- Vision, Today layout, custom planning items, important details and seating
+  helper state now include the active Wedding account namespace. Optional
+  Today photo cards are account-scoped, browser-compressed, contain-fit,
+  reorderable and resizable. The Wedding upgrade panel is opaque for contrast.
+- Verification before freeze: TypeScript passes; line budgets pass; focused
+  account, setup, photo, vendor evidence and contact-action tests pass; full
+  Wedding suite passes 2,265/2,265. Rust and production build verification must
+  run from the clean exact-SHA release checkout after the implementation commit.
+- The vendor portal's reviewed first-release authority remains VMP-01 through
+  VMP-06. VMP-07 publication revisions, VMP-08 named-resource/bulk calendars
+  and VMP-09 teams/entitlements remain explicit P1 work; this candidate does
+  not add browser-only controls that falsely imply those server authorities.

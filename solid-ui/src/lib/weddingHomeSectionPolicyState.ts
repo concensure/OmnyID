@@ -1,10 +1,10 @@
 // @locs-version: 1.0
 
 export const WEDDING_HOME_SECTION_IDS = [
+  "decision_focus",
   "vendor_search",
   "quote_replies",
   "vendor_follow_up",
-  "decision_focus",
   "overview",
   "next_step",
   "notice",
@@ -12,6 +12,7 @@ export const WEDDING_HOME_SECTION_IDS = [
   "threads",
   "resilience",
   "approval",
+  "photos",
 ] as const;
 
 export type WeddingHomeSectionId = typeof WEDDING_HOME_SECTION_IDS[number];
@@ -24,6 +25,7 @@ const WEDDING_HOME_VISIBLE_SECTION_SET = new Set<WeddingHomeSectionId>([
   "vendor_follow_up",
   "decision_focus",
   "overview",
+  "photos",
 ]);
 
 export function isWeddingHomeSectionId(value: unknown): value is WeddingHomeSectionId {

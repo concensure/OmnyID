@@ -57,6 +57,7 @@ export type WeddingRsvpResponseRow = {
   eventCount: number;
   hasPrivateRequirements: boolean;
   privacyLabel: string | null;
+  changeSummary: string | null;
 };
 
 export type WeddingRsvpResponseSummaryState = {
@@ -228,6 +229,7 @@ export function buildWeddingRsvpResponseSummary(
     const missing = missingDetailLabels(snapshot);
     const state = operationalState(snapshot, missing);
     const hasPrivateRequirements = Boolean(clean(snapshot.dietaryNote) || clean(snapshot.accessibilityNote));
+    const changedEvent = [...(snapshot.eventResponses ?? [])].reverse().find((event) => event.changed);
     return {
       guestId: snapshot.id,
       displayName: snapshot.displayName,
@@ -239,6 +241,9 @@ export function buildWeddingRsvpResponseSummary(
       eventCount: snapshot.eventResponses?.length ?? 0,
       hasPrivateRequirements,
       privacyLabel: hasPrivateRequirements ? "Private to the couple until explicitly shared" : null,
+      changeSummary: changedEvent
+        ? `${snapshot.displayName} changed their RSVP to ${snapshot.attendance}${changedEvent.respondedAt ? ` on ${new Date(changedEvent.respondedAt).toLocaleDateString()}` : ""}.`
+        : null,
     };
   });
   const repliedCount = rows.filter((row) => row.attendance !== "Pending").length;

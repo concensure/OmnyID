@@ -54,23 +54,23 @@ const SEARCH_PROGRESS_LABELS = [
 ] as const;
 
 const CORE_VENDOR_CATEGORY_CHIPS: ReadonlyArray<{ label: string; query: string; icon: WeddingDashboardIconId }> = [
-  { label: "Venues", query: "venue", icon: "calendar-days" },
-  { label: "Planners", query: "planner", icon: "check-circle" },
-  { label: "Photographers", query: "photographer", icon: "search" },
-  { label: "Celebrants", query: "celebrant", icon: "user-plus" },
+  { label: "Venues", query: "venue", icon: "venue" },
+  { label: "Planners", query: "planner", icon: "planner" },
+  { label: "Photographers", query: "photographer", icon: "camera" },
+  { label: "Celebrants", query: "celebrant", icon: "celebrant" },
 ];
 const MORE_VENDOR_CATEGORY_CHIPS: ReadonlyArray<{ label: string; query: string; icon: WeddingDashboardIconId }> = [
-  { label: "Bands & DJs", query: "band", icon: "users" },
-  { label: "Florists", query: "floral_designer", icon: "shield-check" },
-  { label: "Cake", query: "cake_baker", icon: "clock" },
-  { label: "Videographers", query: "videographer", icon: "search" },
-  { label: "Caterers", query: "caterer", icon: "users" },
-  { label: "Musicians", query: "band", icon: "users" },
-  { label: "Hair & Makeup", query: "hair_stylist", icon: "user-plus" },
-  { label: "Styling & Decor", query: "stylist", icon: "shield-check" },
-  { label: "Transport", query: "transport", icon: "calendar-days" },
-  { label: "Stationery", query: "stationery", icon: "check-circle" },
-  { label: "Jewellers", query: "jeweller", icon: "shield-check" },
+  { label: "Bands & DJs", query: "band", icon: "music" },
+  { label: "Florists", query: "floral_designer", icon: "flower" },
+  { label: "Cake", query: "cake_baker", icon: "cake" },
+  { label: "Videographers", query: "videographer", icon: "video" },
+  { label: "Caterers", query: "caterer", icon: "catering" },
+  { label: "Musicians", query: "musician", icon: "music" },
+  { label: "Hair & Makeup", query: "hair_stylist", icon: "beauty" },
+  { label: "Styling & Decor", query: "stylist", icon: "decor" },
+  { label: "Transport", query: "transport", icon: "transport" },
+  { label: "Stationery", query: "stationery", icon: "stationery" },
+  { label: "Jewellers", query: "jeweller", icon: "jewellery" },
 ];
 const VENDOR_CATEGORY_CHIPS = [...CORE_VENDOR_CATEGORY_CHIPS, ...MORE_VENDOR_CATEGORY_CHIPS] as const;
 

@@ -298,6 +298,7 @@ function vendorComparisonTask(
     {
       vendor_comparison_decision_task: true,
       vendor_comparison_top_choice_labels: topChoiceLabels,
+      vendor_search_categories: Array.isArray(artifactMetadata.vendorCategories) ? artifactMetadata.vendorCategories : [],
       selected_decision_required: true,
       collapse_unselected_after_choice: true,
       approval_required_before_outreach: true,

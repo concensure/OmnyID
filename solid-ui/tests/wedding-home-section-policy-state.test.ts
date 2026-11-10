@@ -24,14 +24,14 @@ test("wedding home suppresses competing operational sections", () => {
   assert.equal(shouldShowWeddingHomeSection("next_step"), false);
 });
 
-test("wedding home order puts quote replies and follow-ups above top decisions", () => {
+test("wedding home order keeps the current decision above supporting cards", () => {
   const order = normalizeWeddingHomeSectionOrder([]);
 
   assert.deepEqual(order.slice(0, 5), [
+    "decision_focus",
     "vendor_search",
     "quote_replies",
     "vendor_follow_up",
-    "decision_focus",
     "overview",
   ]);
   assert.equal(order.length, WEDDING_HOME_SECTION_IDS.length);

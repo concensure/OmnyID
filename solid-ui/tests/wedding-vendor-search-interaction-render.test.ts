@@ -67,7 +67,8 @@ test("category chips preserve visible wording and pass category as a separate se
   assert.match(responseQueueSource, /const freeformQuery = currentWeddingVendorSearchQuery\(\)/);
   assert.match(responseQueueSource, /queryIntent\.category \?\? options\?\.category/);
   assert.match(source, /label: "Venues", query: "venue"/);
-  assert.match(source, /label: "Musicians", query: "band"/);
+  assert.match(source, /label: "Musicians", query: "musician", icon: "music"/);
+  assert.match(source, /label: "Florists", query: "floral_designer", icon: "flower"/);
 });
 
 test("completed comparisons suppress the readiness-only notice and scroll the result into view", () => {

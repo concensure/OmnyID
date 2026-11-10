@@ -1,5 +1,6 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { WeddingInlineHelpNote } from "@/components/WeddingInlineHelpNote";
+import { weddingAccountScopedStorageKey } from "@/lib/weddingLocalAccountScope";
 
 import type {
   WeddingSeatingOptimizationAssignment,
@@ -35,6 +36,8 @@ export function WeddingSeatingCanvas(props: {
   const [selectedPersonIds, setSelectedPersonIds] = createSignal<string[]>([]);
   const [hoveredPersonId, setHoveredPersonId] = createSignal<string | null>(null);
   const [draggedPersonIds, setDraggedPersonIds] = createSignal<string[]>([]);
+  const [seatDropTarget, setSeatDropTarget] = createSignal<{ tableId: string; personId: string | null } | null>(null);
+  const [draggingTableId, setDraggingTableId] = createSignal<string | null>(null);
   const [zoom, setZoom] = createSignal(1);
   const [pan, setPan] = createSignal({ x: 0, y: 0 });
   const [panMode, setPanMode] = createSignal(false);
@@ -66,7 +69,7 @@ export function WeddingSeatingCanvas(props: {
   };
   onMount(() => {
     try {
-      setShowGuide(localStorage.getItem(`omnyid.wedding.seating.guide.${props.workspaceId}`) !== "dismissed");
+      setShowGuide(localStorage.getItem(weddingAccountScopedStorageKey(`omnyid.wedding.seating.guide.${props.workspaceId}`)) !== "dismissed");
     } catch { /* storage is optional */ }
     fitCanvas();
     const observer = new ResizeObserver(fitCanvas);
@@ -83,19 +86,23 @@ export function WeddingSeatingCanvas(props: {
     }]);
   }
 
-  function assignMany(personIds: readonly string[], tableId: string): void {
+  function assignMany(personIds: readonly string[], tableId: string, beforePersonId: string | null = null): void {
     const table = tables().find((item) => item.id === tableId);
     if (!table) return;
     const uniqueIds = [...new Set(personIds)].filter((id) => props.people.some((person) => person.id === id));
     const alreadyAtTarget = peopleAt(tableId).filter((item) => !uniqueIds.includes(item.personId)).length;
     const accepted = uniqueIds.slice(0, Math.max(0, table.capacity - alreadyAtTarget));
-    setAssignments((current) => [
-      ...current.filter((item) => !accepted.includes(item.personId)),
-      ...accepted.flatMap((personId) => {
+    setAssignments((current) => {
+      const retained = current.filter((item) => !accepted.includes(item.personId));
+      const inserted = accepted.flatMap((personId) => {
         const person = props.people.find((item) => item.id === personId);
         return person ? [{ personId, personLabel: person.label, tableId, tableLabel: table.label, score: 0, reasonLabels: ["Placed by the couple on the seating canvas."] }] : [];
-      }),
-    ]);
+      });
+      const targetIndex = beforePersonId ? retained.findIndex((item) => item.tableId === tableId && item.personId === beforePersonId) : -1;
+      if (targetIndex < 0) return [...retained, ...inserted];
+      return [...retained.slice(0, targetIndex), ...inserted, ...retained.slice(targetIndex)];
+    });
+    setSeatDropTarget(null);
     setCanvasNotice(accepted.length > 0
       ? `${accepted.length} guest${accepted.length === 1 ? "" : "s"} placed at ${table.label}.`
       : `${table.label} is full. Move a guest or choose another table.`);
@@ -112,7 +119,7 @@ export function WeddingSeatingCanvas(props: {
 
   function dismissGuide(): void {
     setShowGuide(false);
-    try { localStorage.setItem(`omnyid.wedding.seating.guide.${props.workspaceId}`, "dismissed"); } catch { /* storage is optional */ }
+    try { localStorage.setItem(weddingAccountScopedStorageKey(`omnyid.wedding.seating.guide.${props.workspaceId}`), "dismissed"); } catch { /* storage is optional */ }
   }
 
   function renameTable(tableId: string, label: string): void {
@@ -128,25 +135,32 @@ export function WeddingSeatingCanvas(props: {
     if (!table) return;
     const startX = event.clientX, startY = event.clientY, start = { x: table.x, y: table.y };
     const target = event.currentTarget as HTMLElement;
+    setDraggingTableId(tableId);
     target.setPointerCapture(event.pointerId);
+    let frame = 0;
     const onMove = (move: PointerEvent) => {
       const dx = (move.clientX - startX) / Math.max(zoom(), 0.1) / 900 * 100;
       const dy = (move.clientY - startY) / Math.max(zoom(), 0.1) / 560 * 100;
-      setTables((current) => current.map((item) => item.id === tableId ? { ...item, x: Math.max(0, Math.min(80, start.x + dx)), y: Math.max(0, Math.min(72, start.y + dy)) } : item));
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => setTables((current) => current.map((item) => item.id === tableId ? { ...item, x: Math.max(0, Math.min(80, start.x + dx)), y: Math.max(0, Math.min(72, start.y + dy)) } : item)));
     };
     const onUp = () => {
+      setDraggingTableId(null);
       target.removeEventListener("pointermove", onMove); target.removeEventListener("pointerup", onUp); target.removeEventListener("pointercancel", onUp);
     };
     target.addEventListener("pointermove", onMove); target.addEventListener("pointerup", onUp); target.addEventListener("pointercancel", onUp);
   }
 
-  function guestButton(person: WeddingSeatingPersonNode, compact = false) {
+  function guestButton(person: WeddingSeatingPersonNode, compact = false, tableId: string | null = null) {
     const selected = () => selectedPersonIds().includes(person.id);
     return <button type="button" draggable
-      onDragStart={(event) => { const ids = selected() ? selectedPersonIds() : [person.id]; setDraggedPersonIds(ids); event.dataTransfer?.setData("text/plain", ids.join(",")); }}
-      onDragEnd={() => setDraggedPersonIds([])} onMouseEnter={() => setHoveredPersonId(person.id)} onMouseLeave={() => setHoveredPersonId(null)} onFocus={() => setHoveredPersonId(person.id)} onBlur={() => setHoveredPersonId(null)} aria-pressed={selected()}
+      onPointerDown={(event) => event.stopPropagation()}
+      onDragStart={(event) => { event.stopPropagation(); const ids = selected() ? selectedPersonIds() : [person.id]; setDraggedPersonIds(ids); event.dataTransfer?.setData("text/plain", ids.join(",")); }}
+      onDragOver={(event) => { if (!tableId) return; event.preventDefault(); event.stopPropagation(); setSeatDropTarget({ tableId, personId: person.id }); }}
+      onDrop={(event) => { if (!tableId) return; event.preventDefault(); event.stopPropagation(); const ids = draggedPersonIds().length ? draggedPersonIds() : event.dataTransfer?.getData("text/plain").split(",").filter(Boolean) ?? []; assignMany(ids, tableId, person.id); }}
+      onDragEnd={() => { setDraggedPersonIds([]); setSeatDropTarget(null); }} onMouseEnter={() => setHoveredPersonId(person.id)} onMouseLeave={() => setHoveredPersonId(null)} onFocus={() => setHoveredPersonId(person.id)} onBlur={() => setHoveredPersonId(null)} aria-pressed={selected()}
       onClick={(event) => { event.stopPropagation(); setSelectedPersonIds((current) => current.includes(person.id) ? current.filter((id) => id !== person.id) : [...current, person.id]); }}
-      class={`${compact ? "px-2 py-1 text-[11px]" : "min-h-10 px-3 py-2 text-xs"} max-w-full cursor-grab break-words rounded-lg border font-semibold ${selected() ? "border-wedding-primary bg-wedding-primary text-white" : "border-wedding-border bg-white text-wedding-ink"}`}>{person.label}</button>;
+      class={`${compact ? "max-w-28 px-2 py-1 text-[11px] shadow-sm" : "min-h-10 px-3 py-2 text-xs"} cursor-grab break-words rounded-lg border font-semibold ${seatDropTarget()?.personId === person.id ? "ring-4 ring-emerald-300" : ""} ${selected() ? "border-wedding-primary bg-wedding-primary text-white" : "border-wedding-border bg-white text-wedding-ink"}`}>{person.label}</button>;
   }
 
   function save(): void {
@@ -169,8 +183,8 @@ export function WeddingSeatingCanvas(props: {
       <div class="min-w-0"><div class="mb-2 flex flex-wrap gap-2"><button type="button" class="min-h-10 rounded-lg border bg-white px-3 text-xs font-semibold" onClick={fitCanvas}>Fit</button><button type="button" class="min-h-10 rounded-lg border bg-white px-3 text-xs font-semibold" onClick={() => setZoom((value) => Math.min(1.8, value + 0.15))}>Zoom in</button><button type="button" class="min-h-10 rounded-lg border bg-white px-3 text-xs font-semibold" onClick={() => setZoom((value) => Math.max(0.32, value - 0.15))}>Zoom out</button><button type="button" aria-pressed={panMode()} class={`min-h-10 rounded-lg border px-3 text-xs font-semibold ${panMode() ? "bg-wedding-primary text-white" : "bg-white"}`} onClick={() => setPanMode((value) => !value)}>Pan {panMode() ? "on" : "off"}</button></div>
         <div ref={viewport} class={`${fullscreen() ? "h-[calc(100dvh-14rem)]" : "h-[28rem]"} relative overflow-hidden rounded-xl border border-wedding-border bg-[radial-gradient(circle_at_center,_rgba(20,83,45,0.08)_1px,_transparent_1px)] bg-[length:18px_18px] touch-none`} aria-label="Reception floor canvas" onWheel={(event) => { event.preventDefault(); setZoom((value) => Math.max(0.32, Math.min(1.8, value + (event.deltaY < 0 ? 0.08 : -0.08)))); }} onPointerDown={(event) => { if (!panMode() || event.target !== event.currentTarget) return; panStart = { clientX: event.clientX, clientY: event.clientY, ...pan() }; event.currentTarget.setPointerCapture(event.pointerId); }} onPointerMove={(event) => { if (!panStart) return; setPan({ x: panStart.x + event.clientX - panStart.clientX, y: panStart.y + event.clientY - panStart.clientY }); }} onPointerUp={() => { panStart = null; }} onPointerCancel={() => { panStart = null; }}>
           <div class="absolute left-1/2 top-1/2 h-[560px] w-[900px] origin-center" style={{ transform: `translate(calc(-50% + ${pan().x}px), calc(-50% + ${pan().y}px)) scale(${zoom()})` }}>
-            <For each={tables()}>{(table) => <div role="group" aria-label={`${table.label}, ${peopleAt(table.id).length} of ${table.capacity} seats filled`} onPointerDown={(event) => moveTable(event, table.id)} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); event.stopPropagation(); const ids = draggedPersonIds().length ? draggedPersonIds() : event.dataTransfer?.getData("text/plain").split(",").filter(Boolean) ?? []; assignMany(ids, table.id); }} onClick={() => { if (selectedPersonIds().length) assignMany(selectedPersonIds(), table.id); }} class={`absolute flex min-h-36 w-44 touch-none flex-col items-center justify-center border-2 border-wedding-primary/45 bg-white/95 p-3 shadow-sm ${table.shape === "long" ? "rounded-xl" : "rounded-[999px]"}`} style={{ left: `${table.x}%`, top: `${table.y}%` }}>
-              <input aria-label={`Table name for ${table.label}`} value={table.label} onPointerDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()} onChange={(event) => renameTable(table.id, event.currentTarget.value)} class="w-full rounded border-0 bg-transparent px-1 text-center text-xs font-bold text-wedding-ink focus:bg-white focus:ring-2 focus:ring-wedding-primary"/><p class="text-[11px] text-wedding-ink/60">{peopleAt(table.id).length}/{table.capacity}</p><div class="mt-2 flex max-w-full flex-wrap justify-center gap-1"><For each={peopleAt(table.id)}>{(assignment) => { const person = props.people.find((item) => item.id === assignment.personId); return person ? guestButton(person, true) : null; }}</For></div>
+            <For each={tables()}>{(table) => <div role="group" aria-label={`${table.label}, ${peopleAt(table.id).length} of ${table.capacity} seats filled`} onPointerDown={(event) => moveTable(event, table.id)} onDragOver={(event) => { event.preventDefault(); setSeatDropTarget({ tableId: table.id, personId: null }); }} onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setSeatDropTarget(null); }} onDrop={(event) => { event.preventDefault(); event.stopPropagation(); const ids = draggedPersonIds().length ? draggedPersonIds() : event.dataTransfer?.getData("text/plain").split(",").filter(Boolean) ?? []; assignMany(ids, table.id); }} onClick={() => { if (selectedPersonIds().length) assignMany(selectedPersonIds(), table.id); }} class={`absolute flex min-h-36 w-44 cursor-grab touch-none flex-col items-center justify-center border-2 bg-white/95 p-3 shadow-sm active:cursor-grabbing ${seatDropTarget()?.tableId === table.id ? "border-emerald-500 ring-4 ring-emerald-200" : "border-wedding-primary/45"} ${table.shape === "long" ? "rounded-xl" : "rounded-[999px]"}`} style={{ left: `${table.x}%`, top: `${table.y}%`, "will-change": draggingTableId() === table.id ? "left, top" : "auto" }}>
+              <input aria-label={`Table name for ${table.label}`} value={table.label} onPointerDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()} onChange={(event) => renameTable(table.id, event.currentTarget.value)} class="w-full rounded border-0 bg-transparent px-1 text-center text-xs font-bold text-wedding-ink focus:bg-white focus:ring-2 focus:ring-wedding-primary"/><p class="text-[11px] text-wedding-ink/60">{peopleAt(table.id).length}/{table.capacity}</p><For each={peopleAt(table.id)}>{(assignment, seatIndex) => { const person = props.people.find((item) => item.id === assignment.personId); const count = Math.max(1, peopleAt(table.id).length); const angle = () => (Math.PI * 2 * seatIndex() / count) - Math.PI / 2; return person ? <div class="absolute z-10" style={{ left: `calc(50% + ${Math.cos(angle()) * (table.shape === "long" ? 112 : 96)}px)`, top: `calc(50% + ${Math.sin(angle()) * (table.shape === "long" ? 82 : 92)}px)`, transform: "translate(-50%, -50%)" }}>{guestButton(person, true, table.id)}</div> : null; }}</For>
             </div>}</For>
           </div>
         </div>

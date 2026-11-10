@@ -32,6 +32,18 @@ function record(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
 
+test("new wedding accounts receive date, budget, and guest setup as their first decisions", () => {
+  const state = buildWeddingResponseWorkspaceViewState({
+    metadata,
+    projectionStorage: memoryStorage(),
+    nowIso: "2026-11-11T00:00:00.000Z",
+  });
+  assert.deepEqual(
+    state.personalOsProjection.decisionLoadRelief.focusItems.slice(0, 3).map((item) => item.title),
+    ["Add wedding date", "Set a wedding budget", "Start the guest list"],
+  );
+});
+
 test("buildWeddingResponseWorkspaceViewState creates category rail and active artifact preview", () => {
   const state = buildWeddingResponseWorkspaceViewState({
     metadata,
