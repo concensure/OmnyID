@@ -17,7 +17,7 @@ lifecycle:
 tasks:
   - id: WED-358
     title: Complete vendor publication revisions, resource calendars, teams, notifications and entitlements
-    status: in_progress
+    status: done
     owner: codex
     branch: agent/codex/WED-358
     worktree: C:/Users/ozans/Desktop/projects/OmnyID-GROWTH-001
@@ -25,7 +25,7 @@ tasks:
     depends_on: [WED-357, WED-356, WED-345]
     files: [src/server/**wedding**, src/db/**wedding**, postgres/migrations/**, solid-ui/src/components/Vendor**, solid-ui/src/lib/**vendor**, solid-ui/tests/**vendor**, Documents/design/wedding planner/vendor side/**, Documents/verification/**, .agent/**]
     acceptance: [eligible vendor fields have vendor-scoped revisioned publication choices with accepted projection invalidation and moderation only where required, named resources and bounded bulk date changes use the existing availability authority and cannot overwrite confirmed bookings or stale revisions, vendor owners can manage scoped team roles and non-essential notification preferences while operational notifications remain mandatory, existing entitlements expose free and premium boundaries without deleting canonical state on downgrade, all reads and writes enforce authenticated vendor ownership or scoped capability authority and emit AFP-compatible audit evidence, focused security integration frontend full Wedding build exact-SHA deployment provenance and hosted checks pass]
-    progress: "Implemented revisioned field publication with operator review and accepted directory/search projection, named resources and bounded multi-date availability with stale/booking guards, owner-managed scoped team invitations, per-member notification preferences, and canonical subscription entitlements. TypeScript, line budgets, 2,268 Wedding tests, focused portal tests and Rust compile/unit checks pass; exact-SHA build and Oracle release proof remain before completion."
+    progress: "Released implementation SHA 51eacb09afbc297080e4aa573dcc0036eb2f9230 from the clean detached checkout C:/temp/wt/omnyid-wed358-release-51eacb0. Revisioned field publication and operator review, accepted directory/search projections, named resources, bounded multi-date availability with stale/booking guards, scoped team roles, notification preferences and canonical subscription entitlements are live. TypeScript, line budgets, 2,268 Wedding tests, exact-SHA frontend and Linux Rust release builds, focused portal tests, migration 0157 inspection, hosted access refusal, production proof, backup verification and restore drill pass. The first activation was blocked by a pre-existing ClamAV daemon failure after its updater was OOM-killed; the scanner was restarted healthy and the same exact-SHA services and recovered post-deploy proof passed."
 
   - id: WED-357
     title: Complete vendor and couple decision surfaces, seating interactions and account-scoped Today customisation

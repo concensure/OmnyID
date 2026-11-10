@@ -8362,3 +8362,25 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
   Postgres, so the additive migration and its tables must be verified during
   the clean exact-SHA Oracle release.
 - Evidence: `Documents/verification/wed-358-vendor-management-portal-2026-11-11.md`.
+
+# 2026-11-11 — WED-358 Oracle release (Codex)
+
+- Frozen implementation SHA `51eacb09afbc297080e4aa573dcc0036eb2f9230`
+  was built from clean detached checkout
+  `C:\temp\wt\omnyid-wed358-release-51eacb0` and is live on Oracle.
+- Exact-SHA TypeScript, focused portal tests, Vite production build and Rust
+  library check passed locally. The Linux release build passed on Oracle. The
+  seven focused Rust portal tests passed locally before freeze; a repeated
+  Windows test-binary link hit toolchain `STATUS_ACCESS_VIOLATION`/
+  `STATUS_ILLEGAL_INSTRUCTION`, while assertions did not fail.
+- The first activation exposed a pre-existing ClamAV daemon failure: its
+  signature updater had been OOM-killed while the outer container remained
+  unhealthy. ClamAV was restarted to healthy, then the already-built exact-SHA
+  services were activated without rebuilding.
+- Recovered production proof passed: homeserver running, backup verification
+  pass and restore drill pass. `SOURCE_COMMIT` and the runtime manifest match
+  the frozen SHA. Migration 0157 is recorded; all four new portal tables and
+  five owner-profile publication columns exist. Anonymous portal/admin calls
+  are refused and the hosted vendor bundle contains the new controls.
+- Evidence: `Documents/verification/wed-358-vendor-management-portal-2026-11-11.md`
+  and `C:\temp\wt\proofs\wed358-51eacb0\postdeploy-recovered`.

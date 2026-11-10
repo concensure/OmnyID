@@ -26,4 +26,13 @@ Docker Desktop was unavailable for a disposable local Postgres migration run. Mi
 
 ## Release evidence
 
-Pending the frozen implementation commit and exact-SHA Oracle deployment. The deployed SHA, clean release checkout, proof directory, migration evidence and runtime health will be appended after release.
+- Frozen implementation SHA: `51eacb09afbc297080e4aa573dcc0036eb2f9230`.
+- Clean detached release checkout: `C:\temp\wt\omnyid-wed358-release-51eacb0`.
+- Exact-SHA TypeScript, focused portal tests, Vite production build and Rust `cargo check --lib` passed. The Oracle Linux build completed the optimized Rust release binary successfully.
+- The first Compose activation was blocked because the existing ClamAV daemon had died after a signature database test was OOM-killed, leaving its outer container running but unhealthy. No second build was started. ClamAV was restarted, reached `healthy`, and the already-built exact-SHA UI, homeserver and Caddy were activated with `--no-build`.
+- Recovered production proof passed with homeserver running, backup verification `pass` and restore drill `pass`: `C:\temp\wt\proofs\wed358-51eacb0\postdeploy-recovered`.
+- Oracle `SOURCE_COMMIT` and `oracle-runtime-manifest.json` both contain the full frozen SHA.
+- `omnyid_schema_migrations` contains `0157_wedding_vendor_portal_extensions` once. The publication revisions, memberships, notification preferences and content-light event tables all exist; the five required owner-profile publication columns exist.
+- The seven long-running services are up; ClamAV and Electric report healthy. `https://omnyid.com/` and `/workspace/vendor.html` return 200. Anonymous vendor publication and admin-review calls return 401.
+- The hosted vendor bundle contains the `Publish your listing`, `Publication history`, named-resource, team and notification controls.
+- No simulated data or local environment file was uploaded.
