@@ -27,6 +27,7 @@ use crate::wedding_vendor_special_offer::{
 use super::{
     AppState, RateLimitPolicy,
     auth::{authenticated_rate_limit_key, authenticated_user, enforce_rate_limit},
+    wedding_vendor_portal_routes::{VendorPermission, require_vendor_access},
 };
 
 mod records;
@@ -266,31 +267,9 @@ fn rollout_allowed_from(enabled: bool, allowlist: &str, email: &str) -> bool {
         && allowlist
             .split(',')
             .map(|value| value.trim().to_ascii_lowercase())
-            .any(|value| value == "*" || (!value.is_empty() && value == email.trim().to_ascii_lowercase()))
-}
-
-async fn vendor_authority(
-    state: &AppState,
-    user_id: &str,
-    slug: &str,
-) -> Result<VendorAuthority, (StatusCode, String)> {
-    let row = sqlx::query(
-        "SELECT vendor_id,vendor_name,category FROM wedding_vendors WHERE vendor_slug=$1 AND claimed_by_user_id=$2 AND claim_status='verified' AND status='active'",
-    )
-    .bind(clean(slug, 160))
-    .bind(user_id)
-    .fetch_optional(&state.db.pool)
-    .await
-    .map_err(database_failure)?
-    .ok_or((
-        StatusCode::FORBIDDEN,
-        "A verified claimed listing is required.".into(),
-    ))?;
-    Ok(VendorAuthority {
-        vendor_id: row.get("vendor_id"),
-        vendor_name: row.get("vendor_name"),
-        category: row.get("category"),
-    })
+            .any(|value| {
+                value == "*" || (!value.is_empty() && value == email.trim().to_ascii_lowercase())
+            })
 }
 
 async fn vendor_request_authority(
@@ -298,23 +277,19 @@ async fn vendor_request_authority(
     headers: &HeaderMap,
     vendor_slug: &str,
 ) -> Result<(crate::db::UserRecord, VendorAuthority), (StatusCode, String)> {
-    enforce_rate_limit(
-        state,
-        authenticated_rate_limit_key("wedding-vendor-specials", headers),
-        RateLimitPolicy {
-            max_requests: 60,
-            window: Duration::from_secs(60),
-        },
-    )
-    .await?;
-    let user = authenticated_user(&state.db, headers).await?;
+    let (user, access) =
+        require_vendor_access(state, headers, vendor_slug, VendorPermission::Calendar).await?;
     if !rollout_allowed(&user.email) {
         return Err((
             StatusCode::FORBIDDEN,
             "Limited-date offer management is not enabled for this account.".into(),
         ));
     }
-    let vendor = vendor_authority(state, &user.id, vendor_slug).await?;
+    let vendor = VendorAuthority {
+        vendor_id: access.vendor_id,
+        vendor_name: access.vendor_name,
+        category: access.category,
+    };
     Ok((user, vendor))
 }
 
@@ -638,6 +613,7 @@ async fn list_offers_http(
             .collect::<Vec<_>>();
         items.push(json!({
             "offer_id":offer_id,"title":offer.get::<String,_>("title"),
+            "room_id":offer.get::<Option<String>,_>("room_id"),
             "summary":offer.get::<String,_>("summary"),
             "publication_state":offer.get::<String,_>("publication_state"),
             "currency":offer.get::<String,_>("currency"),

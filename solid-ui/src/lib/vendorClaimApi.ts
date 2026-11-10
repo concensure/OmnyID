@@ -79,6 +79,8 @@ export interface VendorOwnerProfile {
   photo_count: number;
   completion_percent: number;
   verified_badge: boolean;
+  draft_revision: number;
+  published_revision?: number | null;
 }
 
 export async function startVendorClaim(input: { vendorSlug: string; declaredRole: string }): Promise<VendorClaim> {

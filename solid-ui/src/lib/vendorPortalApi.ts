@@ -1,0 +1,31 @@
+import { apiFetch } from "@/lib/api";
+
+export type PublicationVisibility = Record<"description" | "email" | "phone" | "website_url" | "instagram_url" | "facebook_url" | "photos", boolean>;
+export interface VendorPublication {
+  draft: { revision: number; description?: string | null; public_contact: Record<string, string | null> };
+  published: { revision?: number | null; description?: string | null; public_contact: Record<string, string | null>; visibility: PublicationVisibility; published_at?: string | null };
+  revisions: Array<{ revision_id: string; profile_revision: number; status: string; moderation_required: boolean; submitted_at: string; review_note?: string | null }>;
+}
+export interface VendorResource { resource_id: string; name: string; description?: string | null; capacity_seated?: number | null; capacity_standing?: number | null; inclusions: string[]; status: string; revision: number; date_count: number; booked_count: number }
+export interface VendorMember { membership_id: string; email: string; role: string; status: string; revision: number; accepted_at?: string | null; created_at: string }
+export interface VendorNotifications { new_enquiry: boolean; follow_up_reminders: boolean; calendar_freshness: boolean; expiring_holds: boolean; publication_updates: boolean; product_updates: boolean; revision: number; security_notifications: "always_on" }
+export interface VendorEntitlements { tier: string; status: string; current_period_end?: string | null; features: Record<string, boolean>; data_retained_on_downgrade: boolean }
+export interface PendingVendorPublication { revision_id: string; profile_revision: number; vendor_slug: string; vendor_name: string; category: string; submitted_at: string; snapshot: { description?: string | null; public_contact?: Record<string, string | null> }; visibility: PublicationVisibility }
+
+const key = (kind: string) => `${kind}-${crypto.randomUUID()}`;
+const query = (slug: string) => `vendor_slug=${encodeURIComponent(slug)}`;
+
+export const getVendorPublication = (slug: string) => apiFetch<VendorPublication>(`/api/wedding/vendor/portal/publication?${query(slug)}`);
+export const submitVendorPublication = (slug: string, revision: number, visibility: PublicationVisibility) => apiFetch<{ status: string; moderation_required: boolean }>("/api/wedding/vendor/portal/publication/submit", { method: "POST", bodyJson: { vendor_slug: slug, expected_revision: revision, visibility, idempotency_key: key("publication") } });
+export const getVendorResources = async (slug: string) => (await apiFetch<{ items: VendorResource[] }>(`/api/wedding/vendor/portal/resources?${query(slug)}`)).items;
+export const createVendorResource = (slug: string, input: { name: string; description: string; capacitySeated: number | null; capacityStanding: number | null; inclusions: string[] }) => apiFetch<{ resource_id: string; revision: number }>("/api/wedding/vendor/portal/resources", { method: "POST", bodyJson: { vendor_slug: slug, name: input.name, description: input.description || null, capacity_seated: input.capacitySeated, capacity_standing: input.capacityStanding, inclusions: input.inclusions, status: "active", idempotency_key: key("resource") } });
+export const updateVendorResource = (slug: string, resource: VendorResource, status = resource.status) => apiFetch<{ revision: number }>(`/api/wedding/vendor/portal/resources/${encodeURIComponent(resource.resource_id)}`, { method: "PUT", bodyJson: { vendor_slug: slug, expected_revision: resource.revision, name: resource.name, description: resource.description, capacity_seated: resource.capacity_seated, capacity_standing: resource.capacity_standing, inclusions: resource.inclusions, status, idempotency_key: key("resource-update") } });
+export const bulkUpdateVendorCalendar = (input: { vendorSlug: string; offerId: string; resourceId: string; offerRevision: number; dates: string[]; state: string; maximumCapacity: number | null; minimumSpendCents: number | null; perHeadCents: number | null; inclusions: string[]; publicConditions: string | null }) => apiFetch<{ updated: number; offer_revision: number }>("/api/wedding/vendor/portal/calendar/bulk", { method: "POST", bodyJson: { vendor_slug: input.vendorSlug, offer_id: input.offerId, resource_id: input.resourceId, expected_offer_revision: input.offerRevision, dates: input.dates, state: input.state, vendor_confirmed: true, maximum_capacity: input.maximumCapacity, minimum_spend_cents: input.minimumSpendCents, indicative_per_head_cents: input.perHeadCents, inclusions: input.inclusions, public_conditions: input.publicConditions, idempotency_key: key("calendar-bulk") } });
+export const getVendorTeam = async (slug: string) => (await apiFetch<{ members: VendorMember[] }>(`/api/wedding/vendor/portal/team?${query(slug)}`)).members;
+export const inviteVendorMember = (slug: string, email: string, role: string) => apiFetch("/api/wedding/vendor/portal/team", { method: "POST", bodyJson: { vendor_slug: slug, email, role, idempotency_key: key("member") } });
+export const updateVendorMember = (slug: string, member: VendorMember, status: string, role = member.role) => apiFetch(`/api/wedding/vendor/portal/team/${encodeURIComponent(member.membership_id)}`, { method: "PUT", bodyJson: { vendor_slug: slug, role, status, expected_revision: member.revision, idempotency_key: key("member-update") } });
+export const getVendorNotifications = (slug: string) => apiFetch<VendorNotifications>(`/api/wedding/vendor/portal/notifications?${query(slug)}`);
+export const updateVendorNotifications = (slug: string, value: VendorNotifications) => apiFetch<VendorNotifications>("/api/wedding/vendor/portal/notifications", { method: "PUT", bodyJson: { vendor_slug: slug, ...value, idempotency_key: key("notifications") } });
+export const getVendorEntitlements = (slug: string) => apiFetch<VendorEntitlements>(`/api/wedding/vendor/portal/entitlements?${query(slug)}`);
+export const getPendingVendorPublications = async () => (await apiFetch<{ items: PendingVendorPublication[] }>("/admin/wedding/vendor/portal/publication/pending")).items;
+export const decideVendorPublication = (revisionId: string, decision: "publish" | "reject", note: string) => apiFetch("/admin/wedding/vendor/portal/publication/decision", { method: "POST", bodyJson: { revision_id: revisionId, decision, note } });

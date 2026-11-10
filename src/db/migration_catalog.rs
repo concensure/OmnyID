@@ -797,4 +797,9 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Account-scoped operator approval for the Gmail alpha integration",
         include_str!("../../postgres/migrations/0156_gmail_alpha_access_requests.sql"),
     ),
+    (
+        "0157_wedding_vendor_portal_extensions",
+        "Revisioned vendor publishing, named resource calendars, scoped team roles, notification preferences and existing subscription entitlements",
+        include_str!("../../postgres/migrations/0157_wedding_vendor_portal_extensions.sql"),
+    ),
 ];

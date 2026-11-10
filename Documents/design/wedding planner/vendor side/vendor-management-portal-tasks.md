@@ -1,6 +1,6 @@
 # Vendor management portal — dependency-ordered implementation tasks
 
-Status: first release implemented; P1 extensions remain deliberately deferred (audited 10 November 2026)
+Status: first release and P1 portal extensions implemented (audited 11 November 2026)
 
 Source: `vendor management portal spec.md` in the canonical project documents
 
@@ -16,11 +16,11 @@ Rule: extend existing AFP, claim, directory, availability, media, messaging and 
 | VMP-04 | Complete | Authenticated owner management, scoped staff links, explicit release authority, false defaults and discovery are covered by the Limited Specials route and rollout suites. |
 | VMP-05 | Complete | The public quote comparison page, deterministic parser/calculation layer, structured extraction and public smoke coverage are present. |
 | VMP-06 | Complete | Exact-SHA Oracle deployment/version evidence is recorded in `.agent/HANDOFF.md`; subsequent releases must repeat that evidence rather than inheriting it. |
-| VMP-07 | Deferred P1 | No reviewed field-level publication revision authority exists yet. The portal deliberately does not claim this control. |
-| VMP-08 | Deferred P1 | Date offers and bounded edits exist; named resources and safe bulk editing do not. |
-| VMP-09 | Deferred P1 | Scoped calendar links exist; vendor teams, notification preferences and paid entitlements remain unimplemented. |
+| VMP-07 | Complete | `0157_wedding_vendor_portal_extensions.sql` and `wedding_vendor_portal_routes/publication.rs` retain draft and accepted revisions, preserve the current public snapshot during review, and feed directory/search projections from the accepted snapshot. |
+| VMP-08 | Complete | Named resources extend `wedding_vendor_rooms`; bounded multi-date editing extends the existing Limited Specials authority with stale-revision and confirmed-booking guards. |
+| VMP-09 | Complete | Vendor memberships enforce server-side roles, per-user notifications keep security alerts mandatory, and `vendor_subscriptions` controls paid portal features without deleting canonical records on downgrade. |
 
-The first-release acceptance boundary is implemented. VMP-07 through VMP-09 are not release blockers and must not be represented as complete until their server-side permission, revision and concurrency contracts exist.
+The first-release and P1 acceptance boundaries are implemented. Hosted release evidence remains tied to the exact deployed SHA in `.agent/HANDOFF.md`.
 
 ## Reuse and extension matrix
 
@@ -35,7 +35,7 @@ The first-release acceptance boundary is implemented. VMP-07 through VMP-09 are 
 | Proposal opportunities | `VendorProposalOpportunitiesPanel` | Reuse inside Enquiries. |
 | Quote construction | existing vendor quote draft/response controls | Reuse inside Enquiries; never send without vendor approval. |
 | Directory/comparison preview | verified owner profile projection | Extend the existing preview to explain which saved fields are public; keep platform verification/ranking read-only. |
-| Billing/team/external calendars | no complete reviewed surface | Defer; do not imply availability in the first release. |
+| Team, entitlements and external calendars | existing grants and `vendor_subscriptions`; no external-calendar authority | Extend canonical roles and entitlement checks for VMP-09; keep external-calendar sync deferred and do not imply it exists. |
 
 ## Dependency order
 

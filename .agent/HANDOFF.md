@@ -8337,3 +8337,28 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
 - The vendor portal first-release scope is live. VMP-07 field-level publication
   revisions, VMP-08 named-resource/bulk calendar editing and VMP-09 vendor
   teams/notification preferences/entitlements remain explicit P1 follow-ons.
+
+# 2026-11-11 — WED-358 release candidate (Codex)
+
+- Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
+  `agent/codex/WED-358`, based on deployed evidence SHA
+  `863ecc687f30682960c04442c31d65b8718ddb06`.
+- VMP-07 now has revisioned draft/accepted vendor publication, field visibility,
+  retained public values during description moderation, an operator review
+  queue, and accepted-snapshot projections across directory, search, photos and
+  Limited Specials.
+- VMP-08 extends canonical vendor rooms into named resources and reuses the
+  existing offer/slot calendar for bounded date-range edits. Server-side stale
+  revision, resource ownership and confirmed-booking guards protect bulk work.
+- VMP-09 adds verified-email vendor team membership with scoped server roles,
+  mandatory operational notification delivery plus optional preferences, and
+  canonical Founding/Pro entitlement guards that preserve vendor data on
+  downgrade.
+- Audit events are idempotent and content-light. They do not copy descriptions,
+  contacts, messages or prices out of canonical stores.
+- Verification passes: TypeScript, line budgets, 4/4 focused frontend portal
+  tests, 2,268/2,268 Wedding tests, production Vite build, Rust library check
+  and 7/7 focused Rust portal tests. Docker was unavailable for disposable
+  Postgres, so the additive migration and its tables must be verified during
+  the clean exact-SHA Oracle release.
+- Evidence: `Documents/verification/wed-358-vendor-management-portal-2026-11-11.md`.

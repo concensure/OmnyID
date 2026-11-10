@@ -15,6 +15,18 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-358
+    title: Complete vendor publication revisions, resource calendars, teams, notifications and entitlements
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-358
+    worktree: C:/Users/ozans/Desktop/projects/OmnyID-GROWTH-001
+    base_sha: 863ecc687f30682960c04442c31d65b8718ddb06
+    depends_on: [WED-357, WED-356, WED-345]
+    files: [src/server/**wedding**, src/db/**wedding**, postgres/migrations/**, solid-ui/src/components/Vendor**, solid-ui/src/lib/**vendor**, solid-ui/tests/**vendor**, Documents/design/wedding planner/vendor side/**, Documents/verification/**, .agent/**]
+    acceptance: [eligible vendor fields have vendor-scoped revisioned publication choices with accepted projection invalidation and moderation only where required, named resources and bounded bulk date changes use the existing availability authority and cannot overwrite confirmed bookings or stale revisions, vendor owners can manage scoped team roles and non-essential notification preferences while operational notifications remain mandatory, existing entitlements expose free and premium boundaries without deleting canonical state on downgrade, all reads and writes enforce authenticated vendor ownership or scoped capability authority and emit AFP-compatible audit evidence, focused security integration frontend full Wedding build exact-SHA deployment provenance and hosted checks pass]
+    progress: "Implemented revisioned field publication with operator review and accepted directory/search projection, named resources and bounded multi-date availability with stale/booking guards, owner-managed scoped team invitations, per-member notification preferences, and canonical subscription entitlements. TypeScript, line budgets, 2,268 Wedding tests, focused portal tests and Rust compile/unit checks pass; exact-SHA build and Oracle release proof remain before completion."
+
   - id: WED-357
     title: Complete vendor and couple decision surfaces, seating interactions and account-scoped Today customisation
     status: done

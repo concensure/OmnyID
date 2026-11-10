@@ -26,11 +26,30 @@ test("verified vendors receive one coherent management shell over existing autho
   for (const label of ["Overview", "Availability", "Enquiries", "Public profile", "Settings"]) {
     assert.match(dashboard, new RegExp(`label: "${label}"`));
   }
-  for (const authority of ["VendorPhotoUploadPanel", "VendorSpecialOffersPanel", "VendorProposalOpportunitiesPanel", "VendorQuotationResponsePanel"]) {
+  for (const authority of ["VendorPhotoUploadPanel", "VendorPublicationPanel", "VendorResourcesPanel", "VendorSpecialOffersPanel", "VendorProposalOpportunitiesPanel", "VendorQuotationResponsePanel", "VendorPortalSettingsPanel"]) {
     assert.match(dashboard, new RegExp(`<${authority}`));
   }
   assert.match(dashboard, /role="tablist"/);
   assert.match(dashboard, /verification, independent reviews and ranking methodology remain platform-controlled/i);
+});
+
+test("portal extensions use server-scoped revisions, roles and entitlements", async () => {
+  const [api, publication, resources, settings, migration] = await Promise.all([
+    read("solid-ui/src/lib/vendorPortalApi.ts"),
+    read("src/server/wedding_vendor_portal_routes/publication.rs"),
+    read("src/server/wedding_vendor_portal_routes/resources.rs"),
+    read("src/server/wedding_vendor_portal_routes/settings.rs"),
+    read("postgres/migrations/0157_wedding_vendor_portal_extensions.sql"),
+  ]);
+  assert.match(api, /expected_revision/);
+  assert.match(publication, /pending_review/);
+  assert.match(resources, /state='booked'/);
+  assert.match(resources, /require_paid_feature/);
+  assert.match(settings, /VendorPermission::ManageTeam/);
+  assert.match(settings, /security_notifications":"always_on/);
+  assert.match(migration, /wedding_vendor_memberships/);
+  assert.match(migration, /wedding_vendor_publication_revisions/);
+  assert.doesNotMatch(migration, /message_body|couple_email|budget_amount/i);
 });
 
 test("Limited Specials supports an explicit authenticated release wildcard without changing false defaults", async () => {

@@ -11,19 +11,34 @@ import {
   type VendorSpecialSlot,
   type VendorSpecialManagementLink,
 } from "@/lib/vendorSpecialsApi";
+import { bulkUpdateVendorCalendar, getVendorResources } from "@/lib/vendorPortalApi";
 
 const dollars = (value: string): number | null => {
   const amount = Number(value);
   return Number.isFinite(amount) && amount >= 0 ? Math.round(amount * 100) : null;
 };
 
+const datesBetween = (start: string, end: string): string[] => {
+  const values: string[] = [];
+  const cursor = new Date(`${start}T12:00:00Z`);
+  const finish = new Date(`${end}T12:00:00Z`);
+  while (cursor <= finish && values.length < 63) {
+    values.push(cursor.toISOString().slice(0, 10));
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return values;
+};
+
 export function VendorSpecialOffersPanel(props: { vendorSlug: string }) {
   const [offers, { refetch }] = createResource(() => props.vendorSlug, (vendorSlug) => listClaimedVendorSpecials(vendorSlug));
+  const [resources] = createResource(() => props.vendorSlug, getVendorResources);
   const [showForm, setShowForm] = createSignal(false);
   const [editing, setEditing] = createSignal<{ offer: VendorSpecialOffer; slot: VendorSpecialSlot } | null>(null);
   const [title, setTitle] = createSignal("");
   const [summary, setSummary] = createSignal("");
   const [date, setDate] = createSignal("");
+  const [dateEnd, setDateEnd] = createSignal("");
+  const [resourceId, setResourceId] = createSignal("");
   const [capacity, setCapacity] = createSignal("");
   const [minimumSpend, setMinimumSpend] = createSignal("");
   const [perHead, setPerHead] = createSignal("");
@@ -38,8 +53,11 @@ export function VendorSpecialOffersPanel(props: { vendorSlug: string }) {
     if (!title().trim() || !summary().trim() || !date() || busy()) return;
     setBusy(true); setNotice("");
     try {
+      const dates = dateEnd() && dateEnd() >= date() ? datesBetween(date(), dateEnd()) : [date()];
+      if (dates.length > 62) throw new Error("Choose a range of no more than 62 dates.");
       const values = {
         vendorSlug: props.vendorSlug, title: title().trim(), summary: summary().trim(), date: date(),
+        dates, resourceId: resourceId() || null,
         maximumCapacity: capacity() ? Number(capacity()) : null,
         minimumSpendCents: minimumSpend() ? dollars(minimumSpend()) : null,
         indicativePerHeadCents: perHead() ? dollars(perHead()) : null,
@@ -50,7 +68,7 @@ export function VendorSpecialOffersPanel(props: { vendorSlug: string }) {
       const current = editing();
       if (current) await editClaimedVendorSpecial({ ...values, ...current });
       else await createClaimedVendorSpecial(values);
-      setShowForm(false); setEditing(null); setTitle(""); setSummary(""); setDate(""); setCapacity(""); setMinimumSpend(""); setPerHead(""); setInclusions(""); setConditions(""); setMandatoryChargesKnown(false);
+      setShowForm(false); setEditing(null); setTitle(""); setSummary(""); setDate(""); setDateEnd(""); setResourceId(""); setCapacity(""); setMinimumSpend(""); setPerHead(""); setInclusions(""); setConditions(""); setMandatoryChargesKnown(false);
       await refetch(); setNotice(current ? "Draft changes saved. Review them before publishing again." : "Draft saved. Preview it below, then publish when every date and price is accurate.");
     } catch (reason) { setNotice(reason instanceof Error ? reason.message : "The special could not be saved."); }
     finally { setBusy(false); }
@@ -59,7 +77,7 @@ export function VendorSpecialOffersPanel(props: { vendorSlug: string }) {
   const startEdit = (offer: VendorSpecialOffer) => {
     const slot = offer.slots[0];
     if (!slot) return;
-    setEditing({ offer, slot }); setTitle(offer.title); setSummary(offer.summary); setDate(slot.local_date);
+    setEditing({ offer, slot }); setTitle(offer.title); setSummary(offer.summary); setDate(slot.local_date); setDateEnd(""); setResourceId(offer.room_id ?? "");
     setCapacity(slot.maximum_capacity == null ? "" : String(slot.maximum_capacity));
     setMinimumSpend(slot.minimum_spend_cents == null ? "" : String(slot.minimum_spend_cents / 100));
     setPerHead(slot.indicative_per_head_cents == null ? "" : String(slot.indicative_per_head_cents / 100));
@@ -82,6 +100,17 @@ export function VendorSpecialOffersPanel(props: { vendorSlug: string }) {
       setManagementLink(link);
       setNotice("Private link created. Copy it now; OmnyID will not show its secret again after you leave this page.");
     } catch (reason) { setNotice(reason instanceof Error ? reason.message : "The private management link could not be created."); }
+    finally { setBusy(false); }
+  };
+
+  const bulkRefresh = async (offer: VendorSpecialOffer) => {
+    const source = offer.slots[0];
+    if (!source || !offer.room_id || busy() || !confirm("Apply the first date's terms to every date in this offer? Confirmed bookings will block the whole change.")) return;
+    setBusy(true); setNotice("");
+    try {
+      const result = await bulkUpdateVendorCalendar({ vendorSlug: props.vendorSlug, offerId: offer.offer_id, resourceId: offer.room_id, offerRevision: offer.revision, dates: offer.slots.map((slot) => slot.local_date), state: "available", maximumCapacity: source.maximum_capacity, minimumSpendCents: source.minimum_spend_cents, perHeadCents: source.indicative_per_head_cents, inclusions: source.inclusions, publicConditions: source.public_conditions });
+      await refetch(); setNotice(`${result.updated} dates updated. Review and republish the offer.`);
+    } catch (reason) { setNotice(reason instanceof Error ? reason.message : "The date range could not be updated."); }
     finally { setBusy(false); }
   };
 
@@ -110,6 +139,8 @@ export function VendorSpecialOffersPanel(props: { vendorSlug: string }) {
     <Show when={showForm()}><div class="mt-4 grid gap-3 rounded-xl border border-wedding-muted bg-wedding-surface p-4 sm:grid-cols-2">
       <label class="text-sm font-semibold">Offer title<input class="mt-1 min-h-11 w-full rounded-lg border bg-white px-3 font-normal" maxlength="160" value={title()} onInput={(event) => setTitle(event.currentTarget.value)} /></label>
       <label class="text-sm font-semibold">Available date<input class="mt-1 min-h-11 w-full rounded-lg border bg-white px-3 font-normal" type="date" min={new Date().toISOString().slice(0, 10)} value={date()} onInput={(event) => setDate(event.currentTarget.value)} /></label>
+      <Show when={!editing()}><label class="text-sm font-semibold">Repeat through (optional)<input class="mt-1 min-h-11 w-full rounded-lg border bg-white px-3 font-normal" type="date" min={date() || new Date().toISOString().slice(0, 10)} value={dateEnd()} onInput={(event) => setDateEnd(event.currentTarget.value)} /></label></Show>
+      <label class="text-sm font-semibold">Resource<select class="mt-1 min-h-11 w-full rounded-lg border bg-white px-3 font-normal" value={resourceId()} onChange={(event) => setResourceId(event.currentTarget.value)}><option value="">Whole business / not specified</option><For each={(resources() ?? []).filter((resource) => resource.status === "active")}>{(resource) => <option value={resource.resource_id}>{resource.name}</option>}</For></select></label>
       <label class="text-sm font-semibold sm:col-span-2">What is included and why this date is useful<textarea class="mt-1 w-full rounded-lg border bg-white p-3 font-normal" rows={3} maxlength="1200" value={summary()} onInput={(event) => setSummary(event.currentTarget.value)} /></label>
       <label class="text-sm font-semibold">Maximum capacity<input class="mt-1 min-h-11 w-full rounded-lg border bg-white px-3 font-normal" type="number" min="1" max="5000" value={capacity()} onInput={(event) => setCapacity(event.currentTarget.value)} /></label>
       <label class="text-sm font-semibold">Minimum spend (AUD)<input class="mt-1 min-h-11 w-full rounded-lg border bg-white px-3 font-normal" type="number" min="0" step="1" value={minimumSpend()} onInput={(event) => setMinimumSpend(event.currentTarget.value)} /></label>
@@ -125,7 +156,7 @@ export function VendorSpecialOffersPanel(props: { vendorSlug: string }) {
     <Show when={offers.loading}><p class="mt-4 text-sm" role="status">Loading available dates…</p></Show>
     <div class="mt-4 grid gap-3"><For each={offers()} fallback={<p class="rounded-lg bg-wedding-surface p-3 text-sm text-wedding-muted">No limited-date special has been added yet.</p>}>{(offer) => <article class="rounded-xl border border-wedding-muted p-4">
       <div class="flex flex-wrap justify-between gap-2"><div><h3 class="font-bold">{offer.title}</h3><p class="mt-1 text-sm text-wedding-muted">{offer.summary}</p></div><span class="h-fit rounded-full bg-wedding-surface px-3 py-1 text-xs font-bold capitalize">{offer.publication_state}</span></div>
-      <div class="mt-3 flex flex-wrap gap-2"><Show when={offer.publication_state === "draft" || offer.publication_state === "paused"}><button disabled={busy()} class="min-h-11 rounded-lg border px-3 font-semibold" onClick={() => startEdit(offer)}>Edit draft</button><button disabled={busy()} class="min-h-11 rounded-lg bg-wedding-accent px-3 font-bold text-white" onClick={() => void offerAction(offer, offer.publication_state === "draft" ? "publish" : "reconfirm")}>{offer.publication_state === "draft" ? "Publish after review" : "Reconfirm offer"}</button></Show><Show when={offer.publication_state === "active"}><button disabled={busy()} class="min-h-11 rounded-lg border px-3 font-semibold" onClick={() => void offerAction(offer, "pause")}>Pause offer</button></Show><button disabled={busy()} class="min-h-11 rounded-lg border px-3 font-semibold" onClick={() => void createManagementLink(offer)}>Create staff link</button><button disabled={busy()} class="min-h-11 rounded-lg border border-red-300 px-3 font-semibold text-red-800" onClick={() => void offerAction(offer, "withdraw")}>Withdraw</button></div>
+      <div class="mt-3 flex flex-wrap gap-2"><Show when={offer.publication_state === "draft" || offer.publication_state === "paused"}><button disabled={busy()} class="min-h-11 rounded-lg border px-3 font-semibold" onClick={() => startEdit(offer)}>Edit draft</button><button disabled={busy()} class="min-h-11 rounded-lg bg-wedding-accent px-3 font-bold text-white" onClick={() => void offerAction(offer, offer.publication_state === "draft" ? "publish" : "reconfirm")}>{offer.publication_state === "draft" ? "Publish after review" : "Reconfirm offer"}</button></Show><Show when={offer.publication_state === "active"}><button disabled={busy()} class="min-h-11 rounded-lg border px-3 font-semibold" onClick={() => void offerAction(offer, "pause")}>Pause offer</button></Show><Show when={offer.room_id && offer.slots.length > 1}><button disabled={busy()} class="min-h-11 rounded-lg border px-3 font-semibold" onClick={() => void bulkRefresh(offer)}>Apply terms to all dates</button></Show><button disabled={busy()} class="min-h-11 rounded-lg border px-3 font-semibold" onClick={() => void createManagementLink(offer)}>Create staff link</button><button disabled={busy()} class="min-h-11 rounded-lg border border-red-300 px-3 font-semibold text-red-800" onClick={() => void offerAction(offer, "withdraw")}>Withdraw</button></div>
       <For each={offer.slots}>{(slot) => <div class="mt-3 rounded-lg bg-wedding-surface p-3">
         <div class="flex flex-wrap justify-between gap-2">
           <strong>{new Date(`${slot.local_date}T12:00:00`).toLocaleDateString("en-AU", { dateStyle: "long" })}</strong>

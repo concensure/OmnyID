@@ -26,6 +26,7 @@ use super::{
     AppState, RateLimitPolicy,
     auth::{authenticated_rate_limit_key, authenticated_user, enforce_rate_limit},
     wedding_vendor_claim_routes::valid_slug,
+    wedding_vendor_portal_routes::{VendorPermission, require_vendor_access},
 };
 
 const CLAIM_LIFETIME_HOURS: i64 = 72;
@@ -59,10 +60,16 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
 }
 
 #[derive(Deserialize)]
-struct VendorSlugQuery { vendor_slug: String }
+struct VendorSlugQuery {
+    vendor_slug: String,
+}
 
 #[derive(Deserialize)]
-struct OwnershipRequest { vendor_slug: String, method: String, token: Option<String> }
+struct OwnershipRequest {
+    vendor_slug: String,
+    method: String,
+    token: Option<String>,
+}
 
 #[derive(Deserialize)]
 struct VendorProfileUpdate {
@@ -75,7 +82,11 @@ struct VendorProfileUpdate {
 }
 
 #[derive(Deserialize)]
-struct OwnershipAdminDecision { claim_id: String, decision: String, note: String }
+struct OwnershipAdminDecision {
+    claim_id: String,
+    decision: String,
+    note: String,
+}
 
 struct OwnershipContext {
     claim_id: String,
@@ -378,9 +389,10 @@ async fn vendor_profile_http(
     headers: HeaderMap,
     Query(query): Query<VendorSlugQuery>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
-    let user = authenticated_user(&state.db, &headers).await?;
     let slug = valid_slug(&query.vendor_slug)?;
-    let row = verified_profile_row(&state, &user.id, &slug).await?;
+    let (_user, access) =
+        require_vendor_access(&state, &headers, &slug, VendorPermission::View).await?;
+    let row = profile_row_by_vendor_id(&state, &access.vendor_id).await?;
     Ok(Json(profile_json(&row)))
 }
 
@@ -390,10 +402,11 @@ async fn vendor_profile_update_http(
     Query(query): Query<VendorSlugQuery>,
     Json(body): Json<VendorProfileUpdate>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
-    let user = authenticated_user(&state.db, &headers).await?;
     limit(&state, &headers, "vendor_profile_update", 20).await?;
     let slug = valid_slug(&query.vendor_slug)?;
-    let row = verified_profile_row(&state, &user.id, &slug).await?;
+    let (_user, access) =
+        require_vendor_access(&state, &headers, &slug, VendorPermission::Publish).await?;
+    let row = profile_row_by_vendor_id(&state, &access.vendor_id).await?;
     let vendor_id: String = row.get("vendor_id");
     let description = bounded(body.description, 4_000, "description")?;
     let contact_email = validated_contact_email(body.contact_email)?;
@@ -420,11 +433,13 @@ async fn vendor_profile_update_http(
         r#"INSERT INTO wedding_vendor_owner_profile (vendor_id, description, public_contact, updated_at)
            VALUES ($1, $2, $3, NOW())
            ON CONFLICT (vendor_id) DO UPDATE SET description = EXCLUDED.description,
-             public_contact = EXCLUDED.public_contact, updated_at = NOW()"#,
+             public_contact = EXCLUDED.public_contact,
+             draft_revision = wedding_vendor_owner_profile.draft_revision + 1,
+             updated_at = NOW()"#,
     )
     .bind(&vendor_id).bind(description).bind(public_contact)
     .execute(&state.db.pool).await.map_err(database_failure)?;
-    let refreshed = verified_profile_row(&state, &user.id, &slug).await?;
+    let refreshed = profile_row_by_vendor_id(&state, &vendor_id).await?;
     Ok(Json(profile_json(&refreshed)))
 }
 
@@ -805,6 +820,23 @@ async fn verified_profile_row(
     .ok_or_else(|| (StatusCode::FORBIDDEN, "verified listing ownership is required".to_string()))
 }
 
+async fn profile_row_by_vendor_id(
+    state: &Arc<AppState>,
+    vendor_id: &str,
+) -> Result<sqlx::postgres::PgRow, (StatusCode, String)> {
+    sqlx::query(
+        r#"SELECT v.vendor_id, v.vendor_slug, v.vendor_name, v.category, v.service_area, v.address,
+                  v.website_url AS source_website_url, v.contact_email AS source_contact_email,
+                  v.contact_phone AS source_contact_phone, v.claim_status,
+                  COALESCE(p.description, '') AS description, COALESCE(p.public_contact, '{}'::jsonb) AS public_contact,
+                  COALESCE(p.draft_revision, 1) AS draft_revision,p.published_revision,
+                  (SELECT COUNT(*) FROM wedding_vendor_owner_assets a WHERE a.vendor_id = v.vendor_id AND a.status = 'live') AS photo_count
+           FROM wedding_vendors v LEFT JOIN wedding_vendor_owner_profile p ON p.vendor_id = v.vendor_id
+           WHERE v.vendor_id=$1 AND v.status='active' AND v.claim_status='verified'"#,
+    ).bind(vendor_id).fetch_optional(&state.db.pool).await.map_err(database_failure)?
+      .ok_or_else(||(StatusCode::FORBIDDEN,"verified listing access is required".to_string()))
+}
+
 fn profile_json(row: &sqlx::postgres::PgRow) -> Value {
     let public_contact: Value = row.get("public_contact");
     let description: String = row.get("description");
@@ -839,6 +871,8 @@ fn profile_json(row: &sqlx::postgres::PgRow) -> Value {
         "contact_email": email, "contact_phone": phone, "website_url": website_url,
         "instagram_url": effective("instagram_url", None), "facebook_url": effective("facebook_url", None),
         "photo_count": photo_count, "completion_percent": completed * 25, "verified_badge": true,
+        "draft_revision": row.try_get::<i64,_>("draft_revision").unwrap_or(1),
+        "published_revision": row.try_get::<Option<i64>,_>("published_revision").ok().flatten(),
     })
 }
 

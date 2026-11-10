@@ -4229,16 +4229,24 @@ impl Db {
                 v.category,
                 v.service_area,
                 v.address,
-                v.website_url,
-                v.contact_phone,
-                v.contact_email,
+                CASE WHEN COALESCE((p.publication_visibility->>'website_url')::boolean,FALSE)
+                     THEN COALESCE(NULLIF(p.published_public_contact->>'website_url',''),v.website_url)
+                     ELSE v.website_url END AS website_url,
+                CASE WHEN COALESCE((p.publication_visibility->>'phone')::boolean,FALSE)
+                     THEN COALESCE(NULLIF(p.published_public_contact->>'phone',''),v.contact_phone)
+                     ELSE v.contact_phone END AS contact_phone,
+                CASE WHEN COALESCE((p.publication_visibility->>'email')::boolean,FALSE)
+                     THEN COALESCE(NULLIF(p.published_public_contact->>'email',''),v.contact_email)
+                     ELSE v.contact_email END AS contact_email,
                 v.source_url,
                 v.source_label,
                 v.source_checked_at::text AS source_checked_at,
                 v.status,
                 v.claim_status,
                 l.agent_id AS linked_agent_id,
-                v.notes,
+                CASE WHEN COALESCE((p.publication_visibility->>'description')::boolean,FALSE)
+                     AND NULLIF(btrim(COALESCE(p.published_description,'')),'') IS NOT NULL
+                     THEN concat_ws(E'\n\n',v.notes,p.published_description) ELSE v.notes END AS notes,
                 v.evidence,
                 v.caveat_labels,
                 v.created_by_user_id,
@@ -4262,6 +4270,8 @@ impl Db {
                 AND c.user_id = $1
             LEFT JOIN wedding_vendor_agent_links l
                 ON l.vendor_id = v.vendor_id
+            LEFT JOIN wedding_vendor_owner_profile p
+                ON p.vendor_id = v.vendor_id
             WHERE v.status = 'active'
                 AND (
                     c.contact_id IS NOT NULL

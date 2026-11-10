@@ -25,6 +25,7 @@ import {
 } from "@/lib/weddingVendorAttributeCatalogState";
 import type { WeddingVendorAttributeEvidence } from "@/lib/weddingVendorRankingState";
 import { WeddingConfirmDialog } from "@/components/WeddingConfirmDialog";
+import VendorPublicationReviewPanel from "@/components/VendorPublicationReviewPanel";
 
 export default function UsageAdminWeddingVendorsPanel() {
   const [query, setQuery] = createSignal("");
@@ -146,6 +147,8 @@ export default function UsageAdminWeddingVendorsPanel() {
       <Show when={error()}>
         {(message) => <p class="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-900">{message()}</p>}
       </Show>
+
+      <VendorPublicationReviewPanel />
 
       <div class="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.9fr)]">
         <div class="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-50/70">

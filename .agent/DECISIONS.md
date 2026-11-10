@@ -3222,3 +3222,26 @@ synthetic vendor search or introduce another send path.
   website opens the recorded URL, email enters the existing approved enquiry
   composer, phone uses the recorded dial target, and address resolves into an
   in-place OpenStreetMap surface. No contact field is inferred.
+
+# 2026-11-11 — WED-358 vendor portal extensions reuse canonical vendor authorities
+
+- Vendor profile edits are drafts. A field-level publication revision snapshots
+  only eligible public fields; contact-only revisions may publish immediately,
+  while changed descriptions retain the prior public snapshot until an operator
+  accepts or rejects the new revision. Both the crawlable directory and live
+  comparison search read that accepted snapshot.
+- Named vendor resources extend `wedding_vendor_rooms`; their date ranges remain
+  `wedding_vendor_special_offer_slots`. Bulk writes require the current offer
+  revision and reject the complete operation if any selected date is a confirmed
+  booking. Resource/calendar truth is not copied into a portal-specific calendar.
+- Vendor staff access is listing-scoped and role-scoped. Only the owner manages
+  membership. Invited email access activates only after that same verified email
+  signs in. Managers cannot delegate team authority, and profile, calendar,
+  enquiry and read-only roles do not imply one another.
+- Notification preferences are per vendor member. Security/account notifications
+  are always on and optional product updates default off. Paid portal features
+  derive from the canonical `vendor_subscriptions` row; downgrade changes access
+  but never deletes profile, enquiry, resource or calendar records.
+- Portal audit events are content-light and idempotent. Descriptions, contacts,
+  prices and messages remain in their canonical stores rather than being copied
+  into event metadata.

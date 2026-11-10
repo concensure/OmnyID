@@ -130,7 +130,9 @@ pub(super) fn rollout_allowed(email: &str) -> bool {
             .unwrap_or_default()
             .split(',')
             .map(|value| value.trim().to_ascii_lowercase())
-            .any(|value| value == "*" || (!value.is_empty() && value == email.trim().to_ascii_lowercase()))
+            .any(|value| {
+                value == "*" || (!value.is_empty() && value == email.trim().to_ascii_lowercase())
+            })
 }
 
 fn clean_category(value: Option<String>) -> Option<String> {
@@ -451,11 +453,13 @@ async fn discover_specials_http(
            LEFT JOIN wedding_vendor_attributes reviews_easy
              ON reviews_easy.vendor_id=v.vendor_id AND reviews_easy.attribute_key='review_count_easyweddings'
                 AND reviews_easy.status IN ('known','estimated') AND jsonb_typeof(reviews_easy.value)='number'
+           LEFT JOIN wedding_vendor_owner_profile owner_profile ON owner_profile.vendor_id=v.vendor_id
            LEFT JOIN LATERAL (
              SELECT '/api/public/wedding/vendor/photos/' || asset.asset_id || '/medium' AS photo_url,
                     asset.alt_text
              FROM wedding_vendor_owner_assets asset
              WHERE asset.vendor_id=v.vendor_id AND asset.status='live'
+               AND COALESCE((owner_profile.publication_visibility->>'photos')::boolean,TRUE)
                AND asset.photo_licence_id IS NOT NULL
              ORDER BY asset.is_cover DESC,asset.position,asset.asset_id
              LIMIT 1

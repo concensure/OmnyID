@@ -46,6 +46,7 @@ export type VendorSpecialSession = {
   account_access: false;
   offer: {
     offer_id: string;
+    room_id: string | null;
     title: string;
     summary: string;
     publication_state: string;
@@ -87,6 +88,8 @@ export async function createClaimedVendorSpecial(input: {
   title: string;
   summary: string;
   date: string;
+  dates?: string[];
+  resourceId?: string | null;
   maximumCapacity: number | null;
   minimumSpendCents: number | null;
   indicativePerHeadCents: number | null;
@@ -99,7 +102,7 @@ export async function createClaimedVendorSpecial(input: {
     body: JSON.stringify({
       vendor_slug: input.vendorSlug,
       idempotency_key: `vendor-special-${crypto.randomUUID()}`,
-      room_id: null,
+      room_id: input.resourceId ?? null,
       title: input.title,
       summary: input.summary,
       offer_type: input.indicativePerHeadCents !== null ? "per_head" : "minimum_spend",
@@ -118,12 +121,12 @@ export async function createClaimedVendorSpecial(input: {
       exclusions: [],
       public_conditions: input.publicConditions,
       approved_package_version: null,
-      slots: [{
-        local_date: input.date, timezone: "Australia/Sydney", starts_at: null, ends_at: null,
+      slots: (input.dates?.length ? input.dates : [input.date]).map((localDate) => ({
+        local_date: localDate, timezone: "Australia/Sydney", starts_at: null, ends_at: null,
         space_label: null, session_label: null, maximum_capacity: input.maximumCapacity,
         minimum_spend_cents: input.minimumSpendCents, indicative_per_head_cents: input.indicativePerHeadCents,
         inclusions: input.inclusions, public_conditions: input.publicConditions,
-      }],
+      })),
     }),
   });
 }

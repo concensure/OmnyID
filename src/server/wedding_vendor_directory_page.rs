@@ -102,8 +102,10 @@ async fn directory_rows(
     let rows = sqlx::query(
         r#"
         SELECT v.vendor_slug, v.vendor_name, v.category, v.service_area, v.address,
-               v.website_url, v.claim_status,
-               COALESCE(p.description, '') AS owner_description,
+               CASE WHEN COALESCE((p.publication_visibility->>'website_url')::boolean,FALSE)
+                    THEN COALESCE(NULLIF(p.published_public_contact->>'website_url',''),v.website_url)
+                    ELSE v.website_url END AS website_url, v.claim_status,
+               COALESCE(p.published_description, '') AS owner_description,
                COALESCE(p.price_tier, '') AS price_tier,
                COALESCE(p.capacity_min, 0) AS capacity_min,
                COALESCE(p.capacity_max, 0) AS capacity_max
@@ -132,8 +134,10 @@ async fn vendor_row(
     sqlx::query(
         r#"
         SELECT v.vendor_slug, v.vendor_name, v.category, v.service_area, v.address,
-               v.website_url, v.claim_status,
-               COALESCE(p.description, '') AS owner_description,
+               CASE WHEN COALESCE((p.publication_visibility->>'website_url')::boolean,FALSE)
+                    THEN COALESCE(NULLIF(p.published_public_contact->>'website_url',''),v.website_url)
+                    ELSE v.website_url END AS website_url, v.claim_status,
+               COALESCE(p.published_description, '') AS owner_description,
                COALESCE(p.price_tier, '') AS price_tier,
                COALESCE(p.capacity_min, 0) AS capacity_min,
                COALESCE(p.capacity_max, 0) AS capacity_max

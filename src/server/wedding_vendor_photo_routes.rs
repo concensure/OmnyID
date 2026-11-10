@@ -130,7 +130,9 @@ async fn schedule_owner_photo_removal_http(
     if result.rows_affected() == 0 {
         return Err((StatusCode::NOT_FOUND, "live photo not found".to_string()));
     }
-    Ok(Json(json!({ "status": "scheduled_for_removal", "purge_after_days": 14 })))
+    Ok(Json(
+        json!({ "status": "scheduled_for_removal", "purge_after_days": 14 }),
+    ))
 }
 
 async fn owned_vendor_id(
@@ -378,7 +380,7 @@ async fn public_owner_photo_http(
         _ => return Err((StatusCode::NOT_FOUND, "photo not found".to_string())),
     };
     let query = format!(
-        "SELECT asset.{column} AS storage_key FROM wedding_vendor_owner_assets asset JOIN wedding_vendors vendor ON vendor.vendor_id = asset.vendor_id WHERE asset.asset_id = $1 AND asset.status = 'live' AND vendor.status = 'active' AND vendor.claim_status = 'verified'"
+        "SELECT asset.{column} AS storage_key FROM wedding_vendor_owner_assets asset JOIN wedding_vendors vendor ON vendor.vendor_id = asset.vendor_id LEFT JOIN wedding_vendor_owner_profile profile ON profile.vendor_id=asset.vendor_id WHERE asset.asset_id = $1 AND asset.status = 'live' AND vendor.status = 'active' AND vendor.claim_status = 'verified' AND COALESCE((profile.publication_visibility->>'photos')::boolean,TRUE)"
     );
     let row = sqlx::query(&query)
         .bind(&asset_id)
@@ -467,7 +469,10 @@ fn webp_variants(image: &DynamicImage) -> Result<(Vec<u8>, Vec<u8>, Vec<u8>), im
     ))
 }
 
-pub(super) fn decode_upload(bytes: &[u8], format: ImageFormat) -> Result<DynamicImage, image::ImageError> {
+pub(super) fn decode_upload(
+    bytes: &[u8],
+    format: ImageFormat,
+) -> Result<DynamicImage, image::ImageError> {
     let mut limits = Limits::default();
     limits.max_image_width = Some(MAX_SOURCE_EDGE);
     limits.max_image_height = Some(MAX_SOURCE_EDGE);

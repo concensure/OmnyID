@@ -4,7 +4,10 @@
 import { createMemo, createResource, createSignal, For, Show } from "solid-js";
 
 import { VendorPhotoUploadPanel } from "@/components/vendor/VendorPhotoUploadPanel";
+import { VendorPortalSettingsPanel } from "@/components/vendor/VendorPortalSettingsPanel";
+import { VendorPublicationPanel } from "@/components/vendor/VendorPublicationPanel";
 import { VendorQuotationResponsePanel } from "@/components/vendor/VendorQuotationResponsePanel";
+import { VendorResourcesPanel } from "@/components/vendor/VendorResourcesPanel";
 import { VendorProposalOpportunitiesPanel } from "@/components/vendor/VendorProposalOpportunitiesPanel";
 import { VendorSpecialOffersPanel } from "@/components/vendor/VendorSpecialOffersPanel";
 import {
@@ -136,22 +139,23 @@ export function VendorProfileDashboard(props: { vendorSlug: string }) {
             <label class="text-sm font-medium sm:col-span-2">Facebook Page<input class="mt-1 min-h-11 w-full rounded-lg border border-wedding-muted px-3" type="url" value={value("facebook_url")} onInput={(event) => edit("facebook_url", event.currentTarget.value)} /></label>
           </div>
           <button type="button" class="mt-4 min-h-11 rounded-lg bg-wedding-accent px-5 font-bold text-white disabled:opacity-50" disabled={!draft() || busy()} onClick={() => void save()}>{busy() ? "Saving…" : "Save profile"}</button>
-          <Show when={saved()}><p class="mt-3 text-sm text-emerald-800" role="status">Profile saved and preview updated.</p></Show>
+          <Show when={saved()}><p class="mt-3 text-sm text-emerald-800" role="status">Draft saved. Review the preview, then publish the fields you want couples to see.</p></Show>
           <Show when={error()}>{(message) => <p class="mt-3 text-sm text-red-800" role="alert">{message()}</p>}</Show>
         </section></Show>
 
         <Show when={section() === "profile"}><section class="rounded-xl border border-wedding-muted bg-wedding-surface p-5" aria-labelledby="profile-preview-title">
-          <p class="text-xs font-bold uppercase tracking-[0.16em] text-wedding-accent">Couple-facing preview</p>
+          <p class="text-xs font-bold uppercase tracking-[0.16em] text-wedding-accent">Draft preview</p>
           <h2 id="profile-preview-title" class="mt-1 text-xl font-semibold">{current().vendor_name} <span class="text-sm text-emerald-800">✓ Verified</span></h2>
           <p class="mt-2 text-sm leading-6 text-wedding-muted">{value("description") || "Add a description to help couples understand your service."}</p>
           <dl class="mt-4 grid gap-2 text-sm sm:grid-cols-2"><div><dt class="font-semibold">Area</dt><dd>{current().service_area}</dd></div><div><dt class="font-semibold">Contact</dt><dd>{value("contact_email") || value("contact_phone") || "Add public contact details"}</dd></div></dl>
           <p class="mt-4 rounded-lg bg-white p-3 text-xs leading-5 text-wedding-muted">Eligible saved fields and licensed live photos feed the existing public directory and comparison-card projections. Verification, independent reviews and ranking methodology remain platform-controlled.</p>
         </section>
 
+        <VendorPublicationPanel vendorSlug={props.vendorSlug} />
         <section><h2 class="mb-3 text-lg font-semibold">Gallery photos</h2><VendorPhotoUploadPanel vendorSlug={props.vendorSlug} onPublished={() => void refetch()} /></section></Show>
-        <Show when={section() === "availability"}><section class="rounded-xl border border-wedding-muted bg-wedding-surface p-4"><h2 class="text-xl font-semibold">Availability</h2><p class="mt-1 text-sm leading-6 text-wedding-muted">Manage indicative dates here or create a scoped staff link. Calendar-open, vendor-confirmed, temporary hold and confirmed booking remain different evidence states.</p></section><VendorSpecialOffersPanel vendorSlug={props.vendorSlug} /></Show>
+        <Show when={section() === "availability"}><section class="rounded-xl border border-wedding-muted bg-wedding-surface p-4"><h2 class="text-xl font-semibold">Availability</h2><p class="mt-1 text-sm leading-6 text-wedding-muted">Manage indicative dates here or create a scoped staff link. Calendar-open, vendor-confirmed, temporary hold and confirmed booking remain different evidence states.</p></section><VendorResourcesPanel vendorSlug={props.vendorSlug} /><VendorSpecialOffersPanel vendorSlug={props.vendorSlug} /></Show>
         <Show when={section() === "enquiries"}><section class="rounded-xl border border-wedding-muted bg-wedding-surface p-4"><h2 class="text-xl font-semibold">Enquiries and quotes</h2><p class="mt-1 text-sm leading-6 text-wedding-muted">Review authorised couple context, respond in the existing conversation and prepare an itemised quote. A draft is never sent without your approval.</p></section><VendorProposalOpportunitiesPanel vendorSlug={props.vendorSlug} /><VendorQuotationResponsePanel /></Show>
-        <Show when={section() === "settings"}><section class="rounded-xl border border-wedding-muted bg-white p-5 shadow-sm" aria-labelledby="vendor-settings-title"><h2 id="vendor-settings-title" class="text-xl font-semibold">Business access and settings</h2><dl class="mt-4 grid gap-3 text-sm sm:grid-cols-2"><div class="rounded-lg bg-wedding-surface p-3"><dt class="font-bold">Ownership</dt><dd class="mt-1 text-wedding-muted">Verified for {current().vendor_name}</dd></div><div class="rounded-lg bg-wedding-surface p-3"><dt class="font-bold">Staff calendar access</dt><dd class="mt-1 text-wedding-muted">Create and rotate scoped links from Availability.</dd></div><div class="rounded-lg bg-wedding-surface p-3"><dt class="font-bold">Public information</dt><dd class="mt-1 text-wedding-muted">Edit eligible fields and previews in Public profile.</dd></div><div class="rounded-lg bg-wedding-surface p-3"><dt class="font-bold">Security</dt><dd class="mt-1 text-wedding-muted">Account, billing and owner changes remain outside staff links.</dd></div></dl></section></Show>
+        <Show when={section() === "settings"}><VendorPortalSettingsPanel vendorSlug={props.vendorSlug} /></Show>
       </>}</Show>
     </div>
   );
