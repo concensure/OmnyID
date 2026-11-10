@@ -25,6 +25,7 @@ import UsageAdminWeddingNewsletterPanel from "@/components/UsageAdminWeddingNews
 import UsageAdminWeddingWaitlistPanel from "@/components/UsageAdminWeddingWaitlistPanel";
 import UsageAdminWeddingBlogPublisher from "@/components/UsageAdminWeddingBlogPublisher";
 import UsageAdminWeddingQuoteStudyPanel from "@/components/UsageAdminWeddingQuoteStudyPanel";
+import UsageAdminWeddingQuoteSharePanel from "@/components/UsageAdminWeddingQuoteSharePanel";
 import UsageAdminWeddingProposalOpportunitiesPanel from "@/components/UsageAdminWeddingProposalOpportunitiesPanel";
 import UsageAdminWeddingSpecialsPanel from "@/components/UsageAdminWeddingSpecialsPanel";
 
@@ -150,6 +151,7 @@ export default function UsageOperatorSection(props: UsageOperatorSectionProps) {
       <UsageAdminWeddingBlogPublisher />
 
       <UsageAdminWeddingQuoteStudyPanel />
+      <UsageAdminWeddingQuoteSharePanel />
 
       <UsageAdminWeddingProposalOpportunitiesPanel />
 

@@ -1,5 +1,5 @@
 // @locs-version: 1.0
-import { accountScopedStorageKey } from "@/lib/accountScopedStorage";
+import { accountScopedStorageKey, accountScopedStorageReadKey } from "@/lib/accountScopedStorage";
 import { isRecord } from "@/lib/eventDetail";
 import { parseJsonValue } from "@/lib/jsonParseState";
 
@@ -63,7 +63,7 @@ function removeCustomViewsStorageValue(key: string): void {
 export function loadCustomViews(userId?: string | null): CustomView[] {
   const scopedKey = customViewsStorageKey(userId);
   try {
-    const stored = localStorage.getItem(scopedKey) ?? localStorage.getItem(CUSTOM_VIEWS_KEY);
+    const stored = localStorage.getItem(accountScopedStorageReadKey(CUSTOM_VIEWS_KEY, userId));
     if (!stored) return [];
     const raw = parseJsonValue(stored);
     if (!raw.ok) {

@@ -14,4 +14,8 @@ test("run-sheet contextual cards preserve the A2UI intent and authoritative-comm
   assert.doesNotMatch(panel, /sendAfpMessage/);
   assert.match(database, /sendDatabaseRecordRevision/);
   assert.match(database, /weddingRunSheetApprovedBufferPatch/);
+  assert.match(database, /databaseRootRef\.requestFullscreen/);
+  assert.match(database, /document\.exitFullscreen/);
+  assert.match(database, /data-database-fullscreen/);
+  assert.match(database, /Run sheet are live read-only views/);
 });

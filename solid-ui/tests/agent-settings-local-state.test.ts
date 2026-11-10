@@ -216,7 +216,7 @@ test("agent settings local append helpers preserve bounded latency and test hist
   assert.equal(localStorageState.get(testHistoryKey), JSON.stringify(testHistory));
 });
 
-test("agent settings local state migrates legacy global storage into scoped keys", () => {
+test("authenticated agent settings ignore unowned legacy global storage", () => {
   localStorageState.set(LLM_LATENCY_KEY, JSON.stringify([{ ts: 1, ms: 20 }]));
   localStorageState.set(LLM_TEST_HISTORY_KEY, JSON.stringify([{ ts: 1, model: "claude", ms: 42, ok: true }]));
   localStorageState.set(LORA_HISTORY_KEY, JSON.stringify([{ date: "2026-07-18", score: 0.7 }]));
@@ -227,22 +227,15 @@ test("agent settings local state migrates legacy global storage into scoped keys
   localStorageState.set(LLM_PING_OK_KEY, "1");
   localStorageState.set(SOUL_SAVED_KEY, "5678");
 
-  assert.deepEqual(loadLatencyHistory(userId), [{ ts: 1, ms: 20 }]);
-  assert.deepEqual(loadTestHistory(userId), [{ ts: 1, model: "claude", ms: 42, ok: true, reason: undefined }]);
-  assert.deepEqual(loadLoraHistory(userId), [{ date: "2026-07-18", score: 0.7 }]);
-  assert.deepEqual(loadCapabilityLastUsed(userId), { github: 5 });
-  assert.deepEqual(loadCapabilityUsageCount(userId), { github: 3 });
-  assert.deepEqual(loadCapabilityDowUsage(userId), { github: [1, 0, 2, 0, 0, 0, 1] });
-  assert.equal(loadLastLlmPingAt(userId), 1234);
-  assert.equal(loadLastLlmPingOk(userId), true);
-  assert.equal(loadSoulSavedAt(userId), 5678);
-  assert.equal(localStorageState.has(LLM_LATENCY_KEY), false);
-  assert.equal(localStorageState.has(LLM_TEST_HISTORY_KEY), false);
-  assert.equal(localStorageState.has(LORA_HISTORY_KEY), false);
-  assert.equal(localStorageState.has(CAP_LAST_USED_KEY), false);
-  assert.equal(localStorageState.has(CAP_USAGE_COUNT_KEY), false);
-  assert.equal(localStorageState.has(CAP_DOW_KEY), false);
-  assert.equal(localStorageState.has(LLM_PING_KEY), false);
-  assert.equal(localStorageState.has(LLM_PING_OK_KEY), false);
-  assert.equal(localStorageState.has(SOUL_SAVED_KEY), false);
+  assert.deepEqual(loadLatencyHistory(userId), []);
+  assert.deepEqual(loadTestHistory(userId), []);
+  assert.deepEqual(loadLoraHistory(userId), []);
+  assert.deepEqual(loadCapabilityLastUsed(userId), {});
+  assert.deepEqual(loadCapabilityUsageCount(userId), {});
+  assert.deepEqual(loadCapabilityDowUsage(userId), {});
+  assert.equal(loadLastLlmPingAt(userId), null);
+  assert.equal(loadLastLlmPingOk(userId), false);
+  assert.equal(loadSoulSavedAt(userId), null);
+  assert.equal(localStorageState.has(LLM_LATENCY_KEY), true);
+  assert.equal(localStorageState.has(LLM_TEST_HISTORY_KEY), true);
 });

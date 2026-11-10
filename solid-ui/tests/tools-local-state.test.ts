@@ -162,7 +162,7 @@ test("saveLocalToolConnections persists only normalized local connection rows", 
   );
 });
 
-test("tools local state migrates legacy global storage into scoped keys", () => {
+test("authenticated tools state ignores unowned legacy global storage", () => {
   localStorageState.set(TOOL_USAGE_KEY, JSON.stringify({ "github_2026-07": 4 }));
   localStorageState.set(RECENTLY_USED_KEY, JSON.stringify(["github", "slack"]));
   localStorageState.set(
@@ -170,18 +170,10 @@ test("tools local state migrates legacy global storage into scoped keys", () => 
     JSON.stringify([{ id: "local-github", tool_slug: "github", tool_name: "GitHub", mcp_server_url: "local://workspace/github", connected_at: "2026-07-18T00:00:00.000Z" }]),
   );
 
-  assert.equal(loadToolUseCount("github", new Date("2026-07-18T00:00:00.000Z"), userId), 4);
-  assert.deepEqual(loadRecentlyUsedToolSlugs(userId), ["github", "slack"]);
-  assert.deepEqual(loadLocalToolConnections(userId), [
-    {
-      id: "local-github",
-      tool_slug: "github",
-      tool_name: "GitHub",
-      mcp_server_url: "local://workspace/github",
-      connected_at: "2026-07-18T00:00:00.000Z",
-    },
-  ]);
-  assert.equal(localStorageState.has(TOOL_USAGE_KEY), false);
-  assert.equal(localStorageState.has(RECENTLY_USED_KEY), false);
-  assert.equal(localStorageState.has(LOCAL_CONNECTIONS_KEY), false);
+  assert.equal(loadToolUseCount("github", new Date("2026-07-18T00:00:00.000Z"), userId), 0);
+  assert.deepEqual(loadRecentlyUsedToolSlugs(userId), []);
+  assert.deepEqual(loadLocalToolConnections(userId), []);
+  assert.equal(localStorageState.has(TOOL_USAGE_KEY), true);
+  assert.equal(localStorageState.has(RECENTLY_USED_KEY), true);
+  assert.equal(localStorageState.has(LOCAL_CONNECTIONS_KEY), true);
 });

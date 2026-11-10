@@ -1,4 +1,4 @@
-import { accountScopedStorageKey } from "./accountScopedStorage.ts";
+import { accountScopedStorageKey, accountScopedStorageReadKey } from "./accountScopedStorage.ts";
 import {
   preferredSnoozeOptionId,
   recordSnoozeHistory,
@@ -13,8 +13,7 @@ function scopedSnoozeStorageKey(baseKey, userId) {
 }
 
 function loadSnoozeStorageValue(baseKey, userId) {
-  const scopedKey = scopedSnoozeStorageKey(baseKey, userId);
-  return localStorage.getItem(scopedKey) ?? localStorage.getItem(baseKey);
+  return localStorage.getItem(accountScopedStorageReadKey(baseKey, userId));
 }
 
 function removeSnoozeStorageValue(baseKey, userId) {

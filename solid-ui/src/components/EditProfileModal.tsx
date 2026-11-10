@@ -5,6 +5,7 @@ import { DialogShell } from "@/components/DialogShell";
 import { TiptapEditor } from "@/components/editor/TiptapEditor";
 import { loadUserProfile, saveUserProfile } from "@/lib/profileLocalState";
 import { recordShortcutUse } from "@/lib/shortcutRecency";
+import { loadLedger, setProfilingEnabled } from "@/lib/profileLedger";
 
 const PRESET_WEBSITES = [
   { id: "linkedin", label: "LinkedIn", emoji: "in" },
@@ -31,6 +32,10 @@ export function EditProfileModal(props: { onClose: () => void; showWeddingUpgrad
   const [saving, setSaving] = createSignal(false);
   const [upgrading, setUpgrading] = createSignal(false);
   const [upgradeError, setUpgradeError] = createSignal("");
+  const [profilingEnabled, setProfilingEnabledState] = createSignal(false);
+  const [profilingLoading, setProfilingLoading] = createSignal(true);
+  const [profilingSaving, setProfilingSaving] = createSignal(false);
+  const [profilingError, setProfilingError] = createSignal("");
   let displayNameRef: HTMLInputElement | undefined;
 
   function toggleWebsite(id: string) {
@@ -79,6 +84,22 @@ export function EditProfileModal(props: { onClose: () => void; showWeddingUpgrad
     }
   }
 
+  async function toggleProfiling() {
+    if (profilingLoading() || profilingSaving()) return;
+    setProfilingSaving(true);
+    setProfilingError("");
+    const next = !profilingEnabled();
+    try {
+      const status = await setProfilingEnabled(next);
+      if (status !== "ok") throw new Error("Your profiling preference could not be saved on this device.");
+      setProfilingEnabledState(next);
+    } catch (error) {
+      setProfilingError(error instanceof Error ? error.message : "Your profiling preference could not be saved.");
+    } finally {
+      setProfilingSaving(false);
+    }
+  }
+
   function handleFormShortcut(event: KeyboardEvent) {
     if (event.key === "Escape" && !saving()) {
       event.preventDefault();
@@ -96,6 +117,11 @@ export function EditProfileModal(props: { onClose: () => void; showWeddingUpgrad
   createEffect(() => {
     queueMicrotask(() => displayNameRef?.focus());
   });
+
+  void loadLedger()
+    .then((ledger) => setProfilingEnabledState(ledger.profiling_enabled))
+    .catch(() => setProfilingError("Your profiling preference could not be loaded."))
+    .finally(() => setProfilingLoading(false));
 
   return (
     <DialogShell
@@ -211,6 +237,30 @@ export function EditProfileModal(props: { onClose: () => void; showWeddingUpgrad
               </For>
             </div>
           </div>
+
+          <section class="rounded-2xl border border-outline/15 bg-white/55 p-4" aria-labelledby="edit-profile-profiling-title">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <div class="min-w-0 flex-1">
+                <p id="edit-profile-profiling-title" class="text-sm font-semibold text-on-surface">Profiling ledger</p>
+                <p class="mt-1 text-xs leading-5 text-on-surface-variant">
+                  Turn off preference learning without deleting your profile. This uses the same setting shown in the Profiling ledger.
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={profilingEnabled()}
+                onClick={() => void toggleProfiling()}
+                disabled={profilingLoading() || profilingSaving()}
+                class={`min-h-11 rounded-full border px-4 py-2 text-sm font-semibold transition disabled:cursor-wait disabled:opacity-60 ${profilingEnabled() ? "border-primary/30 bg-primary/10 text-primary" : "border-outline/25 bg-white text-on-surface-variant"}`}
+              >
+                {profilingLoading() ? "Loading…" : profilingSaving() ? "Saving…" : profilingEnabled() ? "Profiling on" : "Profiling off"}
+              </button>
+            </div>
+            <Show when={profilingError()}>
+              <p class="mt-2 text-xs leading-5 text-error" role="alert">{profilingError()}</p>
+            </Show>
+          </section>
 
           <Show when={props.showWeddingUpgrade}>
           <div class="rounded-2xl border border-primary/25 bg-primary/7 p-4">

@@ -1,7 +1,7 @@
 ﻿// @locs-version: 1.0
 import { isRecord } from "@/lib/eventDetail";
 import { parseJsonValue } from "@/lib/jsonParseState";
-import { accountScopedStorageKey } from "@/lib/accountScopedStorage";
+import { accountScopedStorageKey, accountScopedStorageReadKey } from "@/lib/accountScopedStorage";
 
 export const ACTIVATION_TIMES_KEY = "omnyid.skill-activation-times";
 export const ACTIVATION_HISTORY_KEY = "omnyid.skill-activation-history";
@@ -94,8 +94,7 @@ function skillsScopedStorageKey(baseKey: string, userId?: string | null): string
 }
 
 function loadSkillsStorageValue(baseKey: string, userId?: string | null): string | null {
-  const scopedKey = skillsScopedStorageKey(baseKey, userId);
-  return localStorage.getItem(scopedKey) ?? localStorage.getItem(baseKey);
+  return localStorage.getItem(accountScopedStorageReadKey(baseKey, userId));
 }
 
 function removeSkillsStorageValue(baseKey: string, userId?: string | null): void {

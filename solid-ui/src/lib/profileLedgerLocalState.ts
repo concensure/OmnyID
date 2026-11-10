@@ -51,7 +51,7 @@ function scopedProfileLedgerStorageKey(baseKey: string, userId?: string | null):
 
 function loadProfileLedgerStorageValue(baseKey: string, userId?: string | null): string | null {
   const scopedKey = scopedProfileLedgerStorageKey(baseKey, userId);
-  return localStorage.getItem(scopedKey) ?? localStorage.getItem(baseKey);
+  return localStorage.getItem(scopedKey);
 }
 
 function writeScopedProfileLedgerStorageValue(

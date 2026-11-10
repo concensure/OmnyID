@@ -1169,7 +1169,7 @@ function DailyBriefingBar(props: {
               style={pct() >= 100 ? { filter: "drop-shadow(0 0 3px rgba(34,197,94,0.7))" } : {}}
             />
           </svg>
-          <span class="absolute inset-0 flex items-center justify-center font-mono text-[7px] text-on-surface-variant/60">
+          <span class="absolute inset-0 flex items-center justify-center font-mono text-[8px] text-on-surface-variant/60">
             {pct()}
           </span>
         </div>
@@ -1790,7 +1790,7 @@ function DecisionCard(props: {
                       class="pointer-events-none absolute right-0 top-full z-[60] mt-1 hidden min-w-[190px] max-w-[240px] rounded-xl border border-primary/20 bg-white/97 p-2.5 shadow-xl backdrop-blur-sm group-hover:block"
                       role="tooltip"
                     >
-                      <p class="mb-1 font-mono text-[7px] uppercase tracking-[0.16em] text-primary/50">{decisionOsAiRecommendationTitle()}</p>
+                      <p class="mb-1 font-mono text-[8px] uppercase tracking-[0.16em] text-primary/50">{decisionOsAiRecommendationTitle()}</p>
                       <p class="text-[10px] text-on-surface leading-relaxed">
                         {decisionOsAiRecommendationDetail(opt.detail)}
                       </p>
@@ -1831,7 +1831,7 @@ function DecisionCard(props: {
               class="pointer-events-none absolute bottom-full left-0 z-[60] mb-1 hidden min-w-[190px] max-w-[230px] rounded-xl border border-white/70 bg-white/97 p-2 shadow-xl backdrop-blur-sm group-hover:block"
               role="tooltip"
             >
-              <p class="mb-1 font-mono text-[7px] uppercase tracking-[0.16em] text-on-surface-variant/40">{decisionOsDecisionCardImpactTooltipTitle()}</p>
+              <p class="mb-1 font-mono text-[8px] uppercase tracking-[0.16em] text-on-surface-variant/40">{decisionOsDecisionCardImpactTooltipTitle()}</p>
               <p class="text-[10px] text-on-surface leading-relaxed">{decisionOsImpactExplanation(d.impact)}</p>
             </div>
           </div>
@@ -1865,7 +1865,7 @@ function DecisionCard(props: {
                 class="pointer-events-none absolute bottom-full left-0 z-[60] mb-1 hidden min-w-[160px] max-w-[200px] rounded-xl border border-white/70 bg-white/97 p-2 shadow-xl backdrop-blur-sm group-hover:block"
                 role="tooltip"
               >
-                <p class="mb-1 font-mono text-[7px] uppercase tracking-[0.14em] text-on-surface-variant/40">{decisionOsDecisionCardSourcesTooltipTitle()}</p>
+                <p class="mb-1 font-mono text-[8px] uppercase tracking-[0.14em] text-on-surface-variant/40">{decisionOsDecisionCardSourcesTooltipTitle()}</p>
                 <For each={sourcePreviewItems()}>
                   {(item) => <p class="truncate py-0.5 text-[10px] text-on-surface">{item.icon} {item.title}</p>}
                 </For>

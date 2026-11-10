@@ -173,7 +173,7 @@ export function SearchBar(props: {
   const ssKey = () => accountScopedStorageKey(SAVED_SEARCH_KEY, props.userId);
   const legacySavedSearchKeys = () =>
     props.userId
-      ? [`${SAVED_SEARCH_KEY}.${props.userId}`, SAVED_SEARCH_KEY]
+      ? [`${SAVED_SEARCH_KEY}.${props.userId}`]
       : [];
   const bmKey = () => props.userId ? `${BOOLEAN_MODE_KEY}.${props.userId}` : BOOLEAN_MODE_KEY;
   const [query, setQuery] = createSignal("");

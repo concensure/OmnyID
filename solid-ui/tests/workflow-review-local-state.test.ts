@@ -459,7 +459,7 @@ test("workflow review local state tolerates storage read and write failures", ()
   );
 });
 
-test("workflow review local state migrates legacy global keys into scoped keys", () => {
+test("authenticated workflow review ignores unowned legacy global keys", () => {
   const localStorage = createStorage();
   const userId = "user-1";
   const reviewStateKey = accountScopedStorageKey("omnyid.workflow.runHistory.review.v1", userId);
@@ -486,9 +486,9 @@ test("workflow review local state migrates legacy global keys into scoped keys",
   );
 
   assert.deepEqual(loadWorkflowRunHistoryReviewStorageState(userId), {
-    driftFilter: "deployment",
-    sortMode: "drift_desc",
-    selectedRuns: { "workflow-a": "run-a" },
+    driftFilter: "all",
+    sortMode: "recent",
+    selectedRuns: {},
     reviewContexts: {},
     sharedReviewUiContexts: {},
   });
@@ -498,51 +498,13 @@ test("workflow review local state migrates legacy global keys into scoped keys",
       inferShareMode: () => "core",
       now: () => "2026-07-18T12:00:00.000Z",
     }, userId),
-    {
-      "workflow-a": [
-        {
-          id: "shared_review-generated",
-          href: "https://example.test/review?wf=workflow-a",
-          saved_at: "2026-07-18T12:00:00.000Z",
-          environment: null,
-          deployment_id: null,
-          share_mode: "core",
-          title: null,
-          pinned: false,
-        },
-      ],
-    },
+    {},
   );
 
-  assert.equal(localStorage.getItem("omnyid.workflow.runHistory.review.v1"), null);
-  assert.equal(localStorage.getItem("omnyid.workflow.sharedReviewLinks.v1"), null);
-  assert.equal(
-    localStorage.getItem(reviewStateKey),
-    JSON.stringify({
-      drift_filter: "deployment",
-      sort_mode: "drift_desc",
-      selected_runs: { "workflow-a": "run-a" },
-      review_contexts: {},
-      shared_review_ui_contexts: {},
-    }),
-  );
-  assert.equal(
-    localStorage.getItem(sharedLinksKey),
-    JSON.stringify({
-      "workflow-a": [
-        {
-          id: "shared_review-generated",
-          href: "https://example.test/review?wf=workflow-a",
-          saved_at: "2026-07-18T12:00:00.000Z",
-          environment: null,
-          deployment_id: null,
-          share_mode: "core",
-          title: null,
-          pinned: false,
-        },
-      ],
-    }),
-  );
+  assert.notEqual(localStorage.getItem("omnyid.workflow.runHistory.review.v1"), null);
+  assert.notEqual(localStorage.getItem("omnyid.workflow.sharedReviewLinks.v1"), null);
+  assert.equal(localStorage.getItem(reviewStateKey), null);
+  assert.equal(localStorage.getItem(sharedLinksKey), null);
 });
 
 test("workflow review url state parsing and share-mode inference stay in the review helper", () => {

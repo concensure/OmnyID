@@ -4,11 +4,26 @@
 
 import { isRecord } from "@/lib/eventDetail";
 import { parseJsonValue } from "@/lib/jsonParseState";
+import { accountScopedStorageKey } from "@/lib/accountScopedStorage";
 
 const LEDGER_KEY       = "omnyid.profile.ledger.e2"; // .e2 = identity-derived key
 const SALT_KEY         = "omnyid.ledger.salt";
 const CONSENT_KEY      = "omnyid.profiling.consent";
 const SESSION_KEY_FB   = "omnyid.ck"; // fallback: session key when identity unavailable
+
+let ledgerAccountUserId: string | null = null;
+
+function scopedLedgerKey(baseKey: string): string {
+  return accountScopedStorageKey(baseKey, ledgerAccountUserId);
+}
+
+/** Set before any ledger read so authenticated browser state can never cross accounts. */
+export function setProfileLedgerAccountScope(userId: string | null | undefined): void {
+  const normalized = typeof userId === "string" ? userId.trim() : "";
+  ledgerAccountUserId = normalized || null;
+  _resolvedKey = null;
+  _keyIsIdentityDerived = false;
+}
 
 const MAX_ENTRIES      = 500;
 const MAX_FIELD_LEN    = 1_000;
@@ -319,12 +334,13 @@ export type UISignal = { kind: UISignalKind; context?: string };
 // The key is never stored — reconstructed from identity on each session.
 
 function getLedgerSalt(): Uint8Array {
-  const stored = localStorage.getItem(SALT_KEY);
+  const key = scopedLedgerKey(SALT_KEY);
+  const stored = localStorage.getItem(key);
   if (stored) {
     try { return Uint8Array.from(atob(stored), (c) => c.charCodeAt(0)); } catch { /* regenerate */ }
   }
   const salt = crypto.getRandomValues(new Uint8Array(32));
-  localStorage.setItem(SALT_KEY, btoa(String.fromCharCode(...salt)));
+  localStorage.setItem(key, btoa(String.fromCharCode(...salt)));
   return salt;
 }
 
@@ -351,18 +367,19 @@ async function deriveLedgerKey(privateKeyBytes: Uint8Array): Promise<CryptoKey |
 async function getSessionFallbackKey(): Promise<CryptoKey | null> {
   if (typeof crypto === "undefined" || !crypto.subtle) return null;
   try {
-    const stored = sessionStorage.getItem(SESSION_KEY_FB);
+    const storageKey = scopedLedgerKey(SESSION_KEY_FB);
+    const stored = sessionStorage.getItem(storageKey);
     if (stored) {
       const jwk = parseLedgerSessionFallbackJwk(stored);
       if (!jwk) {
-        sessionStorage.removeItem(SESSION_KEY_FB);
+        sessionStorage.removeItem(storageKey);
         return null;
       }
       return await crypto.subtle.importKey("jwk", jwk, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
     }
     const key = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]);
     const jwk = await crypto.subtle.exportKey("jwk", key);
-    sessionStorage.setItem(SESSION_KEY_FB, JSON.stringify(jwk));
+    sessionStorage.setItem(storageKey, JSON.stringify(jwk));
     return key;
   } catch { return null; }
 }
@@ -643,17 +660,15 @@ function defaultLedger(): ProfileLedger {
 
 export async function loadLedger(): Promise<ProfileLedger> {
   const cryptoKey = await getCryptoKey();
-  const raw = localStorage.getItem(LEDGER_KEY);
+  const storageKey = scopedLedgerKey(LEDGER_KEY);
+  const raw = localStorage.getItem(storageKey);
   if (!raw) {
-    // Attempt migration from old .e1 key (session-based) — if it fails, start fresh silently
-    const oldRaw = localStorage.getItem("omnyid.profile.ledger.e1");
-    if (oldRaw) localStorage.removeItem("omnyid.profile.ledger.e1");
     return defaultLedger();
   }
   if (cryptoKey) {
     const plain = await decryptJson(cryptoKey, raw);
     if (plain === null) {
-      localStorage.removeItem(LEDGER_KEY);
+      localStorage.removeItem(storageKey);
       return defaultLedger();
     }
     return parseLedger(plain);
@@ -680,7 +695,7 @@ export async function saveLedger(ledger: ProfileLedger): Promise<StorageStatus> 
   const cryptoKey = await getCryptoKey();
   try {
     const payload = cryptoKey ? await encryptJson(cryptoKey, json) : json;
-    localStorage.setItem(LEDGER_KEY, payload);
+    localStorage.setItem(scopedLedgerKey(LEDGER_KEY), payload);
     return "ok";
   } catch (err) {
     if (err instanceof DOMException && err.name === "QuotaExceededError") return "quota_exceeded";
@@ -690,8 +705,12 @@ export async function saveLedger(ledger: ProfileLedger): Promise<StorageStatus> 
 
 // ─── Consent ──────────────────────────────────────────────────────────────────
 
-export function hasConsentBeenAsked(): boolean { return localStorage.getItem(CONSENT_KEY) === "done"; }
-export function markConsentAsked(): void { localStorage.setItem(CONSENT_KEY, "done"); }
+export function hasConsentBeenAsked(): boolean {
+  return localStorage.getItem(scopedLedgerKey(CONSENT_KEY)) === "done";
+}
+export function markConsentAsked(): void {
+  localStorage.setItem(scopedLedgerKey(CONSENT_KEY), "done");
+}
 
 export async function setProfilingEnabled(enabled: boolean): Promise<StorageStatus> {
   const ledger = await loadLedger();

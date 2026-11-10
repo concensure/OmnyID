@@ -1,7 +1,7 @@
 // @locs-version: 1.0
 import { isRecord } from "@/lib/eventDetail";
 import { parseJsonValue } from "@/lib/jsonParseState";
-import { accountScopedStorageKey } from "@/lib/accountScopedStorage";
+import { accountScopedStorageKey, accountScopedStorageReadKey } from "@/lib/accountScopedStorage";
 
 const CONTEXT_ANNOTATIONS_KEY = "omnyid.decisionos.context-annotations";
 
@@ -41,7 +41,7 @@ function removeAnnotationsStorage(userId?: string | null): void {
 function loadAnnotations(userId?: string | null): Record<string, string> {
   const scopedKey = scopedAnnotationStorageKey(userId);
   try {
-    const raw = localStorage.getItem(scopedKey) ?? localStorage.getItem(CONTEXT_ANNOTATIONS_KEY);
+    const raw = localStorage.getItem(accountScopedStorageReadKey(CONTEXT_ANNOTATIONS_KEY, userId));
     if (!raw) return {};
     const parsed = parseJsonValue(raw);
     if (!parsed.ok) {

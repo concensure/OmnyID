@@ -6,6 +6,7 @@ try {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
   await page.addInitScript(() => localStorage.setItem('omnyid.public.privacy.v1', JSON.stringify({ version: 1, analytics: false, saved_at: '2026-11-09T00:00:00.000Z' })));
   let extractionRequests = 0;
+  let shareRequests = 0;
   await page.route('**/wedding/quote-extract', async (route) => {
     extractionRequests += 1;
     const request = route.request().postDataJSON();
@@ -28,6 +29,14 @@ try {
       line_items: [{ label: 'Dinner package', unit: 'per_head', amount: 275, source_snippet: '120 guests x $275.00', confidence: 'high' }],
       inclusions: [{ label: 'Dinner package', source_snippet: 'Dinner package for 120 guests x $275.00' }], exclusions: [],
     }) });
+  });
+  await page.route('**/wedding/quote-share', async (route) => {
+    shareRequests += 1;
+    const request = route.request().postDataJSON();
+    if (request.email !== 'couple@example.com' || !Array.isArray(request.snapshot?.proposals)) {
+      throw new Error('Share request lost the recipient or comparison snapshot');
+    }
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'sent', message: 'PDF sent.' }) });
   });
   await page.goto(`${origin}/wedding/compare-wedding-venue-quotes.html`, { waitUntil: 'domcontentloaded' });
   if (await page.locator('[name=company]').isVisible()) throw new Error('Quote honeypot became a visible blank field');
@@ -64,10 +73,19 @@ try {
   });
   await page.locator('[data-extract-selection=b]').click();
   if (await page.locator('[name=b_gst]').inputValue() !== 'unclear') throw new Error('Extract-from-selection did not map the chosen source');
+  if (!await page.locator('[data-source-highlight=b]').isVisible()) throw new Error('Mapped quote source was not persistently highlighted');
+  if (!await page.locator('[data-source-highlight=b]').evaluate((element) => getComputedStyle(element).backgroundColor === 'rgb(255, 243, 166)')) {
+    throw new Error('Mapped quote source was not highlighted in yellow');
+  }
   await page.locator('[data-quote-decoder]').evaluate((form) => form.requestSubmit());
   const comparisonText = await page.locator('[data-quote-result]').innerText();
   if (!comparisonText.includes('Not enough pricing stated')) throw new Error(`Unknown core price was not explained: ${comparisonText}`);
   if (comparisonText.includes('undefined')) throw new Error(`Comparison rendered an undefined value: ${comparisonText}`);
+  await page.locator('[data-open-share]').click();
+  await page.locator('[name=share_email]').fill('couple@example.com');
+  await page.locator('[data-quote-share]').evaluate((form) => form.requestSubmit());
+  await page.locator('[data-share-status]').getByText('PDF sent.').waitFor();
+  if (shareRequests !== 1) throw new Error(`Expected one PDF share request, saw ${shareRequests}`);
   await page.locator('[data-clear-analysis=a]').click();
   if (!await page.locator('[data-analysis-status=a]').innerText().then((text) => text.includes('cleared'))) throw new Error('Clear saved analysis did not provide feedback');
   if (await page.locator('[data-suggestions=a] > *').count() !== 0) throw new Error('Clear saved analysis left stale suggestions visible');
@@ -90,7 +108,7 @@ try {
   const rootZoom = await desktop.evaluate(() => getComputedStyle(document.documentElement).zoom);
   if (rootZoom !== '1.1') throw new Error(`Expected desktop root zoom 1.1, received ${rootZoom}`);
   await desktop.close();
-  console.log(JSON.stringify({ summary, extractionRequests, cached: true, componentSubtotalProtected: true, mobileWidth: 390, weddingZoom, rootZoom }));
+  console.log(JSON.stringify({ summary, extractionRequests, shareRequests, cached: true, componentSubtotalProtected: true, mobileWidth: 390, weddingZoom, rootZoom }));
 } finally {
   await browser.close();
 }

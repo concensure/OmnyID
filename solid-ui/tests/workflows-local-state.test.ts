@@ -303,7 +303,7 @@ test("workflow local state writers persist only normalized values", () => {
   );
 });
 
-test("workflow local state migrates legacy global keys into scoped keys", () => {
+test("authenticated workflow state ignores unowned legacy global keys", () => {
   const localStorage = createStorage();
   const userId = "user-1";
   const tagsKey = accountScopedStorageKey(WORKFLOW_TAGS_STORAGE_KEY, userId);
@@ -327,30 +327,20 @@ test("workflow local state migrates legacy global keys into scoped keys", () => 
   );
   localStorage.setItem(WORKFLOW_BRANCH_FAMILY_COLLAPSE_STORAGE_KEY, JSON.stringify(["family-a"]));
 
-  assert.deepEqual(loadWorkflowTags(userId), { "workflow-a": ["alpha"] });
-  assert.deepEqual(loadWorkflowNodeComments(userId), { "node-a": "comment" });
-  assert.deepEqual([...loadWorkflowHasRun(userId)], ["workflow-a"]);
-  assert.deepEqual(loadWorkflowRunStats(userId), { "workflow-a": { ok: 2, fail: 1 } });
-  assert.deepEqual(loadWorkflowVersions(userId), {
-    "workflow-a": [{ nodes: [], ts: "2026-07-18T00:00:00.000Z" }],
-  });
-  assert.deepEqual([...loadCollapsedWorkflowBranchFamilies(userId)], ["family-a"]);
+  assert.deepEqual(loadWorkflowTags(userId), {});
+  assert.deepEqual(loadWorkflowNodeComments(userId), {});
+  assert.deepEqual([...loadWorkflowHasRun(userId)], []);
+  assert.deepEqual(loadWorkflowRunStats(userId), {});
+  assert.deepEqual(loadWorkflowVersions(userId), {});
+  assert.deepEqual([...loadCollapsedWorkflowBranchFamilies(userId)], []);
 
-  assert.equal(localStorage.getItem(WORKFLOW_TAGS_STORAGE_KEY), null);
-  assert.equal(localStorage.getItem(NODE_COMMENTS_KEY), null);
-  assert.equal(localStorage.getItem(WORKFLOW_HAS_RUN_KEY), null);
-  assert.equal(localStorage.getItem(WORKFLOW_RUN_STATS_KEY), null);
-  assert.equal(localStorage.getItem(WORKFLOW_VERSIONS_KEY), null);
-  assert.equal(localStorage.getItem(WORKFLOW_BRANCH_FAMILY_COLLAPSE_STORAGE_KEY), null);
-  assert.equal(localStorage.getItem(tagsKey), JSON.stringify({ "workflow-a": ["alpha"] }));
-  assert.equal(localStorage.getItem(commentsKey), JSON.stringify({ "node-a": "comment" }));
-  assert.equal(localStorage.getItem(hasRunKey), JSON.stringify(["workflow-a"]));
-  assert.equal(localStorage.getItem(runStatsKey), JSON.stringify({ "workflow-a": { ok: 2, fail: 1 } }));
-  assert.equal(
-    localStorage.getItem(versionsKey),
-    JSON.stringify({ "workflow-a": [{ nodes: [], ts: "2026-07-18T00:00:00.000Z" }] }),
-  );
-  assert.equal(localStorage.getItem(collapsedKey), JSON.stringify(["family-a"]));
+  assert.notEqual(localStorage.getItem(WORKFLOW_TAGS_STORAGE_KEY), null);
+  assert.equal(localStorage.getItem(tagsKey), null);
+  assert.equal(localStorage.getItem(commentsKey), null);
+  assert.equal(localStorage.getItem(hasRunKey), null);
+  assert.equal(localStorage.getItem(runStatsKey), null);
+  assert.equal(localStorage.getItem(versionsKey), null);
+  assert.equal(localStorage.getItem(collapsedKey), null);
 });
 
 test("workflow local state reducers mark runs and compute run stats", () => {

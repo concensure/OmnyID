@@ -38,7 +38,7 @@
         ? `<select name="${name}" data-source-field="${prefix}:${key}">${options.map(([optionValue, optionLabel]) => `<option value="${optionValue}">${escapeHtml(optionLabel)}</option>`).join("")}</select>`
         : type === "text"
           ? `<textarea name="${name}" rows="2" maxlength="500" data-source-field="${prefix}:${key}" placeholder="Not stated"></textarea>`
-          : `<input name="${name}" type="number" min="0" ${key === "guest_count" ? 'max="5000" step="1"' : key === "service_charge_pct" ? 'max="100" step="0.1"' : key === "venue_hours" ? 'max="48" step="0.5"' : 'step="0.01"'} inputmode="decimal" data-source-field="${prefix}:${key}" placeholder="Not stated">`;
+          : `<input name="${name}" type="number" min="0" ${key === "guest_count" ? 'max="5000"' : key === "service_charge_pct" ? 'max="100"' : key === "venue_hours" ? 'max="48"' : ''} step="1" inputmode="numeric" data-source-field="${prefix}:${key}" placeholder="Not stated">`;
       return `<label class="magnet-field"><span>${escapeHtml(label)} ${helpMarkup}</span>${input}<small class="quote-field-state" data-field-state="${prefix}:${key}">Not analysed</small></label>`;
     }).join("");
     const target = document.querySelector(`[data-selection-target="${prefix}"]`);
@@ -53,7 +53,7 @@
     host.innerHTML = rows.length ? `<div class="quote-line-table-wrap"><table class="quote-line-table"><thead><tr><th>Item</th><th>Basis</th><th>Amount</th><th><span title="Tick only when this is additional to the package figures above">Add to total</span></th><th></th></tr></thead><tbody>${rows.map((row, index) => `<tr>
       <td><input data-line-label="${prefix}:${index}" value="${escapeHtml(row.label)}" aria-label="Line item ${index + 1} name"><small>${escapeHtml(row.source_snippet || "Manually added")}</small></td>
       <td><select data-line-unit="${prefix}:${index}" aria-label="Line item ${index + 1} basis"><option value="included" ${row.unit === "included" ? "selected" : ""}>Included / don't add</option><option value="per_head" ${row.unit === "per_head" ? "selected" : ""}>Per head</option><option value="fixed" ${row.unit === "fixed" ? "selected" : ""}>Fixed</option><option value="unclear" ${row.unit === "unclear" ? "selected" : ""}>Unclear</option></select></td>
-      <td><input data-line-amount="${prefix}:${index}" type="number" min="0" step="0.01" value="${row.amount ?? ""}" aria-label="Line item ${index + 1} amount"></td>
+      <td><input data-line-amount="${prefix}:${index}" type="number" min="0" step="1" inputmode="numeric" value="${row.amount ?? ""}" aria-label="Line item ${index + 1} amount"></td>
       <td><input data-line-counted="${prefix}:${index}" type="checkbox" ${row.counted ? "checked" : ""} aria-label="Add line item ${index + 1} to total"></td>
       <td><button type="button" class="quote-line-remove" data-remove-line="${prefix}:${index}" aria-label="Remove line item ${index + 1}">Remove</button></td>
     </tr>`).join("")}</tbody></table></div>` : `<p class="quote-empty-lines">No line items yet. Analyse the quote or add one manually.</p>`;
@@ -95,9 +95,17 @@
 
   function highlightSource(prefix, source) {
     const textarea = field(`${prefix}_text`);
-    if (!textarea || !source) return;
+    const highlight = document.querySelector(`[data-source-highlight="${prefix}"]`);
+    if (!textarea || !source) {
+      if (highlight) highlight.hidden = true;
+      return;
+    }
     const start = textarea.value.indexOf(source);
     if (start < 0) return;
+    if (highlight) {
+      highlight.textContent = source;
+      highlight.hidden = false;
+    }
     textarea.focus({ preventScroll: true });
     textarea.setSelectionRange(start, start + source.length);
     textarea.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -187,15 +195,28 @@
         result = cached.result;
         status.textContent = "Reused the structured analysis saved in this browser. No new model request was made.";
       } else {
-        const response = await fetch("/wedding/quote-extract", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text, proposal: prefix.toUpperCase(), comparison_guests: engine.finite(value("comparison_guests")), company: value("company") }) });
-        if (!response.ok) throw new Error((await response.text()) || "The analysis service is temporarily unavailable.");
-        result = await response.json();
+        const response = await fetch("/wedding/quote-extract", { method: "POST", headers: { "Content-Type": "application/json", "Accept": "application/json" }, body: JSON.stringify({ text, proposal: prefix.toUpperCase(), comparison_guests: engine.finite(value("comparison_guests")), company: value("company") }) });
+        const responseText = await response.text();
+        if (!response.ok) {
+          const message = response.status === 429
+            ? "This public analyser has reached its request limit. Wait a little, or enter the terms manually below."
+            : "The analysis service is temporarily unavailable. Your pasted quote remains here; enter the terms manually or try again shortly.";
+          throw new Error(message);
+        }
+        try { result = JSON.parse(responseText); }
+        catch { throw new Error("The analysis service returned an unreadable response. Your pasted quote remains here; try again or enter the terms manually."); }
+        if (result?.schema_version !== "quote-extraction.v2" || !result.fields || typeof result.fields !== "object") {
+          throw new Error("The analysis response was incomplete, so no fields were changed. Try again or enter the terms manually.");
+        }
         cache.entries.push({ key, result, saved_at: new Date().toISOString() });
         status.textContent = "Analysis ready. High-confidence stated terms were applied; review their source snippets and correct anything that differs from the quote.";
       }
       cache.lastBySide = { ...(cache.lastBySide || {}), [prefix]: key };
       cacheWrite(cache);
       status.dataset.kind = "success";
+      if (result?.schema_version !== "quote-extraction.v2" || !result.fields || typeof result.fields !== "object") {
+        throw new Error("The saved analysis was incomplete. Clear it and analyse this quote again.");
+      }
       useExtraction(prefix, result, previous);
     } catch (error) {
       status.textContent = error?.message || "The analysis service is temporarily unavailable. Enter the commercial terms manually below.";
@@ -278,6 +299,83 @@
     const result = document.querySelector("[data-quote-result]"); result.hidden = false; result.focus({ preventScroll: true }); result.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
+  function shareSnapshot() {
+    const guests = engine.finite(value("comparison_guests")) || 100;
+    const hours = engine.finite(value("comparison_hours")) || 6;
+    const items = [proposal("a"), proposal("b")].filter(isActive);
+    return {
+      generated_at: new Date().toISOString(),
+      comparison_guests: guests,
+      comparison_hours: hours,
+      proposals: items.map((item) => {
+        const result = engine.calculate(item, guests, hours);
+        return {
+          label: item.label,
+          proposal_text: item.text,
+          pricing_model: item.pricingModel,
+          commercial_terms: {
+            per_head_rate: item.perHeadRate,
+            guest_count: item.quoteGuests,
+            whole_package_amount: item.packageTotal,
+            fixed_fee: item.fixedFee,
+            minimum_spend: item.minimumSpend,
+            gst: item.gst,
+            service_charge_pct: item.servicePct,
+            venue_hours: item.includedHours,
+            overtime_rate: item.overtimeRate,
+            payment_schedule: item.paymentSchedule,
+          },
+          line_items: item.lineItems,
+          estimated_total: result.estimatedTotal,
+          formula_lines: result.lines,
+          assumptions: result.assumptions,
+          unknowns: result.unknowns,
+          follow_up_questions: engine.questions(item, result),
+          extraction_fields: item.fields,
+        };
+      }),
+    };
+  }
+
+  async function sharePdf(event) {
+    event.preventDefault();
+    const shareForm = event.currentTarget;
+    const email = String(shareForm.elements.namedItem("share_email")?.value ?? "").trim();
+    const company = String(shareForm.elements.namedItem("share_company")?.value ?? "").trim();
+    const button = shareForm.querySelector("[data-share-submit]");
+    const status = shareForm.querySelector("[data-share-status]");
+    if (!/^\S+@\S+\.\S+$/.test(email)) {
+      status.textContent = "Enter a valid email address.";
+      status.dataset.kind = "error";
+      return;
+    }
+    button.disabled = true;
+    button.textContent = "Preparing PDF…";
+    status.textContent = "Preparing a private PDF attachment and sending it now…";
+    status.dataset.kind = "";
+    try {
+      const response = await fetch("/wedding/quote-share", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Accept": "application/json" },
+        body: JSON.stringify({ email, company, snapshot: shareSnapshot() }),
+      });
+      const responseText = await response.text();
+      let payload = null;
+      try { payload = JSON.parse(responseText); } catch { /* never expose gateway HTML */ }
+      if (!response.ok) throw new Error(response.status === 429
+        ? "Too many share requests were made. Wait a little before trying again."
+        : payload?.message || "The PDF could not be sent just now. Your comparison is still available here.");
+      status.textContent = payload?.message || `PDF sent to ${email}.`;
+      status.dataset.kind = "success";
+      button.textContent = "PDF sent";
+    } catch (error) {
+      status.textContent = error?.message || "The PDF could not be sent just now. Your comparison is still available here.";
+      status.dataset.kind = "error";
+      button.disabled = false;
+      button.textContent = "Send PDF";
+    }
+  }
+
   function extractSelection(prefix) {
     const textarea = field(`${prefix}_text`);
     const selected = textarea.value.slice(textarea.selectionStart, textarea.selectionEnd).trim();
@@ -295,6 +393,7 @@
       if (!match) { status.textContent = "The selected wording has no number to apply to that field."; status.dataset.kind = "error"; return; }
       setControl(prefix, key, match[0].replaceAll(",", ""), selected);
     }
+    highlightSource(prefix, selected);
     status.textContent = "Applied your selected source to the chosen field."; status.dataset.kind = "success";
   }
 
@@ -315,10 +414,12 @@
     const key = cache.lastBySide?.[prefix];
     if (key) cache.entries = cache.entries.filter((entry) => entry.key !== key);
     if (cache.lastBySide) delete cache.lastBySide[prefix]; cacheWrite(cache); extracted[prefix] = null; acceptedSources[prefix] = {}; lineItems[prefix] = []; renderLineItems(prefix);
-    document.querySelector(`[data-suggestions="${prefix}"]`).innerHTML = ""; document.querySelector(`[data-analysis-status="${prefix}"]`).textContent = "Saved analysis for this proposal was cleared. Manual fields were left unchanged.";
+    document.querySelector(`[data-suggestions="${prefix}"]`).innerHTML = "";
+    const highlight = document.querySelector(`[data-source-highlight="${prefix}"]`); if (highlight) highlight.hidden = true;
+    const status = document.querySelector(`[data-analysis-status="${prefix}"]`); status.textContent = "Saved analysis for this proposal was cleared. Manual fields were left unchanged."; status.dataset.kind = "success";
   }));
   document.querySelectorAll("[data-extract-selection]").forEach((button) => button.addEventListener("click", () => extractSelection(button.dataset.extractSelection)));
-  document.querySelectorAll("[data-add-line]").forEach((button) => button.addEventListener("click", () => { const prefix = button.dataset.addLine; lineItems[prefix].push({ label: "", unit: "fixed", amount: null, counted: false, source_snippet: "" }); renderLineItems(prefix); }));
+  document.querySelectorAll("[data-add-line]").forEach((button) => button.addEventListener("click", () => { const prefix = button.dataset.addLine; lineItems[prefix].push({ label: "", unit: "fixed", amount: null, counted: false, source_snippet: "" }); renderLineItems(prefix); const status = document.querySelector(`[data-analysis-status="${prefix}"]`); status.textContent = "Blank line item added below."; status.dataset.kind = "success"; }));
   document.querySelectorAll("[data-source-field]").forEach((control) => control.addEventListener("click", () => { const [prefix, key] = control.dataset.sourceField.split(":"); highlightSource(prefix, acceptedSources[prefix][key]); }));
   for (const prefix of ["a", "b"]) field(`${prefix}_file`).addEventListener("change", (event) => void readFile(prefix, event.currentTarget.files?.[0]));
   document.querySelectorAll("[data-copy]").forEach((button) => button.addEventListener("click", async () => {
@@ -327,5 +428,9 @@
     try { await navigator.clipboard.writeText(body); button.textContent = "Copied"; } catch { button.textContent = "Select the questions above to copy"; }
   }));
   document.querySelector("[data-print]").addEventListener("click", () => window.print());
+  const shareForm = document.querySelector("[data-quote-share]");
+  document.querySelector("[data-open-share]")?.addEventListener("click", () => { shareForm.hidden = false; shareForm.querySelector('[name="share_email"]')?.focus(); shareForm.scrollIntoView({ behavior: "smooth", block: "center" }); });
+  document.querySelector("[data-share-cancel]")?.addEventListener("click", () => { shareForm.hidden = true; });
+  shareForm?.addEventListener("submit", sharePdf);
   window.OmnyVenueQuoteDecoder = { calculate: engine.calculate, proposal };
 })();

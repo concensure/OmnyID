@@ -107,7 +107,7 @@ function removeThreadViewSessionStorageValue(key: string): void {
 function loadThreadViewStarredMessageIdsForUser(userId: string | null | undefined): Set<string> {
   try {
     const scopedKey = accountScopedStorageKey(THREAD_VIEW_STARRED_KEY, userId);
-    const raw = localStorage.getItem(scopedKey) ?? localStorage.getItem(THREAD_VIEW_STARRED_KEY);
+    const raw = localStorage.getItem(scopedKey);
     if (!raw) return new Set<string>();
     const parsed = parseJsonValue(raw);
     if (!parsed.ok) {
@@ -149,7 +149,7 @@ export function saveThreadViewStarredMessageIds(value: ReadonlySet<string>, user
 export function loadThreadViewReactions(userId?: string | null): Record<string, Record<string, number>> {
   try {
     const scopedKey = accountScopedStorageKey(THREAD_VIEW_REACTIONS_KEY, userId);
-    const raw = localStorage.getItem(scopedKey) ?? localStorage.getItem(THREAD_VIEW_REACTIONS_KEY);
+    const raw = localStorage.getItem(scopedKey);
     if (!raw) return {};
     const parsed = parseJsonValue(raw);
     if (!parsed.ok) {
@@ -193,7 +193,7 @@ export function loadThreadViewLastReadMessageId(threadId: string, userId?: strin
   if (!storageKey) return null;
   try {
     const scopedRaw = localStorage.getItem(storageKey);
-    const legacyRaw = legacyKey ? localStorage.getItem(legacyKey) : null;
+    const legacyRaw = !userId && legacyKey ? localStorage.getItem(legacyKey) : null;
     const raw = scopedRaw ?? legacyRaw;
     const normalized = normalizeThreadViewMessageId(raw);
     if (normalized && (raw !== normalized || scopedRaw !== normalized)) {
@@ -230,7 +230,7 @@ export function loadThreadViewScrollPosition(threadId: string, userId?: string |
   if (!storageKey) return null;
   try {
     const scopedRaw = sessionStorage.getItem(storageKey);
-    const legacyRaw = legacyKey ? sessionStorage.getItem(legacyKey) : null;
+    const legacyRaw = !userId && legacyKey ? sessionStorage.getItem(legacyKey) : null;
     const raw = scopedRaw ?? legacyRaw;
     const normalized = normalizeThreadViewScrollPosition(raw);
     if (normalized !== null && (String(normalized) !== raw || scopedRaw !== String(normalized))) {

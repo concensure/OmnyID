@@ -3162,3 +3162,21 @@ synthetic vendor search or introduce another send path.
   each time the view renders; no database records are written. The projected
   database opens on Budget by default while user-created databases and the
   existing run-sheet profile remain independently available.
+
+# 2026-11-10 — WED-354 authenticated browser state is account-only and quote sharing is content-free
+
+- Supplying an authenticated account id always resolves mutable browser state
+  to that account's namespace. It never reads a browser-global legacy value as
+  fallback. Anonymous public handoffs may retain their explicit one-time import
+  path, but successful import consumes them.
+- The encrypted Profile Ledger's payload, salt, consent marker and session
+  fallback key use the same account scope. Switching accounts in one browser
+  re-scopes the ledger before profile or consent surfaces read it.
+- The Wedding Database Run sheet is a read-only projection, like Budget,
+  Timeline and Seating. Confirmed arrival or on-site times in account-scoped
+  vendor messages may become source-linked day-of rows; they do not create a
+  second scheduling authority.
+- Public quote-sharing PDFs are generated in memory from the reviewed browser
+  snapshot and sent as an attachment. The database stores only event id,
+  timestamps, delivery status and a coarse provider error class. It never
+  stores proposal text, calculations or recipient email addresses.

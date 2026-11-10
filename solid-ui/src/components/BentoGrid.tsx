@@ -1139,7 +1139,7 @@ function CalendarMiniMonth() {
       </div>
       <div class="grid grid-cols-7 gap-0.5">
         {["S","M","T","W","T","F","S"].map((d) => (
-          <p class="text-center font-mono text-[7px] text-outline/40 py-0.5">{d}</p>
+          <p class="text-center font-mono text-[8px] text-outline/40 py-0.5">{d}</p>
         ))}
         <For each={cells}>
           {(day) => (
@@ -1245,7 +1245,7 @@ function GraphTile(props: { msgs: { type: string; content: unknown }[] }) {
       </div>
       <div class="flex gap-1">
         <For each={["M", "T", "W", "T", "F", "S", "S"]}>
-          {(d) => <p class="flex-1 text-center font-mono text-[7px] text-outline/40">{d}</p>}
+          {(d) => <p class="flex-1 text-center font-mono text-[8px] text-outline/40">{d}</p>}
         </For>
       </div>
     </div>

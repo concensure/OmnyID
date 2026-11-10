@@ -1,5 +1,5 @@
 ﻿// @locs-version: 1.0
-import { accountScopedStorageKey } from "@/lib/accountScopedStorage";
+import { accountScopedStorageKey, accountScopedStorageReadKey } from "@/lib/accountScopedStorage";
 import { isRecord } from "@/lib/eventDetail";
 import { parseJsonValue } from "@/lib/jsonParseState";
 
@@ -32,8 +32,7 @@ function removeDecisionOsStorageValue(baseKey: string, userId: string | null | u
 }
 
 function loadDecisionOsStorageValue(baseKey: string, userId: string | null | undefined): string | null {
-  const scopedKey = scopedDecisionOsStorageKey(baseKey, userId);
-  return localStorage.getItem(scopedKey) ?? localStorage.getItem(baseKey);
+  return localStorage.getItem(accountScopedStorageReadKey(baseKey, userId));
 }
 
 function writeDecisionOsStorageValue(baseKey: string, userId: string | null | undefined, value: string): void {

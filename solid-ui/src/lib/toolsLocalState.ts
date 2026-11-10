@@ -1,5 +1,5 @@
 ﻿// @locs-version: 1.0
-import { accountScopedStorageKey } from "@/lib/accountScopedStorage";
+import { accountScopedStorageKey, accountScopedStorageReadKey } from "@/lib/accountScopedStorage";
 import type { McpToolConnection } from "@/lib/api";
 import { isRecord } from "@/lib/eventDetail";
 import { parseJsonValue } from "@/lib/jsonParseState";
@@ -65,8 +65,7 @@ function scopedToolsStorageKey(baseKey: string, userId?: string | null): string 
 }
 
 function loadToolsStorageValue(baseKey: string, userId?: string | null): string | null {
-  const scopedKey = scopedToolsStorageKey(baseKey, userId);
-  return localStorage.getItem(scopedKey) ?? localStorage.getItem(baseKey);
+  return localStorage.getItem(accountScopedStorageReadKey(baseKey, userId));
 }
 
 function removeToolsStorageValue(baseKey: string, userId?: string | null): void {

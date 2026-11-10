@@ -1,3 +1,33 @@
+## 2026-11-10 - WED-354 Database, account isolation and quote sharing (Codex, release candidate)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
+`agent/codex/WED-354`, based on deployed WED-353 SHA
+`d5c996dd1a19936aef5c3a8c51248aa5b9f6dbe2`.
+
+- Database fullscreen now uses the native browser API and keeps a visible,
+  scrollable fixed-layout fallback. The Wedding projection adds a Run sheet
+  sourced from the same ledger and can derive source-linked confirmed vendor
+  arrival times from messages.
+- Edit Profile exposes the canonical Profile Ledger profiling switch. The
+  encrypted ledger, consent and key material are account scoped; authenticated
+  local state no longer falls back to ambiguous browser-global keys. Explicit
+  6px/7px typography was raised to the eight-pixel floor.
+- Workflows catches temporary API failures inside the editor and has a local
+  retry/back boundary for unexpected render faults. Firefox's null WebAssembly
+  source-map console entry is a developer-tools warning rather than the runtime
+  error and is not treated as application health evidence.
+- The public venue quote tool now applies safe structured extraction to the
+  commercial fields, uses integer steppers, labels manual mapping clearly,
+  shows grounded selections in yellow, keeps gateway HTML out of the UI and
+  can email an auditable PDF. The PDF and recipient stay out of storage; the
+  operator dashboard gets only successful-share counts and a tool link.
+- Evidence: `npm --prefix solid-ui run test:wedding:ci` passes line budgets,
+  public-site checks and all 2,252 Wedding tests; focused account-state tests
+  pass; quote Chromium smoke passes extraction/cache/source/share/mobile
+  assertions; `cargo test --lib wedding_quote_decoder_routes` passes three
+  tests; `cargo check --lib` and TypeScript pass. The next action is the clean
+  exact-SHA UI build, Oracle deployment and hosted provenance/route checks.
+
 ## 2026-11-10 - WED-350 source-grounded venue quote comparison (Codex, complete)
 
 Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch

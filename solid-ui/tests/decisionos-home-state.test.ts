@@ -62,14 +62,14 @@ test("decisionos home state remembers per-decision option choices", () => {
   );
 });
 
-test("decisionos home state migrates legacy option choices into a scoped key", () => {
+test("authenticated decision choices ignore an unowned legacy global key", () => {
   const localStorage = installLocalStorage();
   localStorage.clear();
   localStorage.setItem("omnyid.decision-choices", JSON.stringify({ "decision-1": "approve_fast" }));
 
-  assert.equal(loadOptionChoice("decision-1", userId), "approve_fast");
-  assert.equal(localStorage.getItem(optionChoiceKey), JSON.stringify({ "decision-1": "approve_fast" }));
-  assert.equal(localStorage.getItem("omnyid.decision-choices"), null);
+  assert.equal(loadOptionChoice("decision-1", userId), null);
+  assert.equal(localStorage.getItem(optionChoiceKey), null);
+  assert.notEqual(localStorage.getItem("omnyid.decision-choices"), null);
 });
 
 test("decisionos home state tracks consecutive clear streaks by date", () => {
@@ -131,7 +131,7 @@ test("decisionos home state ignores malformed stored option choices", () => {
   const localStorage = installLocalStorage();
   localStorage.clear();
   localStorage.setItem(
-    "omnyid.decision-choices",
+    optionChoiceKey,
     JSON.stringify({
       "decision-1": "approve_fast",
       "decision-2": 7,
@@ -151,7 +151,7 @@ test("decisionos home state ignores malformed clear streak payloads", () => {
   const localStorage = installLocalStorage();
   localStorage.clear();
   localStorage.setItem(
-    "omnyid.decisionos.clear-streak",
+    clearStreakKey,
     JSON.stringify({
       dates: ["2026-06-27", 7, "2026-06-26"],
     }),
@@ -168,7 +168,7 @@ test("decisionos home state ignores malformed pending outcome checks", () => {
   const localStorage = installLocalStorage();
   localStorage.clear();
   localStorage.setItem(
-    "omnyid.pending-outcome-checks",
+    outcomeChecksKey,
     JSON.stringify([
       {
         id: "decision-2",
@@ -203,7 +203,7 @@ test("decisionos home state ignores malformed snooze history payloads", () => {
   const localStorage = installLocalStorage();
   localStorage.clear();
   localStorage.setItem(
-    "omnyid.decisionos.snooze-history",
+    snoozeHistoryKey,
     JSON.stringify([
       { id: "tomorrow", count: 2, lastUsedAt: "2026-06-27T11:00:00Z" },
       { id: "after_lunch", count: "3", lastUsedAt: "2026-06-27T10:00:00Z" },
@@ -220,12 +220,7 @@ test("decisionos home state ignores malformed snooze history payloads", () => {
 test("decisionos home state clears unparseable persisted json buckets", () => {
   const localStorage = installLocalStorage();
   localStorage.clear();
-  const keys = [
-    "omnyid.decision-choices",
-    "omnyid.decisionos.clear-streak",
-    "omnyid.pending-outcome-checks",
-    "omnyid.decisionos.snooze-history",
-  ];
+  const keys = [optionChoiceKey, clearStreakKey, outcomeChecksKey, snoozeHistoryKey];
   for (const key of keys) localStorage.setItem(key, "{bad-json");
 
   assert.equal(loadOptionChoice("decision-1", userId), null);
@@ -263,7 +258,7 @@ test("decisionos home state persists only normalized snooze history entries on s
   const localStorage = installLocalStorage();
   localStorage.clear();
   localStorage.setItem(
-    "omnyid.decisionos.snooze-history",
+    snoozeHistoryKey,
     JSON.stringify([
       { id: "tomorrow", count: 2, lastUsedAt: "2026-06-27T11:00:00Z" },
     ]),

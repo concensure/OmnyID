@@ -53,7 +53,7 @@ test("thread view local state normalizes starred message ids", () => {
   localStorageState.clear();
   sessionStorageState.clear();
   localStorageState.set(
-    THREAD_VIEW_STARRED_KEY,
+    starredKey,
     JSON.stringify([" msg-a ", "", 7, "msg-b", "msg-a"]),
   );
 
@@ -78,7 +78,7 @@ test("thread view local state normalizes reactions", () => {
   localStorageState.clear();
   sessionStorageState.clear();
   localStorageState.set(
-    THREAD_VIEW_REACTIONS_KEY,
+    reactionsKey,
     JSON.stringify({
       " msg-a ": { " ðŸ‘ ": 2, "": 1, "ðŸ‘Ž": 0, "ðŸ˜‚": "3" },
       "msg-b": { "ðŸ”¥": 1.9, "âœ…": 4 },
@@ -130,8 +130,8 @@ test("thread view local state writers persist only normalized reactions", () => 
 test("thread view local state normalizes last-read message ids", () => {
   localStorageState.clear();
   sessionStorageState.clear();
-  localStorageState.set("omnyid.thread.lastread.thread-a", " msg-a ");
-  localStorageState.set("omnyid.thread.lastread.thread-b", "");
+  localStorageState.set(lastReadKey("thread-a"), " msg-a ");
+  localStorageState.set(lastReadKey("thread-b"), "");
 
   assert.equal(loadThreadViewLastReadMessageId(" thread-a ", userId), "msg-a");
   assert.equal(loadThreadViewLastReadMessageId("thread-b", userId), null);
@@ -153,8 +153,8 @@ test("thread view local state writers persist only normalized last-read message 
 test("thread view local state normalizes scroll positions", () => {
   localStorageState.clear();
   sessionStorageState.clear();
-  sessionStorageState.set("omnyid.thread.scrollpos.thread-a", " 42 ");
-  sessionStorageState.set("omnyid.thread.scrollpos.thread-b", "-7");
+  sessionStorageState.set(scrollPosKey("thread-a"), " 42 ");
+  sessionStorageState.set(scrollPosKey("thread-b"), "-7");
 
   assert.equal(loadThreadViewScrollPosition(" thread-a ", userId), 42);
   assert.equal(loadThreadViewScrollPosition("thread-b", userId), null);
@@ -167,8 +167,8 @@ test("thread view local state normalizes scroll positions", () => {
 test("thread view local state loaders clear unparseable json buckets", () => {
   localStorageState.clear();
   sessionStorageState.clear();
-  localStorageState.set(THREAD_VIEW_STARRED_KEY, "{bad-json");
-  localStorageState.set(THREAD_VIEW_REACTIONS_KEY, "{bad-json");
+  localStorageState.set(starredKey, "{bad-json");
+  localStorageState.set(reactionsKey, "{bad-json");
 
   assert.deepEqual([...loadThreadViewStarredMessageIds(userId)], []);
   assert.deepEqual(loadThreadViewReactions(userId), {});

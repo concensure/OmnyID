@@ -1,5 +1,5 @@
 ﻿// @locs-version: 1.0
-import { accountScopedStorageKey } from "@/lib/accountScopedStorage";
+import { accountScopedStorageKey, accountScopedStorageReadKey } from "@/lib/accountScopedStorage";
 import { isRecord } from "@/lib/eventDetail";
 import { parseJsonValue } from "@/lib/jsonParseState";
 
@@ -44,9 +44,8 @@ function scopedWorkflowStorageKey(baseKey: string, userId?: string | null): stri
 function loadWorkflowStorageValue(baseKey: string, userId?: string | null): string | null {
   const storage = workflowLocalStorage();
   if (!storage) return null;
-  const scopedKey = scopedWorkflowStorageKey(baseKey, userId);
   try {
-    return storage.getItem(scopedKey) ?? storage.getItem(baseKey);
+    return storage.getItem(accountScopedStorageReadKey(baseKey, userId));
   } catch {
     return null;
   }

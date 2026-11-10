@@ -95,7 +95,7 @@ test("saveResponseQueuePolicy persists only normalized numeric and boolean field
   );
 });
 
-test("response queue policy migrates legacy global storage into a scoped key", () => {
+test("authenticated response queue policy ignores an unowned legacy global key", () => {
   localStorageState.set(RESPONSE_QUEUE_POLICY_KEY, JSON.stringify({
     supplier_due_hours: 12,
     friend_due_hours: 24,
@@ -105,21 +105,12 @@ test("response queue policy migrates legacy global storage into a scoped key", (
   }));
 
   assert.deepEqual(loadResponseQueuePolicy(userId), {
-    supplier_due_hours: 12,
-    friend_due_hours: 24,
+    supplier_due_hours: 24,
+    friend_due_hours: 48,
     general_due_hours: 36,
-    prioritize_with_local_llm: false,
+    prioritize_with_local_llm: true,
     allow_remote_fallback: true,
   });
-  assert.equal(localStorageState.has(RESPONSE_QUEUE_POLICY_KEY), false);
-  assert.equal(
-    localStorageState.get(scopedPolicyKey),
-    JSON.stringify({
-      supplier_due_hours: 12,
-      friend_due_hours: 24,
-      general_due_hours: 36,
-      prioritize_with_local_llm: false,
-      allow_remote_fallback: true,
-    }),
-  );
+  assert.equal(localStorageState.has(RESPONSE_QUEUE_POLICY_KEY), true);
+  assert.equal(localStorageState.get(scopedPolicyKey), undefined);
 });

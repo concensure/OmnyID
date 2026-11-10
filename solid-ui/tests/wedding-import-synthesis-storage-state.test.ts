@@ -227,7 +227,7 @@ test("workspace view exposes import parser readiness beside downstream wedding s
   ));
 });
 
-test("saved wedding imports are isolated by user while migrating legacy workspace keys", () => {
+test("saved wedding imports are isolated by user and ignore unowned legacy workspace keys", () => {
   const storage = weddingMemoryStorage();
   const userA = buildWeddingImportSynthesisState({
     metadata,
@@ -254,6 +254,6 @@ test("saved wedding imports are isolated by user while migrating legacy workspac
   });
   storage.setItem(weddingImportStorageKey("response_workspace:legacy"), JSON.stringify(legacy.generatedArtifacts));
 
-  assert.equal(loadWeddingImportedArtifacts("response_workspace:legacy", storage, "legacy-user")[0]?.summary.kind, "guest_list");
-  assert.equal(storage.getItem(weddingImportStorageKey("response_workspace:legacy")), null);
+  assert.equal(loadWeddingImportedArtifacts("response_workspace:legacy", storage, "legacy-user").length, 0);
+  assert.notEqual(storage.getItem(weddingImportStorageKey("response_workspace:legacy")), null);
 });

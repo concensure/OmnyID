@@ -2,7 +2,7 @@
 import { isRecord } from "@/lib/eventDetail";
 import { parseJsonValue } from "@/lib/jsonParseState";
 import type { DecisionOsResponseItem } from "@/lib/decisionosContinuity";
-import { accountScopedStorageKey } from "@/lib/accountScopedStorage";
+import { accountScopedStorageKey, accountScopedStorageReadKey } from "@/lib/accountScopedStorage";
 
 export type ResponseQueueRelationship = "supplier" | "friend" | "client" | "team" | "other";
 
@@ -91,7 +91,7 @@ export function defaultResponseQueuePolicy(): ResponseQueuePolicy {
 export function loadResponseQueuePolicy(userId?: string | null): ResponseQueuePolicy {
   try {
     const scopedKey = scopedResponseQueuePolicyKey(userId);
-    const raw = localStorage.getItem(scopedKey) ?? localStorage.getItem(RESPONSE_QUEUE_POLICY_KEY);
+    const raw = localStorage.getItem(accountScopedStorageReadKey(RESPONSE_QUEUE_POLICY_KEY, userId));
     if (!raw) return defaultResponseQueuePolicy();
     const parsed = parseJsonValue(raw);
     if (!parsed.ok) {

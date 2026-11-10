@@ -1,5 +1,5 @@
 ﻿// @locs-version: 1.0
-import { accountScopedStorageKey } from "@/lib/accountScopedStorage";
+import { accountScopedStorageKey, accountScopedStorageReadKey } from "@/lib/accountScopedStorage";
 import type { ThreadSortMode } from "@/lib/threadSort";
 import { isRecord } from "@/lib/eventDetail";
 import { parseJsonValue } from "@/lib/jsonParseState";
@@ -130,8 +130,7 @@ function removeScopedThreadListStorageValue(baseKey: string, userId: string | nu
 }
 
 function loadRawThreadListStorageValue(baseKey: string, userId: string | null | undefined): string | null {
-  const scopedKey = scopedThreadListStorageKey(baseKey, userId);
-  return localStorage.getItem(scopedKey) ?? localStorage.getItem(baseKey);
+  return localStorage.getItem(accountScopedStorageReadKey(baseKey, userId));
 }
 
 function writeScopedThreadListStorageValue(baseKey: string, userId: string | null | undefined, value: string): void {

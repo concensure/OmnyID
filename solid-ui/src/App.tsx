@@ -413,6 +413,7 @@ import {
   getSelfProfile,
   hasConsentBeenAsked,
   initLedgerKey,
+  setProfileLedgerAccountScope,
   updateSelfProfile,
   type PrimaryUseCaseKind,
   type PrimaryUseCaseProfile,
@@ -1224,6 +1225,7 @@ function App() {
 
   // Stable user ID at initialization — available before dashboard loads
   const initUserId = readSession()?.user?.id ?? "";
+  setProfileLedgerAccountScope(initUserId || null);
   // User-scoped localStorage key builders — reads use initUserId, writes use userId()
   const _prefs = loadPrefs(initUserId);
   const initialParaViewEnabled = loadParaViewPreference();
@@ -2935,6 +2937,12 @@ function App() {
     registerLocalRouterOllamaEmbedder(null);
   });
 
+  createEffect(() => {
+    // Scope before consent/profile surfaces read and rescope if a browser
+    // session changes accounts without recreating the application shell.
+    setProfileLedgerAccountScope(userId() || null);
+  });
+
   onMount(async () => {
     installMobileFocusViewportListener();
     // U-01: listen for service worker update-ready events fired by main.tsx
@@ -4027,18 +4035,27 @@ function App() {
                 <GuestGate label="Workflows" onSignIn={() => openAuthModalIfSignedOut()} />
               </Show>
               <Show when={activeView() === "workflows" && Boolean(session()?.token)}>
-                <Suspense fallback={<LazyViewFallback label="Workflows" />}>
-                  <div class="view-enter">
-                    <LazyWorkflowsView
-                      pendingIntent={workflowPendingIntent()}
-                      onPendingIntentConsumed={(seedId) => {
-                        setWorkflowPendingIntent((current) =>
-                          commandPreviewPendingIntentAfterConsumed(current, seedId) ?? null,
-                        );
-                      }}
+                <ErrorBoundary
+                  fallback={(_error, reset) => (
+                    <WorkflowViewFailure
+                      onRetry={() => reset()}
+                      onBack={() => selectView("home")}
                     />
-                  </div>
-                </Suspense>
+                  )}
+                >
+                  <Suspense fallback={<LazyViewFallback label="Workflows" />}>
+                    <div class="view-enter">
+                      <LazyWorkflowsView
+                        pendingIntent={workflowPendingIntent()}
+                        onPendingIntentConsumed={(seedId) => {
+                          setWorkflowPendingIntent((current) =>
+                            commandPreviewPendingIntentAfterConsumed(current, seedId) ?? null,
+                          );
+                        }}
+                      />
+                    </div>
+                  </Suspense>
+                </ErrorBoundary>
               </Show>
 
               <Show when={activeView() === "cofounder_studio" && !session()?.token}>
@@ -4602,6 +4619,34 @@ function DemoPreviewCallout(props: { title: string; body: string }) {
     <div class="rounded-2xl border border-amber-200/70 bg-amber-50/80 px-5 py-4 text-sm text-amber-900 shadow-soft animate-fade-in">
       <p class="font-mono text-[10px] uppercase tracking-[0.18em] text-amber-700">{props.title}</p>
       <p class="mt-1 leading-6">{props.body}</p>
+    </div>
+  );
+}
+
+function WorkflowViewFailure(props: { onBack: () => void; onRetry: () => void }) {
+  return (
+    <div class="view-enter rounded-3xl border border-teal-200/70 bg-teal-50/85 p-6 text-teal-950 shadow-card animate-fade-in">
+      <p class="font-mono text-[10px] uppercase tracking-[0.18em] text-teal-700">Workflows</p>
+      <h2 class="mt-2 text-xl font-semibold">Workflow canvas could not open</h2>
+      <p class="mt-2 max-w-2xl text-sm leading-6 text-teal-900/85">
+        Your saved workflows have not changed. Retry the canvas without reloading the workspace, or return home.
+      </p>
+      <div class="mt-5 flex flex-wrap gap-3">
+        <button
+          type="button"
+          class="rounded-full border border-teal-300 bg-white px-4 py-2 text-sm font-semibold transition hover:bg-teal-100"
+          onClick={props.onRetry}
+        >
+          Retry Workflows
+        </button>
+        <button
+          type="button"
+          class="rounded-full bg-teal-800 px-4 py-2 text-sm font-semibold text-white transition hover:bg-teal-900"
+          onClick={props.onBack}
+        >
+          Back to Home
+        </button>
+      </div>
     </div>
   );
 }

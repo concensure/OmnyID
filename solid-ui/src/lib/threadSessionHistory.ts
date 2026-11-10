@@ -1,5 +1,5 @@
 ﻿// @locs-version: 1.0
-import { accountScopedStorageKey } from "@/lib/accountScopedStorage";
+import { accountScopedStorageKey, accountScopedStorageReadKey } from "@/lib/accountScopedStorage";
 import { isRecord } from "@/lib/eventDetail";
 import { parseJsonValue } from "@/lib/jsonParseState";
 
@@ -68,7 +68,7 @@ function removeThreadSessionHistoryStorageValue(storageKey: string): void {
 export function loadThreadSessionHistory(userId?: string | null): ThreadSessionHistoryState {
   const scopedKey = threadSessionHistoryStorageKey(userId);
   try {
-    const raw = sessionStorage.getItem(scopedKey) ?? sessionStorage.getItem(THREAD_SESSION_HISTORY_KEY);
+    const raw = sessionStorage.getItem(accountScopedStorageReadKey(THREAD_SESSION_HISTORY_KEY, userId));
     if (!raw) return EMPTY_THREAD_SESSION_HISTORY;
     const parsed = parseJsonValue(raw);
     if (!parsed.ok) {

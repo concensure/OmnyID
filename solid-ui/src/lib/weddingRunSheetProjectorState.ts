@@ -124,8 +124,10 @@ export function weddingRunSheetSourceMessageIds(
   messages: CompatibleDatabaseMessage[],
   weddingPlanId: string,
 ): string[] {
-  return scopedSources(messages, weddingPlanId)
-    .filter((source) => packetForSource(source) !== null)
+  const sources = scopedSources(messages, weddingPlanId);
+  const weddingDay = weddingDayForSources(sources);
+  return sources
+    .filter((source) => packetForSource(source, weddingDay) !== null)
     .map((source) => source.id);
 }
 
@@ -133,12 +135,24 @@ function sourceText(source: Source): string {
   return [
     source.type, source.contentObject.kind, source.contentObject.title, source.contentObject.name,
     source.contentObject.label, source.contentObject.category, source.contentObject.stage,
+    source.contentObject.subject, source.contentObject.summary, source.contentObject.body,
+    source.contentObject.text, source.contentObject.message,
     source.contentObject.milestone_kind, source.contentObject.wedding_task_kind,
     source.contentObject.vendor_category, source.contentObject.decision_type,
     source.metadataObject.wedding_task_kind, source.metadataObject.projection,
     source.metadataObject.category, source.metadataObject.stage,
   ]
     .map(clean).join(" ").toLocaleLowerCase();
+}
+
+function sourceNarrative(source: Source): string {
+  return [
+    source.contentObject.subject,
+    source.contentObject.summary,
+    source.contentObject.body,
+    source.contentObject.text,
+    source.contentObject.message,
+  ].map(clean).filter(Boolean).join("\n").slice(0, 20_000);
 }
 
 function sourceKind(source: Source): string {
@@ -179,6 +193,69 @@ function exactDateTime(value: unknown): string | null {
   return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
 }
 
+function weddingDayForSources(sources: Source[]): string | null {
+  for (const source of sources.slice().sort((left, right) => (right.timestamp ?? "").localeCompare(left.timestamp ?? ""))) {
+    const candidates = [
+      source.contentObject.wedding_date,
+      source.contentObject.event_date,
+      objectValue(source.contentObject.couple).wedding_date,
+      objectValue(source.contentObject.scope).wedding_date,
+    ];
+    for (const candidate of candidates) {
+      const value = clean(candidate);
+      if (/^20\d{2}-\d{2}-\d{2}$/.test(value)) return value;
+    }
+  }
+  return null;
+}
+
+function sydneyLocalDateTime(day: string, hour: number, minute: number): string | null {
+  const expected = `${day}-${String(hour).padStart(2, "0")}-${String(minute).padStart(2, "0")}`;
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Australia/Sydney",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  });
+  for (const offset of [11, 10]) {
+    const candidate = new Date(`${day}T${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00+${offset}:00`);
+    if (Number.isNaN(candidate.getTime())) continue;
+    const values = Object.fromEntries(
+      formatter.formatToParts(candidate).map((part) => [part.type, part.value]),
+    );
+    if (`${values.year}-${values.month}-${values.day}-${values.hour}-${values.minute}` === expected) {
+      return candidate.toISOString();
+    }
+  }
+  return null;
+}
+
+function confirmedNarrativeStartAt(source: Source, weddingDay: string | null): string | null {
+  const narrative = sourceNarrative(source);
+  if (!narrative || !/\b(confirm(?:ed|ing)?|will arrive|arrival(?: time)?|on[ -]?site|attendance time|scheduled)\b/i.test(narrative)) return null;
+  const explicit = narrative.match(/\b(20\d{2}-\d{2}-\d{2})[ T](\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/i);
+  const time = explicit ?? narrative.match(/\b(?:arriv(?:e|es|al)|on[ -]?site|start(?:s|ing)?|setup(?: begins| starts)?|attendance time|scheduled)\s*(?:at|from|is|for|:)?\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i);
+  if (!time) return null;
+  const day = explicit?.[1] ?? weddingDay;
+  if (!day) return null;
+  const hourIndex = explicit ? 2 : 1;
+  const minuteIndex = explicit ? 3 : 2;
+  const meridiemIndex = explicit ? 4 : 3;
+  let hour = Number(time[hourIndex]);
+  const minute = Number(time[minuteIndex] ?? "0");
+  const meridiem = (time[meridiemIndex] ?? "").toLocaleLowerCase();
+  if (!Number.isInteger(hour) || hour < 0 || hour > 23 || !Number.isInteger(minute) || minute < 0 || minute > 59) return null;
+  if (meridiem) {
+    if (hour < 1 || hour > 12) return null;
+    if (meridiem === "pm" && hour !== 12) hour += 12;
+    if (meridiem === "am" && hour === 12) hour = 0;
+  }
+  return sydneyLocalDateTime(day, hour, minute);
+}
+
 function boundedMinutes(value: unknown): number | null {
   const parsed = typeof value === "number" ? value : Number(clean(value));
   return Number.isFinite(parsed) && parsed > 0 && parsed <= 24 * 60 ? Math.round(parsed) : null;
@@ -196,13 +273,13 @@ function sourceLocation(source: Source): string | null {
 }
 
 function sourceStatus(source: Source): RunSheetFactPacket["status"] {
-  const value = clean(source.contentObject.status || source.contentObject.time_status || source.metadataObject.status).toLocaleLowerCase();
+  const value = `${clean(source.contentObject.status || source.contentObject.time_status || source.metadataObject.status)} ${sourceNarrative(source)}`.toLocaleLowerCase();
   if (/confirmed|booked|accepted|complete|done/.test(value)) return "confirmed";
   if (/proposed|draft|suggested|tentative/.test(value)) return "proposed";
   return "needs-confirmation";
 }
 
-function packetForSource(source: Source): RunSheetFactPacket | null {
+function packetForSource(source: Source, weddingDay: string | null = null): RunSheetFactPacket | null {
   const category = sourceKind(source);
   if (!category) return null;
   const itemId = `runsheet:${category}:${safeId(sourceLogicalId(source))}`;
@@ -211,7 +288,8 @@ function packetForSource(source: Source): RunSheetFactPacket | null {
     itemId,
     title: sourceTitle(source, category),
     category,
-    startAt: exactDateTime(source.contentObject.start_at ?? source.contentObject.starts_at ?? source.contentObject.event_at),
+    startAt: exactDateTime(source.contentObject.start_at ?? source.contentObject.starts_at ?? source.contentObject.event_at)
+      ?? confirmedNarrativeStartAt(source, weddingDay),
     endAt: exactDateTime(source.contentObject.end_at ?? source.contentObject.ends_at),
     dueAt: exactDateTime(source.contentObject.due_at ?? source.contentObject.due_date),
     durationMinutes: boundedMinutes(source.contentObject.duration_minutes ?? source.contentObject.duration),
@@ -248,6 +326,37 @@ function rowData(packet: RunSheetFactPacket): Record<string, unknown> {
     due_at: packet.dueAt,
     updated_at: packet.updatedAt,
   };
+}
+
+/**
+ * Read-only projection used by the synthetic Wedding plan database. It uses
+ * the same deterministic fact packets as the editable run-sheet profile, so
+ * Database never creates a second schedule or asks the couple to reconcile it.
+ */
+export function projectWeddingRunSheetPreviewRecords(input: {
+  messages: CompatibleDatabaseMessage[];
+  weddingPlanId: string;
+  databaseId: string;
+}): DatabaseViewRecord[] {
+  const sources = scopedSources(input.messages, input.weddingPlanId);
+  const weddingDay = weddingDayForSources(sources);
+  const latestByItem = new Map<string, RunSheetFactPacket>();
+  for (const source of sources) {
+    const packet = packetForSource(source, weddingDay);
+    if (!packet) continue;
+    const current = latestByItem.get(packet.itemId);
+    if (!current || packet.updatedAt.localeCompare(current.updatedAt) >= 0) latestByItem.set(packet.itemId, packet);
+  }
+  return Array.from(latestByItem.values())
+    .sort((left, right) => (left.startAt ?? "9999").localeCompare(right.startAt ?? "9999") || left.title.localeCompare(right.title))
+    .map((packet) => ({
+      id: `${input.databaseId}:${packet.itemId}`,
+      databaseId: input.databaseId,
+      table: "run_sheet",
+      data: rowData(packet),
+      revision: 1,
+      timestamp: packet.updatedAt,
+    }));
 }
 
 function isProjectorOwnedRow(row: DatabaseViewRecord): boolean {
@@ -301,10 +410,11 @@ export function buildWeddingRunSheetProjectionPlan(input: {
   checkpoint?: WeddingRunSheetProjectionCheckpoint | null;
 }): WeddingRunSheetProjectionPlan {
   const sources = scopedSources(input.messages, input.weddingPlanId);
-  const resolvableSourceIds = new Set(sources.filter((source) => packetForSource(source) !== null).map((source) => source.id));
+  const weddingDay = weddingDayForSources(sources);
+  const resolvableSourceIds = new Set(sources.filter((source) => packetForSource(source, weddingDay) !== null).map((source) => source.id));
   const changed = new Set(input.changedMessageIds);
   const affectedPacketMap = new Map<string, RunSheetFactPacket>();
-  for (const packet of sources.filter((source) => changed.has(source.id)).map(packetForSource).filter((value): value is RunSheetFactPacket => !!value)) {
+  for (const packet of sources.filter((source) => changed.has(source.id)).map((source) => packetForSource(source, weddingDay)).filter((value): value is RunSheetFactPacket => !!value)) {
     const current = affectedPacketMap.get(packet.itemId);
     if (!current || packet.updatedAt.localeCompare(current.updatedAt) >= 0) affectedPacketMap.set(packet.itemId, packet);
   }

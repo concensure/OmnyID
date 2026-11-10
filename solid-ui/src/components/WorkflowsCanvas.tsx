@@ -907,7 +907,7 @@ export function WorkflowsCanvas() {
                   <For each={CANVAS_HORIZONTAL_RULER_MARKS}>
                     {(x) => (
                       <div class="absolute bottom-0 flex flex-col items-start" style={workflowCanvasHorizontalRulerMarkStyle(x)}>
-                        <span class="text-[6px] text-on-surface-variant/30 font-mono leading-none ml-0.5 mb-0.5">{x}</span>
+                        <span class="text-[8px] text-on-surface-variant/30 font-mono leading-none ml-0.5 mb-0.5">{x}</span>
                         <div class="h-1.5 w-px bg-on-surface-variant/20" />
                       </div>
                     )}
@@ -920,7 +920,7 @@ export function WorkflowsCanvas() {
                     {(y) => (
                       <div class="absolute left-0 flex items-center" style={workflowCanvasVerticalRulerMarkStyle(y)}>
                         <div class="h-px w-1.5 bg-on-surface-variant/20" />
-                        <span class="text-[6px] text-on-surface-variant/25 font-mono leading-none" style={CANVAS_VERTICAL_RULER_LABEL_STYLE}>{y}</span>
+                        <span class="text-[8px] text-on-surface-variant/25 font-mono leading-none" style={CANVAS_VERTICAL_RULER_LABEL_STYLE}>{y}</span>
                       </div>
                     )}
                   </For>
@@ -2251,7 +2251,7 @@ export function WorkflowsCanvas() {
 
                             <Show when={nodeRunCount}>
                               <span
-                                class="absolute -bottom-2.5 left-3 z-10 rounded-full bg-slate-600/75 px-1.5 py-[1px] font-mono text-[7px] font-semibold text-white/85 pointer-events-none shadow-sm"
+                                class="absolute -bottom-2.5 left-3 z-10 rounded-full bg-slate-600/75 px-1.5 py-[1px] font-mono text-[8px] font-semibold text-white/85 pointer-events-none shadow-sm"
                                             title={`Executed in ${nodeRunCount}r`}
                               >
                                 {nodeRunCount}r

@@ -184,17 +184,13 @@ test("agent dashboard shortcuts-dismissed storage subscription helper reacts onl
   }
 });
 
-test("agent dashboard query history migrates legacy global storage into a scoped key", () => {
+test("authenticated agent dashboard history ignores an unowned legacy global key", () => {
   localStorageState.set(
     AGENT_DASHBOARD_QUERY_HISTORY_KEY,
     JSON.stringify([{ query: "Launch status", view: "board", ts: "2024-07-19T09:00:00.000Z" }]),
   );
 
-  assert.deepEqual(loadAgentDashboardQueryHistory(userId), [
-    { query: "Launch status", view: "board", ts: "2024-07-19T09:00:00.000Z" },
-  ]);
-  assert.equal(localStorageState.get(scopedHistoryKey), JSON.stringify([
-    { query: "Launch status", view: "board", ts: "2024-07-19T09:00:00.000Z" },
-  ]));
+  assert.deepEqual(loadAgentDashboardQueryHistory(userId), []);
+  assert.equal(localStorageState.get(scopedHistoryKey), "[]");
   assert.equal(localStorageState.has(AGENT_DASHBOARD_QUERY_HISTORY_KEY), false);
 });

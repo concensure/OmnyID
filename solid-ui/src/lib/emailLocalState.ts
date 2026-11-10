@@ -1,5 +1,5 @@
 ﻿// @locs-version: 1.0
-import { accountScopedStorageKey } from "@/lib/accountScopedStorage";
+import { accountScopedStorageKey, accountScopedStorageReadKey } from "@/lib/accountScopedStorage";
 import { isRecord } from "@/lib/eventDetail";
 import { parseJsonValue } from "@/lib/jsonParseState";
 
@@ -104,8 +104,7 @@ function removeLocalEmailStorageValue(key: string): void {
 }
 
 function loadLocalEmailStorageJson(baseKey: string, userId: string | null | undefined): string | null {
-  const scopedKey = localEmailStorageKey(baseKey, userId);
-  return localStorage.getItem(scopedKey) ?? localStorage.getItem(baseKey);
+  return localStorage.getItem(accountScopedStorageReadKey(baseKey, userId));
 }
 
 function persistLocalEmailStorageJson(baseKey: string, userId: string | null | undefined, value: string): void {

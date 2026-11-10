@@ -199,18 +199,18 @@ test("persistLocalEmailMailboxOverrides writes only normalized mailbox mappings"
   );
 });
 
-test("local email loaders migrate legacy global buckets into scoped keys", () => {
+test("authenticated local email ignores unowned legacy global buckets", () => {
   localStorageState.clear();
   localStorageState.set(LOCAL_EMAIL_DRAFTS_KEY, JSON.stringify([{ id: "draft-1", threadId: "thread-1", sender: "Jane", subject: "Hello", preview: "World", body: "World", timestamp: "2026-07-18T10:00:00.000Z", supertags: [] }]));
   localStorageState.set(LOCAL_EMAIL_READ_STATE_KEY, JSON.stringify(["msg-1"]));
   localStorageState.set(LOCAL_EMAIL_MAILBOX_OVERRIDES_KEY, JSON.stringify({ "thread-1": "archive" }));
 
-  assert.deepEqual(loadLocalEmailDrafts(userId).map((draft) => draft.id), ["draft-1"]);
-  assert.deepEqual([...loadLocalEmailReadState(userId)], ["msg-1"]);
-  assert.deepEqual(loadLocalEmailMailboxOverrides(userId), { "thread-1": "archive" });
-  assert.equal(localStorageState.has(LOCAL_EMAIL_DRAFTS_KEY), false);
-  assert.equal(localStorageState.has(LOCAL_EMAIL_READ_STATE_KEY), false);
-  assert.equal(localStorageState.has(LOCAL_EMAIL_MAILBOX_OVERRIDES_KEY), false);
+  assert.deepEqual(loadLocalEmailDrafts(userId), []);
+  assert.deepEqual([...loadLocalEmailReadState(userId)], []);
+  assert.deepEqual(loadLocalEmailMailboxOverrides(userId), {});
+  assert.equal(localStorageState.has(LOCAL_EMAIL_DRAFTS_KEY), true);
+  assert.equal(localStorageState.has(LOCAL_EMAIL_READ_STATE_KEY), true);
+  assert.equal(localStorageState.has(LOCAL_EMAIL_MAILBOX_OVERRIDES_KEY), true);
 });
 
 test("local Gmail sync preference normalizes and persists mailbox scope", () => {

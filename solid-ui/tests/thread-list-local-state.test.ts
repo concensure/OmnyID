@@ -64,8 +64,8 @@ test.beforeEach(() => {
 });
 
 test("thread list local state falls back to supported density and sort values", () => {
-  localStorageState.set(THREAD_DENSITY_KEY, "dense");
-  localStorageState.set(THREAD_SORT_MODE_KEY, "priority");
+  localStorageState.set(scopedKey(THREAD_DENSITY_KEY), "dense");
+  localStorageState.set(scopedKey(THREAD_SORT_MODE_KEY), "priority");
 
   assert.equal(loadThreadDensity(userId), "7");
   assert.equal(loadThreadSortMode(userId), "activity");
@@ -77,7 +77,7 @@ test("thread list local state falls back to supported density and sort values", 
 
 test("thread list local state normalizes last-read records", () => {
   localStorageState.set(
-    THREAD_LAST_READ_KEY,
+    scopedKey(THREAD_LAST_READ_KEY),
     JSON.stringify({
       " thread-a ": " 2026-07-19T12:00:00.000Z ",
       "": "2026-07-19T12:01:00.000Z",
@@ -96,7 +96,7 @@ test("thread list local state normalizes last-read records", () => {
 
 test("thread list local state normalizes archived thread id sets", () => {
   localStorageState.set(
-    THREAD_ARCHIVED_KEY,
+    scopedKey(THREAD_ARCHIVED_KEY),
     JSON.stringify([" thread-a ", "", 7, "thread-b", "thread-a"]),
   );
 
@@ -107,7 +107,7 @@ test("thread list local state normalizes archived thread id sets", () => {
 
 test("thread list local state normalizes starred thread id sets", () => {
   localStorageState.set(
-    THREAD_STARS_KEY,
+    scopedKey(THREAD_STARS_KEY),
     JSON.stringify([" thread-a ", "", 7, "thread-b", "thread-a"]),
   );
 
@@ -116,7 +116,7 @@ test("thread list local state normalizes starred thread id sets", () => {
 
 test("thread list local state normalizes locked thread id sets", () => {
   localStorageState.set(
-    THREAD_LOCKED_KEY,
+    scopedKey(THREAD_LOCKED_KEY),
     JSON.stringify([" thread-a ", "", 7, "thread-b", "thread-a"]),
   );
 
@@ -125,7 +125,7 @@ test("thread list local state normalizes locked thread id sets", () => {
 
 test("thread list local state normalizes pinned thread id sets", () => {
   localStorageState.set(
-    THREAD_PINNED_KEY,
+    scopedKey(THREAD_PINNED_KEY),
     JSON.stringify([" thread-a ", "", 7, "thread-b", "thread-a"]),
   );
 
@@ -134,7 +134,7 @@ test("thread list local state normalizes pinned thread id sets", () => {
 
 test("thread list local state normalizes thread order arrays", () => {
   localStorageState.set(
-    THREAD_ORDER_KEY,
+    scopedKey(THREAD_ORDER_KEY),
     JSON.stringify([" thread-a ", "", 7, "thread-b", "thread-a"]),
   );
 
@@ -145,7 +145,7 @@ test("thread list local state normalizes thread order arrays", () => {
 
 test("thread list local state normalizes thread priority maps", () => {
   localStorageState.set(
-    THREAD_PRIORITY_KEY,
+    scopedKey(THREAD_PRIORITY_KEY),
     JSON.stringify({
       " thread-a ": "high",
       "thread-b": "medium",
@@ -174,7 +174,7 @@ test("thread list local state normalizes thread priority maps", () => {
 
 test("thread list local state normalizes dismissed merge pair sets", () => {
   localStorageState.set(
-    DISMISSED_MERGE_PAIRS_KEY,
+    scopedKey(DISMISSED_MERGE_PAIRS_KEY),
     JSON.stringify([" thread-a|thread-b ", "", 7, "thread-c|thread-d", "thread-a|thread-b"]),
   );
 
@@ -183,7 +183,7 @@ test("thread list local state normalizes dismissed merge pair sets", () => {
 
 test("thread list local state normalizes thread title maps", () => {
   localStorageState.set(
-    THREAD_TITLES_KEY,
+    scopedKey(THREAD_TITLES_KEY),
     JSON.stringify({
       " thread-a ": " Alpha ",
       "thread-b": "Beta",
@@ -201,7 +201,7 @@ test("thread list local state normalizes thread title maps", () => {
 
 test("thread list local state normalizes query history rows", () => {
   localStorageState.set(
-    QUERY_HISTORY_KEY,
+    scopedKey(QUERY_HISTORY_KEY),
     JSON.stringify([
       { query: " alpha ", timestamp: " 2026-07-19T12:00:00.000Z ", result: " first " },
       { query: "", timestamp: "2026-07-19T12:01:00.000Z" },
@@ -235,7 +235,7 @@ test("thread list local state clears unparseable JSON buckets", () => {
     QUERY_HISTORY_KEY,
     THREAD_LAST_READ_KEY,
   ];
-  for (const key of keys) localStorageState.set(key, "{bad json");
+  for (const key of keys) localStorageState.set(scopedKey(key), "{bad json");
 
   assert.deepEqual([...loadArchivedThreadIds(userId)], []);
   assert.deepEqual([...loadStarredThreadIds(userId)], []);

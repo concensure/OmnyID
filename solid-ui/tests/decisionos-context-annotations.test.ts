@@ -243,7 +243,7 @@ test("context annotation saves persist only normalized keys and trimmed notes", 
   );
 });
 
-test("context annotation storage migrates legacy notes into a scoped key", () => {
+test("authenticated context annotations ignore unowned legacy notes", () => {
   const storage = installLocalStorage();
   storage.clear();
   storage.setItem(
@@ -258,10 +258,8 @@ test("context annotation storage migrates legacy notes into a scoped key", () =>
       title: "Budget thread",
       sourceRefs: ["thread:q3-budget"],
     }, userId),
-    "Legacy private note.",
+    null,
   );
-  assert.equal(storage.getItem(annotationKey), JSON.stringify({
-    "refs:thread:q3-budget": "Legacy private note.",
-  }));
-  assert.equal(storage.getItem("omnyid.decisionos.context-annotations"), null);
+  assert.equal(storage.getItem(annotationKey), null);
+  assert.notEqual(storage.getItem("omnyid.decisionos.context-annotations"), null);
 });

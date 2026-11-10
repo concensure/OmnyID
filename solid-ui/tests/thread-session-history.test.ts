@@ -99,7 +99,7 @@ test("stepForwardThreadSessionHistory restores the future thread and records the
 
 test("loadThreadSessionHistory filters malformed session storage entries", () => {
   sessionStorageState.set(
-    THREAD_SESSION_HISTORY_KEY,
+    scopedHistoryKey,
     JSON.stringify({
       past: [entry("thread-1"), { threadId: "" }, { nope: true }],
       future: [entry("thread-2", "msg-2"), { threadId: 4 }],
@@ -121,7 +121,7 @@ test("loadThreadSessionHistory filters malformed session storage entries", () =>
 });
 
 test("loadThreadSessionHistory clears unparseable session history", () => {
-  sessionStorageState.set(THREAD_SESSION_HISTORY_KEY, "{bad-json");
+  sessionStorageState.set(scopedHistoryKey, "{bad-json");
 
   assert.deepEqual(loadThreadSessionHistory(userId), {
     past: [],

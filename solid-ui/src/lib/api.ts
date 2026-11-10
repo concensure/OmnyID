@@ -5634,6 +5634,14 @@ export type OperatorRuntimeRemediationHistoryResponse = {
 
 export type AdminWeddingOpsMetricsPayload = Record<string, unknown>;
 
+export type AdminWeddingQuoteShareMetrics = {
+  sentTotal: number;
+  sent7d: number;
+  lastSentAt: string | null;
+  toolUrl: string;
+  privacy: string;
+};
+
 export type AdminWeddingApiProviderStatus = {
   providerId: string;
   connectedAppId: string;
@@ -6376,6 +6384,18 @@ export const fetchOperatorRuntimeRemediationHistory = () =>
 
 export const fetchAdminWeddingOpsMetrics = () =>
   apiFetch<unknown>("/admin/wedding/ops-metrics").then(normalizeAdminWeddingOpsMetricsPayload);
+
+export const fetchAdminWeddingQuoteShareMetrics = () =>
+  apiFetch<unknown>("/admin/wedding/quote-shares").then((value): AdminWeddingQuoteShareMetrics => {
+    const record = isRecord(value) ? value : {};
+    return {
+      sentTotal: apiNumber(record.sent_total) ?? 0,
+      sent7d: apiNumber(record.sent_7d) ?? 0,
+      lastSentAt: apiString(record.last_sent_at) || null,
+      toolUrl: apiString(record.tool_url) || "https://omnyid.com/wedding/compare-wedding-venue-quotes.html",
+      privacy: apiString(record.privacy) || "Quote content and recipient addresses are not stored.",
+    };
+  });
 
 export const fetchAdminWeddingAiRoutingPolicy = () =>
   apiFetch<unknown>("/admin/wedding/ai-routing-policy").then(normalizeAdminWeddingAiRoutingPolicyPayload);

@@ -116,25 +116,25 @@ test("snooze state derives highlighted, quick-action, and usual labels from pref
   assert.equal(decisionSnoozeSavedChoiceLabel(), "Saved choice");
 });
 
-test("snooze state migrates legacy stored wake times and counts into scoped keys", () => {
+test("authenticated snooze state ignores unowned legacy wake times and counts", () => {
   const localStorage = installLocalStorage();
   localStorage.clear();
   localStorage.setItem("omnyid.decisionos.snoozed", JSON.stringify({ "decision-1": 12345 }));
   localStorage.setItem("omnyid.decisionos.snooze-counts", JSON.stringify({ "decision-1": 2 }));
 
-  assert.deepEqual([...loadDecisionOsSnoozed(userId).entries()], [["decision-1", 12345]]);
-  assert.deepEqual([...loadSnoozeCounts(userId).entries()], [["decision-1", 2]]);
-  assert.equal(localStorage.getItem(snoozedKey), JSON.stringify({ "decision-1": 12345 }));
-  assert.equal(localStorage.getItem(countsKey), JSON.stringify({ "decision-1": 2 }));
-  assert.equal(localStorage.getItem("omnyid.decisionos.snoozed"), null);
-  assert.equal(localStorage.getItem("omnyid.decisionos.snooze-counts"), null);
+  assert.deepEqual([...loadDecisionOsSnoozed(userId).entries()], []);
+  assert.deepEqual([...loadSnoozeCounts(userId).entries()], []);
+  assert.equal(localStorage.getItem(snoozedKey), null);
+  assert.equal(localStorage.getItem(countsKey), null);
+  assert.notEqual(localStorage.getItem("omnyid.decisionos.snoozed"), null);
+  assert.notEqual(localStorage.getItem("omnyid.decisionos.snooze-counts"), null);
 });
 
 test("snooze state ignores malformed stored wake times and counts", () => {
   const localStorage = installLocalStorage();
   localStorage.clear();
   localStorage.setItem(
-    "omnyid.decisionos.snoozed",
+    snoozedKey,
     JSON.stringify({
       "decision-1": 12345,
       "decision-2": "tomorrow",
@@ -142,7 +142,7 @@ test("snooze state ignores malformed stored wake times and counts", () => {
     }),
   );
   localStorage.setItem(
-    "omnyid.decisionos.snooze-counts",
+    countsKey,
     JSON.stringify({
       "decision-1": 2,
       "decision-2": "3",
@@ -165,8 +165,8 @@ test("snooze state ignores malformed stored wake times and counts", () => {
 test("snooze state clears unparseable persisted wake times and counts", () => {
   const localStorage = installLocalStorage();
   localStorage.clear();
-  localStorage.setItem("omnyid.decisionos.snoozed", "{bad-json");
-  localStorage.setItem("omnyid.decisionos.snooze-counts", "{bad-json");
+  localStorage.setItem(snoozedKey, "{bad-json");
+  localStorage.setItem(countsKey, "{bad-json");
 
   assert.deepEqual([...loadDecisionOsSnoozed(userId).entries()], []);
   assert.deepEqual([...loadSnoozeCounts(userId).entries()], []);

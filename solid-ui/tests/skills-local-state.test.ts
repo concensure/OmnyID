@@ -152,7 +152,7 @@ test("skills local state writers persist only normalized activation and profile 
   ]);
 });
 
-test("skills local state migrates legacy global storage into scoped keys", () => {
+test("authenticated skills state ignores unowned legacy global storage", () => {
   localStorageState.set(ACTIVATION_TIMES_KEY, JSON.stringify({ writing: 1721385600000 }));
   localStorageState.set(
     ACTIVATION_HISTORY_KEY,
@@ -163,14 +163,10 @@ test("skills local state migrates legacy global storage into scoped keys", () =>
     JSON.stringify([{ id: "profile_1", name: "Deep Work", skill_ids: ["writing"], created_at: "2026-07-18T00:00:00.000Z" }]),
   );
 
-  assert.deepEqual(loadActivationTimes(userId), { writing: 1721385600000 });
-  assert.deepEqual(loadActivationHistory(userId), {
-    writing: [{ activated_at: "2026-07-18T00:00:00.000Z", scope: "--session" }],
-  });
-  assert.deepEqual(loadProfiles(userId), [
-    { id: "profile_1", name: "Deep Work", skill_ids: ["writing"], created_at: "2026-07-18T00:00:00.000Z" },
-  ]);
-  assert.equal(localStorageState.has(ACTIVATION_TIMES_KEY), false);
-  assert.equal(localStorageState.has(ACTIVATION_HISTORY_KEY), false);
-  assert.equal(localStorageState.has(PROFILES_KEY), false);
+  assert.deepEqual(loadActivationTimes(userId), {});
+  assert.deepEqual(loadActivationHistory(userId), {});
+  assert.deepEqual(loadProfiles(userId), []);
+  assert.equal(localStorageState.has(ACTIVATION_TIMES_KEY), true);
+  assert.equal(localStorageState.has(ACTIVATION_HISTORY_KEY), true);
+  assert.equal(localStorageState.has(PROFILES_KEY), true);
 });

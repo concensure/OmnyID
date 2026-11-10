@@ -5,6 +5,7 @@ import { buildWeddingBudgetTrackingState } from "@/lib/weddingBudgetTrackingStat
 import { weddingJourneyStageId, WEDDING_JOURNEY_STAGES } from "@/lib/weddingJourneyStageState";
 import { buildWeddingPersistedWorkspaceState } from "@/lib/weddingPersistedWorkspaceState";
 import { planIdFrom, workspaceIdFrom } from "@/lib/weddingPersistedWorkspaceMessageState";
+import { projectWeddingRunSheetPreviewRecords } from "@/lib/weddingRunSheetProjectorState";
 
 const clean = (value: unknown) => typeof value === "string" ? value.trim() : "";
 const record = (value: unknown): Record<string, unknown> => value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
@@ -85,5 +86,22 @@ export function projectWeddingPlanningDatabaseRecords(messages: readonly AfpMess
     guest: constraint.primaryPersonId ?? "Seating rule", table: constraint.relatedPersonId ?? constraint.socialGroup ?? "Not assigned",
     status: constraint.statusLabel, reason: constraint.instruction, source: `Seating constraint · ${constraint.confidence} confidence`,
   });
+
+  const runSheetRows = projectWeddingRunSheetPreviewRecords({
+    messages: [...messages],
+    weddingPlanId: scope.weddingPlanId,
+    databaseId,
+  });
+  push(`${databaseId}:run-sheet:summary`, "run_sheet", {
+    title: "Wedding day run sheet",
+    start_at: null,
+    time_status: runSheetRows.some((row) => row.data.time_status === "confirmed") ? "confirmed timings available" : "timings need confirmation",
+    location: null,
+    owner_refs: ["Couple"],
+    participant_refs: [],
+    status: `${runSheetRows.length} known day-of item${runSheetRows.length === 1 ? "" : "s"}`,
+    source: "Wedding schedule, task and vendor-message ledger projection",
+  });
+  rows.push(...runSheetRows);
   return rows;
 }

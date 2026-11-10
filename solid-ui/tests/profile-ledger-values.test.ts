@@ -7,6 +7,7 @@ import {
   initLedgerKey,
   ledgerKeyIsIdentityDerived,
   resetLedger,
+  setProfileLedgerAccountScope,
   updateSelfProfile,
 } from "../src/lib/profileLedger.ts";
 
@@ -146,6 +147,29 @@ test("initLedgerKey with a stable identity key lets the ledger survive across br
   const profile = await getSelfProfile();
   assert.equal(profile.primary_use_case?.status, "active");
   assert.equal(profile.primary_use_case?.kind, "wedding_planning");
+});
+
+test("authenticated profile ledgers and consent never fall back across accounts", async () => {
+  const { localStorage } = installBrowserStorage();
+  const accountAKey = new Uint8Array(32).fill(7);
+  const accountBKey = new Uint8Array(32).fill(8);
+
+  setProfileLedgerAccountScope("account-a");
+  await initLedgerKey(accountAKey);
+  await updateSelfProfile({ display_name: "Account A" });
+
+  setProfileLedgerAccountScope("account-b");
+  await initLedgerKey(accountBKey);
+  assert.equal((await getSelfProfile()).display_name, undefined);
+  await updateSelfProfile({ display_name: "Account B" });
+
+  assert.equal(localStorage.getItem("omnyid.profile.ledger.e2"), null);
+  assert.notEqual(localStorage.getItem("omnyid.profile.ledger.e2:account-a"), null);
+  assert.notEqual(localStorage.getItem("omnyid.profile.ledger.e2:account-b"), null);
+
+  setProfileLedgerAccountScope("account-a");
+  await initLedgerKey(accountAKey);
+  assert.equal((await getSelfProfile()).display_name, "Account A");
 });
 
 test("resetLedger preserves self profile value settings while clearing derived ledger state", async () => {

@@ -19,12 +19,32 @@ function task(): AfpMessage {
   };
 }
 
+function vendorTiming(): AfpMessage {
+  return {
+    id: "message-photographer-arrival", thread_id: "vendor:photographer", from: "vendor://photographer",
+    timestamp: "2026-11-10T01:00:00Z", type: "message", kind: "vendor_reply", subtype: "wedding_vendor_reply",
+    supertags: ["template:wedding_planning"],
+    content: {
+      kind: "vendor_reply", subject: "Confirmed photography arrival",
+      body: "Our photographer will arrive at 2:30 pm and is confirmed for the wedding day.",
+      wedding_date: "2027-12-29", vendor_id: "vendor-photographer",
+      wedding_plan_id: "wedding_plan:plan-2027", response_workspace_id: "response_workspace:workspace-2027",
+    },
+    metadata: { weddingPlanId: "wedding_plan:plan-2027", responseWorkspaceId: "response_workspace:workspace-2027" },
+    views: [], attachments: [],
+  };
+}
+
 test("Wedding database projects budget timeline and seating from one ledger without writes", () => {
-  const rows = projectWeddingPlanningDatabaseRecords([task()]);
-  assert.deepEqual([...new Set(rows.map((row) => row.table))], ["budget", "timeline", "seating"]);
+  const rows = projectWeddingPlanningDatabaseRecords([task(), vendorTiming()]);
+  assert.deepEqual([...new Set(rows.map((row) => row.table))], ["budget", "timeline", "seating", "run_sheet"]);
   const venueTask = rows.find((row) => row.id.includes("venue-search"));
   assert.equal(venueTask?.data.task, "Research wedding venue");
   assert.equal(venueTask?.data.stage, "Venue & date");
   assert.equal(venueTask?.data.status, "To do");
+  const arrival = rows.find((row) => row.table === "run_sheet" && row.data.category === "photos");
+  assert.equal(arrival?.data.status, "confirmed");
+  assert.equal(arrival?.data.start_at, "2027-12-29T03:30:00.000Z");
+  assert.deepEqual(arrival?.data.source_refs, [{ message_id: "message-photographer-arrival", kind: "vendor_reply" }]);
   assert.ok(rows.every((row) => row.databaseId === "database:wedding-plan:wedding_plan:plan-2027"));
 });

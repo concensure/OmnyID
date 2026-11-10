@@ -51,7 +51,7 @@ export function DurationTabs(props: {
                 class="pointer-events-none absolute left-1/2 top-full z-50 mt-1.5 hidden min-w-[160px] max-w-[220px] -translate-x-1/2 rounded-xl border border-white/70 bg-white/96 p-2 shadow-xl backdrop-blur-sm group-hover:block"
                 role="tooltip"
               >
-                <p class="mb-1 font-mono text-[7px] uppercase tracking-[0.18em] text-on-surface-variant/50">In this view</p>
+                <p class="mb-1 font-mono text-[8px] uppercase tracking-[0.18em] text-on-surface-variant/50">In this view</p>
                 <For each={props.previews![v.id]!.slice(0, 2)}>
                   {(title) => <p class="truncate py-0.5 text-[10px] text-on-surface">{title}</p>}
                 </For>

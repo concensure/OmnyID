@@ -17,7 +17,7 @@ lifecycle:
 tasks:
   - id: WED-354
     title: Repair Database and Workflows surfaces and harden quote sharing, typography, isolation and run-sheet projection
-    status: in_progress
+    status: done
     owner: codex
     branch: agent/codex/WED-354
     worktree: C:/Users/ozans/Desktop/projects/OmnyID-GROWTH-001
@@ -25,7 +25,7 @@ tasks:
     depends_on: [WED-350, WED-352, WED-353]
     files: [solid-ui/src/components/DatabaseView.tsx, solid-ui/src/components/WorkflowsView.tsx, solid-ui/src/components/EditProfileModal.tsx, solid-ui/src/components/**Persona**, solid-ui/src/lib/**State.*, solid-ui/src/styles.css, solid-ui/tests/**, wedding/compare-wedding-venue-quotes.html, wedding/assets/js/quote-decoder*.js, wedding/assets/css/quote-decoder.css, wedding/tests/**quote**, src/server/wedding_quote_decoder_routes.rs, src/server/**email**, postgres/migrations/**, Documents/verification/**, .agent/**]
     acceptance: [Database fullscreen preserves and enlarges the active database instead of blanking it, Edit Profile exposes the canonical profiling on-off control, all rendered application text has an effective floor of eight pixels and persona source text remains readable, authenticated views never adopt ambiguous legacy global browser state, the Wedding Database run-sheet projects known schedule and vendor confirmed arrival evidence from the account ledger, Workflows opens without a fatal application error and the reported null WebAssembly source-map warning is correctly separated from runtime faults, the public quote decoder uses the requested copy compact tooltips integer number steps yellow grounded selections working commercial-term updates and a privacy-safe email-to-PDF share flow, the admin magnet dashboard links to quote comparison and reports aggregate share counts without quote content, focused browser isolation frontend backend build exact-SHA deployment provenance and hosted checks pass]
-    progress: "Task claimed from deployed WED-353 SHA; diagnosis and implementation are in progress."
+    progress: "Implemented native Database fullscreen with a visible layout fallback; account-scoped Profile Ledger controls in Edit Profile; an eight-pixel explicit typography floor; authenticated browser-state isolation without legacy global fallback; and a read-only Run sheet projection that derives confirmed vendor arrival evidence from the Wedding ledger. Workflows now contain API and render failures locally instead of taking down the workspace. The public venue quote tool safely applies extracted terms, grounds manual mappings in yellow, uses integer inputs, emails an in-memory auditable PDF, and retains only content-free delivery receipts for aggregate admin metrics. TypeScript, 2,252 Wedding tests, public browser smoke, Rust route tests and cargo check pass; exact-SHA clean build and Oracle release verification follow from the frozen commit."
 
   - id: WED-353
     title: Make Wedding setup account-safe and complete planner, specials, diary, contacts and admin usability

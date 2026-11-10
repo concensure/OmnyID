@@ -121,6 +121,7 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
   } | null>(null);
   let tableScrollRef: HTMLDivElement | undefined;
   let runSheetRecordsAnchorRef: HTMLDivElement | undefined;
+  let databaseRootRef: HTMLDivElement | undefined;
   let lastSelectedDatabaseId: string | null = null;
 
   const allMessages = createMemo(() => [
@@ -613,15 +614,38 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
       }
     }
     window.addEventListener("beforeunload", beforeUnload);
-    onCleanup(() => window.removeEventListener("beforeunload", beforeUnload));
+    const syncFullscreenState = () => setFullscreen(document.fullscreenElement === databaseRootRef);
+    document.addEventListener("fullscreenchange", syncFullscreenState);
+    onCleanup(() => {
+      window.removeEventListener("beforeunload", beforeUnload);
+      document.removeEventListener("fullscreenchange", syncFullscreenState);
+    });
   });
 
+  async function toggleFullscreen() {
+    if (!databaseRootRef) return;
+    try {
+      if (document.fullscreenElement === databaseRootRef) {
+        await document.exitFullscreen();
+        return;
+      }
+      if (databaseRootRef.requestFullscreen) {
+        await databaseRootRef.requestFullscreen();
+        return;
+      }
+    } catch {
+      // Embedded browsers can block the native API. Keep a layout fallback so
+      // the database remains visible and usable instead of becoming blank.
+    }
+    setFullscreen((value) => !value);
+  }
+
   const containerClass = () => fullscreen()
-    ? "fixed inset-0 z-[150] bg-white/98 backdrop-blur-xl overflow-auto p-8 animate-fade-in"
+    ? "fixed inset-0 z-[150] space-y-5 overflow-auto bg-white/98 p-3 backdrop-blur-xl animate-fade-in sm:p-6 lg:p-8"
     : "animate-fade-in space-y-5";
 
   return (
-    <div class={containerClass()}>
+    <div ref={databaseRootRef} class={containerClass()} data-database-fullscreen={fullscreen() ? "true" : "false"}>
       <DatabaseHeader
         definitions={definitions()}
         selectedDatabaseId={selectedDatabaseId()}
@@ -630,13 +654,13 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
         fullscreen={fullscreen()}
         readOnly={databaseReadOnly()}
         readOnlyReason={selectedDefinition()?.profileId === "wedding_plan_projection.v1"
-          ? "Budget, Timeline and Seating are live read-only views of the same Wedding ledger. Update them in their planning views; no second copy is stored here."
+          ? "Budget, Timeline, Seating and Run sheet are live read-only views of the same Wedding ledger. Update them in their planning views; no second copy is stored here."
           : runSheetOffline() ? "This offline copy is read-only until OmnyID reconnects." : undefined}
         onSelect={selectDatabase}
         onNameInput={setDatabaseName}
         onNameCommit={() => void commitDatabaseName()}
         onDensityChange={(mode) => { setDensityMode(mode); applyQueueFontSize(mode); }}
-        onToggleFullscreen={() => setFullscreen((value) => !value)}
+        onToggleFullscreen={() => void toggleFullscreen()}
         onNewDatabase={() => { setDatabaseCreateError(""); setShowDatabaseCreate(true); }}
         onNewRecord={() => {
           if (selectedProfilePlugin()?.toolbarKind === "wedding_run_sheet") {
@@ -663,7 +687,7 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
       <Show when={selectedDefinition()?.profileId === "wedding_plan_projection.v1"}>
         <section class="rounded-xl border border-primary/15 bg-primary/5 p-4" aria-label="Wedding planning database projection">
           <p class="font-semibold text-on-surface">Wedding plan, projected once</p>
-          <p class="mt-1 text-sm leading-6 text-on-surface-variant">These tables read the account-scoped Wedding ledger directly. Budget decisions, timeline tasks and seating changes appear here without manual reconciliation or duplicate records.</p>
+          <p class="mt-1 text-sm leading-6 text-on-surface-variant">These tables read the account-scoped Wedding ledger directly. Budget decisions, timeline tasks, seating changes and known day-of timings appear here without manual reconciliation or duplicate records.</p>
         </section>
       </Show>
 

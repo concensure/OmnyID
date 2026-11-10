@@ -333,6 +333,13 @@
         import omnyid_proxy
     }
 
+    # Privacy-minimised PDF delivery for the public quote comparison. The
+    # homeserver validates the snapshot, rate-limits it, sends the attachment,
+    # and retains only a content-free delivery receipt.
+    handle /wedding/quote-share {
+        import omnyid_proxy
+    }
+
     handle /wedding/provider-capabilities {
         import omnyid_proxy
     }

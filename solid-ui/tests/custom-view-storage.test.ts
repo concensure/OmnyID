@@ -136,33 +136,11 @@ test("saveCustomViews persists only normalized valid custom views", () => {
   ]);
 });
 
-test("loadCustomViews migrates legacy global custom views into the scoped key", () => {
+test("authenticated custom views ignore an unowned legacy global key", () => {
   localStorageState.clear();
   localStorageState.set("omnyid.custom_views", JSON.stringify([{ id: "cv_1", name: "Lens", description: "", filterType: "", filterSubtype: "", keywords: "" }]));
 
-  assert.deepEqual(loadCustomViews("user-1"), [
-    {
-      id: "cv_1",
-      name: "Lens",
-      description: "",
-      filterType: "",
-      filterSubtype: "",
-      keywords: "",
-      workflowFamilyId: undefined,
-      familyAssetWorkflowId: undefined,
-      instanceWorkflowId: undefined,
-    },
-  ]);
-  assert.equal(localStorageState.has("omnyid.custom_views"), false);
-  assert.equal(
-    localStorageState.get(accountScopedStorageKey("omnyid.custom_views", "user-1")),
-    JSON.stringify([{
-      id: "cv_1",
-      name: "Lens",
-      description: "",
-      filterType: "",
-      filterSubtype: "",
-      keywords: "",
-    }]),
-  );
+  assert.deepEqual(loadCustomViews("user-1"), []);
+  assert.equal(localStorageState.has("omnyid.custom_views"), true);
+  assert.equal(localStorageState.get(accountScopedStorageKey("omnyid.custom_views", "user-1")), undefined);
 });

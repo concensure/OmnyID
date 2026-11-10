@@ -1,3 +1,4 @@
+use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64_STANDARD};
 use serde_json::Value;
 use tracing::{instrument, warn};
 
@@ -195,7 +196,10 @@ pub async fn send_transactional_email(to: &str, subject: &str, body: &str) -> Re
         Ok(()) => Ok(()),
         Err(primary_error) => {
             let config = MailGatewayConfig::from_env();
-            let smtp_error = if matches!(config.outbound_auth_mode, OutboundAuthMode::DirectSmtpFallback) {
+            let smtp_error = if matches!(
+                config.outbound_auth_mode,
+                OutboundAuthMode::DirectSmtpFallback
+            ) {
                 None
             } else {
                 match smtp_fallback_config_from_env(&config) {
@@ -210,7 +214,9 @@ pub async fn send_transactional_email(to: &str, subject: &str, body: &str) -> Re
                 "OMNYID_TRANSACTIONAL_RESEND_API_KEY",
             ) else {
                 return Err(match smtp_error {
-                    Some(smtp_error) => format!("Primary transactional delivery failed: {primary_error}; SMTP fallback failed: {smtp_error}"),
+                    Some(smtp_error) => format!(
+                        "Primary transactional delivery failed: {primary_error}; SMTP fallback failed: {smtp_error}"
+                    ),
                     None => primary_error,
                 });
             };
@@ -310,6 +316,166 @@ pub async fn send_transactional_multipart_email(
         Some(primary) => format!("Cloudflare primary failed: {primary}; Resend failed: {error}"),
         None => error,
     })
+}
+
+/// Send a platform-owned transactional message with one bounded attachment.
+/// This path is used for explicit user-requested exports and never persists the
+/// attachment bytes. Cloudflare Email Sending is primary, Resend is fallback,
+/// and the configured authenticated mailbox transport remains available when
+/// neither platform API is configured.
+pub async fn send_transactional_email_with_attachment(
+    to: &str,
+    subject: &str,
+    body: &str,
+    attachment: OutgoingEmailAttachment,
+) -> Result<(), String> {
+    if attachment.bytes.is_empty() || attachment.bytes.len() > 8 * 1024 * 1024 {
+        return Err("Transactional attachment must be between 1 byte and 8 MiB".to_string());
+    }
+    let from = std::env::var("OMNYID_TRANSACTIONAL_FROM_ADDRESS")
+        .ok()
+        .or_else(|| std::env::var("FROM_ADDRESS").ok())
+        .or_else(|| std::env::var("OMNYID_EMAIL_ADDRESS").ok())
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty());
+    let cloudflare_token = crate::secret_manager::read_process_secret_trimmed(
+        "OMNYID_TRANSACTIONAL_CLOUDFLARE_API_TOKEN",
+    );
+    let cloudflare_account = std::env::var("OMNYID_TRANSACTIONAL_CLOUDFLARE_ACCOUNT_ID")
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty());
+    let resend_key =
+        crate::secret_manager::read_process_secret_trimmed("OMNYID_TRANSACTIONAL_RESEND_API_KEY");
+
+    let mut platform_errors = Vec::new();
+    if let (Some(token), Some(account), Some(from)) = (
+        cloudflare_token.as_deref(),
+        cloudflare_account.as_deref(),
+        from.as_deref(),
+    ) {
+        match send_transactional_attachment_via_cloudflare(
+            token,
+            account,
+            from,
+            to,
+            subject,
+            body,
+            &attachment,
+        )
+        .await
+        {
+            Ok(()) => return Ok(()),
+            Err(error) => platform_errors.push(format!("Cloudflare: {error}")),
+        }
+    }
+    if let (Some(key), Some(from)) = (resend_key.as_deref(), from.as_deref()) {
+        match send_transactional_attachment_via_resend(key, from, to, subject, body, &attachment)
+            .await
+        {
+            Ok(()) => return Ok(()),
+            Err(error) => platform_errors.push(format!("Resend: {error}")),
+        }
+    }
+
+    let request = OutgoingEmailRequest {
+        thread_id: format!("transactional-{}", ulid::Ulid::new()),
+        message_id: format!("txattachment-{}", ulid::Ulid::new()),
+        parent_id: None,
+        to: vec![to.to_string()],
+        subject: subject.to_string(),
+        body: body.to_string(),
+        in_reply_to: None,
+        references: vec![],
+        attachments: vec![attachment],
+    };
+    send_outgoing_email(&request).await.map_err(|error| {
+        if platform_errors.is_empty() {
+            error
+        } else {
+            format!(
+                "{}; authenticated mailbox: {error}",
+                platform_errors.join("; ")
+            )
+        }
+    })
+}
+
+async fn send_transactional_attachment_via_cloudflare(
+    api_key: &str,
+    account_id: &str,
+    from: &str,
+    to: &str,
+    subject: &str,
+    body: &str,
+    attachment: &OutgoingEmailAttachment,
+) -> Result<(), String> {
+    let response = reqwest::Client::new()
+        .post(format!(
+            "https://api.cloudflare.com/client/v4/accounts/{}/email/sending/send",
+            urlencoding::encode(account_id)
+        ))
+        .bearer_auth(api_key)
+        .json(&serde_json::json!({
+            "from": from,
+            "to": [to],
+            "subject": subject,
+            "text": body,
+            "attachments": [{
+                "content": BASE64_STANDARD.encode(&attachment.bytes),
+                "disposition": "attachment",
+                "filename": attachment.file_name,
+                "type": attachment.media_type,
+            }],
+        }))
+        .send()
+        .await
+        .map_err(|error| format!("request failed: {error}"))?;
+    if response.status().is_success() {
+        return Ok(());
+    }
+    let status = response.status();
+    let detail = response.text().await.unwrap_or_default();
+    Err(format!(
+        "returned {status}: {}",
+        detail.chars().take(500).collect::<String>()
+    ))
+}
+
+async fn send_transactional_attachment_via_resend(
+    api_key: &str,
+    from: &str,
+    to: &str,
+    subject: &str,
+    body: &str,
+    attachment: &OutgoingEmailAttachment,
+) -> Result<(), String> {
+    let response = reqwest::Client::new()
+        .post("https://api.resend.com/emails")
+        .bearer_auth(api_key)
+        .json(&serde_json::json!({
+            "from": from,
+            "to": [to],
+            "subject": subject,
+            "text": body,
+            "attachments": [{
+                "filename": attachment.file_name,
+                "content": BASE64_STANDARD.encode(&attachment.bytes),
+                "content_type": attachment.media_type,
+            }],
+        }))
+        .send()
+        .await
+        .map_err(|error| format!("request failed: {error}"))?;
+    if response.status().is_success() {
+        return Ok(());
+    }
+    let status = response.status();
+    let detail = response.text().await.unwrap_or_default();
+    Err(format!(
+        "returned {status}: {}",
+        detail.chars().take(500).collect::<String>()
+    ))
 }
 
 /// Platform-owned account mail is separate from the Gmail continuity gateway.
@@ -646,7 +812,10 @@ fn references_from_content(content: &Value) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{build_outgoing_email_request, cloudflare_email_sending_payload, dispatch_outgoing_message, send_transactional_platform_email};
+    use super::{
+        build_outgoing_email_request, cloudflare_email_sending_payload, dispatch_outgoing_message,
+        send_transactional_platform_email,
+    };
     use crate::message::AFPMessage;
     use serde_json::{Value, json};
     use std::sync::{Mutex, OnceLock};
@@ -701,7 +870,12 @@ mod tests {
 
     #[test]
     fn cloudflare_structured_payload_keeps_recipient_array_contract() {
-        let payload = cloudflare_email_sending_payload("hello@mail.omnyid.com", "vendor@example.com", "Wedding enquiry", "Hello");
+        let payload = cloudflare_email_sending_payload(
+            "hello@mail.omnyid.com",
+            "vendor@example.com",
+            "Wedding enquiry",
+            "Hello",
+        );
         assert_eq!(payload["to"], json!(["vendor@example.com"]));
     }
 
@@ -718,12 +892,26 @@ mod tests {
             unsafe { std::env::remove_var(key) };
         }
         unsafe {
-            std::env::set_var("OMNYID_VENDOR_MAIL_CLOUDFLARE_API_TOKEN", "vendor-only-token");
-            std::env::set_var("OMNYID_VENDOR_MAIL_CLOUDFLARE_ACCOUNT_ID", "vendor-only-account");
+            std::env::set_var(
+                "OMNYID_VENDOR_MAIL_CLOUDFLARE_API_TOKEN",
+                "vendor-only-token",
+            );
+            std::env::set_var(
+                "OMNYID_VENDOR_MAIL_CLOUDFLARE_ACCOUNT_ID",
+                "vendor-only-account",
+            );
             std::env::set_var("OMNYID_VENDOR_MAIL_RESEND_API_KEY", "vendor-only-resend");
         }
-        assert!(send_transactional_platform_email("person@example.com", "Subject", "Body").await.is_none());
-        for key in ["OMNYID_VENDOR_MAIL_CLOUDFLARE_API_TOKEN", "OMNYID_VENDOR_MAIL_CLOUDFLARE_ACCOUNT_ID", "OMNYID_VENDOR_MAIL_RESEND_API_KEY"] {
+        assert!(
+            send_transactional_platform_email("person@example.com", "Subject", "Body")
+                .await
+                .is_none()
+        );
+        for key in [
+            "OMNYID_VENDOR_MAIL_CLOUDFLARE_API_TOKEN",
+            "OMNYID_VENDOR_MAIL_CLOUDFLARE_ACCOUNT_ID",
+            "OMNYID_VENDOR_MAIL_RESEND_API_KEY",
+        ] {
             unsafe { std::env::remove_var(key) };
         }
     }

@@ -1,5 +1,5 @@
 ﻿// @locs-version: 1.0
-import { accountScopedStorageKey } from "@/lib/accountScopedStorage";
+import { accountScopedStorageKey, accountScopedStorageReadKey } from "@/lib/accountScopedStorage";
 import { parseJsonValue } from "@/lib/jsonParseState";
 import type { RunTimelineFilterMode } from "@/lib/workflowGraphTypes";
 import type {
@@ -868,9 +868,8 @@ function scopedWorkflowReviewStorageKey(baseKey: string, userId?: string | null)
 function loadWorkflowReviewStorageValue(baseKey: string, userId?: string | null): string | null {
   const storage = workflowReviewLocalStorage();
   if (!storage) return null;
-  const scopedKey = scopedWorkflowReviewStorageKey(baseKey, userId);
   try {
-    return storage.getItem(scopedKey) ?? storage.getItem(baseKey);
+    return storage.getItem(accountScopedStorageReadKey(baseKey, userId));
   } catch {
     return null;
   }

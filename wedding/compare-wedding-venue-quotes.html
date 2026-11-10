@@ -8,7 +8,7 @@
 <link rel="icon" type="image/png" href="assets/logo/omnyid-mark.png">
 <link rel="stylesheet" href="assets/css/style.css">
 <link rel="stylesheet" href="assets/css/magnet.css">
-<link rel="stylesheet" href="assets/css/quote-decoder.css?v=20261110-351">
+<link rel="stylesheet" href="assets/css/quote-decoder.css?v=20261110-354">
 <link rel="canonical" href="https://omnyid.com/wedding/compare-wedding-venue-quotes.html">
 <meta property="og:type" content="website">
 <meta property="og:locale" content="en_AU">
@@ -45,8 +45,8 @@
     <section class="magnet-card" aria-labelledby="comparison-settings-title">
       <h2 id="comparison-settings-title">Use the same wedding for both quotes</h2>
       <div class="magnet-grid">
-        <label class="magnet-field">Guests to compare<input name="comparison_guests" type="number" min="1" max="500" value="100" inputmode="numeric" required></label>
-        <label class="magnet-field">Event length (hours)<input name="comparison_hours" type="number" min="1" max="24" step="0.5" value="6" inputmode="decimal" required></label>
+        <label class="magnet-field">Guests to compare<input name="comparison_guests" type="number" min="1" max="500" step="1" value="100" inputmode="numeric" required></label>
+        <label class="magnet-field">Event length (hours)<input name="comparison_hours" type="number" min="1" max="24" step="1" value="6" inputmode="numeric" required></label>
       </div>
     </section>
 
@@ -55,12 +55,12 @@
       <section class="quote-proposal magnet-card" data-proposal="a" aria-labelledby="proposal-a-title">
         <h2 id="proposal-a-title">Proposal A</h2>
         <label class="magnet-field">Venue label<input name="a_label" maxlength="100" placeholder="Venue name (kept on this device)"></label>
-        <label class="magnet-field">Paste proposal text<textarea name="a_text" rows="9" placeholder="Paste the wording from the proposal"></textarea></label>
+        <label class="magnet-field">Paste proposal text<textarea name="a_text" rows="9" placeholder="Paste the wording from the proposal"></textarea></label><p class="quote-source-highlight" data-source-highlight="a" hidden aria-live="polite"></p>
         <div class="quote-local-file"><label class="magnet-link-button" for="a_file">Choose local text file</label><input id="a_file" name="a_file" type="file" accept=".txt,.md,text/plain,text/markdown"><span data-file-status="a">TXT and Markdown are read locally. For PDF or Word, paste the text for now.</span></div>
         <div class="quote-analysis-actions"><button class="magnet-button" type="button" data-analyse="a">Analyse quote</button><button class="magnet-link-button" type="button" data-clear-analysis="a">Clear saved analysis</button></div>
         <p class="quote-analysis-status" data-analysis-status="a" role="status" aria-live="polite">Not analysed. Manual fields remain available.</p>
         <div class="quote-suggestions" data-suggestions="a"></div>
-        <div class="quote-selection-tool"><label class="magnet-field">Map selected quote text to<select data-selection-target="a"></select></label><button class="magnet-link-button" type="button" data-extract-selection="a">Extract from selection</button></div>
+        <div class="quote-selection-tool"><label class="magnet-field">Manually select figures to map to<select data-selection-target="a" aria-label="Commercial term for the selected Proposal A wording"></select></label><button class="magnet-link-button" type="button" data-extract-selection="a">Extract from selection</button></div>
         <details open><summary>Commercial terms</summary><div class="quote-fields" data-commercial-fields="a"></div></details>
         <details open><summary>Line items and inclusions</summary><div class="quote-line-items" data-line-items="a"></div><button class="magnet-link-button" type="button" data-add-line="a">Add line item</button></details>
         <div class="quote-change-list" data-changes="a" hidden></div>
@@ -69,12 +69,12 @@
       <section class="quote-proposal magnet-card" data-proposal="b" aria-labelledby="proposal-b-title">
         <h2 id="proposal-b-title">Proposal B <span class="quote-optional">optional</span></h2>
         <label class="magnet-field">Venue label<input name="b_label" maxlength="100" placeholder="Venue name (kept on this device)"></label>
-        <label class="magnet-field">Paste proposal text<textarea name="b_text" rows="9" placeholder="Paste the wording from the second proposal"></textarea></label>
+        <label class="magnet-field">Paste proposal text<textarea name="b_text" rows="9" placeholder="Paste the wording from the second proposal"></textarea></label><p class="quote-source-highlight" data-source-highlight="b" hidden aria-live="polite"></p>
         <div class="quote-local-file"><label class="magnet-link-button" for="b_file">Choose local text file</label><input id="b_file" name="b_file" type="file" accept=".txt,.md,text/plain,text/markdown"><span data-file-status="b">TXT and Markdown are read locally. For PDF or Word, paste the text for now.</span></div>
         <div class="quote-analysis-actions"><button class="magnet-button" type="button" data-analyse="b">Analyse quote</button><button class="magnet-link-button" type="button" data-clear-analysis="b">Clear saved analysis</button></div>
         <p class="quote-analysis-status" data-analysis-status="b" role="status" aria-live="polite">Not analysed. Manual fields remain available.</p>
         <div class="quote-suggestions" data-suggestions="b"></div>
-        <div class="quote-selection-tool"><label class="magnet-field">Map selected quote text to<select data-selection-target="b"></select></label><button class="magnet-link-button" type="button" data-extract-selection="b">Extract from selection</button></div>
+        <div class="quote-selection-tool"><label class="magnet-field">Manually select figures to map to<select data-selection-target="b" aria-label="Commercial term for the selected Proposal B wording"></select></label><button class="magnet-link-button" type="button" data-extract-selection="b">Extract from selection</button></div>
         <details open><summary>Commercial terms</summary><div class="quote-fields" data-commercial-fields="b"></div></details>
         <details open><summary>Line items and inclusions</summary><div class="quote-line-items" data-line-items="b"></div><button class="magnet-link-button" type="button" data-add-line="b">Add line item</button></details>
         <div class="quote-change-list" data-changes="b" hidden></div>
@@ -90,7 +90,15 @@
     <div class="quote-formula-columns" data-formulas></div>
     <div class="magnet-table-wrap"><table class="magnet-table"><thead><tr><th scope="col">Decision factor</th><th scope="col" data-result-label="a">Proposal A</th><th scope="col" data-result-label="b">Proposal B</th></tr></thead><tbody data-result-body></tbody></table></div>
     <div class="quote-question-columns"><section class="magnet-card"><h3 data-question-title="a">Questions for Proposal A</h3><ul data-questions="a"></ul><button class="magnet-link-button" type="button" data-copy="a">Copy follow-up</button></section><section class="magnet-card" data-question-card="b"><h3 data-question-title="b">Questions for Proposal B</h3><ul data-questions="b"></ul><button class="magnet-link-button" type="button" data-copy="b">Copy follow-up</button></section></div>
-    <div class="magnet-actions"><button class="magnet-link-button" type="button" data-print>Print comparison</button></div>
+    <div class="magnet-actions"><button class="magnet-link-button" type="button" data-print>Print comparison</button><button class="magnet-link-button" type="button" data-open-share>Share PDF by email</button></div>
+    <form class="quote-share magnet-card" data-quote-share hidden novalidate>
+      <h3>Email this comparison as a PDF</h3>
+      <p>The PDF includes the proposal text, reviewed commercial terms, calculations and analysis currently shown here. The PDF and email address are not retained; the admin dashboard receives only a successful-share count.</p>
+      <label class="magnet-field">Email address<input name="share_email" type="email" maxlength="254" autocomplete="email" required placeholder="you@example.com"></label>
+      <input class="quote-honeypot" name="share_company" tabindex="-1" autocomplete="off" aria-hidden="true" hidden>
+      <div class="magnet-actions"><button class="magnet-button" type="submit" data-share-submit>Send PDF</button><button class="magnet-link-button" type="button" data-share-cancel>Cancel</button></div>
+      <p class="magnet-status" data-share-status role="status" aria-live="polite"></p>
+    </form>
     <aside class="magnet-continue"><h3>Keep quotes, messages and decisions together</h3><p>Continue in OmnyID Wedding to keep the original proposals, normalised quote evidence and follow-up drafts in one private plan. Nothing is sent until you approve it.</p><a class="magnet-button" href="../workspace/?auth=register&amp;source=wedding&amp;from=quote-decoder">Continue in OmnyID Wedding</a></aside>
   </section>
 
@@ -100,7 +108,7 @@
 <footer class="site-footer"><div class="container"><div class="footer-bottom"><span>© <span data-year></span> OmnyID. All rights reserved.</span><span><a href="privacy.html">Privacy</a> · <a href="disclosures.html">Disclosures</a> · <a href="../workspace/vendor.html?source=vendor_claim" data-vendor-login>Vendor login</a></span></div></div></footer>
 <div class="signin-modal" id="signinModal" aria-hidden="true"><div class="signin-overlay" data-close-signin></div><div class="signin-panel" role="dialog" aria-modal="true" aria-labelledby="signinTitle"><button class="signin-close" type="button" data-close-signin aria-label="Close">&times;</button><p class="eyebrow">Continue to your workspace</p><h2 id="signinTitle">Keep the comparison with your wedding plan</h2><p class="signin-lede">Sign in or create a free account. You choose what to add; this public page does not save proposal text to your account.</p><div class="signin-options"><div class="signin-option"><a class="btn btn-primary btn-block" href="../workspace/?auth=register&amp;source=wedding&amp;from=quote-decoder">Create free account</a><a class="btn btn-outline btn-block" href="../workspace/?auth=signin&amp;source=wedding&amp;from=quote-decoder">Sign in</a></div></div><button type="button" class="link-btn" data-close-signin>Not now</button></div></div>
 <script src="assets/js/main.js"></script>
-<script src="assets/js/quote-decoder-engine.js?v=20261110-351"></script>
-<script src="assets/js/quote-decoder.js?v=20261110-351"></script>
+<script src="assets/js/quote-decoder-engine.js?v=20261110-354"></script>
+<script src="assets/js/quote-decoder.js?v=20261110-354"></script>
 </body>
 </html>

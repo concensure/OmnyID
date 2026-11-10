@@ -8,15 +8,23 @@ use axum::{
     Json, Router,
     extract::{DefaultBodyLimit, State},
     http::{HeaderMap, StatusCode},
-    routing::post,
+    routing::{get, post},
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
+use sqlx::Row;
+use ulid::Ulid;
+
+use crate::gateway::smtp_out::{OutgoingEmailAttachment, send_transactional_email_with_attachment};
 
 use super::{
     AppState, RateLimitPolicy,
-    auth::{enforce_rate_limit, public_rate_limit_key},
+    auth::{authenticated_user, enforce_rate_limit, public_rate_limit_key},
+    cost_controls::operator_access_allowed,
+    is_plausible_email,
     openrouter_funded_inference::{self, FundedInferenceRequest},
+    readiness_error_to_http,
 };
 
 const MAX_QUOTE_CHARS: usize = 20_000;
@@ -118,7 +126,319 @@ struct ModelPayload {
 pub(super) fn routes() -> Router<Arc<AppState>> {
     Router::new()
         .route("/wedding/quote-extract", post(extract_http))
-        .layer(DefaultBodyLimit::max(28 * 1024))
+        .route("/wedding/quote-share", post(share_quote_http))
+        .route("/admin/wedding/quote-shares", get(admin_quote_shares_http))
+        .layer(DefaultBodyLimit::max(96 * 1024))
+}
+
+#[derive(Deserialize)]
+struct QuoteShareRequest {
+    email: String,
+    #[serde(default)]
+    company: String,
+    snapshot: Value,
+}
+
+fn printable(value: &str) -> String {
+    value
+        .chars()
+        .map(|character| match character {
+            '\n' | '\r' | '\t' => character,
+            '—' | '–' => '-',
+            '“' | '”' => '"',
+            '‘' | '’' => '\'',
+            character if character.is_ascii() && !character.is_ascii_control() => character,
+            _ => '?',
+        })
+        .collect()
+}
+
+fn human_key(value: &str) -> String {
+    let mut label = value.replace('_', " ");
+    if let Some(first) = label.get_mut(0..1) {
+        first.make_ascii_uppercase();
+    }
+    label
+}
+
+fn snapshot_lines(snapshot: &Value) -> Vec<String> {
+    let mut lines = vec![
+        "OmnyID Wedding - venue quote comparison".to_string(),
+        "Prepared from the figures and evidence reviewed in the public quote tool.".to_string(),
+        String::new(),
+    ];
+    for key in ["generated_at", "comparison_guests", "comparison_hours"] {
+        if let Some(value) = snapshot.get(key) {
+            lines.push(format!(
+                "{}: {}",
+                human_key(key),
+                value
+                    .as_str()
+                    .map(str::to_string)
+                    .unwrap_or_else(|| value.to_string())
+            ));
+        }
+    }
+    let proposals = snapshot
+        .get("proposals")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    for (index, proposal) in proposals.iter().take(2).enumerate() {
+        lines.push(String::new());
+        lines.push(format!(
+            "PROPOSAL {} - {}",
+            index + 1,
+            proposal
+                .get("label")
+                .and_then(Value::as_str)
+                .unwrap_or("Unnamed venue")
+        ));
+        for key in ["pricing_model", "estimated_total"] {
+            if let Some(value) = proposal.get(key) {
+                lines.push(format!("{}: {}", human_key(key), value));
+            }
+        }
+        for section in [
+            "commercial_terms",
+            "line_items",
+            "formula_lines",
+            "assumptions",
+            "unknowns",
+            "follow_up_questions",
+            "extraction_fields",
+        ] {
+            if let Some(value) = proposal.get(section) {
+                lines.push(String::new());
+                lines.push(human_key(section));
+                let rendered = serde_json::to_string_pretty(value)
+                    .unwrap_or_else(|_| "Not available".to_string());
+                lines.extend(rendered.lines().map(|line| format!("  {line}")));
+            }
+        }
+        lines.push(String::new());
+        lines.push("Original proposal text".to_string());
+        lines.extend(
+            proposal
+                .get("proposal_text")
+                .and_then(Value::as_str)
+                .unwrap_or("Not included")
+                .lines()
+                .map(str::to_string),
+        );
+    }
+    lines
+}
+
+fn wrap_pdf_lines(lines: Vec<String>) -> Vec<String> {
+    let mut wrapped = Vec::new();
+    for line in lines {
+        let line = printable(&line);
+        if line.is_empty() {
+            wrapped.push(String::new());
+            continue;
+        }
+        let mut remaining = line.as_str();
+        while remaining.chars().count() > 86 {
+            let boundary = remaining
+                .char_indices()
+                .take_while(|(index, _)| *index <= 86)
+                .filter(|(_, character)| character.is_whitespace())
+                .map(|(index, _)| index)
+                .last()
+                .unwrap_or_else(|| {
+                    remaining
+                        .char_indices()
+                        .nth(86)
+                        .map(|(index, _)| index)
+                        .unwrap_or(remaining.len())
+                });
+            let (head, tail) = remaining.split_at(boundary.max(1));
+            wrapped.push(head.trim_end().to_string());
+            remaining = tail.trim_start();
+        }
+        wrapped.push(remaining.to_string());
+    }
+    wrapped
+}
+
+fn pdf_escape(value: &str) -> String {
+    value
+        .replace('\\', "\\\\")
+        .replace('(', "\\(")
+        .replace(')', "\\)")
+}
+
+fn build_quote_pdf(snapshot: &Value) -> Vec<u8> {
+    let lines = wrap_pdf_lines(snapshot_lines(snapshot));
+    let pages = lines.chunks(50).collect::<Vec<_>>();
+    let page_count = pages.len().max(1);
+    let kids = (0..page_count)
+        .map(|index| format!("{} 0 R", 4 + index * 2))
+        .collect::<Vec<_>>()
+        .join(" ");
+    let mut objects = vec![
+        "<< /Type /Catalog /Pages 2 0 R >>".to_string(),
+        format!("<< /Type /Pages /Kids [{kids}] /Count {page_count} >>"),
+        "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>".to_string(),
+    ];
+    for (index, page_lines) in pages.iter().enumerate() {
+        let content_id = 5 + index * 2;
+        objects.push(format!("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents {content_id} 0 R >>"));
+        let mut content = "BT\n/F1 9 Tf\n48 800 Td\n14 TL\n".to_string();
+        for line in *page_lines {
+            content.push_str(&format!("({}) Tj\nT*\n", pdf_escape(line)));
+        }
+        content.push_str("ET\n");
+        objects.push(format!(
+            "<< /Length {} >>\nstream\n{}endstream",
+            content.len(),
+            content
+        ));
+    }
+    if pages.is_empty() {
+        objects.push("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 5 0 R >>".to_string());
+        let content = "BT\n/F1 9 Tf\n48 800 Td\n(OmnyID Wedding quote comparison) Tj\nET\n";
+        objects.push(format!(
+            "<< /Length {} >>\nstream\n{}endstream",
+            content.len(),
+            content
+        ));
+    }
+    let mut pdf = b"%PDF-1.4\n%OmnyID\n".to_vec();
+    let mut offsets = vec![0usize];
+    for (index, object) in objects.iter().enumerate() {
+        offsets.push(pdf.len());
+        pdf.extend_from_slice(format!("{} 0 obj\n{}\nendobj\n", index + 1, object).as_bytes());
+    }
+    let xref = pdf.len();
+    pdf.extend_from_slice(
+        format!("xref\n0 {}\n0000000000 65535 f \n", objects.len() + 1).as_bytes(),
+    );
+    for offset in offsets.iter().skip(1) {
+        pdf.extend_from_slice(format!("{offset:010} 00000 n \n").as_bytes());
+    }
+    pdf.extend_from_slice(
+        format!(
+            "trailer\n<< /Size {} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n",
+            objects.len() + 1
+        )
+        .as_bytes(),
+    );
+    pdf
+}
+
+async fn share_quote_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(request): Json<QuoteShareRequest>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    if !request.company.trim().is_empty() {
+        return Ok(Json(json!({"status":"sent","message":"PDF sent."})));
+    }
+    let email = request.email.trim().to_ascii_lowercase();
+    if !is_plausible_email(&email) || email.len() > 254 {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Enter a valid email address.".to_string(),
+        ));
+    }
+    let serialized = serde_json::to_vec(&request.snapshot).map_err(|_| {
+        (
+            StatusCode::BAD_REQUEST,
+            "The comparison could not be read.".to_string(),
+        )
+    })?;
+    if serialized.len() > 72 * 1024
+        || !request
+            .snapshot
+            .get("proposals")
+            .is_some_and(Value::is_array)
+    {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "The comparison is incomplete or too large to share.".to_string(),
+        ));
+    }
+    enforce_rate_limit(
+        &state,
+        public_rate_limit_key("wedding_quote_share_burst", &headers),
+        RateLimitPolicy {
+            max_requests: 3,
+            window: Duration::from_secs(3_600),
+        },
+    )
+    .await?;
+    enforce_rate_limit(
+        &state,
+        public_rate_limit_key("wedding_quote_share_daily", &headers),
+        RateLimitPolicy {
+            max_requests: 8,
+            window: Duration::from_secs(86_400),
+        },
+    )
+    .await?;
+    let recipient_digest = hex::encode(Sha256::digest(email.as_bytes()));
+    enforce_rate_limit(
+        &state,
+        format!("wedding_quote_share_recipient:{recipient_digest}"),
+        RateLimitPolicy {
+            max_requests: 3,
+            window: Duration::from_secs(86_400),
+        },
+    )
+    .await?;
+    let event_id = Ulid::new().to_string();
+    sqlx::query(
+        "INSERT INTO wedding_quote_share_events (event_id, delivery_status) VALUES ($1, 'pending')",
+    )
+    .bind(&event_id)
+    .execute(&state.db.pool)
+    .await
+    .map_err(readiness_error_to_http)?;
+    let pdf = build_quote_pdf(&request.snapshot);
+    let delivery = send_transactional_email_with_attachment(
+        &email,
+        "Your OmnyID Wedding venue quote comparison",
+        "Your requested venue quote comparison is attached as a PDF. The figures are based on the terms you reviewed in the public tool; unknown terms remain questions for the venue.\n\nContinue in OmnyID Wedding: https://omnyid.com/workspace/?auth=register&source=wedding&from=quote-decoder",
+        OutgoingEmailAttachment { attachment_id: event_id.clone(), file_name: "omnyid-wedding-venue-quote-comparison.pdf".to_string(), media_type: "application/pdf".to_string(), bytes: pdf },
+    ).await;
+    let (status, error_class) = if delivery.is_ok() {
+        ("sent", None)
+    } else {
+        ("failed", Some("provider_rejected"))
+    };
+    sqlx::query("UPDATE wedding_quote_share_events SET delivery_status = $2, completed_at = NOW(), provider_error_class = $3 WHERE event_id = $1")
+        .bind(&event_id).bind(status).bind(error_class).execute(&state.db.pool).await.map_err(readiness_error_to_http)?;
+    if let Err(error) = delivery {
+        tracing::warn!(%error, %event_id, "public quote comparison PDF delivery failed");
+        return Err((StatusCode::SERVICE_UNAVAILABLE, "The PDF could not be sent just now. Your comparison has not been lost in this browser.".to_string()));
+    }
+    Ok(Json(
+        json!({"status":"sent","message":format!("PDF sent to {email}.")}),
+    ))
+}
+
+async fn admin_quote_shares_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    let operator = authenticated_user(&state.db, &headers).await?;
+    if !operator_access_allowed(&operator.email) {
+        return Err((
+            StatusCode::FORBIDDEN,
+            "operator access required".to_string(),
+        ));
+    }
+    let row = sqlx::query("SELECT COUNT(*) FILTER (WHERE delivery_status = 'sent') AS sent_total, COUNT(*) FILTER (WHERE delivery_status = 'sent' AND requested_at >= NOW() - INTERVAL '7 days') AS sent_7d, MAX(completed_at) FILTER (WHERE delivery_status = 'sent') AS last_sent_at FROM wedding_quote_share_events")
+        .fetch_one(&state.db.pool).await.map_err(readiness_error_to_http)?;
+    Ok(Json(json!({
+        "sent_total": row.try_get::<i64, _>("sent_total").unwrap_or(0),
+        "sent_7d": row.try_get::<i64, _>("sent_7d").unwrap_or(0),
+        "last_sent_at": row.try_get::<Option<chrono::DateTime<chrono::Utc>>, _>("last_sent_at").ok().flatten(),
+        "tool_url": "https://omnyid.com/wedding/compare-wedding-venue-quotes.html",
+        "privacy": "Counts successful deliveries only; quote content and recipient addresses are not stored.",
+    })))
 }
 
 fn bounded(value: &str, max: usize) -> String {
@@ -394,5 +714,31 @@ mod tests {
         let sanitized = sanitize_field("Package: 120 guests x $275.00", field, "money");
         assert_eq!(sanitized.state, "extracted");
         assert_eq!(sanitized.value, Some(json!(275)));
+    }
+
+    #[test]
+    fn shared_quote_pdf_is_auditable_and_contains_reviewed_terms() {
+        let snapshot = json!({
+            "generated_at": "2026-11-10T00:00:00Z",
+            "comparison_guests": 100,
+            "comparison_hours": 6,
+            "proposals": [{
+                "label": "Harbour Garden",
+                "proposal_text": "Reception package is $220 per guest. GST included.",
+                "pricing_model": "per_head",
+                "estimated_total": 22000,
+                "commercial_terms": { "per_head_rate": 220, "gst": "included" },
+                "line_items": [{ "label": "Reception package", "amount": 220 }],
+                "formula_lines": ["100 guests x $220 = $22,000"],
+                "unknowns": ["overtime rate"],
+                "follow_up_questions": ["What is the overtime rate?"]
+            }]
+        });
+        let pdf = build_quote_pdf(&snapshot);
+        assert!(pdf.starts_with(b"%PDF-1.4"));
+        let rendered = String::from_utf8_lossy(&pdf);
+        assert!(rendered.contains("Harbour Garden"));
+        assert!(rendered.contains("100 guests x $220 = $22,000"));
+        assert!(rendered.ends_with("%%EOF\n"));
     }
 }

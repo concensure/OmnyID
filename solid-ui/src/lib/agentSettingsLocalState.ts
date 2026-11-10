@@ -1,7 +1,7 @@
 ﻿// @locs-version: 1.0
 import { isRecord } from "@/lib/eventDetail";
 import { parseJsonValue } from "@/lib/jsonParseState";
-import { accountScopedStorageKey } from "@/lib/accountScopedStorage";
+import { accountScopedStorageKey, accountScopedStorageReadKey } from "@/lib/accountScopedStorage";
 
 export type LatencySnapshot = { ts: number; ms: number };
 export type TestHistoryEntry = {
@@ -48,8 +48,7 @@ function scopedAgentSettingsStorageKey(baseKey: string, userId?: string | null):
 }
 
 function loadAgentSettingsStorageValue(baseKey: string, userId?: string | null): string | null {
-  const scopedKey = scopedAgentSettingsStorageKey(baseKey, userId);
-  return localStorage.getItem(scopedKey) ?? localStorage.getItem(baseKey);
+  return localStorage.getItem(accountScopedStorageReadKey(baseKey, userId));
 }
 
 function writeScopedAgentSettingsStorageValue(baseKey: string, value: string, userId?: string | null): void {

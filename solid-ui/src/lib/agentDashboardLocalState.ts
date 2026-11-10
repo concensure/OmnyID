@@ -1,7 +1,7 @@
 // @locs-version: 1.0
 import { isRecord } from "@/lib/eventDetail";
 import { parseJsonValueOr } from "@/lib/jsonParseState";
-import { accountScopedStorageKey } from "@/lib/accountScopedStorage";
+import { accountScopedStorageKey, accountScopedStorageReadKey } from "@/lib/accountScopedStorage";
 
 export type AgentDashboardQueryHistoryEntry = {
   query: string;
@@ -35,8 +35,7 @@ function removeAgentDashboardStorageValue(baseKey: string, userId?: string | nul
 }
 
 function loadAgentDashboardStorageValue(baseKey: string, userId?: string | null): string | null {
-  const scopedKey = agentDashboardScopedStorageKey(baseKey, userId);
-  return localStorage.getItem(scopedKey) ?? localStorage.getItem(baseKey);
+  return localStorage.getItem(accountScopedStorageReadKey(baseKey, userId));
 }
 
 function writeAgentDashboardStorageValue(baseKey: string, value: string, userId?: string | null): void {

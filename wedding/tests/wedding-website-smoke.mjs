@@ -492,8 +492,8 @@ if (!quoteDecoderJs.includes('/wedding/quote-extract') || !quoteDecoderJs.includ
 if (!quoteDecoderEngine.includes('Estimated total') && !quoteDecoderEngine.includes('estimatedTotal')) {
   failures.push('quote-decoder-engine.js: deterministic total calculation is missing');
 }
-if (!caddyfile.includes('handle /wedding/quote-extract')) {
-  failures.push('Caddyfile: contextual quote extraction route must precede the static Wedding handler');
+if (!caddyfile.includes('handle /wedding/quote-extract') || !caddyfile.includes('handle /wedding/quote-share')) {
+  failures.push('Caddyfile: contextual quote extraction and PDF sharing routes must precede the static Wedding handler');
 }
 if (!quoteDecoder.includes('does not retain the proposal text') || !quoteDecoder.includes('Manual entry remains available')) {
   failures.push('compare-wedding-venue-quotes.html: model-processing disclosure or manual fallback is missing');

@@ -1,7 +1,7 @@
 // @locs-version: 2.0
 import type { WeddingGeneratedArtifact } from "@/lib/weddingArtifactGenerationState";
 import { normalizeWeddingArtifactSummary, type WeddingArtifactInput } from "@/lib/weddingArtifactState";
-import { accountScopedStorageKey } from "@/lib/accountScopedStorage";
+import { accountScopedStorageKey, accountScopedStorageReadKey } from "@/lib/accountScopedStorage";
 import type { AfpAttachment } from "@/lib/api";
 import {
   normalizeWeddingPlanningMetadata,
@@ -577,7 +577,8 @@ export function loadWeddingImportedArtifacts(
 ): WeddingGeneratedArtifact[] {
   const scopedKey = weddingImportScopedStorageKey(responseWorkspaceId, userId);
   const legacyKey = weddingImportStorageKey(responseWorkspaceId);
-  const raw = storage.getItem(scopedKey) ?? storage.getItem(legacyKey);
+  const scopedRaw = storage.getItem(scopedKey);
+  const raw = scopedRaw ?? storage.getItem(accountScopedStorageReadKey(legacyKey, userId));
   if (!raw) return [];
   try {
     const parsed = JSON.parse(raw);
@@ -590,10 +591,6 @@ export function loadWeddingImportedArtifacts(
       const artifact = normalizedStoredImportArtifact(item, responseWorkspaceId);
       return artifact ? [artifact] : [];
     });
-    if (raw === storage.getItem(legacyKey) && legacyKey !== scopedKey) {
-      storage.setItem(scopedKey, JSON.stringify(artifacts));
-      storage.removeItem(legacyKey);
-    }
     return artifacts;
   } catch {
     storage.removeItem(scopedKey);

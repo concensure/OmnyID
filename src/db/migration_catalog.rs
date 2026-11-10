@@ -787,4 +787,9 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Expiring vendor-bound Invite Proposal lead feeds and typed private responses",
         include_str!("../../postgres/migrations/0154_wedding_invite_proposal_vendor_feeds.sql"),
     ),
+    (
+        "0155_wedding_quote_share_events",
+        "Content-free public Wedding quote-comparison PDF delivery receipts",
+        include_str!("../../postgres/migrations/0155_wedding_quote_share_events.sql"),
+    ),
 ];
