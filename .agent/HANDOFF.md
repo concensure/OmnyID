@@ -8241,3 +8241,11 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
 - Added account-scoped General/Wedding/Study lens switching. Wedding entry defaults to the reduced Wedding lens, keeps breadcrumbs, exposes Wedding destinations plus Calendar/Database/Diary, and lets users opt into non-admin advanced views. Admin remains General with direct Growth/admin and cost actions; vendor entry still uses the dedicated portal.
 - Vendor lifecycle chips now hide zero counts; categories are ordered Venue, Planner, Photographer, Celebrant then More; canonical category constraints retain typed prose and musicians map to the directory `band` category; small evidenced categories can show fewer than three cards. Search progress reuses the project robot glyph at text height.
 - Verification passed: TypeScript, line budgets, 2,255 Wedding tests, focused Gmail/account tests, Rust `cargo check --all-targets`, and the Gmail route unit test. Docker Desktop was unavailable at its named pipe, so disposable-Postgres execution remains to be repeated from the clean release/Oracle environment before final evidence.
+
+# 2026-11-10 — WED-355 released (Codex)
+
+- Released implementation SHA `69061a7647fd9d252b6d3c60dbb2fb15b201acab` from the clean detached checkout `C:\temp\wt\omnyid-wed355-release-69061a7`.
+- Exact-SHA frontend build and Oracle deploy preflight/post-deploy proof passed. Oracle `SOURCE_COMMIT` and `oracle-runtime-manifest.json` both match the implementation SHA.
+- Production migration `0156_gmail_alpha_access_requests` is recorded once; the table exists with `owner_user_id` as the account boundary and the expected request/review fields. Unauthenticated approval-request and OAuth URL calls return 401.
+- All seven long-running Oracle services reported `running` after deployment. No simulated data was included or inserted.
+- Docker Desktop remained unavailable locally. Production table/migration inspection supplied hosted persistence evidence without creating a request; an authenticated UI request remains an optional operator acceptance test because it intentionally sends mail to `admin@omnyid.com`.

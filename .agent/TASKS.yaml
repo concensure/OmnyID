@@ -17,7 +17,7 @@ lifecycle:
 tasks:
   - id: WED-355
     title: Enforce account-isolated Wedding progress and deliver role-aware lenses, Gmail approval, and vendor discovery
-    status: in_progress
+    status: done
     owner: codex
     branch: agent/codex/WED-355
     worktree: C:/Users/ozans/Desktop/projects/OmnyID-GROWTH-001
@@ -25,7 +25,7 @@ tasks:
     depends_on: [WED-353, WED-354]
     files: [solid-ui/src/App.tsx, solid-ui/src/components/**, solid-ui/src/lib/**State.*, solid-ui/src/styles.css, solid-ui/tests/**, src/server/**email**, src/server/**wedding**, tests/**, postgres/migrations/**, Documents/verification/**, .agent/**]
     acceptance: [Gmail connection is an explicit alpha approval flow that records an authenticated request and notifies admin@omnyid.com without connecting before approval, mutable Wedding progress tasks profiles and UI preferences are strictly account scoped with regression tests proving two accounts cannot share state, the setup card remains until both wedding date and budget are known, Wedding lens is the default for Wedding users while administrators remain in the full workspace and vendor accounts enter their dedicated portal, Wedding lens removes unrelated AI chrome and offers a small role-safe configurable navigation with Today Guests Plan Budget Vendor Calendar Database Diary and Advanced, admin-only surfaces are direct admin navigation and never user-selectable, vendor status filters render only for non-zero counts and category order and musician ranking remain query relevant, the vendor-search waiting indicator reuses the existing dynamic project glyph at text height, focused isolation frontend backend build exact-SHA deployment provenance and hosted checks pass]
-    progress: "Implementation complete in the task worktree: authenticated Wedding browser mirrors are account-namespaced; Gmail OAuth is behind a recorded operator approval request; Wedding/General/Study lenses are role-aware; setup stays until date and budget; vendor zero-count filters, category order, musician routing, small-category comparisons and waiting glyph are repaired. TypeScript, line budgets, 2,255 Wedding tests, cargo check and the focused Gmail route test pass. Freeze a clean exact-SHA candidate, build/deploy it, run migration/hosted checks, then mark done."
+    progress: "Released implementation SHA 69061a7647fd9d252b6d3c60dbb2fb15b201acab to Oracle from a clean detached checkout. Authenticated Wedding browser mirrors are account-namespaced; Gmail OAuth is behind a recorded operator approval request; Wedding/General/Study lenses are role-aware; setup stays until date and budget; vendor zero-count filters, category order, musician routing, small-category comparisons and waiting glyph are repaired. TypeScript, line budgets, 2,255 Wedding tests, focused isolation/lens/Gmail/vendor tests (47/47), cargo check, migration-catalogue and Gmail route tests, exact-SHA production build, deploy proof, migration 0156, account-owned table shape, unauthenticated route rejection, service state and Oracle provenance all pass."
 
   - id: WED-354
     title: Repair Database and Workflows surfaces and harden quote sharing, typography, isolation and run-sheet projection
