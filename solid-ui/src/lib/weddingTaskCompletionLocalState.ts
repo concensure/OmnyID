@@ -1,4 +1,5 @@
-// @locs-version: 2.0
+// @locs-version: 2.1
+import { weddingAccountScopedStorageKey } from "@/lib/weddingLocalAccountScope";
 export const WEDDING_TASK_COMPLETION_KEY_PREFIX = "omnyid.wedding-task-completion";
 export const WEDDING_TASK_COMPLETION_EVENT = "omnyid:wedding-task-completion";
 
@@ -30,7 +31,7 @@ export function weddingTaskCompletionKey(scope: WeddingTaskCompletionScope): str
   if (!taskId) return null;
   const workspace = clean(scope.responseWorkspaceId) || "no_workspace";
   const plan = clean(scope.weddingPlanId) || "no_plan";
-  return `${WEDDING_TASK_COMPLETION_KEY_PREFIX}:${safeKeyPart(plan)}:${safeKeyPart(workspace)}:${safeKeyPart(taskId)}`;
+  return weddingAccountScopedStorageKey(`${WEDDING_TASK_COMPLETION_KEY_PREFIX}:${safeKeyPart(plan)}:${safeKeyPart(workspace)}:${safeKeyPart(taskId)}`);
 }
 
 function normalizeRecord(value: unknown): WeddingTaskCompletionRecord | null {

@@ -1,5 +1,6 @@
 // @locs-version: 2.1
 import type { WeddingResponseWorkspaceViewState } from "@/lib/weddingResponseWorkspaceViewState";
+import { weddingAccountScopedStorageKey } from "@/lib/weddingLocalAccountScope";
 
 export type WeddingWorkspaceMenuBadgeInput = Pick<
   WeddingResponseWorkspaceViewState,
@@ -54,7 +55,7 @@ export const WEDDING_WORKSPACE_MENU_EVENT = "omnyid:wedding-workspace-menu";
 
 export function loadWeddingWorkspaceMenu(storage: Storage = localStorage): WeddingWorkspaceMenuId {
   try {
-    const raw = storage.getItem(WEDDING_WORKSPACE_MENU_STORAGE_KEY);
+    const raw = storage.getItem(weddingAccountScopedStorageKey(WEDDING_WORKSPACE_MENU_STORAGE_KEY));
     return isWeddingWorkspaceMenuId(raw) ? canonicalWeddingWorkspaceMenuId(raw) : "home";
   } catch {
     return "home";
@@ -63,7 +64,7 @@ export function loadWeddingWorkspaceMenu(storage: Storage = localStorage): Weddi
 
 export function saveWeddingWorkspaceMenu(id: WeddingWorkspaceMenuId, storage: Storage = localStorage): void {
   try {
-    storage.setItem(WEDDING_WORKSPACE_MENU_STORAGE_KEY, canonicalWeddingWorkspaceMenuId(id));
+    storage.setItem(weddingAccountScopedStorageKey(WEDDING_WORKSPACE_MENU_STORAGE_KEY), canonicalWeddingWorkspaceMenuId(id));
   } catch {
     // Ignore localStorage write failures for convenience state.
   }

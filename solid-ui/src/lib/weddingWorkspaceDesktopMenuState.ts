@@ -36,6 +36,12 @@ export const WEDDING_WORKSPACE_PRIMARY_MENU_ITEMS: readonly WeddingWorkspaceDesk
     className: "border-emerald-100 bg-emerald-50/80 text-emerald-950 hover:border-emerald-200",
     activeClassName: "border-emerald-300 bg-emerald-100 text-emerald-950",
   },
+  {
+    id: "response_queue", icon: "response_queue", label: "Vendors",
+    title: "Find, compare, contact, and review wedding vendors.",
+    className: "border-cyan-100 bg-cyan-50/80 text-cyan-950 hover:border-cyan-200",
+    activeClassName: "border-cyan-300 bg-cyan-100 text-cyan-950",
+  },
 ];
 
 export const WEDDING_WORKSPACE_MORE_MENU_ITEMS: readonly WeddingWorkspaceDesktopMenuItem[] = [

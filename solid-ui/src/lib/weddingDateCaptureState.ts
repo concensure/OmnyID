@@ -1,5 +1,6 @@
 // @locs-version: 1.0
 import type { SendAfpMessageInput } from "@/lib/api";
+import { weddingAccountScopedStorageKey } from "@/lib/weddingLocalAccountScope";
 import {
   type WeddingPlanningScheduleItem,
   weddingScheduleItemToAfpSendInput,
@@ -18,7 +19,7 @@ function clean(value: unknown): string {
 }
 
 function storageKey(responseWorkspaceId: string): string {
-  return `${STORAGE_PREFIX}${safeWeddingLabel(responseWorkspaceId)}`;
+  return weddingAccountScopedStorageKey(`${STORAGE_PREFIX}${safeWeddingLabel(responseWorkspaceId)}`);
 }
 
 export function parseWeddingDateInput(value: string): string | null {

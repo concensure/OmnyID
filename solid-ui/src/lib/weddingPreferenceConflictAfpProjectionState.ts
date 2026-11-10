@@ -12,6 +12,7 @@ import {
   safeWeddingLabel,
 } from "@/lib/weddingPlanningTemplateState";
 import { weddingSemanticObjectFromPreferenceConflictState } from "@/lib/weddingSemanticUiState";
+import { weddingAccountScopedStorageKey } from "@/lib/weddingLocalAccountScope";
 
 export const WEDDING_PREFERENCE_CONFLICT_AFP_PROJECTIONS_KEY =
   "omnyid.wedding-preference-conflict-afp-projections";
@@ -325,7 +326,8 @@ export function weddingPreferenceConflictToAfpSendInput(
 }
 
 export function loadWeddingPreferenceConflictAfpProjectionIds(storage: Storage = localStorage): string[] {
-  const raw = storage.getItem(WEDDING_PREFERENCE_CONFLICT_AFP_PROJECTIONS_KEY);
+  const key = weddingAccountScopedStorageKey(WEDDING_PREFERENCE_CONFLICT_AFP_PROJECTIONS_KEY);
+  const raw = storage.getItem(key);
   if (!raw) return [];
   try {
     const parsed = JSON.parse(raw);
@@ -333,7 +335,7 @@ export function loadWeddingPreferenceConflictAfpProjectionIds(storage: Storage =
       ? parsed.filter((value): value is string => typeof value === "string" && value.trim().length > 0)
       : [];
   } catch {
-    storage.removeItem(WEDDING_PREFERENCE_CONFLICT_AFP_PROJECTIONS_KEY);
+    storage.removeItem(key);
     return [];
   }
 }
@@ -347,7 +349,7 @@ export function markWeddingPreferenceConflictAfpProjectionSent(id: string, stora
   const cleanId = clean(id);
   if (!cleanId) return;
   const next = [...new Set([cleanId, ...loadWeddingPreferenceConflictAfpProjectionIds(storage)])].slice(0, 300);
-  storage.setItem(WEDDING_PREFERENCE_CONFLICT_AFP_PROJECTIONS_KEY, JSON.stringify(next));
+  storage.setItem(weddingAccountScopedStorageKey(WEDDING_PREFERENCE_CONFLICT_AFP_PROJECTIONS_KEY), JSON.stringify(next));
 }
 
 export function weddingPreferenceConflictFromAfpMessage(message: AfpMessage): WeddingPreferenceConflictState | null {

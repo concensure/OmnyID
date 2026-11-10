@@ -383,10 +383,12 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
             axum::routing::delete(calendar_delete_http),
         )
         .route("/gmail/connect-url", get(gmail_connect_url_http))
+        .route("/gmail/access-request", post(gmail_access_request_http))
         .route("/gmail/callback", get(gmail_callback_http))
         .route("/gmail/config", get(gmail_config_http))
         .route("/gmail/status", get(gmail_status_http))
         .route("/integrations/gmail/oauth-url", get(gmail_connect_url_http))
+        .route("/integrations/gmail/access-request", post(gmail_access_request_http))
         .route("/integrations/gmail/config", get(gmail_config_http))
         .route("/integrations/gmail/status", get(gmail_status_http))
         .route("/gmail/disconnect", post(gmail_disconnect_http))
@@ -413,6 +415,61 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
 
 // ── Gmail OAuth routes ────────────────────────────────────────────────────────
 
+async fn gmail_alpha_access_state(state: &AppState, user_id: &str) -> Result<(String, Option<String>), (StatusCode, String)> {
+    let row = sqlx::query_as::<_, (String, chrono::DateTime<chrono::Utc>)>(
+        "SELECT status, requested_at FROM gmail_alpha_access_requests WHERE owner_user_id = $1",
+    )
+    .bind(user_id)
+    .fetch_optional(&state.db.pool)
+    .await
+    .map_err(internal_error)
+    .map_err(status_to_http)?;
+    Ok(row
+        .map(|(status, requested_at)| (status, Some(requested_at.to_rfc3339())))
+        .unwrap_or_else(|| ("not_requested".to_string(), None)))
+}
+
+async fn gmail_access_request_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    let user = authenticated_user(&state.db, &headers).await?;
+    enforce_rate_limit(
+        &state,
+        authenticated_rate_limit_key("gmail_alpha_access_request", &headers),
+        RateLimitPolicy { max_requests: 3, window: Duration::from_secs(24 * 60 * 60) },
+    ).await?;
+    let requested_at = chrono::Utc::now();
+    let status: String = sqlx::query_scalar(
+        "INSERT INTO gmail_alpha_access_requests (owner_user_id, requester_email, status, requested_at) VALUES ($1, $2, 'pending', $3) ON CONFLICT (owner_user_id) DO UPDATE SET requester_email = EXCLUDED.requester_email, status = CASE WHEN gmail_alpha_access_requests.status = 'approved' THEN 'approved' ELSE 'pending' END, requested_at = CASE WHEN gmail_alpha_access_requests.status = 'approved' THEN gmail_alpha_access_requests.requested_at ELSE EXCLUDED.requested_at END RETURNING status",
+    )
+    .bind(&user.id)
+    .bind(user.email.trim().to_lowercase())
+    .bind(requested_at)
+    .fetch_one(&state.db.pool)
+    .await
+    .map_err(internal_error)
+    .map_err(status_to_http)?;
+    if status != "approved" {
+        crate::gateway::smtp_out::send_transactional_email(
+            "admin@omnyid.com",
+            "[OmnyID alpha access] Gmail connection request",
+            &format!("A signed-in OmnyID user requested access to the Gmail alpha.\n\nAccount email: {}\nAccount ID: {}\nRequested at: {}\n\nReview this request before changing its status to approved.", user.email.trim(), user.id, requested_at.to_rfc3339()),
+        )
+        .await
+        .map_err(|error| {
+            tracing::warn!(%error, user_id = %user.id, "gmail alpha request notification failed");
+            (StatusCode::BAD_GATEWAY, "Your request was saved, but the admin notification could not be sent yet. Please try again shortly.".to_string())
+        })?;
+    }
+    Ok(Json(serde_json::json!({
+        "accepted": true,
+        "access_status": status,
+        "requested_at": requested_at.to_rfc3339(),
+        "message": if status == "approved" { "Gmail alpha access is approved for this account." } else { "Your Gmail alpha access request was sent to the OmnyID administrator." },
+    })))
+}
+
 /// GET /gmail/status — returns whether a Gmail token is stored for the user
 async fn gmail_status_http(
     State(state): State<Arc<AppState>>,
@@ -437,6 +494,7 @@ async fn gmail_status_http(
         .and_then(Value::as_str);
     let (token_expired, expires_within_24h) =
         gmail_token_expiry_warning_state(token_expiry, chrono::Utc::now());
+    let (alpha_access_status, alpha_requested_at) = gmail_alpha_access_state(&state, &user.id).await?;
     if let Some(gmail_email) = token
         .as_ref()
         .and_then(|value| value.get("gmail_email"))
@@ -462,6 +520,8 @@ async fn gmail_status_http(
             .and_then(Value::as_str),
         "token_expired": token_expired,
         "expires_within_24h": expires_within_24h,
+        "alpha_access_status": alpha_access_status,
+        "alpha_requested_at": alpha_requested_at,
         "message": integration_user_facing_text(
             if token.is_some() {
                 if token_expired {
@@ -602,7 +662,10 @@ async fn gmail_connect_url_http(
     if gmail_connection_change_requires_recent_session() {
         require_recent_high_risk_session(&session)?;
     }
-    let _ = user.id; // ensure user is authenticated
+    let (alpha_access_status, _) = gmail_alpha_access_state(&state, &user.id).await?;
+    if alpha_access_status != "approved" {
+        return Err((StatusCode::FORBIDDEN, "Gmail is an alpha feature. Request administrator approval before connecting an account.".to_string()));
+    }
     let client_id = gmail_oauth_client_id_configured()?;
     let redirect_uri = gmail_oauth_redirect_uri()?;
     // Sign the state so the callback can verify it wasn't forged.
@@ -651,6 +714,15 @@ async fn gmail_callback_http(
             .into_response();
         }
     };
+    match gmail_alpha_access_state(&state, &user_id).await {
+        Ok((status, _)) if status == "approved" => {}
+        _ => {
+            return axum::response::Redirect::temporary(&gmail_oauth_redirect_target(
+                "alpha_not_approved",
+            ))
+            .into_response();
+        }
+    }
 
     let Ok(client_id) = gmail_oauth_client_id_configured() else {
         return axum::response::Redirect::temporary(&gmail_oauth_redirect_target("not_configured"))

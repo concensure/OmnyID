@@ -8233,3 +8233,11 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
   passes. Freeze this documentation commit as a new exact-SHA candidate, then
   deploy only from its clean detached release checkout and verify hosted
   provenance and health.
+# 2026-11-10 — WED-355 release candidate (Codex)
+
+- Continued from deployed SHA `bf49b6c7aa94a04835e01af783b02aa283380b72` in `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001` on `agent/codex/WED-355`.
+- Namespaced Wedding task/budget/date/guest/helper/selection/menu/projection fallback state by authenticated account, preventing shared starter identifiers from carrying progress between couples.
+- Added a fail-closed Gmail alpha approval request: signed-in users receive an explanation, the server records the request and notifies `admin@omnyid.com`, and OAuth URL/callback paths require `approved` status.
+- Added account-scoped General/Wedding/Study lens switching. Wedding entry defaults to the reduced Wedding lens, keeps breadcrumbs, exposes Wedding destinations plus Calendar/Database/Diary, and lets users opt into non-admin advanced views. Admin remains General with direct Growth/admin and cost actions; vendor entry still uses the dedicated portal.
+- Vendor lifecycle chips now hide zero counts; categories are ordered Venue, Planner, Photographer, Celebrant then More; canonical category constraints retain typed prose and musicians map to the directory `band` category; small evidenced categories can show fewer than three cards. Search progress reuses the project robot glyph at text height.
+- Verification passed: TypeScript, line budgets, 2,255 Wedding tests, focused Gmail/account tests, Rust `cargo check --all-targets`, and the Gmail route unit test. Docker Desktop was unavailable at its named pipe, so disposable-Postgres execution remains to be repeated from the clean release/Oracle environment before final evidence.

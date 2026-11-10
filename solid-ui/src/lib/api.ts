@@ -4266,6 +4266,17 @@ export const fetchGmailStatus = (scope: "workspace" | "integration" = "workspace
 export const fetchGmailOAuthUrl = (scope: "workspace" | "integration" = "workspace"): Promise<string> =>
   apiFetch<unknown>(scope === "integration" ? "/integrations/gmail/oauth-url" : "/gmail/connect-url")
     .then(oauthUrlFromResponse);
+export const requestGmailAlphaAccess = (scope: "workspace" | "integration" = "workspace"): Promise<{ accepted: boolean; access_status: string; requested_at?: string; message?: string }> =>
+  apiFetch<unknown>(scope === "integration" ? "/integrations/gmail/access-request" : "/gmail/access-request", { method: "POST" })
+    .then((value) => {
+      const record = isRecord(value) ? value : {};
+      return {
+        accepted: record.accepted === true,
+        access_status: apiString(record.access_status, "pending"),
+        requested_at: apiString(record.requested_at) || undefined,
+        message: apiString(record.message) || undefined,
+      };
+    });
 export const fetchGmailOAuthConfig = (scope: "workspace" | "integration" = "workspace"): Promise<GmailOAuthConfig> =>
   apiFetch<unknown>(scope === "integration" ? "/integrations/gmail/config" : "/gmail/config")
     .then(normalizeGmailOAuthConfig);

@@ -13,6 +13,7 @@ import {
 } from "@/lib/weddingPlanningTemplateState";
 import type { WeddingResponseWorkspaceViewState } from "@/lib/weddingResponseWorkspaceViewState";
 import type { WeddingSemanticUiObject } from "@/lib/weddingSemanticUiState";
+import { weddingAccountScopedStorageKey } from "@/lib/weddingLocalAccountScope";
 
 export type WeddingHelperPlanningTask = WeddingResponseWorkspaceViewState["planningTaskItems"][number];
 
@@ -206,7 +207,7 @@ function helperResponsibilitySemanticObject(input: {
 }
 
 function storageKey(workspaceId: string): string {
-  return `${WEDDING_HELPER_LOCAL_STATE_KEY}:${workspaceId}`;
+  return weddingAccountScopedStorageKey(`${WEDDING_HELPER_LOCAL_STATE_KEY}:${workspaceId}`);
 }
 
 function emptyWeddingHelperLocalState(): WeddingHelperLocalState {

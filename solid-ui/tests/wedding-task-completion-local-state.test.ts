@@ -6,6 +6,7 @@ import {
   saveWeddingTaskCompletion,
   weddingTaskCompletionKey,
 } from "@/lib/weddingTaskCompletionLocalState";
+import { setWeddingLocalAccountScope } from "@/lib/weddingLocalAccountScope";
 
 function memoryStorage(): Storage {
   const values = new Map<string, string>();
@@ -80,6 +81,24 @@ test("wedding task completion state isolates same task id across workspaces", ()
     responseWorkspaceId: "response_workspace:b",
     weddingPlanId: "wedding_plan:b",
   }, storage)?.completed, false);
+});
+
+test("wedding task completion state isolates the same starter plan and task across accounts", () => {
+  const storage = memoryStorage();
+  const scope = {
+    taskId: "starter-task:venue",
+    responseWorkspaceId: "response_workspace:starter",
+    weddingPlanId: "wedding_plan:starter",
+  };
+  setWeddingLocalAccountScope("user-mia");
+  saveWeddingTaskCompletion({ ...scope, completed: true }, storage);
+  setWeddingLocalAccountScope("user-priya");
+  assert.equal(loadWeddingTaskCompletion(scope, storage), null);
+  saveWeddingTaskCompletion({ ...scope, completed: false }, storage);
+  assert.equal(loadWeddingTaskCompletion(scope, storage)?.completed, false);
+  setWeddingLocalAccountScope("user-mia");
+  assert.equal(loadWeddingTaskCompletion(scope, storage)?.completed, true);
+  setWeddingLocalAccountScope(null);
 });
 
 test("wedding task completion state rejects missing task ids and malformed stored records", () => {

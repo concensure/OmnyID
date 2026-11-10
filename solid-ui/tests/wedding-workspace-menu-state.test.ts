@@ -13,6 +13,7 @@ import {
   type WeddingWorkspaceMenuBadgeInput,
 } from "../src/lib/weddingWorkspaceMenuState.ts";
 import { weddingMenuKeyDownStep } from "../src/lib/weddingWorkspaceDesktopMenuState.ts";
+import { setWeddingLocalAccountScope } from "../src/lib/weddingLocalAccountScope.ts";
 
 function fakeStorage(): Storage {
   const state = new Map<string, string>();
@@ -70,6 +71,18 @@ test("loadWeddingWorkspaceMenu defaults to home and round-trips a saved tab", ()
   assert.equal(loadWeddingWorkspaceMenu(storage), "home");
   saveWeddingWorkspaceMenu("timeline", storage);
   assert.equal(loadWeddingWorkspaceMenu(storage), "timeline");
+});
+
+test("workspace menu selection does not cross authenticated accounts", () => {
+  const storage = fakeStorage();
+  setWeddingLocalAccountScope("couple-one");
+  saveWeddingWorkspaceMenu("budget", storage);
+  setWeddingLocalAccountScope("couple-two");
+  assert.equal(loadWeddingWorkspaceMenu(storage), "home");
+  saveWeddingWorkspaceMenu("people", storage);
+  setWeddingLocalAccountScope("couple-one");
+  assert.equal(loadWeddingWorkspaceMenu(storage), "budget");
+  setWeddingLocalAccountScope(null);
 });
 
 test("legacy Vision and Inspiration menu values open Plan", () => {

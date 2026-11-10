@@ -31,11 +31,14 @@ fn gmail_routes_include_workspace_and_integration_status_aliases() {
     assert!(source.contains(".route(\"/gmail/status\", get(gmail_status_http))"));
     assert!(source.contains(".route(\"/integrations/gmail/status\", get(gmail_status_http))"));
     assert!(source.contains(".route(\"/gmail/connect-url\", get(gmail_connect_url_http))"));
+    assert!(source.contains(".route(\"/gmail/access-request\", post(gmail_access_request_http))"));
     assert!(source.contains(".route(\"/gmail/config\", get(gmail_config_http))"));
     assert!(
         source.contains(".route(\"/integrations/gmail/oauth-url\", get(gmail_connect_url_http))")
     );
     assert!(source.contains(".route(\"/integrations/gmail/config\", get(gmail_config_http))"));
+    assert!(source.contains(".route(\"/integrations/gmail/access-request\", post(gmail_access_request_http))"));
+    assert!(source.contains("alpha_access_status != \"approved\""));
 }
 
 #[test]

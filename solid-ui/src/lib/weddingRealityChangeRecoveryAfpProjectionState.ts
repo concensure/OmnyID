@@ -9,6 +9,7 @@ import type {
   WeddingRecoveryShortlistItem,
   WeddingRecoveryStep,
 } from "@/lib/weddingRealityChangeRecoveryState";
+import { weddingAccountScopedStorageKey } from "@/lib/weddingLocalAccountScope";
 import {
   normalizeWeddingPlanningMetadata,
   safeWeddingLabel,
@@ -331,7 +332,8 @@ export function weddingRealityChangeRecoveryToAfpSendInput(
 }
 
 export function loadWeddingRecoveryAfpProjectionIds(storage: Storage = localStorage): string[] {
-  const raw = storage.getItem(WEDDING_RECOVERY_AFP_PROJECTIONS_KEY);
+  const key = weddingAccountScopedStorageKey(WEDDING_RECOVERY_AFP_PROJECTIONS_KEY);
+  const raw = storage.getItem(key);
   if (!raw) return [];
   try {
     const parsed = JSON.parse(raw);
@@ -339,7 +341,7 @@ export function loadWeddingRecoveryAfpProjectionIds(storage: Storage = localStor
       ? parsed.filter((value): value is string => typeof value === "string" && value.trim().length > 0)
       : [];
   } catch {
-    storage.removeItem(WEDDING_RECOVERY_AFP_PROJECTIONS_KEY);
+    storage.removeItem(key);
     return [];
   }
 }
@@ -353,7 +355,7 @@ export function markWeddingRecoveryAfpProjectionSent(id: string, storage: Storag
   const cleanId = clean(id);
   if (!cleanId) return;
   const next = [...new Set([cleanId, ...loadWeddingRecoveryAfpProjectionIds(storage)])].slice(0, 300);
-  storage.setItem(WEDDING_RECOVERY_AFP_PROJECTIONS_KEY, JSON.stringify(next));
+  storage.setItem(weddingAccountScopedStorageKey(WEDDING_RECOVERY_AFP_PROJECTIONS_KEY), JSON.stringify(next));
 }
 
 export function weddingRealityChangeRecoveryFromAfpMessage(message: AfpMessage): WeddingRealityChangeRecoveryState | null {

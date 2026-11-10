@@ -12,7 +12,7 @@ test("setup checks remain available to the allowlisted operator", () => {
   assert.equal(weddingWorkspaceMoreItemsForEmail(" CONCENSURE@GMAIL.COM ").some((item) => item.id === "advanced"), true);
 });
 
-test("primary navigation stays focused while documents move under More", () => {
-  assert.deepEqual(weddingWorkspaceMenuItemsForEmail("couple@example.test").map((item) => item.id), ["home", "people", "plan", "budget"]);
+test("primary navigation exposes the vendor finder while documents stay under More", () => {
+  assert.deepEqual(weddingWorkspaceMenuItemsForEmail("couple@example.test").map((item) => item.id), ["home", "people", "plan", "budget", "response_queue"]);
   assert.deepEqual(weddingWorkspaceMoreItemsForEmail("couple@example.test").map((item) => item.id), ["documents"]);
 });

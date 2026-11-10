@@ -7,6 +7,7 @@ import {
   type WeddingPlanningMetadata,
 } from "@/lib/weddingPlanningTemplateState";
 import { weddingSemanticObjectFromNeedToKnowContext } from "@/lib/weddingSemanticUiState";
+import { weddingAccountScopedStorageKey } from "@/lib/weddingLocalAccountScope";
 
 export const WEDDING_NEED_TO_KNOW_AFP_PROJECTIONS_KEY = "omnyid.wedding-need-to-know-afp-projections";
 
@@ -205,7 +206,8 @@ export function weddingNeedToKnowContextToAfpSendInput(
 }
 
 export function loadWeddingNeedToKnowAfpProjectionIds(storage: Storage = localStorage): string[] {
-  const raw = storage.getItem(WEDDING_NEED_TO_KNOW_AFP_PROJECTIONS_KEY);
+  const key = weddingAccountScopedStorageKey(WEDDING_NEED_TO_KNOW_AFP_PROJECTIONS_KEY);
+  const raw = storage.getItem(key);
   if (!raw) return [];
   try {
     const parsed = JSON.parse(raw);
@@ -213,7 +215,7 @@ export function loadWeddingNeedToKnowAfpProjectionIds(storage: Storage = localSt
       ? parsed.filter((value): value is string => typeof value === "string" && value.trim().length > 0)
       : [];
   } catch {
-    storage.removeItem(WEDDING_NEED_TO_KNOW_AFP_PROJECTIONS_KEY);
+    storage.removeItem(key);
     return [];
   }
 }
@@ -227,5 +229,5 @@ export function markWeddingNeedToKnowAfpProjectionSent(id: string, storage: Stor
   const cleanId = clean(id);
   if (!cleanId) return;
   const next = [...new Set([cleanId, ...loadWeddingNeedToKnowAfpProjectionIds(storage)])].slice(0, 300);
-  storage.setItem(WEDDING_NEED_TO_KNOW_AFP_PROJECTIONS_KEY, JSON.stringify(next));
+  storage.setItem(weddingAccountScopedStorageKey(WEDDING_NEED_TO_KNOW_AFP_PROJECTIONS_KEY), JSON.stringify(next));
 }

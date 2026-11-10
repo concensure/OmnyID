@@ -1160,13 +1160,6 @@ export function ResponseQueueView(props: {
   const weddingVendorSearchBlockedReason = createMemo(() =>
     weddingVendorSearchProviderBlockedReason(weddingProviderCapabilities()),
   );
-  const weddingFirstIntakeComplete = createMemo(() => {
-    const workspace = weddingWorkspace();
-    return weddingFollowUpRequested()
-      || Boolean(weddingPersistedWorkspace()?.hasPersistedData)
-      || Boolean(workspace?.contextCards.some((card) => card.planningContext));
-  });
-
   onMount(() => {
     const menuHandler = (event: Event) => {
       const menu = weddingWorkspaceMenuIdFromEvent(event);
@@ -1824,8 +1817,12 @@ export function ResponseQueueView(props: {
         // `Custom vendor search` filters out a real saved venue such as Mackay.
         targetCategory: directoryLookupOnly || (freeformQuery && !queryIntent.category && !options?.category)
           ? null
-          : options?.category ?? queryIntent.category ?? effectiveCategoryLabels[0] ?? null,
-        requireExactlyThree: true,
+          : queryIntent.category ?? options?.category ?? effectiveCategoryLabels[0] ?? null,
+        // Show the useful directory matches immediately when a smaller
+        // category (for example Sydney musicians) has fewer than three
+        // evidenced listings. Missing choices stay explicit instead of being
+        // replaced by an unrelated search-notes document.
+        requireExactlyThree: false,
         // An exact vendor-name lookup must be predictable and private: search
         // the existing directory only instead of turning a name into a broad
         // online query when the directory has fewer than three matches.
@@ -1966,6 +1963,8 @@ export function ResponseQueueView(props: {
     return state ? weddingSetupChecklistItems(state, weddingFollowUpDate()) : [];
   });
   const incompleteWeddingSetupChecklist = createMemo(() => weddingSetupChecklist().filter((item) => !item.complete));
+  const essentialWeddingSetupIncomplete = createMemo(() => weddingSetupChecklist()
+    .some((item) => (item.id === "date" || item.id === "budget") && !item.complete));
 
   return (
     <div class={RESPONSE_QUEUE_VIEW_CLASS}>
@@ -2067,7 +2066,7 @@ export function ResponseQueueView(props: {
           /></div>
       </Show>
 
-      <Show when={weddingWorkspace() && weddingWorkspaceMenu() === "home" && !weddingFirstIntakeComplete() && incompleteWeddingSetupChecklist().length > 0}>
+      <Show when={weddingWorkspace() && weddingWorkspaceMenu() === "home" && essentialWeddingSetupIncomplete() && incompleteWeddingSetupChecklist().length > 0}>
         <WeddingSetupChecklist
           items={weddingSetupChecklist()}
           initialDate={parseWeddingDateInput(weddingFollowUpDate()) ?? ""}

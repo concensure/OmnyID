@@ -3180,3 +3180,8 @@ synthetic vendor search or introduce another send path.
   snapshot and sent as an attachment. The database stores only event id,
   timestamps, delivery status and a coarse provider error class. It never
   stores proposal text, calculations or recipient email addresses.
+# 2026-11-10 — Authenticated Wedding browser mirrors use an account namespace
+
+- Shared starter plan and workspace identifiers are product templates, not tenant boundaries.
+- Every mutable authenticated Wedding browser mirror must include the signed-in account ID even when its durable source is AFP. Unauthenticated quiz/lead-magnet handoffs remain explicitly separate import inputs.
+- OAuth access to alpha integrations is a server-enforced account grant, not a presentation-only warning.

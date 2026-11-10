@@ -5,7 +5,7 @@
 import type { JSX } from "solid-js";
 import type { ViewName } from "@/lib/viewNames";
 
-export type IconId = ViewName | "home" | "more" | "back" | "forward" | "fleet" | "user" | "weather" | "help" | "tools" | "para" | "seating" | "timeline";
+export type IconId = ViewName | "home" | "more" | "back" | "forward" | "fleet" | "user" | "weather" | "help" | "tools" | "para" | "seating" | "timeline" | "lens";
 
 // Typed SVG wrapper — avoids object-spread type errors with SvgSVGAttributes.
 function I(props: { class?: string; children: JSX.Element }) {
@@ -27,6 +27,15 @@ function I(props: { class?: string; children: JSX.Element }) {
 
 export function RailIcon(props: { id: IconId }) {
   switch (props.id) {
+
+    case "lens": return (
+      <I>
+        <circle cx="8" cy="8" r="4.5" />
+        <path d="M11.3 11.3 17 17" />
+        <path d="M5.7 8 h4.6" />
+        <path d="M8 5.7 v4.6" />
+      </I>
+    );
 
     // search — rounded bubble with bottom-left tail + 3 bobbing dots (CSS rd1/2/3)
     case "search": return (

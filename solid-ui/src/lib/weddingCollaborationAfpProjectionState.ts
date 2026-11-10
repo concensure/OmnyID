@@ -10,6 +10,7 @@ import {
   type WeddingPlanningMetadata,
 } from "@/lib/weddingPlanningTemplateState";
 import type { WeddingSemanticUiObject } from "@/lib/weddingSemanticUiState";
+import { weddingAccountScopedStorageKey } from "@/lib/weddingLocalAccountScope";
 
 export const WEDDING_COLLABORATION_AFP_PROJECTIONS_KEY = "omnyid.wedding-collaboration-afp-projections";
 
@@ -363,7 +364,7 @@ export function hasSentWeddingCollaborationAfpProjection(
   storage: Storage,
 ): boolean {
   try {
-    const raw = storage.getItem(WEDDING_COLLABORATION_AFP_PROJECTIONS_KEY);
+    const raw = storage.getItem(weddingAccountScopedStorageKey(WEDDING_COLLABORATION_AFP_PROJECTIONS_KEY));
     const parsed = raw ? JSON.parse(raw) : {};
     return Boolean(parsed?.[projectionId]);
   } catch {
@@ -375,9 +376,10 @@ export function markWeddingCollaborationAfpProjectionSent(
   projectionId: string,
   storage: Storage = localStorage,
 ): void {
-  const raw = storage.getItem(WEDDING_COLLABORATION_AFP_PROJECTIONS_KEY);
+  const key = weddingAccountScopedStorageKey(WEDDING_COLLABORATION_AFP_PROJECTIONS_KEY);
+  const raw = storage.getItem(key);
   const parsed = raw ? JSON.parse(raw) : {};
-  storage.setItem(WEDDING_COLLABORATION_AFP_PROJECTIONS_KEY, JSON.stringify({
+  storage.setItem(key, JSON.stringify({
     ...parsed,
     [projectionId]: true,
   }));

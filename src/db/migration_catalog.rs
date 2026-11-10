@@ -792,4 +792,9 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Content-free public Wedding quote-comparison PDF delivery receipts",
         include_str!("../../postgres/migrations/0155_wedding_quote_share_events.sql"),
     ),
+    (
+        "0156_gmail_alpha_access_requests",
+        "Account-scoped operator approval for the Gmail alpha integration",
+        include_str!("../../postgres/migrations/0156_gmail_alpha_access_requests.sql"),
+    ),
 ];

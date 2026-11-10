@@ -54,23 +54,23 @@ const SEARCH_PROGRESS_LABELS = [
 ] as const;
 
 const CORE_VENDOR_CATEGORY_CHIPS: ReadonlyArray<{ label: string; query: string; icon: WeddingDashboardIconId }> = [
-  { label: "Venues", query: "wedding venues", icon: "calendar-days" },
-  { label: "Photographers", query: "wedding photographers", icon: "search" },
-  { label: "Bands & DJs", query: "wedding bands and DJs", icon: "users" },
-  { label: "Florists", query: "wedding florists", icon: "shield-check" },
-  { label: "Planners", query: "wedding planners", icon: "check-circle" },
-  { label: "Celebrants", query: "authorised wedding celebrants", icon: "user-plus" },
-  { label: "Cake", query: "wedding cakes", icon: "clock" },
+  { label: "Venues", query: "venue", icon: "calendar-days" },
+  { label: "Planners", query: "planner", icon: "check-circle" },
+  { label: "Photographers", query: "photographer", icon: "search" },
+  { label: "Celebrants", query: "celebrant", icon: "user-plus" },
 ];
 const MORE_VENDOR_CATEGORY_CHIPS: ReadonlyArray<{ label: string; query: string; icon: WeddingDashboardIconId }> = [
-  { label: "Videographers", query: "wedding videographers", icon: "search" },
-  { label: "Caterers", query: "wedding caterers", icon: "users" },
-  { label: "Musicians", query: "wedding musicians", icon: "users" },
-  { label: "Hair & Makeup", query: "wedding hair and makeup", icon: "user-plus" },
-  { label: "Styling & Decor", query: "wedding styling and decor", icon: "shield-check" },
-  { label: "Transport", query: "wedding transport", icon: "calendar-days" },
-  { label: "Stationery", query: "wedding stationery and invitations", icon: "check-circle" },
-  { label: "Jewellers", query: "wedding jewellers", icon: "shield-check" },
+  { label: "Bands & DJs", query: "band", icon: "users" },
+  { label: "Florists", query: "floral_designer", icon: "shield-check" },
+  { label: "Cake", query: "cake_baker", icon: "clock" },
+  { label: "Videographers", query: "videographer", icon: "search" },
+  { label: "Caterers", query: "caterer", icon: "users" },
+  { label: "Musicians", query: "band", icon: "users" },
+  { label: "Hair & Makeup", query: "hair_stylist", icon: "user-plus" },
+  { label: "Styling & Decor", query: "stylist", icon: "shield-check" },
+  { label: "Transport", query: "transport", icon: "calendar-days" },
+  { label: "Stationery", query: "stationery", icon: "check-circle" },
+  { label: "Jewellers", query: "jeweller", icon: "shield-check" },
 ];
 const VENDOR_CATEGORY_CHIPS = [...CORE_VENDOR_CATEGORY_CHIPS, ...MORE_VENDOR_CATEGORY_CHIPS] as const;
 
@@ -265,6 +265,7 @@ export function WeddingVendorSearchHomeSection(props: {
   const lifecycleCount = (filter: VendorHomeFilter) => filter === "proposals"
     ? (proposalOpportunities()?.reduce((sum, item) => sum + item.responseCount, 0) ?? 0)
     : lifecycleRecords().filter((record) => weddingVendorLifecycleMatches(record, filter)).length;
+  const visibleLifecycleFilters = createMemo(() => lifecycleFilters.filter((filter) => lifecycleCount(filter.id) > 0));
   const filteredLifecycleRecords = () => lifecycleFilter() === "proposals"
     ? []
     : lifecycleRecords().filter((record) => weddingVendorLifecycleMatches(record, lifecycleFilter() as WeddingVendorLifecycleFilter));
@@ -441,7 +442,7 @@ export function WeddingVendorSearchHomeSection(props: {
         <div class="flex min-w-0 flex-wrap items-center justify-between gap-2">
           <p class="mt-4 font-display text-[22px] font-semibold leading-7 tracking-[-.01em] text-wedding-ink">Search and compare</p>
           <div class="-mx-1 flex max-w-full snap-x gap-1 overflow-x-auto px-1 pb-1 text-xs [scrollbar-width:none]" aria-label="Show vendors by wedding status">
-            <For each={lifecycleFilters}>{(filter) => <button type="button" class={`min-h-9 shrink-0 rounded-full border px-2.5 font-semibold ${lifecycleFilter() === filter.id ? "border-wedding-primary bg-wedding-page text-wedding-primary" : "border-wedding-border bg-white text-wedding-ink/65"}`} aria-pressed={lifecycleFilter() === filter.id} onClick={() => setLifecycleFilter(lifecycleFilter() === filter.id ? "all" : filter.id)}>{filter.label}{lifecycleCount(filter.id) ? ` ${lifecycleCount(filter.id)}` : ""}</button>}</For>
+            <For each={visibleLifecycleFilters()}>{(filter) => <button type="button" class={`min-h-9 shrink-0 rounded-full border px-2.5 font-semibold ${lifecycleFilter() === filter.id ? "border-wedding-primary bg-wedding-page text-wedding-primary" : "border-wedding-border bg-white text-wedding-ink/65"}`} aria-pressed={lifecycleFilter() === filter.id} onClick={() => setLifecycleFilter(lifecycleFilter() === filter.id ? "all" : filter.id)}>{filter.label} {lifecycleCount(filter.id)}</button>}</For>
           </div>
       </div>
       <label class="relative mt-4 block">
@@ -550,8 +551,9 @@ export function WeddingVendorSearchHomeSection(props: {
         when={workspace().vendorSearchRunning}
         fallback={<Show when={visibleVendorSearchNotice()}>{(notice) => <p class="mt-4 break-words text-xs leading-5 text-wedding-ink/70">{notice()}</p>}</Show>}
       >
-        <p class="mt-4 break-words text-xs font-medium leading-5 text-wedding-ink/70" role="status" aria-live="polite">
-          {SEARCH_PROGRESS_LABELS[searchProgressIndex()]}
+        <p class="mt-4 flex items-center gap-1.5 break-words text-xs font-medium leading-5 text-wedding-ink/70" role="status" aria-live="polite">
+          <span class="inline-flex h-[1em] w-[1em] items-center justify-center overflow-hidden text-[0.9em] leading-none motion-safe:animate-pulse" aria-hidden="true">🤖</span>
+          <span>{SEARCH_PROGRESS_LABELS[searchProgressIndex()]}</span>
         </p>
       </Show>
       </Show>

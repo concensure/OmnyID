@@ -1,6 +1,7 @@
 // @locs-version: 2.0
 import type { AfpMessage, SendAfpMessageInput } from "@/lib/api";
 import type { WeddingGeneratedArtifact } from "@/lib/weddingArtifactGenerationState";
+import { weddingAccountScopedStorageKey } from "@/lib/weddingLocalAccountScope";
 import { buildWeddingArtifactExportManifest } from "@/lib/weddingExportState";
 import {
   safeWeddingLabel,
@@ -354,7 +355,8 @@ export function weddingGeneratedArtifactsToAfpSendInputs(
 }
 
 export function loadWeddingArtifactAfpProjectionIds(storage: Storage = localStorage): string[] {
-  const raw = storage.getItem(WEDDING_ARTIFACT_AFP_PROJECTIONS_KEY);
+  const key = weddingAccountScopedStorageKey(WEDDING_ARTIFACT_AFP_PROJECTIONS_KEY);
+  const raw = storage.getItem(key);
   if (!raw) return [];
   try {
     const parsed = JSON.parse(raw);
@@ -362,7 +364,7 @@ export function loadWeddingArtifactAfpProjectionIds(storage: Storage = localStor
       ? parsed.filter((value): value is string => typeof value === "string" && value.trim().length > 0)
       : [];
   } catch {
-    storage.removeItem(WEDDING_ARTIFACT_AFP_PROJECTIONS_KEY);
+    storage.removeItem(key);
     return [];
   }
 }
@@ -376,13 +378,14 @@ export function markWeddingArtifactAfpProjectionSent(id: string, storage: Storag
   const cleanId = clean(id);
   if (!cleanId) return;
   const next = [...new Set([cleanId, ...loadWeddingArtifactAfpProjectionIds(storage)])].slice(0, 300);
-  storage.setItem(WEDDING_ARTIFACT_AFP_PROJECTIONS_KEY, JSON.stringify(next));
+  storage.setItem(weddingAccountScopedStorageKey(WEDDING_ARTIFACT_AFP_PROJECTIONS_KEY), JSON.stringify(next));
 }
 
 export function unmarkWeddingArtifactAfpProjectionSent(id: string, storage: Storage = localStorage): void {
   const cleanId = clean(id);
   if (!cleanId) return;
   const next = loadWeddingArtifactAfpProjectionIds(storage).filter((value) => value !== cleanId);
-  if (next.length > 0) storage.setItem(WEDDING_ARTIFACT_AFP_PROJECTIONS_KEY, JSON.stringify(next));
-  else storage.removeItem(WEDDING_ARTIFACT_AFP_PROJECTIONS_KEY);
+  const key = weddingAccountScopedStorageKey(WEDDING_ARTIFACT_AFP_PROJECTIONS_KEY);
+  if (next.length > 0) storage.setItem(key, JSON.stringify(next));
+  else storage.removeItem(key);
 }

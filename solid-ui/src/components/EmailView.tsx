@@ -4,6 +4,7 @@ import {
   disconnectGmail,
   fetchGmailOAuthConfig,
   fetchGmailOAuthUrl,
+  requestGmailAlphaAccess,
   fetchGmailInboxSummary,
   fetchGmailStatus,
   orchestrateAgent,
@@ -139,6 +140,8 @@ export function EmailView(props: {
   const [writeLikeMe, setWriteLikeMe] = createSignal(false);
   const [profilingEnabled, setProfilingEnabledState] = createSignal(false);
   const [connectError, setConnectError] = createSignal<string | null>(null);
+  const [gmailAlphaDisclosureOpen, setGmailAlphaDisclosureOpen] = createSignal(false);
+  const [gmailAlphaRequesting, setGmailAlphaRequesting] = createSignal(false);
   const [searchQuery, setSearchQuery] = createSignal("");
   const [selectedMailbox, setSelectedMailbox] = createSignal<MailboxKey>("inbox");
   const [selectedSmartFolder, setSelectedSmartFolder] = createSignal<string | null>(null);
@@ -322,6 +325,10 @@ export function EmailView(props: {
       setConnectError("Please sign in to your OmnyID account first, then connect Gmail.");
       return;
     }
+    if (gmailStatus()?.alpha_access_status !== "approved") {
+      setGmailAlphaDisclosureOpen(true);
+      return;
+    }
     setConnecting(true);
     setConnectError(null);
     try {
@@ -335,6 +342,29 @@ export function EmailView(props: {
         setConnectError(gmailOAuthConfigFailureMessage(null));
       }
       setConnecting(false);
+    }
+  }
+
+  async function requestGmailApproval() {
+    if (!props.signedIn || gmailAlphaRequesting()) return;
+    setGmailAlphaRequesting(true);
+    setConnectError(null);
+    try {
+      const result = await requestGmailAlphaAccess();
+      setGmailStatus((previous) => ({
+        connected: previous?.connected ?? false,
+        gmail_email: previous?.gmail_email ?? "",
+        configured: previous?.configured ?? true,
+        ...previous,
+        alpha_access_status: result.access_status,
+        alpha_requested_at: result.requested_at ?? previous?.alpha_requested_at,
+      }));
+      setConnectError(result.message ?? "Your request was sent to the OmnyID administrator.");
+      if (result.access_status === "approved") setGmailAlphaDisclosureOpen(false);
+    } catch (error: unknown) {
+      setConnectError(error instanceof Error ? error.message : "The approval request could not be sent yet.");
+    } finally {
+      setGmailAlphaRequesting(false);
     }
   }
 
@@ -645,6 +675,24 @@ export function EmailView(props: {
             You're viewing a <span class="font-semibold">sample inbox preview</span> in guest mode.
             Sign in to replace these cards with your real AFP-derived or Gmail-connected email state.
           </p>
+        </div>
+      </Show>
+
+      <Show when={gmailAlphaDisclosureOpen() && !gmailStatus()?.connected}>
+        <div class="border-b border-amber-200 bg-amber-50/95 px-4 py-4 sm:px-5" role="dialog" aria-label="Gmail alpha access">
+          <div class="flex flex-wrap items-start justify-between gap-4">
+            <div class="max-w-2xl">
+              <p class="text-sm font-semibold text-amber-950">Gmail connection is an alpha feature</p>
+              <p class="mt-1 text-sm leading-6 text-amber-900">An OmnyID administrator must approve this account before Google authorisation can begin. Requesting access sends only your signed-in account email, account ID and request date to admin@omnyid.com; it does not share email content.</p>
+              <Show when={gmailStatus()?.alpha_access_status === "pending"}>
+                <p class="mt-2 text-xs font-semibold text-amber-900">Approval requested{gmailStatus()?.alpha_requested_at ? ` on ${new Date(gmailStatus()!.alpha_requested_at!).toLocaleString()}` : ""}.</p>
+              </Show>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <button type="button" class="min-h-11 rounded-full border border-amber-300 bg-white px-4 text-sm font-semibold text-amber-950" onClick={() => setGmailAlphaDisclosureOpen(false)}>Not now</button>
+              <button type="button" class="min-h-11 rounded-full bg-[#ff6b35] px-4 text-sm font-semibold text-white disabled:opacity-60" disabled={gmailAlphaRequesting()} onClick={() => void requestGmailApproval()}>{gmailAlphaRequesting() ? "Sending request…" : gmailStatus()?.alpha_access_status === "pending" ? "Send request again" : "Request admin approval"}</button>
+            </div>
+          </div>
         </div>
       </Show>
 

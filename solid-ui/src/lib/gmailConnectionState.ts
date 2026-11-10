@@ -9,6 +9,8 @@ export type GmailConnectionStatus = {
   connected_at?: string | null;
   token_expired?: boolean;
   expires_within_24h?: boolean;
+  alpha_access_status?: "not_requested" | "pending" | "approved" | "denied" | "revoked" | string;
+  alpha_requested_at?: string | null;
 };
 
 export type GmailOAuthConfig = {
@@ -59,6 +61,8 @@ export function normalizeGmailConnectionStatus(payload: unknown): GmailConnectio
     connected_at: optionalStringAlias(payload, "connected_at", "connectedAt"),
     token_expired: optionalBooleanAlias(payload, "token_expired", "tokenExpired"),
     expires_within_24h: optionalBooleanAlias(payload, "expires_within_24h", "expiresWithin24h"),
+    alpha_access_status: stringAlias(payload, "alpha_access_status", "alphaAccessStatus") || "not_requested",
+    alpha_requested_at: optionalStringAlias(payload, "alpha_requested_at", "alphaRequestedAt"),
   };
 }
 

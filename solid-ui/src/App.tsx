@@ -418,6 +418,8 @@ import {
   type PrimaryUseCaseKind,
   type PrimaryUseCaseProfile,
 } from "@/lib/profileLedger";
+import { setWeddingLocalAccountScope } from "@/lib/weddingLocalAccountScope";
+import { hasSavedWorkspaceLens, loadWorkspaceLens, nextWorkspaceLens, saveWorkspaceLens, type WorkspaceLens } from "@/lib/workspaceLensState";
 import {
   applyPrimaryUseCaseTheme,
   completeCurrentPrimaryUseCase,
@@ -1226,12 +1228,17 @@ function App() {
   // Stable user ID at initialization — available before dashboard loads
   const initUserId = readSession()?.user?.id ?? "";
   setProfileLedgerAccountScope(initUserId || null);
+  setWeddingLocalAccountScope(initUserId || null);
   // User-scoped localStorage key builders — reads use initUserId, writes use userId()
   const _prefs = loadPrefs(initUserId);
   const initialParaViewEnabled = loadParaViewPreference();
   const initialPreferredView = normalizeViewName(_prefs.activeView) ?? "search";
   const initialHistoryView = appViewFromBrowserHistory(window.history.state, window.location.href);
   const initialAdminAccount = (readSession()?.user?.email ?? "").trim().toLowerCase() === "concensure@gmail.com";
+  const initialWeddingLens = !initialAdminAccount && (
+    ["wedding", "marketing", "wedding_quiz"].includes(new URLSearchParams(window.location.search).get("source") ?? "")
+    || Boolean(loadWeddingEntrySource(initUserId))
+  );
   const initialActiveView =
     gmailRedirectStatus
       ? "email"
@@ -1290,6 +1297,10 @@ function App() {
   // UI state
   const [advanced, setAdvanced] = createSignal(loadAdvancedNavEnabled(initUserId));
   const [studyLensEnabled, setStudyLensEnabled] = createSignal(loadStudyLensEnabled());
+  const [workspaceLens, setWorkspaceLens] = createSignal<WorkspaceLens>(
+    loadWorkspaceLens(initUserId, initialWeddingLens ? "wedding" : "general"),
+  );
+  const weddingLensEnabled = createMemo(() => workspaceLens() === "wedding");
   const [savedStudyReportArtifacts, setSavedStudyReportArtifacts] = createSignal<StudyReportArtifact[]>([]);
   const [studyCourses, setStudyCourses] = createSignal<StudyCourse[]>([]);
   const [studyDeadlines, setStudyDeadlines] = createSignal<StudyDeadline[]>([]);
@@ -1322,6 +1333,7 @@ function App() {
       pendingWeddingQuizHandoff ? "wedding_quiz" : "wedding_site",
       userId() || initUserId,
     );
+    setWorkspaceLens(saveWorkspaceLens(userId() || initUserId, "wedding"));
     setShowTour(false); setShowOnboarding(false); setShowProfilingConsent(false);
     void savePrimaryUseCase("wedding_planning", "inferred").catch(() => {});
     // Quiz results remain browser-local suggestions until the couple explicitly
@@ -1361,6 +1373,13 @@ function App() {
   const [primaryUseCasePromptVisible, setPrimaryUseCasePromptVisible] = createSignal(false);
   const [primaryUseCaseSaving, setPrimaryUseCaseSaving] = createSignal(false);
   const [primaryUseCaseError, setPrimaryUseCaseError] = createSignal<string | null>(null);
+  createEffect(() => {
+    const accountId = userId() || initUserId;
+    if (!accountId || initialAdminAccount || hasSavedWorkspaceLens(accountId)) return;
+    if (primaryUseCaseProfile()?.kind === "wedding_planning" && primaryUseCaseProfile()?.status === "active") {
+      setWorkspaceLens(saveWorkspaceLens(accountId, "wedding"));
+    }
+  });
   const [searchBusy, setSearchBusy] = createSignal(false);
   const [searchFeedback, setSearchFeedback] = createSignal("");
   const [isSearchError, setIsSearchError] = createSignal(false);
@@ -1450,6 +1469,9 @@ function App() {
         return;
       }
       setPrimaryUseCasePromptDismissedThisSession(false);
+      if (kind === "wedding_planning" && !initialAdminAccount) {
+        setWorkspaceLens(saveWorkspaceLens(userId() || initUserId, "wedding"));
+      }
       await refreshPrimaryUseCaseProfile(false);
       setPrimaryUseCasePromptVisible(false);
     } catch (error: unknown) {
@@ -1722,6 +1744,20 @@ function App() {
     const next = saveStudyLensEnabled(!studyLensEnabled());
     setStudyLensEnabled(next);
     if (!next && activeView() === "study") {
+      selectView("home");
+    }
+  }
+
+  function cycleWorkspaceLens() {
+    const next = nextWorkspaceLens(workspaceLens());
+    setWorkspaceLens(saveWorkspaceLens(userId() || initUserId, next));
+    if (next === "study") {
+      if (!studyLensEnabled()) toggleStudyLens();
+      selectView("study");
+    } else if (next === "wedding") {
+      dispatchWeddingWorkspaceMenuSelection("home");
+      selectView("response_queue");
+    } else if (activeView() === "study" || activeView() === "response_queue") {
       selectView("home");
     }
   }
@@ -2941,6 +2977,7 @@ function App() {
     // Scope before consent/profile surfaces read and rescope if a browser
     // session changes accounts without recreating the application shell.
     setProfileLedgerAccountScope(userId() || null);
+    setWeddingLocalAccountScope(userId() || null);
   });
 
   onMount(async () => {
@@ -3445,6 +3482,12 @@ function App() {
         }}
         studyLensEnabled={studyLensEnabled()}
         onToggleStudyLens={toggleStudyLens}
+        workspaceLens={workspaceLens()}
+        onCycleWorkspaceLens={cycleWorkspaceLens}
+        onSelectWeddingMenu={(menu) => {
+          dispatchWeddingWorkspaceMenuSelection(menu);
+          selectView("response_queue");
+        }}
         activeCount={fleetActiveCount()}
         idleCount={fleetIdleCount()}
         activeAgentNames={fleetActiveNames()}
@@ -3515,7 +3558,7 @@ function App() {
             )}
             onSelectView={selectView}
           />
-          <div data-search-host>
+          <Show when={!weddingLensEnabled()}><div data-search-host>
             <SearchBar
               onSubmit={handleSearch}
               busy={searchBusy()}
@@ -3527,7 +3570,7 @@ function App() {
               composerSeed={searchComposerSeed()}
               studyLensEnabled={studyLensEnabled()}
             />
-          </div>
+          </div></Show>
           <Show when={searchFailureReceipt()}>
             <div
               class={`mt-3 rounded-2xl border px-4 py-3 text-sm ${
@@ -3647,7 +3690,7 @@ function App() {
                 {retryingSearchCleanup() ? "Deleting temporary copies..." : "Retry temporary cleanup"}
               </button>
             </Show>
-            <AgentStatusPill
+            <Show when={!weddingLensEnabled()}><AgentStatusPill
               llmConfig={llmConfig()}
               browserAiLabel={browserAiLabel()}
               signedIn={Boolean(session()?.token)}
@@ -3657,7 +3700,7 @@ function App() {
                 selectView("agent_settings");
               }}
               onSignIn={() => openAuthModalIfSignedOut()}
-            />
+            /></Show>
             {/* Approval-gate notice — surfaces when orchestration is waiting for a decision */}
             <Show when={commandResult()?.intent === "orchestrate"}>
               <span class="flex items-center gap-2 rounded-full border border-amber-300/60 bg-amber-50/80 px-3 py-1 text-xs font-medium text-amber-700 animate-pulse">
@@ -3698,7 +3741,7 @@ function App() {
           </Show>
 
           {/* Setup checklist — visible until LLM is configured */}
-          <Show when={Boolean(session()?.token) && !workspaceLlmSetupComplete()}>
+          <Show when={!weddingLensEnabled() && Boolean(session()?.token) && !workspaceLlmSetupComplete()}>
             <div class="mt-3 flex items-center gap-3 rounded-2xl border border-amber-200/60 bg-amber-50/70 px-4 py-2.5 animate-fade-in">
               <span class="flex-shrink-0 text-amber-500">⚙</span>
               <div class="flex-1 min-w-0">

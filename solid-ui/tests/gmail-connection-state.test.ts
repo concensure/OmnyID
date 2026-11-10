@@ -29,6 +29,8 @@ test("normalizeGmailConnectionStatus rejects malformed payload fields", () => {
     connected_at: undefined,
     token_expired: undefined,
     expires_within_24h: undefined,
+    alpha_access_status: "not_requested",
+    alpha_requested_at: undefined,
   });
 });
 
@@ -41,6 +43,8 @@ test("normalizeGmailConnectionStatus accepts status aliases from integration ada
     connectedAt: "2026-09-27T00:00:00Z",
     tokenExpired: false,
     expiresWithin24h: true,
+    alphaAccessStatus: "approved",
+    alphaRequestedAt: "2026-09-26T10:30:00Z",
   });
 
   assert.deepEqual(status, {
@@ -51,6 +55,8 @@ test("normalizeGmailConnectionStatus accepts status aliases from integration ada
     connected_at: "2026-09-27T00:00:00Z",
     token_expired: false,
     expires_within_24h: true,
+    alpha_access_status: "approved",
+    alpha_requested_at: "2026-09-26T10:30:00Z",
   });
 });
 

@@ -12,6 +12,7 @@
 import type { WeddingDecisionProjectionInput } from "@/lib/weddingDecisionAfpProjectionState";
 import type { WeddingPersistedDecisionRecord } from "@/lib/weddingPersistedWorkspaceState";
 import { normalizeWeddingPlanningMetadata, type WeddingPlanningMetadata } from "@/lib/weddingPlanningTemplateState";
+import { weddingAccountScopedStorageKey } from "@/lib/weddingLocalAccountScope";
 
 export const WEDDING_BUDGET_ALLOCATION_ARTIFACT_KIND = "budget_sheet";
 export const WEDDING_BUDGET_ALLOCATION_ARTIFACT_ID = "wedding-budget-allocation";
@@ -137,11 +138,11 @@ function moneyLabel(amount: number, currency: string): string {
 }
 
 function draftStorageKey(weddingPlanId: string): string {
-  return `${WEDDING_BUDGET_ALLOCATION_DRAFT_KEY_PREFIX}${weddingPlanId}`;
+  return weddingAccountScopedStorageKey(`${WEDDING_BUDGET_ALLOCATION_DRAFT_KEY_PREFIX}${weddingPlanId}`);
 }
 
 function pendingDecisionStorageKey(weddingPlanId: string): string {
-  return `${WEDDING_BUDGET_ALLOCATION_PENDING_DECISION_KEY_PREFIX}${weddingPlanId}`;
+  return weddingAccountScopedStorageKey(`${WEDDING_BUDGET_ALLOCATION_PENDING_DECISION_KEY_PREFIX}${weddingPlanId}`);
 }
 
 function stringArray(value: unknown): string[] {

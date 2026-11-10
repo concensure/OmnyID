@@ -8,6 +8,7 @@ import {
   type WeddingPlanningMetadata,
 } from "@/lib/weddingPlanningTemplateState";
 import { weddingSemanticObjectFromDecisionProjection } from "@/lib/weddingSemanticUiState";
+import { weddingAccountScopedStorageKey } from "@/lib/weddingLocalAccountScope";
 
 export const WEDDING_DECISION_AFP_PROJECTIONS_KEY = "omnyid.wedding-decision-afp-projections";
 
@@ -429,7 +430,8 @@ export function weddingDecisionProjectionToAfpSendInput(
 }
 
 export function loadWeddingDecisionAfpProjectionIds(storage: Storage = localStorage): string[] {
-  const raw = storage.getItem(WEDDING_DECISION_AFP_PROJECTIONS_KEY);
+  const key = weddingAccountScopedStorageKey(WEDDING_DECISION_AFP_PROJECTIONS_KEY);
+  const raw = storage.getItem(key);
   if (!raw) return [];
   try {
     const parsed = JSON.parse(raw);
@@ -437,7 +439,7 @@ export function loadWeddingDecisionAfpProjectionIds(storage: Storage = localStor
       ? parsed.filter((value): value is string => typeof value === "string" && value.trim().length > 0)
       : [];
   } catch {
-    storage.removeItem(WEDDING_DECISION_AFP_PROJECTIONS_KEY);
+    storage.removeItem(key);
     return [];
   }
 }
@@ -451,5 +453,5 @@ export function markWeddingDecisionAfpProjectionSent(id: string, storage: Storag
   const cleanId = clean(id);
   if (!cleanId) return;
   const next = [...new Set([cleanId, ...loadWeddingDecisionAfpProjectionIds(storage)])].slice(0, 300);
-  storage.setItem(WEDDING_DECISION_AFP_PROJECTIONS_KEY, JSON.stringify(next));
+  storage.setItem(weddingAccountScopedStorageKey(WEDDING_DECISION_AFP_PROJECTIONS_KEY), JSON.stringify(next));
 }

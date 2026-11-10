@@ -5,6 +5,7 @@ import type { WeddingPreferenceFacet, WeddingPreferenceProfile, WeddingPreferenc
 import type { WeddingVendorRankingRequirements } from "@/lib/weddingVendorRankingState";
 import { buildDeterministicPreferenceProfile, mergePreferenceProfile } from "@/lib/weddingPreferenceProfileState";
 import { WEDDING_FACET_VOCABULARY_VERSION, weddingFacetById, weddingFacetsForPhrase } from "@/lib/weddingFacetVocabularyState";
+import { weddingAccountScopedStorageKey } from "@/lib/weddingLocalAccountScope";
 
 export const WEDDING_PREFERENCE_INTERPRETER_CACHE_KEY = "omnyid.wedding-preference-interpreter.v1";
 
@@ -85,9 +86,9 @@ export function preferenceProfileWithInterpreter(
 
 export function loadWeddingPreferenceInterpreterCache(storage: Storage = localStorage): WeddingPreferenceInterpreterCacheEntry[] {
   try {
-    const parsed = JSON.parse(storage.getItem(WEDDING_PREFERENCE_INTERPRETER_CACHE_KEY) ?? "[]");
+    const parsed = JSON.parse(storage.getItem(weddingAccountScopedStorageKey(WEDDING_PREFERENCE_INTERPRETER_CACHE_KEY)) ?? "[]");
     return Array.isArray(parsed) ? parsed.filter((entry): entry is WeddingPreferenceInterpreterCacheEntry => Boolean(entry) && typeof entry.fingerprint === "string" && typeof entry.vocabularyVersion === "string" && entry.response && typeof entry.response === "object").slice(0, 80) : [];
-  } catch { storage.removeItem(WEDDING_PREFERENCE_INTERPRETER_CACHE_KEY); return []; }
+  } catch { storage.removeItem(weddingAccountScopedStorageKey(WEDDING_PREFERENCE_INTERPRETER_CACHE_KEY)); return []; }
 }
 
 export function cachedWeddingPreferenceInterpretation(fingerprint: string, vocabularyVersion = WEDDING_FACET_VOCABULARY_VERSION, storage: Storage = localStorage): WeddingPreferenceInterpreterResponse | null {
@@ -97,7 +98,7 @@ export function cachedWeddingPreferenceInterpretation(fingerprint: string, vocab
 export function cacheWeddingPreferenceInterpretation(entry: WeddingPreferenceInterpreterCacheEntry, storage: Storage = localStorage): void {
   if (!clean(entry.fingerprint) || !clean(entry.vocabularyVersion)) return;
   const prior = loadWeddingPreferenceInterpreterCache(storage).filter((current) => current.fingerprint !== entry.fingerprint || current.vocabularyVersion !== entry.vocabularyVersion);
-  storage.setItem(WEDDING_PREFERENCE_INTERPRETER_CACHE_KEY, JSON.stringify([entry, ...prior].slice(0, 80)));
+  storage.setItem(weddingAccountScopedStorageKey(WEDDING_PREFERENCE_INTERPRETER_CACHE_KEY), JSON.stringify([entry, ...prior].slice(0, 80)));
 }
 
 /** Intended for the intake-save owner. A failed request is intentionally indistinguishable from no interpretation. */

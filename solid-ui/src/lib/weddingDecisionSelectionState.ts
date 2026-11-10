@@ -5,6 +5,7 @@ import {
   type WeddingExperienceModelState,
 } from "@/lib/weddingExperienceModelState";
 import type { WeddingArtifactKind } from "@/lib/weddingPlanningTemplateState";
+import { weddingAccountScopedStorageKey } from "@/lib/weddingLocalAccountScope";
 
 export const WEDDING_DECISION_SELECTION_KEY = "omnyid.wedding-decision-selections";
 
@@ -87,10 +88,10 @@ function loadRecord(storage?: Storage | null): WeddingDecisionSelectionRecord {
   const target = storageOrNull(storage);
   if (!target) return {};
   try {
-    const raw = target.getItem(WEDDING_DECISION_SELECTION_KEY);
+    const raw = target.getItem(weddingAccountScopedStorageKey(WEDDING_DECISION_SELECTION_KEY));
     return normalizeRecord(raw ? JSON.parse(raw) : {});
   } catch {
-    target.removeItem(WEDDING_DECISION_SELECTION_KEY);
+    target.removeItem(weddingAccountScopedStorageKey(WEDDING_DECISION_SELECTION_KEY));
     return {};
   }
 }
@@ -99,7 +100,7 @@ function saveRecord(record: WeddingDecisionSelectionRecord, storage?: Storage | 
   const target = storageOrNull(storage);
   if (!target) return;
   try {
-    target.setItem(WEDDING_DECISION_SELECTION_KEY, JSON.stringify(normalizeRecord(record)));
+    target.setItem(weddingAccountScopedStorageKey(WEDDING_DECISION_SELECTION_KEY), JSON.stringify(normalizeRecord(record)));
   } catch {
     // Selection state is convenience state; ignore storage failures.
   }

@@ -34,6 +34,8 @@ import {
 } from "@/lib/navBarLocalState";
 import type { ViewName } from "@/lib/viewNames";
 import { RailIcon, type IconId } from "@/components/RailIcons";
+import type { WeddingWorkspaceMenuId } from "@/lib/weddingWorkspaceMenuState";
+import type { WorkspaceLens } from "@/lib/workspaceLensState";
 
 export type { ViewName } from "@/lib/viewNames";
 export const CORE_ITEMS: Array<{ id: ViewName; label: string; icon: string; shortcut: string }> = [
@@ -109,6 +111,20 @@ const EXPANDED_VIEW_ITEMS: Array<{ id: ViewName; label: string; icon: IconId }> 
 const ADVANCED_VIEW_ITEMS: Array<{ id: ViewName; label: string; icon: IconId }> = [
   { id: "runner", label: "Runner", icon: "runner" },
   { id: "agent_settings", label: "Agent Settings", icon: "agent_settings" },
+];
+
+const WEDDING_LENS_MENU_ITEMS: Array<{ menu: WeddingWorkspaceMenuId; label: string; icon: IconId }> = [
+  { menu: "home", label: "Today", icon: "home" },
+  { menu: "people", label: "Guests", icon: "contacts" },
+  { menu: "plan", label: "Plan", icon: "timeline" },
+  { menu: "budget", label: "Budget", icon: "cost_dashboard" },
+  { menu: "response_queue", label: "Vendors", icon: "response_queue" },
+];
+const WEDDING_LENS_OPTIONAL_ITEMS = [
+  ...CORE_ITEMS.filter((item) => item.id !== "calendar" && item.id !== "database").map((item) => ({ id: item.id, label: item.label, icon: item.id as IconId })),
+  ...MORE_VIEW_ITEMS,
+  ...EXPANDED_VIEW_ITEMS.filter((item) => item.id !== "cost_dashboard"),
+  ...ADVANCED_VIEW_ITEMS,
 ];
 
 const VIEW_LABELS = new Map<ViewName, string>([
@@ -427,6 +443,9 @@ export function NavBar(props: {
   onToggleAdvanced: () => void;
   studyLensEnabled?: boolean;
   onToggleStudyLens?: () => void;
+  workspaceLens?: WorkspaceLens;
+  onCycleWorkspaceLens?: () => void;
+  onSelectWeddingMenu?: (menu: WeddingWorkspaceMenuId) => void;
   activeCount: number;
   idleCount: number;
   activeAgentNames?: string[];
@@ -458,6 +477,27 @@ export function NavBar(props: {
   const [cheatSheetPos, setCheatSheetPos] = createSignal<{ top: number; left: number } | null>(null);
   const [showMoreMenu, setShowMoreMenu] = createSignal(false);
   const isAdminAccount = () => Boolean(props.adminAccount);
+  const weddingLensEnabled = () => props.workspaceLens === "wedding";
+  const weddingLensViewKey = () => `omnyid.wedding-lens.active-views:${props.userId || "guest"}`;
+  const loadWeddingLensViews = (): ViewName[] => {
+    try {
+      const value = JSON.parse(localStorage.getItem(weddingLensViewKey()) ?? "[]");
+      const allowed = new Set(WEDDING_LENS_OPTIONAL_ITEMS.map((item) => item.id));
+      return Array.isArray(value) ? value.filter((item): item is ViewName => typeof item === "string" && allowed.has(item as ViewName)) : [];
+    } catch { return []; }
+  };
+  const [weddingLensViews, setWeddingLensViews] = createSignal<ViewName[]>(loadWeddingLensViews());
+  createEffect(() => {
+    props.userId;
+    setWeddingLensViews(loadWeddingLensViews());
+  });
+  function toggleWeddingLensView(view: ViewName) {
+    const next = weddingLensViews().includes(view)
+      ? weddingLensViews().filter((item) => item !== view)
+      : [...weddingLensViews(), view];
+    setWeddingLensViews(next);
+    try { localStorage.setItem(weddingLensViewKey(), JSON.stringify(next)); } catch { /* preference only */ }
+  }
   const expandedViewItems = createMemo(() =>
     EXPANDED_VIEW_ITEMS.filter((item) => {
       if (!props.paraViewEnabled && item.id === "para") return false;
@@ -969,7 +1009,7 @@ export function NavBar(props: {
 
           <div class="mx-3 mb-2 h-px w-10 bg-outline/10" />
 
-          <Show when={pendingAggregateLabel()}>
+          <Show when={!weddingLensEnabled() && pendingAggregateLabel()}>
             {(pendingLabel) => (
               <div class="group relative mb-2 flex w-full justify-center">
                 <div
@@ -998,6 +1038,25 @@ export function NavBar(props: {
 
           {/* Core nav items */}
           <nav class="flex flex-1 flex-col items-center gap-0.5 py-1 w-full">
+            <Show when={weddingLensEnabled()}>
+              <For each={WEDDING_LENS_MENU_ITEMS}>
+                {(item) => (
+                  <div class="group relative flex w-full justify-center">
+                    <button type="button" onClick={() => props.onSelectWeddingMenu?.(item.menu)} aria-label={`Open Wedding ${item.label}`} class="rail-icon-btn flex h-11 w-11 items-center justify-center rounded-2xl text-outline/75 outline-none transition hover:bg-white/60 hover:text-on-surface focus-visible:ring-2 focus-visible:ring-primary/50"><RailIcon id={item.icon} /></button>
+                    <div class="rail-tooltip pointer-events-none absolute left-full top-1/2 z-50 ml-2.5 -translate-y-1/2 whitespace-nowrap rounded-xl border border-white/50 bg-white/96 px-3 py-1.5 text-xs font-medium text-on-surface opacity-0 shadow-card group-hover:opacity-100">{item.label}</div>
+                  </div>
+                )}
+              </For>
+              <For each={[{ id: "calendar" as ViewName, label: "Calendar", icon: "calendar" as IconId }, { id: "database" as ViewName, label: "Database", icon: "database" as IconId }, ...WEDDING_LENS_OPTIONAL_ITEMS.filter((item) => weddingLensViews().includes(item.id))]}>
+                {(item) => (
+                  <div class="group relative flex w-full justify-center">
+                    <button type="button" onClick={() => activateView(item.id)} aria-label={`Open ${item.label}`} aria-current={props.activeView === item.id ? "page" : undefined} class={`rail-icon-btn flex h-11 w-11 items-center justify-center rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-primary/50 ${props.activeView === item.id ? "bg-on-surface text-white" : "text-outline/70 hover:bg-white/60 hover:text-on-surface"}`}><RailIcon id={item.icon} /></button>
+                    <div class="rail-tooltip pointer-events-none absolute left-full top-1/2 z-50 ml-2.5 -translate-y-1/2 whitespace-nowrap rounded-xl border border-white/50 bg-white/96 px-3 py-1.5 text-xs font-medium text-on-surface opacity-0 shadow-card group-hover:opacity-100">{item.label}</div>
+                  </div>
+                )}
+              </For>
+            </Show>
+            <Show when={!weddingLensEnabled()}>
             <Show when={isAdminAccount()}>
               <div class="group relative flex w-full justify-center">
                 <button
@@ -1009,7 +1068,11 @@ export function NavBar(props: {
                 >
                   <RailIcon id="admin_dashboard" />
                 </button>
-                <div class="rail-tooltip pointer-events-none absolute left-full top-1/2 z-50 ml-2.5 -translate-y-1/2 whitespace-nowrap rounded-xl border border-white/50 bg-white/96 px-3 py-1.5 text-xs font-medium text-on-surface opacity-0 shadow-card group-hover:opacity-100">Admin dashboard</div>
+                <div class="rail-tooltip pointer-events-none absolute left-full top-1/2 z-50 ml-2.5 -translate-y-1/2 whitespace-nowrap rounded-xl border border-white/50 bg-white/96 px-3 py-1.5 text-xs font-medium text-on-surface opacity-0 shadow-card group-hover:opacity-100">Growth Analytics &amp; admin dashboard</div>
+              </div>
+              <div class="group relative flex w-full justify-center">
+                <button type="button" onClick={() => activateView("cost_dashboard")} aria-label="Open admin cost dashboard" aria-current={props.activeView === "cost_dashboard" ? "page" : undefined} class={`rail-icon-btn flex h-11 w-11 items-center justify-center rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-primary/50 ${props.activeView === "cost_dashboard" ? "bg-on-surface text-white" : "text-outline/70 hover:bg-white/60"}`}><RailIcon id="cost_dashboard" /></button>
+                <div class="rail-tooltip pointer-events-none absolute left-full top-1/2 z-50 ml-2.5 -translate-y-1/2 whitespace-nowrap rounded-xl border border-white/50 bg-white/96 px-3 py-1.5 text-xs font-medium opacity-0 shadow-card group-hover:opacity-100">Admin cost dashboard</div>
               </div>
             </Show>
             <For each={CORE_ITEMS}>
@@ -1066,10 +1129,11 @@ export function NavBar(props: {
                 </div>
               </div>
             </Show>
+            </Show>
           </nav>
 
           {/* PARA Navigator toggle — visible on home or para view */}
-          <Show when={props.paraViewEnabled && (paraToggleActiveView() === "home" || paraToggleActiveView() === "para")}>
+          <Show when={!weddingLensEnabled() && props.paraViewEnabled && (paraToggleActiveView() === "home" || paraToggleActiveView() === "para")}>
             <div class="group relative flex w-full justify-center mb-0.5">
               <button
                 type="button"
@@ -1096,34 +1160,24 @@ export function NavBar(props: {
 
           {/* Bottom controls — flex-shrink-0 so they are always visible at the bottom of the rail */}
           <div class="flex flex-col items-center gap-0.5 pb-1 w-full flex-shrink-0">
-            <Show when={props.onToggleStudyLens}>
+            <Show when={props.onCycleWorkspaceLens}>
               <div class="group relative flex w-full justify-center">
                 <button
                   type="button"
-                  onClick={() => props.onToggleStudyLens?.()}
-                  aria-pressed={props.studyLensEnabled ? "true" : "false"}
-                  aria-label={props.studyLensEnabled ? "Turn Study Lens off" : "Turn Study Lens on"}
-                  class={`rail-icon-btn relative flex h-11 w-11 items-center justify-center rounded-2xl text-[11px] font-black tracking-tight outline-none transition focus-visible:ring-2 focus-visible:ring-primary/50 ${
-                    props.studyLensEnabled
-                      ? "bg-sky-600 text-white shadow-sm hover:bg-sky-700"
-                      : "text-outline/70 hover:bg-white/60 hover:text-on-surface"
-                  }`}
+                  onClick={() => props.onCycleWorkspaceLens?.()}
+                  aria-label={`Switch workspace lens. ${props.workspaceLens ?? "general"} lens is on`}
+                  class="rail-icon-btn relative flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary outline-none transition hover:bg-primary/20 focus-visible:ring-2 focus-visible:ring-primary/50"
                 >
-                  SL
-                  <span
-                    class={`absolute right-1.5 top-1.5 h-2 w-2 rounded-full ${
-                      props.studyLensEnabled ? "bg-emerald-300" : "bg-outline/25"
-                    }`}
-                  />
+                  <RailIcon id="lens" />
                 </button>
                 <div class="rail-tooltip pointer-events-none absolute left-full bottom-0 z-50 ml-2.5 translate-x-[-4px] whitespace-nowrap rounded-xl border border-white/50 bg-white/96 px-3 py-1.5 text-xs font-medium text-on-surface opacity-0 shadow-card backdrop-blur-xl group-hover:translate-x-0 group-hover:opacity-100">
-                  {props.studyLensEnabled ? "Study Lens on" : "Study Lens off"}
+                  Switch lens · {props.workspaceLens ?? "general"} on
                 </div>
               </div>
             </Show>
 
             {/* Fleet status indicator */}
-            <div class="group relative flex w-full justify-center">
+            <Show when={!weddingLensEnabled()}><div class="group relative flex w-full justify-center">
               <button
                 type="button"
                 onClick={() => {
@@ -1165,20 +1219,20 @@ export function NavBar(props: {
                   <span class="ml-1.5 text-outline/50">{lastRunLabel()}</span>
                 </Show>
               </div>
-            </div>
+            </div></Show>
 
             {/* Connectivity dot */}
-            <div class="group relative flex w-full justify-center">
+            <Show when={!weddingLensEnabled()}><div class="group relative flex w-full justify-center">
               <div class="flex h-7 w-11 items-center justify-center" role="img" aria-label={CONN_LABELS[connStatus()]}>
                 <div title={CONN_LABELS[connStatus()]} class={`h-2 w-2 rounded-full ${CONN_COLORS[connStatus()]}`} />
               </div>
               <div class="rail-tooltip pointer-events-none absolute left-full top-1/2 z-50 ml-2.5 -translate-y-1/2 translate-x-[-4px] whitespace-nowrap rounded-xl border border-white/50 bg-white/96 px-3 py-1.5 text-xs font-medium text-on-surface opacity-0 shadow-card backdrop-blur-xl group-hover:translate-x-0 group-hover:opacity-100">
                 {CONN_LABELS[connStatus()]}
               </div>
-            </div>
+            </div></Show>
 
             {/* Help / shortcuts */}
-            <div class="group relative flex w-full justify-center">
+            <Show when={!weddingLensEnabled()}><div class="group relative flex w-full justify-center">
               <button
                 type="button"
                 ref={shortcutButtonRef}
@@ -1199,10 +1253,10 @@ export function NavBar(props: {
               <div class="rail-tooltip pointer-events-none absolute left-full top-1/2 z-50 ml-2.5 -translate-y-1/2 translate-x-[-4px] whitespace-nowrap rounded-xl border border-white/50 bg-white/96 px-3 py-1.5 text-xs font-medium text-on-surface opacity-0 shadow-card backdrop-blur-xl group-hover:translate-x-0 group-hover:opacity-100">
                 Shortcuts <span class="ml-1.5 font-mono text-[9px] text-outline/50">?</span>
               </div>
-            </div>
+            </div></Show>
 
             {/* Tool connections */}
-            <div class="group relative flex w-full justify-center">
+            <Show when={!weddingLensEnabled()}><div class="group relative flex w-full justify-center">
               <button
                 type="button"
                 onPointerEnter={() => signalViewIntent("tools")}
@@ -1217,7 +1271,7 @@ export function NavBar(props: {
               <div class="rail-tooltip pointer-events-none absolute left-full top-1/2 z-50 ml-2.5 -translate-y-1/2 translate-x-[-4px] whitespace-nowrap rounded-xl border border-white/50 bg-white/96 px-3 py-1.5 text-xs font-medium text-on-surface opacity-0 shadow-card backdrop-blur-xl group-hover:translate-x-0 group-hover:opacity-100">
                 Tools &amp; Integrations
               </div>
-            </div>
+            </div></Show>
 
             {/* More views */}
             <div ref={moreMenuRef} class="group relative flex w-full justify-center">
@@ -1350,7 +1404,44 @@ export function NavBar(props: {
         <div class="fixed bottom-0 left-14 top-0 z-40 w-56 animate-fade-in border-r border-white/20 bg-white/92 shadow-panel backdrop-blur-2xl">
           <div class="flex h-full flex-col py-5">
             <p class="mb-3 px-5 font-mono text-[9px] uppercase tracking-[0.2em] text-outline">More views</p>
-            {MORE_VIEW_ITEMS.map((item) => (
+            {(weddingLensEnabled() ? MORE_VIEW_ITEMS.filter((item) => item.id === "diary") : MORE_VIEW_ITEMS).map((item) => (
+                <button
+                  type="button"
+                  onPointerEnter={() => signalViewIntent(item.id)}
+                  onFocus={() => signalViewIntent(item.id)}
+                  onPointerDown={() => signalViewIntent(item.id)}
+                  onClick={() => { activateView(item.id); setShowMoreMenu(false); }}
+                class={`flex w-full items-center gap-3 px-5 py-2.5 text-sm font-medium transition ${
+                  props.activeView === item.id ? "bg-primary/10 text-primary" : "text-on-surface hover:bg-on-surface/5"
+                }`}
+              >
+                <span class={props.activeView === item.id ? "text-primary" : "text-outline/70"}><RailIcon id={item.icon} /></span>
+                {item.label}
+                <Show when={!props.signedIn && viewRequiresSignIn(item.id)}>
+                  <span class="ml-auto rounded-full border border-amber-200/70 bg-amber-50 px-1.5 py-0.5 font-mono text-[8px] text-amber-700">sign in</span>
+                </Show>
+              </button>
+            ))}
+            <Show when={weddingLensEnabled()}>
+              <div class="mx-5 my-2 h-px bg-outline/10" />
+              <div class="px-5 py-2">
+                <p class="font-semibold text-on-surface">Advanced</p>
+                <p class="mt-1 text-[10px] leading-4 text-on-surface-variant">Choose extra personal-agent views. Admin-only views are never available here.</p>
+              </div>
+              <div class="min-h-0 overflow-y-auto px-3 pb-3">
+                <For each={WEDDING_LENS_OPTIONAL_ITEMS}>
+                  {(item) => (
+                    <label class="flex min-h-10 cursor-pointer items-center gap-3 rounded-xl px-2 text-xs text-on-surface hover:bg-on-surface/5">
+                      <input type="checkbox" checked={weddingLensViews().includes(item.id)} onChange={() => toggleWeddingLensView(item.id)} class="h-4 w-4 accent-primary" />
+                      <RailIcon id={item.icon} />
+                      <span>{item.label}</span>
+                    </label>
+                  )}
+                </For>
+              </div>
+            </Show>
+            <div class="mx-5 my-2 h-px bg-outline/10" />
+            {(!weddingLensEnabled() ? expandedViewItems() : []).map((item) => (
                 <button
                   type="button"
                   onPointerEnter={() => signalViewIntent(item.id)}
@@ -1369,26 +1460,7 @@ export function NavBar(props: {
               </button>
             ))}
             <div class="mx-5 my-2 h-px bg-outline/10" />
-            {expandedViewItems().map((item) => (
-                <button
-                  type="button"
-                  onPointerEnter={() => signalViewIntent(item.id)}
-                  onFocus={() => signalViewIntent(item.id)}
-                  onPointerDown={() => signalViewIntent(item.id)}
-                  onClick={() => { activateView(item.id); setShowMoreMenu(false); }}
-                class={`flex w-full items-center gap-3 px-5 py-2.5 text-sm font-medium transition ${
-                  props.activeView === item.id ? "bg-primary/10 text-primary" : "text-on-surface hover:bg-on-surface/5"
-                }`}
-              >
-                <span class={props.activeView === item.id ? "text-primary" : "text-outline/70"}><RailIcon id={item.icon} /></span>
-                {item.label}
-                <Show when={!props.signedIn && viewRequiresSignIn(item.id)}>
-                  <span class="ml-auto rounded-full border border-amber-200/70 bg-amber-50 px-1.5 py-0.5 font-mono text-[8px] text-amber-700">sign in</span>
-                </Show>
-              </button>
-            ))}
-            <div class="mx-5 my-2 h-px bg-outline/10" />
-            {ADVANCED_VIEW_ITEMS.map((item) => (
+            {(!weddingLensEnabled() ? ADVANCED_VIEW_ITEMS : []).map((item) => (
                 <button
                   type="button"
                   onPointerEnter={() => signalViewIntent(item.id)}
@@ -1409,7 +1481,7 @@ export function NavBar(props: {
                 </Show>
               </button>
             ))}
-            <div class="mx-5 my-2 h-px bg-outline/10" />
+            <Show when={!weddingLensEnabled()}><div class="mx-5 my-2 h-px bg-outline/10" />
             <div class="px-5 py-1">
               <p class="mb-2 font-mono text-[9px] uppercase tracking-[0.15em] text-outline/50">Quick controls</p>
               <div class="space-y-1.5">
@@ -1433,17 +1505,17 @@ export function NavBar(props: {
                   )}
                 </For>
               </div>
-            </div>
+            </div></Show>
             <div class="mx-5 my-2 h-px bg-outline/10" />
-            <button
+            <Show when={!weddingLensEnabled()}><button
               type="button"
               onClick={() => props.onToggleAdvanced()}
               class="flex w-full items-center gap-3 px-5 py-2 text-xs text-outline/60 transition hover:text-on-surface-variant"
             >
               <span class="font-mono text-[10px]">{props.advanced ? "-" : "+"}</span>
               {props.advanced ? "Hide advanced" : "Enable advanced mode"}
-            </button>
-            <Show when={recentSessionTrail().length > 0}>
+            </button></Show>
+            <Show when={!weddingLensEnabled() && recentSessionTrail().length > 0}>
               <div class="mx-5 my-3 h-px bg-outline/10" />
               <div class="px-5">
                 <div class="mb-2 flex items-center justify-between gap-2">

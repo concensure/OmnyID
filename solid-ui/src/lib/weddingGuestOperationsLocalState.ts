@@ -1,4 +1,5 @@
-// @locs-version: 1.0
+// @locs-version: 1.1
+import { weddingAccountScopedStorageKey } from "@/lib/weddingLocalAccountScope";
 
 export type WeddingGuestOperationsLocalDraftGuest = {
   name: string;
@@ -43,7 +44,7 @@ function defaultStorage(): StorageLike | null {
 }
 
 export function weddingGuestOperationsStorageKey(scope: string): string {
-  return `omnyid:wedding_guest_operations:${scope}`;
+  return weddingAccountScopedStorageKey(`omnyid:wedding_guest_operations:${scope}`);
 }
 
 export function weddingGuestOperationsScopeFromMetadata(metadata: unknown): string {
