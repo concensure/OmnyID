@@ -74,8 +74,8 @@ export function WeddingLimitedSpecialVenueCard(props: {
   }
 
   return <article class="mt-4 overflow-hidden rounded-xl border border-wedding-border bg-white shadow-wedding-card" aria-labelledby={`limited-special-${props.marker.vendorId}`}>
-    <Show when={props.marker.photoUrl} fallback={<div class="flex h-44 items-center justify-center bg-wedding-slate text-4xl font-bold text-wedding-primary" aria-hidden="true">{props.marker.vendorName.slice(0, 1)}</div>}>
-      {(url) => <img class="h-52 w-full object-cover" src={url()} alt={props.marker.photoAlt || `${props.marker.vendorName} venue`} loading="lazy" decoding="async" />}
+    <Show when={props.marker.photoUrl} fallback={<div class="flex h-24 items-center justify-center bg-wedding-slate text-3xl font-bold text-wedding-primary" aria-hidden="true">{props.marker.vendorName.slice(0, 1)}</div>}>
+      {(url) => <img class="h-28 w-full object-cover" src={url()} alt={props.marker.photoAlt || `${props.marker.vendorName} venue`} loading="lazy" decoding="async" />}
     </Show>
     <div class="p-4">
       <p class="text-xs font-bold uppercase tracking-[.12em] text-wedding-primary">{props.marker.category}</p>

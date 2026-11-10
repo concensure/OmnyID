@@ -40,13 +40,28 @@ function installLocalStorage() {
   return localStorage;
 }
 
+test("an authenticated diary never inherits another account's legacy unscoped entries", () => {
+  const localStorage = installLocalStorage();
+  localStorage.setItem("omnyid.diary-entries", JSON.stringify({
+    "2026-06-27": [{
+      ts: "2026-06-27T09:00:00.000Z",
+      type: "note",
+      icon: "n",
+      title: "Belongs to a previous local session",
+    }],
+  }));
+
+  assert.deepEqual(loadDecisionOsDiaryBuckets("brand-new-user"), {});
+  assert.equal(localStorage.getItem(accountScopedStorageKey("omnyid.diary-entries", "brand-new-user")), null);
+});
+
 test("diary state appends a new entry to today's bucket and dispatches it", () => {
   const localStorage = installLocalStorage();
   localStorage.clear();
   let dispatchedTitle = "";
 
   localStorage.setItem(
-    "omnyid.diary-entries",
+    diaryKey,
     JSON.stringify({
       "2026-06-27": [
         {
@@ -160,7 +175,7 @@ test("diary state ignores malformed stored bucket entries", () => {
   const localStorage = installLocalStorage();
   localStorage.clear();
   localStorage.setItem(
-    "omnyid.diary-entries",
+    diaryKey,
     JSON.stringify({
       "2026-06-27": [
         {
@@ -214,7 +229,7 @@ test("diary state ignores malformed stored bucket entries", () => {
 test("diary state clears unparseable persisted buckets", () => {
   const localStorage = installLocalStorage();
   localStorage.clear();
-  localStorage.setItem("omnyid.diary-entries", "{bad-json");
+  localStorage.setItem(diaryKey, "{bad-json");
 
   assert.deepEqual(loadDecisionOsDiaryBuckets(userId), {});
   assert.equal(localStorage.getItem("omnyid.diary-entries"), null);
@@ -225,7 +240,7 @@ test("diary state persists only normalized bucket entries on save", () => {
   const localStorage = installLocalStorage();
   localStorage.clear();
   localStorage.setItem(
-    "omnyid.diary-entries",
+    diaryKey,
     JSON.stringify({
       "2026-06-27": [
         {
@@ -314,7 +329,7 @@ test("diary helper applies component-style per-day and rolling-day limits on app
   const localStorage = installLocalStorage();
   localStorage.clear();
   localStorage.setItem(
-    "omnyid.diary-entries",
+    diaryKey,
     JSON.stringify({
       "2026-07-03": [
         {
@@ -389,7 +404,7 @@ test("diary helper loads one day of entries sorted chronologically", () => {
   const localStorage = installLocalStorage();
   localStorage.clear();
   localStorage.setItem(
-    "omnyid.diary-entries",
+    diaryKey,
     JSON.stringify({
       "2026-07-19": [
         {

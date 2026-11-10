@@ -13,15 +13,17 @@
  * Date picker lets users view past days.
  */
 
-import { createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import {
   subscribeDiaryEntryEvent,
   type DiaryEntry,
 } from "@/lib/diaryEvent";
-import { readSession } from "@/lib/api";
+import { readSession, type AfpMessage, type SendAfpMessageInput } from "@/lib/api";
 import { appendDecisionOsDiaryEntry, loadDecisionOsDiaryEntriesForDate } from "@/lib/decisionOsDiaryState";
 import { pendingOutcomeCheckForDecision } from "@/lib/decisionOsHomeState";
 import { recordShortcutUse } from "@/lib/shortcutRecency";
+import { TiptapEditor } from "@/components/editor/TiptapEditor";
+import { renderMarkdown } from "@/lib/markdownRenderer";
 
 const MAX_DIARY_ENTRIES_PER_DAY = 200;
 const MAX_DIARY_DAYS = 14;
@@ -149,8 +151,11 @@ function EntryCard(props: { entry: DiaryEntry }) {
           <p class="text-[12px] font-medium text-on-surface leading-snug">{e.title}</p>
           <span class="flex-shrink-0 font-mono text-[9px] text-on-surface-variant/40">{formatTime(e.ts)}</span>
         </div>
-        <Show when={e.detail}>
-          <p class="mt-0.5 text-[11px] text-on-surface-variant leading-relaxed">{e.detail}</p>
+        <Show when={e.note || e.detail}>
+          <div
+            class="prose prose-sm mt-1 max-w-none text-[11px] leading-relaxed text-on-surface-variant"
+            innerHTML={renderMarkdown(e.note || e.detail || "")}
+          />
         </Show>
         <Show when={e.meta}>
           <span class="mt-1 inline-block rounded-full bg-black/[0.04] px-2 py-0.5 text-[9px] font-medium text-on-surface-variant/70">
@@ -172,13 +177,34 @@ function EntryCard(props: { entry: DiaryEntry }) {
 
 // ── Main view ─────────────────────────────────────────────────────────────────
 
-export function DiaryView() {
+function diaryEntriesFromMessages(messages: readonly AfpMessage[]): DiaryEntry[] {
+  return messages.flatMap((message) => {
+    if (message.kind !== "diary_entry" && message.subtype !== "diary_entry") return [];
+    const content = message.content ?? {};
+    const markdown = typeof content.markdown === "string" ? content.markdown.trim() : "";
+    const title = typeof content.title === "string" ? content.title.trim() : "";
+    if (!markdown && !title) return [];
+    return [{
+      ts: typeof content.recorded_at === "string" ? content.recorded_at : message.timestamp,
+      type: "note" as const,
+      icon: "📝",
+      title: title || "Diary note",
+      note: markdown || title,
+      meta: "Synced privately",
+    }];
+  });
+}
+
+export function DiaryView(props: {
+  messages?: readonly AfpMessage[];
+  saveProjection?: (input: SendAfpMessageInput) => Promise<unknown>;
+}) {
   const sessionUserId = readSession()?.user?.id ?? null;
   const todayKey = toDateKey(new Date());
   const [dateKey, setDateKey] = createSignal(todayKey);
   const [entries, setEntries] = createSignal<DiaryEntry[]>(loadDecisionOsDiaryEntriesForDate(todayKey, sessionUserId));
   const [newNote, setNewNote] = createSignal("");
-  let inputRef: HTMLInputElement | undefined;
+  const [savingNote, setSavingNote] = createSignal(false);
 
   // Reload entries when date changes
   const loadDate = (key: string) => {
@@ -207,14 +233,15 @@ export function DiaryView() {
     return opts;
   });
 
-  function addNote() {
+  async function addNote() {
     const text = newNote().trim();
     if (!text) return;
     const entry: DiaryEntry = {
       ts: new Date().toISOString(),
       type: "note",
       icon: "📝",
-      title: text,
+      title: text.replace(/[#*_>`~\[\]]/g, "").slice(0, 90) || "Diary note",
+      note: text,
     };
     appendDecisionOsDiaryEntry(entry, sessionUserId, {
       maxEntriesPerDay: MAX_DIARY_ENTRIES_PER_DAY,
@@ -222,8 +249,43 @@ export function DiaryView() {
     });
     if (dateKey() === todayKey) setEntries(prev => [...prev, entry]);
     setNewNote("");
-    inputRef?.focus();
+    if (props.saveProjection) {
+      setSavingNote(true);
+      try {
+        await props.saveProjection({
+          thread_id: `private-diary-${sessionUserId || "local"}`,
+          from: "user@omnyid.local",
+          to: ["agent://diary"],
+          type: "note",
+          kind: "diary_entry",
+          subtype: "diary_entry",
+          content: {
+            kind: "diary_entry",
+            title: entry.title,
+            markdown: text,
+            recorded_at: entry.ts,
+          },
+          supertags: ["diary:entry", "privacy:private"],
+          metadata: { surface: "diary", account_scoped: true },
+          memory_scope: { memory_space: "personal", author_mask: "private", author_type: "human", human_only: true },
+        });
+      } catch {
+        // The account-scoped local mirror remains available and will not leak
+        // into another account. The next saved entry may be retried normally.
+      } finally {
+        setSavingNote(false);
+      }
+    }
   }
+
+  createEffect(() => {
+    const synced = diaryEntriesFromMessages(props.messages ?? []);
+    const syncedForDay = synced.filter((entry) => entry.ts.slice(0, 10) === dateKey());
+    if (!syncedForDay.length) return;
+    const local = loadDecisionOsDiaryEntriesForDate(dateKey(), sessionUserId);
+    const unique = new Map([...local, ...syncedForDay].map((entry) => [`${entry.ts}|${entry.title}`, entry]));
+    setEntries([...unique.values()].sort((a, b) => a.ts.localeCompare(b.ts)));
+  });
 
   // Live updates from other parts of the app
   onMount(() => {
@@ -247,7 +309,7 @@ export function DiaryView() {
               A private record of your decisions, mood, and moments.
             </p>
             <div class="mt-3 max-w-2xl rounded-2xl border border-amber-200/70 bg-amber-50/80 px-3 py-2 text-[11px] leading-relaxed text-amber-900 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.16)]">
-              Diary entries are currently <span class="font-semibold">stored locally on this device</span>. They build a day timeline here, but they are not yet a fully synced cross-device journal.
+              Diary entries are kept private to this account and synced across signed-in devices. A local account-scoped copy keeps the diary usable during a temporary connection problem.
             </div>
           </div>
           {/* Date picker */}
@@ -297,7 +359,7 @@ export function DiaryView() {
           <span class="text-4xl mb-3">📖</span>
           <p class="text-sm font-semibold text-on-surface">Nothing here yet</p>
           <p class="mt-1 max-w-xs text-xs text-on-surface-variant/60">
-            Decisions you approve, moods you log on the Home screen, and notes you add on this device will appear here.
+            Decisions you approve, moods you log on the Home screen, and notes you add will appear here.
           </p>
         </div>
       </Show>
@@ -308,36 +370,20 @@ export function DiaryView() {
           <p class="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-on-surface-variant/50">
             Add to today's diary
           </p>
-          <div class="flex gap-2">
-            <input
-              ref={inputRef}
-              type="text"
-              value={newNote()}
-              onInput={e => setNewNote(e.currentTarget.value)}
-              onKeyDown={e => {
-                if (e.key === "Enter") {
-                  recordShortcutUse("form_submit");
-                  addNote();
-                  return;
-                }
-                if (e.key === "Escape") {
-                  e.preventDefault();
-                  recordShortcutUse("form_cancel");
-                  setNewNote("");
-                }
-              }}
-              placeholder="Capture a thought, reflection, or moment…"
-              class="flex-1 rounded-xl border border-black/[0.08] bg-white/70 px-3 py-2 text-sm text-on-surface placeholder:text-on-surface-variant/40 outline-none transition focus:border-primary/40 focus:bg-white/90"
-            />
-            <button
-              type="button"
-              class="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
-              disabled={newNote().trim().length === 0}
-              onClick={addNote}
-            >
-              Save
-            </button>
-          </div>
+          <TiptapEditor
+            mode="full"
+            initialContent={newNote()}
+            placeholder="Capture a thought, reflection, or moment…"
+            submitLabel={savingNote() ? "Saving…" : "Save to diary"}
+            disabled={savingNote()}
+            clearOnSend
+            onChange={(_text, markdown) => setNewNote(markdown)}
+            onSend={async (payload) => {
+              setNewNote(payload.markdown || payload.text);
+              recordShortcutUse("form_submit");
+              await addNote();
+            }}
+          />
         </div>
       </Show>
     </div>

@@ -4383,6 +4383,17 @@ export const sendGmailApprovedDraft = (
     method: "POST",
     bodyJson: body,
   }).then(normalizeGmailApprovedDraftSendResponse);
+export const sendWeddingVendorApprovedEnquiry = (body: {
+  vendor_id: string;
+  to: string;
+  subject: string;
+  text: string;
+  draft_message_id: string;
+}): Promise<GmailApprovedDraftSendResponse> =>
+  apiFetch<unknown>("/wedding/vendor-outreach/send-approved", {
+    method: "POST",
+    bodyJson: body,
+  }).then(normalizeGmailApprovedDraftSendResponse);
 export type WeddingTaskAssignmentDeliveryInput = {
   wedding_plan_id: string;
   response_workspace_id: string;

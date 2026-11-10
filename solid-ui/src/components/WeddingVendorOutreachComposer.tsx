@@ -332,7 +332,7 @@ export function WeddingVendorOutreachComposer(props: {
             {props.flow.stage === "sending" ? "Sending…" : "Send enquiry"}
           </button>
 
-          <Show when={!props.gmailConnected}>
+          <Show when={!props.gmailConnected && !props.protectedRepliesAvailable}>
             <button
               type="button"
               onClick={props.onConnectGmail}

@@ -33,7 +33,9 @@ export function fontScalePixels(scale: FontScaleOption): string {
 
 export function applyFontScalePreference(scale: FontScaleOption) {
   if (typeof document === "undefined") return;
-  const pixels = fontScalePixels(scale);
+  const basePixels = Number.parseFloat(fontScalePixels(scale));
+  const weddingScale = document.body?.classList?.contains("omnyid-usecase-wedding-planning") ? 1.1 : 1;
+  const pixels = `${Math.round(basePixels * weddingScale * 10) / 10}px`;
   document.documentElement.style.setProperty("--base-font-size", pixels);
   document.body?.style.setProperty("--base-font-size", pixels);
 }

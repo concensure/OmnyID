@@ -59,6 +59,7 @@ export function WeddingVendorChoiceCard(props: {
   selectedForFollowUp?: boolean;
   onToggleFollowUp?: (card: WeddingVendorChoiceCardData) => void;
   onNotForUs?: (card: WeddingVendorChoiceCardData, reason: WeddingPreferenceSignalReason) => Promise<boolean> | boolean;
+  hidePrimaryAction?: boolean;
 }) {
   const card = props.card;
   const [contactOpen, setContactOpen] = createSignal(false);
@@ -332,7 +333,7 @@ export function WeddingVendorChoiceCard(props: {
               {props.selectedForFollowUp ? "Favourited" : "Favourite"}
             </button>
           </Show>
-          <Show
+          <Show when={!props.hidePrimaryAction}><Show
             when={props.outreachFlow?.stage === "sent"}
             fallback={
               <button
@@ -359,7 +360,7 @@ export function WeddingVendorChoiceCard(props: {
             }
           >
             <button type="button" onClick={() => props.onViewEvidence?.(card)} class="min-h-12 w-full rounded-lg bg-wedding-primary px-3 py-2 text-sm font-bold text-wedding-page transition hover:bg-wedding-primary/90">View conversation</button>
-          </Show>
+          </Show></Show>
           <Show when={props.outreachFlow?.stage === "sent"}>
             <div class="w-full rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-emerald-950" role="status" aria-live="polite">
               <p class="text-sm font-bold">Message sent!</p>
@@ -389,6 +390,7 @@ export function WeddingVendorChoiceCard(props: {
               flow={flow()}
               busy={flow().stage === "drafting" || flow().stage === "sending"}
               gmailConnected={Boolean(props.gmailConnected)}
+              protectedRepliesAvailable={Boolean(card.vendorId && card.email && flow().attachments.length === 0)}
               onBodyChange={(bodyMarkdown, bodyHtml) => props.onOutreachBodyChange?.(card.choiceId, bodyMarkdown, bodyHtml)}
               onRecipientChange={(email) => props.onOutreachRecipientChange?.(card.choiceId, email)}
               onAttachmentsChange={(attachments) => props.onOutreachAttachmentsChange?.(card.choiceId, attachments)}

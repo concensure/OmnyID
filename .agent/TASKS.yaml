@@ -15,6 +15,18 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-353
+    title: Make Wedding setup account-safe and complete planner, specials, diary, contacts and admin usability
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-353
+    worktree: C:/Users/ozans/Desktop/projects/OmnyID-GROWTH-001
+    base_sha: 0c47c9280584dc49ed685b798a71212c131d436b
+    depends_on: [WED-351, WED-352]
+    files: [solid-ui/src/components/**, solid-ui/src/lib/**, solid-ui/src/App.tsx, solid-ui/src/styles.css, solid-ui/tests/**, src/server/**diary**, src/server/**wedding**, tests/**, postgres/migrations/**, Documents/verification/**, .agent/**]
+    acceptance: [Wedding setup uses useful date location budget and guest controls while preserving imported quiz answers, all mutable planner browser projections are scoped to the authenticated account and new accounts never inherit another account's progress contacts contributors or persona, Limited Specials prefills known planning facts and provides in-place location centring and a working reviewed enquiry, rich-text controls are readable and reusable in enquiries and synced Diary entries, Contacts add works, responsive Wedding typography remains readable at the new default scale, administrators alone see and default to the consolidated dashboard while signed-in identity and Wedding-only upgrade copy are accurate, focused isolation frontend backend full Wedding build exact-SHA deployment provenance and hosted checks pass]
+    progress: "Release candidate implemented: useful onboarding controls, authenticated browser-state boundary coverage and AFP-synced private Diary, Limited Specials fact/photo/location improvements, directory-bound platform enquiry delivery, readable rich-text and Wedding scale, working Contacts reveal, signed-in email, Wedding-only upgrade and consolidated admin-only dashboard. TypeScript, 42 focused tests and all 2,252 Wedding tests pass; exact-SHA Rust/build/deploy proof remains."
+
   - id: WED-352
     title: Add protected vendor proposal lead feeds and project Wedding truth into Database
     status: done

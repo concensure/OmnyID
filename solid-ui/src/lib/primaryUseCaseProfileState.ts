@@ -9,6 +9,7 @@ import {
   type UserSelfProfile,
 } from "@/lib/profileLedger";
 import type { WeddingEntrySource } from "@/lib/weddingEntrySourceState";
+import { applyFontScalePreference, loadFontScalePreference } from "@/lib/fontScalePreference";
 
 export type PrimaryUseCaseOption = {
   kind: PrimaryUseCaseKind;
@@ -178,6 +179,9 @@ export function applyPrimaryUseCaseTheme(profile: UserSelfProfile | null | undef
     targetBody?.classList.remove(className);
   }
   if (nextClass) targetBody?.classList.add(nextClass);
+  // Wedding planning defaults to a 10% larger readable scale while preserving
+  // the person's selected S/M/L/XL preference.
+  applyFontScalePreference(loadFontScalePreference());
   return nextClass;
 }
 
@@ -214,7 +218,10 @@ export function completePrimaryUseCaseProfile(
 export function accountLooksLikeAdmin(email: string | null | undefined): boolean {
   const normalized = email?.trim().toLowerCase() ?? "";
   if (!normalized) return false;
-  return normalized === "admin@omnyid.com" || normalized.startsWith("admin@") || normalized.includes("+admin@");
+  return normalized === "concensure@gmail.com"
+    || normalized === "admin@omnyid.com"
+    || normalized.startsWith("admin@")
+    || normalized.includes("+admin@");
 }
 
 export function withAdminPrimaryUseCaseDefault(

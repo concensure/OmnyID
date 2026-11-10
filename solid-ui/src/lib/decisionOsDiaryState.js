@@ -11,7 +11,10 @@ function diaryStorageKey(userId) {
 
 function loadDiaryStorageValue(userId) {
   const scopedKey = diaryStorageKey(userId);
-  return localStorage.getItem(scopedKey) ?? localStorage.getItem(DIARY_KEY);
+  const authenticatedUserId = typeof userId === "string" && userId.trim().length > 0;
+  // An authenticated account must never inherit the old unscoped diary. The
+  // legacy key remains readable only for signed-out/local-only use.
+  return localStorage.getItem(scopedKey) ?? (authenticatedUserId ? null : localStorage.getItem(DIARY_KEY));
 }
 
 function removeDiaryStorageValue(userId) {

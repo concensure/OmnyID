@@ -95,6 +95,7 @@ export function RailIcon(props: { id: IconId }) {
       </I>
     );
 
+    case "admin_dashboard":
     case "cost_dashboard": return (
       <I>
         <path d="M3.5 15.5 h13" />

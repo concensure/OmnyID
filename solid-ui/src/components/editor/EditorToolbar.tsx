@@ -4,6 +4,7 @@ import type { Editor } from "@tiptap/core";
 import type { EditorMode } from "@/lib/editorMode";
 import type { EditorState } from "./tiptapEditorTypes";
 import type { AgentPersona } from "@/lib/api";
+import type { JSX } from "solid-js";
 
 // ── Toolbar button ─────────────────────────────────────────────────────────
 
@@ -12,7 +13,7 @@ function ToolBtn(props: {
   disabled?: boolean;
   title: string;
   onClick: () => void;
-  children: string;
+  children: JSX.Element;
 }) {
   return (
     <button
@@ -21,7 +22,7 @@ function ToolBtn(props: {
       aria-label={props.title}
       disabled={props.disabled}
       onClick={props.onClick}
-      class={`flex h-7 min-w-[28px] items-center justify-center rounded-md px-1.5 text-[12px] font-medium transition select-none ${
+      class={`flex h-8 min-w-[30px] shrink-0 items-center justify-center rounded-md px-1.5 text-[14px] font-medium transition select-none ${
         props.active
           ? "bg-primary/10 text-primary"
           : "text-on-surface-variant hover:bg-black/5 hover:text-on-surface"
@@ -174,7 +175,7 @@ export function EditorToolbar(props: {
   const s = () => props.state;
 
   return (
-    <div class="flex flex-wrap items-center gap-0.5 border-b border-black/[0.06] bg-black/[0.02] px-2 py-1.5" role="toolbar" aria-label="Text formatting">
+    <div class="flex flex-nowrap items-center gap-0.5 overflow-x-auto border-b border-black/[0.06] bg-black/[0.02] px-2 py-1.5" role="toolbar" aria-label="Text formatting">
 
       {/* Compact + Full + Email: basic formatting */}
       <ToolBtn active={s().bold} title="Bold (Ctrl+B)" onClick={() => e().chain().focus().toggleBold().run()}>B</ToolBtn>
@@ -201,9 +202,9 @@ export function EditorToolbar(props: {
         <FontSizeSelect editor={e()} />
         <Sep />
 
-        <ToolBtn active={s().alignLeft} title="Align left" onClick={() => e().chain().focus().setTextAlign("left").run()}>⬅</ToolBtn>
-        <ToolBtn active={s().alignCenter} title="Align center" onClick={() => e().chain().focus().setTextAlign("center").run()}>☰</ToolBtn>
-        <ToolBtn active={s().alignRight} title="Align right" onClick={() => e().chain().focus().setTextAlign("right").run()}>➡</ToolBtn>
+        <ToolBtn active={s().alignLeft} title="Align left" onClick={() => e().chain().focus().setTextAlign("left").run()}><span class="text-base leading-none" aria-hidden="true">≡</span></ToolBtn>
+        <ToolBtn active={s().alignCenter} title="Align center" onClick={() => e().chain().focus().setTextAlign("center").run()}><span class="text-base leading-none" aria-hidden="true">≣</span></ToolBtn>
+        <ToolBtn active={s().alignRight} title="Align right" onClick={() => e().chain().focus().setTextAlign("right").run()}><span class="inline-block rotate-180 text-base leading-none" aria-hidden="true">≡</span></ToolBtn>
         <Sep />
 
         <ToolBtn active={s().bulletList} title="Bullet list" onClick={() => e().chain().focus().toggleBulletList().run()}>• –</ToolBtn>

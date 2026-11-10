@@ -655,6 +655,11 @@ body[data-search-open] [data-search-host] {
   background: transparent;
   border: 0;
 }
+
+body.omnyid-usecase-wedding-planning :where(p, span, a, button, label, dd, dt, li, h1, h2, h3, h4) {
+  overflow-wrap: break-word;
+  word-break: normal;
+}
 .wedding-special-map-marker__inner {
   display: flex;
   width: 46px;

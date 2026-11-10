@@ -27,6 +27,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::db::wedding_vendor_evidence::{VENDOR_AVAILABILITY_STATES, VendorAvailabilityInput};
+use crate::gateway::smtp_out::send_transactional_email;
 use crate::wedding_shared_tool_metering::{
     WeddingSharedToolFeature, WeddingSharedToolUsageInput,
     record_wedding_shared_tool_usage,
@@ -80,9 +81,75 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
             post(wedding_vendor_outreach_draft_http),
         )
         .route(
+            "/wedding/vendor-outreach/send-approved",
+            post(wedding_vendor_outreach_send_approved_http),
+        )
+        .route(
             "/wedding/vendors/{vendor_id}/availability",
             post(wedding_vendor_availability_http),
         )
+}
+
+#[derive(Deserialize)]
+struct WeddingVendorApprovedSendRequest {
+    vendor_id: String,
+    to: String,
+    subject: String,
+    text: String,
+    draft_message_id: String,
+}
+
+#[derive(Serialize)]
+struct WeddingVendorApprovedSendResponse {
+    sent: bool,
+    message_id: String,
+    client_message_id: String,
+}
+
+async fn wedding_vendor_outreach_send_approved_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(request): Json<WeddingVendorApprovedSendRequest>,
+) -> Result<Json<WeddingVendorApprovedSendResponse>, (StatusCode, String)> {
+    let _user = authenticated_user(&state.db, &headers).await?;
+    enforce_rate_limit(
+        &state,
+        authenticated_rate_limit_key("wedding_vendor_outreach_send", &headers),
+        RateLimitPolicy { max_requests: 8, window: Duration::from_secs(60) },
+    ).await?;
+    let vendor_id = request.vendor_id.trim();
+    let recipient = request.to.trim().to_lowercase();
+    let subject = request.subject.trim();
+    let text = request.text.trim();
+    if vendor_id.is_empty() || request.draft_message_id.trim().is_empty() {
+        return Err((StatusCode::BAD_REQUEST, "The approved vendor draft is incomplete.".into()));
+    }
+    if subject.is_empty() || subject.chars().count() > 240 || text.is_empty() || text.chars().count() > 20_000 {
+        return Err((StatusCode::BAD_REQUEST, "The approved enquiry content is invalid.".into()));
+    }
+    let directory_email = sqlx::query_scalar::<_, Option<String>>(
+        "SELECT contact_email FROM wedding_vendors WHERE vendor_id=$1 AND status='active'",
+    )
+    .bind(vendor_id)
+    .fetch_optional(&state.db.pool)
+    .await
+    .map_err(|error| (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?
+    .flatten()
+    .map(|value| value.trim().to_lowercase())
+    .filter(|value| !value.is_empty())
+    .ok_or((StatusCode::PRECONDITION_FAILED, "This vendor does not have a verified delivery address yet.".into()))?;
+    if recipient != directory_email {
+        return Err((StatusCode::FORBIDDEN, "The recipient no longer matches this vendor's directory address. Refresh before sending.".into()));
+    }
+    send_transactional_email(&recipient, subject, text)
+        .await
+        .map_err(|_| (StatusCode::BAD_GATEWAY, "The email provider did not accept this enquiry. Your approved draft remains saved.".into()))?;
+    let receipt = ulid::Ulid::new().to_string();
+    Ok(Json(WeddingVendorApprovedSendResponse {
+        sent: true,
+        message_id: format!("platform-{receipt}"),
+        client_message_id: request.draft_message_id.trim().to_string(),
+    }))
 }
 
 #[derive(Deserialize)]

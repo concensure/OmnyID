@@ -584,6 +584,9 @@ const LazySpacesView = lazy(() =>
 const LazyDiaryView = lazy(() =>
   import("@/components/DiaryView").then((m) => ({ default: m.DiaryView })),
 );
+const LazyUsageView = lazy(() =>
+  import("@/components/UsageView").then((m) => ({ default: m.UsageView })),
+);
 const LazyDiscoverView = lazy(() =>
   import("@/components/DiscoverView").then((m) => ({ default: m.DiscoverView })),
 );
@@ -1226,6 +1229,7 @@ function App() {
   const initialParaViewEnabled = loadParaViewPreference();
   const initialPreferredView = normalizeViewName(_prefs.activeView) ?? "search";
   const initialHistoryView = appViewFromBrowserHistory(window.history.state, window.location.href);
+  const initialAdminAccount = (readSession()?.user?.email ?? "").trim().toLowerCase() === "concensure@gmail.com";
   const initialActiveView =
     gmailRedirectStatus
       ? "email"
@@ -1233,6 +1237,8 @@ function App() {
         ? "calendar"
         : initialHistoryView
           ? initialHistoryView
+        : initialAdminAccount
+          ? "admin_dashboard"
         : initialPreferredView === "para" && !initialParaViewEnabled
           ? "home"
           : initialPreferredView;
@@ -3274,6 +3280,9 @@ function App() {
             setServerOffline(false);
             if (pendingVendorAuthSource) return void window.location.assign(vendorPortalUrlFromDeepLink());
             const loginUserId = readSession()?.user?.id ?? "";
+            if (readSession()?.user?.email?.trim().toLowerCase() === "concensure@gmail.com") {
+              selectView("admin_dashboard");
+            }
             if (loginUserId && loadShouldShowGuidedTour(loginUserId)) setShowTour(true);
             void loadDashboard();
             void loadRunnerFiles();
@@ -3294,7 +3303,10 @@ function App() {
       </Show>
       <Show when={showEditProfile()}>
         <Suspense>
-          <LazyEditProfileModal onClose={() => setShowEditProfile(false)} />
+          <LazyEditProfileModal
+            onClose={() => setShowEditProfile(false)}
+            showWeddingUpgrade={loadWeddingEntrySource(userId()) === "wedding_site" || primaryUseCaseProfile()?.kind === "wedding_planning"}
+          />
         </Suspense>
       </Show>
 
@@ -3438,6 +3450,8 @@ function App() {
         onEditProfile={() => setShowEditProfile(true)}
         onQuickControl={openQuickControl}
         userId={userId()}
+        sessionEmail={session()?.user?.email}
+        adminAccount={session()?.user?.email?.trim().toLowerCase() === "concensure@gmail.com"}
       />
 
       <Show when={isMobileFocusViewport()}>
@@ -4206,6 +4220,15 @@ function App() {
               </Suspense>
             </Show>
 
+            <Show when={activeView() === "admin_dashboard" && session()?.user?.email?.trim().toLowerCase() !== "concensure@gmail.com"}>
+              <GuestGate label="Admin dashboard" onSignIn={() => openAuthModalIfSignedOut()} />
+            </Show>
+            <Show when={activeView() === "admin_dashboard" && session()?.user?.email?.trim().toLowerCase() === "concensure@gmail.com"}>
+              <Suspense fallback={<LazyViewFallback label="Admin dashboard" />}>
+                <div class="view-enter"><LazyUsageView /></div>
+              </Suspense>
+            </Show>
+
             {/* Tools view — MCP tools and skill capsules */}
             <Show when={activeView() === "tools"}>
               <Suspense fallback={<LazyViewFallback label="Tools" />}>
@@ -4309,7 +4332,12 @@ function App() {
             </Show>
             <Show when={activeView() === "diary" && Boolean(session()?.token)}>
               <Suspense fallback={<LazyViewFallback label="Diary" />}>
-                <div class="view-enter"><LazyDiaryView /></div>
+                <div class="view-enter">
+                  <LazyDiaryView
+                    messages={dashboardBootstrapMessages(workspaceBootstrap())}
+                    saveProjection={sendAfpMessage}
+                  />
+                </div>
               </Suspense>
             </Show>
 

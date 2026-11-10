@@ -8166,3 +8166,37 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
   release used direct proof and completed normally.
 - Evidence:
   `Documents/verification/wed-352-vendor-proposal-feeds-and-wedding-database-2026-11-10.md`.
+## 2026-11-10 - WED-353 account-safe Wedding setup and planner usability (Codex, release candidate)
+
+Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
+`agent/codex/WED-353`, based on `0c47c9280584dc49ed685b798a71212c131d436b`.
+
+- Wedding setup now opens its date picker twelve months ahead, offers adaptive
+  Australian location and budget suggestions, and starts an otherwise unknown
+  guest count at 20 with accessible ten-person step controls.
+- Authenticated diary state no longer adopts an unscoped browser diary. Private
+  rich-text diary notes now persist to the account AFP ledger while retaining
+  an account-scoped offline mirror; the existing login boundary continues to
+  remove ambiguous Wedding, decisions, contacts, contributor, and persona
+  browser state before a newly authenticated account is projected.
+- Limited Specials now adopts known date/guest facts reactively, calculates the
+  flexible window as wedding date plus 30 days, centres in place with browser
+  geolocation, carries the actual vendor photo into the reviewed draft, and
+  keeps the selected venue image compact. The redundant primary review action
+  is hidden from that already-open review surface.
+- Approved directory-vendor enquiries can use the platform sender without a
+  personal Gmail connection. The authenticated, rate-limited endpoint permits
+  only the active vendor directory address and refuses an edited recipient,
+  preserving the existing explicit preview and AFP draft/sent receipts.
+- Rich-text alignment controls now use familiar line icons, remain in one
+  horizontally scrollable row, and have larger touch targets. Contacts Add
+  reveals and scrolls to its existing account-backed form.
+- Wedding defaults to a 10% larger scale without overriding S/M/L/XL, with
+  normal word wrapping. The session menu shows the sign-in email; only Wedding
+  profiles see its upgrade card. `concensure@gmail.com` alone gets the admin
+  dashboard rail action and defaults to the consolidated existing Usage/admin
+  dashboard after login.
+- Verification so far: TypeScript typecheck passes; focused account, Diary,
+  DecisionOS, font, Limited Specials and routing tests pass (42/42); the full
+  Wedding state suite passes (2,252/2,252). Final Rust check, production build,
+  exact-SHA deployment and hosted proof are the next release steps.

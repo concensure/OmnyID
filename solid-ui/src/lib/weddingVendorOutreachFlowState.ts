@@ -106,7 +106,7 @@ export function weddingVendorOutreachSendGate(
       reason: `No email address found for ${flow.vendorName}. Open their website to use their contact form, or add an email in the vendor directory.`,
     };
   }
-  if (!gate.gmailConnected) {
+  if (!gate.gmailConnected && !gate.protectedRepliesAvailable) {
     return {
       canSend: false,
       reason: "Connect Gmail to send this enquiry. Nothing is sent until you press Send.",

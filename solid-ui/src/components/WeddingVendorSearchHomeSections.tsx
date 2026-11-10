@@ -79,6 +79,8 @@ function limitedSpecialOutreachCard(input: {
   vendorName: string;
   category: string;
   date: string;
+  imageUrl?: string | null;
+  imageAlt?: string | null;
 }, vendor: WeddingVendor | null): WeddingVendorChoiceCardData {
   return {
     choiceId: `limited-specials:${input.vendorId}:${input.date}`,
@@ -86,8 +88,8 @@ function limitedSpecialOutreachCard(input: {
     comparisonCount: 1,
     title: input.vendorName,
     category: input.category,
-    imageUrl: vendor?.photos[0]?.photoUrl ?? null,
-    imageAlt: vendor?.photos[0]?.altText ?? null,
+    imageUrl: vendor?.photos[0]?.photoUrl ?? input.imageUrl ?? null,
+    imageAlt: vendor?.photos[0]?.altText ?? input.imageAlt ?? null,
     scoreLabel: "",
     provider: vendor?.sourceLabel ?? "Wedding vendor directory",
     sourceUrl: vendor?.sourceUrl ?? null,
@@ -325,7 +327,7 @@ export function WeddingVendorSearchHomeSection(props: {
   const weddingGuestCount = () => workspace().state.contextCards
     .map((card) => Number(card.planningContext.guestCount))
     .find((value) => Number.isFinite(value) && value > 0) ?? null;
-  const prepareDateEnquiry = (input: { vendorId: string; vendorName: string; category: string; date: string }, detail: WeddingVendorRankedSpecialDetail | null = null) => {
+  const prepareDateEnquiry = (input: { vendorId: string; vendorName: string; category: string; date: string; imageUrl?: string | null; imageAlt?: string | null }, detail: WeddingVendorRankedSpecialDetail | null = null) => {
     const preview = props.result?.preview ?? props.result?.sourcePreview;
     const previewCard = preview?.vendorComparisonCards.find((item) => item.vendorId === input.vendorId || vendorKey(item.title) === vendorKey(input.vendorName));
     const directoryMatch = workspace().weddingVendorDirectory?.find((item) => item.vendorId === input.vendorId || vendorKey(item.vendorName) === vendorKey(input.vendorName)) ?? null;
@@ -346,7 +348,7 @@ export function WeddingVendorSearchHomeSection(props: {
     );
     queueMicrotask(() => directSpecialEnquiryElement?.scrollIntoView({ behavior: "smooth", block: "start" }));
   };
-  const prepareSpecialEnquiry = (marker: WeddingVendorSpecialMarker, detail: WeddingVendorRankedSpecialDetail | null) => prepareDateEnquiry({ vendorId: marker.vendorId, vendorName: marker.vendorName, category: marker.category, date: detail?.specialDate || marker.availableOnDate }, detail);
+  const prepareSpecialEnquiry = (marker: WeddingVendorSpecialMarker, detail: WeddingVendorRankedSpecialDetail | null) => prepareDateEnquiry({ vendorId: marker.vendorId, vendorName: marker.vendorName, category: marker.category, date: detail?.specialDate || marker.availableOnDate, imageUrl: marker.photoUrl, imageAlt: marker.photoAlt }, detail);
   const prepareDirectoryDateEnquiry = (vendor: WeddingVendor, date: string) => prepareDateEnquiry({ vendorId: vendor.vendorId, vendorName: vendor.vendorName, category: vendor.category, date });
   async function saveSpecialPreference(marker: WeddingVendorSpecialMarker, preference: WeddingVendorShortlistPreference, reason: string | null) {
     if (!workspace().saveProjection) throw new Error("Account saving is unavailable");
@@ -754,6 +756,7 @@ export function WeddingVendorSearchHomeSection(props: {
                     onCancelOutreach={props.outreach.onCancelOutreach}
                     onRetryOutreach={props.outreach.onRetryOutreach}
                     onConnectGmailForOutreach={() => void props.outreach.onConnectGmailForOutreach()}
+                    hidePrimaryAction
                   />
                 </div>
               </div>

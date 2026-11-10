@@ -390,7 +390,11 @@ export function ContactsView() {
         </div>
         <button
           type="button"
-          onClick={() => setShowAdd((v) => !v)}
+          onClick={() => {
+            const opening = !showAdd();
+            setShowAdd(opening);
+            if (opening) queueMicrotask(() => document.getElementById("contact-add-form")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+          }}
           class="w-full rounded-full bg-primary px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-primary/80 sm:mt-2 sm:w-auto sm:py-1.5"
         >
           + Add
@@ -481,7 +485,7 @@ export function ContactsView() {
       </Show>
 
       <Show when={showAdd()}>
-        <div class="min-w-0 animate-fade-in space-y-2 rounded-2xl border border-white/50 bg-white/60 p-4 shadow-card">
+        <div id="contact-add-form" class="min-w-0 scroll-mt-4 animate-fade-in space-y-2 rounded-2xl border border-white/50 bg-white/60 p-4 shadow-card">
           <p class="mb-1 font-mono text-[9px] uppercase tracking-[0.2em] text-outline">New Contact</p>
           <input
             type="text"

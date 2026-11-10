@@ -138,6 +138,7 @@ const AUTH_REQUIRED_VIEWS = new Set<ViewName>([
   "goals",
   "sovereignty_audit",
   "reports",
+  "admin_dashboard",
 ]);
 
 function viewLabel(view: ViewName): string {
@@ -439,6 +440,8 @@ export function NavBar(props: {
   onEditProfile?: () => void;
   onQuickControl?: (action: QuickControlActionId) => void;
   userId?: string;
+  sessionEmail?: string;
+  adminAccount?: boolean;
 }) {
   const _vp = useViewport();
   const isWatch = () => _vp?.isWatch?.() ?? false;
@@ -454,7 +457,7 @@ export function NavBar(props: {
   );
   const [cheatSheetPos, setCheatSheetPos] = createSignal<{ top: number; left: number } | null>(null);
   const [showMoreMenu, setShowMoreMenu] = createSignal(false);
-  const isAdminAccount = () => readSession()?.user?.email?.trim().toLowerCase() === "concensure@gmail.com";
+  const isAdminAccount = () => Boolean(props.adminAccount);
   const expandedViewItems = createMemo(() =>
     EXPANDED_VIEW_ITEMS.filter((item) => {
       if (!props.paraViewEnabled && item.id === "para") return false;
@@ -995,6 +998,20 @@ export function NavBar(props: {
 
           {/* Core nav items */}
           <nav class="flex flex-1 flex-col items-center gap-0.5 py-1 w-full">
+            <Show when={isAdminAccount()}>
+              <div class="group relative flex w-full justify-center">
+                <button
+                  type="button"
+                  onClick={() => activateView("admin_dashboard")}
+                  aria-label="Open admin dashboard"
+                  aria-current={props.activeView === "admin_dashboard" ? "page" : undefined}
+                  class={`rail-icon-btn relative flex h-11 w-11 items-center justify-center rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-primary/50 ${props.activeView === "admin_dashboard" ? "bg-on-surface text-white" : "text-outline/70 hover:bg-white/60 hover:text-on-surface"}`}
+                >
+                  <RailIcon id="admin_dashboard" />
+                </button>
+                <div class="rail-tooltip pointer-events-none absolute left-full top-1/2 z-50 ml-2.5 -translate-y-1/2 whitespace-nowrap rounded-xl border border-white/50 bg-white/96 px-3 py-1.5 text-xs font-medium text-on-surface opacity-0 shadow-card group-hover:opacity-100">Admin dashboard</div>
+              </div>
+            </Show>
             <For each={CORE_ITEMS}>
               {(item) => {
                 const active = () => props.activeView === item.id;
@@ -1247,6 +1264,9 @@ export function NavBar(props: {
               <Show when={showSessionMenu()}>
                 <div class="absolute left-full bottom-0 z-50 ml-2 min-w-[180px] animate-fade-in rounded-2xl border border-white/45 bg-white/95 p-3 shadow-panel backdrop-blur-xl">
                   <p class="font-mono text-[9px] uppercase tracking-[0.2em] text-outline mb-2">Session</p>
+                  <Show when={props.sessionEmail}>
+                    <p class="mb-2 break-all rounded-lg bg-on-surface/4 px-2 py-1.5 text-xs font-medium text-on-surface-variant">{props.sessionEmail}</p>
+                  </Show>
                   <Show when={sessionActionError()}>
                     {(message) => (
                       <div class="mb-2 rounded-lg border border-amber-300/50 bg-amber-50/90 px-2 py-1.5 text-[10px] text-amber-900 shadow-sm">

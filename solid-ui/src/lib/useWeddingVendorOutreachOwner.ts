@@ -7,6 +7,7 @@ import {
   fetchThread,
   recordWeddingVendorContact,
   sendGmailApprovedDraft,
+  sendWeddingVendorApprovedEnquiry,
   type WeddingVendor,
   type AfpAttachment,
 } from "@/lib/api";
@@ -475,9 +476,11 @@ export function useWeddingVendorOutreachOwner(input: {
   async function onSendOutreach(choiceId: string) {
     const flow = vendorOutreachFlows()[choiceId];
     if (!flow) return;
+    const directoryVendor = outreachDirectoryVendorMatch(flow.vendorName);
+    const platformDeliveryAvailable = Boolean(directoryVendor?.vendorId && directoryVendor.contactEmail && flow.attachments.length === 0);
     const gate = weddingVendorOutreachSendGate(flow, {
       gmailConnected: Boolean(input.gmailStatus()?.connected),
-      protectedRepliesAvailable: false,
+      protectedRepliesAvailable: platformDeliveryAvailable,
     });
     if (!gate.canSend) {
       input.setNotice(gate.reason);
@@ -495,7 +498,6 @@ export function useWeddingVendorOutreachOwner(input: {
     let providerAttempted = false;
     try {
       if (linkedSpecialContext) await recheckWeddingVendorSpecialEnquiry(linkedSpecialContext);
-      const directoryVendor = outreachDirectoryVendorMatch(flow.vendorName);
       const html = flow.bodyHtml ?? renderMarkdown(flow.bodyMarkdown);
       const draftProjection = weddingVendorOutreachDraftAfpSendInput({
         flow,
@@ -509,13 +511,21 @@ export function useWeddingVendorOutreachOwner(input: {
       await saveProjection(draftProjection);
       const draftMessageId = draftProjection.id;
       providerAttempted = true;
-      const sendResult = await sendGmailApprovedDraft({
-        to: flow.recipientEmail ?? "",
-        subject: flow.subject,
-        html,
-        text: flow.bodyMarkdown,
-        attachment_ids: flow.attachments.map((attachment) => attachment.id),
-      });
+      const sendResult = platformDeliveryAvailable && directoryVendor
+        ? await sendWeddingVendorApprovedEnquiry({
+            vendor_id: directoryVendor.vendorId,
+            to: flow.recipientEmail ?? "",
+            subject: flow.subject,
+            text: flow.bodyMarkdown,
+            draft_message_id: draftMessageId ?? draftProjection.thread_id,
+          })
+        : await sendGmailApprovedDraft({
+            to: flow.recipientEmail ?? "",
+            subject: flow.subject,
+            html,
+            text: flow.bodyMarkdown,
+            attachment_ids: flow.attachments.map((attachment) => attachment.id),
+          });
       const sentProjection = weddingVendorOutreachSentAfpSendInput({
         flow,
         metadata,

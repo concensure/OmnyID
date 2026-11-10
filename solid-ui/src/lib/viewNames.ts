@@ -26,6 +26,7 @@ export const VIEW_NAMES = [
   "response_queue",
   "tasks",
   "cost_dashboard",
+  "admin_dashboard",
   "tools",
   "pulse",
   "goals",

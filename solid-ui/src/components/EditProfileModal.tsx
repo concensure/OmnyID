@@ -1,6 +1,6 @@
 ﻿// @locs-version: 1.0
 import { createBillingCheckoutSession, readSession } from "@/lib/api";
-import { For, createEffect, createSignal } from "solid-js";
+import { For, Show, createEffect, createSignal } from "solid-js";
 import { DialogShell } from "@/components/DialogShell";
 import { TiptapEditor } from "@/components/editor/TiptapEditor";
 import { loadUserProfile, saveUserProfile } from "@/lib/profileLocalState";
@@ -21,7 +21,7 @@ const PRESET_WEBSITES = [
   { id: "reddit", label: "Reddit", emoji: "r" },
 ];
 
-export function EditProfileModal(props: { onClose: () => void }) {
+export function EditProfileModal(props: { onClose: () => void; showWeddingUpgrade?: boolean }) {
   const sessionUserId = readSession()?.user?.id ?? null;
   const initial = loadUserProfile(sessionUserId);
   const [displayName, setDisplayName] = createSignal(initial.displayName);
@@ -212,6 +212,7 @@ export function EditProfileModal(props: { onClose: () => void }) {
             </div>
           </div>
 
+          <Show when={props.showWeddingUpgrade}>
           <div class="rounded-2xl border border-primary/25 bg-primary/7 p-4">
             <p class="text-sm font-semibold text-on-surface">OmnyID Wedding</p>
             <p class="mt-1 text-xs leading-5 text-on-surface-variant">
@@ -231,6 +232,7 @@ export function EditProfileModal(props: { onClose: () => void }) {
               </p>
             )}
           </div>
+          </Show>
 
           <div class="flex justify-end gap-2 pt-2">
             <button

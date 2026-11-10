@@ -129,6 +129,12 @@ test("send gate blocks with an actionable reason for each missing piece", () => 
   assert.equal(noGmail.canSend, false);
   assert.match(noGmail.reason ?? "", /Connect Gmail/);
 
+  const protectedPlatform = weddingVendorOutreachSendGate(
+    gateFlow(),
+    { gmailConnected: false, protectedRepliesAvailable: true },
+  );
+  assert.equal(protectedPlatform.canSend, true);
+
   const emptyBody = weddingVendorOutreachSendGate(
     gateFlow({ bodyMarkdown: "   " }),
     { gmailConnected: true },

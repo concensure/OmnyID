@@ -3,7 +3,7 @@
 // marketing site (omnyid.com/wedding). Same underlying signals and generation
 // logic as the generic in-app intake form in ResponseQueueView.tsx — this
 // component only changes how those fields are presented, never what they do.
-import { createMemo, createSignal, For, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
 
 import { WeddingDashboardIcon } from "@/components/WeddingDashboardIcons";
 import { WeddingConfirmDialog } from "@/components/WeddingConfirmDialog";
@@ -17,6 +17,7 @@ import { weddingVendorSelectionLabels } from "@/lib/weddingVendorChecklistState"
 import { weddingVendorMustDecideFirstCategories } from "@/lib/weddingVendorLeadTimeState";
 import type { WeddingVendorSearchResultAction } from "@/lib/weddingVendorSearchResultActionState";
 import { WEDDING_VOW_STYLE_OPTIONS } from "@/lib/weddingVowPlanningState";
+import { australianWeddingLocationSuggestions } from "@/lib/australianWeddingLocationSuggestionState";
 
 const STEP_LABELS = ["The basics", "Vendors", "Legal & vows", "Review"] as const;
 const LAST_STEP = STEP_LABELS.length - 1;
@@ -56,6 +57,16 @@ const MONTH_INDEX_BY_NAME: Record<string, number> = {
   december: 11,
   dec: 11,
 };
+const BUDGET_COMFORT_OPTIONS = [
+  "Keep it lean (under AUD $20,000)",
+  "Comfortable (AUD $20,000–$40,000)",
+  "More flexibility (AUD $40,000–$70,000)",
+  "Premium (over AUD $70,000)",
+] as const;
+
+function twelveMonthsFromToday(today = new Date()): Date {
+  return new Date(today.getFullYear() + 1, today.getMonth(), 1);
+}
 
 export function WeddingSiteIntakeWizard(props: {
   launch: WeddingTemplateLaunchState;
@@ -111,8 +122,11 @@ export function WeddingSiteIntakeWizard(props: {
   const [finishing, setFinishing] = createSignal(false);
   const [dateCalendarOpen, setDateCalendarOpen] = createSignal(false);
   const [clearVendorsOpen, setClearVendorsOpen] = createSignal(false);
-  const [calendarMonth, setCalendarMonth] = createSignal(new Date().getMonth());
-  const [calendarYear, setCalendarYear] = createSignal(new Date().getFullYear());
+  const defaultCalendarDate = twelveMonthsFromToday();
+  const [calendarMonth, setCalendarMonth] = createSignal(defaultCalendarDate.getMonth());
+  const [calendarYear, setCalendarYear] = createSignal(defaultCalendarDate.getFullYear());
+  const [locationSuggestionsOpen, setLocationSuggestionsOpen] = createSignal(false);
+  const [guestDefaultApplied, setGuestDefaultApplied] = createSignal(false);
   const [selectedStarterIntents, setSelectedStarterIntents] = createSignal<WeddingTemplateStarterIntent[]>(
     props.launch.starterCards
       .filter((card) => card.recommended)
@@ -142,6 +156,15 @@ export function WeddingSiteIntakeWizard(props: {
     }
     return cells;
   });
+  const locationSuggestions = createMemo(() => australianWeddingLocationSuggestions(
+    props.weddingFollowUpLocation(),
+    [],
+  ).slice(0, 8));
+  createEffect(() => {
+    if (guestDefaultApplied()) return;
+    if (!props.weddingFollowUpGuests().trim()) props.onWeddingFollowUpGuestsInput("20");
+    setGuestDefaultApplied(true);
+  });
   function shiftCalendarMonth(offset: number) {
     const next = new Date(calendarYear(), calendarMonth() + offset, 1);
     setCalendarYear(next.getFullYear());
@@ -164,7 +187,15 @@ export function WeddingSiteIntakeWizard(props: {
     if (typeof month === "number" && monthYear?.[2]) {
       setCalendarYear(Number(monthYear[2]));
       setCalendarMonth(month);
+      return;
     }
+    const future = twelveMonthsFromToday();
+    setCalendarYear(future.getFullYear());
+    setCalendarMonth(future.getMonth());
+  }
+  function adjustGuestCount(delta: number) {
+    const current = Number.parseInt(props.weddingFollowUpGuests(), 10);
+    props.onWeddingFollowUpGuestsInput(String(Math.max(0, (Number.isFinite(current) ? current : 20) + delta)));
   }
   function toggleStarterIntent(intent: WeddingTemplateStarterIntent, selected: boolean) {
     setSelectedStarterIntents((current) => {
@@ -379,30 +410,47 @@ export function WeddingSiteIntakeWizard(props: {
           </label>
           <label class={labelClass}>
             Location
-            <input
-              class={inputClass}
-              value={props.weddingFollowUpLocation()}
-              onInput={(event) => props.onWeddingFollowUpLocationInput(event.currentTarget.value)}
-              placeholder="Sydney NSW"
-            />
+            <div class="relative">
+              <input
+                class={inputClass}
+                value={props.weddingFollowUpLocation()}
+                onFocus={() => setLocationSuggestionsOpen(true)}
+                onInput={(event) => { props.onWeddingFollowUpLocationInput(event.currentTarget.value); setLocationSuggestionsOpen(true); }}
+                onKeyDown={(event) => { if (event.key === "Escape") setLocationSuggestionsOpen(false); }}
+                autocomplete="off"
+                aria-autocomplete="list"
+                aria-controls="wedding-onboarding-location-suggestions"
+                placeholder="Sydney NSW"
+              />
+              <Show when={locationSuggestionsOpen() && locationSuggestions().length > 0}>
+                <div id="wedding-onboarding-location-suggestions" role="listbox" class="absolute left-0 right-0 top-full z-30 mt-1 max-h-56 overflow-y-auto rounded-xl border border-wedding-border bg-white p-1 shadow-card">
+                  <For each={locationSuggestions()}>{(suggestion) => (
+                    <button type="button" role="option" class="flex min-h-11 w-full items-center gap-1 rounded-lg px-3 py-2 text-left text-sm hover:bg-wedding-page" onClick={() => { props.onWeddingFollowUpLocationInput(suggestion.label); setLocationSuggestionsOpen(false); }}>
+                      <span class="font-semibold">{suggestion.locality}</span><span class="font-bold text-wedding-secondary">{suggestion.state}</span>
+                    </button>
+                  )}</For>
+                </div>
+              </Show>
+            </div>
           </label>
           <label class={labelClass}>
             Guest count
-            <input
-              class={inputClass}
-              value={props.weddingFollowUpGuests()}
-              onInput={(event) => props.onWeddingFollowUpGuestsInput(event.currentTarget.value)}
-              placeholder="80"
-            />
+            <div class="grid grid-cols-[2.75rem_minmax(0,1fr)_2.75rem] gap-1">
+              <button type="button" class="min-h-11 rounded-lg border border-wedding-border bg-white text-lg font-bold" aria-label="Reduce guest count by 10" onClick={() => adjustGuestCount(-10)}>−</button>
+              <input class={`${inputClass} text-center`} type="number" min="0" step="10" inputmode="numeric" value={props.weddingFollowUpGuests()} onInput={(event) => props.onWeddingFollowUpGuestsInput(event.currentTarget.value)} placeholder="20" />
+              <button type="button" class="min-h-11 rounded-lg border border-wedding-border bg-white text-lg font-bold" aria-label="Increase guest count by 10" onClick={() => adjustGuestCount(10)}>+</button>
+            </div>
           </label>
           <label class={labelClass}>
             Budget comfort
             <input
               class={inputClass}
+              list="wedding-budget-comfort-options"
               value={props.weddingFollowUpBudget()}
               onInput={(event) => props.onWeddingFollowUpBudgetInput(event.currentTarget.value)}
               placeholder="Keep it lean"
             />
+            <datalist id="wedding-budget-comfort-options"><For each={BUDGET_COMFORT_OPTIONS}>{(option) => <option value={option} />}</For></datalist>
           </label>
           <label class={`${labelClass} md:col-span-2`}>
             Your names

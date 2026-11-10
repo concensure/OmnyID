@@ -29,6 +29,14 @@ function validDate(value: string | null | undefined): string {
   return fallback.toISOString().slice(0, 10);
 }
 
+function flexibleThroughDate(value: string | null | undefined): string {
+  const known = value?.match(/^20\d{2}-\d{2}-\d{2}$/)?.[0];
+  if (!known) return "";
+  const date = new Date(`${known}T12:00:00`);
+  date.setDate(date.getDate() + 30);
+  return date.toISOString().slice(0, 10);
+}
+
 function normalizedVendorCategory(value: string | null | undefined): string {
   const text = (value ?? "").toLowerCase();
   if (text.includes("venue")) return "Venue";
@@ -64,7 +72,7 @@ export function WeddingLimitedSpecialsMap(props: {
   onSavePreference?: (marker: WeddingVendorSpecialMarker, preference: WeddingVendorShortlistPreference, reason: string | null) => Promise<void> | void;
 }) {
   const [date, setDate] = createSignal(validDate(props.weddingDate));
-  const [dateTo, setDateTo] = createSignal("");
+  const [dateTo, setDateTo] = createSignal(flexibleThroughDate(props.weddingDate));
   const [category, setCategory] = createSignal(normalizedVendorCategory(props.initialCategory));
   const [selectedId, setSelectedId] = createSignal<string | null>(null);
   const [hoveredName, setHoveredName] = createSignal<string | null>(null);
@@ -72,6 +80,8 @@ export function WeddingLimitedSpecialsMap(props: {
   const [searchCenter, setSearchCenter] = createSignal<{ latitude: number; longitude: number }>({ latitude: SYDNEY[0], longitude: SYDNEY[1] });
   const [radiusKm, setRadiusKm] = createSignal(75);
   const [guestCount, setGuestCount] = createSignal<number | null>(props.initialGuestCount ?? null);
+  let dateEdited = false;
+  let guestCountEdited = false;
   const [vendorQuery, setVendorQuery] = createSignal("");
   const [selectedFallbackVendorId, setSelectedFallbackVendorId] = createSignal<string | null>(null);
   const categoryBudgetCents = createMemo(() => {
@@ -107,6 +117,17 @@ export function WeddingLimitedSpecialsMap(props: {
     ?? markers()[0]
     ?? null);
   const selectedDetail = createMemo<WeddingVendorRankedSpecialDetail | null>(() => discovery()?.topChoices.find((item) => item.vendorId === selected()?.vendorId) ?? null);
+
+  createEffect(() => {
+    const knownDate = props.weddingDate?.match(/^20\d{2}-\d{2}-\d{2}$/)?.[0];
+    if (knownDate && !dateEdited) {
+      setDate(knownDate);
+      setDateTo(flexibleThroughDate(knownDate));
+    }
+    if (!guestCountEdited && typeof props.initialGuestCount === "number" && props.initialGuestCount > 0) {
+      setGuestCount(props.initialGuestCount);
+    }
+  });
 
   onMount(async () => {
     try {
@@ -235,13 +256,13 @@ export function WeddingLimitedSpecialsMap(props: {
     <section class="mt-4 min-w-0" aria-labelledby="limited-specials-heading">
       <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-[repeat(5,minmax(8rem,1fr))_auto] xl:items-end">
         <label class="grid gap-1 text-sm font-semibold text-wedding-ink">Wedding date
-          <input class="h-11 rounded-lg border border-wedding-border bg-white px-3 font-normal" type="date" value={date()} onInput={(event) => setDate(event.currentTarget.value)} />
+          <input class="h-11 rounded-lg border border-wedding-border bg-white px-3 font-normal" type="date" value={date()} onInput={(event) => { dateEdited = true; setDate(event.currentTarget.value); }} />
         </label>
         <label class="grid gap-1 text-sm font-semibold text-wedding-ink">Flexible through <span class="font-normal text-wedding-ink/55">(optional, up to 31 days)</span>
           <input class="h-11 rounded-lg border border-wedding-border bg-white px-3 font-normal" type="date" min={date()} max={new Date(new Date(`${date()}T12:00:00`).getTime() + 31 * 86400000).toISOString().slice(0, 10)} value={dateTo()} onInput={(event) => setDateTo(event.currentTarget.value)} />
         </label>
         <label class="grid gap-1 text-sm font-semibold text-wedding-ink">Guests
-          <input class="h-11 rounded-lg border border-wedding-border bg-white px-3 font-normal" type="number" min="1" max="5000" inputmode="numeric" value={guestCount() ?? ""} placeholder="Optional" onInput={(event) => setGuestCount(event.currentTarget.value ? Number(event.currentTarget.value) : null)} />
+          <input class="h-11 rounded-lg border border-wedding-border bg-white px-3 font-normal" type="number" min="1" max="5000" inputmode="numeric" value={guestCount() ?? ""} placeholder="Optional" onInput={(event) => { guestCountEdited = true; setGuestCount(event.currentTarget.value ? Number(event.currentTarget.value) : null); }} />
         </label>
         <label class="grid gap-1 text-sm font-semibold text-wedding-ink">Distance
           <select class="h-11 rounded-lg border border-wedding-border bg-white px-3 font-normal" value={radiusKm()} onChange={(event) => setRadiusKm(Number(event.currentTarget.value))}>
@@ -256,7 +277,7 @@ export function WeddingLimitedSpecialsMap(props: {
         </label>
         <div class="flex flex-wrap gap-2 xl:flex-col">
           <button type="button" class="min-h-11 rounded-lg bg-wedding-primary px-3 text-sm font-bold text-white" onClick={() => applyFilters()}>Update map</button>
-          <button type="button" class="min-h-11 rounded-lg border border-wedding-secondary bg-white px-3 text-sm font-bold text-wedding-secondary" onClick={useMyLocation}>Use my location</button>
+          <button type="button" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-wedding-secondary bg-white px-3 text-sm font-bold text-wedding-secondary" onClick={useMyLocation}><span aria-hidden="true">⌖</span> Use my location</button>
         </div>
       </div>
       <p class="mt-2 text-xs leading-5 text-wedding-ink/65">{locationNote()}</p>
