@@ -3185,3 +3185,20 @@ synthetic vendor search or introduce another send path.
 - Shared starter plan and workspace identifiers are product templates, not tenant boundaries.
 - Every mutable authenticated Wedding browser mirror must include the signed-in account ID even when its durable source is AFP. Unauthenticated quiz/lead-magnet handoffs remain explicitly separate import inputs.
 - OAuth access to alpha integrations is a server-enforced account grant, not a presentation-only warning.
+
+# 2026-11-10 — WED-356 Overview notes and vendor-card media reuse canonical authorities
+
+- Budget, Guests and Seating notes created from Wedding Overview are ordinary
+  account-scoped AFP `note` records with a `wedding_overview_note` subtype. The
+  Overview and Notes view project the same message; there is no separate note
+  database or browser-global fallback.
+- Task assignment persists through the existing responsibility projection and
+  updates in place. A successful assignment does not reload the whole Wedding
+  workspace.
+- Vendor comparison photos remain restricted to approved first-party assets,
+  managed public-photo routes and the authenticated Google media proxy. The
+  image-overlay heart writes through the existing favourite/selection ledger;
+  it is not a second shortlist state.
+- The vendor management portal first-release boundary is complete. Field-level
+  publication revisions, named-resource/bulk calendars and vendor-team
+  entitlements remain explicit P1 work rather than implied browser controls.

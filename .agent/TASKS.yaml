@@ -17,7 +17,7 @@ lifecycle:
 tasks:
   - id: WED-356
     title: Refine Wedding decision, overview and vendor discovery cards and close the vendor portal audit
-    status: in_progress
+    status: done
     owner: codex
     branch: agent/codex/WED-356
     worktree: C:/Users/ozans/Desktop/projects/OmnyID-GROWTH-001
@@ -25,7 +25,7 @@ tasks:
     depends_on: [WED-355, WED-347, WED-344]
     files: [solid-ui/src/components/**, solid-ui/src/lib/**, solid-ui/src/styles.css, solid-ui/tests/**, src/server/**wedding**, Documents/design/wedding planner/vendor side/**, Documents/verification/**, .agent/**]
     acceptance: [Limited Specials removes the redundant no-match explanation and all-category button while preserving a useful empty map, vendor cards render a representative image and expose an accessible image-overlay heart whose filled state projects through the existing account-scoped favourite ledger, decision cards remove queue-count copy and place an accessible question-mark rationale control at the lower right, Wedding Overview assignment is in-place and its Budget Guests Seating panel creates account-scoped AFP notes visible both locally and in Notes, non-zero activity filters have a labelled visually distinct count-bearing status treatment while zero states stay hidden, the existing vendor portal task document is audited against code tests and deployed capabilities without falsely completing deferred work, focused frontend backend full Wedding build exact-SHA deployment provenance and hosted checks pass]
-    progress: "Implemented and verified the requested card refinements, approved-media hydration, in-place assignment and account-scoped AFP overview notes. Full 2,262-test Wedding suite, typecheck and line budgets pass; exact-SHA build and Oracle release remain."
+    progress: "Implemented and released at e2a1e816367c02570000ed2eab1445ee1696f805. Typecheck, line budgets, 2,262 Wedding tests, clean exact-SHA build, Oracle preflight/post-deploy proof, runtime provenance and hosted asset checks pass."
 
   - id: WED-355
     title: Enforce account-isolated Wedding progress and deliver role-aware lenses, Gmail approval, and vendor discovery

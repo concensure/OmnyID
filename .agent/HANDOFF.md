@@ -8249,3 +8249,38 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
 - Production migration `0156_gmail_alpha_access_requests` is recorded once; the table exists with `owner_user_id` as the account boundary and the expected request/review fields. Unauthenticated approval-request and OAuth URL calls return 401.
 - All seven long-running Oracle services reported `running` after deployment. No simulated data was included or inserted.
 - Docker Desktop remained unavailable locally. Production table/migration inspection supplied hosted persistence evidence without creating a request; an authenticated UI request remains an optional operator acceptance test because it intentionally sends mail to `admin@omnyid.com`.
+
+# 2026-11-10 — WED-356 released (Codex)
+
+- Worktree: `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`; branch:
+  `agent/codex/WED-356`. Released implementation SHA:
+  `e2a1e816367c02570000ed2eab1445ee1696f805`; clean detached release checkout:
+  `C:\temp\wt\omnyid-wed356-release-e2a1e81`.
+- Removed the redundant Limited Specials no-match prose and all-category
+  action while preserving its reviewed directory enquiry route. Approved
+  first-party and proxied directory photos now survive comparison-card
+  projection.
+- Replaced the text favourite action with an accessible outline/filled heart
+  over the vendor image. Non-zero vendor activity filters now sit under a
+  distinct My activity label with tinted status indicators and count badges;
+  zero-count filters remain hidden.
+- Removed decision queue prose and moved Show Me Why to a separate lower-right
+  question control. Wedding task assignment no longer refreshes the whole
+  workspace.
+- Added in-place Budget, Guests and Seating notes to Wedding Overview. They
+  persist as account-scoped AFP notes, render immediately in Up Next, and are
+  available to the existing Notes projection.
+- Audited the vendor management portal task plan. VMP-01 through VMP-06 meet
+  the first-release boundary. VMP-07 through VMP-09 remain truthfully deferred
+  P1 work: publication revisions, resource/bulk calendar editing, and vendor
+  teams/entitlements.
+- Verification passed: TypeScript; line budgets; focused card, note, media,
+  Limited Specials and portal tests; full Wedding suite (2,262/2,262); clean
+  exact-SHA Vite production build; Oracle preflight and post-deploy proof.
+  Production `SOURCE_COMMIT` and `oracle-runtime-manifest.json` match the
+  released SHA. The workspace and changed hosted assets return 200 and contain
+  the expected controls/copy; the removed sentence is absent. Backup verify
+  and restore drill passed. No simulated data was included. Root and `/var`
+  usage are 80%.
+- Evidence: `Documents/verification/wed-356-wedding-card-refinement-2026-11-10.md`
+  and `C:\temp\wt\proofs\wed356-e2a1e81\postdeploy`.
