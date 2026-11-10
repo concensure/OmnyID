@@ -8196,7 +8196,10 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
   profiles see its upgrade card. `concensure@gmail.com` alone gets the admin
   dashboard rail action and defaults to the consolidated existing Usage/admin
   dashboard after login.
-- Verification so far: TypeScript typecheck passes; focused account, Diary,
+- Verification: TypeScript typecheck passes; focused account, Diary,
   DecisionOS, font, Limited Specials and routing tests pass (42/42); the full
-  Wedding state suite passes (2,252/2,252). Final Rust check, production build,
-  exact-SHA deployment and hosted proof are the next release steps.
+  Wedding state suite passes (2,252/2,252); `cargo check --all-targets` passes;
+  all 11 focused vendor-outreach Rust tests pass; and the production Vite build
+  passes. Freeze this documentation commit as a new exact-SHA candidate, then
+  deploy only from its clean detached release checkout and verify hosted
+  provenance and health.
