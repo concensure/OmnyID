@@ -802,4 +802,9 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Revisioned vendor publishing, named resource calendars, scoped team roles, notification preferences and existing subscription entitlements",
         include_str!("../../postgres/migrations/0157_wedding_vendor_portal_extensions.sql"),
     ),
+    (
+        "0158_wedding_celebrant_consultations",
+        "Verified Sydney celebrant consultation windows, live capacity, phone verification and content-light callback lifecycle evidence",
+        include_str!("../../postgres/migrations/0158_wedding_celebrant_consultations.sql"),
+    ),
 ];

@@ -8384,3 +8384,39 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
   are refused and the hosted vendor bundle contains the new controls.
 - Evidence: `Documents/verification/wed-358-vendor-management-portal-2026-11-11.md`
   and `C:\temp\wt\proofs\wed358-51eacb0\postdeploy-recovered`.
+
+# 2026-11-11 — WED-359 celebrant consultation implementation (Codex)
+
+- Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
+  `agent/codex/WED-359`, base SHA
+  `90bca017bfee60a183ea6dc04d0e53267b769cef`.
+- Added `celebrant-consultations-spec.md` and dependency-ordered tasks from the
+  canonical `celebrant.md` brief. The design reuses verified vendor profiles,
+  owner photos, portal roles, Wedding-date availability and the existing lead
+  authority rather than creating a second vendor CRM/calendar.
+- Migration 0158 adds vendor-keyed pilot verification, recurring/exception
+  consultation windows, bounded live sessions, provider verification sessions,
+  callback/scheduled requests, an active-slot uniqueness guard and content-light
+  lifecycle events. Raw phones are encrypted; phone/token lookups use HMAC
+  digests; codes are never persisted.
+- Backend routes add a false-default public list, Twilio Verify start/check,
+  atomic immediate/scheduled requests, status/outcome capabilities, vendor
+  settings/windows/live/request commands, and operator register verification.
+  Callback numbers are revealed only by the authenticated Accept command.
+- Frontend adds a celebrant-only Phone consultations panel inside the existing
+  vendor Availability section, and a public `talk-to-a-celebrant.html` page with
+  truthful empty/live/next-time states, first-available or selected routing,
+  phone verification and outcome reporting. The directory and celebrant decision
+  surface link to it.
+- Passed: Cargo library check; scoped Rust formatting; Solid TypeScript; Vite
+  production build; 3/3 focused celebrant frontend/contract tests; line-budget
+  tests; public Wedding website smoke; public JS syntax. The focused Rust test linker twice
+  crashed in the Windows toolchain (`STATUS_PRIVILEGED_INSTRUCTION`, then
+  `STATUS_ACCESS_VIOLATION`) without an assertion/compiler error. Docker Desktop
+  was unreachable, so migration 0158 has not had a disposable-Postgres run.
+- Still open by design: extend the existing no-login calendar capability with
+  consultation-only scope; automatically retry another live celebrant when a
+  first-available request is passed; create a canonical post-call hiring enquiry
+  after explicit approval; expose one-off exceptions/rescheduling in UI; run a
+  Twilio sandbox and hosted Postgres/concurrency test; operator-review the Sydney
+  pilot cohort; keep the rollout flag false until that evidence passes.

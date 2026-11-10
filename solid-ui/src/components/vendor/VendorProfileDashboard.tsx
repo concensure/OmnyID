@@ -10,6 +10,7 @@ import { VendorQuotationResponsePanel } from "@/components/vendor/VendorQuotatio
 import { VendorResourcesPanel } from "@/components/vendor/VendorResourcesPanel";
 import { VendorProposalOpportunitiesPanel } from "@/components/vendor/VendorProposalOpportunitiesPanel";
 import { VendorSpecialOffersPanel } from "@/components/vendor/VendorSpecialOffersPanel";
+import { VendorCelebrantConsultationsPanel } from "@/components/vendor/VendorCelebrantConsultationsPanel";
 import {
   getVendorOwnerProfile,
   updateVendorOwnerProfile,
@@ -153,7 +154,7 @@ export function VendorProfileDashboard(props: { vendorSlug: string }) {
 
         <VendorPublicationPanel vendorSlug={props.vendorSlug} />
         <section><h2 class="mb-3 text-lg font-semibold">Gallery photos</h2><VendorPhotoUploadPanel vendorSlug={props.vendorSlug} onPublished={() => void refetch()} /></section></Show>
-        <Show when={section() === "availability"}><section class="rounded-xl border border-wedding-muted bg-wedding-surface p-4"><h2 class="text-xl font-semibold">Availability</h2><p class="mt-1 text-sm leading-6 text-wedding-muted">Manage indicative dates here or create a scoped staff link. Calendar-open, vendor-confirmed, temporary hold and confirmed booking remain different evidence states.</p></section><VendorResourcesPanel vendorSlug={props.vendorSlug} /><VendorSpecialOffersPanel vendorSlug={props.vendorSlug} /></Show>
+        <Show when={section() === "availability"}><section class="rounded-xl border border-wedding-muted bg-wedding-surface p-4"><h2 class="text-xl font-semibold">Availability</h2><p class="mt-1 text-sm leading-6 text-wedding-muted">Manage indicative dates here or create a scoped staff link. Calendar-open, vendor-confirmed, temporary hold and confirmed booking remain different evidence states.</p></section><VendorResourcesPanel vendorSlug={props.vendorSlug} /><VendorSpecialOffersPanel vendorSlug={props.vendorSlug} /><Show when={current().category.toLowerCase().includes("celebrant")}><VendorCelebrantConsultationsPanel vendorSlug={props.vendorSlug} /></Show></Show>
         <Show when={section() === "enquiries"}><section class="rounded-xl border border-wedding-muted bg-wedding-surface p-4"><h2 class="text-xl font-semibold">Enquiries and quotes</h2><p class="mt-1 text-sm leading-6 text-wedding-muted">Review authorised couple context, respond in the existing conversation and prepare an itemised quote. A draft is never sent without your approval.</p></section><VendorProposalOpportunitiesPanel vendorSlug={props.vendorSlug} /><VendorQuotationResponsePanel /></Show>
         <Show when={section() === "settings"}><VendorPortalSettingsPanel vendorSlug={props.vendorSlug} /></Show>
       </>}</Show>

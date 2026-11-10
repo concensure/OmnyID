@@ -3245,3 +3245,21 @@ synthetic vendor search or introduce another send path.
 - Portal audit events are content-light and idempotent. Descriptions, contacts,
   prices and messages remain in their canonical stores rather than being copied
   into event metadata.
+
+# 2026-11-11 — WED-359 celebrant calls are a verified availability projection, not a second vendor calendar
+
+- Celebrant consultation settings are keyed to the canonical `wedding_vendors`
+  record and are shown inside the existing vendor Availability area. Wedding
+  dates continue to use the Limited Specials/calendar authority; consultation
+  windows and bounded live sessions answer a different question.
+- An Attorney-General register check establishes pilot eligibility only. Public
+  **Available now** is derived independently from a non-expired live check-in,
+  sufficient remaining time and atomically reserved capacity.
+- First-time public requests use provider-backed phone verification. Phone
+  numbers are encrypted at rest, phone lookup uses a keyed digest, and the
+  callback number is returned only to an authorised celebrant after acceptance.
+  Verification codes and numbers are excluded from content-light lifecycle
+  events.
+- Acceptance and a connected call are separate outcomes. A consultation does
+  not silently become a hiring lead; the existing vendor-enquiry authority is
+  the only permitted conversion path after explicit couple approval.

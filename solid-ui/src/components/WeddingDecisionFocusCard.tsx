@@ -709,9 +709,14 @@ export function WeddingDecisionFocusCard(props: {
                           </div>
                         </Show>
                         <Show when={/celebrant/i.test(`${task().title} ${task().notes ?? ""}`) && !hasChosenCelebrant()}>
-                          <button type="button" class="mt-3 min-h-9 rounded-full border border-pink-300 bg-pink-100 px-3 text-xs font-semibold text-pink-950 transition hover:bg-pink-200" onClick={launchCelebrantSearch}>
-                            Find an authorised celebrant
-                          </button>
+                          <div class="mt-3 flex flex-wrap gap-2">
+                            <button type="button" class="min-h-9 rounded-full border border-pink-300 bg-pink-100 px-3 text-xs font-semibold text-pink-950 transition hover:bg-pink-200" onClick={launchCelebrantSearch}>
+                              Find an authorised celebrant
+                            </button>
+                            <a class="inline-flex min-h-9 items-center rounded-full border border-pink-300 bg-white px-3 text-xs font-semibold text-pink-950 transition hover:bg-pink-50" href="/wedding/talk-to-a-celebrant.html">
+                              ☎ Talk to a celebrant
+                            </a>
+                          </div>
                         </Show>
                       </section>
                     )}
