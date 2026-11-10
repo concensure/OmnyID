@@ -2610,7 +2610,8 @@ mod tests {
             Some("https://images.unsplash.com/photo-1507504031003-b417219a0fde")
         );
         let snippet = source.snippet.as_deref().unwrap_or_default();
-        assert!(snippet.contains("Florist"));
+        assert!(snippet.contains("florist"));
+        assert!(snippet.contains("Sydney"));
         assert!(!snippet.contains("shared wedding vendor database"));
     }
 
