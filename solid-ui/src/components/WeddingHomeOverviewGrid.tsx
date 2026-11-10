@@ -12,6 +12,11 @@ import {
   type WeddingHomeOverviewActionTile,
 } from "@/lib/weddingHomeOverviewState";
 import { weddingTimelineWeddingDateLabel } from "@/lib/weddingTimelineWeddingDateState";
+import {
+  projectWeddingOverviewNotes,
+  weddingOverviewNoteToAfpSendInput,
+  type WeddingOverviewNote,
+} from "@/lib/weddingOverviewNoteState";
 import type { WeddingResponseWorkspaceViewState } from "@/lib/weddingResponseWorkspaceViewState";
 import type { WeddingWorkspaceSidebarAction } from "@/lib/weddingWorkspaceActionState";
 import type { WeddingWorkspaceMenuId } from "@/lib/weddingWorkspaceMenuState";
@@ -95,6 +100,17 @@ export function WeddingHomeOverviewGrid(props: {
   const visibleTiles = () => tiles().filter((item): item is WeddingHomeOverviewActionTile & { id: Domain } => item.id !== "vendors");
   const tile = (id: Domain) => tiles().find((item) => item.id === id);
   const [transportOpen, setTransportOpen] = createSignal(false);
+  const [noteDomain, setNoteDomain] = createSignal<Domain | null>(null);
+  const [noteDrafts, setNoteDrafts] = createSignal<Record<Domain, string>>({ budget: "", guests: "", seating: "" });
+  const [noteSaving, setNoteSaving] = createSignal<Domain | null>(null);
+  const [noteError, setNoteError] = createSignal<string | null>(null);
+  const [optimisticNotes, setOptimisticNotes] = createSignal<WeddingOverviewNote[]>([]);
+  const overviewNotes = createMemo(() => {
+    const projected = projectWeddingOverviewNotes(props.state.afpMessages);
+    const known = new Set(projected.map((note) => `${note.domain}:${note.body}:${note.timestamp}`));
+    return [...optimisticNotes().filter((note) => !known.has(`${note.domain}:${note.body}:${note.timestamp}`)), ...projected]
+      .sort((left, right) => right.timestamp.localeCompare(left.timestamp));
+  });
   const transportTask = () => /transport|trackwork|guest logistics|access/i.test(timeline().detailLabel);
   const destination = createMemo(() => props.state.workspace.artifacts
     .flatMap((artifact) => artifact.locationLabels)
@@ -110,6 +126,34 @@ export function WeddingHomeOverviewGrid(props: {
       return;
     }
     props.onSelectMenu?.(timeline().menuId);
+  };
+  const saveOverviewNote = async (domain: Domain) => {
+    const input = weddingOverviewNoteToAfpSendInput({
+      domain,
+      body: noteDrafts()[domain],
+      responseWorkspaceId: props.state.workspace.metadata.responseWorkspaceId,
+      weddingPlanId: props.state.workspace.metadata.weddingPlanId,
+    });
+    if (!input || !props.saveProjection || noteSaving()) return;
+    setNoteSaving(domain);
+    setNoteError(null);
+    try {
+      await props.saveProjection(input);
+      const content = input.content as { title: string; body: string };
+      setOptimisticNotes((current) => [{
+        id: `pending:${input.thread_id}:${input.timestamp}`,
+        domain,
+        title: content.title,
+        body: content.body,
+        timestamp: input.timestamp ?? new Date().toISOString(),
+      }, ...current]);
+      setNoteDrafts((current) => ({ ...current, [domain]: "" }));
+      setNoteDomain(null);
+    } catch {
+      setNoteError("That note could not be saved. Your draft is still here.");
+    } finally {
+      setNoteSaving(null);
+    }
   };
 
   return (
@@ -170,12 +214,53 @@ export function WeddingHomeOverviewGrid(props: {
         </button>
         <div class="mt-3 grid gap-1 border-t border-wedding-border pt-3">
           <For each={visibleTiles()}>{(item) => (
-            <button type="button" class="flex min-h-11 items-center justify-between gap-2 rounded-lg px-1 text-left hover:bg-wedding-page focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-primary" onClick={() => openTile(item.id)}>
-              <span class="min-w-0 truncate text-xs font-medium">{DOMAIN_STYLE[item.id].label}</span>
-              <span class="shrink-0 text-[11px] text-wedding-ink/65">{item.toneLabel}</span>
-            </button>
+            <div class="rounded-lg border border-transparent px-1 py-1 focus-within:border-wedding-primary/30">
+              <button type="button" class="flex min-h-11 w-full items-center justify-between gap-2 rounded-lg text-left hover:bg-wedding-page focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-primary" onClick={() => openTile(item.id)}>
+                <span class="min-w-0 truncate text-xs font-medium">{DOMAIN_STYLE[item.id].label}</span>
+                <span class="shrink-0 text-[11px] text-wedding-ink/65">{item.toneLabel}</span>
+              </button>
+              <button
+                type="button"
+                class="min-h-9 rounded-lg px-2 text-[11px] font-semibold text-wedding-secondary hover:bg-wedding-page focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-primary"
+                aria-expanded={noteDomain() === item.id}
+                onClick={() => { setNoteDomain((current) => current === item.id ? null : item.id); setNoteError(null); }}
+              >
+                + Add note
+              </button>
+              <Show when={noteDomain() === item.id}>
+                <div class="mt-1 rounded-lg border border-wedding-border bg-wedding-page p-2">
+                  <label class="text-[11px] font-semibold text-wedding-ink" for={`wedding-overview-note-${item.id}`}>{DOMAIN_STYLE[item.id].label} note</label>
+                  <textarea
+                    id={`wedding-overview-note-${item.id}`}
+                    rows="3"
+                    value={noteDrafts()[item.id]}
+                    onInput={(event) => setNoteDrafts((current) => ({ ...current, [item.id]: event.currentTarget.value }))}
+                    placeholder={`Add a note about ${DOMAIN_STYLE[item.id].label.toLowerCase()}`}
+                    class="mt-1 w-full resize-y rounded-lg border border-wedding-border bg-white p-2 text-xs leading-5 text-wedding-ink outline-none focus:border-wedding-primary focus:ring-2 focus:ring-wedding-primary/15"
+                  />
+                  <div class="mt-2 flex flex-wrap justify-end gap-2">
+                    <button type="button" class="min-h-9 rounded-lg px-3 text-xs font-semibold text-wedding-secondary" onClick={() => setNoteDomain(null)}>Cancel</button>
+                    <button type="button" disabled={!noteDrafts()[item.id].trim() || !props.saveProjection || Boolean(noteSaving())} class="min-h-9 rounded-lg bg-wedding-primary px-3 text-xs font-semibold text-white disabled:opacity-45" onClick={() => void saveOverviewNote(item.id)}>{noteSaving() === item.id ? "Saving…" : "Save note"}</button>
+                  </div>
+                </div>
+              </Show>
+            </div>
           )}</For>
         </div>
+        <Show when={noteError()}>{(message) => <p role="alert" class="mt-2 rounded-lg bg-wedding-status-action-bg px-2 py-1.5 text-xs text-wedding-status-action-ink">{message()}</p>}</Show>
+        <Show when={overviewNotes().length > 0}>
+          <div class="mt-3 border-t border-wedding-border pt-3" aria-label="Wedding overview notes">
+            <p class="text-[10px] font-bold uppercase tracking-[0.1em] text-wedding-ink/55">Notes</p>
+            <ul class="mt-2 space-y-2">
+              <For each={overviewNotes()}>{(note) => (
+                <li class="rounded-lg bg-wedding-page px-2.5 py-2 text-xs leading-5 text-wedding-ink">
+                  <span class="font-semibold text-wedding-primary">{DOMAIN_STYLE[note.domain].label}</span>
+                  <span class="ml-1 [overflow-wrap:anywhere]">{note.body}</span>
+                </li>
+              )}</For>
+            </ul>
+          </div>
+        </Show>
       </aside>
 
       <DomainTile domain="budget" tile={tile("budget")} dense={dense()} desktopSpan="lg:col-span-3" onOpen={() => openTile("budget")} />

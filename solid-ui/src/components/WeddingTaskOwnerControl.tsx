@@ -79,7 +79,6 @@ export function WeddingTaskOwnerControl(props: {
       assigneeEmail: ownerLabel === "You" ? "" : contact?.email?.trim() ?? "",
     });
     setNotice(result.notice);
-    if (result.saved) props.onRefreshWorkspace?.();
     setSaving(false);
   }
 

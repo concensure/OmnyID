@@ -75,5 +75,6 @@ test("Limited Specials and quote comparison expose decision-useful source-backed
   assert.match(comparison, /View source or correct/);
   assert.match(lifecycle, /WeddingQuoteEvidenceComparison/);
   assert.match(lifecycle, /WeddingNormalizedQuoteSummary/);
-  assert.match(map, /Show all vendor categories/);
+  assert.doesNotMatch(map, /Show all vendor categories/);
+  assert.match(map, /Enquire about this date anyway/);
 });

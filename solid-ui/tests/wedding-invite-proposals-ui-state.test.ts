@@ -34,7 +34,8 @@ test("proposal facts are actionable in place and the mobile panel is full bleed"
   assert.match(panelSource, /saveContextFact/);
   assert.match(panelSource, /saveBudget/);
   assert.match(panelSource, /class="-mx-3 mt-4 min-w-0 sm:mx-0"/);
-  assert.match(homeSource, /\{ id: "enquired", label: "Enquired" \}, \{ id: "proposals", label: "Proposals" \}/);
+  assert.match(homeSource, /id: "enquired", label: "Enquired"/);
+  assert.match(homeSource, /id: "proposals", label: "Proposals"/);
   assert.match(panelSource, /australianWeddingLocationSuggestions/);
   assert.match(panelSource, /Australian location suggestions/);
   assert.match(panelSource, /suggestion\.state/);

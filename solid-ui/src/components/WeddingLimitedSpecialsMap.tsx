@@ -247,11 +247,6 @@ export function WeddingLimitedSpecialsMap(props: {
     });
   }
 
-  function showAllCategories() {
-    setCategory("");
-    applyFilters(searchCenter(), "");
-  }
-
   return (
     <section class="mt-4 min-w-0" aria-labelledby="limited-specials-heading">
       <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-[repeat(5,minmax(8rem,1fr))_auto] xl:items-end">
@@ -292,9 +287,7 @@ export function WeddingLimitedSpecialsMap(props: {
 
       <Show when={!query.loading && markers().length === 0}>
         <div class="mt-4 rounded-lg border border-wedding-border bg-white p-4 text-sm text-wedding-ink/70">
-          <p>No vendor-confirmed specials match this date and category yet. Missing availability is unknown, not evidence that vendors are unavailable.</p>
-          <button type="button" class="mt-3 min-h-11 rounded-lg border border-wedding-secondary bg-white px-3 font-bold text-wedding-secondary" onClick={showAllCategories}>Show all vendor categories</button>
-          <div class="mt-4 border-t border-wedding-border pt-4">
+          <div>
             <p class="font-semibold text-wedding-ink">Enquire about this date anyway</p>
             <p class="mt-1 text-xs leading-5">Choose a directory vendor. OmnyID will prepare the normal reviewed enquiry for {new Date(`${date()}T12:00:00`).toLocaleDateString("en-AU", { day: "numeric", month: "long", year: "numeric" })}; it will not book or hold the date.</p>
             <label class="mt-3 block font-semibold text-wedding-ink">Venue or vendor

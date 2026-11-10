@@ -317,14 +317,16 @@ function publicImageUrl(value: unknown): string | null {
   const url = clean(value);
   // Do not render arbitrary third-party image URLs in couple-facing cards.
   // Google Places media stays behind our authenticated, narrowly shaped proxy.
+  if (/^\/wedding\/assets\/(?:venue-photos|images)\/[a-z0-9][a-z0-9/._-]*\.(?:jpe?g|png|webp)$/i.test(url)) return url;
   if (/^\/wedding\/vendor-photo\/google\?name=places%2f[^&]+(?:&max_width_px=\d{1,4})?$/i.test(url)) return url;
+  if (/^\/api\/wedding\/vendor-photos\/google\//i.test(url)) return url;
   if (/^\/api\/public\/wedding\/vendor\/photos\/[0-9a-hjkmnp-tv-z]{26}\/(?:full|medium|thumb)$/i.test(url)) return url;
   try {
     const parsed = new URL(url);
     const hostname = parsed.hostname.toLowerCase();
     const isUnsplash = hostname === "images.unsplash.com";
     const isOmnyidVenueAsset = hostname === "omnyid.com"
-      && /^\/wedding\/assets\/venue-photos\/[a-z0-9][a-z0-9._-]*\.(?:jpe?g|png|webp)$/i.test(parsed.pathname)
+      && /^\/wedding\/assets\/(?:venue-photos|images)\/[a-z0-9][a-z0-9/._-]*\.(?:jpe?g|png|webp)$/i.test(parsed.pathname)
       && !parsed.search
       && !parsed.hash;
     return parsed.protocol === "https:" && (isUnsplash || isOmnyidVenueAsset) ? parsed.toString() : null;

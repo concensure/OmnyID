@@ -7,10 +7,11 @@ type VendorCard = WeddingWorkspaceArtifactPreview["vendorComparisonCards"][numbe
 export function safeWeddingVendorImageUrl(value: string | null | undefined): string | null {
   const candidate = value?.trim() ?? "";
   if (/^https:\/\/images\.unsplash\.com\//i.test(candidate)) return candidate;
+  if (/^\/wedding\/assets\/(?:venue-photos|images)\/[a-z0-9][a-z0-9/._-]*\.(?:jpe?g|png|webp)$/i.test(candidate)) return candidate;
   if (/^\/wedding\/vendor-photo\/google\?name=places%2f[^&]+(?:&max_width_px=\d{1,4})?$/i.test(candidate)) return candidate;
   if (/^\/api\/wedding\/vendor-photos\/google\//i.test(candidate)) return candidate;
   if (/^\/api\/public\/wedding\/vendor\/photos\/[0-9a-hjkmnp-tv-z]{26}\/(?:full|medium|thumb)$/i.test(candidate)) return candidate;
-  if (/^https:\/\/omnyid\.com\/wedding\/assets\/venue-photos\/[a-z0-9][a-z0-9._-]*\.(?:jpe?g|png|webp)$/i.test(candidate)) return candidate;
+  if (/^https:\/\/omnyid\.com\/wedding\/assets\/(?:venue-photos|images)\/[a-z0-9][a-z0-9/._-]*\.(?:jpe?g|png|webp)$/i.test(candidate)) return candidate;
   return null;
 }
 

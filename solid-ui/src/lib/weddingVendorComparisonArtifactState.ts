@@ -66,14 +66,17 @@ function safeExternalUrl(value: unknown): string | null {
  * authenticated first-party Google Places proxy. Links are handled separately. */
 function unsplashImageUrl(value: unknown): string | null {
   const raw = clean(value);
+  if (/^\/wedding\/assets\/(?:venue-photos|images)\/[a-z0-9][a-z0-9/._-]*\.(?:jpe?g|png|webp)$/i.test(raw)) return raw;
   if (/^\/wedding\/vendor-photo\/google\?name=places%2f[^&]+(?:&max_width_px=\d{1,4})?$/i.test(raw)) return raw;
+  if (/^\/api\/wedding\/vendor-photos\/google\//i.test(raw)) return raw;
+  if (/^\/api\/public\/wedding\/vendor\/photos\/[0-9a-hjkmnp-tv-z]{26}\/(?:full|medium|thumb)$/i.test(raw)) return raw;
   const url = safeExternalUrl(raw);
   if (!url) return null;
   try {
     const parsed = new URL(url);
     const isUnsplash = parsed.hostname.toLowerCase() === "images.unsplash.com";
     const isOmnyidVenueAsset = parsed.hostname.toLowerCase() === "omnyid.com"
-      && /^\/wedding\/assets\/venue-photos\/[a-z0-9][a-z0-9._-]*\.(?:jpe?g|png|webp)$/i.test(parsed.pathname)
+      && /^\/wedding\/assets\/(?:venue-photos|images)\/[a-z0-9][a-z0-9/._-]*\.(?:jpe?g|png|webp)$/i.test(parsed.pathname)
       && !parsed.search
       && !parsed.hash;
     return isUnsplash || isOmnyidVenueAsset ? url : null;

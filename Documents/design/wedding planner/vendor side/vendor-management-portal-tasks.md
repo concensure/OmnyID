@@ -1,8 +1,26 @@
 # Vendor management portal — dependency-ordered implementation tasks
 
-Status: active first-release plan (WED-347)  
-Source: `vendor management portal spec.md` in the canonical project documents  
+Status: first release implemented; P1 extensions remain deliberately deferred (audited 10 November 2026)
+
+Source: `vendor management portal spec.md` in the canonical project documents
+
 Rule: extend existing AFP, claim, directory, availability, media, messaging and quotation authorities; do not create a parallel CRM or ledger.
+
+## Implementation audit — 10 November 2026
+
+| Task | Status | Repository evidence |
+|---|---|---|
+| VMP-01 | Complete | `verification_source.rs`, `auth.rs`, `App.tsx`; vendor-source return is covered by `wedding-vendor-portal-launch.test.ts`. |
+| VMP-02 | Complete | `VendorProfileDashboard.tsx` provides the mobile-first Overview, Availability, Enquiries, Public profile and Settings shell over the existing panels. |
+| VMP-03 | Complete for first-release authority | The couple-facing preview explains what is published and keeps verification/ranking read-only. Field-level revision history remains VMP-07 rather than being simulated in the browser. |
+| VMP-04 | Complete | Authenticated owner management, scoped staff links, explicit release authority, false defaults and discovery are covered by the Limited Specials route and rollout suites. |
+| VMP-05 | Complete | The public quote comparison page, deterministic parser/calculation layer, structured extraction and public smoke coverage are present. |
+| VMP-06 | Complete | Exact-SHA Oracle deployment/version evidence is recorded in `.agent/HANDOFF.md`; subsequent releases must repeat that evidence rather than inheriting it. |
+| VMP-07 | Deferred P1 | No reviewed field-level publication revision authority exists yet. The portal deliberately does not claim this control. |
+| VMP-08 | Deferred P1 | Date offers and bounded edits exist; named resources and safe bulk editing do not. |
+| VMP-09 | Deferred P1 | Scoped calendar links exist; vendor teams, notification preferences and paid entitlements remain unimplemented. |
+
+The first-release acceptance boundary is implemented. VMP-07 through VMP-09 are not release blockers and must not be represented as complete until their server-side permission, revision and concurrency contracts exist.
 
 ## Reuse and extension matrix
 
@@ -85,4 +103,3 @@ Rule: extend existing AFP, claim, directory, availability, media, messaging and 
 ## First-release acceptance
 
 The release is acceptable when a vendor-source registrant reaches the vendor portal without generic study onboarding; a verified claimant can update public contact details, upload licensed photos, preview the listing, manage date offers or a secure staff link, review enquiries and construct a quote; the public quote decoder remains local and careful; Limited Specials is active only behind its existing authenticated authorities; and exact-SHA production evidence matches the deployed commit.
-

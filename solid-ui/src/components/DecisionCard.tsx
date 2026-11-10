@@ -33,6 +33,8 @@ export function DecisionCard(props: {
     : "bg-primary text-white";
   const muted = () => wedding() ? "text-wedding-ink/70" : "text-on-surface-variant";
   const text = (value: string | null | undefined, fallback: string) => wedding() ? safeWeddingUiText(value, fallback) : value ?? fallback;
+  const regularActions = () => card().actions.filter((action) => action.id !== "why");
+  const whyAction = () => card().actions.find((action) => action.id === "why") ?? null;
   const handleKeyDown = (event: KeyboardEvent) => {
     if (!props.onSelect || (event.key !== "Enter" && event.key !== " ")) return;
     event.preventDefault();
@@ -117,7 +119,7 @@ export function DecisionCard(props: {
       </Show>
       <Show when={props.showActions !== false}>
       <div class="mt-3 flex flex-wrap gap-2">
-        <For each={card().actions}>
+        <For each={regularActions()}>
           {(action) => (
             <button
               type="button"
@@ -131,6 +133,20 @@ export function DecisionCard(props: {
           )}
         </For>
       </div>
+      <Show when={whyAction()}>{(action) => (
+        <div class="mt-3 flex justify-end">
+          <button
+            type="button"
+            disabled={Boolean(action().disabledReason)}
+            title={action().disabledReason ?? "Show Me Why"}
+            aria-label="Show Me Why"
+            class={`inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border text-lg font-bold transition disabled:cursor-not-allowed disabled:opacity-45 ${wedding() ? "border-wedding-secondary bg-white text-wedding-secondary hover:bg-wedding-slate" : "border-current/15 bg-white/75"}`}
+            onClick={(event) => runAction(event, action())}
+          >
+            ?
+          </button>
+        </div>
+      )}</Show>
       </Show>
     </article>
   );

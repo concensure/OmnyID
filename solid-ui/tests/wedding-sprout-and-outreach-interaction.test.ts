@@ -78,8 +78,8 @@ test("a successful vendor delivery has a clear, encouraging confirmation", () =>
 test("live vendor results expose a distinct mobile favourite action", () => {
   assert.match(vendorSearch, /loadWeddingDecisionSelections/);
   assert.match(vendorSearch, /onToggleFollowUp=\{\(card\) => toggleFollowUp/);
-  assert.match(choiceCard, /inline-flex min-h-11 w-full items-center justify-center/);
-  assert.match(choiceCard, /"Favourited" : "Favourite"/);
+  assert.match(choiceCard, /Add \$\{card\.title\} to favourites/);
+  assert.match(choiceCard, /fill=\{props\.selectedForFollowUp \? "currentColor" : "none"\}/);
   assert.match(choiceCard, /min-h-12 w-full rounded-lg/);
 });
 

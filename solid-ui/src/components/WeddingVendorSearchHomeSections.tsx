@@ -208,9 +208,12 @@ export function WeddingVendorSearchHomeSection(props: {
     return mergeWeddingVendorLifecycleCandidates(projectWeddingVendorLifecycle(workspace().state.afpMessages), candidates);
   });
   const shortlistPreferences = createMemo(() => projectWeddingVendorShortlistPreferences(workspace().state.afpMessages));
-  const lifecycleFilters: ReadonlyArray<{ id: VendorHomeFilter; label: string }> = [
-    { id: "enquired", label: "Enquired" }, { id: "proposals", label: "Proposals" }, { id: "favourited", label: "Favourited" },
-    { id: "quote_received", label: "Quote received" }, { id: "booked", label: "Booked" },
+  const lifecycleFilters: ReadonlyArray<{ id: VendorHomeFilter; label: string; dotClass: string }> = [
+    { id: "enquired", label: "Enquired", dotClass: "bg-sky-500" },
+    { id: "proposals", label: "Proposals", dotClass: "bg-violet-500" },
+    { id: "favourited", label: "Favourited", dotClass: "bg-rose-500" },
+    { id: "quote_received", label: "Quote received", dotClass: "bg-amber-500" },
+    { id: "booked", label: "Booked", dotClass: "bg-emerald-600" },
   ];
   let previousResultArtifactId: string | null = null;
   createEffect(() => {
@@ -441,9 +444,27 @@ export function WeddingVendorSearchHomeSection(props: {
       <div class="min-w-0">
         <div class="flex min-w-0 flex-wrap items-center justify-between gap-2">
           <p class="mt-4 font-display text-[22px] font-semibold leading-7 tracking-[-.01em] text-wedding-ink">Search and compare</p>
-          <div class="-mx-1 flex max-w-full snap-x gap-1 overflow-x-auto px-1 pb-1 text-xs [scrollbar-width:none]" aria-label="Show vendors by wedding status">
-            <For each={visibleLifecycleFilters()}>{(filter) => <button type="button" class={`min-h-9 shrink-0 rounded-full border px-2.5 font-semibold ${lifecycleFilter() === filter.id ? "border-wedding-primary bg-wedding-page text-wedding-primary" : "border-wedding-border bg-white text-wedding-ink/65"}`} aria-pressed={lifecycleFilter() === filter.id} onClick={() => setLifecycleFilter(lifecycleFilter() === filter.id ? "all" : filter.id)}>{filter.label} {lifecycleCount(filter.id)}</button>}</For>
-          </div>
+          <Show when={visibleLifecycleFilters().length > 0}>
+            <div class="min-w-0">
+              <p class="mb-1 text-[10px] font-bold uppercase tracking-[0.12em] text-wedding-ink/60">My activity</p>
+              <div class="-mx-1 flex max-w-full snap-x gap-1.5 overflow-x-auto px-1 pb-1 text-xs [scrollbar-width:none]" aria-label="My vendor activity">
+                <For each={visibleLifecycleFilters()}>{(filter) => (
+                  <button
+                    type="button"
+                    class={`inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full border px-2.5 font-semibold shadow-sm transition ${lifecycleFilter() === filter.id ? "border-wedding-primary bg-wedding-primary text-white" : "border-wedding-primary/20 bg-wedding-primary/10 text-wedding-primary hover:bg-wedding-primary/15"}`}
+                    aria-pressed={lifecycleFilter() === filter.id}
+                    onClick={() => setLifecycleFilter(lifecycleFilter() === filter.id ? "all" : filter.id)}
+                  >
+                    <Show when={filter.id === "favourited"} fallback={<span class={`h-2 w-2 rounded-full ${filter.dotClass}`} aria-hidden="true" />}>
+                      <span aria-hidden="true" class="text-rose-600">♥</span>
+                    </Show>
+                    <span>{filter.label}</span>
+                    <span class={`inline-flex min-w-5 items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-extrabold ${lifecycleFilter() === filter.id ? "bg-white/20 text-white" : "bg-white text-wedding-primary"}`}>({lifecycleCount(filter.id)})</span>
+                  </button>
+                )}</For>
+              </div>
+            </div>
+          </Show>
       </div>
       <label class="relative mt-4 block">
         <span class="pointer-events-none absolute inset-y-0 left-4 flex items-center text-wedding-ink/65" aria-hidden="true"><WeddingDashboardIcon id="search" class="h-5 w-5" /></span>

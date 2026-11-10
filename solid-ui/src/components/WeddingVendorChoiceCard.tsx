@@ -162,26 +162,42 @@ export function WeddingVendorChoiceCard(props: {
     : "No preference matches confirmed yet";
   return (
     <article data-wedding-surface="vendor-choice" class={`w-full min-w-0 max-w-full overflow-hidden rounded-xl border border-wedding-border bg-wedding-card ${card.rank === 1 ? "border-l-4 border-l-wedding-primary" : ""}`}>
-      <Show
-        when={resolvedImageUrl() && !imageFailed()}
-        fallback={
-          <div class={`flex aspect-[4/3] flex-col items-center justify-center gap-1 px-3 text-center ${placeholder().toneClass}`}>
-            <span class="text-lg font-semibold">{placeholder().initials}</span>
-            <span class="text-xs font-medium">{placeholder().label}</span>
-          </div>
-        }
-      >
-        {(_shown) => (
-          <img
-            src={resolvedImageUrl() as string}
-            alt={card.imageAlt ?? `${card.title} vendor photo`}
-            loading="lazy"
-            referrerPolicy="no-referrer"
-            onError={() => setImageFailed(true)}
-            class="aspect-[4/3] w-full object-cover"
-          />
-        )}
-      </Show>
+      <div class="relative">
+        <Show
+          when={resolvedImageUrl() && !imageFailed()}
+          fallback={
+            <div class={`flex aspect-[4/3] flex-col items-center justify-center gap-1 px-3 text-center ${placeholder().toneClass}`}>
+              <span class="text-lg font-semibold">{placeholder().initials}</span>
+              <span class="text-xs font-medium">{placeholder().label}</span>
+            </div>
+          }
+        >
+          {(_shown) => (
+            <img
+              src={resolvedImageUrl() as string}
+              alt={card.imageAlt ?? `${card.title} vendor photo`}
+              loading="lazy"
+              referrerPolicy="no-referrer"
+              onError={() => setImageFailed(true)}
+              class="aspect-[4/3] w-full object-cover"
+            />
+          )}
+        </Show>
+        <Show when={props.onToggleFollowUp}>
+          <button
+            type="button"
+            onClick={() => props.onToggleFollowUp?.(card)}
+            aria-label={props.selectedForFollowUp ? `Remove ${card.title} from favourites` : `Add ${card.title} to favourites`}
+            title={props.selectedForFollowUp ? "Remove from favourites" : "Add to favourites"}
+            aria-pressed={Boolean(props.selectedForFollowUp)}
+            class={`absolute right-3 top-3 inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border bg-white/95 shadow-card backdrop-blur transition hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-primary focus-visible:ring-offset-2 ${props.selectedForFollowUp ? "border-wedding-primary text-rose-600" : "border-wedding-border text-wedding-ink"}`}
+          >
+            <svg aria-hidden="true" viewBox="0 0 24 24" class="h-6 w-6" fill={props.selectedForFollowUp ? "currentColor" : "none"} stroke="currentColor" stroke-width="1.8">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78Z" />
+            </svg>
+          </button>
+        </Show>
+      </div>
       <div class="w-full min-w-0 space-y-2 p-3">
         <div class="grid w-full min-w-0 grid-cols-[minmax(0,1fr)] gap-2">
           <div class="w-full min-w-0 max-w-full">
@@ -319,20 +335,6 @@ export function WeddingVendorChoiceCard(props: {
           ]}
         />
         <div class="flex flex-wrap gap-1.5">
-          <Show when={props.onToggleFollowUp}>
-            <button
-              type="button"
-              onClick={() => props.onToggleFollowUp?.(card)}
-              aria-pressed={Boolean(props.selectedForFollowUp)}
-              class={`inline-flex min-h-11 w-full items-center justify-center rounded-lg px-3 py-2 text-xs font-bold transition sm:w-auto sm:px-2.5 sm:py-1.5 ${
-                props.selectedForFollowUp
-                  ? "bg-wedding-primary text-wedding-page hover:bg-wedding-primary/90"
-                  : "border border-wedding-secondary bg-white text-wedding-secondary hover:bg-wedding-slate"
-              }`}
-            >
-              {props.selectedForFollowUp ? "Favourited" : "Favourite"}
-            </button>
-          </Show>
           <Show when={!props.hidePrimaryAction}><Show
             when={props.outreachFlow?.stage === "sent"}
             fallback={

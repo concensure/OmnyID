@@ -451,7 +451,6 @@ export function WeddingDecisionFocusCard(props: {
         <div class="flex items-start justify-between gap-2">
           <div>
             <p class="text-base font-semibold text-pink-950">Your next wedding decision</p>
-            <p class="mt-0.5 text-xs text-pink-950/70">{display().summaryLabel}</p>
           </div>
           <span class="max-w-full break-words rounded-full bg-white/80 px-2 py-1 text-xs font-semibold text-pink-900">
             {display().remainingCount > 0 ? `${display().remainingCount} next` : "Last one"}
