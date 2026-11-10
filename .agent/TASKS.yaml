@@ -17,7 +17,7 @@ lifecycle:
 tasks:
   - id: WED-357
     title: Complete vendor and couple decision surfaces, seating interactions and account-scoped Today customisation
-    status: review
+    status: done
     owner: codex
     branch: agent/codex/WED-357
     worktree: C:/Users/ozans/Desktop/projects/OmnyID-GROWTH-001
@@ -25,7 +25,7 @@ tasks:
     depends_on: [WED-356, WED-355, WED-345]
     files: [solid-ui/src/components/**, solid-ui/src/lib/**, solid-ui/src/styles.css, solid-ui/tests/**, src/server/**wedding**, postgres/migrations/**, Documents/design/wedding planner/vendor side/**, Documents/verification/**, .agent/**]
     acceptance: [vendor portal and discovery surfaces use category-correct icons a desktop-safe return control non-duplicated formatted evidence and actionable contact details, decision recommendations are specific and rationale controls remain compact and aligned, seating tables and guests have smooth accessible drag and seat placement feedback, mutable Wedding vision inspiration plan setup RSVP and Today image-card state is account scoped, setup becomes ranked date budget and guest decisions with date and budget first and the decision card leads Today, RSVP meal and change alerts open their relevant inline surfaces, user image cards support optimized contain-fit media reordering and resizing through the existing card authority, the Wedding upgrade panel remains readable, focused frontend backend full Wedding exact-SHA deployment provenance and hosted checks pass]
-    progress: "Implemented category-specific vendor discovery, deduplicated booking evidence, actionable research contacts, account-scoped Wedding presentation mirrors, ranked setup decisions, RSVP change/detail actions, smooth seating placement, and optimized resizable Today photo cards. TypeScript, line budgets, focused isolation/UI tests and 2,265 Wedding tests pass; clean exact-SHA build/deploy evidence remains."
+    progress: "Released from clean detached SHA 2eabb74290945029eded686ccbb950da332b2ea5. Category-specific vendor discovery, deduplicated booking evidence, actionable research contacts, account-scoped Wedding presentation mirrors, ranked setup decisions, RSVP change/detail actions, smooth seating placement, and optimized resizable Today photo cards are live. TypeScript, line budgets, public smoke tests, 2,267 Wedding tests, the focused Rust regression, production build, Oracle preflight/post-deploy proof, runtime manifest and hosted asset checks pass."
 
   - id: WED-356
     title: Refine Wedding decision, overview and vendor discovery cards and close the vendor portal audit

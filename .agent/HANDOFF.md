@@ -8315,3 +8315,25 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
   VMP-06. VMP-07 publication revisions, VMP-08 named-resource/bulk calendars
   and VMP-09 teams/entitlements remain explicit P1 work; this candidate does
   not add browser-only controls that falsely imply those server authorities.
+
+# 2026-11-11 — WED-357 Oracle release (Codex)
+
+- Frozen implementation SHA: `2eabb74290945029eded686ccbb950da332b2ea5`.
+  The release was built and deployed only from clean detached worktree
+  `C:\temp\wt\omnyid-wed357-release-2eabb74`.
+- Exact-candidate verification passed: production Vite build, focused Rust
+  vendor-directory regression, TypeScript, line budgets, public Wedding site
+  and CSP smoke tests, and 2,267/2,267 Wedding tests. The focused regression
+  caught and corrected a case-sensitive test expectation before release.
+- Oracle preflight and post-deploy proof passed. Production `SOURCE_COMMIT`
+  and `oracle-runtime-manifest.json` both contain the full frozen SHA. The
+  workspace returns 200, its deployed Wedding workspace chunk returns 200 and
+  contains the new account-scoped photo-card and inline OpenStreetMap behavior.
+  The runtime CSP permits Nominatim and the OpenStreetMap frame.
+- Backup verification and restore drill passed. No simulated data and no local
+  environment file were uploaded. Root and `/var` usage were 80% at proof time.
+- Evidence: `Documents/verification/wed-357-wedding-vendor-planning-surfaces-2026-11-11.md`
+  and `C:\temp\wt\proofs\wed357-2eabb74\postdeploy`.
+- The vendor portal first-release scope is live. VMP-07 field-level publication
+  revisions, VMP-08 named-resource/bulk calendar editing and VMP-09 vendor
+  teams/notification preferences/entitlements remain explicit P1 follow-ons.
