@@ -8743,8 +8743,7 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
 ## 2026-11-12 - WED-360 vendor boundary/public UI and WED-362 living run-sheet preview (Codex, in progress)
 
 Worktree `C:\temp\wt\omnyid-wed360`, branch `agent/codex/WED-360`, based on
-implementation SHA `940b488603f9ec600f755a10f5e929b30358a98a` plus the current
-uncommitted slice.
+implementation commit `a05468de6d3b28db916d23492f866715d765cbc3`.
 
 - Migration 0167 adds content-light vendor report, command-receipt, reply access
   and reply moderation records. Vendor reply/report bodies stay in the acting
