@@ -81,8 +81,14 @@ Depends on CCB-03.
   exclude drafts and provider acceptance alone.
 - [x] Add query indexes without introducing a new visitor identifier, content
   copy or browser analytics event.
-- [ ] Prove migration 0160, the authenticated metrics response and E.164 links
-  on the exact hosted release SHA.
+- [x] Prove migration 0160 and all five reporting indexes on the exact hosted
+  release SHA.
+- [x] Prove that all fifteen hosted celebrant profile pages return HTTP 200 and
+  publish Australian contact numbers as normalised `tel:+61…` targets.
+- [ ] Complete an authenticated operator-browser acceptance of the metrics
+  response. Anonymous access is masked with 404 and the Linux release, route,
+  query migration and operator UI are live; no administrator credential was
+  copied into release tooling merely to manufacture this final UI check.
 
 Hosted activation remains false-default until the Twilio Verify Account SID,
 auth token and Verify Service SID are present in Oracle's secret authority and a

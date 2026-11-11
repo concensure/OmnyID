@@ -145,5 +145,32 @@ Pre-release verification:
 - Windows execution of the Rust test binaries: blocked by an MSVC `rustc`
   `STATUS_ACCESS_VIOLATION`; no assertion or source diagnostic was produced.
 
-Hosted migration, authenticated metric payload and public E.164 evidence remain
-to be added against the exact release SHA.
+## Exact-SHA call-hardening release evidence
+
+- Live implementation SHA:
+  `ffa7415279de30549e3f3f0c3c1e6ab94bb0a194`.
+- Clean release checkout:
+  `C:\temp\wt\omnyid-wed359-release-ffa7415`.
+- Oracle `SOURCE_COMMIT` and `oracle-runtime-manifest.json` both contain that
+  full SHA.
+- Migration `0160_wedding_vendor_funnel_metric_indexes` is recorded in
+  `omnyid_schema_migrations`; all five expected indexes exist in production.
+- All fifteen `/wedding/directory/<celebrant-slug>` pages return HTTP 200. Each
+  page emits its published Australian phone number as a whitespace-free,
+  symbol-free E.164 `tel:+61…` target while retaining readable visible text.
+- Anonymous access to `/admin/wedding/celebrant-management` is deliberately
+  masked with HTTP 404. The operator-only panel and 30/90/365-day server query
+  are in the Linux release. A signed-in administrator browser acceptance is
+  still listed separately rather than placing an admin credential in a proof
+  script.
+- Exact-SHA Linux homeserver and UI builds passed. The post-deploy production
+  proof passed backup verification and an isolated restore drill with
+  `FAILURE_STEP=none`.
+- The first restore preflight found only 6.6 GB free against an 8.0 GB safety
+  requirement. Pruning only inactive Docker builder cache recovered about
+  4.9 GB. No container, image in use, volume, database or user file was
+  removed. Oracle finished at 77% root use with roughly 11 GB free.
+
+The E.164 call path and canonical operator measures are live. The public
+callback rollout remains false-default until the controlled Twilio and real
+connected-call gates above are satisfied.

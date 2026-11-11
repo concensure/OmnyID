@@ -8529,3 +8529,35 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
   `tokio`) without a source diagnostic. Re-run them on Linux in the clean
   exact-SHA release and prove migration 0160 plus hosted E.164 links before
   closing the hardening slice.
+
+# 2026-11-11 — WED-359 call-hardening Oracle release (Codex)
+
+- Released implementation SHA
+  `ffa7415279de30549e3f3f0c3c1e6ab94bb0a194` from clean detached checkout
+  `C:\temp\wt\omnyid-wed359-release-ffa7415`.
+- Oracle `SOURCE_COMMIT` and `oracle-runtime-manifest.json` match that full
+  SHA. Migration 0160 is recorded and all five supporting funnel indexes are
+  present.
+- Every one of the fifteen hosted celebrant detail pages returns HTTP 200 and
+  exposes its published Australian phone action as a portable `tel:+61…` URI.
+  The visible number remains readable. Malformed/incomplete numbers are not
+  guessed by the shared Rust/Solid policy.
+- The admin panel now uses canonical, content-free 30/90/365-day projections
+  for qualified wedding plans, fresh/maintained availability and venue
+  enquiries proven delivered or acknowledged. Drafts and provider acceptance
+  do not count. Anonymous access to the admin route is masked with 404.
+- Exact-SHA TypeScript, focused phone tests, line budgets, Vite production
+  build, Cargo library check and Linux release build passed. Windows Rust test
+  execution remains affected by the host MSVC `rustc` access violation; the
+  focused test sources compile and no source assertion failed.
+- The first post-deploy restore preflight needed 8.0 GB but found 6.6 GB. Only
+  inactive Docker builder cache was pruned, recovering about 4.9 GB. No
+  volumes, active images, databases or user files were touched. The repeated
+  production proof passed backup verification and the isolated restore drill;
+  root use is 77% with roughly 11 GB free.
+- Proof artefacts:
+  `C:\temp\wt\proofs\wed359-ffa7415-postdeploy`. Keep the callback feature
+  false-default until controlled Twilio verification, a connected Sydney call,
+  canonical post-call enquiry creation and disposable-Postgres concurrency
+  evidence are complete. A signed-in admin browser acceptance of the metrics
+  panel is also still explicit; no admin credential was copied into automation.
