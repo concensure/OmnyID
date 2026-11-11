@@ -8440,3 +8440,29 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
   can ship dormant code and migration 0158, but the callback flag must remain
   false until controlled provider and connected-call evidence exists.
 - Evidence: `Documents/verification/wed-359-celebrant-consultations-2026-11-11.md`.
+
+# 2026-11-11 — WED-359 celebrant profiles and scoped management links (Codex)
+
+- Continued in `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001` on
+  `agent/codex/WED-359` from deployed SHA
+  `c56d8041990ceaddefd13bab0ba36cd616edf8bb`.
+- Used the approved vendor crawler against all 16 imported official URLs. All
+  fetched/extracted successfully. Fifteen are genuine celebrant services;
+  Enzo Weddings Hunter Valley is corrected to `Venue`. Reviewed evidence and
+  own-word profile batches are under the dated celebrant-enrichment folder;
+  raw crawler caches are ignored.
+- Added migration 0159, integrated directory cards/detail pages, dynamic
+  category filtering, truthful consultation states and authorised-photo
+  placeholders. No scraped testimonial, price, availability or unlicensed
+  image is presented as fact.
+- Added admin generation/QR/revocation and a no-login, expiring management
+  capability scoped to one celebrant's consultation windows and live state.
+  Rotation/revocation consume sessions; callback requests, private phones,
+  account access and other vendors are outside the capability.
+- Local passes: Cargo library check; scoped management contracts 3/3; existing
+  consultation contracts 4/4; Solid TypeScript; Vite production build; line
+  budgets 2/2; public Wedding and metadata smoke; public JS syntax. Docker was
+  unavailable, so exact-SHA Oracle migration execution is the database proof.
+- Next: freeze a commit, verify/build from a clean detached worktree, deploy
+  that exact SHA, prove migration/profile/table counts and all 15 hosted profile
+  URLs, then record the runtime manifest/SOURCE_COMMIT match.

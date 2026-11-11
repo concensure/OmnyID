@@ -1,0 +1,67 @@
+{
+  "www.jessiecacchillo.com": {
+    "name": "Jessie Cacchillo",
+    "vendor_slug": "celebrant-jessie-cacchillo",
+    "editorial_summary": "Full-time Sydney celebrant offering contemporary, personalised ceremonies with detailed planning guidance and regional travel by arrangement.",
+    "strengths": ["contemporary ceremonies", "detailed planning", "personal storytelling", "travel by arrangement"],
+    "ceremony_types": ["personalised ceremony", "elopement", "micro-wedding", "large wedding"],
+    "source_url": "http://www.jessiecacchillo.com/",
+    "contact_note": "The crawler found an unrelated web-developer email; it was rejected and not imported."
+  },
+  "www.johanthecelebrant.com.au": {
+    "name": "Johan the Celebrant and Wedding MC Sydney",
+    "vendor_slug": "celebrant-johan-the-celebrant-and-wedding-mc-sydney",
+    "editorial_summary": "Sydney celebrant and MC offering personalised storytelling, reception MC support and travel across Australia.",
+    "strengths": ["celebrant and MC", "storytelling", "reception coordination", "Australia-wide travel"],
+    "ceremony_types": ["personalised ceremony", "elopement", "micro-wedding", "large wedding"],
+    "source_url": "https://www.johanthecelebrant.com.au/"
+  },
+  "juliemuircelebrant.com.au": {
+    "name": "Julie Muir - Celebrant",
+    "vendor_slug": "celebrant-julie-muir-celebrant",
+    "editorial_summary": "Newcastle and Hunter Valley celebrant offering weddings, elopements, legal-only ceremonies and vow renewals, with an organised event-management background.",
+    "strengths": ["event organisation", "vow writing", "legal-only options", "regional service"],
+    "ceremony_types": ["personalised ceremony", "elopement", "legal-only ceremony", "vow renewal"],
+    "source_url": "https://juliemuircelebrant.com.au/",
+    "public_email": "hello@juliemuircelebrant.com.au"
+  },
+  "www.montyking.com.au": {
+    "name": "Monty King Celebrant",
+    "vendor_slug": "celebrant-monty-king-celebrant",
+    "editorial_summary": "Newcastle and Hunter Valley celebrant and MC focused on couple-centred storytelling, humour and an inclusive ceremony experience.",
+    "strengths": ["storytelling", "celebrant and MC", "inclusive ceremonies", "light-hearted delivery"],
+    "ceremony_types": ["personalised ceremony", "elopement", "micro-wedding", "LGBTQIA+ wedding"],
+    "source_url": "http://www.montyking.com.au/"
+  },
+  "www.robynpattison.com.au": {
+    "name": "Robyn Pattison Marriage & Funeral Celebrant",
+    "vendor_slug": "celebrant-robyn-pattison-marriage-funeral-celebrant",
+    "editorial_summary": "Sydney marriage celebrant and MC offering bespoke, inclusive ceremonies, elopements, mini-weddings and vow renewals.",
+    "strengths": ["bespoke ceremonies", "celebrant and MC", "inclusive ceremonies", "elopements"],
+    "ceremony_types": ["personalised ceremony", "elopement", "micro-wedding", "vow renewal", "LGBTQIA+ wedding"],
+    "source_url": "http://www.robynpattison.com.au/"
+  },
+  "www.simpleceremonies.com.au": {
+    "name": "Simple Ceremonies",
+    "vendor_slug": "celebrant-simple-ceremonies",
+    "editorial_summary": "Sydney celebrant service offering straightforward legal ceremonies, elopements and larger celebrations at its studio and selected public or private locations.",
+    "strengths": ["legal ceremony process", "online paperwork", "bookable locations", "seven-day service"],
+    "ceremony_types": ["legal-only ceremony", "elopement", "micro-wedding", "large wedding"],
+    "source_url": "https://www.simpleceremonies.com.au/"
+  },
+  "www.tmtweddings.com.au": {
+    "name": "TMT Weddings",
+    "vendor_slug": "celebrant-tmt-weddings",
+    "editorial_summary": "Sydney marriage celebrant and master of ceremonies service. Its public website provides only a brief service outline, so package details should be confirmed directly.",
+    "strengths": ["marriage celebrant", "MC services", "Sydney service"],
+    "ceremony_types": ["personalised ceremony", "micro-wedding", "large wedding"],
+    "source_url": "https://www.tmtweddings.com.au/"
+  },
+  "www.enzohuntervalley.com.au": {
+    "name": "Enzo Weddings Hunter Valley",
+    "vendor_slug": "celebrant-enzo-weddings-hunter-valley",
+    "editorial_summary": "Official-site evidence describes a Hunter Valley wedding venue and cafe, not a celebrant service.",
+    "category_correction": "Venue",
+    "source_url": "https://www.enzohuntervalley.com.au/"
+  }
+}

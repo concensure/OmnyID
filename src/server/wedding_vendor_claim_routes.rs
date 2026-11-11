@@ -169,13 +169,18 @@ async fn public_directory_http(
         SELECT
             v.vendor_slug, v.vendor_name, v.category, v.service_area, v.address,
             v.website_url, v.claim_status, link.agent_id AS linked_agent_id,
-            COALESCE(p.description, '') AS owner_description,
+            COALESCE(NULLIF(p.published_description, ''), v.evidence #>> '{celebrant_profile,editorial_summary}', '') AS owner_description,
             COALESCE(p.price_tier, '') AS price_tier,
             COALESCE(p.capacity_min, 0) AS capacity_min,
             COALESCE(p.capacity_max, 0) AS capacity_max,
-            COALESCE(p.styles, ARRAY[]::TEXT[]) AS styles,
+            CASE WHEN COALESCE(array_length(p.styles,1),0)>0 THEN p.styles ELSE ARRAY(SELECT jsonb_array_elements_text(COALESCE(v.evidence #> '{celebrant_profile,strengths}','[]'::jsonb))) END AS styles,
             COALESCE(p.flags, ARRAY[]::TEXT[]) AS flags,
             COALESCE(p.public_contact, '{}'::jsonb) AS public_contact,
+            COALESCE(cp.register_status,'pending') AS consultation_register_status,
+            EXISTS(SELECT 1 FROM wedding_celebrant_live_sessions live WHERE live.vendor_id=v.vendor_id AND live.paused_at IS NULL AND live.expires_at>NOW()+make_interval(mins=>COALESCE(cp.consultation_minutes,10)+COALESCE(cp.buffer_minutes,5)) AND (SELECT COUNT(*) FROM wedding_celebrant_callback_requests request WHERE request.live_session_id=live.session_id AND request.status IN ('waiting_acceptance','accepted') AND COALESCE(request.hold_expires_at,live.expires_at)>NOW())<live.call_cap) AS consultation_live,
+            next_window.local_date AS consultation_next_date,
+            next_window.weekday AS consultation_next_weekday,
+            next_window.starts_at AS consultation_next_time,
             COALESCE((
                 SELECT jsonb_agg(jsonb_build_object(
                     'url', photo_url, 'alt_text', alt_text, 'source_label', source_label
@@ -196,6 +201,13 @@ async fn public_directory_http(
             ), '[]'::jsonb) AS owner_photos
         FROM wedding_vendors v
         LEFT JOIN wedding_vendor_owner_profile p ON p.vendor_id = v.vendor_id
+        LEFT JOIN wedding_celebrant_pilot_profiles cp ON cp.vendor_id=v.vendor_id
+        LEFT JOIN LATERAL (
+          SELECT w.local_date,w.weekday,w.starts_at FROM wedding_celebrant_consultation_windows w
+          WHERE w.vendor_id=v.vendor_id AND w.enabled AND w.window_kind IN ('recurring','exception_open')
+            AND (w.local_date IS NULL OR w.local_date >= (NOW() AT TIME ZONE 'Australia/Sydney')::date)
+          ORDER BY COALESCE(w.local_date,(NOW() AT TIME ZONE 'Australia/Sydney')::date + ((w.weekday-EXTRACT(ISODOW FROM NOW() AT TIME ZONE 'Australia/Sydney')::int+7)%7)),w.starts_at LIMIT 1
+        ) next_window ON TRUE
         LEFT JOIN wedding_vendor_agent_links link ON link.vendor_id = v.vendor_id
         WHERE v.status = 'active'
           AND ($1::TEXT IS NULL OR lower(v.vendor_name) LIKE '%' || lower($1) || '%'
@@ -292,13 +304,18 @@ async fn public_vendor_http(
         SELECT
             v.vendor_slug, v.vendor_name, v.category, v.service_area, v.address,
             v.website_url, v.claim_status, link.agent_id AS linked_agent_id,
-            COALESCE(p.description, '') AS owner_description,
+            COALESCE(NULLIF(p.published_description, ''), v.evidence #>> '{celebrant_profile,editorial_summary}', '') AS owner_description,
             COALESCE(p.price_tier, '') AS price_tier,
             COALESCE(p.capacity_min, 0) AS capacity_min,
             COALESCE(p.capacity_max, 0) AS capacity_max,
-            COALESCE(p.styles, ARRAY[]::TEXT[]) AS styles,
+            CASE WHEN COALESCE(array_length(p.styles,1),0)>0 THEN p.styles ELSE ARRAY(SELECT jsonb_array_elements_text(COALESCE(v.evidence #> '{celebrant_profile,strengths}','[]'::jsonb))) END AS styles,
             COALESCE(p.flags, ARRAY[]::TEXT[]) AS flags,
             COALESCE(p.public_contact, '{}'::jsonb) AS public_contact,
+            COALESCE(cp.register_status,'pending') AS consultation_register_status,
+            EXISTS(SELECT 1 FROM wedding_celebrant_live_sessions live WHERE live.vendor_id=v.vendor_id AND live.paused_at IS NULL AND live.expires_at>NOW()+make_interval(mins=>COALESCE(cp.consultation_minutes,10)+COALESCE(cp.buffer_minutes,5)) AND (SELECT COUNT(*) FROM wedding_celebrant_callback_requests request WHERE request.live_session_id=live.session_id AND request.status IN ('waiting_acceptance','accepted') AND COALESCE(request.hold_expires_at,live.expires_at)>NOW())<live.call_cap) AS consultation_live,
+            next_window.local_date AS consultation_next_date,
+            next_window.weekday AS consultation_next_weekday,
+            next_window.starts_at AS consultation_next_time,
             COALESCE((
                 SELECT jsonb_agg(jsonb_build_object(
                     'url', photo_url, 'alt_text', alt_text, 'source_label', source_label
@@ -319,6 +336,13 @@ async fn public_vendor_http(
             ), '[]'::jsonb) AS owner_photos
         FROM wedding_vendors v
         LEFT JOIN wedding_vendor_owner_profile p ON p.vendor_id = v.vendor_id
+        LEFT JOIN wedding_celebrant_pilot_profiles cp ON cp.vendor_id=v.vendor_id
+        LEFT JOIN LATERAL (
+          SELECT w.local_date,w.weekday,w.starts_at FROM wedding_celebrant_consultation_windows w
+          WHERE w.vendor_id=v.vendor_id AND w.enabled AND w.window_kind IN ('recurring','exception_open')
+            AND (w.local_date IS NULL OR w.local_date >= (NOW() AT TIME ZONE 'Australia/Sydney')::date)
+          ORDER BY COALESCE(w.local_date,(NOW() AT TIME ZONE 'Australia/Sydney')::date + ((w.weekday-EXTRACT(ISODOW FROM NOW() AT TIME ZONE 'Australia/Sydney')::int+7)%7)),w.starts_at LIMIT 1
+        ) next_window ON TRUE
         LEFT JOIN wedding_vendor_agent_links link ON link.vendor_id = v.vendor_id
         WHERE v.status = 'active' AND v.vendor_slug = $1
         LIMIT 1
@@ -737,6 +761,7 @@ async fn public_vendor_agent_card_http(
 
 fn public_vendor_from_row(row: sqlx::postgres::PgRow) -> Value {
     let claim_status: String = row.get("claim_status");
+    let category: String = row.get("category");
     let has_public_agent_card = claim_status == "verified";
     let agent_id = row
         .try_get::<Option<String>, _>("linked_agent_id")
@@ -748,10 +773,21 @@ fn public_vendor_from_row(row: sqlx::postgres::PgRow) -> Value {
         .is_some_and(|photos| !photos.is_empty())
         .then_some(owner_photos)
         .unwrap_or_else(|| row.get("photos"));
+    let consultation_enabled = category.eq_ignore_ascii_case("celebrant")
+        && std::env::var("OMNYID_CELEBRANT_CONSULTATIONS_ENABLED").as_deref() == Ok("true")
+        && row.get::<String, _>("consultation_register_status") == "verified";
+    let consultation_live = consultation_enabled && row.get::<bool, _>("consultation_live");
+    let next_date = row
+        .get::<Option<chrono::NaiveDate>, _>("consultation_next_date")
+        .map(|value| value.to_string());
+    let next_weekday = row.get::<Option<i16>, _>("consultation_next_weekday");
+    let next_time = row
+        .get::<Option<chrono::NaiveTime>, _>("consultation_next_time")
+        .map(|value| value.format("%H:%M").to_string());
     json!({
         "slug": row.get::<String, _>("vendor_slug"),
         "name": row.get::<String, _>("vendor_name"),
-        "category": row.get::<String, _>("category"),
+        "category": category,
         "service_area": row.get::<String, _>("service_area"),
         "address": row.try_get::<Option<String>, _>("address").ok().flatten(),
         "website_url": row.try_get::<Option<String>, _>("website_url").ok().flatten(),
@@ -771,6 +807,12 @@ fn public_vendor_from_row(row: sqlx::postgres::PgRow) -> Value {
         "flags": row.get::<Vec<String>, _>("flags"),
         "public_contact": row.get::<Value, _>("public_contact"),
         "photos": display_photos,
+        "consultation": {
+            "state": if consultation_live { "available_now" } else if consultation_enabled && next_time.is_some() { "scheduled" } else { "closed" },
+            "next_date": if consultation_enabled { next_date } else { None },
+            "next_weekday": if consultation_enabled { next_weekday } else { None },
+            "next_time": if consultation_enabled { next_time } else { None },
+        },
     })
 }
 

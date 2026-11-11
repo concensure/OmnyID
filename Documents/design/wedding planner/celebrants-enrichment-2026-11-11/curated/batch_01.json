@@ -1,0 +1,68 @@
+{
+  "amywebster.au": {
+    "name": "Amy Webster - Celebrant + MC",
+    "vendor_slug": "celebrant-amy-webster-celebrant-mc",
+    "editorial_summary": "Newcastle and Hunter Valley celebrant and MC focused on relaxed, personal ceremonies with practical guidance for vows and the ceremony flow.",
+    "strengths": ["relaxed ceremony planning", "personal storytelling", "MC services", "vow guidance"],
+    "ceremony_types": ["personalised ceremony", "elopement", "micro-wedding", "vow renewal"],
+    "source_url": "http://amywebster.au/",
+    "public_email": "amy@amywebster.com.au"
+  },
+  "www.yourcelebrantandceremony.com.au": {
+    "name": "Beverly Your Celebrant & MC",
+    "vendor_slug": "celebrant-beverly-your-celebrant-mc",
+    "editorial_summary": "Sydney celebrant and MC who develops ceremony wording around each couple's story and is open to travel beyond Sydney.",
+    "strengths": ["couple-led ceremony wording", "MC services", "travel", "storytelling"],
+    "ceremony_types": ["personalised ceremony", "elopement", "commitment ceremony", "vow renewal"],
+    "source_url": "http://www.yourcelebrantandceremony.com.au/",
+    "public_email": "beverly@yourcelebrantandceremony.com"
+  },
+  "www.carladavern.com.au": {
+    "name": "Carla Davern Celebrant",
+    "vendor_slug": "celebrant-carla-davern-celebrant",
+    "editorial_summary": "Sydney-based celebrant, MC and singer serving Sydney, the Hunter Valley and Blue Mountains, with experience incorporating a range of cultural traditions.",
+    "strengths": ["celebrant and MC", "ceremony singing", "cultural ceremony experience", "regional travel"],
+    "ceremony_types": ["personalised ceremony", "elopement", "large wedding", "multicultural ceremony"],
+    "source_url": "https://www.carladavern.com.au/"
+  },
+  "www.marriagecelebrantonline.com": {
+    "name": "Celebrant Melissa Soncini",
+    "vendor_slug": "celebrant-celebrant-melissa-soncini",
+    "editorial_summary": "Surry Hills celebrant offering modern, inclusive ceremonies, including options for international couples, mixed-faith celebrations and friend- or family-led ceremonies.",
+    "strengths": ["inclusive ceremonies", "international couples", "mixed-faith ceremonies", "family-led ceremony support"],
+    "ceremony_types": ["personalised ceremony", "elopement", "micro-wedding", "registry-style ceremony", "LGBTQIA+ wedding"],
+    "source_url": "http://www.marriagecelebrantonline.com/"
+  },
+  "www.celebrationsbybev.com.au": {
+    "name": "Celebrations By Bev",
+    "vendor_slug": "celebrant-celebrations-by-bev",
+    "editorial_summary": "Sydney celebrant offering customised ceremonies, simple legal weddings and elopements, with an organised and calm approach to the day.",
+    "strengths": ["simple legal weddings", "calm coordination", "custom ceremony planning", "elopements"],
+    "ceremony_types": ["personalised ceremony", "elopement", "legal-only ceremony", "large wedding"],
+    "source_url": "https://www.celebrationsbybev.com.au/"
+  },
+  "happycelebrant.com.au": {
+    "name": "Happy Celebrant",
+    "vendor_slug": "celebrant-happy-celebrant",
+    "editorial_summary": "Sydney celebrant service centred on fresh, modern ceremonies with planning support for a warm and upbeat wedding day.",
+    "strengths": ["modern ceremonies", "ceremony planning", "upbeat delivery", "Sydney service"],
+    "ceremony_types": ["personalised ceremony", "elopement", "micro-wedding", "large wedding"],
+    "source_url": "https://happycelebrant.com.au/"
+  },
+  "www.hungryheartsco.com": {
+    "name": "Hungry Hearts Co",
+    "vendor_slug": "celebrant-hungry-hearts-co",
+    "editorial_summary": "Newcastle celebrant-and-photographer team offering ceremony, MC and documentary-style photography packages through one coordinated service.",
+    "strengths": ["celebrant and photography team", "MC services", "documentary photography", "coordinated packages"],
+    "ceremony_types": ["personalised ceremony", "micro-wedding", "elopement", "large wedding"],
+    "source_url": "http://www.hungryheartsco.com/"
+  },
+  "www.jayabargwannacelebrant.com": {
+    "name": "Jaya Bargwanna Celebrant",
+    "vendor_slug": "celebrant-jaya-bargwanna-celebrant-fun-weddings-for-the-fools-in-love",
+    "editorial_summary": "Newcastle and Hunter Valley celebrant specialising in warm, inclusive storytelling with a light-hearted ceremony style.",
+    "strengths": ["inclusive ceremonies", "storytelling", "light-hearted delivery", "Hunter Valley travel"],
+    "ceremony_types": ["personalised ceremony", "elopement", "micro-wedding", "LGBTQIA+ wedding"],
+    "source_url": "http://www.jayabargwannacelebrant.com/"
+  }
+}

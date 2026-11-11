@@ -807,4 +807,11 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Verified Sydney celebrant consultation windows, live capacity, phone verification and content-light callback lifecycle evidence",
         include_str!("../../postgres/migrations/0158_wedding_celebrant_consultations.sql"),
     ),
+    (
+        "0159_wedding_celebrant_profiles_and_management_links",
+        "Official-site celebrant profiles and vendor-scoped consultation calendar management capabilities",
+        include_str!(
+            "../../postgres/migrations/0159_wedding_celebrant_profiles_and_management_links.sql"
+        ),
+    ),
 ];

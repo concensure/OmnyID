@@ -4,6 +4,7 @@ import { VendorClaimFlow } from "@/components/vendor/VendorClaimFlow";
 import { PublicVendorProposalFlow } from "@/components/vendor/PublicVendorProposalFlow";
 import { PublicVendorProposalLeadFeed } from "@/components/vendor/PublicVendorProposalLeadFeed";
 import { VendorSpecialManagementFlow } from "@/components/vendor/VendorSpecialManagementFlow";
+import { CelebrantManagementFlow } from "@/components/vendor/CelebrantManagementFlow";
 import { readSession } from "@/lib/api";
 import { attributeVendorSpecialSignup } from "@/lib/vendorSpecialsApi";
 import "./index.css";
@@ -16,6 +17,8 @@ const proposalToken = (params.get("proposal") ?? "").trim();
 const fragment = new URLSearchParams(window.location.hash.slice(1));
 const proposalFeedToken = (fragment.get("proposal_feed") ?? "").trim();
 const specialManagementToken = (fragment.get("special_management") ?? "").trim();
+const celebrantManagementToken = (fragment.get("celebrant_management") ?? "").trim();
+const celebrantManagementActive = Boolean(celebrantManagementToken || sessionStorage.getItem("omnyid.celebrantManagement.csrf"));
 const specialManagementActive = Boolean(specialManagementToken || sessionStorage.getItem("omnyid.vendorSpecials.csrf"));
 const signInHref = `/workspace/?auth=signin&source=vendor_claim${vendorSlug ? `&vendor_slug=${encodeURIComponent(vendorSlug)}` : ""}`;
 const signedIn = Boolean(readSession());
@@ -24,7 +27,9 @@ if (signedIn && referralGrantId) {
   void attributeVendorSpecialSignup(referralGrantId).then(() => localStorage.removeItem("omnyid.vendorSpecials.referralGrantId")).catch(() => undefined);
 }
 
-render(() => specialManagementActive
+render(() => celebrantManagementActive
+  ? <CelebrantManagementFlow token={celebrantManagementToken} />
+  : specialManagementActive
   ? <VendorSpecialManagementFlow token={specialManagementToken} />
   : proposalFeedToken
   ? <PublicVendorProposalLeadFeed token={proposalFeedToken} />

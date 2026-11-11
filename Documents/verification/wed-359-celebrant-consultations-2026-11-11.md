@@ -50,8 +50,32 @@ observed. Provider acceptance alone is not a connected call.
 
 ## Deliberately open
 
-- Consultation-only authority on the no-login calendar-management link.
 - Creating a canonical logged-in vendor enquiry after the visitor explicitly
   approves it; the current post-call surface only offers the next action.
 - Disposable-Postgres concurrency evidence and controlled Twilio/phone evidence.
 - Operator-selected Sydney pilot cohort and rollout activation.
+
+## Celebrant directory and scoped-calendar continuation
+
+- The approved vendor crawler fetched and extracted all 16 imported official
+  URLs without a blocked page. Fifteen sites support a celebrant profile. Enzo
+  Weddings Hunter Valley is a venue and is corrected to `Venue` rather than
+  inventing a celebrant service.
+- Reviewed sources and own-word curation are stored under
+  `Documents/design/wedding planner/celebrants-enrichment-2026-11-11/`. Raw
+  crawler caches are ignored. Scraped testimonials and unlicensed images are
+  not republished; an initials image state remains until owner approval.
+- The integrated directory now provides celebrant category filtering, profile
+  cards and detail pages with evidence-backed summaries, strengths, ceremony
+  types, contacts and consultation status.
+- Admin can generate one expiring private link and QR code per celebrant, see
+  aggregate link/open status, rotate the prior link and revoke the current
+  link. The link manages only that celebrant's consultation windows and live
+  state; it cannot access callback leads or another listing.
+- Continuation checks pass locally: Cargo library check; 3/3 scoped-management
+  Rust contracts; 4/4 existing consultation contracts; Solid TypeScript;
+  production Vite build; 2/2 line budgets; public Wedding and metadata smoke;
+  public directory JavaScript syntax.
+- Docker Desktop was unavailable. Migration 0159 therefore requires real
+  Postgres execution and table/profile counts during the exact-SHA Oracle
+  release before this continuation is marked complete.

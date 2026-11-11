@@ -3263,3 +3263,24 @@ synthetic vendor search or introduce another send path.
 - Acceptance and a connected call are separate outcomes. A consultation does
   not silently become a hiring lead; the existing vendor-enquiry authority is
   the only permitted conversion path after explicit couple approval.
+
+# 2026-11-11 — WED-359 celebrant profiles and no-account calendar links
+
+- Public celebrant profiles are integrated vendor-directory projections, not
+  separately generated microsites. Reviewed official-site evidence supplies an
+  own-word summary, strengths and ceremony types; the canonical vendor row,
+  accepted owner publication and consultation ledgers remain authoritative.
+- Discovering an image URL on a celebrant website does not establish a licence
+  to republish or hotlink it. Until a verified owner supplies an authorised
+  image, the directory renders an explicit initials placeholder rather than a
+  misleading or unlicensed photograph.
+- A no-account calendar-management URL is a revocable, expiring capability for
+  exactly one celebrant. It exchanges into a short-lived HttpOnly/SameSite
+  session and may change only that vendor's consultation windows and bounded
+  live status. It cannot read callback requests, couple details, messages,
+  private phone values, listing publication or another vendor's calendar.
+- Consultation availability is evidence with scope and freshness. The public
+  directory may say **available now** only when the rollout flag, official
+  register verification, live-session expiry and capacity checks all pass. A
+  prepared calendar alone never implies that the celebrant is available for a
+  couple's wedding date.
