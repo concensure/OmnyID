@@ -69,3 +69,19 @@ test("a venue-scoped comparison excludes a known photographer category", () => {
   assert.equal(result.verify.length, 0);
   assert.match(result.excluded[0]?.exclusionReason ?? "", /category is photographer, not venue/);
 });
+
+test("a venue-scoped comparison excludes an explicit combined hair and makeup category", () => {
+  const result = rankWeddingVendorCandidates({
+    sources: [{
+      id: "beauty", title: "Amy Chan Hair and Makeup Artistry", category: "Hair and Makeup Artist",
+      provider: "Admin vendor database", url: "https://beauty.example", snippet: "Sydney hair and makeup artist",
+    }, {
+      id: "venue", title: "Harbour Room", category: "Venue",
+      provider: "Admin vendor database", url: "https://venue.example", snippet: "Sydney metropolitan wedding venue for 60 guests",
+    }],
+    requirements: { vendorCategories: ["Venue"], location: "Sydney", guestCount: "60 guests" },
+  });
+
+  assert.deepEqual([...result.bookable, ...result.verify].map((choice) => choice.title), ["Harbour Room"]);
+  assert.match(result.excluded[0]?.exclusionReason ?? "", /hair makeup artist, not venue/);
+});

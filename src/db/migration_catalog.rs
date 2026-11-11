@@ -824,4 +824,9 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "AFP-backed Wedding review lifecycle, evidence references, moderation and deterministic public projections",
         include_str!("../../postgres/migrations/0161_wedding_reviews.sql"),
     ),
+    (
+        "0162_wedding_review_evidence_access",
+        "Audited operator access and fail-closed purge execution for protected Wedding review evidence",
+        include_str!("../../postgres/migrations/0162_wedding_review_evidence_access.sql"),
+    ),
 ];

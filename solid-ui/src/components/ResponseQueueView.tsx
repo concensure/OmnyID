@@ -1765,6 +1765,7 @@ export function ResponseQueueView(props: {
         return false;
       }
       const scopedQuery = Boolean(freeformQuery && !queryIntent.exactNameLookup);
+      const broadVendorQuery = Boolean(freeformQuery && !queryIntent.category && !options?.category && !directoryLookupOnly);
       const mergedPreferenceLabels = mergeWeddingVendorPreferenceLabels(
         queryIntent.priorities,
         weddingFollowUpPriorities(),
@@ -1776,10 +1777,15 @@ export function ResponseQueueView(props: {
         location: scopedQuery ? queryIntent.location ?? weddingFollowUpLocation() : weddingFollowUpLocation(), dateOrSeason: weddingFollowUpDate(), guestCount: scopedQuery ? queryIntent.guestCount ?? weddingFollowUpGuests() : weddingFollowUpGuests(),
         budgetComfort: scopedQuery ? queryIntent.budgetComfort ?? weddingFollowUpBudget() : weddingFollowUpBudget(), atmosphereDescription: scopedQuery ? queryIntent.atmosphere ?? weddingFollowUpAtmosphere() : weddingFollowUpAtmosphere(),
         inspirationImageUrls: linesFromText(weddingFollowUpImageLinks()), topPriorities: scopedQuery ? mergedPreferenceLabels : linesFromText(weddingFollowUpPriorities()),
-        vendorCategories: effectiveCategoryLabels,
+        // A broad "wedding vendors" request is intentionally cross-category.
+        // Keep a display/pattern label below, but do not turn the synthetic
+        // "Custom vendor search" label into a ranking hard constraint.
+        vendorCategories: broadVendorQuery ? [] : effectiveCategoryLabels,
         // A named directory lookup is not a category request. Treating it as
         // `Custom vendor search` filters out a real saved venue such as Mackay.
-        targetCategory: directoryLookupOnly || (freeformQuery && !queryIntent.category && !options?.category)
+        targetCategory: broadVendorQuery
+          ? "Wedding vendor"
+          : directoryLookupOnly || (freeformQuery && !queryIntent.category && !options?.category)
           ? null
           : queryIntent.category ?? options?.category ?? effectiveCategoryLabels[0] ?? null,
         // Show the useful directory matches immediately when a smaller

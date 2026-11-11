@@ -10,6 +10,10 @@
   let activeRequest = null;
   let pollTimer = 0;
   const requestedVendor = new URLSearchParams(location.search).get("vendor") || "";
+  const startVerification = document.getElementById("startPhoneVerification");
+  const verificationHelp = document.getElementById("verificationHelp");
+  let startVerificationAction = () => cards.scrollIntoView({ behavior: "smooth", block: "start" });
+  if (startVerification) startVerification.addEventListener("click", () => startVerificationAction());
   const api = async (url, options = {}) => {
     const response = await fetch(url, { credentials: "same-origin", headers: { "content-type": "application/json", ...(options.headers || {}) }, ...options });
     const text = await response.text();
@@ -26,6 +30,8 @@
     const live = availability.filter((card) => card.available_now);
     status.textContent = live.length ? `${live.length} celebrant${live.length === 1 ? " is" : "s are"} available now.` : payload.empty_message;
     if (!availability.length) {
+      if (startVerification) startVerification.disabled = true;
+      if (verificationHelp) verificationHelp.textContent = "No consultation time is published yet. Browse celebrants and return when a time is available.";
       cards.innerHTML = `<div class="celebrant-empty"><h3>No consultation times are published yet</h3><p>The page stays open so you can still browse verified directory listings.</p><a class="btn btn-outline" href="vendors.html">Browse celebrants</a></div>`;
       return;
     }
@@ -35,6 +41,18 @@
       <div class="celebrant-card-actions">${card.available_now ? `<button class="btn btn-primary" type="button" data-callback="${escape(card.vendor_slug)}">Request a callback</button>` : ""}${card.next_available_at ? `<button class="btn btn-outline" type="button" data-book="${escape(card.vendor_slug)}" data-time="${escape(card.next_available_at)}">Book this time</button>` : ""}</div>
     </article>`).join("");
     if (live.length) cards.insertAdjacentHTML("afterbegin", `<article class="celebrant-card"><div class="celebrant-avatar" aria-hidden="true">↗</div><div><span class="celebrant-live">Available now</span><h3>First available celebrant</h3><p class="celebrant-meta">Choose this when getting an answer matters more than who calls.</p></div><div class="celebrant-card-actions"><button class="btn btn-primary" type="button" data-callback="">Request first available</button></div></article>`);
+    const requestedCard = availability.find((card) => card.vendor_slug === requestedVendor);
+    const preferred = requestedVendor
+      ? (requestedCard && (requestedCard.available_now || requestedCard.next_available_at) ? requestedCard : null)
+      : availability.find((card) => card.available_now) || availability.find((card) => card.next_available_at);
+    if (startVerification) {
+      startVerification.disabled = !preferred;
+      startVerification.textContent = preferred?.available_now ? "Start phone verification" : preferred?.next_available_at ? "Choose this time and verify" : "Choose a consultation time below";
+      startVerificationAction = preferred ? () => openForm(preferred.vendor_slug, preferred.available_now ? "immediate" : "scheduled", preferred.available_now ? "" : preferred.next_available_at) : () => cards.scrollIntoView({ behavior: "smooth" });
+    }
+    if (verificationHelp) verificationHelp.textContent = preferred
+      ? "The button opens the secure number and verification-code form on this page."
+      : requestedCard ? "This celebrant has not published a consultation time yet. Choose another available celebrant below or check back later." : "Choose a published consultation time below to continue.";
   };
   const openForm = (vendorSlug, mode, scheduledStart = "") => {
     const selected = availability.find((card) => card.vendor_slug === vendorSlug);

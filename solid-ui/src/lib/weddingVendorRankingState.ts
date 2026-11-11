@@ -549,14 +549,10 @@ function categoryKey(value: string): string {
   if (["photographer", "photographers", "photography"].includes(category)) return "photographer";
   if (["florist", "floral_designer", "flowers"].includes(category)) return "floral_designer";
   if (["celebrant", "officiant"].includes(category)) return "officiant";
-  if (["dj", "music", "band"].includes(category)) return "band";
+  if (["dj", "music", "musician", "musicians", "band", "singer", "live_music"].includes(category)) return "band";
+  if (["hair_and_makeup", "hair_makeup", "hair_and_makeup_artist", "hair_makeup_artist", "beauty"].includes(category)) return "hair_makeup_artist";
   return category;
 }
-
-const KNOWN_CATEGORY_KEYS = new Set([
-  "venue", "photographer", "videographer", "floral_designer", "caterer", "officiant",
-  "band", "cake_baker", "hair_stylist", "makeup_artist", "planner",
-]);
 
 // ---------------------------------------------------------------------------------------------
 // Stage 1: eligibility
@@ -579,7 +575,10 @@ function evaluateEligibility(source: WeddingVendorRankingSource, venue: boolean,
 
   const requestedCategories = new Set((context.requirements.vendorCategories ?? []).map(categoryKey).filter(Boolean));
   const sourceCategory = categoryKey(clean(source.category));
-  if (KNOWN_CATEGORY_KEYS.has(sourceCategory) && requestedCategories.size > 0 && !requestedCategories.has(sourceCategory)) {
+  // An explicit source category is evidence, even when it is a newer or
+  // combined label outside the original catalogue. Do not let an unknown
+  // label (for example "Hair and Makeup Artist") bypass a venue-only search.
+  if (sourceCategory && requestedCategories.size > 0 && !requestedCategories.has(sourceCategory)) {
     failReasons.push(`category is ${sourceCategory.replaceAll("_", " ")}, not ${[...requestedCategories].join(" or ").replaceAll("_", " ")}`);
   }
 

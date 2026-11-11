@@ -15,6 +15,17 @@ pub(super) async fn search_wedding_vendor_directory(
     // and scale evidence. Keep this bounded so directory reuse stays cheap.
     let candidate_limit = (limit.saturating_mul(6)).clamp(12, 48) as i64;
     for query in queries {
+        if is_generic_vendor_directory_query(query) && seen_queries.insert("__all__".to_string()) {
+            let records = db
+                .list_active_wedding_vendors_for_user(user_id, candidate_limit, None)
+                .await?;
+            sources.extend(
+                records
+                    .into_iter()
+                    .filter(is_real_vendor_directory_record)
+                    .map(wedding_vendor_record_to_search_source),
+            );
+        }
         for candidate in wedding_vendor_directory_search_terms(query) {
             if !seen_queries.insert(candidate.clone()) {
                 continue;
@@ -34,6 +45,40 @@ pub(super) async fn search_wedding_vendor_directory(
         .into_iter()
         .take(limit.saturating_mul(3).max(12) * queries.len().max(1))
         .collect())
+}
+
+pub(super) fn is_generic_vendor_directory_query(query: &WeddingVendorSearchQueryRequest) -> bool {
+    let words = query
+        .query
+        .to_ascii_lowercase()
+        .split(|character: char| !character.is_alphanumeric())
+        .filter(|word| !word.is_empty())
+        .map(str::to_string)
+        .collect::<Vec<_>>();
+    let asks_for_vendors = words
+        .iter()
+        .any(|word| word == "vendor" || word == "vendors");
+    let names_specific_category = [
+        "venue",
+        "venues",
+        "photographer",
+        "photographers",
+        "florist",
+        "florists",
+        "celebrant",
+        "celebrants",
+        "caterer",
+        "caterers",
+        "musician",
+        "musicians",
+        "planner",
+        "planners",
+        "videographer",
+        "videographers",
+    ]
+    .iter()
+    .any(|category| words.iter().any(|word| word == category));
+    asks_for_vendors && !names_specific_category
 }
 
 const DISTINCTIVE_QUERY_TERMS: &[&str] = &[

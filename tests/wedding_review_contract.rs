@@ -4,8 +4,12 @@ use omnyid_homeserver::wedding_reviews::{
 };
 
 const MIGRATION: &str = include_str!("../postgres/migrations/0161_wedding_reviews.sql");
+const EVIDENCE_ACCESS_MIGRATION: &str =
+    include_str!("../postgres/migrations/0162_wedding_review_evidence_access.sql");
 const ROUTES: &str = include_str!("../src/server/wedding_review_routes.rs");
 const EVIDENCE_ROUTES: &str = include_str!("../src/server/wedding_review_evidence_routes.rs");
+const EVIDENCE_OPERATOR_ROUTES: &str =
+    include_str!("../src/server/wedding_review_evidence_operator_routes.rs");
 const SERVER: &str = include_str!("../src/server/mod.rs");
 
 #[test]
@@ -121,6 +125,28 @@ fn evidence_links_reuse_private_upload_ownership_without_copying_file_content() 
         assert!(
             !EVIDENCE_ROUTES.contains(forbidden),
             "evidence control route must not copy protected material: {forbidden}"
+        );
+    }
+}
+
+#[test]
+fn operator_evidence_access_is_purpose_bound_audited_and_purgeable() {
+    assert!(EVIDENCE_ACCESS_MIGRATION.contains("wedding_review_evidence_access_log"));
+    assert!(EVIDENCE_ACCESS_MIGRATION.contains("purpose_code TEXT NOT NULL"));
+    assert!(EVIDENCE_ACCESS_MIGRATION.contains("status = 'purge_scheduled'"));
+    assert!(EVIDENCE_OPERATOR_ROUTES.contains("operator_access_allowed"));
+    assert!(EVIDENCE_OPERATOR_ROUTES.contains("build_download_url"));
+    assert!(EVIDENCE_OPERATOR_ROUTES.contains("delete_uploaded_file"));
+    assert!(EVIDENCE_OPERATOR_ROUTES.contains("delete_private_attachment_by_id"));
+    for forbidden in [
+        "review_text",
+        "reviewer_email",
+        "reviewer_phone",
+        "storage_key:",
+    ] {
+        assert!(
+            !EVIDENCE_ACCESS_MIGRATION.contains(forbidden),
+            "operator evidence audit must remain content-light: {forbidden}"
         );
     }
 }

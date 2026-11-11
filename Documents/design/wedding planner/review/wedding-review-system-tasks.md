@@ -21,9 +21,9 @@ Dependency order is authoritative. An unchecked item is not a release claim.
   venue contribution per wedding/canonical vendor across partner accounts.
 - [x] Store every private draft/submitted revision through the existing
   tenant-private AFP writeback with typed review, wedding and vendor references.
-- [ ] Bind optional protected proof attachments into the AFP revision/evidence
-  graph after operator access and purge execution are implemented.
-- [ ] Add expected-revision and idempotency receipts; prove retries/concurrent
+- [x] Bind optional protected proof attachments into the AFP revision/evidence
+  graph with purpose-bound operator access and fail-closed purge execution.
+- [x] Add expected-revision and idempotency receipts; prove retries/concurrent
   partner submissions cannot duplicate a rating or notification.
 
 Depends on REV-01.
@@ -32,8 +32,11 @@ Depends on REV-01.
 
 - [ ] Reuse canonical planner activity, enquiry, quote/booking and event-date
   evidence without treating them as stronger claims than they prove.
-- [ ] Add author/operator-only proof attachment access and revocable deletion
-  scheduling through the existing upload/object-store authority.
+- [x] Add purpose-bound operator-only proof access, audited access facts and
+  revocable deletion scheduling/execution through the existing upload and
+  object-store authority.
+- [ ] Connect author withdrawal/deletion commands to the same purge scheduler;
+  the author's ordinary Files view remains the only author file reader meanwhile.
 - [ ] Implement claim-specific verification and probable-duplicate review while
   keeping private match signals out of public/vendor responses.
 
@@ -135,10 +138,20 @@ invent a couple, or publish the control merely because the review system ships.
   content-light lifecycle pointers and receipts. Incomplete drafts may be
   resumed; submission applies the stricter rating/audience/text policy.
 - Existing private uploads can be linked only by the authenticated author to
-  their current revision. The control row stores a purgeable attachment ID and
-  90-day pilot expiry, never file bytes, storage URLs or contact details.
+  their current revision. Purpose-bound operator access mints the existing
+  short-lived attachment capability and writes only operator, purpose, review
+  and evidence-reference IDs to the access audit. Purge scheduling is explicit;
+  an object is marked purged only after object-store and tenant attachment
+  deletion succeeds. The control and audit rows never contain file bytes,
+  storage URLs, storage keys, review text or contact details.
 - Focused review policy/route tests: 15/15 pass. Evidence route tests: 2/2
   pass. Independent migration/privacy/tenancy contracts: 8/8 pass. Cargo
   library check passes.
-- Docker Desktop was unavailable, so disposable-Postgres execution of migration
-  0161 remains required before REV-02 can be called database-complete.
+- Disposable PostgreSQL 18/pgvector execution created all nine review tables,
+  the evidence-access table and the required uniqueness/access/purge indexes.
+  A real-router
+  integration test proves simultaneous identical retries converge on one
+  revision, while a partner's competing contribution for the same
+  wedding/workspace/vendor is refused; one review and one rating revision
+  remain. The same test proves link, signed operator access, access audit,
+  scheduled purge, physical byte deletion and terminal purged state.

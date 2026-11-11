@@ -2056,8 +2056,9 @@ fn env_lock() -> std::sync::MutexGuard<'static, ()> {
 #[cfg(test)]
 mod tests {
     use super::directory::{
-        directory_sources_cover_query, is_real_vendor_directory_record,
-        wedding_vendor_directory_search_terms, wedding_vendor_record_to_search_source,
+        directory_sources_cover_query, is_generic_vendor_directory_query,
+        is_real_vendor_directory_record, wedding_vendor_directory_search_terms,
+        wedding_vendor_record_to_search_source,
     };
     use super::*;
     use crate::db::WeddingVendorRecord;
@@ -2357,6 +2358,25 @@ mod tests {
                 "Sydney".to_string(),
             ]
         );
+    }
+
+    #[test]
+    fn generic_wedding_vendor_query_opens_the_bounded_whole_directory_pass() {
+        let generic = WeddingVendorSearchQueryRequest {
+            provider_kind: "brave_search".to_string(),
+            category: Some("custom_vendor_search".to_string()),
+            query: "wedding vendors in Sydney, Australia 60 guests, metropolitan".to_string(),
+            google_place_types: None,
+            overpass_tags: None,
+        };
+        let venue = WeddingVendorSearchQueryRequest {
+            category: Some("venue".to_string()),
+            query: "wedding venues in Sydney, Australia 60 guests, metropolitan".to_string(),
+            ..generic.clone()
+        };
+
+        assert!(is_generic_vendor_directory_query(&generic));
+        assert!(!is_generic_vendor_directory_query(&venue));
     }
 
     #[test]

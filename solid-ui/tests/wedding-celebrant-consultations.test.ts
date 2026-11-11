@@ -43,7 +43,10 @@ test("public page remains useful without a live celebrant or an account", async 
   ]);
   assert.match(page, /A phone-consultation time is not confirmation/);
   assert.match(page, /Request a callback/);
+  assert.match(page, /Send verification code/);
+  assert.match(page, /id="startPhoneVerification"/);
   assert.match(script, /No consultation times are published yet/);
+  assert.match(script, /openForm\(preferred\.vendor_slug/);
   assert.match(script, /First available celebrant/);
   assert.match(script, /celebrant-consultations\/verify\/start/);
   assert.match(script, /acceptRescheduleButton/);

@@ -3319,5 +3319,20 @@ synthetic vendor search or introduce another send path.
 - Review evidence reuses the existing private upload/object-store authority.
   The author may link only an attachment in their tenant to their own current
   revision. The review schema stores a purgeable attachment ID and bounded
-  expiry, never bytes or storage/download URLs. Operator access and actual
-  purge execution remain separate follow-on work.
+  expiry, never bytes or storage/download URLs. Operator access and purge use
+  the separately audited, purpose-bound boundary recorded below.
+
+# 2026-11-12 — WED-360 review proof access is purpose-bound and fail-closed
+
+- An authorised operator receives the existing short-lived signed attachment
+  capability only after giving one enumerated review purpose. The access audit
+  stores operator, purpose, review and evidence-reference IDs, never storage
+  coordinates, file names, review text, contacts or proof content.
+- Review-proof deletion is a two-step schedule/execution path. Execution removes
+  the existing object-store file and tenant attachment record before marking the
+  reference purged; a storage failure leaves it scheduled for retry rather than
+  writing a false deletion result.
+- A saved visual seating optimisation is current seating truth for decision
+  counts. Explicit vendor categories are hard eligibility constraints, while a
+  genuinely generic “wedding vendors” request may search a bounded cross-category
+  directory without inventing a synthetic category constraint.

@@ -4277,6 +4277,8 @@ impl Db {
                     c.contact_id IS NOT NULL
                     OR NULLIF(btrim(COALESCE(v.contact_phone, '')), '') IS NOT NULL
                     OR NULLIF(btrim(COALESCE(v.contact_email, '')), '') IS NOT NULL
+                    OR NULLIF(btrim(COALESCE(v.website_url, '')), '') IS NOT NULL
+                    OR NULLIF(btrim(COALESCE(v.source_url, '')), '') IS NOT NULL
                     OR l.agent_id IS NOT NULL
                 )
                 AND (

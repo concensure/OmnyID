@@ -74,6 +74,35 @@ test("buildWeddingSeatingPlanState reports draft-ready when attending guests are
   assert.ok(state.vendorBriefLines.some((line) => /2 named tables detected/i.test(line)));
 });
 
+test("buildWeddingSeatingPlanState closes the assignment action after a saved canvas placement", () => {
+  const state = buildWeddingSeatingPlanState({
+    artifacts: [{
+      title: "Guest list",
+      kind: "guest_list",
+      bodyText: [
+        "| Name | RSVP | Household |",
+        "| --- | --- | --- |",
+        "| Alex | Yes | Friends |",
+      ].join("\n"),
+    }],
+    seatingOptimizations: [{
+      assignments: [{ personId: "alex", personLabel: "Alex", tableId: "table-1", tableLabel: "Table 1", score: 0, reasonLabels: ["Placed by the couple."] }],
+      totalScore: 0,
+      hardViolations: [],
+      softSignals: [],
+      explanationLabels: ["Saved by the couple."],
+      proactiveIssueLabels: [],
+      applyLabel: "Apply seating plan",
+      alternativeLabel: "Show another option",
+    }],
+  });
+
+  assert.equal(state.assignedSeatCount, 1);
+  assert.equal(state.unassignedAttendingCount, 0);
+  assert.ok(!state.actionItems.some((item) => /Assign .*attending guest/i.test(item.title)));
+  assert.deepEqual(state.tableLabels, ["Table 1"]);
+});
+
 test("buildWeddingSeatingPlanState feeds conflict notes into the optimizer preview", () => {
   const state = buildWeddingSeatingPlanState({
     artifacts: [{

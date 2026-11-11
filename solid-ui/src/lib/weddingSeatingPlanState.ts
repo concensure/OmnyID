@@ -460,6 +460,26 @@ export function buildWeddingSeatingPlanState(input: {
     if (hasUsefulValue(accessibilityLabel)) accessibilityConstraintCount += 1;
   }
 
+  // A saved visual-canvas result is the current seating authority. Earlier
+  // versions only used it as a preview, so an attending guest could remain in
+  // the "assign to tables" count after the couple had saved their table.
+  const savedOptimizationPreview = (input.seatingOptimizations ?? []).at(-1) ?? null;
+  if (savedOptimizationPreview) {
+    const knownPeople = new Set(optimizerPeople.map((person) => person.id));
+    const savedAssignments = new Map(
+      savedOptimizationPreview.assignments
+        .filter((assignment) => knownPeople.has(assignment.personId))
+        .map((assignment) => [assignment.personId, assignment]),
+    );
+    if (savedAssignments.size > 0) {
+      assignedSeatCount = Math.max(assignedSeatCount, savedAssignments.size);
+      unassignedAttendingCount = Math.max(0, guestRowsConsidered - assignedSeatCount);
+      for (const assignment of savedAssignments.values()) {
+        if (hasUsefulValue(assignment.tableLabel)) tableLabels.add(assignment.tableLabel);
+      }
+    }
+  }
+
   householdGroupCount = householdLabels.size;
   const attendingCount = Math.max(guestRowsConsidered, input.guestTracking?.attendingCount ?? 0);
   const suggestedTableCount = Math.max(0, Math.ceil(attendingCount / seatsPerTable));
@@ -507,7 +527,6 @@ export function buildWeddingSeatingPlanState(input: {
       tables: optimizerTables,
     })
     : null;
-  const savedOptimizationPreview = (input.seatingOptimizations ?? []).at(-1) ?? null;
   const optimizationPreview = savedOptimizationPreview ?? computedOptimizationPreview;
 
   const statusLabel = guestRowsConsidered === 0
