@@ -283,12 +283,25 @@ async fn concurrent_retry_and_partner_submission_converge_without_duplicate_rati
     let access_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM wedding_review_evidence_access_log WHERE review_id=$1 AND purpose_code='eligibility'")
         .bind(review_id).fetch_one(&db.pool).await.expect("access count");
     assert_eq!(access_count, 1);
+    let (partner_schedule_status, partner_scheduled) = request_json(
+        &app,
+        Method::POST,
+        &format!("/wedding/reviews/{review_id}/evidence/{evidence_ref_id}/schedule-purge"),
+        &partner_auth,
+        Some(&json!({"reason_code":"author_withdrawal"})),
+    )
+    .await;
+    assert_eq!(
+        partner_schedule_status,
+        StatusCode::NOT_FOUND,
+        "partner must not schedule another author's proof: {partner_scheduled}"
+    );
     let (schedule_status, scheduled) = request_json(
         &app,
         Method::POST,
-        &format!("/admin/wedding/reviews/evidence/{evidence_ref_id}/schedule-purge"),
-        &operator_auth,
-        Some(&json!({"reason_code":"retention_expired"})),
+        &format!("/wedding/reviews/{review_id}/evidence/{evidence_ref_id}/schedule-purge"),
+        &first_auth,
+        Some(&json!({"reason_code":"author_withdrawal"})),
     )
     .await;
     assert_eq!(

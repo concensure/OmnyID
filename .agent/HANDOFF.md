@@ -8647,3 +8647,23 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
 - Next: run disposable-Postgres migration/concurrency proof, then add operator
   evidence access/audit and the expiry purge worker before building the couple
   status/history UI. `Read the couple's story` remains explicitly deferred.
+
+# 2026-11-12 — WED-360 author proof deletion boundary (Codex)
+
+- Continued in `C:\temp\wt\omnyid-wed360` on `agent/codex/WED-360` from
+  `aa0c8282865ec3b075a076c476bb0da16af76642`.
+- Added an authenticated author command that can schedule only evidence linked
+  by that author to that review, and only for `author_withdrawal` or
+  `privacy_request`. Cross-partner attempts return the same unavailable result
+  as a missing reference.
+- The command deliberately does not add another evidence reader. It reuses the
+  existing purge-scheduled state; the bounded operator executor remains the
+  only physical object/attachment deletion path.
+- `cargo check --lib` and `cargo check --tests` pass with the shared
+  `C:\cargo-target`. The focused Windows Rust test binary again failed inside
+  `rustc` with `STATUS_ILLEGAL_INSTRUCTION`, before any test assertion. A
+  mistaken attempt to invoke the Rust contract source with Node produced only a
+  JavaScript syntax error and is not product evidence.
+- Next: prove the new author/partner assertions in the disposable-Postgres
+  real-router test on Linux, then implement claim-specific eligibility. The
+  review rollout flag remains false and no deployment occurred.

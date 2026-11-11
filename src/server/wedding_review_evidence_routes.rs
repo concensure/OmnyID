@@ -24,10 +24,15 @@ use ulid::Ulid;
 const PROOF_RETENTION_DAYS: i64 = 90;
 
 pub(super) fn routes() -> Router<Arc<AppState>> {
-    Router::new().route(
-        "/wedding/reviews/{review_id}/evidence",
-        post(link_evidence_http),
-    )
+    Router::new()
+        .route(
+            "/wedding/reviews/{review_id}/evidence",
+            post(link_evidence_http),
+        )
+        .route(
+            "/wedding/reviews/{review_id}/evidence/{evidence_ref_id}/schedule-purge",
+            post(schedule_author_purge_http),
+        )
 }
 
 fn enabled() -> bool {
@@ -99,6 +104,23 @@ struct EvidenceReply {
     status: String,
     expires_at: String,
     replayed: bool,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ScheduleAuthorPurgeRequest {
+    reason_code: String,
+}
+
+#[derive(Debug, Serialize)]
+struct ScheduleAuthorPurgeReply {
+    evidence_ref_id: String,
+    status: String,
+    scheduled: bool,
+}
+
+fn valid_author_purge_reason(value: &str) -> bool {
+    ["author_withdrawal", "privacy_request"].contains(&value)
 }
 
 async fn link_evidence_http(
@@ -210,6 +232,69 @@ async fn link_evidence_http(
     }))
 }
 
+async fn schedule_author_purge_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((review_id, evidence_ref_id)): Path<(String, String)>,
+    Json(request): Json<ScheduleAuthorPurgeRequest>,
+) -> Result<Json<ScheduleAuthorPurgeReply>, (StatusCode, String)> {
+    enforce_rate_limit(
+        &state,
+        authenticated_rate_limit_key("wedding_review_author_evidence_purge", &headers),
+        RateLimitPolicy {
+            max_requests: 20,
+            window: Duration::from_secs(60),
+        },
+    )
+    .await?;
+    let user = authenticated_user(&state.db, &headers).await?;
+    if !enabled() {
+        return Err(unavailable());
+    }
+    let reason = request.reason_code.trim().to_ascii_lowercase();
+    if !valid_id(&review_id, 200)
+        || !valid_id(&evidence_ref_id, 200)
+        || !valid_author_purge_reason(&reason)
+    {
+        return Err(bad(
+            "Choose a valid review proof and author deletion reason.",
+        ));
+    }
+    let changed = sqlx::query(
+        "UPDATE wedding_review_evidence_refs e
+         SET status='purge_scheduled',expires_at=LEAST(COALESCE(e.expires_at,NOW()),NOW())
+         FROM wedding_reviews r
+         WHERE e.evidence_ref_id=$1 AND e.review_id=$2 AND r.review_id=e.review_id
+           AND e.created_by_user_id=$3 AND e.status <> 'purged' AND e.purged_at IS NULL
+           AND EXISTS (
+             SELECT 1 FROM wedding_user_onboarding_state s
+             WHERE s.user_id=$3 AND s.wedding_plan_id=r.wedding_plan_id
+           )",
+    )
+    .bind(&evidence_ref_id)
+    .bind(&review_id)
+    .bind(&user.id)
+    .execute(&state.db.pool)
+    .await
+    .map_err(store_error)?
+    .rows_affected()
+        == 1;
+    if !changed {
+        return Err(unavailable());
+    }
+    tracing::info!(
+        evidence_ref_id = %evidence_ref_id,
+        review_id = %review_id,
+        reason_code = %reason,
+        "Wedding review author scheduled proof purge"
+    );
+    Ok(Json(ScheduleAuthorPurgeReply {
+        evidence_ref_id,
+        status: "purge_scheduled".into(),
+        scheduled: true,
+    }))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -224,5 +309,13 @@ mod tests {
     #[test]
     fn proof_retention_is_a_bounded_product_default() {
         assert_eq!(PROOF_RETENTION_DAYS, 90);
+    }
+
+    #[test]
+    fn author_purge_reasons_are_narrower_than_operator_reasons() {
+        assert!(valid_author_purge_reason("author_withdrawal"));
+        assert!(valid_author_purge_reason("privacy_request"));
+        assert!(!valid_author_purge_reason("eligibility"));
+        assert!(!valid_author_purge_reason("appeal_resolved"));
     }
 }

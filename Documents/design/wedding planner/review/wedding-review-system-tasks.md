@@ -35,7 +35,7 @@ Depends on REV-01.
 - [x] Add purpose-bound operator-only proof access, audited access facts and
   revocable deletion scheduling/execution through the existing upload and
   object-store authority.
-- [ ] Connect author withdrawal/deletion commands to the same purge scheduler;
+- [x] Connect author withdrawal/deletion commands to the same purge scheduler;
   the author's ordinary Files view remains the only author file reader meanwhile.
 - [ ] Implement claim-specific verification and probable-duplicate review while
   keeping private match signals out of public/vendor responses.
@@ -155,3 +155,8 @@ invent a couple, or publish the control merely because the review system ships.
   wedding/workspace/vendor is refused; one review and one rating revision
   remain. The same test proves link, signed operator access, access audit,
   scheduled purge, physical byte deletion and terminal purged state.
+- An authenticated author can now schedule immediate purge of only proof they
+  linked to their own review, for withdrawal or a privacy request. A partner's
+  attempt is masked as unavailable. The author route does not expose a second
+  proof reader; physical deletion still runs through the bounded operator purge
+  executor and existing upload/object-store authority.
