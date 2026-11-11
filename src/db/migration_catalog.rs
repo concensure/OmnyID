@@ -839,4 +839,9 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Account-scoped Wedding review status and idempotent author withdrawal receipts",
         include_str!("../../postgres/migrations/0164_wedding_review_author_lifecycle.sql"),
     ),
+    (
+        "0165_wedding_review_correction_receipts",
+        "Truthful idempotency receipts for author corrections awaiting moderation",
+        include_str!("../../postgres/migrations/0165_wedding_review_correction_receipts.sql"),
+    ),
 ];

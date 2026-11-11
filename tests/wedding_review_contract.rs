@@ -10,6 +10,8 @@ const ELIGIBILITY_MIGRATION: &str =
     include_str!("../postgres/migrations/0163_wedding_review_eligibility.sql");
 const AUTHOR_LIFECYCLE_MIGRATION: &str =
     include_str!("../postgres/migrations/0164_wedding_review_author_lifecycle.sql");
+const CORRECTION_MIGRATION: &str =
+    include_str!("../postgres/migrations/0165_wedding_review_correction_receipts.sql");
 const ROUTES: &str = include_str!("../src/server/wedding_review_routes.rs");
 const EVIDENCE_ROUTES: &str = include_str!("../src/server/wedding_review_evidence_routes.rs");
 const EVIDENCE_OPERATOR_ROUTES: &str =
@@ -201,4 +203,13 @@ fn author_status_and_withdrawal_are_account_scoped_and_content_light() {
             "lifecycle receipt leaked private field: {forbidden}"
         );
     }
+}
+
+#[test]
+fn corrections_preserve_prior_publication_and_replay_edit_pending() {
+    assert!(CORRECTION_MIGRATION.contains("'draft', 'submitted', 'edit_pending'"));
+    assert!(ROUTES.contains("correction_over_publication"));
+    assert!(ROUTES.contains("\"correction_submitted\""));
+    assert!(ROUTES.contains("verification_state='unreviewed'"));
+    assert!(!ROUTES.contains("UPDATE wedding_review_publications SET status='superseded'"));
 }

@@ -458,13 +458,29 @@ async fn save_revision_http(
         )));
     }
     let current_status: String = review.get("status");
-    if !["draft", "rejected"].contains(&current_status.as_str()) {
+    if ![
+        "draft",
+        "submitted",
+        "evidence_requested",
+        "moderation_pending",
+        "published",
+        "edit_pending",
+        "rejected",
+        "restricted",
+        "restored",
+    ]
+    .contains(&current_status.as_str())
+    {
         return Err(conflict(
-            "This review is already being handled. Open its current status before editing.",
+            "This review cannot be corrected in its current state.",
         ));
     }
     let revision = current_revision + 1;
-    let status = if request.action == RevisionAction::Submit {
+    let correction_over_publication =
+        ["published", "edit_pending", "restricted", "restored"].contains(&current_status.as_str());
+    let status = if correction_over_publication {
+        "edit_pending"
+    } else if request.action == RevisionAction::Submit {
         "submitted"
     } else {
         "draft"
@@ -560,7 +576,7 @@ async fn save_revision_http(
         .execute(&mut *tx)
         .await
         .map_err(store_error)?;
-    sqlx::query("UPDATE wedding_reviews SET current_revision=$2,current_afp_message_id=$3,status=$4,venue_space_ref=$5,updated_at=NOW() WHERE review_id=$1")
+    sqlx::query("UPDATE wedding_reviews SET current_revision=$2,current_afp_message_id=$3,status=$4,venue_space_ref=$5,verification_state='unreviewed',updated_at=NOW() WHERE review_id=$1")
         .bind(&review_id)
         .bind(revision)
         .bind(&message_id)
@@ -577,7 +593,13 @@ async fn save_revision_http(
     sqlx::query("INSERT INTO wedding_review_events (event_id,review_id,event_kind,actor_role,actor_user_id,revision,dedupe_key,metadata) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT (review_id,event_kind,dedupe_key) DO NOTHING")
         .bind(format!("review-event-{}", Ulid::new()))
         .bind(&review_id)
-        .bind(if status == "submitted" { "submitted" } else { "draft_saved" })
+        .bind(if request.action == RevisionAction::Submit && current_revision > 0 {
+            "correction_submitted"
+        } else if status == "submitted" {
+            "submitted"
+        } else {
+            "draft_saved"
+        })
         .bind(actor_role)
         .bind(&user.id)
         .bind(revision)
