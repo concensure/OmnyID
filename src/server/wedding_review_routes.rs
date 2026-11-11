@@ -635,9 +635,10 @@ mod tests {
     }
 
     #[test]
-    fn public_enquiry_feedback_is_rejected_before_storage() {
+    fn public_enquiry_feedback_cannot_be_submitted() {
         let mut value = request();
         value.experience_kind = ReviewExperienceKind::EnquiryTour;
+        value.action = RevisionAction::Submit;
         assert_eq!(
             validate_request(&value).unwrap_err().0,
             StatusCode::BAD_REQUEST
