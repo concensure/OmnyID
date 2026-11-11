@@ -1,3 +1,36 @@
+## 2026-11-12 - WED-360 evidence lifecycle and Wedding regression slice (Codex, in progress)
+
+Worktree `C:\temp\wt\omnyid-wed360`, branch `agent/codex/WED-360`;
+implementation commit `8cd29692db80aa95730238d97a0db3eb0132b9b6`.
+
+- Saved seating-canvas assignments now feed the canonical seating projection,
+  so an already seated attending guest no longer produces an assignment
+  decision. Generic Wedding-vendor searches use a bounded whole-directory pass;
+  official/source-page-backed records remain eligible. Explicit category
+  searches are hard constraints, preventing hair/makeup evidence and Amy Chan
+  recommendations from leaking into venue comparisons.
+- The public celebrant page now explains and exposes the real phone-verification
+  action. It opens the requested celebrant's published consultation time, stays
+  honest when no time exists and never silently substitutes another celebrant.
+- Migration 0162 and the operator evidence routes extend the existing private
+  upload authority. Access requires an enumerated purpose, mints the existing
+  short-lived signed attachment URL and writes a content-free audit. Purge is
+  scheduled first and records success only after object and tenant attachment
+  deletion; failures remain retryable. Review rollout remains false-default.
+- Evidence: TypeScript typecheck, full 2,273-test Wedding suite, public Wedding
+  site suite, JS syntax check, line budgets and 17 focused frontend regressions
+  pass. `cargo check --lib`, nine review contract tests and two evidence-route
+  unit tests pass. Disposable PostgreSQL 18/pgvector applied migrations 0161-0162;
+  the real router proved concurrent retry convergence, partner duplicate refusal,
+  proof linking, purpose-bound access, one access audit, scheduled purge, byte
+  deletion and terminal purged state. The exact disposable container was removed.
+- WED-360 is not complete and was not deployed. Remaining dependencies are
+  claim-specific eligibility, author correction/withdrawal and status UI,
+  invitation handling, moderation/publication and disputes, vendor replies,
+  deterministic public aggregates/DecisionOS evidence, analytics, accessibility
+  and exact-SHA hosted false-default/pilot checks. `Read the couple's story`
+  remains deferred until a real couple grants separate permission.
+
 ## 2026-11-10 - WED-354 Database, account isolation and quote sharing (Codex, release candidate)
 
 Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
