@@ -829,4 +829,9 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Audited operator access and fail-closed purge execution for protected Wedding review evidence",
         include_str!("../../postgres/migrations/0162_wedding_review_evidence_access.sql"),
     ),
+    (
+        "0163_wedding_review_eligibility",
+        "Claim-specific Wedding review eligibility assessments and private duplicate reconciliation signals",
+        include_str!("../../postgres/migrations/0163_wedding_review_eligibility.sql"),
+    ),
 ];

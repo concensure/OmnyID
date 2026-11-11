@@ -6,10 +6,13 @@ use omnyid_homeserver::wedding_reviews::{
 const MIGRATION: &str = include_str!("../postgres/migrations/0161_wedding_reviews.sql");
 const EVIDENCE_ACCESS_MIGRATION: &str =
     include_str!("../postgres/migrations/0162_wedding_review_evidence_access.sql");
+const ELIGIBILITY_MIGRATION: &str =
+    include_str!("../postgres/migrations/0163_wedding_review_eligibility.sql");
 const ROUTES: &str = include_str!("../src/server/wedding_review_routes.rs");
 const EVIDENCE_ROUTES: &str = include_str!("../src/server/wedding_review_evidence_routes.rs");
 const EVIDENCE_OPERATOR_ROUTES: &str =
     include_str!("../src/server/wedding_review_evidence_operator_routes.rs");
+const ELIGIBILITY_ROUTES: &str = include_str!("../src/server/wedding_review_eligibility_routes.rs");
 const SERVER: &str = include_str!("../src/server/mod.rs");
 
 #[test]
@@ -147,6 +150,30 @@ fn operator_evidence_access_is_purpose_bound_audited_and_purgeable() {
         assert!(
             !EVIDENCE_ACCESS_MIGRATION.contains(forbidden),
             "operator evidence audit must remain content-light: {forbidden}"
+        );
+    }
+}
+
+#[test]
+fn eligibility_is_versioned_claim_specific_and_private() {
+    assert!(ELIGIBILITY_MIGRATION.contains("verification_version BIGINT"));
+    assert!(ELIGIBILITY_MIGRATION.contains("wedding_review_eligibility_assessments"));
+    assert!(ELIGIBILITY_MIGRATION.contains("probable_duplicate BOOLEAN"));
+    assert!(ELIGIBILITY_ROUTES.contains("evaluate_review_eligibility"));
+    assert!(ELIGIBILITY_ROUTES.contains("purpose_code IN ('eligibility','evidence')"));
+    assert!(ELIGIBILITY_ROUTES.contains("event_month_wholly_past"));
+    assert!(ELIGIBILITY_ROUTES.contains("accepted_post_event_delivery"));
+    assert!(SERVER.contains(".merge(wedding_review_eligibility_routes::routes())"));
+    for forbidden in [
+        "review_text",
+        "reviewer_email",
+        "reviewer_phone",
+        "evidence_content",
+        "attachment_id",
+    ] {
+        assert!(
+            !ELIGIBILITY_MIGRATION.contains(forbidden),
+            "eligibility assessment must not retain private material: {forbidden}"
         );
     }
 }

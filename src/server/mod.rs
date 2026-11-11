@@ -183,6 +183,7 @@ mod wedding_preference_routes; mod wedding_quote_decoder_routes; mod wedding_quo
 mod wedding_review_routes;
 mod wedding_review_evidence_routes;
 mod wedding_review_evidence_operator_routes;
+mod wedding_review_eligibility_routes;
 mod wedding_invite_proposal_opportunity_ledger; mod wedding_invite_proposal_opportunity_routes; mod wedding_invite_proposal_routes;
 mod wedding_celebrant_consultation_routes;
 mod wedding_celebrant_management_link_routes;
@@ -1444,6 +1445,7 @@ pub async fn run() {
         .merge(wedding_review_routes::routes())
         .merge(wedding_review_evidence_routes::routes())
         .merge(wedding_review_evidence_operator_routes::routes())
+        .merge(wedding_review_eligibility_routes::routes())
         .merge(wedding_rsvp_capability_routes::routes())
         .merge(wedding_rsvp_reminder_routes::routes())
         .merge(wedding_rsvp_response_routes::routes())
@@ -1611,6 +1613,7 @@ pub async fn build_test_router(database_url: &str) -> Router {
         .merge(wedding_review_routes::routes())
         .merge(wedding_review_evidence_routes::routes())
         .merge(wedding_review_evidence_operator_routes::routes())
+        .merge(wedding_review_eligibility_routes::routes())
         .merge(planning_constraint_routes::routes()).merge(planning_constraint_capture_routes::routes()).merge(planning_constraint_evaluation_routes::routes()).merge(planning_constraint_intervention_routes::routes()).merge(planning_cost_tradeoff_routes::routes()).merge(planning_directory_evaluation_routes::routes()).merge(planning_milestone_routes::routes()).merge(planning_vendor_change_routes::routes())
         .layer(cors_layer())
         .layer(axum::middleware::from_fn(request_id_middleware))

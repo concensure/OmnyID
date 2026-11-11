@@ -155,7 +155,7 @@ fn review_body(plan_id: &str, workspace_id: &str, vendor_id: &str, key: &str) ->
         "experience_kind": "wedding_held",
         "experience_status": "completed",
         "rating": 5,
-        "event_month": "2026-11-01",
+        "event_month": "2026-10-01",
         "display_mode": "omnyid_couple",
         "title": "Clear communication",
         "body": "The venue team explained the wet-weather plan clearly.",
@@ -283,6 +283,49 @@ async fn concurrent_retry_and_partner_submission_converge_without_duplicate_rati
     let access_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM wedding_review_evidence_access_log WHERE review_id=$1 AND purpose_code='eligibility'")
         .bind(review_id).fetch_one(&db.pool).await.expect("access count");
     assert_eq!(access_count, 1);
+    let eligibility_request = json!({
+        "expected_revision":1,
+        "expected_verification_version":0,
+        "idempotency_key":format!("eligibility-{suffix}"),
+        "evidence_decisions":[{
+            "evidence_ref_id":evidence_ref_id,
+            "decision":"accept"
+        }]
+    });
+    let (eligibility_status, eligibility) = request_json(
+        &app,
+        Method::POST,
+        &format!("/admin/wedding/reviews/{review_id}/eligibility"),
+        &operator_auth,
+        Some(&eligibility_request),
+    )
+    .await;
+    assert_eq!(
+        eligibility_status,
+        StatusCode::OK,
+        "eligibility decision: {eligibility}"
+    );
+    assert_eq!(eligibility["verification_state"], "verified_wedding_held");
+    assert_eq!(eligibility["review_status"], "moderation_pending");
+    assert_eq!(eligibility["probable_duplicate"], false);
+    let (eligibility_retry_status, eligibility_retry) = request_json(
+        &app,
+        Method::POST,
+        &format!("/admin/wedding/reviews/{review_id}/eligibility"),
+        &operator_auth,
+        Some(&eligibility_request),
+    )
+    .await;
+    assert_eq!(eligibility_retry_status, StatusCode::OK);
+    assert_eq!(eligibility_retry["replayed"], true);
+    let assessment_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM wedding_review_eligibility_assessments WHERE review_id=$1",
+    )
+    .bind(review_id)
+    .fetch_one(&db.pool)
+    .await
+    .expect("eligibility assessment count");
+    assert_eq!(assessment_count, 1);
     let (partner_schedule_status, partner_scheduled) = request_json(
         &app,
         Method::POST,

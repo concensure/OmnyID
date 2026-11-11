@@ -81,6 +81,151 @@ pub struct ReviewAggregate {
     pub show_compact_score: bool,
 }
 
+/// Content-light facts used by the deterministic eligibility evaluator.
+/// Source record identifiers and evidence content deliberately stay outside
+/// this value so it is safe to persist in the private operator assessment.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct ReviewEligibilitySignals {
+    pub canonical_planner_activity: bool,
+    pub canonical_enquiry_or_tour: bool,
+    pub canonical_booking: bool,
+    pub accepted_planner_activity: bool,
+    pub accepted_enquiry_or_tour: bool,
+    pub accepted_booking: bool,
+    pub accepted_post_event_delivery: bool,
+    /// The claimed event month is wholly in the past. This signal never proves
+    /// delivery on its own.
+    pub event_month_wholly_past: bool,
+    pub probable_duplicate: bool,
+    pub conflicting_evidence: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ReviewEligibilityDecision {
+    pub verification: ReviewVerificationState,
+    pub reason_codes: Vec<&'static str>,
+    pub signal_codes: Vec<&'static str>,
+    pub probable_duplicate: bool,
+}
+
+/// Evaluates only what the supplied canonical facts and operator-reviewed
+/// evidence establish. An account, invitation, authored event month, enquiry
+/// or booking is intentionally insufficient to prove that a wedding occurred.
+pub fn evaluate_review_eligibility(
+    subject: ReviewSubjectKind,
+    experience: ReviewExperienceKind,
+    signals: ReviewEligibilitySignals,
+) -> ReviewEligibilityDecision {
+    let mut signal_codes = Vec::new();
+    for (present, code) in [
+        (
+            signals.canonical_planner_activity,
+            "canonical_planner_activity",
+        ),
+        (
+            signals.canonical_enquiry_or_tour,
+            "canonical_enquiry_or_tour",
+        ),
+        (signals.canonical_booking, "canonical_booking"),
+        (
+            signals.accepted_planner_activity,
+            "accepted_planner_activity",
+        ),
+        (signals.accepted_enquiry_or_tour, "accepted_enquiry_or_tour"),
+        (signals.accepted_booking, "accepted_booking"),
+        (
+            signals.accepted_post_event_delivery,
+            "accepted_post_event_delivery",
+        ),
+        (signals.event_month_wholly_past, "event_month_wholly_past"),
+    ] {
+        if present {
+            signal_codes.push(code);
+        }
+    }
+    if signals.probable_duplicate {
+        signal_codes.push("probable_duplicate_private_match");
+    }
+    if signals.conflicting_evidence {
+        signal_codes.push("conflicting_evidence");
+    }
+
+    if signals.probable_duplicate || signals.conflicting_evidence {
+        return ReviewEligibilityDecision {
+            verification: ReviewVerificationState::Conflicted,
+            reason_codes: vec![if signals.probable_duplicate {
+                "probable_duplicate"
+            } else {
+                "conflicting_evidence"
+            }],
+            signal_codes,
+            probable_duplicate: signals.probable_duplicate,
+        };
+    }
+
+    let (verified, verification, missing_reason, supporting) = match (subject, experience) {
+        (ReviewSubjectKind::Planner, ReviewExperienceKind::PlannerTask)
+        | (ReviewSubjectKind::Planner, ReviewExperienceKind::Resource) => (
+            signals.canonical_planner_activity || signals.accepted_planner_activity,
+            ReviewVerificationState::VerifiedActivity,
+            "planner_activity_not_established",
+            signals.canonical_planner_activity || signals.accepted_planner_activity,
+        ),
+        (ReviewSubjectKind::Vendor, ReviewExperienceKind::EnquiryTour)
+        | (ReviewSubjectKind::Vendor, ReviewExperienceKind::Resource) => (
+            signals.canonical_enquiry_or_tour || signals.accepted_enquiry_or_tour,
+            ReviewVerificationState::VerifiedActivity,
+            "enquiry_or_tour_not_established",
+            signals.canonical_enquiry_or_tour || signals.accepted_enquiry_or_tour,
+        ),
+        (ReviewSubjectKind::Vendor, ReviewExperienceKind::Booking) => (
+            signals.canonical_booking || signals.accepted_booking,
+            ReviewVerificationState::VerifiedBooking,
+            "booking_not_established",
+            signals.canonical_enquiry_or_tour
+                || signals.accepted_enquiry_or_tour
+                || signals.canonical_booking
+                || signals.accepted_booking,
+        ),
+        (ReviewSubjectKind::Vendor, ReviewExperienceKind::WeddingHeld) => (
+            signals.event_month_wholly_past && signals.accepted_post_event_delivery,
+            ReviewVerificationState::VerifiedWeddingHeld,
+            if !signals.event_month_wholly_past {
+                "event_month_not_wholly_past"
+            } else {
+                "post_event_delivery_not_established"
+            },
+            signals.event_month_wholly_past
+                || signals.accepted_post_event_delivery
+                || signals.canonical_booking
+                || signals.accepted_booking,
+        ),
+        _ => (
+            false,
+            ReviewVerificationState::Insufficient,
+            "experience_subject_mismatch",
+            false,
+        ),
+    };
+
+    ReviewEligibilityDecision {
+        verification: if verified {
+            verification
+        } else if supporting {
+            ReviewVerificationState::Pending
+        } else {
+            ReviewVerificationState::Insufficient
+        },
+        reason_codes: if verified {
+            vec!["claim_established"]
+        } else {
+            vec![missing_reason]
+        },
+        signal_codes,
+        probable_duplicate: false,
+    }
+}
+
 /// Validates the subject/experience shape of an in-progress private draft.
 /// Drafts deliberately allow an unselected rating; submission/publication
 /// applies the stricter audience rules in `validate_policy`.
@@ -347,5 +492,69 @@ mod tests {
             review_supertags("rev-1", ReviewSubjectKind::Vendor),
             vec!["wedding_review", "review:rev-1", "wedding_review_vendor"]
         );
+    }
+
+    #[test]
+    fn elapsed_month_or_booking_alone_never_proves_wedding_delivery() {
+        let result = evaluate_review_eligibility(
+            ReviewSubjectKind::Vendor,
+            ReviewExperienceKind::WeddingHeld,
+            ReviewEligibilitySignals {
+                canonical_booking: true,
+                event_month_wholly_past: true,
+                ..Default::default()
+            },
+        );
+        assert_eq!(result.verification, ReviewVerificationState::Pending);
+        assert_eq!(
+            result.reason_codes,
+            vec!["post_event_delivery_not_established"]
+        );
+    }
+
+    #[test]
+    fn wedding_held_requires_past_month_and_accepted_delivery_proof() {
+        let result = evaluate_review_eligibility(
+            ReviewSubjectKind::Vendor,
+            ReviewExperienceKind::WeddingHeld,
+            ReviewEligibilitySignals {
+                event_month_wholly_past: true,
+                accepted_post_event_delivery: true,
+                ..Default::default()
+            },
+        );
+        assert_eq!(
+            result.verification,
+            ReviewVerificationState::VerifiedWeddingHeld
+        );
+    }
+
+    #[test]
+    fn enquiry_evidence_cannot_be_promoted_to_booking() {
+        let result = evaluate_review_eligibility(
+            ReviewSubjectKind::Vendor,
+            ReviewExperienceKind::Booking,
+            ReviewEligibilitySignals {
+                canonical_enquiry_or_tour: true,
+                ..Default::default()
+            },
+        );
+        assert_eq!(result.verification, ReviewVerificationState::Pending);
+        assert_eq!(result.reason_codes, vec!["booking_not_established"]);
+    }
+
+    #[test]
+    fn private_duplicate_signal_forces_operator_reconciliation() {
+        let result = evaluate_review_eligibility(
+            ReviewSubjectKind::Planner,
+            ReviewExperienceKind::PlannerTask,
+            ReviewEligibilitySignals {
+                canonical_planner_activity: true,
+                probable_duplicate: true,
+                ..Default::default()
+            },
+        );
+        assert_eq!(result.verification, ReviewVerificationState::Conflicted);
+        assert!(result.probable_duplicate);
     }
 }
