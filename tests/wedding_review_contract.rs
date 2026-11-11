@@ -14,6 +14,8 @@ const CORRECTION_MIGRATION: &str =
     include_str!("../postgres/migrations/0165_wedding_review_correction_receipts.sql");
 const MODERATION_MIGRATION: &str =
     include_str!("../postgres/migrations/0166_wedding_review_moderation.sql");
+const VENDOR_BOUNDARY_MIGRATION: &str =
+    include_str!("../postgres/migrations/0167_wedding_review_vendor_boundary.sql");
 const ROUTES: &str = include_str!("../src/server/wedding_review_routes.rs");
 const EVIDENCE_ROUTES: &str = include_str!("../src/server/wedding_review_evidence_routes.rs");
 const EVIDENCE_OPERATOR_ROUTES: &str =
@@ -22,6 +24,9 @@ const ELIGIBILITY_ROUTES: &str = include_str!("../src/server/wedding_review_elig
 const AUTHOR_ROUTES: &str = include_str!("../src/server/wedding_review_author_routes.rs");
 const MODERATION_ROUTES: &str = include_str!("../src/server/wedding_review_moderation_routes.rs");
 const PUBLIC_ROUTES: &str = include_str!("../src/server/wedding_review_public_routes.rs");
+const VENDOR_ROUTES: &str = include_str!("../src/server/wedding_review_vendor_routes.rs");
+const VENDOR_MODERATION_ROUTES: &str =
+    include_str!("../src/server/wedding_review_vendor_moderation_routes.rs");
 const MESSAGE_ATTACHMENTS: &str = include_str!("../src/db/message_attachments.rs");
 const SERVER: &str = include_str!("../src/server/mod.rs");
 
@@ -268,4 +273,29 @@ fn public_projection_uses_only_publications_and_one_eligible_scored_set() {
     assert!(!PUBLIC_ROUTES.contains("wedding_review_revision_content"));
     assert!(!PUBLIC_ROUTES.contains("tenant_messages_table"));
     assert!(SERVER.contains(".merge(wedding_review_public_routes::routes())"));
+}
+
+#[test]
+fn vendor_boundary_keeps_reply_and_report_narrative_private() {
+    assert!(VENDOR_BOUNDARY_MIGRATION.contains("wedding_review_reports"));
+    assert!(VENDOR_BOUNDARY_MIGRATION.contains("wedding_review_reply_access_log"));
+    assert!(VENDOR_ROUTES.contains("require_vendor_access"));
+    assert!(VENDOR_ROUTES.contains("VendorPermission::Publish"));
+    assert!(VENDOR_ROUTES.contains("wedding_review_vendor_reply"));
+    assert!(VENDOR_ROUTES.contains("wedding_review_vendor_report"));
+    assert!(VENDOR_ROUTES.contains("store_private_app_message"));
+    assert!(!VENDOR_BOUNDARY_MIGRATION.contains("review_text"));
+    assert!(!VENDOR_BOUNDARY_MIGRATION.contains("report_detail"));
+    assert!(SERVER.contains(".merge(wedding_review_vendor_routes::routes())"));
+}
+
+#[test]
+fn vendors_can_report_and_reply_but_cannot_moderate_reviews() {
+    assert!(VENDOR_MODERATION_ROUTES.contains("operator_access_allowed"));
+    assert!(VENDOR_MODERATION_ROUTES.contains("Open the current reply preview before deciding it."));
+    assert!(VENDOR_MODERATION_ROUTES.contains("review_restricted"));
+    assert!(VENDOR_MODERATION_ROUTES.contains("restriction remains"));
+    assert!(!VENDOR_ROUTES.contains("UPDATE wedding_review_publications SET status"));
+    assert!(!VENDOR_ROUTES.contains("wedding_review_moderation_decisions"));
+    assert!(SERVER.contains(".merge(wedding_review_vendor_moderation_routes::routes())"));
 }

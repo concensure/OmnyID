@@ -3377,3 +3377,26 @@ synthetic vendor search or introduce another send path.
   excludes account/contact/evidence/duplicate identifiers, and score/count use
   the same current eligible scored wedding-held set. Name-bearing display modes
   fail closed until an explicit separately approved public couple label exists.
+
+# 2026-11-12 — Vendor review responses remain private until independent moderation
+
+- A verified vendor owner, manager or profile editor may report a current
+  public review or write an attributed reply, but both narratives are stored in
+  that acting member's tenant-private AFP schema.
+- Vendor-facing reads contain only the public review snapshot and the vendor's
+  own reply/report workflow state. They never expose author identity, evidence,
+  eligibility signals or operator notes, and vendor commands cannot alter a
+  publication.
+- Publishing a reply requires a recent audited operator preview of the exact
+  private revision. A report adds a reason-coded dispute to the shared queue;
+  restricting the review remains a separate operator decision.
+
+# 2026-11-12 — Database run-sheet preview is a reactive projection, not a second schedule
+
+- The visual master sequence reads the same `wedding_runsheet.v1` presented
+  rows used by the grid, saved views, print and sharing controls. It does not
+  copy times, owners or notes into another store.
+- Source controls focus the canonical projected record. Changes in the
+  underlying AFP source continue to trigger the existing source-ID/timestamp
+  fingerprinted projector, so the visual sequence and editable table update
+  together and preserve the record revision trail.

@@ -37,6 +37,12 @@
     var meta = document.createElement('p'); meta.className = 'vendor-meta'; meta.textContent = [vendor.category, vendor.service_area].filter(Boolean).join(' · '); body.appendChild(meta);
     if (vendor.description) { var desc = document.createElement('p'); desc.className = 'vendor-summary'; desc.textContent = vendor.description.slice(0, 260); body.appendChild(desc); }
     addChips(body, vendor.styles);
+    var reviewCount = vendor.reviews && Number(vendor.reviews.count || 0); var scoredCount = vendor.reviews && Number(vendor.reviews.scored_count || 0);
+    var reviewLine = document.createElement('p'); reviewLine.className = 'vendor-review-line';
+    if (!reviewCount) reviewLine.textContent = 'No wedding reviews on OmnyID yet';
+    else if (scoredCount >= 3 && vendor.reviews.average) reviewLine.textContent = vendor.reviews.average + ' out of 5 · ' + reviewCount + ' wedding review' + (reviewCount === 1 ? '' : 's');
+    else reviewLine.textContent = reviewCount + ' wedding review' + (reviewCount === 1 ? '' : 's') + ' · score shown after 3 eligible reviews';
+    body.appendChild(reviewLine);
     if (/celebrant/i.test(vendor.category || '')) { var availability = document.createElement('p'); availability.className = 'consultation-status'; availability.textContent = consultationLabel(vendor.consultation); body.appendChild(availability); }
     var pricing = document.createElement('p'); pricing.className = 'vendor-price-line'; pricing.innerHTML = '<strong>Pricing:</strong> Ask for a current, date-specific quote'; body.appendChild(pricing);
     if (vendor.claim_cta) { var claimNote = document.createElement('p'); claimNote.className = 'vendor-claim-note'; claimNote.textContent = 'Own this business? Claim this listing to update photos, pricing, and reply to enquiries.'; body.appendChild(claimNote); }

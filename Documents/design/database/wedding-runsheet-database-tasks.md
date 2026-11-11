@@ -381,6 +381,25 @@ boundary rather than being inferred from these local checks.
 | Projector receives unchanged events | Zero effective revisions and zero model calls |
 | Couple opens/sorts/scrolls grid | Zero model calls |
 | Couple previews Vendor view | Private couple/contact fields excluded |
+
+## WED-362 — Living source-linked sequence in Database
+
+- [x] Render the Master run sheet directly in Database as an immediately
+  readable chronological sequence, without creating a second record store.
+- [x] Show time, title, detail, owner and an explicit source-linked state.
+- [x] Let the source control focus the exact canonical run-sheet row and its
+  existing revision context in the editable grid.
+- [x] Keep the sequence reactive to the existing account-scoped incremental
+  projector so task, booking, vendor-arrival and other source changes update
+  both the sequence and grid together.
+- [ ] Add browser evidence for mobile, keyboard focus, empty state, print and a
+  simulated underlying-source change after the frontend dependency baseline is
+  healthy.
+
+The screenshot promise is implemented as a presentation of
+`wedding_runsheet.v1` rows. No times, owners or notes are copied into a landing
+page model or local checklist; saved views, print, sharing preview, the visible
+sequence and the grid all consume the same canonical record IDs.
 | Share is revoked | Hosted access fails; audit remains |
 | Offline day-of mode opens | Last synchronized data and timestamp are visible |
 | Concurrent edit and source update touch same field | Both histories preserved; conflict requires review |

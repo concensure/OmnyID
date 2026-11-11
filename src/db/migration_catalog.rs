@@ -849,4 +849,9 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Audited and idempotent Wedding review moderation and publication",
         include_str!("../../postgres/migrations/0166_wedding_review_moderation.sql"),
     ),
+    (
+        "0167_wedding_review_vendor_boundary",
+        "Private AFP vendor replies, reports and audited moderation receipts",
+        include_str!("../../postgres/migrations/0167_wedding_review_vendor_boundary.sql"),
+    ),
 ];

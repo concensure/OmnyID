@@ -753,6 +753,17 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
           rows={runSheetRows()}
           archived={databaseReadOnly()}
           onMessage={(message) => recordLocalMessage(message as DatabaseMessage)}
+          onFocusRecord={(recordId) => {
+            setActiveTable("run_sheet");
+            setRunSheetFilters(weddingRunSheetDefaultFilters());
+            setSelectedRowIds([recordId]);
+            window.requestAnimationFrame(() => {
+              runSheetRecordsAnchorRef?.scrollIntoView({ behavior: "smooth", block: "start" });
+              runSheetRecordsAnchorRef?.focus({ preventScroll: true });
+              const firstColumn = columns()[0]?.key;
+              if (firstColumn) document.getElementById(databaseCellFocusId(recordId, firstColumn))?.focus({ preventScroll: true });
+            });
+          }}
         />
       }</Show>
 

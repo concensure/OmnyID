@@ -44,6 +44,40 @@ impl Db {
         .await
     }
 
+    /// Returns one vendor-authored review reply or report from the exact
+    /// member's tenant-private AFP store. Callers establish vendor membership
+    /// or operator access before using this deliberately non-enumerating read.
+    pub async fn wedding_review_vendor_content(
+        &self,
+        authored_by_user_id: &str,
+        afp_message_id: &str,
+        subtype: &str,
+        review_id: &str,
+    ) -> Result<Option<Value>, sqlx::Error> {
+        if !matches!(
+            subtype,
+            "wedding_review_vendor_reply" | "wedding_review_vendor_report"
+        ) {
+            return Ok(None);
+        }
+        self.ensure_user_private_schema(authored_by_user_id).await?;
+        let messages = tenant_messages_table(authored_by_user_id);
+        sqlx::query_scalar(&format!(
+            r#"SELECT content
+               FROM {messages}
+               WHERE id = $1
+                 AND subtype = $2
+                 AND metadata->>'origin' = 'server_wedding_review_vendor_boundary'
+                 AND content->>'review_id' = $3
+               LIMIT 1"#,
+        ))
+        .bind(afp_message_id)
+        .bind(subtype)
+        .bind(review_id)
+        .fetch_optional(&self.pool)
+        .await
+    }
+
     pub async fn private_attachment_by_id(
         &self,
         owner_user_id: &str,

@@ -41,6 +41,7 @@ struct DirectoryPageQuery {
 
 #[derive(Debug)]
 struct PublicVendorPageRow {
+    vendor_id: String,
     slug: String,
     name: String,
     category: String,
@@ -63,6 +64,9 @@ struct PublicVendorPageRow {
     consultation_next_date: Option<chrono::NaiveDate>,
     consultation_next_weekday: Option<i16>,
     consultation_next_time: Option<chrono::NaiveTime>,
+    review_count: i64,
+    scored_review_count: i64,
+    review_average: Option<String>,
 }
 
 async fn directory_page_http(
@@ -118,7 +122,7 @@ async fn directory_rows(
 ) -> Result<Vec<PublicVendorPageRow>, (StatusCode, String)> {
     let rows = sqlx::query(
         r#"
-        SELECT v.vendor_slug, v.vendor_name, v.category, v.service_area, v.address,
+        SELECT v.vendor_id,v.vendor_slug, v.vendor_name, v.category, v.service_area, v.address,
                CASE WHEN COALESCE((p.publication_visibility->>'website_url')::boolean,FALSE)
                     THEN COALESCE(NULLIF(p.published_public_contact->>'website_url',''),v.website_url)
                     ELSE v.website_url END AS website_url, v.claim_status,
@@ -134,6 +138,9 @@ async fn directory_rows(
                COALESCE(cp.register_status,'pending') AS register_status,
                EXISTS(SELECT 1 FROM wedding_celebrant_live_sessions live WHERE live.vendor_id=v.vendor_id AND live.paused_at IS NULL AND live.expires_at>NOW()+make_interval(mins=>COALESCE(cp.consultation_minutes,10)+COALESCE(cp.buffer_minutes,5)) AND (SELECT COUNT(*) FROM wedding_celebrant_callback_requests request WHERE request.live_session_id=live.session_id AND request.status IN ('waiting_acceptance','accepted') AND COALESCE(request.hold_expires_at,live.expires_at)>NOW())<live.call_cap) AS consultation_live,
                next_window.local_date AS consultation_next_date,next_window.weekday AS consultation_next_weekday,next_window.starts_at AS consultation_next_time
+               ,(SELECT COUNT(*)::bigint FROM wedding_review_publications review WHERE review.vendor_id=v.vendor_id AND review.status='published') AS review_count
+               ,(SELECT COUNT(*)::bigint FROM wedding_review_publications review WHERE review.vendor_id=v.vendor_id AND review.status='published' AND review.aggregate_eligible AND review.rating IS NOT NULL) AS scored_review_count
+               ,(SELECT ROUND(AVG(review.rating)::numeric,1)::text FROM wedding_review_publications review WHERE review.vendor_id=v.vendor_id AND review.status='published' AND review.aggregate_eligible AND review.rating IS NOT NULL) AS review_average
         FROM wedding_vendors v
         LEFT JOIN wedding_vendor_owner_profile p ON p.vendor_id = v.vendor_id
         LEFT JOIN wedding_celebrant_pilot_profiles cp ON cp.vendor_id=v.vendor_id
@@ -167,7 +174,7 @@ async fn vendor_row(
 ) -> Result<PublicVendorPageRow, (StatusCode, String)> {
     sqlx::query(
         r#"
-        SELECT v.vendor_slug, v.vendor_name, v.category, v.service_area, v.address,
+        SELECT v.vendor_id,v.vendor_slug, v.vendor_name, v.category, v.service_area, v.address,
                CASE WHEN COALESCE((p.publication_visibility->>'website_url')::boolean,FALSE)
                     THEN COALESCE(NULLIF(p.published_public_contact->>'website_url',''),v.website_url)
                     ELSE v.website_url END AS website_url, v.claim_status,
@@ -183,6 +190,9 @@ async fn vendor_row(
                COALESCE(cp.register_status,'pending') AS register_status,
                EXISTS(SELECT 1 FROM wedding_celebrant_live_sessions live WHERE live.vendor_id=v.vendor_id AND live.paused_at IS NULL AND live.expires_at>NOW()+make_interval(mins=>COALESCE(cp.consultation_minutes,10)+COALESCE(cp.buffer_minutes,5)) AND (SELECT COUNT(*) FROM wedding_celebrant_callback_requests request WHERE request.live_session_id=live.session_id AND request.status IN ('waiting_acceptance','accepted') AND COALESCE(request.hold_expires_at,live.expires_at)>NOW())<live.call_cap) AS consultation_live,
                next_window.local_date AS consultation_next_date,next_window.weekday AS consultation_next_weekday,next_window.starts_at AS consultation_next_time
+               ,(SELECT COUNT(*)::bigint FROM wedding_review_publications review WHERE review.vendor_id=v.vendor_id AND review.status='published') AS review_count
+               ,(SELECT COUNT(*)::bigint FROM wedding_review_publications review WHERE review.vendor_id=v.vendor_id AND review.status='published' AND review.aggregate_eligible AND review.rating IS NOT NULL) AS scored_review_count
+               ,(SELECT ROUND(AVG(review.rating)::numeric,1)::text FROM wedding_review_publications review WHERE review.vendor_id=v.vendor_id AND review.status='published' AND review.aggregate_eligible AND review.rating IS NOT NULL) AS review_average
         FROM wedding_vendors v
         LEFT JOIN wedding_vendor_owner_profile p ON p.vendor_id = v.vendor_id
         LEFT JOIN wedding_celebrant_pilot_profiles cp ON cp.vendor_id=v.vendor_id
@@ -211,6 +221,7 @@ async fn vendor_row(
 
 fn page_row(row: sqlx::postgres::PgRow) -> PublicVendorPageRow {
     PublicVendorPageRow {
+        vendor_id: row.get("vendor_id"),
         slug: row.get("vendor_slug"),
         name: row.get("vendor_name"),
         category: row.get("category"),
@@ -233,6 +244,9 @@ fn page_row(row: sqlx::postgres::PgRow) -> PublicVendorPageRow {
         consultation_next_date: row.try_get("consultation_next_date").ok().flatten(),
         consultation_next_weekday: row.try_get("consultation_next_weekday").ok().flatten(),
         consultation_next_time: row.try_get("consultation_next_time").ok().flatten(),
+        review_count: row.get("review_count"),
+        scored_review_count: row.get("scored_review_count"),
+        review_average: row.try_get("review_average").ok().flatten(),
     }
 }
 
@@ -265,8 +279,9 @@ fn directory_card(vendor: &PublicVendorPageRow) -> String {
     let talk = vendor.category.eq_ignore_ascii_case("celebrant").then(|| format!(
         "<a class=\"btn btn-outline\" href=\"/wedding/talk-to-a-celebrant.html?vendor={}\">Talk for 10 minutes</a>",escape_html(&vendor.slug)
     )).unwrap_or_default();
+    let reviews = review_summary(vendor);
     format!(
-        "<article class=\"vendor-card\">{}<div class=\"vendor-card-body\"><span class=\"vendor-badge\">{}</span><h3>{}</h3><p class=\"vendor-meta\">{} · {}</p>{}<div class=\"vendor-chip-list\">{}{}</div>{}<p class=\"vendor-price-line\"><strong>Pricing:</strong> Ask for a current, date-specific quote</p><div class=\"vendor-card-actions\"><a class=\"btn btn-primary\" href=\"/wedding/directory/{}\">View details</a>{}</div></div></article>",
+        "<article class=\"vendor-card\">{}<div class=\"vendor-card-body\"><span class=\"vendor-badge\">{}</span><h3>{}</h3><p class=\"vendor-meta\">{} · {}</p>{}<div class=\"vendor-chip-list\">{}{}</div>{}<p class=\"vendor-review-line\">{}</p><p class=\"vendor-price-line\"><strong>Pricing:</strong> Ask for a current, date-specific quote</p><div class=\"vendor-card-actions\"><a class=\"btn btn-primary\" href=\"/wedding/directory/{}\">View details</a>{}</div></div></article>",
         profile_media(vendor),
         status,
         escape_html(&vendor.name),
@@ -276,9 +291,22 @@ fn directory_card(vendor: &PublicVendorPageRow) -> String {
         strengths,
         ceremonies,
         consultation,
+        escape_html(&reviews),
         escape_html(&vendor.slug),
         talk,
     )
+}
+
+fn review_summary(vendor: &PublicVendorPageRow) -> String {
+    if vendor.review_count == 0 {
+        return "No wedding reviews on OmnyID yet".into();
+    }
+    if vendor.scored_review_count >= 3 {
+        if let Some(average) = vendor.review_average.as_deref() {
+            return format!("{average} out of 5 · {} wedding review{}", vendor.review_count, if vendor.review_count == 1 { "" } else { "s" });
+        }
+    }
+    format!("{} wedding review{} · score shown after 3 eligible reviews", vendor.review_count, if vendor.review_count == 1 { "" } else { "s" })
 }
 
 fn render_vendor_page(vendor: &PublicVendorPageRow) -> String {
@@ -365,7 +393,7 @@ fn render_vendor_page(vendor: &PublicVendorPageRow) -> String {
         chips(&vendor.strengths,12,"Strength"),chips(&vendor.ceremony_types,12,"Ceremony type"),escape_html(&consultation_label(vendor)),escape_html(&vendor.slug)
     )).unwrap_or_default();
     format!(
-        r##"<!doctype html><html lang="en-AU"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{name} | OmnyID Weddings</title><meta name="description" content="{description}"><link rel="canonical" href="{canonical}"><meta property="og:type" content="website"><meta property="og:locale" content="en_AU"><meta property="og:url" content="{canonical}"><meta property="og:title" content="{name} | OmnyID Weddings"><meta property="og:description" content="{description}"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="{name} | OmnyID Weddings"><meta name="twitter:description" content="{description}"><link rel="stylesheet" href="/wedding/assets/css/style.css"><link rel="stylesheet" href="/wedding/assets/css/directory.css"><script type="application/ld+json">{schema}</script></head><body><a class="skip-link" href="#main">Skip to main content</a><header class="site-header"><div class="container header-inner"><a href="/wedding/" class="logo"><img class="logo-img" src="/wedding/assets/logo/omnyid-logo.png" alt="" width="102" height="40"><span>Weddings</span></a><a class="btn btn-outline" href="/wedding/vendors.html?category={category_query}">All {category_plural}</a></div></header><main id="main"><section class="directory-hero"><div class="container"><p class="eyebrow">{category} · {area}</p><div class="vendor-profile-hero">{media}<div><h1>{name}</h1><p>{description}</p></div></div></div></section><section class="directory-results"><div class="container vendor-profile-layout"><div><dl class="vendor-facts">{address}<dt>Service area</dt><dd>{area}</dd><dt>Capacity or coverage</dt><dd>{capacity}</dd><dt>Pricing basis</dt><dd>{price}</dd>{phone}{email}</dl>{celebrant_details}</div><aside><div class="hero-cta">{website}<a class="btn btn-primary" href="/workspace/?auth=register&amp;source=wedding_enquiry&amp;vendor={slug}">Start an enquiry</a><a class="btn btn-outline" href="/workspace/vendor.html?source=vendor_claim&amp;vendor_slug={slug}">Own this business? Claim this listing</a></div></aside></div><p class="vendor-directory-note">Profile details are an evidence-backed starting point, not a compatibility score. Confirm the date, fee, inclusions and terms directly before booking. Photographs appear only after the vendor or rights holder grants OmnyID permission.</p></div></section></main></body></html>"##,
+        r##"<!doctype html><html lang="en-AU"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{name} | OmnyID Weddings</title><meta name="description" content="{description}"><link rel="canonical" href="{canonical}"><meta property="og:type" content="website"><meta property="og:locale" content="en_AU"><meta property="og:url" content="{canonical}"><meta property="og:title" content="{name} | OmnyID Weddings"><meta property="og:description" content="{description}"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="{name} | OmnyID Weddings"><meta name="twitter:description" content="{description}"><link rel="stylesheet" href="/wedding/assets/css/style.css"><link rel="stylesheet" href="/wedding/assets/css/directory.css"><script type="application/ld+json">{schema}</script><script src="/wedding/assets/js/vendor-reviews.js" defer></script></head><body><a class="skip-link" href="#main">Skip to main content</a><header class="site-header"><div class="container header-inner"><a href="/wedding/" class="logo"><img class="logo-img" src="/wedding/assets/logo/omnyid-logo.png" alt="" width="102" height="40"><span>Weddings</span></a><a class="btn btn-outline" href="/wedding/vendors.html?category={category_query}">All {category_plural}</a></div></header><main id="main"><section class="directory-hero"><div class="container"><p class="eyebrow">{category} · {area}</p><div class="vendor-profile-hero">{media}<div><h1>{name}</h1><p>{description}</p></div></div></div></section><section class="directory-results"><div class="container vendor-profile-layout"><div><dl class="vendor-facts">{address}<dt>Service area</dt><dd>{area}</dd><dt>Capacity or coverage</dt><dd>{capacity}</dd><dt>Pricing basis</dt><dd>{price}</dd>{phone}{email}</dl>{celebrant_details}</div><aside><div class="hero-cta">{website}<a class="btn btn-primary" href="/workspace/?auth=register&amp;source=wedding_enquiry&amp;vendor={slug}">Start an enquiry</a><a class="btn btn-outline" href="/workspace/vendor.html?source=vendor_claim&amp;vendor_slug={slug}">Own this business? Claim this listing</a></div></aside></div><section id="weddingReviews" class="vendor-review-section" data-vendor-id="{vendor_id}" aria-labelledby="weddingReviewsHeading"><div class="vendor-review-heading"><h2 id="weddingReviewsHeading">Wedding reviews</h2><label>Order <select id="weddingReviewOrder"><option value="recent">Most recent</option><option value="rating_high">Rating: high to low</option><option value="rating_low">Rating: low to high</option></select></label></div><p id="weddingReviewStatus">{review_summary}</p><div id="weddingReviewList"></div></section><p class="vendor-directory-note">Profile details are an evidence-backed starting point, not a compatibility score. Confirm the date, fee, inclusions and terms directly before booking. Photographs appear only after the vendor or rights holder grants OmnyID permission.</p></div></section></main></body></html>"##,
         name = escape_html(&vendor.name),
         description = escape_html(&description),
         canonical = canonical,
@@ -387,6 +415,8 @@ fn render_vendor_page(vendor: &PublicVendorPageRow) -> String {
         email = email_html,
         celebrant_details = celebrant_details,
         slug = escape_html(&vendor.slug),
+        vendor_id = escape_html(&vendor.vendor_id),
+        review_summary = escape_html(&review_summary(vendor)),
     )
 }
 

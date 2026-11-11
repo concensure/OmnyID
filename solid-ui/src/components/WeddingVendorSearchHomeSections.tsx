@@ -556,6 +556,8 @@ export function WeddingVendorSearchHomeSection(props: {
                     imageUrl={lifecycleImage(vendor).url}
                     imageAlt={lifecycleImage(vendor).alt}
                     weddingDate={weddingDateOrSeason()}
+                    weddingPlanId={workspace().state.workspace.metadata.weddingPlanId}
+                    responseWorkspaceId={workspace().state.workspace.metadata.responseWorkspaceId}
                     onOpenArtifact={openLifecycleArtifact}
                   />
                 </div>

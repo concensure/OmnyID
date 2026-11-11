@@ -177,6 +177,14 @@ async fn public_directory_http(
             COALESCE(p.flags, ARRAY[]::TEXT[]) AS flags,
             COALESCE(p.public_contact, '{}'::jsonb) AS public_contact,
             COALESCE(cp.register_status,'pending') AS consultation_register_status,
+            (SELECT COUNT(*)::bigint FROM wedding_review_publications review
+             WHERE review.vendor_id=v.vendor_id AND review.status='published') AS review_count,
+            (SELECT COUNT(*)::bigint FROM wedding_review_publications review
+             WHERE review.vendor_id=v.vendor_id AND review.status='published'
+               AND review.aggregate_eligible AND review.rating IS NOT NULL) AS scored_review_count,
+            (SELECT ROUND(AVG(review.rating)::numeric,1)::text FROM wedding_review_publications review
+             WHERE review.vendor_id=v.vendor_id AND review.status='published'
+               AND review.aggregate_eligible AND review.rating IS NOT NULL) AS review_average,
             EXISTS(SELECT 1 FROM wedding_celebrant_live_sessions live WHERE live.vendor_id=v.vendor_id AND live.paused_at IS NULL AND live.expires_at>NOW()+make_interval(mins=>COALESCE(cp.consultation_minutes,10)+COALESCE(cp.buffer_minutes,5)) AND (SELECT COUNT(*) FROM wedding_celebrant_callback_requests request WHERE request.live_session_id=live.session_id AND request.status IN ('waiting_acceptance','accepted') AND COALESCE(request.hold_expires_at,live.expires_at)>NOW())<live.call_cap) AS consultation_live,
             next_window.local_date AS consultation_next_date,
             next_window.weekday AS consultation_next_weekday,
@@ -812,6 +820,12 @@ fn public_vendor_from_row(row: sqlx::postgres::PgRow) -> Value {
             "next_date": if consultation_enabled { next_date } else { None },
             "next_weekday": if consultation_enabled { next_weekday } else { None },
             "next_time": if consultation_enabled { next_time } else { None },
+        },
+        "reviews": {
+            "count": row.get::<i64, _>("review_count"),
+            "scored_count": row.get::<i64, _>("scored_review_count"),
+            "average": row.try_get::<Option<String>, _>("review_average").ok().flatten(),
+            "score_visible": row.get::<i64, _>("scored_review_count") >= 3,
         },
     })
 }

@@ -32,6 +32,7 @@ export function WeddingRunSheetSavedViews(props: {
   rows: WeddingRunSheetPresentedRow[];
   archived: boolean;
   onMessage: (message: SavedViewMessage) => void;
+  onFocusRecord?: (recordId: string) => void;
 }) {
   const [selectedId, setSelectedId] = createSignal("master");
   const [previewOpen, setPreviewOpen] = createSignal(false);
@@ -44,6 +45,19 @@ export function WeddingRunSheetSavedViews(props: {
     const value = row.values.owner_refs;
     return Array.isArray(value) ? value.map(String) : [];
   }))));
+  const masterSequence = createMemo(() => projectWeddingRunSheetSavedView(props.rows, weddingRunSheetSavedViewPreset("master")).slice(0, 8));
+  const sequenceDay = createMemo(() => {
+    const start = masterSequence()[0]?.values.start_at;
+    if (typeof start !== "string" || !start) return "Master run sheet";
+    const parsed = new Date(start);
+    return Number.isNaN(parsed.getTime()) ? "Master run sheet" : `${new Intl.DateTimeFormat("en-AU", { weekday: "long" }).format(parsed)} · Master run sheet`;
+  });
+  const timeLabel = (value: unknown): string => {
+    if (typeof value !== "string" || !value) return "Time needed";
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? value : new Intl.DateTimeFormat("en-AU", { hour: "numeric", minute: "2-digit" }).format(parsed);
+  };
+  const rowText = (value: unknown): string => Array.isArray(value) ? value.map(String).join(" · ") : typeof value === "string" || typeof value === "number" ? String(value) : "";
 
   createEffect(() => {
     if (previewOpen()) queueMicrotask(() => closeButton?.focus());
@@ -107,6 +121,28 @@ export function WeddingRunSheetSavedViews(props: {
     <p class="mt-2 text-xs leading-5 text-wedding-muted">{preset().description} Previewing or saving a view does not send it to anyone.</p>
     <p class="mt-1 text-xs text-wedding-muted">Hosted links remain off unless the reviewed server flag is enabled. You can always preview or print safely.</p>
     <Show when={notice()}><p role="status" class="mt-2 rounded-lg bg-white px-3 py-2 text-xs text-wedding-text">{notice()}</p></Show>
+
+    <section class="mt-4 overflow-hidden rounded-2xl border border-wedding-border bg-white shadow-sm" aria-label="Living master run sheet">
+      <div class="flex flex-wrap items-center justify-between gap-3 border-b border-wedding-border px-4 py-4 sm:px-5">
+        <div><p class="text-xs font-bold uppercase tracking-[0.14em] text-wedding-action">Run-sheet preview</p><h3 class="mt-1 font-display text-xl font-bold text-wedding-text">{sequenceDay()}</h3></div>
+        <span class="rounded-full bg-sky-50 px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-sky-900">Source-linked</span>
+      </div>
+      <Show when={masterSequence().length > 0} fallback={<div class="p-5"><p class="text-sm font-semibold text-wedding-text">Your living sequence will appear here.</p><p class="mt-1 text-sm leading-6 text-wedding-muted">Add a day-of item or confirm a task, booking or vendor arrival. The existing projector will bring the same underlying fact into this run sheet.</p></div>}>
+        <ol class="divide-y divide-dashed divide-wedding-border px-4 sm:px-5">
+          <For each={masterSequence()}>{(row) => {
+            const title = () => rowText(row.values.title) || "Wedding-day item";
+            const detail = () => rowText(row.values.notes) || rowText(row.values.location) || "Details to confirm";
+            const owner = () => rowText(row.values.owner_refs) || "Owner needed";
+            return <li class="grid min-w-0 grid-cols-[4.5rem_minmax(0,1fr)] gap-3 py-4 sm:grid-cols-[5rem_minmax(0,1fr)_auto] sm:items-start">
+              <time class="font-bold text-wedding-action">{timeLabel(row.values.start_at)}</time>
+              <div class="min-w-0"><p class="break-words text-sm font-bold text-wedding-text">{title()}</p><p class="mt-1 break-words text-sm leading-5 text-wedding-muted">{detail()}</p><button type="button" class="mt-2 text-left text-xs font-semibold text-sky-800 underline decoration-sky-300 underline-offset-2" onClick={() => props.onFocusRecord?.(row.sourceRecordId)}>View source-linked row and revisions</button></div>
+              <span class="col-start-2 w-fit rounded-full bg-stone-100 px-2.5 py-1 text-xs font-bold text-stone-700 sm:col-start-auto">{owner()}</span>
+            </li>;
+          }}</For>
+        </ol>
+        <Show when={projectWeddingRunSheetSavedView(props.rows, weddingRunSheetSavedViewPreset("master")).length > masterSequence().length}><p class="border-t border-wedding-border px-5 py-3 text-xs text-wedding-muted">Showing the next {masterSequence().length} items. The editable run-sheet table below contains the full sequence.</p></Show>
+      </Show>
+    </section>
 
     <Show when={previewOpen()}><div data-runsheet-print-shell class="fixed inset-0 z-[230] flex items-end bg-on-surface/30 sm:items-center sm:justify-center sm:p-4">
       <div data-runsheet-print role="dialog" aria-modal="true" aria-labelledby="runsheet-preview-title" onKeyDown={(event) => { if (event.key === "Escape" && !busy()) closePreview(); }} class="max-h-[94vh] w-full overflow-auto rounded-t-2xl bg-white p-5 shadow-panel sm:max-w-5xl sm:rounded-2xl sm:p-6">

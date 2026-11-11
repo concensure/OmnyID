@@ -44,7 +44,7 @@ Depends on REV-02.
 
 ## REV-04 — Couple submission and status surfaces
 
-- [ ] Add authenticated create/edit preview with unselected rating, neutral
+- [x] Add authenticated create/edit preview with unselected rating, neutral
   prompts, display choice and separate private/public actions.
 - [ ] Add correction, withdrawal, safe retry and status/history surfaces.
   - [x] Backend revisions, metadata-only status/history and idempotent immediate
@@ -81,9 +81,9 @@ Depends on REV-03 and REV-04.
 
 ## REV-07 — Vendor reply/report boundary
 
-- [ ] Let authenticated vendor managers/profile editors report a review and
+- [x] Let authenticated vendor managers/profile editors report a review and
   submit a clearly attributed reply.
-- [ ] Prevent vendors from seeing hidden identity/evidence, editing reviews,
+- [x] Prevent vendors from seeing hidden identity/evidence, editing reviews,
   deciding eligibility or suppressing critical reviews.
 
 Depends on REV-06 and existing vendor membership permissions.
@@ -166,3 +166,16 @@ invent a couple, or publish the control merely because the review system ships.
   attempt is masked as unavailable. The author route does not expose a second
   proof reader; physical deletion still runs through the bounded operator purge
   executor and existing upload/object-store authority.
+- The couple-facing form starts with no rating selected, uses neutral prompts,
+  separates private feedback from the exact public preview, and supports
+  private drafts, corrections and immediate withdrawal. Current narrative is
+  read only from the exact author-owned private AFP revision.
+- Migration 0167 and the vendor boundary keep reply/report prose in the acting
+  vendor member's tenant-private AFP store. Vendors receive only the published
+  snapshot and their own workflow state. Reply publication requires an audited
+  operator preview; a report enters the shared queue but cannot restrict a
+  review by itself.
+- Directory cards and vendor profile pages derive zero, sparse and score-visible
+  states from the same current publication set. Profile review cards include
+  experience/verification context and an independently moderated attributed
+  vendor reply without private identity or evidence.

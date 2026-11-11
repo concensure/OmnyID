@@ -8740,3 +8740,36 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
   invitations; analytics/accessibility; false-default hosted proof. The new
   run-sheet database-view request should consume the existing projection and
   source authorities, not introduce a second schedule ledger.
+## 2026-11-12 - WED-360 vendor boundary/public UI and WED-362 living run-sheet preview (Codex, in progress)
+
+Worktree `C:\temp\wt\omnyid-wed360`, branch `agent/codex/WED-360`, based on
+implementation SHA `940b488603f9ec600f755a10f5e929b30358a98a` plus the current
+uncommitted slice.
+
+- Migration 0167 adds content-light vendor report, command-receipt, reply access
+  and reply moderation records. Vendor reply/report bodies stay in the acting
+  member's private AFP schema. Verified vendor permissions are reused; vendor
+  routes cannot update review publications or moderation decisions.
+- The operator queue includes open report reasons/counts. Reply publication or
+  rejection requires an audited exact-revision preview; resolving a report does
+  not itself suppress a review.
+- Couples get an authenticated neutral review form with an initially unselected
+  rating, separate private/public actions, exact public preview, author-only
+  correction loading and immediate withdrawal. Public directory/profile UI
+  derives zero/sparse/full states and attributed replies from the canonical
+  publication route without changing search order.
+- Database now shows a reactive master run-sheet sequence directly above its
+  editable grid. It reads the existing source-linked projected rows and focuses
+  the canonical record/revision context; it is not another checklist/store.
+- Pass: `cargo check --lib`, `git diff --check`, both new public JS syntax
+  checks, and a TypeScript diagnostic filtered to the changed review/run-sheet
+  files. Full TypeScript remains blocked by pre-existing missing `qrcode` and
+  `zod/v3` dependencies plus quotation typing errors. The focused Rust lib-test
+  link again ended in the known Windows rustc `STATUS_ACCESS_VIOLATION` before
+  assertions. Docker Desktop was unavailable, so migration 0167 still needs
+  disposable PostgreSQL execution.
+- Still open before release: invitation/reminder capability and suppression,
+  author event-history rendering, direct capability-link exchange, author
+  appeals, comparison/DecisionOS review evidence, content-free analytics,
+  accessibility/browser coverage, Linux real-router tests, hosted false-default
+  evidence and pilot approval. Nothing in this slice has been deployed.

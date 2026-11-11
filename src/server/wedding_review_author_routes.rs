@@ -30,6 +30,10 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
             get(review_status_http),
         )
         .route(
+            "/wedding/reviews/{review_id}/draft",
+            get(review_draft_http),
+        )
+        .route(
             "/wedding/reviews/{review_id}/withdraw",
             post(withdraw_review_http),
         )
@@ -123,6 +127,17 @@ struct ReviewHistoryItem {
 struct ReviewStatusReply {
     review: ReviewStatusItem,
     history: Vec<ReviewHistoryItem>,
+}
+
+#[derive(Debug, Serialize)]
+struct ReviewDraftReply {
+    review_id: String,
+    revision: u64,
+    title: String,
+    body: String,
+    next_couple_question: Option<String>,
+    context_tags: Vec<String>,
+    display_mode: String,
 }
 
 fn status_item(row: &sqlx::postgres::PgRow) -> ReviewStatusItem {
@@ -280,6 +295,55 @@ async fn review_status_http(
     Ok(Json(ReviewStatusReply {
         review: status_item(&row),
         history: events,
+    }))
+}
+
+async fn review_draft_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(review_id): Path<String>,
+) -> Result<Json<ReviewDraftReply>, (StatusCode, String)> {
+    enforce_rate_limit(
+        &state,
+        authenticated_rate_limit_key("wedding_review_author_draft", &headers),
+        RateLimitPolicy { max_requests: 30, window: Duration::from_secs(60) },
+    ).await?;
+    let user = authenticated_user(&state.db, &headers).await?;
+    if !enabled() || !valid_id(&review_id, 200) { return Err(unavailable()); }
+    let row = sqlx::query(
+        "SELECT review.current_revision,review.current_afp_message_id,
+                revision.authored_by_user_id
+         FROM wedding_reviews review
+         JOIN wedding_review_revisions revision
+           ON revision.review_id=review.review_id AND revision.revision=review.current_revision
+         WHERE review.review_id=$1
+           AND EXISTS(SELECT 1 FROM wedding_user_onboarding_state owner
+                      WHERE owner.user_id=$2 AND owner.wedding_plan_id=review.wedding_plan_id)
+           AND (review.owner_user_id=$2 OR revision.authored_by_user_id=$2)",
+    )
+    .bind(&review_id).bind(&user.id)
+    .fetch_optional(&state.db.pool).await.map_err(store_error)?
+    .ok_or_else(unavailable)?;
+    let revision: i64 = row.get("current_revision");
+    let authored_by: String = row.get("authored_by_user_id");
+    if authored_by != user.id {
+        return Err((StatusCode::FORBIDDEN, "Only the author can edit this revision.".into()));
+    }
+    let content = state.db.wedding_review_revision_content(
+        &authored_by, row.get("current_afp_message_id"), &review_id, revision,
+    ).await.map_err(store_error)?.ok_or_else(unavailable)?;
+    let text = |key: &str, max: usize| content.get(key).and_then(serde_json::Value::as_str)
+        .map(str::trim).filter(|value| value.chars().count() <= max).unwrap_or("").to_string();
+    Ok(Json(ReviewDraftReply {
+        review_id,
+        revision: revision as u64,
+        title: text("title", 180),
+        body: text("body", 8_000),
+        next_couple_question: content.get("next_couple_question").and_then(serde_json::Value::as_str)
+            .map(str::trim).filter(|value| !value.is_empty() && value.chars().count() <= 500).map(str::to_string),
+        context_tags: content.get("context_tags").and_then(serde_json::Value::as_array)
+            .map(|values| values.iter().filter_map(serde_json::Value::as_str).take(12).map(str::to_string).collect()).unwrap_or_default(),
+        display_mode: text("display_mode", 60),
     }))
 }
 

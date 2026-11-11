@@ -4,6 +4,7 @@ import { createMemo, createSignal, For, Show } from "solid-js";
 import { WeddingDashboardIcon } from "@/components/WeddingDashboardIcons";
 import { WeddingNormalizedQuoteSummary } from "@/components/WeddingNormalizedQuoteSummary";
 import { WeddingQuoteEvidenceComparison } from "@/components/WeddingQuoteEvidenceComparison";
+import { WeddingReviewPanel } from "@/components/WeddingReviewPanel";
 import { renderMarkdown } from "@/lib/markdownRenderer";
 import type { AfpMessage } from "@/lib/api";
 import type { WeddingWorkspaceArtifactPreview } from "@/lib/weddingResponseWorkspaceViewState";
@@ -58,6 +59,8 @@ export function WeddingVendorLifecycleDetailPanel(props: {
   imageUrl?: string | null;
   imageAlt?: string | null;
   weddingDate?: string | null;
+  weddingPlanId?: string | null;
+  responseWorkspaceId?: string | null;
   onOpenArtifact: (artifactId: string) => void;
 }) {
   const [tab, setTab] = createSignal<DetailTab>("message");
@@ -175,6 +178,14 @@ export function WeddingVendorLifecycleDetailPanel(props: {
           </Show>
         </div>
       </div>
+      <Show when={props.vendor.vendorId && props.weddingPlanId && props.responseWorkspaceId}>
+        <WeddingReviewPanel
+          weddingPlanId={props.weddingPlanId as string}
+          responseWorkspaceId={props.responseWorkspaceId as string}
+          vendorId={props.vendor.vendorId as string}
+          vendorName={props.vendor.vendorName}
+        />
+      </Show>
     </div>
   </section>;
 }

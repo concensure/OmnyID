@@ -152,6 +152,8 @@ struct QueueItem {
     evidence_count: u64,
     probable_duplicate: bool,
     reason_codes: Vec<String>,
+    open_report_count: u64,
+    report_reason_codes: Vec<String>,
     updated_at: String,
 }
 
@@ -199,7 +201,12 @@ async fn queue_http(
                   WHERE evidence.review_id=review.review_id
                     AND evidence.purged_at IS NULL)::bigint AS evidence_count,
                 COALESCE(assessment.probable_duplicate,FALSE) AS probable_duplicate,
-                COALESCE(assessment.reason_codes,ARRAY[]::text[]) AS reason_codes
+                COALESCE(assessment.reason_codes,ARRAY[]::text[]) AS reason_codes,
+                (SELECT COUNT(*) FROM wedding_review_reports report
+                  WHERE report.review_id=review.review_id AND report.status='open')::bigint AS open_report_count,
+                COALESCE((SELECT ARRAY_AGG(DISTINCT report.reason_code ORDER BY report.reason_code)
+                  FROM wedding_review_reports report
+                  WHERE report.review_id=review.review_id AND report.status='open'),ARRAY[]::text[]) AS report_reason_codes
          FROM wedding_reviews review
          JOIN wedding_review_revisions revision
            ON revision.review_id=review.review_id
@@ -212,6 +219,8 @@ async fn queue_http(
              ORDER BY eligibility.created_at DESC LIMIT 1
          ) assessment ON TRUE
          WHERE review.status=ANY($1)
+            OR EXISTS(SELECT 1 FROM wedding_review_reports report
+                      WHERE report.review_id=review.review_id AND report.status='open')
          ORDER BY review.updated_at,review.review_id
          LIMIT $2",
     )
@@ -240,6 +249,8 @@ async fn queue_http(
             evidence_count: row.get::<i64, _>("evidence_count") as u64,
             probable_duplicate: row.get("probable_duplicate"),
             reason_codes: row.get("reason_codes"),
+            open_report_count: row.get::<i64, _>("open_report_count") as u64,
+            report_reason_codes: row.get("report_reason_codes"),
             updated_at: row.get("updated_at"),
         })
         .collect();
