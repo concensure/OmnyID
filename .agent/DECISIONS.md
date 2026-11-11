@@ -3350,3 +3350,18 @@ synthetic vendor search or introduce another send path.
   returned to authors, vendors or public projections.
 - Eligibility has its own monotonic version and idempotency receipt, remaining
   independent from invitation origin, moderation and publication.
+
+# 2026-11-12 — Review correction and withdrawal preserve distinct authorities
+
+- A correction writes a new tenant-private AFP revision and resets the current
+  claim to `unreviewed`. When a moderated version was already public, the review
+  becomes `edit_pending`; the prior publication is neither overwritten nor
+  superseded until a moderator accepts the correction.
+- Author withdrawal changes the canonical review and any current publication
+  to `withdrawn` in one transaction, immediately removing it from consumers
+  that filter the public projection correctly.
+- Withdrawal accelerates purge only for proof uploaded by the withdrawing
+  actor. Another contributor's protected attachment remains governed by its
+  own retention or an authorised operator decision.
+- Author status/history returns lifecycle metadata and evidence counts, never
+  AFP narrative, attachment identifiers or moderator user identifiers.

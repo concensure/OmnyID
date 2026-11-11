@@ -8691,3 +8691,27 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
   publication, vendor reply/reporting, public aggregates, invitations,
   analytics and the false-default hosted rollout. Do not enable or deploy the
   review feature before those gates are complete.
+
+# 2026-11-12 — WED-360 author lifecycle backend (Codex)
+
+- Continued in `C:\temp\wt\omnyid-wed360` from eligibility commit
+  `282d33b0ce4f1cbd985ead45fdc07d7ae51f87f7`.
+- Added migrations 0164–0165 and false-default authenticated endpoints for an
+  author's review list, metadata-only status/history and idempotent withdrawal.
+  Access requires both account wedding ownership and authorship/ownership of
+  the review; an uninvolved partner gets the same unavailable response as a
+  missing review.
+- Withdrawal hides the current publication and review in one transaction,
+  emits a content-light event/receipt and accelerates only that actor's linked
+  proof purge. Corrections create a new private AFP revision, reset current
+  verification and use `edit_pending` without overwriting a prior moderated
+  public snapshot.
+- `cargo check --lib` and `cargo check --tests` pass using `C:\cargo-target`.
+  Disposable PostgreSQL 18 applied migrations 0161–0165, exercised the exact
+  status aggregate SQL and accepted withdrawal plus edit-pending receipt
+  constraints. The 14 exact-source policy tests remain green. Full Windows
+  test binary linking still fails inside rustc with the existing access
+  violation; run `tests/wedding_review_api.rs` on Linux before release.
+- Remaining: author-facing form/status UI, operator moderation/publication,
+  vendor reply/report, public aggregates and DecisionOS projection,
+  invitations, analytics/accessibility and hosted false-default/pilot proof.

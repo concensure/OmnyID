@@ -47,6 +47,9 @@ Depends on REV-02.
 - [ ] Add authenticated create/edit preview with unselected rating, neutral
   prompts, display choice and separate private/public actions.
 - [ ] Add correction, withdrawal, safe retry and status/history surfaces.
+  - [x] Backend revisions, metadata-only status/history and idempotent immediate
+    withdrawal preserve the prior moderated snapshot during correction.
+  - [ ] Couple-facing form, preview, correction and status/history UI.
 - [ ] Add direct venue-profile review route and optional narrow invitation-link
   exchange without creating a duplicate workspace.
 
