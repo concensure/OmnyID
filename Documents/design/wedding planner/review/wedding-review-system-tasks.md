@@ -19,8 +19,10 @@ Dependency order is authoritative. An unchecked item is not a release claim.
   and content-light events.
 - [x] Enforce one canonical planner review per wedding workspace and one
   venue contribution per wedding/canonical vendor across partner accounts.
-- [ ] Store every private draft/submitted revision through the existing
-  tenant-private AFP writeback with typed references and attachments.
+- [x] Store every private draft/submitted revision through the existing
+  tenant-private AFP writeback with typed review, wedding and vendor references.
+- [ ] Bind optional protected proof attachments into the AFP revision/evidence
+  graph after operator access and purge execution are implemented.
 - [ ] Add expected-revision and idempotency receipts; prove retries/concurrent
   partner submissions cannot duplicate a rating or notification.
 
@@ -128,5 +130,15 @@ invent a couple, or publish the control merely because the review system ships.
   projections. Narrative is absent from lifecycle/audit tables.
 - Review policy unit tests: 9/9 pass.
 - Migration/privacy contract tests: 4/4 pass.
+- Authenticated revision writeback is false-default, checks canonical wedding
+  ownership, stores narrative in tenant-private AFP, and records only
+  content-light lifecycle pointers and receipts. Incomplete drafts may be
+  resumed; submission applies the stricter rating/audience/text policy.
+- Existing private uploads can be linked only by the authenticated author to
+  their current revision. The control row stores a purgeable attachment ID and
+  90-day pilot expiry, never file bytes, storage URLs or contact details.
+- Focused review policy/route tests: 15/15 pass. Evidence route tests: 2/2
+  pass. Independent migration/privacy/tenancy contracts: 8/8 pass. Cargo
+  library check passes.
 - Docker Desktop was unavailable, so disposable-Postgres execution of migration
   0161 remains required before REV-02 can be called database-complete.

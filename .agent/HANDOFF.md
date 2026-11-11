@@ -8590,3 +8590,27 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
   draft/revision AFP writeback with expected-revision/idempotency receipts and
   cross-partner/cross-tenant tests. Do not surface `Read the couple's story`
   until an actual separately permissioned story exists.
+# 2026-11-12 — WED-360 private revision and evidence slice (Codex)
+
+- Continued in `C:\temp\wt\omnyid-wed360` on `agent/codex/WED-360` from
+  `766a733f21e4ce8c3159959284133cd97cc4e0b0`.
+- Added false-default authenticated draft/submission writeback at
+  `/wedding/reviews/revisions`. It reuses onboarding ownership, canonical
+  vendors, tenant-private AFP storage, rate limits and relay notifications.
+- Added content-light command receipts, expected-revision locking and stable
+  AFP message IDs. Duplicate actor/retry keys converge; partner contributions
+  lock the same canonical wedding/subject review rather than adding a rating.
+- Drafts can remain incomplete. Submission requires the applicable rating and
+  audience policy plus meaningful authored text. Enquiry/tour feedback can be
+  drafted privately but cannot be submitted as a public pilot review.
+- Added `/wedding/reviews/{review_id}/evidence`, which links an author's current
+  revision to an existing attachment in that same tenant. The row holds only a
+  purgeable reference with the 90-day pilot expiry.
+- Verification at exact SHA `b15ada659c152d1b8eeea74634337a8289c6c919` plus
+  subsequent draft-policy commits: Cargo library check passed; 15/15 review
+  policy/revision tests, 2/2 evidence tests and 8/8 independent contracts pass.
+  Docker Desktop remains unavailable, so migration 0161 execution and true
+  concurrent HTTP/Postgres proof are still open. No deployment occurred.
+- Next: run disposable-Postgres migration/concurrency proof, then add operator
+  evidence access/audit and the expiry purge worker before building the couple
+  status/history UI. `Read the couple's story` remains explicitly deferred.

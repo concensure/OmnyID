@@ -3306,3 +3306,18 @@ synthetic vendor search or introduce another send path.
   reviews do not change organic ranking.
 - `Read the couple's story` remains absent until a real couple grants separate
   excerpt/case-study permission and assistance/withdrawal handling exists.
+# 2026-11-12 — WED-360 review drafts, submissions and proof reuse
+
+- A saved review draft is deliberately incomplete: rating, title and narrative
+  may remain unselected/empty. Submission applies the stricter subject,
+  audience, rating and authored-text rules. This preserves neutral onboarding
+  without allowing an incomplete review into moderation.
+- Review narrative is an immutable tenant-private AFP revision. Relational
+  review rows keep lifecycle facts and pointers only. An authenticated command
+  receipt is scoped to `(owner_user_id, idempotency_key)`, hashes the complete
+  request and contains no narrative, display identity, evidence or contact.
+- Review evidence reuses the existing private upload/object-store authority.
+  The author may link only an attachment in their tenant to their own current
+  revision. The review schema stores a purgeable attachment ID and bounded
+  expiry, never bytes or storage/download URLs. Operator access and actual
+  purge execution remain separate follow-on work.
