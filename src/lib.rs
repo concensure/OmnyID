@@ -152,6 +152,7 @@ pub mod wedding_vendor_special_offer;
 pub mod wedding_vendor_special_offer_maintenance;
 pub mod wedding_lifecycle_email;
 pub mod wedding_quote_reading;
+pub mod wedding_reviews;
 pub mod weekly_operator_report;
 pub mod workflow_instance_contracts;
 pub mod workflow_supervisor;

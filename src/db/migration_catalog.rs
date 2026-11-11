@@ -819,4 +819,9 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Content-free indexes for qualified-couple, availability-maintenance and completed venue-enquiry operator trends",
         include_str!("../../postgres/migrations/0160_wedding_vendor_funnel_metric_indexes.sql"),
     ),
+    (
+        "0161_wedding_reviews",
+        "AFP-backed Wedding review lifecycle, evidence references, moderation and deterministic public projections",
+        include_str!("../../postgres/migrations/0161_wedding_reviews.sql"),
+    ),
 ];

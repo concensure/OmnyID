@@ -8561,3 +8561,30 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
   canonical post-call enquiry creation and disposable-Postgres concurrency
   evidence are complete. A signed-in admin browser acceptance of the metrics
   panel is also still explicit; no admin credential was copied into automation.
+
+# 2026-11-11 — WED-360 review-system contracts and schema foundation (Codex)
+
+- Started `agent/codex/WED-360` in `C:\temp\wt\omnyid-wed360` from
+  `48234988561f8b16284e72e65fa65b1ae06f2c8b` so review work consumes the live
+  celebrant/vendor lineage without modifying the dirty primary checkout.
+- Added an extension-first specification and dependency-ordered task document
+  under `Documents/design/wedding planner/review/`. They map authentication,
+  wedding identity, vendors, evidence, moderation, publishing, directory,
+  DecisionOS, quote/availability and analytics to their existing authorities.
+- Added `src/wedding_reviews.rs`: typed review subjects/experiences,
+  verification and lifecycle states, truthful aggregate eligibility, sparse
+  score policy, half-up one-decimal arithmetic, AFP supertags and content-light
+  audit key validation.
+- Added migration 0161 for canonical control metadata, AFP revision pointers,
+  purgeable evidence references, invitation capabilities, moderation,
+  publications, vendor replies and events. Partner submissions deduplicate on
+  the canonical wedding/subject tuple rather than owner account.
+- Verification: 9/9 review policy unit tests and 4/4 independent migration/
+  privacy contract tests pass. The repository-wide `cargo fmt --check` still
+  reports extensive pre-existing differences; only new Rust files were
+  formatted. Docker Desktop was unavailable, so migration execution against a
+  disposable Postgres remains open and no deployment occurred.
+- Next: run migration 0161 on disposable Postgres, then implement authenticated
+  draft/revision AFP writeback with expected-revision/idempotency receipts and
+  cross-partner/cross-tenant tests. Do not surface `Read the couple's story`
+  until an actual separately permissioned story exists.

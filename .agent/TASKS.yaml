@@ -15,6 +15,18 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-360
+    title: Add an AFP-backed wedding planner and venue review system without duplicating vendor or evidence authorities
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-360
+    worktree: C:/temp/wt/omnyid-wed360
+    base_sha: 48234988561f8b16284e72e65fa65b1ae06f2c8b
+    depends_on: [WED-359, WED-358, WED-345, WED-303]
+    files: [Documents/design/wedding planner/review/**, postgres/migrations/0161_wedding_reviews.sql, src/wedding_reviews.rs, src/server/wedding_review_routes.rs, src/server/wedding_review_*.rs, src/server/wedding_vendor_directory_page.rs, src/server/wedding_vendor_claim_routes.rs, src/server/ui_decision_routes.rs, src/db/migration_catalog.rs, src/lib.rs, solid-ui/src/components/**Review**, solid-ui/src/lib/**review**, solid-ui/tests/**review**, wedding/vendors.html, wedding/assets/css/directory.css, .agent/**]
+    acceptance: [one canonical review and revision history is scoped to a wedding workspace and planner or canonical vendor subject, private drafts evidence and moderation material remain outside public projections and immutable event payloads, eligibility verification publication and invitation origin remain distinct, only published eligible wedding-held venue ratings enter one deterministic aggregate with duplicate partner submissions prevented, authors explicitly choose private feedback or public moderation and can correct or withdraw, operators moderate with reasoned content-light AFP-compatible events while vendors can report and publish attributed replies but cannot identify or suppress reviewers, directory comparison profile and DecisionOS surfaces derive from the same public projection without affecting organic ranking, invitations reuse existing communication preferences rate limits idempotency and scoped capability patterns, featured couple stories remain deferred until a real permissioned story exists, focused lifecycle migration tenancy privacy frontend public accessibility build and exact-SHA hosted checks pass]
+    progress: "The extension-first specification and dependency-ordered delivery plan are written. The first implementation slice adds typed subject/experience/verification/lifecycle policy, deterministic sparse aggregates, migration 0161 lifecycle/control tables, tenant-private AFP revision pointers, purgeable evidence references, partner-safe uniqueness, scoped invitations, moderation, vendor replies and approved public projections. Nine policy tests and four migration/privacy contracts pass. Docker is unavailable, so disposable-Postgres migration proof and authenticated AFP revision routes remain next. Read the couple's story is explicitly deferred until a real separately permissioned story exists."
+
   - id: WED-359
     title: Add celebrant callbacks and ten-minute consultation scheduling to the existing vendor portal
     status: in_progress

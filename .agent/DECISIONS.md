@@ -3284,3 +3284,25 @@ synthetic vendor search or introduce another send path.
   register verification, live-session expiry and capacity checks all pass. A
   prepared calendar alone never implies that the celebrant is available for a
   couple's wedding date.
+
+# 2026-11-11 — WED-360 reviews extend AFP and vendor publishing authorities
+
+- A review is new lifecycle metadata plus a tenant-private AFP revision, not a
+  second account, wedding, vendor, attachment, message or ranking system.
+  `wedding_plan_id`, `response_workspace_id` and canonical `vendor_id` bind the
+  subject; cross-partner unique indexes make both partners update one review.
+- Private narrative and proof stay in the existing tenant-private AFP message
+  and protected attachment authorities. Relational review rows carry status,
+  revision pointers, permissions and purgeable evidence references. Content-
+  light events reject narrative, contact and attachment fields.
+- Eligibility, verification, publication and invitation origin are independent.
+  Only a current, public, moderator-approved, scored venue review verified as a
+  wedding actually held enters the venue aggregate. Booking reviews may be
+  public with their truthful label but cannot affect that score; enquiry/tour
+  feedback is private in the pilot.
+- Public review text exists only in the accepted publication projection.
+  Directory, comparison, profile and DecisionOS surfaces consume that derived
+  projection and fail independently. Review volume, vendor payment and missing
+  reviews do not change organic ranking.
+- `Read the couple's story` remains absent until a real couple grants separate
+  excerpt/case-study permission and assistance/withdrawal handling exists.
