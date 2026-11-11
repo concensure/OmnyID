@@ -209,6 +209,27 @@ CREATE TABLE IF NOT EXISTS wedding_review_vendor_replies (
     UNIQUE (review_id, vendor_id, revision)
 );
 
+-- Command receipts make duplicate clicks and transport retries converge before
+-- they can create a second revision. The receipt intentionally contains no
+-- narrative, display label, evidence or contact information.
+CREATE TABLE IF NOT EXISTS wedding_review_command_receipts (
+    receipt_id TEXT PRIMARY KEY,
+    owner_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    idempotency_key TEXT NOT NULL CHECK (char_length(idempotency_key) BETWEEN 8 AND 180),
+    request_hash TEXT NOT NULL CHECK (request_hash ~ '^[a-f0-9]{64}$'),
+    review_id TEXT REFERENCES wedding_reviews(review_id) ON DELETE CASCADE,
+    revision BIGINT CHECK (revision IS NULL OR revision > 0),
+    afp_message_id TEXT,
+    result_status TEXT CHECK (result_status IS NULL OR result_status IN ('draft', 'submitted')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    completed_at TIMESTAMPTZ,
+    UNIQUE (owner_user_id, idempotency_key),
+    CHECK ((completed_at IS NULL AND review_id IS NULL AND revision IS NULL AND afp_message_id IS NULL AND result_status IS NULL)
+        OR (completed_at IS NOT NULL AND review_id IS NOT NULL AND revision IS NOT NULL AND afp_message_id IS NOT NULL AND result_status IS NOT NULL))
+);
+CREATE INDEX IF NOT EXISTS idx_wedding_review_command_receipts_review
+    ON wedding_review_command_receipts (review_id, revision);
+
 -- Content-light, AFP-compatible transition facts. Application validation keeps
 -- metadata to revision/reason/policy/result fields only.
 CREATE TABLE IF NOT EXISTS wedding_review_events (
