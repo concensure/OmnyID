@@ -70,7 +70,10 @@ Depends on REV-02.
 
 - [ ] Add an operator-only queue for eligibility/evidence/duplicate/privacy and
   policy review with reason codes and access audit.
-- [ ] Publish/reject/restrict/restore without changing author meaning; route
+  The audited eligibility/evidence/policy queue and bounded narrative preview
+  are implemented; report/appeal intake still needs to feed privacy/dispute
+  items into that same queue.
+- [x] Publish/reject/restrict/restore without changing author meaning; route
   substantive edits back to the author.
 - [ ] Add report/appeal/correction handling and evidence purge scheduling.
 
@@ -87,7 +90,7 @@ Depends on REV-06 and existing vendor membership permissions.
 
 ## REV-08 — Public projections and deterministic aggregates
 
-- [ ] Project only current published revisions and rebuild count/score from the
+- [x] Project only current published revisions and rebuild count/score from the
   same eligible scored wedding-held set using one-decimal half-up rounding.
 - [ ] Add zero/sparse/full states to directory, comparison and profile pages;
   keep reviews out of organic ranking.

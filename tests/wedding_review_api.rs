@@ -326,6 +326,162 @@ async fn concurrent_retry_and_partner_submission_converge_without_duplicate_rati
     .await
     .expect("eligibility assessment count");
     assert_eq!(assessment_count, 1);
+    let (queue_status, queue) = request_json(
+        &app,
+        Method::GET,
+        "/admin/wedding/reviews/moderation?status=moderation_pending",
+        &operator_auth,
+        None,
+    )
+    .await;
+    assert_eq!(queue_status, StatusCode::OK, "moderation queue: {queue}");
+    assert!(
+        queue["items"]
+            .as_array()
+            .is_some_and(|items| items.iter().any(|item| item["review_id"] == review_id))
+    );
+    assert!(queue.to_string().find("Clear communication").is_none());
+    let moderation_request = json!({
+        "expected_revision":1,
+        "expected_verification_version":1,
+        "decision":"approve",
+        "reason_code":"eligibility",
+        "idempotency_key":format!("moderate-{suffix}")
+    });
+    let (unopened_status, unopened) = request_json(
+        &app,
+        Method::POST,
+        &format!("/admin/wedding/reviews/{review_id}/moderation"),
+        &operator_auth,
+        Some(&moderation_request),
+    )
+    .await;
+    assert_eq!(
+        unopened_status,
+        StatusCode::CONFLICT,
+        "approval must require an audited preview: {unopened}"
+    );
+    let (preview_status, preview) = request_json(
+        &app,
+        Method::GET,
+        &format!("/admin/wedding/reviews/{review_id}/moderation?purpose=moderation"),
+        &operator_auth,
+        None,
+    )
+    .await;
+    assert_eq!(
+        preview_status,
+        StatusCode::OK,
+        "moderation preview: {preview}"
+    );
+    assert_eq!(preview["title"], "Clear communication");
+    assert!(preview.get("owner_user_id").is_none());
+    let (approve_status, approved) = request_json(
+        &app,
+        Method::POST,
+        &format!("/admin/wedding/reviews/{review_id}/moderation"),
+        &operator_auth,
+        Some(&moderation_request),
+    )
+    .await;
+    assert_eq!(approve_status, StatusCode::OK, "approve review: {approved}");
+    assert_eq!(approved["result_status"], "published");
+    let (approve_retry_status, approve_retry) = request_json(
+        &app,
+        Method::POST,
+        &format!("/admin/wedding/reviews/{review_id}/moderation"),
+        &operator_auth,
+        Some(&moderation_request),
+    )
+    .await;
+    assert_eq!(approve_retry_status, StatusCode::OK);
+    assert_eq!(approve_retry["replayed"], true);
+    let publication: Value = sqlx::query_scalar(
+        "SELECT public_snapshot FROM wedding_review_publications
+         WHERE review_id=$1 AND status='published'",
+    )
+    .bind(review_id)
+    .fetch_one(&db.pool)
+    .await
+    .expect("published snapshot");
+    assert_eq!(publication["display_label"], "An OmnyID couple");
+    assert_eq!(publication["title"], "Clear communication");
+    assert!(publication.get("owner_user_id").is_none());
+    assert!(publication.get("evidence_ref_id").is_none());
+    let (public_status, public_reviews) = request_json(
+        &app,
+        Method::GET,
+        &format!("/public/wedding/vendors/{}/reviews", vendor.vendor_id),
+        &first_auth,
+        None,
+    )
+    .await;
+    assert_eq!(
+        public_status,
+        StatusCode::OK,
+        "public reviews: {public_reviews}"
+    );
+    assert_eq!(public_reviews["published_review_count"], 1);
+    assert_eq!(public_reviews["aggregate"]["eligible_review_count"], 1);
+    assert_eq!(public_reviews["aggregate"]["average_display"], "5.0");
+    assert_eq!(public_reviews["aggregate"]["show_compact_score"], false);
+    assert_eq!(
+        public_reviews["reviews"][0]["public_snapshot"]["title"],
+        "Clear communication"
+    );
+    let (restrict_status, restricted) = request_json(
+        &app,
+        Method::POST,
+        &format!("/admin/wedding/reviews/{review_id}/moderation"),
+        &operator_auth,
+        Some(&json!({
+            "expected_revision":1,
+            "expected_verification_version":1,
+            "decision":"restrict",
+            "reason_code":"policy_other",
+            "idempotency_key":format!("restrict-{suffix}")
+        })),
+    )
+    .await;
+    assert_eq!(
+        restrict_status,
+        StatusCode::OK,
+        "restrict review: {restricted}"
+    );
+    assert_eq!(restricted["result_status"], "restricted");
+    let (restricted_public_status, restricted_public) = request_json(
+        &app,
+        Method::GET,
+        &format!("/public/wedding/vendors/{}/reviews", vendor.vendor_id),
+        &first_auth,
+        None,
+    )
+    .await;
+    assert_eq!(restricted_public_status, StatusCode::OK);
+    assert_eq!(restricted_public["published_review_count"], 0);
+    let (restore_status, restored) = request_json(
+        &app,
+        Method::POST,
+        &format!("/admin/wedding/reviews/{review_id}/moderation"),
+        &operator_auth,
+        Some(&json!({
+            "expected_revision":1,
+            "expected_verification_version":1,
+            "decision":"restore",
+            "reason_code":"policy_other",
+            "idempotency_key":format!("restore-{suffix}")
+        })),
+    )
+    .await;
+    assert_eq!(restore_status, StatusCode::OK, "restore review: {restored}");
+    assert_eq!(restored["result_status"], "restored");
+    let published_revision: i64 =
+        sqlx::query_scalar("SELECT published_revision FROM wedding_reviews WHERE review_id=$1")
+            .bind(review_id)
+            .fetch_one(&db.pool)
+            .await
+            .expect("restored publication revision");
+    assert_eq!(published_revision, 1);
     let (list_status, listed) = request_json(
         &app,
         Method::GET,
@@ -373,6 +529,21 @@ async fn concurrent_retry_and_partner_submission_converge_without_duplicate_rati
         "withdraw review: {withdrawn}"
     );
     assert_eq!(withdrawn["status"], "withdrawn");
+    assert_eq!(withdrawn["affected_publications"], 1);
+    let (withdrawn_public_status, withdrawn_public_reviews) = request_json(
+        &app,
+        Method::GET,
+        &format!("/public/wedding/vendors/{}/reviews", vendor.vendor_id),
+        &first_auth,
+        None,
+    )
+    .await;
+    assert_eq!(withdrawn_public_status, StatusCode::OK);
+    assert_eq!(withdrawn_public_reviews["published_review_count"], 0);
+    assert_eq!(
+        withdrawn_public_reviews["aggregate"]["eligible_review_count"],
+        0
+    );
     assert_eq!(withdrawn["scheduled_evidence"], 1);
     let (withdraw_retry_status, withdraw_retry) = request_json(
         &app,

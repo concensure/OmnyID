@@ -3365,3 +3365,15 @@ synthetic vendor search or introduce another send path.
   own retention or an authorised operator decision.
 - Author status/history returns lifecycle metadata and evidence counts, never
   AFP narrative, attachment identifiers or moderator user identifiers.
+# 2026-11-12 — Wedding review publication is an audited minimal projection
+
+- The authored narrative remains in its tenant-private AFP revision. An
+  operator can open only the bounded fields that could become public, and that
+  access is audited against the exact revision before any decision.
+- Publish/reject/restrict/restore commands use expected revision and
+  verification versions plus operator-scoped idempotency receipts. Operators
+  do not rewrite author text; substantive changes return to the author.
+- Public review reads consume only `wedding_review_publications`. The snapshot
+  excludes account/contact/evidence/duplicate identifiers, and score/count use
+  the same current eligible scored wedding-held set. Name-bearing display modes
+  fail closed until an explicit separately approved public couple label exists.

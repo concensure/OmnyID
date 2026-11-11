@@ -844,4 +844,9 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Truthful idempotency receipts for author corrections awaiting moderation",
         include_str!("../../postgres/migrations/0165_wedding_review_correction_receipts.sql"),
     ),
+    (
+        "0166_wedding_review_moderation",
+        "Audited and idempotent Wedding review moderation and publication",
+        include_str!("../../postgres/migrations/0166_wedding_review_moderation.sql"),
+    ),
 ];

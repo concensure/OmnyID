@@ -8715,3 +8715,28 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
 - Remaining: author-facing form/status UI, operator moderation/publication,
   vendor reply/report, public aggregates and DecisionOS projection,
   invitations, analytics/accessibility and hosted false-default/pilot proof.
+# 2026-11-12 — WED-360 audited moderation and public projection (Codex)
+
+- Continued in `C:\temp\wt\omnyid-wed360` on `agent/codex/WED-360` from
+  `a4d9263a60b8210ebc3447ca665faf86a447da67`.
+- Added migration 0166, an operator moderation queue, bounded/audited preview,
+  reasoned idempotent publish/reject/restrict/restore commands and a narrow DB
+  reader for the exact tenant-private AFP revision. The operator cannot alter
+  narrative; public snapshots omit account, contact, evidence and private
+  duplicate fields.
+- Added a rate-limited public vendor-review projection. It reads only current
+  publications, keeps booking/resource reviews out of the wedding-held score,
+  and derives count and one-decimal half-up average from exactly the same
+  eligible rating set. Withdrawal/restriction disappear immediately because
+  the projection has no parallel cache.
+- Verification: Cargo library and all test targets check; the exact policy
+  harness passes 14/14; disposable PostgreSQL 18 accepted migrations 0161–0166
+  and a synthetic moderation access/decision/publication/receipt transaction.
+  A focused test-binary run again failed inside Windows `rustc` with
+  `STATUS_ACCESS_VIOLATION` before assertions; run the expanded real-router
+  journey on Linux before release.
+- Remaining: author form/status UI; report/appeal intake; vendor attributed
+  reply/report; directory/profile/comparison and DecisionOS surfaces;
+  invitations; analytics/accessibility; false-default hosted proof. The new
+  run-sheet database-view request should consume the existing projection and
+  source authorities, not introduce a second schedule ledger.

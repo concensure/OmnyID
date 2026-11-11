@@ -15,6 +15,35 @@ pub struct StoredMessageAttachment {
 }
 
 impl Db {
+    /// Returns one authored Wedding review revision from its tenant-private
+    /// AFP table. The caller establishes operator or author access first; this
+    /// narrow reader cannot enumerate messages or accept a mismatched subtype.
+    pub async fn wedding_review_revision_content(
+        &self,
+        authored_by_user_id: &str,
+        afp_message_id: &str,
+        review_id: &str,
+        revision: i64,
+    ) -> Result<Option<Value>, sqlx::Error> {
+        self.ensure_user_private_schema(authored_by_user_id).await?;
+        let messages = tenant_messages_table(authored_by_user_id);
+        sqlx::query_scalar(&format!(
+            r#"SELECT content
+               FROM {messages}
+               WHERE id = $1
+                 AND subtype = 'wedding_review_revision'
+                 AND metadata->>'origin' = 'server_wedding_reviews'
+                 AND content->>'review_id' = $2
+                 AND content->>'revision' = $3
+               LIMIT 1"#,
+        ))
+        .bind(afp_message_id)
+        .bind(review_id)
+        .bind(revision.to_string())
+        .fetch_optional(&self.pool)
+        .await
+    }
+
     pub async fn private_attachment_by_id(
         &self,
         owner_user_id: &str,

@@ -12,12 +12,17 @@ const AUTHOR_LIFECYCLE_MIGRATION: &str =
     include_str!("../postgres/migrations/0164_wedding_review_author_lifecycle.sql");
 const CORRECTION_MIGRATION: &str =
     include_str!("../postgres/migrations/0165_wedding_review_correction_receipts.sql");
+const MODERATION_MIGRATION: &str =
+    include_str!("../postgres/migrations/0166_wedding_review_moderation.sql");
 const ROUTES: &str = include_str!("../src/server/wedding_review_routes.rs");
 const EVIDENCE_ROUTES: &str = include_str!("../src/server/wedding_review_evidence_routes.rs");
 const EVIDENCE_OPERATOR_ROUTES: &str =
     include_str!("../src/server/wedding_review_evidence_operator_routes.rs");
 const ELIGIBILITY_ROUTES: &str = include_str!("../src/server/wedding_review_eligibility_routes.rs");
 const AUTHOR_ROUTES: &str = include_str!("../src/server/wedding_review_author_routes.rs");
+const MODERATION_ROUTES: &str = include_str!("../src/server/wedding_review_moderation_routes.rs");
+const PUBLIC_ROUTES: &str = include_str!("../src/server/wedding_review_public_routes.rs");
+const MESSAGE_ATTACHMENTS: &str = include_str!("../src/db/message_attachments.rs");
 const SERVER: &str = include_str!("../src/server/mod.rs");
 
 #[test]
@@ -212,4 +217,55 @@ fn corrections_preserve_prior_publication_and_replay_edit_pending() {
     assert!(ROUTES.contains("\"correction_submitted\""));
     assert!(ROUTES.contains("verification_state='unreviewed'"));
     assert!(!ROUTES.contains("UPDATE wedding_review_publications SET status='superseded'"));
+}
+
+#[test]
+fn moderation_requires_audited_preview_and_idempotent_receipt() {
+    assert!(MODERATION_MIGRATION.contains("wedding_review_moderation_access_log"));
+    assert!(MODERATION_MIGRATION.contains("wedding_review_moderation_receipts"));
+    assert!(MODERATION_MIGRATION.contains("UNIQUE (moderator_user_id, idempotency_key)"));
+    assert!(MODERATION_ROUTES.contains("Open the current review preview before deciding it."));
+    assert!(MODERATION_ROUTES.contains("INTERVAL '24 hours'"));
+    assert!(MODERATION_ROUTES.contains("operator_access_allowed"));
+    assert!(SERVER.contains(".merge(wedding_review_moderation_routes::routes())"));
+}
+
+#[test]
+fn publication_reads_only_the_exact_private_revision_and_builds_a_safe_snapshot() {
+    assert!(MESSAGE_ATTACHMENTS.contains("wedding_review_revision_content"));
+    assert!(MESSAGE_ATTACHMENTS.contains("subtype = 'wedding_review_revision'"));
+    assert!(MESSAGE_ATTACHMENTS.contains("content->>'review_id' = $2"));
+    assert!(MODERATION_ROUTES.contains("\"display_label\": \"An OmnyID couple\""));
+    assert!(MODERATION_ROUTES.contains("validate_policy(ReviewPolicyInput"));
+    let snapshot = MODERATION_ROUTES
+        .split("let snapshot = json!({")
+        .nth(1)
+        .and_then(|tail| tail.split("});").next())
+        .expect("bounded public snapshot");
+    for forbidden in [
+        "owner_user_id",
+        "authored_by_user_id",
+        "evidence_ref_id",
+        "attachment_id",
+        "probable_duplicate",
+        "reviewer_email",
+        "reviewer_phone",
+    ] {
+        assert!(
+            !snapshot.contains(forbidden),
+            "public snapshot leaked {forbidden}"
+        );
+    }
+}
+
+#[test]
+fn public_projection_uses_only_publications_and_one_eligible_scored_set() {
+    assert!(PUBLIC_ROUTES.contains("wedding_review_publications publication"));
+    assert!(PUBLIC_ROUTES.contains("publication.status='published'"));
+    assert!(PUBLIC_ROUTES.contains("aggregate_eligible_scores(&scores)"));
+    assert!(PUBLIC_ROUTES.contains("filter(|row| row.get::<bool, _>(\"aggregate_eligible\"))"));
+    assert!(!PUBLIC_ROUTES.contains("wedding_review_evidence_refs"));
+    assert!(!PUBLIC_ROUTES.contains("wedding_review_revision_content"));
+    assert!(!PUBLIC_ROUTES.contains("tenant_messages_table"));
+    assert!(SERVER.contains(".merge(wedding_review_public_routes::routes())"));
 }
