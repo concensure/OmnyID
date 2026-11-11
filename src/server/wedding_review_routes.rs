@@ -24,7 +24,7 @@ use axum::{
 };
 use chrono::{Datelike, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::json;
 use sha2::{Digest, Sha256};
 use sqlx::{Postgres, Row, Transaction};
 use std::{collections::BTreeSet, sync::Arc, time::Duration};
@@ -141,6 +141,7 @@ struct RevisionReply {
     replayed: bool,
 }
 
+#[derive(Debug)]
 struct ValidatedRevision {
     plan: String,
     workspace: String,
