@@ -13,7 +13,7 @@ use crate::{
     message::AFPMessage,
     wedding_reviews::{
         ReviewAudience, ReviewExperienceKind, ReviewPolicyInput, ReviewSubjectKind,
-        ReviewVerificationState, review_supertags, validate_policy,
+        ReviewVerificationState, review_supertags, validate_draft_policy, validate_policy,
     },
 };
 use axum::{
@@ -185,14 +185,18 @@ fn validate_request(
         }
         _ => {}
     }
-    validate_policy(ReviewPolicyInput {
+    let policy = ReviewPolicyInput {
         subject: request.subject_kind,
         experience: request.experience_kind,
         verification: ReviewVerificationState::Unreviewed,
         audience: request.audience,
         rating: request.rating,
-    })
-    .map_err(bad)?;
+    };
+    if request.action == RevisionAction::Submit {
+        validate_policy(policy).map_err(bad)?;
+    } else {
+        validate_draft_policy(policy).map_err(bad)?;
+    }
     let experience_status = request.experience_status.trim().to_ascii_lowercase();
     if ![
         "completed",
@@ -213,14 +217,24 @@ fn validate_request(
             "Choose how your name should appear if this review is published.",
         ));
     }
-    let title =
-        bounded(&request.title, MAX_TITLE_CHARS).ok_or_else(|| bad("Add a short review title."))?;
-    let body = bounded(&request.body, MAX_BODY_CHARS)
-        .ok_or_else(|| bad("Add your own review before saving."))?;
-    if request.action == RevisionAction::Submit && body.chars().count() < 20 {
-        return Err(bad(
-            "Add a little more detail before submitting this review.",
-        ));
+    let title = request.title.trim().to_string();
+    let body = request.body.trim().to_string();
+    if title.chars().count() > MAX_TITLE_CHARS
+        || body.chars().count() > MAX_BODY_CHARS
+        || title.chars().any(char::is_control)
+        || body.chars().any(char::is_control)
+    {
+        return Err(bad("Keep the review within the form limits."));
+    }
+    if request.action == RevisionAction::Submit {
+        if title.is_empty() {
+            return Err(bad("Add a short review title before submitting."));
+        }
+        if body.chars().count() < 20 {
+            return Err(bad(
+                "Add a little more detail before submitting this review.",
+            ));
+        }
     }
     let next_couple_question = request
         .next_couple_question
@@ -639,6 +653,15 @@ mod tests {
             validate_request(&value).unwrap_err().0,
             StatusCode::BAD_REQUEST
         );
+    }
+
+    #[test]
+    fn draft_can_start_without_rating_or_narrative() {
+        let mut value = request();
+        value.rating = None;
+        value.title.clear();
+        value.body.clear();
+        validate_request(&value).expect("an incomplete private draft remains saveable");
     }
 
     #[test]

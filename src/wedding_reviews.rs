@@ -81,6 +81,32 @@ pub struct ReviewAggregate {
     pub show_compact_score: bool,
 }
 
+/// Validates the subject/experience shape of an in-progress private draft.
+/// Drafts deliberately allow an unselected rating; submission/publication
+/// applies the stricter audience rules in `validate_policy`.
+pub fn validate_draft_policy(input: ReviewPolicyInput) -> Result<(), &'static str> {
+    if input
+        .rating
+        .is_some_and(|rating| !(1..=5).contains(&rating))
+    {
+        return Err("rating must be an integer from 1 to 5");
+    }
+    if input.subject == ReviewSubjectKind::Planner
+        && !matches!(
+            input.experience,
+            ReviewExperienceKind::PlannerTask | ReviewExperienceKind::Resource
+        )
+    {
+        return Err("planner reviews require planner-task or resource experience");
+    }
+    if input.subject == ReviewSubjectKind::Vendor
+        && matches!(input.experience, ReviewExperienceKind::PlannerTask)
+    {
+        return Err("venue reviews cannot claim planner-task experience");
+    }
+    Ok(())
+}
+
 pub fn transition_allowed(from: ReviewStatus, to: ReviewStatus) -> bool {
     use ReviewStatus::*;
     matches!(
@@ -114,11 +140,8 @@ pub fn transition_allowed(from: ReviewStatus, to: ReviewStatus) -> bool {
 }
 
 pub fn validate_policy(input: ReviewPolicyInput) -> Result<PublishedScore, &'static str> {
-    let rating = match input.rating {
-        Some(1..=5) => input.rating,
-        Some(_) => return Err("rating must be an integer from 1 to 5"),
-        None => None,
-    };
+    validate_draft_policy(input)?;
+    let rating = input.rating;
     if input.audience == ReviewAudience::PublicReview
         && matches!(input.experience, ReviewExperienceKind::EnquiryTour)
     {
@@ -132,19 +155,6 @@ pub fn validate_policy(input: ReviewPolicyInput) -> Result<PublishedScore, &'sta
         && rating.is_none()
     {
         return Err("a public planner or wedding-held review requires a rating");
-    }
-    if input.subject == ReviewSubjectKind::Planner
-        && !matches!(
-            input.experience,
-            ReviewExperienceKind::PlannerTask | ReviewExperienceKind::Resource
-        )
-    {
-        return Err("planner reviews require planner-task or resource experience");
-    }
-    if input.subject == ReviewSubjectKind::Vendor
-        && matches!(input.experience, ReviewExperienceKind::PlannerTask)
-    {
-        return Err("venue reviews cannot claim planner-task experience");
     }
     let aggregate_eligible = input.audience == ReviewAudience::PublicReview
         && input.subject == ReviewSubjectKind::Vendor
@@ -262,6 +272,14 @@ mod tests {
     fn public_wedding_review_requires_a_score() {
         let mut input = public_wedding(ReviewVerificationState::VerifiedWeddingHeld);
         input.rating = None;
+        assert!(validate_policy(input).is_err());
+    }
+
+    #[test]
+    fn private_draft_allows_an_unselected_rating() {
+        let mut input = public_wedding(ReviewVerificationState::Unreviewed);
+        input.rating = None;
+        validate_draft_policy(input).unwrap();
         assert!(validate_policy(input).is_err());
     }
 
