@@ -8420,3 +8420,23 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
   after explicit approval; expose one-off exceptions/rescheduling in UI; run a
   Twilio sandbox and hosted Postgres/concurrency test; operator-review the Sydney
   pilot cohort; keep the rollout flag false until that evidence passes.
+
+# 2026-11-11 — WED-359 reliability hardening (Codex)
+
+- First-available requests now move atomically to another eligible live
+  celebrant after a pass or expired acceptance hold; specifically selected
+  celebrants are never silently substituted.
+- The existing vendor Availability portal now supports one-off open/unavailable
+  dates and proposing a new consultation time. The visitor can accept or decline
+  that proposal through the original opaque request capability.
+- The public directory links celebrant cards to the callback page and the page
+  provides explicit post-call Save/Ask next actions without silently converting
+  a private consultation into a sales lead.
+- Passed locally: TypeScript, production Vite build, Cargo library check, 3/3
+  focused celebrant tests, 2/2 line-budget tests, 2,271/2,271 Wedding tests,
+  public Wedding smoke, public metadata smoke and public JavaScript syntax.
+- Oracle inspection found the encryption-key file authority but no celebrant
+  rollout flag/token pepper or Twilio Verify credentials. The exact-SHA release
+  can ship dormant code and migration 0158, but the callback flag must remain
+  false until controlled provider and connected-call evidence exists.
+- Evidence: `Documents/verification/wed-359-celebrant-consultations-2026-11-11.md`.

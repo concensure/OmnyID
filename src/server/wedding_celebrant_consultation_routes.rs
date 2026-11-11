@@ -64,6 +64,10 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
             post(report_outcome_http),
         )
         .route(
+            "/api/public/wedding/celebrant-consultations/requests/{request_id}/reschedule",
+            post(respond_to_reschedule_http),
+        )
+        .route(
             "/wedding/vendor/portal/celebrant-consultations",
             get(vendor_dashboard_http).put(update_settings_http),
         )
@@ -618,10 +622,103 @@ async fn request_status_http(
         return Err(unavailable());
     }
     public_limit(&state, &headers, "celebrant-request-status", 60).await?;
-    let row=sqlx::query("SELECT r.status,r.hold_expires_at,r.scheduled_start,r.accepted_at,v.vendor_name FROM wedding_celebrant_callback_requests r LEFT JOIN wedding_vendors v ON v.vendor_id=r.selected_vendor_id WHERE r.request_id=$1 AND r.status_token_digest=$2")
-      .bind(clean(&request_id,40)).bind(digest(&pepper()?,&query.token)?).fetch_optional(&state.db.pool).await.map_err(db_error)?.ok_or_else(unavailable)?;
+    let request_id = clean(&request_id, 40);
+    let token_digest = digest(&pepper()?, &query.token)?;
+    let mut tx = state.db.pool.begin().await.map_err(db_error)?;
+    let current = sqlx::query(
+        r#"SELECT status,hold_expires_at,first_available,selected_vendor_id,intent,topic,revision
+             FROM wedding_celebrant_callback_requests
+            WHERE request_id=$1 AND status_token_digest=$2 FOR UPDATE"#,
+    )
+    .bind(&request_id)
+    .bind(&token_digest)
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(db_error)?
+    .ok_or_else(unavailable)?;
+    let expired_wait = current.get::<String, _>("status") == "waiting_acceptance"
+        && current
+            .get::<Option<DateTime<Utc>>, _>("hold_expires_at")
+            .is_some_and(|value| value <= Utc::now());
+    let mut lifecycle_event = None;
+    let mut event_vendor_id = current.get::<Option<String>, _>("selected_vendor_id");
+    if expired_wait {
+        let candidate = if current.get::<bool, _>("first_available") {
+            sqlx::query(
+                r#"SELECT v.vendor_id,l.session_id
+                     FROM wedding_vendors v
+                     JOIN wedding_celebrant_pilot_profiles p ON p.vendor_id=v.vendor_id AND p.register_status='verified'
+                     JOIN wedding_celebrant_live_sessions l ON l.vendor_id=v.vendor_id
+                       AND l.paused_at IS NULL AND l.starts_at<=NOW() AND l.expires_at>NOW()
+                    WHERE v.status='active' AND v.category ILIKE '%celebrant%'
+                      AND v.vendor_id<>COALESCE($1,'') AND $2=ANY(p.accepted_intents) AND $3=ANY(p.topics)
+                      AND l.expires_at > NOW() + make_interval(mins=>p.consultation_minutes+p.buffer_minutes)
+                      AND (SELECT COUNT(*) FROM wedding_celebrant_callback_requests r
+                            WHERE r.live_session_id=l.session_id
+                              AND r.status IN ('waiting_acceptance','accepted')
+                              AND COALESCE(r.hold_expires_at,l.expires_at)>NOW()) < l.call_cap
+                    ORDER BY l.starts_at,v.vendor_name
+                    FOR UPDATE OF l SKIP LOCKED LIMIT 1"#,
+            )
+            .bind(event_vendor_id.as_deref())
+            .bind(current.get::<String, _>("intent"))
+            .bind(current.get::<String, _>("topic"))
+            .fetch_optional(&mut *tx)
+            .await
+            .map_err(db_error)?
+        } else {
+            None
+        };
+        if let Some(candidate) = candidate {
+            let vendor_id = candidate.get::<String, _>("vendor_id");
+            sqlx::query(
+                r#"UPDATE wedding_celebrant_callback_requests
+                      SET selected_vendor_id=$1,live_session_id=$2,hold_expires_at=NOW()+INTERVAL '5 minutes',
+                          revision=revision+1,updated_at=NOW()
+                    WHERE request_id=$3 AND revision=$4 AND status='waiting_acceptance'"#,
+            )
+            .bind(&vendor_id)
+            .bind(candidate.get::<String, _>("session_id"))
+            .bind(&request_id)
+            .bind(current.get::<i64, _>("revision"))
+            .execute(&mut *tx)
+            .await
+            .map_err(db_error)?;
+            event_vendor_id = Some(vendor_id);
+            lifecycle_event = Some("request_reassigned");
+        } else {
+            sqlx::query(
+                "UPDATE wedding_celebrant_callback_requests SET status='expired',hold_expires_at=NULL,revision=revision+1,updated_at=NOW() WHERE request_id=$1 AND revision=$2 AND status='waiting_acceptance'",
+            )
+            .bind(&request_id)
+            .bind(current.get::<i64, _>("revision"))
+            .execute(&mut *tx)
+            .await
+            .map_err(db_error)?;
+            lifecycle_event = Some("request_expired");
+        }
+    }
+    tx.commit().await.map_err(db_error)?;
+    if let Some(event) = lifecycle_event {
+        record_event(
+            &state,
+            Some(&request_id),
+            event_vendor_id.as_deref(),
+            event,
+            "system",
+            None,
+            &format!(
+                "status-expiry-{request_id}-{}",
+                current.get::<i64, _>("revision")
+            ),
+            json!({"status":if event=="request_reassigned"{"waiting_acceptance"}else{"expired"}}),
+        )
+        .await?;
+    }
+    let row=sqlx::query("SELECT r.status,r.hold_expires_at,r.scheduled_start,r.accepted_at,v.vendor_name,v.vendor_slug FROM wedding_celebrant_callback_requests r LEFT JOIN wedding_vendors v ON v.vendor_id=r.selected_vendor_id WHERE r.request_id=$1 AND r.status_token_digest=$2")
+      .bind(&request_id).bind(token_digest).fetch_optional(&state.db.pool).await.map_err(db_error)?.ok_or_else(unavailable)?;
     Ok(Json(
-        json!({"request_id":request_id,"status":row.get::<String,_>("status"),"celebrant_name":row.get::<Option<String>,_>("vendor_name"),"hold_expires_at":row.get::<Option<DateTime<Utc>>,_>("hold_expires_at").map(|v|v.to_rfc3339()),"scheduled_start":row.get::<Option<DateTime<Utc>>,_>("scheduled_start").map(|v|v.to_rfc3339()),"accepted_at":row.get::<Option<DateTime<Utc>>,_>("accepted_at").map(|v|v.to_rfc3339())}),
+        json!({"request_id":request_id,"status":row.get::<String,_>("status"),"celebrant_name":row.get::<Option<String>,_>("vendor_name"),"vendor_slug":row.get::<Option<String>,_>("vendor_slug"),"hold_expires_at":row.get::<Option<DateTime<Utc>>,_>("hold_expires_at").map(|v|v.to_rfc3339()),"scheduled_start":row.get::<Option<DateTime<Utc>>,_>("scheduled_start").map(|v|v.to_rfc3339()),"accepted_at":row.get::<Option<DateTime<Utc>>,_>("accepted_at").map(|v|v.to_rfc3339())}),
     ))
 }
 
@@ -669,6 +766,70 @@ async fn report_outcome_http(
     Ok(Json(
         json!({"request_id":request_id,"status":status,"next_actions":["save_celebrant","ask_about_wedding_date"]}),
     ))
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RescheduleResponseRequest {
+    token: String,
+    action: String,
+}
+
+async fn respond_to_reschedule_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(request_id): Path<String>,
+    Json(request): Json<RescheduleResponseRequest>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    if !enabled() {
+        return Err(unavailable());
+    }
+    public_limit(&state, &headers, "celebrant-reschedule-response", 8).await?;
+    let (status, event) = match request.action.as_str() {
+        "accept" => ("scheduled", "reschedule_accepted"),
+        "decline" => ("cancelled", "reschedule_declined"),
+        _ => {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                "action must be accept or decline.".into(),
+            ));
+        }
+    };
+    let request_id = clean(&request_id, 40);
+    let row = sqlx::query(
+        r#"UPDATE wedding_celebrant_callback_requests
+              SET status=$1,completed_at=CASE WHEN $1='cancelled' THEN NOW() ELSE NULL END,
+                  revision=revision+1,updated_at=NOW()
+            WHERE request_id=$2 AND status_token_digest=$3 AND status='reschedule_requested'
+            RETURNING selected_vendor_id,scheduled_start"#,
+    )
+    .bind(status)
+    .bind(&request_id)
+    .bind(digest(&pepper()?, &request.token)?)
+    .fetch_optional(&state.db.pool)
+    .await
+    .map_err(db_error)?
+    .ok_or((
+        StatusCode::CONFLICT,
+        "This reschedule request is no longer waiting for a response.".into(),
+    ))?;
+    let vendor_id = row.get::<Option<String>, _>("selected_vendor_id");
+    record_event(
+        &state,
+        Some(&request_id),
+        vendor_id.as_deref(),
+        event,
+        "visitor",
+        None,
+        &format!("reschedule-response-{request_id}-{status}"),
+        json!({"status":status}),
+    )
+    .await?;
+    Ok(Json(json!({
+        "request_id":request_id,
+        "status":status,
+        "scheduled_start":row.get::<Option<DateTime<Utc>>,_>("scheduled_start").map(|value|value.to_rfc3339())
+    })))
 }
 
 #[derive(Deserialize)]
@@ -991,6 +1152,114 @@ async fn vendor_request_action_http(
     )
     .await?;
     consultation_vendor(&access.category)?;
+    if request.action == "pass" {
+        let request_id = clean(&request_id, 40);
+        let mut tx = state.db.pool.begin().await.map_err(db_error)?;
+        let current = sqlx::query(
+            r#"SELECT status,first_available,intent,topic,selected_vendor_id
+                 FROM wedding_celebrant_callback_requests
+                WHERE request_id=$1 AND selected_vendor_id=$2 AND revision=$3
+                FOR UPDATE"#,
+        )
+        .bind(&request_id)
+        .bind(&access.vendor_id)
+        .bind(request.expected_revision)
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(db_error)?
+        .ok_or((
+            StatusCode::CONFLICT,
+            "This callback changed elsewhere. Refresh and try again.".into(),
+        ))?;
+        if current.get::<String, _>("status") != "waiting_acceptance" {
+            return Err((
+                StatusCode::CONFLICT,
+                "That call is no longer waiting for a response.".into(),
+            ));
+        }
+        let next = if current.get::<bool, _>("first_available") {
+            sqlx::query(
+                r#"SELECT v.vendor_id,l.session_id
+                     FROM wedding_vendors v
+                     JOIN wedding_celebrant_pilot_profiles p ON p.vendor_id=v.vendor_id AND p.register_status='verified'
+                     JOIN wedding_celebrant_live_sessions l ON l.vendor_id=v.vendor_id
+                       AND l.paused_at IS NULL AND l.starts_at<=NOW() AND l.expires_at>NOW()
+                    WHERE v.status='active' AND v.category ILIKE '%celebrant%'
+                      AND v.vendor_id<>$1 AND $2=ANY(p.accepted_intents) AND $3=ANY(p.topics)
+                      AND l.expires_at > NOW() + make_interval(mins=>p.consultation_minutes+p.buffer_minutes)
+                      AND (SELECT COUNT(*) FROM wedding_celebrant_callback_requests r
+                            WHERE r.live_session_id=l.session_id
+                              AND r.status IN ('waiting_acceptance','accepted')
+                              AND COALESCE(r.hold_expires_at,l.expires_at)>NOW()) < l.call_cap
+                    ORDER BY l.starts_at,v.vendor_name
+                    FOR UPDATE OF l SKIP LOCKED LIMIT 1"#,
+            )
+            .bind(&access.vendor_id)
+            .bind(current.get::<String, _>("intent"))
+            .bind(current.get::<String, _>("topic"))
+            .fetch_optional(&mut *tx)
+            .await
+            .map_err(db_error)?
+        } else {
+            None
+        };
+        let (next_status, next_vendor_id, next_session_id, event) = if let Some(next) = next {
+            (
+                "waiting_acceptance",
+                Some(next.get::<String, _>("vendor_id")),
+                Some(next.get::<String, _>("session_id")),
+                "request_reassigned",
+            )
+        } else {
+            ("passed", None, None, "request_passed")
+        };
+        let updated = sqlx::query(
+            r#"UPDATE wedding_celebrant_callback_requests
+                  SET status=$1,
+                      selected_vendor_id=COALESCE($2,selected_vendor_id),
+                      live_session_id=COALESCE($3,live_session_id),
+                      hold_expires_at=CASE WHEN $1='waiting_acceptance' THEN NOW()+INTERVAL '5 minutes' ELSE NULL END,
+                      revision=revision+1,updated_at=NOW()
+                WHERE request_id=$4 AND selected_vendor_id=$5 AND revision=$6 AND status='waiting_acceptance'"#,
+        )
+        .bind(next_status)
+        .bind(next_vendor_id.as_deref())
+        .bind(next_session_id.as_deref())
+        .bind(&request_id)
+        .bind(&access.vendor_id)
+        .bind(request.expected_revision)
+        .execute(&mut *tx)
+        .await
+        .map_err(db_error)?;
+        if updated.rows_affected() != 1 {
+            return Err((
+                StatusCode::CONFLICT,
+                "This callback changed elsewhere. Refresh and try again.".into(),
+            ));
+        }
+        tx.commit().await.map_err(db_error)?;
+        record_event(
+            &state,
+            Some(&request_id),
+            next_vendor_id.as_deref().or(Some(&access.vendor_id)),
+            event,
+            "vendor_user",
+            Some(&user.id),
+            &format!(
+                "vendor-action-{request_id}-{}-{event}",
+                request.expected_revision
+            ),
+            json!({"status":next_status,"previous_vendor_id":access.vendor_id}),
+        )
+        .await?;
+        return Ok(Json(json!({
+            "request_id":request_id,
+            "status":next_status,
+            "reassigned":next_vendor_id.is_some(),
+            "callback_phone":Value::Null,
+            "number_notice":Value::Null
+        })));
+    }
     let row=sqlx::query("SELECT status,phone_ciphertext,hold_expires_at FROM wedding_celebrant_callback_requests WHERE request_id=$1 AND selected_vendor_id=$2 AND revision=$3")
       .bind(clean(&request_id,40)).bind(&access.vendor_id).bind(request.expected_revision).fetch_optional(&state.db.pool).await.map_err(db_error)?.ok_or((StatusCode::CONFLICT,"This callback changed elsewhere. Refresh and try again.".into()))?;
     let current = row.get::<String, _>("status");
@@ -998,7 +1267,6 @@ async fn vendor_request_action_http(
         "accept" if matches!(current.as_str(), "waiting_acceptance" | "scheduled") => {
             ("accepted", "request_accepted")
         }
-        "pass" if current == "waiting_acceptance" => ("passed", "request_passed"),
         "cancel" if matches!(current.as_str(), "scheduled" | "accepted") => {
             ("cancelled", "request_cancelled")
         }
@@ -1036,6 +1304,17 @@ async fn vendor_request_action_http(
             )
         })?
         .map(|v| v.with_timezone(&Utc));
+    if request.action == "reschedule"
+        && !reschedule.is_some_and(|value| {
+            value >= Utc::now() + ChronoDuration::minutes(10)
+                && value <= Utc::now() + ChronoDuration::days(90)
+        })
+    {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Choose a new time from ten minutes to ninety days ahead.".into(),
+        ));
+    }
     let updated=sqlx::query("UPDATE wedding_celebrant_callback_requests SET status=$1,accepted_at=CASE WHEN $1='accepted' THEN NOW() ELSE accepted_at END,completed_at=CASE WHEN $1 IN ('connected','not_connected','cancelled') THEN NOW() ELSE completed_at END,scheduled_start=COALESCE($2,scheduled_start),scheduled_end=CASE WHEN $2::timestamptz IS NULL THEN scheduled_end ELSE $2+INTERVAL '10 minutes' END,revision=revision+1,updated_at=NOW() WHERE request_id=$3 AND selected_vendor_id=$4 AND revision=$5")
       .bind(next).bind(reschedule).bind(&request_id).bind(&access.vendor_id).bind(request.expected_revision).execute(&state.db.pool).await.map_err(db_error)?;
     if updated.rows_affected() != 1 {

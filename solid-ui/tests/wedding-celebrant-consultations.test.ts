@@ -32,6 +32,8 @@ test("vendor portal separates wedding dates from phone consultations", async () 
   assert.match(panel, /Register check/);
   assert.match(panel, /Go live/);
   assert.match(panel, /Callback accepted/);
+  assert.match(panel, /One-off date/);
+  assert.match(panel, /Propose new time/);
 });
 
 test("public page remains useful without a live celebrant or an account", async () => {
@@ -44,5 +46,7 @@ test("public page remains useful without a live celebrant or an account", async 
   assert.match(script, /No consultation times are published yet/);
   assert.match(script, /First available celebrant/);
   assert.match(script, /celebrant-consultations\/verify\/start/);
+  assert.match(script, /acceptRescheduleButton/);
+  assert.match(script, /askWeddingDateLink/);
   assert.doesNotMatch(page, /You must create an account/);
 });

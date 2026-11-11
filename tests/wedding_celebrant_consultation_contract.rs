@@ -60,3 +60,14 @@ fn policy_accepts_only_explicit_intents_topics_and_capacity() {
         5
     ));
 }
+
+#[test]
+fn request_lifecycle_supports_reassignment_expiry_and_couple_reschedule_choice() {
+    let routes = include_str!("../src/server/wedding_celebrant_consultation_routes.rs");
+    assert!(routes.contains("request_reassigned"));
+    assert!(routes.contains("request_expired"));
+    assert!(routes.contains("respond_to_reschedule_http"));
+    assert!(routes.contains("reschedule_accepted"));
+    assert!(routes.contains("reschedule_declined"));
+    assert!(routes.contains("FOR UPDATE OF l SKIP LOCKED LIMIT 1"));
+}

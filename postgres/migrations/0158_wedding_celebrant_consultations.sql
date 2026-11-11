@@ -102,7 +102,7 @@ CREATE TABLE IF NOT EXISTS wedding_celebrant_callback_requests (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS uq_celebrant_active_scheduled_slot
     ON wedding_celebrant_callback_requests (selected_vendor_id, scheduled_start)
-    WHERE request_mode='scheduled' AND status IN ('scheduled','accepted');
+    WHERE request_mode='scheduled' AND status IN ('scheduled','accepted','reschedule_requested');
 CREATE INDEX IF NOT EXISTS idx_celebrant_requests_vendor
     ON wedding_celebrant_callback_requests (selected_vendor_id, status, created_at DESC);
 
@@ -113,7 +113,7 @@ CREATE TABLE IF NOT EXISTS wedding_celebrant_consultation_events (
     vendor_id TEXT REFERENCES wedding_vendors(vendor_id) ON DELETE SET NULL,
     event_kind TEXT NOT NULL CHECK (event_kind IN (
         'verification_started','verification_approved','request_created','request_accepted','request_reassigned',
-        'request_passed','request_expired','request_cancelled','reschedule_requested',
+        'request_passed','request_expired','request_cancelled','reschedule_requested','reschedule_accepted','reschedule_declined',
         'call_connected','call_not_connected','live_started','live_paused','settings_updated','register_checked'
     )),
     actor_kind TEXT NOT NULL CHECK (actor_kind IN ('visitor','vendor_user','operator','system')),

@@ -8,6 +8,8 @@
   if (!form || !input || !grid || !status || !filters) return;
   var selectedCategory = '';
   var categories = [];
+  var initialQuery = new URLSearchParams(window.location.search).get('q') || '';
+  if (initialQuery) input.value = initialQuery;
 
   function safeImageUrl(raw) {
     try { var url = new URL(raw, window.location.origin); return /^https?:$/.test(url.protocol) ? url.href : ''; } catch (_) { return ''; }
@@ -25,6 +27,7 @@
     if (vendor.description) { var desc = document.createElement('p'); desc.className = 'vendor-meta'; desc.textContent = vendor.description.slice(0, 180); body.appendChild(desc); }
     if (vendor.claim_cta) { var claimNote = document.createElement('p'); claimNote.className = 'vendor-claim-note'; claimNote.textContent = 'Own this business? Claim this listing to update photos, pricing, and reply to enquiries.'; body.appendChild(claimNote); }
     var action = document.createElement('a'); action.className = vendor.claim_cta ? 'btn btn-outline' : 'btn btn-primary'; action.href = vendor.claim_cta ? claimHref(vendor.slug) : vendor.agent_card_url ? '../workspace/?auth=register&source=wedding_enquiry&vendor=' + encodeURIComponent(vendor.slug) : (vendor.website_url || '#'); action.textContent = vendor.claim_cta ? 'Claim this listing' : vendor.agent_card_url ? 'Enquire securely' : 'View vendor'; body.appendChild(action);
+    if (/celebrant/i.test(vendor.category || '')) { var call = document.createElement('a'); call.className = 'btn btn-outline'; call.href = 'talk-to-a-celebrant.html?vendor=' + encodeURIComponent(vendor.slug); call.textContent = '☎ Talk to this celebrant'; body.appendChild(call); }
     article.appendChild(body); return article;
   }
   function render(items) {
@@ -56,5 +59,5 @@
   }
   form.addEventListener('submit', function (event) { event.preventDefault(); load((input.value || '').trim()); });
   renderFilters();
-  load('');
+  load(initialQuery);
 })();

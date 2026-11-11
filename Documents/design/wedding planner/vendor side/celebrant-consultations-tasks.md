@@ -33,7 +33,9 @@ Depends on CCB-02.
 
 - [x] Permit only verified Celebrant vendors with owner/calendar/enquiry permissions.
 - [x] Add recurring hours, topics, intent, buffer and live-session commands to the existing Availability area.
-- [x] Add upcoming callback/scheduled-call projection with Accept, Pass, cancel/reschedule and outcome commands. The first UI exposes accept/pass/cancel/outcome; reschedule is API-ready.
+- [x] Add upcoming callback/scheduled-call projection with Accept, Pass, cancel/reschedule and outcome commands.
+- [x] Expose one-off open/unavailable exceptions and vendor-proposed rescheduling in the existing portal, with an explicit couple accept/decline response.
+- [x] Reassign an unaccepted first-available request atomically when its celebrant passes or its hold expires; never retry a specifically selected celebrant.
 - [x] Reveal the callback number only after successful acceptance.
 - [ ] Extend the scoped calendar-management capability with consultation-only permissions or document a release blocker.
 
@@ -65,6 +67,11 @@ Depends on CCB-03.
 - [x] Run frontend typecheck/build and the public Wedding website smoke suite.
 - [ ] Run a Twilio sandbox verification and a controlled Sydney pilot callback before enabling the false-default flag.
 - [ ] Record source commit, deployed SHA and runtime health; do not call provider acceptance a connected call.
+
+Hosted activation remains false-default until the Twilio Verify Account SID,
+auth token and Verify Service SID are present in Oracle's secret authority and a
+controlled phone verification/callback is observed. Shipping the page,
+migration and dormant routes does not satisfy that external-provider gate.
 
 Depends on CCB-03 through CCB-06.
 
