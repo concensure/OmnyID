@@ -8667,3 +8667,27 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
 - Next: prove the new author/partner assertions in the disposable-Postgres
   real-router test on Linux, then implement claim-specific eligibility. The
   review rollout flag remains false and no deployment occurred.
+# 2026-11-12 — WED-360 claim-specific review eligibility (Codex)
+
+- Continued in `C:\temp\wt\omnyid-wed360` on `agent/codex/WED-360` from
+  `caf454635536a1824e4da5a760dde99f27da1b4c`.
+- Added migration 0163 and an operator-only, false-default eligibility command.
+  Evidence can be accepted/rejected only after that operator recently opened
+  it for `eligibility` or `evidence`; retries converge through a request hash,
+  idempotency key and expected verification version.
+- The deterministic evaluator truthfully limits signals: canonical run-sheet
+  activity can verify planner activity, enquiry/tour evidence cannot verify a
+  booking, and a wedding-held claim requires both a wholly past event month
+  and accepted post-event delivery proof. Probable duplicates become a private
+  `conflicted` assessment and expose no source identifiers publicly.
+- Verification: `cargo check --lib` and `cargo check --tests` pass using shared
+  `C:\cargo-target`; a small exact-source harness passes 14/14 review-policy
+  tests. Migrations 0161–0163 applied to disposable pgvector/PostgreSQL 18 and
+  accepted a versioned `verified_wedding_held` transition/event. Full Windows
+  unit/integration test linking again fails inside rustc with
+  `STATUS_ACCESS_VIOLATION`, before assertions, so the expanded real-router
+  eligibility assertion still requires Linux execution.
+- Remaining: author status/correction/withdrawal UI and API, moderation and
+  publication, vendor reply/reporting, public aggregates, invitations,
+  analytics and the false-default hosted rollout. Do not enable or deploy the
+  review feature before those gates are complete.

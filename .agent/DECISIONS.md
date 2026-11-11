@@ -3336,3 +3336,17 @@ synthetic vendor search or introduce another send path.
   counts. Explicit vendor categories are hard eligibility constraints, while a
   genuinely generic “wedding vendors” request may search a bounded cross-category
   directory without inventing a synthetic category constraint.
+# 2026-11-12 — Wedding review eligibility is claim-specific and operator-reviewed
+
+- Canonical planner activity, enquiries and bookings are reused only for the
+  claim they establish. An enquiry cannot verify a booking, and neither a
+  booking nor an elapsed authored date can verify wedding delivery.
+- `verified_wedding_held` requires a claimed event month wholly before the
+  current month plus operator-accepted post-event invoice or correspondence.
+  Evidence acceptance requires a recent audited access for the explicit
+  eligibility/evidence purpose.
+- Probable duplicate matching is limited to a private operator assessment and
+  produces `conflicted`; source record identifiers and match fields are not
+  returned to authors, vendors or public projections.
+- Eligibility has its own monotonic version and idempotency receipt, remaining
+  independent from invitation origin, moderation and publication.

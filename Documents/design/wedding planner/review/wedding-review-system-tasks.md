@@ -30,14 +30,14 @@ Depends on REV-01.
 
 ## REV-03 — Eligibility and evidence
 
-- [ ] Reuse canonical planner activity, enquiry, quote/booking and event-date
+- [x] Reuse canonical planner activity, enquiry, quote/booking and event-date
   evidence without treating them as stronger claims than they prove.
 - [x] Add purpose-bound operator-only proof access, audited access facts and
   revocable deletion scheduling/execution through the existing upload and
   object-store authority.
 - [x] Connect author withdrawal/deletion commands to the same purge scheduler;
   the author's ordinary Files view remains the only author file reader meanwhile.
-- [ ] Implement claim-specific verification and probable-duplicate review while
+- [x] Implement claim-specific verification and probable-duplicate review while
   keeping private match signals out of public/vendor responses.
 
 Depends on REV-02.
