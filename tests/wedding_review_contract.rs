@@ -5,6 +5,7 @@ use omnyid_homeserver::wedding_reviews::{
 
 const MIGRATION: &str = include_str!("../postgres/migrations/0161_wedding_reviews.sql");
 const ROUTES: &str = include_str!("../src/server/wedding_review_routes.rs");
+const EVIDENCE_ROUTES: &str = include_str!("../src/server/wedding_review_evidence_routes.rs");
 const SERVER: &str = include_str!("../src/server/mod.rs");
 
 #[test]
@@ -102,4 +103,24 @@ fn expected_revision_and_partner_safe_canonical_lock_are_both_enforced() {
     assert!(ROUTES.contains("vendor_id IS NOT DISTINCT FROM $4 FOR UPDATE"));
     assert!(ROUTES.contains("ON CONFLICT (owner_user_id,idempotency_key) DO NOTHING"));
     assert!(ROUTES.contains("if review.get::<String, _>(\"owner_user_id\") == user.id"));
+}
+
+#[test]
+fn evidence_links_reuse_private_upload_ownership_without_copying_file_content() {
+    assert!(EVIDENCE_ROUTES.contains("tenant_schema_name(&user.id)"));
+    assert!(EVIDENCE_ROUTES.contains("rr.authored_by_user_id=$1"));
+    assert!(EVIDENCE_ROUTES.contains("r.current_revision=$3"));
+    assert!(EVIDENCE_ROUTES.contains("wedding_user_onboarding_state"));
+    assert!(EVIDENCE_ROUTES.contains("PROOF_RETENTION_DAYS: i64 = 90"));
+    for forbidden in [
+        "storage_url",
+        "download_url",
+        "file_bytes",
+        "reviewer_email",
+    ] {
+        assert!(
+            !EVIDENCE_ROUTES.contains(forbidden),
+            "evidence control route must not copy protected material: {forbidden}"
+        );
+    }
 }
