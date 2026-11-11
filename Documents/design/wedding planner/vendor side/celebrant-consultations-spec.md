@@ -49,6 +49,13 @@ Verified celebrants see **Phone consultations** in the existing vendor Availabil
 
 The first release uses the vendor's nominated business phone for callbacks. OmnyID does not promise masked calling.
 
+After acceptance, the verified callback number is presented as a tap-sized
+`tel:` action. Australian national mobile and landline numbers are normalised
+to E.164 (`+61…`) in the link while retaining readable formatting on screen.
+Incomplete local numbers are shown without a call action rather than guessed.
+Mobile devices open their native dialler; desktop behaviour depends on the
+calling application registered with the operating system.
+
 ## Authorisation and official evidence
 
 Pilot cards require a current operator-recorded check against the Australian Attorney-General's Department celebrant register. The verification record stores the register type, source URL, checked time and operator—not copied register content. Registration evidence does not imply live readiness.
@@ -83,6 +90,21 @@ The portal inbox is the initial reliable notification surface. Email/SMS notific
 ## Rollout and observability
 
 The entire public surface is false-default behind `OMNYID_CELEBRANT_CONSULTATIONS_ENABLED`. Publishing also requires the vendor-level pilot verification flag. Operator metrics distinguish requested, accepted, connected, not connected, expired, scheduled and hiring-enquiry outcomes. No metric treats acceptance as a completed conversation.
+
+The operator Wedding funnel also reports three separately defined, content-free
+measures over selectable 30-, 90- and 365-day windows:
+
+- **Qualified couples** are distinct wedding plans that reached the existing
+  activation projection. This does not inspect budgets, messages or plan text.
+- **Accurately maintained availability** shows both vendors with current,
+  unexpired availability refreshed in the last 30 days and the distinct vendors
+  that made an authoritative availability change on each Sydney calendar day.
+- **Completed venue enquiries** require delivery or acknowledgement evidence.
+  A draft or provider-level `accepted` event is deliberately excluded.
+
+The time series is projected from canonical server records, not browser-local
+analytics, and uses Australia/Sydney day boundaries. It stores no new message
+content, phone number, visitor cookie or couple profile field.
 
 ## Acceptance boundaries
 

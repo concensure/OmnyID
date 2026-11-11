@@ -8,7 +8,7 @@ use std::{sync::Arc, time::Duration};
 
 use axum::{
     Json, Router,
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::{HeaderMap, HeaderValue, StatusCode, header},
     response::{IntoResponse, Response},
     routing::{get, post},
@@ -172,8 +172,10 @@ async fn record_event(
 async fn admin_dashboard_http(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
+    Query(query): Query<AdminMetricsQuery>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     operator(&state, &headers, "celebrant-management-dashboard").await?;
+    let days = query.days.unwrap_or(90).clamp(7, 365);
     let rows = sqlx::query(
         r#"SELECT v.vendor_id,v.vendor_slug,v.vendor_name,v.service_area,v.claim_status,
                   p.register_status,p.register_checked_at,
@@ -190,6 +192,113 @@ async fn admin_dashboard_http(
             ORDER BY v.vendor_name"#,
     )
     .fetch_all(&state.db.pool).await.map_err(db_error)?;
+    let metric_rows = sqlx::query(
+        r#"WITH report_days AS (
+               SELECT generate_series(
+                   (NOW() AT TIME ZONE 'Australia/Sydney')::date - ($1::integer - 1),
+                   (NOW() AT TIME ZONE 'Australia/Sydney')::date,
+                   INTERVAL '1 day'
+               )::date AS day
+           ), qualified AS (
+               SELECT (activated_at AT TIME ZONE 'Australia/Sydney')::date AS day,
+                      owner_user_id || ':' || wedding_plan_id AS wedding_key
+                 FROM growth_wedding_activations
+                WHERE activated_at >= NOW() - make_interval(days => $1::integer)
+           ), availability_updates AS (
+               SELECT (occurred_at AT TIME ZONE 'Australia/Sydney')::date AS day,vendor_id
+                 FROM wedding_vendor_special_offer_events
+                WHERE occurred_at >= NOW() - make_interval(days => $1::integer)
+                  AND event_kind IN ('created','approved','published','reconfirmed','paused','withdrawn',
+                    'hold_created','hold_expired','booked','stale','availability_confirmed','cancelled_booking_reopened')
+               UNION ALL
+               SELECT (occurred_at AT TIME ZONE 'Australia/Sydney')::date AS day,vendor_id
+                 FROM wedding_celebrant_management_events
+                WHERE occurred_at >= NOW() - make_interval(days => $1::integer)
+                  AND event_kind IN ('settings_updated','window_added','window_removed','live_started','live_paused')
+               UNION ALL
+               SELECT (occurred_at AT TIME ZONE 'Australia/Sydney')::date AS day,vendor_id
+                 FROM wedding_celebrant_consultation_events
+                WHERE occurred_at >= NOW() - make_interval(days => $1::integer)
+                  AND vendor_id IS NOT NULL
+                  AND event_kind IN ('settings_updated','live_started','live_paused')
+           ), completed_delivery_evidence AS (
+               SELECT 'afp:' || envelope.message_id AS delivery_key,
+                      COALESCE(envelope.acked_at,envelope.delivered_at,envelope.received_at) AS completed_at
+                 FROM wedding_enquiry_envelopes envelope
+                 JOIN wedding_vendors vendor ON vendor.vendor_id=envelope.vendor_id
+                WHERE envelope.direction='to_vendor'
+                  AND (envelope.delivered_at IS NOT NULL OR envelope.acked_at IS NOT NULL)
+                  AND lower(vendor.category)='venue'
+               UNION ALL
+               SELECT CASE WHEN provider_event.afp_message_id IS NOT NULL
+                           THEN 'afp:' || provider_event.afp_message_id
+                           ELSE 'provider:' || provider_event.provider || ':' || provider_event.provider_event_id END,
+                      COALESCE(provider_event.processed_at,provider_event.created_at)
+                 FROM wedding_vendor_email_provider_events provider_event
+                 JOIN wedding_vendor_email_threads thread ON thread.relay_thread_id=provider_event.relay_thread_id
+                 JOIN wedding_vendors vendor ON vendor.vendor_id=thread.vendor_id
+                WHERE provider_event.event_kind='delivered'
+                  AND provider_event.processing_status='completed'
+                  AND lower(vendor.category)='venue'
+           ), completed_enquiries AS (
+               SELECT delivery_key,
+                      (MIN(completed_at) AT TIME ZONE 'Australia/Sydney')::date AS day
+                 FROM completed_delivery_evidence
+                WHERE completed_at >= NOW() - make_interval(days => $1::integer)
+                GROUP BY delivery_key
+           )
+           SELECT report_days.day,
+                  COALESCE((SELECT COUNT(DISTINCT wedding_key) FROM qualified WHERE qualified.day=report_days.day),0)::bigint AS qualified_couples,
+                  COALESCE((SELECT COUNT(DISTINCT vendor_id) FROM availability_updates WHERE availability_updates.day=report_days.day),0)::bigint AS availability_vendors_maintained,
+                  COALESCE((SELECT COUNT(*) FROM completed_enquiries WHERE completed_enquiries.day=report_days.day),0)::bigint AS completed_venue_enquiries
+             FROM report_days ORDER BY report_days.day"#,
+    )
+    .bind(days)
+    .fetch_all(&state.db.pool)
+    .await
+    .map_err(db_error)?;
+    let fresh_availability_vendors = sqlx::query_scalar::<_, i64>(
+        r#"SELECT COUNT(DISTINCT vendor_id)::bigint FROM (
+               SELECT vendor_id
+                 FROM wedding_vendor_special_offer_slots
+                WHERE state IN ('available','enquiry_received','provisional_hold','booked')
+                  AND confirmation_expires_at>NOW()
+                  AND last_confirmed_at>=NOW()-INTERVAL '30 days'
+               UNION
+               SELECT vendor_id
+                 FROM wedding_celebrant_management_events
+                WHERE event_kind IN ('settings_updated','window_added','window_removed','live_started','live_paused')
+                  AND occurred_at>=NOW()-INTERVAL '30 days'
+               UNION
+               SELECT vendor_id
+                 FROM wedding_celebrant_consultation_windows
+                WHERE enabled=TRUE AND updated_at>=NOW()-INTERVAL '30 days'
+           ) fresh"#,
+    )
+    .fetch_one(&state.db.pool)
+    .await
+    .map_err(db_error)?;
+    let series = metric_rows
+        .into_iter()
+        .map(|row| json!({
+            "day":row.get::<NaiveDate,_>("day"),
+            "qualified_couples":row.get::<i64,_>("qualified_couples"),
+            "availability_vendors_maintained":row.get::<i64,_>("availability_vendors_maintained"),
+            "completed_venue_enquiries":row.get::<i64,_>("completed_venue_enquiries")
+        }))
+        .collect::<Vec<_>>();
+    let qualified_couples = series
+        .iter()
+        .filter_map(|row| row.get("qualified_couples")?.as_i64())
+        .sum::<i64>();
+    let availability_vendors_maintained = series
+        .iter()
+        .filter_map(|row| row.get("availability_vendors_maintained")?.as_i64())
+        .sum::<i64>();
+    let completed_venue_enquiries = series
+        .iter()
+        .filter_map(|row| row.get("completed_venue_enquiries")?.as_i64())
+        .sum::<i64>();
     Ok(Json(json!({"vendors":rows.into_iter().map(|row|json!({
         "vendor_id":row.get::<String,_>("vendor_id"),"vendor_slug":row.get::<String,_>("vendor_slug"),
         "vendor_name":row.get::<String,_>("vendor_name"),"service_area":row.get::<String,_>("service_area"),
@@ -199,7 +308,28 @@ async fn admin_dashboard_http(
         "latest_opened_at":row.get::<Option<DateTime<Utc>>,_>("latest_opened_at").map(|v|v.to_rfc3339()),
         "active_grant_id":row.get::<Option<String>,_>("active_grant_id"),
         "active_link_expires_at":row.get::<Option<DateTime<Utc>>,_>("active_link_expires_at").map(|v|v.to_rfc3339())
-    })).collect::<Vec<_>>() })))
+    })).collect::<Vec<_>>(),
+    "metrics":{
+        "window_days":days,
+        "fresh_availability_vendors":fresh_availability_vendors,
+        "qualified_couples":qualified_couples,
+        "availability_vendors_maintained":availability_vendors_maintained,
+        "completed_venue_enquiries":completed_venue_enquiries,
+        "series":series,
+        "definitions":{
+            "qualified_couples":"Distinct wedding plans reaching the existing activation projection in the selected period; no plan content is read.",
+            "fresh_availability_vendors":"Distinct vendors with unexpired availability confirmed or explicitly maintained in the last 30 days.",
+            "availability_vendors_maintained":"Distinct vendors with an authoritative availability state change on each Sydney calendar day.",
+            "completed_venue_enquiries":"Distinct venue enquiries with delivery or acknowledgement evidence; drafts and provider acceptance alone are excluded."
+        },
+        "timezone":"Australia/Sydney",
+        "generated_at":Utc::now().to_rfc3339()
+    }})))
+}
+
+#[derive(Deserialize)]
+struct AdminMetricsQuery {
+    days: Option<i32>,
 }
 
 #[derive(Deserialize)]

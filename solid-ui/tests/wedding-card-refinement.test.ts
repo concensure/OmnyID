@@ -53,7 +53,7 @@ test("decision research exposes real vendor contact actions and an in-place Open
   ]);
   assert.match(detail, />Website</);
   assert.match(detail, /onEmailVendor/);
-  assert.match(detail, /href={`tel:/);
+  assert.match(detail, /phoneTelHref\(vendor\.phone\)/);
   assert.match(detail, /WeddingVendorInlineMap/);
   assert.match(map, /nominatim\.openstreetmap\.org/);
   assert.match(map, /openstreetmap\.org\/export\/embed/);

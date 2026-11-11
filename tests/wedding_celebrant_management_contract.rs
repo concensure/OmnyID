@@ -28,7 +28,11 @@ fn management_link_is_vendor_scoped_revocable_and_content_light() {
     assert!(routes.contains("status='revoked'"));
     assert!(routes.contains("consumed_at=COALESCE(consumed_at,NOW())"));
 
-    for forbidden in ["consultation_requests", "phone_ciphertext FROM", "couple_user_id"] {
+    for forbidden in [
+        "consultation_requests",
+        "phone_ciphertext FROM",
+        "couple_user_id",
+    ] {
         assert!(
             !routes.contains(forbidden),
             "management capability must not expose {forbidden}"
@@ -40,8 +44,7 @@ fn management_link_is_vendor_scoped_revocable_and_content_light() {
 fn public_and_admin_surfaces_support_the_scoped_flow() {
     let portal = include_str!("../solid-ui/src/vendor-claim-main.tsx");
     let manager = include_str!("../solid-ui/src/components/vendor/CelebrantManagementFlow.tsx");
-    let admin =
-        include_str!("../solid-ui/src/components/UsageAdminWeddingCelebrantsPanel.tsx");
+    let admin = include_str!("../solid-ui/src/components/UsageAdminWeddingCelebrantsPanel.tsx");
     let directory = include_str!("../wedding/assets/js/directory.js");
 
     assert!(portal.contains("celebrant_management"));
@@ -50,4 +53,24 @@ fn public_and_admin_surfaces_support_the_scoped_flow() {
     assert!(admin.contains("Generate link + QR"));
     assert!(admin.contains("Revoke active link"));
     assert!(directory.contains("category=Celebrant") || directory.contains("category"));
+}
+
+#[test]
+fn call_actions_and_operator_funnel_use_durable_evidence() {
+    let directory = include_str!("../src/server/wedding_vendor_directory_page.rs");
+    let calls =
+        include_str!("../solid-ui/src/components/vendor/VendorCelebrantConsultationsPanel.tsx");
+    let admin = include_str!("../src/server/wedding_celebrant_management_link_routes.rs");
+    let migration =
+        include_str!("../postgres/migrations/0160_wedding_vendor_funnel_metric_indexes.sql");
+
+    assert!(directory.contains("phone_tel_href"));
+    assert!(calls.contains("phoneTelHref"));
+    assert!(calls.contains("native calling app"));
+    assert!(admin.contains("growth_wedding_activations"));
+    assert!(admin.contains("wedding_enquiry_envelopes"));
+    assert!(admin.contains("provider_event.event_kind='delivered'"));
+    assert!(migration.contains("WHERE direction='to_vendor'"));
+    assert!(!migration.contains("message_body"));
+    assert!(!migration.contains("phone"));
 }

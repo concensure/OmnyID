@@ -110,3 +110,40 @@ observed. Provider acceptance alone is not a connected call.
 The celebrant directory, integrated profiles and single-celebrant management
 links are therefore live. The callback flag remains false by design until the
 controlled Twilio and connected-call gates in this document have evidence.
+
+## Call reliability and operator funnel hardening
+
+The next release candidate adds a shared, tested telephone-link policy. A
+readable Australian mobile or landline number is emitted as an E.164 `tel:` URI
+for the native dialler/calling application. Malformed or incomplete local
+numbers remain visible but are not made into a guessed call action. This policy
+is used by public celebrant profiles, vendor comparison/research contacts and
+the accepted-callback action in the vendor portal.
+
+The authenticated operator panel now reports, for selectable 30-, 90- and
+365-day windows:
+
+- distinct wedding plans in the existing activation projection;
+- vendors whose authoritative availability remains fresh;
+- daily distinct vendors maintaining availability; and
+- distinct venue enquiries with delivery or acknowledgement evidence.
+
+The enquiry measure excludes drafts and provider acceptance. These are
+content-free projections over canonical server tables; no message content,
+phone number, new browser event or visitor cookie is copied into the report.
+Migration 0160 adds only supporting indexes.
+
+Pre-release verification:
+
+- `cargo check --lib`: pass.
+- focused Rust management/consultation contracts with `cargo check --test`:
+  pass.
+- phone URI unit tests: 2/2 pass.
+- Solid TypeScript: pass.
+- Vite production build: pass (existing chunk-size warning only).
+- source and Wedding line-budget checks: 2/2 pass.
+- Windows execution of the Rust test binaries: blocked by an MSVC `rustc`
+  `STATUS_ACCESS_VIOLATION`; no assertion or source diagnostic was produced.
+
+Hosted migration, authenticated metric payload and public E.164 evidence remain
+to be added against the exact release SHA.

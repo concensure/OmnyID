@@ -814,4 +814,9 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
             "../../postgres/migrations/0159_wedding_celebrant_profiles_and_management_links.sql"
         ),
     ),
+    (
+        "0160_wedding_vendor_funnel_metric_indexes",
+        "Content-free indexes for qualified-couple, availability-maintenance and completed venue-enquiry operator trends",
+        include_str!("../../postgres/migrations/0160_wedding_vendor_funnel_metric_indexes.sql"),
+    ),
 ];

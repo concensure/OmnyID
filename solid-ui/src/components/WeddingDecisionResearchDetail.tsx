@@ -7,6 +7,7 @@ import { WeddingVendorInlineMap } from "@/components/WeddingVendorInlineMap";
 import { renderMarkdown } from "@/lib/markdownRenderer";
 import { weddingGeneratedArtifactToAfpSendInput } from "@/lib/weddingArtifactAfpProjectionState";
 import type { WeddingDecisionResearchState } from "@/lib/weddingDecisionResearchState";
+import { phoneTelHref } from "@/lib/phoneTelHref";
 
 const savedResearchArtifactIds = new Set<string>();
 
@@ -57,7 +58,7 @@ export function WeddingDecisionResearchDetail(props: {
           <div class="mt-2 flex flex-wrap gap-2 text-xs font-semibold">
             <Show when={vendor.websiteUrl}>{(url) => <a href={url()} target="_blank" rel="noreferrer" class="min-h-9 rounded-lg border border-pink-200 bg-white px-3 py-2 text-pink-900 underline">Website</a>}</Show>
             <Show when={Boolean(vendor.email)}><button type="button" class="min-h-9 rounded-lg border border-pink-200 bg-white px-3 text-pink-900 underline" onClick={() => props.onEmailVendor?.(vendor)}>Email</button></Show>
-            <Show when={vendor.phone}>{(phone) => <a href={`tel:${phone().replace(/\s+/g, "")}`} class="min-h-9 rounded-lg border border-pink-200 bg-white px-3 py-2 text-pink-900 underline">Phone</a>}</Show>
+            <Show when={phoneTelHref(vendor.phone)}>{(href) => <a href={href()} class="min-h-9 rounded-lg border border-pink-200 bg-white px-3 py-2 text-pink-900 underline">Phone</a>}</Show>
             <Show when={Boolean(vendor.address)}><button type="button" class="min-h-9 rounded-lg border border-pink-200 bg-white px-3 text-pink-900 underline" onClick={() => setMapVendorId((current) => current === vendor.choiceId ? null : vendor.choiceId)}>Address</button></Show>
           </div>
           <Show when={mapVendorId() === vendor.choiceId && vendor.address}>{(address) => <WeddingVendorInlineMap address={address()} externalMapUrl={vendor.mapUrl} />}</Show>

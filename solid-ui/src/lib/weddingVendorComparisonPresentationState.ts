@@ -13,6 +13,7 @@ import {
 import { weddingVendorShortlistMedia } from "@/lib/weddingVendorShortlistPolicyState";
 import { weddingVendorAnchorRows, weddingVendorVerifyQuestions } from "@/lib/weddingVendorAnchorRowState";
 import { weddingFacetById } from "@/lib/weddingFacetVocabularyState";
+import { phoneTelHref } from "@/lib/phoneTelHref";
 
 export type WeddingVendorComparisonContext = {
   preferences?: string | null;
@@ -260,7 +261,7 @@ function contactSummaryMarkdown(choice: WeddingVendorRankedCandidate): string {
     choice.websiteUrl && usableSourceUrl({ url: choice.websiteUrl }) ? `[website](${choice.websiteUrl})` : null,
     choice.instagramUrl && usableSourceUrl({ url: choice.instagramUrl }) ? `[Instagram](${choice.instagramUrl})` : null,
     choice.email ? `[email](mailto:${choice.email}?subject=${encodeURIComponent(`Wedding enquiry for ${choice.title}`)})` : null,
-    choice.phone ? `[phone](tel:${choice.phone.replace(/[^+\d]/g, "")})` : null,
+    choice.phone && phoneTelHref(choice.phone) ? `[phone](${phoneTelHref(choice.phone)})` : null,
     choice.address ? `[address](https://www.openstreetmap.org/search?query=${encodeURIComponent(choice.address)})` : null,
     choice.mapUrl && usableSourceUrl({ url: choice.mapUrl }) ? `[map](${choice.mapUrl})` : null,
   ].filter((value): value is string => Boolean(value));

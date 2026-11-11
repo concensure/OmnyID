@@ -18,6 +18,7 @@ import type { WeddingPreferenceSignalReason } from "@/lib/weddingPreferenceSigna
 import type { WeddingVendorOutreachFlowState } from "@/lib/weddingVendorOutreachFlowState";
 import type { WeddingVendorEnquiryPermissions } from "@/lib/weddingVendorEnquiryPermissionsState";
 import { WeddingTrustInfoTip } from "@/components/WeddingTrustInfoTip";
+import { phoneTelHref } from "@/lib/phoneTelHref";
 
 export type WeddingVendorChoiceCardData = WeddingWorkspaceArtifactPreview["vendorComparisonCards"][number];
 
@@ -85,7 +86,7 @@ export function WeddingVendorChoiceCard(props: {
     card.websiteUrl ? { label: "Website", value: card.websiteUrl, href: card.websiteUrl } : null,
     card.instagramUrl ? { label: "Instagram", value: card.instagramUrl, href: card.instagramUrl } : null,
     card.email ? { label: "Email", value: card.email, href: vendorEmailHref(card.title, card.email) } : null,
-    card.phone ? { label: "Phone", value: card.phone, href: `tel:${card.phone.replace(/\s+/g, "")}` } : null,
+    card.phone ? { label: "Phone", value: card.phone, href: phoneTelHref(card.phone) } : null,
     card.address ? { label: "Address", value: card.address, href: null } : null,
     card.mapUrl ? { label: "Map", value: card.mapUrl, href: card.mapUrl } : null,
   ].filter((item): item is { label: string; value: string; href: string | null } => item !== null);

@@ -37,7 +37,7 @@ Depends on CCB-02.
 - [x] Expose one-off open/unavailable exceptions and vendor-proposed rescheduling in the existing portal, with an explicit couple accept/decline response.
 - [x] Reassign an unaccepted first-available request atomically when its celebrant passes or its hold expires; never retry a specifically selected celebrant.
 - [x] Reveal the callback number only after successful acceptance.
-- [ ] Extend the scoped calendar-management capability with consultation-only permissions or document a release blocker.
+- [x] Extend the scoped calendar-management capability with consultation-only permissions and single-celebrant authority.
 
 Depends on CCB-02.
 
@@ -67,6 +67,22 @@ Depends on CCB-03.
 - [x] Run frontend typecheck/build and the public Wedding website smoke suite.
 - [ ] Run a Twilio sandbox verification and a controlled Sydney pilot callback before enabling the false-default flag.
 - [ ] Record source commit, deployed SHA and runtime health; do not call provider acceptance a connected call.
+
+## CCB-08 — Call reliability and operator funnel hardening
+
+- [x] Present accepted callback numbers as tap-sized `tel:` links and normalise
+  Australian mobile and landline targets to E.164 without guessing incomplete
+  local numbers.
+- [x] Use the same phone-link policy for integrated directory and vendor
+  research call actions.
+- [x] Add operator-only 30-, 90- and 365-day trends for qualified activated
+  wedding plans, availability maintenance and completed venue enquiries.
+- [x] Require delivery or acknowledgement evidence for a completed enquiry;
+  exclude drafts and provider acceptance alone.
+- [x] Add query indexes without introducing a new visitor identifier, content
+  copy or browser analytics event.
+- [ ] Prove migration 0160, the authenticated metrics response and E.164 links
+  on the exact hosted release SHA.
 
 Hosted activation remains false-default until the Twilio Verify Account SID,
 auth token and Verify Service SID are present in Oracle's secret authority and a

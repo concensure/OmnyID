@@ -8504,3 +8504,28 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
   evidence, disposable-Postgres concurrency proof and canonical post-call
   enquiry creation remain deliberately gated. The completed directory/profile
   and single-celebrant calendar-authority slice is live.
+
+# 2026-11-11 — WED-359 call and operator-metric hardening (Codex)
+
+- Continued in `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001` on
+  `agent/codex/WED-359` from release-evidence SHA
+  `7633397008fe34043e79d60be1fce1797538d945`.
+- Added one shared phone-target policy in Rust and Solid: Australian national
+  mobile and landline numbers become E.164 `tel:+61…` targets while the UI keeps
+  readable formatting. Invalid or incomplete local numbers are not guessed.
+  Accepted callback numbers use a tap-sized call action and explain that the
+  native phone/calling app opens before the person places the call.
+- Added operator-only 30-, 90- and 365-day Wedding commercial-funnel evidence:
+  distinct activated wedding plans, current/fresh vendor availability,
+  availability-maintenance vendor-days, and venue enquiries with delivery or
+  acknowledgement evidence. Drafts and provider `accepted` events are excluded;
+  no message body, phone, visitor cookie or new user identifier is collected.
+- Migration 0160 adds partial/query indexes only. The measures remain projections
+  over the existing activation, availability and enquiry authorities.
+- Passed locally: Cargo library check; focused Rust contract compilation; Solid
+  TypeScript; phone URI tests 2/2; production Vite build; line budgets 2/2.
+  Running the Rust test binaries on this Windows host still crashes inside the
+  MSVC `rustc` process (`STATUS_ACCESS_VIOLATION`, including while compiling
+  `tokio`) without a source diagnostic. Re-run them on Linux in the clean
+  exact-SHA release and prove migration 0160 plus hosted E.164 links before
+  closing the hardening slice.

@@ -308,6 +308,11 @@ fn render_vendor_page(vendor: &PublicVendorPageRow) -> String {
         .website_url
         .as_deref()
         .filter(|value| safe_public_url(value));
+    let telephone = vendor
+        .contact_phone
+        .as_deref()
+        .and_then(crate::wedding_celebrant_consultation::phone_tel_href)
+        .and_then(|value| value.strip_prefix("tel:").map(str::to_string));
     let schema = json!({
         "@context": "https://schema.org",
         "@type": "LocalBusiness",
@@ -317,6 +322,7 @@ fn render_vendor_page(vendor: &PublicVendorPageRow) -> String {
         "address": address,
         "url": canonical,
         "sameAs": website,
+        "telephone": telephone,
     })
     .to_string()
     .replace('<', "\\u003c");
@@ -331,15 +337,15 @@ fn render_vendor_page(vendor: &PublicVendorPageRow) -> String {
         .as_deref()
         .filter(|value| !value.trim().is_empty())
         .map(|value| {
-            let dial = value
-                .chars()
-                .filter(|character| character.is_ascii_digit() || *character == '+')
-                .collect::<String>();
-            format!(
-                "<dt>Phone</dt><dd><a href=\"tel:{}\">{}</a></dd>",
-                escape_html(&dial),
-                escape_html(value)
-            )
+            match crate::wedding_celebrant_consultation::phone_tel_href(value) {
+                Some(href) => format!(
+                    "<dt>Phone</dt><dd><a class=\"vendor-phone-link\" href=\"{}\" aria-label=\"Call {}\">{}</a></dd>",
+                    escape_html(&href),
+                    escape_html(&vendor.name),
+                    escape_html(value)
+                ),
+                None => format!("<dt>Phone</dt><dd>{}</dd>", escape_html(value)),
+            }
         })
         .unwrap_or_default();
     let email_html = vendor
