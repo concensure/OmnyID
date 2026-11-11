@@ -8,11 +8,14 @@ const EVIDENCE_ACCESS_MIGRATION: &str =
     include_str!("../postgres/migrations/0162_wedding_review_evidence_access.sql");
 const ELIGIBILITY_MIGRATION: &str =
     include_str!("../postgres/migrations/0163_wedding_review_eligibility.sql");
+const AUTHOR_LIFECYCLE_MIGRATION: &str =
+    include_str!("../postgres/migrations/0164_wedding_review_author_lifecycle.sql");
 const ROUTES: &str = include_str!("../src/server/wedding_review_routes.rs");
 const EVIDENCE_ROUTES: &str = include_str!("../src/server/wedding_review_evidence_routes.rs");
 const EVIDENCE_OPERATOR_ROUTES: &str =
     include_str!("../src/server/wedding_review_evidence_operator_routes.rs");
 const ELIGIBILITY_ROUTES: &str = include_str!("../src/server/wedding_review_eligibility_routes.rs");
+const AUTHOR_ROUTES: &str = include_str!("../src/server/wedding_review_author_routes.rs");
 const SERVER: &str = include_str!("../src/server/mod.rs");
 
 #[test]
@@ -174,6 +177,28 @@ fn eligibility_is_versioned_claim_specific_and_private() {
         assert!(
             !ELIGIBILITY_MIGRATION.contains(forbidden),
             "eligibility assessment must not retain private material: {forbidden}"
+        );
+    }
+}
+
+#[test]
+fn author_status_and_withdrawal_are_account_scoped_and_content_light() {
+    assert!(AUTHOR_LIFECYCLE_MIGRATION.contains("wedding_review_lifecycle_receipts"));
+    assert!(AUTHOR_LIFECYCLE_MIGRATION.contains("UNIQUE (actor_user_id, idempotency_key)"));
+    assert!(AUTHOR_ROUTES.contains("wedding_user_onboarding_state"));
+    assert!(AUTHOR_ROUTES.contains("authored.authored_by_user_id=$2"));
+    assert!(AUTHOR_ROUTES.contains("status='withdrawn'"));
+    assert!(AUTHOR_ROUTES.contains("status='purge_scheduled'"));
+    assert!(SERVER.contains(".merge(wedding_review_author_routes::routes())"));
+    for forbidden in [
+        "review_text",
+        "public_snapshot",
+        "attachment_id",
+        "reviewer_email",
+    ] {
+        assert!(
+            !AUTHOR_LIFECYCLE_MIGRATION.contains(forbidden),
+            "lifecycle receipt leaked private field: {forbidden}"
         );
     }
 }

@@ -326,6 +326,64 @@ async fn concurrent_retry_and_partner_submission_converge_without_duplicate_rati
     .await
     .expect("eligibility assessment count");
     assert_eq!(assessment_count, 1);
+    let (list_status, listed) = request_json(
+        &app,
+        Method::GET,
+        &format!("/wedding/reviews/status?wedding_plan_id={plan_id}"),
+        &first_auth,
+        None,
+    )
+    .await;
+    assert_eq!(list_status, StatusCode::OK, "review status list: {listed}");
+    assert_eq!(listed["items"].as_array().map(Vec::len), Some(1));
+    assert_eq!(
+        listed["items"][0]["verification_state"],
+        "verified_wedding_held"
+    );
+    assert!(listed.to_string().find(&attachment_id).is_none());
+    let (partner_detail_status, partner_detail) = request_json(
+        &app,
+        Method::GET,
+        &format!("/wedding/reviews/{review_id}/status"),
+        &partner_auth,
+        None,
+    )
+    .await;
+    assert_eq!(
+        partner_detail_status,
+        StatusCode::NOT_FOUND,
+        "a partner who did not author the review cannot infer its status: {partner_detail}"
+    );
+    let withdrawal = json!({
+        "expected_revision":1,
+        "idempotency_key":format!("withdraw-{suffix}"),
+        "reason_code":"author_request"
+    });
+    let (withdraw_status, withdrawn) = request_json(
+        &app,
+        Method::POST,
+        &format!("/wedding/reviews/{review_id}/withdraw"),
+        &first_auth,
+        Some(&withdrawal),
+    )
+    .await;
+    assert_eq!(
+        withdraw_status,
+        StatusCode::OK,
+        "withdraw review: {withdrawn}"
+    );
+    assert_eq!(withdrawn["status"], "withdrawn");
+    assert_eq!(withdrawn["scheduled_evidence"], 1);
+    let (withdraw_retry_status, withdraw_retry) = request_json(
+        &app,
+        Method::POST,
+        &format!("/wedding/reviews/{review_id}/withdraw"),
+        &first_auth,
+        Some(&withdrawal),
+    )
+    .await;
+    assert_eq!(withdraw_retry_status, StatusCode::OK);
+    assert_eq!(withdraw_retry["replayed"], true);
     let (partner_schedule_status, partner_scheduled) = request_json(
         &app,
         Method::POST,

@@ -834,4 +834,9 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Claim-specific Wedding review eligibility assessments and private duplicate reconciliation signals",
         include_str!("../../postgres/migrations/0163_wedding_review_eligibility.sql"),
     ),
+    (
+        "0164_wedding_review_author_lifecycle",
+        "Account-scoped Wedding review status and idempotent author withdrawal receipts",
+        include_str!("../../postgres/migrations/0164_wedding_review_author_lifecycle.sql"),
+    ),
 ];
