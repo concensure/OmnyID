@@ -8466,3 +8466,41 @@ Worktree `C:\Users\ozans\Desktop\projects\OmnyID-GROWTH-001`, branch
 - Next: freeze a commit, verify/build from a clean detached worktree, deploy
   that exact SHA, prove migration/profile/table counts and all 15 hosted profile
   URLs, then record the runtime manifest/SOURCE_COMMIT match.
+
+# 2026-11-11 — WED-359 celebrant directory release evidence (Codex)
+
+- Released implementation SHA
+  `1263c8a67c7512864ef20de515cfba857da07cd6` from clean detached checkout
+  `C:\temp\wt\omnyid-wed359-release-1263c8a` to Oracle.
+- Oracle `SOURCE_COMMIT` and `oracle-runtime-manifest.json` both contain that
+  full SHA. The homeserver is running and the hosted directory endpoint returns
+  fifteen Celebrant records. The category directory and all fifteen individual
+  profile URLs return HTTP 200 with the expected profile content.
+- Migration 0159 is recorded. Production contains fifteen Celebrant rows,
+  fifteen `celebrant_profile` evidence blocks and fifteen pilot-profile rows;
+  all celebrant management grant/session/event tables exist. Enzo Weddings
+  Hunter Valley is `Venue`, not misrepresented as a celebrant.
+- Anonymous access to the admin management route is refused and an invalid
+  public capability exchange is refused. The hosted vendor bundle contains the
+  private consultation-availability controls. The capability pepper is
+  configured; its value was never printed.
+- The first proof attempt found the restore-drill free-space margin about
+  78 MB short. Only inactive Docker build cache was pruned (4.824 GB); no
+  containers, volumes, current images or user data were removed. Disk use is
+  now 75% with roughly 12 GB free.
+- A fresh detached Oracle proof job completed with `STATUS=pass`, homeserver and
+  backup service running, manifest verification passed, backup verification
+  passed, restore drill passed, and `FAILURE_STEP=none`. The local wrapper kept
+  polling after the remote job had written exit code 0; that stale local wrapper
+  was stopped without touching the completed remote proof or runtime.
+- Local verification passed before freeze: Cargo library check; scoped
+  management contracts 3/3; consultation contracts 4/4; Solid TypeScript;
+  Vite production build; line budgets 2/2; 2,271/2,271 Wedding tests; public
+  Wedding and metadata smoke; directory JavaScript syntax. A repeated clean
+  Windows test-binary link hit the known MSVC `STATUS_ACCESS_VIOLATION`; the
+  same exact implementation tests had already passed in the task worktree and
+  the Oracle Linux release build passed.
+- WED-359 is left in review because callback activation, controlled Twilio
+  evidence, disposable-Postgres concurrency proof and canonical post-call
+  enquiry creation remain deliberately gated. The completed directory/profile
+  and single-celebrant calendar-authority slice is live.

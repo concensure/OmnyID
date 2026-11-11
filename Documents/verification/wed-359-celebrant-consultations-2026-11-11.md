@@ -76,6 +76,37 @@ observed. Provider acceptance alone is not a connected call.
   Rust contracts; 4/4 existing consultation contracts; Solid TypeScript;
   production Vite build; 2/2 line budgets; public Wedding and metadata smoke;
   public directory JavaScript syntax.
-- Docker Desktop was unavailable. Migration 0159 therefore requires real
-  Postgres execution and table/profile counts during the exact-SHA Oracle
-  release before this continuation is marked complete.
+- Docker Desktop was unavailable locally, so migration 0159 was verified on
+  the real Oracle Postgres deployment instead of being inferred from source.
+
+## Exact-SHA Oracle release evidence
+
+- Live implementation SHA:
+  `1263c8a67c7512864ef20de515cfba857da07cd6`.
+- Clean release checkout:
+  `C:\temp\wt\omnyid-wed359-release-1263c8a`.
+- `SOURCE_COMMIT` and `oracle-runtime-manifest.json` match the full live SHA.
+- Migration 0159 is recorded. Counts: 15 Celebrant vendors, 15
+  `celebrant_profile` evidence blocks and 15 celebrant pilot profiles. The
+  management grant, session and event tables exist. Enzo Weddings Hunter
+  Valley is classified as `Venue`.
+- `GET /api/public/wedding/vendors?category=Celebrant` returns 15 records.
+  `wedding/vendors.html?category=Celebrant` and every one of the 15 celebrant
+  detail URLs return HTTP 200 and contain the expected name and ceremony-type
+  profile content.
+- The admin management endpoint returns 401 without an authenticated operator
+  session. An invalid capability exchange returns 404. The hosted vendor bundle
+  includes the consultation-availability management surface.
+- The capability pepper is configured on Oracle. Its value was never emitted
+  to logs or terminal output.
+- Production proof: pass. Homeserver and backup service are running; runtime
+  manifest verification, backup verification and restore drill all pass;
+  `FAILURE_STEP=none`. The proof job wrote remote exit code 0.
+- The initial restore preflight was about 78 MB below its safety margin. A safe
+  prune removed only 4.824 GB of inactive Docker build cache. No container,
+  volume, current image or user data was removed. Root and `/var` use are 75%,
+  leaving roughly 12 GB free.
+
+The celebrant directory, integrated profiles and single-celebrant management
+links are therefore live. The callback flag remains false by design until the
+controlled Twilio and connected-call gates in this document have evidence.
