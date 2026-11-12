@@ -12,6 +12,7 @@ use omnyid_homeserver::{
     db::{AuthSessionRecord, Db, UserRecord, WeddingVendorUpsertRecord},
 };
 use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
 use tower::ServiceExt;
 use ulid::Ulid;
 
@@ -52,6 +53,10 @@ async fn seed_user(db: &Db, email: String) -> (String, String) {
     .await
     .expect("create session");
     (user.id, format!("Bearer {token}"))
+}
+
+fn token_digest(value: &str) -> String {
+    hex::encode(Sha256::digest(value.as_bytes()))
 }
 
 async fn post(app: &Router, auth: &str, body: &Value) -> (StatusCode, Value) {
@@ -286,7 +291,7 @@ async fn concurrent_retry_and_partner_submission_converge_without_duplicate_rati
 
     let known_invitation_token = format!("known-invitation-token-{suffix}");
     sqlx::query("UPDATE wedding_review_invitations SET token_digest=$1 WHERE invitation_id=$2")
-        .bind(omnyid_homeserver::db::sha256_token(&known_invitation_token))
+        .bind(token_digest(&known_invitation_token))
         .bind(invitation_id)
         .execute(&db.pool)
         .await
