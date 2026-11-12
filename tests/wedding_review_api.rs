@@ -191,10 +191,11 @@ async fn concurrent_retry_and_partner_submission_converge_without_duplicate_rati
     let (_, operator_auth) = seed_user(&db, operator_email).await;
     let plan_id = format!("wedding-plan-{suffix}");
     let workspace_id = format!("wedding-workspace-{suffix}");
-    for user_id in [&first_id, &partner_id] {
-        sqlx::query("INSERT INTO wedding_user_onboarding_state (user_id,wedding_plan_id,intake_variant,entry_source) VALUES ($1,$2,'wedding_site','wedding_site')")
-            .bind(user_id).bind(&plan_id).execute(&db.pool).await.expect("onboarding state");
-    }
+    sqlx::query("INSERT INTO wedding_user_onboarding_state (user_id,wedding_plan_id,intake_variant,entry_source) VALUES ($1,$2,'wedding_site','wedding_site')")
+        .bind(&first_id).bind(&plan_id).execute(&db.pool).await.expect("onboarding state");
+    sqlx::query("INSERT INTO wedding_plan_memberships (wedding_owner_user_id,wedding_plan_id,response_workspace_id,member_user_id,role,invited_by_user_id) VALUES ($1,$2,$3,$1,'owner',$1),($1,$2,$3,$4,'co_owner',$1)")
+        .bind(&first_id).bind(&plan_id).bind(&workspace_id).bind(&partner_id)
+        .execute(&db.pool).await.expect("couple memberships");
     let vendor = db
         .upsert_wedding_vendor(
             None,
