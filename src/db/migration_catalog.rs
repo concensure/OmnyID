@@ -874,4 +874,9 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Revisioned canonical Wedding membership authority for couple coworking",
         include_str!("../../postgres/migrations/0171_wedding_scope_revision.sql"),
     ),
+    (
+        "0172_wedding_review_event_kinds",
+        "Forward repair preserving all Wedding review eligibility, invitation and appeal event kinds",
+        include_str!("../../postgres/migrations/0172_wedding_review_event_kinds.sql"),
+    ),
 ];

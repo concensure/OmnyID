@@ -20,6 +20,8 @@ const PARTNER_SHARING_MIGRATION: &str =
     include_str!("../postgres/migrations/0168_wedding_partner_sharing.sql");
 const OPERATIONS_MIGRATION: &str =
     include_str!("../postgres/migrations/0170_wedding_review_operations.sql");
+const EVENT_KIND_REPAIR_MIGRATION: &str =
+    include_str!("../postgres/migrations/0172_wedding_review_event_kinds.sql");
 const ROUTES: &str = include_str!("../src/server/wedding_review_routes.rs");
 const EVIDENCE_ROUTES: &str = include_str!("../src/server/wedding_review_evidence_routes.rs");
 const EVIDENCE_OPERATOR_ROUTES: &str =
@@ -31,8 +33,7 @@ const PUBLIC_ROUTES: &str = include_str!("../src/server/wedding_review_public_ro
 const VENDOR_ROUTES: &str = include_str!("../src/server/wedding_review_vendor_routes.rs");
 const VENDOR_MODERATION_ROUTES: &str =
     include_str!("../src/server/wedding_review_vendor_moderation_routes.rs");
-const OPERATIONS_ROUTES: &str =
-    include_str!("../src/server/wedding_review_operations_routes.rs");
+const OPERATIONS_ROUTES: &str = include_str!("../src/server/wedding_review_operations_routes.rs");
 const MESSAGE_ATTACHMENTS: &str = include_str!("../src/db/message_attachments.rs");
 const SERVER: &str = include_str!("../src/server/mod.rs");
 
@@ -59,12 +60,14 @@ fn migration_keeps_private_content_out_of_control_and_event_rows() {
 fn migration_deduplicates_partner_reviews_by_canonical_wedding_subject() {
     assert!(MIGRATION.contains("uq_wedding_reviews_planner_workspace"));
     assert!(MIGRATION.contains("uq_wedding_reviews_vendor_workspace"));
-    assert!(PARTNER_SHARING_MIGRATION.contains(
-        "owner_user_id, wedding_plan_id, response_workspace_id, vendor_id"
-    ));
-    assert!(PARTNER_SHARING_MIGRATION.contains(
-        "owner_user_id, wedding_plan_id, response_workspace_id)"
-    ));
+    assert!(
+        PARTNER_SHARING_MIGRATION
+            .contains("owner_user_id, wedding_plan_id, response_workspace_id, vendor_id")
+    );
+    assert!(
+        PARTNER_SHARING_MIGRATION
+            .contains("owner_user_id, wedding_plan_id, response_workspace_id)")
+    );
 }
 
 #[test]
@@ -303,7 +306,9 @@ fn vendor_boundary_keeps_reply_and_report_narrative_private() {
 #[test]
 fn vendors_can_report_and_reply_but_cannot_moderate_reviews() {
     assert!(VENDOR_MODERATION_ROUTES.contains("operator_access_allowed"));
-    assert!(VENDOR_MODERATION_ROUTES.contains("Open the current reply preview before deciding it."));
+    assert!(
+        VENDOR_MODERATION_ROUTES.contains("Open the current reply preview before deciding it.")
+    );
     assert!(VENDOR_MODERATION_ROUTES.contains("review_restricted"));
     assert!(VENDOR_MODERATION_ROUTES.contains("restriction remains"));
     assert!(!VENDOR_ROUTES.contains("UPDATE wedding_review_publications SET status"));
@@ -324,7 +329,30 @@ fn review_operations_are_neutral_suppressed_and_content_light() {
     assert!(OPERATIONS_ROUTES.contains("This is one couple's past experience"));
     assert!(OPERATIONS_ROUTES.contains("\"content_free\":true"));
     assert!(SERVER.contains(".merge(wedding_review_operations_routes::routes())"));
-    for forbidden in ["review_text", "evidence_content", "reviewer_email", "reviewer_phone"] {
+    for forbidden in [
+        "review_text",
+        "evidence_content",
+        "reviewer_email",
+        "reviewer_phone",
+    ] {
         assert!(!OPERATIONS_MIGRATION.contains(forbidden));
+    }
+}
+
+#[test]
+fn cumulative_review_event_constraint_retains_eligibility_and_operations() {
+    for event_kind in [
+        "eligibility_decided",
+        "invitation_opened",
+        "invitation_reminded",
+        "invitation_declined",
+        "invitation_opted_out",
+        "appeal_submitted",
+        "appeal_resolved",
+    ] {
+        assert!(
+            EVENT_KIND_REPAIR_MIGRATION.contains(event_kind),
+            "forward repair must retain {event_kind}"
+        );
     }
 }
