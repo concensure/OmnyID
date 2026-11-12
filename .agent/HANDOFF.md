@@ -8772,3 +8772,36 @@ implementation commit `a05468de6d3b28db916d23492f866715d765cbc3`.
   appeals, comparison/DecisionOS review evidence, content-free analytics,
   accessibility/browser coverage, Linux real-router tests, hosted false-default
   evidence and pilot approval. Nothing in this slice has been deployed.
+
+## 2026-11-12 - WED-363 celebrant and public Quote Intelligence release (Codex)
+
+- Released implementation SHA
+  `46fb900eb4204715f3bb164c4ebe5b4c971571ed` from clean detached checkout
+  `C:\temp\wt\omnyid-wed363-release-46fb900`. The dirty QA checkout was used
+  only as diagnostic evidence; no old-worktree artifact or wholesale diff was
+  merged or built.
+- Dashboard reload/export authentication now accepts the canonical cookie or
+  bearer session. Officiant aliases resolve to the Celebrant category. Disabled
+  vendor consultation/quotation panels settle into bounded unavailable states.
+- Claimed listings no longer leak unpublished seeded contact fields. Until the
+  real platform enquiry launches, public celebrant profiles clearly say so and
+  offer only published direct email and/or portable `tel:+61...` calling.
+- The public quote article now uses the canonical source-grounded, no-retention
+  Quote Intelligence extractor and hands off to the deterministic comparison
+  tool. The OpenRouter-funded runtime is enabled with its existing abuse limits,
+  usage ledger and hard USD 50 weekly cap.
+- Verification passed: Rust checks; 2,273 Wedding tests; public-site/CSP/
+  metadata tests; TypeScript; Vite; both quote Playwright journeys; a real
+  hosted extraction with exact evidence and an explicit missing whole-package
+  amount; hosted direct-contact behavior; full-SHA provenance; backup verify;
+  and isolated restore drill.
+- Oracle's existing ClamAV updater had been OOM-killed and left health stale.
+  A controlled scanner restart recovered it. Only inactive Docker builder
+  cache and dangling images were pruned to make room for the restore drill; no
+  volume, database, backup or user file was removed. Final root use is 81%.
+- Evidence:
+  `Documents/verification/wed-363-celebrant-quote-journey-2026-11-12.md` and
+  `C:\temp\wt\proofs\wed363-46fb900\postdeploy-exact-image-remote`.
+- WED-360 review rollout remains false-default. Continue its remaining
+  invitations, appeals, DecisionOS/comparison evidence and controlled pilot
+  gates independently of this released hardening slice.
