@@ -101,6 +101,25 @@ pub(super) async fn resolve_wedding_scope(
         });
     }
 
+    // Once a plan has a canonical membership tuple, a caller cannot replace
+    // its response workspace by supplying another client-controlled label.
+    // Revoked memberships also stay revoked instead of falling through to
+    // owner bootstrap.
+    let existing_membership: bool = sqlx::query_scalar(
+        "SELECT EXISTS(
+             SELECT 1 FROM wedding_plan_memberships
+              WHERE wedding_plan_id=$1 AND member_user_id=$2
+         )",
+    )
+    .bind(&plan)
+    .bind(member_user_id)
+    .fetch_one(&db.pool)
+    .await
+    .map_err(store_error)?;
+    if existing_membership {
+        return Err(unavailable());
+    }
+
     let owns_plan = sqlx::query_scalar::<_, bool>(
         "SELECT EXISTS(
              SELECT 1 FROM wedding_user_onboarding_state

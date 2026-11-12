@@ -4750,7 +4750,18 @@ export type WeddingPartnerMember = {
   user_id: string;
   display_name: string;
   role: "owner" | "co_owner";
+  membership_revision: number;
   joined_at: string;
+};
+
+export type WeddingPartnerScope = {
+  owner_user_id: string;
+  wedding_plan_id: string;
+  response_workspace_id: string;
+  member_user_id: string;
+  role: "owner" | "co_owner";
+  membership_revision: number;
+  cache_namespace: string;
 };
 
 export type WeddingSharedContact = {
@@ -4770,7 +4781,7 @@ const weddingPartnerScopeQuery = (weddingPlanId: string, responseWorkspaceId: st
   `wedding_plan_id=${encodeURIComponent(weddingPlanId)}&response_workspace_id=${encodeURIComponent(responseWorkspaceId)}`;
 
 export const listWeddingPartnerMembers = (weddingPlanId: string, responseWorkspaceId: string) =>
-  apiFetch<{ members: WeddingPartnerMember[] }>(`/wedding/partners?${weddingPartnerScopeQuery(weddingPlanId, responseWorkspaceId)}`);
+  apiFetch<{ scope: WeddingPartnerScope; members: WeddingPartnerMember[] }>(`/wedding/partners?${weddingPartnerScopeQuery(weddingPlanId, responseWorkspaceId)}`);
 
 export const inviteWeddingPartner = (input: { weddingPlanId: string; responseWorkspaceId: string; email: string }) =>
   apiFetch<{ invite_id: string; invite_url: string; delivered: boolean; expires_in_days: number }>("/wedding/partners/invites", {
@@ -4782,6 +4793,16 @@ export const acceptWeddingPartnerInvite = (token: string) =>
   apiFetch<{ accepted: boolean; wedding_plan_id: string; response_workspace_id: string }>("/wedding/partners/invites/accept", {
     method: "POST",
     bodyJson: { token },
+  });
+
+export const revokeWeddingPartner = (weddingPlanId: string, responseWorkspaceId: string, memberUserId: string) =>
+  apiFetch<{ revoked: boolean }>(`/wedding/partners/${encodeURIComponent(memberUserId)}?${weddingPartnerScopeQuery(weddingPlanId, responseWorkspaceId)}`, {
+    method: "DELETE",
+  });
+
+export const leaveWeddingPartnerPlan = (weddingPlanId: string, responseWorkspaceId: string) =>
+  apiFetch<{ left: boolean }>(`/wedding/partners/leave?${weddingPartnerScopeQuery(weddingPlanId, responseWorkspaceId)}`, {
+    method: "DELETE",
   });
 
 export const openWeddingReviewInvitation = (token: string) =>

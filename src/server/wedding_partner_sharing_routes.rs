@@ -34,6 +34,7 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
         .route("/wedding/partners", get(list_members_http))
         .route("/wedding/partners/invites", post(create_invite_http))
         .route("/wedding/partners/invites/accept", post(accept_invite_http))
+        .route("/wedding/partners/leave", delete(leave_plan_http))
         .route("/wedding/partners/{member_user_id}", delete(revoke_member_http))
         .route("/wedding/partners/contacts", get(list_shared_contacts_http).post(share_contact_http))
         .route("/wedding/partners/contacts/{share_id}", delete(revoke_shared_contact_http))
@@ -82,10 +83,49 @@ async fn create_invite_http(
     let plan_id = clean(&request.wedding_plan_id, 200);
     let workspace_id = clean(&request.response_workspace_id, 200);
     let scope = resolve_wedding_scope(&state.db, &user.id, &plan_id, &workspace_id).await?;
+    if !scope.can_manage_membership() {
+        return Err((StatusCode::FORBIDDEN, "Only the plan owner can invite a partner.".into()));
+    }
     let owner_id = scope.owner_user_id;
     let email = request.email.trim().to_ascii_lowercase();
     if !email.contains('@') || email.len() > 254 || email == user.email.to_ascii_lowercase() {
         return Err((StatusCode::BAD_REQUEST, "Enter your partner's email address.".into()));
+    }
+    sqlx::query(
+        "UPDATE wedding_partner_invites SET status='expired'
+          WHERE wedding_owner_user_id=$1 AND wedding_plan_id=$2
+            AND status='pending' AND expires_at<=NOW()",
+    )
+    .bind(&owner_id)
+    .bind(&plan_id)
+    .execute(&state.db.pool)
+    .await
+    .map_err(db_error)?;
+    let active_partner: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM wedding_plan_memberships
+          WHERE wedding_owner_user_id=$1 AND wedding_plan_id=$2
+            AND status='active' AND role='co_owner')",
+    )
+    .bind(&owner_id)
+    .bind(&plan_id)
+    .fetch_one(&state.db.pool)
+    .await
+    .map_err(db_error)?;
+    if active_partner {
+        return Err((StatusCode::CONFLICT, "This Wedding plan already has two partners.".into()));
+    }
+    let pending_digest = sqlx::query_scalar::<_, String>(
+        "SELECT invited_email_digest FROM wedding_partner_invites
+          WHERE wedding_owner_user_id=$1 AND wedding_plan_id=$2 AND status='pending'
+          ORDER BY created_at DESC LIMIT 1",
+    )
+    .bind(&owner_id)
+    .bind(&plan_id)
+    .fetch_optional(&state.db.pool)
+    .await
+    .map_err(db_error)?;
+    if pending_digest.as_deref().is_some_and(|digest| digest != hash(&email)) {
+        return Err((StatusCode::CONFLICT, "A partner invitation is already awaiting a response.".into()));
     }
     let mut raw = [0_u8; 32];
     rand::rng().fill_bytes(&mut raw);
@@ -141,6 +181,30 @@ async fn accept_invite_http(
     let owner: String = invite.get("wedding_owner_user_id");
     let plan: String = invite.get("wedding_plan_id");
     let workspace: String = invite.get("response_workspace_id");
+    sqlx::query(
+        "SELECT member_user_id FROM wedding_plan_memberships
+          WHERE wedding_owner_user_id=$1 AND wedding_plan_id=$2 AND role='owner'
+          FOR UPDATE",
+    )
+    .bind(&owner)
+    .bind(&plan)
+    .fetch_one(&mut *tx)
+    .await
+    .map_err(db_error)?;
+    let active_partner: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM wedding_plan_memberships
+          WHERE wedding_owner_user_id=$1 AND wedding_plan_id=$2
+            AND status='active' AND role='co_owner' AND member_user_id<>$3)",
+    )
+    .bind(&owner)
+    .bind(&plan)
+    .bind(&user.id)
+    .fetch_one(&mut *tx)
+    .await
+    .map_err(db_error)?;
+    if active_partner {
+        return Err((StatusCode::CONFLICT, "This Wedding plan already has two partners.".into()));
+    }
     sqlx::query("INSERT INTO wedding_plan_memberships (wedding_owner_user_id,wedding_plan_id,response_workspace_id,member_user_id,role,invited_by_user_id) VALUES ($1,$2,$3,$4,'co_owner',$1) ON CONFLICT (wedding_owner_user_id,wedding_plan_id,member_user_id) DO UPDATE SET role='co_owner',status='active',revoked_at=NULL,response_workspace_id=EXCLUDED.response_workspace_id,membership_revision=wedding_plan_memberships.membership_revision+1,updated_at=NOW()")
         .bind(&owner).bind(&plan).bind(&workspace).bind(&user.id).execute(&mut *tx).await.map_err(db_error)?;
     sqlx::query("UPDATE wedding_partner_invites SET status='accepted',accepted_by_user_id=$1,accepted_at=NOW() WHERE invite_id=$2")
@@ -177,7 +241,58 @@ async fn revoke_member_http(
         .bind(&scope.owner_user_id).bind(&scope.wedding_plan_id).bind(clean(&member_user_id,200)).execute(&state.db.pool).await.map_err(db_error)?.rows_affected();
     sqlx::query("UPDATE wedding_shared_contact_grants SET status='revoked',revoked_at=NOW(),updated_at=NOW() WHERE wedding_owner_user_id=$1 AND wedding_plan_id=$2 AND recipient_user_id=$3 AND status='active'")
         .bind(&scope.owner_user_id).bind(&scope.wedding_plan_id).bind(clean(&member_user_id,200)).execute(&state.db.pool).await.map_err(db_error)?;
+    super::dashboard_routes::invalidate_dashboard_message_cache(&member_user_id);
+    super::dashboard_routes::invalidate_dashboard_message_cache(&scope.owner_user_id);
     Ok(Json(json!({"revoked": affected > 0})))
+}
+
+async fn leave_plan_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(query): Query<ScopeQuery>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    let user = authenticated_user(&state.db, &headers).await?;
+    let scope = resolve_wedding_scope(
+        &state.db,
+        &user.id,
+        &query.wedding_plan_id,
+        &query.response_workspace_id,
+    )
+    .await?;
+    if scope.role != "co_owner" || scope.owner_user_id == user.id {
+        return Err((
+            StatusCode::CONFLICT,
+            "The plan owner cannot leave this Wedding plan here.".into(),
+        ));
+    }
+    let affected = sqlx::query(
+        "UPDATE wedding_plan_memberships
+            SET status='revoked',revoked_at=NOW(),membership_revision=membership_revision+1,updated_at=NOW()
+          WHERE wedding_owner_user_id=$1 AND wedding_plan_id=$2
+            AND member_user_id=$3 AND status='active'",
+    )
+    .bind(&scope.owner_user_id)
+    .bind(&scope.wedding_plan_id)
+    .bind(&user.id)
+    .execute(&state.db.pool)
+    .await
+    .map_err(db_error)?
+    .rows_affected();
+    sqlx::query(
+        "UPDATE wedding_shared_contact_grants
+            SET status='revoked',revoked_at=NOW(),updated_at=NOW()
+          WHERE wedding_owner_user_id=$1 AND wedding_plan_id=$2
+            AND recipient_user_id=$3 AND status='active'",
+    )
+    .bind(&scope.owner_user_id)
+    .bind(&scope.wedding_plan_id)
+    .bind(&user.id)
+    .execute(&state.db.pool)
+    .await
+    .map_err(db_error)?;
+    super::dashboard_routes::invalidate_dashboard_message_cache(&user.id);
+    super::dashboard_routes::invalidate_dashboard_message_cache(&scope.owner_user_id);
+    Ok(Json(json!({"left":affected > 0})))
 }
 
 #[derive(Clone, Deserialize, Serialize)]

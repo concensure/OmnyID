@@ -4,10 +4,13 @@ import { createMemo, createSignal, For, onMount, Show } from "solid-js";
 import { WeddingInfoTip } from "@/components/WeddingInfoTip";
 import {
   inviteWeddingPartner,
+  leaveWeddingPartnerPlan,
   listWeddingPartnerMembers,
   listWeddingSharedContacts,
+  revokeWeddingPartner,
   shareWeddingContact,
   type WeddingPartnerMember,
+  type WeddingPartnerScope,
   type WeddingSharedContact,
 } from "@/lib/api";
 import { loadContacts } from "@/lib/contactsLocalState";
@@ -36,6 +39,7 @@ export function WeddingCollaborationAccessCard(props: {
   const [selectedRole, setSelectedRole] = createSignal<WeddingCollaboratorRole>("co_owner");
   const [draftAssignments, setDraftAssignments] = createSignal<DraftRoleAssignment[]>([]);
   const [members, setMembers] = createSignal<WeddingPartnerMember[]>([]);
+  const [scope, setScope] = createSignal<WeddingPartnerScope | null>(null);
   const [sharedWithMe, setSharedWithMe] = createSignal<WeddingSharedContact[]>([]);
   const [selectedRecipient, setSelectedRecipient] = createSignal("");
   const [contactRoleFilter, setContactRoleFilter] = createSignal("all");
@@ -55,6 +59,7 @@ export function WeddingCollaborationAccessCard(props: {
         listWeddingSharedContacts(props.metadata.weddingPlanId, props.metadata.responseWorkspaceId),
       ]);
       setMembers(response.members);
+      setScope(response.scope);
       setSharedWithMe(sharedContacts.contacts);
       const recipient = response.members.find((member) => member.role === "co_owner");
       if (recipient && !selectedRecipient()) setSelectedRecipient(recipient.user_id);
@@ -139,6 +144,43 @@ export function WeddingCollaborationAccessCard(props: {
     }
   }
 
+  async function removePartner(member: WeddingPartnerMember) {
+    if (!window.confirm(`Remove ${member.display_name} from this Wedding plan? Their personal account and private data will not be deleted.`)) return;
+    setBusy(true);
+    setSharingNotice(null);
+    try {
+      const result = await revokeWeddingPartner(
+        props.metadata.weddingPlanId,
+        props.metadata.responseWorkspaceId,
+        member.user_id,
+      );
+      setSharingNotice(result.revoked ? `${member.display_name} no longer has access to this Wedding plan.` : "That partner was already removed.");
+      await refreshMembers();
+    } catch (error) {
+      setSharingNotice(error instanceof Error ? error.message : "The partner could not be removed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function leavePlan() {
+    if (!window.confirm("Leave this shared Wedding plan? Your personal account and private data will remain available.")) return;
+    setBusy(true);
+    setSharingNotice(null);
+    try {
+      const result = await leaveWeddingPartnerPlan(
+        props.metadata.weddingPlanId,
+        props.metadata.responseWorkspaceId,
+      );
+      setSharingNotice(result.left ? "You have left this Wedding plan. Your personal account was not changed." : "You had already left this plan.");
+      await refreshMembers();
+    } catch (error) {
+      setSharingNotice(error instanceof Error ? error.message : "The plan could not be left.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div class="min-w-0 rounded-[24px] border border-sky-100/80 bg-sky-50/80 p-3 shadow-card sm:rounded-[28px] sm:p-4">
       <div class="flex items-start justify-between gap-2">
@@ -153,6 +195,36 @@ export function WeddingCollaborationAccessCard(props: {
         </span>
       </div>
       <p class="mt-2 text-sm leading-6 text-sky-900/75">{props.state.summaryLabel}</p>
+      <p class="mt-2 rounded-2xl border border-sky-100 bg-white/75 px-3 py-2 text-xs leading-5 text-sky-950/75">
+        A partner gets equal access to this Wedding plan only. Your personal contacts, diary, chats, files, databases and AI memory stay in your own account unless you explicitly share an item.
+      </p>
+      <Show when={members().length > 0}>
+        <div class="mt-3 rounded-2xl border border-sky-100 bg-white/75 p-3">
+          <p class="text-sm font-semibold text-sky-950">People sharing this Wedding</p>
+          <div class="mt-2 space-y-2">
+            <For each={members()}>
+              {(member) => (
+                <div class="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-sky-100 bg-sky-50/60 px-3 py-2">
+                  <div>
+                    <p class="text-xs font-semibold text-sky-950">{member.display_name}</p>
+                    <p class="text-xs text-sky-950/65">{member.role === "owner" ? "Plan owner" : "Partner"}</p>
+                  </div>
+                  <Show when={scope()?.role === "owner" && member.role === "co_owner"}>
+                    <button type="button" class="rounded-full border border-sky-200 bg-white px-3 py-1.5 text-xs font-semibold text-sky-950 disabled:opacity-50" disabled={busy()} onClick={() => void removePartner(member)}>
+                      Remove access
+                    </button>
+                  </Show>
+                </div>
+              )}
+            </For>
+          </div>
+          <Show when={scope()?.role === "co_owner"}>
+            <button type="button" class="mt-3 rounded-full border border-sky-200 bg-white px-3 py-2 text-xs font-semibold text-sky-950 disabled:opacity-50" disabled={busy()} onClick={() => void leavePlan()}>
+              Leave this Wedding plan
+            </button>
+          </Show>
+        </div>
+      </Show>
       <div class="mt-3 rounded-2xl border border-sky-100 bg-white/75 p-3">
         <p class="text-sm font-semibold text-sky-950">Add someone</p>
         <p class="mt-1 text-xs leading-5 text-sky-950/70">
@@ -169,7 +241,7 @@ export function WeddingCollaborationAccessCard(props: {
             />
           </label>
           <label class="text-xs font-semibold text-sky-950">
-            Email optional
+            Partner email
             <input
               class="mt-1 w-full rounded-full border border-sky-100 bg-white px-3 py-2 text-xs font-medium text-sky-950 outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100"
               value={personEmail()}
@@ -194,14 +266,14 @@ export function WeddingCollaborationAccessCard(props: {
           <button
             type="button"
             class="rounded-full bg-sky-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-sky-800 disabled:cursor-not-allowed disabled:opacity-50"
-            disabled={!personName().trim() && !personEmail().trim()}
+            disabled={busy() || scope()?.role === "co_owner" || members().some((member) => member.role === "co_owner") || !personEmail().trim()}
             data-magic-action="invite"
             data-magic-icon="person-add"
             data-magic-label="Add person"
             data-magic-id="wedding:collaboration:add-person"
             onClick={() => void addDraftAssignment()}
           >
-            {busy() ? "Sending…" : "Send partner invite"}
+            {busy() ? "Sending…" : members().some((member) => member.role === "co_owner") ? "Partner already added" : "Send partner invite"}
           </button>
           <span class="text-xs leading-5 text-sky-950/60">
             Send the invite after you review their role.

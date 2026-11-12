@@ -215,7 +215,150 @@ async fn concurrent_retry_and_partner_submission_converge_without_duplicate_rati
         )
         .await
         .expect("vendor");
+    let invitation_vendor = db
+        .upsert_wedding_vendor(
+            None,
+            &WeddingVendorUpsertRecord {
+                vendor_slug: format!("review-invitation-venue-{suffix}"),
+                vendor_name: "Review Invitation Test Venue".into(),
+                category: "Venue".into(),
+                service_area: "Sydney NSW".into(),
+                address: None,
+                website_url: Some("https://invitation-venue.example.test".into()),
+                contact_phone: None,
+                contact_email: None,
+                source_url: Some("https://directory.example.test/invitation-venue".into()),
+                source_label: Some("Integration fixture".into()),
+                source_checked_at: None,
+                status: "active".into(),
+                notes: None,
+                evidence: json!({}),
+                caveat_labels: vec![],
+                photos: vec![],
+            },
+            &first_id,
+        )
+        .await
+        .expect("invitation vendor");
     let app = omnyid_homeserver::server::build_test_router(&db_url).await;
+
+    let mut invitation_draft = review_body(
+        &plan_id,
+        &workspace_id,
+        &invitation_vendor.vendor_id,
+        &format!("invitation-draft-{suffix}"),
+    );
+    invitation_draft["action"] = json!("save_draft");
+    let (draft_status, draft) = post(&app, &first_auth, &invitation_draft).await;
+    assert_eq!(
+        draft_status,
+        StatusCode::OK,
+        "save invitation draft: {draft}"
+    );
+    let invitation_review_id = draft["review_id"].as_str().expect("invitation review id");
+    let invitation_request = json!({"idempotency_key":format!("invite-{suffix}")});
+    let (invitation_status, invitation) = request_json(
+        &app,
+        Method::POST,
+        &format!("/admin/wedding/reviews/{invitation_review_id}/invitation"),
+        &operator_auth,
+        Some(&invitation_request),
+    )
+    .await;
+    assert_eq!(
+        invitation_status,
+        StatusCode::OK,
+        "create invitation: {invitation}"
+    );
+    assert_eq!(invitation["replayed"], false);
+    let invitation_id = invitation["invitation_id"].as_str().expect("invitation id");
+    let (invitation_retry_status, invitation_retry) = request_json(
+        &app,
+        Method::POST,
+        &format!("/admin/wedding/reviews/{invitation_review_id}/invitation"),
+        &operator_auth,
+        Some(&invitation_request),
+    )
+    .await;
+    assert_eq!(invitation_retry_status, StatusCode::OK);
+    assert_eq!(invitation_retry["replayed"], true);
+    assert_eq!(invitation_retry["invitation_id"], invitation_id);
+
+    let known_invitation_token = format!("known-invitation-token-{suffix}");
+    sqlx::query("UPDATE wedding_review_invitations SET token_digest=$1 WHERE invitation_id=$2")
+        .bind(omnyid_homeserver::db::sha256_token(&known_invitation_token))
+        .bind(invitation_id)
+        .execute(&db.pool)
+        .await
+        .expect("replace invitation token for fixture");
+    let (wrong_user_open_status, _) = request_json(
+        &app,
+        Method::POST,
+        "/wedding/reviews/invitations/open",
+        &partner_auth,
+        Some(&json!({"token":known_invitation_token})),
+    )
+    .await;
+    assert_eq!(wrong_user_open_status, StatusCode::NOT_FOUND);
+    let (open_status, opened) = request_json(
+        &app,
+        Method::POST,
+        "/wedding/reviews/invitations/open",
+        &first_auth,
+        Some(&json!({"token":known_invitation_token})),
+    )
+    .await;
+    assert_eq!(open_status, StatusCode::OK, "open invitation: {opened}");
+    assert_eq!(opened["review_id"], invitation_review_id);
+    let (decline_status, declined) = request_json(
+        &app,
+        Method::POST,
+        &format!("/wedding/reviews/invitations/{invitation_id}/respond"),
+        &first_auth,
+        Some(&json!({"action":"decline"})),
+    )
+    .await;
+    assert_eq!(
+        decline_status,
+        StatusCode::OK,
+        "decline invitation: {declined}"
+    );
+    assert_eq!(declined["status"], "declined");
+
+    sqlx::query("UPDATE wedding_reviews SET status='rejected' WHERE review_id=$1")
+        .bind(invitation_review_id)
+        .execute(&db.pool)
+        .await
+        .expect("prepare appeal fixture");
+    let (partner_appeal_status, _) = request_json(
+        &app,
+        Method::POST,
+        &format!("/wedding/reviews/{invitation_review_id}/appeal"),
+        &partner_auth,
+        Some(&json!({"reason_code":"evidence"})),
+    )
+    .await;
+    assert_eq!(partner_appeal_status, StatusCode::NOT_FOUND);
+    let (appeal_status, appeal) = request_json(
+        &app,
+        Method::POST,
+        &format!("/wedding/reviews/{invitation_review_id}/appeal"),
+        &first_auth,
+        Some(&json!({"reason_code":"evidence"})),
+    )
+    .await;
+    assert_eq!(appeal_status, StatusCode::OK, "create appeal: {appeal}");
+    let appeal_id = appeal["appeal_id"].as_str().expect("appeal id");
+    let (resolve_status, resolved) = request_json(
+        &app,
+        Method::POST,
+        &format!("/admin/wedding/reviews/appeals/{appeal_id}"),
+        &operator_auth,
+        Some(&json!({"decision":"reopen"})),
+    )
+    .await;
+    assert_eq!(resolve_status, StatusCode::OK, "resolve appeal: {resolved}");
+    assert_eq!(resolved["resolution_code"], "reopened");
 
     let retry = review_body(
         &plan_id,
@@ -482,6 +625,48 @@ async fn concurrent_retry_and_partner_submission_converge_without_duplicate_rati
             .await
             .expect("restored publication revision");
     assert_eq!(published_revision, 1);
+    let (observation_status, observation) = request_json(
+        &app,
+        Method::GET,
+        &format!(
+            "/wedding/reviews/decision-observation?wedding_plan_id={plan_id}&vendor_id={}",
+            vendor.vendor_id
+        ),
+        &first_auth,
+        None,
+    )
+    .await;
+    assert_eq!(
+        observation_status,
+        StatusCode::OK,
+        "decision observation: {observation}"
+    );
+    assert_eq!(
+        observation["observation"]["source_kind"],
+        "published_wedding_review"
+    );
+    assert!(observation["observation"]["observed_at"].is_string());
+    assert!(
+        observation["observation"]["caveat"]
+            .as_str()
+            .is_some_and(|value| value.contains("not current price"))
+    );
+    let (metrics_status, metrics) = request_json(
+        &app,
+        Method::GET,
+        "/admin/wedding/reviews/operations/metrics",
+        &operator_auth,
+        None,
+    )
+    .await;
+    assert_eq!(metrics_status, StatusCode::OK, "review metrics: {metrics}");
+    assert_eq!(metrics["content_free"], true);
+    assert!(
+        metrics["counts"]["invitations"]
+            .as_i64()
+            .is_some_and(|count| count >= 1)
+    );
+    assert!(metrics.get("review_text").is_none());
     let (list_status, listed) = request_json(
         &app,
         Method::GET,
