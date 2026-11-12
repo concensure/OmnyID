@@ -26,7 +26,7 @@ test("public quote article reuses the bounded no-retention Quote Intelligence ro
   assert.doesNotMatch(script, /wedding\/quote-study/);
   assert.match(script, /textContent/);
   assert.doesNotMatch(script, /resultBody\.innerHTML/);
-  assert.match(script, /retained the proposal text/);
+  assert.match(script, /did not retain the proposal text/);
   assert.match(compose, /OMNYID_WEDDING_QUOTE_STUDY_ENABLED: \$\{OMNYID_WEDDING_QUOTE_STUDY_ENABLED:-false\}/);
 });
 
