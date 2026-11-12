@@ -864,4 +864,9 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Content-light celebrant outreach, explicit consultation participation and scoped management capabilities",
         include_str!("../../postgres/migrations/0169_wedding_celebrant_onboarding_operations.sql"),
     ),
+    (
+        "0170_wedding_review_operations",
+        "Neutral Wedding review invitations, author appeals and content-free operational evidence",
+        include_str!("../../postgres/migrations/0170_wedding_review_operations.sql"),
+    ),
 ];

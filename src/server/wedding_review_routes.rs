@@ -628,6 +628,18 @@ async fn save_revision_http(
         .execute(&mut *tx)
         .await
         .map_err(store_error)?;
+    if request.action == RevisionAction::Submit {
+        sqlx::query(
+            "UPDATE wedding_review_invitations
+                SET status='submitted',token_digest=NULL,updated_at=NOW()
+              WHERE review_id=$1 AND invited_user_id=$2 AND status IN ('pending','opened')",
+        )
+        .bind(&review_id)
+        .bind(&user.id)
+        .execute(&mut *tx)
+        .await
+        .map_err(store_error)?;
+    }
     tx.commit().await.map_err(store_error)?;
     Ok(Json(RevisionReply {
         review_id,

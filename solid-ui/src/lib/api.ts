@@ -4784,6 +4784,19 @@ export const acceptWeddingPartnerInvite = (token: string) =>
     bodyJson: { token },
   });
 
+export const openWeddingReviewInvitation = (token: string) =>
+  apiFetch<{
+    invitation_id: string;
+    review_id: string;
+    wedding_plan_id: string;
+    response_workspace_id: string;
+    vendor_id: string | null;
+    status: "opened";
+  }>("/wedding/reviews/invitations/open", {
+    method: "POST",
+    bodyJson: { token },
+  });
+
 export const shareWeddingContact = (input: {
   weddingPlanId: string;
   responseWorkspaceId: string;

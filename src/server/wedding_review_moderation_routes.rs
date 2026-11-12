@@ -154,6 +154,8 @@ struct QueueItem {
     reason_codes: Vec<String>,
     open_report_count: u64,
     report_reason_codes: Vec<String>,
+    open_appeal_count: u64,
+    appeal_reason_codes: Vec<String>,
     updated_at: String,
 }
 
@@ -185,6 +187,7 @@ async fn queue_http(
             "moderation_pending",
             "edit_pending",
             "restricted",
+            "rejected",
         ],
         "moderation_pending" => vec!["moderation_pending"],
         "edit_pending" => vec!["edit_pending"],
@@ -206,7 +209,12 @@ async fn queue_http(
                   WHERE report.review_id=review.review_id AND report.status='open')::bigint AS open_report_count,
                 COALESCE((SELECT ARRAY_AGG(DISTINCT report.reason_code ORDER BY report.reason_code)
                   FROM wedding_review_reports report
-                  WHERE report.review_id=review.review_id AND report.status='open'),ARRAY[]::text[]) AS report_reason_codes
+                  WHERE report.review_id=review.review_id AND report.status='open'),ARRAY[]::text[]) AS report_reason_codes,
+                (SELECT COUNT(*) FROM wedding_review_appeals appeal
+                  WHERE appeal.review_id=review.review_id AND appeal.status='open')::bigint AS open_appeal_count,
+                COALESCE((SELECT ARRAY_AGG(DISTINCT appeal.reason_code ORDER BY appeal.reason_code)
+                  FROM wedding_review_appeals appeal
+                  WHERE appeal.review_id=review.review_id AND appeal.status='open'),ARRAY[]::text[]) AS appeal_reason_codes
          FROM wedding_reviews review
          JOIN wedding_review_revisions revision
            ON revision.review_id=review.review_id
@@ -221,6 +229,8 @@ async fn queue_http(
          WHERE review.status=ANY($1)
             OR EXISTS(SELECT 1 FROM wedding_review_reports report
                       WHERE report.review_id=review.review_id AND report.status='open')
+            OR EXISTS(SELECT 1 FROM wedding_review_appeals appeal
+                      WHERE appeal.review_id=review.review_id AND appeal.status='open')
          ORDER BY review.updated_at,review.review_id
          LIMIT $2",
     )
@@ -251,6 +261,8 @@ async fn queue_http(
             reason_codes: row.get("reason_codes"),
             open_report_count: row.get::<i64, _>("open_report_count") as u64,
             report_reason_codes: row.get("report_reason_codes"),
+            open_appeal_count: row.get::<i64, _>("open_appeal_count") as u64,
+            appeal_reason_codes: row.get("appeal_reason_codes"),
             updated_at: row.get("updated_at"),
         })
         .collect();

@@ -39,6 +39,7 @@ import {
   authenticateWithGoogleIdToken,
   authenticateWithPassword,
   acceptWeddingPartnerInvite,
+  openWeddingReviewInvitation,
   apiFetch,
   API_BASE,
   type AttachmentIngestCapabilities,
@@ -1179,6 +1180,7 @@ function App() {
   });
   const [session, setSession] = createSignal(initialSession);
   let partnerInviteClaimStarted = false;
+  let reviewInviteClaimStarted = false;
   createEffect(() => {
     if (partnerInviteClaimStarted || !session()?.token) return;
     const match = window.location.hash.match(/(?:^#|&)wedding-partner-invite=([^&]+)/);
@@ -1203,6 +1205,29 @@ function App() {
       .catch(() => {
         partnerInviteClaimStarted = false;
       });
+  });
+  createEffect(() => {
+    if (reviewInviteClaimStarted || !session()?.token) return;
+    const match = window.location.hash.match(/(?:^#|&)wedding-review-invite=([^&]+)/);
+    if (!match?.[1]) return;
+    reviewInviteClaimStarted = true;
+    const token = decodeURIComponent(match[1]);
+    void openWeddingReviewInvitation(token)
+      .then((opened) => {
+        saveWeddingNavigationIntent(buildWeddingPlannerHomeIntent({
+          weddingPlanId: opened.wedding_plan_id,
+          responseWorkspaceId: opened.response_workspace_id,
+          sourceResponseId: null,
+          metadata: {
+            wedding_review_id: opened.review_id,
+            wedding_vendor_id: opened.vendor_id,
+            wedding_review_invitation: "opened",
+          },
+        }));
+        window.history.replaceState(window.history.state, "", `${window.location.pathname}${window.location.search}`);
+        window.location.reload();
+      })
+      .catch(() => { reviewInviteClaimStarted = false; });
   });
   const [personaFabVisible, setPersonaFabVisible] = createSignal(true);
   // Declared early: userId/workspaceBootstrap are read synchronously by several

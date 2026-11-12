@@ -10,6 +10,7 @@ import { postAgentMessage, readSession, type SendAfpMessageInput } from "@/lib/a
 import { buildWeddingDecisionResearchState, weddingDecisionResearchQueueWindow } from "@/lib/weddingDecisionResearchState";
 import type { WeddingDecisionResearchState } from "@/lib/weddingDecisionResearchState";
 import { requestFundedWeddingDecisionResearch } from "@/lib/weddingDecisionResearchApi";
+import { loadWeddingReviewDecisionObservation, type WeddingReviewDecisionObservation } from "@/lib/weddingReviewApi";
 import {
   WEDDING_ASSIGNMENT_ROLE_OPTIONS,
   weddingAssignmentContactKey,
@@ -92,7 +93,9 @@ export function WeddingDecisionFocusCard(props: {
   const [fundedResearchStatus, setFundedResearchStatus] = createSignal<Record<string, "loading" | "failed">>({});
   const [finalCountSelections, setFinalCountSelections] = createSignal<Record<string, string>>({});
   const [finalCountApprovalBusyId, setFinalCountApprovalBusyId] = createSignal<string | null>(null);
+  const [reviewObservations, setReviewObservations] = createSignal<Record<string, WeddingReviewDecisionObservation | null>>({});
   const fundedResearchAttempts = new Set<string>();
+  const reviewObservationAttempts = new Set<string>();
   const rsvpSetup = createMemo(() => weddingRsvpSetupFromAfpMessages(
     props.state.afpMessages,
     props.state.workspace.metadata.responseWorkspaceId,
@@ -235,6 +238,19 @@ export function WeddingDecisionFocusCard(props: {
     if (!isComparison) return null;
     return props.state.artifactPreviews.find((artifact) => artifact.vendorComparisonCards.length > 0) ?? null;
   }
+  createEffect(() => {
+    const weddingPlanId = props.state.workspace.metadata.weddingPlanId;
+    for (const card of display().itemCards) {
+      const recommended = comparisonFor(card.item)?.vendorComparisonCards.slice().sort((left, right) => left.rank - right.rank)[0];
+      if (!recommended?.choiceId) continue;
+      const key = `${weddingPlanId}:${recommended.choiceId}`;
+      if (reviewObservationAttempts.has(key)) continue;
+      reviewObservationAttempts.add(key);
+      void loadWeddingReviewDecisionObservation(weddingPlanId, recommended.choiceId)
+        .then((observation) => setReviewObservations((current) => ({ ...current, [card.item.id]: observation })))
+        .catch(() => setReviewObservations((current) => ({ ...current, [card.item.id]: null })));
+    }
+  });
   function priorityFor(item: (typeof props.state.personalOsProjection.decisionLoadRelief.focusItems)[number]): string {
     const taskPriority = taskFor(item.id)?.priority?.trim();
     const evidencePriority = item.evidenceLabels.find((label) => /^priority:/i.test(label))?.replace(/^priority:\s*/i, "").trim();
@@ -327,9 +343,19 @@ export function WeddingDecisionFocusCard(props: {
     const rationale = [artifact.vendorComparisonHandoff?.recommendationLabel, ...(artifact.vendorComparisonHandoff?.whyLabels ?? []).slice(0, 2)]
       .filter((label): label is string => Boolean(label?.trim()))
       .join(" ");
+    const reviewObservation = reviewObservations()[item.id];
+    const reviewReason = reviewObservation
+      ? `${reviewObservation.summary ?? "A published couple review is available"} (${new Date(reviewObservation.observedAt).toLocaleDateString()}). ${reviewObservation.caveat}`
+      : null;
     return {
       ...researchCard,
-      recommendation: { summary: `${lead}${rationale ? ` ${rationale}` : ""}`, reasons: [recommended.situationFit || recommended.preferenceMatch] },
+      recommendation: { summary: `${lead}${rationale ? ` ${rationale}` : ""}`, reasons: [recommended.situationFit || recommended.preferenceMatch, reviewReason].filter((reason): reason is string => Boolean(reason)) },
+      evidence: reviewObservation ? [...researchCard.evidence, {
+        label: "Dated couple review observation",
+        ref: reviewObservation.publicationId,
+        sourceKind: "published_wedding_review",
+        freshness: "aging",
+      }] : researchCard.evidence,
       actions: [
         { id: "select_recommended", label: "Select recommended vendor", role: "primary", effect: `Saves ${recommended.title} for follow-up`, intent: "select" },
         { id: "follow_up", label: "Follow-Up", role: "secondary", effect: `Creates an editable draft for ${recommended.title}`, intent: "draft" },

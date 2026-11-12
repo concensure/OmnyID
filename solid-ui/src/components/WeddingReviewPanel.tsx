@@ -2,12 +2,15 @@ import { createEffect, createSignal, For, Show } from "solid-js";
 
 import {
   listWeddingReviews,
+  loadWeddingReviewAppeal,
   loadWeddingReviewDraft,
   loadWeddingReviewHistory,
   saveWeddingReview,
+  submitWeddingReviewAppeal,
   withdrawWeddingReview,
   type WeddingReviewStatus,
   type WeddingReviewHistoryItem,
+  type WeddingReviewAppeal,
 } from "@/lib/weddingReviewApi";
 
 const retryKey = (prefix: string): string => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
@@ -32,6 +35,8 @@ export function WeddingReviewPanel(props: {
   const [notice, setNotice] = createSignal<string | null>(null);
   const [error, setError] = createSignal<string | null>(null);
   const [history, setHistory] = createSignal<WeddingReviewHistoryItem[]>([]);
+  const [appeal, setAppeal] = createSignal<WeddingReviewAppeal | null>(null);
+  const [appealReason, setAppealReason] = createSignal("eligibility");
 
   async function load(): Promise<void> {
     setLoading(true); setError(null);
@@ -39,10 +44,11 @@ export function WeddingReviewPanel(props: {
       const current = (await listWeddingReviews(props.weddingPlanId)).find((item) => item.vendorId === props.vendorId) ?? null;
       setStatus(current);
       if (current) {
-        const [draft, events] = await Promise.all([loadWeddingReviewDraft(current.reviewId), loadWeddingReviewHistory(current.reviewId)]);
+        const [draft, events, currentAppeal] = await Promise.all([loadWeddingReviewDraft(current.reviewId), loadWeddingReviewHistory(current.reviewId), loadWeddingReviewAppeal(current.reviewId)]);
         setTitle(draft.title); setBody(draft.body); setQuestion(draft.nextCoupleQuestion);
         setDisplayMode(draft.displayMode); setAudience(current.audience); setRating(current.rating);
         setHistory(events);
+        setAppeal(currentAppeal);
       }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The review could not be loaded just now.");
@@ -82,6 +88,17 @@ export function WeddingReviewPanel(props: {
     finally { setSaving(false); }
   }
 
+  async function appealDecision(): Promise<void> {
+    const current = status(); if (!current) return;
+    setSaving(true); setError(null); setNotice(null);
+    try {
+      const submitted = await submitWeddingReviewAppeal(current.reviewId, appealReason());
+      setAppeal(submitted);
+      setNotice("Appeal submitted for independent review. Your review remains private while it is assessed.");
+    } catch (caught) { setError(caught instanceof Error ? caught.message : "The appeal could not be submitted."); }
+    finally { setSaving(false); }
+  }
+
   const canSubmit = () => title().trim().length > 0 && body().trim().length >= 20 && (audience() === "private_feedback" || rating() !== null);
   const statusLabel = () => ({ draft: "Private draft", submitted: "Awaiting review", moderation_pending: "Awaiting review", evidence_requested: "More evidence requested", published: "Published", edit_pending: "Correction awaiting review", rejected: "Returned", restricted: "Temporarily restricted", restored: "Published", withdrawn: "Withdrawn" }[status()?.status ?? ""] ?? status()?.status ?? "Not started");
 
@@ -104,6 +121,14 @@ export function WeddingReviewPanel(props: {
           <Show when={audience() === "public_review"}><label class="block text-sm font-semibold text-wedding-ink">Public name<select class="mt-1 min-h-11 w-full rounded-lg border border-wedding-border bg-white px-3" value={displayMode()} onChange={(event) => setDisplayMode(event.currentTarget.value)}><option value="omnyid_couple">OmnyID couple</option><option value="first_names">First names</option><option value="first_name_and_initial">First name and initial</option></select></label></Show>
           <Show when={preview()}><article class="rounded-lg border-2 border-wedding-primary bg-white p-3" aria-label="Exact public preview"><p class="text-xs font-bold uppercase tracking-wide text-wedding-primary">Exact public preview</p><p class="mt-2 text-sm font-bold text-wedding-ink">{title() || "No title yet"}</p><p class="mt-2 whitespace-pre-wrap text-sm leading-6 text-wedding-ink/80">{body() || "No review text yet"}</p><Show when={rating()}>{(value) => <p class="mt-2 text-sm font-semibold">{value()} of 5</p>}</Show><p class="mt-2 text-xs text-wedding-ink/60">Published as {displayMode() === "omnyid_couple" ? "OmnyID couple" : "your selected name format"}. Evidence and account details are never included.</p></article></Show>
           <div class="flex flex-wrap gap-2"><button type="button" class="min-h-11 rounded-lg border border-wedding-secondary bg-white px-3 text-sm font-bold text-wedding-secondary disabled:opacity-50" disabled={saving()} onClick={() => void save("save_draft")}>Save private draft</button><Show when={audience() === "public_review"}><button type="button" class="min-h-11 rounded-lg border border-wedding-secondary bg-white px-3 text-sm font-bold text-wedding-secondary" onClick={() => setPreview((value) => !value)}>{preview() ? "Hide preview" : "Preview exactly"}</button></Show><button type="button" class="min-h-11 rounded-lg bg-wedding-primary px-3 text-sm font-bold text-white disabled:opacity-50" disabled={saving() || !canSubmit() || (audience() === "public_review" && !preview())} onClick={() => void save("submit")}>{audience() === "public_review" ? "Submit public review" : "Save private feedback"}</button><Show when={status() && status()?.status !== "withdrawn"}><button type="button" class="min-h-11 rounded-lg border border-red-300 bg-white px-3 text-sm font-semibold text-red-800" disabled={saving()} onClick={() => void withdraw()}>Withdraw review</button></Show></div>
+          <Show when={status() && ["rejected", "restricted"].includes(status()!.status)}>
+            <section class="rounded-lg border border-amber-200 bg-amber-50 p-3" aria-label="Review appeal">
+              <p class="text-sm font-semibold text-amber-950">Ask for another review</p>
+              <Show when={appeal()} fallback={<div class="mt-2 flex flex-wrap items-end gap-2"><label class="min-w-52 flex-1 text-xs font-semibold text-amber-950">Reason<select class="mt-1 min-h-11 w-full rounded-lg border border-amber-300 bg-white px-3" value={appealReason()} onChange={(event) => setAppealReason(event.currentTarget.value)}><option value="eligibility">Eligibility was misunderstood</option><option value="evidence">Evidence needs another look</option><option value="personal_information">Privacy handling needs review</option><option value="unsupported_claim">The unsupported-claim decision needs review</option><option value="correction_required">A correction is ready</option><option value="policy_other">Other policy reason</option></select></label><button type="button" class="min-h-11 rounded-lg border border-amber-400 bg-white px-3 text-sm font-bold text-amber-950 disabled:opacity-50" disabled={saving()} onClick={() => void appealDecision()}>Submit appeal</button></div>}>
+                {(currentAppeal) => <p class="mt-2 text-sm text-amber-950">{currentAppeal().status === "open" ? "Appeal awaiting independent review." : `Appeal resolved: ${currentAppeal().resolutionCode?.replaceAll("_", " ") ?? "reviewed"}.`}</p>}
+              </Show>
+            </section>
+          </Show>
           <Show when={history().length > 0}>
             <details class="rounded-lg border border-wedding-border bg-white p-3">
               <summary class="cursor-pointer text-sm font-semibold text-wedding-ink">Review history ({history().length})</summary>

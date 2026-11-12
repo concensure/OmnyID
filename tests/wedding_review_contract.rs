@@ -18,6 +18,8 @@ const VENDOR_BOUNDARY_MIGRATION: &str =
     include_str!("../postgres/migrations/0167_wedding_review_vendor_boundary.sql");
 const PARTNER_SHARING_MIGRATION: &str =
     include_str!("../postgres/migrations/0168_wedding_partner_sharing.sql");
+const OPERATIONS_MIGRATION: &str =
+    include_str!("../postgres/migrations/0170_wedding_review_operations.sql");
 const ROUTES: &str = include_str!("../src/server/wedding_review_routes.rs");
 const EVIDENCE_ROUTES: &str = include_str!("../src/server/wedding_review_evidence_routes.rs");
 const EVIDENCE_OPERATOR_ROUTES: &str =
@@ -29,6 +31,8 @@ const PUBLIC_ROUTES: &str = include_str!("../src/server/wedding_review_public_ro
 const VENDOR_ROUTES: &str = include_str!("../src/server/wedding_review_vendor_routes.rs");
 const VENDOR_MODERATION_ROUTES: &str =
     include_str!("../src/server/wedding_review_vendor_moderation_routes.rs");
+const OPERATIONS_ROUTES: &str =
+    include_str!("../src/server/wedding_review_operations_routes.rs");
 const MESSAGE_ATTACHMENTS: &str = include_str!("../src/db/message_attachments.rs");
 const SERVER: &str = include_str!("../src/server/mod.rs");
 
@@ -305,4 +309,22 @@ fn vendors_can_report_and_reply_but_cannot_moderate_reviews() {
     assert!(!VENDOR_ROUTES.contains("UPDATE wedding_review_publications SET status"));
     assert!(!VENDOR_ROUTES.contains("wedding_review_moderation_decisions"));
     assert!(SERVER.contains(".merge(wedding_review_vendor_moderation_routes::routes())"));
+}
+
+#[test]
+fn review_operations_are_neutral_suppressed_and_content_light() {
+    assert!(OPERATIONS_MIGRATION.contains("reminder_count"));
+    assert!(OPERATIONS_MIGRATION.contains("wedding_review_appeals"));
+    assert!(OPERATIONS_MIGRATION.contains("uq_wedding_review_appeals_open"));
+    assert!(OPERATIONS_ROUTES.contains("Positive, critical and private feedback"));
+    assert!(OPERATIONS_ROUTES.contains("reminder_count=0"));
+    assert!(OPERATIONS_ROUTES.contains("status IN ('pending','opened')"));
+    assert!(OPERATIONS_ROUTES.contains("invitation_opted_out"));
+    assert!(OPERATIONS_ROUTES.contains("published_wedding_review"));
+    assert!(OPERATIONS_ROUTES.contains("This is one couple's past experience"));
+    assert!(OPERATIONS_ROUTES.contains("\"content_free\":true"));
+    assert!(SERVER.contains(".merge(wedding_review_operations_routes::routes())"));
+    for forbidden in ["review_text", "evidence_content", "reviewer_email", "reviewer_phone"] {
+        assert!(!OPERATIONS_MIGRATION.contains(forbidden));
+    }
 }

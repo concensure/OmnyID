@@ -119,3 +119,59 @@ export function withdrawWeddingReview(reviewId: string, expectedRevision: number
     bodyJson: { expected_revision: expectedRevision, idempotency_key: idempotencyKey, reason_code: "author_request" },
   });
 }
+
+export type WeddingReviewAppeal = {
+  appealId: string;
+  reasonCode: string;
+  status: string;
+  resolutionCode: string | null;
+};
+
+export async function loadWeddingReviewAppeal(reviewId: string): Promise<WeddingReviewAppeal | null> {
+  const value = object(await apiFetch<unknown>(`/wedding/reviews/${encodeURIComponent(reviewId)}/appeal`));
+  const appeal = object(value.appeal);
+  const appealId = text(appeal.appeal_id);
+  return appealId ? {
+    appealId,
+    reasonCode: text(appeal.reason_code),
+    status: text(appeal.status),
+    resolutionCode: text(appeal.resolution_code) || null,
+  } : null;
+}
+
+export async function submitWeddingReviewAppeal(reviewId: string, reasonCode: string): Promise<WeddingReviewAppeal> {
+  const value = object(await apiFetch<unknown>(`/wedding/reviews/${encodeURIComponent(reviewId)}/appeal`, {
+    method: "POST",
+    bodyJson: { reason_code: reasonCode },
+  }));
+  return {
+    appealId: text(value.appeal_id),
+    reasonCode: text(value.reason_code),
+    status: text(value.status),
+    resolutionCode: null,
+  };
+}
+
+export type WeddingReviewDecisionObservation = {
+  publicationId: string;
+  observedAt: string;
+  summary: string | null;
+  question: string | null;
+  caveat: string;
+};
+
+export async function loadWeddingReviewDecisionObservation(
+  weddingPlanId: string,
+  vendorId: string,
+): Promise<WeddingReviewDecisionObservation | null> {
+  const value = object(await apiFetch<unknown>(`/wedding/reviews/decision-observation?wedding_plan_id=${encodeURIComponent(weddingPlanId)}&vendor_id=${encodeURIComponent(vendorId)}`));
+  const observation = object(value.observation);
+  const publicationId = text(observation.publication_id);
+  return publicationId ? {
+    publicationId,
+    observedAt: text(observation.observed_at),
+    summary: text(observation.summary) || null,
+    question: text(observation.question) || null,
+    caveat: text(observation.caveat),
+  } : null;
+}
