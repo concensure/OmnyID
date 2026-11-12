@@ -8,7 +8,7 @@ use std::{sync::Arc, time::Duration};
 
 use axum::{
     Json, Router,
-    extract::{Path, Query, State},
+    extract::{Path, Query, Request, State},
     http::{HeaderMap, HeaderValue, StatusCode, header},
     response::{IntoResponse, Response},
     routing::{get, post},
@@ -85,6 +85,20 @@ fn db_error(error: sqlx::Error) -> (StatusCode, String) {
 
 fn clean(value: &str, limit: usize) -> String {
     value.trim().chars().take(limit).collect()
+}
+
+async fn authenticated_body<T: for<'de> Deserialize<'de>>(
+    request: Request,
+) -> Result<T, (StatusCode, String)> {
+    let bytes = axum::body::to_bytes(request.into_body(), 32 * 1024)
+        .await
+        .map_err(|_| (StatusCode::BAD_REQUEST, "Invalid request body.".into()))?;
+    serde_json::from_slice(&bytes).map_err(|_| {
+        (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "Invalid request body.".into(),
+        )
+    })
 }
 
 fn pepper() -> Option<Vec<u8>> {
@@ -181,8 +195,11 @@ async fn admin_dashboard_http(
     operator(&state, &headers, "celebrant-management-dashboard").await?;
     let days = query.days.unwrap_or(90).clamp(7, 365);
     let rows = sqlx::query(
-        r#"SELECT v.vendor_id,v.vendor_slug,v.vendor_name,v.service_area,v.claim_status,
-                  p.register_status,p.register_checked_at,
+        r#"SELECT v.vendor_id,v.vendor_slug,v.vendor_name,v.service_area,v.claim_status,v.status listing_status,
+                  p.register_status,p.register_type,p.register_source_url,p.register_checked_at,p.register_evidence_ref,
+                  p.participation_status,p.participation_updated_at,p.callback_phone_confirmed,
+                  o.channel outreach_channel,o.status outreach_status,o.sent_at outreach_sent_at,
+                  o.follow_up_due_at,o.opted_out_at,
                   COUNT(g.grant_id)::bigint generated_links,
                   COUNT(g.grant_id) FILTER (WHERE g.exchanged_at IS NOT NULL)::bigint opened_links,
                   MAX(g.exchanged_at) latest_opened_at,
@@ -190,9 +207,13 @@ async fn admin_dashboard_http(
                   MAX(g.expires_at) FILTER (WHERE g.status IN ('active','exchanged')) active_link_expires_at
              FROM wedding_vendors v
              LEFT JOIN wedding_celebrant_pilot_profiles p ON p.vendor_id=v.vendor_id
+             LEFT JOIN wedding_celebrant_outreach o ON o.vendor_id=v.vendor_id
              LEFT JOIN wedding_celebrant_management_grants g ON g.vendor_id=v.vendor_id
-            WHERE v.status='active' AND lower(v.category)='celebrant'
-            GROUP BY v.vendor_id,v.vendor_slug,v.vendor_name,v.service_area,v.claim_status,p.register_status,p.register_checked_at
+            WHERE v.status IN ('active','hidden') AND lower(v.category)='celebrant'
+            GROUP BY v.vendor_id,v.vendor_slug,v.vendor_name,v.service_area,v.claim_status,v.status,
+                     p.register_status,p.register_type,p.register_source_url,p.register_checked_at,p.register_evidence_ref,
+                     p.participation_status,p.participation_updated_at,p.callback_phone_confirmed,
+                     o.channel,o.status,o.sent_at,o.follow_up_due_at,o.opted_out_at
             ORDER BY v.vendor_name"#,
     )
     .fetch_all(&state.db.pool).await.map_err(db_error)?;
@@ -282,6 +303,25 @@ async fn admin_dashboard_http(
     .fetch_one(&state.db.pool)
     .await
     .map_err(db_error)?;
+    let funnel = sqlx::query(
+        r#"SELECT
+             COUNT(*)::bigint AS discovered,
+             COUNT(*) FILTER (WHERE v.status='active')::bigint AS listed,
+             COUNT(*) FILTER (WHERE EXISTS(SELECT 1 FROM wedding_celebrant_management_grants g WHERE g.vendor_id=v.vendor_id))::bigint AS invited,
+             COUNT(*) FILTER (WHERE EXISTS(SELECT 1 FROM wedding_celebrant_management_grants g WHERE g.vendor_id=v.vendor_id AND g.exchanged_at IS NOT NULL))::bigint AS opened,
+             COUNT(*) FILTER (WHERE EXISTS(SELECT 1 FROM wedding_celebrant_consultation_windows w WHERE w.vendor_id=v.vendor_id AND w.enabled))::bigint AS configured,
+             COUNT(*) FILTER (WHERE p.participation_status='accepted')::bigint AS opted_in,
+             COUNT(*) FILTER (WHERE v.status='active' AND p.register_status='verified')::bigint AS published,
+             COUNT(*) FILTER (WHERE EXISTS(SELECT 1 FROM wedding_celebrant_callback_requests r WHERE r.selected_vendor_id=v.vendor_id))::bigint AS engaged,
+             COUNT(*) FILTER (WHERE o.status='opted_out' OR o.follow_up_due_at<=NOW() OR p.register_status IN ('not_found','requires_review'))::bigint AS exceptions
+           FROM wedding_vendors v
+           LEFT JOIN wedding_celebrant_pilot_profiles p ON p.vendor_id=v.vendor_id
+           LEFT JOIN wedding_celebrant_outreach o ON o.vendor_id=v.vendor_id
+          WHERE lower(v.category)='celebrant' AND v.status IN ('active','hidden')"#,
+    )
+    .fetch_one(&state.db.pool)
+    .await
+    .map_err(db_error)?;
     let series = metric_rows
         .into_iter()
         .map(|row| json!({
@@ -315,8 +355,20 @@ async fn admin_dashboard_http(
     Ok(Json(json!({"vendors":rows.into_iter().map(|row|json!({
         "vendor_id":row.get::<String,_>("vendor_id"),"vendor_slug":row.get::<String,_>("vendor_slug"),
         "vendor_name":row.get::<String,_>("vendor_name"),"service_area":row.get::<String,_>("service_area"),
-        "claim_status":row.get::<String,_>("claim_status"),"register_status":row.get::<Option<String>,_>("register_status").unwrap_or_else(||"pending".into()),
+        "claim_status":row.get::<String,_>("claim_status"),"listing_status":row.get::<String,_>("listing_status"),
+        "register_status":row.get::<Option<String>,_>("register_status").unwrap_or_else(||"pending".into()),
+        "register_type":row.get::<Option<String>,_>("register_type"),
+        "register_source_url":row.get::<Option<String>,_>("register_source_url"),
+        "register_evidence_ref":row.get::<Option<String>,_>("register_evidence_ref"),
         "register_checked_at":row.get::<Option<DateTime<Utc>>,_>("register_checked_at").map(|v|v.to_rfc3339()),
+        "participation_status":row.get::<Option<String>,_>("participation_status").unwrap_or_else(||"not_asked".into()),
+        "participation_updated_at":row.get::<Option<DateTime<Utc>>,_>("participation_updated_at").map(|v|v.to_rfc3339()),
+        "callback_phone_confirmed":row.get::<Option<bool>,_>("callback_phone_confirmed").unwrap_or(false),
+        "outreach_channel":row.get::<Option<String>,_>("outreach_channel"),
+        "outreach_status":row.get::<Option<String>,_>("outreach_status"),
+        "outreach_sent_at":row.get::<Option<DateTime<Utc>>,_>("outreach_sent_at").map(|v|v.to_rfc3339()),
+        "follow_up_due_at":row.get::<Option<DateTime<Utc>>,_>("follow_up_due_at").map(|v|v.to_rfc3339()),
+        "opted_out_at":row.get::<Option<DateTime<Utc>>,_>("opted_out_at").map(|v|v.to_rfc3339()),
         "generated_links":row.get::<i64,_>("generated_links"),"opened_links":row.get::<i64,_>("opened_links"),
         "latest_opened_at":row.get::<Option<DateTime<Utc>>,_>("latest_opened_at").map(|v|v.to_rfc3339()),
         "active_grant_id":row.get::<Option<String>,_>("active_grant_id"),
@@ -328,6 +380,17 @@ async fn admin_dashboard_http(
         "qualified_couples":qualified_couples,
         "availability_vendors_maintained":availability_vendors_maintained,
         "completed_venue_enquiries":completed_venue_enquiries,
+        "celebrant_funnel":{
+            "discovered":funnel.get::<i64,_>("discovered"),
+            "listed":funnel.get::<i64,_>("listed"),
+            "invited":funnel.get::<i64,_>("invited"),
+            "opened":funnel.get::<i64,_>("opened"),
+            "configured":funnel.get::<i64,_>("configured"),
+            "opted_in":funnel.get::<i64,_>("opted_in"),
+            "published":funnel.get::<i64,_>("published"),
+            "engaged":funnel.get::<i64,_>("engaged"),
+            "exceptions":funnel.get::<i64,_>("exceptions")
+        },
         "series":series,
         "definitions":{
             "qualified_couples":"Distinct wedding plans reaching the existing activation projection in the selected period; no plan content is read.",
@@ -405,8 +468,14 @@ async fn create_link_for_vendor(
     // Serialise even the first grant for a vendor. Locking only a grant row is
     // insufficient when there is no row yet and two batch requests arrive at
     // the same time.
-    let vendor = sqlx::query("SELECT vendor_slug,vendor_name FROM wedding_vendors WHERE vendor_id=$1 AND status='active' AND lower(category)='celebrant' FOR UPDATE")
+    let vendor = sqlx::query("SELECT v.vendor_slug,v.vendor_name,COALESCE(o.status='opted_out',FALSE) opted_out FROM wedding_vendors v LEFT JOIN wedding_celebrant_outreach o ON o.vendor_id=v.vendor_id WHERE v.vendor_id=$1 AND v.status='active' AND lower(v.category)='celebrant' FOR UPDATE OF v")
         .bind(&vendor_id).fetch_optional(&mut *tx).await.map_err(db_error)?.ok_or((StatusCode::NOT_FOUND,"Celebrant listing not found.".into()))?;
+    if vendor.get::<bool, _>("opted_out") {
+        return Err((
+            StatusCode::CONFLICT,
+            "This celebrant opted out of outreach. No management link was created.".into(),
+        ));
+    }
     let active = sqlx::query_scalar::<_, String>(
         "SELECT grant_id FROM wedding_celebrant_management_grants WHERE vendor_id=$1 AND status IN ('active','exchanged') AND expires_at>NOW() ORDER BY created_at DESC LIMIT 1 FOR UPDATE",
     )
@@ -461,9 +530,10 @@ async fn create_link_for_vendor(
 async fn create_link_http(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
-    Json(request): Json<CreateLinkRequest>,
+    request: Request,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let user = operator(&state, &headers, "celebrant-management-link-create").await?;
+    let request: CreateLinkRequest = authenticated_body(request).await?;
     let days = request.expires_in_days.unwrap_or(14);
     Ok(Json(
         create_link_for_vendor(&state, &user.id, &request.vendor_id, days, true).await?,
@@ -473,9 +543,10 @@ async fn create_link_http(
 async fn create_links_batch_http(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
-    Json(request): Json<CreateLinksBatchRequest>,
+    request: Request,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let user = operator(&state, &headers, "celebrant-management-link-batch").await?;
+    let request: CreateLinksBatchRequest = authenticated_body(request).await?;
     let days = request.expires_in_days.unwrap_or(14);
     if !(1..=MAX_GRANT_DAYS).contains(&days) {
         return Err((
@@ -515,9 +586,10 @@ async fn revoke_link_http(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Path(grant_id): Path<String>,
-    Json(request): Json<RevokeRequest>,
+    request: Request,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     operator(&state, &headers, "celebrant-management-link-revoke").await?;
+    let request: RevokeRequest = authenticated_body(request).await?;
     let mut tx = state.db.pool.begin().await.map_err(db_error)?;
     let vendor_id = clean(&request.vendor_id, 160);
     let changed=sqlx::query("UPDATE wedding_celebrant_management_grants SET status='revoked',revoked_at=NOW() WHERE grant_id=$1 AND vendor_id=$2 AND status IN ('active','exchanged')")
@@ -651,18 +723,44 @@ async fn session_authority(
     })
 }
 
-async fn dashboard(state: &AppState, vendor_id: &str) -> Result<Value, (StatusCode, String)> {
+async fn dashboard(
+    state: &AppState,
+    vendor_id: &str,
+    grant_id: &str,
+) -> Result<Value, (StatusCode, String)> {
     let vendor=sqlx::query("SELECT vendor_slug,vendor_name,service_area FROM wedding_vendors WHERE vendor_id=$1 AND status='active' AND lower(category)='celebrant'")
         .bind(vendor_id).fetch_one(&state.db.pool).await.map_err(db_error)?;
-    let profile=sqlx::query("SELECT register_status,register_checked_at,(business_phone_ciphertext IS NOT NULL) phone_configured FROM wedding_celebrant_pilot_profiles WHERE vendor_id=$1")
+    let profile=sqlx::query("SELECT register_status,register_checked_at,(business_phone_ciphertext IS NOT NULL) phone_configured,participation_status,participation_updated_at,callback_phone_confirmed FROM wedding_celebrant_pilot_profiles WHERE vendor_id=$1")
         .bind(vendor_id).fetch_optional(&state.db.pool).await.map_err(db_error)?;
     let windows=sqlx::query("SELECT window_id,window_kind,weekday,local_date,starts_at,ends_at,revision FROM wedding_celebrant_consultation_windows WHERE vendor_id=$1 AND enabled ORDER BY COALESCE(local_date,'9999-12-31'),weekday,starts_at")
         .bind(vendor_id).fetch_all(&state.db.pool).await.map_err(db_error)?;
     let live=sqlx::query("SELECT session_id,expires_at,call_cap,paused_at,revision FROM wedding_celebrant_live_sessions WHERE vendor_id=$1 ORDER BY created_at DESC LIMIT 1")
         .bind(vendor_id).fetch_optional(&state.db.pool).await.map_err(db_error)?;
+    let capability_scopes = sqlx::query_scalar::<_, Vec<String>>(
+        "SELECT capability_scopes FROM wedding_celebrant_management_grants WHERE grant_id=$1 AND vendor_id=$2",
+    )
+    .bind(grant_id)
+    .bind(vendor_id)
+    .fetch_one(&state.db.pool)
+    .await
+    .map_err(db_error)?;
+    let separate_wedding_date_calendar = sqlx::query_scalar::<_, bool>(
+        "SELECT EXISTS(SELECT 1 FROM wedding_vendor_special_offers WHERE vendor_id=$1)",
+    )
+    .bind(vendor_id)
+    .fetch_one(&state.db.pool)
+    .await
+    .unwrap_or(false);
     Ok(
         json!({"vendor":{"slug":vendor.get::<String,_>("vendor_slug"),"name":vendor.get::<String,_>("vendor_name"),"service_area":vendor.get::<String,_>("service_area")},
-      "profile":profile.map(|r|json!({"register_status":r.get::<String,_>("register_status"),"register_checked_at":r.get::<Option<DateTime<Utc>>,_>("register_checked_at").map(|v|v.to_rfc3339()),"phone_configured":r.get::<bool,_>("phone_configured")})),
+      "profile":profile.map(|r|json!({"register_status":r.get::<String,_>("register_status"),"register_checked_at":r.get::<Option<DateTime<Utc>>,_>("register_checked_at").map(|v|v.to_rfc3339()),"phone_configured":r.get::<bool,_>("phone_configured"),"participation_status":r.get::<String,_>("participation_status"),"participation_updated_at":r.get::<Option<DateTime<Utc>>,_>("participation_updated_at").map(|v|v.to_rfc3339()),"callback_phone_confirmed":r.get::<bool,_>("callback_phone_confirmed")})),
+      "capabilities":{
+        "granted":capability_scopes,
+        "consultation_availability":true,
+        "wedding_date_availability":false,
+        "separate_wedding_date_calendar":separate_wedding_date_calendar,
+        "notice":"Consultation hours and wedding-date availability use separate scoped authorities."
+      },
       "windows":windows.into_iter().map(|r|json!({"window_id":r.get::<String,_>("window_id"),"kind":r.get::<String,_>("window_kind"),"weekday":r.get::<Option<i16>,_>("weekday"),"local_date":r.get::<Option<NaiveDate>,_>("local_date").map(|v|v.to_string()),"starts_at":r.get::<NaiveTime,_>("starts_at").format("%H:%M").to_string(),"ends_at":r.get::<NaiveTime,_>("ends_at").format("%H:%M").to_string(),"revision":r.get::<i64,_>("revision")})).collect::<Vec<_>>(),
       "live":live.map(|r|json!({"session_id":r.get::<String,_>("session_id"),"expires_at":r.get::<DateTime<Utc>,_>("expires_at").to_rfc3339(),"call_cap":r.get::<i32,_>("call_cap"),"paused":r.get::<Option<DateTime<Utc>>,_>("paused_at").is_some(),"revision":r.get::<i64,_>("revision")}))}),
     )
@@ -682,7 +780,9 @@ async fn session_http(
     )
     .await?;
     let authority = session_authority(&state, &headers, false).await?;
-    dashboard(&state, &authority.vendor_id).await.map(Json)
+    dashboard(&state, &authority.vendor_id, &authority.grant_id)
+        .await
+        .map(Json)
 }
 
 #[derive(Deserialize)]
@@ -698,6 +798,8 @@ struct CommandRequest {
     ends_at: Option<String>,
     duration_minutes: Option<i64>,
     call_cap: Option<i32>,
+    participation_status: Option<String>,
+    callback_phone_confirmed: Option<bool>,
 }
 
 async fn command_http(
@@ -731,6 +833,7 @@ async fn command_http(
         "window_remove" => "window_removed",
         "live_start" => "live_started",
         "live_pause" => "live_paused",
+        "participation_update" => "participation_updated",
         _ => "",
     })
     .bind(&dedupe)
@@ -744,6 +847,19 @@ async fn command_http(
     }
     match request.operation.as_str() {
         "window_add" => {
+            let participation = sqlx::query_scalar::<_, String>(
+                "SELECT participation_status FROM wedding_celebrant_pilot_profiles WHERE vendor_id=$1",
+            )
+            .bind(&authority.vendor_id)
+            .fetch_optional(&mut *tx)
+            .await
+            .map_err(db_error)?;
+            if participation.as_deref() != Some("accepted") {
+                return Err((
+                    StatusCode::CONFLICT,
+                    "Accept consultation participation before publishing hours.".into(),
+                ));
+            }
             let kind = request
                 .kind
                 .as_deref()
@@ -829,12 +945,14 @@ async fn command_http(
             .await?;
         }
         "live_start" => {
-            let profile=sqlx::query("SELECT register_status,(business_phone_ciphertext IS NOT NULL) phone_configured FROM wedding_celebrant_pilot_profiles WHERE vendor_id=$1")
+            let profile=sqlx::query("SELECT register_status,(business_phone_ciphertext IS NOT NULL) phone_configured,participation_status,callback_phone_confirmed FROM wedding_celebrant_pilot_profiles WHERE vendor_id=$1")
             .bind(&authority.vendor_id).fetch_optional(&mut *tx).await.map_err(db_error)?.ok_or((StatusCode::CONFLICT,"Save the claimed profile's phone settings first.".into()))?;
             if profile.get::<String, _>("register_status") != "verified"
                 || !profile.get::<bool, _>("phone_configured")
+                || profile.get::<String, _>("participation_status") != "accepted"
+                || !profile.get::<bool, _>("callback_phone_confirmed")
             {
-                return Err((StatusCode::CONFLICT,"Official register verification and a nominated business phone are required before going live.".into()));
+                return Err((StatusCode::CONFLICT,"Accepted participation, official register verification and a confirmed nominated callback phone are required before going live.".into()));
             }
             let cap = request.call_cap.unwrap_or(3);
             if !(1..=20).contains(&cap) {
@@ -866,6 +984,53 @@ async fn command_http(
                 "live_paused",
                 &dedupe,
                 json!({}),
+            )
+            .await?;
+        }
+        "participation_update" => {
+            let status = request
+                .participation_status
+                .as_deref()
+                .filter(|value| matches!(*value, "accepted" | "declined" | "paused"))
+                .ok_or((
+                    StatusCode::BAD_REQUEST,
+                    "Choose accepted, declined or paused participation.".into(),
+                ))?;
+            let callback_phone_confirmed = request.callback_phone_confirmed.unwrap_or(false);
+            let profile = sqlx::query(
+                "SELECT (business_phone_ciphertext IS NOT NULL) phone_configured FROM wedding_celebrant_pilot_profiles WHERE vendor_id=$1 FOR UPDATE",
+            )
+            .bind(&authority.vendor_id)
+            .fetch_optional(&mut *tx)
+            .await
+            .map_err(db_error)?
+            .ok_or((StatusCode::CONFLICT, "This celebrant profile is not ready for consultation setup.".into()))?;
+            if callback_phone_confirmed && !profile.get::<bool, _>("phone_configured") {
+                return Err((
+                    StatusCode::CONFLICT,
+                    "A claimed owner must add the nominated callback phone before it can be confirmed.".into(),
+                ));
+            }
+            sqlx::query(
+                "UPDATE wedding_celebrant_pilot_profiles SET participation_status=$2,participation_updated_at=NOW(),callback_phone_confirmed=$3,revision=revision+1,updated_at=NOW() WHERE vendor_id=$1",
+            )
+            .bind(&authority.vendor_id)
+            .bind(status)
+            .bind(callback_phone_confirmed)
+            .execute(&mut *tx)
+            .await
+            .map_err(db_error)?;
+            if matches!(status, "declined" | "paused") {
+                sqlx::query("UPDATE wedding_celebrant_live_sessions SET paused_at=COALESCE(paused_at,NOW()),revision=revision+1 WHERE vendor_id=$1 AND paused_at IS NULL")
+                    .bind(&authority.vendor_id).execute(&mut *tx).await.map_err(db_error)?;
+            }
+            record_event(
+                &mut tx,
+                Some(&authority.grant_id),
+                &authority.vendor_id,
+                "participation_updated",
+                &dedupe,
+                json!({"status":status,"callback_phone_confirmed":callback_phone_confirmed}),
             )
             .await?;
         }

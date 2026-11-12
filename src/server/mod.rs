@@ -193,6 +193,7 @@ mod wedding_review_vendor_moderation_routes;
 mod wedding_invite_proposal_opportunity_ledger; mod wedding_invite_proposal_opportunity_routes; mod wedding_invite_proposal_routes;
 mod wedding_celebrant_consultation_routes;
 mod wedding_celebrant_management_link_routes;
+mod wedding_celebrant_management_ops_routes;
 #[cfg(test)]
 mod wedding_rsvp_capability_routes_tests;
 #[cfg(test)]
@@ -1445,6 +1446,7 @@ pub async fn run() {
         .merge(wedding_vendor_special_offer_routes::routes())
         .merge(wedding_celebrant_consultation_routes::routes())
         .merge(wedding_celebrant_management_link_routes::routes())
+        .merge(wedding_celebrant_management_ops_routes::routes())
         .merge(wedding_vendor_portal_routes::routes())
         .merge(wedding_invite_proposal_routes::routes()).merge(wedding_invite_proposal_opportunity_routes::routes())
         .merge(wedding_preference_routes::routes())
@@ -1621,6 +1623,7 @@ pub async fn build_test_router(database_url: &str) -> Router {
         .merge(wedding_vendor_special_offer_routes::routes())
         .merge(wedding_celebrant_consultation_routes::routes())
         .merge(wedding_celebrant_management_link_routes::routes())
+        .merge(wedding_celebrant_management_ops_routes::routes())
         .merge(wedding_vendor_portal_routes::routes())
         .merge(wedding_review_routes::routes())
         .merge(wedding_partner_sharing_routes::routes())

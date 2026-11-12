@@ -93,3 +93,30 @@ fn call_actions_and_operator_funnel_use_durable_evidence() {
     assert!(!migration.contains("contact_phone"));
     assert!(!migration.contains("phone_ciphertext"));
 }
+
+#[test]
+fn onboarding_operations_keep_consent_outreach_and_capabilities_separate() {
+    let migration =
+        include_str!("../postgres/migrations/0169_wedding_celebrant_onboarding_operations.sql");
+    let operations = include_str!("../src/server/wedding_celebrant_management_ops_routes.rs");
+    let links = include_str!("../src/server/wedding_celebrant_management_link_routes.rs");
+    let admin = include_str!("../solid-ui/src/components/UsageAdminWeddingCelebrantsPanel.tsx");
+    let manager = include_str!("../solid-ui/src/components/vendor/CelebrantManagementFlow.tsx");
+
+    assert!(migration.contains("wedding_celebrant_outreach"));
+    assert!(migration.contains("participation_status"));
+    assert!(migration.contains("capability_scopes"));
+    assert!(operations.contains("opted_out"));
+    assert!(operations.contains("status='revoked'"));
+    assert!(operations.contains("minimal unpublished preview"));
+    assert!(!operations.contains("message_body"));
+    assert!(links.contains("celebrant_funnel"));
+    assert!(links.contains("wedding_date_availability"));
+    assert!(links.contains("authenticated_body(request).await?"));
+    assert!(admin.contains("Open official register"));
+    assert!(admin.contains("Content-light outreach"));
+    assert!(admin.contains("Add a minimal unpublished celebrant listing"));
+    assert!(manager.contains("Accept participation"));
+    assert!(manager.contains("Pause"));
+    assert!(manager.contains("Decline"));
+}

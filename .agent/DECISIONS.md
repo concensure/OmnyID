@@ -3434,3 +3434,18 @@ synthetic vendor search or introduce another send path.
   starter plan labels from colliding.
 - Operator presentation uses the same server-side email allowlist authority as
   operator APIs. The client must not infer authority from a hard-coded address.
+
+# 2026-11-12 — Celebrant outreach, participation and availability remain separate authorities
+
+- The operator register check records only an official-register status, source,
+  date and actor. It does not imply invitation, consent, publication or a
+  completed consultation.
+- Outreach stores channel, lifecycle dates and status without message content.
+  An opt-out is terminal without a separately recorded fresh consent: it
+  revokes every active management grant/session and blocks link reissue.
+- A vendor-scoped no-account link may manage consultation participation and
+  hours only. Wedding-date availability continues through the independent
+  vendor-special authority; the session exposes a truthful capability manifest
+  rather than copying dates or broadening the bearer token.
+- Minimal operator-created listings are hidden, unclaimed and unverified.
+  Duplicate checks and publication/claim/register decisions remain separate.

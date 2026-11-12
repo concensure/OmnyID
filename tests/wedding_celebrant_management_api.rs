@@ -49,13 +49,13 @@ async fn seed_user(db: &Db, email: String) -> (String, String) {
     (user.id, format!("Bearer {token}"))
 }
 
-async fn post(app: &Router, auth: &str, body: Value) -> (StatusCode, Value) {
+async fn post(app: &Router, auth: &str, uri: &str, body: Value) -> (StatusCode, Value) {
     let response = app
         .clone()
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/admin/wedding/celebrant-management/links/batch")
+                .uri(uri)
                 .header(AUTHORIZATION, auth)
                 .header("content-type", "application/json")
                 .body(Body::from(body.to_string()))
@@ -104,12 +104,13 @@ async fn concurrent_batches_create_one_once_only_link_and_preserve_it() {
     let app = omnyid_homeserver::server::build_test_router(&db_url).await;
     let body = json!({"vendor_ids":[vendor_id],"expires_in_days":14});
 
-    let (ordinary_status, _) = post(&app, &ordinary_auth, body.clone()).await;
+    let batch_uri = "/admin/wedding/celebrant-management/links/batch";
+    let (ordinary_status, _) = post(&app, &ordinary_auth, batch_uri, body.clone()).await;
     assert_eq!(ordinary_status, StatusCode::FORBIDDEN);
 
     let (left, right) = tokio::join!(
-        post(&app, &operator_auth, body.clone()),
-        post(&app, &operator_auth, body.clone())
+        post(&app, &operator_auth, batch_uri, body.clone()),
+        post(&app, &operator_auth, batch_uri, body.clone())
     );
     assert_eq!(left.0, StatusCode::OK, "left: {}", left.1);
     assert_eq!(right.0, StatusCode::OK, "right: {}", right.1);
@@ -131,6 +132,32 @@ async fn concurrent_batches_create_one_once_only_link_and_preserve_it() {
         .await
         .expect("plaintext audit");
     assert_eq!(persisted_plaintext, 0);
+
+    let (opt_out_status, opt_out) = post(
+        &app,
+        &operator_auth,
+        "/admin/wedding/celebrant-management/outreach",
+        json!({
+            "vendor_id":vendor_id,
+            "channel":"email",
+            "status":"opted_out",
+            "sent_at":null,
+            "follow_up_due_at":null
+        }),
+    )
+    .await;
+    assert_eq!(opt_out_status, StatusCode::OK, "opt out: {opt_out}");
+    assert_eq!(opt_out["revoked_links"], 1);
+    let (blocked_status, blocked) = post(&app, &operator_auth, batch_uri, body).await;
+    assert_eq!(blocked_status, StatusCode::OK, "blocked batch: {blocked}");
+    assert_eq!(blocked["created"].as_array().unwrap().len(), 0);
+    assert_eq!(blocked["skipped"].as_array().unwrap().len(), 1);
+    assert!(
+        blocked["skipped"][0]["reason"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("opted out")
+    );
 
     unsafe {
         match previous_admins {

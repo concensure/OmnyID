@@ -26,25 +26,25 @@ Dependency order is authoritative. Task: WED-365.
 
 ### CEL-BULK-03 — One-workflow register verification
 
-- [ ] Surface the official register link and existing verification command in
+- [x] Surface the official register link and existing verification command in
   each operator row.
-- [ ] Show pending, verified, not found and requires-review independently of
+- [x] Show pending, verified, not found and requires-review independently of
   invitation/participation state; preserve source/date/operator audit.
 - Depends on CEL-BULK-01.
 
 ### CEL-BULK-04 — Outreach lifecycle
 
-- [ ] Add content-light manual outreach facts: channel, sent date, status,
+- [x] Add content-light manual outreach facts: channel, sent date, status,
   follow-up due and opt-out. Do not store social-message content.
-- [ ] Generate truthful personalised copy from the existing active link without
+- [x] Generate truthful personalised copy from the existing active link without
   regenerating it; provide status filters and exceptions.
 - Depends on CEL-BULK-02.
 
 ### CEL-BULK-05 — Self-service consent and recovery
 
-- [ ] Add explicit consultation participation accept/decline/pause state and
+- [x] Add explicit consultation participation accept/decline/pause state and
   recovery guidance to the mobile flow.
-- [ ] Keep public phone/display choices owner-confirmed and distinct from
+- [x] Keep public phone/display choices owner-confirmed and distinct from
   register verification.
 - Depends on CEL-BULK-03.
 
@@ -52,24 +52,24 @@ Dependency order is authoritative. Task: WED-365.
 
 ### CEL-BULK-06 — Minimal listing preview
 
-- [ ] Reuse admin vendor enrichment to search duplicates and preview a minimal,
+- [x] Reuse admin vendor enrichment to search duplicates and preview a minimal,
   unpublished Celebrant record from name plus source URL.
-- [ ] Preserve claims and existing fields; never infer register verification.
+- [x] Preserve claims and existing fields; never infer register verification.
 - Depends on CEL-BULK-01.
 
 ### CEL-BULK-07 — Unified entry, separate authorities
 
-- [ ] Add a capability-scope manifest and present consultation plus wedding-date
+- [x] Add a capability-scope manifest and present consultation plus wedding-date
   modules only when their existing independent authorities are granted.
-- [ ] Reuse vendor-special slots for ceremony dates; do not copy dates into
+- [x] Reuse vendor-special slots for ceremony dates; do not copy dates into
   consultation windows or broaden legacy tokens.
 - Depends on CEL-BULK-05 and the vendor-special capability contract.
 
 ### CEL-BULK-08 — Funnel and follow-up operations
 
-- [ ] Extend existing content-free metrics with discovered/listed/invited/opened/
+- [x] Extend existing content-free metrics with discovered/listed/invited/opened/
   configured/opted-in/published/engaged counts and exception filters.
-- [ ] Keep `tel:` clicks distinct from connected/completed calls.
+- [x] Keep `tel:` clicks distinct from connected/completed calls.
 - Depends on CEL-BULK-04 and CEL-BULK-05.
 
 ## P2 — Deferred marketing extension

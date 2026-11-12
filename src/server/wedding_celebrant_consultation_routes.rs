@@ -3,35 +3,35 @@
 use std::{sync::Arc, time::Duration};
 
 use axum::{
+    Json, Router,
     extract::{Path, Query, Request, State},
-    http::{header, HeaderMap, HeaderValue, StatusCode},
+    http::{HeaderMap, HeaderValue, StatusCode, header},
     middleware::Next,
     response::Response,
     routing::{get, post, put},
-    Json, Router,
 };
-use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
+use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use chrono::{DateTime, Datelike, Duration as ChronoDuration, NaiveDate, NaiveTime, Utc};
 use chrono_tz::Australia::Sydney;
 use hmac::{Hmac, Mac};
 use rand::RngCore;
 use serde::Deserialize;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sha2::Sha256;
 use sqlx::Row;
 use ulid::Ulid;
 
 use crate::wedding_celebrant_consultation::{
-    live_has_capacity, live_session_end, normalize_phone, valid_topic, ConsultationIntent,
-    ACCEPTANCE_HOLD_MINUTES,
+    ACCEPTANCE_HOLD_MINUTES, ConsultationIntent, live_has_capacity, live_session_end,
+    normalize_phone, valid_topic,
 };
 
 use super::{
+    AppState, RateLimitPolicy,
     auth::{
         authenticated_rate_limit_key, authenticated_user, enforce_rate_limit, public_rate_limit_key,
     },
-    wedding_vendor_portal_routes::{require_vendor_access, VendorPermission},
-    AppState, RateLimitPolicy,
+    wedding_vendor_portal_routes::{VendorPermission, require_vendor_access},
 };
 
 type HmacSha256 = Hmac<Sha256>;
@@ -234,7 +234,7 @@ async fn public_availability_http(
         (SELECT COUNT(*)::bigint FROM wedding_celebrant_callback_requests r WHERE r.live_session_id=live.session_id AND r.status IN ('waiting_acceptance','accepted') AND COALESCE(r.hold_expires_at,live.expires_at)>NOW()) active_holds,
         next_window.next_start
       FROM wedding_vendors v
-      JOIN wedding_celebrant_pilot_profiles p ON p.vendor_id=v.vendor_id AND p.register_status='verified'
+      JOIN wedding_celebrant_pilot_profiles p ON p.vendor_id=v.vendor_id AND p.register_status='verified' AND p.participation_status='accepted'
       LEFT JOIN LATERAL (SELECT photo_url FROM wedding_vendor_photos WHERE vendor_id=v.vendor_id ORDER BY slot LIMIT 1) photo ON TRUE
       LEFT JOIN LATERAL (SELECT session_id,expires_at,call_cap FROM wedding_celebrant_live_sessions WHERE vendor_id=v.vendor_id AND paused_at IS NULL AND starts_at<=NOW() AND expires_at>NOW() ORDER BY starts_at DESC LIMIT 1) live ON TRUE
       LEFT JOIN LATERAL (
@@ -513,7 +513,7 @@ async fn create_request_http(
             .map(|value| clean(value, 120));
         let candidate=sqlx::query(r#"SELECT v.vendor_id,l.session_id,l.expires_at,l.call_cap,p.buffer_minutes,
           (SELECT COUNT(*)::bigint FROM wedding_celebrant_callback_requests r WHERE r.live_session_id=l.session_id AND r.status IN ('waiting_acceptance','accepted') AND COALESCE(r.hold_expires_at,l.expires_at)>NOW()) active_holds
-          FROM wedding_vendors v JOIN wedding_celebrant_pilot_profiles p ON p.vendor_id=v.vendor_id AND p.register_status='verified'
+          FROM wedding_vendors v JOIN wedding_celebrant_pilot_profiles p ON p.vendor_id=v.vendor_id AND p.register_status='verified' AND p.participation_status='accepted'
           JOIN wedding_celebrant_live_sessions l ON l.vendor_id=v.vendor_id AND l.paused_at IS NULL AND l.starts_at<=NOW() AND l.expires_at>NOW()
           WHERE v.status='active' AND v.category ILIKE '%celebrant%' AND $1=ANY(p.accepted_intents) AND $2=ANY(p.topics) AND ($3::text IS NULL OR v.vendor_slug=$3)
           ORDER BY l.starts_at FOR UPDATE OF l SKIP LOCKED LIMIT 1"#)
@@ -563,7 +563,7 @@ async fn create_request_http(
         let date = local.date_naive();
         let time = local.time();
         let weekday = local.weekday().number_from_monday() as i16;
-        let row=sqlx::query(r#"SELECT v.vendor_id,p.consultation_minutes FROM wedding_vendors v JOIN wedding_celebrant_pilot_profiles p ON p.vendor_id=v.vendor_id AND p.register_status='verified'
+        let row=sqlx::query(r#"SELECT v.vendor_id,p.consultation_minutes FROM wedding_vendors v JOIN wedding_celebrant_pilot_profiles p ON p.vendor_id=v.vendor_id AND p.register_status='verified' AND p.participation_status='accepted'
           WHERE v.vendor_slug=$1 AND v.status='active' AND v.category ILIKE '%celebrant%' AND $2=ANY(p.accepted_intents) AND $3=ANY(p.topics)
           AND EXISTS (SELECT 1 FROM wedding_celebrant_consultation_windows w WHERE w.vendor_id=v.vendor_id AND w.enabled AND w.starts_at<=$4 AND w.ends_at>=($4 + make_interval(mins=>p.consultation_minutes)) AND ((w.window_kind='recurring' AND w.weekday=$5) OR (w.window_kind='exception_open' AND w.local_date=$6)))
           AND NOT EXISTS (SELECT 1 FROM wedding_celebrant_consultation_windows x WHERE x.vendor_id=v.vendor_id AND x.enabled AND x.window_kind='exception_closed' AND x.local_date=$6 AND x.starts_at<=$4 AND x.ends_at>$4)"#)
@@ -647,7 +647,7 @@ async fn request_status_http(
             sqlx::query(
                 r#"SELECT v.vendor_id,l.session_id
                      FROM wedding_vendors v
-                     JOIN wedding_celebrant_pilot_profiles p ON p.vendor_id=v.vendor_id AND p.register_status='verified'
+                     JOIN wedding_celebrant_pilot_profiles p ON p.vendor_id=v.vendor_id AND p.register_status='verified' AND p.participation_status='accepted'
                      JOIN wedding_celebrant_live_sessions l ON l.vendor_id=v.vendor_id
                        AND l.paused_at IS NULL AND l.starts_at<=NOW() AND l.expires_at>NOW()
                     WHERE v.status='active' AND v.category ILIKE '%celebrant%'
@@ -1181,7 +1181,7 @@ async fn vendor_request_action_http(
             sqlx::query(
                 r#"SELECT v.vendor_id,l.session_id
                      FROM wedding_vendors v
-                     JOIN wedding_celebrant_pilot_profiles p ON p.vendor_id=v.vendor_id AND p.register_status='verified'
+                     JOIN wedding_celebrant_pilot_profiles p ON p.vendor_id=v.vendor_id AND p.register_status='verified' AND p.participation_status='accepted'
                      JOIN wedding_celebrant_live_sessions l ON l.vendor_id=v.vendor_id
                        AND l.paused_at IS NULL AND l.starts_at<=NOW() AND l.expires_at>NOW()
                     WHERE v.status='active' AND v.category ILIKE '%celebrant%'
@@ -1371,8 +1371,12 @@ async fn operator_verification_http(
     let bytes = axum::body::to_bytes(request.into_body(), 64 * 1024)
         .await
         .map_err(|_| (StatusCode::BAD_REQUEST, "Invalid request body.".into()))?;
-    let request: OperatorVerificationRequest = serde_json::from_slice(&bytes)
-        .map_err(|_| (StatusCode::UNPROCESSABLE_ENTITY, "Invalid verification decision.".into()))?;
+    let request: OperatorVerificationRequest = serde_json::from_slice(&bytes).map_err(|_| {
+        (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "Invalid verification decision.".into(),
+        )
+    })?;
     enforce_rate_limit(
         &state,
         authenticated_rate_limit_key("celebrant-register-verification", &headers),
@@ -1382,10 +1386,13 @@ async fn operator_verification_http(
         },
     )
     .await?;
-    if !matches!(request.status.as_str(), "verified" | "rejected" | "expired") {
+    if !matches!(
+        request.status.as_str(),
+        "verified" | "not_found" | "requires_review" | "rejected" | "expired"
+    ) {
         return Err((
             StatusCode::BAD_REQUEST,
-            "status must be verified, rejected or expired.".into(),
+            "status must be verified, not found, requires review, rejected or expired.".into(),
         ));
     }
     let register_type = request
@@ -1444,7 +1451,11 @@ async fn operator_verification_http(
         "operator",
         Some(&user.id),
         &format!("register-{vendor_id}-{revision}"),
-        json!({"register_status":request.status,"revision":revision}),
+        json!({
+            "register_status":request.status,
+            "revision":revision,
+            "source_url":"https://www.ag.gov.au/families-and-marriage/marriage/find-marriage-celebrant"
+        }),
     )
     .await?;
     Ok(Json(json!({
@@ -1478,6 +1489,10 @@ mod tests {
         let source = include_str!("wedding_celebrant_consultation_routes.rs");
         let start = source.find("async fn operator_verification_http(").unwrap();
         let body = &source[start..];
-        assert!(body.find("authenticated_user(&state.db, &headers)").unwrap() < body.find("to_bytes(request.into_body()").unwrap());
+        assert!(
+            body.find("authenticated_user(&state.db, &headers)")
+                .unwrap()
+                < body.find("to_bytes(request.into_body()").unwrap()
+        );
     }
 }

@@ -859,4 +859,9 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Explicit revocable partner membership and encrypted selected-contact grants for one shared Wedding plan",
         include_str!("../../postgres/migrations/0168_wedding_partner_sharing.sql"),
     ),
+    (
+        "0169_wedding_celebrant_onboarding_operations",
+        "Content-light celebrant outreach, explicit consultation participation and scoped management capabilities",
+        include_str!("../../postgres/migrations/0169_wedding_celebrant_onboarding_operations.sql"),
+    ),
 ];

@@ -25,7 +25,21 @@ export type CelebrantManagementWindow = {
 
 export type CelebrantManagementSession = {
   vendor: { slug: string; name: string; service_area: string };
-  profile: { register_status: string; register_checked_at: string | null; phone_configured: boolean } | null;
+  profile: {
+    register_status: string;
+    register_checked_at: string | null;
+    phone_configured: boolean;
+    participation_status: "not_asked" | "accepted" | "declined" | "paused";
+    participation_updated_at: string | null;
+    callback_phone_confirmed: boolean;
+  } | null;
+  capabilities: {
+    granted: string[];
+    consultation_availability: boolean;
+    wedding_date_availability: boolean;
+    separate_wedding_date_calendar: boolean;
+    notice: string;
+  };
   windows: CelebrantManagementWindow[];
   live: { session_id: string; expires_at: string; call_cap: number; paused: boolean; revision: number } | null;
 };

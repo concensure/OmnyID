@@ -8902,3 +8902,27 @@ implementation commit `a05468de6d3b28db916d23492f866715d765cbc3`.
   false-default; its invitation, author-appeal, DecisionOS citation, aggregate
   analytics and controlled five-venue rollout gates are not implied by this
   release.
+
+# 2026-11-12 — WED-365 bulk celebrant onboarding completion candidate (Codex)
+
+- Worktree: `C:/temp/wt/omnyid-wed360`; branch:
+  `agent/codex/WED-360`. Build and deploy only the clean exact commit produced
+  from this candidate.
+- Migration 0169 adds content-light outreach, explicit consultation
+  participation, callback-phone confirmation and bounded capability scopes.
+  It is registered in the canonical migration catalogue.
+- The existing operator panel now handles official-register decisions,
+  outreach/follow-up/opt-out, funnel exceptions, once-only scoped links and QR
+  codes, and duplicate-safe unpublished listing previews. Opt-out revokes
+  active grants/sessions and prevents link reissue.
+- The no-account mobile flow supports accept, pause, decline and recovery.
+  Public consultation projection requires accepted participation plus verified
+  register status; going live additionally requires the claimed phone and the
+  owner's explicit private callback-phone confirmation. Wedding-date calendar
+  authority remains independent and is reported in the capability manifest.
+- Pass: Solid TypeScript; Rust library check; six management contract tests;
+  disposable PostgreSQL migration plus real-router concurrent batch creation,
+  once-only plaintext proof, opt-out revocation and blocked reissue. The
+  disposable container was removed after testing.
+- The co-branded Binder task remains deliberately deferred until separate
+  publication and asset-rights review. It does not block calendar onboarding.
