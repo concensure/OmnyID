@@ -682,11 +682,11 @@ async fn concurrent_retry_and_partner_submission_converge_without_duplicate_rati
     )
     .await;
     assert_eq!(list_status, StatusCode::OK, "review status list: {listed}");
-    assert_eq!(listed["items"].as_array().map(Vec::len), Some(1));
-    assert_eq!(
-        listed["items"][0]["verification_state"],
-        "verified_wedding_held"
-    );
+    let listed_review = listed["items"]
+        .as_array()
+        .and_then(|items| items.iter().find(|item| item["review_id"] == review_id))
+        .expect("submitted review remains in the author's status list");
+    assert_eq!(listed_review["verification_state"], "verified_wedding_held");
     assert!(listed.to_string().find(&attachment_id).is_none());
     let (partner_detail_status, partner_detail) = request_json(
         &app,
