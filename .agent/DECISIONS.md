@@ -3449,3 +3449,30 @@ synthetic vendor search or introduce another send path.
   rather than copying dates or broadening the bearer token.
 - Minimal operator-created listings are hidden, unclaimed and unverified.
   Duplicate checks and publication/claim/register decisions remain separate.
+
+# 2026-11-12 — Review operations preserve prior event vocabulary
+
+- Review invitations attach to an existing canonical author review and reuse
+  approved outbound delivery. They remain distinct from vendor-management
+  capabilities, are bound to the invited authenticated user and allow at most
+  one reminder before expiry, decline, opt-out or review submission suppresses
+  them.
+- Author appeals are personal author commands even when two people share one
+  Wedding. A co-owner may share Wedding truth but cannot appeal, correct or
+  withdraw the other person's authored review.
+- Migration constraints that enumerate AFP-compatible event kinds are
+  cumulative contracts. A later migration must retain every earlier legal
+  kind; migration 0172 forward-repairs the omission of
+  `eligibility_decided` from migration 0170.
+
+# 2026-11-12 — Couple coworking is a revisioned two-person Wedding scope
+
+- Launch membership is one owner plus at most one active co-owner. Partner
+  acceptance serialises on the owner membership row so concurrent pending
+  invitations cannot create a third full member.
+- The first canonical plan/workspace tuple is stable. Supplying a different
+  response-workspace label cannot rebind an existing or revoked membership.
+- Owner revocation and partner leave advance membership revision, revoke the
+  leaving member's selected-contact grants and invalidate both affected
+  dashboard caches. Neither operation deletes either person's account or
+  private objects.

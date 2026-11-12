@@ -58,11 +58,11 @@ Depends on REV-02 and REV-03.
 
 ## REV-05 — Invitations
 
-- [ ] Reuse existing approved outbound messaging, preferences, rate limits and
+- [x] Reuse existing approved outbound messaging, preferences, rate limits and
   delivery evidence for neutral invitations.
-- [ ] Enforce one reminder after seven days and suppression after submission,
+- [x] Enforce one reminder after seven days and suppression after submission,
   decline, opt-out, expiry or duplicate detection.
-- [ ] Keep vendor standard links distinct from vendor-management capabilities
+- [x] Keep vendor standard links distinct from vendor-management capabilities
   and record invitation origin separately from verification.
 
 Depends on REV-02.
@@ -77,7 +77,7 @@ Depends on REV-02.
 - [x] Publish/reject/restrict/restore without changing author meaning; route
   substantive edits back to the author.
 - [x] Add vendor report, author correction and evidence purge scheduling.
-- [ ] Add a separately permissioned author appeal command and status surface.
+- [x] Add a separately permissioned author appeal command and status surface.
 
 Depends on REV-03 and REV-04.
 
@@ -99,14 +99,14 @@ Depends on REV-06 and existing vendor membership permissions.
 - [x] Propagate correction/withdrawal/restriction to the canonical public
   projection and deterministic aggregate. Public consumers read only the
   current `published` row; no organic ranking input is changed.
-- [ ] Add the bounded dated observation to DecisionOS before it can cite a
+- [x] Add the bounded dated observation to DecisionOS before it can cite a
   published review.
 
 Depends on REV-06.
 
 ## REV-09 — DecisionOS evidence and approved questions
 
-- [ ] Cite a dated public review observation only when relevant to the current
+- [x] Cite a dated public review observation only when relevant to the current
   decision and label the past-experience caveat.
 - [x] Write any generated question into AFP before display and use the existing
   human-approved enquiry workflow; opening evidence must never send.
@@ -115,7 +115,7 @@ Depends on REV-08.
 
 ## REV-10 — Analytics, pilot and release
 
-- [ ] Add content-free invitation, submission, verification, handling-time,
+- [x] Add content-free invitation, submission, verification, handling-time,
   coverage and qualified-enquiry aggregates; exclude text/evidence/private IDs.
 - [ ] Run cross-tenant, duplicate, retry, moderation, deletion, accessibility,
   outage and exact-SHA hosted checks with reviews unable to break directory,
@@ -188,3 +188,16 @@ invent a couple, or publish the control merely because the review system ships.
   plan/workspace tuple. Explicit co-owner memberships converge on that owner;
   unrelated accounts using the same starter labels cannot collide or read one
   another's review state.
+- Migration 0170 and `wedding_review_operations_routes.rs` add neutral,
+  rate-limited, idempotent invitations; a single seven-day reminder; authenticated
+  decline/opt-out; author-only appeals; operator resolution; dated bounded
+  DecisionOS observations; and content-free operational counts. Migration 0172
+  forward-repairs the cumulative event constraint so the earlier
+  `eligibility_decided` event remains legal alongside invitation and appeal
+  events.
+- The real-router disposable-Postgres journey reached eligibility, exposed the
+  0170 event-constraint regression, and passed that SQL path after the forward
+  repair was applied directly. A final linked rerun remains an infrastructure
+  gate: Windows `rustc` exits with `STATUS_ACCESS_VIOLATION`, while Docker's
+  LLVM process subsequently exited with SIGILL/SIGSEGV under the current
+  3.8-GiB Docker allocation. These compiler crashes are not marked as passing.

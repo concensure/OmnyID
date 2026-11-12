@@ -1,6 +1,6 @@
 # Couple coworking specification
 
-Status: implementation started
+Status: implementation in progress
 Date: 12 November 2026
 Task: WED-365
 Source guidance: `couple coworking.md`
@@ -62,6 +62,13 @@ plan, workspace, acting member, role and membership revision in one server-side
 authority. The partner-sharing routes now consume it rather than maintaining a
 second resolver. This is foundation work only; it does not claim the mixed
 domains above are already shared safely.
+
+The second slice enforces the launch membership shape at the server boundary:
+one owner and at most one active co-owner. Acceptance serialises on the owner
+membership row so two pending links cannot race into a three-person Wedding.
+The owner may revoke the partner and the partner may leave; both operations
+advance membership revision, revoke selected-contact grants and invalidate
+the affected dashboard caches without deleting either personal account.
 
 ## Scope model
 

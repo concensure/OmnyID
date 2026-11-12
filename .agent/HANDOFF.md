@@ -8926,3 +8926,39 @@ implementation commit `a05468de6d3b28db916d23492f866715d765cbc3`.
   disposable container was removed after testing.
 - The co-branded Binder task remains deliberately deferred until separate
   publication and asset-rights review. It does not block calendar onboarding.
+
+# 2026-11-12 — WED-360 review completion and WED-365 coworking start (Codex)
+
+- Worktree: `C:/temp/wt/omnyid-wed360`; branch:
+  `agent/codex/WED-360`. Latest implementation commit before this coordination
+  update: `ca56277f62e2ad441bc96c83f229cdf136dc7ba2`.
+- Completed the remaining implementable review operations: neutral/idempotent
+  invitations, one seven-day reminder, authenticated open/decline/opt-out,
+  author-only appeal and status, operator appeal resolution, bounded dated
+  DecisionOS observations and content-free operator metrics. A co-owner cannot
+  withdraw or appeal another person's authored review.
+- Added and extended the canonical couple-coworking specification/task set
+  rather than creating a parallel system. Migration 0171 and `WeddingScope`
+  provide canonical owner/plan/workspace/member/role/revision authority.
+  Partner invitations are owner-only, capped at one active co-owner and
+  serialised during acceptance. The UI now explains the personal-data
+  boundary and provides real member, revoke and leave controls.
+- Hardening found a production-relevant migration defect: 0170 replaced the
+  event-kind constraint without retaining `eligibility_decided`. Forward
+  migration 0172 restores the cumulative vocabulary for already-upgraded
+  databases. Disposable PostgreSQL applied 0172, accepted an
+  `eligibility_decided` event and exposed the complete repaired constraint.
+- Verification passed: `npm run typecheck`; `cargo check --lib`; 17 focused
+  celebrant, vendor-portal and collaboration tests; migration 0172 execution
+  and constraint inspection. The real-router review test executed through the
+  repaired eligibility path and then exposed a stale list-count assertion,
+  which is now ID-based.
+- Verification not claimed: the final linked Rust rerun. Windows `rustc`
+  repeatedly exits with `STATUS_ACCESS_VIOLATION`; two Docker retries under
+  the current 3.8-GiB allocation exited inside LLVM with SIGILL/SIGSEGV. This
+  is an infrastructure gate, not a green test. Hosted exact-SHA review pilot,
+  accessibility/full-account evidence and the five-venue rollout remain open.
+- Vendor management VMP-01 through VMP-09 and the bulk celebrant calendar-link
+  workflow were audited as already implemented; no duplicate portal or
+  calendar authority was introduced. The co-branded Binder remains an
+  intentional P2 deferral pending publication and asset-rights review.

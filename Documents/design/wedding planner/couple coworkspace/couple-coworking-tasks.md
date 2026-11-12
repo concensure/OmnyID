@@ -43,13 +43,22 @@ remains open.
 
 ### COW-04 — Invitation and membership UX (P0)
 
-- Surface existing invite, accept, member list, leave/revoke and expiry states
+- [x] Surface existing invite, accept, member list and leave/revoke states
   inside Wedding sharing settings.
-- Explain equal Wedding access versus separate personal accounts before
+- [x] Explain equal Wedding access versus separate personal accounts before
   acceptance.
-- Enforce the initial two-partner limit without weakening existing restricted
+- [x] Enforce the initial two-partner limit without weakening existing restricted
   external capabilities.
+- [ ] Add an explicit expired-invitation presentation to the authenticated
+  sharing card; the server already rejects and expires stale tokens.
 - Depends on COW-02.
+
+Implementation evidence: the canonical resolver refuses workspace substitution
+after the first scope binding; owner-only invitations and serialised acceptance
+enforce one owner plus one co-owner; removal and partner leave both increment
+membership revision, revoke selected-contact grants and invalidate dashboard
+caches. The sharing card names the personal-data boundary and exposes real
+member/remove/leave actions.
 
 ### COW-05 — Selected-contact sharing (P0)
 
