@@ -2,26 +2,35 @@
 
 Dependency order is authoritative. Task: WED-365.
 
+Status: implementation started 12 November 2026. Checked items are repository
+claims only; hosted and full-account release gates remain separate.
+
 ## Phase 1 — Shared-scope foundation
 
 ### COW-01 — Route and object inventory (P0)
 
-- Map budget, guest/RSVP, seating, vendor/quote, task/decision, run-sheet,
+- [x] Map budget, guest/RSVP, seating, vendor/quote, task/decision, run-sheet,
   document, database, search and AI routes to their current ownership check.
-- Classify each as membership-ready, owner-only or browser-local.
-- Acceptance: every shared object has one named canonical authority and no
+- [x] Classify each as membership-ready, owner-only or browser-local.
+- [x] Acceptance: every shared object has one named canonical authority and no
   proposed duplicate store.
 
 ### COW-02 — Canonical WeddingScope resolver (P0)
 
-- Extract the membership resolution in `wedding_partner_sharing_routes.rs` into
+- [x] Extract the membership resolution in `wedding_partner_sharing_routes.rs` into
   a reusable server service returning canonical owner/plan/workspace/member/
   role/revision.
-- Require an active membership and scope IDs in one database query.
-- Add owner bootstrap through the same path.
-- Tests: owner, partner, revoked member, guessed plan/workspace and role
+- [x] Require an active membership and exact scope IDs in the membership query.
+- [x] Add owner bootstrap through the same path.
+- [ ] Tests: owner, partner, revoked member, guessed plan/workspace and role
   escalation.
 - Depends on COW-01.
+
+Implementation evidence: `0171_wedding_scope_revision.sql`,
+`src/server/wedding_scope.rs`, and the refactored
+`wedding_partner_sharing_routes.rs`. Unit coverage proves bounded IDs,
+revisioned cache names and role behaviour; disposable-Postgres route coverage
+remains open.
 
 ### COW-03 — Cross-domain server enforcement (P0)
 

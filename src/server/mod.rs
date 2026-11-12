@@ -182,6 +182,7 @@ mod wedding_boundary_routes;
 mod wedding_preference_routes; mod wedding_quote_decoder_routes; mod wedding_quote_study_routes; mod wedding_rsvp_capability_routes; mod wedding_rsvp_reminder_routes; mod wedding_rsvp_response_routes; mod wedding_runsheet_projection_routes; mod wedding_runsheet_share_routes;
 mod wedding_review_routes;
 mod wedding_partner_sharing_routes;
+mod wedding_scope;
 mod wedding_review_evidence_routes;
 mod wedding_review_evidence_operator_routes;
 mod wedding_review_eligibility_routes;

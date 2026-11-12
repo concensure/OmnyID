@@ -869,4 +869,9 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Neutral Wedding review invitations, author appeals and content-free operational evidence",
         include_str!("../../postgres/migrations/0170_wedding_review_operations.sql"),
     ),
+    (
+        "0171_wedding_scope_revision",
+        "Revisioned canonical Wedding membership authority for couple coworking",
+        include_str!("../../postgres/migrations/0171_wedding_scope_revision.sql"),
+    ),
 ];

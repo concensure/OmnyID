@@ -24,7 +24,7 @@ use crate::gateway::smtp_out::{send_outgoing_email, OutgoingEmailRequest};
 
 use super::{
     auth::{authenticated_rate_limit_key, authenticated_user, enforce_rate_limit}, AppState,
-    RateLimitPolicy,
+    wedding_scope::resolve_wedding_scope, RateLimitPolicy,
 };
 
 const INVITE_LIFETIME_DAYS: i64 = 7;
@@ -43,15 +43,6 @@ fn clean(value: &str, max: usize) -> String {
     value.trim().chars().take(max).collect()
 }
 
-fn valid_scope(plan: &str, workspace: &str) -> bool {
-    !plan.is_empty()
-        && !workspace.is_empty()
-        && plan.len() <= 200
-        && workspace.len() <= 200
-        && plan.chars().all(|c| c.is_ascii_alphanumeric() || "_:.-/".contains(c))
-        && workspace.chars().all(|c| c.is_ascii_alphanumeric() || "_:.-/".contains(c))
-}
-
 fn hash(value: &str) -> String {
     crate::db::sha256_token(value)
 }
@@ -65,49 +56,6 @@ fn encryption_key() -> Result<[u8; 32], (StatusCode, String)> {
 fn db_error(error: sqlx::Error) -> (StatusCode, String) {
     tracing::warn!(error_kind = ?error.as_database_error().map(|e| e.kind()), "Wedding partner sharing database operation failed");
     (StatusCode::SERVICE_UNAVAILABLE, "Sharing could not be updated just now.".into())
-}
-
-async fn require_scope_access(
-    state: &AppState,
-    user_id: &str,
-    plan_id: &str,
-    workspace_id: &str,
-) -> Result<String, (StatusCode, String)> {
-    if !valid_scope(plan_id, workspace_id) {
-        return Err((StatusCode::BAD_REQUEST, "Choose a valid Wedding plan.".into()));
-    }
-    if let Some(owner) = sqlx::query_scalar::<_, String>(
-        "SELECT wedding_owner_user_id FROM wedding_plan_memberships WHERE wedding_plan_id=$1 AND response_workspace_id=$2 AND member_user_id=$3 AND status='active' LIMIT 1",
-    )
-    .bind(plan_id)
-    .bind(workspace_id)
-    .bind(user_id)
-    .fetch_optional(&state.db.pool)
-    .await
-    .map_err(db_error)? {
-        return Ok(owner);
-    }
-    let owns_plan = sqlx::query_scalar::<_, bool>(
-        "SELECT EXISTS(SELECT 1 FROM wedding_user_onboarding_state WHERE user_id=$1 AND wedding_plan_id=$2)",
-    )
-    .bind(user_id)
-    .bind(plan_id)
-    .fetch_one(&state.db.pool)
-    .await
-    .map_err(db_error)?;
-    if !owns_plan {
-        return Err((StatusCode::FORBIDDEN, "This Wedding plan is not available to this account.".into()));
-    }
-    sqlx::query(
-        "INSERT INTO wedding_plan_memberships (wedding_owner_user_id,wedding_plan_id,response_workspace_id,member_user_id,role,invited_by_user_id) VALUES ($1,$2,$3,$1,'owner',$1) ON CONFLICT (wedding_owner_user_id,wedding_plan_id,member_user_id) DO UPDATE SET response_workspace_id=EXCLUDED.response_workspace_id,status='active',revoked_at=NULL",
-    )
-    .bind(user_id)
-    .bind(plan_id)
-    .bind(workspace_id)
-    .execute(&state.db.pool)
-    .await
-    .map_err(db_error)?;
-    Ok(user_id.to_string())
 }
 
 #[derive(Deserialize)]
@@ -133,7 +81,8 @@ async fn create_invite_http(
     enforce_rate_limit(&state, authenticated_rate_limit_key("wedding-partner-invite", &headers), RateLimitPolicy { max_requests: 8, window: Duration::from_secs(60) }).await?;
     let plan_id = clean(&request.wedding_plan_id, 200);
     let workspace_id = clean(&request.response_workspace_id, 200);
-    let owner_id = require_scope_access(&state, &user.id, &plan_id, &workspace_id).await?;
+    let scope = resolve_wedding_scope(&state.db, &user.id, &plan_id, &workspace_id).await?;
+    let owner_id = scope.owner_user_id;
     let email = request.email.trim().to_ascii_lowercase();
     if !email.contains('@') || email.len() > 254 || email == user.email.to_ascii_lowercase() {
         return Err((StatusCode::BAD_REQUEST, "Enter your partner's email address.".into()));
@@ -192,7 +141,7 @@ async fn accept_invite_http(
     let owner: String = invite.get("wedding_owner_user_id");
     let plan: String = invite.get("wedding_plan_id");
     let workspace: String = invite.get("response_workspace_id");
-    sqlx::query("INSERT INTO wedding_plan_memberships (wedding_owner_user_id,wedding_plan_id,response_workspace_id,member_user_id,role,invited_by_user_id) VALUES ($1,$2,$3,$4,'co_owner',$1) ON CONFLICT (wedding_owner_user_id,wedding_plan_id,member_user_id) DO UPDATE SET role='co_owner',status='active',revoked_at=NULL,response_workspace_id=EXCLUDED.response_workspace_id")
+    sqlx::query("INSERT INTO wedding_plan_memberships (wedding_owner_user_id,wedding_plan_id,response_workspace_id,member_user_id,role,invited_by_user_id) VALUES ($1,$2,$3,$4,'co_owner',$1) ON CONFLICT (wedding_owner_user_id,wedding_plan_id,member_user_id) DO UPDATE SET role='co_owner',status='active',revoked_at=NULL,response_workspace_id=EXCLUDED.response_workspace_id,membership_revision=wedding_plan_memberships.membership_revision+1,updated_at=NOW()")
         .bind(&owner).bind(&plan).bind(&workspace).bind(&user.id).execute(&mut *tx).await.map_err(db_error)?;
     sqlx::query("UPDATE wedding_partner_invites SET status='accepted',accepted_by_user_id=$1,accepted_at=NOW() WHERE invite_id=$2")
         .bind(&user.id).bind(invite.get::<String,_>("invite_id")).execute(&mut *tx).await.map_err(db_error)?;
@@ -208,10 +157,11 @@ async fn list_members_http(
     Query(query): Query<ScopeQuery>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let user = authenticated_user(&state.db, &headers).await?;
-    let owner = require_scope_access(&state, &user.id, &query.wedding_plan_id, &query.response_workspace_id).await?;
-    let rows = sqlx::query("SELECT m.member_user_id,m.role,m.status,m.joined_at::text AS joined_at,u.display_name FROM wedding_plan_memberships m JOIN users u ON u.id=m.member_user_id WHERE m.wedding_owner_user_id=$1 AND m.wedding_plan_id=$2 AND m.status='active' ORDER BY m.joined_at")
-        .bind(owner).bind(clean(&query.wedding_plan_id,200)).fetch_all(&state.db.pool).await.map_err(db_error)?;
-    Ok(Json(json!({"members": rows.into_iter().map(|row| json!({"user_id":row.get::<String,_>("member_user_id"),"display_name":row.get::<String,_>("display_name"),"role":row.get::<String,_>("role"),"joined_at":row.get::<String,_>("joined_at")})).collect::<Vec<_>>() })))
+    let scope = resolve_wedding_scope(&state.db, &user.id, &query.wedding_plan_id, &query.response_workspace_id).await?;
+    let cache_namespace = scope.cache_namespace();
+    let rows = sqlx::query("SELECT m.member_user_id,m.role,m.status,m.membership_revision,m.joined_at::text AS joined_at,u.display_name FROM wedding_plan_memberships m JOIN users u ON u.id=m.member_user_id WHERE m.wedding_owner_user_id=$1 AND m.wedding_plan_id=$2 AND m.status='active' ORDER BY m.joined_at")
+        .bind(&scope.owner_user_id).bind(&scope.wedding_plan_id).fetch_all(&state.db.pool).await.map_err(db_error)?;
+    Ok(Json(json!({"scope":{"owner_user_id":scope.owner_user_id,"wedding_plan_id":scope.wedding_plan_id,"response_workspace_id":scope.response_workspace_id,"member_user_id":scope.member_user_id,"role":scope.role,"membership_revision":scope.membership_revision,"cache_namespace":cache_namespace},"members": rows.into_iter().map(|row| json!({"user_id":row.get::<String,_>("member_user_id"),"display_name":row.get::<String,_>("display_name"),"role":row.get::<String,_>("role"),"membership_revision":row.get::<i64,_>("membership_revision"),"joined_at":row.get::<String,_>("joined_at")})).collect::<Vec<_>>() })))
 }
 
 async fn revoke_member_http(
@@ -221,12 +171,12 @@ async fn revoke_member_http(
     Query(query): Query<ScopeQuery>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let user = authenticated_user(&state.db, &headers).await?;
-    let owner = require_scope_access(&state, &user.id, &query.wedding_plan_id, &query.response_workspace_id).await?;
-    if owner != user.id || member_user_id == owner { return Err((StatusCode::FORBIDDEN, "Only the plan owner can remove a partner.".into())); }
-    let affected = sqlx::query("UPDATE wedding_plan_memberships SET status='revoked',revoked_at=NOW() WHERE wedding_owner_user_id=$1 AND wedding_plan_id=$2 AND member_user_id=$3 AND status='active'")
-        .bind(&owner).bind(clean(&query.wedding_plan_id,200)).bind(clean(&member_user_id,200)).execute(&state.db.pool).await.map_err(db_error)?.rows_affected();
+    let scope = resolve_wedding_scope(&state.db, &user.id, &query.wedding_plan_id, &query.response_workspace_id).await?;
+    if !scope.can_manage_membership() || member_user_id == scope.owner_user_id { return Err((StatusCode::FORBIDDEN, "Only the plan owner can remove a partner.".into())); }
+    let affected = sqlx::query("UPDATE wedding_plan_memberships SET status='revoked',revoked_at=NOW(),membership_revision=membership_revision+1,updated_at=NOW() WHERE wedding_owner_user_id=$1 AND wedding_plan_id=$2 AND member_user_id=$3 AND status='active'")
+        .bind(&scope.owner_user_id).bind(&scope.wedding_plan_id).bind(clean(&member_user_id,200)).execute(&state.db.pool).await.map_err(db_error)?.rows_affected();
     sqlx::query("UPDATE wedding_shared_contact_grants SET status='revoked',revoked_at=NOW(),updated_at=NOW() WHERE wedding_owner_user_id=$1 AND wedding_plan_id=$2 AND recipient_user_id=$3 AND status='active'")
-        .bind(&owner).bind(clean(&query.wedding_plan_id,200)).bind(clean(&member_user_id,200)).execute(&state.db.pool).await.map_err(db_error)?;
+        .bind(&scope.owner_user_id).bind(&scope.wedding_plan_id).bind(clean(&member_user_id,200)).execute(&state.db.pool).await.map_err(db_error)?;
     Ok(Json(json!({"revoked": affected > 0})))
 }
 
@@ -255,7 +205,8 @@ async fn share_contact_http(
     Json(request): Json<ShareContactRequest>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let user = authenticated_user(&state.db, &headers).await?;
-    let owner = require_scope_access(&state, &user.id, &request.wedding_plan_id, &request.response_workspace_id).await?;
+    let scope = resolve_wedding_scope(&state.db, &user.id, &request.wedding_plan_id, &request.response_workspace_id).await?;
+    let owner = scope.owner_user_id;
     let recipient = clean(&request.recipient_user_id, 200);
     let active = sqlx::query_scalar::<_, bool>("SELECT EXISTS(SELECT 1 FROM wedding_plan_memberships WHERE wedding_owner_user_id=$1 AND wedding_plan_id=$2 AND member_user_id=$3 AND status='active')")
         .bind(&owner).bind(clean(&request.wedding_plan_id,200)).bind(&recipient).fetch_one(&state.db.pool).await.map_err(db_error)?;
@@ -277,7 +228,7 @@ async fn list_shared_contacts_http(
     Query(query): Query<ScopeQuery>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let user = authenticated_user(&state.db, &headers).await?;
-    let _owner = require_scope_access(&state, &user.id, &query.wedding_plan_id, &query.response_workspace_id).await?;
+    let _scope = resolve_wedding_scope(&state.db, &user.id, &query.wedding_plan_id, &query.response_workspace_id).await?;
     let rows = sqlx::query("SELECT share_id,shared_by_user_id,contact_ciphertext,updated_at::text AS updated_at FROM wedding_shared_contact_grants WHERE recipient_user_id=$1 AND wedding_plan_id=$2 AND response_workspace_id=$3 AND status='active' ORDER BY updated_at DESC")
         .bind(&user.id).bind(clean(&query.wedding_plan_id,200)).bind(clean(&query.response_workspace_id,200)).fetch_all(&state.db.pool).await.map_err(db_error)?;
     let key = encryption_key()?;

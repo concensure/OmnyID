@@ -1,6 +1,6 @@
 # Couple coworking specification
 
-Status: implementation specification
+Status: implementation started
 Date: 12 November 2026
 Task: WED-365
 Source guidance: `couple coworking.md`
@@ -35,6 +35,34 @@ Remaining architectural gap: many older Wedding routes still authorise only by
 route must resolve a canonical `WeddingScope` before reading or writing. The UI
 must not simulate sharing with browser storage or by copying projections.
 
+## Cross-view authority inventory (first pass)
+
+This inventory follows the source guidance's requirement to map access before
+redesigning the UI. `Membership-ready` means the canonical record already has
+the Wedding plan/workspace identity or an existing resolver can bind it. It
+does not mean every route in that domain has completed partner enforcement.
+
+| Domain | Canonical authority | Current state | Required next action |
+| --- | --- | --- | --- |
+| Membership and selected contacts | `wedding_plan_memberships`, `wedding_partner_invites`, encrypted `wedding_shared_contact_grants` | Membership-ready | Reuse `WeddingScope`; retain field-preview publication and revocation. |
+| Budget and contributions | Existing Wedding AFP projections and budget records | Mixed owner/browser assumptions | Resolve `WeddingScope` before read/write and add expected revision to protected money changes. |
+| Guests, RSVP and households | Canonical RSVP setup/response/capability routes and guest AFP projections | External capability is narrow; couple routes are mixed | Bind authenticated couple routes to the canonical owner/plan/workspace without broadening guest capabilities. |
+| Seating | Canonical guest/seating AFP projections plus account-keyed presentation state | Partly browser-local | Move authoritative placement mutations behind scoped server commands; keep only view preferences local. |
+| Vendors, enquiries and quotes | Canonical vendor IDs, enquiry envelopes, messages and Quote Intelligence | Mostly plan-referenced, not uniformly membership-resolved | Apply scope to authenticated couple reads, messages, attachments and quote selection. |
+| Tasks and decisions | Wedding task AFP records, assignment routes and DecisionOS projections | Mixed owner ID and response-workspace checks | Use canonical owner for shared task truth while retaining actor ID for attribution. |
+| Run sheet and timeline | Existing source-linked run-sheet projector/share capability | Membership-ready projection, owner-oriented writes | Resolve scope on couple reads/writes; keep vendor/public share capabilities narrower. |
+| Wedding documents | Tenant-private AFP/files with Wedding references | Personal by default | Add an explicit Wedding publication/grant boundary; never infer sharing from a filename or tag. |
+| Database view | Existing personal databases plus Wedding saved/projection views | Presentation exists; shared enumeration incomplete | List only personal databases plus exact Wedding projections authorised by `WeddingScope`; do not clone rows. |
+| Search, embeddings and AI | General tenant-private retrieval plus Wedding research routes | Not membership-complete | Filter before prompt/retrieval, namespace caches by scope revision, and adversarially test stale access. |
+| Diary and chat | Tenant-private AFP messages | Personal by default | Keep private; create shared Wedding journal/chat only through explicit Wedding-scoped AFP writes. |
+
+The first implementation slice adds migration `0171_wedding_scope_revision.sql`
+and `src/server/wedding_scope.rs`. The resolver returns the canonical owner,
+plan, workspace, acting member, role and membership revision in one server-side
+authority. The partner-sharing routes now consume it rather than maintaining a
+second resolver. This is foundation work only; it does not claim the mixed
+domains above are already shared safely.
+
 ## Scope model
 
 ```text
@@ -50,6 +78,10 @@ WeddingScope {
 
 The server derives this value from active membership. Clients may request a
 plan ID but cannot nominate its owner or elevate their role.
+
+`membership_revision` changes when access is restored or revoked and is part
+of the cache namespace. A valid account session therefore cannot keep using a
+stale shared Wedding cache after its membership changes.
 
 Data classes:
 
