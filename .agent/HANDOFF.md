@@ -1,9 +1,8 @@
 ## 2026-11-12 - WED-365 quote upload, operator authority and bulk celebrant slice (Codex, in progress)
 
-Worktree `C:\temp\wt\omnyid-wed360`, branch `agent/codex/WED-360`; current
-committed base `d79e7d47b7ac8e91779b2547ff46d569f3af80cf` plus the dirty files named
-below. The operator Compose pass-through is committed; the remaining slice is
-not yet committed or deployed.
+Worktree `C:\temp\wt\omnyid-wed360`, branch `agent/codex/WED-360`.
+Implementation commit `2a86946ffe1e2fdf5e9a96fe6336e02300ad06e9` was released from clean
+detached checkout `C:\temp\wt\omnyid-wed365-release-2a86946`.
 
 - Oracle `.env.oracle` and the recreated homeserver now agree on
   `admin@omnyid.com,concensure@gmail.com`. The container is running and serving
@@ -33,6 +32,14 @@ not yet committed or deployed.
   contracts and one disposable-Postgres concurrent API test). Global
   `cargo fmt --check` remains red on large pre-existing formatting drift, while
   changed Rust files are formatted and `git diff --check` passes.
+- Hosted evidence: both Oracle `SOURCE_COMMIT` and
+  `oracle-runtime-manifest.json` name the full implementation SHA; Caddy and the
+  homeserver restarted; the public quote upload-only Chromium journey passes at
+  390 px; and the batch celebrant route is present and rejects an unauthenticated
+  caller with 401 rather than 404. Runtime-script integrity and backup
+  verification pass. The post-deploy restore drill is capacity-blocked because
+  it calculated about 8.0 GB required while only about 4.2 GB was free during
+  the check; no user data, volume or active image was removed to force it.
 - Remaining: review invitations, author appeal, DecisionOS dated evidence,
   content-free review analytics and human five-venue pilot gate; later
   celebrant workflow tasks are register controls, outreach status/opt-out,
