@@ -468,6 +468,9 @@ async fn withdraw_review_http(
     if !owns_plan {
         return Err(unavailable());
     }
+    if review.get::<String, _>("authored_by_user_id") != user.id {
+        return Err(unavailable());
+    }
     let revision: i64 = review.get("current_revision");
     if request.expected_revision != revision as u64 {
         return Err(conflict(

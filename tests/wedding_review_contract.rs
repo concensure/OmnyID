@@ -132,7 +132,7 @@ fn receipt_contract_is_content_light_and_scoped_to_authenticated_actor() {
 #[test]
 fn expected_revision_and_partner_safe_canonical_lock_are_both_enforced() {
     assert!(ROUTES.contains("current_revision != i64::try_from(request.expected_revision)"));
-    assert!(ROUTES.contains("vendor_id IS NOT DISTINCT FROM $4 FOR UPDATE"));
+    assert!(ROUTES.contains("vendor_id IS NOT DISTINCT FROM $4 AND owner_user_id=$5 FOR UPDATE"));
     assert!(ROUTES.contains("AND owner_user_id=$5 FOR UPDATE"));
     assert!(ROUTES.contains("ON CONFLICT (owner_user_id,idempotency_key) DO NOTHING"));
     assert!(ROUTES.contains("if review.get::<String, _>(\"owner_user_id\") == user.id"));
@@ -209,7 +209,7 @@ fn author_status_and_withdrawal_are_account_scoped_and_content_light() {
     assert!(AUTHOR_LIFECYCLE_MIGRATION.contains("wedding_review_lifecycle_receipts"));
     assert!(AUTHOR_LIFECYCLE_MIGRATION.contains("UNIQUE (actor_user_id, idempotency_key)"));
     assert!(AUTHOR_ROUTES.contains("wedding_user_onboarding_state"));
-    assert!(AUTHOR_ROUTES.contains("authored.authored_by_user_id=$2"));
+    assert!(AUTHOR_ROUTES.contains("review.get::<String, _>(\"authored_by_user_id\") != user.id"));
     assert!(AUTHOR_ROUTES.contains("status='withdrawn'"));
     assert!(AUTHOR_ROUTES.contains("status='purge_scheduled'"));
     assert!(SERVER.contains(".merge(wedding_review_author_routes::routes())"));
@@ -313,7 +313,7 @@ fn vendors_can_report_and_reply_but_cannot_moderate_reviews() {
 
 #[test]
 fn review_operations_are_neutral_suppressed_and_content_light() {
-    assert!(OPERATIONS_MIGRATION.contains("reminder_count"));
+    assert!(OPERATIONS_ROUTES.contains("reminder_count=0"));
     assert!(OPERATIONS_MIGRATION.contains("wedding_review_appeals"));
     assert!(OPERATIONS_MIGRATION.contains("uq_wedding_review_appeals_open"));
     assert!(OPERATIONS_ROUTES.contains("Positive, critical and private feedback"));
