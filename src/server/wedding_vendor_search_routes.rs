@@ -2380,6 +2380,22 @@ mod tests {
     }
 
     #[test]
+    fn officiant_category_searches_the_canonical_celebrant_directory_category() {
+        let query = WeddingVendorSearchQueryRequest {
+            provider_kind: "brave_search".to_string(),
+            category: Some("officiant".to_string()),
+            query: "wedding celebrant Sydney".to_string(),
+            google_place_types: None,
+            overpass_tags: None,
+        };
+
+        let terms = wedding_vendor_directory_search_terms(&query);
+
+        assert!(terms.contains(&"Celebrant".to_string()));
+        assert!(!terms.contains(&"officiant".to_string()));
+    }
+
+    #[test]
     fn descriptive_vendor_query_does_not_treat_generic_cached_rows_as_complete() {
         let query = WeddingVendorSearchQueryRequest {
             provider_kind: "google_places".to_string(),

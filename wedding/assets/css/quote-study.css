@@ -19,3 +19,5 @@
 .quote-study-disclosure summary small{font-family:var(--font-body);font-size:.84rem;font-weight:500;line-height:1.45;color:var(--ink-soft)}
 .quote-study-disclosure>div{padding:0 1.1rem 1rem}
 .quote-study-disclosure>div p:first-child{margin-top:0}
+.quote-study-optional{font-weight:500;color:var(--ink-soft);font-size:.88rem}
+.quote-study-term-list{display:grid;gap:12px}.quote-study-term{padding:12px;border:1px solid #ead8b8;border-radius:9px;background:#fffdf8}.quote-study-term>p{margin:.3rem 0 0;font-size:1.04rem}.quote-study-source-snippet{margin:.65rem 0 0;padding:.7rem .8rem;border-left:4px solid #d6aa37;background:#fff3a6;color:#392d1d;font-size:.88rem;line-height:1.45}.quote-study-caution{color:#7a4a00}.quote-study-next{margin-top:18px;padding:15px;border:1px solid #c8dbc8;border-radius:10px;background:#f2f7ef;line-height:1.55}.quote-study-next a{font-weight:700}

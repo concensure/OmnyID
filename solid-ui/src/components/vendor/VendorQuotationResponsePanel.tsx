@@ -193,7 +193,7 @@ export function VendorQuotationResponsePanel(props: Props = {}) {
       </Show>
 
       <div class="mt-4 grid gap-3">
-        <For each={transactions() ?? []}>{(item) => (
+        <For each={(transactions.error ? undefined : transactions()) ?? []}>{(item) => (
           <article class="rounded-xl border border-wedding-muted p-4">
             <p class="text-sm font-semibold">Quotation {item.quotation_id}</p>
             <p class="mt-1 text-xs text-wedding-muted">Version {item.quotation_version_id} · expires {new Date(item.expires_at).toLocaleString()}</p>

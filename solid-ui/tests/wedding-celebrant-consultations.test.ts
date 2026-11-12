@@ -28,7 +28,9 @@ test("vendor portal separates wedding dates from phone consultations", async () 
   assert.match(dashboard, /VendorSpecialOffersPanel/);
   assert.match(dashboard, /VendorCelebrantConsultationsPanel/);
   assert.match(dashboard, /category\.toLowerCase\(\)\.includes\("celebrant"\)/);
-  assert.match(panel, /Wedding-date availability stays in Wedding dates above/);
+  assert.match(panel, /Wedding-date availability is managed separately/);
+  assert.match(panel, /resource\.error \? undefined : resource\(\)/);
+  assert.match(panel, /Phone consultations are not open yet/);
   assert.match(panel, /Register check/);
   assert.match(panel, /Go live/);
   assert.match(panel, /Callback accepted/);

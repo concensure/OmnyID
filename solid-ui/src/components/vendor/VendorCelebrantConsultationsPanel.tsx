@@ -20,7 +20,11 @@ const TOPICS = [
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
 export function VendorCelebrantConsultationsPanel(props: { vendorSlug: string }) {
-  const [dashboard, { refetch }] = createResource(() => props.vendorSlug, getCelebrantDashboard);
+  const [resource, { refetch }] = createResource(() => props.vendorSlug, getCelebrantDashboard);
+  // Solid resources throw when read after a rejected request. Guard the read
+  // so a false-default feature renders its stable state instead of leaving the
+  // panel stuck on its initial loading copy.
+  const dashboard = () => (resource.error ? undefined : resource());
   const [phone, setPhone] = createSignal("");
   const [regions, setRegions] = createSignal("Sydney");
   const [languages, setLanguages] = createSignal("English");
@@ -80,9 +84,9 @@ export function VendorCelebrantConsultationsPanel(props: { vendorSlug: string })
   return <section class="rounded-xl border border-wedding-muted bg-white p-5 shadow-sm" aria-labelledby="celebrant-consultations-title">
     <p class="text-xs font-bold uppercase tracking-[0.16em] text-wedding-accent">Phone consultations</p>
     <h2 id="celebrant-consultations-title" class="mt-1 text-lg font-semibold">Offer ten-minute calls without exposing your number</h2>
-    <p class="mt-1 text-sm leading-6 text-wedding-muted">Wedding-date availability stays in Wedding dates above. This view controls question and prospective-client calls in Sydney time.</p>
-    <Show when={dashboard.loading}><p class="mt-4 text-sm" role="status">Loading consultation settings…</p></Show>
-    <Show when={dashboard.error}><p class="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-800" role="alert">Phone consultations could not be loaded.</p></Show>
+    <p class="mt-1 text-sm leading-6 text-wedding-muted">Wedding-date availability is managed separately. This view controls question and prospective-client calls in Sydney time.</p>
+    <Show when={resource.loading}><p class="mt-4 text-sm" role="status">Loading consultation settings…</p></Show>
+    <Show when={resource.error}><p class="mt-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-900" role="status">{/not available/i.test(String((resource.error as Error | undefined)?.message ?? "")) ? "Phone consultations are not open yet. Your wedding-date availability and enquiries are not affected." : "Phone consultations could not be loaded. Try again shortly."}</p></Show>
     <Show when={dashboard()}>{(current) => <>
       <div class="mt-4 rounded-xl bg-wedding-surface p-4">
         <div class="flex flex-wrap items-center justify-between gap-3"><div><strong>Register check: <span class="capitalize">{current().profile?.register_status ?? "pending"}</span></strong><p class="mt-1 text-xs text-wedding-muted">Registration evidence and live readiness are separate. You cannot go live until an operator records the official check.</p></div><Show when={current().profile?.register_checked_at}><span class="text-xs text-wedding-muted">Checked {new Date(current().profile!.register_checked_at!).toLocaleDateString("en-AU")}</span></Show></div>

@@ -30,7 +30,7 @@ use super::{
 const MAX_QUOTE_CHARS: usize = 20_000;
 const MIN_QUOTE_CHARS: usize = 40;
 
-const SYSTEM_PROMPT: &str = r#"You extract commercial terms from one wedding venue proposal. Return only strict JSON. Never calculate arithmetic: OmnyID calculates totals deterministically. Never infer an unstated value. Never map a component subtotal to whole_package_amount. Every extracted or ambiguous value must include one exact, contiguous source_snippet copied verbatim from the proposal; do not add ellipses. If no exact support exists, use state not_found and value null.
+const SYSTEM_PROMPT: &str = r#"You extract commercial terms from one wedding vendor proposal, including venue proposals. Return only strict JSON. Never calculate arithmetic: OmnyID calculates totals deterministically. Never infer an unstated value. Never map a component subtotal to whole_package_amount. Every extracted or ambiguous value must include one exact, contiguous source_snippet copied verbatim from the proposal; do not add ellipses. If no exact support exists, use state not_found and value null.
 
 Return exactly this shape:
 {

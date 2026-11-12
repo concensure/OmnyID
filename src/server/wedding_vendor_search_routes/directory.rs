@@ -153,6 +153,17 @@ pub(super) fn directory_sources_cover_query(
         >= needed
 }
 
+/// Internal planning categories and the canonical directory use a few
+/// different labels. Normalize only those known aliases before querying; a
+/// literal `officiant` search otherwise cannot match stored `Celebrant` rows.
+fn directory_category_term(category: &str) -> &str {
+    match category.trim().to_ascii_lowercase().as_str() {
+        "officiant" | "celebrant" | "marriage celebrant" => "Celebrant",
+        "floral_designer" | "floral designer" | "floristry" | "flowers" => "Florist",
+        _ => category,
+    }
+}
+
 pub(super) fn wedding_vendor_directory_search_terms(
     query: &WeddingVendorSearchQueryRequest,
 ) -> Vec<String> {
@@ -163,7 +174,7 @@ pub(super) fn wedding_vendor_directory_search_terms(
         .map(str::trim)
         .filter(|value| !value.is_empty())
     {
-        terms.push(category.to_string());
+        terms.push(directory_category_term(category).to_string());
     }
     if let Some(location) = infer_vendor_service_area(&query.query) {
         terms.push(location);

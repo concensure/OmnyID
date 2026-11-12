@@ -1821,8 +1821,12 @@ async fn dashboard_bootstrap_http(
         .await
         .ok()
         .flatten();
-    let current_token = bearer_token_from_headers(&headers)
-        .ok_or_else(|| (StatusCode::UNAUTHORIZED, "missing bearer token".to_string()))?;
+    let current_token = session_token_from_headers(&headers).ok_or_else(|| {
+        (
+            StatusCode::UNAUTHORIZED,
+            "missing session token".to_string(),
+        )
+    })?;
     ensure_user_agents_and_demo_seed(&state, &user)
         .await
         .map_err(internal_http_error)?;
@@ -2103,8 +2107,12 @@ async fn dashboard_export_http(
         .await
         .ok()
         .flatten();
-    let current_token = bearer_token_from_headers(&headers)
-        .ok_or_else(|| (StatusCode::UNAUTHORIZED, "missing bearer token".to_string()))?;
+    let current_token = session_token_from_headers(&headers).ok_or_else(|| {
+        (
+            StatusCode::UNAUTHORIZED,
+            "missing session token".to_string(),
+        )
+    })?;
     ensure_user_agents_and_demo_seed(&state, &user)
         .await
         .map_err(internal_http_error)?;

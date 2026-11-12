@@ -18,6 +18,7 @@ const sitemap = readFileSync(sitemapPath, 'utf8');
 const vendorAcquisitionHtml = readFileSync(vendorAcquisitionPage, 'utf8');
 const weddingJs = readFileSync(resolve(root, 'assets', 'js', 'main.js'), 'utf8');
 const quoteDecoderJs = readFileSync(resolve(root, 'assets', 'js', 'quote-decoder.js'), 'utf8');
+const quoteStudyJs = readFileSync(resolve(root, 'assets', 'js', 'quote-study.js'), 'utf8');
 const quoteDecoderEngine = readFileSync(resolve(root, 'assets', 'js', 'quote-decoder-engine.js'), 'utf8');
 const landingConfig = readFileSync(resolve(root, 'assets', 'js', 'landing-config.js'), 'utf8');
 const landingContext = readFileSync(resolve(root, 'assets', 'js', 'landing-context.js'), 'utf8');
@@ -497,6 +498,13 @@ if (!caddyfile.includes('handle /wedding/quote-extract') || !caddyfile.includes(
 }
 if (!quoteDecoder.includes('does not retain the proposal text') || !quoteDecoder.includes('Manual entry remains available')) {
   failures.push('compare-wedding-venue-quotes.html: model-processing disclosure or manual fallback is missing');
+}
+const quoteArticle = htmlByPath.get(normalize(resolve(root, 'blog/before-you-accept-that-wedding-quote.html'))) ?? '';
+for (const required of ['Analyse quote', 'does not retain the proposal text', 'compare-wedding-venue-quotes.html', 'assets/js/quote-study.js']) {
+  if (!quoteArticle.includes(required)) failures.push(`before-you-accept-that-wedding-quote.html: missing ${required}`);
+}
+if (!quoteStudyJs.includes('/wedding/quote-extract') || quoteStudyJs.includes('/wedding/quote-study/notice') || quoteStudyJs.includes('not accepting quotes yet')) {
+  failures.push('quote-study.js: article analysis must reuse canonical Quote Intelligence without the disabled research-preview gate');
 }
 for (const context of ['starting', 'vendors', 'guests', 'final']) {
   if (!new RegExp(`${context}:[\\s\\S]*?retrieval:[\\s\\S]*?question:[\\s\\S]*?directAnswer:[\\s\\S]*?destinationPath:`).test(landingConfig)) failures.push(`landing-config.js: ${context} context lacks non-visible retrieval metadata`);
