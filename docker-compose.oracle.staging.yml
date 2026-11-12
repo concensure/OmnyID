@@ -73,6 +73,7 @@ services:
       OMNYID_AFP_DELEGATION: staging.omnyid.com:443
       OMNYID_DOMAIN: staging.omnyid.com
       OMNYID_BASE_URL: https://staging.omnyid.com
+      OMNYID_ADMIN_EMAILS: ${OMNYID_ADMIN_EMAILS:-}
       LOG_FORMAT: json
       OMNYID_PUBLIC_KEY_HEX: ${OMNYID_STAGING_PUBLIC_KEY_HEX:?run scripts/staging-up.sh first}
       OMNYID_SIGNING_KEY_HEX_FILE: /run/secrets/omnyid_signing_key_hex
