@@ -6,27 +6,27 @@ import test from "node:test";
 const root = resolve(import.meta.dirname, "../..");
 const read = (path: string) => readFile(resolve(root, path), "utf8");
 
-test("public quote study requires explicit consent and keeps analysis server-side", async () => {
+test("public quote article reuses the bounded no-retention Quote Intelligence route", async () => {
   const [page, script, compose] = await Promise.all([
     read("wedding/blog/before-you-accept-that-wedding-quote.html"),
     read("wedding/assets/js/quote-study.js"),
     read("docker-compose.oracle.minimal.yml"),
   ]);
 
-  assert.match(page, /stored <strong>unencrypted<\/strong> in private SeaweedFS/i);
-  assert.match(page, /openai\/gpt-5-mini/i);
-  assert.match(page, /type="checkbox" required/i);
-  assert.match(page, /authorised to upload/i);
-  assert.match(page, /private deletion token/i);
+  assert.match(page, /does not retain the proposal text or result/i);
+  assert.match(page, /not added to a research study/i);
+  assert.match(page, /Nothing is sent until you choose Analyse quote/i);
+  assert.doesNotMatch(page, /type="checkbox" required/i);
+  assert.doesNotMatch(page, /private deletion token/i);
   assert.match(page, /<details class="quote-study-disclosure">/i);
-  assert.match(page, /Your consent matters:<\/strong>/i);
   assert.match(page, /venue quote — detailed venue checks/i);
   assert.match(page, /another wedding vendor — generic quote checks/i);
   assert.doesNotMatch(page + script, /OPENROUTER_API_KEY\s*=/i);
-  assert.match(script, /fetch\("\/wedding\/quote-study"/);
+  assert.match(script, /fetch\("\/wedding\/quote-extract"/);
+  assert.doesNotMatch(script, /wedding\/quote-study/);
   assert.match(script, /textContent/);
   assert.doesNotMatch(script, /resultBody\.innerHTML/);
-  assert.doesNotMatch(script, /privacy notice is unavailable/i);
+  assert.match(script, /retained the proposal text/);
   assert.match(compose, /OMNYID_WEDDING_QUOTE_STUDY_ENABLED: \$\{OMNYID_WEDDING_QUOTE_STUDY_ENABLED:-false\}/);
 });
 
