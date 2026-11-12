@@ -8829,3 +8829,29 @@ implementation commit `a05468de6d3b28db916d23492f866715d765cbc3`.
   quote article Playwright smoke passed. Windows linked Rust tests still hit
   the known rustc `STATUS_ACCESS_VIOLATION`; Docker Desktop was unavailable, so
   migration 0168 must be executed and inspected by the clean Oracle release.
+
+# 2026-11-12 — WED-364 Oracle release (Codex)
+
+- Released the account-boundary implementation in
+  `d558272771336cabf6b924ac2f874c0888dc5b8f`, followed by static cache-safe
+  article SHA `e5e55825fc084eaff7644eafe62f687089a232ad`. The latter changes only the
+  public article's analyser asset URL and reused the already-proven container
+  images.
+- Oracle migration 0168 is present: explicit Wedding memberships, expiring
+  partner invites and selected-contact grants. The three relations were
+  inspected in production. `admin@omnyid.com` is in the server operator
+  allowlist; no admin login was used for verification.
+- The ordinary hosted quote article passed Playwright at 390 px: selecting a
+  TXT file enables Analyse quote, sends nothing before the click, submits once
+  after the click and renders source-grounded output. A versioned script URL
+  avoids the stale four-hour Cloudflare object; the configured token did not
+  have cache-purge authority and no broader permission was added.
+- Full Oracle production proof passed backup verification and the isolated
+  restore drill. The cold build temporarily raised root use to 92%; only 5.247
+  GB of inactive Docker builder cache was removed. No active image, volume,
+  database, backup or user file was removed. Final root use is 81% with about
+  8.5 GB free.
+- WED-364 is complete. WED-360's public review pilot remains independently
+  false-default; its invitation, author-appeal, DecisionOS citation, aggregate
+  analytics and controlled five-venue rollout gates are not implied by this
+  release.
