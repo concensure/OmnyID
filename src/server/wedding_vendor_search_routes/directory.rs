@@ -2,6 +2,13 @@
 use super::*;
 use crate::db::{WeddingVendorRecord, WeddingVendorRoomRecord};
 
+fn category_matches_selected_category(record_category: &str, category: Option<&str>) -> bool {
+    category.is_none_or(|category| {
+        canonical_wedding_vendor_category(record_category)
+            == canonical_wedding_vendor_category(directory_category_term(category))
+    })
+}
+
 pub(super) async fn search_wedding_vendor_directory(
     db: &Db,
     user_id: &str,
@@ -15,7 +22,15 @@ pub(super) async fn search_wedding_vendor_directory(
     // and scale evidence. Keep this bounded so directory reuse stays cheap.
     let candidate_limit = (limit.saturating_mul(6)).clamp(12, 48) as i64;
     for query in queries {
-        if is_generic_vendor_directory_query(query) && seen_queries.insert("__all__".to_string()) {
+        let selected_category = query
+            .category
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty());
+        if selected_category.is_none()
+            && is_generic_vendor_directory_query(query)
+            && seen_queries.insert("__all__".to_string())
+        {
             let records = db
                 .list_active_wedding_vendors_for_user(user_id, candidate_limit, None)
                 .await?;
@@ -36,6 +51,9 @@ pub(super) async fn search_wedding_vendor_directory(
             sources.extend(
                 records
                     .into_iter()
+                    .filter(|record| {
+                        category_matches_selected_category(&record.category, selected_category)
+                    })
                     .filter(is_real_vendor_directory_record)
                     .map(wedding_vendor_record_to_search_source),
             );
@@ -158,8 +176,14 @@ pub(super) fn directory_sources_cover_query(
 /// literal `officiant` search otherwise cannot match stored `Celebrant` rows.
 fn directory_category_term(category: &str) -> &str {
     match category.trim().to_ascii_lowercase().as_str() {
-        "officiant" | "celebrant" | "marriage celebrant" => "Celebrant",
-        "floral_designer" | "floral designer" | "floristry" | "flowers" => "Florist",
+        "officiant" | "officiants" | "celebrant" | "celebrants" | "marriage celebrant" => {
+            "Celebrant"
+        }
+        "floral_designer" | "floral designer" | "floristry" | "flowers" | "florists" => "Florist",
+        "venues" => "Venue",
+        "photographers" => "Photographer",
+        "planners" => "Planner",
+        "musicians" => "Musician",
         _ => category,
     }
 }
@@ -180,6 +204,58 @@ pub(super) fn wedding_vendor_directory_search_terms(
         terms.push(location);
     }
     dedupe_strings(terms)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn request(query: &str, category: Option<&str>) -> WeddingVendorSearchQueryRequest {
+        WeddingVendorSearchQueryRequest {
+            provider_kind: "brave_search".into(),
+            category: category.map(str::to_string),
+            query: query.into(),
+            google_place_types: None,
+            overpass_tags: None,
+        }
+    }
+
+    #[test]
+    fn broad_wording_remains_generic_only_without_a_selected_category() {
+        assert!(is_generic_vendor_directory_query(&request(
+            "wedding vendors in Sydney, Australia",
+            None,
+        )));
+        let selected = request("wedding vendors in Sydney, Australia", Some("Celebrants"));
+        assert_eq!(
+            wedding_vendor_directory_search_terms(&selected),
+            vec![
+                "wedding vendors in Sydney, Australia".to_string(),
+                "Celebrant".to_string(),
+                "Sydney".to_string(),
+            ],
+        );
+    }
+
+    #[test]
+    fn selected_category_aliases_match_the_directory_category() {
+        assert_eq!(
+            canonical_wedding_vendor_category(directory_category_term("officiant")),
+            canonical_wedding_vendor_category("Celebrant"),
+        );
+        assert_eq!(
+            canonical_wedding_vendor_category(directory_category_term("floral_designer")),
+            canonical_wedding_vendor_category("Florist"),
+        );
+        assert!(category_matches_selected_category(
+            "Celebrant",
+            Some("officiant")
+        ));
+        assert!(!category_matches_selected_category(
+            "Hair and Makeup",
+            Some("Venue")
+        ));
+    }
 }
 
 pub(super) fn is_real_vendor_directory_record(record: &WeddingVendorRecord) -> bool {

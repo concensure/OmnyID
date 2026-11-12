@@ -15,6 +15,18 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-365
+    title: Restore operator authority, harden quote and vendor search, specify couple coworking, and begin safe bulk celebrant outreach
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-360
+    worktree: C:/temp/wt/omnyid-wed360
+    base_sha: 97c2c1c34b65e5d7139bd7ba779300564574effa
+    depends_on: [WED-360, WED-364, WED-363, WED-293]
+    files: [docker-compose*.yml, src/server/**wedding*vendor*search**, src/server/**wedding*review**, src/server/wedding_celebrant_management_link_routes.rs, src/server/ui_decision_routes.rs, solid-ui/src/components/**Review**, solid-ui/src/components/UsageAdminWeddingCelebrantsPanel.tsx, solid-ui/src/lib/**review**, solid-ui/tests/**review**, postgres/migrations/**wedding*review**, wedding/blog/before-you-accept-that-wedding-quote.html, wedding/assets/js/quote-study.js, wedding/tests/quote-article-browser-smoke.mjs, Documents/operations/oracle/**, Documents/design/wedding planner/review/**, Documents/design/wedding planner/couple coworkspace/**, Documents/design/wedding planner/vendor side/CELEBRANT_WORKFLOW_*.md, tests/**review**, tests/wedding_celebrant_management_*.rs, .agent/**]
+    acceptance: [the production homeserver receives the exact configured operator allowlist and admin@omnyid.com is no longer rejected solely because Compose dropped the variable, the verified server allowlist is documented without secrets, an explicit vendor category is a hard internal-directory constraint even for broad wording and a no-useful-result fallback names that category and inferred location, a selected quote text file is analysed without native validation demanding a manual paste, bulk celebrant link preparation reuses vendor-scoped grants preserves active links serialises concurrent creation returns plaintext once and exposes runtime readiness truthfully, all implementable review invitation appeal DecisionOS analytics and verification work is complete without claiming unperformed human pilot evidence, couple coworking is specified as explicit shared Wedding scope over existing AFP authorities with personal data private by default, focused tests exact-SHA release provenance homeserver restart and hosted health checks pass]
+    progress: "Oracle now passes admin@omnyid.com and concensure@gmail.com into the running homeserver; container activity is healthy although public health endpoints are protected by the hosted authentication boundary. The category-authoritative vendor query and file-only quote analysis regressions are implemented and focused tests pass. Couple coworking spec/tasks and verified bulk celebrant audit/spec/tasks are written; the first batch-link slice, concurrency guard, runtime readiness projection and operator UI are implemented with disposable-Postgres coverage. Review-system completion remains in progress."
+
   - id: WED-364
     title: Correct public quote readiness, operator routing, and private-by-default partner wedding sharing
     status: done

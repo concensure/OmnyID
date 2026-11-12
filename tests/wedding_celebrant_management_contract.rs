@@ -52,7 +52,21 @@ fn public_and_admin_surfaces_support_the_scoped_flow() {
     assert!(manager.contains("cannot open couple details, messages, phone numbers"));
     assert!(admin.contains("Generate link + QR"));
     assert!(admin.contains("Revoke active link"));
+    assert!(admin.contains("Prepare several outreach links"));
+    assert!(admin.contains("Copy all invitations"));
     assert!(directory.contains("category=Celebrant") || directory.contains("category"));
+}
+
+#[test]
+fn bulk_link_preparation_reuses_the_scoped_grant_and_preserves_active_links() {
+    let routes = include_str!("../src/server/wedding_celebrant_management_link_routes.rs");
+
+    assert!(routes.contains("/admin/wedding/celebrant-management/links/batch"));
+    assert!(routes.contains("normalize_batch_vendor_ids"));
+    assert!(routes.contains("replace_active.unwrap_or(false)"));
+    assert!(routes.contains("FOR UPDATE"));
+    assert!(routes.contains("Bearer links are returned once"));
+    assert!(!routes.contains("management_url\" FROM"));
 }
 
 #[test]
@@ -70,7 +84,12 @@ fn call_actions_and_operator_funnel_use_durable_evidence() {
     assert!(admin.contains("growth_wedding_activations"));
     assert!(admin.contains("wedding_enquiry_envelopes"));
     assert!(admin.contains("provider_event.event_kind='delivered'"));
+    assert!(admin.contains("phone_verification_configured"));
+    assert!(admin.contains("consultations_enabled"));
     assert!(migration.contains("WHERE direction='to_vendor'"));
     assert!(!migration.contains("message_body"));
-    assert!(!migration.contains("phone"));
+    // Explanatory comments may name excluded fields; the metric SQL itself
+    // must not select or persist any phone column.
+    assert!(!migration.contains("contact_phone"));
+    assert!(!migration.contains("phone_ciphertext"));
 }

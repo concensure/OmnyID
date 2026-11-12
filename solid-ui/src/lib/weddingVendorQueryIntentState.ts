@@ -128,3 +128,42 @@ export function weddingVendorQueryGooglePlaceTypes(category: string | null): str
   if (category === "makeup_artist") return ["beauty_salon"];
   return ["point_of_interest"];
 }
+
+function providerCategoryLabel(value: string): string {
+  const intent = weddingVendorQueryIntent(value.replace(/_/g, " "));
+  if (intent.categoryLabel) return intent.categoryLabel;
+  return clean(value).replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+/**
+ * Category chips are a hard search constraint, even when the visible wording
+ * is deliberately broad (for example “wedding vendors in Sydney”). Preserve
+ * the person's wording when it already names the selected category; otherwise
+ * build the bounded provider fallback requested by that category and place.
+ */
+export function weddingVendorScopedProviderQuery(input: {
+  query: string;
+  selectedCategory?: string | null;
+  fallbackArea?: string | null;
+}): { category: string | null; query: string } {
+  const query = clean(input.query);
+  const selected = clean(input.selectedCategory);
+  const queryIntent = weddingVendorQueryIntent(query);
+  const selectedIntent = weddingVendorQueryIntent(selected.replace(/_/g, " "));
+  const selectedCategory = selectedIntent.category ?? (selected ? selected.toLowerCase().replace(/[^a-z0-9]+/g, "_") : null);
+  const selectedIsSynthetic = !selected || /^(?:custom_vendor_search|wedding_vendor|wedding vendors?)$/i.test(selectedCategory ?? selected);
+  const normalizedArea = clean(queryIntent.location ?? input.fallbackArea);
+  const area = /\baustralia\b/i.test(query) && normalizedArea && !/\baustralia\b/i.test(normalizedArea)
+    ? `${normalizedArea} Australia`
+    : normalizedArea;
+  if (!selectedIsSynthetic && selectedCategory && queryIntent.category !== selectedCategory) {
+    return {
+      category: selectedCategory,
+      query: `wedding ${providerCategoryLabel(selected)} ${area || "Australia"}`.replace(/\s+/g, " ").trim().slice(0, 280),
+    };
+  }
+  const withArea = query && area && !/\b(in|near|around|within)\s+[\p{L}\p{N}]/iu.test(query)
+    ? `${query} near ${area}`
+    : query;
+  return { category: selectedIsSynthetic ? queryIntent.category : selectedCategory ?? queryIntent.category, query: withArea.slice(0, 280) };
+}

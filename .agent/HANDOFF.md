@@ -1,3 +1,43 @@
+## 2026-11-12 - WED-365 quote upload, operator authority and bulk celebrant slice (Codex, in progress)
+
+Worktree `C:\temp\wt\omnyid-wed360`, branch `agent/codex/WED-360`; current
+committed base `d79e7d47b7ac8e91779b2547ff46d569f3af80cf` plus the dirty files named
+below. The operator Compose pass-through is committed; the remaining slice is
+not yet committed or deployed.
+
+- Oracle `.env.oracle` and the recreated homeserver now agree on
+  `admin@omnyid.com,concensure@gmail.com`. The container is running and serving
+  workload after restart. Hosted health URLs return the environment's 401
+  authentication boundary rather than an anonymous health payload; logs show
+  active queries and no restart loop. The allowlist is documented without
+  secrets in `Documents/operations/oracle/2026-11-12-operator-admin-allowlist.md`.
+- The public quote article no longer lets native `required` validation reject
+  text loaded by the local file reader. The canonical in-memory text is length
+  checked before the rest of the form. A 390px Chromium regression proves one
+  explicit extraction request and no request before Analyse quote.
+- A selected vendor category is now authoritative for internal directory
+  results even when the typed words say generic `wedding vendors`; an external
+  fallback is rewritten to `wedding [category] [location]`. Focused Rust and
+  TypeScript tests pass.
+- Wrote the verified celebrant audit/spec/tasks requested by the bulk brief.
+  The first implementation slice adds an operator-only 1-100 batch endpoint
+  and selection/copy UI. Existing links are preserved by default, celebrant
+  identity locking serialises concurrent first-link creation, and plaintext
+  bearer URLs are returned once without entering events/analytics. Runtime
+  link, consultation and phone-verification readiness are distinct facts.
+- Wrote `couple-coworking-spec.md` and `couple-coworking-tasks.md`, extending
+  migration 0168 membership and selected-contact grants rather than proposing
+  another wedding ledger.
+- Evidence: quote browser smoke passes; Solid UI typecheck passes; vendor-query
+  tests pass (10 TypeScript, 2 Rust); celebrant management tests pass (5
+  contracts and one disposable-Postgres concurrent API test). Global
+  `cargo fmt --check` remains red on large pre-existing formatting drift, while
+  changed Rust files are formatted and `git diff --check` passes.
+- Remaining: review invitations, author appeal, DecisionOS dated evidence,
+  content-free review analytics and human five-venue pilot gate; later
+  celebrant workflow tasks are register controls, outreach status/opt-out,
+  minimal listing preview and separately scoped wedding-date authority.
+
 ## 2026-11-12 - WED-360 evidence lifecycle and Wedding regression slice (Codex, in progress)
 
 Worktree `C:\temp\wt\omnyid-wed360`, branch `agent/codex/WED-360`;

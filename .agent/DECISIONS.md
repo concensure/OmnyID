@@ -1,3 +1,24 @@
+## 2026-11-12: Bulk celebrant outreach preserves active capabilities
+
+Bulk preparation reuses the existing vendor-scoped celebrant consultation
+grant. It does not create a second calendar token or celebrant CRM. A batch may
+contain 1-100 distinct active Celebrant IDs and skips an active/exchanged link
+by default. Replacement remains an explicit single-celebrant action. The
+server locks the vendor identity so concurrent first-link requests converge on
+one grant. Plaintext bearer URLs are returned once for manual outreach and are
+never stored in events, analytics or an ordinary export. Wedding-date
+availability stays under the independent vendor-special slot authority until
+a separately scoped combined entry experience is approved.
+
+## 2026-11-12: Wedding membership grants a scope, not another account
+
+Two partners remain independently authenticated. Active membership resolves a
+canonical owner/plan/workspace tuple for shared Wedding records, while personal
+messages, diary, contacts, databases, files and AI memory remain account-only.
+Contacts cross the boundary as encrypted, selected-field snapshots. Shared AI,
+search, cache, export and live delivery must resolve the same server-side scope;
+visual Wedding context and prompt instructions are not authorisation.
+
 ## 2026-11-10 — Quote models extract evidence; deterministic code calculates money
 
 - The public venue quote tool may send proposal text to the configured model

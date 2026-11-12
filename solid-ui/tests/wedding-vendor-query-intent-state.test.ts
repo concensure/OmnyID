@@ -5,6 +5,7 @@ import {
   mergeWeddingVendorPreferenceLabels,
   weddingVendorQueryGooglePlaceTypes,
   weddingVendorQueryIntent,
+  weddingVendorScopedProviderQuery,
 } from "@/lib/weddingVendorQueryIntentState";
 import { rankWeddingVendorCandidates } from "@/lib/weddingVendorRankingState";
 
@@ -68,6 +69,28 @@ test("a venue-scoped comparison excludes a known photographer category", () => {
   });
   assert.equal(result.verify.length, 0);
   assert.match(result.excluded[0]?.exclusionReason ?? "", /category is photographer, not venue/);
+});
+
+test("a selected category replaces generic vendor wording in the provider fallback", () => {
+  assert.deepEqual(
+    weddingVendorScopedProviderQuery({
+      query: "wedding vendors in Sydney, Australia",
+      selectedCategory: "Celebrants",
+      fallbackArea: "Sydney",
+    }),
+    { category: "officiant", query: "wedding Celebrant Sydney Australia" },
+  );
+});
+
+test("matching category wording keeps the couple's exact provider query", () => {
+  assert.deepEqual(
+    weddingVendorScopedProviderQuery({
+      query: "rustic wedding venues in Sydney",
+      selectedCategory: "Venue",
+      fallbackArea: "Sydney",
+    }),
+    { category: "venue", query: "rustic wedding venues in Sydney" },
+  );
 });
 
 test("a venue-scoped comparison excludes an explicit combined hair and makeup category", () => {

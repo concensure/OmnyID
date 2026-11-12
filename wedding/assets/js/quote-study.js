@@ -145,13 +145,16 @@
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
-    if (!form.reportValidity()) return;
     const text = quoteText.value.trim();
     if (text.length < 40 || text.length > 20_000) {
       setStatus("Paste between 40 and 20,000 characters of quote wording.", "error");
       quoteText.focus();
       return;
     }
+    // The quote may come from the local text-file reader rather than a typing
+    // interaction. Validate that canonical in-memory text first so native
+    // `required` handling cannot reject a valid uploaded quote.
+    if (!form.reportValidity()) return;
     submit.disabled = true;
     results.hidden = true;
     setStatus("Analysing the quote against exact source wording…");

@@ -50,6 +50,10 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
             post(create_link_http),
         )
         .route(
+            "/admin/wedding/celebrant-management/links/batch",
+            post(create_links_batch_http),
+        )
+        .route(
             "/admin/wedding/celebrant-management/links/{grant_id}/revoke",
             post(revoke_link_http),
         )
@@ -299,6 +303,15 @@ async fn admin_dashboard_http(
         .iter()
         .filter_map(|row| row.get("completed_venue_enquiries")?.as_i64())
         .sum::<i64>();
+    let consultations_enabled =
+        std::env::var("OMNYID_CELEBRANT_CONSULTATIONS_ENABLED").as_deref() == Ok("true");
+    let phone_verification_configured = [
+        "OMNYID_TWILIO_ACCOUNT_SID",
+        "OMNYID_TWILIO_AUTH_TOKEN",
+        "OMNYID_TWILIO_VERIFY_SERVICE_SID",
+    ]
+    .iter()
+    .all(|name| crate::secret_manager::read_process_secret_trimmed(name).is_some());
     Ok(Json(json!({"vendors":rows.into_iter().map(|row|json!({
         "vendor_id":row.get::<String,_>("vendor_id"),"vendor_slug":row.get::<String,_>("vendor_slug"),
         "vendor_name":row.get::<String,_>("vendor_name"),"service_area":row.get::<String,_>("service_area"),
@@ -324,6 +337,12 @@ async fn admin_dashboard_http(
         },
         "timezone":"Australia/Sydney",
         "generated_at":Utc::now().to_rfc3339()
+    },
+    "readiness":{
+        "management_links_configured":pepper().is_some(),
+        "consultations_enabled":consultations_enabled,
+        "phone_verification_configured":phone_verification_configured,
+        "notice":if !consultations_enabled { "Consultation rollout is disabled globally; individual celebrant setup may still be prepared." } else if !phone_verification_configured { "Consultations are enabled but couple phone verification is not configured." } else { "Consultation runtime gates are configured; individual eligibility still applies." }
     }})))
 }
 
@@ -339,13 +358,38 @@ struct CreateLinkRequest {
     expires_in_days: Option<i64>,
 }
 
-async fn create_link_http(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-    Json(request): Json<CreateLinkRequest>,
-) -> Result<Json<Value>, (StatusCode, String)> {
-    let user = operator(&state, &headers, "celebrant-management-link-create").await?;
-    let days = request.expires_in_days.unwrap_or(14);
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CreateLinksBatchRequest {
+    vendor_ids: Vec<String>,
+    expires_in_days: Option<i64>,
+    replace_active: Option<bool>,
+}
+
+fn normalize_batch_vendor_ids(
+    values: &[String],
+) -> Result<std::collections::BTreeSet<String>, (StatusCode, String)> {
+    let vendor_ids = values
+        .iter()
+        .map(|value| clean(value, 160))
+        .filter(|value| !value.is_empty())
+        .collect::<std::collections::BTreeSet<_>>();
+    if vendor_ids.is_empty() || vendor_ids.len() > 100 {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Choose between 1 and 100 celebrants.".into(),
+        ));
+    }
+    Ok(vendor_ids)
+}
+
+async fn create_link_for_vendor(
+    state: &AppState,
+    user_id: &str,
+    vendor_id: &str,
+    days: i64,
+    replace_active: bool,
+) -> Result<Value, (StatusCode, String)> {
     if !(1..=MAX_GRANT_DAYS).contains(&days) {
         return Err((
             StatusCode::BAD_REQUEST,
@@ -356,25 +400,45 @@ async fn create_link_http(
         StatusCode::SERVICE_UNAVAILABLE,
         "Secure vendor links are not configured.".into(),
     ))?;
-    let vendor_id = clean(&request.vendor_id, 160);
-    let vendor = sqlx::query("SELECT vendor_slug,vendor_name FROM wedding_vendors WHERE vendor_id=$1 AND status='active' AND lower(category)='celebrant'")
-        .bind(&vendor_id).fetch_optional(&state.db.pool).await.map_err(db_error)?.ok_or((StatusCode::NOT_FOUND,"Celebrant listing not found.".into()))?;
+    let vendor_id = clean(vendor_id, 160);
+    let mut tx = state.db.pool.begin().await.map_err(db_error)?;
+    // Serialise even the first grant for a vendor. Locking only a grant row is
+    // insufficient when there is no row yet and two batch requests arrive at
+    // the same time.
+    let vendor = sqlx::query("SELECT vendor_slug,vendor_name FROM wedding_vendors WHERE vendor_id=$1 AND status='active' AND lower(category)='celebrant' FOR UPDATE")
+        .bind(&vendor_id).fetch_optional(&mut *tx).await.map_err(db_error)?.ok_or((StatusCode::NOT_FOUND,"Celebrant listing not found.".into()))?;
+    let active = sqlx::query_scalar::<_, String>(
+        "SELECT grant_id FROM wedding_celebrant_management_grants WHERE vendor_id=$1 AND status IN ('active','exchanged') AND expires_at>NOW() ORDER BY created_at DESC LIMIT 1 FOR UPDATE",
+    )
+    .bind(&vendor_id)
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(db_error)?;
+    if active.is_some() && !replace_active {
+        return Err((
+            StatusCode::CONFLICT,
+            "This celebrant already has an active link. Keep it or explicitly replace it.".into(),
+        ));
+    }
     let token = fresh_secret("wcc");
     let prefix = token_prefix(&token, "wcc").ok_or_else(unavailable)?;
     let digest = mac(&pepper, &token).ok_or_else(unavailable)?;
     let grant_id = format!("wcc_grant_{}", Ulid::new());
     let expires_at = Utc::now() + ChronoDuration::days(days);
-    let mut tx = state.db.pool.begin().await.map_err(db_error)?;
     let generation = sqlx::query_scalar::<_, i64>("SELECT COALESCE(MAX(generation),0)+1 FROM wedding_celebrant_management_grants WHERE vendor_id=$1")
         .bind(&vendor_id).fetch_one(&mut *tx).await.map_err(db_error)?;
-    let rotated = sqlx::query_scalar::<_, String>("UPDATE wedding_celebrant_management_grants SET status='rotated',revoked_at=NOW() WHERE vendor_id=$1 AND status IN ('active','exchanged') RETURNING grant_id")
-        .bind(&vendor_id).fetch_all(&mut *tx).await.map_err(db_error)?;
+    let rotated = if replace_active {
+        sqlx::query_scalar::<_, String>("UPDATE wedding_celebrant_management_grants SET status='rotated',revoked_at=NOW() WHERE vendor_id=$1 AND status IN ('active','exchanged') RETURNING grant_id")
+            .bind(&vendor_id).fetch_all(&mut *tx).await.map_err(db_error)?
+    } else {
+        Vec::new()
+    };
     if !rotated.is_empty() {
         sqlx::query("UPDATE wedding_celebrant_management_sessions SET consumed_at=COALESCE(consumed_at,NOW()) WHERE grant_id=ANY($1)")
             .bind(&rotated).execute(&mut *tx).await.map_err(db_error)?;
     }
     sqlx::query("INSERT INTO wedding_celebrant_management_grants(grant_id,vendor_id,token_prefix,token_digest,generation,expires_at,created_by_user_id) VALUES($1,$2,$3,$4,$5,$6,$7)")
-        .bind(&grant_id).bind(&vendor_id).bind(prefix).bind(digest).bind(generation).bind(expires_at).bind(&user.id)
+        .bind(&grant_id).bind(&vendor_id).bind(prefix).bind(digest).bind(generation).bind(expires_at).bind(user_id)
         .execute(&mut *tx).await.map_err(db_error)?;
     record_event(
         &mut tx,
@@ -382,15 +446,62 @@ async fn create_link_http(
         &vendor_id,
         "link_created",
         &format!("link-{grant_id}"),
-        json!({"generation":generation,"rotated":rotated.len()}),
+        json!({"generation":generation,"rotated":rotated.len(),"batch_safe":!replace_active}),
     )
     .await?;
     tx.commit().await.map_err(db_error)?;
-    Ok(Json(json!({
-        "grant_id":grant_id,"vendor_slug":vendor.get::<String,_>("vendor_slug"),"vendor_name":vendor.get::<String,_>("vendor_name"),
+    Ok(json!({
+        "grant_id":grant_id,"vendor_id":vendor_id,"vendor_slug":vendor.get::<String,_>("vendor_slug"),"vendor_name":vendor.get::<String,_>("vendor_name"),
         "management_url":format!("{}/workspace/vendor.html#celebrant_management={token}",management_base_url()),
         "expires_at":expires_at.to_rfc3339(),"generation":generation,"rotated_previous_links":!rotated.is_empty(),
         "notice":"This private link is shown once and manages only this celebrant's consultation availability."
+    }))
+}
+
+async fn create_link_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(request): Json<CreateLinkRequest>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    let user = operator(&state, &headers, "celebrant-management-link-create").await?;
+    let days = request.expires_in_days.unwrap_or(14);
+    Ok(Json(
+        create_link_for_vendor(&state, &user.id, &request.vendor_id, days, true).await?,
+    ))
+}
+
+async fn create_links_batch_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(request): Json<CreateLinksBatchRequest>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    let user = operator(&state, &headers, "celebrant-management-link-batch").await?;
+    let days = request.expires_in_days.unwrap_or(14);
+    if !(1..=MAX_GRANT_DAYS).contains(&days) {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Expiry must be between 1 and 14 days.".into(),
+        ));
+    }
+    let vendor_ids = normalize_batch_vendor_ids(&request.vendor_ids)?;
+    let replace_active = request.replace_active.unwrap_or(false);
+    let mut created = Vec::new();
+    let mut skipped = Vec::new();
+    for vendor_id in vendor_ids {
+        match create_link_for_vendor(&state, &user.id, &vendor_id, days, replace_active).await {
+            Ok(link) => created.push(link),
+            Err((status, message)) => skipped.push(json!({
+                "vendor_id":vendor_id,
+                "status":status.as_u16(),
+                "reason":message,
+            })),
+        }
+    }
+    Ok(Json(json!({
+        "created":created,
+        "skipped":skipped,
+        "replace_active":replace_active,
+        "notice":"Bearer links are returned once. They are not stored in plaintext or included in analytics."
     })))
 }
 
@@ -780,5 +891,26 @@ mod tests {
         assert_ne!(token, fresh_secret("wcc"));
         assert!(token_prefix(&token, "wcc").is_some());
         assert!(token_prefix(&token, "wvs").is_none());
+    }
+
+    #[test]
+    fn batch_ids_are_trimmed_deduplicated_and_bounded() {
+        let ids = normalize_batch_vendor_ids(&[
+            " celebrant-b ".into(),
+            "celebrant-a".into(),
+            "celebrant-b".into(),
+            "".into(),
+        ])
+        .expect("valid batch");
+        assert_eq!(
+            ids.into_iter().collect::<Vec<_>>(),
+            vec!["celebrant-a", "celebrant-b"]
+        );
+        assert!(normalize_batch_vendor_ids(&[]).is_err());
+        assert!(normalize_batch_vendor_ids(&vec!["vendor".into(); 101]).is_ok());
+        let unique = (0..101)
+            .map(|index| format!("vendor-{index}"))
+            .collect::<Vec<_>>();
+        assert!(normalize_batch_vendor_ids(&unique).is_err());
     }
 }

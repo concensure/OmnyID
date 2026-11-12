@@ -151,7 +151,7 @@ import {
 } from "@/lib/weddingVendorSearchExecutorState";
 import { runWeddingVendorDirectoryFirstSearch } from "@/lib/weddingVendorDirectoryFirstSearchState";
 import { weddingVendorDirectorySearchPlans } from "@/lib/weddingVendorDirectorySearchPlanState";
-import { mergeWeddingVendorPreferenceLabels, weddingVendorQueryGooglePlaceTypes, weddingVendorQueryIntent } from "@/lib/weddingVendorQueryIntentState";
+import { mergeWeddingVendorPreferenceLabels, weddingVendorQueryGooglePlaceTypes, weddingVendorQueryIntent, weddingVendorScopedProviderQuery } from "@/lib/weddingVendorQueryIntentState";
 import { useWeddingVendorShortlistLaunch } from "@/lib/useWeddingVendorShortlistLaunch";
 import { weddingVendorRankingPolicyV2Enabled } from "@/lib/weddingVendorRankingV2State";
 import { parseGuestCount } from "@/lib/weddingVendorRankingState";
@@ -283,14 +283,6 @@ function normalizedVowPreferenceAnswer(value: string): "" | "standard" | "create
 
 function linesFromText(value: string): string[] {
   return value.split(/\n|,/).map((item) => item.trim()).filter(Boolean);
-}
-
-function vendorSearchQueryWithFallbackArea(query: string, area: string): string {
-  const normalizedQuery = query.replace(/\s+/g, " ").trim();
-  const normalizedArea = area.replace(/\s+/g, " ").trim();
-  if (!normalizedQuery || !normalizedArea) return normalizedQuery;
-  if (/\b(in|near|around|within)\s+[\p{L}\p{N}]/iu.test(normalizedQuery)) return normalizedQuery;
-  return `${normalizedQuery} near ${normalizedArea}`.slice(0, 280);
 }
 
 export function ResponseQueueView(props: {
@@ -1737,12 +1729,18 @@ export function ResponseQueueView(props: {
       const plannedQueries = plan.providerPlans
         .flatMap((providerPlan) => providerPlan.queries)
         .slice(0, 8);
+      const selectedSearchCategory = options?.category ?? queryIntent.categoryLabel ?? effectiveCategoryLabels[0] ?? null;
+      const scopedProviderQuery = weddingVendorScopedProviderQuery({
+        query: freeformQuery,
+        selectedCategory: selectedSearchCategory,
+        fallbackArea: weddingVendorSearchServiceArea(),
+      });
       const freeformQueries = freeformQuery
         ? configuredProviderKinds.map((providerKind) => ({
           providerKind,
-          category: queryIntent.category ?? "custom_vendor_search",
-          query: vendorSearchQueryWithFallbackArea(freeformQuery, weddingVendorSearchServiceArea()),
-          googlePlaceTypes: providerKind === "google_places" ? weddingVendorQueryGooglePlaceTypes(queryIntent.category) : [],
+          category: scopedProviderQuery.category ?? "custom_vendor_search",
+          query: scopedProviderQuery.query,
+          googlePlaceTypes: providerKind === "google_places" ? weddingVendorQueryGooglePlaceTypes(scopedProviderQuery.category) : [],
           overpassTags: providerKind === "overpass" ? ["name~wedding"] : [],
           expectedFields: plannedQueries.find((query) => query.providerKind === providerKind)?.expectedFields
             ?? ["name", "website", "phone", "address", "rating", "review count", "source"],

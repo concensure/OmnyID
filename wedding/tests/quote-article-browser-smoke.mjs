@@ -32,6 +32,7 @@ try {
   });
   await page.goto(`${origin}/wedding/blog/before-you-accept-that-wedding-quote.html`, { waitUntil: 'domcontentloaded' });
   if ((await page.locator('#quoteStudyStatus').innerText()).includes('not accepting')) throw new Error('Article still renders the disabled research-preview state');
+  if (await page.locator('#quoteStudyText').getAttribute('required') !== null) throw new Error('Native required validation can reject an already-read quote file');
   await page.locator('#quoteStudyGuests').fill('80');
   if (await page.locator('#quoteStudySubmit').isEnabled()) throw new Error('Analyse quote should wait for quote wording');
   await page.locator('#quoteStudyFile').setInputFiles({
