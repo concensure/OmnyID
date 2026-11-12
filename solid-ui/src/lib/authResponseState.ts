@@ -27,6 +27,7 @@ function normalizeAuthUser(value: unknown): Session["user"] | undefined {
     email: value.email,
     display_name: value.display_name,
     auth_provider: value.auth_provider,
+    operator: value.operator === true,
   };
 }
 

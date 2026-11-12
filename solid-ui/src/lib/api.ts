@@ -138,6 +138,7 @@ export type Session = {
     email: string;
     display_name: string;
     auth_provider: string;
+    operator?: boolean;
   };
 };
 
@@ -4091,10 +4092,10 @@ export const verifyEmailToken = (token: string): Promise<VerifyEmailResponse> =>
       experience: value.experience === "wedding" ? "wedding" : value.experience === "vendor" ? "vendor" : "generic",
     };
   });
-export const authenticateWithGoogleIdToken = (idToken: string, acquisitionVisitId?: string | null): Promise<AuthApiResponse> =>
+export const authenticateWithGoogleIdToken = (idToken: string, acquisitionVisitId?: string | null, source?: string | null): Promise<AuthApiResponse> =>
   publicApiFetch<unknown>("/auth/google", {
     method: "POST",
-    bodyJson: { id_token: idToken, ...(acquisitionVisitId ? { acquisition_visit_id: acquisitionVisitId } : {}) },
+    bodyJson: { id_token: idToken, ...(acquisitionVisitId ? { acquisition_visit_id: acquisitionVisitId } : {}), ...(source ? { source } : {}) },
   }).then(parseAuthApiResponse);
 export const authenticateWithPassword = (args: {
   mode: "login" | "register";
@@ -4744,6 +4745,70 @@ export const postAgentMessage = (body: {
     method: "POST",
     bodyJson: body,
   }).then(normalizeOkResponse);
+
+export type WeddingPartnerMember = {
+  user_id: string;
+  display_name: string;
+  role: "owner" | "co_owner";
+  joined_at: string;
+};
+
+export type WeddingSharedContact = {
+  share_id: string;
+  shared_by_user_id: string;
+  updated_at: string;
+  contact: {
+    name: string;
+    email?: string | null;
+    phone?: string | null;
+    relationship_kind?: string | null;
+    roles: string[];
+  };
+};
+
+const weddingPartnerScopeQuery = (weddingPlanId: string, responseWorkspaceId: string) =>
+  `wedding_plan_id=${encodeURIComponent(weddingPlanId)}&response_workspace_id=${encodeURIComponent(responseWorkspaceId)}`;
+
+export const listWeddingPartnerMembers = (weddingPlanId: string, responseWorkspaceId: string) =>
+  apiFetch<{ members: WeddingPartnerMember[] }>(`/wedding/partners?${weddingPartnerScopeQuery(weddingPlanId, responseWorkspaceId)}`);
+
+export const inviteWeddingPartner = (input: { weddingPlanId: string; responseWorkspaceId: string; email: string }) =>
+  apiFetch<{ invite_id: string; invite_url: string; delivered: boolean; expires_in_days: number }>("/wedding/partners/invites", {
+    method: "POST",
+    bodyJson: { wedding_plan_id: input.weddingPlanId, response_workspace_id: input.responseWorkspaceId, email: input.email },
+  });
+
+export const acceptWeddingPartnerInvite = (token: string) =>
+  apiFetch<{ accepted: boolean; wedding_plan_id: string; response_workspace_id: string }>("/wedding/partners/invites/accept", {
+    method: "POST",
+    bodyJson: { token },
+  });
+
+export const shareWeddingContact = (input: {
+  weddingPlanId: string;
+  responseWorkspaceId: string;
+  recipientUserId: string;
+  contactRef: string;
+  contact: { name: string; email?: string; phone?: string; relationshipKind?: string; roles?: string[] };
+}) => apiFetch<{ shared: boolean; share_id: string }>("/wedding/partners/contacts", {
+  method: "POST",
+  bodyJson: {
+    wedding_plan_id: input.weddingPlanId,
+    response_workspace_id: input.responseWorkspaceId,
+    recipient_user_id: input.recipientUserId,
+    contact_ref: input.contactRef,
+    contact: {
+      name: input.contact.name,
+      email: input.contact.email,
+      phone: input.contact.phone,
+      relationship_kind: input.contact.relationshipKind,
+      roles: input.contact.roles ?? [],
+    },
+  },
+});
+
+export const listWeddingSharedContacts = (weddingPlanId: string, responseWorkspaceId: string) =>
+  apiFetch<{ contacts: WeddingSharedContact[] }>(`/wedding/partners/contacts?${weddingPartnerScopeQuery(weddingPlanId, responseWorkspaceId)}`);
 export const saveThreadMessage = (payload: Record<string, unknown>) =>
   apiFetch<unknown>("/messages", {
     method: "POST",
@@ -6787,6 +6852,7 @@ export function normalizeAuthUser(value: unknown): Session["user"] {
     email: value.email,
     display_name: apiString(value.display_name, value.email),
     auth_provider: apiString(value.auth_provider),
+    operator: value.operator === true,
   };
 }
 

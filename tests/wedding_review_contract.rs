@@ -16,6 +16,8 @@ const MODERATION_MIGRATION: &str =
     include_str!("../postgres/migrations/0166_wedding_review_moderation.sql");
 const VENDOR_BOUNDARY_MIGRATION: &str =
     include_str!("../postgres/migrations/0167_wedding_review_vendor_boundary.sql");
+const PARTNER_SHARING_MIGRATION: &str =
+    include_str!("../postgres/migrations/0168_wedding_partner_sharing.sql");
 const ROUTES: &str = include_str!("../src/server/wedding_review_routes.rs");
 const EVIDENCE_ROUTES: &str = include_str!("../src/server/wedding_review_evidence_routes.rs");
 const EVIDENCE_OPERATOR_ROUTES: &str =
@@ -52,9 +54,13 @@ fn migration_keeps_private_content_out_of_control_and_event_rows() {
 #[test]
 fn migration_deduplicates_partner_reviews_by_canonical_wedding_subject() {
     assert!(MIGRATION.contains("uq_wedding_reviews_planner_workspace"));
-    assert!(MIGRATION.contains("wedding_plan_id, response_workspace_id, vendor_id"));
     assert!(MIGRATION.contains("uq_wedding_reviews_vendor_workspace"));
-    assert!(!MIGRATION.contains("owner_user_id, vendor_id)\n    WHERE subject_kind = 'vendor'"));
+    assert!(PARTNER_SHARING_MIGRATION.contains(
+        "owner_user_id, wedding_plan_id, response_workspace_id, vendor_id"
+    ));
+    assert!(PARTNER_SHARING_MIGRATION.contains(
+        "owner_user_id, wedding_plan_id, response_workspace_id)"
+    ));
 }
 
 #[test]
@@ -123,6 +129,7 @@ fn receipt_contract_is_content_light_and_scoped_to_authenticated_actor() {
 fn expected_revision_and_partner_safe_canonical_lock_are_both_enforced() {
     assert!(ROUTES.contains("current_revision != i64::try_from(request.expected_revision)"));
     assert!(ROUTES.contains("vendor_id IS NOT DISTINCT FROM $4 FOR UPDATE"));
+    assert!(ROUTES.contains("AND owner_user_id=$5 FOR UPDATE"));
     assert!(ROUTES.contains("ON CONFLICT (owner_user_id,idempotency_key) DO NOTHING"));
     assert!(ROUTES.contains("if review.get::<String, _>(\"owner_user_id\") == user.id"));
 }

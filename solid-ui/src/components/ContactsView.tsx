@@ -56,6 +56,7 @@ export function ContactsView() {
   const sessionUserId = readSession()?.user?.id ?? null;
   const [contacts, setContacts] = createSignal<Contact[]>(loadContacts(sessionUserId));
   const [filter, setFilter] = createSignal("");
+  const [roleFilter, setRoleFilter] = createSignal("all");
   const [showAdd, setShowAdd] = createSignal(false);
   const [showImport, setShowImport] = createSignal(false);
   const [newName, setNewName] = createSignal("");
@@ -370,15 +371,17 @@ export function ContactsView() {
 
   const visible = () => {
     const q = filter().toLowerCase();
-    if (!q) return contacts();
-    return contacts().filter(
-      (contact) => contact.name.toLowerCase().includes(q)
+    return contacts().filter((contact) => {
+      const roleMatches = roleFilter() === "all" || (contact.roles ?? []).includes(roleFilter());
+      const searchMatches = !q || contact.name.toLowerCase().includes(q)
         || (contact.email ?? "").toLowerCase().includes(q)
         || (contact.phone ?? "").toLowerCase().includes(q)
         || contact.relationshipKind.toLowerCase().includes(q)
-        || (contact.roles ?? []).some((role) => role.toLowerCase().includes(q)),
-    );
+        || (contact.roles ?? []).some((role) => role.toLowerCase().includes(q));
+      return roleMatches && searchMatches;
+    });
   };
+  const roleOptions = () => Array.from(new Set(contacts().flatMap((contact) => contact.roles ?? []))).sort();
 
   return (
     <div class="min-w-0 animate-fade-in space-y-5">
@@ -595,13 +598,20 @@ export function ContactsView() {
         )}
       </Show>
 
-      <input
-        type="text"
-        placeholder="Find contacts by name, email, phone, role, or follow-up type..."
-        value={filter()}
-        onInput={(e) => setFilter(e.currentTarget.value)}
-        class="w-full rounded-xl border border-white/35 bg-white/30 px-4 py-2 text-sm text-on-surface outline-none transition placeholder:text-on-surface-variant/40 focus:border-primary/40 focus:bg-white/50"
-      />
+      <div class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_13rem]">
+        <input
+          type="text"
+          placeholder="Find contacts by name, email, phone, role, or follow-up type..."
+          value={filter()}
+          onInput={(e) => setFilter(e.currentTarget.value)}
+          class="w-full rounded-xl border border-white/35 bg-white/30 px-4 py-2 text-sm text-on-surface outline-none transition placeholder:text-on-surface-variant/40 focus:border-primary/40 focus:bg-white/50"
+        />
+        <label class="sr-only" for="contacts-role-filter">Filter contacts by role</label>
+        <select id="contacts-role-filter" value={roleFilter()} onChange={(event) => setRoleFilter(event.currentTarget.value)} class="w-full rounded-xl border border-white/35 bg-white/50 px-3 py-2 text-sm text-on-surface outline-none focus:border-primary/40">
+          <option value="all">All contact roles</option>
+          <For each={roleOptions()}>{(role) => <option value={role}>{role}</option>}</For>
+        </select>
+      </div>
 
       <div class="min-w-0 rounded-2xl border border-amber-200/70 bg-amber-50/80 p-4 shadow-sm">
         <div class="flex flex-wrap items-start justify-between gap-3">
@@ -740,7 +750,7 @@ export function ContactsView() {
         when={visible().length > 0}
         fallback={
           <Show
-            when={filter().trim().length > 0}
+            when={filter().trim().length > 0 || roleFilter() !== "all"}
             fallback={<EmptyState icon="CT" title="No contacts yet" body="Add people and agents you communicate with in this workspace." />}
           >
             <EmptyState icon="CT" title="No contacts match this filter" body="Try a broader name or email search." />

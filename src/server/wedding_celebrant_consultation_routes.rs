@@ -1362,12 +1362,17 @@ struct OperatorVerificationRequest {
 async fn operator_verification_http(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
-    Json(request): Json<OperatorVerificationRequest>,
+    request: Request,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let user = authenticated_user(&state.db, &headers).await?;
     if !super::cost_controls::operator_access_allowed(&user.email) {
         return Err((StatusCode::FORBIDDEN, "Operator access is required.".into()));
     }
+    let bytes = axum::body::to_bytes(request.into_body(), 64 * 1024)
+        .await
+        .map_err(|_| (StatusCode::BAD_REQUEST, "Invalid request body.".into()))?;
+    let request: OperatorVerificationRequest = serde_json::from_slice(&bytes)
+        .map_err(|_| (StatusCode::UNPROCESSABLE_ENTITY, "Invalid verification decision.".into()))?;
     enforce_rate_limit(
         &state,
         authenticated_rate_limit_key("celebrant-register-verification", &headers),
@@ -1466,5 +1471,13 @@ mod tests {
         assert!(token.starts_with("ccs_"));
         assert!(token.len() > 40);
         assert_ne!(token, random_token("ccs"));
+    }
+
+    #[test]
+    fn operator_auth_precedes_verification_body_parsing() {
+        let source = include_str!("wedding_celebrant_consultation_routes.rs");
+        let start = source.find("async fn operator_verification_http(").unwrap();
+        let body = &source[start..];
+        assert!(body.find("authenticated_user(&state.db, &headers)").unwrap() < body.find("to_bytes(request.into_body()").unwrap());
     }
 }

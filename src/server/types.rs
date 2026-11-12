@@ -135,6 +135,7 @@ pub(super) struct LoginRequest {
 pub(super) struct GoogleAuthRequest {
     pub(super) id_token: String,
     pub(super) acquisition_visit_id: Option<String>,
+    pub(super) source: Option<String>,
 }
 
 #[derive(serde::Serialize)]
@@ -436,6 +437,10 @@ pub(super) struct SessionUserResponse {
     pub(super) email: String,
     pub(super) display_name: String,
     pub(super) auth_provider: String,
+    /// Presentation hint derived from the same server allowlist that protects
+    /// operator routes. This is not an authorisation grant: every operator
+    /// command still re-checks the authenticated account server-side.
+    pub(super) operator: bool,
 }
 
 #[derive(serde::Serialize)]

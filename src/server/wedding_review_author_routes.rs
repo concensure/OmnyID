@@ -214,11 +214,13 @@ async fn list_status_http(
     let sql = format!(
         "{STATUS_SELECT}
          WHERE review.wedding_plan_id=$1
-           AND EXISTS(SELECT 1 FROM wedding_user_onboarding_state owner
-                      WHERE owner.user_id=$2 AND owner.wedding_plan_id=review.wedding_plan_id)
-           AND (review.owner_user_id=$2 OR EXISTS(
-                SELECT 1 FROM wedding_review_revisions authored
-                WHERE authored.review_id=review.review_id AND authored.authored_by_user_id=$2))
+           AND ((review.owner_user_id=$2 AND EXISTS(
+                       SELECT 1 FROM wedding_user_onboarding_state owner
+                       WHERE owner.user_id=$2 AND owner.wedding_plan_id=review.wedding_plan_id))
+                OR EXISTS(SELECT 1 FROM wedding_plan_memberships member
+                          WHERE member.member_user_id=$2 AND member.wedding_plan_id=review.wedding_plan_id
+                            AND member.response_workspace_id=review.response_workspace_id
+                            AND member.wedding_owner_user_id=review.owner_user_id AND member.status='active'))
          {STATUS_GROUP}
          ORDER BY review.updated_at DESC,review.review_id
          LIMIT $3"
@@ -257,11 +259,13 @@ async fn review_status_http(
     let sql = format!(
         "{STATUS_SELECT}
          WHERE review.review_id=$1
-           AND EXISTS(SELECT 1 FROM wedding_user_onboarding_state owner
-                      WHERE owner.user_id=$2 AND owner.wedding_plan_id=review.wedding_plan_id)
-           AND (review.owner_user_id=$2 OR EXISTS(
-                SELECT 1 FROM wedding_review_revisions authored
-                WHERE authored.review_id=review.review_id AND authored.authored_by_user_id=$2))
+           AND ((review.owner_user_id=$2 AND EXISTS(
+                       SELECT 1 FROM wedding_user_onboarding_state owner
+                       WHERE owner.user_id=$2 AND owner.wedding_plan_id=review.wedding_plan_id))
+                OR EXISTS(SELECT 1 FROM wedding_plan_memberships member
+                          WHERE member.member_user_id=$2 AND member.wedding_plan_id=review.wedding_plan_id
+                            AND member.response_workspace_id=review.response_workspace_id
+                            AND member.wedding_owner_user_id=review.owner_user_id AND member.status='active'))
          {STATUS_GROUP}"
     );
     let row = sqlx::query(&sql)
@@ -317,9 +321,13 @@ async fn review_draft_http(
          JOIN wedding_review_revisions revision
            ON revision.review_id=review.review_id AND revision.revision=review.current_revision
          WHERE review.review_id=$1
-           AND EXISTS(SELECT 1 FROM wedding_user_onboarding_state owner
-                      WHERE owner.user_id=$2 AND owner.wedding_plan_id=review.wedding_plan_id)
-           AND (review.owner_user_id=$2 OR revision.authored_by_user_id=$2)",
+           AND ((review.owner_user_id=$2 AND EXISTS(
+                       SELECT 1 FROM wedding_user_onboarding_state owner
+                       WHERE owner.user_id=$2 AND owner.wedding_plan_id=review.wedding_plan_id))
+                OR EXISTS(SELECT 1 FROM wedding_plan_memberships member
+                          WHERE member.member_user_id=$2 AND member.wedding_plan_id=review.wedding_plan_id
+                            AND member.response_workspace_id=review.response_workspace_id
+                            AND member.wedding_owner_user_id=review.owner_user_id AND member.status='active'))",
     )
     .bind(&review_id).bind(&user.id)
     .fetch_optional(&state.db.pool).await.map_err(store_error)?
@@ -430,7 +438,7 @@ async fn withdraw_review_http(
         return Ok(Json(reply));
     }
     let review = sqlx::query(
-        "SELECT review.owner_user_id,review.wedding_plan_id,review.status,
+        "SELECT review.owner_user_id,review.wedding_plan_id,review.response_workspace_id,review.status,
                 review.current_revision,revision.authored_by_user_id
          FROM wedding_reviews review
          JOIN wedding_review_revisions revision
@@ -443,18 +451,21 @@ async fn withdraw_review_http(
     .map_err(store_error)?
     .ok_or_else(unavailable)?;
     let owns_plan: bool = sqlx::query_scalar(
-        "SELECT EXISTS(SELECT 1 FROM wedding_user_onboarding_state
-                       WHERE user_id=$1 AND wedding_plan_id=$2)",
+        "SELECT ($1=$4 AND EXISTS(SELECT 1 FROM wedding_user_onboarding_state
+                                  WHERE user_id=$1 AND wedding_plan_id=$2))
+                OR EXISTS(SELECT 1 FROM wedding_plan_memberships
+                          WHERE member_user_id=$1 AND wedding_plan_id=$2
+                            AND response_workspace_id=$3 AND wedding_owner_user_id=$4
+                            AND status='active')",
     )
     .bind(&user.id)
     .bind(review.get::<String, _>("wedding_plan_id"))
+    .bind(review.get::<String, _>("response_workspace_id"))
+    .bind(review.get::<String, _>("owner_user_id"))
     .fetch_one(&mut *transaction)
     .await
     .map_err(store_error)?;
-    if !owns_plan
-        || (review.get::<String, _>("owner_user_id") != user.id
-            && review.get::<String, _>("authored_by_user_id") != user.id)
-    {
+    if !owns_plan {
         return Err(unavailable());
     }
     let revision: i64 = review.get("current_revision");

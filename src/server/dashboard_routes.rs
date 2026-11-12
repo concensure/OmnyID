@@ -48,6 +48,13 @@ fn dashboard_message_cache_key(user_id: &str, limit: usize) -> String {
     format!("{user_id}:{limit}")
 }
 
+pub(super) fn invalidate_dashboard_message_cache(user_id: &str) {
+    if let Ok(mut cache) = dashboard_message_cache().lock() {
+        let prefix = format!("{user_id}:");
+        cache.retain(|key, _| !key.starts_with(&prefix));
+    }
+}
+
 fn dashboard_user_facing_text(
     text: &str,
     active_persona: Option<&crate::agent_personas::AgentPersona>,
@@ -3339,6 +3346,7 @@ mod tests {
                 email: "user@example.com".to_string(),
                 display_name: "User".to_string(),
                 auth_provider: "password".to_string(),
+                operator: false,
             },
             Vec::new(),
             None,

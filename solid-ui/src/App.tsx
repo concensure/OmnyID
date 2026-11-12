@@ -38,6 +38,7 @@ import {
 import {
   authenticateWithGoogleIdToken,
   authenticateWithPassword,
+  acceptWeddingPartnerInvite,
   apiFetch,
   API_BASE,
   type AttachmentIngestCapabilities,
@@ -178,6 +179,7 @@ import { weddingNavigationCalendarTarget } from "@/lib/weddingNavigationCalendar
 import {
   consumeWeddingNavigationIntent,
   loadWeddingNavigationIntent,
+  saveWeddingNavigationIntent,
 } from "@/lib/weddingNavigationLocalState";
 import {
   buildWeddingPlannerHomeIntent,
@@ -1176,6 +1178,32 @@ function App() {
       || new URLSearchParams(window.location.search).get("from") === "quiz",
   });
   const [session, setSession] = createSignal(initialSession);
+  let partnerInviteClaimStarted = false;
+  createEffect(() => {
+    if (partnerInviteClaimStarted || !session()?.token) return;
+    const match = window.location.hash.match(/(?:^#|&)wedding-partner-invite=([^&]+)/);
+    if (!match?.[1]) return;
+    partnerInviteClaimStarted = true;
+    const token = decodeURIComponent(match[1]);
+    void acceptWeddingPartnerInvite(token)
+      .then((accepted) => {
+        saveWeddingNavigationIntent(buildWeddingPlannerHomeIntent({
+          weddingPlanId: accepted.wedding_plan_id,
+          responseWorkspaceId: accepted.response_workspace_id,
+          sourceResponseId: null,
+          metadata: {
+            wedding_membership: "co_owner",
+            wedding_plan_id: accepted.wedding_plan_id,
+            response_workspace_id: accepted.response_workspace_id,
+          },
+        }));
+        window.history.replaceState(window.history.state, "", `${window.location.pathname}${window.location.search}`);
+        window.location.reload();
+      })
+      .catch(() => {
+        partnerInviteClaimStarted = false;
+      });
+  });
   const [personaFabVisible, setPersonaFabVisible] = createSignal(true);
   // Declared early: userId/workspaceBootstrap are read synchronously by several
   // createMemo initializers further down (e.g. studyLensDashboard, weddingArrivalBanner),
@@ -1234,7 +1262,7 @@ function App() {
   const initialParaViewEnabled = loadParaViewPreference();
   const initialPreferredView = normalizeViewName(_prefs.activeView) ?? "search";
   const initialHistoryView = appViewFromBrowserHistory(window.history.state, window.location.href);
-  const initialAdminAccount = (readSession()?.user?.email ?? "").trim().toLowerCase() === "concensure@gmail.com";
+  const initialAdminAccount = readSession()?.user?.operator === true;
   const initialWeddingLens = !initialAdminAccount && (
     ["wedding", "marketing", "wedding_quiz"].includes(new URLSearchParams(window.location.search).get("source") ?? "")
     || Boolean(loadWeddingEntrySource(initUserId))
@@ -3325,7 +3353,7 @@ function App() {
             setServerOffline(false);
             if (pendingVendorAuthSource) return void window.location.assign(vendorPortalUrlFromDeepLink());
             const loginUserId = readSession()?.user?.id ?? "";
-            if (readSession()?.user?.email?.trim().toLowerCase() === "concensure@gmail.com") {
+            if (readSession()?.user?.operator === true) {
               selectView("admin_dashboard");
             }
             if (loginUserId && loadShouldShowGuidedTour(loginUserId)) setShowTour(true);
@@ -3502,7 +3530,7 @@ function App() {
         onQuickControl={openQuickControl}
         userId={userId()}
         sessionEmail={session()?.user?.email}
-        adminAccount={session()?.user?.email?.trim().toLowerCase() === "concensure@gmail.com"}
+        adminAccount={session()?.user?.operator === true}
       />
 
       <Show when={isMobileFocusViewport()}>
@@ -3511,7 +3539,7 @@ function App() {
           advanced={advanced()}
           paraViewEnabled={paraViewEnabled()}
           studyLensEnabled={studyLensEnabled()}
-          adminAccount={session()?.user?.email?.trim().toLowerCase() === "concensure@gmail.com"}
+          adminAccount={session()?.user?.operator === true}
           hideTrigger={activeView() === "response_queue" && (loadWeddingEntrySource(userId()) === "wedding_site" || (primaryUseCaseProfile()?.kind === "wedding_planning" && primaryUseCaseProfile()?.status === "active"))}
           userId={userId()}
           onSelectApp={selectKnownView}
@@ -4280,10 +4308,10 @@ function App() {
               </Suspense>
             </Show>
 
-            <Show when={activeView() === "admin_dashboard" && session()?.user?.email?.trim().toLowerCase() !== "concensure@gmail.com"}>
+            <Show when={activeView() === "admin_dashboard" && session()?.user?.operator !== true}>
               <GuestGate label="Admin dashboard" onSignIn={() => openAuthModalIfSignedOut()} />
             </Show>
-            <Show when={activeView() === "admin_dashboard" && session()?.user?.email?.trim().toLowerCase() === "concensure@gmail.com"}>
+            <Show when={activeView() === "admin_dashboard" && session()?.user?.operator === true}>
               <Suspense fallback={<LazyViewFallback label="Admin dashboard" />}>
                 <div class="view-enter"><LazyUsageView /></div>
               </Suspense>
@@ -5320,7 +5348,7 @@ function AuthModal(props: {
     setGoogleError("");
     props.onClearNotice?.();
     try {
-      const data = await authenticateWithGoogleIdToken(idToken, sameSessionAcquisitionVisitId());
+      const data = await authenticateWithGoogleIdToken(idToken, sameSessionAcquisitionVisitId(), props.signupSource);
       completeAuth(data);
     } catch (err) {
       setError(visibleErrorText(err, "Google sign-in failed."));
@@ -5570,7 +5598,7 @@ function AuthModal(props: {
             ref={(el) => { googleButtonHost = el; }}
             class={`min-h-[44px] rounded-2xl transition ${googleReady() ? "" : "border border-white/30 bg-white/45"}`}
           />
-          <AppleSignInButton onAuthenticated={completeAuth} />
+          <AppleSignInButton onAuthenticated={completeAuth} signupSource={props.signupSource} />
           <Show when={googleLoading()}>
             <p class="text-center text-xs text-on-surface-variant/70">Loading Google sign-in...</p>
           </Show>

@@ -15,6 +15,18 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-364
+    title: Correct public quote readiness, operator routing, and private-by-default partner wedding sharing
+    status: review
+    owner: codex
+    branch: agent/codex/WED-360
+    worktree: C:/temp/wt/omnyid-wed360
+    base_sha: 129677af
+    depends_on: [WED-360, WED-363, WED-355, WED-293]
+    files: [wedding/assets/js/quote-study.js, wedding/tests/**quote**, solid-ui/src/App.tsx, solid-ui/src/lib/api.ts, solid-ui/src/lib/authResponseState.ts, solid-ui/src/components/ContactsView.tsx, solid-ui/src/lib/contactsLocalState.ts, solid-ui/src/lib/**wedding*sharing**, solid-ui/tests/**privacy**, src/server/auth.rs, src/server/types.rs, src/server/dashboard_routes.rs, src/server/user_management_routes/**, src/server/wedding_vendor_portal_routes/publication.rs, src/server/wedding_celebrant_consultation_routes.rs, src/server/**wedding*sharing**, postgres/migrations/0168_wedding_partner_sharing.sql, tests/cross-account-privacy-report.md, .agent/**]
+    acceptance: [a selected text quote immediately makes Analyse quote available and a browser regression proves the upload-only path, operator presentation derives from the same server allowlist as operator APIs and admin accounts never default into Wedding lens, authenticated vendor catalog responses expose only the bounded published planning projection, admin endpoints authenticate before parsing command bodies, wedding registration records the couple role consistently, two authenticated partners can join one explicit revocable wedding membership and read and write the same wedding-plan projection without sharing general account data, contacts remain account-private unless the owner selects exact contacts and roles for an explicit wedding share, shared-contact reads reveal only selected fields and revoke cleanly, remaining review-system integration and exact-SHA Oracle checks pass]
+    progress: "Release candidate prepared on the WED-360 lineage without logging into the admin account. TXT upload readiness is browser-proven; server session authority drives operator UI; Wedding signups consistently receive the couple role; raw vendor research/contact fields are removed from the authenticated planner catalogue; admin commands authenticate before parsing; and explicit revocable co-owner membership shares only exact Wedding AFP projections. Partner acceptance opens the canonical plan, review ownership is canonical-owner scoped even when starter IDs collide, and contacts remain private unless selected and encrypted for one active partner. Full TypeScript, 2,275 Wedding tests, public-site checks, production UI build and cargo checks pass. Exact-SHA Oracle migration/release evidence remains the final gate."
+
   - id: WED-363
     title: Harden the released celebrant journey and connect the public quote article to canonical Quote Intelligence
     status: done

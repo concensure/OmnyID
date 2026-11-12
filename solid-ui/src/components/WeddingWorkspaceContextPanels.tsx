@@ -407,7 +407,7 @@ export function WeddingWorkspaceContextPanels(props: {
       </Show>
 
       <Show when={props.sharePlanOpen}>
-        <WeddingCollaborationAccessCard state={props.state.collaboration} />
+        <WeddingCollaborationAccessCard state={props.state.collaboration} metadata={props.state.workspace.metadata} contactUserId={props.contactUserId} />
       </Show>
 
       <Show when={props.showTechnicalDetails}>

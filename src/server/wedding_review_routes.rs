@@ -405,18 +405,27 @@ async fn save_revision_http(
         tx.commit().await.map_err(store_error)?;
         return Ok(Json(reply));
     }
-    let owns_plan = sqlx::query_scalar::<_, bool>("SELECT EXISTS(SELECT 1 FROM wedding_user_onboarding_state WHERE user_id=$1 AND wedding_plan_id=$2)")
+    let membership_owner_user_id = sqlx::query_scalar::<_, String>(
+        "SELECT wedding_owner_user_id FROM wedding_plan_memberships WHERE member_user_id=$1 AND wedding_plan_id=$2 AND response_workspace_id=$3 AND status='active' LIMIT 1",
+    )
         .bind(&user.id)
         .bind(&validated.plan)
-        .fetch_one(&mut *tx)
+        .bind(&validated.workspace)
+        .fetch_optional(&mut *tx)
         .await
         .map_err(store_error)?;
-    if !owns_plan {
-        return Err((
-            StatusCode::FORBIDDEN,
-            "This review does not belong to this account's wedding.".into(),
-        ));
-    }
+    let owns_direct_plan = sqlx::query_scalar::<_, bool>("SELECT EXISTS(SELECT 1 FROM wedding_user_onboarding_state WHERE user_id=$1 AND wedding_plan_id=$2)")
+        .bind(&user.id).bind(&validated.plan).fetch_one(&mut *tx).await.map_err(store_error)?;
+    let wedding_owner_user_id = match membership_owner_user_id {
+        Some(owner_user_id) => owner_user_id,
+        None if owns_direct_plan => user.id.clone(),
+        None => {
+            return Err((
+                StatusCode::FORBIDDEN,
+                "This review does not belong to this account's wedding.".into(),
+            ));
+        }
+    };
     if let Some(vendor_id) = &validated.vendor_id {
         let vendor_exists = sqlx::query_scalar::<_, bool>(
             "SELECT EXISTS(SELECT 1 FROM wedding_vendors WHERE vendor_id=$1)",
@@ -432,7 +441,7 @@ async fn save_revision_http(
     let proposed_review_id = format!("review-{}", Ulid::new());
     sqlx::query("INSERT INTO wedding_reviews (review_id,owner_user_id,wedding_plan_id,response_workspace_id,subject_kind,vendor_id,venue_space_ref,invitation_origin) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT DO NOTHING")
         .bind(&proposed_review_id)
-        .bind(&user.id)
+        .bind(&wedding_owner_user_id)
         .bind(&validated.plan)
         .bind(&validated.workspace)
         .bind(enum_value(request.subject_kind))
@@ -442,11 +451,12 @@ async fn save_revision_http(
         .execute(&mut *tx)
         .await
         .map_err(store_error)?;
-    let review = sqlx::query("SELECT review_id,owner_user_id,current_revision,status FROM wedding_reviews WHERE wedding_plan_id=$1 AND response_workspace_id=$2 AND subject_kind=$3 AND vendor_id IS NOT DISTINCT FROM $4 FOR UPDATE")
+    let review = sqlx::query("SELECT review_id,owner_user_id,current_revision,status FROM wedding_reviews WHERE wedding_plan_id=$1 AND response_workspace_id=$2 AND subject_kind=$3 AND vendor_id IS NOT DISTINCT FROM $4 AND owner_user_id=$5 FOR UPDATE")
         .bind(&validated.plan)
         .bind(&validated.workspace)
         .bind(enum_value(request.subject_kind))
         .bind(&validated.vendor_id)
+        .bind(&wedding_owner_user_id)
         .fetch_one(&mut *tx)
         .await
         .map_err(store_error)?;

@@ -47,7 +47,7 @@ function loadAppleSdk(): Promise<void> {
   return sdkPromise;
 }
 
-export function AppleSignInButton(props: { onAuthenticated: (response: AuthApiResponse) => void }) {
+export function AppleSignInButton(props: { onAuthenticated: (response: AuthApiResponse) => void; signupSource?: string }) {
   const [enabled, setEnabled] = createSignal(false);
   const [busy, setBusy] = createSignal(false);
   const [error, setError] = createSignal("");
@@ -74,6 +74,7 @@ export function AppleSignInButton(props: { onAuthenticated: (response: AuthApiRe
             identity_token: authorization.id_token,
             email: event.detail?.user?.email ?? "",
             nonce,
+            ...(props.signupSource ? { source: props.signupSource } : {}),
           }),
         });
         const payload = await response.json().catch(() => null);

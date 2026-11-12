@@ -8805,3 +8805,27 @@ implementation commit `a05468de6d3b28db916d23492f866715d765cbc3`.
 - WED-360 review rollout remains false-default. Continue its remaining
   invitations, appeals, DecisionOS/comparison evidence and controlled pilot
   gates independently of this released hardening slice.
+# WED-364 release candidate — 2026-11-12
+
+- Worktree: `C:/temp/wt/omnyid-wed360`; branch: `agent/codex/WED-360`.
+- Fixed TXT-only public Quote Intelligence readiness and added a real mobile
+  browser regression that proves no upload occurs before explicit analysis.
+- Replaced hard-coded admin-email UI checks with the authenticated server
+  `operator` authority and passed the Wedding signup source through password,
+  Google and Apple registration so new Wedding accounts receive `couple`.
+- Reconciled the cross-account privacy report: planner vendor projection omits
+  raw contacts/notes/evidence; two operator commands authenticate before body
+  parsing; shared Wedding plans use explicit revocable memberships; contacts
+  remain private unless individually selected, encrypted and granted.
+- Co-owner invite acceptance persists the canonical Wedding navigation scope;
+  the dashboard merges only exact plan/workspace AFP records. Review reads,
+  writes and uniqueness are also canonical-owner scoped.
+- Review correction, withdrawal, history and vendor-detail entry are connected.
+  The public review pilot remains false-default; review invitations, author
+  appeal, DecisionOS citation, content-free analytics and the five-venue pilot
+  are still tracked as later gated work in the review task document.
+- Evidence: `cargo check --lib`, `cargo check --tests`, `npm run typecheck`,
+  2,275 Wedding tests, public Wedding site suite, Vite production build and the
+  quote article Playwright smoke passed. Windows linked Rust tests still hit
+  the known rustc `STATUS_ACCESS_VIOLATION`; Docker Desktop was unavailable, so
+  migration 0168 must be executed and inspected by the clean Oracle release.

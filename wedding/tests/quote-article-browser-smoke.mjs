@@ -33,7 +33,22 @@ try {
   await page.goto(`${origin}/wedding/blog/before-you-accept-that-wedding-quote.html`, { waitUntil: 'domcontentloaded' });
   if ((await page.locator('#quoteStudyStatus').innerText()).includes('not accepting')) throw new Error('Article still renders the disabled research-preview state');
   await page.locator('#quoteStudyGuests').fill('80');
-  await page.locator('#quoteStudyText').fill('Dinner package for 80 guests at $220 per person. GST included.');
+  if (await page.locator('#quoteStudySubmit').isEnabled()) throw new Error('Analyse quote should wait for quote wording');
+  await page.locator('#quoteStudyFile').setInputFiles({
+    name: 'venue-quote.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from('Dinner package for 80 guests at $220 per person. GST included.'),
+  });
+  await page.waitForFunction(() => document.querySelector('#quoteStudySubmit')?.disabled === false);
+  if (!(await page.locator('#quoteStudySubmit').isEnabled())) {
+    const state = await page.evaluate(() => ({
+      status: document.querySelector('#quoteStudyStatus')?.textContent,
+      quoteLength: document.querySelector('#quoteStudyText')?.value?.length,
+      disabled: document.querySelector('#quoteStudySubmit')?.disabled,
+    }));
+    throw new Error(`Selecting a valid text quote did not enable Analyse quote: ${JSON.stringify(state)}`);
+  }
+  if (!(await page.locator('#quoteStudyStatus').innerText()).includes('venue-quote.txt was read')) throw new Error('Text quote readiness was not announced');
   if (requests !== 0) throw new Error('Article sent quote text before explicit analysis');
   await page.locator('#quoteStudySubmit').click();
   await page.locator('#quoteStudyResults').waitFor({ state: 'visible' });

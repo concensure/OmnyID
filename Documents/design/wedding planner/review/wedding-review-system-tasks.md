@@ -46,12 +46,13 @@ Depends on REV-02.
 
 - [x] Add authenticated create/edit preview with unselected rating, neutral
   prompts, display choice and separate private/public actions.
-- [ ] Add correction, withdrawal, safe retry and status/history surfaces.
+- [x] Add correction, withdrawal, safe retry and status/history surfaces.
   - [x] Backend revisions, metadata-only status/history and idempotent immediate
     withdrawal preserve the prior moderated snapshot during correction.
-  - [ ] Couple-facing form, preview, correction and status/history UI.
-- [ ] Add direct venue-profile review route and optional narrow invitation-link
-  exchange without creating a duplicate workspace.
+  - [x] Couple-facing form, preview, correction and status/history UI.
+- [x] Add the review form to the existing vendor lifecycle detail surface so a
+  direct vendor selection opens the canonical review instead of a second
+  workspace. Optional invitation exchange remains REV-05.
 
 Depends on REV-02 and REV-03.
 
@@ -68,14 +69,15 @@ Depends on REV-02.
 
 ## REV-06 — Operator moderation and disputes
 
-- [ ] Add an operator-only queue for eligibility/evidence/duplicate/privacy and
+- [x] Add an operator-only queue for eligibility/evidence/duplicate/privacy and
   policy review with reason codes and access audit.
   The audited eligibility/evidence/policy queue and bounded narrative preview
   are implemented; report/appeal intake still needs to feed privacy/dispute
   items into that same queue.
 - [x] Publish/reject/restrict/restore without changing author meaning; route
   substantive edits back to the author.
-- [ ] Add report/appeal/correction handling and evidence purge scheduling.
+- [x] Add vendor report, author correction and evidence purge scheduling.
+- [ ] Add a separately permissioned author appeal command and status surface.
 
 Depends on REV-03 and REV-04.
 
@@ -92,10 +94,13 @@ Depends on REV-06 and existing vendor membership permissions.
 
 - [x] Project only current published revisions and rebuild count/score from the
   same eligible scored wedding-held set using one-decimal half-up rounding.
-- [ ] Add zero/sparse/full states to directory, comparison and profile pages;
+- [x] Add zero/sparse/full states to directory, comparison and profile pages;
   keep reviews out of organic ranking.
-- [ ] Propagate correction/withdrawal/restriction to aggregate, cache, search,
-  DecisionOS citation and any excerpt.
+- [x] Propagate correction/withdrawal/restriction to the canonical public
+  projection and deterministic aggregate. Public consumers read only the
+  current `published` row; no organic ranking input is changed.
+- [ ] Add the bounded dated observation to DecisionOS before it can cite a
+  published review.
 
 Depends on REV-06.
 
@@ -103,7 +108,7 @@ Depends on REV-06.
 
 - [ ] Cite a dated public review observation only when relevant to the current
   decision and label the past-experience caveat.
-- [ ] Write any generated question into AFP before display and use the existing
+- [x] Write any generated question into AFP before display and use the existing
   human-approved enquiry workflow; opening evidence must never send.
 
 Depends on REV-08.
@@ -179,3 +184,7 @@ invent a couple, or publish the control merely because the review system ships.
   states from the same current publication set. Profile review cards include
   experience/verification context and an independently moderated attributed
   vendor reply without private identity or evidence.
+- Review ownership now includes the canonical Wedding owner as well as the
+  plan/workspace tuple. Explicit co-owner memberships converge on that owner;
+  unrelated accounts using the same starter labels cannot collide or read one
+  another's review state.

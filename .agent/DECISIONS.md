@@ -3400,3 +3400,16 @@ synthetic vendor search or introduce another send path.
   underlying AFP source continue to trigger the existing source-ID/timestamp
   fingerprinted projector, so the visual sequence and editable table update
   together and preserve the record revision trail.
+# 2026-11-12 — Shared Wedding truth uses explicit canonical-owner membership
+
+- A partner account receives access only after accepting a single-use,
+  exact-email, expiring invitation. Both accounts then project AFP records that
+  carry the exact Wedding plan and response-workspace identity.
+- Membership does not union general workspaces, private Contacts, personas or
+  unrelated messages. Contacts require a separate encrypted grant containing
+  only fields the sharer selected, for one active recipient, and are revocable.
+- Review identity includes the canonical Wedding owner. This preserves one
+  review across partners while preventing unrelated accounts with identical
+  starter plan labels from colliding.
+- Operator presentation uses the same server-side email allowlist authority as
+  operator APIs. The client must not infer authority from a hard-coded address.

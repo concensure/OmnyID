@@ -5363,18 +5363,90 @@ impl Db {
             return Ok(vec![]);
         }
 
-        let (shared_msgs, private_msgs) = tokio::join!(
+        let (shared_msgs, private_msgs, shared_wedding_msgs) = tokio::join!(
             self.recent_messages_for_agents(agent_ids, limit),
             self.recent_private_messages_for_user(user_id, limit),
+            self.recent_shared_wedding_messages_for_user(user_id, limit),
         );
         let mut merged = shared_msgs?;
         merged.extend(private_msgs?);
+        merged.extend(shared_wedding_msgs?);
         merged.sort_by(|left, right| right.timestamp.cmp(&left.timestamp));
 
         let mut seen_ids = HashSet::new();
         merged.retain(|message| seen_ids.insert(message.id.clone()));
         merged.truncate(limit as usize);
         Ok(merged)
+    }
+
+    /// Read only the exact Wedding-plan projection of active co-owners. This
+    /// deliberately does not union either account's general tenant ledger.
+    pub async fn recent_shared_wedding_messages_for_user(
+        &self,
+        user_id: &str,
+        limit: i64,
+    ) -> Result<Vec<ProtoMessage>, sqlx::Error> {
+        if limit <= 0 {
+            return Ok(vec![]);
+        }
+        let scopes = sqlx::query(
+            r#"SELECT wedding_owner_user_id,wedding_plan_id,response_workspace_id
+               FROM wedding_plan_memberships
+               WHERE member_user_id=$1 AND status='active'"#,
+        )
+        .bind(user_id)
+        .fetch_all(&self.pool)
+        .await?;
+        let mut messages = Vec::new();
+        for scope in scopes {
+            let owner: String = scope.get("wedding_owner_user_id");
+            let plan: String = scope.get("wedding_plan_id");
+            let workspace: String = scope.get("response_workspace_id");
+            let member_ids = sqlx::query_scalar::<_, String>(
+                "SELECT member_user_id FROM wedding_plan_memberships WHERE wedding_owner_user_id=$1 AND wedding_plan_id=$2 AND response_workspace_id=$3 AND status='active' AND member_user_id<>$4",
+            )
+            .bind(&owner)
+            .bind(&plan)
+            .bind(&workspace)
+            .bind(user_id)
+            .fetch_all(&self.pool)
+            .await?;
+            for member_id in member_ids {
+                let table = tenant_messages_table(&member_id);
+                let rows = sqlx::query(&format!(
+                    r#"SELECT id,thread_id,parent_id,from_agent,to_agents,
+                              timestamp::text AS timestamp,type,content,signature,
+                              encryption,views,"references",attachments,store_in_relational
+                       FROM {table}
+                       WHERE (
+                           metadata->>'wedding_plan_id'=$1 OR metadata->>'weddingPlanId'=$1
+                           OR content->>'wedding_plan_id'=$1 OR content->>'weddingPlanId'=$1
+                           OR $3=ANY(supertags)
+                       )
+                       AND (
+                           metadata->>'response_workspace_id'=$2 OR metadata->>'responseWorkspaceId'=$2
+                           OR content->>'response_workspace_id'=$2 OR content->>'responseWorkspaceId'=$2
+                           OR $4=ANY(supertags)
+                       )
+                       ORDER BY timestamp DESC LIMIT $5"#,
+                ))
+                .bind(&plan)
+                .bind(&workspace)
+                .bind(format!("wedding_plan:{plan}"))
+                .bind(format!("response_workspace:{workspace}"))
+                .bind(limit)
+                .fetch_all(&self.pool)
+                .await?;
+                messages.extend(
+                    rows.into_iter().map(proto_message_from_row).collect::<Result<Vec<_>, _>>()?,
+                );
+            }
+        }
+        messages.sort_by(|left, right| right.timestamp.cmp(&left.timestamp));
+        let mut seen = HashSet::new();
+        messages.retain(|message| seen.insert(message.id.clone()));
+        messages.truncate(limit as usize);
+        Ok(messages)
     }
 
     /// GAP-075: fetch recent messages from the user's private tenant schema.

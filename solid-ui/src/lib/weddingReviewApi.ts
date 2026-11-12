@@ -23,6 +23,14 @@ export type WeddingReviewDraft = {
   displayMode: string;
 };
 
+export type WeddingReviewHistoryItem = {
+  eventKind: string;
+  actorRole: string;
+  revision: number | null;
+  reasonCode: string | null;
+  occurredAt: string;
+};
+
 const object = (value: unknown): Record<string, unknown> => value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 const text = (value: unknown): string => typeof value === "string" ? value : "";
 const number = (value: unknown): number => typeof value === "number" && Number.isFinite(value) ? value : 0;
@@ -51,6 +59,18 @@ export async function loadWeddingReviewDraft(reviewId: string): Promise<WeddingR
     nextCoupleQuestion: text(value.next_couple_question), contextTags: Array.isArray(value.context_tags) ? value.context_tags.filter((item): item is string => typeof item === "string") : [],
     displayMode: text(value.display_mode) || "omnyid_couple",
   };
+}
+
+export async function loadWeddingReviewHistory(reviewId: string): Promise<WeddingReviewHistoryItem[]> {
+  const value = object(await apiFetch<unknown>(`/wedding/reviews/${encodeURIComponent(reviewId)}/status`));
+  const history = Array.isArray(value.history) ? value.history : [];
+  return history.map((item) => object(item)).map((item) => ({
+    eventKind: text(item.event_kind),
+    actorRole: text(item.actor_role),
+    revision: typeof item.revision === "number" ? item.revision : null,
+    reasonCode: text(item.reason_code) || null,
+    occurredAt: text(item.occurred_at),
+  })).filter((item) => item.eventKind && item.occurredAt);
 }
 
 export async function saveWeddingReview(input: {

@@ -854,4 +854,9 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Private AFP vendor replies, reports and audited moderation receipts",
         include_str!("../../postgres/migrations/0167_wedding_review_vendor_boundary.sql"),
     ),
+    (
+        "0168_wedding_partner_sharing",
+        "Explicit revocable partner membership and encrypted selected-contact grants for one shared Wedding plan",
+        include_str!("../../postgres/migrations/0168_wedding_partner_sharing.sql"),
+    ),
 ];

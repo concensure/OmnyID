@@ -180,6 +180,27 @@ async fn wedding_vendors_with_attributes(
         .collect())
 }
 
+/// The signed-in planner catalogue is a planning projection, not an operator
+/// export. Raw crawl notes, evidence blobs and unpublished contact channels
+/// are deliberately absent; outreach routes resolve contact server-side only
+/// after the couple chooses a vendor.
+fn planner_vendor_projection(mut value: Value) -> Value {
+    let Some(object) = value.as_object_mut() else {
+        return value;
+    };
+    for key in [
+        "contact_email",
+        "contact_phone",
+        "notes",
+        "evidence",
+        "created_by_user_id",
+        "updated_by_user_id",
+    ] {
+        object.remove(key);
+    }
+    value
+}
+
 pub(super) fn wedding_vendor_write_input(
     body: WeddingVendorWriteRequest,
 ) -> Result<WeddingVendorUpsertRecord, (StatusCode, String)> {
@@ -862,7 +883,11 @@ pub(super) async fn wedding_vendors_list_http(
         )
         .await
         .map_err(readiness_error_to_http)?;
-    let vendors = wedding_vendors_with_attributes(&state.db, vendors).await?;
+    let vendors = wedding_vendors_with_attributes(&state.db, vendors)
+        .await?
+        .into_iter()
+        .map(planner_vendor_projection)
+        .collect::<Vec<_>>();
     Ok(Json(serde_json::json!({
         "vendors": vendors,
         "attribute_catalog": attribute_catalog_json(),
@@ -895,6 +920,13 @@ pub(super) async fn wedding_onboarding_state_upsert_http(
     let wedding_plan_id = clean_required_string(body.wedding_plan_id, "wedding_plan_id")?;
     let intake_variant = validate_wedding_intake_source(body.intake_variant, "intake_variant")?;
     let entry_source = validate_wedding_intake_source(body.entry_source, "entry_source")?;
+    sqlx::query(
+        "INSERT INTO user_roles (user_id, role) VALUES ($1, 'couple') ON CONFLICT DO NOTHING",
+    )
+    .bind(&user.id)
+    .execute(&state.db.pool)
+    .await
+    .map_err(readiness_error_to_http)?;
     let onboarding_state = state
         .db
         .upsert_wedding_user_onboarding_state(

@@ -47,6 +47,15 @@
     block.setAttribute("aria-label", "Exact wording from the quote");
     return block;
   };
+  const quoteLengthIsReady = () => {
+    const length = quoteText?.value?.trim().length ?? 0;
+    return length >= 40 && length <= 20_000;
+  };
+  const refreshSubmitState = () => {
+    if (!submit) return;
+    submit.disabled = !quoteLengthIsReady();
+    submit.setAttribute("aria-disabled", submit.disabled ? "true" : "false");
+  };
 
   function renderEvidenceList(title, items) {
     const card = node("section", "", "quote-study-result-card");
@@ -124,11 +133,15 @@
     }
     try {
       quoteText.value = await file.text();
+      quoteText.dispatchEvent(new Event("input", { bubbles: true }));
+      refreshSubmitState();
       setStatus(`${file.name} was read on this device. Nothing is sent until you choose Analyse quote.`, "success");
     } catch (_) {
       setStatus("That file could not be read as text. Paste the quote wording instead.", "error");
     }
   });
+
+  quoteText?.addEventListener("input", refreshSubmitState);
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -165,9 +178,10 @@
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Quote analysis is temporarily unavailable.", "error");
     } finally {
-      submit.disabled = false;
+      refreshSubmitState();
     }
   });
 
-  setStatus("Ready. Nothing is sent until you choose Analyse quote.", "success");
+  refreshSubmitState();
+  setStatus("Ready. Paste quote wording or choose a text file to enable Analyse quote. Nothing is sent until you choose Analyse quote.", "success");
 })();

@@ -109,6 +109,16 @@ pub(super) async fn register_http(
         .await
         .map_err(internal_error)
         .map_err(status_to_http)?;
+    if verification_source::is_wedding_source(verification_source.as_deref()) {
+        sqlx::query(
+            "INSERT INTO user_roles (user_id, role) VALUES ($1, 'couple') ON CONFLICT DO NOTHING",
+        )
+        .bind(&user.id)
+        .execute(&state.db.pool)
+        .await
+        .map_err(internal_error)
+        .map_err(status_to_http)?;
+    }
     if let Err(err) = state
         .db
         .link_new_user_same_session_acquisition(&user.id, acquisition_visit_id.as_deref())
@@ -302,6 +312,16 @@ pub(super) async fn google_auth_http(
     };
 
     if account_created {
+        if verification_source::is_wedding_source(request.source.as_deref()) {
+            sqlx::query(
+                "INSERT INTO user_roles (user_id, role) VALUES ($1, 'couple') ON CONFLICT DO NOTHING",
+            )
+            .bind(&user.id)
+            .execute(&state.db.pool)
+            .await
+            .map_err(internal_error)
+            .map_err(status_to_http)?;
+        }
         if let Err(err) = state
             .db
             .link_new_user_same_session_acquisition(
@@ -407,6 +427,8 @@ pub(super) struct AppleAuthRequest {
     #[serde(default)] pub nonce: Option<String>,
     #[serde(default)]
     pub acquisition_visit_id: Option<String>,
+    #[serde(default)]
+    pub source: Option<String>,
 }
 
 pub(super) async fn apple_auth_http(
@@ -508,6 +530,16 @@ pub(super) async fn apple_auth_http(
     };
 
     if account_created {
+        if verification_source::is_wedding_source(request.source.as_deref()) {
+            sqlx::query(
+                "INSERT INTO user_roles (user_id, role) VALUES ($1, 'couple') ON CONFLICT DO NOTHING",
+            )
+            .bind(&user.id)
+            .execute(&state.db.pool)
+            .await
+            .map_err(internal_error)
+            .map_err(status_to_http)?;
+        }
         if let Err(err) = state
             .db
             .link_new_user_same_session_acquisition(
@@ -3859,6 +3891,7 @@ pub(super) fn session_user_response(user: &UserRecord) -> SessionUserResponse {
         email: user.email.clone(),
         display_name: user.display_name.clone(),
         auth_provider: user.auth_provider.clone(),
+        operator: super::cost_controls::operator_access_allowed(&user.email),
     }
 }
 

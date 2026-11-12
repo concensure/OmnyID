@@ -3,9 +3,11 @@ import { createEffect, createSignal, For, Show } from "solid-js";
 import {
   listWeddingReviews,
   loadWeddingReviewDraft,
+  loadWeddingReviewHistory,
   saveWeddingReview,
   withdrawWeddingReview,
   type WeddingReviewStatus,
+  type WeddingReviewHistoryItem,
 } from "@/lib/weddingReviewApi";
 
 const retryKey = (prefix: string): string => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
@@ -29,6 +31,7 @@ export function WeddingReviewPanel(props: {
   const [preview, setPreview] = createSignal(false);
   const [notice, setNotice] = createSignal<string | null>(null);
   const [error, setError] = createSignal<string | null>(null);
+  const [history, setHistory] = createSignal<WeddingReviewHistoryItem[]>([]);
 
   async function load(): Promise<void> {
     setLoading(true); setError(null);
@@ -36,9 +39,10 @@ export function WeddingReviewPanel(props: {
       const current = (await listWeddingReviews(props.weddingPlanId)).find((item) => item.vendorId === props.vendorId) ?? null;
       setStatus(current);
       if (current) {
-        const draft = await loadWeddingReviewDraft(current.reviewId);
+        const [draft, events] = await Promise.all([loadWeddingReviewDraft(current.reviewId), loadWeddingReviewHistory(current.reviewId)]);
         setTitle(draft.title); setBody(draft.body); setQuestion(draft.nextCoupleQuestion);
         setDisplayMode(draft.displayMode); setAudience(current.audience); setRating(current.rating);
+        setHistory(events);
       }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The review could not be loaded just now.");
@@ -100,6 +104,14 @@ export function WeddingReviewPanel(props: {
           <Show when={audience() === "public_review"}><label class="block text-sm font-semibold text-wedding-ink">Public name<select class="mt-1 min-h-11 w-full rounded-lg border border-wedding-border bg-white px-3" value={displayMode()} onChange={(event) => setDisplayMode(event.currentTarget.value)}><option value="omnyid_couple">OmnyID couple</option><option value="first_names">First names</option><option value="first_name_and_initial">First name and initial</option></select></label></Show>
           <Show when={preview()}><article class="rounded-lg border-2 border-wedding-primary bg-white p-3" aria-label="Exact public preview"><p class="text-xs font-bold uppercase tracking-wide text-wedding-primary">Exact public preview</p><p class="mt-2 text-sm font-bold text-wedding-ink">{title() || "No title yet"}</p><p class="mt-2 whitespace-pre-wrap text-sm leading-6 text-wedding-ink/80">{body() || "No review text yet"}</p><Show when={rating()}>{(value) => <p class="mt-2 text-sm font-semibold">{value()} of 5</p>}</Show><p class="mt-2 text-xs text-wedding-ink/60">Published as {displayMode() === "omnyid_couple" ? "OmnyID couple" : "your selected name format"}. Evidence and account details are never included.</p></article></Show>
           <div class="flex flex-wrap gap-2"><button type="button" class="min-h-11 rounded-lg border border-wedding-secondary bg-white px-3 text-sm font-bold text-wedding-secondary disabled:opacity-50" disabled={saving()} onClick={() => void save("save_draft")}>Save private draft</button><Show when={audience() === "public_review"}><button type="button" class="min-h-11 rounded-lg border border-wedding-secondary bg-white px-3 text-sm font-bold text-wedding-secondary" onClick={() => setPreview((value) => !value)}>{preview() ? "Hide preview" : "Preview exactly"}</button></Show><button type="button" class="min-h-11 rounded-lg bg-wedding-primary px-3 text-sm font-bold text-white disabled:opacity-50" disabled={saving() || !canSubmit() || (audience() === "public_review" && !preview())} onClick={() => void save("submit")}>{audience() === "public_review" ? "Submit public review" : "Save private feedback"}</button><Show when={status() && status()?.status !== "withdrawn"}><button type="button" class="min-h-11 rounded-lg border border-red-300 bg-white px-3 text-sm font-semibold text-red-800" disabled={saving()} onClick={() => void withdraw()}>Withdraw review</button></Show></div>
+          <Show when={history().length > 0}>
+            <details class="rounded-lg border border-wedding-border bg-white p-3">
+              <summary class="cursor-pointer text-sm font-semibold text-wedding-ink">Review history ({history().length})</summary>
+              <ol class="mt-2 space-y-2">
+                <For each={history()}>{(event) => <li class="text-xs leading-5 text-wedding-ink/70"><span class="font-semibold text-wedding-ink">{event.eventKind.replaceAll("_", " ")}</span>{event.revision ? ` · revision ${event.revision}` : ""} · {new Date(event.occurredAt).toLocaleString()}<Show when={event.reasonCode}><span> · {event.reasonCode}</span></Show></li>}</For>
+              </ol>
+            </details>
+          </Show>
           <Show when={notice()}>{(message) => <p class="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-900" role="status">{message()}</p>}</Show><Show when={error()}>{(message) => <p class="rounded-lg bg-red-50 p-3 text-sm text-red-900" role="alert">{message()}</p>}</Show>
         </div>
       </Show>

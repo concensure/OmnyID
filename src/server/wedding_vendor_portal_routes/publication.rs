@@ -2,7 +2,7 @@ use std::{collections::BTreeMap, sync::Arc};
 
 use axum::{
     Json, Router,
-    extract::{Query, State},
+    extract::{Query, Request, State},
     http::{HeaderMap, StatusCode},
     routing::{get, post},
 };
@@ -283,7 +283,7 @@ async fn submit_publication_http(
 async fn publication_decision_http(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
-    Json(body): Json<PublicationDecision>,
+    request: Request,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let (operator, session) =
         super::super::auth::authenticated_user_and_session(&state.db, &headers).await?;
@@ -291,6 +291,11 @@ async fn publication_decision_http(
     if !super::super::cost_controls::operator_access_allowed(&operator.email) {
         return Err((StatusCode::FORBIDDEN, "Operator access required.".into()));
     }
+    let bytes = axum::body::to_bytes(request.into_body(), 64 * 1024)
+        .await
+        .map_err(|_| (StatusCode::BAD_REQUEST, "Invalid request body.".into()))?;
+    let body: PublicationDecision = serde_json::from_slice(&bytes)
+        .map_err(|_| (StatusCode::UNPROCESSABLE_ENTITY, "Invalid publication decision.".into()))?;
     let note = clean(&body.note, 1000);
     if note.len() < 10 {
         return Err((
@@ -492,5 +497,13 @@ mod tests {
         assert_eq!(value["email"], false);
         assert_eq!(value["description"], true);
         assert!(normalized_visibility(&json!({"ranking":true})).is_err());
+    }
+
+    #[test]
+    fn operator_auth_precedes_publication_body_parsing() {
+        let source = include_str!("publication.rs");
+        let start = source.find("async fn publication_decision_http(").unwrap();
+        let body = &source[start..];
+        assert!(body.find("authenticated_user_and_session").unwrap() < body.find("to_bytes(request.into_body()").unwrap());
     }
 }
