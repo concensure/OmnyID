@@ -8962,3 +8962,32 @@ implementation commit `a05468de6d3b28db916d23492f866715d765cbc3`.
   workflow were audited as already implemented; no duplicate portal or
   calendar authority was introduced. The co-branded Binder remains an
   intentional P2 deferral pending publication and asset-rights review.
+
+# 2026-11-15 — WED-365 mobile startup and invitation lifecycle hardening (Codex)
+
+- Worktree: `C:/temp/wt/omnyid-wed360`; branch:
+  `agent/codex/WED-360`; verified implementation SHA before this coordination
+  commit: `0f93c88ae50fe6c75667281e9eb5009c62d14574`.
+- Mobile Wedding startup now resolves the signed-in account's onboarding state
+  and canonical Wedding projection before choosing one initial surface.
+  Returning couples no longer flash intake; genuinely new Wedding accounts
+  still receive intake; refresh failure shows retry rather than guessing.
+- The existing Wedding typography token enlarges root type by 1.1 before the
+  first render and is also applied synchronously during a no-reload auth
+  handoff. No transform/late zoom is used, so layout is designed at the larger
+  scale from the start. Operators retain the general presentation.
+- Partner invitation history now gives the owner bounded pending, accepted,
+  revoked and expired states without retaining the invited email in the
+  response. Expired links are explicitly shown as granting no access;
+  co-owners cannot read owner invitation history.
+- Passed on the exact implementation SHA: `npm run typecheck`; 17 focused
+  Wedding startup, collaboration and font tests; `npm run build`;
+  `CARGO_TARGET_DIR=C:\\cargo-target cargo check --lib`; and linked
+  `cargo test --test wedding_partner_sharing_api -- --nocapture` against the
+  disposable test database (`1 passed`).
+- Remaining work is external evidence rather than another local review-system
+  implementation: hosted exact-SHA false-default proof, accessibility/full-
+  account evidence and the controlled five-venue review pilot. `Read the
+  couple's story` remains deliberately deferred until a real separately
+  permissioned story exists. The co-branded Binder likewise remains deferred
+  for publication and asset-rights review.

@@ -3476,3 +3476,16 @@ synthetic vendor search or introduce another send path.
   leaving member's selected-contact grants and invalidate both affected
   dashboard caches. Neither operation deletes either person's account or
   private objects.
+
+# 2026-11-15 — Wedding startup resolves account truth before choosing a surface
+
+- A signed-in Wedding launch does not treat an empty starter projection as
+  proof that the account is new. It waits for both account onboarding state
+  and the canonical Wedding refresh, then renders either intake or workspace,
+  never both during the same initial load.
+- A failed empty refresh produces a bounded retry state rather than exposing
+  onboarding to a potentially returning account.
+- Wedding's 1.1 readable scale is a root typography token, not a post-render
+  transform. Deep-link, saved-lens and same-page authentication paths apply
+  the Wedding presentation before the planner surface becomes visible;
+  operator accounts remain excluded.
