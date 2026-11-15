@@ -197,7 +197,8 @@ export function applyWeddingPresentationTheme(body?: HTMLElement | null): void {
   for (const className of ALL_THEME_CLASSES) {
     targetBody?.classList.remove(className);
   }
-  targetBody?.classList.add(THEME_CLASS_BY_USE_CASE.wedding_planning);
+  const weddingClass = THEME_CLASS_BY_USE_CASE.wedding_planning;
+  if (weddingClass) targetBody?.classList.add(weddingClass);
   applyFontScalePreference(loadFontScalePreference());
 }
 
