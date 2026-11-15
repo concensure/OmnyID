@@ -4754,6 +4754,15 @@ export type WeddingPartnerMember = {
   joined_at: string;
 };
 
+export type WeddingPartnerInviteSummary = {
+  invite_id: string;
+  status: "pending" | "accepted" | "revoked" | "expired";
+  created_at: string;
+  expires_at: string;
+  accepted_at?: string | null;
+  revoked_at?: string | null;
+};
+
 export type WeddingPartnerScope = {
   owner_user_id: string;
   wedding_plan_id: string;
@@ -4781,7 +4790,7 @@ const weddingPartnerScopeQuery = (weddingPlanId: string, responseWorkspaceId: st
   `wedding_plan_id=${encodeURIComponent(weddingPlanId)}&response_workspace_id=${encodeURIComponent(responseWorkspaceId)}`;
 
 export const listWeddingPartnerMembers = (weddingPlanId: string, responseWorkspaceId: string) =>
-  apiFetch<{ scope: WeddingPartnerScope; members: WeddingPartnerMember[] }>(`/wedding/partners?${weddingPartnerScopeQuery(weddingPlanId, responseWorkspaceId)}`);
+  apiFetch<{ scope: WeddingPartnerScope; members: WeddingPartnerMember[]; invites: WeddingPartnerInviteSummary[] }>(`/wedding/partners?${weddingPartnerScopeQuery(weddingPlanId, responseWorkspaceId)}`);
 
 export const inviteWeddingPartner = (input: { weddingPlanId: string; responseWorkspaceId: string; email: string }) =>
   apiFetch<{ invite_id: string; invite_url: string; delivered: boolean; expires_in_days: number }>("/wedding/partners/invites", {

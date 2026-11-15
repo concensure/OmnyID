@@ -5,6 +5,10 @@ import { ViewportProvider } from "@/context/ViewportContext";
 import { dispatchSwUpdateReadyEvent } from "@/lib/swUpdateEvent";
 import { applyFontBodyPreference, loadFontBodyPreference } from "@/lib/fontBodyPreference";
 import { applyFontScalePreference, loadFontScalePreference } from "@/lib/fontScalePreference";
+import { readSession } from "@/lib/api";
+import { loadWeddingEntrySource } from "@/lib/weddingEntrySourceState";
+import { shouldApplyInitialWeddingPresentation } from "@/lib/weddingInitialPresentationState";
+import { loadWorkspaceLens } from "@/lib/workspaceLensState";
 import "./index.css";
 
 // ── Service Worker registration (U-01: update-ready notification) ─────────────
@@ -53,6 +57,21 @@ if ("serviceWorker" in navigator) {
   });
 }
 
+// Resolve the Wedding presentation before Solid mounts. Previously the body
+// class arrived with the encrypted profile after login, so mobile first drew
+// at 1.0 and visibly jumped to the Wedding 1.1 typography token.
+const initialSession = readSession();
+const initialUserId = initialSession?.user.id ?? "guest";
+const initialParams = new URLSearchParams(window.location.search);
+if (shouldApplyInitialWeddingPresentation({
+  operator: initialSession?.user.operator === true,
+  authSource: initialParams.get("source"),
+  fromQuiz: initialParams.get("from"),
+  workspaceLens: loadWorkspaceLens(initialUserId, "general"),
+  weddingEntrySource: loadWeddingEntrySource(initialSession?.user.id ?? null),
+})) {
+  document.body.classList.add("omnyid-usecase-wedding-planning");
+}
 applyFontScalePreference(loadFontScalePreference());
 applyFontBodyPreference(loadFontBodyPreference());
 

@@ -119,6 +119,7 @@ async fn membership_is_two_person_revisioned_and_revocable() {
     assert_eq!(owner_status, StatusCode::OK, "owner scope: {owner_members}");
     assert_eq!(owner_members["scope"]["role"], "owner");
     assert_eq!(owner_members["members"].as_array().map(Vec::len), Some(1));
+    assert_eq!(owner_members["invites"].as_array().map(Vec::len), Some(0));
 
     let (wrong_workspace_status, _) = request_json(
         &app,
@@ -159,6 +160,22 @@ async fn membership_is_two_person_revisioned_and_revocable() {
     .await;
     assert_eq!(accept_status, StatusCode::OK, "accept partner: {accepted}");
 
+    let (owner_invite_history_status, owner_invite_history) = request_json(
+        &app,
+        Method::GET,
+        &format!("/wedding/partners?{scope_query}"),
+        &owner_auth,
+        None,
+    )
+    .await;
+    assert_eq!(owner_invite_history_status, StatusCode::OK);
+    assert_eq!(owner_invite_history["invites"][0]["status"], "accepted");
+    assert!(
+        owner_invite_history["invites"][0]
+            .get("invited_email_digest")
+            .is_none()
+    );
+
     let (partner_status, partner_members) = request_json(
         &app,
         Method::GET,
@@ -175,6 +192,7 @@ async fn membership_is_two_person_revisioned_and_revocable() {
     assert_eq!(partner_members["scope"]["role"], "co_owner");
     assert_eq!(partner_members["scope"]["owner_user_id"], owner_id);
     assert_eq!(partner_members["members"].as_array().map(Vec::len), Some(2));
+    assert_eq!(partner_members["invites"].as_array().map(Vec::len), Some(0));
 
     let (third_invite_status, _) = request_json(
         &app,

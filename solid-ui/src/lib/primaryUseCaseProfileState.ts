@@ -172,8 +172,15 @@ export function primaryUseCaseThemeClass(profile: UserSelfProfile | null | undef
   return THEME_CLASS_BY_USE_CASE[primary.kind] ?? null;
 }
 
-export function applyPrimaryUseCaseTheme(profile: UserSelfProfile | null | undefined, body?: HTMLElement | null): string | null {
-  const nextClass = primaryUseCaseThemeClass(profile);
+export function applyPrimaryUseCaseTheme(
+  profile: UserSelfProfile | null | undefined,
+  body?: HTMLElement | null,
+  weddingPresentationActive = false,
+): string | null {
+  const profileClass = primaryUseCaseThemeClass(profile);
+  const nextClass = weddingPresentationActive
+    ? THEME_CLASS_BY_USE_CASE.wedding_planning ?? profileClass
+    : profileClass;
   const targetBody = body ?? (typeof document !== "undefined" ? document.body : null);
   for (const className of ALL_THEME_CLASSES) {
     targetBody?.classList.remove(className);
@@ -183,6 +190,15 @@ export function applyPrimaryUseCaseTheme(profile: UserSelfProfile | null | undef
   // the person's selected S/M/L/XL preference.
   applyFontScalePreference(loadFontScalePreference());
   return nextClass;
+}
+
+export function applyWeddingPresentationTheme(body?: HTMLElement | null): void {
+  const targetBody = body ?? (typeof document !== "undefined" ? document.body : null);
+  for (const className of ALL_THEME_CLASSES) {
+    targetBody?.classList.remove(className);
+  }
+  targetBody?.classList.add(THEME_CLASS_BY_USE_CASE.wedding_planning);
+  applyFontScalePreference(loadFontScalePreference());
 }
 
 export function buildPrimaryUseCaseProfile(

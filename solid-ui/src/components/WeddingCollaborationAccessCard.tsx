@@ -10,6 +10,7 @@ import {
   revokeWeddingPartner,
   shareWeddingContact,
   type WeddingPartnerMember,
+  type WeddingPartnerInviteSummary,
   type WeddingPartnerScope,
   type WeddingSharedContact,
 } from "@/lib/api";
@@ -39,6 +40,7 @@ export function WeddingCollaborationAccessCard(props: {
   const [selectedRole, setSelectedRole] = createSignal<WeddingCollaboratorRole>("co_owner");
   const [draftAssignments, setDraftAssignments] = createSignal<DraftRoleAssignment[]>([]);
   const [members, setMembers] = createSignal<WeddingPartnerMember[]>([]);
+  const [invites, setInvites] = createSignal<WeddingPartnerInviteSummary[]>([]);
   const [scope, setScope] = createSignal<WeddingPartnerScope | null>(null);
   const [sharedWithMe, setSharedWithMe] = createSignal<WeddingSharedContact[]>([]);
   const [selectedRecipient, setSelectedRecipient] = createSignal("");
@@ -59,6 +61,7 @@ export function WeddingCollaborationAccessCard(props: {
         listWeddingSharedContacts(props.metadata.weddingPlanId, props.metadata.responseWorkspaceId),
       ]);
       setMembers(response.members);
+      setInvites(response.invites ?? []);
       setScope(response.scope);
       setSharedWithMe(sharedContacts.contacts);
       const recipient = response.members.find((member) => member.role === "co_owner");
@@ -93,6 +96,7 @@ export function WeddingCollaborationAccessCard(props: {
       setSharingNotice(result.delivered
         ? "Invitation sent. The partner must sign in with that exact email before the Wedding plan is shared."
         : `Invitation created but email delivery needs retry. Copy this private link: ${result.invite_url}`);
+      await refreshMembers();
     } catch (error) {
       setSharingNotice(error instanceof Error ? error.message : "The invitation could not be sent.");
       setBusy(false);
@@ -223,6 +227,38 @@ export function WeddingCollaborationAccessCard(props: {
               Leave this Wedding plan
             </button>
           </Show>
+        </div>
+      </Show>
+      <Show when={scope()?.role === "owner" && invites().length > 0}>
+        <div class="mt-3 rounded-2xl border border-sky-100 bg-white/75 p-3">
+          <p class="text-sm font-semibold text-sky-950">Partner invitation history</p>
+          <p class="mt-1 text-xs leading-5 text-sky-950/70">Email addresses are deliberately not retained here. Expired links never grant access; send a fresh invitation only after confirming the recipient.</p>
+          <div class="mt-2 space-y-2">
+            <For each={invites()}>
+              {(invite) => {
+                const label = () => invite.status === "pending"
+                  ? "Awaiting response"
+                  : invite.status === "accepted"
+                    ? "Accepted"
+                    : invite.status === "expired"
+                      ? "Expired — no access granted"
+                      : "Revoked — no access granted";
+                return (
+                  <div class="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-sky-100 bg-sky-50/60 px-3 py-2">
+                    <div>
+                      <p class="text-xs font-semibold text-sky-950">{label()}</p>
+                      <p class="text-[11px] text-sky-950/65">
+                        Created {new Date(invite.created_at).toLocaleDateString()} · expires {new Date(invite.expires_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <span class={`rounded-full px-2 py-1 text-[11px] font-semibold ${invite.status === "pending" ? "bg-amber-100 text-amber-900" : invite.status === "accepted" ? "bg-emerald-100 text-emerald-900" : "bg-slate-200 text-slate-700"}`}>
+                      {invite.status}
+                    </span>
+                  </div>
+                );
+              }}
+            </For>
+          </div>
         </div>
       </Show>
       <div class="mt-3 rounded-2xl border border-sky-100 bg-white/75 p-3">

@@ -425,6 +425,7 @@ import { setWeddingLocalAccountScope } from "@/lib/weddingLocalAccountScope";
 import { hasSavedWorkspaceLens, loadWorkspaceLens, nextWorkspaceLens, saveWorkspaceLens, type WorkspaceLens } from "@/lib/workspaceLensState";
 import {
   applyPrimaryUseCaseTheme,
+  applyWeddingPresentationTheme,
   completeCurrentPrimaryUseCase,
   PRIMARY_USE_CASE_PROFILE_UPDATED_EVENT,
   profileNeedsPrimaryUseCasePrompt,
@@ -1387,6 +1388,10 @@ function App() {
       userId() || initUserId,
     );
     setWorkspaceLens(saveWorkspaceLens(userId() || initUserId, "wedding"));
+    // The auth handoff can complete without a document reload. Apply the
+    // Wedding typography token before selecting the planner so mobile never
+    // paints a 1.0 card and then visibly enlarges it to 1.1.
+    if (!initialAdminAccount) applyWeddingPresentationTheme();
     setShowTour(false); setShowOnboarding(false); setShowProfilingConsent(false);
     void savePrimaryUseCase("wedding_planning", "inferred").catch(() => {});
     // Quiz results remain browser-local suggestions until the couple explicitly
@@ -1505,7 +1510,7 @@ function App() {
     const entrySource = loadWeddingEntrySource(userId() || initUserId);
     setPrimaryUseCaseProfile(profile.primary_use_case ?? null);
     setPrimaryUseCaseNeedsPrompt(profileNeedsPrimaryUseCasePrompt(profile, entrySource));
-    applyPrimaryUseCaseTheme(profile);
+    applyPrimaryUseCaseTheme(profile, undefined, weddingLensEnabled() && !initialAdminAccount);
 
     const dismissed = primaryUseCasePromptDismissedThisSession();
     setPrimaryUseCasePromptVisible(forcePrompt || (profileNeedsPrimaryUseCasePrompt(profile, entrySource) && !dismissed));

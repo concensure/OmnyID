@@ -49,7 +49,7 @@ remains open.
   acceptance.
 - [x] Enforce the initial two-partner limit without weakening existing restricted
   external capabilities.
-- [ ] Add an explicit expired-invitation presentation to the authenticated
+- [x] Add an explicit expired-invitation presentation to the authenticated
   sharing card; the server already rejects and expires stale tokens.
 - Depends on COW-02.
 
@@ -58,7 +58,10 @@ after the first scope binding; owner-only invitations and serialised acceptance
 enforce one owner plus one co-owner; removal and partner leave both increment
 membership revision, revoke selected-contact grants and invalidate dashboard
 caches. The sharing card names the personal-data boundary and exposes real
-member/remove/leave actions.
+member/remove/leave actions. The owner-only invitation history now projects
+pending, accepted, revoked and expired states without retaining or returning
+the invited email address; expired links are explicitly labelled as granting
+no access.
 
 ### COW-05 — Selected-contact sharing (P0)
 

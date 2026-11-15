@@ -225,7 +225,43 @@ async fn list_members_http(
     let cache_namespace = scope.cache_namespace();
     let rows = sqlx::query("SELECT m.member_user_id,m.role,m.status,m.membership_revision,m.joined_at::text AS joined_at,u.display_name FROM wedding_plan_memberships m JOIN users u ON u.id=m.member_user_id WHERE m.wedding_owner_user_id=$1 AND m.wedding_plan_id=$2 AND m.status='active' ORDER BY m.joined_at")
         .bind(&scope.owner_user_id).bind(&scope.wedding_plan_id).fetch_all(&state.db.pool).await.map_err(db_error)?;
-    Ok(Json(json!({"scope":{"owner_user_id":scope.owner_user_id,"wedding_plan_id":scope.wedding_plan_id,"response_workspace_id":scope.response_workspace_id,"member_user_id":scope.member_user_id,"role":scope.role,"membership_revision":scope.membership_revision,"cache_namespace":cache_namespace},"members": rows.into_iter().map(|row| json!({"user_id":row.get::<String,_>("member_user_id"),"display_name":row.get::<String,_>("display_name"),"role":row.get::<String,_>("role"),"membership_revision":row.get::<i64,_>("membership_revision"),"joined_at":row.get::<String,_>("joined_at")})).collect::<Vec<_>>() })))
+    let invites = if scope.can_manage_membership() {
+        sqlx::query(
+            "UPDATE wedding_partner_invites SET status='expired'
+               WHERE wedding_owner_user_id=$1 AND wedding_plan_id=$2
+                 AND status='pending' AND expires_at<=NOW()",
+        )
+        .bind(&scope.owner_user_id)
+        .bind(&scope.wedding_plan_id)
+        .execute(&state.db.pool)
+        .await
+        .map_err(db_error)?;
+        sqlx::query(
+            "SELECT invite_id,status,created_at::text AS created_at,expires_at::text AS expires_at,
+                    accepted_at::text AS accepted_at,revoked_at::text AS revoked_at
+               FROM wedding_partner_invites
+              WHERE wedding_owner_user_id=$1 AND wedding_plan_id=$2
+              ORDER BY created_at DESC LIMIT 8",
+        )
+        .bind(&scope.owner_user_id)
+        .bind(&scope.wedding_plan_id)
+        .fetch_all(&state.db.pool)
+        .await
+        .map_err(db_error)?
+        .into_iter()
+        .map(|row| json!({
+            "invite_id": row.get::<String, _>("invite_id"),
+            "status": row.get::<String, _>("status"),
+            "created_at": row.get::<String, _>("created_at"),
+            "expires_at": row.get::<String, _>("expires_at"),
+            "accepted_at": row.get::<Option<String>, _>("accepted_at"),
+            "revoked_at": row.get::<Option<String>, _>("revoked_at"),
+        }))
+        .collect::<Vec<_>>()
+    } else {
+        Vec::new()
+    };
+    Ok(Json(json!({"scope":{"owner_user_id":scope.owner_user_id,"wedding_plan_id":scope.wedding_plan_id,"response_workspace_id":scope.response_workspace_id,"member_user_id":scope.member_user_id,"role":scope.role,"membership_revision":scope.membership_revision,"cache_namespace":cache_namespace},"members": rows.into_iter().map(|row| json!({"user_id":row.get::<String,_>("member_user_id"),"display_name":row.get::<String,_>("display_name"),"role":row.get::<String,_>("role"),"membership_revision":row.get::<i64,_>("membership_revision"),"joined_at":row.get::<String,_>("joined_at")})).collect::<Vec<_>>(),"invites":invites })))
 }
 
 async fn revoke_member_http(

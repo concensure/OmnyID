@@ -112,6 +112,7 @@ import {
 } from "@/lib/weddingRecommendationGenerationActionState";
 import type { WeddingWorkspaceSidebarAction } from "@/lib/weddingWorkspaceActionState";
 import { shouldShowWeddingFirstRunIntake } from "@/lib/weddingFirstRunIntakeGateState";
+import { weddingInitialExperienceMode } from "@/lib/weddingInitialExperienceState";
 import {
   WEDDING_VENDOR_CHECKLIST,
   normalizeWeddingVendorSelections,
@@ -692,8 +693,24 @@ export function ResponseQueueView(props: {
         .catch(() => {});
     }
   });
+  const weddingInitialExperience = createMemo(() => {
+    const launch = weddingTemplateLaunch();
+    const persisted = weddingPersistedWorkspace();
+    const planId = launch?.metadata.weddingPlanId ?? null;
+    return weddingInitialExperienceMode({
+      signedIn: weddingSignedIn(),
+      hasTemplateLaunch: Boolean(launch),
+      hasPersistedWorkspaceContent: Boolean(persisted?.hasPersistedData),
+      followUpRequested: weddingFollowUpRequested(),
+      onboardingResolved: !weddingSignedIn()
+        || planId === null
+        || weddingAccountOnboardingResolvedPlanId() === planId,
+      workspaceRefreshStatus: weddingScopedRefreshState()?.status ?? null,
+      intakeVariantResolved: weddingIntakeVariant() !== null,
+    });
+  });
   const activeWeddingLaunch = createMemo(() => (
-    weddingIntakeActive() ? weddingTemplateLaunch() : null
+    weddingInitialExperience() === "intake" ? weddingTemplateLaunch() : null
   ));
   function updateWeddingAdminDataConsent(enabled: boolean): void {
     const previous = weddingAdminDataConsentEnabled();
@@ -906,9 +923,14 @@ export function ResponseQueueView(props: {
       projectionStorage: localStorage,
     });
   });
-  const standaloneWeddingRichResponse = createMemo(() =>
-    weddingWorkspace() ? null : weddingRichResponse(),
-  );
+  const visibleWeddingWorkspace = createMemo(() => (
+    weddingInitialExperience() === "workspace" ? weddingWorkspace() : null
+  ));
+  const standaloneWeddingRichResponse = createMemo(() => (
+    weddingInitialExperience() === "workspace" && !weddingWorkspace()
+      ? weddingRichResponse()
+      : null
+  ));
   createEffect(() => {
     const workspace = weddingWorkspace();
     if (!workspace) return;
@@ -1929,7 +1951,7 @@ export function ResponseQueueView(props: {
 
   return (
     <div class={RESPONSE_QUEUE_VIEW_CLASS}>
-      <Show when={weddingWorkspace()}>
+      <Show when={visibleWeddingWorkspace()}>
         <div class="relative z-[200] -mx-1 flex flex-wrap items-start gap-2 overflow-visible px-1 pb-1 phone:hidden sm:pb-0">
           <div role="tablist" aria-label="Wedding planner sections" class="flex shrink-0 gap-2">
             <For each={weddingDesktopMenuItems()}>
@@ -1997,7 +2019,7 @@ export function ResponseQueueView(props: {
         </div>
       </Show>
       <div class={RESPONSE_QUEUE_VIEW_HEADER_CLASS}>
-        <Show when={!weddingWorkspace()}>
+        <Show when={!visibleWeddingWorkspace()}>
           <QueueDensityToggle
             density={viewState().density}
             onSelect={selectDensityMode}
@@ -2005,7 +2027,7 @@ export function ResponseQueueView(props: {
           />
         </Show>
       </div>
-      <Show when={weddingWorkspace() && weddingImportNotice()}>
+      <Show when={visibleWeddingWorkspace() && weddingImportNotice()}>
         {(notice) => (
           <div class="ml-auto flex max-w-2xl flex-col gap-2 rounded-2xl border border-teal-100 bg-white/95 px-3 py-2 text-xs leading-5 text-teal-950 shadow-sm sm:flex-row sm:items-center" role="status">
             <p class="min-w-0 flex-1">{notice()}</p>
@@ -2017,7 +2039,7 @@ export function ResponseQueueView(props: {
         )}
       </Show>
 
-      <Show when={weddingWorkspace() && weddingWorkspaceMenu() === "home"}>
+      <Show when={visibleWeddingWorkspace() && weddingWorkspaceMenu() === "home"}>
         <div class="phone:hidden"><WorkspaceSetupBanner
             signedIn={weddingSignedIn()}
             onNavigate={(view, hint) => {
@@ -2030,7 +2052,7 @@ export function ResponseQueueView(props: {
 
       {/* Suppressed while an intake form is the active next step — its "Open wedding
           documents" copy assumes a response already exists, which isn't true yet here. */}
-      <Show when={!weddingWorkspace() && !weddingIntakeActive()}>
+      <Show when={!visibleWeddingWorkspace() && weddingInitialExperience() === "workspace" && !weddingIntakeActive()}>
         <WeddingNavigationArrivalBanner
           state={weddingArrivalBanner()}
           onAction={runWeddingArrivalAction}
@@ -2107,6 +2129,27 @@ export function ResponseQueueView(props: {
         )}
       </Show>
 
+      <Show when={weddingInitialExperience() === "resolving"}>
+        <div class="mx-auto flex min-h-[55vh] w-full max-w-3xl items-center justify-center px-4" role="status" aria-live="polite">
+          <div class="rounded-3xl border border-wedding-border bg-white/95 px-6 py-5 text-center shadow-card">
+            <p class="text-base font-semibold text-wedding-ink">Preparing your wedding planner…</p>
+            <p class="mt-2 text-sm leading-6 text-wedding-ink/65">Checking this account's saved plan before opening the right starting point.</p>
+          </div>
+        </div>
+      </Show>
+
+      <Show when={weddingInitialExperience() === "retry"}>
+        <div class="mx-auto flex min-h-[55vh] w-full max-w-3xl items-center justify-center px-4" role="alert">
+          <div class="rounded-3xl border border-amber-200 bg-white/95 px-6 py-5 text-center shadow-card">
+            <p class="text-base font-semibold text-wedding-ink">Your wedding plan could not be checked just now</p>
+            <p class="mt-2 text-sm leading-6 text-wedding-ink/65">We have not shown onboarding because a failed refresh is not proof that this is a new account.</p>
+            <button type="button" class="mt-4 min-h-11 rounded-lg bg-wedding-primary px-4 text-sm font-semibold text-white" onClick={() => void refreshWeddingWorkspaceMessages()}>
+              Try again
+            </button>
+          </div>
+        </div>
+      </Show>
+
       <Show when={standaloneWeddingRichResponse()}>
         {(richResponse) => (
           <WeddingResponseFeatureBoundary label="Preparing this wedding update">
@@ -2118,7 +2161,7 @@ export function ResponseQueueView(props: {
         )}
       </Show>
 
-      <Show when={weddingWorkspace()}>
+      <Show when={visibleWeddingWorkspace()}>
         {(workspace) => (
           <WeddingResponseFeatureBoundary label="Opening your wedding planner">
             <LazyWeddingResponseWorkspaceView
@@ -2174,7 +2217,7 @@ export function ResponseQueueView(props: {
         )}
       </Show>
 
-      <Show when={!weddingWorkspace()}><ResponseQueueSurface queueCompanionState={viewState().responseSurfaceState} titleTag={RESPONSE_QUEUE_VIEW_TITLE_TAG} compact={viewState().responseSurfaceCompactMode} /></Show>
+      <Show when={!visibleWeddingWorkspace() && weddingInitialExperience() === "workspace"}><ResponseQueueSurface queueCompanionState={viewState().responseSurfaceState} titleTag={RESPONSE_QUEUE_VIEW_TITLE_TAG} compact={viewState().responseSurfaceCompactMode} /></Show>
     </div>
   );
 }
