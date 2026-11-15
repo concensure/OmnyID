@@ -9031,12 +9031,12 @@ implementation commit `a05468de6d3b28db916d23492f866715d765cbc3`.
   couple's story` remains deliberately deferred until a real separately
   permissioned story exists. The co-branded Binder likewise remains deferred
   for publication and asset-rights review.
-## 2026-11-15 - WED-367 quote, operator, import and in-place Wedding hardening (Codex, release candidate)
+## 2026-11-16 - WED-367 quote, operator, import and in-place Wedding hardening (Codex, released)
 
-Worktree `C:\temp\wt\omnyid-wed360`, branch `agent/codex/WED-360`, based on
-`d634bf7593a53f9b02450ad88d56b3139ab1d101`. Build and release only the clean
-exact commit produced from this candidate and record it in `SOURCE_COMMIT` and
-`oracle-runtime-manifest.json`.
+Worktree `C:\temp\wt\omnyid-wed360`, branch `agent/codex/WED-360`.
+Application commit `cd03631160efab96c0eab635f09dddf41f7f750c` was built and
+released from clean detached checkout
+`C:\temp\wt\omnyid-wed367-release-cd03631`.
 
 - Hosted Quote Intelligence keeps model-first structured extraction and now
   falls back to exact-source deterministic fields when the provider is down or
@@ -9064,6 +9064,20 @@ exact commit produced from this candidate and record it in `SOURCE_COMMIT` and
   `wedding-lead-magnet-import-state.test.ts` rejection assertion already
   recorded by WED-366.
 
-Remaining action: commit this candidate, release it from a clean exact-SHA
-worktree, then verify hosted quote extraction, operator environment, account
-absence, runtime provenance and service health.
+- Hosted evidence: `SOURCE_COMMIT` and `oracle-runtime-manifest.json` both
+  contain the full application SHA; the authenticated production proof passes;
+  core containers are running and ClamAV, Postgres, Electric and SeaweedFS are
+  healthy. A real synthetic quote returned source-grounded
+  `quote-extraction.v2` from `openai/gpt-5-mini` with
+  `retained_by_omnyid=false`. The UI image contains the explicit list-kind,
+  rotating example and operator-dashboard code. Production user and tenant
+  schema counts for `concensure@gmail.com` are zero.
+- The normal deployment wrapper became idle after successful container
+  rotation and HTTP 200 workspace smoke, with no child or remote proof process.
+  It was stopped locally; the project production-proof script was then run
+  directly in bounded no-restore mode and passed. No production service was
+  interrupted by stopping the idle wrapper.
+
+Recommended next action: no additional WED-367 implementation. The one
+unrelated lead-magnet assertion should be diagnosed under its own task rather
+than mixed into this released slice.
