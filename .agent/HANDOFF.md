@@ -1,3 +1,43 @@
+## 2026-11-15 - WED-366 vendor sales operations portal (Codex, released; inbox confirmation pending)
+
+Worktree `C:\temp\wt\omnyid-wed360`, branch `agent/codex/WED-360`.
+Application commit `caead2c714a340e511c7edd4f323655d2d218411` was built and released from clean
+detached checkout `C:\temp\wt\omnyid-wed366-release-caead2c`.
+
+- Extended the existing vendor portal rather than creating a second CRM. Claimed vendors now have a
+  dated response/stage history, non-linear journey stages, current customer state, 90-day totals,
+  12-week trends, printable records, computed exception escalation and a named-room availability
+  calendar. `price_review` reuses the Limited Specials calendar authority but is excluded from public
+  availability discovery.
+- Migration `0173_wedding_vendor_sales_operations` stores content-light journey state plus append-only
+  events. Private enquiry content remains in its existing encrypted authority; tenant/vendor scope,
+  optimistic revision and idempotency checks remain server-enforced.
+- Local evidence: Solid UI typecheck and production build pass; five focused vendor-portal contracts
+  pass; `cargo check --lib` passes; a clean Linux image build and disposable pgvector/PostgreSQL 18
+  startup applied migration 0173 and accepted the new constrained states. The full Wedding run is
+  2,283/2,284 with the unrelated pre-existing `wedding-lead-magnet-import-state.test.ts` rejection
+  assertion still failing. Linked Windows Rust test binaries crashed inside rustc twice with process
+  faults and produced no source diagnostic.
+- Hosted evidence: `SOURCE_COMMIT` and `oracle-runtime-manifest.json` both contain the full application
+  SHA; production has migration 0173; the unauthenticated operations route returns the expected 401
+  boundary rather than 404; and the released `vendor-D4Bhynqh.js` contains the Sales & records surface.
+  Caddy and the homeserver are serving, and ClamAV is healthy.
+- Oracle reached 100% during the first homeserver rotation because `/var/backups/omnyid` had accumulated
+  about 21 GB of repeated generations. Only backups older than 12 Nov were removed after their exact
+  paths were enumerated. The six newest generations remain, including the 15 Nov dump whose manifest
+  records verification `passed`; root usage is now 66% with about 16 GB free. No database, attachment
+  volume, current image or active service data was removed.
+- The general deploy wrapper stalled in its post-proof phase and was stopped after direct hosted checks
+  passed. The split homeserver/UI builds themselves completed. This is recorded rather than treating the
+  wrapper as machine-owned green evidence.
+- Controlled mail evidence: Cloudflare Email Sending accepted and queued one production test to
+  `casper.wu01@gmail.com` from `hello@omnyid.com`, returning a provider message ID with no immediate
+  bounce or suppression. Do not claim inbox delivery until the recipient confirms it.
+
+Recommended next action: have the test vendor confirm receipt, then exercise one authenticated claimed
+vendor journey through stage update, printable summary and room price-review state in a browser. Also
+add an explicit backup-retention job so repeated deploy proofs cannot refill `/var/backups`.
+
 ## 2026-11-12 - WED-365 quote upload, operator authority and bulk celebrant slice (Codex, in progress)
 
 Worktree `C:\temp\wt\omnyid-wed360`, branch `agent/codex/WED-360`.

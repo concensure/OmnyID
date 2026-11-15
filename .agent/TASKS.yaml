@@ -1,5 +1,5 @@
 version: 1
-updated: 2026-11-12
+updated: 2026-11-15
 
 lifecycle:
   allowed_statuses:
@@ -17,7 +17,7 @@ lifecycle:
 tasks:
   - id: WED-366
     title: Add a non-linear vendor sales journey, dated response history, operational summary and room calendar to the existing vendor portal
-    status: in_progress
+    status: review
     owner: codex
     branch: agent/codex/WED-360
     worktree: C:/temp/wt/omnyid-wed360
@@ -25,7 +25,7 @@ tasks:
     depends_on: [WED-365, WED-359, WED-352, WED-293]
     files: [postgres/migrations/**vendor*journey**, src/server/wedding_vendor_portal_routes/**, src/server/mod.rs, src/db/migration_catalog.rs, solid-ui/src/components/vendor/**, solid-ui/src/lib/vendorPortalApi.ts, solid-ui/tests/**vendor*portal**, tests/**vendor*portal**, Documents/design/wedding planner/vendor side/**, Documents/verification/**, .agent/**]
     acceptance: [claimed vendors can see dated response history without exposing another vendor or couple private content, each customer journey can carry multiple non-linear stage events and a clear current operational state, the portal shows printable totals and bounded trends from canonical events, venue resources show calendar-open tentative hold confirmed booking and price-review states without replacing Limited Specials authority, stale follow-ups expiring holds quote delays and date conflicts create deduplicated exceptions visible to the vendor, focused backend frontend migration production-build exact-SHA release and hosted health checks pass, one controlled test email reaches the configured test vendor and the actual sender address is recorded]
-    progress: "Implemented a content-light sales-journey projection over canonical encrypted enquiries, named resources and Limited Specials; added dated response/stage history, unique-journey 90-day totals, 12-week trends, computed exception escalation, printable records, room availability calendar and price-review set-aside. Candidate still requires focused/full verification, controlled email proof and exact-SHA Oracle release."
+    progress: "Application SHA caead2c714a340e511c7edd4f323655d2d218411 is live on Oracle with matching SOURCE_COMMIT and runtime manifest. The existing vendor portal now projects dated response and stage history from canonical encrypted enquiries, tracks non-linear customer stages, shows unique-journey 90-day totals and 12-week trends, computes operational exceptions, prints an at-a-glance record, and reuses named resources plus Limited Specials for booked, tentative, open and price-review room states. Typecheck, focused portal contracts, production UI build, cargo check, a clean Linux image build and disposable PostgreSQL migration/constraint checks pass; the full Wedding suite is 2,283/2,284 with one unrelated existing lead-magnet import-state failure, and linked Windows Rust tests remain blocked by a rustc process crash rather than a source diagnostic. Oracle migration 0173 is applied, the protected operations route returns 401 rather than 404, the released portal asset is present and Caddy, homeserver and ClamAV are running. Safe recovery retained the six newest verified backups and removed only superseded generations after /var/backups filled the disk. Cloudflare accepted and queued the controlled test to casper.wu01@gmail.com from hello@omnyid.com with no immediate bounce or suppression; recipient inbox confirmation remains the final review evidence."
 
   - id: WED-365
     title: Restore operator authority, harden quote and vendor search, specify couple coworking, and begin safe bulk celebrant outreach
