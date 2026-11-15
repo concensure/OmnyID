@@ -20,6 +20,7 @@ use super::{
     wedding_vendor_claim_routes::valid_slug,
 };
 
+mod operations;
 mod publication;
 mod resources;
 mod settings;
@@ -48,6 +49,7 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
         .merge(publication::routes())
         .merge(resources::routes())
         .merge(settings::routes())
+        .merge(operations::routes())
 }
 
 pub(super) async fn require_vendor_access(

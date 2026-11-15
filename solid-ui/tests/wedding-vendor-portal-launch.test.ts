@@ -23,7 +23,7 @@ test("vendor-source authentication returns to the existing vendor portal", async
 
 test("verified vendors receive one coherent management shell over existing authorities", async () => {
   const dashboard = await read("solid-ui/src/components/vendor/VendorProfileDashboard.tsx");
-  for (const label of ["Overview", "Availability", "Enquiries", "Public profile", "Settings"]) {
+  for (const label of ["Overview", "Availability", "Enquiries", "Sales & records", "Public profile", "Settings"]) {
     assert.match(dashboard, new RegExp(`label: "${label}"`));
   }
   for (const authority of ["VendorPhotoUploadPanel", "VendorPublicationPanel", "VendorResourcesPanel", "VendorSpecialOffersPanel", "VendorProposalOpportunitiesPanel", "VendorQuotationResponsePanel", "VendorPortalSettingsPanel"]) {
@@ -50,6 +50,26 @@ test("portal extensions use server-scoped revisions, roles and entitlements", as
   assert.match(migration, /wedding_vendor_memberships/);
   assert.match(migration, /wedding_vendor_publication_revisions/);
   assert.doesNotMatch(migration, /message_body|couple_email|budget_amount/i);
+});
+
+test("vendor sales operations project existing enquiries, resources and availability without a parallel CRM", async () => {
+  const [dashboard, panel, routes, migration] = await Promise.all([
+    read("solid-ui/src/components/vendor/VendorProfileDashboard.tsx"),
+    read("solid-ui/src/components/vendor/VendorSalesOperationsPanel.tsx"),
+    read("src/server/wedding_vendor_portal_routes/operations.rs"),
+    read("postgres/migrations/0173_wedding_vendor_sales_operations.sql"),
+  ]);
+  assert.match(dashboard, /VendorSalesOperationsPanel/);
+  for (const surface of ["Response and stage history by date", "Customer journeys", "Space availability calendar", "Print summary", "Needs attention"]) {
+    assert.match(panel, new RegExp(surface));
+  }
+  assert.match(routes, /FROM wedding_enquiry_envelopes/);
+  assert.match(routes, /FROM wedding_vendor_special_offer_slots/);
+  assert.match(routes, /FROM wedding_vendor_rooms/);
+  assert.match(routes, /VendorPermission::Enquiries/);
+  assert.match(routes, /This customer journey changed in another session/);
+  assert.match(migration, /content-light journey stage and due-date decisions/);
+  assert.doesNotMatch(migration, /message_body|quote_body|couple_email|couple_phone|budget_amount/i);
 });
 
 test("Limited Specials supports an explicit authenticated release wildcard without changing false defaults", async () => {

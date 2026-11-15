@@ -879,4 +879,9 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Forward repair preserving all Wedding review eligibility, invitation and appeal event kinds",
         include_str!("../../postgres/migrations/0172_wedding_review_event_kinds.sql"),
     ),
+    (
+        "0173_wedding_vendor_sales_operations",
+        "Content-light vendor sales stages, dated response projection, operational trends and price-review calendar state",
+        include_str!("../../postgres/migrations/0173_wedding_vendor_sales_operations.sql"),
+    ),
 ];

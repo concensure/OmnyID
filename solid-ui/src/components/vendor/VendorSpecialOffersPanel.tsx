@@ -114,6 +114,29 @@ export function VendorSpecialOffersPanel(props: { vendorSlug: string }) {
     finally { setBusy(false); }
   };
 
+  const setAsideForPriceReview = async (offer: VendorSpecialOffer, slot: VendorSpecialSlot) => {
+    if (!offer.room_id || busy() || !confirm("Set this room and date aside while pricing is reviewed? It will be hidden from couple discovery until you reopen it.")) return;
+    setBusy(true); setNotice("");
+    try {
+      await bulkUpdateVendorCalendar({
+        vendorSlug: props.vendorSlug,
+        offerId: offer.offer_id,
+        resourceId: offer.room_id,
+        offerRevision: offer.revision,
+        dates: [slot.local_date],
+        state: "price_review",
+        maximumCapacity: slot.maximum_capacity,
+        minimumSpendCents: slot.minimum_spend_cents,
+        perHeadCents: slot.indicative_per_head_cents,
+        inclusions: slot.inclusions,
+        publicConditions: slot.public_conditions,
+      });
+      await refetch();
+      setNotice("This room and date are set aside for price review and hidden from couple discovery.");
+    } catch (reason) { setNotice(reason instanceof Error ? reason.message : "The date could not be set aside for price review."); }
+    finally { setBusy(false); }
+  };
+
   const slotAction = async (offer: VendorSpecialOffer, slot: VendorSpecialSlot, action: "calendar_open" | "confirm_availability" | "place_hold" | "mark_booked" | "reopen_cancelled_booking" | "pause" | "withdraw" | "reconfirm") => {
     if (busy() || ((action === "mark_booked" || action === "withdraw") && !confirm(action === "mark_booked" ? "Mark this date booked and remove it from discovery?" : "Withdraw this date?"))) return;
     const reason = action === "reopen_cancelled_booking"
@@ -160,7 +183,7 @@ export function VendorSpecialOffersPanel(props: { vendorSlug: string }) {
       <For each={offer.slots}>{(slot) => <div class="mt-3 rounded-lg bg-wedding-surface p-3">
         <div class="flex flex-wrap justify-between gap-2">
           <strong>{new Date(`${slot.local_date}T12:00:00`).toLocaleDateString("en-AU", { dateStyle: "long" })}</strong>
-          <span class="capitalize">{slot.state === "provisional_hold" ? "Temporary hold · 48 hours" : slot.state === "booked" ? "Confirmed booking" : slot.availability_scope === "vendor_confirmed" ? "Vendor confirmed" : "Calendar open"}</span>
+          <span class="capitalize">{slot.state === "provisional_hold" ? "Temporary hold · 48 hours" : slot.state === "booked" ? "Confirmed booking" : slot.state === "price_review" ? "Set aside for price review" : slot.availability_scope === "vendor_confirmed" ? "Vendor confirmed" : "Calendar open"}</span>
         </div>
         <p class="mt-1 text-xs text-wedding-muted">Capacity {slot.maximum_capacity ?? "not supplied"} · Minimum {slot.minimum_spend_cents == null ? "not supplied" : `$${Math.round(slot.minimum_spend_cents / 100).toLocaleString()}`} · {slot.indicative_per_head_cents == null ? "No per-head guide" : `$${Math.round(slot.indicative_per_head_cents / 100)} per head`}</p>
         <p class="mt-1 text-xs text-wedding-muted">Confirmed until {new Date(slot.confirmation_expires_at).toLocaleDateString("en-AU", { dateStyle: "medium" })}</p>
@@ -168,6 +191,7 @@ export function VendorSpecialOffersPanel(props: { vendorSlug: string }) {
         <div class="mt-2 flex flex-wrap gap-2">
           <Show when={!["booked", "withdrawn", "provisional_hold"].includes(slot.state)}><button disabled={busy()} class="min-h-11 rounded-lg border bg-white px-3 text-sm font-semibold" onClick={() => void slotAction(offer, slot, "calendar_open")}>Set calendar open</button><button disabled={busy()} class="min-h-11 rounded-lg border bg-white px-3 text-sm font-semibold" onClick={() => void slotAction(offer, slot, "confirm_availability")}>Confirm availability</button></Show>
           <Show when={slot.state === "enquiry_received"}><button disabled={busy()} class="min-h-11 rounded-lg border bg-white px-3 text-sm font-semibold" onClick={() => confirm("Hold this date for 48 hours? New couples will not see it during the hold.") && void slotAction(offer, slot, "place_hold")}>Hold 48 hours</button></Show>
+          <Show when={offer.room_id && !["booked", "withdrawn", "price_review"].includes(slot.state)}><button disabled={busy()} class="min-h-11 rounded-lg border bg-white px-3 text-sm font-semibold" onClick={() => void setAsideForPriceReview(offer, slot)}>Set aside for price review</button></Show>
           <Show when={!["booked", "withdrawn"].includes(slot.state)}><button disabled={busy()} class="min-h-11 rounded-lg border bg-white px-3 text-sm font-semibold" onClick={() => void slotAction(offer, slot, "pause")}>Pause</button><button disabled={busy()} class="min-h-11 rounded-lg border bg-white px-3 text-sm font-semibold" onClick={() => void slotAction(offer, slot, "mark_booked")}>Mark booked</button><button disabled={busy()} class="min-h-11 rounded-lg border border-red-300 bg-white px-3 text-sm font-semibold text-red-800" onClick={() => void slotAction(offer, slot, "withdraw")}>Withdraw date</button></Show>
           <Show when={slot.state === "booked"}><button disabled={busy()} class="min-h-11 rounded-lg border bg-white px-3 text-sm font-semibold" onClick={() => void slotAction(offer, slot, "reopen_cancelled_booking")}>Reopen cancelled booking</button></Show>
         </div>

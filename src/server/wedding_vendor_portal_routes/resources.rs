@@ -282,11 +282,11 @@ async fn bulk_calendar_http(
     require_paid_feature(&state, &access.vendor_id, "Bulk calendar editing").await?;
     let dates = validate_dates(&body.dates)?;
     let state_name = match body.state.as_str() {
-        "available" | "paused" | "withdrawn" => body.state.as_str(),
+        "available" | "price_review" | "paused" | "withdrawn" => body.state.as_str(),
         _ => {
             return Err((
                 StatusCode::BAD_REQUEST,
-                "Bulk state must be available, paused or withdrawn.".into(),
+                "Bulk state must be available, price_review, paused or withdrawn.".into(),
             ));
         }
     };

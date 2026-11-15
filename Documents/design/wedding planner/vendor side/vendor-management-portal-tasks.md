@@ -1,6 +1,6 @@
 # Vendor management portal — dependency-ordered implementation tasks
 
-Status: first release and P1 portal extensions implemented (audited 11 November 2026)
+Status: first release, P1 extensions and sales-operations projection implemented (audited 15 November 2026)
 
 Source: `vendor management portal spec.md` in the canonical project documents
 
@@ -19,6 +19,7 @@ Rule: extend existing AFP, claim, directory, availability, media, messaging and 
 | VMP-07 | Complete | `0157_wedding_vendor_portal_extensions.sql` and `wedding_vendor_portal_routes/publication.rs` retain draft and accepted revisions, preserve the current public snapshot during review, and feed directory/search projections from the accepted snapshot. |
 | VMP-08 | Complete | Named resources extend `wedding_vendor_rooms`; bounded multi-date editing extends the existing Limited Specials authority with stale-revision and confirmed-booking guards. |
 | VMP-09 | Complete | Vendor memberships enforce server-side roles, per-user notifications keep security alerts mandatory, and `vendor_subscriptions` controls paid portal features without deleting canonical records on downgrade. |
+| VMP-10 | Complete | `0173_wedding_vendor_sales_operations.sql`, `wedding_vendor_portal_routes/operations.rs` and `VendorSalesOperationsPanel.tsx` project dated response history, non-linear journey state, 90-day totals/trends, exception escalation and room-level availability from the existing enquiry, resource and Limited Specials authorities. |
 
 The first-release and P1 acceptance boundaries are implemented. Hosted release evidence remains tied to the exact deployed SHA in `.agent/HANDOFF.md`.
 
@@ -99,6 +100,15 @@ The first-release and P1 acceptance boundaries are implemented. Hosted release e
 
 - Reuse existing grants, notification delivery and entitlement infrastructure.
 - Add vendor staff roles, preferences and free/premium boundaries only after server-side permission tests.
+
+### VMP-10 — Sales history, records and space operations (P1)
+
+- Project response dates and delivery acknowledgements from canonical encrypted enquiry envelopes; do not copy message or quote bodies into a CRM table.
+- Let an authorised vendor record a bounded, non-linear customer state: enquiry, qualification, availability check, tailored quote delivered, tour booked/completed, follow-up, hold, contract, deposit, booked, declined or lost.
+- Keep an immutable dated stage history, optimistic revisions and idempotency keys. A stage change is an operational note only; it never sends a message, signs a contract or moves money.
+- Provide printable 90-day totals and 12-week trends. Count distinct journeys for stage totals so a repeated or reversed stage does not inflate performance.
+- Surface unanswered enquiries, overdue next actions, expiring holds and approaching price reviews as vendor exceptions.
+- Project room-level availability from `wedding_vendor_rooms` and Limited Specials slots. Distinguish open, enquiry received, temporary hold, confirmed booking, unknown and set-aside-for-price-review states; unknown never means unavailable.
 
 ## First-release acceptance
 

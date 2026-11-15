@@ -3489,3 +3489,20 @@ synthetic vendor search or introduce another send path.
   transform. Deep-link, saved-lens and same-page authentication paths apply
   the Wedding presentation before the planner surface becomes visible;
   operator accounts remain excluded.
+
+# 2026-11-15 — Vendor sales operations project canonical evidence instead of copying it
+
+- The claimed-vendor portal reads response dates and delivery acknowledgements
+  from encrypted Wedding enquiry envelopes, resource names from
+  `wedding_vendor_rooms`, and availability from Limited Specials slots. It does
+  not copy couple details, message bodies or quote bodies into a second CRM.
+- The only new mutable authority is a content-light, revisioned customer stage
+  and next-action date. Stages are deliberately non-linear and every change is
+  append-only, actor-attributed and idempotent; changing a stage does not send
+  a message, accept a contract or move money.
+- Room dates set aside for price review are withheld from couple discovery.
+  Unknown dates remain unknown rather than being presented as unavailable.
+- Vendor exceptions are computed from canonical timing evidence: unanswered
+  inbound enquiries, overdue next actions, expiring holds and approaching
+  price reviews. Reporting counts distinct customer journeys so revisiting a
+  stage does not inflate the printable totals.

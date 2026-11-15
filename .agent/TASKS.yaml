@@ -15,6 +15,18 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-366
+    title: Add a non-linear vendor sales journey, dated response history, operational summary and room calendar to the existing vendor portal
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-360
+    worktree: C:/temp/wt/omnyid-wed360
+    base_sha: 9d595fcca535defb0e636a3f47b33f1e29096ae2
+    depends_on: [WED-365, WED-359, WED-352, WED-293]
+    files: [postgres/migrations/**vendor*journey**, src/server/wedding_vendor_portal_routes/**, src/server/mod.rs, src/db/migration_catalog.rs, solid-ui/src/components/vendor/**, solid-ui/src/lib/vendorPortalApi.ts, solid-ui/tests/**vendor*portal**, tests/**vendor*portal**, Documents/design/wedding planner/vendor side/**, Documents/verification/**, .agent/**]
+    acceptance: [claimed vendors can see dated response history without exposing another vendor or couple private content, each customer journey can carry multiple non-linear stage events and a clear current operational state, the portal shows printable totals and bounded trends from canonical events, venue resources show calendar-open tentative hold confirmed booking and price-review states without replacing Limited Specials authority, stale follow-ups expiring holds quote delays and date conflicts create deduplicated exceptions visible to the vendor, focused backend frontend migration production-build exact-SHA release and hosted health checks pass, one controlled test email reaches the configured test vendor and the actual sender address is recorded]
+    progress: "Implemented a content-light sales-journey projection over canonical encrypted enquiries, named resources and Limited Specials; added dated response/stage history, unique-journey 90-day totals, 12-week trends, computed exception escalation, printable records, room availability calendar and price-review set-aside. Candidate still requires focused/full verification, controlled email proof and exact-SHA Oracle release."
+
   - id: WED-365
     title: Restore operator authority, harden quote and vendor search, specify couple coworking, and begin safe bulk celebrant outreach
     status: in_progress

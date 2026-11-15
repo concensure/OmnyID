@@ -11,6 +11,7 @@ import { VendorResourcesPanel } from "@/components/vendor/VendorResourcesPanel";
 import { VendorProposalOpportunitiesPanel } from "@/components/vendor/VendorProposalOpportunitiesPanel";
 import { VendorSpecialOffersPanel } from "@/components/vendor/VendorSpecialOffersPanel";
 import { VendorCelebrantConsultationsPanel } from "@/components/vendor/VendorCelebrantConsultationsPanel";
+import { VendorSalesOperationsPanel } from "@/components/vendor/VendorSalesOperationsPanel";
 import {
   getVendorOwnerProfile,
   updateVendorOwnerProfile,
@@ -27,11 +28,12 @@ export function VendorProfileDashboard(props: { vendorSlug: string }) {
   const [error, setError] = createSignal<string | null>(null);
   const [saved, setSaved] = createSignal(false);
   const initialSection = new URLSearchParams(window.location.search).get("section");
-  const allowedSections = ["overview", "availability", "enquiries", "profile", "settings"] as const;
+  const allowedSections = ["overview", "sales", "availability", "enquiries", "profile", "settings"] as const;
   type Section = typeof allowedSections[number];
   const [section, setSection] = createSignal<Section>(allowedSections.includes(initialSection as Section) ? initialSection as Section : "overview");
   const navigation = [
     { id: "overview" as const, label: "Overview" },
+    { id: "sales" as const, label: "Sales & records" },
     { id: "availability" as const, label: "Availability" },
     { id: "enquiries" as const, label: "Enquiries" },
     { id: "profile" as const, label: "Public profile" },
@@ -84,6 +86,7 @@ export function VendorProfileDashboard(props: { vendorSlug: string }) {
     if (current.completion_percent < 100) actions.push({ label: "Complete public profile", section: "profile", detail: `${current.completion_percent}% complete` });
     if (current.photo_count < 3) actions.push({ label: "Add service photos", section: "profile", detail: `${current.photo_count} published` });
     actions.push(
+      { label: "Review sales journey", section: "sales", detail: "History, exceptions, totals and room calendar" },
       { label: "Check available dates", section: "availability", detail: "Publish or update date evidence" },
       { label: "Review enquiries", section: "enquiries", detail: "Messages, proposals and quotes" },
     );
@@ -125,6 +128,8 @@ export function VendorProfileDashboard(props: { vendorSlug: string }) {
             <div class="mt-4 grid gap-3 sm:grid-cols-2"><For each={nextActions()}>{(item) => <button type="button" class="min-h-24 rounded-xl border border-wedding-muted bg-wedding-surface p-4 text-left hover:border-wedding-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-wedding-accent" onClick={() => changeSection(item.section)}><span class="block font-bold">{item.label}</span><span class="mt-1 block text-sm text-wedding-muted">{item.detail}</span></button>}</For></div>
           </section>
         </Show>
+
+        <Show when={section() === "sales"}><VendorSalesOperationsPanel vendorSlug={props.vendorSlug} /></Show>
 
         <Show when={section() === "profile"}><section class="rounded-xl border border-wedding-muted bg-white p-5 shadow-sm" aria-labelledby="profile-editor-title">
           <h2 id="profile-editor-title" class="text-lg font-semibold">Quick profile updates</h2>
