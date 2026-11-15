@@ -33,9 +33,34 @@ test("vendor portal separates wedding dates from phone consultations", async () 
   assert.match(panel, /Phone consultations are not open yet/);
   assert.match(panel, /Register check/);
   assert.match(panel, /Go live/);
-  assert.match(panel, /Callback accepted/);
+  assert.match(panel, /Both calendars were updated and the couple was emailed/);
   assert.match(panel, /One-off date/);
   assert.match(panel, /Propose new time/);
+});
+
+test("ranked celebrants expose only top-three scoped slots and preserve approval boundaries", async () => {
+  const [panel, detail, ranking, management, migration] = await Promise.all([
+    read("solid-ui/src/components/WeddingCelebrantConsultationShortlistPanel.tsx"),
+    read("solid-ui/src/components/WeddingArtifactDetailPanel.tsx"),
+    read("solid-ui/src/lib/weddingVendorRankingState.ts"),
+    read("solid-ui/src/components/vendor/CelebrantManagementFlow.tsx"),
+    read("postgres/migrations/0174_wedding_celebrant_consultation_approval.sql"),
+  ]);
+  assert.match(detail, /vendorComparisonCards\.slice\(0, 3\)/);
+  assert.match(panel, /vendor_slug=/);
+  assert.match(panel, /available_slots/);
+  assert.match(panel, /Wedding date:/);
+  assert.match(panel, /verify\/start/);
+  assert.match(panel, /Verify and request this time/);
+  assert.match(panel, /Awaiting celebrant approval/);
+  assert.match(ranking, /vendorSlug/);
+  assert.match(management, /Sign in to review and approve requests/);
+  assert.match(management, /auth=register&source=vendor_claim&vendor_slug=/);
+  assert.match(management, /request_summary/);
+  assert.doesNotMatch(management, /current\.requests|requester_name/);
+  assert.match(management, /cannot open couple details, messages, phone numbers or another listing/);
+  assert.match(migration, /requester_user_id/);
+  assert.match(migration, /confirmation_email_status/);
 });
 
 test("public page remains useful without a live celebrant or an account", async () => {

@@ -9081,3 +9081,44 @@ released from clean detached checkout
 Recommended next action: no additional WED-367 implementation. The one
 unrelated lead-magnet assertion should be diagnosed under its own task rather
 than mixed into this released slice.
+## 2026-11-16 - WED-368 ranked celebrant consultation approval and public articles (Codex, release candidate)
+
+Worktree `C:\temp\wt\omnyid-wed360`, branch `agent/codex/WED-360`, based on
+`294300d702a26ccb3b2d247737de18e1748dca02`.
+
+- Connected the existing Ranking Policy V2, Celebrant consultation, scoped
+  capability-link, claimed-vendor, Calendar and transactional-email authorities.
+  Only the current top three Celebrant cards request vendor-scoped published
+  ten-minute slots. A couple verifies the callback phone through Twilio and the
+  selected time remains pending until that claimed Celebrant approves it.
+- Approval atomically changes request state and writes the vendor and requesting
+  account Calendar entries. Confirmation email is attempted after commit and its
+  sent/failed outcome is retained independently. Content-light lifecycle events
+  never contain the phone number or bearer link.
+- The unauthenticated management link remains single-vendor and exposes only
+  total/awaiting/accepted counts plus sign-in and account-creation paths. Names,
+  request times and approval controls require authenticated access to that claimed
+  vendor. Existing fresh wedding-date availability remains a Ranking V2 factor.
+- Selectively imported the fifteen requested articles and eight missing licensed
+  assets from the dirty old checkout into this lineage. Reconciled cards, taxonomy,
+  publication catalogue, metadata and sitemap. Hardened reconciliation so an
+  editorial archive can fill a missing article but cannot overwrite a newer live
+  article.
+- Verification: 25 focused Celebrant/ranking tests pass; all public Wedding site
+  checks pass for 93 sitemap pages; TypeScript, Rust library check and the production
+  Vite build pass. The full Wedding suite is 2,291/2,292 with the same unrelated
+  lead-magnet import-state rejection documented in WED-366/WED-367. The aggregate
+  CI wrapper also reports pre-existing line-budget drift in untouched `src/db.rs`
+  and `src/server/mod.rs`; the focused Wedding line budget passes. Migration 0174
+  was applied successfully with the dependent consultation migrations to local
+  PostgreSQL.
+- Production readiness check (values never printed): Oracle currently has the
+  feature flag false and has none of the consultation pepper, Twilio Account SID,
+  Twilio Auth Token or Twilio Verify Service SID settings. Release the code
+  false-default, but do not claim verified phone scheduling is operational or turn
+  the flag on until those secrets are supplied through root-readable secret files.
+
+Recommended next action: supply the three Twilio values and a generated consultation
+pepper through the existing Oracle secret-file mechanism, enable the feature, then
+run one controlled phone verification, pending-request, claimed-vendor approval,
+email receipt and two-Calendar browser journey before widening the cohort.

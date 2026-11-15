@@ -884,4 +884,9 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Content-light vendor sales stages, dated response projection, operational trends and price-review calendar state",
         include_str!("../../postgres/migrations/0173_wedding_vendor_sales_operations.sql"),
     ),
+    (
+        "0174_wedding_celebrant_consultation_approval",
+        "Account-linked celebrant consultation approval, calendar projection and delivery receipts",
+        include_str!("../../postgres/migrations/0174_wedding_celebrant_consultation_approval.sql"),
+    ),
 ];

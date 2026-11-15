@@ -40,6 +40,12 @@ export type CelebrantManagementSession = {
     separate_wedding_date_calendar: boolean;
     notice: string;
   };
+  request_summary: {
+    total: number;
+    awaiting_approval: number;
+    accepted: number;
+    privacy_notice: string;
+  };
   windows: CelebrantManagementWindow[];
   live: { session_id: string; expires_at: string; call_cap: number; paused: boolean; revision: number } | null;
 };

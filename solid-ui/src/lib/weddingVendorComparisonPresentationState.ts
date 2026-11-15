@@ -222,6 +222,7 @@ export function vendorChoiceCards(
     availability_label: choice.availabilityLabel,
     confidence_label: choice.confidenceLabel,
     vendor_id: choice.vendorId,
+    vendor_slug: choice.vendorSlug,
     wedding_plan_id: weddingPlanId,
     unknown_constraints: choice.unknownHardConstraints,
     feedback_reason_ids: feedbackReasonIds,

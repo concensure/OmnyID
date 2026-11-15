@@ -26,6 +26,7 @@ import {
   toggleWeddingDecisionSelectionValue,
 } from "@/lib/weddingDecisionSelectionState";
 import { WeddingVendorChoiceCard, type WeddingVendorChoiceCardData } from "@/components/WeddingVendorChoiceCard";
+import { WeddingCelebrantConsultationShortlistPanel } from "@/components/WeddingCelebrantConsultationShortlistPanel";
 import type { WeddingVendorChoiceIntent } from "@/lib/weddingVendorChoiceActionState";
 import type { WeddingVendorOutreachFlowState } from "@/lib/weddingVendorOutreachFlowState";
 import type { WeddingVendorEnquiryPermissions } from "@/lib/weddingVendorEnquiryPermissionsState";
@@ -352,6 +353,7 @@ function ArtifactPreviewCard(props: {
             </For>
           </div>
         </Show>
+        <WeddingCelebrantConsultationShortlistPanel cards={props.artifact.vendorComparisonCards.slice(0, 3).map(cardWithCurrentPhoto)} />
         <Show when={preview.budgetSummary}>
           {(summary) => (
             <div class="mt-3 rounded-xl border border-amber-100 bg-amber-50/80 p-3">

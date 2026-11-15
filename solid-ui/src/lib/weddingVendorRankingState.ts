@@ -73,6 +73,7 @@ export type WeddingVendorAvailabilityEvidence = {
 /** Optional, additive evidence the server attaches to a vendor-search source. */
 export type WeddingVendorSourceEvidence = {
   vendor_id?: string | null;
+  vendor_slug?: string | null;
   source_kind?: string | null;
   category?: string | null;
   official_site_confidence?: number | null;
@@ -182,6 +183,7 @@ export type WeddingVendorRankedCandidate = {
   availabilityState: WeddingVendorAvailabilityState;
   availabilityLabel: string;
   vendorId: string | null;
+  vendorSlug: string | null;
   riskFlags: string[];
   unknownHardConstraints: string[];
   components: WeddingVendorUtilityComponent[];
@@ -213,6 +215,7 @@ export type WeddingVendorRankingCardFields = {
   availabilityLabel: string;
   confidenceLabel: string;
   vendorId: string | null;
+  vendorSlug: string | null;
   unknownConstraints: string[];
   weddingPlanId: string | null;
   qualityScoreLabel: string | null;
@@ -300,6 +303,7 @@ function normalizeLimitedSpecial(value: unknown): WeddingVendorLimitedSpecialEvi
 export function normalizeWeddingVendorSourceEvidence(record: Record<string, unknown>): WeddingVendorSourceEvidence {
   const evidence: WeddingVendorSourceEvidence = {};
   const vendorId = clean(record.vendor_id);
+  const vendorSlug = clean(record.vendor_slug);
   const sourceKind = clean(record.source_kind);
   const category = clean(record.category);
   const placeId = clean(record.place_id);
@@ -311,6 +315,7 @@ export function normalizeWeddingVendorSourceEvidence(record: Record<string, unkn
   const rooms = normalizeWeddingVendorRooms(record.rooms);
   const limitedSpecial = normalizeLimitedSpecial(record.limited_special);
   if (vendorId) evidence.vendor_id = vendorId;
+  if (vendorSlug) evidence.vendor_slug = vendorSlug;
   if (sourceKind) evidence.source_kind = sourceKind;
   if (category) evidence.category = category;
   if (placeId) evidence.place_id = placeId;
@@ -337,6 +342,7 @@ export function weddingVendorRankingCardFieldsFromRecord(record: Record<string, 
     availabilityLabel: clean(record.availability_label) || weddingVendorAvailabilityLabel(knownState ? state as WeddingVendorAvailabilityState : "unknown"),
     confidenceLabel: clean(record.confidence_label),
     vendorId: clean(record.vendor_id) || null,
+    vendorSlug: clean(record.vendor_slug) || null,
     unknownConstraints: Array.isArray(record.unknown_constraints)
       ? record.unknown_constraints.map(clean).filter(Boolean).slice(0, 6)
       : [],
@@ -886,6 +892,7 @@ function rankCandidate(
     availabilityState: availability.state,
     availabilityLabel: availability.label,
     vendorId: clean(source.vendor_id) || null,
+    vendorSlug: clean(source.vendor_slug) || null,
     riskFlags: eligibility.riskFlags,
     unknownHardConstraints: eligibility.unknownConstraints.map((constraint) => constraint.label),
     components,

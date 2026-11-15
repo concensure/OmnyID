@@ -3525,3 +3525,22 @@ it does not create a parallel import database. Original files and projected
 rows remain reviewable in Documents before reliance. User-created overview
 notes are removed by relational tombstone events so AFP history remains
 auditable and account scoped.
+## 2026-11-16: Ranked celebrant consultations reuse ranking, capability and calendar authorities
+
+Only the current top-three comparison cards may request the public consultation
+projection, and each request carries the canonical vendor slug selected by
+Ranking Policy V2. Fresh positive wedding-date availability continues to rank
+through the existing availability evidence; consultation windows are not a
+second ranking score and do not imply wedding-date availability.
+
+Twilio Verify remains the phone-possession boundary. A scheduled request is
+pending, not booked, until a user authenticated to that claimed vendor approves
+it. Approval and the vendor/couple Calendar entries commit atomically. Email is
+an independently recorded delivery outcome so a transport outage does not
+undo an approved appointment. Public capability links remain vendor scoped and
+expose aggregate request counts only; names, phone numbers and request details
+require claimed-vendor authentication. AFP-compatible lifecycle evidence is
+content-light and never contains the phone number or capability bearer token.
+
+The editorial archive may seed a missing public article, but reconciliation
+must never overwrite an existing live article from an older archive copy.

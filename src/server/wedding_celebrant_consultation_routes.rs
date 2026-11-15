@@ -3,35 +3,36 @@
 use std::{sync::Arc, time::Duration};
 
 use axum::{
-    Json, Router,
     extract::{Path, Query, Request, State},
-    http::{HeaderMap, HeaderValue, StatusCode, header},
+    http::{header, HeaderMap, HeaderValue, StatusCode},
     middleware::Next,
     response::Response,
     routing::{get, post, put},
+    Json, Router,
 };
-use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use chrono::{DateTime, Datelike, Duration as ChronoDuration, NaiveDate, NaiveTime, Utc};
 use chrono_tz::Australia::Sydney;
 use hmac::{Hmac, Mac};
 use rand::RngCore;
 use serde::Deserialize;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use sha2::Sha256;
 use sqlx::Row;
 use ulid::Ulid;
 
 use crate::wedding_celebrant_consultation::{
-    ACCEPTANCE_HOLD_MINUTES, ConsultationIntent, live_has_capacity, live_session_end,
-    normalize_phone, valid_topic,
+    live_has_capacity, live_session_end, normalize_phone, valid_topic, ConsultationIntent,
+    ACCEPTANCE_HOLD_MINUTES,
 };
 
 use super::{
-    AppState, RateLimitPolicy,
     auth::{
-        authenticated_rate_limit_key, authenticated_user, enforce_rate_limit, public_rate_limit_key,
+        authenticated_rate_limit_key, authenticated_user, enforce_rate_limit,
+        optional_authenticated_user, public_rate_limit_key,
     },
-    wedding_vendor_portal_routes::{VendorPermission, require_vendor_access},
+    wedding_vendor_portal_routes::{require_vendor_access, VendorPermission},
+    AppState, RateLimitPolicy,
 };
 
 type HmacSha256 = Hmac<Sha256>;
@@ -109,6 +110,21 @@ async fn no_store(request: Request, next: Next) -> Response {
 
 fn enabled() -> bool {
     std::env::var("OMNYID_CELEBRANT_CONSULTATIONS_ENABLED").as_deref() == Ok("true")
+}
+
+fn phone_verification_configured() -> bool {
+    [
+        "OMNYID_TWILIO_ACCOUNT_SID",
+        "OMNYID_TWILIO_AUTH_TOKEN",
+        "OMNYID_TWILIO_VERIFY_SERVICE_SID",
+        PEPPER_ENV,
+        "OMNYID_ENCRYPTION_KEY_HEX",
+    ]
+    .iter()
+    .all(|name| {
+        crate::secret_manager::read_process_secret_trimmed(name)
+            .is_some_and(|value| !value.is_empty())
+    })
 }
 
 fn unavailable() -> (StatusCode, String) {
@@ -220,6 +236,52 @@ struct AvailabilityQuery {
     vendor_slug: Option<String>,
 }
 
+async fn next_available_slots(
+    state: &AppState,
+    vendor_id: &str,
+) -> Result<Vec<String>, (StatusCode, String)> {
+    let slots = sqlx::query_scalar::<_, DateTime<Utc>>(
+        r#"SELECT slot
+             FROM wedding_celebrant_pilot_profiles p
+             CROSS JOIN generate_series(
+               (NOW() AT TIME ZONE 'Australia/Sydney')::date,
+               (NOW() AT TIME ZONE 'Australia/Sydney')::date + 30,
+               interval '1 day'
+             ) day
+             JOIN wedding_celebrant_consultation_windows w
+               ON w.vendor_id=p.vendor_id AND w.enabled
+              AND ((w.window_kind='recurring' AND w.weekday=EXTRACT(ISODOW FROM day))
+                OR (w.window_kind='exception_open' AND w.local_date=day::date))
+             CROSS JOIN LATERAL generate_series(
+               ((day::date + w.starts_at) AT TIME ZONE 'Australia/Sydney'),
+               ((day::date + w.ends_at) AT TIME ZONE 'Australia/Sydney')
+                 - make_interval(mins=>p.consultation_minutes),
+               make_interval(mins=>p.consultation_minutes+p.buffer_minutes)
+             ) AS generated(slot)
+            WHERE p.vendor_id=$1
+              AND slot >= NOW() + interval '10 minutes'
+              AND NOT EXISTS (
+                SELECT 1 FROM wedding_celebrant_consultation_windows x
+                 WHERE x.vendor_id=p.vendor_id AND x.enabled
+                   AND x.window_kind='exception_closed' AND x.local_date=day::date
+                   AND x.starts_at <= (slot AT TIME ZONE 'Australia/Sydney')::time
+                   AND x.ends_at > (slot AT TIME ZONE 'Australia/Sydney')::time
+              )
+              AND NOT EXISTS (
+                SELECT 1 FROM wedding_celebrant_callback_requests r
+                 WHERE r.selected_vendor_id=p.vendor_id AND r.scheduled_start=slot
+                   AND r.status IN ('scheduled','accepted','reschedule_requested')
+              )
+            ORDER BY slot
+            LIMIT 12"#,
+    )
+    .bind(vendor_id)
+    .fetch_all(&state.db.pool)
+    .await
+    .map_err(db_error)?;
+    Ok(slots.into_iter().map(|value| value.to_rfc3339()).collect())
+}
+
 async fn public_availability_http(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -250,20 +312,33 @@ async fn public_availability_http(
         .bind(query.vendor_slug.as_deref().map(|value| clean(value,120)))
         .fetch_all(&state.db.pool).await.map_err(db_error)?;
     let now = Utc::now();
-    let cards = rows.into_iter().map(|row| {
-        let expires = row.get::<Option<DateTime<Utc>>,_>("expires_at");
-        let live = expires.is_some_and(|expiry| live_has_capacity(now, expiry, false, row.get::<i64,_>("active_holds"), row.get::<Option<i32>,_>("call_cap").unwrap_or(0), row.get("buffer_minutes")));
-        json!({
+    let mut cards = Vec::with_capacity(rows.len());
+    for row in rows {
+        let expires = row.get::<Option<DateTime<Utc>>, _>("expires_at");
+        let live = expires.is_some_and(|expiry| {
+            live_has_capacity(
+                now,
+                expiry,
+                false,
+                row.get::<i64, _>("active_holds"),
+                row.get::<Option<i32>, _>("call_cap").unwrap_or(0),
+                row.get("buffer_minutes"),
+            )
+        });
+        let vendor_id = row.get::<String, _>("vendor_id");
+        let slots = next_available_slots(&state, &vendor_id).await?;
+        cards.push(json!({
             "vendor_slug":row.get::<String,_>("vendor_slug"),"name":row.get::<String,_>("vendor_name"),
             "service_area":row.get::<String,_>("service_area"),"photo_url":row.get::<Option<String>,_>("photo_url"),
             "languages":row.get::<Vec<String>,_>("languages"),"topics":row.get::<Vec<String>,_>("topics"),
             "accepted_intents":row.get::<Vec<String>,_>("accepted_intents"),"available_now":live,
             "live_until":if live { expires.map(|value|value.to_rfc3339()) } else { None },
-            "next_available_at":row.get::<Option<DateTime<Utc>>,_>("next_start").map(|value|value.to_rfc3339())
-        })
-    }).collect::<Vec<_>>();
+            "next_available_at":slots.first().cloned().or_else(|| row.get::<Option<DateTime<Utc>>,_>("next_start").map(|value|value.to_rfc3339())),
+            "available_slots":slots
+        }));
+    }
     Ok(Json(
-        json!({"timezone":"Australia/Sydney","consultation_minutes":10,"cards":cards,"empty_message":"No celebrant is live right now. You can still choose the next available time or browse celebrants."}),
+        json!({"timezone":"Australia/Sydney","consultation_minutes":10,"phone_verification_configured":phone_verification_configured(),"cards":cards,"empty_message":"No celebrant is live right now. You can still choose the next available time or browse celebrants."}),
     ))
 }
 
@@ -443,6 +518,7 @@ async fn create_request_http(
     if !enabled() {
         return Err(unavailable());
     }
+    let requester = optional_authenticated_user(&state.db, &headers).await?;
     public_limit(&state, &headers, "celebrant-request-create", 8).await?;
     let intent = ConsultationIntent::parse(&request.intent).ok_or((
         StatusCode::BAD_REQUEST,
@@ -584,10 +660,11 @@ async fn create_request_http(
             "request_mode must be immediate or scheduled.".into(),
         ));
     };
-    sqlx::query(r#"INSERT INTO wedding_celebrant_callback_requests (request_id,idempotency_key,verification_id,selected_vendor_id,first_available,request_mode,intent,topic,location,wedding_date,phone_ciphertext,status_token_digest,status,live_session_id,scheduled_start,scheduled_end,hold_expires_at)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)"#)
+    sqlx::query(r#"INSERT INTO wedding_celebrant_callback_requests (request_id,idempotency_key,verification_id,selected_vendor_id,first_available,request_mode,intent,topic,location,wedding_date,phone_ciphertext,status_token_digest,status,live_session_id,scheduled_start,scheduled_end,hold_expires_at,requester_user_id,confirmation_email_status)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)"#)
       .bind(&request_id).bind(idempotency).bind(&request.verification_id).bind(&vendor_id).bind(request.first_available).bind(&request.request_mode).bind(intent.as_str()).bind(&request.topic)
       .bind(request.location.as_deref().map(|v|clean(v,180))).bind(wedding_date).bind(verified.get::<String,_>("phone_ciphertext")).bind(status_digest).bind(status).bind(live_session).bind(scheduled_start).bind(scheduled_end).bind(hold_expires)
+      .bind(requester.as_ref().map(|user| user.id.as_str())).bind(if requester.is_some(){"pending"}else{"not_applicable"})
       .execute(&mut *tx).await.map_err(|error| if error.to_string().contains("uq_celebrant_active_scheduled_slot"){(StatusCode::CONFLICT,"That time was just booked. Choose another time.".into())}else{db_error(error)})?;
     sqlx::query("UPDATE wedding_celebrant_phone_verifications SET status='consumed',consumed_at=NOW() WHERE verification_id=$1").bind(&request.verification_id).execute(&mut *tx).await.map_err(db_error)?;
     tx.commit().await.map_err(db_error)?;
@@ -597,13 +674,13 @@ async fn create_request_http(
         Some(&vendor_id),
         "request_created",
         "visitor",
-        None,
+        requester.as_ref().map(|user| user.id.as_str()),
         &format!("request-{request_id}"),
-        json!({"mode":request.request_mode,"intent":intent.as_str(),"topic":request.topic}),
+        json!({"mode":request.request_mode,"intent":intent.as_str(),"topic":request.topic,"account_linked":requester.is_some(),"approval_state":if status=="scheduled"{"pending"}else{"awaiting_response"}}),
     )
     .await?;
     Ok(Json(
-        json!({"request_id":request_id,"status":status,"status_token":status_token,"hold_expires_at":hold_expires.map(|v|v.to_rfc3339()),"scheduled_start":scheduled_start.map(|v|v.to_rfc3339())}),
+        json!({"request_id":request_id,"status":status,"approval_state":if status=="scheduled"{"pending"}else{"awaiting_response"},"status_token":status_token,"hold_expires_at":hold_expires.map(|v|v.to_rfc3339()),"scheduled_start":scheduled_start.map(|v|v.to_rfc3339())}),
     ))
 }
 
@@ -717,9 +794,17 @@ async fn request_status_http(
     }
     let row=sqlx::query("SELECT r.status,r.hold_expires_at,r.scheduled_start,r.accepted_at,v.vendor_name,v.vendor_slug FROM wedding_celebrant_callback_requests r LEFT JOIN wedding_vendors v ON v.vendor_id=r.selected_vendor_id WHERE r.request_id=$1 AND r.status_token_digest=$2")
       .bind(&request_id).bind(token_digest).fetch_optional(&state.db.pool).await.map_err(db_error)?.ok_or_else(unavailable)?;
-    Ok(Json(
-        json!({"request_id":request_id,"status":row.get::<String,_>("status"),"celebrant_name":row.get::<Option<String>,_>("vendor_name"),"vendor_slug":row.get::<Option<String>,_>("vendor_slug"),"hold_expires_at":row.get::<Option<DateTime<Utc>>,_>("hold_expires_at").map(|v|v.to_rfc3339()),"scheduled_start":row.get::<Option<DateTime<Utc>>,_>("scheduled_start").map(|v|v.to_rfc3339()),"accepted_at":row.get::<Option<DateTime<Utc>>,_>("accepted_at").map(|v|v.to_rfc3339())}),
-    ))
+    let status = row.get::<String, _>("status");
+    Ok(Json(json!({
+        "request_id": request_id,
+        "status": status,
+        "approval_state": if status == "scheduled" { "pending" } else if status == "accepted" { "approved" } else { "not_applicable" },
+        "celebrant_name": row.get::<Option<String>,_>("vendor_name"),
+        "vendor_slug": row.get::<Option<String>,_>("vendor_slug"),
+        "hold_expires_at": row.get::<Option<DateTime<Utc>>,_>("hold_expires_at").map(|v|v.to_rfc3339()),
+        "scheduled_start": row.get::<Option<DateTime<Utc>>,_>("scheduled_start").map(|v|v.to_rfc3339()),
+        "accepted_at": row.get::<Option<DateTime<Utc>>,_>("accepted_at").map(|v|v.to_rfc3339())
+    })))
 }
 
 #[derive(Deserialize)]
@@ -851,10 +936,10 @@ async fn vendor_dashboard_http(
       .bind(&access.vendor_id).fetch_all(&state.db.pool).await.map_err(db_error)?;
     let live=sqlx::query("SELECT session_id,starts_at,expires_at,call_cap,paused_at,revision FROM wedding_celebrant_live_sessions WHERE vendor_id=$1 ORDER BY created_at DESC LIMIT 1")
       .bind(&access.vendor_id).fetch_optional(&state.db.pool).await.map_err(db_error)?;
-    let requests=sqlx::query("SELECT request_id,request_mode,intent,topic,location,wedding_date,status,scheduled_start,hold_expires_at,accepted_at,revision,created_at FROM wedding_celebrant_callback_requests WHERE selected_vendor_id=$1 ORDER BY CASE WHEN status IN ('waiting_acceptance','scheduled') THEN 0 ELSE 1 END,created_at DESC LIMIT 50")
+    let requests=sqlx::query("SELECT r.request_id,r.request_mode,r.intent,r.topic,r.location,r.wedding_date,r.status,r.scheduled_start,r.hold_expires_at,r.accepted_at,r.revision,r.created_at,u.display_name requester_name,(r.requester_user_id IS NOT NULL) account_linked FROM wedding_celebrant_callback_requests r LEFT JOIN users u ON u.id=r.requester_user_id WHERE r.selected_vendor_id=$1 ORDER BY CASE WHEN r.status IN ('waiting_acceptance','scheduled') THEN 0 ELSE 1 END,r.created_at DESC LIMIT 50")
       .bind(&access.vendor_id).fetch_all(&state.db.pool).await.map_err(db_error)?;
     Ok(Json(
-        json!({"vendor":{"vendor_slug":access.vendor_slug,"name":access.vendor_name,"category":access.category},"profile":profile.map(|r|json!({"register_status":r.get::<String,_>("register_status"),"register_type":r.get::<Option<String>,_>("register_type"),"register_checked_at":r.get::<Option<DateTime<Utc>>,_>("register_checked_at").map(|v|v.to_rfc3339()),"service_regions":r.get::<Vec<String>,_>("service_regions"),"languages":r.get::<Vec<String>,_>("languages"),"topics":r.get::<Vec<String>,_>("topics"),"accepted_intents":r.get::<Vec<String>,_>("accepted_intents"),"buffer_minutes":r.get::<i32,_>("buffer_minutes"),"consultation_minutes":r.get::<i32,_>("consultation_minutes"),"business_phone_configured":r.get::<bool,_>("business_phone_configured"),"revision":r.get::<i64,_>("revision")})),"windows":windows.into_iter().map(|r|json!({"window_id":r.get::<String,_>("window_id"),"kind":r.get::<String,_>("window_kind"),"weekday":r.get::<Option<i16>,_>("weekday"),"local_date":r.get::<Option<NaiveDate>,_>("local_date").map(|v|v.to_string()),"starts_at":r.get::<NaiveTime,_>("starts_at").format("%H:%M").to_string(),"ends_at":r.get::<NaiveTime,_>("ends_at").format("%H:%M").to_string(),"enabled":r.get::<bool,_>("enabled"),"revision":r.get::<i64,_>("revision")})).collect::<Vec<_>>(),"live":live.map(|r|json!({"session_id":r.get::<String,_>("session_id"),"starts_at":r.get::<DateTime<Utc>,_>("starts_at").to_rfc3339(),"expires_at":r.get::<DateTime<Utc>,_>("expires_at").to_rfc3339(),"call_cap":r.get::<i32,_>("call_cap"),"paused":r.get::<Option<DateTime<Utc>>,_>("paused_at").is_some(),"revision":r.get::<i64,_>("revision")})),"requests":requests.into_iter().map(|r|json!({"request_id":r.get::<String,_>("request_id"),"mode":r.get::<String,_>("request_mode"),"intent":r.get::<String,_>("intent"),"topic":r.get::<String,_>("topic"),"location":r.get::<Option<String>,_>("location"),"wedding_date":r.get::<Option<NaiveDate>,_>("wedding_date").map(|v|v.to_string()),"status":r.get::<String,_>("status"),"scheduled_start":r.get::<Option<DateTime<Utc>>,_>("scheduled_start").map(|v|v.to_rfc3339()),"hold_expires_at":r.get::<Option<DateTime<Utc>>,_>("hold_expires_at").map(|v|v.to_rfc3339()),"accepted_at":r.get::<Option<DateTime<Utc>>,_>("accepted_at").map(|v|v.to_rfc3339()),"revision":r.get::<i64,_>("revision")})).collect::<Vec<_>>() }),
+        json!({"vendor":{"vendor_slug":access.vendor_slug,"name":access.vendor_name,"category":access.category},"profile":profile.map(|r|json!({"register_status":r.get::<String,_>("register_status"),"register_type":r.get::<Option<String>,_>("register_type"),"register_checked_at":r.get::<Option<DateTime<Utc>>,_>("register_checked_at").map(|v|v.to_rfc3339()),"service_regions":r.get::<Vec<String>,_>("service_regions"),"languages":r.get::<Vec<String>,_>("languages"),"topics":r.get::<Vec<String>,_>("topics"),"accepted_intents":r.get::<Vec<String>,_>("accepted_intents"),"buffer_minutes":r.get::<i32,_>("buffer_minutes"),"consultation_minutes":r.get::<i32,_>("consultation_minutes"),"business_phone_configured":r.get::<bool,_>("business_phone_configured"),"revision":r.get::<i64,_>("revision")})),"windows":windows.into_iter().map(|r|json!({"window_id":r.get::<String,_>("window_id"),"kind":r.get::<String,_>("window_kind"),"weekday":r.get::<Option<i16>,_>("weekday"),"local_date":r.get::<Option<NaiveDate>,_>("local_date").map(|v|v.to_string()),"starts_at":r.get::<NaiveTime,_>("starts_at").format("%H:%M").to_string(),"ends_at":r.get::<NaiveTime,_>("ends_at").format("%H:%M").to_string(),"enabled":r.get::<bool,_>("enabled"),"revision":r.get::<i64,_>("revision")})).collect::<Vec<_>>(),"live":live.map(|r|json!({"session_id":r.get::<String,_>("session_id"),"starts_at":r.get::<DateTime<Utc>,_>("starts_at").to_rfc3339(),"expires_at":r.get::<DateTime<Utc>,_>("expires_at").to_rfc3339(),"call_cap":r.get::<i32,_>("call_cap"),"paused":r.get::<Option<DateTime<Utc>>,_>("paused_at").is_some(),"revision":r.get::<i64,_>("revision")})),"requests":requests.into_iter().map(|r|{let status=r.get::<String,_>("status");json!({"request_id":r.get::<String,_>("request_id"),"mode":r.get::<String,_>("request_mode"),"intent":r.get::<String,_>("intent"),"topic":r.get::<String,_>("topic"),"location":r.get::<Option<String>,_>("location"),"wedding_date":r.get::<Option<NaiveDate>,_>("wedding_date").map(|v|v.to_string()),"status":status,"approval_state":if status=="scheduled"{"pending"}else if status=="accepted"{"approved"}else{"not_applicable"},"requester_name":r.get::<Option<String>,_>("requester_name"),"account_linked":r.get::<bool,_>("account_linked"),"scheduled_start":r.get::<Option<DateTime<Utc>>,_>("scheduled_start").map(|v|v.to_rfc3339()),"hold_expires_at":r.get::<Option<DateTime<Utc>>,_>("hold_expires_at").map(|v|v.to_rfc3339()),"accepted_at":r.get::<Option<DateTime<Utc>>,_>("accepted_at").map(|v|v.to_rfc3339()),"revision":r.get::<i64,_>("revision")})}).collect::<Vec<_>>() }),
     ))
 }
 
@@ -1260,8 +1345,9 @@ async fn vendor_request_action_http(
             "number_notice":Value::Null
         })));
     }
-    let row=sqlx::query("SELECT status,phone_ciphertext,hold_expires_at FROM wedding_celebrant_callback_requests WHERE request_id=$1 AND selected_vendor_id=$2 AND revision=$3")
-      .bind(clean(&request_id,40)).bind(&access.vendor_id).bind(request.expected_revision).fetch_optional(&state.db.pool).await.map_err(db_error)?.ok_or((StatusCode::CONFLICT,"This callback changed elsewhere. Refresh and try again.".into()))?;
+    let request_id = clean(&request_id, 40);
+    let row=sqlx::query("SELECT r.status,r.phone_ciphertext,r.hold_expires_at,r.scheduled_start,r.scheduled_end,r.requester_user_id,u.email requester_email,u.display_name requester_name FROM wedding_celebrant_callback_requests r LEFT JOIN users u ON u.id=r.requester_user_id WHERE r.request_id=$1 AND r.selected_vendor_id=$2 AND r.revision=$3")
+      .bind(&request_id).bind(&access.vendor_id).bind(request.expected_revision).fetch_optional(&state.db.pool).await.map_err(db_error)?.ok_or((StatusCode::CONFLICT,"This callback changed elsewhere. Refresh and try again.".into()))?;
     let current = row.get::<String, _>("status");
     let (next, event) = match request.action.as_str() {
         "accept" if matches!(current.as_str(), "waiting_acceptance" | "scheduled") => {
@@ -1315,14 +1401,86 @@ async fn vendor_request_action_http(
             "Choose a new time from ten minutes to ninety days ahead.".into(),
         ));
     }
+    let mut tx = state.db.pool.begin().await.map_err(db_error)?;
     let updated=sqlx::query("UPDATE wedding_celebrant_callback_requests SET status=$1,accepted_at=CASE WHEN $1='accepted' THEN NOW() ELSE accepted_at END,completed_at=CASE WHEN $1 IN ('connected','not_connected','cancelled') THEN NOW() ELSE completed_at END,scheduled_start=COALESCE($2,scheduled_start),scheduled_end=CASE WHEN $2::timestamptz IS NULL THEN scheduled_end ELSE $2+INTERVAL '10 minutes' END,revision=revision+1,updated_at=NOW() WHERE request_id=$3 AND selected_vendor_id=$4 AND revision=$5")
-      .bind(next).bind(reschedule).bind(&request_id).bind(&access.vendor_id).bind(request.expected_revision).execute(&state.db.pool).await.map_err(db_error)?;
+      .bind(next).bind(reschedule).bind(&request_id).bind(&access.vendor_id).bind(request.expected_revision).execute(&mut *tx).await.map_err(db_error)?;
     if updated.rows_affected() != 1 {
         return Err((
             StatusCode::CONFLICT,
             "This callback changed elsewhere. Refresh and try again.".into(),
         ));
     }
+    let phone = if next == "accepted" {
+        crate::crypto::decrypt_secret(
+            &row.get::<String, _>("phone_ciphertext"),
+            &encryption_key()?,
+        )
+    } else {
+        None
+    };
+    let mut confirmation_email: Option<(String, String, DateTime<Utc>)> = None;
+    if next == "accepted" {
+        if let Some(start) = row.get::<Option<DateTime<Utc>>, _>("scheduled_start") {
+            let end = row
+                .get::<Option<DateTime<Utc>>, _>("scheduled_end")
+                .unwrap_or_else(|| start + ChronoDuration::minutes(10));
+            let couple_name = row
+                .get::<Option<String>, _>("requester_name")
+                .filter(|value| !value.trim().is_empty())
+                .unwrap_or_else(|| "Couple".to_string());
+            let requester_user_id = row.get::<Option<String>, _>("requester_user_id");
+            let requester_event_id = requester_user_id
+                .as_ref()
+                .map(|_| format!("celebrant-consultation-couple-{request_id}"));
+            let vendor_event_id = format!("celebrant-consultation-vendor-{request_id}");
+            let phone_line = phone
+                .as_deref()
+                .map(|value| format!("Verified callback number: {value}."))
+                .unwrap_or_else(|| {
+                    "The verified callback number is available from the consultation request."
+                        .to_string()
+                });
+            sqlx::query(
+                r#"INSERT INTO calendar_events (id,owner_user_id,title,description,start_at,end_at,all_day,status)
+                   VALUES ($1,$2,$3,$4,$5,$6,FALSE,'confirmed')
+                   ON CONFLICT (id) DO UPDATE SET title=EXCLUDED.title,description=EXCLUDED.description,start_at=EXCLUDED.start_at,end_at=EXCLUDED.end_at,status='confirmed',updated_at=NOW()"#,
+            )
+            .bind(&vendor_event_id)
+            .bind(&user.id)
+            .bind(format!("10-minute consultation with {couple_name}"))
+            .bind(format!("Approved OmnyID Wedding celebrant consultation. {phone_line}"))
+            .bind(start)
+            .bind(end)
+            .execute(&mut *tx)
+            .await
+            .map_err(db_error)?;
+            if let (Some(owner), Some(event_id)) =
+                (requester_user_id.as_deref(), requester_event_id.as_deref())
+            {
+                sqlx::query(
+                    r#"INSERT INTO calendar_events (id,owner_user_id,title,description,start_at,end_at,all_day,status)
+                       VALUES ($1,$2,$3,$4,$5,$6,FALSE,'confirmed')
+                       ON CONFLICT (id) DO UPDATE SET title=EXCLUDED.title,description=EXCLUDED.description,start_at=EXCLUDED.start_at,end_at=EXCLUDED.end_at,status='confirmed',updated_at=NOW()"#,
+                )
+                .bind(event_id)
+                .bind(owner)
+                .bind(format!("10-minute consultation with {}", access.vendor_name))
+                .bind("The celebrant approved this phone consultation. They will use your verified callback number.")
+                .bind(start)
+                .bind(end)
+                .execute(&mut *tx)
+                .await
+                .map_err(db_error)?;
+            }
+            sqlx::query("UPDATE wedding_celebrant_callback_requests SET requester_calendar_event_id=COALESCE(requester_calendar_event_id,$1),vendor_calendar_event_id=COALESCE(vendor_calendar_event_id,$2),confirmation_email_status=CASE WHEN requester_user_id IS NULL THEN 'not_applicable' ELSE 'pending' END WHERE request_id=$3")
+                .bind(requester_event_id.as_deref()).bind(&vendor_event_id).bind(&request_id)
+                .execute(&mut *tx).await.map_err(db_error)?;
+            if let Some(email) = row.get::<Option<String>, _>("requester_email") {
+                confirmation_email = Some((email, couple_name, start));
+            }
+        }
+    }
+    tx.commit().await.map_err(db_error)?;
     record_event(
         &state,
         Some(&request_id),
@@ -1337,16 +1495,29 @@ async fn vendor_request_action_http(
         json!({"status":next}),
     )
     .await?;
-    let phone = if next == "accepted" {
-        crate::crypto::decrypt_secret(
-            &row.get::<String, _>("phone_ciphertext"),
-            &encryption_key()?,
+    if let Some((email, couple_name, start)) = confirmation_email {
+        let local = start.with_timezone(&Sydney);
+        let body = format!(
+            "Hi {couple_name},\n\n{} has confirmed your 10-minute phone consultation for {}. They will call the mobile number you verified when making the request.\n\nThe appointment is now in your OmnyID Calendar.\n\nOmnyID Wedding",
+            access.vendor_name,
+            local.format("%A %-d %B %Y at %-I:%M %p %Z")
+        );
+        let delivered = crate::gateway::smtp_out::send_transactional_email(
+            &email,
+            &format!(
+                "{} confirmed your 10-minute consultation",
+                access.vendor_name
+            ),
+            &body,
         )
-    } else {
-        None
-    };
+        .await
+        .is_ok();
+        sqlx::query("UPDATE wedding_celebrant_callback_requests SET confirmation_email_status=$1,confirmation_email_sent_at=CASE WHEN $1='sent' THEN NOW() ELSE confirmation_email_sent_at END WHERE request_id=$2")
+            .bind(if delivered { "sent" } else { "failed" }).bind(&request_id)
+            .execute(&state.db.pool).await.map_err(db_error)?;
+    }
     Ok(Json(
-        json!({"request_id":request_id,"status":next,"callback_phone":phone,"number_notice":if phone.is_some(){Some("Use your nominated business phone. The couple may see its caller ID.")}else{None}}),
+        json!({"request_id":request_id,"status":next,"approval_state":if next=="accepted"{"approved"}else{"not_applicable"},"callback_phone":phone,"number_notice":if phone.is_some(){Some("Use your nominated business phone. The couple may see its caller ID.")}else{None}}),
     ))
 }
 

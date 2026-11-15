@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 
 const repoRoot = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const weddingRoot = resolve(repoRoot, 'wedding');
+const requestedPaths = new Set(process.argv.slice(2).map((value) => resolve(repoRoot, value)));
 const marker = /\s*<!-- omnyid-privacy-analytics:start -->[\s\S]*?<!-- omnyid-privacy-analytics:end -->\s*/gi;
 const directAhrefs = /\s*<script\s+src=["']https:\/\/analytics\.ahrefs\.com\/analytics\.js["'][^>]*><\/script>\s*/gi;
 
@@ -24,6 +25,7 @@ const block = [
 
 let updated = 0;
 for (const path of files(weddingRoot)) {
+  if (requestedPaths.size > 0 && !requestedPaths.has(path)) continue;
   let html = readFileSync(path, 'utf8').replace(marker, '\n').replace(directAhrefs, '\n');
   html = html.replace(
     /<script\s+src=["']([^"']*assets\/js\/measure\.js)["']\s+defer><\/script>/gi,

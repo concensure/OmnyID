@@ -19,6 +19,9 @@ export interface CelebrantRequest {
   location?: string | null;
   wedding_date?: string | null;
   status: string;
+  approval_state?: "pending" | "approved" | "not_applicable";
+  requester_name?: string | null;
+  account_linked?: boolean;
   scheduled_start?: string | null;
   hold_expires_at?: string | null;
   accepted_at?: string | null;
@@ -81,6 +84,6 @@ export const setCelebrantLive = (slug: string, action: "start" | "pause", durati
   method: "PUT", bodyJson: { action, duration_minutes: durationMinutes, call_cap: callCap },
 });
 
-export const actionCelebrantRequest = (slug: string, request: CelebrantRequest, action: "accept" | "pass" | "cancel" | "reschedule" | "connected" | "not_connected", rescheduleStart?: string) => apiFetch<{ status: string; callback_phone?: string; number_notice?: string }>(`/api/wedding/vendor/portal/celebrant-consultations/requests/${encodeURIComponent(request.request_id)}/action?${query(slug)}`, {
+export const actionCelebrantRequest = (slug: string, request: CelebrantRequest, action: "accept" | "pass" | "cancel" | "reschedule" | "connected" | "not_connected", rescheduleStart?: string) => apiFetch<{ status: string; approval_state?: string; callback_phone?: string; number_notice?: string }>(`/api/wedding/vendor/portal/celebrant-consultations/requests/${encodeURIComponent(request.request_id)}/action?${query(slug)}`, {
   method: "POST", bodyJson: { action, expected_revision: request.revision, reschedule_start: rescheduleStart ?? null },
 });

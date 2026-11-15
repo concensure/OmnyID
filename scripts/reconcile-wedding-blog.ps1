@@ -10,7 +10,16 @@ $taxonomyPath = Join-Path $RepoRoot 'wedding\blog-taxonomy.json'
 $cataloguePath = Join-Path $EditorialRoot 'blog-publication-catalogue.csv'
 
 New-Item -ItemType Directory -Force $blogRoot, $EditorialRoot | Out-Null
-Get-ChildItem $EditorialRoot -Filter '*.html' -File | Copy-Item -Destination $blogRoot -Force
+# The published tree can contain newer functional article surfaces than the
+# editorial archive (for example Quote Intelligence). Editorial HTML is an
+# import source for missing articles, never an authority that may overwrite an
+# existing live article.
+Get-ChildItem $EditorialRoot -Filter '*.html' -File | ForEach-Object {
+    $destination = Join-Path $blogRoot $_.Name
+    if (-not (Test-Path -LiteralPath $destination)) {
+        Copy-Item -LiteralPath $_.FullName -Destination $destination
+    }
+}
 
 $taxonomy = Get-Content $taxonomyPath -Raw | ConvertFrom-Json -AsHashtable
 $articleFiles = @(Get-ChildItem $blogRoot -Filter '*.html' -File | Sort-Object BaseName)
@@ -144,7 +153,7 @@ foreach ($slug in ($articleSlugs | Where-Object { $_ -notin $existingSlugs })) {
 "@
 }
 $generatedBlock = "`r`n        <!-- omnyid-catalogue:start -->`r`n" + ($newCards -join "`r`n") + "`r`n        <!-- omnyid-catalogue:end -->`r`n"
-$index = $index -replace '(<div class="blog-grid reveal-stagger" data-blog-grid>)', ('$1' + $generatedBlock)
+$index = $index -replace '(<div class="[^"]*\bblog-grid\b[^"]*"\s+data-blog-grid>)', ('$1' + $generatedBlock)
 Set-Content -Path $blogIndexPath -Value $index -Encoding utf8 -NoNewline
 
 node (Join-Path $RepoRoot 'scripts\reconcile-wedding-seo.mjs')

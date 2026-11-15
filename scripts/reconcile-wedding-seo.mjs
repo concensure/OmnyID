@@ -6,6 +6,7 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const weddingRoot = resolve(repoRoot, 'wedding');
 const docsRoot = resolve(repoRoot, 'docs');
 const origin = 'https://omnyid.com';
+const requestedPaths = new Set(process.argv.slice(2).map((value) => resolve(repoRoot, value)));
 const markerPattern = /\s*<!-- omnyid-seo:start -->[\s\S]*?<!-- omnyid-seo:end -->\s*/gi;
 const months = new Map([
   ['January', '01'], ['February', '02'], ['March', '03'], ['April', '04'],
@@ -80,6 +81,11 @@ function isoDate(html) {
 function removeGeneratedMeta(html) {
   return html
     .replace(markerPattern, '\n')
+    // The generated graph is the single Article authority. Retaining an older
+    // standalone Article block makes crawlers and validators select conflicting
+    // authors or dates; keep unrelated FAQ/Breadcrumb schemas intact.
+    .replace(/<script\s+type=["']application\/ld\+json["']>([\s\S]*?)<\/script>/gi, (match, json) =>
+      /["']?@type["']?\s*:\s*["']Article["']/i.test(json) ? '\n' : match)
     .replace(/\s*<link\s+rel=["']canonical["'][^>]*>\s*/gi, '\n')
     .replace(/\s*<meta\s+(?:property|name)=["'](?:og:[^"']+|twitter:[^"']+|article:published_time|article:author)["'][^>]*>\s*/gi, '\n');
 }
@@ -142,6 +148,7 @@ function rootIndexableFiles() {
 
 let updated = 0;
 for (const path of [...htmlFiles(weddingRoot), ...rootIndexableFiles()]) {
+  if (requestedPaths.size > 0 && !requestedPaths.has(path)) continue;
   let html = readFileSync(path, 'utf8');
   const canonical = pageUrl(path);
   const wedding = path.startsWith(`${weddingRoot}${sep}`);

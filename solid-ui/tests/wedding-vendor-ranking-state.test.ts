@@ -94,6 +94,24 @@ test("availability buckets bookable, verify and excluded without penalising unkn
   assert.ok((result.verify[0]?.fit ?? 0) > (result.bookable[0]?.fit ?? 100), "unknown availability keeps its higher fit");
 });
 
+test("fresh positive celebrant wedding-date availability ranks ahead of unknown availability", () => {
+  const result = rankWeddingVendorCandidates({
+    sources: [
+      source("unknown-celebrant", { category: "Celebrant", vendor_slug: "unknown-celebrant" }),
+      source("available-celebrant", {
+        category: "Celebrant",
+        vendor_slug: "available-celebrant",
+        availability: availability("confirmed_available", "2026-12-01T00:00:00Z"),
+      }),
+    ],
+    requirements: { vendorCategories: ["celebrant"] },
+    now: NOW,
+  });
+  assert.equal(result.bookable[0]?.id, "available-celebrant");
+  assert.equal(result.bookable[0]?.vendorSlug, "available-celebrant");
+  assert.equal(result.verify[0]?.id, "unknown-celebrant");
+});
+
 test("booked vendors are listed separately and temporary holds count as bookable", () => {
   const result = rankWeddingVendorCandidates({
     sources: [

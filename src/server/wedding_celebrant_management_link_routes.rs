@@ -7,27 +7,27 @@
 use std::{sync::Arc, time::Duration};
 
 use axum::{
-    Json, Router,
     extract::{Path, Query, Request, State},
-    http::{HeaderMap, HeaderValue, StatusCode, header},
+    http::{header, HeaderMap, HeaderValue, StatusCode},
     response::{IntoResponse, Response},
     routing::{get, post},
+    Json, Router,
 };
-use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use chrono::{DateTime, Duration as ChronoDuration, NaiveDate, NaiveTime, Utc};
 use hmac::{Hmac, Mac};
 use rand::RngCore;
 use serde::Deserialize;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use sha2::Sha256;
 use sqlx::Row;
 use ulid::Ulid;
 
 use super::{
-    AppState, RateLimitPolicy,
     auth::{
         authenticated_rate_limit_key, authenticated_user, enforce_rate_limit, public_rate_limit_key,
     },
+    AppState, RateLimitPolicy,
 };
 use crate::wedding_celebrant_consultation::live_session_end;
 
@@ -751,6 +751,17 @@ async fn dashboard(
     .fetch_one(&state.db.pool)
     .await
     .unwrap_or(false);
+    let request_summary = sqlx::query(
+        r#"SELECT COUNT(*)::bigint AS total,
+                  COUNT(*) FILTER (WHERE status IN ('waiting_acceptance','scheduled'))::bigint AS awaiting_approval,
+                  COUNT(*) FILTER (WHERE status='accepted')::bigint AS accepted
+             FROM wedding_celebrant_callback_requests
+            WHERE selected_vendor_id=$1"#,
+    )
+    .bind(vendor_id)
+    .fetch_one(&state.db.pool)
+    .await
+    .map_err(db_error)?;
     Ok(
         json!({"vendor":{"slug":vendor.get::<String,_>("vendor_slug"),"name":vendor.get::<String,_>("vendor_name"),"service_area":vendor.get::<String,_>("service_area")},
       "profile":profile.map(|r|json!({"register_status":r.get::<String,_>("register_status"),"register_checked_at":r.get::<Option<DateTime<Utc>>,_>("register_checked_at").map(|v|v.to_rfc3339()),"phone_configured":r.get::<bool,_>("phone_configured"),"participation_status":r.get::<String,_>("participation_status"),"participation_updated_at":r.get::<Option<DateTime<Utc>>,_>("participation_updated_at").map(|v|v.to_rfc3339()),"callback_phone_confirmed":r.get::<bool,_>("callback_phone_confirmed")})),
@@ -760,6 +771,12 @@ async fn dashboard(
         "wedding_date_availability":false,
         "separate_wedding_date_calendar":separate_wedding_date_calendar,
         "notice":"Consultation hours and wedding-date availability use separate scoped authorities."
+      },
+      "request_summary":{
+        "total":request_summary.get::<i64,_>("total"),
+        "awaiting_approval":request_summary.get::<i64,_>("awaiting_approval"),
+        "accepted":request_summary.get::<i64,_>("accepted"),
+        "privacy_notice":"This link shows counts only. Sign in to the claimed vendor account to see and act on request details."
       },
       "windows":windows.into_iter().map(|r|json!({"window_id":r.get::<String,_>("window_id"),"kind":r.get::<String,_>("window_kind"),"weekday":r.get::<Option<i16>,_>("weekday"),"local_date":r.get::<Option<NaiveDate>,_>("local_date").map(|v|v.to_string()),"starts_at":r.get::<NaiveTime,_>("starts_at").format("%H:%M").to_string(),"ends_at":r.get::<NaiveTime,_>("ends_at").format("%H:%M").to_string(),"revision":r.get::<i64,_>("revision")})).collect::<Vec<_>>(),
       "live":live.map(|r|json!({"session_id":r.get::<String,_>("session_id"),"expires_at":r.get::<DateTime<Utc>,_>("expires_at").to_rfc3339(),"call_cap":r.get::<i32,_>("call_cap"),"paused":r.get::<Option<DateTime<Utc>>,_>("paused_at").is_some(),"revision":r.get::<i64,_>("revision")}))}),

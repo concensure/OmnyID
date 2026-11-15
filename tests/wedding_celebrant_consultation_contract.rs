@@ -71,3 +71,23 @@ fn request_lifecycle_supports_reassignment_expiry_and_couple_reschedule_choice()
     assert!(routes.contains("reschedule_declined"));
     assert!(routes.contains("FOR UPDATE OF l SKIP LOCKED LIMIT 1"));
 }
+
+#[test]
+fn ranked_scheduled_requests_wait_for_scoped_vendor_approval_and_project_receipts() {
+    let routes = include_str!("../src/server/wedding_celebrant_consultation_routes.rs");
+    let management = include_str!("../src/server/wedding_celebrant_management_link_routes.rs");
+    let migration =
+        include_str!("../postgres/migrations/0174_wedding_celebrant_consultation_approval.sql");
+    assert!(routes.contains("next_available_slots"));
+    assert!(routes.contains("phone_verification_configured"));
+    assert!(routes.contains("requester_calendar_event_id"));
+    assert!(routes.contains("vendor_calendar_event_id"));
+    assert!(routes.contains("send_transactional_email"));
+    assert!(routes.contains("approval_state"));
+    assert!(management.contains("awaiting_approval"));
+    assert!(management.contains("This link shows counts only"));
+    assert!(migration.contains("requester_user_id TEXT REFERENCES users(id) ON DELETE SET NULL"));
+    let compose = include_str!("../docker-compose.oracle.minimal.yml");
+    assert!(compose.contains("OMNYID_CELEBRANT_CONSULTATIONS_ENABLED:"));
+    assert!(compose.contains("OMNYID_TWILIO_VERIFY_SERVICE_SID_FILE:"));
+}

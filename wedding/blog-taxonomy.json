@@ -54,5 +54,20 @@
   "wedding-website-and-childfree-invitation-wording": { "stakeholders": ["couples", "guests", "families"], "stage": "Details & invites", "locations": [], "emotions": ["etiquette anxiety", "confidence"] },
   "small-ceremony-big-reception-australia": { "stakeholders": ["couples", "venues", "guests"], "stage": "Venue & date", "locations": ["Australia"], "emotions": ["intimacy", "joy"] },
   "wedding-party-without-the-stress": { "stakeholders": ["couples", "wedding party", "families"], "stage": "Details & invites", "locations": [], "emotions": ["stress", "relief"] },
-  "what-couples-forget-final-three-months": { "stakeholders": ["couples", "vendors", "wedding party"], "stage": "Final prep", "locations": [], "emotions": ["overwhelm", "confidence"] }
+  "what-couples-forget-final-three-months": { "stakeholders": ["couples", "vendors", "wedding party"], "stage": "Final prep", "locations": [], "emotions": ["overwhelm", "confidence"] },
+  "married-at-the-movies-cinema-wedding": { "stakeholders": ["couples", "venues", "cinema operators"], "stage": "Venue & date", "locations": ["Australia"], "emotions": ["curiosity", "clarity"] },
+  "unconventional-wedding-venue-hidden-costs": { "stakeholders": ["couples", "venues", "caterers"], "stage": "Venue & date", "locations": ["Australia"], "emotions": ["cost anxiety", "clarity"] },
+  "how-to-elope-in-australia-celebrant": { "stakeholders": ["couples", "celebrants"], "stage": "Celebrant & suppliers", "locations": ["Australia"], "emotions": ["urgency", "confidence"] },
+  "same-sex-wedding-celebrant-australia": { "stakeholders": ["couples", "celebrants"], "stage": "Celebrant & suppliers", "locations": ["Australia"], "emotions": ["belonging", "confidence"] },
+  "non-religious-marriage-celebrant-ceremony": { "stakeholders": ["couples", "celebrants"], "stage": "Celebrant & suppliers", "locations": ["Australia"], "emotions": ["authenticity", "confidence"] },
+  "wedding-photographer-forty-photos-that-matter": { "stakeholders": ["couples", "photographers"], "stage": "Celebrant & suppliers", "locations": [], "emotions": ["nostalgia", "clarity"] },
+  "wedding-gifts-registry-cash-etiquette": { "stakeholders": ["couples", "guests", "families"], "stage": "Details & invites", "locations": ["Australia"], "emotions": ["etiquette anxiety", "clarity"] },
+  "wedding-food-and-drink-gifts-fine-print": { "stakeholders": ["couples", "guests", "vendors"], "stage": "Details & invites", "locations": ["Australia"], "emotions": ["curiosity", "confidence"] },
+  "lace-wedding-veil-guide": { "stakeholders": ["couples", "dressmakers", "stylists"], "stage": "Details & invites", "locations": [], "emotions": ["excitement", "clarity"] },
+  "mantilla-veil-history-and-styling": { "stakeholders": ["couples", "dressmakers", "stylists"], "stage": "Details & invites", "locations": [], "emotions": ["curiosity", "confidence"] },
+  "mens-wedding-band-guide": { "stakeholders": ["couples", "jewellers"], "stage": "Details & invites", "locations": ["Australia"], "emotions": ["uncertainty", "confidence"] },
+  "bridesmaid-gifts-they-will-use": { "stakeholders": ["couples", "wedding party"], "stage": "Details & invites", "locations": [], "emotions": ["consideration", "joy"] },
+  "bachelorette-favours-hens-party-bags": { "stakeholders": ["couples", "wedding party", "guests"], "stage": "Details & invites", "locations": ["Australia"], "emotions": ["creativity", "joy"] },
+  "lab-grown-diamond-engagement-ring-guide": { "stakeholders": ["couples", "jewellers"], "stage": "Plan & budget", "locations": ["Australia"], "emotions": ["cost anxiety", "clarity"] },
+  "wedding-reception-decor-where-to-spend": { "stakeholders": ["couples", "venues", "stylists"], "stage": "Details & invites", "locations": [], "emotions": ["creativity", "clarity"] }
 }
