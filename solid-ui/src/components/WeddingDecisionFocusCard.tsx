@@ -3,6 +3,7 @@ import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show }
 import { DecisionCard } from "@/components/DecisionCard";
 import { WeddingDecisionResearchDetail } from "@/components/WeddingDecisionResearchDetail";
 import { WeddingDecisionRsvpFollowUp } from "@/components/WeddingDecisionRsvpFollowUp";
+import { WeddingSeatingPanel } from "@/components/WeddingSeatingPanel";
 import { WeddingVendorOutreachComposer } from "@/components/WeddingVendorOutreachComposer";
 import type { WeddingVendorChoiceSelectionSaveInput } from "@/components/WeddingArtifactDetailPanel";
 import { loadContacts, saveContacts, subscribeContactsChangedEvent, type Contact } from "@/lib/contactsLocalState";
@@ -75,6 +76,7 @@ export function WeddingDecisionFocusCard(props: {
   const [locallyDeferredIds, setLocallyDeferredIds] = createSignal<Set<string>>(readDeferredIds());
   const [completionRevision, setCompletionRevision] = createSignal(0);
   const [expandedTaskId, setExpandedTaskId] = createSignal<string | null>(null);
+  const [expandedSeatingItemId, setExpandedSeatingItemId] = createSignal<string | null>(null);
   const [expandedWhyItemId, setExpandedWhyItemId] = createSignal<string | null>(null);
   const [showDecisionHistory, setShowDecisionHistory] = createSignal(false);
   const [assignmentDrafts, setAssignmentDrafts] = createSignal<Record<string, string>>({});
@@ -596,6 +598,9 @@ export function WeddingDecisionFocusCard(props: {
                         }
                       } else if (action.id === "why") {
                         setExpandedWhyItemId((current) => current === item.id ? null : item.id);
+                      } else if (action.id === "open" && /assign\s+\d+\s+attending guest|assign.*guest.*table|seating assignment/i.test(item.title)) {
+                        setExpandedTaskId(item.id);
+                        setExpandedSeatingItemId((current) => current === item.id ? null : item.id);
                       } else if (action.id === "open" && isPendingRsvpFollowUp(item.id)) {
                         setRsvpFollowUpOpenId((current) => current === item.id ? null : item.id);
                       } else if (action.id === "open" && researchFor(item.id)) {
@@ -746,6 +751,15 @@ export function WeddingDecisionFocusCard(props: {
                         </Show>
                       </section>
                     )}
+                  </Show>
+                  <Show when={expandedSeatingItemId() === item.id}>
+                    <section class="overflow-hidden rounded-xl border border-pink-200 bg-white p-2 sm:p-3" aria-label="Seating assignment canvas">
+                      <div class="mb-2 flex items-center justify-between gap-2">
+                        <div><p class="text-xs font-semibold uppercase tracking-wide text-pink-900/70">Assign guests in place</p><p class="mt-1 text-xs text-pink-950/70">The task assignment controls stay open above while you place attending guests.</p></div>
+                        <button type="button" class="min-h-9 rounded-full border border-pink-200 px-3 text-xs font-semibold text-pink-950" onClick={() => setExpandedSeatingItemId(null)}>Close canvas</button>
+                      </div>
+                      <WeddingSeatingPanel state={props.state} saveProjection={props.saveProjection} onRefreshWorkspace={props.onRefreshWorkspace ?? undefined} onSidebarAction={props.onSidebarAction} />
+                    </section>
                   </Show>
                 </div>
               );}}

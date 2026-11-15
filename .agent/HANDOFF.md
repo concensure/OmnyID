@@ -9031,3 +9031,39 @@ implementation commit `a05468de6d3b28db916d23492f866715d765cbc3`.
   couple's story` remains deliberately deferred until a real separately
   permissioned story exists. The co-branded Binder likewise remains deferred
   for publication and asset-rights review.
+## 2026-11-15 - WED-367 quote, operator, import and in-place Wedding hardening (Codex, release candidate)
+
+Worktree `C:\temp\wt\omnyid-wed360`, branch `agent/codex/WED-360`, based on
+`d634bf7593a53f9b02450ad88d56b3139ab1d101`. Build and release only the clean
+exact commit produced from this candidate and record it in `SOURCE_COMMIT` and
+`oracle-runtime-manifest.json`.
+
+- Hosted Quote Intelligence keeps model-first structured extraction and now
+  falls back to exact-source deterministic fields when the provider is down or
+  malformed. It never promotes a component into a grand total and retains the
+  USD 50 weekly cutoff. Public burst/day limits are 5 and 10 respectively.
+- Authenticated session authority is refreshed from the server after mount;
+  server-confirmed operators arrive at the admin dashboard and a Wedding deep
+  link cannot overwrite that choice.
+- Up-next notes can be removed in place using account-scoped AFP tombstones.
+  Existing-list imports require an explicit planning kind and reuse the
+  canonical budget, guest/seating, vendor, timeline and Documents projections.
+  Seating decisions mount the existing canvas below the still-visible task
+  assignment controls. Vendor search examples rotate as placeholders only.
+- `concensure@gmail.com` was deleted through the supported full-account route.
+  The route reported profile/ledger deletion and storage release; production
+  checks found zero matching users and zero tenant schemas. Its operator entry
+  was removed, and the running homeserver reports only `admin@omnyid.com` in
+  `OMNYID_ADMIN_EMAILS`. This did not alter separately configured operational
+  report recipients.
+- Local evidence: TypeScript passes; 45 focused Wedding tests pass; four Rust
+  quote-route tests pass; the 390 px browser quote journey reads a TXT file,
+  sends exactly one request only after Analyse and renders grounded output;
+  public-site smoke and the production UI build pass. The full Wedding suite
+  is 2,289/2,290 with only the same unrelated
+  `wedding-lead-magnet-import-state.test.ts` rejection assertion already
+  recorded by WED-366.
+
+Remaining action: commit this candidate, release it from a clean exact-SHA
+worktree, then verify hosted quote extraction, operator environment, account
+absence, runtime provenance and service health.

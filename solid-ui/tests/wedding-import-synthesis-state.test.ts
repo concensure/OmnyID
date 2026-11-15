@@ -6,6 +6,7 @@ import {
   buildWeddingImportSynthesisState,
   WEDDING_IMPORT_MAX_SYNTHESIS_ROWS,
 } from "../src/lib/weddingImportSynthesisState.ts";
+import { buildWeddingBudgetTrackingState } from "../src/lib/weddingBudgetTrackingState.ts";
 import {
   buildWeddingImportParserReadinessState,
   buildWeddingImportParserTaskItems,
@@ -805,4 +806,35 @@ test("legacy placeholder original upload metadata does not clear import parser r
   assert.equal(readiness.unsavedOriginalUploadCount, 1);
   assert.equal(readiness.productionReady, false);
   assert.ok(readiness.blockerLabels.some((label) => /need to be saved/i.test(label)));
+});
+
+test("declared list kind overrides ambiguous headers and budget rows project exact imported amounts", () => {
+  const state = buildWeddingImportSynthesisState({
+    metadata,
+    files: [{
+      name: "my-list.csv",
+      declaredKind: "budget",
+      text: "Thing,Value,Notes\nVenue,$22000,Estimated package\nPhotography,$4800,Quoted",
+    }],
+  });
+  assert.equal(state.items[0]?.artifactKind, "budget_sheet");
+  assert.equal(state.items[0]?.generatedArtifact.input.metadata?.importDeclaredKind, "budget");
+  const budget = buildWeddingBudgetTrackingState({ artifacts: state.artifactInputs });
+  assert.deepEqual(budget.lineItems.map((item) => [item.categoryLabel, item.amount]), [
+    ["Venue", 22000],
+    ["Photography", 4800],
+  ]);
+});
+
+test("a declared seating chart projects through the existing guest and seating artifact", () => {
+  const state = buildWeddingImportSynthesisState({
+    metadata,
+    files: [{
+      name: "room-layout.csv",
+      declaredKind: "seating_chart",
+      text: "Name,Table,RSVP\nAlex,Table 1,Attending\nBlair,Table 2,Attending",
+    }],
+  });
+  assert.equal(state.items[0]?.artifactKind, "guest_list");
+  assert.match(state.generatedArtifacts[0]?.markdown ?? "", /Planning area chosen by user: seating chart/);
 });

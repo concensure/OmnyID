@@ -54,6 +54,7 @@ import {
   fetchEncKey,
   getFleet,
   getAgentUiPreferences,
+  getAuthSession,
   fetchLlmConfig,
   fetchObjectMessages,
   probeApiReachability,
@@ -1309,6 +1310,19 @@ function App() {
   const [activeView, setActiveView] = createSignal<ViewName>(
     initialActiveView
   );
+  onMount(() => {
+    if (!initialSession?.token) return;
+    void getAuthSession().then((user) => {
+      const current = readSession();
+      if (!current?.token || current.user.id !== user.id) return;
+      const refreshed = { token: current.token, user };
+      writeSession(refreshed);
+      setSession(refreshed);
+      if (user.operator === true && current.user.operator !== true) {
+        setActiveView("admin_dashboard");
+      }
+    }).catch(() => undefined);
+  });
   const [weddingNavigationIntent, setWeddingNavigationIntent] = createSignal<ReturnType<typeof consumeWeddingNavigationIntent>>(null);
   const [weddingReturnContextActive, setWeddingReturnContextActive] = createSignal(false);
   const weddingArrivalBanner = createMemo(() =>
@@ -3382,8 +3396,10 @@ function App() {
             setAuthNotice(null);
             setServerOffline(false);
             if (pendingVendorAuthSource) return void window.location.assign(vendorPortalUrlFromDeepLink());
-            const loginUserId = readSession()?.user?.id ?? "";
-            if (readSession()?.user?.operator === true) {
+            const loginSession = readSession();
+            const loginUserId = loginSession?.user?.id ?? "";
+            const operatorLogin = loginSession?.user?.operator === true;
+            if (operatorLogin) {
               selectView("admin_dashboard");
             }
             if (loginUserId && loadShouldShowGuidedTour(loginUserId)) setShowTour(true);
@@ -3393,9 +3409,12 @@ function App() {
             startLoraPolling();
             void import("@/lib/weddingLeadMagnetImportRunnerState").then(({ requestWeddingLeadMagnetImport }) => requestWeddingLeadMagnetImport());
             // Preserve the wedding deep link after authentication.
-            if (shouldLaunchWeddingTemplateFromDeepLink()) {
+            // Operators always arrive at the server-confirmed admin surface.
+            // A /wedding login source must not immediately overwrite that
+            // arrival with the couple planner after the dashboard was chosen.
+            if (!operatorLogin && shouldLaunchWeddingTemplateFromDeepLink()) {
               launchWeddingTemplateFromDeepLink();
-            } else if (shouldQueueOnboardingAfterLogin({ userId: loginUserId, weddingDeepLink: false })) {
+            } else if (!operatorLogin && shouldQueueOnboardingAfterLogin({ userId: loginUserId, weddingDeepLink: false })) {
               // App mounted before this session existed, so the mount-time
               // onboarding check could not run. Queue it behind the privacy
               // tour for this account instead of silently skipping setup.

@@ -14,6 +14,7 @@ import {
 import { weddingTimelineWeddingDateLabel } from "@/lib/weddingTimelineWeddingDateState";
 import {
   projectWeddingOverviewNotes,
+  weddingOverviewNoteRemovalToAfpSendInput,
   weddingOverviewNoteToAfpSendInput,
   type WeddingOverviewNote,
 } from "@/lib/weddingOverviewNoteState";
@@ -105,10 +106,13 @@ export function WeddingHomeOverviewGrid(props: {
   const [noteSaving, setNoteSaving] = createSignal<Domain | null>(null);
   const [noteError, setNoteError] = createSignal<string | null>(null);
   const [optimisticNotes, setOptimisticNotes] = createSignal<WeddingOverviewNote[]>([]);
+  const [optimisticallyRemovedNoteIds, setOptimisticallyRemovedNoteIds] = createSignal<Set<string>>(new Set());
+  const [noteRemovingId, setNoteRemovingId] = createSignal<string | null>(null);
   const overviewNotes = createMemo(() => {
     const projected = projectWeddingOverviewNotes(props.state.afpMessages);
     const known = new Set(projected.map((note) => `${note.domain}:${note.body}:${note.timestamp}`));
     return [...optimisticNotes().filter((note) => !known.has(`${note.domain}:${note.body}:${note.timestamp}`)), ...projected]
+      .filter((note) => !optimisticallyRemovedNoteIds().has(note.id))
       .sort((left, right) => right.timestamp.localeCompare(left.timestamp));
   });
   const transportTask = () => /transport|trackwork|guest logistics|access/i.test(timeline().detailLabel);
@@ -119,6 +123,30 @@ export function WeddingHomeOverviewGrid(props: {
   const openTile = (id: Domain) => {
     const selected = tile(id);
     if (selected?.menuId) props.onSelectMenu?.(selected.menuId);
+  };
+  const removeOverviewNote = async (note: WeddingOverviewNote) => {
+    if (!props.saveProjection || noteRemovingId()) return;
+    setNoteRemovingId(note.id);
+    setNoteError(null);
+    setOptimisticallyRemovedNoteIds((current) => new Set([...current, note.id]));
+    try {
+      await props.saveProjection(weddingOverviewNoteRemovalToAfpSendInput({
+        note,
+        responseWorkspaceId: props.state.workspace.metadata.responseWorkspaceId,
+        weddingPlanId: props.state.workspace.metadata.weddingPlanId,
+      }));
+      setOptimisticNotes((current) => current.filter((candidate) => candidate.id !== note.id));
+      props.onRefreshWorkspace?.();
+    } catch {
+      setOptimisticallyRemovedNoteIds((current) => {
+        const next = new Set(current);
+        next.delete(note.id);
+        return next;
+      });
+      setNoteError("That note could not be removed. Nothing was changed.");
+    } finally {
+      setNoteRemovingId(null);
+    }
   };
   const openTimeline = () => {
     if (transportTask()) {
@@ -253,9 +281,9 @@ export function WeddingHomeOverviewGrid(props: {
             <p class="text-[10px] font-bold uppercase tracking-[0.1em] text-wedding-ink/55">Notes</p>
             <ul class="mt-2 space-y-2">
               <For each={overviewNotes()}>{(note) => (
-                <li class="rounded-lg bg-wedding-page px-2.5 py-2 text-xs leading-5 text-wedding-ink">
-                  <span class="font-semibold text-wedding-primary">{DOMAIN_STYLE[note.domain].label}</span>
-                  <span class="ml-1 [overflow-wrap:anywhere]">{note.body}</span>
+                <li class="flex items-start gap-2 rounded-lg bg-wedding-page px-2.5 py-2 text-xs leading-5 text-wedding-ink">
+                  <span class="min-w-0 flex-1"><span class="font-semibold text-wedding-primary">{DOMAIN_STYLE[note.domain].label}</span><span class="ml-1 [overflow-wrap:anywhere]">{note.body}</span></span>
+                  <button type="button" class="min-h-8 shrink-0 rounded-lg px-2 text-[11px] font-semibold text-wedding-secondary hover:bg-white disabled:opacity-45" disabled={!props.saveProjection || Boolean(noteRemovingId())} aria-label={`Remove ${DOMAIN_STYLE[note.domain].label.toLowerCase()} note`} onClick={() => void removeOverviewNote(note)}>{noteRemovingId() === note.id ? "Removing…" : "Remove"}</button>
                 </li>
               )}</For>
             </ul>

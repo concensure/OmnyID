@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import type { AfpMessage } from "../src/lib/api";
-import { projectWeddingOverviewNotes, weddingOverviewNoteToAfpSendInput } from "../src/lib/weddingOverviewNoteState";
+import { projectWeddingOverviewNotes, weddingOverviewNoteRemovalToAfpSendInput, weddingOverviewNoteToAfpSendInput } from "../src/lib/weddingOverviewNoteState";
 
 test("wedding overview writes an AFP note that the Notes view can project", () => {
     const input = weddingOverviewNoteToAfpSendInput({
@@ -54,4 +54,19 @@ test("wedding overview projects only valid overview notes and keeps newest first
 
 test("wedding overview does not create an empty ledger entry", () => {
   assert.equal(weddingOverviewNoteToAfpSendInput({ domain: "guests", body: "  " }), null);
+});
+
+test("wedding overview removal is an account-scoped tombstone and hides the original note", () => {
+  const original: AfpMessage = {
+    id: "note-1", thread_id: "wedding_overview_note:workspace-1:budget", from: "user://wedding-overview",
+    timestamp: "2026-11-10T01:00:00.000Z", type: "note", kind: "note", subtype: "wedding_overview_note",
+    content: { kind: "wedding_overview_note", domain: "budget", body: "Check the venue allowance." }, views: [], attachments: [],
+  };
+  const removal = weddingOverviewNoteRemovalToAfpSendInput({
+    note: { id: original.id, domain: "budget", body: "Check the venue allowance.", title: "Budget note", timestamp: original.timestamp },
+    responseWorkspaceId: "workspace-1", weddingPlanId: "plan-1", nowIso: "2026-11-10T02:00:00.000Z",
+  });
+  const tombstone: AfpMessage = { id: "remove-1", thread_id: removal.thread_id, from: removal.from, timestamp: removal.timestamp!, type: removal.type, kind: removal.kind, subtype: removal.subtype, content: removal.content, views: [], attachments: [] };
+  assert.equal((removal.content as Record<string, unknown>).note_id, "note-1");
+  assert.deepEqual(projectWeddingOverviewNotes([original, tombstone]), []);
 });

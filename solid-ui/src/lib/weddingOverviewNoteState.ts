@@ -14,6 +14,11 @@ export type WeddingOverviewNote = {
   timestamp: string;
 };
 
+export type WeddingOverviewNoteRemoval = {
+  noteId: string;
+  timestamp: string;
+};
+
 function clean(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -23,12 +28,18 @@ function isDomain(value: unknown): value is WeddingOverviewNoteDomain {
 }
 
 export function projectWeddingOverviewNotes(messages: readonly AfpMessage[]): WeddingOverviewNote[] {
+  const removedIds = new Set(messages.flatMap((message): string[] => {
+    const content = afpRecord(decryptedDisplayContent(message));
+    if (message.type !== "note" || (message.subtype !== "wedding_overview_note_removed" && content.kind !== "wedding_overview_note_removed")) return [];
+    const noteId = clean(content.note_id);
+    return noteId ? [noteId] : [];
+  }));
   return messages.flatMap((message): WeddingOverviewNote[] => {
     const content = afpRecord(decryptedDisplayContent(message));
     if (message.type !== "note" || (message.subtype !== "wedding_overview_note" && content.kind !== "wedding_overview_note")) return [];
     const domain = content.domain;
     const body = clean(content.body);
-    if (!isDomain(domain) || !body) return [];
+    if (!isDomain(domain) || !body || removedIds.has(message.id)) return [];
     return [{
       id: message.id,
       domain,
@@ -37,6 +48,42 @@ export function projectWeddingOverviewNotes(messages: readonly AfpMessage[]): We
       timestamp: message.timestamp,
     }];
   }).sort((left, right) => right.timestamp.localeCompare(left.timestamp));
+}
+
+export function weddingOverviewNoteRemovalToAfpSendInput(input: {
+  note: WeddingOverviewNote;
+  responseWorkspaceId?: string | null;
+  weddingPlanId?: string | null;
+  nowIso?: string;
+}): SendAfpMessageInput {
+  const timestamp = input.nowIso ?? new Date().toISOString();
+  const scope = clean(input.responseWorkspaceId) || clean(input.weddingPlanId) || "wedding";
+  return {
+    thread_id: `wedding_overview_note:${scope}:${input.note.domain}`,
+    from: "user://wedding-overview",
+    to: ["agent://notes", "agent://wedding-planner"],
+    type: "note",
+    kind: "note",
+    subtype: "wedding_overview_note_removed",
+    timestamp,
+    content: {
+      kind: "wedding_overview_note_removed",
+      note_id: input.note.id,
+      domain: input.note.domain,
+      title: "Wedding overview note removed",
+      summary: `Removed ${input.note.domain} note`,
+      response_workspace_id: clean(input.responseWorkspaceId) || null,
+      wedding_plan_id: clean(input.weddingPlanId) || null,
+    },
+    supertags: ["Wedding"],
+    references: [{ id: input.note.id, type: "wedding_overview_note" }],
+    metadata: {
+      origin: "wedding_overview_up_next",
+      wedding_domain: input.note.domain,
+      removes_message_id: input.note.id,
+    },
+    store_in_relational: true,
+  };
 }
 
 export function weddingOverviewNoteToAfpSendInput(input: {

@@ -44,6 +44,23 @@ test("overview assignment remains in place and overview notes use AFP", async ()
   assert.match(noteState, /type: "note"/);
   assert.match(noteState, /subtype: "wedding_overview_note"/);
   assert.match(noteState, /store_in_relational: true/);
+  assert.match(overview, /Remove \$\{DOMAIN_STYLE\[note\.domain\]\.label\.toLowerCase\(\)\} note/);
+  assert.match(noteState, /wedding_overview_note_removed/);
+});
+
+test("seating decisions open the existing canvas while task assignment remains visible", async () => {
+  const focus = await read("solid-ui/src/components/WeddingDecisionFocusCard.tsx");
+  assert.match(focus, /assign\\s\+\\d\+\\s\+attending guest/);
+  assert.match(focus, /setExpandedTaskId\(item\.id\)/);
+  assert.match(focus, /<WeddingSeatingPanel/);
+  assert.match(focus, /The task assignment controls stay open above/);
+});
+
+test("server-confirmed operators are not redirected back into the wedding deep link", async () => {
+  const app = await read("solid-ui/src/App.tsx");
+  assert.match(app, /getAuthSession\(\)/);
+  assert.match(app, /if \(!operatorLogin && shouldLaunchWeddingTemplateFromDeepLink\(\)\)/);
+  assert.match(app, /setActiveView\("admin_dashboard"\)/);
 });
 
 test("decision research exposes real vendor contact actions and an in-place OpenStreetMap", async () => {

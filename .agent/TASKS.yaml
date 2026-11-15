@@ -15,6 +15,18 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-367
+    title: Repair hosted Quote Intelligence and operator arrival, harden Wedding imports and in-place task surfaces, and remove the requested account
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-360
+    worktree: C:/temp/wt/omnyid-wed360
+    base_sha: d634bf75
+    depends_on: [WED-365, WED-366, WED-364, WED-360]
+    files: [wedding/blog/before-you-accept-that-wedding-quote.html, wedding/assets/js/quote-study.js, src/server/**quotation**, src/server/**admin**, src/server/user_management_routes/**, solid-ui/src/App.tsx, solid-ui/src/components/**Wedding**, solid-ui/src/lib/**wedding**, solid-ui/tests/**wedding**, wedding/tests/**quote**, tests/**account**, .agent/**]
+    acceptance: [uploaded text quotes reach canonical analysis without a generic unavailable state and without requiring a pasted-text field, server-confirmed operators land in and retain access to operator dashboard growth calendar-link and vendor-management surfaces, user-created Up next notes can be removed without reloading and remain account scoped, existing-list import requires an explicit list kind and maps budget rows guest or seating names and other supported records into the existing canonical projections with a review step, seating-assignment decisions open the existing seating canvas in place while preserving assignment controls, vendor-search placeholder examples rotate without replacing user input, concensure@gmail.com and its owned private data are deleted through the supported full-account deletion authority and absence is verified, focused tests production build exact-SHA Oracle release provenance and hosted checks pass]
+    progress: "Implementation and local verification complete. Quote Intelligence keeps the hosted structured extractor as primary but now returns a source-grounded deterministic extraction when the model is unavailable or malformed, with arithmetic still outside the model; public burst/day limits are 5/10 while the USD 50 weekly gate remains. Server-confirmed operators refresh stale browser session authority and cannot be redirected from the admin dashboard by a Wedding deep link. Up-next notes use account-scoped removal tombstones; imports require an explicit planning kind and project into the existing budget, guest, seating, vendor or timeline authorities; seating decisions open the existing canvas in place; vendor examples rotate only as placeholders. concensure@gmail.com was deleted through the supported full-account route, including its profile/ledger/storage allocation and tenant schema, and removed from OMNYID_ADMIN_EMAILS; only admin@omnyid.com remains. TypeScript, 45 focused tests, four Rust quote tests, browser quote upload, public-site smoke and production UI build pass. The full Wedding suite is 2,289/2,290 with the same unrelated lead-magnet import-state assertion documented by WED-366. Exact-SHA release and hosted checks remain."
+
   - id: WED-366
     title: Add a non-linear vendor sales journey, dated response history, operational summary and room calendar to the existing vendor portal
     status: review
@@ -29,7 +41,7 @@ tasks:
 
   - id: WED-365
     title: Restore operator authority, harden quote and vendor search, specify couple coworking, and begin safe bulk celebrant outreach
-    status: in_progress
+    status: review
     owner: codex
     branch: agent/codex/WED-360
     worktree: C:/temp/wt/omnyid-wed360

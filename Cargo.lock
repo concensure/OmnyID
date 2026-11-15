@@ -2745,6 +2745,7 @@ dependencies = [
  "prost",
  "protoc-bin-vendored",
  "rand 0.9.5",
+ "regex",
  "reqwest",
  "rust_xlsxwriter",
  "serde",

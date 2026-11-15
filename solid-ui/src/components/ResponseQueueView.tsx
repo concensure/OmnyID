@@ -204,6 +204,7 @@ import {
   loadWeddingImportedArtifacts,
   saveWeddingImportedArtifacts,
   type WeddingImportFileInput,
+  type WeddingImportDeclaredKind,
   type WeddingImportUploadReceipt,
 } from "@/lib/weddingImportSynthesisState";
 import { weddingImportFileInputsFromBrowserFile } from "@/lib/weddingXlsxImportParserState";
@@ -325,6 +326,7 @@ export function ResponseQueueView(props: {
   const [weddingLocalDateRefreshKey, setWeddingLocalDateRefreshKey] = createSignal(0);
   const [weddingLocalBudgetRefreshKey, setWeddingLocalBudgetRefreshKey] = createSignal(0);
   const [weddingImportRefreshKey, setWeddingImportRefreshKey] = createSignal(0);
+  const [weddingImportDeclaredKind, setWeddingImportDeclaredKind] = createSignal<WeddingImportDeclaredKind | "">("");
   const [weddingRefreshRunning, setWeddingRefreshRunning] = createSignal(false);
   const [weddingRefreshQueuedIntent, setWeddingRefreshQueuedIntent] = createSignal<ReturnType<typeof consumeWeddingNavigationIntent>>(null);
   const [weddingRefreshState, setWeddingRefreshState] = createSignal<WeddingWorkspaceRefreshState | null>(null);
@@ -1594,9 +1596,14 @@ export function ResponseQueueView(props: {
       : "No explicit planning fields were detected. Add details manually or paste a more specific answer.");
   }
 
-  async function importWeddingFiles(files: readonly File[]) {
+  async function importWeddingFiles(files: readonly File[], declaredKindOverride?: WeddingImportDeclaredKind) {
     const intent = weddingNavigationIntent();
+    const declaredKind = declaredKindOverride ?? weddingImportDeclaredKind();
     if (!intent || intent.surface !== "planning_files" || files.length === 0 || weddingImportRunning()) return;
+    if (!declaredKind) {
+      setWeddingImportNotice("Choose what the uploaded list contains before selecting a file.");
+      return;
+    }
     setWeddingImportRunning(true);
     try {
       const metadata = weddingWorkspace()?.workspace.metadata ?? normalizeWeddingPlanningMetadata({
@@ -1623,7 +1630,7 @@ export function ResponseQueueView(props: {
             };
           }
         }
-        return weddingImportFileInputsFromBrowserFile(file, uploadReceipt);
+        return weddingImportFileInputsFromBrowserFile(file, uploadReceipt, declaredKind);
       }));
       const fileInputs: WeddingImportFileInput[] = fileInputGroups.flat();
       const synthesis = buildWeddingImportSynthesisState({
@@ -1645,7 +1652,7 @@ export function ResponseQueueView(props: {
             ? `${synthesis.parserNeededCount} need a supported document parser before structured rows can be created.`
             : "Structured content was synthesized during this upload.";
         setWeddingImportNotice(savedCount > 0
-          ? `${synthesis.summaryLabel}. ${processingDetail} ${savedCount} import${savedCount === 1 ? "" : "s"} saved to Documents.`
+          ? `${synthesis.summaryLabel}. ${processingDetail} ${savedCount} import${savedCount === 1 ? "" : "s"} saved to Documents. Review the imported rows there before relying on them.`
           : `${synthesis.summaryLabel}. Imports are saved locally and queued for Files.`
         );
         return;
@@ -2009,7 +2016,7 @@ export function ResponseQueueView(props: {
           </div>
           <div aria-label="Wedding planner controls" class="ml-auto flex shrink-0 items-center gap-2 overflow-visible">
             <WeddingWorkspaceMoreMenu items={weddingMoreMenuItems()} onSelect={(item) => setWeddingWorkspaceMenu(item.id)} />
-            <WeddingUploadFilesButton running={weddingImportRunning()} onChange={importWeddingFilesFromHeader} />
+            <WeddingUploadFilesButton running={weddingImportRunning()} listKind={weddingImportDeclaredKind()} onListKindChange={setWeddingImportDeclaredKind} onChange={importWeddingFilesFromHeader} />
             <QueueDensityToggle
               density={viewState().density}
               onSelect={selectDensityMode}
@@ -2179,7 +2186,7 @@ export function ResponseQueueView(props: {
             activeMenu={weddingWorkspaceMenu()}
             sharePlanOpen={showWeddingSharePlan()}
             onToggleSharePlan={() => setShowWeddingSharePlan((current) => !current)}
-            onImportFiles={(files) => void importWeddingFiles(Array.from(files))}
+            onImportFiles={(files) => void importWeddingFiles(Array.from(files), weddingWorkspaceMenu() === "budget" ? "vendor_list" : "general_planning")}
             onQueryChange={setWeddingWorkspaceQuery}
             onAdminDataConsentChange={updateWeddingAdminDataConsent}
             onRefreshWorkspace={() => void refreshWeddingWorkspaceMessages()}

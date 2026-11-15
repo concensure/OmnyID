@@ -3506,3 +3506,22 @@ synthetic vendor search or introduce another send path.
   inbound enquiries, overdue next actions, expiring holds and approaching
   price reviews. Reporting counts distinct customer journeys so revisiting a
   stage does not inflate the printable totals.
+## 2026-11-15: Quote analysis degrades to grounded extraction, not an unavailable tool
+
+The paid structured extractor remains the preferred Quote Intelligence path.
+If the provider fails, returns invalid JSON or changes schema, the server may
+return only deterministic fields whose exact wording is present in the quote.
+It does not invent inclusions, exclusions or a whole-package total, and all
+arithmetic remains in deterministic client code. This keeps an explicitly
+submitted quote useful without weakening the existing no-retention boundary,
+weekly cost cutoff or source-grounding contract.
+
+## 2026-11-15: Imported list type is explicit; planner projections stay canonical
+
+The Wedding import surface asks the user whether a file is a budget, guest
+list, seating chart, vendor list, timeline or general planning list before it
+is read. That declaration guides the existing artifact and planner projections;
+it does not create a parallel import database. Original files and projected
+rows remain reviewable in Documents before reliance. User-created overview
+notes are removed by relational tombstone events so AFP history remains
+auditable and account scoped.

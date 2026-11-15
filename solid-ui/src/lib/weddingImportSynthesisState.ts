@@ -11,6 +11,7 @@ import {
 } from "@/lib/weddingPlanningTemplateState";
 
 export type WeddingImportSourceKind = "csv" | "tsv" | "spreadsheet" | "google_sheets" | "the_knot" | "text" | "unknown";
+export type WeddingImportDeclaredKind = "budget" | "guest_list" | "seating_chart" | "vendor_list" | "timeline" | "general_planning";
 export type WeddingImportSynthesisStatus = "synthesized" | "needs_parser" | "needs_review";
 
 export type WeddingImportFileInput = {
@@ -25,6 +26,7 @@ export type WeddingImportFileInput = {
   parserFormulaCellCount?: number | null;
   parserWarningLabels?: readonly string[] | null;
   uploadReceipt?: WeddingImportUploadReceipt | null;
+  declaredKind?: WeddingImportDeclaredKind | null;
 };
 
 export type WeddingImportUploadReceipt = {
@@ -289,7 +291,12 @@ function normalizedHeader(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
 
-function inferArtifactKind(headers: readonly string[], fileName: string): WeddingArtifactKind {
+function inferArtifactKind(headers: readonly string[], fileName: string, declaredKind?: WeddingImportDeclaredKind | null): WeddingArtifactKind {
+  if (declaredKind === "budget") return "budget_sheet";
+  if (declaredKind === "guest_list" || declaredKind === "seating_chart") return "guest_list";
+  if (declaredKind === "vendor_list") return "vendor_table";
+  if (declaredKind === "timeline") return "timeline";
+  if (declaredKind === "general_planning") return "research";
   const haystack = `${headers.map(normalizedHeader).join(" ")} ${fileName.toLowerCase()}`;
   const score = (pattern: RegExp) => (haystack.match(pattern) ?? []).length;
   const guestScore = score(/\b(rsvp|guest|attendee|invite|invitation|meal|dietary|allergy|accessibility|table|household)\b/g);
@@ -382,7 +389,7 @@ function synthesizeImport(file: WeddingImportFileInput, metadata: WeddingPlannin
   const rows = parsed.rows;
   const headers = rows[0] ?? [];
   const dataRows = rows.slice(1).filter((row) => row.some(Boolean));
-  const artifactKind = inferArtifactKind(headers, fileName);
+  const artifactKind = inferArtifactKind(headers, fileName, file.declaredKind);
   const title = titleFor(artifactKind, fileName);
   const status: WeddingImportSynthesisStatus = parserRequired
     ? "needs_parser"
@@ -398,7 +405,7 @@ function synthesizeImport(file: WeddingImportFileInput, metadata: WeddingPlannin
   const summaryLabels = [
     `${dataRows.length} row${dataRows.length === 1 ? "" : "s"} detected`,
     `${headers.length} column${headers.length === 1 ? "" : "s"} detected`,
-    artifactKind.replace(/_/g, " "),
+    (file.declaredKind ?? artifactKind).replace(/_/g, " "),
     sourceKind.replace(/_/g, " "),
   ];
   const limitedRows = dataRows.slice(0, WEDDING_IMPORT_PREVIEW_ROWS);
@@ -412,7 +419,8 @@ function synthesizeImport(file: WeddingImportFileInput, metadata: WeddingPlannin
     `- File: ${fileName}`,
     `- Source type: ${sourceKind.replace(/_/g, " ")}`,
     `- Status: ${status.replace(/_/g, " ")}`,
-    `- Inferred planning area: ${artifactKind.replace(/_/g, " ")}`,
+    `- Planning area chosen by user: ${(file.declaredKind ?? "not specified").replace(/_/g, " ")}`,
+    `- Projected planner view: ${artifactKind.replace(/_/g, " ")}`,
     parserName ? `- Read with: ${parserName}` : null,
     parsedSheetName ? `- Sheet: ${parsedSheetName}` : null,
     parserFormulaCellCount > 0 ? `- Formula cells detected: ${parserFormulaCellCount}` : null,
@@ -476,6 +484,7 @@ function synthesizeImport(file: WeddingImportFileInput, metadata: WeddingPlannin
       importParsedSheetName: parsedSheetName || null,
       importParserFormulaCellCount: parserFormulaCellCount,
       importParserWarningLabels: parserWarningLabels,
+      importDeclaredKind: file.declaredKind ?? null,
     },
     sourceLabels: [sourceLabel(sourceKind, fileName)],
     searchLabels: [

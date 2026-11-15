@@ -1,5 +1,5 @@
 // @locs-version: 1.0
-import { createEffect, createMemo, createResource, createSignal, ErrorBoundary, For, onCleanup, Show } from "solid-js";
+import { createEffect, createMemo, createResource, createSignal, ErrorBoundary, For, onCleanup, onMount, Show } from "solid-js";
 
 import { DecisionCard } from "@/components/DecisionCard";
 import { WeddingDashboardIcon, type WeddingDashboardIconId } from "@/components/WeddingDashboardIcons";
@@ -51,6 +51,12 @@ const SEARCH_PROGRESS_LABELS = [
   "Checking what matters most to you…",
   "Looking for nearby vendors…",
   "Finding your strongest matches…",
+] as const;
+
+const VENDOR_SEARCH_EXAMPLES = [
+  "A relaxed waterfront venue near Sydney for 80 guests, indoor wet-weather option, around $22,000 including catering",
+  "Documentary-style photographer for an intimate Blue Mountains wedding, warm natural colour and candid family photos",
+  "Authorised celebrant in inner-west Sydney for a bilingual micro-wedding, warm but not overly formal",
 ] as const;
 
 const CORE_VENDOR_CATEGORY_CHIPS: ReadonlyArray<{ label: string; query: string; icon: WeddingDashboardIconId }> = [
@@ -120,6 +126,7 @@ function VendorSearchDraftInput(props: {
 }) {
   const workspace = () => props.workspace;
   const [draft, setDraft] = createSignal(workspace().vendorSearchQuery ?? "");
+  const [placeholderIndex, setPlaceholderIndex] = createSignal(0);
   let lastExternalValue = workspace().vendorSearchQuery ?? "";
 
   createEffect(() => {
@@ -135,6 +142,13 @@ function VendorSearchDraftInput(props: {
     lastExternalValue = value;
     workspace().onVendorSearchQueryChange?.(value);
   }
+
+  onMount(() => {
+    const timer = window.setInterval(() => {
+      if (!draft()) setPlaceholderIndex((index) => (index + 1) % VENDOR_SEARCH_EXAMPLES.length);
+    }, 5500);
+    onCleanup(() => window.clearInterval(timer));
+  });
 
   return (
     <input
@@ -152,7 +166,7 @@ function VendorSearchDraftInput(props: {
         event.currentTarget.form?.requestSubmit();
       }}
       onBlur={commit}
-      placeholder={props.placeholder}
+      placeholder={VENDOR_SEARCH_EXAMPLES[placeholderIndex()] ?? props.placeholder}
       class={props.class}
     />
   );
@@ -471,7 +485,7 @@ export function WeddingVendorSearchHomeSection(props: {
         <VendorSearchDraftInput
           workspace={workspace()}
           name="wedding-vendor-search-query"
-          placeholder="Search photographers, venues, bands…"
+          placeholder="Describe the category, location, guest count, budget and the feel you want"
           class="h-14 w-full rounded-lg border border-wedding-border bg-wedding-page py-2 pl-12 pr-24 text-base text-wedding-ink outline-none transition duration-150 placeholder:text-wedding-ink/55 focus:border-wedding-primary focus:ring-4 focus:ring-wedding-primary/15"
         />
         <button

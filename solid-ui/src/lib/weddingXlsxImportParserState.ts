@@ -260,6 +260,7 @@ export async function parseWeddingXlsxArrayBuffer(arrayBuffer: ArrayBuffer): Pro
 export async function weddingImportFileInputsFromBrowserFile(
   file: File,
   uploadReceipt: WeddingImportFileInput["uploadReceipt"] = null,
+  declaredKind: WeddingImportFileInput["declaredKind"] = null,
 ): Promise<WeddingImportFileInput[]> {
   const isModernSpreadsheet = /\.xlsx$/i.test(file.name) || /officedocument\.spreadsheetml\.sheet/i.test(file.type);
   const isLegacySpreadsheet = /\.xls$/i.test(file.name) || (/excel/i.test(file.type) && !isModernSpreadsheet);
@@ -276,6 +277,7 @@ export async function weddingImportFileInputsFromBrowserFile(
       parsedSheetName: parsedSheets[0]?.sheetName ?? null,
       parserWarningLabels: parsedSheets.flatMap((sheet) => sheet.warningLabels),
       uploadReceipt,
+      declaredKind,
     }];
     return readableSheets.map((parsed, index) => ({
       name: readableSheets.length === 1 ? file.name : `${file.name} - ${parsed.sheetName ?? `Sheet ${index + 1}`}`,
@@ -289,6 +291,7 @@ export async function weddingImportFileInputsFromBrowserFile(
       parserFormulaCellCount: parsed.formulaCellCount,
       parserWarningLabels: parsed.warningLabels,
       uploadReceipt,
+      declaredKind,
     }));
   }
   return [{
@@ -299,19 +302,22 @@ export async function weddingImportFileInputsFromBrowserFile(
     sourceKind: isLegacySpreadsheet ? "spreadsheet" : null,
     text: !isLegacySpreadsheet && file.size <= WEDDING_IMPORT_MAX_TEXT_BYTES ? await file.text() : "",
     uploadReceipt,
+    declaredKind,
   }];
 }
 
 export async function weddingImportFileInputFromBrowserFile(
   file: File,
   uploadReceipt: WeddingImportFileInput["uploadReceipt"] = null,
+  declaredKind: WeddingImportFileInput["declaredKind"] = null,
 ): Promise<WeddingImportFileInput> {
-  return (await weddingImportFileInputsFromBrowserFile(file, uploadReceipt))[0] ?? {
+  return (await weddingImportFileInputsFromBrowserFile(file, uploadReceipt, declaredKind))[0] ?? {
     name: file.name,
     mimeType: file.type,
     sizeBytes: file.size,
     lastModified: file.lastModified,
     text: "",
     uploadReceipt,
+    declaredKind,
   };
 }

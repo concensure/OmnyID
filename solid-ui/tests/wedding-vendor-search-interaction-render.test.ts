@@ -29,6 +29,15 @@ test("vendor search preserves native caret and word or sentence selection", () =
   assert.doesNotMatch(source, /event\.currentTarget\.select\(\)/);
 });
 
+test("vendor search rotates useful personalised examples without writing into the field", () => {
+  assert.match(source, /VENDOR_SEARCH_EXAMPLES/);
+  assert.match(source, /waterfront venue near Sydney for 80 guests/);
+  assert.match(source, /Documentary-style photographer/);
+  assert.match(source, /Authorised celebrant/);
+  assert.match(source, /placeholder=\{VENDOR_SEARCH_EXAMPLES\[placeholderIndex\(\)\]/);
+  assert.doesNotMatch(source, /setDraft\(VENDOR_SEARCH_EXAMPLES/);
+});
+
 test("vendor search owns Enter rather than an armed global action", () => {
   const magicPointer = readFileSync(resolve(process.cwd(), "src/components/MagicPointer.tsx"), "utf8");
   assert.match(magicPointer, /e\.defaultPrevented \|\| isEditableTarget\(e\.target\)/);

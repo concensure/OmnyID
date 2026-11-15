@@ -866,6 +866,45 @@ export function buildWeddingBudgetPaymentTaskItems(input: WeddingBudgetPaymentTa
     }));
 }
 
+function importedBudgetLineItems(artifacts: readonly WeddingArtifactInput[]): WeddingBudgetLineItem[] {
+  return artifacts.flatMap((artifact): WeddingBudgetLineItem[] => {
+    const metadata = artifact.metadata && typeof artifact.metadata === "object" && !Array.isArray(artifact.metadata)
+      ? artifact.metadata as Record<string, unknown>
+      : {};
+    if (artifact.kind !== "budget_sheet" || (metadata.importDeclaredKind !== "budget" && !/^Imported budget\b/i.test(clean(artifact.title)))) return [];
+    const table = parseMarkdownTable(clean(artifact.bodyText));
+    if (!table) return [];
+    const categoryIndex = headerIndex(table.headers, /\b(category|item|service|budget item|expense|thing|description|name)\b/i);
+    const vendorIndex = headerIndex(table.headers, /\b(vendor|supplier|provider)\b/i);
+    const amountIndex = headerIndex(table.headers, /\b(amount|budget|estimate|estimated|projected|cost|price|total|value|allocated)\b/i);
+    const statusIndex = headerIndex(table.headers, /\b(status|basis|type|certainty)\b/i);
+    const noteIndex = headerIndex(table.headers, /\b(note|notes|detail|description)\b/i);
+    if (amountIndex < 0) return [];
+    return table.rows.flatMap((row, rowIndex): WeddingBudgetLineItem[] => {
+      const amountText = cell(row, amountIndex);
+      const amount = moneyValue(amountText);
+      const categoryLabel = cell(row, categoryIndex) || cell(row, vendorIndex) || `Budget item ${rowIndex + 1}`;
+      if (!categoryLabel || amount === null) return [];
+      const vendorName = cell(row, vendorIndex) || categoryLabel;
+      const context = [cell(row, statusIndex), cell(row, noteIndex), amountText].filter(Boolean).join(" ");
+      const status = priceStatus(context);
+      return [{
+        id: `wedding_import_budget:${safeWeddingLabel(clean(artifact.id) || clean(artifact.title) || "budget")}:${rowIndex + 1}`,
+        linkedArtifactId: clean(artifact.id) || null,
+        vendorName,
+        categoryLabel,
+        amount,
+        currency: currencyFor(amountText),
+        priceStatus: status,
+        sourceLabel: artifactSourceLabelForBudget(artifact, "Imported budget list"),
+        confidenceLabel: "User-provided imported amount",
+        warningLabels: warningLabelsFor(status, amount, context),
+        rowCells: row.map(clean),
+      }];
+    });
+  });
+}
+
 export function buildWeddingBudgetTrackingState(input: {
   decisionRecords?: readonly WeddingPersistedDecisionRecord[] | null;
   selectedDecisionItems?: readonly WeddingDecisionProjectionInput[] | null;
@@ -874,10 +913,10 @@ export function buildWeddingBudgetTrackingState(input: {
   budgetTargetText?: string | null;
 }): WeddingBudgetTrackingState {
   const mergedRecords = mergedBudgetDecisionRecords(input);
-  const lineItems = mergedRecords.flatMap((record): WeddingBudgetLineItem[] => {
+  const lineItems = [...mergedRecords.flatMap((record): WeddingBudgetLineItem[] => {
     const item = lineItemFor(record);
     return item ? [item] : [];
-  });
+  }), ...importedBudgetLineItems(input.artifacts ?? [])];
   const budgetAllocationSummary = weddingBudgetAllocationFromDecisionRecords(mergedRecords);
   const savedContributionRows = weddingBudgetContributionsFromDecisionRecords(mergedRecords);
   const totalProjectedAmount = lineItems
