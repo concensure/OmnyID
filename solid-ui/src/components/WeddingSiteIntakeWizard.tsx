@@ -355,7 +355,7 @@ export function WeddingSiteIntakeWizard(props: {
                 <WeddingDashboardIcon id="calendar-days" class="h-4 w-4" />
               </button>
               <Show when={dateCalendarOpen()}>
-                <div class="absolute left-0 top-full z-30 mt-2 w-72 rounded-2xl border border-rose-100 bg-white p-3 shadow-card">
+                <div class="absolute left-0 right-0 top-full z-30 mt-2 w-auto max-w-[calc(100vw-0.5rem)] rounded-2xl border border-rose-100 bg-white p-3 shadow-card sm:right-auto sm:w-72">
                   <div class="flex items-center justify-between gap-2">
                     <button
                       type="button"
@@ -425,7 +425,7 @@ export function WeddingSiteIntakeWizard(props: {
               <Show when={locationSuggestionsOpen() && locationSuggestions().length > 0}>
                 <div id="wedding-onboarding-location-suggestions" role="listbox" class="absolute left-0 right-0 top-full z-30 mt-1 max-h-56 overflow-y-auto rounded-xl border border-wedding-border bg-white p-1 shadow-card">
                   <For each={locationSuggestions()}>{(suggestion) => (
-                    <button type="button" role="option" class="flex min-h-11 w-full items-center gap-1 rounded-lg px-3 py-2 text-left text-sm hover:bg-wedding-page" onClick={() => { props.onWeddingFollowUpLocationInput(suggestion.label); setLocationSuggestionsOpen(false); }}>
+                    <button type="button" role="option" class="flex min-h-11 w-full items-center gap-1 rounded-lg px-3 py-2 text-left text-sm hover:bg-wedding-page" onPointerDown={(event) => event.preventDefault()} onClick={() => { props.onWeddingFollowUpLocationInput(suggestion.label); setLocationSuggestionsOpen(false); }}>
                       <span class="font-semibold">{suggestion.locality}</span><span class="font-bold text-wedding-secondary">{suggestion.state}</span>
                     </button>
                   )}</For>
@@ -482,7 +482,7 @@ export function WeddingSiteIntakeWizard(props: {
                     <button
                       type="button"
                       aria-pressed={selected()}
-                      class={`group overflow-hidden rounded-xl border bg-white text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-primary ${selected() ? "border-wedding-primary ring-2 ring-wedding-primary/20" : "border-wedding-border hover:border-wedding-primary/50"}`}
+                      class={`group flex min-w-0 flex-col overflow-hidden rounded-xl border bg-white text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-primary ${selected() ? "border-wedding-primary ring-2 ring-wedding-primary/20" : "border-wedding-border hover:border-wedding-primary/50"}`}
                       onClick={() => chooseAtmosphere(choice.detail)}
                     >
                       <img
@@ -492,7 +492,7 @@ export function WeddingSiteIntakeWizard(props: {
                         height="320"
                         loading={index() < 2 ? "eager" : "lazy"}
                         decoding="async"
-                        class="aspect-[3/2] w-full bg-wedding-page object-cover transition duration-300 group-hover:scale-[1.02]"
+                        class="aspect-[3/2] w-full max-w-none bg-wedding-page object-cover transition duration-300 group-hover:scale-[1.02]"
                       />
                       <span class="block px-2 pt-2 text-xs font-bold text-wedding-ink">{choice.label}</span>
                       <span class="block px-2 pb-2 text-[10px] leading-4 text-wedding-ink/65">{choice.detail}</span>
@@ -501,7 +501,7 @@ export function WeddingSiteIntakeWizard(props: {
                 }}
               </For>
             </div>
-            <WeddingInlineHelpNote class="mt-2 font-normal">Choose any photographs that feel close, then add your own words below. Select a photograph again to remove it.</WeddingInlineHelpNote>
+            <WeddingInlineHelpNote class="mt-2 font-normal">Choose any photographs that feel close, then add your own words below.</WeddingInlineHelpNote>
             <textarea
               class="min-h-24 w-full rounded-2xl border border-rose-100 bg-white px-3 py-2 text-sm font-normal text-on-surface outline-none focus:border-rose-300"
               value={props.weddingFollowUpAtmosphere()}
@@ -641,7 +641,7 @@ export function WeddingSiteIntakeWizard(props: {
                 class="min-h-28 w-full rounded-2xl border border-rose-100 bg-white px-3 py-2 text-sm font-normal text-on-surface outline-none focus:border-rose-300"
                 value={props.weddingFollowUpRelationshipFacts()}
                 onInput={(event) => props.onWeddingFollowUpRelationshipFactsInput(event.currentTarget.value)}
-                placeholder="One known fact per line. Leave blank if not already known; OmnyID must not invent relationship history."
+                placeholder="One known fact per line, e.g. We met through mutual friends; Sunday walks are our favourite ritual."
               />
             </label>
             <label class={labelClass}>
@@ -650,7 +650,7 @@ export function WeddingSiteIntakeWizard(props: {
                 class="min-h-28 w-full rounded-2xl border border-rose-100 bg-white px-3 py-2 text-sm font-normal text-on-surface outline-none focus:border-rose-300"
                 value={props.weddingFollowUpVowChecklist()}
                 onInput={(event) => props.onWeddingFollowUpVowChecklistInput(event.currentTarget.value)}
-                placeholder="One checklist item per line, e.g. agree target length; decide private vs ceremony-facing; confirm celebrant constraints."
+                placeholder="One checklist item per line, e.g. agree target length; decide private vs ceremony-facing; choose one shared memory to include."
               />
             </label>
           </div>
@@ -771,26 +771,26 @@ export function WeddingSiteIntakeWizard(props: {
       </Show>
 
       {/* Step navigation */}
-      <div class="mt-4 flex items-center justify-between gap-2">
-        <button
-          type="button"
-          disabled={atFirstStep()}
-          onClick={goBack}
-          class="rounded-lg border border-wedding-secondary bg-white px-4 py-2 text-sm font-semibold text-wedding-secondary transition hover:bg-wedding-slate disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          Back
-        </button>
-        <Show when={!atLastStep()}>
-          <div class="flex flex-wrap items-center gap-2">
-            <Show when={step() === 1 || step() === 2}>
-              <button
-                type="button"
-                onClick={goNext}
-                class="rounded-lg px-3 py-2 text-xs font-semibold text-wedding-secondary underline decoration-wedding-border underline-offset-2"
-              >
-                Skip — decide later
-              </button>
-            </Show>
+      <div class="mt-4">
+        <Show when={step() === 1 || step() === 2}>
+          <button
+            type="button"
+            onClick={goNext}
+            class="mb-2 block w-full rounded-lg px-3 py-2 text-center text-xs font-semibold text-wedding-secondary underline decoration-wedding-border underline-offset-2"
+          >
+            Skip — decide later
+          </button>
+        </Show>
+        <div class="flex items-center justify-between gap-2">
+          <button
+            type="button"
+            disabled={atFirstStep()}
+            onClick={goBack}
+            class="rounded-lg border border-wedding-secondary bg-white px-4 py-2 text-sm font-semibold text-wedding-secondary transition hover:bg-wedding-slate disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Back
+          </button>
+          <Show when={!atLastStep()}>
             <button
               type="button"
               onClick={goNext}
@@ -798,8 +798,8 @@ export function WeddingSiteIntakeWizard(props: {
             >
               Next
             </button>
-          </div>
-        </Show>
+          </Show>
+        </div>
       </div>
     </section>
   );

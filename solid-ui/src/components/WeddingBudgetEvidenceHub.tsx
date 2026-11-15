@@ -1,4 +1,4 @@
-import { For, Match, Show, Switch, createEffect, createMemo, createSignal } from "solid-js";
+import { For, Match, Show, Switch, createEffect, createMemo, createSignal, onMount } from "solid-js";
 import { WeddingNormalizedQuoteSummary } from "@/components/WeddingNormalizedQuoteSummary";
 import type { SendAfpMessageInput } from "@/lib/api";
 import type { WeddingArtifactQuotePreview } from "@/lib/weddingArtifactPreviewState";
@@ -91,6 +91,9 @@ export function WeddingBudgetEvidenceHub(props: {
   const [selectedQuoteIds, setSelectedQuoteIds] = createSignal<string[]>([]);
   const [notice, setNotice] = createSignal<string | null>(null);
   const [savingSourceId, setSavingSourceId] = createSignal<string | null>(null);
+  const [canScrollTabsBack, setCanScrollTabsBack] = createSignal(false);
+  const [canScrollTabsForward, setCanScrollTabsForward] = createSignal(true);
+  let tabScroller: HTMLDivElement | undefined;
   const state = createMemo(() => buildWeddingBudgetEvidenceHubState(props.state));
   const quoteArtifacts = createMemo(() => props.state.artifactPreviews.filter((artifact) => artifact.preview?.kind === "quote"));
   const activeQuote = createMemo(() => quoteArtifacts().find((artifact) => artifact.artifactId === activeQuoteId()) ?? null);
@@ -101,6 +104,17 @@ export function WeddingBudgetEvidenceHub(props: {
     setActiveTab("quotes");
     setIntakeOpen(true);
   });
+  function updateTabScrollControls(): void {
+    if (!tabScroller) return;
+    setCanScrollTabsBack(tabScroller.scrollLeft > 4);
+    setCanScrollTabsForward(tabScroller.scrollLeft + tabScroller.clientWidth < tabScroller.scrollWidth - 4);
+  }
+  function scrollTabs(direction: -1 | 1): void {
+    if (!tabScroller) return;
+    tabScroller.scrollBy({ left: direction * Math.max(160, tabScroller.clientWidth * 0.72), behavior: "smooth" });
+    window.setTimeout(updateTabScrollControls, 220);
+  }
+  onMount(() => queueMicrotask(updateTabScrollControls));
 
   function openReading(artifactId: string): void {
     setActiveQuoteId(artifactId);
@@ -136,7 +150,9 @@ export function WeddingBudgetEvidenceHub(props: {
         <h2 id="wedding-budget-hub-title" class="mt-1 font-display text-xl font-semibold text-wedding-ink">Budget at a glance</h2>
         <p class="mt-1 text-sm leading-6 text-wedding-ink/65">Quotes, contracts and payment dates stay connected to their source files in Documents.</p>
       </div>
-      <div class="mt-4 flex max-w-full gap-2 overflow-x-auto pb-1" role="tablist" aria-label="Budget details">
+      <div class="mt-4 grid max-w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-1">
+        <button type="button" aria-label="Show earlier budget tabs" class={`hidden h-10 w-8 items-center justify-center rounded-full border border-wedding-border bg-white text-lg font-semibold text-wedding-primary phone:inline-flex ${canScrollTabsBack() ? "" : "phone:invisible"}`} onClick={() => scrollTabs(-1)}>←</button>
+        <div ref={tabScroller} class="flex min-w-0 gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="tablist" aria-label="Budget details" onScroll={updateTabScrollControls}>
         <For each={state().tabs}>{(tab) => (
           <button
             type="button"
@@ -149,6 +165,8 @@ export function WeddingBudgetEvidenceHub(props: {
             {tab.label}<Show when={tab.id !== "overview"}> ({tab.count})</Show>
           </button>
         )}</For>
+        </div>
+        <button type="button" aria-label="Show later budget tabs" class={`hidden h-10 w-8 items-center justify-center rounded-full border border-wedding-border bg-white text-lg font-semibold text-wedding-primary phone:inline-flex ${canScrollTabsForward() ? "" : "phone:invisible"}`} onClick={() => scrollTabs(1)}>→</button>
       </div>
       <div id={`wedding-budget-panel-${activeTab()}`} role="tabpanel" class="mt-4 min-w-0">
         <Switch>

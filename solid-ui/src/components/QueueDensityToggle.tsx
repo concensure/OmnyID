@@ -79,7 +79,7 @@ export function QueueDensityToggle(props: {
 
   return (
     <div
-      class={toggleState().shellClass}
+      class={`${toggleState().shellClass} phone:hidden`}
       onMouseEnter={() => setExpanded(true)}
       onMouseLeave={() => setExpanded(false)}
     >

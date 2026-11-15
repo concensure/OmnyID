@@ -132,6 +132,13 @@ export function WeddingWorkspaceContextPanels(props: {
     props.state.afpMessages,
     props.state.workspace.metadata.responseWorkspaceId,
   ));
+  const budgetPreferenceSignals = createMemo(() => props.state.contextCards.flatMap((card) => [
+    ...(card.planningContext?.topPriorities ?? []),
+    card.planningContext?.atmosphereDescription ?? "",
+    card.planningContext?.vendorPreferences ?? "",
+    card.planningContext?.photographyScope ?? "",
+    ...(card.planningContext?.inspirationImageUrls ?? []),
+  ]).map((value) => value.trim()).filter(Boolean));
   function openAggregateAction(action: WeddingWorkspaceAggregateAction) {
     if (!action.enabled) return;
     if (action.targetMenu === "share_plan") {
@@ -431,6 +438,7 @@ export function WeddingWorkspaceContextPanels(props: {
           state={props.state.budgetTracking}
           weddingPlanId={props.state.workspace.metadata.weddingPlanId}
           locationLabel={weddingLocationAdviceLabel(props.state)}
+          preferenceSignals={budgetPreferenceSignals()}
           metadata={props.state.workspace.metadata}
           onSaveAllocation={saveBudgetAllocation}
           onSaveContribution={saveBudgetAllocation}

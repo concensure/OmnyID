@@ -15,8 +15,10 @@ const boundaryAccess = read("src/components/WeddingBoundaryAccessManagementPanel
 test("atmosphere photographs toggle exact selections without technical image copy", () => {
   assert.match(intake, /selectedIndex >= 0/);
   assert.match(intake, /parts\.filter\(\(_, index\) => index !== selectedIndex\)/);
-  assert.match(intake, /Select a photograph again to remove it\./);
+  assert.doesNotMatch(intake, /Select a photograph again to remove it\./);
   assert.doesNotMatch(intake, /local WebP thumbnails/i);
+  assert.match(intake, /group flex min-w-0 flex-col/);
+  assert.match(intake, /aspect-\[3\/2\] w-full max-w-none/);
 });
 test("Wedding mobile content removes the desktop outer frame while retaining inner cards", () => {
   assert.match(mobilePage, /wedding-mobile-content[\s\S]*px-0/);

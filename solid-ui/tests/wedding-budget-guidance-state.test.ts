@@ -5,6 +5,7 @@ import {
   WEDDING_BUDGET_CATEGORY_GUIDANCE,
   WEDDING_BUDGET_MODEL_VERSION,
   WEDDING_BUDGET_TARGET_TOTAL,
+  buildWeddingBudgetSuggestedAllocation,
   buildWeddingBudgetCategoryGuidanceLabel,
   weddingBudgetLocationMarketNote,
 } from "../src/lib/weddingBudgetGuidanceState.ts";
@@ -66,5 +67,34 @@ test("budget location notes fall back calmly when no exact region is known", () 
   assert.match(
     weddingBudgetLocationMarketNote("Central Coast"),
     /guest count/i,
+  );
+});
+
+test("suggested budget items always reconcile to the couple's total", () => {
+  const allocation = buildWeddingBudgetSuggestedAllocation({ totalAmount: 40_000 });
+
+  assert.equal(allocation.length, WEDDING_BUDGET_CATEGORIES.length);
+  assert.equal(allocation.reduce((sum, category) => sum + category.amount, 0), 40_000);
+  assert.ok(Math.abs(allocation.reduce((sum, category) => sum + category.share, 0) - 100) < 0.2);
+  assert.ok(allocation.every((category) => category.amount >= 0));
+  assert.ok(allocation.every((category) => !category.personalized));
+});
+
+test("known style priorities gently personalise the split without inventing a quote", () => {
+  const baseline = buildWeddingBudgetSuggestedAllocation({ totalAmount: 40_000 });
+  const personalised = buildWeddingBudgetSuggestedAllocation({
+    totalAmount: 40_000,
+    preferenceSignals: ["A long-table feast with great wine", "Documentary photography and after-dark energy"],
+  });
+  const share = (items: typeof personalised, categoryId: string) =>
+    items.find((item) => item.categoryId === categoryId)?.share ?? 0;
+
+  assert.ok(share(personalised, "catering_drinks") > share(baseline, "catering_drinks"));
+  assert.ok(share(personalised, "photo_video") > share(baseline, "photo_video"));
+  assert.ok(share(personalised, "entertainment_music") > share(baseline, "entertainment_music"));
+  assert.equal(personalised.reduce((sum, category) => sum + category.amount, 0), 40_000);
+  assert.match(
+    personalised.find((category) => category.categoryId === "catering_drinks")?.reasonLabel ?? "",
+    /Adjusted from the usual split/i,
   );
 });

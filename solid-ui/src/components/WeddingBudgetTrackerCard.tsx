@@ -29,7 +29,10 @@ import {
   type WeddingBudgetCategoryId,
 } from "@/lib/weddingBudgetAllocationState";
 import { buildWeddingBudgetContributionProjectionInput } from "@/lib/weddingBudgetContributionState";
-import { buildWeddingBudgetCategoryGuidanceLabel } from "@/lib/weddingBudgetGuidanceState";
+import {
+  buildWeddingBudgetCategoryGuidanceLabel,
+  buildWeddingBudgetSuggestedAllocation,
+} from "@/lib/weddingBudgetGuidanceState";
 import type { WeddingBudgetContribution } from "@/lib/weddingBudgetInsightsState";
 
 function moneyLabel(amount: number, currency: string): string {
@@ -67,6 +70,7 @@ export function WeddingBudgetTrackerCard(props: {
   state: WeddingBudgetTrackingState;
   weddingPlanId?: string | null;
   locationLabel?: string | null;
+  preferenceSignals?: readonly string[] | null;
   metadata?: unknown;
   onSaveAllocation?: (input: SendAfpMessageInput) => Promise<unknown>;
   onSaveContribution?: (input: SendAfpMessageInput) => Promise<unknown>;
@@ -120,6 +124,12 @@ export function WeddingBudgetTrackerCard(props: {
   });
   const contributionTotal = createMemo(() => contributionRows()
     .reduce((total, row) => total + contributionAmountFromLabel(row.amountLabel), 0));
+  const suggestedAllocation = createMemo(() => buildWeddingBudgetSuggestedAllocation({
+    totalAmount: draft().totalAmount || props.state.budgetTargetAmount || 0,
+    preferenceSignals: props.preferenceSignals,
+  }));
+  const suggestedCategory = (categoryId: WeddingBudgetCategoryId) => suggestedAllocation()
+    .find((item) => item.categoryId === categoryId)!;
 
   createEffect(() => {
     const signature = budgetAllocationSignature(props.state);
@@ -153,6 +163,14 @@ export function WeddingBudgetTrackerCard(props: {
     const clamped = Math.max(0, Math.round(value) || 0);
     const next = { ...draft(), categoryAmounts: { ...draft().categoryAmounts, [categoryId]: clamped } };
     updateDraft(categoryId === "other_misc" ? next : withWeddingBudgetAutoBalance(next));
+  }
+
+  function applySuggestedAllocation() {
+    const totalAmount = draft().totalAmount || props.state.budgetTargetAmount || 0;
+    if (totalAmount <= 0) return;
+    const categoryAmounts = { ...draft().categoryAmounts };
+    for (const suggestion of suggestedAllocation()) categoryAmounts[suggestion.categoryId] = suggestion.amount;
+    updateDraft({ ...draft(), totalAmount, categoryAmounts });
   }
 
   async function saveAllocation() {
@@ -310,10 +328,10 @@ export function WeddingBudgetTrackerCard(props: {
           <p class="text-xs font-semibold text-rose-950/65">At risk</p>
           <p class="mt-1 break-words text-lg font-semibold text-rose-950">{moneyLabel(props.state.insights.atRiskAmount, currency)}</p>
         </div>
-        <button type="button" class="rounded-2xl border border-amber-100 bg-amber-50/75 px-2.5 py-2 text-left transition hover:border-amber-300 hover:bg-amber-50 focus:outline-none focus:ring-2 focus:ring-amber-500" onClick={() => props.onAddQuotes?.()} aria-label="Open quote upload and message chooser">
-          <p class="text-xs font-semibold text-amber-950/65">Forecast range</p>
-          <p class="mt-1 break-words text-sm font-semibold leading-5 text-amber-950">{props.state.insights.forecastRangeLabel}</p>
-          <p class="mt-1 text-xs font-semibold text-amber-900 underline">Add or review quotes</p>
+        <button type="button" class="flex min-h-[7.5rem] min-w-0 flex-col items-start rounded-2xl border border-amber-100 bg-amber-50/75 px-2.5 py-2 text-left transition hover:border-amber-300 hover:bg-amber-50 focus:outline-none focus:ring-2 focus:ring-amber-500" onClick={() => props.onAddQuotes?.()} aria-label="Open quote upload and message chooser">
+          <span class="block w-full text-xs font-semibold text-amber-950/65">Forecast range</span>
+          <span class="mt-2 block w-full break-words text-sm font-semibold leading-5 text-amber-950">{props.state.insights.forecastRangeLabel}</span>
+          <span class="mt-auto block w-full pt-2 text-xs font-semibold text-amber-900 underline">Add or review quotes</span>
         </button>
       </div>
 
@@ -335,6 +353,12 @@ export function WeddingBudgetTrackerCard(props: {
             onInput={(event) => setTotalAmount(Number(event.currentTarget.value))}
           />
         </label>
+        <Show when={(draft().totalAmount || props.state.budgetTargetAmount || 0) > 0}>
+          <button type="button" class="mt-2 min-h-10 rounded-lg border border-wedding-primary bg-white px-3 text-xs font-semibold text-wedding-primary" onClick={applySuggestedAllocation}>
+            Use the suggested starting split
+          </button>
+          <p class="mt-1 text-[11px] leading-5 text-wedding-ink/60">Based on the overall budget, the balanced Australian planning model and any saved priorities or style signals. Edit every figure before saving.</p>
+        </Show>
         <div class="mt-3 space-y-3">
           <For each={WEDDING_BUDGET_CATEGORIES}>
             {(category) => {
@@ -363,6 +387,14 @@ export function WeddingBudgetTrackerCard(props: {
                       </WeddingInfoTip>
                     </span>
                     <span class="shrink-0 text-xs font-semibold text-wedding-ink">{moneyLabel(amount(), draft().currency)}</span>
+                  </div>
+                  <div class="mt-1 flex min-w-0 items-start justify-between gap-2 text-[11px] leading-4 text-wedding-ink/65">
+                    <span class="min-w-0 break-words">
+                      Suggested {moneyLabel(suggestedCategory(category.id).amount, draft().currency)} ({suggestedCategory(category.id).share}%). {suggestedCategory(category.id).reasonLabel}
+                    </span>
+                    <Show when={(draft().totalAmount || props.state.budgetTargetAmount || 0) > 0}>
+                      <button type="button" class="shrink-0 font-semibold text-wedding-primary underline underline-offset-2" onClick={() => setCategoryAmount(category.id, suggestedCategory(category.id).amount)}>Use</button>
+                    </Show>
                   </div>
                   <input
                     type="range"

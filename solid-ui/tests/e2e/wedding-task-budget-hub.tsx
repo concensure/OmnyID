@@ -44,6 +44,7 @@ const bootstrap = {
 } as unknown as DashboardBootstrap;
 
 const weddingState = {
+  afpMessages: [],
   artifactPreviews: [
     {
       artifactId: "artifact:quote",

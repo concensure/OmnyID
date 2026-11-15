@@ -9,6 +9,11 @@ import { ThreadDiscoveryLens } from "@/components/ThreadDiscoveryLens";
 import { ThreadDiscoveryStateSummary } from "@/components/ThreadDiscoveryStateSummary";
 import { ViewDispatcher } from "@/components/ViewDispatcher";
 import { AgentPersonaFAB } from "@/components/AgentPersonaFAB";
+import {
+  isPhonePersonaFabViewport,
+  saveMobilePersonaFabOptIn,
+  shouldShowPersonaFab,
+} from "@/lib/agentPersonaFabMobileState";
 import { WeddingNavigationArrivalBanner } from "@/components/WeddingNavigationArrivalBanner";
 import { MasterAgentConversationResponse } from "@/components/MasterAgentConversationResponse";
 import { WeddingReturnBanner } from "@/components/WeddingReturnBanner";
@@ -1231,7 +1236,9 @@ function App() {
       })
       .catch(() => { reviewInviteClaimStarted = false; });
   });
-  const [personaFabVisible, setPersonaFabVisible] = createSignal(true);
+  const [personaFabVisible, setPersonaFabVisible] = createSignal(
+    typeof window === "undefined" || !isPhonePersonaFabViewport(window),
+  );
   // Declared early: userId/workspaceBootstrap are read synchronously by several
   // createMemo initializers further down (e.g. studyLensDashboard, weddingArrivalBanner),
   // and createMemo runs its computation immediately, so these must exist before those do.
@@ -1255,18 +1262,26 @@ function App() {
   const userId = createMemo(() => workspaceBootstrap()?.user.id ?? session()?.user?.id ?? "");
   createEffect(() => {
     const token = session()?.token;
+    const phoneViewport = isMobileFocusViewport();
     if (!token) {
-      setPersonaFabVisible(true);
+      setPersonaFabVisible(!phoneViewport);
       return;
     }
     void getAgentUiPreferences()
-      .then((preferences) => setPersonaFabVisible(preferences.persona_fab_visible))
-      .catch(() => setPersonaFabVisible(true));
+      .then((preferences) => setPersonaFabVisible(shouldShowPersonaFab({
+        serverVisible: preferences.persona_fab_visible,
+        userId: userId(),
+        phoneViewport,
+      })))
+      .catch(() => setPersonaFabVisible(false));
   });
   onMount(() => {
     const listener = (event: Event) => {
       const visible = agentPersonaFabVisibilityFromEvent(event);
-      if (visible !== null) setPersonaFabVisible(visible);
+      if (visible !== null) {
+        if (isPhonePersonaFabViewport(window)) saveMobilePersonaFabOptIn(visible, userId());
+        setPersonaFabVisible(visible);
+      }
     };
     window.addEventListener(AGENT_PERSONA_FAB_VISIBILITY_EVENT, listener);
     onCleanup(() => window.removeEventListener(AGENT_PERSONA_FAB_VISIBILITY_EVENT, listener));
@@ -3381,7 +3396,7 @@ function App() {
 
 
   return (
-    <main id="main-content" tabindex="-1" class={`min-h-screen text-on-surface ${weddingReturnContextActive() && activeView() === "response_queue" ? "p-0 sm:p-6" : "p-4 md:p-6"}`}>
+    <main id="main-content" tabindex="-1" class={`min-h-screen text-on-surface ${weddingReturnContextActive() && activeView() === "response_queue" ? "p-0 sm:p-6" : "p-4 phone:p-0 md:p-6"}`}>
       <a href="#workspace-shell" class="skip-link">Skip to workspace content</a><h1 class="sr-only">OmnyID workspace</h1>
       <Show when={showAuthModal()}>
         <AuthModal
@@ -3595,7 +3610,7 @@ function App() {
         />
       </Show>
 
-      <GlassPanel id="workspace-shell" tabindex="-1" class={`mx-auto max-w-[1700px] p-0 sm:p-5 sm:pl-[68px] lg:p-8 lg:pl-[72px] ${weddingReturnContextActive() && activeView() === "response_queue" ? "phone:rounded-none phone:border-0 phone:bg-transparent phone:shadow-none" : ""}`}>
+      <GlassPanel id="workspace-shell" tabindex="-1" class="mx-auto max-w-[1700px] p-0 phone:rounded-none phone:border-0 phone:bg-transparent phone:shadow-none sm:p-5 sm:pl-[68px] lg:p-8 lg:pl-[72px]">
 
         {/* Fleet pane — slides in below nav when user clicks active/idle badge */}
         <Show when={fleetOpen()}>

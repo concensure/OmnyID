@@ -8,6 +8,7 @@ import {
   listPersonas,
   updateAgentUiPreferences,
   updatePersona,
+  readSession,
   type AgentPersona,
 } from "@/lib/api";
 import { EmptyState } from "@/components/EmptyState";
@@ -27,6 +28,11 @@ import {
 } from "@/lib/personaSwitcherState";
 import { dispatchAgentPersonaFabVisibility } from "@/lib/agentPersonaFabVisibilityState";
 import { preparePersonaAvatar } from "@/lib/personaAvatarState";
+import {
+  isPhonePersonaFabViewport,
+  saveMobilePersonaFabOptIn,
+  shouldShowPersonaFab,
+} from "@/lib/agentPersonaFabMobileState";
 
 const WRITING_STYLES = [
   { value: "balanced", label: "Balanced" },
@@ -119,8 +125,11 @@ export function AgentPersonasPanel() {
   onMount(() => {
     void reload({ initial: true });
     void getAgentUiPreferences()
-      .then((preferences) => setPersonaFabVisible(preferences.persona_fab_visible))
-      .catch(() => setPersonaFabVisible(true));
+      .then((preferences) => setPersonaFabVisible(shouldShowPersonaFab({
+        serverVisible: preferences.persona_fab_visible,
+        userId: readSession()?.user?.id,
+      })))
+      .catch(() => setPersonaFabVisible(false));
   });
 
   async function setFabVisibility(visible: boolean): Promise<void> {
@@ -128,9 +137,16 @@ export function AgentPersonasPanel() {
     setSavingFabPreference(true);
     setActionError(null);
     try {
+      if (isPhonePersonaFabViewport(window)) {
+        saveMobilePersonaFabOptIn(visible, readSession()?.user?.id);
+      }
       const preferences = await updateAgentUiPreferences(visible);
-      setPersonaFabVisible(preferences.persona_fab_visible);
-      dispatchAgentPersonaFabVisibility(preferences.persona_fab_visible);
+      const effectiveVisible = shouldShowPersonaFab({
+        serverVisible: preferences.persona_fab_visible,
+        userId: readSession()?.user?.id,
+      });
+      setPersonaFabVisible(effectiveVisible);
+      dispatchAgentPersonaFabVisibility(effectiveVisible);
     } catch (err) {
       setActionError(buildPersonaSwitcherFailureReceipt(
         "Save Sprout visibility",

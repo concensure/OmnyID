@@ -15,6 +15,18 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-369
+    title: Make Wedding mobile surfaces edge-to-edge, contextualize onboarding, and add personalized budget starting figures
+    status: review
+    owner: codex
+    branch: agent/codex/WED-369
+    worktree: C:/temp/wt/omnyid-wed360
+    base_sha: f7bca68c27651e1e5f586f348b5c093c3488036a
+    depends_on: [WED-368, WED-367]
+    files: [solid-ui/src/App.tsx, solid-ui/src/components/QueueDensityToggle.tsx, solid-ui/src/components/WeddingMobilePage.tsx, solid-ui/src/components/MobileFocusHome.tsx, solid-ui/src/components/WeddingSiteIntakeWizard.tsx, solid-ui/src/components/WeddingMagnetProfileImportReview.tsx, solid-ui/src/components/WeddingBudgetEvidenceHub.tsx, solid-ui/src/components/WeddingBudgetTrackerCard.tsx, solid-ui/src/components/WeddingWorkspaceContextPanels.tsx, solid-ui/src/lib/weddingBudgetGuidanceState.ts, solid-ui/tests/**wedding**, .agent/**]
+    acceptance: [font-size controls and Sprout are hidden by default on mobile without removing the explicit settings opt-in, mobile workspace surfaces use the full viewport width and the focus deck is not double-padded behind its tab bar, remembered-answer review appears only when supported website result facts exist, atmosphere images fill their tiles with text below and obsolete selection copy is removed, date calendar and location suggestions remain usable within a phone viewport, step navigation remains aligned with skip on its own row, vow placeholders are couple-facing and relevant, budget evidence tabs have working phone scroll controls, forecast copy flows vertically without crowding, every broad budget category shows a deterministic starting figure derived from the total normalized guidance and known preference signals without inventing a quote, focused tests typecheck production build exact-SHA Oracle release and hosted checks pass]
+    progress: "Implementation complete on the WED-368 production base: phone controls and outer frames are removed, Sprout is an explicit per-account phone opt-in, onboarding is conditional and phone-safe, budget tabs have tested scroll arrows, and deterministic preference-aware starting figures reconcile exactly to the total. Typecheck, production build, focused tests and 320/1280px Playwright pass; the broad Wedding suite is 2293/2294 with only the pre-existing lead-magnet rejection assertion failing, and the global line budget retains its two pre-existing Rust overages. Exact-SHA Oracle release pending."
+
   - id: WED-368
     title: Connect ranked celebrants to verified consultation scheduling, scoped vendor approval, calendars, notifications, and the new public Wedding articles
     status: in_progress

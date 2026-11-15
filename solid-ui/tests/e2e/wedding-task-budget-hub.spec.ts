@@ -13,6 +13,12 @@ for (const viewport of [{ width: 320, height: 720 }, { width: 1280, height: 800 
     await expect(page.getByText("Harbour House", { exact: true })).toBeVisible();
     await expect(page.getByText("Chosen option")).toHaveCount(2);
 
+    if (viewport.width < 640) {
+      const nextBudgetTabs = page.getByRole("button", { name: "Show later budget tabs" });
+      await expect(nextBudgetTabs).toBeVisible();
+      await nextBudgetTabs.click();
+      await expect(page.getByRole("button", { name: "Show earlier budget tabs" })).toBeVisible();
+    }
     await page.getByRole("tab", { name: /Contracts/ }).click();
     await expect(page.getByText("Garden Hall booking contract")).toBeVisible();
     await page.getByRole("button", { name: "Open in Documents" }).click();

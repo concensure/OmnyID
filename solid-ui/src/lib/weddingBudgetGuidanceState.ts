@@ -1,5 +1,8 @@
 // @locs-version: 1.0
-import type { WeddingBudgetCategoryId } from "@/lib/weddingBudgetAllocationState";
+import {
+  WEDDING_BUDGET_CATEGORIES,
+  type WeddingBudgetCategoryId,
+} from "@/lib/weddingBudgetAllocationState";
 import budgetModel from "@/lib/wedding-budget-model.v1.json" with { type: "json" };
 
 export type WeddingBudgetCategoryGuidance = {
@@ -14,6 +17,14 @@ export type WeddingBudgetCategoryGuidanceLabel = {
   averageLabel: string;
   locationNote: string;
   practicalTip: string;
+};
+
+export type WeddingBudgetSuggestedCategory = {
+  categoryId: WeddingBudgetCategoryId;
+  amount: number;
+  share: number;
+  personalized: boolean;
+  reasonLabel: string;
 };
 
 const PRACTICAL_TIPS: Record<WeddingBudgetCategoryId, string> = {
@@ -104,4 +115,69 @@ export function buildWeddingBudgetCategoryGuidanceLabel(input: {
     locationNote: weddingBudgetLocationMarketNote(input.locationLabel),
     practicalTip: guidance.practicalTip,
   };
+}
+
+const PREFERENCE_ADJUSTMENTS: Record<WeddingBudgetCategoryId, RegExp> = {
+  venue_ceremony: /\b(venue|ceremony|garden|coastal|waterfront|country|rustic|landscape|architecture|destination)\b/i,
+  catering_drinks: /\b(food|cater|dinner|dining|meal|drink|wine|feast|long[ -]?table|family[ -]?centred)\b/i,
+  photo_video: /\b(photo|photograph|video|film|documentary|portrait|memory|memories)\b/i,
+  attire_beauty: /\b(attire|dress|suit|beauty|hair|make[ -]?up|fashion|veil|ring|jewellery|jewelry)\b/i,
+  flowers_decor: /\b(flower|floral|decor|styling|colour|color|pastel|romantic|candle|tablescape)\b/i,
+  entertainment_music: /\b(music|dance|party|after[ -]?dark|dj|band|entertainment|energy|lively)\b/i,
+  other_misc: /\b(transport|stationery|invitation|accessibility|insurance|gift|low stress|simple|logistics)\b/i,
+};
+
+function roundTo(value: number, unit: number): number {
+  return Math.round(value / unit) * unit;
+}
+
+/**
+ * Produces one balanced, deterministic starting split. The model's normal
+ * allocation remains the baseline; known user-authored style and priority
+ * signals can gently lift matching categories before every share is
+ * re-normalised to 100%. These are suggestions, never quotes or bookings.
+ */
+export function buildWeddingBudgetSuggestedAllocation(input: {
+  totalAmount: number;
+  preferenceSignals?: readonly string[] | null;
+  roundingUnit?: number;
+}): WeddingBudgetSuggestedCategory[] {
+  const totalAmount = Math.max(0, Math.round(input.totalAmount) || 0);
+  const signals = (input.preferenceSignals ?? []).map((value) => value.trim()).filter(Boolean);
+  const joined = signals.join(" · ");
+  const rawShares = WEDDING_BUDGET_CATEGORIES.map((category) => {
+    const matchedSignals = signals.filter((signal) => PREFERENCE_ADJUSTMENTS[category.id].test(signal));
+    const bonus = Math.min(6, matchedSignals.length * 2);
+    return {
+      categoryId: category.id,
+      rawShare: WEDDING_BUDGET_CATEGORY_GUIDANCE[category.id].targetShare + bonus,
+      matchedSignals,
+    };
+  });
+  const rawTotal = rawShares.reduce((sum, item) => sum + item.rawShare, 0) || 100;
+  const unit = Math.max(1, Math.round(input.roundingUnit ?? 50));
+  let assigned = 0;
+  return rawShares.map((item, index) => {
+    const share = item.rawShare / rawTotal * 100;
+    const last = index === rawShares.length - 1;
+    const amount = totalAmount <= 0
+      ? 0
+      : last
+        ? Math.max(0, totalAmount - assigned)
+        : Math.min(totalAmount - assigned, roundTo(totalAmount * share / 100, unit));
+    assigned += amount;
+    const personalized = item.matchedSignals.length > 0;
+    const reasonLabel = personalized
+      ? `Adjusted from the usual split using ${item.matchedSignals.slice(0, 2).join(" and ")}.`
+      : joined
+        ? "Usual allocation, balanced with your other stated priorities."
+        : "Usual balanced starting allocation.";
+    return {
+      categoryId: item.categoryId,
+      amount,
+      share: Math.round(share * 10) / 10,
+      personalized,
+      reasonLabel,
+    };
+  });
 }

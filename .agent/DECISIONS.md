@@ -3544,3 +3544,19 @@ content-light and never contains the phone number or capability bearer token.
 
 The editorial archive may seed a missing public article, but reconciliation
 must never overwrite an existing live article from an older archive copy.
+
+## 2026-11-16: Mobile Wedding chrome yields to the task surface; budget suggestions remain deterministic
+
+The phone viewport has one owner for full-width and bottom-inset layout. The
+workspace shell removes its outer frame on phones, and the immersive Wedding
+home does not add a second viewport height or tab-bar clearance. Font-size
+controls are desktop-only. Sprout is quiet by default on each phone/account
+pair and can be explicitly restored in Agent Settings; the server preference
+continues to govern whether it may appear at all.
+
+Remembered-answer review is evidence-derived: it renders only when a supported
+website handoff contains actual facts. It is not a generic first-run card.
+Budget starting figures reuse the existing balanced seven-category guidance,
+apply only small bounded lifts for user-authored preference signals, normalize
+back to 100%, and reconcile rounded dollar amounts to the entered total. They
+are editable planning suggestions, never market prices or quotes.

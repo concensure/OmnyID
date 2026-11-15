@@ -9122,3 +9122,26 @@ Recommended next action: supply the three Twilio values and a generated consulta
 pepper through the existing Oracle secret-file mechanism, enable the feature, then
 run one controlled phone verification, pending-request, claimed-vendor approval,
 email receipt and two-Calendar browser journey before widening the cohort.
+## 2026-11-16 - WED-369 mobile onboarding and budget polish (Codex, release candidate)
+
+Worktree `C:\temp\wt\omnyid-wed360`, branch `agent/codex/WED-369`, based on the
+exact WED-368 production SHA `f7bca68c27651e1e5f586f348b5c093c3488036a`.
+
+- Removed phone font-size controls and the generic outer workspace frame; fixed duplicate phone
+  viewport/tab-bar padding that cut off the decision action. Sprout is hidden by default on phones
+  and can be restored explicitly in Agent Settings with an account-scoped device preference.
+- The remembered-answer onboarding card now appears only with real supported handoff facts. The
+  atmosphere cards are image-first and full-width on phones, location suggestions close after a
+  choice, the date calendar is viewport bounded, skip occupies its own row, and vow/relationship
+  examples are couple-facing.
+- Budget tabs have explicit phone back/forward controls. Forecast copy flows vertically. Every
+  category exposes an editable deterministic starting amount based on the canonical 100% guidance,
+  entered total and bounded saved preference signals; rounded amounts reconcile exactly to total.
+- Evidence: TypeScript typecheck and Vite production build pass; 13 focused tests pass; the Budget
+  hub Playwright journey passes at 320px and 1280px including both scroll arrows. The broad Wedding
+  suite is 2293/2294 with only the pre-existing lead-magnet import rejection assertion failing. The
+  global line-budget suite still reports only its pre-existing `src/server/mod.rs` and `src/db.rs`
+  overages; the focused Wedding 1000-line budget passes.
+
+Recommended next action: freeze this branch commit, deploy only from a clean detached exact-SHA
+worktree, then record hosted `SOURCE_COMMIT`, runtime manifest and phone asset evidence.
