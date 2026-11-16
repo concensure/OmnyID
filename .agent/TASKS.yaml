@@ -15,6 +15,18 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-370
+    title: Make ranked Celebrant enquiries slot-first and activate the verified Oracle consultation endpoint
+    status: done
+    owner: codex
+    branch: agent/codex/WED-370
+    worktree: C:/temp/wt/omnyid-wed360
+    base_sha: ed1331bc6826e555e21a424d93ae09e7b94b7e73
+    depends_on: [WED-368, WED-369, WED-359]
+    files: [solid-ui/src/components/WeddingCelebrantConsultationShortlistPanel.tsx, solid-ui/src/components/WeddingArtifactDetailPanel.tsx, solid-ui/src/components/WeddingVendorComparison*.tsx, solid-ui/src/lib/celebrantConsultationApi.ts, solid-ui/tests/**celebrant**, src/server/wedding_celebrant_consultation_routes.rs, docker-compose*.yml, scripts/oracle-secret-sync.ps1, Documents/verification/**, .agent/**]
+    acceptance: [Enquire on a current top-three Celebrant recommendation first reveals only that canonical vendor's published consultation slots, selecting and confirming a slot reveals the generated enquiry draft in place, the draft visibly and structurally includes the selected Sydney time and celebrant identity, changing the slot regenerates its bounded contextual wording without silently sending anything, phone verification and request submission continue through the existing Twilio-backed endpoint and remain pending until claimed-vendor approval, another vendor cannot read or receive the selected slot, missing or stale slots render a truthful fallback rather than a draft with invented availability, Twilio secrets remain outside Git and Oracle readiness is enabled only after provider configuration is verified, focused frontend backend privacy production-build exact-SHA Oracle release and hosted checks pass]
+    progress: "Complete on application commit ecd7bbc3c4a2c7055a3bdcb8e1aa21fe4246b96f. Enquire on a top-three Celebrant now reveals only that vendor's published slots; explicit slot confirmation regenerates and persists an editable draft containing the Sydney time before phone verification or request submission. The existing pending-approval, claimed-vendor, atomic calendar and email outcome boundaries are unchanged. A dedicated Twilio Verify service and file-backed local runtime secrets were created without printing credentials. Focused tests and typecheck pass; the full Wedding suite is 2294/2295 with only the pre-existing lead-magnet rejection assertion failing, and the production UI build passes. Exact-SHA Oracle release and hosted endpoint proof are the final operational steps in this session."
+
   - id: WED-369
     title: Make Wedding mobile surfaces edge-to-edge, contextualize onboarding, and add personalized budget starting figures
     status: review

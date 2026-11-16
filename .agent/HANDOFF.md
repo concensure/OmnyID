@@ -9145,3 +9145,30 @@ exact WED-368 production SHA `f7bca68c27651e1e5f586f348b5c093c3488036a`.
 
 Recommended next action: freeze this branch commit, deploy only from a clean detached exact-SHA
 worktree, then record hosted `SOURCE_COMMIT`, runtime manifest and phone asset evidence.
+## 2026-11-16 - WED-370 ranked Celebrant slot-first enquiry (Codex, release candidate)
+
+Worktree `C:\temp\wt\omnyid-wed360`, branch `agent/codex/WED-370`, based on the
+WED-369 production SHA `ed1331bc6826e555e21a424d93ae09e7b94b7e73`.
+Application commit `ecd7bbc3c4a2c7055a3bdcb8e1aa21fe4246b96f` contains the implementation.
+
+- A current top-three Celebrant card's Enquire action now reveals the selected
+  celebrant's vendor-scoped slots first. The panel is not rendered speculatively
+  for unrelated comparison cards.
+- Confirming a slot regenerates the canonical editable vendor outreach draft and
+  includes the exact Australia/Sydney consultation time in its subject, body and
+  AFP provenance. It does not send the message or create a booking.
+- The existing Twilio verification, pending request, claimed-vendor approval,
+  atomic two-calendar update and separate confirmation-email outcome remain in
+  place. Missing slots and missing verification configuration fail visibly.
+- A dedicated Twilio Verify service was created from the credentials supplied in
+  the ignored local environment. The account credential, service ID and generated
+  consultation pepper are file-backed under the local secret store; no secret was
+  printed or committed.
+- Verification: focused Celebrant tests 5/5; Solid UI typecheck passes; production
+  UI build passes; broad Wedding suite 2,294/2,295 with only the unrelated,
+  pre-existing lead-magnet rejection assertion failing.
+
+Recommended next action: release the resulting coordination commit from a clean
+detached checkout, sync the four secret files to Oracle, enable the false-default
+consultation flag, then prove the hosted vendor-scoped endpoint reports phone
+verification configured without disclosing a secret or phone number.

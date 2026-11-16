@@ -3560,3 +3560,19 @@ Budget starting figures reuse the existing balanced seven-category guidance,
 apply only small bounded lifts for user-authored preference signals, normalize
 back to 100%, and reconcile rounded dollar amounts to the entered total. They
 are editable planning suggestions, never market prices or quotes.
+
+## 2026-11-16: A ranked celebrant enquiry is slot-first, but never auto-sent
+
+For a current top-three Celebrant card, `Enquire` reveals only the canonical
+vendor slug's published consultation slots. The couple must explicitly confirm
+one slot before the existing outreach owner regenerates an editable draft. The
+selected Sydney time is recorded in both the visible wording and content-light
+AFP draft provenance; changing the slot creates a fresh draft rather than
+silently reusing an earlier one.
+
+Confirming a slot neither sends the draft nor books the call. Phone possession
+still passes through Twilio Verify, the public request remains pending, and only
+an authenticated user for that claimed vendor may approve it. The existing
+atomic couple/vendor Calendar update and separately recorded confirmation-email
+outcome remain the authorities. No second enquiry, calendar or messaging store
+is introduced.
