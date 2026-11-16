@@ -343,21 +343,54 @@ test("home guest tile uses the shared RSVP summary for incomplete and changed re
   assert.equal(guest?.tone, "attention");
 });
 
-test("home timeline overview is actionable when no dated items exist", () => {
+test("home timeline overview starts a fresh plan with the wedding date", () => {
   const timeline = buildWeddingHomeTimelineOverview(state());
   const nodes = timeline.a2ui.nodes as Array<Record<string, unknown>>;
   const props = nodes[0]?.props as Record<string, unknown>;
   const action = props.action as Record<string, unknown>;
 
-  assert.equal(timeline.detailLabel, "No upcoming timeline items yet.");
+  assert.equal(timeline.detailLabel, "Next: Add your wedding date");
   assert.equal(timeline.menuId, "timeline");
-  assert.equal(timeline.actionLabel, "Open timeline");
+  assert.equal(timeline.actionLabel, "Add wedding date");
   assert.equal(action.target_menu, "timeline");
   assert.equal(action.selected_row_id, null);
 });
 
+test("home timeline overview finishes account setup before generic preparation work", () => {
+  const dated = state({
+    ganttTimeline: {
+      rows: [{ id: "cake", title: "Book cake baker", endLabel: "2027-05-24", statusLabel: "Planned" }],
+      undatedItems: [],
+    } as WeddingResponseWorkspaceViewState["ganttTimeline"],
+    contextCards: [{
+      planningContext: { weddingDate: "2027-11-24" },
+      answeredLabels: ["Wedding date: 24 November 2027"],
+    }] as WeddingResponseWorkspaceViewState["contextCards"],
+  });
+
+  const budget = buildWeddingHomeTimelineOverview(dated);
+  assert.equal(budget.detailLabel, "Next: Set a wedding budget");
+  assert.equal(budget.menuId, "budget");
+  assert.equal(budget.selectedRowId, null);
+
+  const guests = buildWeddingHomeTimelineOverview({
+    ...dated,
+    budgetTracking: {
+      budgetTargetAmount: 40_000,
+      totalKnownAmount: 0,
+      remainingAmount: 40_000,
+    } as WeddingResponseWorkspaceViewState["budgetTracking"],
+  });
+  assert.equal(guests.detailLabel, "Next: Start the guest list");
+  assert.equal(guests.menuId, "guests");
+  assert.equal(guests.selectedRowId, null);
+});
+
 test("home timeline overview skips completed rows and tolerates missing status labels", () => {
   const timeline = buildWeddingHomeTimelineOverview(state({
+    contextCards: [{ planningContext: { dateOrSeason: "2027-11-24" }, answeredLabels: [] }] as WeddingResponseWorkspaceViewState["contextCards"],
+    budgetTracking: { budgetTargetAmount: 50_000, totalKnownAmount: 0, remainingAmount: 50_000 } as WeddingResponseWorkspaceViewState["budgetTracking"],
+    guestTracking: { guestRowCount: 2, attendingCount: 0, declinedCount: 0, pendingCount: 2 } as WeddingResponseWorkspaceViewState["guestTracking"],
     ganttTimeline: {
       rows: [
         { id: "done-noim", title: "File NOIM", endLabel: "2027-04-18", statusLabel: "Done" },
@@ -393,6 +426,9 @@ test("home planning progress counts completed planner tasks rather than elapsed 
 
 test("home timeline overview also skips rows with machine status fields", () => {
   const timeline = buildWeddingHomeTimelineOverview(state({
+    contextCards: [{ planningContext: { dateOrSeason: "2027-11-24" }, answeredLabels: [] }] as WeddingResponseWorkspaceViewState["contextCards"],
+    budgetTracking: { budgetTargetAmount: 50_000, totalKnownAmount: 0, remainingAmount: 50_000 } as WeddingResponseWorkspaceViewState["budgetTracking"],
+    guestTracking: { guestRowCount: 2, attendingCount: 0, declinedCount: 0, pendingCount: 2 } as WeddingResponseWorkspaceViewState["guestTracking"],
     ganttTimeline: {
       rows: [
         { id: "done-status", title: "Finish legal form", endLabel: "2027-04-01", status: "completed" },

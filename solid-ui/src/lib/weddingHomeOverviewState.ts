@@ -170,6 +170,30 @@ function timelineA2ui(timeline: Omit<WeddingHomeTimelineOverview, "a2ui">): Reco
 }
 
 export function buildWeddingHomeTimelineOverview(state: WeddingResponseWorkspaceViewState): WeddingHomeTimelineOverview {
+  const setup = weddingTimelineWeddingDateLabel(state) === null
+    ? {
+      detailLabel: "Next: Add your wedding date",
+      menuId: "timeline" as const,
+      actionLabel: "Add wedding date",
+      selectedRowId: null,
+    }
+    : state.budgetTracking.budgetTargetAmount === null
+      ? {
+        detailLabel: "Next: Set a wedding budget",
+        menuId: "budget" as const,
+        actionLabel: "Set budget",
+        selectedRowId: null,
+      }
+      : state.guestTracking.guestRowCount === 0
+        ? {
+          detailLabel: "Next: Start the guest list",
+          menuId: "guests" as const,
+          actionLabel: "Add guests",
+          selectedRowId: null,
+        }
+        : null;
+  if (setup) return { ...setup, a2ui: timelineA2ui(setup) };
+
   const upcoming = state.ganttTimeline.rows
     .filter((row) => !isDoneTimelineRow(row))
     .sort((left, right) => dateSortValue(left.endLabel) - dateSortValue(right.endLabel))[0] ?? null;

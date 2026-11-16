@@ -9208,3 +9208,17 @@ checkout of that exact SHA, then use machine-generated production proof plus
 read-only hosted checks to confirm `SOURCE_COMMIT`, health, funded-AI policy and
 the vendor-scoped Celebrant endpoint/Twilio readiness. A real SMS receipt still
 requires an explicitly supplied controlled phone number.
+
+### WED-371 account-isolation audit addendum
+
+- A read-only production audit of the recreated `concensure@gmail.com` account
+  found one current account row, no private AFP reference to the cake task and no
+  completed Wedding-task event. The cake wording was generated from the common
+  preparation catalogue, not inherited from another user's tenant schema.
+- The overview's next-action projection now finishes account setup in a stable
+  order: wedding date, numeric budget, guest list, then the earliest genuine
+  timeline item. A generic cake or vendor task can no longer displace those
+  first-account actions merely because it has a calculated due date.
+- The focused overview suite is 20/20 and TypeScript still passes. Release this
+  addendum only from a new clean exact-SHA checkout; do not reuse the earlier
+  `971ebf2219c2bbf19cb23a43edea2af2c171fcf9` release evidence.
