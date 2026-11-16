@@ -5,6 +5,7 @@ import {
   exchangeCelebrantManagementLink,
   getCelebrantManagementSession,
   type CelebrantManagementSession,
+  type CelebrantWeddingDateSlot,
   type CelebrantManagementWindow,
 } from "@/lib/celebrantManagementApi";
 
@@ -25,6 +26,9 @@ export function CelebrantManagementFlow(props: { token: string }) {
   const [duration, setDuration] = createSignal(60);
   const [callCap, setCallCap] = createSignal(3);
   const [callbackPhoneConfirmed, setCallbackPhoneConfirmed] = createSignal(false);
+  const [weddingDate, setWeddingDate] = createSignal("");
+  const [weddingDateState, setWeddingDateState] = createSignal<CelebrantWeddingDateSlot["state"]>("available");
+  const [spaceLabel, setSpaceLabel] = createSignal("");
 
   const load = async () => {
     setBusy(true); setError("");
@@ -61,12 +65,13 @@ export function CelebrantManagementFlow(props: { token: string }) {
   const windowLabel = (window: CelebrantManagementWindow) => window.kind === "recurring"
     ? `${days[(window.weekday ?? 1) - 1]} · ${window.starts_at}–${window.ends_at}`
     : `${window.local_date} · ${window.kind === "exception_closed" ? "Unavailable" : `${window.starts_at}–${window.ends_at}`}`;
+  const dateStateLabel = (state: CelebrantWeddingDateSlot["state"]) => state === "available" ? "Calendar open" : state === "provisional_hold" ? "Temporary hold · 48 hours" : state === "booked" ? "Confirmed booking" : "Not publicly available";
 
   return <main class="min-h-screen bg-wedding-surface px-4 py-6 text-wedding-text sm:px-6">
     <section class="mx-auto w-full max-w-3xl rounded-xl bg-white p-5 shadow-sm sm:p-7" aria-labelledby="celebrant-management-title">
       <p class="text-xs font-bold uppercase tracking-[0.16em] text-wedding-accent">Private celebrant link</p>
-      <h1 id="celebrant-management-title" class="mt-2 text-2xl font-bold">Manage consultation availability</h1>
-      <p class="mt-2 text-sm leading-6 text-wedding-muted">This link is scoped to one celebrant. It can change consultation hours and live status only; it cannot open couple details, messages, phone numbers or another listing.</p>
+      <h1 id="celebrant-management-title" class="mt-2 text-2xl font-bold">Manage wedding dates and consultation times</h1>
+      <p class="mt-2 text-sm leading-6 text-wedding-muted">This short-lived link is scoped to one celebrant. It has two separate calendars: dates you may conduct a wedding and times couples may request a 10-minute phone consultation. It cannot open couple details, messages, phone numbers or another listing.</p>
       <Show when={busy() && !session()}><p class="mt-6" role="status">Opening your secure calendar…</p></Show>
       <Show when={error()}><p class="mt-5 rounded-lg bg-red-50 p-3 text-sm text-red-800" role="alert">{error()}</p></Show>
       <Show when={notice()}><p class="mt-5 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-900" role="status">{notice()}</p></Show>
@@ -78,12 +83,26 @@ export function CelebrantManagementFlow(props: { token: string }) {
           <p class="mt-3 text-xs leading-5 text-wedding-muted">{current.request_summary.privacy_notice}</p>
           <div class="mt-3 flex flex-wrap gap-2"><a class="inline-flex min-h-11 items-center rounded-lg bg-wedding-accent px-4 font-bold text-white" href={`/workspace/?auth=signin&source=vendor_claim&vendor_slug=${encodeURIComponent(current.vendor.slug)}`}>Sign in to review and approve requests</a><a class="inline-flex min-h-11 items-center rounded-lg border bg-white px-4 font-semibold" href={`/workspace/?auth=register&source=vendor_claim&vendor_slug=${encodeURIComponent(current.vendor.slug)}`}>Create vendor account</a></div>
         </section>
+        <section class="rounded-xl border border-wedding-muted p-4" aria-labelledby="wedding-date-availability-title">
+          <p class="text-xs font-bold uppercase tracking-[0.14em] text-wedding-accent">1 · Wedding-date availability</p>
+          <h2 id="wedding-date-availability-title" class="mt-1 text-lg font-bold">Show whether you may be free for the ceremony</h2>
+          <p class="mt-1 text-sm leading-6 text-wedding-muted">Couples see dated evidence such as calendar open, temporary hold or confirmed booking. An open calendar still requires a couple-specific enquiry and your confirmation.</p>
+          <Show when={current.capabilities.wedding_date_availability} fallback={<p class="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">This older link does not include wedding-date permission. Ask OmnyID for a replacement unified link.</p>}>
+            <div class="mt-3 grid gap-3 rounded-xl bg-wedding-surface p-4 sm:grid-cols-3">
+              <label class="text-sm font-semibold">Wedding date<input type="date" min={new Date().toISOString().slice(0, 10)} class="mt-1 min-h-11 w-full rounded-lg border bg-white px-3 font-normal" value={weddingDate()} onInput={(event) => setWeddingDate(event.currentTarget.value)} /></label>
+              <label class="text-sm font-semibold">Date status<select class="mt-1 min-h-11 w-full rounded-lg border bg-white px-3 font-normal" value={weddingDateState()} onChange={(event) => setWeddingDateState(event.currentTarget.value as CelebrantWeddingDateSlot["state"])}><option value="available">Calendar open</option><option value="provisional_hold">Temporary hold · 48 hours</option><option value="booked">Confirmed booking</option><option value="paused">Not publicly available</option></select></label>
+              <label class="text-sm font-semibold">Ceremony or space <span class="font-normal">(optional)</span><input maxlength="160" class="mt-1 min-h-11 w-full rounded-lg border bg-white px-3 font-normal" value={spaceLabel()} onInput={(event) => setSpaceLabel(event.currentTarget.value)} placeholder="For example: Main ceremony" /></label>
+              <button type="button" disabled={busy() || !weddingDate()} class="min-h-11 rounded-lg bg-wedding-accent px-4 font-bold text-white disabled:opacity-50 sm:col-span-3" onClick={() => void run({ operation: "date_slot_upsert", local_date: weddingDate(), date_state: weddingDateState(), space_label: spaceLabel() }, "Wedding-date availability saved.")}>Save wedding-date status</button>
+            </div>
+            <div class="mt-3 grid gap-2"><For each={current.date_slots} fallback={<p class="rounded-lg bg-wedding-surface p-3 text-sm text-wedding-muted">No wedding dates have been published from this link.</p>}>{(slot) => <div class="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-wedding-surface p-3 text-sm"><span><strong>{new Date(`${slot.local_date}T12:00:00`).toLocaleDateString("en-AU", { weekday: "short", day: "numeric", month: "short", year: "numeric" })}</strong><span class="ml-2">{dateStateLabel(slot.state)}</span><Show when={slot.space_label}><span class="block text-xs text-wedding-muted">{slot.space_label}</span></Show></span><div class="flex flex-wrap gap-2"><button type="button" disabled={busy()} class="min-h-10 rounded-lg border bg-white px-3 font-semibold" onClick={() => { setWeddingDate(slot.local_date); setWeddingDateState(slot.state); setSpaceLabel(slot.space_label); }}>Edit</button><button type="button" disabled={busy()} class="min-h-10 rounded-lg border border-red-300 bg-white px-3 font-semibold text-red-800" onClick={() => void run({ operation: "date_slot_remove", window_id: slot.slot_id, expected_revision: slot.revision }, "Wedding date removed from public availability.")}>Remove</button></div></div>}</For></div>
+          </Show>
+        </section>
         <section class="rounded-xl border border-wedding-muted p-4" aria-labelledby="consultation-participation-title"><h2 id="consultation-participation-title" class="text-lg font-bold">Choose whether to participate</h2><p class="mt-1 text-sm leading-6 text-wedding-muted">Accepting lets you publish optional ten-minute consultation hours. Declining or pausing hides consultation availability and stops live callbacks; it does not change your listing or wedding-date calendar.</p><p class="mt-2 text-sm"><strong>Current choice:</strong> <span class="capitalize">{(current.profile?.participation_status ?? "not_asked").replaceAll("_", " ")}</span></p>
           <label class="mt-3 flex items-start gap-2 text-sm"><input type="checkbox" class="mt-1" disabled={!current.profile?.phone_configured || busy()} checked={callbackPhoneConfirmed()} onChange={(event) => setCallbackPhoneConfirmed(event.currentTarget.checked)} /><span>Use my nominated business phone for callbacks. It remains private and is not shown to couples.</span></label>
           <div class="mt-3 flex flex-wrap gap-2"><button type="button" disabled={busy()} class="min-h-11 rounded-lg bg-wedding-accent px-4 font-bold text-white disabled:opacity-50" onClick={() => void run({ operation: "participation_update", participation_status: "accepted", callback_phone_confirmed: callbackPhoneConfirmed() }, "Consultation participation accepted.")}>Accept participation</button><button type="button" disabled={busy()} class="min-h-11 rounded-lg border bg-white px-4 font-semibold disabled:opacity-50" onClick={() => void run({ operation: "participation_update", participation_status: "paused", callback_phone_confirmed: callbackPhoneConfirmed() }, "Consultation participation paused.")}>Pause</button><button type="button" disabled={busy()} class="min-h-11 rounded-lg border border-red-300 bg-white px-4 font-semibold text-red-800 disabled:opacity-50" onClick={() => void run({ operation: "participation_update", participation_status: "declined", callback_phone_confirmed: false }, "Consultation participation declined.")}>Decline</button></div>
           <Show when={current.profile?.participation_status === "declined" || current.profile?.participation_status === "paused"}><p class="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">You can return through this unexpired private link and choose Accept participation to resume. If the link expires, ask OmnyID for a replacement; your saved hours stay private in the meantime.</p></Show>
         </section>
-        <section><h2 class="text-lg font-bold">Weekly and one-off hours</h2><div class="mt-3 grid gap-3 rounded-xl border border-wedding-muted p-4 sm:grid-cols-2">
+        <section><p class="text-xs font-bold uppercase tracking-[0.14em] text-wedding-accent">2 · Phone consultation times</p><h2 class="mt-1 text-lg font-bold">Weekly and one-off hours</h2><p class="mt-1 text-sm leading-6 text-wedding-muted">These are the ten-minute slots couples see after a top-three Celebrant recommendation or on your public profile. A request stays pending until you sign in and approve it.</p><div class="mt-3 grid gap-3 rounded-xl border border-wedding-muted p-4 sm:grid-cols-2">
           <label class="text-sm font-semibold">Availability type<select class="mt-1 min-h-11 w-full rounded-lg border px-3 font-normal" value={kind()} onChange={(event) => setKind(event.currentTarget.value as "recurring" | "exception_open" | "exception_closed")}><option value="recurring">Weekly hours</option><option value="exception_open">Open one date</option><option value="exception_closed">Unavailable one date</option></select></label>
           <Show when={kind() === "recurring"} fallback={<label class="text-sm font-semibold">Date<input type="date" min={new Date().toISOString().slice(0, 10)} class="mt-1 min-h-11 w-full rounded-lg border px-3 font-normal" value={date()} onInput={(event) => setDate(event.currentTarget.value)} /></label>}><label class="text-sm font-semibold">Day<select class="mt-1 min-h-11 w-full rounded-lg border px-3 font-normal" value={weekday()} onChange={(event) => setWeekday(Number(event.currentTarget.value))}><For each={days}>{(day, index) => <option value={index() + 1}>{day}</option>}</For></select></label></Show>
           <label class="text-sm font-semibold">From<input type="time" class="mt-1 min-h-11 w-full rounded-lg border px-3 font-normal" value={start()} onInput={(event) => setStart(event.currentTarget.value)} /></label>

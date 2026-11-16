@@ -1,5 +1,5 @@
 // @locs-version: 1.0
-import { For, Show, createMemo, createSignal } from "solid-js";
+import { For, Show, createEffect, createMemo, createSignal } from "solid-js";
 
 import { WeddingRsvpPublishingPanel } from "@/components/WeddingRsvpPublishingPanel";
 import type { WeddingGuestTrackingState } from "@/lib/weddingGuestTrackingState";
@@ -8,6 +8,7 @@ import {
   buildWeddingRsvpInvitationPreviews,
   buildWeddingRsvpSetupDraft,
   weddingRsvpQuestionLibrary,
+  weddingRsvpEventNameOptions,
   weddingRsvpSetupEventOptions,
   type WeddingRsvpQuestionId,
   type WeddingRsvpSetupState,
@@ -41,6 +42,7 @@ export function suggestedWeddingRsvpDeadline(weddingDate?: string | null): strin
 export function WeddingRsvpSetupPanel(props: {
   current: WeddingRsvpSetupState | null;
   defaultHostLabel?: string | null;
+  culturallyDiverseCelebration?: boolean;
   weddingDate?: string | null;
   guestTracking: WeddingGuestTrackingState;
   metadata?: unknown;
@@ -53,6 +55,7 @@ export function WeddingRsvpSetupPanel(props: {
     confirmedAffectedResponses: boolean;
   }) => Promise<string>;
   onSave?: (setup: WeddingRsvpSetupState) => Promise<string>;
+  onCulturallyDiverseCelebrationChange?: (enabled: boolean) => Promise<string>;
 }) {
   const metadata = normalizeWeddingPlanningMetadata(props.metadata);
   const [customEvents, setCustomEvents] = createSignal<Array<{ id: string; label: string; invitationCount: number }>>([]);
@@ -77,6 +80,9 @@ export function WeddingRsvpSetupPanel(props: {
       ? savedHostLabel
       : props.defaultHostLabel?.trim() || "The couple",
   );
+  const [hostLabelEdited, setHostLabelEdited] = createSignal(false);
+  const [culturallyDiverseCelebration, setCulturallyDiverseCelebration] = createSignal(Boolean(props.culturallyDiverseCelebration));
+  const [culturalPreferenceSaving, setCulturalPreferenceSaving] = createSignal(false);
   const [enabledQuestions, setEnabledQuestions] = createSignal<WeddingRsvpQuestionId[]>(currentQuestionIds);
   const [requiredQuestions, setRequiredQuestions] = createSignal<WeddingRsvpQuestionId[]>(currentRequiredIds);
   const [customPrompt, setCustomPrompt] = createSignal(
@@ -96,6 +102,31 @@ export function WeddingRsvpSetupPanel(props: {
   const [saving, setSaving] = createSignal(false);
   const [notice, setNotice] = createSignal<string | null>(null);
   const [localSetup, setLocalSetup] = createSignal<WeddingRsvpSetupState | null>(props.current);
+
+  createEffect(() => {
+    const projected = props.defaultHostLabel?.trim() ?? "";
+    if (!projected || hostLabelEdited() || (savedHostLabel && savedHostLabel.toLowerCase() !== "the couple")) return;
+    setHostLabel(projected);
+  });
+
+  const changeCulturalPreference = async (enabled: boolean) => {
+    if (culturalPreferenceSaving()) return;
+    const previous = culturallyDiverseCelebration();
+    setCulturallyDiverseCelebration(enabled);
+    setCulturalPreferenceSaving(true);
+    setNotice(null);
+    try {
+      const result = await props.onCulturallyDiverseCelebrationChange?.(enabled);
+      setNotice(result ?? (enabled
+        ? "Cultural and community traditions are now available as optional planning choices."
+        : "The optional cultural event suggestions were removed from this planner."));
+    } catch (error) {
+      setCulturallyDiverseCelebration(previous);
+      setNotice(friendlyErrorText(error, "That planning preference could not be saved."));
+    } finally {
+      setCulturalPreferenceSaving(false);
+    }
+  };
 
   const chosenEvent = createMemo(() => eventOptions().find((event) => event.id === eventChoice()));
   const eventLabel = () => eventChoice() === "new_event"
@@ -229,13 +260,17 @@ export function WeddingRsvpSetupPanel(props: {
       </div>
       <label class="mt-3 block min-w-0 text-xs font-semibold text-teal-950/75">
         Names shown to guests
-        <input maxlength="120" class="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-teal-950 focus:border-teal-500 focus:ring-2 focus:ring-teal-100" value={hostLabel()} onInput={(event) => setHostLabel(event.currentTarget.value)} placeholder="Priya and Daniel" />
+        <input maxlength="120" class="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-teal-950 focus:border-teal-500 focus:ring-2 focus:ring-teal-100" value={hostLabel()} onInput={(event) => { setHostLabelEdited(true); setHostLabel(event.currentTarget.value); }} placeholder="Priya and Daniel" />
       </label>
       <Show when={eventChoice() === "new_event"}>
         <fieldset class="mt-3 rounded-xl border border-teal-100 bg-white p-3">
           <legend class="px-1 text-xs font-semibold text-teal-950">Add an event</legend>
+          <label class="mb-3 flex min-h-11 items-start gap-2 rounded-lg bg-teal-50 p-3 text-sm text-teal-950">
+            <input type="checkbox" class="mt-0.5 h-5 w-5 accent-teal-700" checked={culturallyDiverseCelebration()} disabled={culturalPreferenceSaving()} onChange={(event) => void changeCulturalPreference(event.currentTarget.checked)} />
+            <span><strong class="block">Include cultural or community traditions in this wedding plan</strong><span class="mt-0.5 block text-xs leading-5 text-teal-900/70">This is optional and private. It adds relevant event ideas to RSVP, Inspiration and Vision; it does not infer your identity or choose a tradition for you.</span></span>
+          </label>
           <div class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(10rem,0.55fr)_auto] sm:items-end">
-            <label class="min-w-0 text-xs font-semibold text-teal-950/75">Event name<input maxlength="120" class="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-teal-950" value={newEventLabel()} onInput={(event) => setNewEventLabel(event.currentTarget.value)} placeholder="Recovery brunch" /></label>
+            <label class="min-w-0 text-xs font-semibold text-teal-950/75">Event name<input maxlength="120" list="wedding-rsvp-event-name-options" class="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-teal-950" value={newEventLabel()} onInput={(event) => setNewEventLabel(event.currentTarget.value)} placeholder="Type or choose an event" /><datalist id="wedding-rsvp-event-name-options"><For each={weddingRsvpEventNameOptions(culturallyDiverseCelebration())}>{(label) => <option value={label} />}</For></datalist></label>
             <label class="min-w-0 text-xs font-semibold text-teal-950/75">Event date <span class="font-normal">(optional)</span><input type="date" class="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-teal-950" value={newEventDate()} onInput={(event) => setNewEventDate(event.currentTarget.value)} /></label>
             <button type="button" class="min-h-11 rounded-lg bg-teal-800 px-4 text-sm font-semibold text-white" onClick={addEvent}>Add event</button>
           </div>

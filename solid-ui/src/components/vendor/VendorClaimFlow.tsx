@@ -124,7 +124,7 @@ export function VendorClaimFlow() {
   onCleanup(() => window.clearTimeout(suggestionTimer));
 
   return (
-    <main class="mx-auto min-h-screen max-w-2xl bg-wedding-surface px-4 py-8 text-wedding-text sm:px-6">
+    <main class="mx-auto min-h-screen max-w-6xl bg-wedding-surface px-4 py-8 text-wedding-text sm:px-6">
       <a href="/wedding/vendors.html" class="text-sm font-semibold text-wedding-accent">← Wedding vendor directory</a>
       <header class="mt-6">
         <p class="text-xs font-bold uppercase tracking-[0.16em] text-wedding-accent">Vendor portal</p>

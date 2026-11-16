@@ -12,6 +12,7 @@ import { VendorProposalOpportunitiesPanel } from "@/components/vendor/VendorProp
 import { VendorSpecialOffersPanel } from "@/components/vendor/VendorSpecialOffersPanel";
 import { VendorCelebrantConsultationsPanel } from "@/components/vendor/VendorCelebrantConsultationsPanel";
 import { VendorSalesOperationsPanel } from "@/components/vendor/VendorSalesOperationsPanel";
+import { VendorWorkflowGuide } from "@/components/vendor/VendorWorkflowGuide";
 import {
   getVendorOwnerProfile,
   updateVendorOwnerProfile,
@@ -28,11 +29,12 @@ export function VendorProfileDashboard(props: { vendorSlug: string }) {
   const [error, setError] = createSignal<string | null>(null);
   const [saved, setSaved] = createSignal(false);
   const initialSection = new URLSearchParams(window.location.search).get("section");
-  const allowedSections = ["overview", "sales", "availability", "enquiries", "profile", "settings"] as const;
+  const allowedSections = ["overview", "workflows", "sales", "availability", "enquiries", "profile", "settings"] as const;
   type Section = typeof allowedSections[number];
   const [section, setSection] = createSignal<Section>(allowedSections.includes(initialSection as Section) ? initialSection as Section : "overview");
   const navigation = [
     { id: "overview" as const, label: "Overview" },
+    { id: "workflows" as const, label: "How it works" },
     { id: "sales" as const, label: "Sales & records" },
     { id: "availability" as const, label: "Availability" },
     { id: "enquiries" as const, label: "Enquiries" },
@@ -114,9 +116,9 @@ export function VendorProfileDashboard(props: { vendorSlug: string }) {
           </div>
         </section>
 
-        <nav class="overflow-x-auto rounded-xl border border-wedding-muted bg-white p-2 shadow-sm" aria-label="Vendor management">
-          <div class="flex min-w-max gap-1" role="tablist" aria-label="Vendor portal sections">
-            <For each={navigation}>{(item) => <button type="button" role="tab" aria-selected={section() === item.id} class={`min-h-11 rounded-lg px-4 text-sm font-bold ${section() === item.id ? "bg-wedding-accent text-white" : "text-wedding-text hover:bg-wedding-surface"}`} onClick={() => changeSection(item.id)}>{item.label}</button>}</For>
+        <nav class="overflow-x-auto rounded-xl border border-wedding-muted bg-white p-2 shadow-sm lg:fixed lg:left-4 lg:top-24 lg:z-20 lg:w-52 lg:overflow-visible" aria-label="Vendor management">
+          <div class="flex min-w-max gap-1 lg:min-w-0 lg:flex-col" role="tablist" aria-label="Vendor portal sections">
+            <For each={navigation}>{(item) => <button type="button" role="tab" aria-selected={section() === item.id} class={`min-h-11 rounded-lg px-4 text-sm font-bold ${section() === item.id ? "bg-wedding-accent text-white" : "text-wedding-text hover:bg-wedding-surface"}`} onClick={() => changeSection(item.id)}><Show when={item.id === "workflows"}><span class="mr-2" aria-hidden="true">↝</span></Show>{item.label}</button>}</For>
           </div>
         </nav>
 
@@ -128,6 +130,8 @@ export function VendorProfileDashboard(props: { vendorSlug: string }) {
             <div class="mt-4 grid gap-3 sm:grid-cols-2"><For each={nextActions()}>{(item) => <button type="button" class="min-h-24 rounded-xl border border-wedding-muted bg-wedding-surface p-4 text-left hover:border-wedding-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-wedding-accent" onClick={() => changeSection(item.section)}><span class="block font-bold">{item.label}</span><span class="mt-1 block text-sm text-wedding-muted">{item.detail}</span></button>}</For></div>
           </section>
         </Show>
+
+        <Show when={section() === "workflows"}><VendorWorkflowGuide /></Show>
 
         <Show when={section() === "sales"}><VendorSalesOperationsPanel vendorSlug={props.vendorSlug} /></Show>
 

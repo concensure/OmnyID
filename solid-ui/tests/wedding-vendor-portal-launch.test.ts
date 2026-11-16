@@ -13,7 +13,8 @@ test("vendor-source authentication returns to the existing vendor portal", async
     read("src/server/auth.rs"),
   ]);
   assert.match(app, /pendingVendorAuthSource/);
-  assert.match(app, /window\.location\.assign\(vendorPortalUrlFromDeepLink\(\)\)/);
+  assert.match(app, /openVendorPortalFromDeepLink/);
+  assert.match(app, /omnyid\.vendorClaim\.returnTo/);
   assert.match(app, /manage your vendor listing/);
   assert.match(source, /VENDOR_TOKEN_PREFIX/);
   assert.match(source, /"vendor" \| "vendor_claim" \| "vendor_portal"/);
@@ -23,13 +24,14 @@ test("vendor-source authentication returns to the existing vendor portal", async
 
 test("verified vendors receive one coherent management shell over existing authorities", async () => {
   const dashboard = await read("solid-ui/src/components/vendor/VendorProfileDashboard.tsx");
-  for (const label of ["Overview", "Availability", "Enquiries", "Sales & records", "Public profile", "Settings"]) {
+  for (const label of ["Overview", "How it works", "Availability", "Enquiries", "Sales & records", "Public profile", "Settings"]) {
     assert.match(dashboard, new RegExp(`label: "${label}"`));
   }
   for (const authority of ["VendorPhotoUploadPanel", "VendorPublicationPanel", "VendorResourcesPanel", "VendorSpecialOffersPanel", "VendorProposalOpportunitiesPanel", "VendorQuotationResponsePanel", "VendorPortalSettingsPanel"]) {
     assert.match(dashboard, new RegExp(`<${authority}`));
   }
   assert.match(dashboard, /role="tablist"/);
+  assert.match(dashboard, /VendorWorkflowGuide/);
   assert.match(dashboard, /verification, independent reviews and ranking methodology remain platform-controlled/i);
 });
 

@@ -13,15 +13,25 @@ const root = document.getElementById("root");
 if (!root) throw new Error("Vendor portal root is missing");
 const params = new URLSearchParams(window.location.search);
 const vendorSlug = (params.get("vendor_slug") ?? params.get("vendor") ?? "").trim().toLowerCase();
+const vendorReturnKey = "omnyid.vendorClaim.returnTo";
 const proposalToken = (params.get("proposal") ?? "").trim();
 const fragment = new URLSearchParams(window.location.hash.slice(1));
 const proposalFeedToken = (fragment.get("proposal_feed") ?? "").trim();
 const specialManagementToken = (fragment.get("special_management") ?? "").trim();
 const celebrantManagementToken = (fragment.get("celebrant_management") ?? "").trim();
-const celebrantManagementActive = Boolean(celebrantManagementToken || sessionStorage.getItem("omnyid.celebrantManagement.csrf"));
-const specialManagementActive = Boolean(specialManagementToken || sessionStorage.getItem("omnyid.vendorSpecials.csrf"));
+const sessionValue = (key: string) => {
+  try { return sessionStorage.getItem(key); } catch { return null; }
+};
+const celebrantManagementActive = Boolean(celebrantManagementToken || sessionValue("omnyid.celebrantManagement.csrf"));
+const specialManagementActive = Boolean(specialManagementToken || sessionValue("omnyid.vendorSpecials.csrf"));
 const signInHref = `/workspace/?auth=signin&source=vendor_claim${vendorSlug ? `&vendor_slug=${encodeURIComponent(vendorSlug)}` : ""}`;
 const signedIn = Boolean(readSession());
+try {
+  if (!signedIn) sessionStorage.setItem(vendorReturnKey, `/workspace/vendor.html${vendorSlug ? `?vendor_slug=${encodeURIComponent(vendorSlug)}` : ""}`);
+  else sessionStorage.removeItem(vendorReturnKey);
+} catch {
+  // Optional continuity only: the source query remains the normal fallback.
+}
 const referralGrantId = localStorage.getItem("omnyid.vendorSpecials.referralGrantId") ?? "";
 if (signedIn && referralGrantId) {
   void attributeVendorSpecialSignup(referralGrantId).then(() => localStorage.removeItem("omnyid.vendorSpecials.referralGrantId")).catch(() => undefined);

@@ -3592,3 +3592,36 @@ deterministic code chooses allowed Wedding navigation targets. A requested field
 change is staged in the current account for review in its canonical Wedding view
 and is never silently saved, sent or approved. Persona, settings, minimisation
 and customisation remain available as secondary Sprout tools.
+
+## 2026-11-16: One Celebrant capability link may open two calendars, but the evidence remains separate
+
+A newly generated Celebrant management grant carries two explicit scopes in one
+short-lived, single-vendor session: `consultation_availability` and
+`wedding_date_availability`. This is a navigation and capability consolidation,
+not a data-model merge. Consultation windows and live phone-call status remain in
+the Celebrant consultation authority. Wedding-date evidence is written to the
+canonical Limited Specials offer and slot tables with freshness, state, revision,
+idempotency and vendor constraints. An open wedding date never proves a phone slot,
+and a consultation time never proves wedding-date availability.
+
+The bearer session exposes request totals only. Names, phone numbers and request
+detail still require an authenticated membership for the claimed vendor. Approval
+remains a signed-in vendor action. Older consultation-only links remain safe and
+show a replacement-link message rather than gaining authority retrospectively.
+
+## 2026-11-16: Cultural event suggestions require an explicit private planning preference
+
+RSVP does not infer culture, faith or identity. The couple may opt into cultural
+or community event suggestions with an unticked checkbox. That choice reuses the
+existing private Vision preference AFP projection, whose action target is also
+Inspiration, rather than creating a second profile flag. Removing the preference
+records the existing removal action. Event names remain editable; the opt-in only
+widens the datalist and does not choose, publish or invite anyone.
+
+## 2026-11-16: Vendor claim return is same-origin and browser storage is optional
+
+The vendor claim page records only its validated `/workspace/vendor.html` return
+path for the duration of authentication so an OAuth callback that loses its query
+parameters still opens the existing vendor portal. The workspace accepts only that
+same-origin path prefix, removes it after use, and falls back to the source query
+when session storage is unavailable. It never accepts an arbitrary redirect URL.

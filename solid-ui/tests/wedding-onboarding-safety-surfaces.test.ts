@@ -32,6 +32,9 @@ test("RSVP setup offers deadline guidance, couple names and an inline event form
   assert.match(setup, /props\.defaultHostLabel\?\.trim\(\)/);
   assert.match(setup, /Add an event/);
   assert.match(setup, /setCustomEvents/);
+  assert.match(setup, /weddingRsvpEventNameOptions/);
+  assert.match(setup, /Include cultural or community traditions in this wedding plan/);
+  assert.match(setup, /hostLabelEdited/);
 });
 
 test("uploaded Wedding documents retain an original-format preview surface", () => {

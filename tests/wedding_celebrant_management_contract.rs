@@ -48,9 +48,11 @@ fn public_and_admin_surfaces_support_the_scoped_flow() {
     let directory = include_str!("../wedding/assets/js/directory.js");
 
     assert!(portal.contains("celebrant_management"));
-    assert!(manager.contains("Manage consultation availability"));
+    assert!(manager.contains("Manage wedding dates and consultation times"));
+    assert!(manager.contains("date_slot_upsert"));
     assert!(manager.contains("cannot open couple details, messages, phone numbers"));
     assert!(admin.contains("Generate link + QR"));
+    assert!(admin.contains("one private setup link for both calendars"));
     assert!(admin.contains("Revoke active link"));
     assert!(admin.contains("Prepare several outreach links"));
     assert!(admin.contains("Copy all invitations"));
@@ -112,6 +114,8 @@ fn onboarding_operations_keep_consent_outreach_and_capabilities_separate() {
     assert!(!operations.contains("message_body"));
     assert!(links.contains("celebrant_funnel"));
     assert!(links.contains("wedding_date_availability"));
+    assert!(links.contains("ARRAY['consultation_availability','wedding_date_availability']"));
+    assert!(links.contains("ensure_wedding_date_offer"));
     assert!(links.contains("authenticated_body(request).await?"));
     assert!(admin.contains("Open official register"));
     assert!(admin.contains("Content-light outreach"));

@@ -23,6 +23,17 @@ export type CelebrantManagementWindow = {
   revision: number;
 };
 
+export type CelebrantWeddingDateSlot = {
+  slot_id: string;
+  local_date: string;
+  space_label: string;
+  state: "available" | "provisional_hold" | "booked" | "paused";
+  hold_expires_at: string | null;
+  last_confirmed_at: string;
+  confirmation_expires_at: string;
+  revision: number;
+};
+
 export type CelebrantManagementSession = {
   vendor: { slug: string; name: string; service_area: string };
   profile: {
@@ -46,6 +57,7 @@ export type CelebrantManagementSession = {
     accepted: number;
     privacy_notice: string;
   };
+  date_slots: CelebrantWeddingDateSlot[];
   windows: CelebrantManagementWindow[];
   live: { session_id: string; expires_at: string; call_cap: number; paused: boolean; revision: number } | null;
 };

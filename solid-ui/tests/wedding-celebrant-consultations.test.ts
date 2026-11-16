@@ -62,10 +62,14 @@ test("ranked celebrants expose a vendor-scoped slot-first enquiry and preserve a
   assert.match(panel, /verify\/start/);
   assert.match(panel, /Verify and request this time/);
   assert.match(panel, /Awaiting celebrant approval/);
+  assert.match(panel, /pollRequestStatus/);
+  assert.match(panel, /Consultation approved/);
   assert.match(ranking, /vendorSlug/);
   assert.match(management, /Sign in to review and approve requests/);
   assert.match(management, /auth=register&source=vendor_claim&vendor_slug=/);
   assert.match(management, /request_summary/);
+  assert.match(management, /date_slot_upsert/);
+  assert.match(management, /Wedding-date availability/);
   assert.doesNotMatch(management, /current\.requests|requester_name/);
   assert.match(management, /cannot open couple details, messages, phone numbers or another listing/);
   assert.match(migration, /requester_user_id/);

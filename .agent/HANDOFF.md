@@ -9222,3 +9222,46 @@ requires an explicitly supplied controlled phone number.
 - The focused overview suite is 20/20 and TypeScript still passes. Release this
   addendum only from a new clean exact-SHA checkout; do not reuse the earlier
   `971ebf2219c2bbf19cb23a43edea2af2c171fcf9` release evidence.
+## 2026-11-16 - WED-372 RSVP projection and unified Celebrant availability link (Codex, release candidate)
+
+Worktree `C:\temp\wt\omnyid-wed372`, branch `agent/codex/WED-372`, based on exact
+production SHA `9124790ea81935c00f55b6c95f40ef07be164eeb`.
+
+- RSVP guest-facing names reactively project the existing onboarding `Your names`
+  planning field unless the couple has edited or saved a different label. Event
+  names remain free text with common datalist choices. An explicit unticked
+  cultural/community planning checkbox adds the requested culturally specific
+  event choices and records/removes the existing private Vision/Inspiration
+  preference; the app does not infer identity or select an event.
+- The couple's Celebrant consultation surface now polls the existing public status
+  receipt every five seconds within a bounded lifetime and changes to approved or
+  terminal state without a reload.
+- Newly generated Celebrant management links now grant two separately checked
+  scopes in one vendor-specific, short-lived session. Consultation windows retain
+  their existing authority. Wedding-date evidence reuses the canonical Limited
+  Specials offer/slot/event tables with optimistic revisions, 48-hour holds,
+  freshness, idempotency and vendor scoping. Older links remain consultation-only.
+- The management-link UI has distinct wedding-date and consultation sections and
+  never exposes couple request details. The admin invitation and QR surface now
+  explain that the single link opens both calendars. The claimed-vendor portal has
+  a responsive `How it works` navigation item covering enquiry, quote, tour, hold,
+  contract and consultation state changes.
+- Vendor-source authentication persists only a validated same-origin vendor return
+  path, tolerates blocked browser storage and returns OAuth users to the existing
+  vendor portal rather than the couple Wedding lens.
+- `wedding/user-guide.html` contains an accessible five-step couple process diagram
+  and distinguishes requesting a call, vendor approval, notification/Calendar
+  projection and wedding-date availability.
+- Verification: `cargo check --lib` passed; the six-test
+  `wedding_celebrant_management_contract` passed; TypeScript and the production Vite
+  build passed; 18 focused RSVP/Celebrant/vendor/guide tests passed; the full public
+  site suite passed, including metadata for 93 sitemap pages. Full Wedding tests are
+  2302/2303 with only the unchanged `wedding-lead-magnet-import-state.test.ts`
+  rejection assertion failing. The global line-budget check still reports only the
+  two unchanged baseline overages in `src/server/mod.rs` and `src/db.rs`.
+- No new database migration is needed: migrations 0149 and 0169 already provide the
+  canonical date-slot authority and the two allowed Celebrant grant scopes.
+
+Next action: commit this candidate, build/deploy from a clean detached checkout of
+that exact SHA, then verify hosted provenance, the public guide, vendor bundle,
+unauthenticated security boundary and runtime health.

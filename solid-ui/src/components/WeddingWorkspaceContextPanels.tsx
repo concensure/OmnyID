@@ -59,6 +59,7 @@ import {
 } from "@/lib/weddingWorkspaceAggregateState";
 import { recordWeddingRsvpResponse } from "@/lib/weddingRsvpResponseState";
 import { safeWeddingLabel } from "@/lib/weddingPlanningTemplateState";
+import { weddingVisionPreferenceRecordsFromAfpMessages, weddingVisionPreferenceToAfpSendInput } from "@/lib/weddingVisionPreferenceAfpState";
 import {
   weddingRsvpSetupFromAfpMessages,
   weddingRsvpSetupToAfpSendInput,
@@ -125,6 +126,10 @@ export function WeddingWorkspaceContextPanels(props: {
   const rsvpHostLabel = createMemo(() => props.state.contextCards
     .map((card) => card.planningContext?.familyOrStakeholderRoles?.trim() ?? "")
     .find(Boolean) || "The couple");
+  const culturallyDiverseCelebration = createMemo(() => weddingVisionPreferenceRecordsFromAfpMessages({
+    messages: props.state.afpMessages,
+    metadata: props.state.workspace.metadata,
+  }).some((record) => record.label === "Culturally diverse celebration"));
   const rsvpWeddingDate = createMemo(() => props.state.contextCards
     .map((card) => card.planningContext?.dateOrSeason?.match(/\b20\d{2}-\d{2}-\d{2}\b/)?.[0] ?? "")
     .find(Boolean) || null);
@@ -151,6 +156,18 @@ export function WeddingWorkspaceContextPanels(props: {
     if (!props.saveProjection) throw new Error("Saving is not connected yet.");
     await props.saveProjection(input);
     props.onRefreshWorkspace?.();
+  }
+  async function saveCulturallyDiverseCelebration(enabled: boolean): Promise<string> {
+    if (!props.saveProjection) throw new Error("Saving is not connected yet.");
+    await props.saveProjection(weddingVisionPreferenceToAfpSendInput({
+      metadata: props.state.workspace.metadata,
+      label: "Culturally diverse celebration",
+      action: enabled ? "affirm_feel_tag" : "remove_feel_tag",
+    }));
+    props.onRefreshWorkspace?.();
+    return enabled
+      ? "Saved privately to RSVP, Inspiration and Vision. Choose only the traditions that fit you."
+      : "Removed the cultural celebration preference from RSVP, Inspiration and Vision.";
   }
   async function saveBudgetContributorContact(input: SendAfpMessageInput) {
     if (!props.saveProjection) throw new Error("Saving is not connected yet.");
@@ -537,12 +554,14 @@ export function WeddingWorkspaceContextPanels(props: {
         <WeddingRsvpSetupPanel
           current={rsvpSetup()}
           defaultHostLabel={rsvpHostLabel()}
+          culturallyDiverseCelebration={culturallyDiverseCelebration()}
           weddingDate={rsvpWeddingDate()}
           guestTracking={props.state.guestTracking}
           metadata={props.state.workspace.metadata}
           mealChoiceState={mealChoiceState()}
           onSaveMealChoices={saveMealChoices}
           onSave={saveRsvpSetup}
+          onCulturallyDiverseCelebrationChange={saveCulturallyDiverseCelebration}
         />
         <Show when={rsvpSetup()}>{(setup) => (
           <WeddingRsvpOperationsPanel

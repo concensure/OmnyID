@@ -1,4 +1,4 @@
-import { createEffect, createResource, createSignal, For, Show } from "solid-js";
+import { createEffect, createResource, createSignal, For, onCleanup, Show } from "solid-js";
 
 import { apiFetch } from "@/lib/api";
 import type { WeddingVendorChoiceCardData } from "@/components/WeddingVendorChoiceCard";
@@ -25,6 +25,9 @@ type ConsultationReceipt = {
   status: string;
   approval_state: string;
   scheduled_start: string | null;
+  status_token?: string;
+  celebrant_name?: string | null;
+  accepted_at?: string | null;
 };
 
 const localTime = (value: string) => new Date(value).toLocaleString("en-AU", {
@@ -60,6 +63,28 @@ export function WeddingCelebrantConsultationShortlistPanel(props: {
   const [notice, setNotice] = createSignal("");
   const [receipt, setReceipt] = createSignal<ConsultationReceipt | null>(null);
   const [confirmedSlot, setConfirmedSlot] = createSignal("");
+  let statusTimer: number | undefined;
+
+  const stopStatusPolling = () => {
+    if (statusTimer !== undefined) window.clearTimeout(statusTimer);
+    statusTimer = undefined;
+  };
+  const pollRequestStatus = async (current: ConsultationReceipt) => {
+    if (!current.status_token) return;
+    try {
+      const updated = await apiFetch<ConsultationReceipt>(`/api/public/wedding/celebrant-consultations/requests/${encodeURIComponent(current.request_id)}?token=${encodeURIComponent(current.status_token)}`);
+      setReceipt({ ...current, ...updated, status_token: current.status_token });
+      if (updated.status === "accepted") {
+        setNotice(`${updated.celebrant_name || "The celebrant"} approved this consultation. It is now in your Calendar and a confirmation email is being delivered.`);
+        return stopStatusPolling();
+      }
+      if (["passed", "expired", "cancelled", "connected", "not_connected"].includes(updated.status)) return stopStatusPolling();
+    } catch {
+      // A transient status failure must not discard the submitted request.
+    }
+    statusTimer = window.setTimeout(() => void pollRequestStatus(receipt() ?? current), 5000);
+  };
+  onCleanup(stopStatusPolling);
 
   createEffect(() => {
     const requested = props.requestedVendorSlug;
@@ -117,6 +142,8 @@ export function WeddingCelebrantConsultationShortlistPanel(props: {
       });
       setReceipt(result);
       setNotice("Request sent. This time is awaiting the celebrant’s approval; it is not booked yet.");
+      stopStatusPolling();
+      statusTimer = window.setTimeout(() => void pollRequestStatus(result), 5000);
     } catch (reason) { setNotice(reason instanceof Error ? reason.message : "The consultation request could not be sent."); }
     finally { setBusy(false); }
   };
@@ -141,7 +168,7 @@ export function WeddingCelebrantConsultationShortlistPanel(props: {
             <Show when={!verificationId()} fallback={<label class="text-sm font-semibold">Verification code<input inputmode="numeric" autocomplete="one-time-code" class="mt-1 min-h-11 w-full rounded-lg border bg-white px-3 font-normal" value={code()} onInput={(event) => setCode(event.currentTarget.value)} /></label>}><button type="button" disabled={busy() || !phone().trim() || !selectedSlot()} class="min-h-11 self-end rounded-lg bg-teal-800 px-4 font-bold text-white disabled:opacity-50" onClick={() => void startVerification()}>Send verification code</button></Show>
             <Show when={verificationId()}><button type="button" disabled={busy() || !code().trim() || !selectedSlot()} class="min-h-11 self-end rounded-lg bg-teal-800 px-4 font-bold text-white disabled:opacity-50" onClick={() => void verifyAndRequest()}>Verify and request this time</button></Show>
           </Show></Show>
-          <Show when={receipt()}>{(saved) => <div class="sm:col-span-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-950"><strong>Awaiting celebrant approval</strong><p class="mt-1">Requested {saved().scheduled_start ? localTime(saved().scheduled_start!) : "consultation time"}. You will receive email confirmation and a Calendar event after approval.</p></div>}</Show>
+          <Show when={receipt()}>{(saved) => <div class="sm:col-span-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-950"><strong>{saved().status === "accepted" ? "Consultation approved" : "Awaiting celebrant approval"}</strong><p class="mt-1">{saved().status === "accepted" ? `${saved().celebrant_name || "The celebrant"} confirmed ${saved().scheduled_start ? localTime(saved().scheduled_start!) : "the consultation"}. Check your Calendar and confirmation email.` : `Requested ${saved().scheduled_start ? localTime(saved().scheduled_start!) : "consultation time"}. This panel checks for approval automatically; you will also receive email confirmation and a Calendar event.`}</p></div>}</Show>
         </div>}</Show>
       </>}</Show>
       <Show when={notice()}><p class="mt-3 text-sm" role="status">{notice()}</p></Show>

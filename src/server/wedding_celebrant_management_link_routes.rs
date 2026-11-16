@@ -7,27 +7,27 @@
 use std::{sync::Arc, time::Duration};
 
 use axum::{
+    Json, Router,
     extract::{Path, Query, Request, State},
-    http::{header, HeaderMap, HeaderValue, StatusCode},
+    http::{HeaderMap, HeaderValue, StatusCode, header},
     response::{IntoResponse, Response},
     routing::{get, post},
-    Json, Router,
 };
-use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
+use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use chrono::{DateTime, Duration as ChronoDuration, NaiveDate, NaiveTime, Utc};
 use hmac::{Hmac, Mac};
 use rand::RngCore;
 use serde::Deserialize;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sha2::Sha256;
 use sqlx::Row;
 use ulid::Ulid;
 
 use super::{
+    AppState, RateLimitPolicy,
     auth::{
         authenticated_rate_limit_key, authenticated_user, enforce_rate_limit, public_rate_limit_key,
     },
-    AppState, RateLimitPolicy,
 };
 use crate::wedding_celebrant_consultation::live_session_end;
 
@@ -506,7 +506,7 @@ async fn create_link_for_vendor(
         sqlx::query("UPDATE wedding_celebrant_management_sessions SET consumed_at=COALESCE(consumed_at,NOW()) WHERE grant_id=ANY($1)")
             .bind(&rotated).execute(&mut *tx).await.map_err(db_error)?;
     }
-    sqlx::query("INSERT INTO wedding_celebrant_management_grants(grant_id,vendor_id,token_prefix,token_digest,generation,expires_at,created_by_user_id) VALUES($1,$2,$3,$4,$5,$6,$7)")
+    sqlx::query("INSERT INTO wedding_celebrant_management_grants(grant_id,vendor_id,token_prefix,token_digest,generation,expires_at,created_by_user_id,capability_scopes) VALUES($1,$2,$3,$4,$5,$6,$7,ARRAY['consultation_availability','wedding_date_availability']::TEXT[])")
         .bind(&grant_id).bind(&vendor_id).bind(prefix).bind(digest).bind(generation).bind(expires_at).bind(user_id)
         .execute(&mut *tx).await.map_err(db_error)?;
     record_event(
@@ -523,7 +523,7 @@ async fn create_link_for_vendor(
         "grant_id":grant_id,"vendor_id":vendor_id,"vendor_slug":vendor.get::<String,_>("vendor_slug"),"vendor_name":vendor.get::<String,_>("vendor_name"),
         "management_url":format!("{}/workspace/vendor.html#celebrant_management={token}",management_base_url()),
         "expires_at":expires_at.to_rfc3339(),"generation":generation,"rotated_previous_links":!rotated.is_empty(),
-        "notice":"This private link is shown once and manages only this celebrant's consultation availability."
+        "notice":"This private link is shown once and manages only this celebrant's wedding-date availability and consultation hours."
     }))
 }
 
@@ -685,6 +685,8 @@ async fn exchange_http(
 struct Authority {
     grant_id: String,
     vendor_id: String,
+    created_by_user_id: String,
+    capability_scopes: Vec<String>,
 }
 
 fn cookie(headers: &HeaderMap) -> Option<&str> {
@@ -706,7 +708,7 @@ async fn session_authority(
     let secret = cookie(headers).ok_or_else(unavailable)?;
     token_prefix(secret, "wccs").ok_or_else(unavailable)?;
     let digest = mac(&pepper, secret).ok_or_else(unavailable)?;
-    let row=sqlx::query("SELECT g.grant_id,g.vendor_id,s.csrf_token_digest FROM wedding_celebrant_management_sessions s JOIN wedding_celebrant_management_grants g ON g.grant_id=s.grant_id JOIN wedding_vendors v ON v.vendor_id=g.vendor_id AND v.status='active' AND lower(v.category)='celebrant' WHERE s.session_token_digest=$1 AND s.consumed_at IS NULL AND s.expires_at>NOW() AND g.status='exchanged' AND g.revoked_at IS NULL AND g.expires_at>NOW()")
+    let row=sqlx::query("SELECT g.grant_id,g.vendor_id,g.created_by_user_id,g.capability_scopes,s.csrf_token_digest FROM wedding_celebrant_management_sessions s JOIN wedding_celebrant_management_grants g ON g.grant_id=s.grant_id JOIN wedding_vendors v ON v.vendor_id=g.vendor_id AND v.status='active' AND lower(v.category)='celebrant' WHERE s.session_token_digest=$1 AND s.consumed_at IS NULL AND s.expires_at>NOW() AND g.status='exchanged' AND g.revoked_at IS NULL AND g.expires_at>NOW()")
         .bind(digest).fetch_optional(&state.db.pool).await.map_err(|_|unavailable())?.ok_or_else(unavailable)?;
     if require_csrf {
         let csrf = headers
@@ -720,7 +722,57 @@ async fn session_authority(
     Ok(Authority {
         grant_id: row.get("grant_id"),
         vendor_id: row.get("vendor_id"),
+        created_by_user_id: row.get("created_by_user_id"),
+        capability_scopes: row.get("capability_scopes"),
     })
+}
+
+async fn ensure_wedding_date_offer(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    vendor_id: &str,
+    actor_user_id: &str,
+) -> Result<String, (StatusCode, String)> {
+    if let Some(offer_id) = sqlx::query_scalar::<_, String>(
+        "SELECT offer_id FROM wedding_vendor_special_offers WHERE vendor_id=$1 AND creation_idempotency_key='celebrant-unified-calendar-v1' FOR UPDATE",
+    )
+    .bind(vendor_id)
+    .fetch_optional(&mut **tx)
+    .await
+    .map_err(db_error)?
+    {
+        return Ok(offer_id);
+    }
+    let offer_id = Ulid::new().to_string();
+    let valid_from = Utc::now().date_naive();
+    let valid_until = valid_from + ChronoDuration::days(730);
+    sqlx::query(
+        r#"INSERT INTO wedding_vendor_special_offers
+           (offer_id,vendor_id,creation_idempotency_key,category,title,summary,offer_type,
+            publication_state,approved_by_user_id,approved_at,approved_revision,created_by_user_id,
+            valid_from,valid_until)
+           VALUES($1,$2,'celebrant-unified-calendar-v1','Celebrant','Celebrant wedding-date availability',
+                  'Vendor-maintained wedding-date availability. Dates remain indicative until the vendor confirms the couple-specific enquiry.',
+                  'incentive_only','active',$3,NOW(),1,$3,$4,$5)"#,
+    )
+    .bind(&offer_id)
+    .bind(vendor_id)
+    .bind(actor_user_id)
+    .bind(valid_from)
+    .bind(valid_until)
+    .execute(&mut **tx)
+    .await
+    .map_err(db_error)?;
+    for (kind, dedupe) in [
+        ("created", "unified-calendar-created"),
+        ("approved", "unified-calendar-approved"),
+        ("published", "unified-calendar-published"),
+    ] {
+        sqlx::query("INSERT INTO wedding_vendor_special_offer_events(event_id,vendor_id,offer_id,event_kind,actor_kind,actor_user_id,source_ref,dedupe_key,metadata) VALUES($1,$2,$3,$4,'operator',$5,'celebrant_management_link',$6,$7)")
+            .bind(Ulid::new().to_string()).bind(vendor_id).bind(&offer_id).bind(kind)
+            .bind(actor_user_id).bind(dedupe).bind(json!({"event_version":"wedding_vendor_special_offer_event.v1","unified_management_link":true}))
+            .execute(&mut **tx).await.map_err(db_error)?;
+    }
+    Ok(offer_id)
 }
 
 async fn dashboard(
@@ -744,13 +796,19 @@ async fn dashboard(
     .fetch_one(&state.db.pool)
     .await
     .map_err(db_error)?;
-    let separate_wedding_date_calendar = sqlx::query_scalar::<_, bool>(
-        "SELECT EXISTS(SELECT 1 FROM wedding_vendor_special_offers WHERE vendor_id=$1)",
+    let date_offer = sqlx::query_scalar::<_, String>(
+        "SELECT offer_id FROM wedding_vendor_special_offers WHERE vendor_id=$1 AND creation_idempotency_key='celebrant-unified-calendar-v1' ORDER BY updated_at DESC LIMIT 1",
     )
     .bind(vendor_id)
-    .fetch_one(&state.db.pool)
+    .fetch_optional(&state.db.pool)
     .await
-    .unwrap_or(false);
+    .map_err(db_error)?;
+    let date_slots = if let Some(offer_id) = date_offer.as_deref() {
+        sqlx::query("SELECT slot_id,local_date,space_label,state,hold_expires_at,last_confirmed_at,confirmation_expires_at,revision FROM wedding_vendor_special_offer_slots WHERE offer_id=$1 AND vendor_id=$2 AND state<>'withdrawn' ORDER BY local_date")
+            .bind(offer_id).bind(vendor_id).fetch_all(&state.db.pool).await.map_err(db_error)?
+    } else {
+        Vec::new()
+    };
     let request_summary = sqlx::query(
         r#"SELECT COUNT(*)::bigint AS total,
                   COUNT(*) FILTER (WHERE status IN ('waiting_acceptance','scheduled'))::bigint AS awaiting_approval,
@@ -762,15 +820,18 @@ async fn dashboard(
     .fetch_one(&state.db.pool)
     .await
     .map_err(db_error)?;
+    let wedding_date_scope = capability_scopes
+        .iter()
+        .any(|scope| scope == "wedding_date_availability");
     Ok(
         json!({"vendor":{"slug":vendor.get::<String,_>("vendor_slug"),"name":vendor.get::<String,_>("vendor_name"),"service_area":vendor.get::<String,_>("service_area")},
       "profile":profile.map(|r|json!({"register_status":r.get::<String,_>("register_status"),"register_checked_at":r.get::<Option<DateTime<Utc>>,_>("register_checked_at").map(|v|v.to_rfc3339()),"phone_configured":r.get::<bool,_>("phone_configured"),"participation_status":r.get::<String,_>("participation_status"),"participation_updated_at":r.get::<Option<DateTime<Utc>>,_>("participation_updated_at").map(|v|v.to_rfc3339()),"callback_phone_confirmed":r.get::<bool,_>("callback_phone_confirmed")})),
       "capabilities":{
         "granted":capability_scopes,
         "consultation_availability":true,
-        "wedding_date_availability":false,
-        "separate_wedding_date_calendar":separate_wedding_date_calendar,
-        "notice":"Consultation hours and wedding-date availability use separate scoped authorities."
+        "wedding_date_availability":wedding_date_scope,
+        "separate_wedding_date_calendar":true,
+        "notice":"This link opens two separate, vendor-scoped calendars: wedding-date evidence and ten-minute consultation hours. One never proves the other."
       },
       "request_summary":{
         "total":request_summary.get::<i64,_>("total"),
@@ -778,6 +839,7 @@ async fn dashboard(
         "accepted":request_summary.get::<i64,_>("accepted"),
         "privacy_notice":"This link shows counts only. Sign in to the claimed vendor account to see and act on request details."
       },
+      "date_slots":date_slots.into_iter().map(|r|json!({"slot_id":r.get::<String,_>("slot_id"),"local_date":r.get::<NaiveDate,_>("local_date").to_string(),"space_label":r.get::<String,_>("space_label"),"state":r.get::<String,_>("state"),"hold_expires_at":r.get::<Option<DateTime<Utc>>,_>("hold_expires_at").map(|v|v.to_rfc3339()),"last_confirmed_at":r.get::<DateTime<Utc>,_>("last_confirmed_at").to_rfc3339(),"confirmation_expires_at":r.get::<DateTime<Utc>,_>("confirmation_expires_at").to_rfc3339(),"revision":r.get::<i64,_>("revision")})).collect::<Vec<_>>(),
       "windows":windows.into_iter().map(|r|json!({"window_id":r.get::<String,_>("window_id"),"kind":r.get::<String,_>("window_kind"),"weekday":r.get::<Option<i16>,_>("weekday"),"local_date":r.get::<Option<NaiveDate>,_>("local_date").map(|v|v.to_string()),"starts_at":r.get::<NaiveTime,_>("starts_at").format("%H:%M").to_string(),"ends_at":r.get::<NaiveTime,_>("ends_at").format("%H:%M").to_string(),"revision":r.get::<i64,_>("revision")})).collect::<Vec<_>>(),
       "live":live.map(|r|json!({"session_id":r.get::<String,_>("session_id"),"expires_at":r.get::<DateTime<Utc>,_>("expires_at").to_rfc3339(),"call_cap":r.get::<i32,_>("call_cap"),"paused":r.get::<Option<DateTime<Utc>>,_>("paused_at").is_some(),"revision":r.get::<i64,_>("revision")}))}),
     )
@@ -817,6 +879,9 @@ struct CommandRequest {
     call_cap: Option<i32>,
     participation_status: Option<String>,
     callback_phone_confirmed: Option<bool>,
+    date_state: Option<String>,
+    expected_revision: Option<i64>,
+    space_label: Option<String>,
 }
 
 async fn command_http(
@@ -834,6 +899,25 @@ async fn command_http(
     )
     .await?;
     let authority = session_authority(&state, &headers, true).await?;
+    let date_operation = matches!(
+        request.operation.as_str(),
+        "date_slot_upsert" | "date_slot_remove"
+    );
+    let required_scope = if date_operation {
+        "wedding_date_availability"
+    } else {
+        "consultation_availability"
+    };
+    if !authority
+        .capability_scopes
+        .iter()
+        .any(|scope| scope == required_scope)
+    {
+        return Err((
+            StatusCode::FORBIDDEN,
+            "This link does not include that calendar permission.".into(),
+        ));
+    }
     let dedupe = clean(&request.idempotency_key, 180);
     if dedupe.len() < 8 {
         return Err((
@@ -863,6 +947,108 @@ async fn command_http(
         return Ok(Json(json!({"replayed":true})));
     }
     match request.operation.as_str() {
+        "date_slot_upsert" => {
+            let date =
+                NaiveDate::parse_from_str(request.local_date.as_deref().unwrap_or(""), "%Y-%m-%d")
+                    .map_err(|_| {
+                        (
+                            StatusCode::BAD_REQUEST,
+                            "Use YYYY-MM-DD for the wedding date.".into(),
+                        )
+                    })?;
+            if date < Utc::now().date_naive() {
+                return Err((
+                    StatusCode::BAD_REQUEST,
+                    "Choose today or a future wedding date.".into(),
+                ));
+            }
+            let state_value = request
+                .date_state
+                .as_deref()
+                .filter(|value| {
+                    matches!(
+                        *value,
+                        "available" | "provisional_hold" | "booked" | "paused"
+                    )
+                })
+                .ok_or((
+                    StatusCode::BAD_REQUEST,
+                    "Choose calendar open, temporary hold, confirmed booking or unavailable."
+                        .into(),
+                ))?;
+            let offer_id = ensure_wedding_date_offer(
+                &mut tx,
+                &authority.vendor_id,
+                &authority.created_by_user_id,
+            )
+            .await?;
+            let event_kind = match state_value {
+                "provisional_hold" => "hold_created",
+                "booked" => "booked",
+                "paused" => "paused",
+                _ => "reconfirmed",
+            };
+            if sqlx::query_scalar::<_, bool>("SELECT EXISTS(SELECT 1 FROM wedding_vendor_special_offer_events WHERE offer_id=$1 AND event_kind=$2 AND dedupe_key=$3)")
+                .bind(&offer_id).bind(event_kind).bind(&dedupe).fetch_one(&mut *tx).await.map_err(db_error)? {
+                tx.commit().await.map_err(db_error)?;
+                return Ok(Json(json!({"replayed":true})));
+            }
+            let space_label = clean(request.space_label.as_deref().unwrap_or(""), 160);
+            let existing = sqlx::query("SELECT slot_id,revision FROM wedding_vendor_special_offer_slots WHERE offer_id=$1 AND vendor_id=$2 AND local_date=$3 AND space_label=$4 AND session_label='' FOR UPDATE")
+                .bind(&offer_id).bind(&authority.vendor_id).bind(date).bind(&space_label).fetch_optional(&mut *tx).await.map_err(db_error)?;
+            let hold_expires =
+                (state_value == "provisional_hold").then(|| Utc::now() + ChronoDuration::hours(48));
+            let confirmation_expires = Utc::now() + ChronoDuration::days(90);
+            let slot_id = if let Some(row) = existing {
+                let revision = row.get::<i64, _>("revision");
+                if request
+                    .expected_revision
+                    .is_some_and(|expected| expected != revision)
+                {
+                    return Err((
+                        StatusCode::CONFLICT,
+                        "This date changed. Refresh before updating it.".into(),
+                    ));
+                }
+                let slot_id = row.get::<String, _>("slot_id");
+                sqlx::query("UPDATE wedding_vendor_special_offer_slots SET state=$1,hold_expires_at=$2,last_confirmed_at=NOW(),confirmation_expires_at=$3,revision=revision+1,updated_at=NOW(),source_ref=$4 WHERE slot_id=$5 AND vendor_id=$6")
+                    .bind(state_value).bind(hold_expires).bind(confirmation_expires).bind(format!("celebrant_management:{}",authority.grant_id)).bind(&slot_id).bind(&authority.vendor_id)
+                    .execute(&mut *tx).await.map_err(db_error)?;
+                slot_id
+            } else {
+                let slot_id = Ulid::new().to_string();
+                sqlx::query("INSERT INTO wedding_vendor_special_offer_slots(slot_id,offer_id,vendor_id,local_date,timezone,space_label,session_label,state,hold_expires_at,last_confirmed_at,confirmation_expires_at,source_ref) VALUES($1,$2,$3,$4,'Australia/Sydney',$5,'',$6,$7,NOW(),$8,$9)")
+                    .bind(&slot_id).bind(&offer_id).bind(&authority.vendor_id).bind(date).bind(&space_label).bind(state_value).bind(hold_expires).bind(confirmation_expires).bind(format!("celebrant_management:{}",authority.grant_id))
+                    .execute(&mut *tx).await.map_err(db_error)?;
+                slot_id
+            };
+            sqlx::query("INSERT INTO wedding_vendor_special_offer_events(event_id,vendor_id,offer_id,slot_id,event_kind,actor_kind,source_ref,dedupe_key,metadata) VALUES($1,$2,$3,$4,$5,'management_capability',$6,$7,$8)")
+                .bind(Ulid::new().to_string()).bind(&authority.vendor_id).bind(&offer_id).bind(&slot_id).bind(event_kind)
+                .bind(format!("celebrant_management:{}",authority.grant_id)).bind(&dedupe).bind(json!({"event_version":"wedding_vendor_special_offer_event.v1","state":state_value,"local_date":date,"vendor_scoped":true}))
+                .execute(&mut *tx).await.map_err(db_error)?;
+        }
+        "date_slot_remove" => {
+            let slot_id = clean(request.window_id.as_deref().unwrap_or(""), 40);
+            let offer_id = ensure_wedding_date_offer(
+                &mut tx,
+                &authority.vendor_id,
+                &authority.created_by_user_id,
+            )
+            .await?;
+            if sqlx::query_scalar::<_, bool>("SELECT EXISTS(SELECT 1 FROM wedding_vendor_special_offer_events WHERE offer_id=$1 AND event_kind='withdrawn' AND dedupe_key=$2)")
+                .bind(&offer_id).bind(&dedupe).fetch_one(&mut *tx).await.map_err(db_error)? {
+                tx.commit().await.map_err(db_error)?;
+                return Ok(Json(json!({"replayed":true})));
+            }
+            let changed=sqlx::query("UPDATE wedding_vendor_special_offer_slots SET state='withdrawn',hold_expires_at=NULL,revision=revision+1,updated_at=NOW() WHERE slot_id=$1 AND offer_id=$2 AND vendor_id=$3 AND state<>'withdrawn'")
+                .bind(&slot_id).bind(&offer_id).bind(&authority.vendor_id).execute(&mut *tx).await.map_err(db_error)?;
+            if changed.rows_affected() != 1 {
+                return Err((StatusCode::NOT_FOUND, "Wedding date not found.".into()));
+            }
+            sqlx::query("INSERT INTO wedding_vendor_special_offer_events(event_id,vendor_id,offer_id,slot_id,event_kind,actor_kind,source_ref,dedupe_key,metadata) VALUES($1,$2,$3,$4,'withdrawn','management_capability',$5,$6,$7)")
+                .bind(Ulid::new().to_string()).bind(&authority.vendor_id).bind(&offer_id).bind(&slot_id).bind(format!("celebrant_management:{}",authority.grant_id)).bind(&dedupe).bind(json!({"event_version":"wedding_vendor_special_offer_event.v1","vendor_scoped":true}))
+                .execute(&mut *tx).await.map_err(db_error)?;
+        }
         "window_add" => {
             let participation = sqlx::query_scalar::<_, String>(
                 "SELECT participation_status FROM wedding_celebrant_pilot_profiles WHERE vendor_id=$1",

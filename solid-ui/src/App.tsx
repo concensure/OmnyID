@@ -1405,10 +1405,19 @@ function App() {
   // this same workspace sign-in form instead of a separate static one.
   const deepLinkParams = new URLSearchParams(window.location.search);
   const pendingAuthSource = deepLinkParams.get("source");
-  const pendingVendorAuthSource = pendingAuthSource === "vendor_claim" || pendingAuthSource === "vendor";
+  const savedVendorReturn = (() => {
+    try { return sessionStorage.getItem("omnyid.vendorClaim.returnTo") ?? ""; }
+    catch { return ""; }
+  })();
+  const safeSavedVendorReturn = savedVendorReturn.startsWith("/workspace/vendor.html") ? savedVendorReturn : "";
+  const pendingVendorAuthSource = pendingAuthSource === "vendor_claim" || pendingAuthSource === "vendor" || Boolean(safeSavedVendorReturn);
   const pendingWeddingQuizHandoff = deepLinkParams.get("from") === "quiz"
     || pendingAuthSource === "wedding_quiz";
-  const pendingVendorSlug = (deepLinkParams.get("vendor_slug") ?? deepLinkParams.get("vendor") ?? "").trim().toLowerCase(), vendorPortalUrlFromDeepLink = () => `/workspace/vendor.html${pendingVendorSlug ? `?vendor_slug=${encodeURIComponent(pendingVendorSlug)}` : ""}`;
+  const pendingVendorSlug = (deepLinkParams.get("vendor_slug") ?? deepLinkParams.get("vendor") ?? "").trim().toLowerCase(), vendorPortalUrlFromDeepLink = () => safeSavedVendorReturn || `/workspace/vendor.html${pendingVendorSlug ? `?vendor_slug=${encodeURIComponent(pendingVendorSlug)}` : ""}`;
+  const openVendorPortalFromDeepLink = () => {
+    try { sessionStorage.removeItem("omnyid.vendorClaim.returnTo"); } catch { /* optional continuity only */ }
+    window.location.assign(vendorPortalUrlFromDeepLink());
+  };
   const shouldLaunchWeddingTemplateFromDeepLink = () =>
     pendingAuthSource === "wedding" || pendingAuthSource === "marketing" || pendingAuthSource === "wedding_quiz";
   function launchWeddingTemplateFromDeepLink() {
@@ -1632,7 +1641,10 @@ function App() {
 
   // Honour wedding and vendor deep links when a session is already active.
   onMount(() => {
-    if (pendingVendorAuthSource && readSession()?.token) return void window.location.replace(vendorPortalUrlFromDeepLink());
+    if (pendingVendorAuthSource && readSession()?.token) {
+      try { sessionStorage.removeItem("omnyid.vendorClaim.returnTo"); } catch { /* optional continuity only */ }
+      return void window.location.replace(vendorPortalUrlFromDeepLink());
+    }
     if (!shouldLaunchWeddingTemplateFromDeepLink() || !readSession()?.token) return;
     launchWeddingTemplateFromDeepLink();
   });
@@ -3410,7 +3422,7 @@ function App() {
             setShowAuthModal(false);
             setAuthNotice(null);
             setServerOffline(false);
-            if (pendingVendorAuthSource) return void window.location.assign(vendorPortalUrlFromDeepLink());
+            if (pendingVendorAuthSource) return void openVendorPortalFromDeepLink();
             const loginSession = readSession();
             const loginUserId = loginSession?.user?.id ?? "";
             const operatorLogin = loginSession?.user?.operator === true;

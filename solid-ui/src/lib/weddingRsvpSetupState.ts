@@ -89,6 +89,47 @@ const QUESTION_LIBRARY: ReadonlyArray<Omit<WeddingRsvpQuestion, "enabled" | "req
 
 export const weddingRsvpQuestionLibrary = QUESTION_LIBRARY;
 
+export const weddingRsvpCommonEventNames = [
+  "Engagement Party",
+  "Bridal Shower",
+  "Couple's Shower",
+  "Hens Parties",
+  "Bucks Parties",
+  "Rehearsal Dinner",
+  "Welcome Drinks",
+  "Ceremony",
+  "Cocktail Hour",
+  "Reception",
+  "After-Party",
+] as const;
+
+export const weddingRsvpCulturalEventNames = [
+  "Tea Ceremony",
+  "Multi-Course Banquet",
+  "Engagement Ceremony",
+  "Ancestral Altar",
+  "Sangeet",
+  "Baraat Ceremony",
+  "Hindu Ceremony",
+  "Sikh Ceremony",
+  "House Visits",
+  "Church Ceremony",
+  "High-Energy Reception",
+  "Zaffe",
+  "Katb el-Kitab",
+  "Nikah",
+  "Sahra",
+  "Kabbalat Panim, Bedeken & Tish",
+  "Chuppah Ceremony",
+  "Welcome to Country & Smoking Ceremony",
+] as const;
+
+export function weddingRsvpEventNameOptions(includeCulturalEvents: boolean): string[] {
+  return includeCulturalEvents
+    ? [...weddingRsvpCommonEventNames, ...weddingRsvpCulturalEventNames]
+    : [...weddingRsvpCommonEventNames];
+}
+
 function clean(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
