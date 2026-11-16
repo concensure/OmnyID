@@ -51,6 +51,11 @@ import {
 import type { WeddingVendorEnquiryPermissions } from "@/lib/weddingVendorEnquiryPermissionsState";
 import { friendlyErrorText } from "@/lib/visibleErrorText";
 import { weddingDealBreakersFromAfpMessages } from "@/lib/weddingDealBreakerAfpState";
+import {
+  weddingCelebrantConsultationSubject,
+  withWeddingCelebrantConsultationContext,
+  type WeddingCelebrantConsultationDraftContext,
+} from "@/lib/weddingCelebrantConsultationDraftState";
 
 type WeddingVendorOutreachCouple = {
   date_or_season: string | null;
@@ -198,8 +203,9 @@ export function useWeddingVendorOutreachOwner(input: {
   const [vendorOutreachFlows, setVendorOutreachFlows] = createSignal<Record<string, WeddingVendorOutreachFlowState>>({});
   const [vendorOutreachArtifactIds, setVendorOutreachArtifactIds] = createSignal<Record<string, string>>({});
   const [vendorOutreachIntents, setVendorOutreachIntents] = createSignal<Record<string, WeddingVendorChoiceIntent>>({});
-  const [vendorOutreachRetries, setVendorOutreachRetries] = createSignal<Record<string, { card: WeddingVendorChoiceCardData; artifactId: string; intent: WeddingVendorChoiceIntent; specialContext: WeddingVendorSpecialEnquiryContext | null }>>({});
+  const [vendorOutreachRetries, setVendorOutreachRetries] = createSignal<Record<string, { card: WeddingVendorChoiceCardData; artifactId: string; intent: WeddingVendorChoiceIntent; specialContext: WeddingVendorSpecialEnquiryContext | null; consultationContext: WeddingCelebrantConsultationDraftContext | null }>>({});
   const [vendorOutreachSpecialContexts, setVendorOutreachSpecialContexts] = createSignal<Record<string, WeddingVendorSpecialEnquiryContext>>({});
+  const [vendorOutreachConsultationContexts, setVendorOutreachConsultationContexts] = createSignal<Record<string, WeddingCelebrantConsultationDraftContext>>({});
 
   createEffect(() => {
     const persisted = projectWeddingVendorOutreachFlows(input.state().afpMessages);
@@ -258,16 +264,25 @@ export function useWeddingVendorOutreachOwner(input: {
     intent: WeddingVendorChoiceIntent = "CHECK_AVAILABILITY_AND_REQUEST_QUOTE",
     forceRegeneration = false,
     specialContext: WeddingVendorSpecialEnquiryContext | null = null,
+    consultationContext: WeddingCelebrantConsultationDraftContext | null = null,
   ) {
     setVendorOutreachArtifactIds((current) => ({ ...current, [card.choiceId]: artifactId }));
     setVendorOutreachIntents((current) => ({ ...current, [card.choiceId]: intent }));
-    setVendorOutreachRetries((current) => ({ ...current, [card.choiceId]: { card, artifactId, intent, specialContext } }));
+    setVendorOutreachRetries((current) => ({ ...current, [card.choiceId]: { card, artifactId, intent, specialContext, consultationContext } }));
     if (specialContext) setVendorOutreachSpecialContexts((current) => ({ ...current, [card.choiceId]: specialContext }));
+    setVendorOutreachConsultationContexts((current) => {
+      if (consultationContext) return { ...current, [card.choiceId]: consultationContext };
+      const next = { ...current };
+      delete next[card.choiceId];
+      return next;
+    });
     const metadata = input.state().workspace.metadata;
     const recipientEmail = weddingVendorOutreachRecipient(card, input.weddingVendorDirectory() ?? []);
     const existing = vendorOutreachFlows()[card.choiceId]
       ?? weddingVendorOutreachIdleFlow({ choiceId: card.choiceId, vendorName: card.title, recipientEmail });
-    if (!weddingVendorOutreachNeedsGeneration(existing, forceRegeneration)) return;
+    // A newly confirmed consultation time must produce a fresh draft even when
+    // this vendor already has an older, unsent enquiry draft.
+    if (!weddingVendorOutreachNeedsGeneration(existing, forceRegeneration || Boolean(consultationContext))) return;
     setVendorOutreachFlows((current) => ({
       ...current,
       [card.choiceId]: weddingVendorOutreachStartDrafting({ ...existing, recipientEmail }),
@@ -334,14 +349,13 @@ export function useWeddingVendorOutreachOwner(input: {
       if (!flow || flow.stage !== "drafting") return;
       if (!saveProjection) throw new Error("Could not save the draft yet. Reconnect the wedding workspace and try again.");
       const sharedSpecialContext = existing.permissions.shareDateOrSeason ? specialContext : null;
-      const contextualBody = withSpecialEnquiryContext(
-        formatWeddingVendorOutreachForDisplay(result.bodyMarkdown, couple.couple_names),
-        sharedSpecialContext,
-      );
+      const contextualBody = withWeddingCelebrantConsultationContext(withSpecialEnquiryContext(
+        formatWeddingVendorOutreachForDisplay(result.bodyMarkdown, couple.couple_names), sharedSpecialContext,
+      ), consultationContext);
       const persistedFlow = weddingVendorOutreachDraftSucceeded(flow, {
-        subject: sharedSpecialContext?.specialDate && !result.subject.includes(sharedSpecialContext.specialDate)
+        subject: weddingCelebrantConsultationSubject(sharedSpecialContext?.specialDate && !result.subject.includes(sharedSpecialContext.specialDate)
           ? `${result.subject} — ${specialDateLabel(sharedSpecialContext.specialDate)}`
-          : result.subject,
+          : result.subject, consultationContext),
         bodyMarkdown: contextualBody,
         bodyHtml: null,
         groundedOnLabels,
@@ -368,6 +382,7 @@ export function useWeddingVendorOutreachOwner(input: {
         editorHtml: persistedFlow.bodyHtml ?? renderMarkdown(persistedFlow.bodyMarkdown),
         actionIntent: intent,
         specialContext,
+        consultationContext,
       });
       await persistWeddingVendorOutreachDraftBeforeDisplay({
         draft: persistedFlow,
@@ -452,11 +467,16 @@ export function useWeddingVendorOutreachOwner(input: {
       delete next[choiceId];
       return next;
     });
+    setVendorOutreachConsultationContexts((current) => {
+      const next = { ...current };
+      delete next[choiceId];
+      return next;
+    });
   }
 
   function onRetryOutreach(choiceId: string) {
     const retry = vendorOutreachRetries()[choiceId];
-    if (retry) void onContactVendor(retry.card, retry.artifactId, retry.intent, true, retry.specialContext);
+    if (retry) void onContactVendor(retry.card, retry.artifactId, retry.intent, true, retry.specialContext, retry.consultationContext);
   }
 
   async function onConnectGmailForOutreach() {
@@ -493,6 +513,7 @@ export function useWeddingVendorOutreachOwner(input: {
     }
     setVendorOutreachFlows((current) => ({ ...current, [choiceId]: weddingVendorOutreachStartSending(flow) }));
     const specialContext = vendorOutreachSpecialContexts()[choiceId];
+    const consultationContext = vendorOutreachConsultationContexts()[choiceId];
     const linkedSpecialContext = weddingVendorSpecialLinkContext(specialContext);
     const metadata = input.state().workspace.metadata;
     let providerAttempted = false;
@@ -507,6 +528,7 @@ export function useWeddingVendorOutreachOwner(input: {
         editorHtml: html,
         actionIntent: vendorOutreachIntents()[choiceId],
         specialContext,
+        consultationContext,
       });
       await saveProjection(draftProjection);
       const draftMessageId = draftProjection.id;
@@ -534,6 +556,7 @@ export function useWeddingVendorOutreachOwner(input: {
         vendorId: directoryVendor?.vendorId ?? null,
         actionIntent: vendorOutreachIntents()[choiceId],
         specialContext,
+        consultationContext,
       });
       await saveProjection(sentProjection);
       if (linkedSpecialContext && sendResult.clientMessageId) {

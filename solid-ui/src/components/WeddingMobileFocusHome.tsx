@@ -42,6 +42,7 @@ import type { AfpAttachment } from "@/lib/api";
 import type { WeddingVendorChoiceCardData } from "@/components/WeddingVendorChoiceCard";
 import type { WeddingVendorChoiceIntent } from "@/lib/weddingVendorChoiceActionState";
 import type { WeddingVendorEnquiryPermissions } from "@/lib/weddingVendorEnquiryPermissionsState";
+import type { WeddingCelebrantConsultationDraftContext } from "@/lib/weddingCelebrantConsultationDraftState";
 import { friendlyErrorText } from "@/lib/visibleErrorText";
 import { requestFundedWeddingDecisionResearch } from "@/lib/weddingDecisionResearchApi";
 import { buildWeddingDecisionResearchState, weddingDecisionResearchQueueWindow, type WeddingDecisionResearchState } from "@/lib/weddingDecisionResearchState";
@@ -70,7 +71,7 @@ export function WeddingMobileFocusHome(props: {
   onAcknowledgeQuoteReply?: (flow: WeddingVendorQuoteReplyFlowState) => void;
   vendorOutreachFlows?: readonly WeddingVendorOutreachFlowState[];
   gmailConnected?: boolean;
-  onContactVendor?: (card: WeddingVendorChoiceCardData, artifactId: string, intent: WeddingVendorChoiceIntent) => void;
+  onContactVendor?: (card: WeddingVendorChoiceCardData, artifactId: string, intent: WeddingVendorChoiceIntent, consultationContext?: WeddingCelebrantConsultationDraftContext | null) => void;
   onVendorChoiceSelected?: (input: WeddingVendorChoiceSelectionSaveInput) => void;
   onOutreachBodyChange?: (choiceId: string, bodyMarkdown: string) => void;
   onOutreachRecipientChange?: (choiceId: string, email: string) => void;

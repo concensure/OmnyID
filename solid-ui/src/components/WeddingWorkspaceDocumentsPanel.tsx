@@ -17,6 +17,7 @@ import type { WeddingExportManifestEntry } from "@/lib/weddingExportState";
 import type { WeddingBundleExportFormat } from "@/lib/weddingBrowserExportActions";
 import type { WeddingWorkspaceSidebarAction } from "@/lib/weddingWorkspaceActionState";
 import type { WeddingVendorOutreachFlowState } from "@/lib/weddingVendorOutreachFlowState";
+import type { WeddingCelebrantConsultationDraftContext } from "@/lib/weddingCelebrantConsultationDraftState";
 
 type WeddingWorkspaceDocumentsPanelProps = {
   state: WeddingResponseWorkspaceViewProps["state"];
@@ -58,7 +59,7 @@ type WeddingWorkspaceDocumentsPanelProps = {
   onVendorChoiceSelected?: (input: WeddingVendorChoiceSelectionSaveInput) => void;
   outreachFlows?: Record<string, WeddingVendorOutreachFlowState>;
   gmailConnected?: boolean;
-  onContactVendor?: (card: WeddingVendorChoiceCardData, artifactId: string, intent: WeddingVendorChoiceIntent) => void;
+  onContactVendor?: (card: WeddingVendorChoiceCardData, artifactId: string, intent: WeddingVendorChoiceIntent, consultationContext?: WeddingCelebrantConsultationDraftContext | null) => void;
   onOutreachBodyChange?: (choiceId: string, bodyMarkdown: string) => void;
   onOutreachRecipientChange?: (choiceId: string, email: string) => void;
   onOutreachAttachmentsChange?: (choiceId: string, attachments: AfpAttachment[]) => void;

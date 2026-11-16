@@ -955,7 +955,7 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
             onApproveQuoteReply={approveQuoteReplyWording}
             onAcknowledgeQuoteReply={acknowledgeQuoteReplyBudgetImpact}
             vendorOutreachFlows={Object.values(vendorOutreach.flows())} gmailConnected={Boolean(props.gmailStatus?.connected)}
-            onContactVendor={(card, artifactId, intent) => void vendorOutreach.onContactVendor(card, artifactId, intent)} onOutreachBodyChange={vendorOutreach.onOutreachBodyChange} onOutreachAttachmentsChange={vendorOutreach.onOutreachAttachmentsChange}
+            onContactVendor={(card, artifactId, intent, consultationContext) => void vendorOutreach.onContactVendor(card, artifactId, intent, false, null, consultationContext)} onOutreachBodyChange={vendorOutreach.onOutreachBodyChange} onOutreachAttachmentsChange={vendorOutreach.onOutreachAttachmentsChange}
             onVendorChoiceSelected={(input) => saveVendorChoiceSelection(input, { refreshWorkspace: false, surfaceNotice: false })}
             onOutreachRecipientChange={vendorOutreach.onOutreachRecipientChange} onOutreachPermissionsChange={vendorOutreach.onOutreachPermissionsChange} onRetryOutreach={vendorOutreach.onRetryOutreach}
             onSendOutreach={(choiceId) => void vendorOutreach.onSendOutreach(choiceId)} onCancelOutreach={vendorOutreach.onCancelOutreach} onConnectGmailForOutreach={() => void vendorOutreach.onConnectGmailForOutreach()}
@@ -1033,7 +1033,7 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
           onVendorChoiceSelected={(input) => saveVendorChoiceSelection(input, { refreshWorkspace: false, surfaceNotice: false })}
           outreachFlows={vendorOutreach.flows()}
           gmailConnected={Boolean(props.gmailStatus?.connected)}
-          onContactVendor={(card, artifactId, intent) => void vendorOutreach.onContactVendor(card, artifactId, intent)}
+          onContactVendor={(card, artifactId, intent, consultationContext) => void vendorOutreach.onContactVendor(card, artifactId, intent, false, null, consultationContext)}
           onOutreachBodyChange={vendorOutreach.onOutreachBodyChange}
           onOutreachRecipientChange={vendorOutreach.onOutreachRecipientChange}
           onOutreachAttachmentsChange={vendorOutreach.onOutreachAttachmentsChange}

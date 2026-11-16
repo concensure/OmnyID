@@ -38,10 +38,12 @@ test("vendor portal separates wedding dates from phone consultations", async () 
   assert.match(panel, /Propose new time/);
 });
 
-test("ranked celebrants expose only top-three scoped slots and preserve approval boundaries", async () => {
-  const [panel, detail, ranking, management, migration] = await Promise.all([
+test("ranked celebrants expose a vendor-scoped slot-first enquiry and preserve approval boundaries", async () => {
+  const [panel, detail, card, outreach, ranking, management, migration] = await Promise.all([
     read("solid-ui/src/components/WeddingCelebrantConsultationShortlistPanel.tsx"),
     read("solid-ui/src/components/WeddingArtifactDetailPanel.tsx"),
+    read("solid-ui/src/components/WeddingVendorChoiceCard.tsx"),
+    read("solid-ui/src/lib/useWeddingVendorOutreachOwner.ts"),
     read("solid-ui/src/lib/weddingVendorRankingState.ts"),
     read("solid-ui/src/components/vendor/CelebrantManagementFlow.tsx"),
     read("postgres/migrations/0174_wedding_celebrant_consultation_approval.sql"),
@@ -49,7 +51,14 @@ test("ranked celebrants expose only top-three scoped slots and preserve approval
   assert.match(detail, /vendorComparisonCards\.slice\(0, 3\)/);
   assert.match(panel, /vendor_slug=/);
   assert.match(panel, /available_slots/);
-  assert.match(panel, /Wedding date:/);
+  assert.match(panel, /requestedVendorSlug/);
+  assert.match(panel, /Confirm this time and prepare draft/);
+  assert.match(panel, /onPrepareDraft/);
+  assert.match(card, /onRevealCelebrantConsultation/);
+  assert.match(detail, /ranked-celebrant-consultation/);
+  assert.match(outreach, /withWeddingCelebrantConsultationContext/);
+  assert.match(outreach, /forceRegeneration \|\| Boolean\(consultationContext\)/);
+  assert.match(panel, /Wedding-date availability:/);
   assert.match(panel, /verify\/start/);
   assert.match(panel, /Verify and request this time/);
   assert.match(panel, /Awaiting celebrant approval/);
@@ -61,6 +70,24 @@ test("ranked celebrants expose only top-three scoped slots and preserve approval
   assert.match(management, /cannot open couple details, messages, phone numbers or another listing/);
   assert.match(migration, /requester_user_id/);
   assert.match(migration, /confirmation_email_status/);
+});
+
+test("celebrant consultation draft names the selected time and persists scoped provenance", async () => {
+  const [state, afp] = await Promise.all([
+    import("../src/lib/weddingCelebrantConsultationDraftState.ts"),
+    read("solid-ui/src/lib/weddingVendorOutreachAfpState.ts"),
+  ]);
+  const context = {
+    vendorSlug: "celebrant-simple-ceremonies",
+    scheduledStart: "2026-11-19T07:30:00.000Z",
+    timezone: "Australia/Sydney" as const,
+    consultationMinutes: 10 as const,
+  };
+  const body = state.withWeddingCelebrantConsultationContext("Hello", context);
+  assert.match(body, /10-minute phone consultation/);
+  assert.match(body, /19 November 2026/);
+  assert.match(afp, /celebrant_consultation_vendor_slug/);
+  assert.match(afp, /celebrant_consultation_scheduled_start/);
 });
 
 test("public page remains useful without a live celebrant or an account", async () => {

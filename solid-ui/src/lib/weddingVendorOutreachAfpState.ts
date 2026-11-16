@@ -4,6 +4,7 @@ import { safeWeddingLabel, type WeddingPlanningMetadata } from "@/lib/weddingPla
 import type { WeddingVendorOutreachFlowState } from "@/lib/weddingVendorOutreachFlowState";
 import type { WeddingVendorChoiceIntent } from "@/lib/weddingVendorChoiceActionState";
 import type { WeddingVendorSpecialEnquiryContext } from "@/lib/weddingVendorSpecialDiscoveryApi";
+import type { WeddingCelebrantConsultationDraftContext } from "@/lib/weddingCelebrantConsultationDraftState";
 
 function clean(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
@@ -81,6 +82,7 @@ export function weddingVendorOutreachDraftAfpSendInput(input: {
   createdAt?: string | null;
   actionIntent?: WeddingVendorChoiceIntent | null;
   specialContext?: WeddingVendorSpecialEnquiryContext | null;
+  consultationContext?: WeddingCelebrantConsultationDraftContext | null;
 }): SendAfpMessageInput {
   const isResponse = input.flow.choiceId.startsWith("response:");
   const timestamp = timestampOrNow(input.createdAt);
@@ -141,6 +143,12 @@ export function weddingVendorOutreachDraftAfpSendInput(input: {
         special_date: input.specialContext.specialDate,
         offer_title: input.specialContext.offerTitle,
       } : null,
+      celebrant_consultation: input.consultationContext ? {
+        vendor_slug: input.consultationContext.vendorSlug,
+        scheduled_start: input.consultationContext.scheduledStart,
+        timezone: input.consultationContext.timezone,
+        consultation_minutes: input.consultationContext.consultationMinutes,
+      } : null,
     },
     views: [{
       format: "email",
@@ -181,6 +189,8 @@ export function weddingVendorOutreachDraftAfpSendInput(input: {
       limited_special_slot_id: input.specialContext?.slotId ?? null,
       limited_special_slot_revision: input.specialContext?.slotRevision ?? null,
       limited_special_date: input.specialContext?.specialDate ?? null,
+      celebrant_consultation_vendor_slug: input.consultationContext?.vendorSlug ?? null,
+      celebrant_consultation_scheduled_start: input.consultationContext?.scheduledStart ?? null,
     },
     store_in_relational: true,
   };
@@ -195,6 +205,7 @@ export function weddingVendorOutreachSentAfpSendInput(input: {
   createdAt?: string | null;
   actionIntent?: WeddingVendorChoiceIntent | null;
   specialContext?: WeddingVendorSpecialEnquiryContext | null;
+  consultationContext?: WeddingCelebrantConsultationDraftContext | null;
 }): SendAfpMessageInput {
   const isResponse = input.flow.choiceId.startsWith("response:");
   const timestamp = timestampOrNow(input.createdAt);
@@ -239,6 +250,12 @@ export function weddingVendorOutreachSentAfpSendInput(input: {
         special_date: input.specialContext.specialDate,
         offer_title: input.specialContext.offerTitle,
       } : null,
+      celebrant_consultation: input.consultationContext ? {
+        vendor_slug: input.consultationContext.vendorSlug,
+        scheduled_start: input.consultationContext.scheduledStart,
+        timezone: input.consultationContext.timezone,
+        consultation_minutes: input.consultationContext.consultationMinutes,
+      } : null,
     },
     views: [{
       format: "email",
@@ -275,6 +292,8 @@ export function weddingVendorOutreachSentAfpSendInput(input: {
       limited_special_slot_id: input.specialContext?.slotId ?? null,
       limited_special_slot_revision: input.specialContext?.slotRevision ?? null,
       limited_special_date: input.specialContext?.specialDate ?? null,
+      celebrant_consultation_vendor_slug: input.consultationContext?.vendorSlug ?? null,
+      celebrant_consultation_scheduled_start: input.consultationContext?.scheduledStart ?? null,
     },
     store_in_relational: true,
   };

@@ -46,6 +46,7 @@ export function WeddingVendorChoiceCard(props: {
   quoteExists?: boolean;
   bookingContractExists?: boolean;
   onContactVendor?: (card: WeddingVendorChoiceCardData, intent: WeddingVendorChoiceIntent) => void;
+  onRevealCelebrantConsultation?: (card: WeddingVendorChoiceCardData) => void;
   onReviewQuote?: (card: WeddingVendorChoiceCardData) => void;
   onReviewBooking?: (card: WeddingVendorChoiceCardData) => void;
   onViewEvidence?: (card: WeddingVendorChoiceCardData) => void;
@@ -349,7 +350,9 @@ export function WeddingVendorChoiceCard(props: {
                   } else if (action.intent === "REVIEW_QUOTE") props.onReviewQuote?.(card);
                   else if (action.intent === "START_PURCHASE_OR_BOOKING") props.onReviewBooking?.(card);
                   else if (action.intent === "VIEW_EVIDENCE") props.onViewEvidence?.(card);
-                  else props.onContactVendor?.(card, action.intent);
+                  else if (/celebrant/i.test(card.category ?? "") && props.onRevealCelebrantConsultation) {
+                    props.onRevealCelebrantConsultation(card);
+                  } else props.onContactVendor?.(card, action.intent);
                 }}
                 data-wedding-vendor-intent={primaryAction().intent}
                 data-magic-action="contact"

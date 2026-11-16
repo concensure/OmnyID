@@ -30,6 +30,7 @@ import { WeddingCelebrantConsultationShortlistPanel } from "@/components/Wedding
 import type { WeddingVendorChoiceIntent } from "@/lib/weddingVendorChoiceActionState";
 import type { WeddingVendorOutreachFlowState } from "@/lib/weddingVendorOutreachFlowState";
 import type { WeddingVendorEnquiryPermissions } from "@/lib/weddingVendorEnquiryPermissionsState";
+import type { WeddingCelebrantConsultationDraftContext } from "@/lib/weddingCelebrantConsultationDraftState";
 
 function uniqueStrings(values: readonly string[]): string[] {
   const seen = new Set<string>();
@@ -136,7 +137,7 @@ function ArtifactPreviewCard(props: {
   onVendorChoiceSelected?: (input: WeddingVendorChoiceSelectionSaveInput) => void;
   outreachFlows?: Record<string, WeddingVendorOutreachFlowState>;
   gmailConnected?: boolean;
-  onContactVendor?: (card: WeddingVendorChoiceCardData, artifactId: string, intent: WeddingVendorChoiceIntent) => void;
+  onContactVendor?: (card: WeddingVendorChoiceCardData, artifactId: string, intent: WeddingVendorChoiceIntent, consultationContext?: WeddingCelebrantConsultationDraftContext | null) => void;
   onOutreachBodyChange?: (choiceId: string, bodyMarkdown: string) => void;
   onOutreachRecipientChange?: (choiceId: string, email: string) => void;
   onOutreachAttachmentsChange?: (choiceId: string, attachments: AfpAttachment[]) => void;
@@ -149,10 +150,12 @@ function ArtifactPreviewCard(props: {
   const preview = props.preview;
   const [selectedOptionIds, setSelectedOptionIds] = createSignal<string[]>([]);
   const [comparisonExpanded, setComparisonExpanded] = createSignal(false);
+  const [requestedCelebrantSlug, setRequestedCelebrantSlug] = createSignal<string | null>(null);
 
   createEffect(() => {
     setSelectedOptionIds(loadWeddingDecisionSelections(props.artifact.artifactId));
     setComparisonExpanded(false);
+    setRequestedCelebrantSlug(null);
   });
 
   const persistedSelectedOptionIds = createMemo(() =>
@@ -339,6 +342,10 @@ function ArtifactPreviewCard(props: {
                   outreachFlow={props.outreachFlows?.[card.choiceId] ?? null}
                   gmailConnected={props.gmailConnected}
                   onContactVendor={(selectedCard, intent) => props.onContactVendor?.(selectedCard, props.artifact.artifactId, intent)}
+                  onRevealCelebrantConsultation={(selectedCard) => {
+                    setRequestedCelebrantSlug(selectedCard.vendorSlug ?? null);
+                    window.setTimeout(() => document.getElementById("ranked-celebrant-consultation")?.scrollIntoView({ behavior: "smooth", block: "center" }), 0);
+                  }}
                   onOutreachBodyChange={props.onOutreachBodyChange}
                   onOutreachRecipientChange={props.onOutreachRecipientChange}
                   onOutreachAttachmentsChange={props.onOutreachAttachmentsChange}
@@ -353,7 +360,14 @@ function ArtifactPreviewCard(props: {
             </For>
           </div>
         </Show>
-        <WeddingCelebrantConsultationShortlistPanel cards={props.artifact.vendorComparisonCards.slice(0, 3).map(cardWithCurrentPhoto)} />
+        <WeddingCelebrantConsultationShortlistPanel
+          cards={props.artifact.vendorComparisonCards.slice(0, 3).map(cardWithCurrentPhoto)}
+          requestedVendorSlug={requestedCelebrantSlug()}
+          onPrepareDraft={(card, context) => {
+            props.onContactVendor?.(card, props.artifact.artifactId, "CHECK_AVAILABILITY_AND_REQUEST_QUOTE", context);
+            window.setTimeout(() => document.getElementById(`vendor-enquiry-${card.choiceId}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 120);
+          }}
+        />
         <Show when={preview.budgetSummary}>
           {(summary) => (
             <div class="mt-3 rounded-xl border border-amber-100 bg-amber-50/80 p-3">
@@ -649,7 +663,7 @@ export function WeddingArtifactDetailPanel(props: {
   researchAction?: WeddingWorkspaceSidebarAction | null;
   outreachFlows?: Record<string, WeddingVendorOutreachFlowState>;
   gmailConnected?: boolean;
-  onContactVendor?: (card: WeddingVendorChoiceCardData, artifactId: string, intent: WeddingVendorChoiceIntent) => void;
+  onContactVendor?: (card: WeddingVendorChoiceCardData, artifactId: string, intent: WeddingVendorChoiceIntent, consultationContext?: WeddingCelebrantConsultationDraftContext | null) => void;
   onOutreachBodyChange?: (choiceId: string, bodyMarkdown: string) => void;
   onOutreachRecipientChange?: (choiceId: string, email: string) => void;
   onOutreachAttachmentsChange?: (choiceId: string, attachments: AfpAttachment[]) => void;
