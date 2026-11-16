@@ -36,13 +36,17 @@ test("mobile focus keeps completed vendor triage through a route remount", () =>
     value: { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => values.set(key, value) },
   });
   try {
-    saveMobileFocusTriageMemory("wedding-workspace", {
+    saveMobileFocusTriageMemory("account-a", "wedding-workspace", {
       resolvedIds: ["vendor-comparison", "vendor-comparison"],
       deferredIds: ["decision-later"],
     });
-    assert.deepEqual(loadMobileFocusTriageMemory("wedding-workspace"), {
+    assert.deepEqual(loadMobileFocusTriageMemory("account-a", "wedding-workspace"), {
       resolvedIds: ["vendor-comparison"],
       deferredIds: ["decision-later"],
+    });
+    assert.deepEqual(loadMobileFocusTriageMemory("recreated-account", "wedding-workspace"), {
+      resolvedIds: [],
+      deferredIds: [],
     });
   } finally {
     Object.defineProperty(globalThis, "localStorage", { configurable: true, value: original });

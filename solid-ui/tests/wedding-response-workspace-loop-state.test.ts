@@ -616,6 +616,36 @@ test("buildWeddingResponseWorkspaceViewState turns budget drift gaps into task p
   assert.ok(taskGroup?.items.some((item) => /Verify unknown costs/.test(item.title)));
 });
 
+test("budget drift never names a date as a vendor", () => {
+  const state = buildWeddingResponseWorkspaceViewState({
+    metadata,
+    artifacts: [artifact({
+      title: "Budget notes",
+      kind: "budget_sheet",
+      createdAt: 1,
+      bodyText: "Minimum spend, overtime, GST and service fees are unknown.",
+    })],
+    decisionRecords: [{
+      id: "wedding_decision:date",
+      artifactId: "artifact:date",
+      artifactTitle: "Wedding date",
+      artifactKind: "calendar",
+      selectedOptionId: "2027-11-24",
+      selectedOptionLabel: "2027-11-24",
+      selectedOptionDetail: "Wedding date",
+      selectedOptionCells: ["2027-11-24"],
+      createdAt: "2026-11-16T00:00:00.000Z",
+      source: "local_selection",
+      metadataLabels: [],
+    }],
+    projectionStorage: memoryStorage(),
+  });
+  const budgetLoop = state.secondOrderLoopCards.find((card) => card.id === "second_order:budget_drift");
+  assert.ok(budgetLoop);
+  assert.equal(budgetLoop.suggestedTask, null);
+  assert.doesNotMatch(JSON.stringify(state), /Verify unknown costs for 2027-11-24/i);
+});
+
 test("buildWeddingResponseWorkspaceViewState suppresses budget drift suggestions when task exists", () => {
   const state = buildWeddingResponseWorkspaceViewState({
     metadata,

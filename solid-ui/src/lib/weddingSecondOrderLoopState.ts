@@ -42,7 +42,28 @@ function decisionIsContextualOption(record: WeddingPersistedDecisionRecord): boo
   const option = clean(record.selectedOptionLabel);
   if (/budget|contribution/.test(`${kind} ${title}`)) return false;
   if (/^(?:aud\s*)?\$?[\d,.]+\s+total$/i.test(option)) return false;
+  if (/^20\d{2}-\d{2}-\d{2}$/.test(option) || /^\d{1,2}[/-]\d{1,2}[/-]20\d{2}$/.test(option)) return false;
   return Boolean(option);
+}
+
+function decisionIsVendorSelection(record: WeddingPersistedDecisionRecord): boolean {
+  if (!decisionIsContextualOption(record)) return false;
+  const descriptor = `${record.artifactKind} ${record.artifactTitle}`.toLowerCase();
+  return /vendor|supplier|venue|celebrant|photograph|florist|cater|planner|music|dj|band|cake|beauty|hair|makeup|transport|quote|proposal/.test(descriptor);
+}
+
+function selectedVendorSubjectLabel(
+  records: readonly WeddingPersistedDecisionRecord[] | null | undefined,
+  artifacts: readonly WeddingArtifactInput[],
+): string | null {
+  const selected = (records ?? []).find(decisionIsVendorSelection)?.selectedOptionLabel.trim();
+  if (selected) return selected;
+  const quoteVendor = artifacts.find((artifact) => {
+    const descriptor = `${artifact.kind} ${artifact.title} ${artifact.bodyText ?? ""}`.toLowerCase();
+    return (artifact.vendorLabels?.length ?? 0) > 0
+      && /quote|proposal|contract|invoice|pricing|package|minimum spend/.test(descriptor);
+  })?.vendorLabels?.find((label) => label.trim().length > 0)?.trim();
+  return quoteVendor || null;
 }
 
 function decisionContextLabels(records: readonly WeddingPersistedDecisionRecord[] | null | undefined): string[] {
@@ -214,6 +235,7 @@ export function buildWeddingSecondOrderLoopCards(input: {
   const selectedDecisionLabels = decisionContextLabels(input.decisionRecords);
   const primaryDecision = primaryDecisionRecord(input.decisionRecords);
   const selectedOptionLabel = clean(primaryDecision?.selectedOptionLabel);
+  const selectedVendorLabel = selectedVendorSubjectLabel(input.decisionRecords, input.artifacts);
   const selectedEvidenceLabels = selectedDecisionLabels.length > 0
     ? selectedDecisionLabels.map((label) => `selected scope: ${label.replace(/^Selected\s+/i, "")}`)
     : [];
@@ -423,10 +445,10 @@ export function buildWeddingSecondOrderLoopCards(input: {
       budgetTasks.length > 0 ? `${budgetTasks.length} budget task${budgetTasks.length === 1 ? "" : "s"}` : "no budget verification task",
       ...selectedEvidenceLabels,
     ];
-    const suggestedTask = budgetTasks.length === 0
+    const suggestedTask = budgetTasks.length === 0 && selectedVendorLabel
       ? {
-        id: `second-order:budget-drift:${selectedOptionLabel ? taskSafeLabel(selectedOptionLabel) : "workspace"}`,
-        title: selectedOptionLabel ? `Verify unknown costs for ${selectedOptionLabel}` : "Verify unknown wedding costs",
+        id: `second-order:budget-drift:${taskSafeLabel(selectedVendorLabel)}`,
+        title: `Verify unknown costs in ${selectedVendorLabel}'s pricing`,
         kind: "budget_review" as const,
         dueLabel: "Before confirming budget or vendor choice",
         priority: "high" as const,

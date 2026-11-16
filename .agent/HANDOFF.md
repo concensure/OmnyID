@@ -9172,3 +9172,39 @@ Recommended next action: release the resulting coordination commit from a clean
 detached checkout, sync the four secret files to Oracle, enable the false-default
 consultation flag, then prove the hosted vendor-scoped endpoint reports phone
 verification configured without disclosing a secret or phone number.
+
+## 2026-11-16 - WED-371 account-isolated Wedding startup and Wedding Sprout (Codex, release candidate)
+
+Worktree `C:\temp\wt\omnyid-wed360`, branch `agent/codex/WED-371`, based on the
+exact WED-370 production SHA `2adbf4052217a271c19a1f657eb1147bc672b1dd`.
+
+- Fixed the likely older-iOS planner crash by supporting both modern and legacy
+  `MediaQueryList` listener APIs. The generic Wedding error boundary is no longer
+  triggered merely because Safari lacks `addEventListener` on that object.
+- Account-scoped mobile triage and desktop deferrals by authenticated user as well
+  as workspace; reset the module-level mobile mode for accounts without a saved
+  preference. Existing server deletion drops the tenant schema and user row, so
+  recreating an email receives a fresh identity rather than its former ledger.
+- `Set a wedding budget` now opens the real Animal Quiz link and editable Budget
+  tracker below the decision card. It no longer routes to the separate empty
+  Decision Queue. The list-type selector appears only after pressing Upload.
+- Unknown-cost tasks require a selected vendor or quote-like vendor artifact and
+  name that vendor. A date-only decision cannot produce `Verify unknown costs for
+  <date>`.
+- Sprout is now Wedding-first when the Wedding lens is active. The authenticated
+  Wedding-only endpoint reuses the funded inference usage ledger, daily limit and
+  hard weekly cap. Deterministic routing constrains actions to Wedding views. A
+  parsed budget amount is staged in account-scoped storage and visibly prefilled
+  for review; nothing is silently saved or sent. All persona and display tools
+  remain available behind a secondary control.
+- Evidence: `cargo check --lib` passes using `C:\cargo-target`; TypeScript passes;
+  production Vite build passes; 42 focused tests pass; all Wedding tests are
+  2299/2300 with only the previously documented lead-magnet rejection assertion
+  failing. A Rust lib-test link attempt hit a Windows rustc access violation, so
+  the successful library compile and pure route tests are recorded separately.
+
+Recommended next action: commit this candidate, deploy only from a clean detached
+checkout of that exact SHA, then use machine-generated production proof plus
+read-only hosted checks to confirm `SOURCE_COMMIT`, health, funded-AI policy and
+the vendor-scoped Celebrant endpoint/Twilio readiness. A real SMS receipt still
+requires an explicitly supplied controlled phone number.

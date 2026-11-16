@@ -70,6 +70,22 @@ test("RSVP and research tasks expose consequence-specific primary actions", () =
   assert.equal(hens.compareLabel, "View research");
 });
 
+test("budget setup stays in Wedding instead of routing to the empty decision queue", () => {
+  const budget = buildWeddingDecisionFocusDisplayState({ relief: {
+    summaryLabel: "One setup action",
+    focusLimit: 1,
+    focusItems: [item({
+      title: "Set a wedding budget",
+      sourceSurface: "decision_queue",
+      actionMetadata: { wedding_setup_decision: "budget" },
+    })],
+    backlogCount: 0,
+    reliefLabels: [],
+  }}).itemCards[0]!;
+  assert.equal(budget.compareLabel, "Set budget");
+  assert.match(budget.recommendedActionLabel, /suggested category amounts/i);
+});
+
 test("vendor scheduling decisions request the correct source-backed shortlist", () => {
   assert.equal(
     weddingVendorResearchQueryForDecision(item({

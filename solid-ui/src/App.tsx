@@ -4627,6 +4627,11 @@ function App() {
               return false;
             }).length;
           })()}
+          weddingMode={weddingLensEnabled()}
+          onWeddingNavigate={(menu) => {
+            dispatchWeddingWorkspaceMenuSelection(menu);
+            selectView("response_queue");
+          }}
         />
       </Show>
 

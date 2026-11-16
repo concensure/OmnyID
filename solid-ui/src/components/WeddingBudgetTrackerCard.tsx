@@ -1,5 +1,5 @@
 // @locs-version: 2.1
-import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, onMount, Show } from "solid-js";
 
 import type { SendAfpMessageInput } from "@/lib/api";
 import { WeddingDashboardIcon } from "@/components/WeddingDashboardIcons";
@@ -34,6 +34,7 @@ import {
   buildWeddingBudgetSuggestedAllocation,
 } from "@/lib/weddingBudgetGuidanceState";
 import type { WeddingBudgetContribution } from "@/lib/weddingBudgetInsightsState";
+import { consumeWeddingAssistantStagedUpdate } from "@/lib/weddingAssistantStagedUpdateState";
 
 function moneyLabel(amount: number, currency: string): string {
   return amount.toLocaleString(undefined, {
@@ -164,6 +165,15 @@ export function WeddingBudgetTrackerCard(props: {
     const next = { ...draft(), categoryAmounts: { ...draft().categoryAmounts, [categoryId]: clamped } };
     updateDraft(categoryId === "other_misc" ? next : withWeddingBudgetAutoBalance(next));
   }
+
+  onMount(() => {
+    const staged = consumeWeddingAssistantStagedUpdate("budget");
+    const amount = staged?.draftFields.budgetTargetAud;
+    if (typeof amount === "number" && amount > 0) {
+      setTotalAmount(amount);
+      setSaveNotice(`Sprout staged a ${moneyLabel(amount, currency)} budget. Review the allocation, then save it.`);
+    }
+  });
 
   function applySuggestedAllocation() {
     const totalAmount = draft().totalAmount || props.state.budgetTargetAmount || 0;

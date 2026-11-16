@@ -3576,3 +3576,19 @@ an authenticated user for that claimed vendor may approve it. The existing
 atomic couple/vendor Calendar update and separately recorded confirmation-email
 outcome remain the authorities. No second enquiry, calendar or messaging store
 is introduced.
+
+## 2026-11-16: Wedding browser mirrors require account identity; Sprout stages rather than acts
+
+Starter wedding plan and workspace IDs are presentation identifiers, not tenant
+boundaries. Every browser-side completion, deferral, mode and staged-update
+mirror must include the authenticated user ID. Server authority remains the
+user's tenant schema and account deletion drops that schema before removing the
+user, so recreating the same email produces a fresh identity and ledger.
+
+Under the Wedding lens, Sprout's primary surface is a Wedding-only assistant.
+It reuses the existing authenticated platform-funded OpenRouter ledger, request
+limits and hard weekly spend cap. The model may explain or suggest a destination;
+deterministic code chooses allowed Wedding navigation targets. A requested field
+change is staged in the current account for review in its canonical Wedding view
+and is never silently saved, sent or approved. Persona, settings, minimisation
+and customisation remain available as secondary Sprout tools.

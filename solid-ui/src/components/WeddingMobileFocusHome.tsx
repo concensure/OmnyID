@@ -82,7 +82,10 @@ export function WeddingMobileFocusHome(props: {
   onCancelOutreach?: (choiceId: string) => void;
   onConnectGmailForOutreach?: () => void;
 }) {
-  const initialTriageMemory = loadMobileFocusTriageMemory(props.state.workspace.metadata.responseWorkspaceId);
+  const initialTriageMemory = loadMobileFocusTriageMemory(
+    props.userId,
+    props.state.workspace.metadata.responseWorkspaceId,
+  );
   const [position, setPosition] = createSignal(0);
   const [deferredIds, setDeferredIds] = createSignal<Set<string>>(new Set(initialTriageMemory.deferredIds));
   const [resolvedIds, setResolvedIds] = createSignal<Set<string>>(new Set(initialTriageMemory.resolvedIds));
@@ -384,7 +387,7 @@ export function WeddingMobileFocusHome(props: {
     }
     setResolvedIds(resolved);
     setDeferredIds(deferred);
-    saveMobileFocusTriageMemory(props.state.workspace.metadata.responseWorkspaceId, {
+    saveMobileFocusTriageMemory(props.userId, props.state.workspace.metadata.responseWorkspaceId, {
       resolvedIds: [...resolved],
       deferredIds: [...deferred],
     });
@@ -551,7 +554,7 @@ export function WeddingMobileFocusHome(props: {
     const next = new Set(deferredIds());
     next.delete(first);
     setDeferredIds(next);
-    saveMobileFocusTriageMemory(props.state.workspace.metadata.responseWorkspaceId, {
+    saveMobileFocusTriageMemory(props.userId, props.state.workspace.metadata.responseWorkspaceId, {
       resolvedIds: [...resolvedIds()],
       deferredIds: [...next],
     });

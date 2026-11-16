@@ -55,6 +55,9 @@ function checkedLabel(item: WeddingPersonalOsRankedItem): string {
 }
 
 function recommendedActionLabel(item: WeddingPersonalOsRankedItem): string {
+  if (item.actionMetadata?.wedding_setup_decision === "budget") {
+    return "Set a starting budget and adjust the suggested category amounts";
+  }
   const comparisonLabels = Array.isArray(item.actionMetadata?.vendor_comparison_top_choice_labels)
     ? item.actionMetadata.vendor_comparison_top_choice_labels.filter((value): value is string => typeof value === "string" && value.trim().length > 0)
     : [];
@@ -78,6 +81,7 @@ function recommendedActionLabel(item: WeddingPersonalOsRankedItem): string {
 }
 
 function compareLabel(item: WeddingPersonalOsRankedItem): string {
+  if (item.actionMetadata?.wedding_setup_decision === "budget") return "Set budget";
   if (/pending RSVP/i.test(item.title)) return "Message guest";
   if (/hen'?s night|hen party/i.test(item.title)) return "View research";
   if (/transport|access|guest logistics/i.test(item.title)) return "Review findings";

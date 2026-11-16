@@ -52,10 +52,20 @@ export function installMobileFocusViewportListener(): () => void {
   const sync = () => setViewport(mediaQuery?.matches === true);
   sync();
   if (!listenerInstalled) {
-    mediaQuery.addEventListener("change", sync);
+    if (typeof mediaQuery.addEventListener === "function") {
+      mediaQuery.addEventListener("change", sync);
+    } else {
+      // iOS/Safari versions still in use by Wedding customers expose the
+      // older MediaQueryList listener API. Throwing here used to trip the
+      // whole planner error boundary after an otherwise successful login.
+      mediaQuery.addListener(sync);
+    }
     listenerInstalled = true;
   }
-  return () => {};
+  return () => {
+    // The listener is intentionally shared across mounts. Keep it installed
+    // while the application is alive; the function exists for test cleanup.
+  };
 }
 
 export const isMobileFocusViewport: Accessor<boolean> = viewport;
@@ -72,11 +82,15 @@ export function setMobileFocusMode(next: FocusMode, userId?: string | null): voi
   try { localStorage.setItem(storageKey(userId, "mode"), next); } catch { /* convenience preference only */ }
 }
 export function loadMobileFocusMode(userId?: string | null): FocusMode {
+  let next: FocusMode = "decisions";
   try {
     const saved = localStorage.getItem(storageKey(userId, "mode"));
-    if (saved === "decisions" || saved === "responses" || saved === "overview") setMode(saved);
+    if (saved === "decisions" || saved === "responses" || saved === "overview") next = saved;
   } catch { /* storage can be unavailable in privacy modes */ }
-  return mode();
+  // The signal is module-wide, so an account without a saved preference must
+  // explicitly reset it rather than inheriting the previous signed-in user.
+  setMode(next);
+  return next;
 }
 export function setMobileFocusMenuOpen(open: boolean): void { setMenuOpen(open); }
 export function setMobileFocusMenuAttentionCount(count: number): void {
@@ -89,8 +103,9 @@ export function setMobileWeddingDecisionOpenIntent(intent: MobileWeddingDecision
   setDecisionOpenIntentSignal(intent);
 }
 
-function triageStorageKey(workspaceId: string | null | undefined): string {
-  return storageKey(workspaceId, "triage");
+function triageStorageKey(userId: string | null | undefined, workspaceId: string | null | undefined): string {
+  const workspace = workspaceId?.trim() || "no-workspace";
+  return storageKey(userId, `triage.${workspace}`);
 }
 
 function uniqueIds(values: readonly string[]): string[] {
@@ -98,9 +113,12 @@ function uniqueIds(values: readonly string[]): string[] {
 }
 
 /** A local mirror prevents a successfully saved decision flashing back during route remount. */
-export function loadMobileFocusTriageMemory(workspaceId: string | null | undefined): MobileFocusTriageMemory {
+export function loadMobileFocusTriageMemory(
+  userId: string | null | undefined,
+  workspaceId: string | null | undefined,
+): MobileFocusTriageMemory {
   try {
-    const parsed = JSON.parse(localStorage.getItem(triageStorageKey(workspaceId)) ?? "null") as Partial<MobileFocusTriageMemory> | null;
+    const parsed = JSON.parse(localStorage.getItem(triageStorageKey(userId, workspaceId)) ?? "null") as Partial<MobileFocusTriageMemory> | null;
     return {
       resolvedIds: uniqueIds(Array.isArray(parsed?.resolvedIds) ? parsed.resolvedIds : []),
       deferredIds: uniqueIds(Array.isArray(parsed?.deferredIds) ? parsed.deferredIds : []),
@@ -110,9 +128,13 @@ export function loadMobileFocusTriageMemory(workspaceId: string | null | undefin
   }
 }
 
-export function saveMobileFocusTriageMemory(workspaceId: string | null | undefined, memory: MobileFocusTriageMemory): void {
+export function saveMobileFocusTriageMemory(
+  userId: string | null | undefined,
+  workspaceId: string | null | undefined,
+  memory: MobileFocusTriageMemory,
+): void {
   try {
-    localStorage.setItem(triageStorageKey(workspaceId), JSON.stringify({
+    localStorage.setItem(triageStorageKey(userId, workspaceId), JSON.stringify({
       resolvedIds: uniqueIds(memory.resolvedIds),
       deferredIds: uniqueIds(memory.deferredIds),
     }));

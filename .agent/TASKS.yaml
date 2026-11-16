@@ -15,6 +15,18 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-371
+    title: Repair account-isolated Wedding startup and actions, add the Wedding Sprout assistant, and prove the Celebrant rollout
+    status: review
+    owner: codex
+    branch: agent/codex/WED-371
+    worktree: C:/temp/wt/omnyid-wed360
+    base_sha: 2adbf4052217a271c19a1f657eb1147bc672b1dd
+    depends_on: [WED-370, WED-369, WED-367, WED-361]
+    files: [solid-ui/src/components/**Wedding**, solid-ui/src/components/**Sprout**, solid-ui/src/lib/**wedding**, solid-ui/src/App.tsx, solid-ui/tests/**wedding**, src/server/**wedding**, src/server/ui_command_routes.rs, tests/**wedding**, docker-compose.oracle.minimal.yml, scripts/oracle-secret-sync.ps1, Documents/verification/**, .agent/**]
+    acceptance: [an authenticated Wedding account no longer falls into the generic planner-open failure for valid empty first-run state, budget setup opens the animal-quiz guidance and Budget surface in place rather than an empty Decision queue, Wedding tasks decisions notes and progress are keyed by authenticated account and Wedding plan with regression tests preventing another deleted or recreated account from inheriting them, vague unknown-cost tasks name the relevant selected favourited quoted or booked vendor and are suppressed without one, the planning-list type selector appears only inside the import review flow and never in the horizontal menu, Sprout opens a Wedding-first conversational command surface that can answer Wedding questions navigate existing views and stage field or option changes behind the existing approval boundary while retaining secondary Sprout tools, funded AI is limited to Wedding intent account and rate/cost policies, Celebrant consultation flag secret mounts endpoint scope and callback readiness are proven on Oracle without disclosing secrets, focused privacy frontend backend full-account production-build exact-SHA release and hosted checks pass]
+    progress: "Release candidate complete from the exact WED-370 production SHA. The planner startup now supports legacy iOS MediaQueryList listeners; mobile triage, deferred decisions, display mode and staged assistant updates are authenticated-account scoped so a recreated account cannot inherit another account's browser progress. Budget setup opens the Animal Quiz guidance and editable Budget tracker inline; the upload list-type chooser moved into the upload dialog; budget-drift tasks require a selected vendor and never treat a date as one. Sprout is Wedding-first under the Wedding lens, reuses the guarded platform-funded OpenRouter authority with per-account daily and $50 weekly caps, navigates only Wedding views and stages a parsed budget for review without silently saving it. Rust check, TypeScript, production build and 42 focused tests pass; the full Wedding suite is 2299/2300 with only the documented pre-existing lead-magnet rejection assertion failing. Exact-SHA Oracle release and hosted Celebrant/Twilio re-proof are the remaining machine-owned steps."
+
   - id: WED-370
     title: Make ranked Celebrant enquiries slot-first and activate the verified Oracle consultation endpoint
     status: done

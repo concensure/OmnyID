@@ -24,6 +24,9 @@ import {
   type PersonaSwitcherTab as SwitcherTab,
 } from "@/lib/personaSwitcherState";
 import { personaReloadBlocked, personaSwitcherBusy } from "@/lib/personaSwitcherViewState";
+import { askWeddingAssistant, type WeddingAssistantResponse } from "@/lib/weddingAssistantApi";
+import type { WeddingWorkspaceMenuId } from "@/lib/weddingWorkspaceMenuState";
+import { saveWeddingAssistantStagedUpdate } from "@/lib/weddingAssistantStagedUpdateState";
 
 type AnimState = "idle" | "busy" | "error" | "success";
 // Visual mood derived from queue pressure and LoRA genome state.
@@ -69,6 +72,9 @@ export function AgentPersonaFAB(props: {
   loraScore?: number;
   loraActive?: boolean;
   urgentPending?: number;
+  weddingMode?: boolean;
+  weddingPlanId?: string | null;
+  onWeddingNavigate?: (menu: WeddingWorkspaceMenuId) => void;
 }) {
   const [showSwitcher, setShowSwitcher] = createSignal(false);
   const [personas, setPersonas] = createSignal<AgentPersona[]>([]);
@@ -81,6 +87,11 @@ export function AgentPersonaFAB(props: {
   const [actionError, setActionError] = createSignal<PersonaSwitcherFailureReceipt | null>(null);
   const [actionNotice, setActionNotice] = createSignal<string | null>(null);
   const [minimizing, setMinimizing] = createSignal(false);
+  const [showWeddingTools, setShowWeddingTools] = createSignal(false);
+  const [weddingQuestion, setWeddingQuestion] = createSignal("");
+  const [weddingAnswer, setWeddingAnswer] = createSignal<WeddingAssistantResponse | null>(null);
+  const [weddingAssistantBusy, setWeddingAssistantBusy] = createSignal(false);
+  const [weddingAssistantError, setWeddingAssistantError] = createSignal<string | null>(null);
   let longPressTimer: ReturnType<typeof setTimeout> | undefined;
   let didLongPress = false;
   const switcherBusy = createMemo(() => personaSwitcherBusy({
@@ -133,6 +144,7 @@ export function AgentPersonaFAB(props: {
   };
 
   const fabTitle = (): string => {
+    if (props.weddingMode) return "Ask Sprout about your Wedding plan";
     const urgent = props.urgentPending ?? 0;
     switch (avatarMood()) {
       case "overwhelmed": return `Overwhelmed — ${urgent} urgent decisions need attention`;
@@ -205,13 +217,36 @@ export function AgentPersonaFAB(props: {
     if (preferredTab) setTab(preferredTab);
     else setTab(personaSwitcherPreferredTab(personas()));
     setShowSwitcher(true);
+    if (preferredTab) setShowWeddingTools(true);
     if (!loading() && personas().length === 0) void reloadPersonas();
+  }
+
+  async function submitWeddingQuestion(event?: Event) {
+    event?.preventDefault();
+    const question = weddingQuestion().trim();
+    if (!question || weddingAssistantBusy()) return;
+    setWeddingAssistantBusy(true);
+    setWeddingAssistantError(null);
+    try {
+      const response = await askWeddingAssistant({
+        question,
+        weddingPlanId: props.weddingPlanId,
+        currentView: "Wedding template",
+      });
+      if (!response.answer) throw new Error("Wedding assistance returned no answer.");
+      setWeddingAnswer(response);
+    } catch (error) {
+      setWeddingAssistantError(error instanceof Error ? error.message : "Wedding assistance could not respond just now.");
+    } finally {
+      setWeddingAssistantBusy(false);
+    }
   }
 
   function closeSwitcher() {
     if (switchingId() || installingTemplateId()) return;
     setShowSwitcher(false);
     setSearch("");
+    setShowWeddingTools(false);
   }
 
   function startLongPress() {
@@ -339,39 +374,24 @@ export function AgentPersonaFAB(props: {
             <div class="flex flex-wrap items-start gap-2">
               <div class="min-w-0 flex-1 basis-full sm:basis-auto">
                 <p class="font-mono text-[0.5625em] uppercase tracking-[0.2em] text-outline">
-                  Swap agent persona
+                  {props.weddingMode ? "Wedding assistant" : "Swap agent persona"}
                 </p>
                 <p class="mt-1 truncate text-sm font-medium text-on-surface">
-                  {active()?.name ?? "No active persona"}
+                  {props.weddingMode ? "Ask Sprout about your wedding plan" : active()?.name ?? "No active persona"}
                 </p>
               </div>
-              <button
-                type="button"
-                disabled={switcherBusy()}
-                onClick={() => {
-                  closeSwitcher();
-                  props.onOpenSettings();
-                }}
-                class="rounded-xl px-2 py-1 text-[0.6875em] text-on-surface-variant transition hover:bg-on-surface/6 hover:text-on-surface"
-              >
-                Settings
-              </button>
-              <button
-                type="button"
-                disabled={switcherBusy() || minimizing()}
-                onClick={() => void minimizeSprout()}
-                class="rounded-xl px-2 py-1 text-[0.6875em] text-on-surface-variant transition hover:bg-on-surface/6 hover:text-on-surface"
-              >
-                {minimizing() ? "Hiding…" : "Minimise"}
-              </button>
-              <button
-                type="button"
-                onClick={() => { closeSwitcher(); window.dispatchEvent(new CustomEvent("omnyid:open-view-customizer")); }}
-                class="rounded-xl px-2 py-1 text-[0.6875em] text-on-surface-variant transition hover:bg-on-surface/6 hover:text-on-surface"
-              >
-                Customize view
-              </button>
+              <Show when={!props.weddingMode || showWeddingTools()}>
+                <button type="button" disabled={switcherBusy()} onClick={() => { closeSwitcher(); props.onOpenSettings(); }} class="rounded-xl px-2 py-1 text-[0.6875em] text-on-surface-variant transition hover:bg-on-surface/6 hover:text-on-surface">Settings</button>
+                <button type="button" disabled={switcherBusy() || minimizing()} onClick={() => void minimizeSprout()} class="rounded-xl px-2 py-1 text-[0.6875em] text-on-surface-variant transition hover:bg-on-surface/6 hover:text-on-surface">{minimizing() ? "Hiding…" : "Minimise"}</button>
+                <button type="button" onClick={() => { closeSwitcher(); window.dispatchEvent(new CustomEvent("omnyid:open-view-customizer")); }} class="rounded-xl px-2 py-1 text-[0.6875em] text-on-surface-variant transition hover:bg-on-surface/6 hover:text-on-surface">Customize view</button>
+              </Show>
             </div>
+
+            <Show when={props.weddingMode}>
+              <button type="button" class="mt-2 text-[0.6875em] font-medium text-primary underline decoration-primary/30 underline-offset-2" onClick={() => setShowWeddingTools((value) => !value)}>
+                {showWeddingTools() ? "Back to Wedding assistant" : "Persona and Sprout tools"}
+              </button>
+            </Show>
 
             {/* ── Genome state strip ─────────────────────────────────────── */}
             {/* Shows avatar mood + earned LoRA capability badges. Clicking opens
@@ -411,6 +431,7 @@ export function AgentPersonaFAB(props: {
             </Show>
 
             <input
+              classList={{ hidden: Boolean(props.weddingMode && !showWeddingTools()) }}
               type="text"
               value={search()}
               disabled={switcherBusy()}
@@ -418,7 +439,7 @@ export function AgentPersonaFAB(props: {
               placeholder="Search personas"
               class="mt-3 w-full rounded-2xl border border-outline/15 bg-white/75 px-3 py-2 text-xs text-on-surface outline-none transition focus:border-primary/35"
             />
-            <div class="mt-3 flex gap-1">
+            <div class="mt-3 flex gap-1" classList={{ hidden: Boolean(props.weddingMode && !showWeddingTools()) }}>
               <button type="button" class={tabClass("mine")} disabled={switcherBusy()} onClick={() => setTab("mine")}>
                 My personas
               </button>
@@ -434,6 +455,22 @@ export function AgentPersonaFAB(props: {
           </div>
 
           <div class="max-h-[19rem] overflow-auto px-2 py-2">
+            <Show when={props.weddingMode && !showWeddingTools()}>
+              <form class="space-y-3 px-1 py-1" onSubmit={(event) => void submitWeddingQuestion(event)}>
+                <label class="block text-xs font-medium text-on-surface" for="wedding-sprout-question">What would you like help with?</label>
+                <textarea id="wedding-sprout-question" rows="4" value={weddingQuestion()} onInput={(event) => setWeddingQuestion(event.currentTarget.value)} placeholder="Ask about your budget, guests, vendors, tasks, or ask Sprout to open the right part of Wedding." class="w-full resize-none rounded-2xl border border-outline/20 bg-white px-3 py-2 text-sm leading-5 text-on-surface outline-none focus:border-primary/50" />
+                <button type="submit" disabled={weddingAssistantBusy() || !weddingQuestion().trim()} class="w-full rounded-2xl bg-primary px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-45">{weddingAssistantBusy() ? "Thinking…" : "Ask Sprout"}</button>
+                <Show when={weddingAssistantError()}>{(message) => <p class="rounded-xl bg-red-50 px-3 py-2 text-xs leading-5 text-red-700">{message()}</p>}</Show>
+                <Show when={weddingAnswer()}>{(answer) => (
+                  <div class="rounded-2xl border border-primary/15 bg-primary/5 px-3 py-3">
+                    <p class="whitespace-pre-wrap text-sm leading-6 text-on-surface">{answer().answer}</p>
+                    <Show when={answer().suggestedAction}>{(action) => <button type="button" class="mt-3 rounded-xl border border-primary/30 bg-white px-3 py-2 text-xs font-semibold text-primary" onClick={() => { saveWeddingAssistantStagedUpdate(action()); props.onWeddingNavigate?.(action().target); closeSwitcher(); }}>{action().kind === "stage_update" ? `Review in ${action().label.replace(/^Open /, "")}` : action().label}</button>}</Show>
+                    <p class="mt-2 text-[0.625em] text-on-surface-variant">Sprout opens the relevant view; it never saves or sends without your review.</p>
+                  </div>
+                )}</Show>
+              </form>
+            </Show>
+            <div classList={{ hidden: Boolean(props.weddingMode && !showWeddingTools()) }}>
             <Show when={actionError()}>
               {(receipt) => (
                 <div
@@ -593,10 +630,13 @@ export function AgentPersonaFAB(props: {
                 }}
               </For>
             </Show>
+            </div>
           </div>
 
           <div class="border-t border-outline/10 px-3.5 py-2.5 text-[0.625em] text-on-surface-variant/55">
-            {props.activeCount > 0
+            {props.weddingMode && !showWeddingTools()
+              ? "Wedding-only · platform funded within daily and weekly limits"
+              : props.activeCount > 0
               ? `${props.activeCount} agent${props.activeCount === 1 ? "" : "s"} running`
               : "All agents idle"}
           </div>

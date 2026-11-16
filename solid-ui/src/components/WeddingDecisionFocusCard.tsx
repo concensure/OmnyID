@@ -3,6 +3,7 @@ import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show }
 import { DecisionCard } from "@/components/DecisionCard";
 import { WeddingDecisionResearchDetail } from "@/components/WeddingDecisionResearchDetail";
 import { WeddingDecisionRsvpFollowUp } from "@/components/WeddingDecisionRsvpFollowUp";
+import { WeddingBudgetTrackerCard } from "@/components/WeddingBudgetTrackerCard";
 import { WeddingSeatingPanel } from "@/components/WeddingSeatingPanel";
 import { WeddingVendorOutreachComposer } from "@/components/WeddingVendorOutreachComposer";
 import type { WeddingVendorChoiceSelectionSaveInput } from "@/components/WeddingArtifactDetailPanel";
@@ -45,6 +46,7 @@ import {
   mobileWeddingDecisionOpenIntent,
   setMobileWeddingDecisionOpenIntent,
 } from "@/lib/mobileFocusHomeState";
+import { weddingAccountScopedStorageKey } from "@/lib/weddingLocalAccountScope";
 
 export function WeddingDecisionFocusCard(props: {
   state: WeddingResponseWorkspaceViewState;
@@ -58,7 +60,7 @@ export function WeddingDecisionFocusCard(props: {
   const LOCAL_DEFER_TTL_MS = 10 * 60 * 1000;
   const deferredStorageKey = () => {
     const workspaceId = props.state.workspace.metadata.responseWorkspaceId?.trim() || "default";
-    return `omnyid.wedding.deferred-focus.${workspaceId}`;
+    return weddingAccountScopedStorageKey(`omnyid.wedding.deferred-focus.${workspaceId}`);
   };
   const readDeferredIds = (): Set<string> => {
     if (typeof window === "undefined") return new Set();
@@ -91,6 +93,7 @@ export function WeddingDecisionFocusCard(props: {
   const [vendorSelectionNotice, setVendorSelectionNotice] = createSignal<Record<string, string>>({});
   const [rsvpFollowUpOpenId, setRsvpFollowUpOpenId] = createSignal<string | null>(null);
   const [expandedResearchItemId, setExpandedResearchItemId] = createSignal<string | null>(null);
+  const [expandedSetupItemId, setExpandedSetupItemId] = createSignal<string | null>(null);
   const [fundedResearch, setFundedResearch] = createSignal<Record<string, WeddingDecisionResearchState>>({});
   const [fundedResearchStatus, setFundedResearchStatus] = createSignal<Record<string, "loading" | "failed">>({});
   const [finalCountSelections, setFinalCountSelections] = createSignal<Record<string, string>>({});
@@ -601,6 +604,8 @@ export function WeddingDecisionFocusCard(props: {
                       } else if (action.id === "open" && /assign\s+\d+\s+attending guest|assign.*guest.*table|seating assignment/i.test(item.title)) {
                         setExpandedTaskId(item.id);
                         setExpandedSeatingItemId((current) => current === item.id ? null : item.id);
+                      } else if (action.id === "open" && item.actionMetadata?.wedding_setup_decision === "budget") {
+                        setExpandedSetupItemId((current) => current === item.id ? null : item.id);
                       } else if (action.id === "open" && isPendingRsvpFollowUp(item.id)) {
                         setRsvpFollowUpOpenId((current) => current === item.id ? null : item.id);
                       } else if (action.id === "open" && researchFor(item.id)) {
@@ -751,6 +756,24 @@ export function WeddingDecisionFocusCard(props: {
                         </Show>
                       </section>
                     )}
+                  </Show>
+                  <Show when={expandedSetupItemId() === item.id && item.actionMetadata?.wedding_setup_decision === "budget"}>
+                    <section class="rounded-xl border border-pink-200 bg-white p-3 text-pink-950" aria-label="Set your wedding budget">
+                      <p class="text-sm font-semibold">Not sure where to start?</p>
+                      <p class="mt-1 text-sm leading-6 text-pink-950/75">
+                        Don't know where to start? Try the <a class="font-semibold text-pink-800 underline underline-offset-4" href="/wedding/animal-quiz.html">wedding animal quiz</a> to gather your style, then adjust the starting allocation below.
+                      </p>
+                      <div class="mt-3">
+                        <WeddingBudgetTrackerCard
+                          state={props.state.budgetTracking}
+                          weddingPlanId={props.state.workspace.metadata.weddingPlanId}
+                          metadata={props.state.workspace.metadata}
+                          contributorPeople={props.state.helperContactNames}
+                          onSaveAllocation={props.saveProjection ?? undefined}
+                          onSaveContribution={props.saveProjection ?? undefined}
+                        />
+                      </div>
+                    </section>
                   </Show>
                   <Show when={expandedSeatingItemId() === item.id}>
                     <section class="overflow-hidden rounded-xl border border-pink-200 bg-white p-2 sm:p-3" aria-label="Seating assignment canvas">

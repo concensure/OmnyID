@@ -175,6 +175,7 @@ mod wedding_admin_ai_policy;
 mod openrouter_funded_inference;
 mod public_contact_routes;
 mod wedding_decision_research_routes;
+mod wedding_assistant_routes;
 mod wedding_task_assignment_routes;
 mod wedding_ai_cost_policy;
 mod wedding_llm_ladder;
@@ -1471,6 +1472,7 @@ pub async fn run() {
         .merge(wedding_runsheet_share_routes::routes())
         .merge(wedding_understanding_routes::routes())
         .merge(wedding_decision_research_routes::routes())
+        .merge(wedding_assistant_routes::routes())
         .merge(wedding_task_assignment_routes::routes())
         .merge(workspace_routes::routes())
         .merge(wedding_newsletter_routes::routes())
