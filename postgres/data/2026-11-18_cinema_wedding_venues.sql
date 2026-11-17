@@ -11,8 +11,8 @@ VALUES
 ON CONFLICT DO NOTHING;
 
 INSERT INTO wedding_vendor_attributes
-    (vendor_id, attribute_key, value_json, value_state, confidence, provenance_kind, source_url,
-     source_label, observed_at, expires_at, caveat)
+    (vendor_id, attribute_key, value, status, confidence, authority, source_url,
+     source_label, retrieved_at, valid_until, notes)
 VALUES
 ('venue-james-theatre-dungog', 'style_tags', '["cinema","unconventional","dungog","hunter region","regional nsw","heritage","spanish mission","community run","dance floor","garden"]'::jsonb, 'known', 0.8, 'primary_official', 'https://www.jamestheatre.com.au/hire', 'Cinema wedding venues refresh 2026-11-18', TIMESTAMPTZ '2026-11-18 00:00:00+00', NULL, NULL),
 ('venue-james-theatre-dungog', 'editorial_summary', '"A volunteer-run heritage picture house in Dungog with cinema seating, a stage, dance floor, food-preparation space and an outdoor barbecue garden. It is a practical starting point for couples considering a cinema celebration in regional NSW, subject to the venue confirming current wedding terms."'::jsonb, 'known', 0.8, 'primary_official', 'https://www.jamestheatre.com.au/hire', 'Cinema wedding venues refresh 2026-11-18', TIMESTAMPTZ '2026-11-18 00:00:00+00', NULL, NULL),
