@@ -3662,3 +3662,31 @@ AFP runtime builders keep questions, descriptions and model/tool details in
 private content and only project IDs/status/version into metadata. The existing
 private storage boundary must still encrypt/store these proposals. No route,
 Watcher hook, execution flag, provider, timer or tool is enabled by this slice.
+
+## 2026-11-18: Runbook setup and edits share the existing private AFP ledger transaction
+
+WED-375 stores definitions in the account's existing private messages table,
+using the standard XChaCha content envelope and server Ed25519 signature. It
+does not use the snapshot API, which prunes history. Timestamps are canonical
+UTC microseconds before encryption/signing to survive PostgreSQL round trips.
+Only IDs, version, status and enablement remain in searchable metadata.
+
+Setup, projection and edits acquire a transaction-scoped owner advisory lock;
+edits compare the expected parent under that lock. A shared lock on the existing
+account row coordinates with account deletion, and the store never recreates
+schemas. Exact edit retries use a content-addressed AFP message ID and return
+the original revision even after subsequent edits. Changed content with an old
+parent conflicts. Starter roots have owner/pack-version/runbook-derived IDs,
+and setup never overwrites an existing definition. Template upgrade previews
+are read-only; applying one requires the normal expected-parent successor write.
+
+No parsed-definition cache is added. The complete history is bounded at 4,096
+records and fails closed if truncated, corrupt, unsigned or encrypted with an
+unavailable key. Key rotation/migration needs the existing key-management work;
+this implementation does not silently fall back to plaintext or trust a record's
+self-asserted signing key.
+
+Management endpoints require authenticated owner derivation, write/read rate
+limits and explicit OMNYID_RUNBOOK_MANAGEMENT_ENABLED=true. Responses are
+no-store. This management flag conveys no execution authority. Starter templates
+are disabled by default, and runtime integration remains a separate dependency.

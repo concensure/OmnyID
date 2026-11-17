@@ -16,47 +16,48 @@ Application base: `5536b83b2f9d2f58488a075f383c24f8f4f73d6c`; Oracle's
 The newer application base deliberately supersedes the original WED-308 base
 so later production fixes remain in the implementation lineage.
 
-The strict contracts, validation, runtime AFP encoders/parsers, pure definition
-history projection, typed matcher and a bounded persisted-event adapter now
-exist in `src/runbook*.rs`. These modules are **not wired to live routes or the
-daemon**. The matcher produces a shadow plan, not an atomic dispatch receipt.
-The registry validates successor proposals; it does not persist them or claim
-concurrent-write safety. No global runtime definitions or new storage authority
-have been introduced.
+The strict contracts, validation, runtime AFP encoders/parsers, definition history
+projection, typed matcher and bounded persisted-event adapter are implemented.
+Immutable starters and authenticated management now use encrypted, signed AFP
+records in the existing per-user private messages table. Setup and edits run
+under an owner transaction lock, preserve existing definitions, and reject stale
+or foreign parents. Exact edit retries return their original revision. Upgrade
+previews never write; applying one uses the normal successor boundary.
 
-Existing regression locations inventoried for later integration are
-`src/proactive_engine.rs`, `src/background_watcher.rs`,
-`src/background_watcher_runtime.rs`, `src/proactive_heuristics_extended.rs`,
-`src/autonomy_policy.rs`, `src/proactive_provenance.rs`,
-`src/proactive_outcome_memory.rs`, `src/state_synthesizer_contract.rs`,
-`src/server/approval_surfaces.rs` and
-`src/server/proactive_routes/proactive_companion_storage.rs`. Owner-private
-storage is in `src/db.rs`; do not use `store_private_snapshot_message` for
-append-only definition/instance history because that API prunes older snapshots.
-Account erasure and authenticated storage integration still need dedicated
-integration tests when durable runbook writes are introduced.
+Management routes require OMNYID_RUNBOOK_MANAGEMENT_ENABLED=true (default off):
+GET /runbooks, GET /runbooks/starters, POST /runbooks/setup,
+PUT /runbooks/{id}/definition, GET /runbooks/{id}/export and
+GET /runbooks/{id}/upgrade-preview. Enable, disable and archive are validated
+successor definitions. Normal listing returns summaries; explicit export returns
+only the typed definition and its revision reference, with no storage keys or
+provider credentials. Responses are no-store. No frontend control or first-run
+screen is wired yet; the setup endpoint copies the user's selected starters.
 
-The frozen source candidate is `26d2e33c6a8de8bb829a0c2e378c4377daf3b5a5`.
-All 15 tests pass in an isolated source harness loading the six actual runbook
-modules and the unchanged regression file, with the real AFPMessage struct and
-its default protocol function extracted verbatim. Evidence is at
-`C:/temp/runbook-verification-26d2e33c/` with source hashes. The pinned Windows
-Rust 1.94 whole-crate build/check crashed with compiler access/privileged-instruction
-faults, including with incremental compilation disabled and debug info reduced.
-The isolated test result does not establish full application integration.
-The full library check, normal 15-test integration target and library build
-subsequently passed with the installed Rust 1.95 toolchain, incremental
-compilation disabled, and package debug information disabled for test/build.
-This supersedes the isolated-harness limitation for the foundation. The
-project's toolchain pin remains unchanged; see the handoff for exact commands.
+The frozen source candidate is `ad782b25676e68f8ac4faab6760b195a9df46745`.
+Full library check, all 17 normal integration tests (including live disposable
+PostgreSQL and authenticated routes), and library build completed on installed
+Rust 1.95 in the clean exact-SHA worktree
+`C:/temp/wt/omnyid-runbooks-verify-43d7c830`. The first test build hit a Windows
+rustc access violation. Retrying with two jobs, 16 package codegen units,
+incremental compilation off and package debug info disabled succeeded.
+The project toolchain pin is unchanged. See the handoff for exact commands.
 
-Stages 2–17 remain open except for the explicitly checked foundation items below.
-In particular, twelve starter workflows, owner-private atomic seed/successor
-writes, durable dispatch/step locks, complete event adapters, evidence resolution,
-policy/approval integration, execution, models, timers, outcomes, APIs/A2UI,
-erasure integration and rollout have **not** been implemented. Start the next
-slice with immutable starter definitions and atomic private-ledger seeding;
-never hook the matcher into ingress before the durable authority checks exist.
+The twelve starters specify reviewed transform operations, required facts and
+explicit approval steps. Their executor implementations are still pending.
+Stages 4–17 remain open except for the checked foundation/management items below.
+The matcher still produces a shadow plan, not an atomic dispatch receipt.
+Durable dispatch/step transactions, complete adapters, bounded evidence,
+authority/approval integration, execution, model budgets, follow-up scheduling,
+outcomes, activity/A2UI and rollout remain unfinished. No execution or daemon
+hook is enabled. Do not wire the matcher to ingress before these boundaries exist.
+
+Existing regression locations include src/proactive_engine.rs,
+src/background_watcher.rs, src/background_watcher_runtime.rs,
+src/proactive_heuristics_extended.rs, src/autonomy_policy.rs,
+src/proactive_provenance.rs, src/proactive_outcome_memory.rs,
+src/state_synthesizer_contract.rs, src/server/approval_surfaces.rs and
+src/server/proactive_routes/proactive_companion_storage.rs. Do not use the
+pruning store_private_snapshot_message API for append-only runbook records.
 
 Contract details: v1 requires a final `complete` step and at least one success
 criterion. Inputs are bounded selectors (`event.source_refs`, `event.entity_refs`,
@@ -90,23 +91,23 @@ Depends on: 0
 
 Depends on: 1
 
-- [ ] Add `src/runbook_starter_pack.rs`; keep immutable code templates separate from mutable user definitions.
-- [ ] Implement at least the twelve starter runbooks specified in the spec with deterministic steps and explicit approval boundaries.
+- [x] Add `src/runbook_starter_pack.rs`; keep immutable code templates separate from mutable user definitions.
+- [x] Implement at least the twelve starter runbooks specified in the spec with deterministic steps and explicit approval boundaries.
 - [ ] Copy selected starter definitions into each user's AFP ledger during first-run setup; never query one global mutable definition row as runtime truth.
-- [ ] Make seeding idempotent by `(owner, starter_pack_version, runbook_id)`.
-- [ ] Do not overwrite a user-edited or disabled definition when a starter pack changes; offer a successor preview instead.
-- [ ] Add tests for first seed, repeat seed, user edit preservation, disable preservation, pack upgrade, and two-user isolation.
+- [x] Make seeding idempotent by `(owner, starter_pack_version, runbook_id)`.
+- [x] Do not overwrite a user-edited or disabled definition when a starter pack changes; offer a successor preview instead.
+- [x] Add tests for first seed, repeat seed, user edit preservation, disable preservation, pack upgrade, and two-user isolation.
 
 ## 3. Per-user registry projection
 
 Depends on: 1, 2
 
-- [ ] Add `src/runbook_registry.rs` to read the latest non-superseded definition per runbook from the authenticated user's private ledger.
-- [ ] Scope every query by derived owner and reject caller-supplied cross-user references.
+- [x] Add `src/runbook_registry.rs` to read the latest non-superseded definition per runbook from the authenticated user's private ledger.
+- [x] Scope every query by derived owner and reject caller-supplied cross-user references.
 - [ ] Build indexes/projections from AFP metadata only where possible; do not create an independent mutable definition source of truth.
-- [ ] Support enable, disable, supersede, archive, export, and validated import as AFP successor events.
+- [x] Support enable, disable, supersede, archive, export, and validated import as AFP successor events.
 - [ ] Cache only immutable parsed definitions by owner/version/hash and invalidate on a successor event.
-- [ ] Add tests for version ordering, archive, stale edit conflicts, forged owner, forged parent, cache invalidation, and account erasure.
+- [x] Add tests for version ordering, archive, stale edit conflicts, forged owner, forged parent, cache invalidation, and account erasure. (No cache is used; fresh reads observe each committed successor.)
 
 ## 4. Existing-event adapter
 
@@ -226,7 +227,7 @@ Depends on: 6, 8, 9, 11
 Depends on: 3, 6, 8, 10, 12
 
 - [ ] Add focused `src/server/runbook_routes.rs` endpoints for list/detail, enable/disable, validated successor edit, instance activity, cancel, and escalation answer.
-- [ ] Derive owner from authentication on every endpoint and rate-limit writes.
+- [x] Derive owner from authentication on every endpoint and rate-limit writes.
 - [ ] Add semantic A2UI kinds for definition, instance, step trace summary, approval link, and epistemic question.
 - [ ] Reuse current activity/fleet, Decision Queue, settings controls, badges, timeline, confirmation, toast, and failure-state primitives.
 - [ ] Use consequence-specific action labels and expose evidence/provenance in user-facing language.

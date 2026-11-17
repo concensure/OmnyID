@@ -9402,3 +9402,59 @@ bounded evidence, existing authority/approvals, execution, epistemic resume,
 model budgets, scheduled AFP events, provenance/outcomes, APIs/A2UI, erasure and
 rollout. Do not use the pruning private-snapshot API for append-only histories.
 User intent remains continuation of the remaining Runbook implementation.
+
+## 2026-11-18 — WED-375: durable starter setup and authenticated definition management
+
+Implementation worktree: `C:/temp/wt/omnyid-runbooks`.
+Branch: `agent/codex/WED-375`.
+Frozen, verified source: `ad782b25676e68f8ac4faab6760b195a9df46745`.
+Clean verification worktree: `C:/temp/wt/omnyid-runbooks-verify-43d7c830`.
+Documentation commits after that candidate are not separate build candidates.
+
+Changed:
+- Twelve immutable disabled starter definitions, reviewed transform-operation
+  enums and bounded required-fact declarations. These are workflow definitions;
+  their operations still need the later executor/evidence implementation.
+- `src/runbook_store.rs` encrypts and server-signs definitions in the existing
+  owner-private AFP messages table. Owner advisory transactions serialize setup,
+  reads and successor writes; stale/foreign parents conflict. Exact edit retry
+  IDs return the original revision. Setup preserves edits, disable and archive.
+- `src/server/runbook_routes.rs` adds authenticated, rate-limited setup/list,
+  starter catalogue, successor edit, explicit export and upgrade-preview routes.
+  Responses are no-store. `OMNYID_RUNBOOK_MANAGEMENT_ENABLED` defaults off and
+  cannot start execution. Enable/disable/archive use normal successor edits.
+- Existing account erasure drops the entire private history. Reads/writes require
+  the account row and never recreate a deleted schema. No parallel table/cache.
+- Exports/wiring in `src/lib.rs` and `src/server/mod.rs`; foundation fixture updated
+  for the new step fields; new `tests/runbook_storage_postgres.rs`.
+
+Verification on the frozen source (not the dirty implementation worktree):
+- `cargo +1.95.0 check --lib -j 8` completed.
+- `cargo +1.95.0 test --test runbook_foundation --test runbook_storage_postgres -j 2 --config 'profile.test.package.omnyid-homeserver.debug=0' --config 'profile.test.package.omnyid-homeserver.codegen-units=16'`
+  completed: 15 foundation tests plus starter validation and the live PostgreSQL
+  lifecycle/authenticated-route integration scenario (17 total; no skip).
+- `cargo +1.95.0 build --lib -j 2 --config 'profile.dev.package.omnyid-homeserver.debug=0' --config 'profile.dev.package.omnyid-homeserver.codegen-units=16'`
+  completed. All commands used CARGO_TARGET_DIR=C:/cargo-target and
+  CARGO_INCREMENTAL=0. Toplevel, HEAD and clean status were checked before each.
+- PostgreSQL: dedicated local `pgvector/pgvector:pg17` container
+  `omnyid-runbook-wed375-pg`, localhost port 55475, database `omnyid_test`.
+  Tests cover competing setup/edit transactions, exact retry after later edits,
+  stale/foreign parent rejection, two owners, ciphertext-only storage, wrong
+  keys, disabled flags, authentication, owner injection, upgrade preview/apply,
+  archive terminality, signed-metadata forgery and real account/schema erasure.
+- Initial Rust 1.95 test code generation with default codegen units crashed with
+  STATUS_ACCESS_VIOLATION. The reduced-parallelism retry above succeeded. Prior
+  pinned Rust 1.94 compiler faults remain unresolved; no toolchain pin changed.
+- Focused formatting, diff whitespace and file-size checks completed; new source
+  files are below 999 lines, and the new database test is 372 lines.
+- GitHub has no deployments and only unrelated old main failures. No CI run for
+  this unpublished candidate, no PR and no deployment. The task lineage remains
+  local; cross-review/publication is still pending.
+
+Next: implement durable dispatch receipts and instance/step compare-and-append
+transactions, then complete stored-event adapters and bounded evidence before
+connecting ingress or the daemon. Continue existing authority/approval, executor,
+epistemic resume, model-budget, scheduling, outcome/provenance and A2UI stages.
+First-run UI integration is also pending; only its selected-starter setup API
+exists. Do not describe the engine or the remaining runbook tasks as complete.
+The task stays in_progress. No execution flag or live event hook was enabled.
