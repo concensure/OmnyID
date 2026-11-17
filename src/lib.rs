@@ -103,6 +103,7 @@ pub mod runbook_event;
 pub mod runbook_evidence;
 pub mod runbook_matcher;
 pub mod runbook_registry;
+pub mod runbook_read;
 pub mod runbook_runtime;
 pub mod runbook_starter_pack;
 pub mod runbook_store;

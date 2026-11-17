@@ -62,6 +62,18 @@ impl RunbookStore<'_> {
         owner: &str,
         request: &EvidenceRequest,
     ) -> Result<EvidencePacket> {
+        let mut tx = self.begin(owner).await?;
+        let packet = self.resolve_evidence_in(owner, request, &mut tx).await?;
+        tx.commit().await.map_err(|_| "storage_unavailable")?;
+        Ok(packet)
+    }
+
+    pub(crate) async fn resolve_evidence_in(
+        &self,
+        owner: &str,
+        request: &EvidenceRequest,
+        tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    ) -> Result<EvidencePacket> {
         if request.refs.len() > MAX_REFS
             || request.evidence_limit == 0
             || request.evidence_limit > MAX_REFS
@@ -85,7 +97,6 @@ impl RunbookStore<'_> {
                 return Err("invalid_evidence_reference");
             }
         }
-        let mut tx = self.begin(owner).await?;
         let mut packet = EvidencePacket {
             included: vec![],
             omitted: vec![],
@@ -133,7 +144,7 @@ impl RunbookStore<'_> {
                 query = query.bind(owner);
             }
             let header = query
-                .fetch_optional(&mut *tx)
+                .fetch_optional(&mut **tx)
                 .await
                 .map_err(|_| "storage_unavailable")?;
             let Some(header) = header else {
@@ -180,7 +191,7 @@ impl RunbookStore<'_> {
                 query = query.bind(owner);
             }
             let body = query
-                .fetch_one(&mut *tx)
+                .fetch_one(&mut **tx)
                 .await
                 .map_err(|_| "storage_unavailable")?;
             let content = if encrypted {
@@ -257,7 +268,6 @@ impl RunbookStore<'_> {
             }
             .into();
         packet.hash = digest(&json!(packet));
-        tx.commit().await.map_err(|_| "storage_unavailable")?;
         Ok(packet)
     }
 }

@@ -39,7 +39,7 @@ pub struct InstanceRecord {
 }
 
 pub struct RunbookRuntime<'a, 'db> {
-    store: &'a RunbookStore<'db>,
+    pub(crate) store: &'a RunbookStore<'db>,
 }
 
 impl<'a, 'db> RunbookRuntime<'a, 'db> {
@@ -175,11 +175,27 @@ impl<'a, 'db> RunbookRuntime<'a, 'db> {
         result: &LocalStepResult,
     ) -> Result<StepTrace> {
         let mut tx = self.store.begin(owner).await?;
-        let current = self.load_instance(owner, id, &mut tx).await?;
+        let trace = self
+            .record_local_step_in(owner, id, expected_revision, result, None, &mut tx)
+            .await?;
+        tx.commit().await.map_err(|_| "storage_unavailable")?;
+        Ok(trace)
+    }
+
+    pub(crate) async fn record_local_step_in(
+        &self,
+        owner: &str,
+        id: &str,
+        expected_revision: u32,
+        result: &LocalStepResult,
+        evidence_ref: Option<&str>,
+        tx: &mut Transaction<'_, Postgres>,
+    ) -> Result<StepTrace> {
+        let current = self.load_instance(owner, id, tx).await?;
         let trace_id = digest(&json!(["runbook_step.v1", owner, id, result.step_id]));
         if let Some(prior) = self
             .store
-            .read_kind(owner, "runbook_step_trace", Some(&trace_id), None, &mut tx)
+            .read_kind(owner, "runbook_step_trace", Some(&trace_id), None, tx)
             .await?
             .pop()
         {
@@ -193,7 +209,6 @@ impl<'a, 'db> RunbookRuntime<'a, 'db> {
             {
                 return Err("step_replay_conflict");
             }
-            tx.commit().await.map_err(|_| "storage_unavailable")?;
             return Ok(trace);
         }
         if current.instance.revision != expected_revision {
@@ -204,9 +219,8 @@ impl<'a, 'db> RunbookRuntime<'a, 'db> {
         {
             return Err("step_not_current");
         }
-        self.require_enabled(owner, &current.instance, &mut tx)
-            .await?;
-        let definition = self.definition(owner, &current.instance, &mut tx).await?;
+        self.require_enabled(owner, &current.instance, tx).await?;
+        let definition = self.definition(owner, &current.instance, tx).await?;
         let index = current.instance.completed_step_ids.len();
         let step = definition.steps.get(index).ok_or("step_not_found")?;
         if step.step_id != result.step_id
@@ -243,7 +257,7 @@ impl<'a, 'db> RunbookRuntime<'a, 'db> {
             now,
         )?;
         trace_afp["id"] = json!(trace_id);
-        self.store.append(owner, trace_afp, &mut tx).await?;
+        self.store.append(owner, trace_afp, tx).await?;
         let mut next = current.instance.clone();
         next.revision = next.revision.checked_add(1).ok_or("revision_overflow")?;
         next.completed_step_ids.push(step.step_id.clone());
@@ -256,9 +270,11 @@ impl<'a, 'db> RunbookRuntime<'a, 'db> {
                 .clone(),
         );
         next.latest_trace_ref = Some(trace_id);
-        self.append_instance(owner, Some(&current.message_id), next, &mut tx)
+        if let Some(reference) = evidence_ref {
+            next.evidence_packet_ref = Some(reference.into());
+        }
+        self.append_instance(owner, Some(&current.message_id), next, tx)
             .await?;
-        tx.commit().await.map_err(|_| "storage_unavailable")?;
         Ok(trace)
     }
 
@@ -394,7 +410,7 @@ impl<'a, 'db> RunbookRuntime<'a, 'db> {
         Ok(record)
     }
 
-    async fn require_enabled(
+    pub(crate) async fn require_enabled(
         &self,
         owner: &str,
         instance: &RunbookInstance,
@@ -409,7 +425,7 @@ impl<'a, 'db> RunbookRuntime<'a, 'db> {
         }
         Ok(())
     }
-    async fn definition(
+    pub(crate) async fn definition(
         &self,
         owner: &str,
         instance: &RunbookInstance,
@@ -435,7 +451,7 @@ impl<'a, 'db> RunbookRuntime<'a, 'db> {
         }
         Ok(definition)
     }
-    async fn append_instance(
+    pub(crate) async fn append_instance(
         &self,
         owner: &str,
         parent: Option<&str>,
@@ -464,7 +480,7 @@ impl<'a, 'db> RunbookRuntime<'a, 'db> {
             instance,
         })
     }
-    async fn load_instance(
+    pub(crate) async fn load_instance(
         &self,
         owner: &str,
         id: &str,

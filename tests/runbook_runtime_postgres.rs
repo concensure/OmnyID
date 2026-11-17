@@ -363,3 +363,165 @@ async fn atomic_dispatch_steps_cancellation_and_due_resolution() {
         .await
         .unwrap();
 }
+
+#[tokio::test]
+async fn read_execution_freezes_evidence_and_commits_atomically() {
+    use omnyid_homeserver::runbook_read::ReadRequest;
+    let Ok(url) = std::env::var("TEST_DATABASE_URL") else {
+        return;
+    };
+    assert!(url.contains("@127.0.0.1:") && url.ends_with("/omnyid_test"));
+    let db = Db::new(&url).await.unwrap();
+    let alice = user(&db).await;
+    let bob = user(&db).await;
+    let store = RunbookStore::new(&db, [21; 32], [22; 32]);
+    let runtime = RunbookRuntime::new(&store);
+    let mut definition = starter_definitions().remove(0);
+    definition.enabled = true;
+    definition.trigger.event_types = vec!["workflow_failed".into()];
+    let step_id = definition.steps[0].step_id.clone();
+    store.save(&alice.id, None, definition).await.unwrap();
+    let trigger = event(&db, &alice.id).await;
+    let id = runtime
+        .dispatch(&alice.id, &trigger)
+        .await
+        .unwrap()
+        .instance_ids
+        .remove(0);
+    runtime.start(&alice.id, &id, 1).await.unwrap();
+    let mut request = ReadRequest {
+        step_id,
+        expected_revision: 2,
+        snapshot_ref: None,
+        decrypt_limit: 1,
+        byte_limit: 0,
+    };
+    assert_eq!(
+        runtime
+            .execute_read(&alice.id, &id, &request)
+            .await
+            .unwrap_err(),
+        "invalid_evidence_budget"
+    );
+    assert_eq!(
+        runtime
+            .instance(&alice.id, &id)
+            .await
+            .unwrap()
+            .instance
+            .revision,
+        2
+    );
+    request.byte_limit = 65536;
+    request.snapshot_ref = Some("snapshot:injected".into());
+    assert_eq!(
+        runtime
+            .execute_read(&alice.id, &id, &request)
+            .await
+            .unwrap_err(),
+        "undeclared_snapshot_selector"
+    );
+    request.snapshot_ref = None;
+    assert_eq!(
+        runtime
+            .execute_read(&bob.id, &id, &request)
+            .await
+            .unwrap_err(),
+        "instance_not_found"
+    );
+    let (a, b) = tokio::join!(
+        runtime.execute_read(&alice.id, &id, &request),
+        runtime.execute_read(&alice.id, &id, &request)
+    );
+    let receipt = a.unwrap();
+    assert_eq!(receipt, b.unwrap());
+    assert_eq!(receipt.packet.included.len(), 1);
+    assert_eq!(
+        receipt.packet.included[0].reference,
+        format!("message:{trigger}")
+    );
+    assert_eq!(
+        receipt.trace.output_hash.as_deref(),
+        Some(receipt.packet.hash.as_str())
+    );
+    let current = runtime.instance(&alice.id, &id).await.unwrap();
+    assert_eq!(current.instance.revision, 3);
+    assert!(current.instance.evidence_packet_ref.is_some());
+    let table = format!("\"user_{}\".messages", alice.id.to_lowercase());
+    let row: Value = sqlx::query_scalar(&format!(
+        "SELECT to_jsonb(m) FROM {table} m WHERE type='runbook_evidence'"
+    ))
+    .fetch_one(&db.pool)
+    .await
+    .unwrap();
+    assert_eq!(row["content"], json!({}));
+    assert_eq!(row["encryption"]["scheme"], "omnyid-envelope-v1");
+    assert!(!row["metadata"].to_string().contains(&trigger));
+    sqlx::query("UPDATE afp_messages SET payload=jsonb_set(payload,'{content,confidence}','0.1') WHERE id=$1 AND owner_user_id=$2")
+        .bind(&trigger).bind(&alice.id).execute(&db.pool).await.unwrap();
+    assert_eq!(
+        runtime
+            .execute_read(&alice.id, &id, &request)
+            .await
+            .unwrap(),
+        receipt
+    );
+    let mut changed = request.clone();
+    changed.byte_limit = 1000;
+    assert_eq!(
+        runtime
+            .execute_read(&alice.id, &id, &changed)
+            .await
+            .unwrap_err(),
+        "step_replay_conflict"
+    );
+    runtime.cancel(&alice.id, &id, 3).await.unwrap();
+    assert_eq!(
+        runtime
+            .execute_read(&alice.id, &id, &request)
+            .await
+            .unwrap(),
+        receipt
+    );
+    assert_eq!(
+        runtime
+            .instance(&alice.id, &id)
+            .await
+            .unwrap()
+            .instance
+            .status,
+        InstanceState::Cancelled
+    );
+    let trigger2 = event(&db, &alice.id).await;
+    let id2 = runtime
+        .dispatch(&alice.id, &trigger2)
+        .await
+        .unwrap()
+        .instance_ids
+        .remove(0);
+    runtime.start(&alice.id, &id2, 1).await.unwrap();
+    sqlx::query("UPDATE afp_messages SET payload=jsonb_set(payload,'{content,confidence}','0.1') WHERE id=$1 AND owner_user_id=$2")
+        .bind(&trigger2).bind(&alice.id).execute(&db.pool).await.unwrap();
+    assert_eq!(
+        runtime
+            .execute_read(&alice.id, &id2, &request)
+            .await
+            .unwrap_err(),
+        "event_replay_conflict"
+    );
+    assert_eq!(
+        runtime
+            .instance(&alice.id, &id2)
+            .await
+            .unwrap()
+            .instance
+            .revision,
+        2
+    );
+    db.delete_user_account_and_data(&alice.id, &alice.email, &[])
+        .await
+        .unwrap();
+    db.delete_user_account_and_data(&bob.id, &bob.email, &[])
+        .await
+        .unwrap();
+}
