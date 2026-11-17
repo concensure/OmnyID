@@ -142,6 +142,7 @@ mod privacy_routes;
 mod practice_routes;
 mod proactive_ranking_helpers;
 mod proactive_routes;
+mod runbook_routes;
 mod protocol_routes;
 mod quotation_normalisation_routes;
 pub(crate) mod quotation_email_response;
@@ -1435,6 +1436,7 @@ pub async fn run() {
         .merge(geofence_routes::routes())
         .merge(privacy_routes::routes())
         .merge(proactive_routes::routes())
+        .merge(runbook_routes::routes())
         .merge(protocol_routes::routes())
         .merge(runtime_routes::routes())
         .merge(skill_capsule_routes::routes())
@@ -1606,6 +1608,7 @@ pub async fn build_test_router(database_url: &str) -> Router {
         pdf_semaphore: Arc::new(tokio::sync::Semaphore::new(1)),
     });
     let app = Router::new()
+        .merge(runbook_routes::routes())
         .route("/healthz", get(healthz_http))
         .route("/send", post(send_http))
         .route("/relay/ws", get(relay_ws_http))

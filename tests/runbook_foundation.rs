@@ -12,6 +12,8 @@ fn step(id: &str, kind: StepKind) -> Step {
     Step {
         step_id: id.into(),
         kind,
+        operation: None,
+        required_fields: vec![],
         input_refs: vec![],
         tool: None,
         output_kind: None,

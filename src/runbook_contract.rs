@@ -23,6 +23,25 @@ pub enum StepKind {
     Complete,
 }
 
+/// Reviewed deterministic operations. The executor must implement these explicitly;
+/// a definition cannot name arbitrary code, a URL or a shell command.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TransformOperation {
+    CheckThreadReply,
+    CompareCalendarConflicts,
+    ReviewStoredQuote,
+    FindQuoteGaps,
+    CalculateBudgetExposure,
+    ReviewTaskDependencies,
+    CheckReminderPermission,
+    CompareRunsheetVersions,
+    VerifyCommitmentEvidence,
+    AssessWorkflowRetry,
+    ReviewImportStatus,
+    IdentifyMissingFacts,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum FilterOp {
@@ -84,6 +103,10 @@ pub enum EscalationReason {
 pub struct Step {
     pub step_id: String,
     pub kind: StepKind,
+    #[serde(default)]
+    pub operation: Option<TransformOperation>,
+    #[serde(default)]
+    pub required_fields: Vec<String>,
     #[serde(default)]
     pub input_refs: Vec<String>,
     #[serde(default)]

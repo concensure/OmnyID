@@ -128,6 +128,12 @@ pub fn validate_definition(d: &RunbookDefinition) -> Result<()> {
     }
     let mut ids = HashSet::new();
     for step in &d.steps {
+        if (step.kind == StepKind::Transform) != step.operation.is_some() {
+            return Err("invalid_transform_operation");
+        }
+        if !identifiers(&step.required_fields, 16) {
+            return Err("invalid_required_fields");
+        }
         for input in &step.input_refs {
             if matches!(
                 input.as_str(),
