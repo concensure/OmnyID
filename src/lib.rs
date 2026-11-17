@@ -102,6 +102,7 @@ pub mod runbook_contract;
 pub mod runbook_event;
 pub mod runbook_matcher;
 pub mod runbook_registry;
+pub mod runbook_runtime;
 pub mod runbook_starter_pack;
 pub mod runbook_store;
 pub mod runbook_validation;

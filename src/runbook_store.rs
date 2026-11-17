@@ -28,7 +28,7 @@ impl<'a> RunbookStore<'a> {
         }
     }
 
-    async fn begin(&self, owner: &str) -> Result<Transaction<'_, Postgres>> {
+    pub(crate) async fn begin(&self, owner: &str) -> Result<Transaction<'_, Postgres>> {
         if owner.is_empty()
             || owner.len() > 55
             || !owner
@@ -137,7 +137,11 @@ impl<'a> RunbookStore<'a> {
         Ok(message)
     }
 
-    async fn load(&self, owner: &str, tx: &mut Transaction<'_, Postgres>) -> Result<Registry> {
+    pub(crate) async fn load(
+        &self,
+        owner: &str,
+        tx: &mut Transaction<'_, Postgres>,
+    ) -> Result<Registry> {
         Registry::rebuild(owner, &self.read(owner, None, tx).await?)
     }
 
@@ -147,9 +151,21 @@ impl<'a> RunbookStore<'a> {
         id: Option<&str>,
         tx: &mut Transaction<'_, Postgres>,
     ) -> Result<Vec<Value>> {
+        self.read_kind(owner, "runbook_definition", id, None, tx)
+            .await
+    }
+
+    pub(crate) async fn read_kind(
+        &self,
+        owner: &str,
+        kind: &str,
+        id: Option<&str>,
+        thread: Option<&str>,
+        tx: &mut Transaction<'_, Postgres>,
+    ) -> Result<Vec<Value>> {
         let table = format!("\"{}\".messages", tenant_schema_name(owner));
-        let rows = sqlx::query(&format!("SELECT id,thread_id,parent_id,from_agent,to_agents,timestamp,type,kind,subtype,content,metadata,signature,encryption,\"references\",supertags,store_in_relational FROM {table} WHERE type='runbook_definition' AND ($1::text IS NULL OR id=$1) ORDER BY id LIMIT 4097"))
-            .bind(id).fetch_all(&mut **tx).await.map_err(|_| "storage_unavailable")?;
+        let rows = sqlx::query(&format!("SELECT id,thread_id,parent_id,from_agent,to_agents,timestamp,type,kind,subtype,content,metadata,signature,encryption,\"references\",supertags,store_in_relational FROM {table} WHERE type=$2 AND ($1::text IS NULL OR id=$1) AND ($3::text IS NULL OR thread_id=$3) ORDER BY id LIMIT 4097"))
+            .bind(id).bind(kind).bind(thread).fetch_all(&mut **tx).await.map_err(|_| "storage_unavailable")?;
         if rows.len() > 4096 {
             return Err("registry_history_limit");
         }
@@ -177,18 +193,18 @@ impl<'a> RunbookStore<'a> {
             message.content = crypto::decrypt_content(message.encryption.as_ref().ok_or("unencrypted_definition")?, &aad(&message), &self.encryption_key)
                 .ok_or("definition_decryption_failed")?;
             let value = serde_json::to_value(message).map_err(|_| "invalid_stored_definition")?;
-            crate::runbook_registry::parse_definition_afp(owner, &value)?;
+            validate_record(owner, &value)?;
             Ok(value)
         }).collect()
     }
 
-    async fn append(
+    pub(crate) async fn append(
         &self,
         owner: &str,
         value: Value,
         tx: &mut Transaction<'_, Postgres>,
     ) -> Result<()> {
-        crate::runbook_registry::parse_definition_afp(owner, &value)?;
+        validate_record(owner, &value)?;
         let mut message: AFPMessage =
             serde_json::from_value(value).map_err(|_| "invalid_definition_envelope")?;
         // PostgreSQL stores microseconds. Canonicalise before encryption/signing so
@@ -222,6 +238,22 @@ fn aad(message: &AFPMessage) -> Value {
         "timestamp":message.timestamp,"type":message.r#type,"subtype":message.subtype,"metadata":message.metadata})
 }
 
-fn digest(value: &Value) -> String {
+pub(crate) fn digest(value: &Value) -> String {
     hex::encode(Sha256::digest(value.to_string().as_bytes()))
+}
+
+fn validate_record(owner: &str, value: &Value) -> Result<()> {
+    match value["type"].as_str() {
+        Some("runbook_definition") => {
+            crate::runbook_registry::parse_definition_afp(owner, value)?;
+        }
+        Some("runbook_instance" | "runbook_step_trace" | "epistemic_escalation") => {
+            crate::runbook_afp::parse_runtime_afp(owner, value)?;
+        }
+        Some("runbook_dispatch" | "runbook_resolution") => {
+            crate::runbook_runtime::validate_audit(owner, value)?;
+        }
+        _ => return Err("unsupported_runbook_record"),
+    }
+    Ok(())
 }
