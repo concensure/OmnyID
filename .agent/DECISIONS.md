@@ -3690,3 +3690,30 @@ Management endpoints require authenticated owner derivation, write/read rate
 limits and explicit OMNYID_RUNBOOK_MANAGEMENT_ENABLED=true. Responses are
 no-store. This management flag conveys no execution authority. Starter templates
 are disabled by default, and runtime integration remains a separate dependency.
+
+## 2026-11-18: Dispatch freezes the first committed plan; local step commits confer no authority
+
+WED-375 reads trigger IDs from the existing owner-partitioned afp_messages
+ledger and normalizes them under the same owner transaction used for runbook
+storage. A private dispatch receipt and all matched instance roots commit
+atomically. The receipt includes suppressions and binds the normalized event
+hash. Replaying the event returns that original plan even if definitions later
+change; changing the normalized event under its existing ID conflicts. A new
+event uses current definitions. Receipt and instance IDs are deterministic.
+
+Instance revisions and local read/transform traces are encrypted and signed in
+the same private AFP table as definitions. Each instance binds its original
+definition version. Starting or advancing rechecks current enablement; disabling
+or archiving prevents further work. Local-result commits are for trusted executor
+code, not caller-supplied HTTP results. They do not resolve evidence or invoke
+tools/models. Unsupported step kinds fail closed until authority integrations
+exist. Exact committed-step retries return the recorded trace; changed input or
+output conflicts. Returning an old trace never advances a terminal instance.
+
+Wait persistence only supports a current, declared Wait step with a bounded
+delivery time and a distinct, later expiry deadline (`wait_expires_at`). A due
+follow-up is not itself a timeout. Cancel and expiry append terminal revisions plus private resolution
+events; no history is deleted. There is no generic resume API capable of
+bypassing approval or epistemic answers. Timer delivery, retries/cooldowns,
+evidence resolution and external execution remain separate unfinished work.
+All operations remain disconnected from live HTTP ingress and daemon hooks.

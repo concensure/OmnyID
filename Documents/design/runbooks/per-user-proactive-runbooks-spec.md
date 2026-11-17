@@ -112,6 +112,7 @@ Large bodies, credentials, raw attachments, and decrypted history are excluded.
   "current_step_id": "surface",
   "completed_step_ids": ["load_quote", "normalise", "explain"],
   "next_follow_up_at": null,
+  "wait_expires_at": null,
   "definition_ref": "runbook_definition:vendor_quote_received:v3",
   "evidence_packet_ref": "context_packet:01...",
   "latest_trace_ref": "runbook_step_trace:01...",
@@ -248,6 +249,11 @@ Policy denial creates a trace and either an escalation or a failed instance. It 
 ### 6.4 Follow-up events
 
 A step may emit only an event type listed in `follow_up_events`. The event carries `caused_by_event_id`, `caused_by_instance_id`, due time, cancellation key, and source refs. The existing daemon/watcher scheduler should wake on the AFP due record. Cancelling writes a resolution event; it does not delete the scheduled record.
+
+The instance's optional `wait_expires_at` is distinct from `next_follow_up_at`:
+delivery becoming due does not expire the wait. When an expiry is present, it
+must follow the delivery time. Timeout resolution uses the expiry deadline and
+appends a terminal revision; cancellation and timeout clear both pending times.
 
 ## 7. Starter pack copied per user
 

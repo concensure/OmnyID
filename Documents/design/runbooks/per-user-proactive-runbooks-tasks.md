@@ -33,23 +33,32 @@ only the typed definition and its revision reference, with no storage keys or
 provider credentials. Responses are no-store. No frontend control or first-run
 screen is wired yet; the setup endpoint copies the user's selected starters.
 
-The frozen source candidate is `ad782b25676e68f8ac4faab6760b195a9df46745`.
-Full library check, all 17 normal integration tests (including live disposable
-PostgreSQL and authenticated routes), and library build completed on installed
-Rust 1.95 in the clean exact-SHA worktree
-`C:/temp/wt/omnyid-runbooks-verify-43d7c830`. The first test build hit a Windows
-rustc access violation. Retrying with two jobs, 16 package codegen units,
-incremental compilation off and package debug info disabled succeeded.
-The project toolchain pin is unchanged. See the handoff for exact commands.
+The frozen runtime source candidate is `c811b1aceda5eb1c3d26232f6ea85ad09066c805`.
+All 18 focused integration tests and the library build completed in the clean exact-SHA worktree
+`C:/temp/wt/omnyid-runbooks-verify-43d7c830` using Rust 1.95, two jobs,
+16 package codegen units, incremental compilation off and package debug info
+disabled. The project toolchain pin is unchanged; see the final handoff evidence.
 
 The twelve starters specify reviewed transform operations, required facts and
 explicit approval steps. Their executor implementations are still pending.
-Stages 4–17 remain open except for the checked foundation/management items below.
-The matcher still produces a shadow plan, not an atomic dispatch receipt.
-Durable dispatch/step transactions, complete adapters, bounded evidence,
-authority/approval integration, execution, model budgets, follow-up scheduling,
-outcomes, activity/A2UI and rollout remain unfinished. No execution or daemon
-hook is enabled. Do not wire the matcher to ingress before these boundaries exist.
+The pure matcher now feeds a durable dispatcher that reads the owner's existing
+AFP event ledger, freezes matched/suppressed decisions in an encrypted receipt,
+and appends instance roots atomically. Duplicate delivery returns the original
+plan, including after definition changes. Changed normalized input conflicts.
+New events observe current definitions; instances retain their original version.
+
+Instance history, local read/transform result receipts, cancellation and wait
+expiry are implemented under the owner transaction lock. Exact step retries
+return their prior trace; changed inputs/outputs conflict. A wait's follow-up
+delivery time is distinct from its expiry deadline. Current disable/archive
+state blocks start and advancement. This is a persistence boundary for trusted
+executor code, not a tool executor, evidence resolver or authority grant.
+
+Stages 4–17 remain open except for checked items below. Complete adapters,
+remaining step-kind execution, bounded evidence, authority/approval integration,
+retries/cooldowns, model budgets, timer delivery/resume, outcomes, activity/A2UI
+and rollout remain unfinished. No live ingress, scheduler or daemon hook is
+connected. The management API cannot start execution.
 
 Existing regression locations include src/proactive_engine.rs,
 src/background_watcher.rs, src/background_watcher_runtime.rs,
@@ -117,7 +126,7 @@ Depends on: 1
 - [ ] Preserve source and entity references, confidence, urgency, occurrence time, and causation without copying raw bodies.
 - [ ] Add a small post-persistence dispatcher hook to `proactive_routes.rs`; keep substantive logic out of that already-large file.
 - [ ] Add the same hook at the reviewed background-Watcher/daemon boundary for events that do not pass through the HTTP route.
-- [ ] Make event normalization idempotent and reject events that are not owned by the current daemon partition.
+- [x] Make event normalization idempotent and reject events that are not owned by the current daemon partition.
 - [ ] Add tests for email, calendar, Watcher, vendor quote, RSVP, task, workflow failure, scheduled follow-up, malformed, and cross-tenant events.
 
 ## 5. Pure matcher and dedupe
@@ -128,21 +137,21 @@ Depends on: 3, 4
 - [x] Implement stable ordering: priority descending, specificity descending, version descending, runbook ID ascending.
 - [x] Select the first match per dedupe group plus independent definitions, capped at five instances per event.
 - [x] Compute `instance_key = sha256(owner,event,definition,version)` and suppress retries with the same key.
-- [ ] Record matched/suppressed results as content-light AFP audit events.
+- [x] Record matched/suppressed results as content-light AFP audit events.
 - [x] Reuse relevant exact/range condition semantics from `proactive_engine.rs` without coupling execution to `ProactiveHeuristic`.
-- [ ] Add tests for correct match, no match, stable ties, dedupe group, duplicate delivery, cap, disabled/superseded definition, and user isolation.
+- [x] Add tests for correct match, no match, stable ties, dedupe group, duplicate delivery, cap, disabled/superseded definition, and user isolation.
 
 ## 6. Instance store and state machine
 
 Depends on: 1, 5
 
-- [ ] Add `src/runbook_runtime.rs` with append-only instance revisions and one dedicated AFP thread per instance.
-- [ ] Enforce the documented transition graph under an owner/instance advisory lock or equivalent transaction boundary.
+- [x] Add `src/runbook_runtime.rs` with append-only instance revisions and one dedicated AFP thread per instance.
+- [x] Enforce the documented transition graph under an owner/instance advisory lock or equivalent transaction boundary.
 - [ ] Make every step idempotent on owner, instance, step, and input hash.
-- [ ] Return prior trace/response on exact retry and a reviewable conflict on changed inputs.
+- [x] Return prior trace/response on exact retry and a reviewable conflict on changed inputs. (Supported local steps; other step kinds fail closed pending executor integration.)
 - [ ] Bound retries and apply existing cooldown signals after repeated failures.
-- [ ] Add cancel and timeout resolution events rather than deleting waits or instances.
-- [ ] Add concurrency tests for duplicate dispatch, two workers advancing one step, stale revision, retry, cancel, timeout, and terminal state.
+- [x] Add cancel and timeout resolution events rather than deleting waits or instances.
+- [x] Add concurrency tests for duplicate dispatch, two workers advancing one step, stale revision, retry, cancel, timeout, and terminal state.
 
 ## 7. Structure-first evidence packets
 
@@ -256,7 +265,7 @@ Depends on: 1–15
 - [ ] Verify encrypted/private content follows current storage and decrypt-budget rules.
 - [ ] Keep operational logs content-light and redact model/tool inputs.
 - [ ] Add retention for derived traces/projections without deleting immutable evidence that policy requires to retain.
-- [ ] Extend account deletion to definitions, instances, traces, waits, receipts, caches, and projections.
+- [x] Extend account deletion to definitions, instances, traces, waits, receipts, caches, and projections. (Existing private-schema erasure verified for all currently persisted runbook types; no separate caches/projections exist.)
 - [ ] Run dependency/security scans and targeted route abuse tests.
 
 ## 17. Verification and rollout

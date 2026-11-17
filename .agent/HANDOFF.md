@@ -9458,3 +9458,62 @@ epistemic resume, model-budget, scheduling, outcome/provenance and A2UI stages.
 First-run UI integration is also pending; only its selected-starter setup API
 exists. Do not describe the engine or the remaining runbook tasks as complete.
 The task stays in_progress. No execution flag or live event hook was enabled.
+
+## 2026-11-18 — WED-375: durable dispatch, local-step receipts and wait resolution
+
+Implementation: `C:/temp/wt/omnyid-runbooks`, branch `agent/codex/WED-375`.
+Frozen source: `c811b1aceda5eb1c3d26232f6ea85ad09066c805`.
+Verification: `C:/temp/wt/omnyid-runbooks-verify-43d7c830` at that exact SHA.
+
+`src/runbook_runtime.rs` reads an event ID from the authenticated/daemon owner's
+existing afp_messages partition. Under the existing owner transaction, it
+normalizes the event, freezes matched/suppressed decisions in a private receipt,
+and appends at most five instance roots. Duplicate delivery returns that same
+plan; changed normalized input conflicts. Definition changes affect new events,
+not already-bound instance definitions or prior dispatch receipts.
+
+The runtime stores append-only instance histories, commits local read/transform
+result traces and instance advancement atomically, and returns the original
+trace for an exact retry. Changed input/output, stale revisions, disabled
+definitions, unsupported step kinds and terminal advancement fail closed.
+Cancel and timeout append terminal revisions and resolution AFP events. Waits
+store a follow-up due time and a separate later `wait_expires_at`; reaching the
+delivery time is not an expiry. There is no generic resume API that could bypass
+approval or epistemic input authority. No actual tool/model execution is added.
+
+Files: new runtime and PostgreSQL runtime test; shared encrypted record codec
+extended in runbook_store; wait-expiry contract/validation in runbook_contract
+and runbook_afp; lib export and foundation fixture updated. All new files are
+below 999 lines. Runtime public methods are internal application library APIs,
+not newly exposed HTTP endpoints; trusted callers must supply owner context.
+
+Verification completed on the final frozen candidate: all 18 tests passed, including both live PostgreSQL scenarios; no test was skipped. Test command:
+`cargo +1.95.0 test --test runbook_foundation --test runbook_storage_postgres --test runbook_runtime_postgres -j 2 --config 'profile.test.package.omnyid-homeserver.debug=0' --config 'profile.test.package.omnyid-homeserver.codegen-units=16'`.
+Use CARGO_TARGET_DIR=C:/cargo-target and CARGO_INCREMENTAL=0, with
+TEST_DATABASE_URL pointing at the dedicated local omnyid-runbook-wed375-pg
+container, port 55475, omnyid_test database. Do not use another running database.
+The earlier b9a41fa4 candidate reached the runtime scenario but failed an overly
+broad test assertion that forbade opaque AFP reference IDs anywhere in a row.
+The final test checks encrypted content and excludes these references from
+searchable metadata while preserving standard AFP references. The final source
+also separates expiry from follow-up due time and tests that boundary.
+
+No live hook, deployment, frontend change or PR. GitHub still exposes only the
+old unrelated main CI failure and no deployments; this task branch is local.
+Remaining work includes full event adapters/hooks, bounded evidence, authority,
+remaining step kinds, retry/cooldown policy, approval and epistemic resume,
+model budgets, timer delivery, outcomes, activity/A2UI, retention and rollout.
+Account deletion continues to use the existing private-schema erasure boundary.
+The remaining-task count is **83 unchecked checklist items**, with **34 of 117
+complete** (nine additional items completed this session). This counts checklist
+items, not equally sized effort estimates. Next priority: bounded evidence and
+existing authority integration before broadening supported step kinds or wiring
+live ingress. The full remaining list is in
+Documents/design/runbooks/per-user-proactive-runbooks-tasks.md.
+
+The library build also completed on the same clean source SHA:
+`cargo +1.95.0 build --lib -j 2 --config 'profile.dev.package.omnyid-homeserver.debug=0' --config 'profile.dev.package.omnyid-homeserver.codegen-units=16'`.
+The verification commands printed toplevel, exact HEAD and clean status before
+running. Focused rustfmt/diff checks completed. No toolchain pin changed. The
+dedicated database container was stopped after verification; no worktree was
+deleted. Subsequent documentation commits do not change the frozen code SHA.
