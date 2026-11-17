@@ -15,7 +15,7 @@ use sqlx::{Postgres, Row, Transaction};
 
 pub struct RunbookStore<'a> {
     db: &'a Db,
-    encryption_key: [u8; 32],
+    pub(crate) encryption_key: [u8; 32],
     signing_key: [u8; 32],
 }
 

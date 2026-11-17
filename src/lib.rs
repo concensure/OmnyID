@@ -100,6 +100,7 @@ pub mod proactive_provenance;
 pub mod runbook_afp;
 pub mod runbook_contract;
 pub mod runbook_event;
+pub mod runbook_evidence;
 pub mod runbook_matcher;
 pub mod runbook_registry;
 pub mod runbook_runtime;
