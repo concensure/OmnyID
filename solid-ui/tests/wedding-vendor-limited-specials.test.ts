@@ -54,6 +54,8 @@ test("Limited Specials uses a third mode, full marker name and one synchronized 
     read("scripts/deploy-oracle.ps1"),
   ]);
   assert.match(home, /Limited Specials/);
+  assert.match(home, /selectVendorMode\(event, "specials"\)/);
+  assert.match(home, /RotatingVendorSearchExample/);
   assert.match(map, /hoveredName/);
   assert.match(map, /wedding-special-map-tooltip/);
   assert.match(map, /wedding-special-map-cluster/);

@@ -1,3 +1,19 @@
+## 2026-11-18: Wedding Sprout is bounded assistance, not a plan-data retrieval channel
+
+Wedding Sprout uses the server-held OpenAI credential only after authentication,
+the existing per-user daily limit and the shared USD 50 weekly funded-inference
+cap. The client does not choose an authoritative wedding or account identifier.
+No ledger, contact, message, document, email address or other account content is
+placed in its prompt. Deterministic request gates reject other-account and
+non-wedding requests before inference, and the model must return an explicit
+Wedding scope marker. Suggested writes remain staged navigation/draft fields and
+are never executed by the assistant response.
+
+Browser Wedding mirrors also never fall back to legacy unscoped keys. Before a
+session resolves they use a separate anonymous namespace; authenticated mirrors
+use the immutable account id. Importing an anonymous draft must remain an
+explicit reviewed action.
+
 ## 2026-11-12: Bulk celebrant outreach preserves active capabilities
 
 Bulk preparation reuses the existing vendor-scoped celebrant consultation

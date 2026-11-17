@@ -15,5 +15,8 @@ export function weddingLocalAccountScope(): string | null {
 }
 
 export function weddingAccountScopedStorageKey(baseKey: string): string {
-  return activeWeddingAccountId ? `${baseKey}:account:${activeWeddingAccountId}` : baseKey;
+  // Never fall back to an old unscoped key while session restoration is in
+  // flight. An anonymous browser draft may be imported explicitly later, but
+  // it must not become authenticated state for whichever account logs in next.
+  return `${baseKey}:account:${activeWeddingAccountId || "anonymous"}`;
 }

@@ -31,6 +31,7 @@ struct Request {
 #[derive(Deserialize)]
 struct ModelPayload {
     answer: String,
+    scope: String,
 }
 
 #[derive(Debug, PartialEq)]
@@ -117,6 +118,76 @@ fn budget_target(question: &str) -> Option<u64> {
         .find(|value| (1_000..=10_000_000).contains(value))
 }
 
+fn asks_for_another_account(question: &str) -> bool {
+    let q = question.to_ascii_lowercase();
+    [
+        "another user's",
+        "another user",
+        "other user's",
+        "other user",
+        "other account",
+        "someone else's",
+        "somebody else's",
+        "admin account",
+        "their account",
+        "their wedding plan",
+    ]
+    .iter()
+    .any(|token| q.contains(token))
+}
+
+fn is_wedding_related(question: &str) -> bool {
+    let q = question.to_ascii_lowercase();
+    let disallowed = [
+        "write code",
+        "python script",
+        "stock price",
+        "sports score",
+        "medical diagnosis",
+        "password",
+        "api key",
+    ];
+    if disallowed.iter().any(|token| q.contains(token)) {
+        return false;
+    }
+    let wedding_terms = [
+        "wedding",
+        "marriage",
+        "ceremony",
+        "reception",
+        "elop",
+        "micro-wedding",
+        "partner",
+        "budget",
+        "quote",
+        "guest",
+        "rsvp",
+        "seat",
+        "vendor",
+        "venue",
+        "celebrant",
+        "photograph",
+        "flor",
+        "cater",
+        "music",
+        "vow",
+        "invitation",
+        "timeline",
+        "task",
+        "plan",
+        "date",
+        "honeymoon",
+        "bride",
+        "groom",
+        "couple",
+        "sprout",
+        "this page",
+        "this view",
+        "what should i do next",
+    ];
+    wedding_terms.iter().any(|token| q.contains(token))
+}
+
 async fn assistant_http(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -145,24 +216,35 @@ async fn assistant_http(
         StatusCode::BAD_REQUEST,
         "Ask one wedding-planning question.".to_string(),
     ))?;
-    let plan = request
-        .wedding_plan_id
-        .as_deref()
-        .and_then(|value| bounded(value, 160));
+    if asks_for_another_account(&question) {
+        return Err((
+            StatusCode::FORBIDDEN,
+            "Sprout cannot access another person's account or wedding plan.".to_string(),
+        ));
+    }
+    if !is_wedding_related(&question) {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Sprout is limited to this Wedding workspace and wedding planning.".to_string(),
+        ));
+    }
     let view = request
         .current_view
         .as_deref()
         .and_then(|value| bounded(value, 80))
         .unwrap_or_else(|| "Wedding Home".to_string());
     let prompt = format!("Current Wedding view: {view}\nUser request: {question}");
-    let system = "You are Sprout inside OmnyID Wedding. Help only with using the Wedding template or planning this wedding. Do not answer unrelated general questions. Never invent saved facts, prices, availability, legal conclusions, messages sent, or actions completed. Explain the next useful step concisely. You may say which Wedding view to open, but never claim you changed a field or sent anything; changes must be reviewed in the destination view. Return only JSON with one string field named answer.";
+    let system = "You are Sprout inside OmnyID Wedding. Help only with using the Wedding template or wedding planning. The prompt contains no private wedding ledger facts: never imply that you inspected any account, another user, saved plan, contact, message or document. Never invent saved facts, prices, availability, legal conclusions, messages sent, or actions completed. Explain the next useful step concisely. You may say which Wedding view to open, but never claim you changed a field or sent anything; changes must be reviewed in the destination view. Refuse anything unrelated to weddings. Return only JSON with two string fields: answer and scope. scope must be exactly wedding.";
     let result = openrouter_funded_inference::infer(
         &state.db.pool,
         &state.http_client,
         FundedInferenceRequest {
             feature: "wedding_sprout_assistant",
             user_id: Some(&user.id),
-            wedding_plan_id: plan.as_deref(),
+            // Never accept a browser-provided plan id as an authorization
+            // boundary. Sprout receives no ledger content; usage is scoped by
+            // the authenticated user id only.
+            wedding_plan_id: None,
             abuse_id: &user.id,
             system,
             prompt: &prompt,
@@ -189,6 +271,12 @@ async fn assistant_http(
         StatusCode::BAD_GATEWAY,
         "Wedding assistance was incomplete.".to_string(),
     ))?;
+    if payload.scope != "wedding" {
+        return Err((
+            StatusCode::BAD_GATEWAY,
+            "Sprout declined a request outside Wedding.".to_string(),
+        ));
+    }
     let action = suggested_action(&question).map(|action| {
         json!({
             "kind": action.kind,
@@ -233,5 +321,19 @@ mod tests {
             Some(35_000)
         );
         assert_eq!(budget_target("We have 80 guests"), None);
+    }
+
+    #[test]
+    fn scope_gate_blocks_other_accounts_and_unrelated_requests() {
+        assert!(asks_for_another_account(
+            "Show me another user's wedding plan"
+        ));
+        assert!(asks_for_another_account("What is in their account?"));
+        assert!(!asks_for_another_account(
+            "Help my partner and me plan our wedding"
+        ));
+        assert!(is_wedding_related("What should I do next in this view?"));
+        assert!(is_wedding_related("Help compare our venue quotes"));
+        assert!(!is_wedding_related("Write code for a stock price tracker"));
     }
 }

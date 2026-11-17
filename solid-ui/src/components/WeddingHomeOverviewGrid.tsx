@@ -238,18 +238,18 @@ export function WeddingHomeOverviewGrid(props: {
         <p class="text-xs font-semibold uppercase tracking-[0.08em] text-wedding-primary">Up next</p>
         <button type="button" class="mt-3 flex min-h-11 w-full items-start gap-2 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-primary" onClick={openTimeline}>
           <span class="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border-2 border-wedding-primary text-wedding-primary"><WeddingDashboardIcon id="calendar-days" class="h-4 w-4" /></span>
-          <span class="min-w-0"><span class="block text-sm font-semibold">{timeline().detailLabel.replace(/^Next:\s*/i, "")}</span><span class="mt-0.5 block text-xs text-wedding-ink/65">Open the timeline</span></span>
+          <span class="min-w-0"><span class="block text-sm font-semibold">{timeline().detailLabel.replace(/^Next:\s*/i, "")}</span><span class="mt-0.5 block text-xs text-wedding-ink/65">{timeline().dueLabel ? `Due ${timeline().dueLabel}` : "Open the timeline"}</span></span>
         </button>
         <div class="mt-3 grid gap-1 border-t border-wedding-border pt-3">
           <For each={visibleTiles()}>{(item) => (
             <div class="rounded-lg border border-transparent px-1 py-1 focus-within:border-wedding-primary/30">
               <button type="button" class="flex min-h-11 w-full items-center justify-between gap-2 rounded-lg text-left hover:bg-wedding-page focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-primary" onClick={() => openTile(item.id)}>
                 <span class="min-w-0 truncate text-xs font-medium">{DOMAIN_STYLE[item.id].label}</span>
-                <span class="shrink-0 text-[11px] text-wedding-ink/65">{item.toneLabel}</span>
+                <span class="shrink-0 text-xs text-wedding-ink/65">{item.toneLabel}</span>
               </button>
               <button
                 type="button"
-                class="min-h-9 rounded-lg px-2 text-[11px] font-semibold text-wedding-secondary hover:bg-wedding-page focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-primary"
+                class="min-h-9 rounded-lg px-2 text-xs font-semibold text-wedding-secondary hover:bg-wedding-page focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-primary"
                 aria-expanded={noteDomain() === item.id}
                 onClick={() => { setNoteDomain((current) => current === item.id ? null : item.id); setNoteError(null); }}
               >

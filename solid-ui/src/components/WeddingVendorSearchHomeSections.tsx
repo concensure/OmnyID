@@ -125,7 +125,8 @@ function VendorSearchDraftInput(props: {
   name?: string;
 }) {
   const workspace = () => props.workspace;
-  const [draft, setDraft] = createSignal(workspace().vendorSearchQuery ?? "");
+  const initialValue = workspace().vendorSearchQuery ?? "";
+  const [draft, setDraft] = createSignal(initialValue.trim() ? initialValue : "");
   const [placeholderIndex, setPlaceholderIndex] = createSignal(0);
   let lastExternalValue = workspace().vendorSearchQuery ?? "";
 
@@ -133,7 +134,7 @@ function VendorSearchDraftInput(props: {
     const externalValue = workspace().vendorSearchQuery ?? "";
     if (externalValue === lastExternalValue) return;
     lastExternalValue = externalValue;
-    setDraft(externalValue);
+    setDraft(externalValue.trim() ? externalValue : "");
   });
 
   function commit() {
@@ -145,7 +146,7 @@ function VendorSearchDraftInput(props: {
 
   onMount(() => {
     const timer = window.setInterval(() => {
-      if (!draft()) setPlaceholderIndex((index) => (index + 1) % VENDOR_SEARCH_EXAMPLES.length);
+      if (!draft().trim()) setPlaceholderIndex((index) => (index + 1) % VENDOR_SEARCH_EXAMPLES.length);
     }, 5500);
     onCleanup(() => window.clearInterval(timer));
   });
@@ -170,6 +171,15 @@ function VendorSearchDraftInput(props: {
       class={props.class}
     />
   );
+}
+
+function RotatingVendorSearchExample() {
+  const [index, setIndex] = createSignal(0);
+  onMount(() => {
+    const timer = window.setInterval(() => setIndex((value) => (value + 1) % VENDOR_SEARCH_EXAMPLES.length), 5500);
+    onCleanup(() => window.clearInterval(timer));
+  });
+  return <p class="mt-2 min-h-5 text-xs leading-5 text-wedding-ink/60" aria-live="polite">Try: {VENDOR_SEARCH_EXAMPLES[index()]}</p>;
 }
 
 export function WeddingVendorSearchHomeSection(props: {
@@ -207,6 +217,11 @@ export function WeddingVendorSearchHomeSection(props: {
   const [expandedLifecycleVendorKey, setExpandedLifecycleVendorKey] = createSignal<string | null>(null);
   const [selectedVendorCategory, setSelectedVendorCategory] = createSignal<string | null>(null);
   const [vendorMode, setVendorMode] = createSignal<"find" | "invite" | "specials">("find");
+  const selectVendorMode = (event: MouseEvent, mode: "find" | "invite" | "specials") => {
+    event.preventDefault();
+    event.stopPropagation();
+    setVendorMode(mode);
+  };
   const [allMobileCategories, setAllMobileCategories] = createSignal(false);
   const [allDesktopCategories, setAllDesktopCategories] = createSignal(false);
   const [directSpecialEnquiryCard, setDirectSpecialEnquiryCard] = createSignal<WeddingVendorChoiceCardData | null>(null);
@@ -418,7 +433,7 @@ export function WeddingVendorSearchHomeSection(props: {
           aria-selected={vendorMode() === "find"}
           aria-controls="wedding-vendor-panel-find"
           class={`min-h-11 rounded-lg px-3 text-sm font-bold transition ${vendorMode() === "find" ? "bg-white text-wedding-primary shadow-sm" : "text-wedding-ink/70"}`}
-          onClick={() => setVendorMode("find")}
+          onClick={(event) => selectVendorMode(event, "find")}
         >Find vendors</button>
         <button
           id="wedding-vendor-tab-invite"
@@ -427,7 +442,7 @@ export function WeddingVendorSearchHomeSection(props: {
           aria-selected={vendorMode() === "invite"}
           aria-controls="wedding-vendor-panel-invite"
           class={`min-h-11 rounded-lg px-3 text-sm font-bold transition ${vendorMode() === "invite" ? "bg-white text-wedding-primary shadow-sm" : "text-wedding-ink/70"}`}
-          onClick={() => setVendorMode("invite")}
+          onClick={(event) => selectVendorMode(event, "invite")}
         >Invite Proposals</button>
         <button
           id="wedding-vendor-tab-specials"
@@ -436,7 +451,7 @@ export function WeddingVendorSearchHomeSection(props: {
           aria-selected={vendorMode() === "specials"}
           aria-controls="wedding-vendor-panel-specials"
           class={`min-h-11 rounded-lg px-2 text-xs font-bold transition sm:px-3 sm:text-sm ${vendorMode() === "specials" ? "bg-white text-wedding-primary shadow-sm" : "text-wedding-ink/70"}`}
-          onClick={() => setVendorMode("specials")}
+          onClick={(event) => selectVendorMode(event, "specials")}
         >Limited Specials</button>
       </div>
       <div id="wedding-vendor-panel-find" role="tabpanel" aria-labelledby="wedding-vendor-tab-find" hidden={vendorMode() !== "find"}>
@@ -497,6 +512,7 @@ export function WeddingVendorSearchHomeSection(props: {
           <WeddingDashboardIcon id={workspace().vendorSearchRunning ? "clock" : "arrow-right"} class="h-5 w-5" />
         </button>
       </label>
+      <RotatingVendorSearchExample />
       </div>
       </form>
       <div class="mt-3 hidden sm:block" aria-label="Vendor categories">

@@ -15,6 +15,17 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-373
+    title: Small-wedding message, cinema directory, Wedding Sprout and planner reliability
+    status: review
+    owner: codex
+    branch: agent/codex/WED-373
+    worktree: C:/temp/wt/omnyid-wed373
+    base_sha: 402e1f6b8ce5e95a17ff22d1618c4f7ff6f9f615
+    depends_on: [WED-372, WED-371]
+    files: [wedding/index.html, wedding/blog/married-at-the-movies-cinema-wedding.html, wedding/tests/wedding-website-smoke.mjs, postgres/data/**cinema*.sql, src/server/**wedding**, docker-compose.oracle.minimal.yml, solid-ui/src/components/AgentPersonaFAB.tsx, solid-ui/src/components/WeddingBudget*.tsx, solid-ui/src/components/WeddingWorkspaceContextPanels.tsx, solid-ui/src/components/WeddingVendorSearchHomeSections.tsx, solid-ui/src/components/WeddingHomeOverviewGrid.tsx, solid-ui/src/lib/wedding*.ts, solid-ui/tests/wedding-*.test.ts, .agent/**]
+    acceptance: [two source-backed cinema venue records provide practical starting points from the cinema article and directory, Wedding Sprout uses the configured server-side OpenAI credential without exposing it and refuses unrelated or cross-account requests, landing copy is lightly aligned to intimate weddings without implementing unrelated draft scope, budget controls quote handoff RSVP event suggestions vendor examples and in-place mode switching work accessibly, overview progress and due dates are account scoped and fresh accounts start with setup decisions, focused tests public-site checks typecheck build and guarded exact-SHA Oracle deployment are recorded]
+
   - id: WED-372
     title: Project RSVP identity and cultural event choices, unify scoped vendor availability and consultation management, and repair vendor claim arrival
     status: review

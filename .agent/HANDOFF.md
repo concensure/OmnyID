@@ -1,3 +1,45 @@
+## 2026-11-18 - WED-373 small-wedding alignment and Wedding reliability release candidate (Codex)
+
+Worktree `C:\temp\wt\omnyid-wed373`, branch `agent/codex/WED-373`, based on
+production application SHA `402e1f6b8ce5e95a17ff22d1618c4f7ff6f9f615`.
+
+- Lightly aligned the public Wedding hero with personal, right-sized Australian
+  weddings without adopting the unrelated draft architecture in the source
+  documents. The public cinema-wedding article now links to James Theatre
+  Dungog and The Roxy Theatre Bingara. A small idempotent operator SQL load uses
+  their official source evidence and retains verify-before-booking caveats.
+- Wedding Sprout now uses the server-side OpenAI key for this feature only. It
+  retains authenticated per-user rate limiting and the shared USD 50 weekly
+  cutoff, rejects unrelated and cross-account prompts before inference, sends
+  no wedding ledger content or browser-supplied plan authority to the provider,
+  and only returns reviewable navigation/staged field suggestions.
+- Removed the remaining legacy global-key fallback from Wedding browser
+  mirrors. Pre-session drafts use an anonymous namespace and authenticated data
+  uses the immutable account id. The overview now prioritises earlier journey
+  stages, restores its due-date label, and retains date/budget/guest setup before
+  generic preparation work.
+- Budget now has a stronger total field, larger allocation guidance, draggable
+  range affordances, summary icons and a quote handoff that focuses the intake
+  dialog even when no quote exists. RSVP event creation has a visible suggestion
+  select plus free text. Vendor search rotates examples and mode tabs consume
+  their click locally instead of navigating/reloading. Timeline and Up Next
+  supporting text is larger.
+- Secret handling: the supplied plaintext OpenAI value was migrated to the
+  existing gitignored local secret-file convention and the Oracle env references
+  that file. No value is present in code, Git output or this handoff.
+- Evidence: TypeScript passes; 33 focused Wedding tests pass; both focused Rust
+  modules pass (4 tests); all public Wedding/metadata/CSP/quiz/magnet/countdown/
+  quote site checks pass; the full Wedding suite is 2305/2306 with only the
+  pre-existing `wedding-lead-magnet-import-state.test.ts` expected-rejection
+  assertion failing. Changed Rust files are formatted and `git diff --check`
+  passes; global rustfmt still has unrelated baseline drift.
+
+Release action for this session: commit, build from a clean checkout of the
+exact commit, sync the secret file without exposing it, deploy, run the cinema
+operator SQL, and verify runtime SHA/health/public assets plus an authenticated
+Sprout request. Do not describe inference as reading the user's plan until a
+separately authorised server-side context selector exists.
+
 ## 2026-11-15 - WED-366 vendor sales operations portal (Codex, released; inbox confirmation pending)
 
 Worktree `C:\temp\wt\omnyid-wed360`, branch `agent/codex/WED-360`.

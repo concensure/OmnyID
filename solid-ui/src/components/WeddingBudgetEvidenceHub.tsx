@@ -94,6 +94,7 @@ export function WeddingBudgetEvidenceHub(props: {
   const [canScrollTabsBack, setCanScrollTabsBack] = createSignal(false);
   const [canScrollTabsForward, setCanScrollTabsForward] = createSignal(true);
   let tabScroller: HTMLDivElement | undefined;
+  let intakeDialog: HTMLElement | undefined;
   const state = createMemo(() => buildWeddingBudgetEvidenceHubState(props.state));
   const quoteArtifacts = createMemo(() => props.state.artifactPreviews.filter((artifact) => artifact.preview?.kind === "quote"));
   const activeQuote = createMemo(() => quoteArtifacts().find((artifact) => artifact.artifactId === activeQuoteId()) ?? null);
@@ -103,6 +104,7 @@ export function WeddingBudgetEvidenceHub(props: {
     if ((props.openIntakeRequest ?? 0) <= 0) return;
     setActiveTab("quotes");
     setIntakeOpen(true);
+    queueMicrotask(() => intakeDialog?.focus());
   });
   function updateTabScrollControls(): void {
     if (!tabScroller) return;
@@ -199,7 +201,7 @@ export function WeddingBudgetEvidenceHub(props: {
       </div>
       <Show when={intakeOpen()}>
         <div class="fixed inset-0 z-[6500] flex items-end justify-center bg-slate-950/45 p-0 sm:items-center sm:p-4" role="presentation" onClick={(event) => { if (event.target === event.currentTarget) setIntakeOpen(false); }}>
-          <section role="dialog" aria-modal="true" aria-labelledby="quote-intake-title" class="max-h-[92dvh] w-full max-w-5xl overflow-auto rounded-t-2xl bg-white p-4 shadow-2xl sm:rounded-2xl sm:p-5">
+          <section ref={intakeDialog} tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="quote-intake-title" class="max-h-[92dvh] w-full max-w-5xl overflow-auto rounded-t-2xl bg-white p-4 shadow-2xl outline-none sm:rounded-2xl sm:p-5">
             <div class="flex items-start justify-between gap-3">
               <div><h3 id="quote-intake-title" class="font-display text-xl font-semibold text-wedding-ink">Quotes</h3><p class="mt-1 text-sm leading-6 text-wedding-ink/65">One source-backed place for uploads, vendor messages, reading and comparison.</p></div>
               <button type="button" aria-label="Close quote dialogue" class="min-h-11 rounded-lg border border-wedding-border px-4 text-sm font-semibold" onClick={() => setIntakeOpen(false)}>Close</button>

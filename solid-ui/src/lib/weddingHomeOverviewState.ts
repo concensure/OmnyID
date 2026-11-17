@@ -3,6 +3,7 @@ import type { WeddingResponseWorkspaceViewState } from "@/lib/weddingResponseWor
 import type { WeddingWorkspaceMenuId } from "@/lib/weddingWorkspaceMenuState";
 import { weddingDayCountdownLabel } from "@/lib/weddingWorkspaceSidebarActionState";
 import { weddingTimelineWeddingDateLabel } from "@/lib/weddingTimelineWeddingDateState";
+import { weddingJourneyStageId, WEDDING_JOURNEY_STAGES } from "@/lib/weddingJourneyStageState";
 
 export type WeddingHomeStatusTone = "good" | "attention" | "risk";
 
@@ -38,6 +39,7 @@ export type WeddingHomeOverviewActionTile = {
 
 export type WeddingHomeTimelineOverview = {
   detailLabel: string;
+  dueLabel: string | null;
   menuId: WeddingWorkspaceMenuId;
   actionLabel: string;
   selectedRowId: string | null;
@@ -176,6 +178,7 @@ export function buildWeddingHomeTimelineOverview(state: WeddingResponseWorkspace
       menuId: "timeline" as const,
       actionLabel: "Add wedding date",
       selectedRowId: null,
+      dueLabel: null,
     }
     : state.budgetTracking.budgetTargetAmount === null
       ? {
@@ -183,6 +186,7 @@ export function buildWeddingHomeTimelineOverview(state: WeddingResponseWorkspace
         menuId: "budget" as const,
         actionLabel: "Set budget",
         selectedRowId: null,
+        dueLabel: null,
       }
       : state.guestTracking.guestRowCount === 0
         ? {
@@ -190,18 +194,25 @@ export function buildWeddingHomeTimelineOverview(state: WeddingResponseWorkspace
           menuId: "guests" as const,
           actionLabel: "Add guests",
           selectedRowId: null,
+          dueLabel: null,
         }
         : null;
   if (setup) return { ...setup, a2ui: timelineA2ui(setup) };
 
+  const stageRankByTaskId = new Map(optionalArray(state.planningTaskItems).map((task) => [
+    task.id,
+    WEDDING_JOURNEY_STAGES.findIndex((stage) => stage.id === weddingJourneyStageId(task)),
+  ]));
   const upcoming = state.ganttTimeline.rows
     .filter((row) => !isDoneTimelineRow(row))
-    .sort((left, right) => dateSortValue(left.endLabel) - dateSortValue(right.endLabel))[0] ?? null;
+    .sort((left, right) => (stageRankByTaskId.get(left.id) ?? Number.MAX_SAFE_INTEGER) - (stageRankByTaskId.get(right.id) ?? Number.MAX_SAFE_INTEGER)
+      || dateSortValue(left.endLabel) - dateSortValue(right.endLabel))[0] ?? null;
   const timeline = {
     detailLabel: upcoming ? `Next: ${upcoming.title}` : "No upcoming timeline items yet.",
     menuId: "timeline" as const,
     actionLabel: upcoming ? "Open timeline item" : "Open timeline",
     selectedRowId: upcoming?.id ?? null,
+    dueLabel: upcoming?.endLabel ?? null,
   };
   return { ...timeline, a2ui: timelineA2ui(timeline) };
 }

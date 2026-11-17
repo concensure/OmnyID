@@ -101,4 +101,7 @@ test("budget hub exposes one upload, message recovery, reading and comparison su
   assert.match(hub, /Compare selected quotes/);
   assert.match(hub, /\.pdf,\.doc,\.docx,\.txt,\.md/);
   assert.match(tracker, /Open quote upload and message chooser/);
+  assert.match(hub, /intakeDialog\?\.focus/);
+  assert.match(tracker, /cursor-ew-resize/);
+  assert.match(tracker, /text-xs leading-5[\s\S]*Suggested/);
 });

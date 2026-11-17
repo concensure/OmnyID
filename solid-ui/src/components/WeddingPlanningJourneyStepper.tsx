@@ -59,7 +59,7 @@ export function WeddingPlanningJourneyStepper(props: {
                     </svg>
                   </Show>
                 </span>
-                <span class={`mt-2 text-[11px] font-semibold leading-4 ${selected() === stage.id ? "text-wedding-primary" : "text-wedding-ink"}`}>{stage.label}</span>
+                <span class={`mt-2 text-xs font-semibold leading-4 ${selected() === stage.id ? "text-wedding-primary" : "text-wedding-ink"}`}>{stage.label}</span>
               </button>
             );
           }}</For>

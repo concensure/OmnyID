@@ -53,3 +53,9 @@ test("Wedding presentation mirrors derive different keys for the same starter wo
   assert.equal(first.some((key, index) => key === second[index]), false);
   setWeddingLocalAccountScope(null);
 });
+
+test("session restoration never reads the legacy unscoped Wedding key", () => {
+  setWeddingLocalAccountScope(null);
+  assert.equal(weddingAccountScopedStorageKey("omnyid:wedding:task"), "omnyid:wedding:task:account:anonymous");
+  assert.notEqual(weddingAccountScopedStorageKey("omnyid:wedding:task"), "omnyid:wedding:task");
+});

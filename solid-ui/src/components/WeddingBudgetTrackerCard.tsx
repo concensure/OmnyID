@@ -317,47 +317,47 @@ export function WeddingBudgetTrackerCard(props: {
 
       <div class="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-6">
         <div class="rounded-xl border border-wedding-border bg-white px-2.5 py-2">
-          <p class="text-xs font-semibold text-wedding-ink/65">Committed</p>
+          <p class="flex items-center gap-1 text-xs font-semibold text-wedding-ink/65"><WeddingDashboardIcon id="lock" class="h-4 w-4" />Committed</p>
           <p class="mt-1 break-words text-lg font-semibold text-wedding-ink">{moneyLabel(props.state.insights.committedAmount, currency)}</p>
         </div>
         <div class="rounded-xl border border-wedding-border bg-white px-2.5 py-2">
-          <p class="text-xs font-semibold text-wedding-ink/65">Estimated</p>
+          <p class="flex items-center gap-1 text-xs font-semibold text-wedding-ink/65"><WeddingDashboardIcon id="clock" class="h-4 w-4" />Estimated</p>
           <p class="mt-1 break-words text-lg font-semibold text-wedding-ink">{moneyLabel(props.state.insights.estimatedAmount, currency)}</p>
         </div>
         <div class="rounded-xl border border-wedding-border bg-white px-2.5 py-2">
-          <p class="text-xs font-semibold text-wedding-ink/65">Paid</p>
+          <p class="flex items-center gap-1 text-xs font-semibold text-wedding-ink/65"><WeddingDashboardIcon id="check-circle" class="h-4 w-4" />Paid</p>
           <p class="mt-1 break-words text-lg font-semibold text-wedding-ink">{moneyLabel(props.state.insights.paidAmount, currency)}</p>
         </div>
         <div class="rounded-xl border border-wedding-border bg-white px-2.5 py-2">
-          <p class="text-xs font-semibold text-wedding-ink/65">Remaining</p>
+          <p class="flex items-center gap-1 text-xs font-semibold text-wedding-ink/65"><WeddingDashboardIcon id="banknotes" class="h-4 w-4" />Remaining</p>
           <p class="mt-1 break-words text-lg font-semibold text-wedding-ink">
             {props.state.insights.remainingAmount === null ? "Set budget" : moneyLabel(props.state.insights.remainingAmount, currency)}
           </p>
         </div>
         <div class="rounded-2xl border border-rose-100 bg-rose-50/75 px-2.5 py-2">
-          <p class="text-xs font-semibold text-rose-950/65">At risk</p>
+          <p class="flex items-center gap-1 text-xs font-semibold text-rose-950/65"><WeddingDashboardIcon id="alert-circle" class="h-4 w-4" />At risk</p>
           <p class="mt-1 break-words text-lg font-semibold text-rose-950">{moneyLabel(props.state.insights.atRiskAmount, currency)}</p>
         </div>
         <button type="button" class="flex min-h-[7.5rem] min-w-0 flex-col items-start rounded-2xl border border-amber-100 bg-amber-50/75 px-2.5 py-2 text-left transition hover:border-amber-300 hover:bg-amber-50 focus:outline-none focus:ring-2 focus:ring-amber-500" onClick={() => props.onAddQuotes?.()} aria-label="Open quote upload and message chooser">
-          <span class="block w-full text-xs font-semibold text-amber-950/65">Forecast range</span>
+          <span class="flex w-full items-center gap-1 text-xs font-semibold text-amber-950/65"><WeddingDashboardIcon id="search" class="h-4 w-4" />Forecast range</span>
           <span class="mt-2 block w-full break-words text-sm font-semibold leading-5 text-amber-950">{props.state.insights.forecastRangeLabel}</span>
           <span class="mt-auto block w-full pt-2 text-xs font-semibold text-amber-900 underline">Add or review quotes</span>
         </button>
       </div>
 
-      <div class="mt-3 rounded-xl border border-wedding-border bg-white p-3">
+      <div class="mt-3 rounded-xl border border-wedding-primary/30 bg-white p-3 shadow-[0_10px_26px_rgba(15,118,110,0.08)]">
         <p class="text-sm font-semibold text-wedding-ink">Set your budget</p>
         <p class="mt-1 text-xs leading-5 text-wedding-ink/70">
           Set an overall figure, then split it across categories. "Stationery, Transport & Other" automatically absorbs whatever's left, so the total always stays balanced.
         </p>
-        <label class="mt-3 block text-xs font-semibold text-wedding-ink">
-          Total budget
+        <label class="mt-3 block rounded-xl border-2 border-wedding-primary bg-wedding-primary/5 p-3 text-sm font-bold text-wedding-primary">
+          <span class="flex items-center gap-2"><WeddingDashboardIcon id="banknotes" class="h-5 w-5" />Total budget</span>
           <input
             type="number"
             inputmode="numeric"
             min="0"
             step="100"
-            class="mt-1 min-h-11 w-full rounded-lg border border-wedding-border bg-white px-3 py-2 text-sm font-normal text-wedding-ink outline-none focus:border-wedding-primary"
+            class="mt-2 min-h-12 w-full rounded-lg border border-wedding-primary/40 bg-white px-3 py-2 text-lg font-semibold text-wedding-ink outline-none focus:border-wedding-primary focus:ring-4 focus:ring-wedding-primary/15"
             value={draft().totalAmount || ""}
             placeholder="0"
             onInput={(event) => setTotalAmount(Number(event.currentTarget.value))}
@@ -398,7 +398,7 @@ export function WeddingBudgetTrackerCard(props: {
                     </span>
                     <span class="shrink-0 text-xs font-semibold text-wedding-ink">{moneyLabel(amount(), draft().currency)}</span>
                   </div>
-                  <div class="mt-1 flex min-w-0 items-start justify-between gap-2 text-[11px] leading-4 text-wedding-ink/65">
+                  <div class="mt-1 flex min-w-0 items-start justify-between gap-2 text-xs leading-5 text-wedding-ink/65">
                     <span class="min-w-0 break-words">
                       Suggested {moneyLabel(suggestedCategory(category.id).amount, draft().currency)} ({suggestedCategory(category.id).share}%). {suggestedCategory(category.id).reasonLabel}
                     </span>
@@ -413,8 +413,9 @@ export function WeddingBudgetTrackerCard(props: {
                     step="100"
                     value={amount()}
                     aria-label={`${category.label} amount`}
-                    class="mt-2 w-full accent-wedding-primary"
+                    class="mt-2 h-7 w-full cursor-ew-resize touch-none accent-wedding-primary"
                     onInput={(event) => setCategoryAmount(category.id, Number(event.currentTarget.value))}
+                    onChange={(event) => setCategoryAmount(category.id, Number(event.currentTarget.value))}
                   />
                   <input
                     type="number"

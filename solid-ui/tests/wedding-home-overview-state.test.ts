@@ -407,7 +407,29 @@ test("home timeline overview skips completed rows and tolerates missing status l
   assert.equal(timeline.detailLabel, "Next: Pay venue deposit");
   assert.equal(timeline.actionLabel, "Open timeline item");
   assert.equal(timeline.selectedRowId, "venue-payment");
+  assert.equal(timeline.dueLabel, "2027-05-01");
   assert.equal(action.selected_row_id, "venue-payment");
+});
+
+test("home overview keeps early-stage work ahead of later preparation for a fresh account", () => {
+  const timeline = buildWeddingHomeTimelineOverview(state({
+    contextCards: [{ planningContext: { dateOrSeason: "2027-11-24" }, answeredLabels: [] }] as WeddingResponseWorkspaceViewState["contextCards"],
+    budgetTracking: { budgetTargetAmount: 50_000, totalKnownAmount: 0, remainingAmount: 50_000 } as WeddingResponseWorkspaceViewState["budgetTracking"],
+    guestTracking: { guestRowCount: 2, attendingCount: 0, declinedCount: 0, pendingCount: 2 } as WeddingResponseWorkspaceViewState["guestTracking"],
+    planningTaskItems: [
+      { id: "plan-first", title: "Review the wedding budget", kind: "budget", status: "planned" },
+      { id: "cake-later", title: "Book cake baker", kind: "vendor", status: "planned" },
+    ] as WeddingResponseWorkspaceViewState["planningTaskItems"],
+    ganttTimeline: {
+      rows: [
+        { id: "cake-later", title: "Book cake baker", endLabel: "2027-02-01", statusLabel: "Planned" },
+        { id: "plan-first", title: "Review the wedding budget", endLabel: "2027-03-01", statusLabel: "Planned" },
+      ],
+      undatedItems: [],
+    } as WeddingResponseWorkspaceViewState["ganttTimeline"],
+  }));
+  assert.equal(timeline.selectedRowId, "plan-first");
+  assert.equal(timeline.detailLabel, "Next: Review the wedding budget");
 });
 
 test("home planning progress counts completed planner tasks rather than elapsed time", () => {
