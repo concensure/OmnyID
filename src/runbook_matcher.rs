@@ -60,6 +60,10 @@ pub fn filter_matches(filter: &Filter, context: &Value) -> bool {
                 Some(a.cmp(&b))
             } else if let (Some(a), Some(b)) = (actual.as_u64(), expected.as_u64()) {
                 Some(a.cmp(&b))
+            } else if actual.as_i64().is_some() && expected.as_u64().is_some() {
+                Some(std::cmp::Ordering::Less)
+            } else if actual.as_u64().is_some() && expected.as_i64().is_some() {
+                Some(std::cmp::Ordering::Greater)
             } else {
                 actual
                     .as_f64()

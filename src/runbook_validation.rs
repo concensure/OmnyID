@@ -111,6 +111,12 @@ pub fn validate_definition(d: &RunbookDefinition) -> Result<()> {
             return Err("invalid_trigger_path");
         }
     }
+    let mut unique_filters = HashSet::new();
+    for filter in &d.trigger.filters {
+        if !unique_filters.insert(serde_json::to_string(filter).map_err(|_| "invalid_filter")?) {
+            return Err("duplicate_trigger_filter");
+        }
+    }
     for f in &d.success_criteria {
         validate_filter(f)?;
         if !f.path.starts_with("instance.outputs.") {
@@ -122,6 +128,20 @@ pub fn validate_definition(d: &RunbookDefinition) -> Result<()> {
     }
     let mut ids = HashSet::new();
     for step in &d.steps {
+        for input in &step.input_refs {
+            if matches!(
+                input.as_str(),
+                "event.source_refs" | "event.entity_refs" | "state.snapshot_ref"
+            ) {
+                continue;
+            }
+            let previous = input
+                .strip_prefix("steps.")
+                .and_then(|s| s.strip_suffix(".output_refs"));
+            if !previous.is_some_and(|id| ids.iter().any(|known: &&String| known.as_str() == id)) {
+                return Err("unbounded_or_forward_input_ref");
+            }
+        }
         if !identifier(&step.step_id)
             || !ids.insert(&step.step_id)
             || !identifiers(&step.input_refs, MAX_REFS)

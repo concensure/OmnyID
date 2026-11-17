@@ -405,3 +405,158 @@ fn owner_keys_and_event_summaries_are_isolated() {
             .is_empty()
     );
 }
+
+#[test]
+fn runtime_afp_preserves_private_content_and_standard_envelope() {
+    use omnyid_homeserver::runbook_afp::*;
+    let record = RuntimeRecord::Escalation(EpistemicEscalation {
+        escalation_id: "gap-1".into(),
+        instance_id: "instance-1".into(),
+        step_id: "read".into(),
+        status: EscalationStatus::Open,
+        reason: EscalationReason::MissingRequiredFact,
+        missing_fields: vec!["wedding_date".into()],
+        attempted_refs: vec!["wedding:w1".into()],
+        question: "What wedding date should this quote use?".into(),
+        why_needed: "The date is missing.".into(),
+        answer_schema: AnswerSchema::Date,
+        expires_at: now() + chrono::Duration::days(7),
+    });
+    let afp = build_runtime_afp("alice", Some("event-1"), &record, now()).unwrap();
+    assert_eq!(parse_runtime_afp("alice", &afp).unwrap(), record);
+    assert!(parse_runtime_afp("bob", &afp).is_err());
+    assert!(!afp["metadata"].to_string().contains("wedding date"));
+    let standard: omnyid_homeserver::message::AFPMessage =
+        serde_json::from_value(afp.clone()).unwrap();
+    assert_eq!(standard.thread_id, "runbook:instance-1");
+    assert_eq!(standard.parent_id.as_deref(), Some("event-1"));
+    let mut bad = afp.clone();
+    bad["metadata"]["question"] = json!("private question");
+    assert!(parse_runtime_afp("alice", &bad).is_err());
+    let mut bad = afp;
+    bad["content"]["answer_schema"] = json!("execute_shell");
+    assert!(parse_runtime_afp("alice", &bad).is_err());
+}
+
+#[test]
+fn instance_revision_checks_and_runtime_roundtrip() {
+    use omnyid_homeserver::runbook_afp::*;
+    let instance = RunbookInstance {
+        instance_id: "i1".into(),
+        runbook_id: "quote".into(),
+        runbook_version: 1,
+        trigger_event_id: "e1".into(),
+        thread_id: "runbook:i1".into(),
+        instance_key: instance_key("alice", "e1", "quote", 1),
+        status: InstanceState::Matched,
+        current_step_id: None,
+        completed_step_ids: vec![],
+        next_follow_up_at: None,
+        definition_ref: "d1".into(),
+        evidence_packet_ref: None,
+        latest_trace_ref: None,
+        retry_of_instance_id: None,
+        revision: 1,
+    };
+    assert!(instance.transition(2, InstanceState::Running).is_err());
+    let next = instance.transition(1, InstanceState::Running).unwrap();
+    assert_eq!(next.revision, 2);
+    let record = RuntimeRecord::Instance(next);
+    assert!(build_runtime_afp("alice", None, &record, now()).is_err());
+    let afp = build_runtime_afp("alice", Some("revision-1"), &record, now()).unwrap();
+    assert_eq!(parse_runtime_afp("alice", &afp).unwrap(), record);
+    let mut bad = instance;
+    bad.thread_id = "other-thread".into();
+    assert!(RuntimeRecord::Instance(bad).validate().is_err());
+}
+
+#[test]
+fn event_adapter_uses_partition_and_never_copies_raw_payload() {
+    use omnyid_homeserver::runbook_event::normalize_stored_event;
+    let stored = json!({"protocol":"afp-v1", "id":"e1", "type":"passive_event", "content": {
+        "event_type":"email_received", "confidence":0.8, "event_at":now().to_rfc3339(),
+        "entity_id":"thread:t1", "payload":{"body":"PRIVATE"}, "context":{"token":"SECRET"},
+        "metadata":{"revision":1,"body":"PRIVATE","credential":"SECRET"}
+    }});
+    let event = normalize_stored_event("alice", "alice", &stored).unwrap();
+    assert_eq!(
+        event,
+        normalize_stored_event("alice", "alice", &stored).unwrap()
+    );
+    assert_eq!(event.source_refs, vec!["message:e1"]);
+    assert!(!serde_json::to_string(&event).unwrap().contains("PRIVATE"));
+    assert!(!serde_json::to_string(&event).unwrap().contains("SECRET"));
+    assert!(normalize_stored_event("bob", "alice", &stored).is_err());
+    let mut malformed = stored.clone();
+    malformed["content"]["event_at"] = json!("tomorrow");
+    assert!(normalize_stored_event("alice", "alice", &malformed).is_err());
+    let mut malformed = stored;
+    malformed["type"] = json!("runbook_follow_up");
+    assert!(normalize_stored_event("alice", "alice", &malformed).is_err());
+}
+
+#[test]
+fn prior_outputs_are_bounded_and_duplicate_filters_cannot_raise_specificity() {
+    let mut d = definition("quote");
+    d.steps[0].input_refs = vec!["event.source_refs".into()];
+    d.steps[1].input_refs = vec!["steps.read.output_refs".into()];
+    assert!(validate_definition(&d).is_ok());
+    d.steps[0].input_refs = vec!["steps.done.output_refs".into()];
+    assert!(validate_definition(&d).is_err());
+    d.steps[0].input_refs = vec!["all_history".into()];
+    assert!(validate_definition(&d).is_err());
+    d.steps[0].input_refs.clear();
+    let filter = Filter {
+        path: "metadata.wedding_id".into(),
+        op: FilterOp::Exists,
+        value: None,
+    };
+    d.trigger.filters = vec![filter.clone(), filter];
+    assert_eq!(validate_definition(&d), Err("duplicate_trigger_filter"));
+    assert!(!filter_matches(
+        &Filter {
+            path: "count".into(),
+            op: FilterOp::Gte,
+            value: Some(json!(9223372036854775808u64))
+        },
+        &json!({"count":i64::MAX})
+    ));
+}
+
+#[test]
+fn trace_roundtrip_requires_honest_model_cost_and_time_provenance() {
+    use omnyid_homeserver::runbook_afp::*;
+    let trace = StepTrace {
+        trace_id: "trace-1".into(),
+        instance_id: "i1".into(),
+        step_id: "read".into(),
+        step_kind: StepKind::Read,
+        status: TraceStatus::Completed,
+        input_refs: vec!["message:e1".into()],
+        output_refs: vec!["document:d1".into()],
+        input_hash: "a".repeat(64),
+        output_hash: Some("b".repeat(64)),
+        tool_id: None,
+        model: None,
+        prompt_version: None,
+        input_tokens: 0,
+        output_tokens: 0,
+        cost_microunits: 0,
+        approval_ref: None,
+        provenance_ref: Some("provenance:p1".into()),
+        started_at: now(),
+        completed_at: Some(now()),
+    };
+    let record = RuntimeRecord::Trace(trace.clone());
+    let afp = build_runtime_afp("alice", Some("instance-revision-1"), &record, now()).unwrap();
+    assert_eq!(parse_runtime_afp("alice", &afp).unwrap(), record);
+    let mut bad = trace.clone();
+    bad.cost_microunits = 10;
+    assert!(RuntimeRecord::Trace(bad).validate().is_err());
+    let mut bad = trace.clone();
+    bad.step_kind = StepKind::Draft;
+    assert!(RuntimeRecord::Trace(bad).validate().is_err());
+    let mut bad = trace;
+    bad.completed_at = Some(now() - chrono::Duration::seconds(1));
+    assert!(RuntimeRecord::Trace(bad).validate().is_err());
+}
