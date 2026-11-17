@@ -297,13 +297,13 @@ impl RunbookRuntime<'_, '_> {
             None
         };
         let level: Option<i32> = sqlx::query_scalar(
-            "SELECT level FROM proactivity_levels WHERE owner_user_id=$1 FOR SHARE",
+            "SELECT level FROM user_proactivity_config WHERE owner_user_id=$1 FOR SHARE",
         )
         .bind(owner)
         .fetch_optional(&mut *tx)
         .await
         .map_err(|_| "storage_unavailable")?;
-        let override_tier:Option<String>=sqlx::query_scalar("SELECT autonomy_tier FROM autonomy_overrides WHERE owner_user_id=$1 AND heuristic_id=$2 FOR SHARE")
+        let override_tier:Option<String>=sqlx::query_scalar("SELECT autonomy_tier FROM heuristic_autonomy_overrides WHERE owner_user_id=$1 AND heuristic_id=$2 FOR SHARE")
             .bind(owner).bind(format!("runbook:{}",definition.runbook_id)).fetch_optional(&mut *tx).await.map_err(|_|"storage_unavailable")?;
         let mut effective = definition.clone();
         if !latest_permits {

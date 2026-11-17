@@ -125,6 +125,22 @@ async fn atomic_policy_denial_review_replay_revocation_and_erasure() {
     )
     .await
     .unwrap();
+    assert_eq!(db.get_proactivity_level(&alice.id).await.unwrap(), 3);
+    assert_eq!(db.get_proactivity_level(&bob.id).await.unwrap(), 2);
+    let override_key = format!("runbook:{}", d.runbook_id);
+    assert_eq!(
+        db.get_autonomy_override(&alice.id, &override_key)
+            .await
+            .unwrap()
+            .as_deref(),
+        Some("auto_execute")
+    );
+    assert_eq!(
+        db.get_autonomy_override(&bob.id, &override_key)
+            .await
+            .unwrap(),
+        None
+    );
     let review = instance(&db, &runtime, &alice.id).await;
     let receipt = runtime
         .check_tool_policy(&alice.id, &review, &step, 2)
@@ -285,6 +301,19 @@ async fn atomic_policy_denial_review_replay_revocation_and_erasure() {
             .unwrap_err(),
         "owner_not_found"
     );
+    assert_eq!(
+        db.get_autonomy_override(&alice.id, &override_key)
+            .await
+            .unwrap(),
+        None
+    );
+    let setting_count: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM user_proactivity_config WHERE owner_user_id=$1")
+            .bind(&alice.id)
+            .fetch_one(&db.pool)
+            .await
+            .unwrap();
+    assert_eq!(setting_count, 0);
     db.delete_user_account_and_data(&bob.id, &bob.email, &[])
         .await
         .unwrap();

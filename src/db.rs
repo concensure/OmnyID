@@ -5226,6 +5226,12 @@ impl Db {
         .execute(&mut *tx)
         .await?;
 
+        // These existing account-policy tables predate user foreign keys.
+        for table in ["heuristic_autonomy_overrides", "user_proactivity_config"] {
+            sqlx::query(&format!("DELETE FROM {table} WHERE owner_user_id = $1"))
+                .bind(user_id).execute(&mut *tx).await?;
+        }
+
         // Drop the tenant-private schema so private AFP messages, per-user
         // workflow tables, and other user-scoped data cannot survive account
         // deletion in orphaned schemas.
@@ -11278,7 +11284,7 @@ impl Db {
     ) -> Result<Option<String>, sqlx::Error> {
         use sqlx::Row;
         let row = sqlx::query(
-            r#"SELECT autonomy_tier FROM autonomy_overrides
+            r#"SELECT autonomy_tier FROM heuristic_autonomy_overrides
                WHERE owner_user_id = $1 AND heuristic_id = $2"#,
         )
         .bind(owner_user_id)
@@ -11295,7 +11301,7 @@ impl Db {
         autonomy_tier: &str,
     ) -> Result<(), sqlx::Error> {
         sqlx::query(
-            r#"INSERT INTO autonomy_overrides (owner_user_id, heuristic_id, autonomy_tier, updated_at)
+            r#"INSERT INTO heuristic_autonomy_overrides (owner_user_id, heuristic_id, autonomy_tier, updated_at)
                VALUES ($1, $2, $3, NOW())
                ON CONFLICT (owner_user_id, heuristic_id) DO UPDATE SET autonomy_tier = $3, updated_at = NOW()"#,
         )
@@ -11309,7 +11315,7 @@ impl Db {
 
     pub async fn get_proactivity_level(&self, owner_user_id: &str) -> Result<i32, sqlx::Error> {
         use sqlx::Row;
-        let row = sqlx::query(r#"SELECT level FROM proactivity_levels WHERE owner_user_id = $1"#)
+        let row = sqlx::query(r#"SELECT level FROM user_proactivity_config WHERE owner_user_id = $1"#)
             .bind(owner_user_id)
             .fetch_optional(&self.pool)
             .await?;
@@ -11324,7 +11330,7 @@ impl Db {
         level: i32,
     ) -> Result<(), sqlx::Error> {
         sqlx::query(
-            r#"INSERT INTO proactivity_levels (owner_user_id, level, updated_at)
+            r#"INSERT INTO user_proactivity_config (owner_user_id, level, updated_at)
                VALUES ($1, $2, NOW())
                ON CONFLICT (owner_user_id) DO UPDATE SET level = $2, updated_at = NOW()"#,
         )
