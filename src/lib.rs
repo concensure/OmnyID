@@ -98,6 +98,7 @@ pub mod proactive_outcome_memory;
 pub mod proactive_policy;
 pub mod proactive_provenance;
 pub mod runbook_afp;
+pub mod runbook_authority;
 pub mod runbook_contract;
 pub mod runbook_event;
 pub mod runbook_evidence;

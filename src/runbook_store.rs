@@ -244,6 +244,7 @@ pub(crate) fn digest(value: &Value) -> String {
 
 fn validate_record(owner: &str, value: &Value) -> Result<()> {
     match value["type"].as_str() {
+        Some("runbook_policy") => { crate::runbook_authority::parse_policy_receipt(owner, value)?; }
         Some("runbook_evidence") => { crate::runbook_read::parse_receipt(owner, value)?; }
         Some("runbook_definition") => {
             crate::runbook_registry::parse_definition_afp(owner, value)?;
