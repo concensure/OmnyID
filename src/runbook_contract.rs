@@ -199,6 +199,9 @@ pub struct RunbookInstance {
     pub current_step_id: Option<String>,
     pub completed_step_ids: Vec<String>,
     pub next_follow_up_at: Option<DateTime<Utc>>,
+    /// Expiry is distinct from the due time at which a follow-up may be delivered.
+    #[serde(default)]
+    pub wait_expires_at: Option<DateTime<Utc>>,
     pub definition_ref: String,
     pub evidence_packet_ref: Option<String>,
     pub latest_trace_ref: Option<String>,

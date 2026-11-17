@@ -268,14 +268,21 @@ async fn atomic_dispatch_steps_cancellation_and_due_resolution() {
         .instance_ids
         .remove(0);
     runtime.start(&bob.id, &waiting, 1).await.unwrap();
-    let due = Utc::now() + Duration::milliseconds(500);
-    let wait_record = runtime.wait(&bob.id, &waiting, 2, due).await.unwrap();
+    let due = Utc::now() + Duration::milliseconds(300);
+    let expiry = due + Duration::milliseconds(700);
+    assert!(runtime.wait(&bob.id, &waiting, 2, due, due).await.is_err());
+    let wait_record = runtime
+        .wait(&bob.id, &waiting, 2, due, expiry)
+        .await
+        .unwrap();
     assert_eq!(wait_record.instance.status, InstanceState::WaitingForEvent);
+    tokio::time::sleep(std::time::Duration::from_millis(350)).await;
+    // Reaching the follow-up due time does not expire the wait prematurely.
     assert_eq!(
         runtime.expire_wait(&bob.id, &waiting, 3).await.unwrap_err(),
         "wait_not_due"
     );
-    tokio::time::sleep(std::time::Duration::from_millis(550)).await;
+    tokio::time::sleep(std::time::Duration::from_millis(700)).await;
     let (a, b) = tokio::join!(
         runtime.expire_wait(&bob.id, &waiting, 3),
         runtime.expire_wait(&bob.id, &waiting, 3)
@@ -284,6 +291,7 @@ async fn atomic_dispatch_steps_cancellation_and_due_resolution() {
     assert_eq!(expired.message_id, b.unwrap().message_id);
     assert_eq!(expired.instance.status, InstanceState::Failed);
     assert!(expired.instance.next_follow_up_at.is_none());
+    assert!(expired.instance.wait_expires_at.is_none());
     assert!(runtime.start(&bob.id, &waiting, 4).await.is_err());
     let cancel_event = event(&db, &bob.id).await;
     let cancel_id = runtime
@@ -294,7 +302,13 @@ async fn atomic_dispatch_steps_cancellation_and_due_resolution() {
         .remove(0);
     runtime.start(&bob.id, &cancel_id, 1).await.unwrap();
     runtime
-        .wait(&bob.id, &cancel_id, 2, Utc::now() + Duration::hours(1))
+        .wait(
+            &bob.id,
+            &cancel_id,
+            2,
+            Utc::now() + Duration::hours(1),
+            Utc::now() + Duration::hours(2),
+        )
         .await
         .unwrap();
     runtime.cancel(&bob.id, &cancel_id, 3).await.unwrap();
@@ -323,7 +337,9 @@ async fn atomic_dispatch_steps_cancellation_and_due_resolution() {
     .unwrap();
     for row in public_rows {
         assert_eq!(row["content"], json!({}));
-        assert!(!row.to_string().contains("document:review"));
+        // AFP references intentionally retain opaque source/output IDs; private
+        // content must not be copied into searchable metadata or plaintext content.
+        assert!(!row["metadata"].to_string().contains("document:review"));
         assert_eq!(row["encryption"]["scheme"], "omnyid-envelope-v1");
     }
     // All receipt and instance records disappear with the existing account erasure.

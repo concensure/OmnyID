@@ -457,6 +457,7 @@ fn instance_revision_checks_and_runtime_roundtrip() {
         current_step_id: None,
         completed_step_ids: vec![],
         next_follow_up_at: None,
+        wait_expires_at: None,
         definition_ref: "d1".into(),
         evidence_packet_ref: None,
         latest_trace_ref: None,

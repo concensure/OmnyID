@@ -24,6 +24,12 @@ impl RuntimeRecord {
     pub fn validate(&self) -> Result<()> {
         match self {
             Self::Instance(i) => {
+                if i.wait_expires_at.is_some_and(|expiry| {
+                    i.status != InstanceState::WaitingForEvent
+                        || i.next_follow_up_at.is_none_or(|due| due >= expiry)
+                }) {
+                    return Err("invalid_wait_expiry");
+                }
                 if !identifier(&i.instance_id)
                     || !identifier(&i.runbook_id)
                     || i.runbook_version == 0

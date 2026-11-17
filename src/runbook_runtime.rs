@@ -101,6 +101,7 @@ impl<'a, 'db> RunbookRuntime<'a, 'db> {
                 current_step_id: None,
                 completed_step_ids: vec![],
                 next_follow_up_at: None,
+                wait_expires_at: None,
                 definition_ref: decision.definition_ref.clone(),
                 evidence_packet_ref: None,
                 latest_trace_ref: None,
@@ -268,8 +269,12 @@ impl<'a, 'db> RunbookRuntime<'a, 'db> {
         id: &str,
         expected_revision: u32,
         due_at: DateTime<Utc>,
+        expires_at: DateTime<Utc>,
     ) -> Result<InstanceRecord> {
-        if due_at <= Utc::now() || due_at > Utc::now() + Duration::days(30) {
+        if due_at <= Utc::now()
+            || expires_at <= due_at
+            || expires_at > Utc::now() + Duration::days(30)
+        {
             return Err("invalid_wait_deadline");
         }
         let mut tx = self.store.begin(owner).await?;
@@ -294,6 +299,7 @@ impl<'a, 'db> RunbookRuntime<'a, 'db> {
             .instance
             .transition(expected_revision, InstanceState::WaitingForEvent)?;
         next.next_follow_up_at = Some(due_at);
+        next.wait_expires_at = Some(expires_at);
         let result = self
             .append_instance(owner, Some(&current.message_id), next, &mut tx)
             .await?;
@@ -357,7 +363,7 @@ impl<'a, 'db> RunbookRuntime<'a, 'db> {
             && (current.instance.status != InstanceState::WaitingForEvent
                 || current
                     .instance
-                    .next_follow_up_at
+                    .wait_expires_at
                     .is_none_or(|t| t > Utc::now()))
         {
             return Err("wait_not_due");
@@ -371,6 +377,7 @@ impl<'a, 'db> RunbookRuntime<'a, 'db> {
             },
         )?;
         next.next_follow_up_at = None;
+        next.wait_expires_at = None;
         let record = self
             .append_instance(owner, Some(&current.message_id), next, &mut tx)
             .await?;
