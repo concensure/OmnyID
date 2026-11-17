@@ -15,6 +15,17 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-375
+    title: Implement per-user proactive Runbooks in dependency order
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-375
+    worktree: C:/temp/wt/omnyid-runbooks
+    base_sha: 5536b83b2f9d2f58488a075f383c24f8f4f73d6c
+    depends_on: [WED-308, WED-374]
+    files: [src/runbook*.rs, src/lib.rs, tests/runbook*, Documents/design/runbooks/**, .agent/**]
+    acceptance: [Strict bounded contracts and terminal-safe transitions, immutable starter definitions and owner-scoped AFP projection, deterministic typed matching with stable dedupe and owner-bound keys, focused adversarial tests and clean-commit Rust build, execution remains disconnected until ledger transactions and authority integration are complete]
+    progress: "Located the WED-308 spec and all-open dependency plan. No runbook source modules exist in the current application lineage. Continuing on WED-374 to preserve subsequent fixes; initial scope is the validated deterministic foundation, with later integration stages explicitly tracked in the plan. Primary checkout and existing active application worktrees are untouched. GitHub CI only reports old March main failures and does not verify this local lineage."
   - id: WED-374
     title: Restore Wedding Sprout rollout, complete projected databases, persona artwork, exports and planner-card affordances
     status: in_progress
