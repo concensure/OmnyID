@@ -9307,3 +9307,34 @@ production SHA `9124790ea81935c00f55b6c95f40ef07be164eeb`.
 Next action: commit this candidate, build/deploy from a clean detached checkout of
 that exact SHA, then verify hosted provenance, the public guide, vendor bundle,
 unauthenticated security boundary and runtime health.
+## 2026-11-18 - WED-374 Sprout rollout, projected databases and persona artwork (Codex)
+
+Worktree `C:\temp\wt\omnyid-wed374`, branch `agent/codex/WED-374`, based on
+production SHA `9a5ab87ccad1cccc263b4dc8c1066e3c85bb3eb9`.
+
+- Diagnosed the hosted Sprout failure as missing explicit routing, audit-receipt
+  and daily-limit controls. The OpenAI secret remains file-mounted and was not
+  printed or moved into Git. The gitignored release environment now enables the
+  Wedding-only route at six authenticated requests per account/day; the shared
+  USD 50 weekly funded-inference cutoff remains enforced.
+- Extended the existing Database registry rather than creating another data
+  store. Run sheet, Budget, Timeline, Guest list and Seating are focused views
+  of the same account-scoped Wedding ledger. The selector offers only missing
+  projections and removes an Add option after its definition is created.
+- Added guest-list projection, bounded SVG and print/PDF exports, email handoff
+  through the user's mail client, and explicit AFP sharing to an entered agent
+  ID. External copies are labelled for review and the source database remains
+  private.
+- Installed the twelve supplied original SVG persona assets. Built-in template
+  artwork now appears in Templates, installed Mine entries and the FAB; custom
+  persona images and the emoji fallback are preserved. Added small icons to
+  Plan actions and Inspiration controls.
+- Evidence: TypeScript and production Vite build pass; 20 focused Database,
+  Wedding projection and persona tests pass; three Rust Wedding-assistant
+  policy/scope tests pass. The focused 1000-line Wedding budget passes. The
+  global line-budget retains the two unchanged baseline failures in
+  `src/server/mod.rs` and `src/db.rs`.
+
+Next action: commit, create a clean detached checkout of the exact SHA, rebuild,
+deploy with the guarded Oracle helper, then verify runtime provenance, the three
+non-secret Sprout controls, public persona assets and hosted route boundaries.

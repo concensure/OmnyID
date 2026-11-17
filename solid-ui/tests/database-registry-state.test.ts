@@ -97,6 +97,10 @@ test("wedding run-sheet profile is offered only when an accessible plan referenc
   }]);
   assert.deepEqual(profiles.map((profile) => [profile.profileId, profile.weddingPlanId]), [
     ["wedding_runsheet.v1", "plan-2027"],
+    ["wedding_budget.v1", "plan-2027"],
+    ["wedding_timeline.v1", "plan-2027"],
+    ["wedding_guest_list.v1", "plan-2027"],
+    ["wedding_seating.v1", "plan-2027"],
   ]);
 });
 

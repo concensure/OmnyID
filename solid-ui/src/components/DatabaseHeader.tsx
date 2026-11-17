@@ -1,7 +1,7 @@
 // @locs-version: 1.0
 import { createSignal, For, Show } from "solid-js";
 
-import type { DatabaseDefinitionProjection } from "@/lib/databaseRegistryState";
+import type { DatabaseDefinitionProjection, RegisteredDatabaseProfile } from "@/lib/databaseRegistryState";
 
 export type DatabaseDensityMode = "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "10";
 
@@ -27,7 +27,9 @@ export function DatabaseHeader(props: {
   fullscreen: boolean;
   readOnly?: boolean;
   readOnlyReason?: string;
+  addProfiles?: RegisteredDatabaseProfile[];
   onSelect: (databaseId: string) => void;
+  onAddProfile?: (profile: RegisteredDatabaseProfile) => void;
   onNameInput: (name: string) => void;
   onNameCommit: () => void;
   onDensityChange: (mode: DatabaseDensityMode) => void;
@@ -52,7 +54,16 @@ export function DatabaseHeader(props: {
             <select
               id="database-switcher"
               value={props.selectedDatabaseId ?? ""}
-              onChange={(event) => props.onSelect(event.currentTarget.value)}
+              onChange={(event) => {
+                const value = event.currentTarget.value;
+                if (value.startsWith("add-profile:")) {
+                  const profile = props.addProfiles?.find((item) => item.profileId === value.slice("add-profile:".length));
+                  if (profile) props.onAddProfile?.(profile);
+                  event.currentTarget.value = props.selectedDatabaseId ?? "";
+                  return;
+                }
+                props.onSelect(value);
+              }}
               class="min-h-11 max-w-full rounded-xl border border-outline/20 bg-white/70 px-3 text-sm font-semibold text-on-surface outline-none focus:border-primary/50 sm:max-w-xs"
             >
               <For each={props.definitions}>{(definition) => (
@@ -60,6 +71,13 @@ export function DatabaseHeader(props: {
                   {definition.name}{definition.archived ? " (archived)" : ""}
                 </option>
               )}</For>
+              <Show when={(props.addProfiles?.length ?? 0) > 0}>
+                <optgroup label="Add a projected database">
+                  <For each={props.addProfiles}>{(profile) => (
+                    <option value={`add-profile:${profile.profileId}`}>Add {profile.defaultName.toLocaleLowerCase()}</option>
+                  )}</For>
+                </optgroup>
+              </Show>
             </select>
             <input
               value={props.name}

@@ -10,6 +10,11 @@ export interface PersonaTemplate {
   category: "literary" | "folklore" | "modern";
 }
 
+// Original local artwork shared by every persona surface. Custom personas
+// continue to use their selected image or the existing emoji fallback.
+export const personaTemplateIconUrl = (templateId: string): string =>
+  `/icons/personas/${templateId}.svg`;
+
 export const PERSONA_TEMPLATES: PersonaTemplate[] = [
   // ── Literary & Historical ──────────────────────────────────────────────────
 

@@ -79,6 +79,13 @@ function weddingLocationAdviceLabel(state: WeddingResponseWorkspaceViewState): s
   return locationLabel ?? "your wedding location";
 }
 
+function planActionIcon(title: string): string {
+  if (/follow/i.test(title)) return "✉";
+  if (/timeline/i.test(title)) return "◷";
+  if (/share/i.test(title)) return "↗";
+  return "✓";
+}
+
 function WeddingPanelSection(props: {
   label: string;
   detail: string;
@@ -512,7 +519,7 @@ export function WeddingWorkspaceContextPanels(props: {
                   class="flex min-h-[10rem] min-w-0 flex-col items-start gap-3 rounded-2xl border border-indigo-200 bg-white/80 p-5 text-left transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 disabled:cursor-not-allowed disabled:opacity-45 sm:min-h-[9rem]"
                   onClick={() => openAggregateAction(action)}
                 >
-                  <span class="block w-full text-sm font-semibold leading-5 text-indigo-950">{action.title}</span>
+                  <span class="flex w-full items-center gap-2 text-sm font-semibold leading-5 text-indigo-950"><span aria-hidden="true" class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-base text-indigo-900">{planActionIcon(action.title)}</span>{action.title}</span>
                   <span class="block w-full text-xs leading-5 text-indigo-950/70">{action.detail}</span>
                   <span class="mt-auto block w-full text-[11px] font-semibold leading-4 text-indigo-950/65">{action.metaLabel}</span>
                 </button>

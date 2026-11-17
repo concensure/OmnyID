@@ -30,6 +30,17 @@ export type RegisteredDatabaseProfile = {
   weddingPlanId: string | null;
 };
 
+const WEDDING_PROJECTION_PROFILES = [
+  ["wedding_budget.v1", "Wedding budget", "A focused, read-only view of the canonical Wedding budget.", "Budget", "budget"],
+  ["wedding_timeline.v1", "Wedding timeline", "A focused, read-only view of canonical tasks and dated events.", "Timeline", "timeline"],
+  ["wedding_guest_list.v1", "Wedding guest list", "A focused, read-only view of guests, RSVP state, meals and access needs.", "Guest list", "guest_list"],
+  ["wedding_seating.v1", "Wedding seating", "A focused, read-only view of the current seating plan.", "Seating", "seating"],
+] as const;
+
+export function weddingProjectionTableForProfile(profileId: string | null | undefined): string | null {
+  return WEDDING_PROJECTION_PROFILES.find(([id]) => id === profileId)?.[4] ?? null;
+}
+
 function objectValue(value: unknown): Record<string, unknown> | null {
   return typeof value === "object" && value !== null && !Array.isArray(value)
     ? value as Record<string, unknown>
@@ -108,11 +119,14 @@ export function registeredDatabaseProfiles(
     profiles.set("wedding_runsheet.v1", {
       profileId: "wedding_runsheet.v1",
       label: "Wedding run sheet",
-      description: "Prepare the database for a ledger-backed wedding run sheet. Automatic population arrives in the next implementation slice.",
-      defaultName: "Wedding run sheet",
+      description: "A source-linked day-of sequence projected from the canonical Wedding plan, with reviewed manual overrides.",
+      defaultName: "Run sheet",
       defaultTable: "run_sheet",
       weddingPlanId,
     });
+    for (const [profileId, label, description, defaultName, defaultTable] of WEDDING_PROJECTION_PROFILES) {
+      profiles.set(profileId, { profileId, label, description, defaultName, defaultTable, weddingPlanId });
+    }
   }
   for (const message of messages.slice().sort(compareMessages)) {
     const content = objectValue(message.content);

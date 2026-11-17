@@ -37,7 +37,8 @@ function vendorTiming(): AfpMessage {
 
 test("Wedding database projects budget timeline and seating from one ledger without writes", () => {
   const rows = projectWeddingPlanningDatabaseRecords([task(), vendorTiming()]);
-  assert.deepEqual([...new Set(rows.map((row) => row.table))], ["budget", "timeline", "seating", "run_sheet"]);
+  assert.deepEqual([...new Set(rows.map((row) => row.table))], ["budget", "timeline", "guest_list", "seating", "run_sheet"]);
+  assert.equal(rows.find((row) => row.id.includes("guest-list:summary"))?.data.rsvp, "0 attending · 0 pending · 0 not attending");
   const venueTask = rows.find((row) => row.id.includes("venue-search"));
   assert.equal(venueTask?.data.task, "Research wedding venue");
   assert.equal(venueTask?.data.stage, "Venue & date");

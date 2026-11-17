@@ -221,7 +221,7 @@ export function WeddingInspirationPanel(props: {
     <section class="w-full max-w-none min-w-0 rounded-[24px] border border-rose-100/80 bg-rose-50/80 p-3 shadow-card sm:rounded-[28px] sm:p-5 xl:p-6">
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div class="min-w-0">
-          <p class="text-lg font-bold tracking-tight text-rose-950">Inspiration</p>
+          <p class="flex items-center gap-2 text-lg font-bold tracking-tight text-rose-950"><span aria-hidden="true" class="inline-flex h-9 w-9 items-center justify-center rounded-2xl bg-rose-100 text-lg">✦</span>Inspiration</p>
           <p class="mt-1 text-sm leading-6 text-rose-950/75">
             Add photos, screenshots, links, notes, PDFs, emails, or voice notes. OmnyID turns them into wedding preferences.
           </p>
@@ -259,7 +259,7 @@ export function WeddingInspirationPanel(props: {
           class="mt-3 rounded-full border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-950 transition hover:bg-white"
           onClick={() => fileInputRef?.click()}
         >
-          Choose photos or files
+          <span aria-hidden="true" class="mr-1">＋</span>Choose photos or files
         </button>
         <input
           ref={fileInputRef}
@@ -296,14 +296,14 @@ export function WeddingInspirationPanel(props: {
             class="rounded-full border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-950 transition hover:bg-rose-50"
             onClick={addUrl}
           >
-            Add link
+            <span aria-hidden="true" class="mr-1">↗</span>Add link
           </button>
           <button
             type="button"
             class="rounded-full border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-950 transition hover:bg-rose-50"
             onClick={addThought}
           >
-            Add note
+            <span aria-hidden="true" class="mr-1">✎</span>Add note
           </button>
         </div>
       </div>

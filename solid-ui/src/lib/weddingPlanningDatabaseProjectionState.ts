@@ -4,6 +4,7 @@ import type { DatabaseViewRecord } from "@/lib/databaseViewState";
 import { buildWeddingBudgetTrackingState } from "@/lib/weddingBudgetTrackingState";
 import { weddingJourneyStageId, WEDDING_JOURNEY_STAGES } from "@/lib/weddingJourneyStageState";
 import { buildWeddingPersistedWorkspaceState } from "@/lib/weddingPersistedWorkspaceState";
+import { buildWeddingGuestTrackingState } from "@/lib/weddingGuestTrackingState";
 import { planIdFrom, workspaceIdFrom } from "@/lib/weddingPersistedWorkspaceMessageState";
 import { projectWeddingRunSheetPreviewRecords } from "@/lib/weddingRunSheetProjectorState";
 
@@ -69,6 +70,27 @@ export function projectWeddingPlanningDatabaseRecords(messages: readonly AfpMess
     task: item.title, stage: "Dated event", due_date: item.startAt ?? item.dateLabel ?? null,
     owner: item.participants?.join(", ") || "Couple", status: item.approvalState ?? item.reviewStatus ?? "Scheduled",
     priority: "event", source: item.source ?? "Wedding calendar ledger",
+  });
+
+  const guests = buildWeddingGuestTrackingState({
+    artifacts: state.artifacts,
+    boundaryObjects: state.boundaryObjects,
+    afpMessages: [...messages],
+    responseWorkspaceId: scope.responseWorkspaceId,
+  });
+  push(`${databaseId}:guest-list:summary`, "guest_list", {
+    guest: "Guest list summary", household: `${guests.householdCount} household${guests.householdCount === 1 ? "" : "s"}`,
+    rsvp: `${guests.attendingCount} attending · ${guests.pendingCount} pending · ${guests.declinedCount} not attending`,
+    contact: guests.missingContactCount ? `${guests.missingContactCount} contact detail${guests.missingContactCount === 1 ? "" : "s"} needed` : "Contact details complete",
+    meal: guests.missingMealCount ? `${guests.missingMealCount} meal choice${guests.missingMealCount === 1 ? "" : "s"} needed` : "Meal choices up to date",
+    access: `${guests.accessibilityCount} access note${guests.accessibilityCount === 1 ? "" : "s"}`,
+    source: "Wedding guest ledger projection",
+  });
+  for (const guest of guests.guestRows ?? []) push(`${databaseId}:guest-list:${guest.id}`, "guest_list", {
+    guest: guest.displayName, household: guest.householdLabel, rsvp: guest.rsvpStatus,
+    contact: guest.contactLabel ?? "Not added", meal: guest.mealPreference ?? "Not added",
+    dietary: guest.dietaryNote ?? "None recorded", access: guest.accessibilityNote ?? "None recorded",
+    source: guest.sourceLabel,
   });
 
   const latestSeating = state.seatingOptimizations.at(-1);

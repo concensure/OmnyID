@@ -8,6 +8,7 @@ import { listPersonas, updateAgentUiPreferences, type AgentPersona } from "@/lib
 import { dispatchAgentPersonaFabVisibility } from "@/lib/agentPersonaFabVisibilityState";
 import {
   PERSONA_TEMPLATES,
+  personaTemplateIconUrl,
   type PersonaTemplate,
 } from "@/lib/personaTemplates";
 import {
@@ -171,6 +172,18 @@ export function AgentPersonaFAB(props: {
   const installedPersonaIdsByTemplateState = createMemo(() =>
     installedPersonaIdsByTemplate(PERSONA_TEMPLATES, personas()),
   );
+  const installedTemplateIdByPersonaState = createMemo(() => {
+    const reverse = new Map<string, string>();
+    for (const [templateId, personaId] of installedPersonaIdsByTemplateState()) {
+      reverse.set(personaId, templateId);
+    }
+    return reverse;
+  });
+  const templateIconForPersona = (persona: AgentPersona | null): string | null => {
+    if (!persona || persona.image_data_url) return null;
+    const templateId = installedTemplateIdByPersonaState().get(persona.id);
+    return templateId ? personaTemplateIconUrl(templateId) : null;
+  };
   const filteredPersonas = createMemo(() => filterPersonas(personas(), search()));
   const filteredTemplates = createMemo(() => filterPersonaTemplates(PERSONA_TEMPLATES, search()));
 
@@ -547,7 +560,11 @@ export function AgentPersonaFAB(props: {
                   >
                     <Show
                       when={persona.image_data_url}
-                      fallback={<span class="text-lg leading-none">{extractEmoji(persona.soul_md)}</span>}
+                      fallback={
+                        <Show when={templateIconForPersona(persona)} fallback={<span class="text-lg leading-none">{extractEmoji(persona.soul_md)}</span>}>
+                          {(source) => <img src={source()} alt="" class="h-8 w-8" loading="lazy" />}
+                        </Show>
+                      }
                     >
                       {(source) => <img src={source()} alt="" class="h-8 w-8 rounded-xl object-cover" />}
                     </Show>
@@ -598,9 +615,7 @@ export function AgentPersonaFAB(props: {
                       disabled={switcherBusy()}
                       class="mb-1 flex w-full items-start gap-3 rounded-2xl px-3 py-2.5 text-left transition hover:bg-on-surface/6 disabled:cursor-default disabled:hover:bg-transparent"
                     >
-                      <span class="pt-0.5 text-lg leading-none">
-                        {extractEmoji(template.soul_md)}
-                      </span>
+                      <img src={personaTemplateIconUrl(template.id)} alt="" class="h-9 w-9 shrink-0" loading="lazy" />
                       <div class="min-w-0 flex-1">
                         <div class="flex items-center gap-2">
                           <p class="truncate text-sm font-medium text-on-surface">
@@ -676,7 +691,11 @@ export function AgentPersonaFAB(props: {
         >
           <Show
             when={active()?.image_data_url}
-            fallback={<span class="text-xl leading-none select-none" aria-hidden="true">{active() ? extractEmoji(active()!.soul_md) : moodEmoji() ?? "🤖"}</span>}
+            fallback={
+              <Show when={templateIconForPersona(active())} fallback={<span class="text-xl leading-none select-none" aria-hidden="true">{active() ? extractEmoji(active()!.soul_md) : moodEmoji() ?? "🤖"}</span>}>
+                {(source) => <img src={source()} alt="" class="h-9 w-9" />}
+              </Show>
+            }
           >
             {(source) => <img src={source()} alt="" class="h-8 w-8 rounded-xl object-cover" />}
           </Show>

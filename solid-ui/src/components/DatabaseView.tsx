@@ -34,6 +34,8 @@ import {
   projectDatabaseDefinitions,
   reconcileSelectedDatabaseId,
   registeredDatabaseProfiles,
+  weddingProjectionTableForProfile,
+  type RegisteredDatabaseProfile,
 } from "@/lib/databaseRegistryState";
 import { TiptapEditor } from "@/components/editor/TiptapEditor";
 import {
@@ -75,6 +77,7 @@ import {
 } from "@/lib/weddingRunSheetIntelligenceState";
 import { applyQueueFontSize } from "@/lib/queueDensityLocalState";
 import { projectWeddingPlanningDatabaseRecords } from "@/lib/weddingPlanningDatabaseProjectionState";
+import { DatabaseExportShareControls } from "@/components/DatabaseExportShareControls";
 
 type DensityBucket = "compact" | "comfortable" | "spacious";
 
@@ -169,6 +172,9 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
     hasLegacyRecords: records().some((record) => record.databaseId === "database:legacy"),
   }));
   const profiles = createMemo(() => registeredDatabaseProfiles(allMessages()));
+  const addableProfiles = createMemo(() => profiles().filter((profile) => !existingDatabaseDefinitionForProfile(
+    definitions(), profile.profileId, profile.weddingPlanId,
+  )));
   const selectedDefinition = createMemo(() =>
     definitions().find((definition) => definition.databaseId === selectedDatabaseId()) ?? null,
   );
@@ -185,26 +191,39 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
     if (definition && definition.databaseId !== lastSelectedDatabaseId) {
       lastSelectedDatabaseId = definition.databaseId;
       setTableName(definition.defaultTable);
-      setActiveTable(definition.profileId === "wedding_plan_projection.v1" ? definition.defaultTable : null);
+      setActiveTable(definition.profileId === "wedding_plan_projection.v1" || weddingProjectionTableForProfile(definition.profileId)
+        ? definition.defaultTable
+        : null);
       setSelectedRowIds([]);
     }
   });
 
+  function recordsForSelectedDatabase(): DbRecord[] {
+    const definition = selectedDefinition();
+    const sourceTable = weddingProjectionTableForProfile(definition?.profileId);
+    return sourceTable && definition?.weddingPlanId
+      ? records()
+        .filter((row) => row.databaseId === `database:wedding-plan:${definition.weddingPlanId}` && row.table === sourceTable)
+        .map((row) => ({ ...row, databaseId: definition.databaseId }))
+      : databaseRecordsForDatabase(records(), selectedDatabaseId());
+  }
+
   const tables = createMemo(() => {
     const seen = new Set<string>();
-    return databaseRecordsForDatabase(records(), selectedDatabaseId())
+    return recordsForSelectedDatabase()
       .map((record) => record.table)
       .filter((table) => { if (seen.has(table)) return false; seen.add(table); return true; });
   });
 
   const selectedDatabaseRecords = createMemo(() => {
-    const selected = databaseRecordsForDatabase(records(), selectedDatabaseId());
+    const selected = recordsForSelectedDatabase();
     return selectedProfilePlugin()?.toolbarKind === "wedding_run_sheet"
       ? weddingRunSheetEffectiveRows(selected)
       : selected;
   });
   const databaseReadOnly = createMemo(() => Boolean(
     selectedDefinition()?.profileId === "wedding_plan_projection.v1"
+    || weddingProjectionTableForProfile(selectedDefinition()?.profileId) !== null
     || selectedDefinition()?.archived || (
     selectedProfilePlugin()?.toolbarKind === "wedding_run_sheet" && runSheetOffline()
   )));
@@ -368,6 +387,15 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
     } finally {
       setDatabaseCreateBusy(false);
     }
+  }
+
+  function createProfileDatabase(profile: RegisteredDatabaseProfile) {
+    void createDatabase({
+      name: profile.defaultName,
+      defaultTable: profile.defaultTable,
+      profileId: profile.profileId,
+      weddingPlanId: profile.weddingPlanId,
+    });
   }
 
   async function commitDatabaseName() {
@@ -648,15 +676,17 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
     <div ref={databaseRootRef} class={containerClass()} data-database-fullscreen={fullscreen() ? "true" : "false"}>
       <DatabaseHeader
         definitions={definitions()}
+        addProfiles={addableProfiles()}
         selectedDatabaseId={selectedDatabaseId()}
         name={databaseName()}
         densityMode={densityMode()}
         fullscreen={fullscreen()}
         readOnly={databaseReadOnly()}
-        readOnlyReason={selectedDefinition()?.profileId === "wedding_plan_projection.v1"
-          ? "Budget, Timeline, Seating and Run sheet are live read-only views of the same Wedding ledger. Update them in their planning views; no second copy is stored here."
+        readOnlyReason={selectedDefinition()?.profileId === "wedding_plan_projection.v1" || weddingProjectionTableForProfile(selectedDefinition()?.profileId)
+          ? "Budget, Timeline, Guest list, Seating and Run sheet are live views of the same Wedding ledger. Update them in their planning views; no second copy is stored here."
           : runSheetOffline() ? "This offline copy is read-only until OmnyID reconnects." : undefined}
         onSelect={selectDatabase}
+        onAddProfile={createProfileDatabase}
         onNameInput={setDatabaseName}
         onNameCommit={() => void commitDatabaseName()}
         onDensityChange={(mode) => { setDensityMode(mode); applyQueueFontSize(mode); }}
@@ -714,6 +744,17 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
         onRunSheetFilters={setRunSheetFilters}
         onAddRunSheetItem={() => { setRunSheetActionError(""); setRunSheetAddPreset("item"); setShowRunSheetAdd(true); }}
       />
+
+      <Show when={Boolean(selectedDefinition() && selectedDatabaseId())}>
+        <DatabaseExportShareControls
+          databaseId={selectedDatabaseId()!}
+          name={selectedDefinition()?.name ?? "Database"}
+          tableLabel={activeTable()}
+          columns={columns().map((column) => column.key)}
+          rows={visibleRecords()}
+          senderAgentId={props.bootstrap?.agents[0]?.agent_id ?? null}
+        />
+      </Show>
 
       <Show when={selectedProfilePlugin()?.toolbarKind === "wedding_run_sheet"}>
         <WeddingRunSheetIntelligencePanel
@@ -1092,7 +1133,7 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
 
       <DatabaseCreateDialog
         open={showDatabaseCreate()}
-        profiles={profiles()}
+        profiles={addableProfiles()}
         busy={databaseCreateBusy()}
         error={databaseCreateError()}
         onCancel={() => setShowDatabaseCreate(false)}
