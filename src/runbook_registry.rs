@@ -143,6 +143,16 @@ pub fn parse_definition_afp(owner: &str, message: &Value) -> Result<DefinitionRe
         .ok_or("invalid_message_id")?;
     let definition =
         parse_definition(&serde_json::to_vec(&message["content"]).map_err(|_| "invalid_content")?)?;
+    let expected_metadata = json!({
+        "store": true, "private": true, "runbook_id": definition.runbook_id,
+        "version": definition.version, "status": definition.status, "enabled": definition.enabled,
+    });
+    if message["metadata"] != expected_metadata
+        || message["supertags"] != json!(["runbook", "runbook_definition"])
+        || message["store_in_relational"] != true
+    {
+        return Err("definition_public_field_mismatch");
+    }
     if message["parent_id"] != json!(definition.supersedes_id)
         || message["thread_id"] != format!("runbook_definition:{}", definition.runbook_id)
         || message["metadata"]["runbook_id"] != definition.runbook_id

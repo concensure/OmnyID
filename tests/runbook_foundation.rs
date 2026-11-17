@@ -88,6 +88,9 @@ fn strict_round_trip_and_private_envelope() {
     assert!(!afp["metadata"].to_string().contains("Private description"));
     assert!(!afp["metadata"].to_string().contains("steps"));
     assert!(parse_definition_afp("bob", &afp).is_err());
+    let mut leaking = afp;
+    leaking["metadata"]["description"] = json!("Private description");
+    assert!(parse_definition_afp("alice", &leaking).is_err());
 }
 
 #[test]
