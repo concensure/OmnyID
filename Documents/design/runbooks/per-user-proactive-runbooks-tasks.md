@@ -33,8 +33,8 @@ only the typed definition and its revision reference, with no storage keys or
 provider credentials. Responses are no-store. No frontend control or first-run
 screen is wired yet; the setup endpoint copies the user's selected starters.
 
-The frozen runtime source candidate is `c811b1aceda5eb1c3d26232f6ea85ad09066c805`.
-All 18 focused integration tests and the library build completed in the clean exact-SHA worktree
+The frozen evidence source candidate is `44b4117562634eaac2e10314aa346fbc29c6daa6`.
+All 19 focused integration tests and the library build completed in the clean exact-SHA worktree
 `C:/temp/wt/omnyid-runbooks-verify-43d7c830` using Rust 1.95, two jobs,
 16 package codegen units, incremental compilation off and package debug info
 disabled. The project toolchain pin is unchanged; see the final handoff evidence.
@@ -158,11 +158,25 @@ Depends on: 1, 5
 Depends on: 4, 6
 
 - [ ] Add `src/runbook_evidence.rs` that resolves only typed source/entity references and bounded query limits.
-- [ ] Reuse State Synthesizer snapshots and `SynthesizerToMasterHandoff` where relevant instead of synthesizing a parallel state model.
+- [x] Reuse State Synthesizer snapshots and `SynthesizerToMasterHandoff` where relevant instead of synthesizing a parallel state model.
 - [ ] Reuse current metadata relevance/decrypt-budget rules before reading encrypted content.
-- [ ] Record included refs, omitted categories, missing required fields, snapshot ref, hashes, and confidence.
-- [ ] Reject unbounded history/RAG requests in a definition.
-- [ ] Add tests for reference-only retrieval, bounded counts, missing records, private records, decrypt budget, stale synthesis, and cross-user refs.
+- [x] Record included refs, omitted categories, missing required fields, snapshot ref, hashes, and confidence.
+- [x] Reject unbounded history/RAG requests in a definition.
+- [x] Add tests for reference-only retrieval, bounded counts, missing records, private records, decrypt budget, stale synthesis, and cross-user refs.
+
+Evidence continuation: `runbook_evidence.rs` resolves explicit `message:`,
+`private_message:` and `snapshot:` IDs under owner/account and record locks.
+Unsupported entity kinds are reported without querying or following links.
+Headers precede body reads; existing Watcher relevance gates encrypted reads.
+Caller budgets have hard caps of 32 references/decrypt attempts, 64 KiB per
+record and 256 KiB total fetched content/ciphertext. Attempts consume budget
+including decryption failures. Missing/foreign records are indistinguishable.
+Fresh State Synthesizer snapshots reuse the existing content and handoff types;
+stale snapshots and mismatched handoffs are omitted. Packet hashes, per-item
+hashes and explicit omissions/missing fields are returned to trusted executor
+code. Packet content is private data and conveys no authority. No packet
+persistence or runtime read-step binding is connected yet. The two open items
+above retain entity-specific resolution and account-level budget integration.
 
 ## 8. Policy, tools, and approval integration
 
