@@ -3717,3 +3717,17 @@ events; no history is deleted. There is no generic resume API capable of
 bypassing approval or epistemic answers. Timer delivery, retries/cooldowns,
 evidence resolution and external execution remain separate unfinished work.
 All operations remain disconnected from live HTTP ingress and daemon hooks.
+
+## WED-375 bounded evidence boundary - 2026-11-18
+
+Reference resolution uses exact owner-partitioned IDs in existing AFP tables,
+with no search, history scan, link expansion or cross-store fallback. Account
+and row locks protect erasure and concurrent modification. Watcher metadata
+relevance gates encrypted reads; trusted caller limits have hard count/byte/
+decrypt ceilings. Account budget integration remains pending.
+Fresh snapshots reuse StateSnapshotContent and SynthesizerToMasterHandoff;
+stale snapshots and mismatched handoffs are omissions. Evidence conveys no
+authority, including embedded instructions and claimed approvals. Presence
+checks only recognize non-null top-level facts: downstream operations must
+validate schemas and conflicts. Packet and item hashes are deterministic;
+private packet persistence and runtime binding remain pending.

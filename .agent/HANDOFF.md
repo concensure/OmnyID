@@ -9517,3 +9517,44 @@ The verification commands printed toplevel, exact HEAD and clean status before
 running. Focused rustfmt/diff checks completed. No toolchain pin changed. The
 dedicated database container was stopped after verification; no worktree was
 deleted. Subsequent documentation commits do not change the frozen code SHA.
+
+## WED-375 evidence continuation - 2026-11-18
+
+Implementation worktree: C:/temp/wt/omnyid-runbooks
+Branch: agent/codex/WED-375
+Frozen source: 44b4117562634eaac2e10314aa346fbc29c6daa6
+Clean verification worktree: C:/temp/wt/omnyid-runbooks-verify-43d7c830
+
+Added src/runbook_evidence.rs and tests/runbook_evidence_postgres.rs, exported
+in src/lib.rs and made the store encryption key crate-visible to the resolver.
+Exact message/private-message/snapshot references use owner scope, account and
+row locks, header-first reads, Watcher relevance before decryption and hard
+count/decrypt/byte budgets. No history/query fallback. Packets return included
+items and hashes, omissions, missing facts and existing fresh snapshot/handoff
+data. Unsupported entity kinds are explicit omissions. No authority is granted.
+
+Commands printed toplevel, full HEAD and clean status before each verification.
+Rust +1.95.0, CARGO_TARGET_DIR=C:/cargo-target, CARGO_INCREMENTAL=0, two jobs,
+package debug=0 and codegen-units=16 were used; repository pin unchanged.
+All 19 tests completed with zero failures:
+`cargo +1.95.0 test --test runbook_foundation --test runbook_storage_postgres
+ --test runbook_runtime_postgres --test runbook_evidence_postgres -j 2
+ --config 'profile.test.package.omnyid-homeserver.debug=0'
+ --config 'profile.test.package.omnyid-homeserver.codegen-units=16'`.
+TEST_DATABASE_URL targeted only disposable omnyid_test on localhost:55475.
+The library build completed on the same clean source commit:
+`cargo +1.95.0 build --lib -j 2
+ --config 'profile.dev.package.omnyid-homeserver.debug=0'
+ --config 'profile.dev.package.omnyid-homeserver.codegen-units=16'`.
+Focused rustfmt and git diff --check completed. The disposable container
+omnyid-runbook-wed375-pg was stopped. No worktree was deleted.
+
+Checklist: 38 complete, 79 unchecked out of 117 (four completed this turn).
+Remaining evidence work: entity adapters/account budgets, frozen runtime step
+selector binding and encrypted packet receipts. Then existing authority/tool
+intersection and approval AFP integration, before broader step execution or
+live hooks. No PR/cross-review or deployment: branch is local and available
+GitHub status still exposes unrelated old main CI and no deployments.
+Documentation commits follow the verified source and do not change its code.
+The first documentation command hit a Windows default-encoding read error
+before appending this handoff; UTF-8 append repaired the documentation step.
