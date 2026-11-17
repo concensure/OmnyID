@@ -309,7 +309,9 @@ impl RunbookRuntime<'_, '_> {
         if !latest_permits {
             effective.enabled = false;
         }
-        if latest.definition.max_autonomy == MaxAutonomy::ApprovalRequired {
+        if latest.definition.max_autonomy == MaxAutonomy::ApprovalRequired
+            && effective.max_autonomy == MaxAutonomy::Reversible
+        {
             effective.max_autonomy = MaxAutonomy::ApprovalRequired;
         }
         let decision = evaluate_tool_policy(

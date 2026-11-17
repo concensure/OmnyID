@@ -248,6 +248,33 @@ async fn atomic_policy_denial_review_replay_revocation_and_erasure() {
         assert!(!row.to_string().contains("test-secret-reference"));
         assert!(!row["metadata"].to_string().contains("gmail.send"));
     }
+    // A later definition may not expand the frozen instance's autonomy ceiling.
+    let registry = store.registry(&bob.id).await.unwrap();
+    let head = registry.get(&d.runbook_id).unwrap();
+    let mut limited = head.definition.clone();
+    limited.max_autonomy = MaxAutonomy::ObserveOnly;
+    store
+        .save(&bob.id, Some(&head.message_id), limited)
+        .await
+        .unwrap();
+    let limited_id = instance(&db, &runtime, &bob.id).await;
+    let registry = store.registry(&bob.id).await.unwrap();
+    let head = registry.get(&d.runbook_id).unwrap();
+    let mut expanded = head.definition.clone();
+    expanded.max_autonomy = MaxAutonomy::ApprovalRequired;
+    store
+        .save(&bob.id, Some(&head.message_id), expanded)
+        .await
+        .unwrap();
+    assert_eq!(
+        runtime
+            .check_tool_policy(&bob.id, &limited_id, &step, 2)
+            .await
+            .unwrap()
+            .decision
+            .reason,
+        "definition_autonomy_limit"
+    );
     db.delete_user_account_and_data(&alice.id, &alice.email, &[])
         .await
         .unwrap();
