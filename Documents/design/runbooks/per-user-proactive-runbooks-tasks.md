@@ -1,28 +1,90 @@
 # Per-User Proactive Runbooks — Development Tasks
 
-Task: WED-308
+Design task: WED-308
+Implementation task: WED-375
 Order: dependency order
 Rule: reuse the proactive/Watcher/Synthesizer/policy/approval stack; do not create a parallel event, authority, memory, or UI system.
+
+
+## Implementation checkpoint — 2026-11-18
+
+Worktree: `C:/temp/wt/omnyid-runbooks`, branch `agent/codex/WED-375`.
+Original design commit: `dcbe97eff14f2b62a582fe76d340db3f831d9528`.
+Application base: `5536b83b2f9d2f58488a075f383c24f8f4f73d6c`; Oracle's
+`SOURCE_COMMIT` returned this same SHA during read-only inspection. No
+`OMNYID_RUNBOOK*` settings were present in the deployed environment file.
+The newer application base deliberately supersedes the original WED-308 base
+so later production fixes remain in the implementation lineage.
+
+The strict contracts, validation, runtime AFP encoders/parsers, pure definition
+history projection, typed matcher and a bounded persisted-event adapter now
+exist in `src/runbook*.rs`. These modules are **not wired to live routes or the
+daemon**. The matcher produces a shadow plan, not an atomic dispatch receipt.
+The registry validates successor proposals; it does not persist them or claim
+concurrent-write safety. No global runtime definitions or new storage authority
+have been introduced.
+
+Existing regression locations inventoried for later integration are
+`src/proactive_engine.rs`, `src/background_watcher.rs`,
+`src/background_watcher_runtime.rs`, `src/proactive_heuristics_extended.rs`,
+`src/autonomy_policy.rs`, `src/proactive_provenance.rs`,
+`src/proactive_outcome_memory.rs`, `src/state_synthesizer_contract.rs`,
+`src/server/approval_surfaces.rs` and
+`src/server/proactive_routes/proactive_companion_storage.rs`. Owner-private
+storage is in `src/db.rs`; do not use `store_private_snapshot_message` for
+append-only definition/instance history because that API prunes older snapshots.
+Account erasure and authenticated storage integration still need dedicated
+integration tests when durable runbook writes are introduced.
+
+The frozen source candidate is `26d2e33c6a8de8bb829a0c2e378c4377daf3b5a5`.
+All 15 tests pass in an isolated source harness loading the six actual runbook
+modules and the unchanged regression file, with the real AFPMessage struct and
+its default protocol function extracted verbatim. Evidence is at
+`C:/temp/runbook-verification-26d2e33c/` with source hashes. The pinned Windows
+Rust 1.94 whole-crate build/check crashed with compiler access/privileged-instruction
+faults, including with incremental compilation disabled and debug info reduced.
+The isolated test result does not establish full application integration.
+The full library check, normal 15-test integration target and library build
+subsequently passed with the installed Rust 1.95 toolchain, incremental
+compilation disabled, and package debug information disabled for test/build.
+This supersedes the isolated-harness limitation for the foundation. The
+project's toolchain pin remains unchanged; see the handoff for exact commands.
+
+Stages 2–17 remain open except for the explicitly checked foundation items below.
+In particular, twelve starter workflows, owner-private atomic seed/successor
+writes, durable dispatch/step locks, complete event adapters, evidence resolution,
+policy/approval integration, execution, models, timers, outcomes, APIs/A2UI,
+erasure integration and rollout have **not** been implemented. Start the next
+slice with immutable starter definitions and atomic private-ledger seeding;
+never hook the matcher into ingress before the durable authority checks exist.
+
+Contract details: v1 requires a final `complete` step and at least one success
+criterion. Inputs are bounded selectors (`event.source_refs`, `event.entity_refs`,
+`state.snapshot_ref`, or an earlier `steps.<id>.output_refs`). Model steps require
+schema identifiers and explicit token/cost limits. Epistemic answer schemas use a
+reviewed enum rather than arbitrary executable JSON schema. Runtime AFP content
+is private plaintext **before** the existing private storage/encryption boundary;
+a `private` metadata flag is not encryption or authorization.
 
 ## 0. Freeze and inventory
 
 - [ ] Create the implementation worktree from the reviewed WED-308 documentation commit and record its full 40-character SHA.
-- [ ] Confirm the exact production SHA and current rollout flags before implementation.
-- [ ] Inventory active work that overlaps proactive routes, AFP message contracts, daemon scheduling, approval surfaces, A2UI, or migrations.
+- [x] Confirm the exact production SHA and current rollout flags before implementation.
+- [x] Inventory active work that overlaps proactive routes, AFP message contracts, daemon scheduling, approval surfaces, A2UI, or migrations.
 - [ ] Record current tests for passive-event ingestion, Watcher, heuristic packs, autonomy, provenance, outcomes, State Synthesizer, approval cards, and account erasure.
-- [ ] Keep all runbook execution flags false by default.
+- [x] Keep all runbook execution flags false by default.
 
 ## 1. Contract and validation module
 
 Depends on: 0
 
-- [ ] Add `src/runbook_contract.rs` with typed `RunbookDefinition`, trigger/filter, bounded step, success criterion, escalation, instance, trace, and epistemic escalation contracts.
-- [ ] Define reviewed enums for step kinds, filter operators, instance states, max autonomy, and escalation reasons; reject unknown values.
-- [ ] Enforce definition size, step count, per-step input, retry, follow-up, tool, and evidence limits.
-- [ ] Validate that every emitted follow-up type is declared and every tool step uses the definition allowlist.
-- [ ] Validate state transitions and prohibit terminal-state reopening.
-- [ ] Add AFP builders/parsers that preserve standard envelope fields, `parent_id`, references, supertags, searchable metadata, and private-content separation.
-- [ ] Add round-trip, malformed input, unknown field, oversized definition, invalid transition, and private-field leakage tests.
+- [x] Add `src/runbook_contract.rs` with typed `RunbookDefinition`, trigger/filter, bounded step, success criterion, escalation, instance, trace, and epistemic escalation contracts.
+- [x] Define reviewed enums for step kinds, filter operators, instance states, max autonomy, and escalation reasons; reject unknown values.
+- [x] Enforce definition size, step count, per-step input, retry, follow-up, tool, and evidence limits.
+- [x] Validate that every emitted follow-up type is declared and every tool step uses the definition allowlist.
+- [x] Validate state transitions and prohibit terminal-state reopening.
+- [x] Add AFP builders/parsers that preserve standard envelope fields, `parent_id`, references, supertags, searchable metadata, and private-content separation.
+- [x] Add round-trip, malformed input, unknown field, oversized definition, invalid transition, and private-field leakage tests.
 
 ## 2. Immutable starter templates and per-user seeding
 
@@ -61,12 +123,12 @@ Depends on: 1
 
 Depends on: 3, 4
 
-- [ ] Add `src/runbook_matcher.rs` with zero-model typed filter evaluation.
-- [ ] Implement stable ordering: priority descending, specificity descending, version descending, runbook ID ascending.
-- [ ] Select the first match per dedupe group plus independent definitions, capped at five instances per event.
-- [ ] Compute `instance_key = sha256(owner,event,definition,version)` and suppress retries with the same key.
+- [x] Add `src/runbook_matcher.rs` with zero-model typed filter evaluation.
+- [x] Implement stable ordering: priority descending, specificity descending, version descending, runbook ID ascending.
+- [x] Select the first match per dedupe group plus independent definitions, capped at five instances per event.
+- [x] Compute `instance_key = sha256(owner,event,definition,version)` and suppress retries with the same key.
 - [ ] Record matched/suppressed results as content-light AFP audit events.
-- [ ] Reuse relevant exact/range condition semantics from `proactive_engine.rs` without coupling execution to `ProactiveHeuristic`.
+- [x] Reuse relevant exact/range condition semantics from `proactive_engine.rs` without coupling execution to `ProactiveHeuristic`.
 - [ ] Add tests for correct match, no match, stable ties, dedupe group, duplicate delivery, cap, disabled/superseded definition, and user isolation.
 
 ## 6. Instance store and state machine

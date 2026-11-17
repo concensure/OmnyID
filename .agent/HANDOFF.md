@@ -9338,3 +9338,67 @@ production SHA `9a5ab87ccad1cccc263b4dc8c1066e3c85bb3eb9`.
 Next action: commit, create a clean detached checkout of the exact SHA, rebuild,
 deploy with the guarded Oracle helper, then verify runtime provenance, the three
 non-secret Sprout controls, public persona assets and hosted route boundaries.
+
+## 2026-11-18 - WED-375 Runbook implementation foundation (Codex, continuation required)
+
+Worktree `C:/temp/wt/omnyid-runbooks`, branch `agent/codex/WED-375`.
+Frozen application candidate: `26d2e33c6a8de8bb829a0c2e378c4377daf3b5a5`.
+Verification checkout: `C:/temp/wt/omnyid-runbooks-verify-43d7c830`, detached
+at the frozen candidate (the directory name reflects its earlier checkout).
+
+Located WED-308's design and dependency plan in `Documents/design/runbooks`;
+the actual design commit is `dcbe97eff14f2b62a582fe76d340db3f831d9528`.
+All implementation boxes were previously open. Continued from current application
+base `5536b83b2f9d2f58488a075f383c24f8f4f73d6c` to preserve later fixes.
+Read-only Oracle inspection returned that same source marker and no runbook
+settings. No deployment or remote publication occurred. The primary dirty
+checkout and other implementation branches were not changed.
+
+Changed: six new `src/runbook*.rs` modules, exports in `src/lib.rs`,
+`tests/runbook_foundation.rs`, the dependency plan and coordination records.
+Strict contracts reject unknown fields/enums, oversized/bad definitions,
+unallowlisted tools/follow-ups, unbounded/forward input selectors, invalid
+completion steps and terminal reopening. Private runtime AFP parsers/builders
+cover definitions, instances, traces and epistemic questions. Public metadata
+is exact and content-light. Definition projection rejects wrong recipients,
+parents, forks, missing versions, stale edits and reopened archives. Typed
+matching preserves stable priority/specificity/version/ID order, owner-bound
+hashes, group dedupe and five event slots even on retries. The stored-event
+adapter requires the trusted database partition and omits raw bodies/credentials.
+
+Verification:
+- Original 10-test whole-crate integration run passed at
+  `06f6df31912dc71dda7d58c110bb92340e64aaf0` (not evidence for later code).
+- All 15 tests pass for the frozen final source in an isolated source harness.
+  It loads the six actual production modules and unchanged test file, with the
+  actual AFPMessage struct/default_protocol function extracted verbatim from
+  message.rs. This verifies the new logic, not whole-application integration.
+  Harness, binary, test stdout and SHA-256 manifest are under
+  `C:/temp/runbook-verification-26d2e33c/`.
+- Changed Rust formatting, diff whitespace and file budgets pass; the largest
+  new file is the 565-line integration test, and source files are at most 280 lines.
+- Pinned Rust 1.94 full test/build and cargo check attempts crashed inside rustc
+  with STATUS_ACCESS_VIOLATION / STATUS_PRIVILEGED_INSTRUCTION, including with
+  incremental compilation off and per-package debug information disabled.
+  The installed Rust 1.95 full library check, normal 15-test integration target
+  and library build all completed successfully on the frozen final SHA. Commands:
+  `cargo +1.95.0 check --lib -j 8`,
+  `cargo +1.95.0 test --test runbook_foundation -j 8 --config 'profile.test.package.omnyid-homeserver.debug=0'`,
+  `cargo +1.95.0 build --lib -j 8 --config 'profile.dev.package.omnyid-homeserver.debug=0'`.
+  All used CARGO_TARGET_DIR=C:/cargo-target and CARGO_INCREMENTAL=0.
+  The normal integration run supersedes the narrower harness result. The
+  project's Rust 1.94 pin is unchanged and its compiler faults remain a caveat.
+- GitHub queries returned no deployments and only unrelated March main CI
+  failures. No CI authority exists for this unpublished task branch. No PR was
+  created because this local lineage was not published; cross-review is pending.
+
+Remaining: this is the contract and pure planning foundation, not a working
+runbook runtime. The registry builds successor proposals and the matcher builds
+shadow decisions; neither claims atomic writes or exactly-once dispatch. No
+new routes, daemon hooks, execution flags, model calls or tool calls exist.
+Implement starter templates and atomic owner-private seed/successor storage next,
+then continue stages 3–17 in dependency order: complete adapters, durable locks,
+bounded evidence, existing authority/approvals, execution, epistemic resume,
+model budgets, scheduled AFP events, provenance/outcomes, APIs/A2UI, erasure and
+rollout. Do not use the pruning private-snapshot API for append-only histories.
+User intent remains continuation of the remaining Runbook implementation.

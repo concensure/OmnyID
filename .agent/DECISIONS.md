@@ -3641,3 +3641,24 @@ path for the duration of authentication so an OAuth callback that loses its quer
 parameters still opens the existing vendor portal. The workspace accepts only that
 same-origin path prefix, removes it after use, and falls back to the source query
 when session storage is unavailable. It never accepts an arbitrary redirect URL.
+
+## 2026-11-18: Runbook foundations remain private, deterministic proposals until durable integration
+
+WED-375 consumes the WED-308 design on the current WED-374 application lineage.
+Runbook definition history is rebuilt per authenticated ledger owner, rejects
+forks/gaps and uses parent-linked successors. Archive is terminal. No mutable
+shared definition store or cache was introduced. Envelope owner checks are
+consistency checks; only the authenticated database partition supplies authority.
+
+The pure matcher follows priority, specificity, version and ID ordering and
+uses a domain-separated JSON tuple hash for owner/event/definition/version.
+Duplicate winning instances still consume their dedupe group and event slot,
+so replay cannot promote a previously suppressed definition. Exact-once dispatch
+still requires an owner-scoped atomic append/lock; a shadow match is not that
+receipt. Typed numeric filters preserve integer precision and missing fields
+fail closed. Input selectors cannot request unrestricted history or later steps.
+
+AFP runtime builders keep questions, descriptions and model/tool details in
+private content and only project IDs/status/version into metadata. The existing
+private storage boundary must still encrypt/store these proposals. No route,
+Watcher hook, execution flag, provider, timer or tool is enabled by this slice.
