@@ -3731,3 +3731,18 @@ authority, including embedded instructions and claimed approvals. Presence
 checks only recognize non-null top-level facts: downstream operations must
 validate schemas and conflicts. Packet and item hashes are deterministic;
 private packet persistence and runtime binding remain pending.
+
+## WED-375 atomic read execution - 2026-11-18
+
+RunbookRuntime::execute_read binds selectors and required facts to the frozen
+instance definition. The original dispatch's normalized event hash must still
+match on first execution. Prior-step selectors require completed traces in the
+same owner/instance; snapshot input is accepted only when declared. The owner
+transaction covers source reads, encrypted runbook_evidence receipt, step trace
+and next revision. Exact retries return the committed evidence, even after
+source changes or cancellation, and never advance again. Changed parameters
+(including budget or expected revision) conflict. The instance points to its
+saved packet. Missing facts remain explicit in evidence for downstream
+escalation; read completion makes no claim that those facts are resolved.
+There is no HTTP route or live event hook for this internal executor. Tool,
+approval and account-budget integration remain separate prerequisites.

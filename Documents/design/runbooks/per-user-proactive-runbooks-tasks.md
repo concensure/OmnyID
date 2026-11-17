@@ -33,8 +33,8 @@ only the typed definition and its revision reference, with no storage keys or
 provider credentials. Responses are no-store. No frontend control or first-run
 screen is wired yet; the setup endpoint copies the user's selected starters.
 
-The frozen evidence source candidate is `44b4117562634eaac2e10314aa346fbc29c6daa6`.
-All 19 focused integration tests and the library build completed in the clean exact-SHA worktree
+The frozen evidence source candidate is `51407f514eecc683fac3695c9005d731f4c72b76`.
+All 20 focused integration tests and the library build completed in the clean exact-SHA worktree
 `C:/temp/wt/omnyid-runbooks-verify-43d7c830` using Rust 1.95, two jobs,
 16 package codegen units, incremental compilation off and package debug info
 disabled. The project toolchain pin is unchanged; see the final handoff evidence.
@@ -51,8 +51,10 @@ Instance history, local read/transform result receipts, cancellation and wait
 expiry are implemented under the owner transaction lock. Exact step retries
 return their prior trace; changed inputs/outputs conflict. A wait's follow-up
 delivery time is distinct from its expiry deadline. Current disable/archive
-state blocks start and advancement. This is a persistence boundary for trusted
-executor code, not a tool executor, evidence resolver or authority grant.
+state blocks start and advancement. The local-result API is a persistence boundary for trusted executor code.
+The new internal `execute_read` path binds frozen definition selectors to
+owner-scoped evidence, encrypts the resulting receipt and advances atomically.
+It does not grant tool authority or wire live ingress.
 
 Stages 4–17 remain open except for checked items below. Complete adapters,
 remaining step-kind execution, bounded evidence, authority/approval integration,
@@ -81,8 +83,28 @@ a `private` metadata flag is not encryption or authorization.
 - [ ] Create the implementation worktree from the reviewed WED-308 documentation commit and record its full 40-character SHA.
 - [x] Confirm the exact production SHA and current rollout flags before implementation.
 - [x] Inventory active work that overlaps proactive routes, AFP message contracts, daemon scheduling, approval surfaces, A2UI, or migrations.
-- [ ] Record current tests for passive-event ingestion, Watcher, heuristic packs, autonomy, provenance, outcomes, State Synthesizer, approval cards, and account erasure.
+- [x] Record current tests for passive-event ingestion, Watcher, heuristic packs, autonomy, provenance, outcomes, State Synthesizer, approval cards, and account erasure.
 - [x] Keep all runbook execution flags false by default.
+
+Regression inventory (recorded, not a claim that all suites ran this turn):
+
+| Area | Existing regression location |
+| --- | --- |
+| Passive ingestion | `src/server/proactive_routes.rs::tests`, including `passive_event_route_sanitizes_message_construction_failures` |
+| Watcher | `src/background_watcher.rs::tests`, `src/background_watcher_runtime.rs::tests` |
+| Heuristic evaluation/packs | `src/proactive_engine.rs::tests` evaluates built-in heuristics; `src/proactive_heuristics_extended.rs` has no dedicated inline test module, a coverage gap for rollout |
+| Autonomy | `src/autonomy_policy.rs::tests` |
+| Provenance | `src/proactive_provenance.rs::tests` |
+| Outcomes | `src/proactive_outcome_memory.rs::tests` |
+| Synthesis | `src/state_synthesizer.rs::tests`, `src/state_synthesizer_contract.rs::tests` |
+| Approval cards | `src/server/approval_surfaces.rs::tests` |
+| Erasure | `tests/runbook_storage_postgres.rs`, `tests/runbook_runtime_postgres.rs`, `tests/runbook_evidence_postgres.rs` exercise `Db::delete_user_account_and_data`; private tenant persistence is also covered in `src/db/tenant_roundtrip.rs` |
+
+The current change ran the four runbook integration targets (20 tests), not
+all listed legacy unit suites. Later integrations must run the affected suites
+from a clean frozen worktree. A filtered unit-suite command is
+`cargo +1.95.0 test --lib <module_name>::tests` with the documented test-profile
+settings and disposable database when required.
 
 ## 1. Contract and validation module
 
@@ -174,8 +196,10 @@ including decryption failures. Missing/foreign records are indistinguishable.
 Fresh State Synthesizer snapshots reuse the existing content and handoff types;
 stale snapshots and mismatched handoffs are omitted. Packet hashes, per-item
 hashes and explicit omissions/missing fields are returned to trusted executor
-code. Packet content is private data and conveys no authority. No packet
-persistence or runtime read-step binding is connected yet. The two open items
+code. Packet content is private data and conveys no authority. Encrypted packet persistence and frozen runtime read-step binding now commit
+atomically with the trace and next instance revision. Exact request retries
+return the original saved packet even after source mutation or cancellation.
+Changed retry parameters conflict. No external execution is enabled. The two open items
 above retain entity-specific resolution and account-level budget integration.
 
 ## 8. Policy, tools, and approval integration

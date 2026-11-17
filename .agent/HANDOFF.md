@@ -9558,3 +9558,44 @@ GitHub status still exposes unrelated old main CI and no deployments.
 Documentation commits follow the verified source and do not change its code.
 The first documentation command hit a Windows default-encoding read error
 before appending this handoff; UTF-8 append repaired the documentation step.
+
+## WED-375 read executor continuation - 2026-11-18
+
+Worktree: C:/temp/wt/omnyid-runbooks; branch agent/codex/WED-375.
+Frozen source: 51407f514eecc683fac3695c9005d731f4c72b76
+Verification worktree: C:/temp/wt/omnyid-runbooks-verify-43d7c830.
+
+Added src/runbook_read.rs and exported it in src/lib.rs; extended encrypted
+record validation in src/runbook_store.rs. Refactored resolver and local step
+persistence into transaction-aware internal helpers in src/runbook_evidence.rs
+and src/runbook_runtime.rs. Added a PostgreSQL runtime scenario in
+ tests/runbook_runtime_postgres.rs. Evidence now commits atomically with its
+read trace and next revision using frozen selectors and a saved private receipt.
+Retries return original evidence and reject changed request parameters. Tests
+cover concurrent calls, invalid-budget rollback, undeclared snapshot refs,
+foreign ownership, encryption, source changes, terminal retry and event drift.
+
+Before tests/build, commands printed the verification path, full SHA above
+and clean status. With CARGO_TARGET_DIR=C:/cargo-target, CARGO_INCREMENTAL=0,
+Rust +1.95.0, -j 2, package debug=0 and codegen-units=16:
+`cargo +1.95.0 test --test runbook_foundation --test runbook_storage_postgres
+ --test runbook_runtime_postgres --test runbook_evidence_postgres -j 2
+ --config 'profile.test.package.omnyid-homeserver.debug=0'
+ --config 'profile.test.package.omnyid-homeserver.codegen-units=16'`
+completed all 20 tests. The disposable TEST_DATABASE_URL targeted omnyid_test
+on localhost:55475. `cargo +1.95.0 build --lib -j 2
+ --config 'profile.dev.package.omnyid-homeserver.debug=0'
+ --config 'profile.dev.package.omnyid-homeserver.codegen-units=16'`
+also completed. Focused rustfmt and diff checks completed; Rust pin unchanged.
+Disposable container omnyid-runbook-wed375-pg stopped after verification.
+No worktrees deleted. Documentation commits follow the verified source.
+
+Recorded the existing regression inventory in the task document; 39 of 117
+items complete, 78 unchecked. Read execution completes part of the larger
+all-step executor checkbox, which correctly remains open. Reviewed existing
+capability records, approval modes, autonomy overrides and global proactivity
+limits; policy integration was not implemented and remains the next task.
+Other prerequisites: entity-specific refs, account read/decrypt budget,
+remaining deterministic steps, epistemic escalation, approval/resume, timers,
+models, UI and rollout. No PR or deployment. GitHub still shows the old unrelated
+main CI failure and an empty deployment list; no current-branch remote checks.
