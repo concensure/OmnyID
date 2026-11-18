@@ -401,7 +401,7 @@ Depends on: 3, 6, 8, 10, 12
 
 Depends on: 2, 5–14
 
-- [ ] `no_reply_followup`: idle event -> bounded context -> draft -> approval -> permitted follow-up event.
+- [x] `no_reply_followup`: idle event -> bounded context -> draft -> approval -> permitted follow-up event.
 - [x] `calendar_conflict`: conflicting events -> alternatives -> epistemic question when priority is missing.
 - [ ] `vendor_quote_received`: quote event -> one normalization -> Documents/response projection -> separate booking approval.
 - [x] `quote_missing_items`: normalized gaps -> exact questions -> no send before approval.
@@ -670,3 +670,25 @@ approval consumption/resume remains part of the open deterministic executor and
 full authority/provenance work. These proposals do not authorize external actions.
 Provider tests use mocks; live owner inference resolution, approved tool execution,
 no-reply follow-up, Documents integration and hosted rollout remain open. No deploy.
+
+
+## Approval continuation checkpoint — 2026-11-19
+
+Six bounded implementation subtasks completed: strict private decision records;
+atomic approve/reject and exact replay; authenticated existing action-endpoint
+integration; approved private emission/follow-up/completion with decision-bound
+provenance; confirmed Decision Queue controls; adversarial runtime/API/browser
+tests. This closes one parent checklist entry, `no_reply_followup`, rather than
+six parent entries: **98 complete, 19 remaining of 117**.
+
+The starter test covers idle event, frozen bounded context, mock Draft, exact
+human approval, private emission, permitted scheduled event and completion.
+Concurrent decision retries return one receipt; stale, foreign, mismatched,
+cancelled and disabled approvals fail. Rejection remains possible after disable.
+A missing audit projection rolls back the decision, trace and instance writes.
+No external sending or live provider was used. General tool execution, inference
+integration, full provenance/tool coverage and hosted rollout remain open.
+
+Frozen candidate: `d8ebd36dbe2e53d1a83dcd7bbb9a85f9fa97e6af` in
+`C:/temp/wt/omnyid-runbooks-verify-43d7c830`. See the latest canonical handoff for
+verification results and unresolved repository release gates.

@@ -1,3 +1,24 @@
+## 2026-11-19: WED-375 approval permits private continuation only
+
+Runbook review decisions use the existing authenticated /actions/decision route.
+The owner must match the authenticated actor; approvals require a recent session,
+an exact instance revision and proposal target, and current enabled/autonomy
+policy. Runbook requests never enter the generic external-action executor.
+Rejection remains available after a definition is disabled.
+
+The encrypted decision AFP, canonical approval trace, provenance, instance
+transition, existing audit projection update and replay receipt commit in one
+owner-locked transaction. An exact retry returns its original decision; changing
+the target, revision or choice cannot reuse it. Missing pending audit projections
+roll back all writes. Rejection cancels the run and outstanding follow-ups.
+Approval advances only private preparation. Emit and Complete require the saved
+approval evidence; provenance hashes the actual verified decision content.
+
+Decision Queue presents explicit approve/reject confirmations and the saved
+review status. Stale responses require refresh, and account switching clears
+private previews and confirmations. No live inference, provider dispatch,
+send, publish, booking or external retry authority is introduced.
+
 ## 2026-11-18: WED-375 private starter review gates
 
 Reuse the existing action AFP, approval_surfaces builder, action audit projection

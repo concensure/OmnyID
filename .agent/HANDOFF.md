@@ -1,3 +1,65 @@
+## 2026-11-19: WED-375 six approval-continuation subtasks verified
+
+Implementation worktree: `C:/temp/wt/omnyid-runbooks`, branch `agent/codex/WED-375`.
+Frozen candidate: `d8ebd36dbe2e53d1a83dcd7bbb9a85f9fa97e6af`.
+Verification worktree: `C:/temp/wt/omnyid-runbooks-verify-43d7c830` (clean detached).
+
+Completed six bounded subtasks: strict decision contract; atomic approve/reject
+and replay; existing authenticated action endpoint integration; private approved
+emission, follow-up and completion; Decision Queue confirmations/status; backend
+and browser adversarial coverage. This closes one parent entry, no_reply_followup:
+**98 complete / 19 remaining of 117**. General tool execution, inference, full
+executor/provenance coverage and hosted rollout remain open.
+
+Changed: new src/runbook_review_decision.rs and src/runbook_review_emit.rs;
+runbook store, activity, completion, emission and provenance modules; lib module
+registration; server runbook_routes.rs plus one hook in server/mod.rs and an
+optional request revision in types.rs; RunbookPanel, runbookState, browser tests;
+runbook_api_postgres and runbook_starters_postgres; canonical task/decision notes
+and the design checklist. No migration/dependency/sitemap changes.
+
+Decisions bind authenticated owner, exact proposal, revision and current policy.
+Approvals require recent sessions. A single owner transaction persists decision,
+trace, actual-content provenance, instance change and audit projection; missing
+pending projections roll everything back. Exact concurrent retries return the
+same receipt. Rejection cancels the run even when its definition is disabled.
+Private emission/completion require approved evidence. No external action is
+authorized, and the generic provider executor is never called for these reviews.
+
+Final candidate verification performed locally, after printing worktree, full SHA
+and clean status:
+- 74 Rust tests across the 17 runbook integration binaries; library build.
+- TypeScript noEmit; 11 state/navigation tests; all 12 Playwright scenarios,
+  including approval/rejection, stale refresh, account switch, responsive layout
+  and existing accessibility checks; Vite production build.
+- git diff --check.
+
+Rust 1.95.0, CARGO_TARGET_DIR=C:/cargo-target, incremental off,
+RUST_MIN_STACK=67108864, -j1, package debug=0/codegen-units=8 for test/dev.
+Docker was initially stopped; Docker Desktop and the isolated
+omnyid-runbook-wed375-pg database were started for verification. The disposable
+database is stopped after the checks. No production environment was changed.
+
+Earlier candidate a7fdb3d2636e4ef30fe785367bfa377ecb6bc1d9 passed the backend
+suite, but one browser test incorrectly tried another decision while stale-error
+controls were disabled. The test now verifies the disabled state and refreshes
+before reopening confirmation. All final checks above were rerun on d8ebd36d.
+Earlier candidate evidence is not the final build provenance.
+
+Unresolved: global line-budget gate still fails on src/server/mod.rs
+45734/45717 (one hook line added this batch; prior 45733) and src/db.rs
+18045/17986 (unchanged). Vite retains existing screen/chunk warnings. No broad
+Wedding suite or full approval/Watcher/Synthesizer suite was claimed; the parent
+release-verification entry remains open. GitHub run/deployment queries returned
+no records for this branch. Origin remains the unrelated public-history remote;
+a suitable production-lineage PR base is unavailable, so no PR or push was made.
+No deployment, live provider evaluation, Caddy change or production-health claim.
+
+Next: implement strict tool schema/result validation and existing dispatch behind
+separate action authority; then provider inference/ceilings and Documents
+projection. Use the frozen verification SHA for any inspection of this candidate;
+the implementation branch also contains subsequent documentation-only commits.
+
 ## 2026-11-18: WED-375 six starter/review entries verified
 
 Implementation worktree: `C:/temp/wt/omnyid-runbooks`, branch `agent/codex/WED-375`.
