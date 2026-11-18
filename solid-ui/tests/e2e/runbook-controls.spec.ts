@@ -1,18 +1,19 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 
-async function fixtures(page: Page, options: { empty?: boolean; conflict?: boolean; off?: boolean; review?: boolean; approval?: boolean } = {}) {
+async function fixtures(page: Page, options: { empty?: boolean; conflict?: boolean; off?: boolean; review?: boolean; approval?: boolean; decisions?: boolean } = {}) {
   let installed = !options.empty;
   let enabled = false;
   let status = options.approval ? "awaiting_approval" : options.review ? "completed" : "waiting_for_input";
   let revision = 4;
+  let decisionStatus = "pending";
   let exportRequests = 0;
   const writes: {path:string;body:unknown}[] = [];
   const definition = () => ({runbook_id:"calendar_conflict",name:"Calendar conflict",version:1,message_id:"head1",enabled,status:"active",trigger_types:["calendar_conflict"]});
-  const activity = () => ({instance:{instance_id:"i1",runbook_id:"calendar_conflict",revision,status},
+  const activity = () => ({review_actor: options.decisions ? "owner1" : undefined, instance:{instance_id:"i1",runbook_id:"calendar_conflict",revision,status},
     reviews: options.review ? [{id:"review1",trace_id:"emit1",title:"Review budget exposure",
       summary_lines:["Recorded commitments exceed the supplied budget.","No spending has been authorised.","<img src=x onerror=alert(1)>"],source_refs:["private_message:transform1"]}] : [],
-    approval_requests: options.approval ? [{action_ref:"action1",approval_review:{title:"Review calendar proposal",draft_preview:{label:"Private proposal",content_type:"text",content:"Proposed time: 11:15 to 12:15. Availability needs checking."},requires_human_review:true,consequence_summary_lines:["<img src=x onerror=alert(1)>"],source_refs:["private_message:transform1"]}}] : [],
+    approval_requests: options.approval ? [{action_ref:"action1",status:options.decisions ? decisionStatus : undefined,approval_review:{title:"Review calendar proposal",draft_preview:{label:"Private proposal",content_type:"text",content:"Proposed time: 11:15 to 12:15. Availability needs checking."},requires_human_review:true,consequence_summary_lines:["<img src=x onerror=alert(1)>"],source_refs:["private_message:transform1"]}}] : [],
     questions: status === "waiting_for_input" ? [{escalation_id:"q1",instance_id:"i1",step_id:"review",status:"open",
       question:"Which event has priority?",why_needed:"Your priority is needed to compare alternatives.",missing_fields:["priority"],
       attempted_refs:["message:calendar1"],answer_schema:"short_text",expires_at:"2099-01-01T00:00:00Z"}] : [],
@@ -34,6 +35,12 @@ async function fixtures(page: Page, options: { empty?: boolean; conflict?: boole
     if(path.endsWith("/starters")) return route.fulfill({json:{starters:[definition()]}});
     if(path.endsWith("/instances")) return route.fulfill({json:{activities:installed?[activity()]:[],truncated:false}});
     return route.fulfill({json:{definitions:installed?[definition()]:[],execution_available:false}});
+  });
+  await page.route("**/actions/decision", async route => {
+    const body=route.request().postDataJSON(); writes.push({path:new URL(route.request().url()).pathname,body});
+    if(options.conflict) return route.fulfill({status:409,body:"PRIVATE_ERROR_BODY"});
+    decisionStatus=body.decision; status=body.decision==="approved"?"running":"cancelled";revision++;
+    return route.fulfill({json:{success:true,external_execution_authorized:false}});
   });
   return { writes, exports:()=>exportRequests };
 }
@@ -165,5 +172,31 @@ test("approval proposals reuse the review surface without execution controls",as
   const audit=await new AxeBuilder({page}).analyze();
   expect(audit.violations.filter(v=>v.impact==="serious"||v.impact==="critical")).toEqual([]);
   await page.evaluate(()=>window.dispatchEvent(new Event("omnyid:session-changed")));
+  await expect(page.getByText("Review calendar proposal",{exact:true})).toHaveCount(0);
+});
+
+for(const decision of ["approved","rejected"] as const) {
+  test(`private review ${decision} requires confirmation and exact target`,async({page})=>{
+    const state=await fixtures(page,{approval:true,decisions:true});
+    await page.goto("/workspace/e2e/runbook-controls.html?questions");
+    await page.getByRole("button",{name:decision==="approved"?"Approve review…":"Reject review…",exact:true}).click();
+    expect(state.writes).toEqual([]);
+    await page.getByRole("dialog").getByRole("button",{name:decision==="approved"?"Approve private review":"Reject private review",exact:true}).click();
+    await expect(page.getByText(`Review decision: ${decision}`,{exact:true})).toBeVisible();
+    expect(state.writes).toEqual([{path:"/actions/decision",body:{thread_id:"runbook:i1",target_message_id:"action1",decision,decided_by:"owner1",capability_id:"runbook.review",runbook_revision:4}}]);
+    await expect(page.getByRole("button",{name:"Approve review…",exact:true})).toHaveCount(0);
+  });
+}
+test("stale review leaves pending state and account switch clears confirmation",async({page})=>{
+  await fixtures(page,{approval:true,decisions:true,conflict:true});
+  await page.goto("/workspace/e2e/runbook-controls.html?questions");
+  await page.getByRole("button",{name:"Approve review…",exact:true}).click();
+  await page.getByRole("button",{name:"Approve private review",exact:true}).click();
+  await expect(page.getByText("Review decision: pending",{exact:true})).toBeVisible();
+  await expect(page.getByText("PRIVATE_ERROR_BODY")).toHaveCount(0);
+  await page.getByRole("button",{name:"Reject review…",exact:true}).click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await page.evaluate(()=>window.dispatchEvent(new Event("omnyid:session-changed")));
+  await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.getByText("Review calendar proposal",{exact:true})).toHaveCount(0);
 });

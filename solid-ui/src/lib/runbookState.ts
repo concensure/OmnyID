@@ -12,7 +12,8 @@ export type RunbookQuestion = {
 export type RunbookActivity = {
   instance: { instance_id: string; runbook_id: string; status: string; revision: number;
     next_follow_up_at?: string | null; current_step_id?: string | null };
-  approval_requests?: { action_ref: string; approval_review: ApprovalReviewLike }[];
+  review_actor?: string;
+  approval_requests?: { action_ref: string; status?: "pending" | "approved" | "rejected" | "cancelled"; approval_review: ApprovalReviewLike }[];
   reviews?: { id: string; trace_id: string; title: string; summary_lines: string[]; source_refs: string[] }[];
   questions: RunbookQuestion[];
   traces: { trace_id: string; step_id: string; kind: string; status: string;

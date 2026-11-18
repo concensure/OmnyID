@@ -101,6 +101,7 @@ pub(super) struct TrialSessionStateQuery {
 
 #[derive(serde::Deserialize)]
 pub(super) struct ApprovalDecisionRequest {
+    pub(super) runbook_revision: Option<u32>,
     pub(super) thread_id: String,
     pub(super) target_message_id: String,
     pub(super) decision: String,

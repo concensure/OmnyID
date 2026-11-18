@@ -1,15 +1,15 @@
 //! Append-only runbook definitions in the existing authenticated owner's private ledger.
 //! Callers supply an authenticated account ID, never an owner from request content.
 use crate::runbook_contract::{Result, RunbookDefinition};
-use crate::runbook_registry::{Registry, build_definition_afp};
-use crate::runbook_starter_pack::{STARTER_PACK_VERSION, selected_starters};
+use crate::runbook_registry::{build_definition_afp, Registry};
+use crate::runbook_starter_pack::{selected_starters, STARTER_PACK_VERSION};
 use crate::{
     crypto,
-    db::{Db, tenant_schema_name},
+    db::{tenant_schema_name, Db},
     message::AFPMessage,
 };
 use chrono::{DateTime, SecondsFormat, Utc};
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use sqlx::{Postgres, Row, Transaction};
 
@@ -279,6 +279,10 @@ pub(crate) fn digest(value: &Value) -> String {
 
 fn validate_record(owner: &str, value: &Value) -> Result<()> {
     match value["type"].as_str() {
+        Some("runbook_review_decision") => crate::runbook_review_decision::validate(owner, value)?,
+        Some("action") if value["subtype"] == "approval_decision" => {
+            crate::runbook_review_decision::validate(owner, value)?
+        }
         Some("action" | "runbook_review_gate") => {
             crate::runbook_review_gate::validate(owner, value)?
         }

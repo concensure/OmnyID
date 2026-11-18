@@ -158,6 +158,17 @@ export function RunbookPanel(props: { mode?: "manage" | "questions" | "activity"
           <ApprovalReviewSummary approvalReview={proposal.approval_review} />
           <p class="break-all text-sm">Review proposal: {proposal.action_ref}</p>
           <p class="text-sm">Reviewing this proposal does not send or publish anything.</p>
+          <Show when={proposal.status}><p class="text-sm">Review decision: {proposal.status}</p></Show>
+          <Show when={proposal.status === "pending" && a.instance.status === "awaiting_approval" && runbookIdentifier(a.review_actor)}>
+            <div class="flex flex-wrap gap-2"><For each={["approved", "rejected"] as const}>{decision =>
+              <button type="button" class={buttonClass} disabled={busy() || loading() || !!error()} onClick={() => request(
+                () => apiFetch("/actions/decision", {method:"POST",bodyJson:{thread_id:`runbook:${a.instance.instance_id}`,target_message_id:proposal.action_ref,
+                  decision,decided_by:a.review_actor,capability_id:"runbook.review",runbook_revision:a.instance.revision}}),
+                decision === "approved" ? "Approve this private review?" : "Reject this private review?",
+                decision === "approved" ? "Records your decision and lets private preparation continue. It does not send, publish, book or retry anything." : "Stops this run and retains its private evidence.",
+                decision === "approved" ? "Approve private review" : "Reject private review")}>{decision === "approved" ? "Approve review…" : "Reject review…"}</button>
+            }</For></div>
+          </Show>
         </section>}</For>
         <For each={a.reviews ?? []}>{review => <section class="min-w-0 space-y-2 rounded-lg border border-slate-300 bg-slate-50 p-3" aria-label={review.title}>
           <h4 class="break-words font-semibold">{review.title}</h4>

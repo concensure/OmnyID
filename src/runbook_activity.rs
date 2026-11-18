@@ -1,11 +1,11 @@
 //! Bounded owner-scoped projections. Raw evidence, answers and definitions are
 //! intentionally absent; questions expose only the fields required to answer.
 use crate::{
-    runbook_afp::{RuntimeRecord, parse_runtime_afp},
+    runbook_afp::{parse_runtime_afp, RuntimeRecord},
     runbook_contract::*,
     runbook_runtime::RunbookRuntime,
 };
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use std::collections::BTreeMap;
 
 impl RunbookRuntime<'_, '_> {
@@ -149,7 +149,24 @@ impl RunbookRuntime<'_, '_> {
             if receipt.trace.output_hash != Some(crate::runbook_store::digest(&action["content"])) {
                 return Err("review_action_mismatch");
             }
-            approval_requests.push(json!({"action_ref":receipt.action_ref,"approval_review":action["content"]["approval_review"]}));
+            let rid = crate::runbook_review_decision::receipt_id(owner, &receipt.action_ref);
+            let resolved = self
+                .store
+                .read_kind(owner, "runbook_review_decision", Some(&rid), None, tx)
+                .await?
+                .pop();
+            let status = if let Some(v) = resolved {
+                json!(
+                    crate::runbook_review_decision::parse(owner, &v)?
+                        .request
+                        .decision
+                )
+            } else if current.instance.status == InstanceState::AwaitingApproval {
+                json!("pending")
+            } else {
+                json!("cancelled")
+            };
+            approval_requests.push(json!({"action_ref":receipt.action_ref,"status":status,"approval_review":action["content"]["approval_review"]}));
             if approval_requests.len() > MAX_STEPS {
                 return Err("review_limit");
             }
@@ -158,7 +175,7 @@ impl RunbookRuntime<'_, '_> {
         let mut result = json!({"instance":{"instance_id":i.instance_id,"runbook_id":i.runbook_id,"runbook_version":i.runbook_version,
             "status":i.status,"revision":i.revision,"current_step_id":i.current_step_id,"completed_step_ids":i.completed_step_ids,
             "next_follow_up_at":i.next_follow_up_at,"wait_expires_at":i.wait_expires_at},
-            "approval_requests":approval_requests,"reviews":reviews,"traces":traces,"questions":questions.into_values().collect::<Vec<_>>(),"execution_available":false});
+            "review_actor":owner,"approval_requests":approval_requests,"reviews":reviews,"traces":traces,"questions":questions.into_values().collect::<Vec<_>>(),"execution_available":false});
         if i.status == InstanceState::WaitingForBudget {
             result["budget"] = json!(
                 self.model_budget_in(owner, &i, chrono::Utc::now(), tx)

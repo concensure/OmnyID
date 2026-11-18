@@ -1,9 +1,9 @@
 //! Owner-authenticated definition management. This flag never starts execution.
 use super::*;
 use crate::runbook_contract::RunbookDefinition;
-use crate::runbook_starter_pack::{STARTER_PACK_VERSION, starter_definitions};
+use crate::runbook_starter_pack::{starter_definitions, STARTER_PACK_VERSION};
 use crate::runbook_store::RunbookStore;
-use axum::http::{HeaderValue, header};
+use axum::http::{header, HeaderValue};
 use chrono::Utc;
 use serde::Deserialize;
 
@@ -360,4 +360,56 @@ async fn outcome(
         .await
         .map_err(error)?;
     Ok(Json(json!({"receipt":receipt,"authority":"feedback_only"})))
+}
+
+// Existing /actions/decision boundary; never forward Runbook reviews to a provider.
+pub(super) async fn decide_review(
+    state: &AppState,
+    headers: &HeaderMap,
+    user: &str,
+    session: &AuthSessionRecord,
+    request: &ApprovalDecisionRequest,
+) -> Result<Option<Value>, ApiError> {
+    let Some(instance) = request.thread_id.strip_prefix("runbook:") else {
+        if request.runbook_revision.is_some()
+            || request.capability_id.as_deref() == Some("runbook.review")
+        {
+            return Err(error("invalid_review_target"));
+        }
+        return Ok(None);
+    };
+    let authenticated = owner(state, headers).await?;
+    if authenticated != user
+        || request.decided_by != user
+        || request.note.is_some()
+        || request.capability_id.as_deref() != Some("runbook.review")
+    {
+        return Err(error("invalid_review_actor"));
+    }
+    let decision = match request.decision.as_str() {
+        "approved" => {
+            require_recent_high_risk_session(session)?;
+            crate::runbook_review_decision::ReviewDecision::Approved
+        }
+        "rejected" => crate::runbook_review_decision::ReviewDecision::Rejected,
+        _ => return Err(error("invalid_review_decision")),
+    };
+    let store = store(state)?;
+    let receipt = crate::runbook_runtime::RunbookRuntime::new(&store)
+        .decide_review(
+            user,
+            instance,
+            &crate::runbook_review_decision::ReviewDecisionRequest {
+                action_ref: request.target_message_id.clone(),
+                expected_revision: request
+                    .runbook_revision
+                    .ok_or_else(|| error("stale_revision"))?,
+                decision,
+            },
+        )
+        .await
+        .map_err(error)?;
+    Ok(Some(
+        json!({"success":true,"message_id":receipt.decision_ref,"external_execution_authorized":false}),
+    ))
 }

@@ -3522,6 +3522,7 @@ async fn record_action_decision_http(
     Json(request): Json<ApprovalDecisionRequest>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let (user, session) = authenticated_user_and_session(&state.db, &headers).await?;
+    if let Some(result) = runbook_routes::decide_review(&state, &headers, &user.id, &session, &request).await? { return Ok(Json(result)); }
     let normalized_decision = request.decision.trim().to_lowercase();
     let action_status = match normalized_decision.as_str() {
         "approved" => ActionStatus::Approved,

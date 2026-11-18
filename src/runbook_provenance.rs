@@ -6,7 +6,7 @@ use crate::{
     runbook_runtime::RunbookRuntime,
     runbook_store::digest,
 };
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use sqlx::{Postgres, Transaction};
 
 impl RunbookRuntime<'_, '_> {
@@ -54,6 +54,21 @@ impl RunbookRuntime<'_, '_> {
             label: label.into(),
             sha256,
         };
+        let approval_hash = if let Some(reference) = &trace.approval_ref {
+            let approval = self
+                .store
+                .read_kind(owner, "action", Some(reference), None, tx)
+                .await?
+                .pop()
+                .ok_or("approval_evidence_missing")?;
+            crate::runbook_review_decision::validate(owner, &approval)?;
+            if approval["thread_id"] != instance.thread_id {
+                return Err("approval_instance_mismatch");
+            }
+            digest(&approval["content"])
+        } else {
+            digest(&Value::Null)
+        };
         let inputs = vec![
             hash("definition", digest(&json!(definition))),
             hash("trigger", trigger_hash.into()),
@@ -62,9 +77,8 @@ impl RunbookRuntime<'_, '_> {
                 packet_hash.unwrap_or_else(|| digest(&Value::Null)),
             ),
             hash("step_input", trace.input_hash.clone()),
-            // Current executors have no approval grant. Hash explicit absence;
-            // future approval execution must resolve/hash its actual authority.
-            hash("approval", digest(&json!(trace.approval_ref))),
+            // Bind the actual verified private decision, or explicit absence.
+            hash("approval", approval_hash),
         ];
         let outputs = trace
             .output_hash

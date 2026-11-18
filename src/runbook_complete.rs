@@ -1,14 +1,14 @@
 //! Completion derives its context exclusively from committed owner-bound traces.
 //! Unknown or unavailable outputs fail criteria; callers cannot assert success.
 use crate::{
-    runbook_afp::{RuntimeRecord, build_runtime_afp, parse_runtime_afp},
+    runbook_afp::{build_runtime_afp, parse_runtime_afp, RuntimeRecord},
     runbook_contract::*,
     runbook_matcher::filter_matches,
     runbook_runtime::RunbookRuntime,
     runbook_store::digest,
 };
 use chrono::Utc;
-use serde_json::{Map, json};
+use serde_json::{json, Map};
 
 impl RunbookRuntime<'_, '_> {
     pub async fn complete(
@@ -160,6 +160,32 @@ impl RunbookRuntime<'_, '_> {
                 let receipt = crate::runbook_model_runtime::parse_receipt(owner, &value)?;
                 if !receipt.applied || receipt.trace != t {
                     return Err("model_trace_mismatch");
+                }
+            }
+            if prior_step.kind == StepKind::Approval {
+                let action = t.approval_ref.as_ref().ok_or("approval_required")?;
+                let value = self
+                    .store
+                    .read_kind(owner, "action", Some(action), None, &mut tx)
+                    .await?
+                    .pop()
+                    .ok_or("approval_required")?;
+                crate::runbook_review_decision::validate(owner, &value)?;
+                if value["content"]["decision"] != "approved"
+                    || t.output_hash != Some(digest(&value["content"]))
+                {
+                    return Err("approval_trace_mismatch");
+                }
+                let target = value["parent_id"].as_str().ok_or("approval_required")?;
+                let rid = crate::runbook_review_decision::receipt_id(owner, target);
+                let r = self
+                    .store
+                    .read_kind(owner, "runbook_review_decision", Some(&rid), None, &mut tx)
+                    .await?
+                    .pop()
+                    .ok_or("approval_required")?;
+                if crate::runbook_review_decision::parse(owner, &r)?.trace != t {
+                    return Err("approval_trace_mismatch");
                 }
             }
             if prior_step.kind == StepKind::Emit {

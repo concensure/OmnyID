@@ -10,7 +10,7 @@ use crate::{
 };
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
@@ -21,6 +21,8 @@ pub struct EmissionReceipt {
     pub transform_ref: String,
     #[serde(default)]
     pub answer_ref: Option<String>,
+    #[serde(default)]
+    pub approval_ref: Option<String>,
     pub suggestion_ref: String,
     pub trace: StepTrace,
 }
@@ -198,6 +200,13 @@ impl RunbookRuntime<'_, '_> {
             .checked_sub(1)
             .and_then(|i| definition.steps.get(i))
             .ok_or("transform_required")?;
+        if prior.kind == StepKind::Approval {
+            let receipt = self
+                .emit_approved_in(owner, &current, &definition, index, request_hash, &mut tx)
+                .await?;
+            tx.commit().await.map_err(|_| "storage_unavailable")?;
+            return Ok(receipt);
+        }
         if prior.kind != StepKind::Transform
             || step.input_refs != vec![format!("steps.{}.output_refs", prior.step_id)]
         {
@@ -301,6 +310,7 @@ impl RunbookRuntime<'_, '_> {
             request_hash,
             transform_ref,
             answer_ref,
+            approval_ref: None,
             suggestion_ref,
             trace,
         };
@@ -420,9 +430,17 @@ pub(crate) fn validate_receipt(owner: &str, value: &Value) -> Result<EmissionRec
         || r.trace.status != TraceStatus::Completed
         || r.trace.output_refs != vec![format!("private_message:{}", r.suggestion_ref)]
         || r.answer_ref.as_deref().is_some_and(|s| !identifier(s))
+        || r.approval_ref.as_deref().is_some_and(|s| !identifier(s))
+        || r.approval_ref != r.trace.approval_ref
+        || (r.approval_ref.is_some() && r.answer_ref.is_some())
         || r.trace.input_refs
             != std::iter::once(format!("private_message:{}", r.transform_ref))
                 .chain(r.answer_ref.iter().map(|s| format!("private_message:{s}")))
+                .chain(
+                    r.approval_ref
+                        .iter()
+                        .map(|s| format!("private_message:{s}")),
+                )
                 .collect::<Vec<_>>()
     {
         return Err("invalid_emission");

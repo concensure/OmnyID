@@ -10,7 +10,7 @@ use omnyid_homeserver::{
     runbook_starter_pack::starter_definitions,
     runbook_store::RunbookStore,
 };
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use ulid::Ulid;
 
@@ -138,12 +138,10 @@ async fn gate(runtime: &RunbookRuntime<'_, '_>, db: &Db, owner: &str, id: &str, 
         runtime.instance(owner, id).await.unwrap().instance.status,
         InstanceState::AwaitingApproval
     );
-    assert!(
-        runtime
-            .emit_review(owner, id, "surface", rev + 1)
-            .await
-            .is_err()
-    );
+    assert!(runtime
+        .emit_review(owner, id, "surface", rev + 1)
+        .await
+        .is_err());
     assert!(runtime.complete(owner, id, rev + 1).await.is_err());
     let activity = runtime.activity(owner, id).await.unwrap();
     assert_eq!(activity["approval_requests"].as_array().unwrap().len(), 1);
@@ -253,12 +251,10 @@ async fn calendar_conflict_requires_priority_then_proposes_bounded_nonwriting_al
         result.result.conclusions["calendar_write_authorized"],
         false
     );
-    assert!(
-        runtime
-            .request_review(&foreign.id, &id, "review_consequence", 6)
-            .await
-            .is_err()
-    );
+    assert!(runtime
+        .request_review(&foreign.id, &id, "review_consequence", 6)
+        .await
+        .is_err());
     gate(&runtime, &db, &owner.id, &id, 6).await;
     erase(&db, &owner).await;
     erase(&db, &foreign).await;
@@ -333,12 +329,10 @@ async fn rsvp_permission_and_attendance_gate_drafts_before_any_provider_or_appro
         } else {
             assert_eq!(result.unwrap_err(), "draft_not_permitted_by_evidence");
             assert_eq!(provider.calls.load(Ordering::SeqCst), 0);
-            assert!(
-                runtime
-                    .request_review(&owner.id, &id, "review_consequence", 4)
-                    .await
-                    .is_err()
-            );
+            assert!(runtime
+                .request_review(&owner.id, &id, "review_consequence", 4)
+                .await
+                .is_err());
         }
     }
     erase(&db, &owner).await;
@@ -359,12 +353,10 @@ async fn quote_gaps_draft_only_exact_registry_questions_and_never_send() {
             .execute_transform(&owner.id, &id, "assess", 3)
             .await
             .unwrap();
-        assert!(
-            !r.result.conclusions["clarification_candidates"]
-                .as_array()
-                .unwrap()
-                .is_empty()
-        );
+        assert!(!r.result.conclusions["clarification_candidates"]
+            .as_array()
+            .unwrap()
+            .is_empty());
         let provider = Draft {
             calls: AtomicUsize::new(0),
             alter_questions: altered,
@@ -376,12 +368,10 @@ async fn quote_gaps_draft_only_exact_registry_questions_and_never_send() {
         if altered {
             assert!(!model.applied);
             assert_eq!(model.evaluation.failure, Some(ModelFailure::InvalidSchema));
-            assert!(
-                runtime
-                    .request_review(&owner.id, &id, "review_consequence", 5)
-                    .await
-                    .is_err()
-            );
+            assert!(runtime
+                .request_review(&owner.id, &id, "review_consequence", 5)
+                .await
+                .is_err());
         } else {
             assert!(model.applied);
             gate(&runtime, &db, &owner.id, &id, 5).await;
@@ -489,12 +479,10 @@ async fn runsheet_rejects_cross_scope_and_broken_history() {
         }
         let after = message(&db, &owner.id, snapshot).await;
         let id=start(&db,&owner.id,"runsheet_change",json!({"previous_version_ref":before,"current_version_ref":after,"affected_viewers":[],"source_refs":[before,after]})).await;
-        assert!(
-            runtime
-                .execute_transform(&owner.id, &id, "assess", 3)
-                .await
-                .is_err()
-        );
+        assert!(runtime
+            .execute_transform(&owner.id, &id, "assess", 3)
+            .await
+            .is_err());
         assert_eq!(
             runtime
                 .instance(&owner.id, &id)
@@ -504,12 +492,10 @@ async fn runsheet_rejects_cross_scope_and_broken_history() {
                 .revision,
             3
         );
-        assert!(
-            runtime
-                .request_review(&owner.id, &id, "review_consequence", 3)
-                .await
-                .is_err()
-        );
+        assert!(runtime
+            .request_review(&owner.id, &id, "review_consequence", 3)
+            .await
+            .is_err());
     }
     erase(&db, &owner).await;
 }
@@ -561,5 +547,237 @@ async fn review_gate_rechecks_latest_policy_before_creating_any_action() {
         runtime.activity(&owner.id, &id).await.unwrap()["approval_requests"],
         json!([])
     );
+    erase(&db, &owner).await;
+}
+
+#[tokio::test]
+async fn approved_no_reply_review_emits_once_then_delivers_permitted_followup_and_completes() {
+    use omnyid_homeserver::runbook_review_decision::*;
+    let db = database().await;
+    let owner = user(&db).await;
+    let foreign = user(&db).await;
+    let store = RunbookStore::new(&db, [21; 32], [22; 32]);
+    let runtime = RunbookRuntime::new(&store);
+    fund(&runtime, &owner.id).await;
+    let id = start(
+        &db,
+        &owner.id,
+        "no_reply_followup",
+        json!({"last_outbound_ref":"message:outbound","reply_status":"pending","cooldown":false}),
+    )
+    .await;
+    runtime
+        .execute_transform(&owner.id, &id, "assess", 3)
+        .await
+        .unwrap();
+    let provider = Draft {
+        calls: AtomicUsize::new(0),
+        alter_questions: false,
+    };
+    runtime
+        .execute_model(&owner.id, &id, "draft", 4, &policy(), &provider)
+        .await
+        .unwrap();
+    let gate = runtime
+        .request_review(&owner.id, &id, "review_consequence", 5)
+        .await
+        .unwrap();
+    let request = ReviewDecisionRequest {
+        action_ref: gate.action_ref.clone(),
+        expected_revision: 6,
+        decision: ReviewDecision::Approved,
+    };
+    assert!(runtime
+        .decide_review(&foreign.id, &id, &request)
+        .await
+        .is_err());
+    let (a, b) = tokio::join!(
+        runtime.decide_review(&owner.id, &id, &request),
+        runtime.decide_review(&owner.id, &id, &request)
+    );
+    let decision = a.unwrap();
+    assert_eq!(decision, b.unwrap());
+    let mut changed = request.clone();
+    changed.decision = ReviewDecision::Rejected;
+    assert_eq!(
+        runtime
+            .decide_review(&owner.id, &id, &changed)
+            .await
+            .unwrap_err(),
+        "decision_replay_conflict"
+    );
+    let emitted = runtime
+        .emit_review(&owner.id, &id, "surface", 7)
+        .await
+        .unwrap();
+    assert_eq!(emitted.approval_ref, Some(decision.decision_ref.clone()));
+    assert_eq!(
+        runtime
+            .emit_review(&owner.id, &id, "surface", 7)
+            .await
+            .unwrap(),
+        emitted
+    );
+    let activity = runtime.activity(&owner.id, &id).await.unwrap();
+    assert_eq!(activity["approval_requests"][0]["status"], "approved");
+    let due = Utc::now() + Duration::seconds(1);
+    let scheduled = runtime
+        .schedule_wait(&owner.id, &id, 8, due, due + Duration::hours(1))
+        .await
+        .unwrap();
+    tokio::time::sleep(std::time::Duration::from_millis(1100)).await;
+    let delivered = runtime
+        .deliver_follow_up(&owner.id, &id, &scheduled.message_id)
+        .await
+        .unwrap();
+    assert_eq!(delivered.schedule.event_type, "thread_reply_review_due");
+    assert_eq!(
+        runtime
+            .deliver_follow_up(&owner.id, &id, &scheduled.message_id)
+            .await
+            .unwrap(),
+        delivered
+    );
+    runtime.complete(&owner.id, &id, 10).await.unwrap();
+    assert_eq!(
+        runtime
+            .instance(&owner.id, &id)
+            .await
+            .unwrap()
+            .instance
+            .status,
+        InstanceState::Completed
+    );
+    assert_eq!(
+        runtime
+            .decide_review(&owner.id, &id, &request)
+            .await
+            .unwrap(),
+        decision
+    );
+    erase(&db, &owner).await;
+    erase(&db, &foreign).await;
+}
+
+#[tokio::test]
+async fn review_decision_rejects_stale_cancelled_revoked_and_unbound_requests() {
+    use omnyid_homeserver::runbook_review_decision::*;
+    let db = database().await;
+    let owner = user(&db).await;
+    let store = RunbookStore::new(&db, [21; 32], [22; 32]);
+    let runtime = RunbookRuntime::new(&store);
+    let mut pending = vec![];
+    for _ in 0..3 {
+        let id=start(&db,&owner.id,"workflow_failure",json!({"run_ref":"workflow:failed","error_ref":"message:error","retry_consequences":"unknown"})).await;
+        runtime
+            .execute_transform(&owner.id, &id, "assess", 3)
+            .await
+            .unwrap();
+        let gate = runtime
+            .request_review(&owner.id, &id, "review_consequence", 4)
+            .await
+            .unwrap();
+        pending.push((
+            id,
+            ReviewDecisionRequest {
+                action_ref: gate.action_ref,
+                expected_revision: 5,
+                decision: ReviewDecision::Approved,
+            },
+        ));
+    }
+    let (id, request) = &pending[0];
+    let mut stale = request.clone();
+    stale.expected_revision = 4;
+    assert_eq!(
+        runtime
+            .decide_review(&owner.id, id, &stale)
+            .await
+            .unwrap_err(),
+        "stale_revision"
+    );
+    let mut wrong = request.clone();
+    wrong.action_ref = pending[1].1.action_ref.clone();
+    assert_eq!(
+        runtime
+            .decide_review(&owner.id, id, &wrong)
+            .await
+            .unwrap_err(),
+        "review_target_mismatch"
+    );
+    runtime.cancel(&owner.id, id, 5).await.unwrap();
+    assert!(runtime.decide_review(&owner.id, id, request).await.is_err());
+    let table = format!("\"user_{}\".action_audit_log", owner.id.to_lowercase());
+    sqlx::query(&format!("DELETE FROM {table} WHERE external_reference=$1"))
+        .bind(&pending[2].1.action_ref)
+        .execute(&db.pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        runtime
+            .decide_review(&owner.id, &pending[2].0, &pending[2].1)
+            .await
+            .unwrap_err(),
+        "review_projection_conflict"
+    );
+    assert_eq!(
+        runtime
+            .instance(&owner.id, &pending[2].0)
+            .await
+            .unwrap()
+            .instance
+            .revision,
+        5
+    );
+    let messages = format!("\"user_{}\".messages", owner.id.to_lowercase());
+    let count: i64 = sqlx::query_scalar(&format!(
+        "SELECT count(*) FROM {messages} WHERE parent_id=$1 AND subtype='approval_decision'"
+    ))
+    .bind(&pending[2].1.action_ref)
+    .fetch_one(&db.pool)
+    .await
+    .unwrap();
+    assert_eq!(count, 0);
+    let registry = store.registry(&owner.id).await.unwrap();
+    let head = registry.get("workflow_failure").unwrap();
+    let mut definition = head.definition.clone();
+    definition.enabled = false;
+    store
+        .save(&owner.id, Some(&head.message_id), definition)
+        .await
+        .unwrap();
+    let (id, request) = &pending[1];
+    assert_eq!(
+        runtime
+            .decide_review(&owner.id, id, request)
+            .await
+            .unwrap_err(),
+        "definition_disabled"
+    );
+    let mut reject = request.clone();
+    reject.decision = ReviewDecision::Rejected;
+    let receipt = runtime.decide_review(&owner.id, id, &reject).await.unwrap();
+    assert_eq!(receipt.trace.status, TraceStatus::Failed);
+    assert_eq!(
+        runtime
+            .instance(&owner.id, id)
+            .await
+            .unwrap()
+            .instance
+            .status,
+        InstanceState::Cancelled
+    );
+    assert!(runtime
+        .emit_review(&owner.id, id, "surface", 6)
+        .await
+        .is_err());
+    assert_eq!(
+        runtime.activity(&owner.id, id).await.unwrap()["approval_requests"][0]["status"],
+        "rejected"
+    );
+    assert!(serde_json::from_value::<ReviewDecisionRequest>(
+        json!({"action_ref":"one","expected_revision":1,"decision":"approved","send":true})
+    )
+    .is_err());
     erase(&db, &owner).await;
 }

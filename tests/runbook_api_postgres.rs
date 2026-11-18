@@ -15,7 +15,7 @@ use omnyid_homeserver::{
 use omnyid_homeserver::{
     runbook_input::InputSupplied, runbook_read::ReadRequest, runbook_runtime::RunbookRuntime,
 };
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use tower::ServiceExt;
 use ulid::Ulid;
 
@@ -63,7 +63,9 @@ async fn request(
         )
         .await
         .unwrap();
-    assert_eq!(response.headers()["cache-control"], "no-store");
+    if path.starts_with("/runbooks") {
+        assert_eq!(response.headers()["cache-control"], "no-store");
+    }
     let status = response.status();
     let bytes = response.into_body().collect().await.unwrap().to_bytes();
     (
@@ -168,13 +170,11 @@ async fn authenticated_activity_answer_cancel_and_deterministic_completion() {
     assert_eq!(status, StatusCode::OK);
     assert_eq!(activity["questions"].as_array().unwrap().len(), 1);
     assert_eq!(activity["instance"]["status"], "waiting_for_input");
-    assert!(
-        activity["views"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|v| v["content"]["kind"] == "runbook_question")
-    );
+    assert!(activity["views"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|v| v["content"]["kind"] == "runbook_question"));
     let listing = request(&app, "GET", "/runbooks/instances", &auth, json!(null)).await;
     assert_eq!(listing.0, StatusCode::OK);
     assert_eq!(listing.1["activities"].as_array().unwrap().len(), 1);
@@ -402,6 +402,98 @@ async fn authenticated_activity_answer_cancel_and_deterministic_completion() {
         request(&app, "POST", &toggle_path, &auth, toggle).await.0,
         StatusCode::CONFLICT
     );
+    let mut review_definition = starter_definitions()
+        .into_iter()
+        .find(|d| d.runbook_id == "workflow_failure")
+        .unwrap();
+    review_definition.enabled = true;
+    store
+        .save(&alice.id, None, review_definition)
+        .await
+        .unwrap();
+    let event = Ulid::new().to_string();
+    db.insert_daemon_afp_message(&json!({"protocol":"afp-v1","id":event,"type":"workflow_failed","to":[alice.id],"thread_id":"workflow:approval","timestamp":Utc::now().to_rfc3339(),"content":{"confidence":0.9,"run_ref":"workflow:failed","error_ref":"message:error","retry_consequences":"unknown"}})).await.unwrap();
+    let reviewed = runtime
+        .dispatch(&alice.id, &event)
+        .await
+        .unwrap()
+        .instance_ids
+        .remove(0);
+    runtime.start(&alice.id, &reviewed, 1).await.unwrap();
+    runtime
+        .execute_read(
+            &alice.id,
+            &reviewed,
+            &ReadRequest {
+                step_id: "read".into(),
+                expected_revision: 2,
+                snapshot_ref: None,
+                decrypt_limit: 4,
+                byte_limit: 65536,
+            },
+        )
+        .await
+        .unwrap();
+    runtime
+        .execute_transform(&alice.id, &reviewed, "assess", 3)
+        .await
+        .unwrap();
+    let proposal = runtime
+        .request_review(&alice.id, &reviewed, "review_consequence", 4)
+        .await
+        .unwrap();
+    let body = json!({"thread_id":format!("runbook:{reviewed}"),"target_message_id":proposal.action_ref,"decision":"approved","decided_by":alice.id,"capability_id":"runbook.review","runbook_revision":5});
+    assert_eq!(
+        request(&app, "POST", "/actions/decision", "", body.clone())
+            .await
+            .0,
+        StatusCode::UNAUTHORIZED
+    );
+    let mut forged = body.clone();
+    forged["decided_by"] = json!(bob.id);
+    assert!(!request(&app, "POST", "/actions/decision", &auth, forged)
+        .await
+        .0
+        .is_success());
+    let mut foreign = body.clone();
+    foreign["decided_by"] = json!(bob.id);
+    assert!(
+        !request(&app, "POST", "/actions/decision", &bob_auth, foreign)
+            .await
+            .0
+            .is_success()
+    );
+    let stale = Ulid::new().to_string();
+    db.create_session(&AuthSessionRecord {
+        token: stale.clone(),
+        user_id: alice.id.clone(),
+        created_at: (Utc::now() - Duration::days(2)).to_rfc3339(),
+        expires_at: (Utc::now() + Duration::hours(1)).to_rfc3339(),
+    })
+    .await
+    .unwrap();
+    assert!(!request(
+        &app,
+        "POST",
+        "/actions/decision",
+        &format!("Bearer {stale}"),
+        body.clone()
+    )
+    .await
+    .0
+    .is_success());
+    let result = request(&app, "POST", "/actions/decision", &auth, body.clone()).await;
+    assert_eq!(result.0, StatusCode::OK, "{:?}", result.1);
+    assert_eq!(result.1["external_execution_authorized"], false);
+    assert_eq!(
+        request(&app, "POST", "/actions/decision", &auth, body).await,
+        result
+    );
+    runtime
+        .emit_review(&alice.id, &reviewed, "surface", 6)
+        .await
+        .unwrap();
+    runtime.complete(&alice.id, &reviewed, 7).await.unwrap();
     db.delete_user_account_and_data(&alice.id, &alice.email, &[])
         .await
         .unwrap();

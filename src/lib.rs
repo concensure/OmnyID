@@ -122,6 +122,8 @@ pub mod runbook_read;
 pub mod runbook_runtime;
 pub mod runbook_schedule_review;
 pub mod runbook_review_gate;
+pub mod runbook_review_decision;
+mod runbook_review_emit;
 pub mod runbook_budget;
 pub mod runbook_llm_step;
 pub mod runbook_model_runtime;
