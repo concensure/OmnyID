@@ -112,6 +112,16 @@ test("account switch aborts pending export and clears confirmation",async({page}
   await page.evaluate(()=>window.dispatchEvent(new Event("omnyid:session-changed")));
   await release!();
   await expect(page.getByRole("dialog")).toHaveCount(0);
-  await expect(page.getByRole("button",{name:"Refresh runbooks"})).toBeEnabled();
+  await expect(page.getByRole("button",{name:"Refresh runbooks"})).toHaveCount(0);
   expect(downloads).toBe(0);
+});
+
+test("expired session hides controls without an authentication retry loop",async({page})=>{
+  let requests=0;
+  await page.route("**/runbooks**",route=>{requests++;return route.fulfill({status:401,body:"unauthorized"});});
+  await page.goto("/workspace/e2e/runbook-controls.html");
+  await expect(page.getByRole("heading",{name:"Runbooks",exact:true})).toHaveCount(0);
+  await page.waitForLoadState("networkidle");
+  expect(requests).toBeGreaterThan(0);
+  expect(requests).toBeLessThanOrEqual(2);
 });

@@ -1,6 +1,6 @@
 import { navigateToView } from "@/lib/decisionosNavigation";
 import { createSignal, createUniqueId, For, onCleanup, onMount, Show } from "solid-js";
-import { apiFetch, SESSION_CHANGED_EVENT } from "@/lib/api";
+import { apiFetch, readSessionChangedEventDetail, SESSION_CHANGED_EVENT } from "@/lib/api";
 import { openRunbookQuestions, runbookIdentifier, runbookStatus, runbookTerminal,
   type RunbookActivity, type RunbookDefinitionSummary } from "@/lib/runbookState";
 import { RunbookQuestionCard } from "./RunbookQuestionCard";
@@ -55,9 +55,11 @@ export function RunbookPanel(props: { mode?: "manage" | "questions" | "activity"
       else setError("Runbooks could not be loaded. Refresh to try again.");
     } finally { if (current === generation) setLoading(false); }
   }
-  function sessionChanged() {
+  function sessionChanged(event: Event) {
     ++generation; controller?.abort(); setActivities([]); setDefinitions([]); setStarters([]);
-    setSelected([]); setConfirm(undefined); setNotice(""); void load();
+    setSelected([]); setConfirm(undefined); setNotice("");
+    if (!readSessionChangedEventDetail(event).session) { setAvailable(false); setLoading(false); return; }
+    void load();
   }
   onMount(() => { void load(); window.addEventListener(SESSION_CHANGED_EVENT, sessionChanged); });
   onCleanup(() => { ++generation; controller?.abort(); window.removeEventListener(SESSION_CHANGED_EVENT, sessionChanged); });
