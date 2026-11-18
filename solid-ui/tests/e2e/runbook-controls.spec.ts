@@ -194,6 +194,8 @@ test("stale review leaves pending state and account switch clears confirmation",
   await page.getByRole("button",{name:"Approve private review",exact:true}).click();
   await expect(page.getByText("Review decision: pending",{exact:true})).toBeVisible();
   await expect(page.getByText("PRIVATE_ERROR_BODY")).toHaveCount(0);
+  await expect(page.getByRole("button",{name:"Reject review…",exact:true})).toBeDisabled();
+  await page.getByRole("button",{name:"Refresh runbooks",exact:true}).click();
   await page.getByRole("button",{name:"Reject review…",exact:true}).click();
   await expect(page.getByRole("dialog")).toBeVisible();
   await page.evaluate(()=>window.dispatchEvent(new Event("omnyid:session-changed")));
