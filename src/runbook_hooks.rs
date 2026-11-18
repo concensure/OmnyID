@@ -9,6 +9,7 @@ use std::collections::BTreeSet;
 pub struct HookPolicy {
     pub events: bool,
     pub follow_ups: bool,
+    pub retention: bool,
     pub owners: BTreeSet<String>,
 }
 
@@ -34,6 +35,7 @@ impl HookPolicy {
         Self {
             events: std::env::var("OMNYID_RUNBOOK_EVENT_HOOKS_ENABLED").as_deref() == Ok("true"),
             follow_ups: std::env::var("OMNYID_RUNBOOK_FOLLOW_UPS_ENABLED").as_deref() == Ok("true"),
+            retention: std::env::var("OMNYID_RUNBOOK_RETENTION_ENABLED").as_deref() == Ok("true"),
             owners,
         }
     }
@@ -110,7 +112,7 @@ pub async fn persisted_event(db: &Db, owner: &str, id: &str, kind: &str) {
 /// Limits are per pass, not one independent timer per runbook.
 pub async fn maintenance_pass(db: &Db) -> (u32, u32) {
     let policy = HookPolicy::from_env();
-    if policy.owners.is_empty() || !policy.follow_ups {
+    if policy.owners.is_empty() || (!policy.follow_ups && !policy.retention) {
         return (0, 0);
     }
     let Ok((encryption, signing)) = keys() else {
@@ -122,6 +124,12 @@ pub async fn maintenance_pass(db: &Db) -> (u32, u32) {
     let mut errors = 0;
     let pass = tokio::time::timeout(std::time::Duration::from_secs(10), async {
         for owner in &policy.owners {
+            if policy.retention {
+                match store.prune_derived_outcomes(owner).await {
+                    Ok(count) => processed += count,
+                    Err(_) => errors += 1,
+                }
+            }
             if policy.follow_ups {
                 match runtime.due_schedules(owner, 20).await {
                     Ok(due) => {
