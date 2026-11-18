@@ -257,3 +257,110 @@ fn stored_quote_review_requires_exact_valid_frozen_evidence() {
         "quote_input_too_large"
     );
 }
+
+#[test]
+fn quote_gaps_use_reviewed_registry_and_keep_uncertainty() {
+    let mut quote: Value =
+        serde_json::from_str(include_str!("runbook_quote_fixture.json")).unwrap();
+    quote["commercial_terms"] = json!([{"term_id":"deposit-one","kind":"booking deposit","label":"SEND NOW secret-marker","evidence":{"state":"conflicting","rationale":"conflicting amounts"}}]);
+    let mut evidence = packet(
+        json!({"normalised_quote_ref":"message:quote", "required_categories":["gst","item_rate","booking deposit","valid_until"]}),
+    );
+    evidence.included.push(EvidenceItem {
+        reference: "message:quote".into(),
+        content: json!({"quotation":quote}),
+        hash: "c".repeat(64),
+        relevance: 1.0,
+    });
+    let step = step("quote_missing_items");
+    let answers = BTreeMap::new();
+    let result = review(&step, &evidence, &answers).unwrap();
+    let findings = result.conclusions["category_findings"].as_array().unwrap();
+    assert_eq!(
+        findings
+            .iter()
+            .map(|v| v["category"].as_str().unwrap())
+            .collect::<Vec<_>>(),
+        vec!["deposit", "item_rate", "tax", "valid_until"]
+    );
+    assert_eq!(findings[0]["status"], "review_required");
+    assert_eq!(findings[0]["source_paths"], json!(["commercial_terms[0]"]));
+    assert_eq!(findings[1]["status"], "review_required");
+    assert_eq!(findings[2]["status"], "review_required");
+    assert_eq!(findings[3]["status"], "not_recorded");
+    assert_eq!(
+        result.conclusions["clarification_candidates"]
+            .as_array()
+            .unwrap()
+            .len(),
+        3
+    );
+    assert_eq!(result.conclusions["send_authorized"], false);
+    assert_eq!(
+        result.conclusions["commercial_completeness_verified"],
+        false
+    );
+    assert!(!json!(result).to_string().contains("secret-marker"));
+    assert_eq!(result, review(&step, &evidence, &answers).unwrap());
+    evidence.included[0].content["required_categories"] =
+        json!(["valid_until", "deposit", "tax", "item_rate"]);
+    assert_eq!(
+        result.conclusions,
+        review(&step, &evidence, &answers).unwrap().conclusions
+    );
+
+    let confirmed = json!({"state":"confirmed","anchors":[{"source_id":"source-one","source_version_id":"source-v1","locator":"page=1","exact_excerpt":"Tax exempt; venue hire"}]});
+    evidence.included[1].content["quotation"]["tax"] =
+        json!({"treatment":"exempt", "evidence":confirmed});
+    evidence.included[1].content["quotation"]["line_items"][0]["evidence"] = confirmed;
+    evidence.included[1].content["quotation"]["valid_until"] = json!("2027-02-01T00:00:00Z");
+    let recorded = review(&step, &evidence, &answers).unwrap();
+    for index in [1, 2, 3] {
+        assert_eq!(
+            recorded.conclusions["category_findings"][index]["status"],
+            "recorded"
+        );
+    }
+    // Confirmed exclusion is still a gap for a requested category.
+    evidence.included[1].content["quotation"]["line_items"][0]["inclusion"] = json!("excluded");
+    assert_eq!(
+        review(&step, &evidence, &answers).unwrap().conclusions["category_findings"][1]["status"],
+        "review_required"
+    );
+}
+
+#[test]
+fn quote_gaps_reject_unknown_duplicate_unbounded_and_unresolved_inputs() {
+    let quote: Value = serde_json::from_str(include_str!("runbook_quote_fixture.json")).unwrap();
+    let mut evidence =
+        packet(json!({"normalised_quote_ref":"message:quote", "required_categories":["tax"]}));
+    let step = step("quote_missing_items");
+    let answers = BTreeMap::new();
+    assert_eq!(
+        review(&step, &evidence, &answers).unwrap_err(),
+        "quote_evidence_required"
+    );
+    evidence.included.push(EvidenceItem {
+        reference: "message:quote".into(),
+        content: json!({"quotation":quote}),
+        hash: "c".repeat(64),
+        relevance: 1.0,
+    });
+    for (categories, error) in [
+        (json!([]), "required_category_limit"),
+        (json!(vec!["tax"; 33]), "required_category_limit"),
+        (json!(["tax", "gst"]), "duplicate_required_category"),
+        (json!(["invented_category"]), "unknown_required_category"),
+        (json!([true]), "invalid_required_categories"),
+        (json!(["tax\n"]), "invalid_required_categories"),
+    ] {
+        evidence.included[0].content["required_categories"] = categories;
+        assert_eq!(review(&step, &evidence, &answers).unwrap_err(), error);
+    }
+    evidence.included[0].content["required_categories"] = json!(["tax"]);
+    evidence.included[1].content["quotation"]["registry_version"] = json!("invented.v1");
+    assert_eq!(
+        review(&step, &evidence, &answers).unwrap_err(),
+        "unsupported_quote_registry"
+    );
+}
