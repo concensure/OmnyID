@@ -1,3 +1,30 @@
+## 2026-11-18: Runbook model budgets reserve before provider calls
+
+Runbook model spending is limited by a revisioned, encrypted owner policy:
+UTC-day account totals, UTC-day totals per Runbook, and lifetime instance totals.
+All limits default to zero. A trusted internal setter owns configuration; no
+HTTP route, definition, evidence packet or model can supply spending authority.
+The existing owner transaction lock serializes policy changes and reservations.
+
+Each model reservation binds the policy reference, Runbook and maximum permitted
+cost including possible escalation. Its existing immutable result is settlement:
+observed usage is charged even for failed or cancelled work, unknown attempts
+retain their ceilings, and missing results retain the whole reservation. Unknown
+spend remains charged across midnight. Known usage is assigned to the reservation's
+UTC day; lifetime instance usage never resets. Provider ceiling violations block
+further account model calls pending reconciliation. Limits never erase usage.
+
+Exhaustion produces WaitingForBudget, with no provider call or completed step.
+Activity exposes bounded budget totals and the UI labels the pause. Explicit
+internal resume checks revision, enablement and current capacity; the executor
+rechecks under lock before reserving. Resumption grants no execution authority.
+
+This is the Runbook spending domain, not a replacement for the existing shared
+provider funding/billing controls. Live inference remains disconnected until
+owner resolution, provider-enforced cost bounds and shared funding integration
+are verified. Legacy reservations without budget bindings fail closed for new
+spending; uncertain/over-ceiling reconciliation is intentionally not automated.
+
 ## 2026-11-18: Model calls use durable reservations and private draft receipts
 
 The internal model executor accepts only classify/reason/draft and only the

@@ -46,7 +46,7 @@ tasks:
     branch: agent/codex/WED-375
     worktree: C:/temp/wt/omnyid-runbooks
     base_sha: 5536b83b2f9d2f58488a075f383c24f8f4f73d6c
-    candidate_sha: cbd753ebb56a45c2252cb273a5bde9b5ec175d6c
+    candidate_sha: 9c97dab76dd6d95de913fd3ba291925f6e25564b
     verification_worktree: C:/temp/wt/omnyid-runbooks-verify-43d7c830
     depends_on: [WED-308, WED-374]
     files: [src/runbook*.rs, src/proactive_provenance.rs, src/lib.rs, src/db.rs, src/server/runbook_routes.rs, src/server/mod.rs, src/server/proactive_routes.rs, src/daemon_runtime.rs, solid-ui/src/components/Runbook*.tsx, solid-ui/src/components/AgentFleetView.tsx, solid-ui/src/components/DecisionQueueView.tsx, solid-ui/src/components/renderers/A2UIRenderer.tsx, solid-ui/src/lib/runbook*.ts, solid-ui/tests/runbook*, solid-ui/tests/e2e/runbook*, solid-ui/e2e/runbook*, solid-ui/playwright.runbooks.config.ts, tests/runbook*, Documents/design/runbooks/**, .agent/**]

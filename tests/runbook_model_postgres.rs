@@ -600,11 +600,27 @@ async fn foreign_owners_and_preflight_denials_never_call_a_provider() {
 }
 
 async fn next_instance(db: &Db, owner: &str) -> String {
+    next_instance_for(db, owner, "file_requires_review").await
+}
+async fn next_instance_for(db: &Db, owner: &str, runbook: &str) -> String {
     let store = RunbookStore::new(db, [21; 32], [22; 32]);
     let runtime = RunbookRuntime::new(&store);
     let event = Ulid::new().to_string();
     db.insert_daemon_afp_message(&json!({"protocol":"afp-v1","id":event,"type":"workflow_failed","to":[owner],"thread_id":format!("budget:{event}"),"timestamp":Utc::now().to_rfc3339(),"content":{"confidence":0.9,"file_ref":"document:one","parser_status":"ready","quarantine_status":"clear"}})).await.unwrap();
-    let id = runtime.dispatch(owner, &event).await.unwrap().instance_ids[0].clone();
+    let mut selected = None;
+    for candidate in runtime.dispatch(owner, &event).await.unwrap().instance_ids {
+        if runtime
+            .instance(owner, &candidate)
+            .await
+            .unwrap()
+            .instance
+            .runbook_id
+            == runbook
+        {
+            selected = Some(candidate);
+        }
+    }
+    let id = selected.expect("requested runbook matched");
     runtime.start(owner, &id, 1).await.unwrap();
     runtime
         .execute_read(
@@ -948,4 +964,79 @@ async fn timeout_retains_unknown_spend_and_provider_overcharge_freezes_further_c
         }
         cleanup(&db, &owner).await;
     }
+}
+
+#[tokio::test]
+async fn runbook_budgets_are_separate_but_share_account_spend_and_policy_edits_do_not_reset_usage()
+{
+    let db = database().await;
+    let (owner, id, mut definition, _) = fixture(&db, StepKind::Classify, 20, 1).await;
+    let store = RunbookStore::new(&db, [21; 32], [22; 32]);
+    let runtime = RunbookRuntime::new(&store);
+    runtime
+        .configure_model_budget(&owner.id, 1, limits(23, 20, 20))
+        .await
+        .unwrap();
+    let provider = Mock::new(Mode::Valid);
+    assert!(
+        runtime
+            .execute_model(&owner.id, &id, "model", 4, &policy(), &provider)
+            .await
+            .unwrap()
+            .applied
+    );
+    let same = next_instance(&db, &owner.id).await;
+    assert_eq!(
+        runtime
+            .execute_model(&owner.id, &same, "model", 4, &policy(), &provider)
+            .await
+            .unwrap_err(),
+        "model_budget_exhausted"
+    );
+    definition.runbook_id = "other_budget".into();
+    definition.dedupe_group = None;
+    store.save(&owner.id, None, definition).await.unwrap();
+    let other = next_instance_for(&db, &owner.id, "other_budget").await;
+    let usage = runtime.model_budget(&owner.id, &other).await.unwrap().usage;
+    assert_eq!(
+        (
+            usage.account_daily_microunits,
+            usage.runbook_daily_microunits,
+            usage.instance_microunits
+        ),
+        (3, 0, 0)
+    );
+    assert!(
+        runtime
+            .execute_model(&owner.id, &other, "model", 4, &policy(), &provider)
+            .await
+            .unwrap()
+            .applied
+    );
+    runtime
+        .configure_model_budget(&owner.id, 2, limits(0, 0, 0))
+        .await
+        .unwrap();
+    assert_eq!(
+        runtime
+            .model_budget(&owner.id, &other)
+            .await
+            .unwrap()
+            .usage
+            .account_daily_microunits,
+        6
+    );
+    runtime
+        .configure_model_budget(&owner.id, 3, limits(23, 23, 20))
+        .await
+        .unwrap();
+    assert_eq!(
+        runtime
+            .resume_model_budget(&owner.id, &same, 5, &policy())
+            .await
+            .unwrap_err(),
+        "model_budget_exhausted"
+    );
+    assert_eq!(provider.requests.lock().unwrap().len(), 2);
+    cleanup(&db, &owner).await;
 }
