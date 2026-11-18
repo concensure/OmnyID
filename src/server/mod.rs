@@ -110,7 +110,7 @@ mod agent_capability_routes;
 mod agent_memory_routes;
 mod agent_setup_routes;
 mod agent_trigger_routes;
-pub(crate) pub(crate) mod approval_surfaces;
+pub(crate) mod approval_surfaces;
 mod brief_routes;
 mod continuity_ranking_helpers;
 mod continuity_routes;
