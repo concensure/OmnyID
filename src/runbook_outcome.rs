@@ -52,6 +52,18 @@ pub fn apply_feedback(
 ) -> Result<Vec<crate::runbook_matcher::MatchDecision>> {
     use crate::runbook_matcher::MatchDisposition;
     let mut ranked = Vec::new();
+    let cooling = feedback
+        .iter()
+        .filter(|f| f.scope == "exact")
+        .filter(|f| {
+            f.status == "cooldown_recommended"
+                || !suggestion_allowed_by_outcome_feedback(
+                    &json!({"heuristic_id":f.heuristic_id}),
+                    std::slice::from_ref(*f),
+                )
+        })
+        .map(|f| f.heuristic_id.as_str())
+        .collect::<std::collections::BTreeSet<_>>();
     for (index, decision) in decisions.iter_mut().enumerate() {
         let definition = &registry
             .get(&decision.runbook_id)
@@ -59,18 +71,7 @@ pub fn apply_feedback(
             .definition;
         for step in &definition.steps {
             let key = outcome_key(&definition.runbook_id, &step.step_id)?;
-            let suggestion = json!({"heuristic_id":key});
-            let exact = feedback
-                .iter()
-                .filter(|f| f.scope == "exact")
-                .cloned()
-                .collect::<Vec<_>>();
-            let cooling = exact
-                .iter()
-                .any(|f| f.heuristic_id == key && f.status == "cooldown_recommended");
-            if decision.disposition == MatchDisposition::Matched
-                && (cooling || !suggestion_allowed_by_outcome_feedback(&suggestion, &exact))
-            {
+            if decision.disposition == MatchDisposition::Matched && cooling.contains(key.as_str()) {
                 decision.disposition = MatchDisposition::OutcomeCooldown;
             }
         }

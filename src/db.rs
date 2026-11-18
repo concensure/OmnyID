@@ -5234,8 +5234,8 @@ impl Db {
         .execute(&mut *tx)
         .await?;
 
-        // These existing account-policy tables predate user foreign keys.
-        for table in ["heuristic_autonomy_overrides", "user_proactivity_config"] {
+        // These existing policy, counter and outcome tables predate user foreign keys.
+        for table in ["heuristic_autonomy_overrides", "user_proactivity_config", "behavioral_memory", "proactive_outcomes"] {
             sqlx::query(&format!("DELETE FROM {table} WHERE owner_user_id = $1"))
                 .bind(user_id).execute(&mut *tx).await?;
         }

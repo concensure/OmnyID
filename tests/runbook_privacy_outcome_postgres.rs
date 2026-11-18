@@ -303,6 +303,56 @@ async fn provenance_feedback_regret_cooldown_and_retries_never_grant_authority()
             .iter()
             .any(|f| f.scope == "exact" && f.status == "reinforced")
     );
+    let e = event(&db, &a.id).await;
+    let dismissed_id = runtime.dispatch(&a.id, &e).await.unwrap().instance_ids[0].clone();
+    runtime.start(&a.id, &dismissed_id, 1).await.unwrap();
+    let dismissed_trace = runtime
+        .record_local_step(
+            &a.id,
+            &dismissed_id,
+            2,
+            &LocalStepResult {
+                step_id: d.steps[0].step_id.clone(),
+                input_hash: "c".repeat(64),
+                output_hash: "d".repeat(64),
+                input_refs: vec![],
+                output_refs: vec![],
+            },
+        )
+        .await
+        .unwrap();
+    let dismissed = runtime
+        .record_outcome(
+            &a.id,
+            &dismissed_id,
+            &dismissed_trace.trace_id,
+            Outcome::Dismissed,
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        dismissed,
+        runtime
+            .record_outcome(
+                &a.id,
+                &dismissed_id,
+                &dismissed_trace.trace_id,
+                Outcome::Dismissed
+            )
+            .await
+            .unwrap()
+    );
+    assert!(
+        runtime
+            .record_outcome(
+                &a.id,
+                &dismissed_id,
+                &dismissed_trace.trace_id,
+                Outcome::Regretted
+            )
+            .await
+            .is_err()
+    );
     for (id, trace) in &ids {
         let regret = runtime
             .record_outcome(&a.id, id, &trace.trace_id, Outcome::Regretted)
@@ -317,12 +367,12 @@ async fn provenance_feedback_regret_cooldown_and_retries_never_grant_authority()
         );
     }
     let outcomes = private_values(&db, &a.id, "runbook_outcome").await;
-    assert_eq!(outcomes.len(), 6);
+    assert_eq!(outcomes.len(), 7);
     let feedback = feedback_from_records(&a.id, &outcomes, Utc::now()).unwrap();
     assert!(
         feedback
             .iter()
-            .any(|f| f.scope == "exact" && f.status == "suppressed" && f.total == 3)
+            .any(|f| f.scope == "exact" && f.status == "suppressed" && f.total == 4)
     );
     assert!(
         feedback
@@ -345,10 +395,45 @@ async fn provenance_feedback_regret_cooldown_and_retries_never_grant_authority()
             .fetch_one(&db.pool)
             .await
             .unwrap();
-    assert_eq!(count, 3);
+    assert_eq!(count, 4);
+    // A different step in the same family receives cautious ranking only.
+    let head = store
+        .registry(&a.id)
+        .await
+        .unwrap()
+        .get(&d.runbook_id)
+        .unwrap()
+        .message_id
+        .clone();
+    let mut changed = d.clone();
+    changed.steps[0].step_id = "new_read".into();
+    // Remove selectors of the previous first step in the reviewed successor.
+    for step in &mut changed.steps {
+        step.input_refs.retain(|r| !r.starts_with("steps."));
+    }
+    store.save(&a.id, Some(&head), changed).await.unwrap();
+    let e = event(&db, &a.id).await;
+    let family = runtime.dispatch(&a.id, &e).await.unwrap();
+    assert_eq!(family.instance_ids.len(), 1);
+    assert_eq!(
+        runtime
+            .instance(&a.id, &family.instance_ids[0])
+            .await
+            .unwrap()
+            .instance
+            .status,
+        InstanceState::Matched
+    );
     db.delete_user_account_and_data(&a.id, &a.email, &[])
         .await
         .unwrap();
+    let erased: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM proactive_outcomes WHERE owner_user_id=$1")
+            .bind(&a.id)
+            .fetch_one(&db.pool)
+            .await
+            .unwrap();
+    assert_eq!(erased, 0);
     db.delete_user_account_and_data(&b.id, &b.email, &[])
         .await
         .unwrap();
@@ -374,4 +459,35 @@ fn logging_and_feedback_identifiers_are_bounded_and_unambiguous() {
     assert!(hooks.contains(
         "tracing::warn!(\"Runbook persisted-event matching deferred; source remains in ledger\")"
     ));
+}
+
+#[test]
+fn shared_proactive_provenance_adapter_preserves_existing_contract() {
+    let suggestion = json!({"id":"suggestion","thread_id":"thread","content":{
+        "strategic_policy":{"action":"ask_approval"},"action_label":"Review",
+        "source_refs":["a","a","b"],"approval_policy":"approval_required"},
+        "metadata":{"source_refs":["b","c"]}});
+    let value = omnyid_homeserver::proactive_provenance::build_proactive_suggestion_provenance_afp(
+        "owner",
+        &suggestion,
+    )
+    .unwrap();
+    assert_eq!(value["type"], "provenance_record");
+    assert_eq!(
+        value["content"]["source_message_ids"],
+        json!(["a", "b", "c"])
+    );
+    assert_eq!(
+        value["content"]["context"]["approval_policy"],
+        "approval_required"
+    );
+    let mut background = suggestion;
+    background["content"]["strategic_policy"]["action"] = json!("background_only");
+    assert!(
+        omnyid_homeserver::proactive_provenance::build_proactive_suggestion_provenance_afp(
+            "owner",
+            &background
+        )
+        .is_none()
+    );
 }
