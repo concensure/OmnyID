@@ -24,6 +24,12 @@ Verification worktree: `C:/temp/wt/omnyid-runbooks-verify-43d7c830` at that SHA.
 - Existing line-budget gate fails only server/mod.rs 45733/45717 and db.rs
   18045/17986. Prior audit has six advisories/five warnings; no dependencies changed.
   No clean security-gate claim. No Runbook deployment or flag change.
+- Disposable test Postgres container stopped after verification. Branch is committed.
+- PR/remote CI not completed: GitHub has no PR or run for WED-375, and
+  origin/main is unrelated open-source root 509dc31b1423d87c52fbebe5ab85efffacd0c750.
+  `git diff origin/main...HEAD` reports no merge base (repository is not shallow).
+  Did not push the production lineage into that remote or merge unrelated histories.
+  A suitable integration/review remote or base is needed before the PR boundary.
 - Next: review this branch, consume existing calendar/quote/runsheet projections,
   and connect existing approval/action contracts before any execution rollout.
   SEO release is separately documented below; do not conflate its static source
