@@ -279,7 +279,10 @@ async fn runsheet_diff_uses_existing_projection_snapshots_and_never_publishes() 
     let store = RunbookStore::new(&db, [21; 32], [22; 32]);
     let runtime = RunbookRuntime::new(&store);
     let before = message(&db, &owner.id, projection(false)).await;
-    let after = message(&db, &owner.id, projection(true)).await;
+    let mut updated = projection(true);
+    updated["messages"][1]["content"]["patch"]["end_at"] = Value::Null;
+    updated["messages"][1]["content"]["patch"]["duration_minutes"] = json!(90);
+    let after = message(&db, &owner.id, updated).await;
     let id=start(&db,&owner.id,"runsheet_change",json!({"previous_version_ref":before,"current_version_ref":after,"affected_viewers":["person:coordinator","person:couple"],"source_refs":[before,after]})).await;
     let r = runtime
         .execute_transform(&owner.id, &id, "assess", 3)

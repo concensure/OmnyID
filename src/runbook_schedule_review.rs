@@ -205,17 +205,35 @@ fn timing_rows(state: &WeddingRunSheetProjectionState) -> Result<BTreeMap<String
     let mut output = BTreeMap::new();
     for (id, (_, data)) in rows {
         // Use the canonical projection's timing fields, not another schedule model.
-        let parse = |key: &str| -> Result<DateTime<Utc>> {
-            DateTime::parse_from_rfc3339(data[key].as_str().ok_or("runsheet_timing_missing")?)
-                .map(|v| v.with_timezone(&Utc))
+        let parse = |key: &str| -> Result<Option<DateTime<Utc>>> {
+            if data[key].is_null() {
+                return Ok(None);
+            }
+            DateTime::parse_from_rfc3339(data[key].as_str().ok_or("invalid_runsheet_timing")?)
+                .map(|v| Some(v.with_timezone(&Utc)))
                 .map_err(|_| "invalid_runsheet_timing")
         };
         let start = parse("start_at")?;
         let end = parse("end_at")?;
-        if end <= start || end - start > Duration::days(7) {
-            return Err("invalid_runsheet_timing");
+        if let (Some(start), Some(end)) = (start, end) {
+            if end <= start || end - start > Duration::days(7) {
+                return Err("invalid_runsheet_timing");
+            }
         }
-        output.insert(id, json!({"start_at":start,"end_at":end}));
+        let duration = if data["duration_minutes"].is_null() {
+            None
+        } else {
+            Some(
+                data["duration_minutes"]
+                    .as_u64()
+                    .filter(|n| *n > 0 && *n <= 10080)
+                    .ok_or("invalid_runsheet_timing")?,
+            )
+        };
+        output.insert(
+            id,
+            json!({"start_at":start,"end_at":end,"duration_minutes":duration}),
+        );
     }
     Ok(output)
 }

@@ -83,8 +83,12 @@ fn preview(proposal: &Value) -> String {
                 } else {
                     format!(
                         "{} to {}",
-                        change[key]["start_at"].as_str().unwrap_or(""),
-                        change[key]["end_at"].as_str().unwrap_or("")
+                        change[key]["start_at"]
+                            .as_str()
+                            .unwrap_or("start time not supplied"),
+                        change[key]["end_at"]
+                            .as_str()
+                            .unwrap_or("end time not supplied")
                     )
                 }
             };
