@@ -1,3 +1,69 @@
+## 2026-11-19: WED-375 four bounded transport subtasks verified
+
+Implementation: `C:/temp/wt/omnyid-runbooks`, branch `agent/codex/WED-375`.
+Frozen source: `fbe1e671ed14df8fc6fb7468c3816d1a781c4460`.
+Verification checkout: `C:/temp/wt/omnyid-runbooks-verify-43d7c830`, clean detached
+at that exact SHA. Subsequent documentation commits do not change the candidate.
+Parent checklist unchanged: **99 complete / 18 remaining of 117**.
+
+Four completed subtasks: exact bounded MCP requests; total deadline and actual
+response-byte limits with redirect/retry rejection; correlated strict JSON
+receipts and unknown-outcome/schema validation; local adversarial socket tests.
+These are prerequisites for the open durable tool execution parent item.
+
+Changed: src/mcp_client.rs module registration, new mcp_client/bounded.rs and
+bounded/unique_json.rs; tool_dispatch/runbook_contract.rs receipt validation;
+new tests/runbook_tool_transport.rs; registry PostgreSQL test; canonical task,
+decision, handoff and runbook design notes. No migration, dependency, runtime
+route, frontend, sitemap or production configuration changes.
+
+The opt-in low-level client is not called by production runbooks or old
+mcp_client::call_tool callers. It bounds requests before serialization, uses a
+fresh JSON-RPC ID, disables redirects/retries/proxy inheritance, bounds total
+elapsed time and actual response bytes, and rejects unsupported encodings and
+content channels. Object-only exact envelopes and duplicate-free nested JSON
+prevent ambiguous results. Opaque receipts bind endpoint/capability/arguments;
+prepared tools additionally check their frozen output schema. Fixed error codes
+retain no raw provider errors, URLs, credentials or private argument values.
+Pre-send validation is NotSent; all failures after transmission starts are
+Unknown and do not permit automatic retry. Receipt validation is not durable
+approval, owner/account authority, business success or authenticated AFP proof.
+
+Verification from the clean named candidate, with root/SHA/status printed:
+- 92 tests passed in 20 integration binaries, exit 0: previous 84 plus seven
+  local socket transport tests and one PostgreSQL receipt/schema test. Covers
+  exact requests, no credential forwarding, no retries, stalled headers/bodies,
+  declared and chunked oversize responses, duplicate keys, positional arrays,
+  malformed/wrong-ID/provider-error envelopes and frozen schema/request binding.
+- Standalone cargo build --lib completed, exit 0, 42.73s.
+- Linux Rust 1.94.1 in omnyid-wed318-builder-test:a42db33; image identity
+  sha256:21fe7471679891c3a083d0c167ee660873a8be66223ad205dd05405164c1f0fa.
+  Read-only source mount; -j1, CARGO_INCREMENTAL=0, RUST_MIN_STACK=134217728,
+  global test/dev debug=0 and root package codegen-units=64. Existing shared
+  cargo cache volumes reused. Windows compiler limitation from prior handoff
+  was not retried; no Windows build claim.
+- Evidence: C:/temp/wt/runbook-fbe1e671-linux-tests.log and .exit;
+  C:/temp/wt/runbook-fbe1e671-linux-build.log and .exit.
+- The earlier bf6cdf34 attempt was stopped during compilation for the explicit
+  object-envelope fix; its evidence is superseded by the frozen SHA above.
+- Line-budget check still fails only unchanged server/mod.rs 45734/45717 and
+  db.rs 18045/17986. Wedding-specific budget passes. git diff --check completed.
+- GitHub run/deployment queries returned no records. Unsuitable configured
+  remote lineage prevents a meaningful push/PR boundary; no push/PR created.
+
+Local test database omnyid-runbook-wed375-pg stopped after verification; build
+containers removed automatically. Only loopback mock providers were called.
+No production deployment, real provider call or production health assertion.
+Other agents' primary/SEO worktrees were untouched.
+
+Next: durable exact-action approval and atomic attempt reservation, then dispatch
+through this client with live owner/account/grant/policy revalidation, and signed
+private AFP tool results/provenance. Define crash/unknown-outcome reconciliation
+without blind retries. Current private-review approval is not tool authority.
+The existing HTTPS/localhost endpoint guard is retained, not claimed as complete
+DNS/destination isolation; provider compatibility and sandbox evidence remain
+release prerequisites. No further parent checkbox closes in this batch.
+
 ## 2026-11-19: WED-375 four canonical tool prerequisites verified
 
 Implementation: `C:/temp/wt/omnyid-runbooks`, branch `agent/codex/WED-375`.

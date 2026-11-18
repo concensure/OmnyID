@@ -723,3 +723,16 @@ four new canonical registry tests. See the latest canonical handoff for build
 evidence and environment limitations. Preparation calls no providers; the
 legacy dispatcher registry remains empty. Durable approved dispatch, AFP result
 persistence, transport bounds and crash reconciliation are still required.
+
+
+## Bounded tool transport — 2026-11-19
+
+Four more subtasks: exact bounded MCP requests; total deadline and response-byte
+limits with redirects/retries disabled; correlated strict JSON receipts with
+schema checks and honest unknown outcomes; adversarial transport coverage.
+Candidate `fbe1e671ed14df8fc6fb7468c3816d1a781c4460` passes 92 integration tests in
+20 binaries, including seven local socket tests and one added registry/schema
+receipt test. See canonical handoff for build evidence. No production executor
+calls this opt-in client. Durable action authority, reservation and authenticated
+AFP result persistence remain open, so the parent count is unchanged:
+**99 complete / 18 remaining of 117**.

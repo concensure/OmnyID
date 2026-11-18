@@ -1,3 +1,17 @@
+## 2026-11-19: WED-375 bounded tool transport preserves unknown outcomes
+
+Add an opt-in bounded MCP transport rather than changing existing dispatcher
+callers. Runbooks remain disconnected until durable approval/reservation exists.
+Disable redirects and transport retries; impose a total deadline and actual-byte
+ceiling. Reject unsupported content channels and ambiguous JSON before accepting
+a correlated opaque receipt. Bind endpoint/capability/arguments and require the
+prepared output schema. This receipt is not owner/action authority or AFP proof.
+Any failure after transmission starts is outcome Unknown, including validation
+failure: never assume that the tool did nothing or automatically retry it.
+Use fixed private-safe error codes; keep raw provider errors out of diagnostics.
+The legacy endpoint guard remains insufficient for a full destination-isolation
+claim; provider/DNS sandbox policy is still a release prerequisite.
+
 ## 2026-11-19: WED-375 canonical grant snapshot is preparation only
 
 Use one owner-scoped query joining the MCP connection and canonical capability

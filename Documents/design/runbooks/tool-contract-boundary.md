@@ -76,3 +76,38 @@ attempt before any provider call, recheck current registry/policy, bound timeout
 and result size at transport, persist verified private AFP results atomically,
 and define crash/unknown-outcome reconciliation without blind retries. Existing
 private-review approval never supplies external execution authority.
+
+
+## Bounded MCP transport (not yet connected to runbook execution)
+
+`mcp_client::bounded::call_tool` is an opt-in low-level transport alongside the
+legacy API. It does not load credentials, select an account, approve an action,
+reserve an attempt, or persist AFP. No production runbook route invokes it.
+
+It constructs one exact tools/call JSON-RPC request with a fresh correlation ID.
+Arguments must be an object and pass depth/node/byte limits before serialization.
+The request envelope is capped at 64 KiB. Credentials are bounded, validated as
+header values and marked sensitive; errors contain fixed codes only.
+
+A single total deadline (15 seconds by default, at most 30) covers transmission,
+headers and body chunks. Responses are bounded to at most 64 KiB by both declared
+length and actual accumulated bytes. Redirects, retries, inherited proxies,
+compressed responses and event-stream/text fallbacks are disabled or rejected.
+Only an application/json object with exact jsonrpc/id/result fields is accepted.
+The ID must match; duplicate keys, including nested result keys, are rejected.
+
+A correlated transport receipt is opaque and neither Debug nor Serialize. It
+binds endpoint, capability and exact arguments. PreparedRunbookTool validates
+that binding and the frozen output schema. Transport correlation is not business
+success, proof of the owner/account, an approval or an attempt reservation: the
+future executor must bind its full owner/account/grant hash to a durable receipt.
+
+Pre-send validation failures are NotSent. Every error once transmission starts,
+including timeout, HTTP/provider error, malformed body and schema rejection, is
+Unknown. None grants retry permission. Errors retain no URL, credentials, raw
+provider text or private arguments. Cancellation/crash reconciliation and
+provider-side idempotency still require the durable execution implementation.
+
+This client retains the existing HTTPS/localhost endpoint policy. Complete DNS
+and destination isolation, approved provider compatibility and sandbox evidence
+remain release prerequisites; this transport is not an SSRF protection claim.
