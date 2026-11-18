@@ -12,6 +12,7 @@ pub struct PreparedRunbookTool {
     arguments: Value,
     request_hash: String,
     transport_binding: String,
+    pub(crate) approval_mode: String,
     contract: ToolContract,
 }
 impl PreparedRunbookTool {
@@ -64,6 +65,25 @@ pub async fn prepare_runbook_tool(
     arguments: Value,
 ) -> Result<PreparedRunbookTool> {
     let snapshot = super::runbook_registry::load(ctx, slug, capability).await?;
+    from_snapshot(ctx, slug, capability, arguments, snapshot)
+}
+pub(crate) async fn prepare_in(
+    ctx: &ToolDispatchContext<'_>,
+    slug: &str,
+    capability: &str,
+    arguments: Value,
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+) -> Result<PreparedRunbookTool> {
+    let snapshot = super::runbook_registry::load_in(ctx, slug, capability, &mut **tx).await?;
+    from_snapshot(ctx, slug, capability, arguments, snapshot)
+}
+fn from_snapshot(
+    ctx: &ToolDispatchContext<'_>,
+    slug: &str,
+    capability: &str,
+    arguments: Value,
+    snapshot: super::runbook_registry::RegistrySnapshot,
+) -> Result<PreparedRunbookTool> {
     let contract = ToolContract::parse(&snapshot.contract)?;
     contract.validate_input(&arguments)?;
     let transport_binding = crate::mcp_client::bounded::request_binding(
@@ -89,6 +109,10 @@ pub async fn prepare_runbook_tool(
         arguments,
         request_hash,
         transport_binding,
+        approval_mode: snapshot.binding["approval_mode"]
+            .as_str()
+            .ok_or("invalid_tool_policy")?
+            .into(),
         contract,
     })
 }

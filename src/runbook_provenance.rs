@@ -6,7 +6,7 @@ use crate::{
     runbook_runtime::RunbookRuntime,
     runbook_store::digest,
 };
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sqlx::{Postgres, Transaction};
 
 impl RunbookRuntime<'_, '_> {
@@ -54,7 +54,28 @@ impl RunbookRuntime<'_, '_> {
             label: label.into(),
             sha256,
         };
-        let approval_hash = if let Some(reference) = &trace.approval_ref {
+        let approval_hash = if trace.step_kind == StepKind::Tool && trace.approval_ref.is_some() {
+            let reference = trace
+                .approval_ref
+                .as_deref()
+                .ok_or("tool_approval_required")?;
+            let approval = self
+                .store
+                .read_kind(owner, "runbook_tool_decision", Some(reference), None, tx)
+                .await?
+                .pop()
+                .ok_or("tool_approval_required")?;
+            let decision: crate::runbook_tool_records::ToolDecision =
+                crate::runbook_tool_records::decode(&approval)?;
+            if !decision.approved
+                || decision.instance_id != instance.instance_id
+                || decision.step_id != trace.step_id
+                || decision.request_hash != trace.input_hash
+            {
+                return Err("tool_approval_mismatch");
+            }
+            digest(&approval["content"])
+        } else if let Some(reference) = &trace.approval_ref {
             let approval = self
                 .store
                 .read_kind(owner, "action", Some(reference), None, tx)

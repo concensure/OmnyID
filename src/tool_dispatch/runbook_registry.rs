@@ -2,7 +2,7 @@
 //! A connection alone is not authority. This projection permits preparation only.
 use super::ToolDispatchContext;
 use crate::{runbook_contract::Result, runbook_validation::identifier};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sqlx::Row;
 
 pub(super) struct RegistrySnapshot {
@@ -14,6 +14,14 @@ pub(super) async fn load(
     ctx: &ToolDispatchContext<'_>,
     slug: &str,
     capability: &str,
+) -> Result<RegistrySnapshot> {
+    load_in(ctx, slug, capability, &ctx.db.pool).await
+}
+pub(super) async fn load_in<'e, E: sqlx::Executor<'e, Database = sqlx::Postgres>>(
+    ctx: &ToolDispatchContext<'_>,
+    slug: &str,
+    capability: &str,
+    executor: E,
 ) -> Result<RegistrySnapshot> {
     if !identifier(ctx.user_id) || !identifier(slug) || !identifier(capability) {
         return Err("invalid_tool_selection");
@@ -38,13 +46,13 @@ pub(super) async fn load(
         FROM mcp_tool_connections m
         JOIN user_connected_capabilities c ON c.user_id=m.user_id AND c.capability_id=$3
         WHERE m.user_id=$1 AND m.tool_slug=$2
-        ORDER BY c.id LIMIT 2
+        ORDER BY c.id LIMIT 2 FOR SHARE OF m, c
     "#,
     )
     .bind(ctx.user_id)
     .bind(slug)
     .bind(format!("{slug}.{capability}"))
-    .fetch_all(&ctx.db.pool)
+    .fetch_all(executor)
     .await
     .map_err(|_| "tool_registry_unavailable")?;
     if rows.len() != 1 {

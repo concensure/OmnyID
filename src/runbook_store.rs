@@ -279,6 +279,7 @@ pub(crate) fn digest(value: &Value) -> String {
 
 fn validate_record(owner: &str, value: &Value) -> Result<()> {
     match value["type"].as_str() {
+        Some("runbook_tool_proposal" | "runbook_tool_decision" | "runbook_tool_reservation" | "runbook_tool_result") => crate::runbook_tool_records::validate(owner, value)?,
         Some("runbook_review_decision") => crate::runbook_review_decision::validate(owner, value)?,
         Some("action") if value["subtype"] == "approval_decision" => {
             crate::runbook_review_decision::validate(owner, value)?
