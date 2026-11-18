@@ -28,9 +28,21 @@ Get-ChildItem -LiteralPath $weddingRoot -Directory |
     Sort-Object Name |
     ForEach-Object { $locations.Add("/wedding/$($_.Name)/") }
 
+# Only articles declare a trustworthy date (run reconcile-wedding-seo.mjs first). Git commit
+# dates are bulk-rewritten by metadata passes, and a wrong lastmod teaches crawlers to ignore it.
+function Get-Lastmod([string]$Location) {
+    if ($Location -notlike '/wedding/blog/*.html') { return $null }
+    $html = Get-Content -LiteralPath (Join-Path $ProjectRoot $Location.TrimStart('/')) -Raw
+    $match = [regex]::Match($html, 'property="article:published_time" content="(\d{4}-\d{2}-\d{2})"')
+    if ($match.Success) { return $match.Groups[1].Value }
+    return $null
+}
+
 $body = $locations | Sort-Object -Unique | ForEach-Object {
     $escaped = [System.Security.SecurityElement]::Escape("$base$_")
-    "  <url><loc>$escaped</loc></url>"
+    $lastmod = Get-Lastmod $_
+    if ($lastmod) { "  <url><loc>$escaped</loc><lastmod>$lastmod</lastmod></url>" }
+    else { "  <url><loc>$escaped</loc></url>" }
 }
 $xml = @('<?xml version="1.0" encoding="UTF-8"?>', '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">') + $body + @('</urlset>', '')
 Set-Content -LiteralPath (Join-Path $ProjectRoot 'docs/sitemap.xml') -Value $xml -Encoding utf8NoBOM

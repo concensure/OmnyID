@@ -23,13 +23,17 @@ function htmlFiles(root) {
 }
 
 function decodeHtml(value) {
+  // Tags go first and &amp; last so escaped text such as &lt;b&gt; is never mistaken for markup
+  // or decoded twice. Numeric forms matter: titles use &#x27; and re-escaping it printed it literally.
   return value
-    .replaceAll('&amp;', '&')
+    .replaceAll(/<[^>]+>/g, '')
+    .replaceAll(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCodePoint(Number.parseInt(hex, 16)))
+    .replaceAll(/&#(\d+);/g, (_, decimal) => String.fromCodePoint(Number(decimal)))
     .replaceAll('&quot;', '"')
-    .replaceAll('&#39;', "'")
+    .replaceAll('&apos;', "'")
     .replaceAll('&lt;', '<')
     .replaceAll('&gt;', '>')
-    .replaceAll(/<[^>]+>/g, '')
+    .replaceAll('&amp;', '&')
     .trim();
 }
 
@@ -43,7 +47,8 @@ function attr(value) {
 
 function first(html, pattern, fallback = '') {
   const match = html.match(pattern);
-  return match ? decodeHtml(match[1]) : fallback;
+  const captured = match?.slice(1).find((group) => group !== undefined);
+  return captured === undefined ? fallback : decodeHtml(captured);
 }
 
 function pageUrl(path) {
@@ -90,7 +95,19 @@ function removeGeneratedMeta(html) {
     .replace(/\s*<meta\s+(?:property|name)=["'](?:og:[^"']+|twitter:[^"']+|article:published_time|article:author)["'][^>]*>\s*/gi, '\n');
 }
 
-function schemaGraph({ canonical, title, description, image, article, published, wedding }) {
+function breadcrumbTrail({ canonical, label, article, wedding }) {
+  const weddingHome = `${origin}/wedding/`;
+  const trail = [{ name: 'OmnyID', url: `${origin}/` }];
+  if (canonical === weddingHome) trail.push({ name: 'OmnyID Weddings', url: canonical });
+  else if (canonical !== `${origin}/`) {
+    if (wedding) trail.push({ name: 'OmnyID Weddings', url: weddingHome });
+    if (article) trail.push({ name: 'Blog', url: `${weddingHome}blog.html` });
+    trail.push({ name: label, url: canonical });
+  }
+  return trail;
+}
+
+function schemaGraph({ canonical, title, label, description, image, article, published, wedding }) {
   const organisation = {
     '@type': 'Organization',
     '@id': `${origin}/#organization`,
@@ -98,6 +115,27 @@ function schemaGraph({ canonical, title, description, image, article, published,
     url: origin,
     logo: `${origin}/wedding/assets/logo/omnyid-logo.png`,
   };
+  const website = {
+    '@type': 'WebSite',
+    '@id': `${origin}/#website`,
+    name: 'OmnyID',
+    url: origin,
+    inLanguage: 'en-AU',
+    publisher: { '@id': `${origin}/#organization` },
+  };
+  const trail = breadcrumbTrail({ canonical, label, article, wedding });
+  const breadcrumb = trail.length < 2
+    ? null
+    : {
+        '@type': 'BreadcrumbList',
+        '@id': `${canonical}#breadcrumb`,
+        itemListElement: trail.map((crumb, index) => ({
+          '@type': 'ListItem',
+          position: index + 1,
+          name: crumb.name,
+          item: crumb.url,
+        })),
+      };
   const application = {
     '@type': 'SoftwareApplication',
     '@id': wedding ? `${origin}/wedding/#application` : `${origin}/#application`,
@@ -114,13 +152,14 @@ function schemaGraph({ canonical, title, description, image, article, published,
     ? {
         '@type': 'Article',
         '@id': `${canonical}#article`,
-        headline: title,
+        headline: label,
         description,
         image,
         datePublished: published,
         dateModified: published,
         author: { '@type': 'Person', name: 'Casper Wu' },
         publisher: { '@id': `${origin}/#organization` },
+        isPartOf: { '@id': `${origin}/#website` },
         mainEntityOfPage: canonical,
         inLanguage: 'en-AU',
       }
@@ -131,9 +170,12 @@ function schemaGraph({ canonical, title, description, image, article, published,
         description,
         url: canonical,
         inLanguage: 'en-AU',
-        isPartOf: { '@id': wedding ? `${origin}/wedding/#application` : `${origin}/#application` },
+        isPartOf: { '@id': `${origin}/#website` },
+        about: { '@id': wedding ? `${origin}/wedding/#application` : `${origin}/#application` },
+        ...(breadcrumb ? { breadcrumb: { '@id': breadcrumb['@id'] } } : {}),
       };
-  return { '@context': 'https://schema.org', '@graph': [organisation, application, page] };
+  const graph = [organisation, website, application, page, ...(breadcrumb ? [breadcrumb] : [])];
+  return { '@context': 'https://schema.org', '@graph': graph };
 }
 
 function rootIndexableFiles() {
@@ -156,9 +198,11 @@ for (const path of [...htmlFiles(weddingRoot), ...rootIndexableFiles()]) {
   const title = first(html, /<title[^>]*>([\s\S]*?)<\/title>/i, wedding ? 'OmnyID Wedding' : 'OmnyID');
   const description = first(
     html,
-    /<meta\s+name=["']description["']\s+content=["']([^"']*)["'][^>]*>/i,
+    // Quote-aware: a lazy `[^"']*` stops at the first apostrophe inside a double-quoted value.
+    /<meta\s+name=["']description["']\s+content=(?:"([^"]*)"|'([^']*)')/i,
     wedding ? 'Wedding planning guidance from OmnyID Wedding.' : 'Privacy-first decision support from OmnyID.',
   );
+  const label = first(html, /<h1[^>]*>([\s\S]*?)<\/h1>/i, title).replaceAll(/\s+/g, ' ');
   const imageSource = article
     ? first(html, /<div\s+class=["']article-cover["'][^>]*>\s*<img[^>]+src=["']([^"']+)["'][^>]*>/i, '')
     : first(html, /<img[^>]+src=["']([^"']+)["'][^>]*>/i, '');
@@ -173,7 +217,7 @@ for (const path of [...htmlFiles(weddingRoot), ...rootIndexableFiles()]) {
       html = html.replace(/(<h1[^>]*>[\s\S]*?<\/h1>)/i, '$1\n      <p class="article-byline">By Casper Wu</p>');
     }
   }
-  const graph = JSON.stringify(schemaGraph({ canonical, title, description, image, article, published, wedding })).replaceAll('<', '\\u003c');
+  const graph = JSON.stringify(schemaGraph({ canonical, title, label, description, image, article, published, wedding })).replaceAll('<', '\\u003c');
   const block = [
     '<!-- omnyid-seo:start -->',
     `<link rel="canonical" href="${attr(canonical)}">`,
@@ -191,7 +235,9 @@ for (const path of [...htmlFiles(weddingRoot), ...rootIndexableFiles()]) {
     `<script type="application/ld+json">${graph}</script>`,
     '<!-- omnyid-seo:end -->',
   ].join('\n');
-  html = html.replace('</head>', `${block}\n</head>`);
+  // Keep this block ahead of the consent-gated analytics block so reruns stay idempotent.
+  const anchor = html.includes('<!-- omnyid-privacy-analytics:start -->') ? '<!-- omnyid-privacy-analytics:start -->' : '</head>';
+  html = html.replace(anchor, `${block}\n${anchor}`);
   writeFileSync(path, html, 'utf8');
   updated += 1;
 }

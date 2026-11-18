@@ -192,7 +192,10 @@
         header Cache-Control "public, max-age=3600"
     }
     handle /llms.txt {
-        respond "Not found" 404
+        root * /srv/docs
+        file_server
+        header Content-Type "text/plain; charset=utf-8"
+        header Cache-Control "public, max-age=3600"
     }
     handle /federation/* {
         import omnyid_proxy
