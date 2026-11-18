@@ -754,3 +754,17 @@ The tool executor is a trusted backend seam with explicit arguments; authenticat
 routes/queue, live credential adapter, evidence-to-argument projection, provider
 AFP projection and unknown-outcome reconciliation remain integration work. No
 live provider, production rollout or additional parent closure is claimed.
+
+
+## Authenticated exact tool review — 2026-11-19
+
+Owner-authenticated proposal, historical retrieval and approval/rejection routes
+now bridge the durable backend lifecycle. Both management and separate default-off
+review flags are required. Approval uses the existing recent-session policy;
+rejection remains possible with an older valid session after grant revocation.
+Unknown JSON fields and cross-owner access are rejected, responses are no-store,
+and these routes never invoke a provider. Candidate
+`211386468b4f6db1b82aec67411d68c7316fb889` passes 102 tests in 21 integration
+binaries, including the new HTTP boundary scenario. See canonical handoff for
+build evidence. Queue UI, live account-bound adapter and rollout remain open;
+parent checklist stays **100 complete / 17 remaining of 117**.

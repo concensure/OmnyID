@@ -1,3 +1,16 @@
+## 2026-11-19: WED-375 tool review routes never dispatch
+
+Add owner-authenticated proposal, exact proposal retrieval and decision endpoints
+under the existing no-store, bounded-body management router. Require both
+OMNYID_RUNBOOK_MANAGEMENT_ENABLED and OMNYID_RUNBOOK_TOOL_REVIEW_ENABLED, exact
+literal true; the review flag is off by default. Derive owner from authentication,
+reject unknown request fields and require the shared recent-session check on
+approvals including replay. Allow authenticated rejection from an older valid
+session, including after grant revocation. Return execution_available=false:
+a saved decision does not run a provider. Keep the live adapter, queue UI and
+execution route separate. Retrieved proposals are immutable historical facts;
+only a new decision/dispatch check establishes current eligibility.
+
 ## 2026-11-19: WED-375 durable tool approval is separate from private review
 
 A Tool proposal freezes its exact canonical registry request and current step.

@@ -46,15 +46,15 @@ tasks:
     branch: agent/codex/WED-375
     worktree: C:/temp/wt/omnyid-runbooks
     base_sha: 5536b83b2f9d2f58488a075f383c24f8f4f73d6c
-    candidate_sha: 489b13f11968dced83a13e085dc619e00ff76771
+    candidate_sha: 211386468b4f6db1b82aec67411d68c7316fb889
     diagnostic_baseline_sha: d8ebd36dbe2e53d1a83dcd7bbb9a85f9fa97e6af
     verification_worktree: C:/temp/wt/omnyid-runbooks-verify-43d7c830
     depends_on: [WED-308, WED-374]
     files: [src/mcp_client.rs, src/mcp_client/**, src/tool_dispatch.rs, src/tool_dispatch/runbook*.rs, src/runbook*.rs, src/proactive_provenance.rs, src/lib.rs, src/db.rs, src/server/runbook_routes.rs, src/server/runbook_routes/**, src/server/types.rs, src/server/mod.rs, src/server/proactive_routes.rs, src/daemon_runtime.rs, solid-ui/src/components/Runbook*.tsx, solid-ui/src/components/AgentFleetView.tsx, solid-ui/src/components/DecisionQueueView.tsx, solid-ui/src/components/renderers/A2UIRenderer.tsx, solid-ui/src/lib/runbook*.ts, solid-ui/tests/runbook*, solid-ui/tests/e2e/runbook*, solid-ui/e2e/runbook*, solid-ui/playwright.runbooks.config.ts, tests/runbook*, Documents/design/runbooks/**, .agent/**]
     acceptance: [Strict bounded contracts and terminal-safe transitions, immutable starter definitions and owner-scoped AFP projection, deterministic typed matching with stable dedupe and owner-bound keys, focused adversarial tests and clean-commit Rust build, execution remains disconnected until ledger transactions and authority integration are complete]
     current_batch: "Authenticated tool proposal, retrieval and decision routes behind a separate default-off review flag; recent human session required for approval; strict owner, revision and request binding; adversarial HTTP tests. No execution endpoint or live provider adapter."
-    next_batch: "Bind the trusted ToolProvider seam to live owner/account credential authority and authenticated human approval routes/queue; add deterministic evidence-to-argument projection and crash/unknown-outcome reconciliation without blind retries. Provider sandbox/security evidence precedes rollout."
-    progress: "100 complete / 17 remaining of 117: deterministic backend step implementations now include durable exact-action tool proposals, decisions, one-shot reservations and atomic private result/trace/provenance persistence. Frozen candidate 489b13f11968dced83a13e085dc619e00ff76771 passes 101 integration tests in 21 binaries on Linux Rust 1.94.1. See handoff for standalone build evidence and existing line-budget/remote limitations. No deployment or real provider calls; production runbook tool execution remains disconnected."
+    next_batch: "Add separate tool review projection and queue UI using exact saved arguments and the new endpoints, then bind ToolProvider to live owner/account credential authority. Evidence-to-argument mapping and crash/unknown-outcome reconciliation remain; provider sandbox/security evidence precedes rollout."
+    progress: "100 complete / 17 remaining of 117, unchanged: owner-authenticated exact tool proposal/read/decision API completes an integration subtask, not another parent. Candidate 211386468b4f6db1b82aec67411d68c7316fb889 passes 102 integration tests in 21 binaries on Linux Rust 1.94.1. Both management and separate review flags are required; approval requires a recent session; routes never dispatch. See handoff for build evidence and existing line-budget/remote limitations. No deployment or real provider calls."
   - id: WED-374
     title: Restore Wedding Sprout rollout, complete projected databases, persona artwork, exports and planner-card affordances
     status: in_progress

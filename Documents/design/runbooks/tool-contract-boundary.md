@@ -127,8 +127,7 @@ rechecks current canonical account/grant/schema state, both definition policies,
 and the existing account proactivity policy. Rejection remains possible after
 revocation. Decisions are separate runbook_tool_decision records: a private-review
 approval, policy receipt or model answer cannot substitute for this approval.
-Future routes must require a recent authenticated human session; no route is
-wired to this internal seam in this batch.
+Approval routes require a recent authenticated human session, as described below.
 
 Execution takes an owner lock, checks the saved decision and fresh policy, locks
 existing connection/grant rows while preparing, and appends a one-shot reservation
@@ -148,6 +147,30 @@ stored receipt. Completion additionally requires a matching applied tool receipt
 
 The trusted adapter seam currently has loopback/mock coverage only. Selecting and
 loading live provider credentials, approved account binding in the live adapter,
-UI/route integration, deterministic evidence-to-argument mapping, normalized
+Queue UI integration, deterministic evidence-to-argument mapping, normalized
 provider-specific AFP projections and explicit unknown-outcome reconciliation
 remain separate integration work. Nothing here enables production tool execution.
+
+
+## Authenticated tool review API
+
+Both `OMNYID_RUNBOOK_MANAGEMENT_ENABLED=true` and
+`OMNYID_RUNBOOK_TOOL_REVIEW_ENABLED=true` are required. The latter defaults off.
+The management router supplies owner authentication, rate limits, a 40 KiB body
+limit and `Cache-Control: no-store`. These endpoints do not call providers:
+
+| Method | Path | Body / response |
+| --- | --- | --- |
+| POST | `/runbooks/instances/{id}/tools` | `step_id`, `expected_revision`, `request` containing `tool_slug`, `capability`, `arguments`; returns saved `proposal` |
+| GET | `/runbooks/instances/{id}/tools/{proposal}` | Returns the exact historical `proposal`, including reviewed arguments |
+| POST | `/runbooks/instances/{id}/tools/{proposal}/decision` | `expected_revision`, `approved`; returns saved `decision` |
+
+Every response includes `execution_available: false`. Owner identity comes only
+from the authenticated session, never request JSON. Unknown fields are rejected.
+Cross-owner and mismatched-instance lookups cannot reveal a proposal. Approval
+requires the shared recent high-risk session check, even for a replay. Rejection
+requires a valid session but not recent sign-in, so expired proposals and revoked
+grants can still be declined. Runtime revision, hash, expiry and live policy
+checks remain authoritative; historical GET never implies current eligibility.
+There is no provider execution endpoint. Queue UI and live adapter wiring remain
+separate work, and neither management nor review flags enable dispatch.

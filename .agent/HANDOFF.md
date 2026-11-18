@@ -1,3 +1,61 @@
+## 2026-11-19: WED-375 authenticated tool review API verified
+
+Implementation worktree: `C:/temp/wt/omnyid-runbooks`, branch `agent/codex/WED-375`.
+Frozen source: `211386468b4f6db1b82aec67411d68c7316fb889`.
+Verification checkout: `C:/temp/wt/omnyid-runbooks-verify-43d7c830`, clean detached
+at that SHA. Documentation-only follow-ups do not change the source candidate.
+Checklist unchanged: **100 complete / 17 remaining of 117**. This closes an
+integration subtask, not an additional parent. WED-375 remains in progress.
+
+Added POST exact proposal, GET immutable proposal and POST decision routes under
+/runbooks/instances/{id}/tools. Both management and new default-off tool-review
+flags are required. Identity comes from authentication; unknown request fields
+are rejected. Approvals (including replay) require the shared recent-session
+policy. Rejection remains available to an older valid session after revocation.
+The runtime still enforces exact owner, proposal, revision, expiry and policy.
+GET is historical retrieval, not current eligibility. All responses inherit
+no-store/body limits; routes share the management rate limit and never call a
+provider. Every success response reports execution_available=false.
+
+Files: src/server/runbook_routes.rs, new runbook_routes/tool_review.rs,
+src/runbook_tool_runtime.rs, tests/runbook_tool_runtime_postgres.rs, canonical
+coordination and runbook design/checklist documents. No frontend, migration,
+dependency, sitemap, provider adapter or production configuration changes.
+Primary checkout and other agents' work remain untouched.
+
+Verification from clean frozen source with root/SHA/status printed:
+- 102 tests passed in 21 integration binaries, exit 0; compilation 6m 56s.
+  New HTTP scenario covers both dark flags, missing authentication, cross-owner
+  proposal/read/decision, forged fields, exact replay, stale session/revision,
+  conflicting decision, rejection after revocation and zero provider calls.
+  All previous 101 runbook regression tests also passed.
+- Standalone cargo build --lib passed, exit 0, 39.92s.
+- Linux Rust 1.94.1; omnyid-wed318-builder-test:a42db33, image identity
+  sha256:21fe7471679891c3a083d0c167ee660873a8be66223ad205dd05405164c1f0fa;
+  read-only source mount, existing caches, -j1, CARGO_INCREMENTAL=0,
+  RUST_MIN_STACK=268435456, test/dev debug=0, root codegen-units=64.
+- Evidence: C:/temp/wt/runbook-21138646-linux-tests.log and .exit;
+  C:/temp/wt/runbook-21138646-linux-build.log and .exit.
+- Line-budget check still fails only unchanged server/mod.rs 45734/45717 and
+  db.rs 18045/17986; Wedding-specific budget passes. git diff --check passed.
+- GitHub queries show three failed runs at unrelated SHAs (509dc31b, 69fbc2b2,
+  24bb0286), no deployments and no candidate CI evidence. Existing configured
+  remote lineage remains unsuitable; no push/PR created. These local results
+  do not assert GitHub Checks, deployment or runtime health. Windows compiler
+  limitation was not retried; Linux evidence only.
+
+Dedicated disposable Postgres is stopped after verification. Only local mock
+providers were used by the regression suite; the HTTP test makes zero calls.
+No deployment and no production health assertion.
+
+Next: project separate tool review cards into Runbook activity/queue, showing
+exact saved arguments, current revision and expiry; use the new endpoints.
+Existing RunbookPanel private-review cards intentionally use /actions/decision
+and must not silently become tool authority. Then implement the live account-
+bound credential adapter and review destination isolation/provider compatibility.
+Evidence-to-argument mapping, normalized provider projections and explicit
+crash/unknown-outcome reconciliation remain. Keep rollout flags off.
+
 ## 2026-11-19: WED-375 durable tool lifecycle verified
 
 Implementation: `C:/temp/wt/omnyid-runbooks`, branch `agent/codex/WED-375`.
