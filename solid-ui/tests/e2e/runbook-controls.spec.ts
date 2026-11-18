@@ -78,6 +78,7 @@ test("question queue, 200% zoom, keyboard, explicit export and stale errors", as
   await page.keyboard.type("Work");await page.keyboard.press("Enter");
   await expect(page.getByText("Your answer was not saved.",{exact:false})).toBeVisible();
   await expect(page.getByText("PRIVATE_ERROR_BODY")).toHaveCount(0);
+  await expect(page.getByRole("heading",{name:"Runbook questions"})).toBeFocused();
   expect(state.exports()).toBe(0);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth)).toBe(true);
 });

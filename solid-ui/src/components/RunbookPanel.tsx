@@ -73,7 +73,7 @@ export function RunbookPanel(props: { mode?: "manage" | "questions" | "activity"
       setNotice(message); toast.success(message);
       queueMicrotask(() => heading?.focus());
     } catch {
-      if (current === generation) { setConfirm(undefined); setError("The change was not confirmed. Refresh before trying again."); toast.error("Runbook change was not confirmed."); }
+      if (current === generation) { setConfirm(undefined); setError("The change was not confirmed. Refresh before trying again."); toast.error("Runbook change was not confirmed."); queueMicrotask(() => heading?.focus()); }
       throw new Error("runbook_action_failed");
     } finally { setBusy(false); }
   }
