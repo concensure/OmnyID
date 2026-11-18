@@ -22,12 +22,12 @@ tasks:
     branch: agent/codex/WED-375
     worktree: C:/temp/wt/omnyid-runbooks
     base_sha: 5536b83b2f9d2f58488a075f383c24f8f4f73d6c
-    candidate_sha: 152d6f38980245bee25d39814f35b45bb00cec19
+    candidate_sha: df5a7dc59fccfec179cf5631f69b5aa7826b0034
     verification_worktree: C:/temp/wt/omnyid-runbooks-verify-43d7c830
     depends_on: [WED-308, WED-374]
     files: [src/runbook*.rs, src/lib.rs, src/db.rs, src/server/runbook_routes.rs, src/server/mod.rs, tests/runbook*, Documents/design/runbooks/**, .agent/**]
     acceptance: [Strict bounded contracts and terminal-safe transitions, immutable starter definitions and owner-scoped AFP projection, deterministic typed matching with stable dedupe and owner-bound keys, focused adversarial tests and clean-commit Rust build, execution remains disconnected until ledger transactions and authority integration are complete]
-    progress: "Completed seven more items: stage 4 adapter/ref preservation/tests; stage 9 deterministic success criteria; stage 14 authenticated detail/activity/cancel/answer endpoints; stage 16 threat model; stage 17 file budgets. Checklist 61 complete, 56 remaining of 117. Source 152d6f38980245bee25d39814f35b45bb00cec19 completed 33 focused tests and library build in clean exact-SHA worktree on Rust 1.95. Dependency audit reports six advisories and five warnings in unchanged dependencies; registry/yanked checks timed out, so security gate remains open. No live ingress, external execution, frontend integration, PR review or deployment. Remaining work includes UI/daemon hooks, tools/approval, shared budgets, model/provenance/outcomes, retention and rollout."
+    progress: "Completed envelope-only ledger indexes and selective bound queries, including idempotent existing-schema bootstrap regression. Checklist 62 complete, 55 remaining of 117. Source df5a7dc59fccfec179cf5631f69b5aa7826b0034 completed all 33 focused tests and library build in a clean exact-SHA worktree on Rust 1.95. Existing dependency audit findings remain unresolved. No live ingress, external execution, frontend integration, PR review or deployment. Bootstrap index creation can block tenant writes; assess before rollout. Remaining work includes definition cache, UI/daemon hooks, tools/approval, shared budgets, models/provenance/outcomes, retention and rollout."
   - id: WED-374
     title: Restore Wedding Sprout rollout, complete projected databases, persona artwork, exports and planner-card affordances
     status: in_progress

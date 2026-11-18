@@ -3837,3 +3837,17 @@ with event_replay_conflict; do not rewrite receipts to conceal the mismatch.
 There is no live runbook ingress deployment in this branch. Any future migration
 of such development/hosted instances requires an explicit reviewed versioning
 or cancellation/restart policy before rollout.
+
+### WED-375: envelope-only private-ledger indexes (2026-11-18)
+
+Use the existing private messages table's (type, id) and (type, thread_id, id)
+B-tree indexes for bounded kind/history and instance-thread reads. Queries emit
+only supplied predicates with bound values, preserving signature verification,
+decryption, complete-history limits and owner transaction locks. No secondary
+definition authority or plaintext cache is introduced. Bootstrap requires both
+indexes so existing schemas upgrade through the established bootstrap path on a
+fresh Db handle; runbook reads do not bootstrap or recreate erased accounts.
+Indexes cover all private envelope types to support prepared parameterized queries.
+Creating these indexes can lock writes during bootstrap on large existing tenant
+tables; assess tenant sizes and rollout timing before any deployment. No production
+migration or deployment is performed in this implementation slice.

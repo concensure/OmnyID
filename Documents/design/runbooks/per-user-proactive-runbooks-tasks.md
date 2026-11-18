@@ -33,7 +33,7 @@ only the typed definition and its revision reference, with no storage keys or
 provider credentials. Responses are no-store. No frontend control or first-run
 screen is wired yet; the setup endpoint copies the user's selected starters.
 
-The frozen API/event/completion source candidate is `152d6f38980245bee25d39814f35b45bb00cec19`.
+The frozen envelope-index source candidate is `df5a7dc59fccfec179cf5631f69b5aa7826b0034`.
 All 33 focused integration tests and the library build completed in the clean exact-SHA worktree
 `C:/temp/wt/omnyid-runbooks-verify-43d7c830` using Rust 1.95, two jobs,
 16 package codegen units, incremental compilation off and package debug info
@@ -164,7 +164,7 @@ Depends on: 1, 2
 
 - [x] Add `src/runbook_registry.rs` to read the latest non-superseded definition per runbook from the authenticated user's private ledger.
 - [x] Scope every query by derived owner and reject caller-supplied cross-user references.
-- [ ] Build indexes/projections from AFP metadata only where possible; do not create an independent mutable definition source of truth.
+- [x] Build indexes/projections from AFP metadata only where possible; do not create an independent mutable definition source of truth. (Envelope-only type/id and type/thread/id indexes; required bootstrap upgrades existing schemas. No copied content or secondary authority.)
 - [x] Support enable, disable, supersede, archive, export, and validated import as AFP successor events.
 - [ ] Cache only immutable parsed definitions by owner/version/hash and invalidate on a successor event.
 - [x] Add tests for version ordering, archive, stale edit conflicts, forged owner, forged parent, cache invalidation, and account erasure. (No cache is used; fresh reads observe each committed successor.)

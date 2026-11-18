@@ -9783,3 +9783,37 @@ retention, starter end-to-end cases and rollout are still open. No live executio
 flags enabled. Documentation commits follow the frozen source; no worktrees removed.
 
 Dedicated disposable container omnyid-runbook-wed375-pg stopped after verification.
+
+## WED-375 envelope query indexes — 2026-11-18
+
+Implementation: C:/temp/wt/omnyid-runbooks, agent/codex/WED-375.
+Frozen source: df5a7dc59fccfec179cf5631f69b5aa7826b0034.
+Verification: C:/temp/wt/omnyid-runbooks-verify-43d7c830, clean detached at that SHA.
+Changes: src/db.rs adds two required private-message envelope indexes; existing
+bootstrap repairs schemas missing them. src/runbook_store.rs emits only applicable
+bound predicates for kind/id/thread reads. tests/runbook_storage_postgres.rs
+simulates an existing schema missing both indexes, verifies repair and repeated
+bootstrap, then exercises the full encrypted definition lifecycle and erasure.
+No new mutable data authority, cache or encrypted content projection exists.
+
+Validation: all nine focused runbook integration targets (33 tests) completed
+with exit 0. Library build completed with exit 0. Both ran after explicit
+toplevel/HEAD/clean-status checks using Rust 1.95, C:/cargo-target, incremental
+off, two jobs, package debug=0 and codegen-units=16. The pinned 1.94 toolchain
+remains unchanged because of the previously documented host compiler crash.
+No frontend changes; frontend/full application suites were not run. No new source
+file was introduced; db.rs grew by five lines only. git diff --check is clean.
+Checklist now 62 complete, 55 remaining of 117.
+
+Limitations: indexes upgrade on the established bootstrap path with a fresh Db
+handle, not during runbook reads. Large tenant tables may experience write locks
+during index creation; assess sizes and migration timing before production rollout.
+No performance benchmark or production query-plan claim is made.
+Existing six dependency advisories remain unresolved; audit was not repeated
+because Cargo manifests/lockfile are unchanged. GitHub returned only unrelated
+main CI failure 23703104075 and no deployment records; no CI for this local
+candidate, PR review, hosted checks or deployment were performed. Execution remains
+disconnected and management default-off. Next: immutable definition cache design
+with erasure handling, typed deterministic executor outputs, then existing UI and
+daemon integration; preserve authority and shared-budget gates.
+Documentation follows the frozen source commit. No worktrees removed.
