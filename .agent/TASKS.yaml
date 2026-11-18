@@ -15,6 +15,27 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: SEO-001
+    title: Search and AI-answer discoverability static surface
+    status: review
+    owner: claude
+    branch: agent/claude/SEO-001
+    worktree: C:/temp/wt/omnyid-seo
+    base_sha: 1595e9f5b9bbfeb7152d7bb44fe6286e3c5001ac
+    candidate_sha: a2643ce12803ba9defa2cd48a745ee169a2b3adf
+    depends_on: [WED-375]
+    files: [docs/**, wedding/**, Caddyfile, scripts/reconcile-wedding-seo.mjs, scripts/generate-public-sitemap.ps1]
+    acceptance: [Public metadata and website and catalogue and CSP smoke tests, exact-SHA static release preserving server-only Caddy blocks, Caddy recreation and hosted checks]
+    progress: "Author handoff 172a7c80 received from user. Integrate content commit a2643ce1 on WED-375; author retains sitemap/content ownership. Do not deploy application code as part of this static integration."
+  - id: SEO-001-INTEGRATION
+    title: Integrate and verify reviewed SEO snapshot on WED-375
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-375
+    worktree: C:/temp/wt/omnyid-runbooks
+    depends_on: [SEO-001]
+    files: [docs/**, wedding/**, Caddyfile, scripts/reconcile-wedding-seo.mjs, scripts/generate-public-sitemap.ps1, .agent/**]
+    acceptance: [Consume authored snapshot without overwriting ongoing sitemap work, clean exact-SHA verification, preserve production configuration and record rollout evidence or blocker]
   - id: WED-375
     title: Implement per-user proactive Runbooks in dependency order
     status: in_progress

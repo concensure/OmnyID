@@ -1,3 +1,13 @@
+## 2026-11-18: SEO-001 integration ownership (Codex)
+
+User supplied Claude handoff at 172a7c80, content a2643ce12803ba9defa2cd48a745ee169a2b3adf.
+WED-375 is now committed and clean at a131695c; the earlier dirty-tree warning
+is historical. Codex integrates the frozen SEO content snapshot and verifies it;
+Claude retains ownership of ongoing sitemap/content changes in omnyid-seo.
+No application deployment or Runbook rollout is implied by a static Caddy release.
+The supplied handoff requires Caddy recreation, not reload, preserving server-only
+configuration. Its full note remains in commit 172a7c80:.agent/HANDOFF.md.
+
 ## 2026-11-18 - WED-373 small-wedding alignment and Wedding reliability release candidate (Codex)
 
 Worktree `C:\temp\wt\omnyid-wed373`, branch `agent/codex/WED-373`, based on
