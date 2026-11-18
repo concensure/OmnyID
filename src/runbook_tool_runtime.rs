@@ -1,4 +1,4 @@
-//! Internal exact-action tool lifecycle. No HTTP route or live adapter is enabled.
+//! Exact-action tool lifecycle. No live provider adapter is enabled.
 //! Caller derives owner from a recent authenticated session for human decisions.
 pub use crate::runbook_tool_execution::ToolProvider;
 pub use crate::runbook_tool_records::{
@@ -18,6 +18,36 @@ use serde_json::json;
 use sqlx::{Postgres, Transaction};
 
 impl RunbookRuntime<'_, '_> {
+    /// Read the immutable exact request for an owner-authenticated review.
+    /// Historical retrieval does not imply current approval or dispatch eligibility.
+    pub async fn tool_proposal(
+        &self,
+        owner: &str,
+        instance: &str,
+        proposal_ref: &str,
+    ) -> Result<ToolProposal> {
+        let mut tx = self.store.begin(owner).await?;
+        self.load_instance(owner, instance, &mut tx).await?;
+        let value = self
+            .store
+            .read_kind(
+                owner,
+                "runbook_tool_proposal",
+                Some(proposal_ref),
+                None,
+                &mut tx,
+            )
+            .await?
+            .pop()
+            .ok_or("tool_proposal_missing")?;
+        let proposal: ToolProposal = records::decode(&value)?;
+        if proposal.instance_id != instance {
+            return Err("tool_proposal_mismatch");
+        }
+        tx.commit().await.map_err(|_| "storage_unavailable")?;
+        Ok(proposal)
+    }
+
     pub(crate) async fn prepare_current_tool(
         &self,
         owner: &str,

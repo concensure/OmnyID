@@ -657,3 +657,214 @@ async fn provider_failure_records_honest_outcomes_without_raw_error_or_retry() {
         erase(&db, &owner).await;
     }
 }
+
+async fn session(db: &Db, owner: &str, age_hours: i64) -> String {
+    let token = Ulid::new().to_string();
+    db.create_session(&omnyid_homeserver::db::AuthSessionRecord {
+        token: token.clone(),
+        user_id: owner.into(),
+        created_at: (Utc::now() - chrono::Duration::hours(age_hours)).to_rfc3339(),
+        expires_at: (Utc::now() + chrono::Duration::hours(1)).to_rfc3339(),
+    })
+    .await
+    .unwrap();
+    format!("Bearer {token}")
+}
+async fn http(
+    app: &axum::Router,
+    method: &str,
+    path: &str,
+    auth: &str,
+    body: Value,
+) -> (axum::http::StatusCode, Value) {
+    use http_body_util::BodyExt;
+    use tower::ServiceExt;
+    let response = app
+        .clone()
+        .oneshot(
+            axum::http::Request::builder()
+                .method(method)
+                .uri(path)
+                .header("authorization", auth)
+                .header("content-type", "application/json")
+                .body(axum::body::Body::from(body.to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.headers()["cache-control"], "no-store");
+    let status = response.status();
+    let bytes = response.into_body().collect().await.unwrap().to_bytes();
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or_else(|_| json!(String::from_utf8_lossy(&bytes))),
+    )
+}
+#[tokio::test]
+async fn authenticated_tool_review_is_dark_owner_bound_recent_and_never_dispatches() {
+    use axum::http::StatusCode as S;
+    let db = database().await;
+    let alice = user(&db).await;
+    let bob = user(&db).await;
+    let store = RunbookStore::new(&db, [31; 32], [32; 32]);
+    let (provider, server) = provider(json!({"structuredContent":{"limit":0}})).await;
+    let id = setup(&db, &store, &alice.id, &provider.endpoint).await;
+    let bob_id = setup(&db, &store, &bob.id, &provider.endpoint).await;
+    let auth = session(&db, &alice.id, 0).await;
+    let stale = session(&db, &alice.id, 24).await;
+    let bob_auth = session(&db, &bob.id, 0).await;
+    let bob_stale = session(&db, &bob.id, 24).await;
+    unsafe {
+        std::env::set_var("OMNYID_ENCRYPTION_KEY_HEX", hex::encode([31; 32]));
+        std::env::set_var("OMNYID_SIGNING_KEY_HEX", hex::encode([32; 32]));
+        std::env::remove_var("OMNYID_RUNBOOK_MANAGEMENT_ENABLED");
+        std::env::set_var("OMNYID_RUNBOOK_TOOL_REVIEW_ENABLED", "true");
+    }
+    let url = std::env::var("TEST_DATABASE_URL").unwrap();
+    let app = omnyid_homeserver::server::build_test_router(&url).await;
+    let path = format!("/runbooks/instances/{id}/tools");
+    let pid = proposal_id(&alice.id, &id);
+    let detail = format!("{path}/{pid}");
+    let decision = format!("{detail}/decision");
+    let proposal = json!({"step_id":"tool","expected_revision":2,"request":request()});
+    let yes = json!({"expected_revision":3,"approved":true});
+    assert_eq!(
+        http(&app, "POST", &path, &auth, proposal.clone()).await.0,
+        S::NOT_FOUND
+    );
+    unsafe {
+        std::env::set_var("OMNYID_RUNBOOK_MANAGEMENT_ENABLED", "true");
+        std::env::remove_var("OMNYID_RUNBOOK_TOOL_REVIEW_ENABLED");
+    }
+    for (method, target, body) in [
+        ("POST", &path, proposal.clone()),
+        ("GET", &detail, json!(null)),
+        ("POST", &decision, yes.clone()),
+    ] {
+        assert_eq!(
+            http(&app, method, target, &auth, body).await.0,
+            S::NOT_FOUND
+        );
+    }
+    unsafe {
+        std::env::set_var("OMNYID_RUNBOOK_TOOL_REVIEW_ENABLED", "true");
+    }
+    assert_eq!(
+        http(&app, "POST", &path, "", proposal.clone()).await.0,
+        S::UNAUTHORIZED
+    );
+    assert_eq!(
+        http(&app, "POST", &path, &bob_auth, proposal.clone())
+            .await
+            .0,
+        S::NOT_FOUND
+    );
+    let mut forged = proposal.clone();
+    forged["owner"] = json!(bob.id);
+    assert_eq!(
+        http(&app, "POST", &path, &auth, forged).await.0,
+        S::UNPROCESSABLE_ENTITY
+    );
+    let saved = http(&app, "POST", &path, &auth, proposal.clone()).await;
+    assert_eq!(saved.0, S::OK);
+    assert_eq!(saved.1["execution_available"], false);
+    assert_eq!(
+        saved.1["proposal"]["request"]["arguments"],
+        json!({"limit":0})
+    );
+    assert!(!saved.1.to_string().contains("not-a-real-secret"));
+    assert_eq!(http(&app, "POST", &path, &auth, proposal).await.1, saved.1);
+    assert_eq!(
+        http(&app, "GET", &detail, &auth, json!(null)).await.1,
+        saved.1
+    );
+    assert_eq!(
+        http(&app, "GET", &detail, &bob_auth, json!(null)).await.0,
+        S::NOT_FOUND
+    );
+    assert_eq!(
+        http(&app, "POST", &decision, &bob_auth, yes.clone())
+            .await
+            .0,
+        S::NOT_FOUND
+    );
+    assert_eq!(
+        http(&app, "POST", &decision, &stale, yes.clone()).await.0,
+        S::FORBIDDEN
+    );
+    assert_eq!(
+        http(
+            &app,
+            "POST",
+            &decision,
+            &auth,
+            json!({"approved":true,"expected_revision":2})
+        )
+        .await
+        .0,
+        S::CONFLICT
+    );
+    assert_eq!(
+        http(
+            &app,
+            "POST",
+            &decision,
+            &auth,
+            json!({"approved":true,"expected_revision":3,"decided_by":bob.id})
+        )
+        .await
+        .0,
+        S::UNPROCESSABLE_ENTITY
+    );
+    let receipt = http(&app, "POST", &decision, &auth, yes.clone()).await;
+    assert_eq!(receipt.0, S::OK);
+    assert_eq!(receipt.1["decision"]["approved"], true);
+    assert_eq!(receipt.1["execution_available"], false);
+    assert_eq!(http(&app, "POST", &decision, &auth, yes).await.1, receipt.1);
+    assert_eq!(
+        http(
+            &app,
+            "POST",
+            &decision,
+            &auth,
+            json!({"approved":false,"expected_revision":3})
+        )
+        .await
+        .0,
+        S::CONFLICT
+    );
+    let runtime = RunbookRuntime::new(&store);
+    let b = runtime
+        .propose_tool(&bob.id, &bob_id, "tool", 2, &request())
+        .await
+        .unwrap();
+    // Another owner cannot retrieve the original proposal through their instance.
+    assert!(runtime.tool_proposal(&bob.id, &bob_id, &pid).await.is_err());
+    db.delete_mcp_tool_connection(&bob.id, "mail")
+        .await
+        .unwrap();
+    let reject = format!(
+        "/runbooks/instances/{bob_id}/tools/{}/decision",
+        b.proposal_ref
+    );
+    assert_eq!(
+        http(
+            &app,
+            "POST",
+            &reject,
+            &bob_stale,
+            json!({"approved":false,"expected_revision":3})
+        )
+        .await
+        .0,
+        S::OK
+    );
+    assert_eq!(provider.calls.load(Ordering::SeqCst), 0);
+    unsafe {
+        std::env::remove_var("OMNYID_RUNBOOK_TOOL_REVIEW_ENABLED");
+        std::env::remove_var("OMNYID_RUNBOOK_MANAGEMENT_ENABLED");
+    }
+    server.abort();
+    erase(&db, &alice).await;
+    erase(&db, &bob).await;
+}
