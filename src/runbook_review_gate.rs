@@ -39,14 +39,95 @@ fn envelope(
         "references":[],"supertags":["runbook_review_gate"],"store_in_relational":true})
 }
 
-fn review_payload(title: &str, source: &str) -> Value {
+fn preview(proposal: &Value) -> String {
+    if let Some(body) = proposal["content"]["body"].as_str() {
+        return body.to_owned();
+    }
+    let mut lines = Vec::new();
+    if let Some(conflicts) = proposal["conflicts"].as_array() {
+        for conflict in conflicts {
+            lines.push(format!(
+                "Conflicting events: {}",
+                conflict["event_ids"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .filter_map(Value::as_str)
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ));
+            for option in conflict["alternatives"].as_array().into_iter().flatten() {
+                lines.push(format!(
+                    "Proposed time for {}: {} to {}. Availability needs checking.",
+                    option["event_id"].as_str().unwrap_or(""),
+                    option["start_at"].as_str().unwrap_or(""),
+                    option["end_at"].as_str().unwrap_or("")
+                ));
+            }
+            if conflict["alternatives"]
+                .as_array()
+                .is_none_or(|v| v.is_empty())
+            {
+                lines.push("No alternative can be proposed from the supplied evidence.".into());
+            }
+        }
+        if conflicts.is_empty() {
+            lines.push("No conflicts found in the supplied events.".into());
+        }
+    }
+    if let Some(changes) = proposal["changes"].as_array() {
+        for change in changes {
+            let timing = |key: &str| {
+                if change[key].is_null() {
+                    "not scheduled".into()
+                } else {
+                    format!(
+                        "{} to {}",
+                        change[key]["start_at"].as_str().unwrap_or(""),
+                        change[key]["end_at"].as_str().unwrap_or("")
+                    )
+                }
+            };
+            lines.push(format!(
+                "{}: {} -> {}",
+                change["record_id"].as_str().unwrap_or(""),
+                timing("before"),
+                timing("after")
+            ));
+        }
+        if changes.is_empty() {
+            lines.push("No timing changes found.".into());
+        }
+        lines.push(format!(
+            "Affected viewers supplied: {}",
+            proposal["affected_viewer_refs"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(Value::as_str)
+                .collect::<Vec<_>>()
+                .join(", ")
+        ));
+    }
+    if proposal.get("retry_authorized").is_some() {
+        lines.push("Review the failed workflow and its recorded consequences before requesting a retry. No retry is authorised.".into());
+    }
+    let mut text = lines.join("\n");
+    if text.chars().count() > 4000 {
+        text = text.chars().take(3900).collect();
+        text.push_str("\nPreview shortened. Consult the saved evidence for the full proposal.");
+    }
+    text
+}
+
+fn review_payload(title: &str, source: &str, proposal: &Value) -> Value {
     json!({"title":title,"reason":"Review the saved evidence before proposing any external action.",
         "approval_kind":"review","requires_human_review":true,"confidence":"bounded_evidence",
         "option_count":2,"options":[{"option_id":"approve","label":"Approve this review","consequence_summary":"Record review only. Sending, publishing, booking and retries still require their own action authority."},
             {"option_id":"deny","label":"Decline this review","consequence_summary":"Keep the proposal private and take no external action."}],
         "consequence_summary_lines":["This is a private review proposal.","Approval does not send, publish, book or retry anything."],
         "provenance_summary":"Based on the frozen Runbook evidence and verified step receipt.",
-        "source_refs":[source],"draft_preview":null,
+        "source_refs":[source],"draft_preview":{"label":"Private proposal","content_type":"text","content":preview(proposal)},
         "autonomy_decision":crate::autonomy_policy::autonomy_decision_for_explicit_approval_boundary("External actions require separate authority.")})
 }
 
@@ -217,7 +298,7 @@ impl RunbookRuntime<'_, '_> {
             _ => return Err("unsupported_review_source"),
         };
         let source = format!("private_message:{source_ref}");
-        let review = review_payload(&definition.name, &source);
+        let review = review_payload(&definition.name, &source, &proposal);
         let content = json!({"capability_id":"runbook.review","approval_mode":"human_approval_required",
             "approval_review":review,"proposal":proposal,"source_ref":source,"external_execution_authorized":false});
         let action = envelope(owner, instance_id, step_id, &source_ref, "action", content);
@@ -275,13 +356,15 @@ impl RunbookRuntime<'_, '_> {
             .await?;
         // Existing account-private action audit projection, in the same transaction.
         // Only bounded presentation/reference data is projected, never draft bodies.
+        let mut audit_review = shared_review.clone();
+        audit_review["draft_preview"] = Value::Null;
         let table = format!(
             "\"{}\".action_audit_log",
             crate::db::tenant_schema_name(owner)
         );
         sqlx::query(&format!("INSERT INTO {table} (capability_id,thread_id,status,output,external_reference,recorded_at) VALUES ($1,$2,'pending',$3,$4,$5)"))
             .bind("runbook.review").bind(&current.instance.thread_id)
-            .bind(json!({"message_id":action_ref,"approval_mode":"human_approval_required","approval_review":shared_review}))
+            .bind(json!({"message_id":action_ref,"approval_mode":"human_approval_required","approval_review":audit_review}))
             .bind(&action_ref).bind(now).execute(&mut *tx).await.map_err(|_| "storage_unavailable")?;
         let receipt = ReviewGateReceipt {
             instance_id: instance_id.into(),
@@ -363,6 +446,7 @@ pub(crate) fn validate(owner: &str, value: &Value) -> Result<()> {
                         .as_str()
                         .ok_or("invalid_review_gate")?,
                     c["source_ref"].as_str().unwrap_or(""),
+                    &c["proposal"],
                 )
         {
             return Err("invalid_review_action");

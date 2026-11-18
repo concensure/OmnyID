@@ -161,7 +161,7 @@ fn missing_conflicting_and_injected_facts_fail_closed() {
     );
     assert_eq!(
         review(&step("calendar_conflict"), &p, &answers).unwrap_err(),
-        "transform_not_implemented"
+        "missing_required_fact"
     );
 }
 

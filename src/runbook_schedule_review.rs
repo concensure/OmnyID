@@ -120,6 +120,19 @@ fn projection(reference: &str, packet: &EvidencePacket) -> Result<WeddingRunShee
     if state.checkpoint.is_none() || state.messages.len() > 128 {
         return Err("invalid_runsheet_snapshot");
     }
+    let checkpoint = state
+        .checkpoint
+        .as_ref()
+        .ok_or("runsheet_checkpoint_missing")?;
+    if !identifier(&checkpoint.database_id)
+        || !identifier(&checkpoint.wedding_plan_id)
+        || !identifier(&checkpoint.projector_id)
+        || checkpoint.projector_version < 1
+        || checkpoint.source_fingerprint.is_empty()
+        || checkpoint.source_fingerprint.len() > 256
+    {
+        return Err("invalid_runsheet_snapshot");
+    }
     Ok(state)
 }
 

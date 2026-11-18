@@ -152,6 +152,12 @@ async fn gate(runtime: &RunbookRuntime<'_, '_>, db: &Db, owner: &str, id: &str, 
         "review"
     );
     assert!(!activity.to_string().contains("secret-marker"));
+    assert!(
+        !activity["approval_requests"][0]["approval_review"]["draft_preview"]["content"]
+            .as_str()
+            .unwrap()
+            .is_empty()
+    );
     let table = format!(
         "\"{}\".action_audit_log",
         omnyid_homeserver::db::tenant_schema_name(owner)
@@ -164,6 +170,14 @@ async fn gate(runtime: &RunbookRuntime<'_, '_>, db: &Db, owner: &str, id: &str, 
     .await
     .unwrap();
     assert_eq!(count, 1);
+    let output: Value = sqlx::query_scalar(&format!(
+        "SELECT output FROM {table} WHERE external_reference=$1"
+    ))
+    .bind(&receipt.action_ref)
+    .fetch_one(&db.pool)
+    .await
+    .unwrap();
+    assert!(output["approval_review"]["draft_preview"].is_null());
     assert_eq!(
         runtime
             .request_review(owner, id, "review_consequence", rev + 1)
@@ -494,5 +508,55 @@ async fn runsheet_rejects_cross_scope_and_broken_history() {
                 .is_err()
         );
     }
+    erase(&db, &owner).await;
+}
+
+#[tokio::test]
+async fn review_gate_rechecks_latest_policy_before_creating_any_action() {
+    let db = database().await;
+    let owner = user(&db).await;
+    let store = RunbookStore::new(&db, [21; 32], [22; 32]);
+    let runtime = RunbookRuntime::new(&store);
+    let id=start(&db,&owner.id,"workflow_failure",json!({"run_ref":"workflow:failed","error_ref":"message:error","retry_consequences":"unknown"})).await;
+    runtime
+        .execute_transform(&owner.id, &id, "assess", 3)
+        .await
+        .unwrap();
+    assert_eq!(
+        runtime
+            .request_review(&owner.id, &id, "review_consequence", 3)
+            .await
+            .unwrap_err(),
+        "stale_revision"
+    );
+    let registry = store.registry(&owner.id).await.unwrap();
+    let prior = registry.get("workflow_failure").unwrap();
+    let mut changed = prior.definition.clone();
+    changed.version += 1;
+    changed.enabled = false;
+    store
+        .save(&owner.id, Some(&prior.message_id), changed)
+        .await
+        .unwrap();
+    assert_eq!(
+        runtime
+            .request_review(&owner.id, &id, "review_consequence", 4)
+            .await
+            .unwrap_err(),
+        "definition_disabled"
+    );
+    assert_eq!(
+        runtime
+            .instance(&owner.id, &id)
+            .await
+            .unwrap()
+            .instance
+            .revision,
+        4
+    );
+    assert_eq!(
+        runtime.activity(&owner.id, &id).await.unwrap()["approval_requests"],
+        json!([])
+    );
     erase(&db, &owner).await;
 }

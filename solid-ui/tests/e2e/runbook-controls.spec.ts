@@ -12,7 +12,7 @@ async function fixtures(page: Page, options: { empty?: boolean; conflict?: boole
   const activity = () => ({instance:{instance_id:"i1",runbook_id:"calendar_conflict",revision,status},
     reviews: options.review ? [{id:"review1",trace_id:"emit1",title:"Review budget exposure",
       summary_lines:["Recorded commitments exceed the supplied budget.","No spending has been authorised.","<img src=x onerror=alert(1)>"],source_refs:["private_message:transform1"]}] : [],
-    approval_requests: options.approval ? [{action_ref:"action1",approval_review:{title:"Review calendar proposal",requires_human_review:true,consequence_summary_lines:["<img src=x onerror=alert(1)>"],source_refs:["private_message:transform1"]}}] : [],
+    approval_requests: options.approval ? [{action_ref:"action1",approval_review:{title:"Review calendar proposal",draft_preview:{label:"Private proposal",content_type:"text",content:"Proposed time: 11:15 to 12:15. Availability needs checking."},requires_human_review:true,consequence_summary_lines:["<img src=x onerror=alert(1)>"],source_refs:["private_message:transform1"]}}] : [],
     questions: status === "waiting_for_input" ? [{escalation_id:"q1",instance_id:"i1",step_id:"review",status:"open",
       question:"Which event has priority?",why_needed:"Your priority is needed to compare alternatives.",missing_fields:["priority"],
       attempted_refs:["message:calendar1"],answer_schema:"short_text",expires_at:"2099-01-01T00:00:00Z"}] : [],
@@ -156,6 +156,7 @@ test("approval proposals reuse the review surface without execution controls",as
   await page.goto("/workspace/e2e/runbook-controls.html?questions");
   await expect(page.getByText("Review calendar proposal",{exact:true})).toBeVisible();
   await expect(page.getByText("Reviewing this proposal does not send or publish anything.")).toBeVisible();
+  await expect(page.getByText("Proposed time: 11:15 to 12:15. Availability needs checking.")).toBeVisible();
   await expect(page.getByText("<img src=x onerror=alert(1)>",{exact:true})).toBeVisible();
   await expect(page.locator("img[src=x]")).toHaveCount(0);
   await expect(page.getByRole("button",{name:/approve|execute|send|publish/i})).toHaveCount(0);
