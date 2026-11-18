@@ -1,3 +1,49 @@
+## 2026-11-18: WED-375 six starter/review entries verified
+
+Implementation worktree: `C:/temp/wt/omnyid-runbooks`, branch `agent/codex/WED-375`.
+Frozen candidate: `19873160bb5bdf65964c0ecee972c7574ab0d89d`.
+Verification worktree: `C:/temp/wt/omnyid-runbooks-verify-43d7c830` (clean detached).
+
+Targets: existing action/approval AFP projection, calendar conflict, quote gaps,
+RSVP reminder, runsheet change, and general workflow/file/information-gap flows.
+All six existing entries are complete: 97 complete / 20 remaining of 117.
+
+Changes: new runbook_schedule_review.rs and runbook_review_gate.rs; bounded
+calendar alternatives; canonical runsheet snapshot timing/duration diffs; strict
+permission/exact-question Draft checks; answer-bound generic gap emission;
+atomic private action, provenance, waiting trace and existing audit projection;
+existing approval summary rendering in RunbookPanel/Decision Queue. Full private
+proposal previews are absent from the audit table. Cancellation withdraws pending
+reviews. Tests cover starter acceptance, denial, owner isolation, replay and UI.
+
+This is review preparation only. Approval consumption/resume, external execution,
+live inference and hosted rollout remain open. No send, publish, booking or retry
+was enabled. No migrations/dependency changes or sitemap edits.
+
+Candidate frontend checks completed locally: TypeScript; 11 UI tests; nine
+Playwright scenarios including previews, mobile, accessibility and account
+switch; Vite production build. Existing line-budget failures remain exactly
+src/server/mod.rs 45733/45717 and src/db.rs 18045/17986. Vite reports existing
+screen/chunk warnings. All 72 Rust tests in 17 binaries and the library build completed on this exact
+source. Focused starter/transform tests: 16; existing regression tests: 56.
+Rust 1.95.0, CARGO_TARGET_DIR=C:/cargo-target, incremental off, RUST_MIN_STACK=67108864,
+-j1, package debug=0/codegen-units=8 for test/dev. Live release gates remain open.
+
+Earlier candidate compilation caught and fixed a duplicated visibility keyword
+and a test-only call to a crate-private schema helper. An obsolete compile was
+stopped when the final duration preview changed; it is not test evidence.
+
+PR/CI queries returned no WED-375 PR/runs. origin points at the unrelated public
+history; do not push this production lineage there. A suitable review remote/base
+is still required. No deployment. Disposable DB omnyid-runbook-wed375-pg on localhost:55475/omnyid_test was used
+for verification and is stopped after the completed suite.
+
+Next: owner BYOK/shared inference and existing approval/action/tool authority.
+The emission/rendering checklist entry is complete; approval consumption/resume
+remains covered by the open executor and authority items. Do not enable execution.
+The subsequent coordination commit records evidence; the frozen source above is
+the tested code candidate.
+
 ## 2026-11-18: WED-375 aggregate model budgets verified
 
 Implementation worktree: `C:/temp/wt/omnyid-runbooks`, branch `agent/codex/WED-375`.

@@ -259,7 +259,7 @@ Depends on: 6, 7
 - [x] Add `src/runbook_authority.rs` to intersect definition tools, step tools, connected capabilities, account policy, and existing autonomy decisions.
 - [x] Reuse `ProactiveAutonomyTier`, `AutonomyDecision`, `proactive_policy`, and per-user overrides; do not add runbook-specific ambient authority.
 - [x] Treat external messages, spend, booking, publication, destructive action, and irreversible mutation as hard approval boundaries unless existing policy explicitly permits the exact action.
-- [ ] Emit the existing action/approval AFP contract so `approval_surfaces.rs` and DecisionOS render it without a second queue.
+- [x] Emit the existing action/approval AFP contract so `approval_surfaces.rs` and DecisionOS render it without a second queue.
 - [x] On policy denial, append a trace and fail or escalate; never ask an LLM to overrule policy.
 - [x] Add adversarial tests for unallowlisted tools, forged capability IDs, prompt-injected tools, excessive autonomy, approval replay, revoked capability, and cross-tenant execution.
 
@@ -402,14 +402,14 @@ Depends on: 3, 6, 8, 10, 12
 Depends on: 2, 5–14
 
 - [ ] `no_reply_followup`: idle event -> bounded context -> draft -> approval -> permitted follow-up event.
-- [ ] `calendar_conflict`: conflicting events -> alternatives -> epistemic question when priority is missing.
+- [x] `calendar_conflict`: conflicting events -> alternatives -> epistemic question when priority is missing.
 - [ ] `vendor_quote_received`: quote event -> one normalization -> Documents/response projection -> separate booking approval.
-- [ ] `quote_missing_items`: normalized gaps -> exact questions -> no send before approval.
+- [x] `quote_missing_items`: normalized gaps -> exact questions -> no send before approval.
 - [x] `budget_threshold`: changed commitment -> category/total projection -> no invented target or spend.
 - [x] `wedding_task_deadline`: due task -> correct owner/context -> no duplicate decision task.
-- [ ] `rsvp_non_response`: permission check -> reminder draft -> no send if permission absent.
-- [ ] `runsheet_change`: timing diff -> affected viewers -> no publish before approval.
-- [ ] General workflow/file/info-gap runbooks behave as specified.
+- [x] `rsvp_non_response`: permission check -> reminder draft -> no send if permission absent.
+- [x] `runsheet_change`: timing diff -> affected viewers -> no publish before approval.
+- [x] General workflow/file/info-gap runbooks behave as specified.
 
 ## 16. Security, privacy, retention, and erasure
 
@@ -630,3 +630,43 @@ unrelated origin/main history still blocks appropriate PR/CI integration.
 Owner BYOK/shared ladder integration, production model/evaluation policy,
 approval/tool execution, remaining starter flows and hosted rollout remain open.
 No deployment, live provider calls, migrations or dependency changes occurred.
+
+
+## Starter reviews and existing approval projection — 2026-11-18
+
+Frozen source: `19873160bb5bdf65964c0ecee972c7574ab0d89d`, verified in the clean
+`C:/temp/wt/omnyid-runbooks-verify-43d7c830` checkout. This batch closes six existing
+entries, not six subdivisions of one entry: **97 complete, 20 remaining of 117**.
+
+- Existing action/approval AFP emission uses the shared approval surface builder,
+  audit projection and Decision Queue summary. Action, waiting trace, provenance,
+  revision and replay receipt commit atomically. Private previews show the actual
+  proposal; draft bodies are absent from the audit table. Cancellation withdraws
+  pending reviews. Owner isolation, stale requests and latest disablement are tested.
+- Calendar conflicts use bounded offset-aware event times and travel buffers.
+  Missing priority pauses for an owner answer; alternatives preserve that priority
+  and are checked against every supplied event. External availability is unverified.
+- Quote-gap Draft output must exactly reproduce the existing registry questions.
+  Altered questions fail schema acceptance and cannot produce an approval proposal.
+- RSVP reminder Draft execution requires pending attendance and recorded permission
+  before any provider call or reservation. Accepted/declined and unpermitted cases stop.
+- Runsheet differences use existing projection snapshots, matching scope and checked
+  record revision history. Optional start/end/duration fields remain explicit; affected
+  viewer references grant no access and no publishing occurs.
+- Workflow failures prepare a review without retrying; quarantined files remain
+  untrusted; generic information gaps ask an allowlisted fact question and require
+  its owner-bound answer before emission/completion.
+
+Local evidence: 72 Rust tests in 17 binaries; library build; TypeScript; 11 UI tests;
+nine browser scenarios including proposal preview, mobile/accessibility and account
+switch; frontend production build. The disposable Postgres suite also exercises
+concurrent replay, invalid/cross-scope histories, denied drafts and exact questions.
+The unchanged line-budget overages remain server/mod.rs 45733/45717 and db.rs
+18045/17986; Vite has the existing screen/chunk warnings. No migrations changed.
+
+The approval-emission checkbox covers emission and rendering only. The earlier
+note grouping emission with resume is superseded in that respect: validated
+approval consumption/resume remains part of the open deterministic executor and
+full authority/provenance work. These proposals do not authorize external actions.
+Provider tests use mocks; live owner inference resolution, approved tool execution,
+no-reply follow-up, Documents integration and hosted rollout remain open. No deploy.

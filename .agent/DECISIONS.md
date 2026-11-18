@@ -1,3 +1,30 @@
+## 2026-11-18: WED-375 private starter review gates
+
+Reuse the existing action AFP, approval_surfaces builder, action audit projection
+and ApprovalReviewSummary in Decision Queue. A Runbook review is a proposal,
+not an external action capability. Its verified Transform/Draft receipt is the
+only payload source; owner locking makes action, waiting trace, provenance,
+instance revision and gate receipt atomic and replay-safe. Latest enablement and
+autonomy restrictions apply before new proposals. Cancellation withdraws the
+pending audit projection while retaining immutable private evidence.
+
+The encrypted action holds a bounded preview of the proposal. The audit table
+holds references and presentation metadata without draft bodies. Authenticated
+activity reads the verified private action to render the preview. No new queue,
+approval HTTP route, live provider or send/publish/retry adapter is introduced.
+Approval consumption/resume and external execution remain separate open executor
+and authority work; a review receipt never satisfies an action grant.
+
+Calendar comparison uses explicit offset-aware times, a bounded travel buffer
+and a named priority; candidate alternatives are checked against all supplied
+events, with external availability explicitly unverified. Run-sheet comparison
+consumes the existing WeddingRunSheetProjectionState, checks scope and revision
+history, and preserves optional canonical timing/duration fields. It neither
+publishes changes nor grants viewers access. Quote drafts must reproduce the
+registry questions exactly. RSVP drafts require pending attendance and recorded
+reminder permission before any provider reservation. Generic information-gap
+questions allow only reviewed fact fields and bind their answer to the emit step.
+
 ## 2026-11-18: Runbook model budgets reserve before provider calls
 
 Runbook model spending is limited by a revisioned, encrypted owner policy:
