@@ -324,7 +324,7 @@ impl RunbookRuntime<'_, '_> {
         );
         let denied = decision.disposition == PolicyDisposition::Denied;
         let now = Utc::now();
-        let trace = StepTrace {
+        let mut trace = StepTrace {
             trace_id: digest(&json!(["runbook_policy_trace.v1", owner, id, step_id])),
             instance_id: id.into(),
             step_id: step_id.into(),
@@ -349,6 +349,8 @@ impl RunbookRuntime<'_, '_> {
             started_at: now,
             completed_at: if denied { Some(now) } else { None },
         };
+        self.attach_provenance(owner, &current.instance, &mut trace, None, &mut tx)
+            .await?;
         let mut trace_afp = build_runtime_afp(
             owner,
             Some(&current.message_id),

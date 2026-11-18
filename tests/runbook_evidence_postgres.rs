@@ -125,7 +125,7 @@ async fn reference_only_owner_scoped_budgeted_evidence_and_synthesis() {
             "metadata_relevance",
             "invalid_snapshot",
             "missing_or_unavailable",
-            "unsupported_reference_kind"
+            "missing_or_unavailable"
         ]
     );
     assert_eq!(

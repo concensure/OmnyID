@@ -18,6 +18,7 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
         .route("/runbooks/instances/{id}/activity", get(activity))
         .route("/runbooks/instances/{id}/cancel", post(cancel))
         .route("/runbooks/instances/{id}/answers", post(answer))
+        .route("/runbooks/instances/{id}/outcomes", post(outcome))
         .route("/runbooks/{id}/definition", put(save))
         .route("/runbooks/{id}/export", get(export))
         .route("/runbooks/{id}/upgrade-preview", get(upgrade_preview))
@@ -337,4 +338,26 @@ async fn upgrade_preview(
         json!({"starter_pack_version":STARTER_PACK_VERSION,"expected_parent":current.message_id,
         "current":current.definition,"proposed":preview["content"],"applied":false}),
     ))
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RecordRunbookOutcome {
+    trace_id: String,
+    outcome: crate::runbook_outcome::Outcome,
+}
+
+async fn outcome(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    Json(request): Json<RecordRunbookOutcome>,
+) -> Result<Json<Value>, ApiError> {
+    let owner = owner(&state, &headers).await?;
+    let store = store(&state)?;
+    let receipt = crate::runbook_runtime::RunbookRuntime::new(&store)
+        .record_outcome(&owner, &id, &request.trace_id, request.outcome)
+        .await
+        .map_err(error)?;
+    Ok(Json(json!({"receipt":receipt,"authority":"feedback_only"})))
 }

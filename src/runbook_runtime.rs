@@ -80,6 +80,8 @@ impl<'a, 'db> RunbookRuntime<'a, 'db> {
         }
         let registry = self.store.load(owner, &mut tx).await?;
         let decisions = match_event(owner, &registry, &event, &HashSet::new())?;
+        let feedback = self.outcome_feedback_in(owner, &mut tx).await?;
+        let decisions = crate::runbook_outcome::apply_feedback(decisions, &registry, &feedback)?;
         let mut instance_ids = vec![];
         for decision in &decisions {
             if decision.disposition != MatchDisposition::Matched {
@@ -229,7 +231,7 @@ impl<'a, 'db> RunbookRuntime<'a, 'db> {
             return Err("step_requires_executor_integration");
         }
         let now = Utc::now();
-        let trace = StepTrace {
+        let mut trace = StepTrace {
             trace_id: trace_id.clone(),
             instance_id: id.into(),
             step_id: step.step_id.clone(),
@@ -250,6 +252,14 @@ impl<'a, 'db> RunbookRuntime<'a, 'db> {
             started_at: now,
             completed_at: Some(now),
         };
+        self.attach_provenance(
+            owner,
+            &current.instance,
+            &mut trace,
+            evidence_ref.map(|_| result.output_hash.as_str()),
+            tx,
+        )
+        .await?;
         let mut trace_afp = build_runtime_afp(
             owner,
             Some(&current.message_id),

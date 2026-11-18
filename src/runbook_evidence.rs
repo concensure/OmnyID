@@ -28,7 +28,7 @@ pub struct EvidenceRequest {
     pub byte_limit: usize,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, PartialEq)]
 pub struct EvidenceItem {
     pub reference: String,
     pub content: Value,
@@ -120,7 +120,9 @@ impl RunbookStore<'_> {
                     reason: reason.into(),
                 })
             };
-            if !matches!(kind, "message" | "private_message" | "snapshot") {
+            if !matches!(kind, "message" | "private_message" | "snapshot")
+                && crate::runbook_privacy::entity_afp_type(kind).is_none()
+            {
                 omit(&mut packet, "unsupported_reference_kind");
                 continue;
             }
@@ -154,6 +156,12 @@ impl RunbookStore<'_> {
             if header["id"] != id {
                 return Err("evidence_identity_mismatch");
             }
+            if crate::runbook_privacy::entity_afp_type(kind)
+                .is_some_and(|expected| header["type"] != expected)
+            {
+                omit(&mut packet, "entity_type_mismatch");
+                continue;
+            }
             let size = header["size"].as_u64().unwrap_or(u64::MAX);
             if size > MAX_RECORD_BYTES as u64
                 || size > request.byte_limit.saturating_sub(bytes) as u64
@@ -174,6 +182,10 @@ impl RunbookStore<'_> {
             }
             if encrypted && packet.decrypt_attempts >= request.decrypt_limit {
                 omit(&mut packet, "decrypt_budget");
+                continue;
+            }
+            if encrypted && !self.reserve_evidence_decrypt(owner).await? {
+                omit(&mut packet, "account_decrypt_budget");
                 continue;
             }
             // Charge attempted reads too: malformed/stale content cannot buy an
@@ -269,5 +281,14 @@ impl RunbookStore<'_> {
             .into();
         packet.hash = digest(&json!(packet));
         Ok(packet)
+    }
+}
+
+// Evidence can contain tool/model inputs. Debug logging must never reveal bodies.
+impl std::fmt::Debug for EvidenceItem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("EvidenceItem")
+            .field("content", &"[REDACTED]")
+            .finish_non_exhaustive()
     }
 }

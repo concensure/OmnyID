@@ -33,13 +33,23 @@ impl Registry {
     /// Input must be the complete definition history, not a truncated latest-N query.
     /// Sorting by version makes delivery order irrelevant; forks and gaps fail closed.
     pub fn rebuild(owner: &str, messages: &[Value]) -> Result<Self> {
+        Self::rebuild_with(owner, messages, |message| {
+            parse_definition_afp(owner, message)
+        })
+    }
+
+    pub(crate) fn rebuild_with(
+        owner: &str,
+        messages: &[Value],
+        mut parse: impl FnMut(&Value) -> Result<DefinitionRecord>,
+    ) -> Result<Self> {
         if !identifier(owner) || messages.len() > 4096 {
             return Err("invalid_registry_scope");
         }
         let mut records = Vec::new();
         let mut message_ids = HashSet::new();
         for message in messages {
-            let record = parse_definition_afp(owner, message)?;
+            let record = parse(message)?;
             if !message_ids.insert(record.message_id.clone()) {
                 return Err("duplicate_message_id");
             }

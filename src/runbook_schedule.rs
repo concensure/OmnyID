@@ -360,7 +360,7 @@ impl RunbookRuntime<'_, '_> {
             let step_index = current.instance.completed_step_ids.len();
             let now = Utc::now();
             let trace_id = digest(&json!(["runbook_step.v1", owner, id, s.step_id]));
-            let trace = StepTrace {
+            let mut trace = StepTrace {
                 trace_id: trace_id.clone(),
                 instance_id: id.into(),
                 step_id: s.step_id.clone(),
@@ -381,6 +381,8 @@ impl RunbookRuntime<'_, '_> {
                 started_at: now,
                 completed_at: Some(now),
             };
+            self.attach_provenance(owner, &current.instance, &mut trace, None, &mut tx)
+                .await?;
             let mut value = build_runtime_afp(
                 owner,
                 Some(&current.message_id),

@@ -143,7 +143,7 @@ impl RunbookRuntime<'_, '_> {
             .iter()
             .all(|f| filter_matches(f, &context));
         let now = Utc::now();
-        let trace = StepTrace {
+        let mut trace = StepTrace {
             trace_id: trace_id.clone(),
             instance_id: id.into(),
             step_id: step.step_id.clone(),
@@ -168,6 +168,8 @@ impl RunbookRuntime<'_, '_> {
             started_at: now,
             completed_at: Some(now),
         };
+        self.attach_provenance(owner, &current.instance, &mut trace, None, &mut tx)
+            .await?;
         let mut message = build_runtime_afp(
             owner,
             Some(&current.message_id),

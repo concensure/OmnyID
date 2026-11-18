@@ -246,6 +246,46 @@ async fn authenticated_activity_answer_cancel_and_deterministic_completion() {
     let trace = a.unwrap();
     assert_eq!(trace, b.unwrap());
     assert_eq!(trace.status, TraceStatus::Completed);
+    let outcome_path = format!("/runbooks/instances/{id}/outcomes");
+    let body = json!({"trace_id":trace.trace_id,"outcome":"accepted"});
+    assert_eq!(
+        request(&app, "POST", &outcome_path, &bob_auth, body.clone())
+            .await
+            .0,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(
+        request(&app, "POST", &outcome_path, "", body.clone())
+            .await
+            .0,
+        StatusCode::UNAUTHORIZED
+    );
+    let saved = request(&app, "POST", &outcome_path, &auth, body.clone()).await;
+    assert_eq!(saved.0, StatusCode::OK);
+    assert_eq!(saved.1["authority"], "feedback_only");
+    assert_eq!(
+        request(&app, "POST", &outcome_path, &auth, body.clone()).await,
+        saved
+    );
+    let mut invalid = body.clone();
+    invalid["owner"] = json!(bob.id);
+    assert_eq!(
+        request(&app, "POST", &outcome_path, &auth, invalid).await.0,
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
+    assert_eq!(
+        request(
+            &app,
+            "POST",
+            &outcome_path,
+            &auth,
+            json!({"trace_id":trace.trace_id,"outcome":"approved"})
+        )
+        .await
+        .0,
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
+
     assert_eq!(
         runtime
             .instance(&alice.id, &id)

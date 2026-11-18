@@ -14,7 +14,8 @@ use sha2::{Digest, Sha256};
 use sqlx::{Postgres, Row, Transaction};
 
 pub struct RunbookStore<'a> {
-    db: &'a Db,
+    pub(crate) db: &'a Db,
+    definition_cache: std::sync::Mutex<crate::runbook_cache::DefinitionCache>,
     pub(crate) encryption_key: [u8; 32],
     signing_key: [u8; 32],
 }
@@ -23,6 +24,7 @@ impl<'a> RunbookStore<'a> {
     pub fn new(db: &'a Db, encryption_key: [u8; 32], signing_key: [u8; 32]) -> Self {
         Self {
             db,
+            definition_cache: Default::default(),
             encryption_key,
             signing_key,
         }
@@ -52,6 +54,10 @@ impl<'a> RunbookStore<'a> {
                 .await
                 .map_err(|_| "storage_unavailable")?;
         if found.is_none() {
+            self.definition_cache
+                .lock()
+                .map_err(|_| "cache_unavailable")?
+                .clear();
             return Err("owner_not_found");
         }
         sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))")
@@ -142,7 +148,12 @@ impl<'a> RunbookStore<'a> {
         owner: &str,
         tx: &mut Transaction<'_, Postgres>,
     ) -> Result<Registry> {
-        Registry::rebuild(owner, &self.read(owner, None, tx).await?)
+        let messages = self.read(owner, None, tx).await?;
+        let mut cache = self
+            .definition_cache
+            .lock()
+            .map_err(|_| "cache_unavailable")?;
+        Registry::rebuild_with(owner, &messages, |value| cache.parse(owner, value))
     }
 
     async fn read(
@@ -209,7 +220,9 @@ impl<'a> RunbookStore<'a> {
             message.content = crypto::decrypt_content(message.encryption.as_ref().ok_or("unencrypted_definition")?, &aad(&message), &self.encryption_key)
                 .ok_or("definition_decryption_failed")?;
             let value = serde_json::to_value(message).map_err(|_| "invalid_stored_definition")?;
-            validate_record(owner, &value)?;
+            if value["type"] == "runbook_definition" {
+                self.definition_cache.lock().map_err(|_| "cache_unavailable")?.parse(owner, &value)?;
+            } else { validate_record(owner, &value)?; }
             Ok(value)
         }).collect()
     }
@@ -221,6 +234,12 @@ impl<'a> RunbookStore<'a> {
         tx: &mut Transaction<'_, Postgres>,
     ) -> Result<()> {
         validate_record(owner, &value)?;
+        if value["type"] == "runbook_definition" {
+            self.definition_cache
+                .lock()
+                .map_err(|_| "cache_unavailable")?
+                .clear();
+        }
         let mut message: AFPMessage =
             serde_json::from_value(value).map_err(|_| "invalid_definition_envelope")?;
         // PostgreSQL stores microseconds. Canonicalise before encryption/signing so
@@ -260,6 +279,10 @@ pub(crate) fn digest(value: &Value) -> String {
 
 fn validate_record(owner: &str, value: &Value) -> Result<()> {
     match value["type"].as_str() {
+        Some("runbook_outcome") => {
+            crate::runbook_outcome::validate(owner, value)?;
+        }
+        Some("provenance_record") => crate::runbook_provenance::validate(owner, value)?,
         Some("runbook_input_supplied" | "runbook_schedule" | "runbook_follow_up") => {
             crate::runbook_control::validate(owner, value)?;
         }

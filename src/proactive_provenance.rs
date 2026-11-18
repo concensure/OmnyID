@@ -108,7 +108,7 @@ fn source_refs_for_provenance(suggestion_afp: &Value) -> Vec<String> {
             }
         }
     }
-    refs
+    dedupe_provenance_refs(refs)
 }
 
 fn clean_str(value: &str) -> Option<String> {
@@ -232,4 +232,13 @@ mod tests {
             );
         }
     }
+}
+
+/// Stable shared source deduplication; neither source text nor authority is copied.
+pub fn dedupe_provenance_refs(refs: impl IntoIterator<Item = String>) -> Vec<String> {
+    let mut seen = std::collections::HashSet::new();
+    refs.into_iter()
+        .filter_map(|s| clean_str(&s))
+        .filter(|s| seen.insert(s.clone()))
+        .collect()
 }
