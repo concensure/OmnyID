@@ -30,14 +30,23 @@ PUT /runbooks/{id}/definition, GET /runbooks/{id}/export and
 GET /runbooks/{id}/upgrade-preview. Enable, disable and archive are validated
 successor definitions. Normal listing returns summaries; explicit export returns
 only the typed definition and its revision reference, with no storage keys or
-provider credentials. Responses are no-store. No frontend control or first-run
-screen is wired yet; the setup endpoint copies the user's selected starters.
+provider credentials. Responses are no-store. Fleet now offers starter selection, enable/disable successor controls, activity,
+cancellation and confirmed explicit export. Decision Queue hosts inline questions.
+Normal controls use summary endpoints, including GET /runbooks/instances and
+POST /runbooks/{id}/enabled, without fetching raw definitions.
 
-The frozen envelope-index source candidate is `df5a7dc59fccfec179cf5631f69b5aa7826b0034`.
-All 33 focused integration tests and the library build completed in the clean exact-SHA worktree
+The frozen hooks/UI source candidate is `7842bcc236bf93c1d282188a88d4c7b447721fad`.
+All 34 focused integration tests and the library build completed in the clean exact-SHA worktree
 `C:/temp/wt/omnyid-runbooks-verify-43d7c830` using Rust 1.95, two jobs,
 16 package codegen units, incremental compilation off and package debug info
 disabled. The project toolchain pin is unchanged; see the final handoff evidence.
+TypeScript, 49 frontend state/navigation tests, seven browser scenarios (including
+320/375 px, 200% zoom, axe serious/critical checks, focus, session expiry and export
+races), the AFP SDK build and production frontend build also completed.
+The global line-budget gate still reports two oversized existing Rust files:
+server/mod.rs 45,733/45,717 and db.rs 18,045/17,986. This batch adds one and seven
+lines respectively. New source/test files are below 999 lines. Checklist: 72
+complete, 45 remaining of 117.
 
 The twelve starters specify reviewed transform operations, required facts and
 explicit approval steps. Their executor implementations are still pending.
@@ -56,11 +65,17 @@ The new internal `execute_read` path binds frozen definition selectors to
 owner-scoped evidence, encrypts the resulting receipt and advances atomically.
 It does not grant tool authority or wire live ingress.
 
-Stages 4–17 remain open except for checked items below. Live adapter hooks,
-remaining step-kind execution, bounded evidence, approval emission/resume integration,
-retries/cooldowns, model budgets, daemon timer integration, outcomes, activity/A2UI
-and rollout remain unfinished. No live ingress, scheduler or daemon hook is
-connected. The management API cannot start execution.
+Hooks now connect authenticated persisted passive events and the existing daemon
+AFP insert boundary to deterministic matching. Both event matching and shared
+maintenance follow-up delivery are default-off and require an explicit account
+allowlist. The passive bridge preserves event_type and only projects reviewed
+fields/references, excluding raw bodies and mail context. Hooks never start a
+tool/model executor; management cannot start execution. Remaining work includes
+immutable definition caching, typed entity resolution/shared budgets, general
+step execution/retries, approval emission/resume, models, provenance/outcomes,
+retention, end-to-end starters and rollout. Hook failures currently require
+redelivery or explicit internal retry; production throughput/fairness and
+account-erasure lock duration require review before rollout.
 
 Existing regression locations include src/proactive_engine.rs,
 src/background_watcher.rs, src/background_watcher_runtime.rs,
@@ -129,7 +144,7 @@ Regression inventory (recorded, not a claim that all suites ran this turn):
 | Approval cards | `src/server/approval_surfaces.rs::tests` |
 | Erasure | `tests/runbook_storage_postgres.rs`, `tests/runbook_runtime_postgres.rs`, `tests/runbook_evidence_postgres.rs` exercise `Db::delete_user_account_and_data`; private tenant persistence is also covered in `src/db/tenant_roundtrip.rs` |
 
-The latest batch ran nine runbook integration targets (33 tests), not
+The latest batch ran ten runbook integration targets (34 tests), not
 all listed legacy unit suites. Later integrations must run the affected suites
 from a clean frozen worktree. A filtered unit-suite command is
 `cargo +1.95.0 test --lib <module_name>::tests` with the documented test-profile
@@ -153,7 +168,7 @@ Depends on: 1
 
 - [x] Add `src/runbook_starter_pack.rs`; keep immutable code templates separate from mutable user definitions.
 - [x] Implement at least the twelve starter runbooks specified in the spec with deterministic steps and explicit approval boundaries.
-- [ ] Copy selected starter definitions into each user's AFP ledger during first-run setup; never query one global mutable definition row as runtime truth.
+- [x] Copy selected starter definitions into each user's AFP ledger during first-run setup; never query one global mutable definition row as runtime truth.
 - [x] Make seeding idempotent by `(owner, starter_pack_version, runbook_id)`.
 - [x] Do not overwrite a user-edited or disabled definition when a starter pack changes; offer a successor preview instead.
 - [x] Add tests for first seed, repeat seed, user edit preservation, disable preservation, pack upgrade, and two-user isolation.
@@ -175,8 +190,8 @@ Depends on: 1
 
 - [x] Add a normalized proactive-event adapter over stored `passive_event`, Watcher alert/resolution, workflow, vendor, document, wedding, and internal due-event AFP kinds.
 - [x] Preserve source and entity references, confidence, urgency, occurrence time, and causation without copying raw bodies.
-- [ ] Add a small post-persistence dispatcher hook to `proactive_routes.rs`; keep substantive logic out of that already-large file.
-- [ ] Add the same hook at the reviewed background-Watcher/daemon boundary for events that do not pass through the HTTP route.
+- [x] Add a small post-persistence dispatcher hook to `proactive_routes.rs`; keep substantive logic out of that already-large file.
+- [x] Add the same hook at the reviewed background-Watcher/daemon boundary for events that do not pass through the HTTP route.
 - [x] Make event normalization idempotent and reject events that are not owned by the current daemon partition.
 - [x] Add tests for email, calendar, Watcher, vendor quote, RSVP, task, workflow failure, scheduled follow-up, malformed, and cross-tenant events.
 
@@ -283,7 +298,7 @@ Depends on: 6, 7
 
 - [x] Detect required facts missing from the bounded evidence packet.
 - [x] Emit one `epistemic_escalation` with what is missing, what was tried, why it matters, an exact question, answer schema, and expiry.
-- [ ] Project through the existing Decision Queue/A2UI input card rather than a new modal system.
+- [x] Project through the existing Decision Queue/A2UI input card rather than a new modal system.
 - [x] Resume only from a typed `runbook_input_supplied` AFP event linked to the open escalation.
 - [x] Reject wrong user, wrong instance, duplicate answer, invalid schema, late answer, and terminal instance.
 - [x] Add missing-info, resume, timeout, malformed answer, and user-isolation tests.
@@ -297,7 +312,7 @@ Answered successor and a Running revision at the same paused step. Exact field
 sets and schemas are required; foreign, duplicate, stale, late and terminal
 answers fail closed. Answers remain attributed data exposed by `supplied_inputs`,
 never authority. Expiry/cancellation append successors and cannot reopen state.
-The Decision Queue/A2UI adapter and end-to-end executor wiring remain open.
+The Decision Queue/A2UI adapter now reloads authenticated questions and posts typed answers. End-to-end executor wiring remains open.
 
 ## 11. Bounded model steps and cost controls
 
@@ -317,7 +332,7 @@ Depends on: 7–10
 Depends on: 4, 6, 9
 
 - [x] Represent waits and scheduled follow-ups as AFP events with due time, cancellation key, causation, instance, and source refs.
-- [ ] Reuse the existing daemon/Watcher wake-up path rather than starting one scheduler per runbook.
+- [x] Reuse the existing daemon/Watcher wake-up path rather than starting one scheduler per runbook.
 - [x] Enforce the definition's declared `follow_up_events` list before writing.
 - [x] Make delivery and resume idempotent; repeated daemon scans must not duplicate a step.
 - [x] Resolve cancel/reschedule by successor events, preserving the original schedule.
@@ -327,14 +342,18 @@ Scheduling implementation checkpoint: `wait`/`schedule_wait` persist an
 append-only encrypted `runbook_schedule` with due time, expiry, cancellation
 key, instance/step, source refs and causation. Creation, rescheduling and delivery
 intersect frozen and latest declared event types. `due_schedules` returns bounded
-hints for the future shared daemon hook; it starts no independent timers.
+hints for the shared maintenance daemon hook; it starts no independent timers.
 `deliver_follow_up` rechecks state and time under the owner lock, then atomically
 appends one `runbook_follow_up`, completed Wait trace and next instance revision.
 Exact delivery retries return the original receipt; stale scans cannot resume a
 rescheduled or cancelled wait. Cancellation, expiry and rescheduling preserve
 original AFP records and append successors. Tests cover due/not-due, concurrency,
 revocation, stale rescheduling, timeout, encrypted storage and account erasure.
-The existing daemon/Watcher hook remains unchecked and no live delivery is enabled.
+The existing health-maintenance wake/timer path now runs a bounded opt-in pass
+(up to 20 due records per allowlisted account, ten seconds per pass). Delivery
+rechecks current owner/state/revision/policy. Flags remain off; no deployment
+or live delivery was enabled. Account erasure now acquires the users lock before
+tenant DDL to prevent the parallel-erasure deadlock found by the control tests.
 
 ## 13. Provenance and outcome memory
 
@@ -352,11 +371,11 @@ Depends on: 3, 6, 8, 10, 12
 
 - [x] Add focused `src/server/runbook_routes.rs` endpoints for list/detail, enable/disable, validated successor edit, instance activity, cancel, and escalation answer.
 - [x] Derive owner from authentication on every endpoint and rate-limit writes.
-- [ ] Add semantic A2UI kinds for definition, instance, step trace summary, approval link, and epistemic question.
-- [ ] Reuse current activity/fleet, Decision Queue, settings controls, badges, timeline, confirmation, toast, and failure-state primitives.
-- [ ] Use consequence-specific action labels and expose evidence/provenance in user-facing language.
-- [ ] Ensure mobile 320/375 px reflow, 200% zoom, keyboard focus restoration, screen-reader names, and colour-independent states.
-- [ ] Keep raw definitions/secrets out of normal UI; advanced export is explicit and redacted.
+- [x] Add semantic A2UI kinds for definition, instance, step trace summary, approval link, and epistemic question.
+- [x] Reuse current activity/fleet, Decision Queue, settings controls, badges, timeline, confirmation, toast, and failure-state primitives.
+- [x] Use consequence-specific action labels and expose evidence/provenance in user-facing language.
+- [x] Ensure mobile 320/375 px reflow, 200% zoom, keyboard focus restoration, screen-reader names, and colour-independent states.
+- [x] Keep raw definitions/secrets out of normal UI; advanced export is explicit and redacted.
 
 ## 15. Starter runbook integration tests
 

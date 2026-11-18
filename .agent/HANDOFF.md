@@ -9817,3 +9817,91 @@ disconnected and management default-off. Next: immutable definition cache design
 with erasure handling, typed deterministic executor outputs, then existing UI and
 daemon integration; preserve authority and shared-budget gates.
 Documentation follows the frozen source commit. No worktrees removed.
+
+## WED-375: ten hooks and UI items — 2026-11-18
+
+Implementation worktree: C:/temp/wt/omnyid-runbooks, agent/codex/WED-375.
+Frozen source: 7842bcc236bf93c1d282188a88d4c7b447721fad.
+Verification worktree: C:/temp/wt/omnyid-runbooks-verify-43d7c830, clean detached
+at that exact source. Documentation commits follow the verified source.
+
+Completed checklist items (10): stage 2 selected starter first-run setup;
+stage 4 passive HTTP and daemon/Watcher post-persistence hooks (2);
+stage 10 Decision Queue question projection; stage 12 shared daemon wake path;
+stage 14 semantic A2UI kinds, reused UI surfaces/primitives, consequence labels,
+mobile/zoom/keyboard/screen-reader states, and explicit private export (5).
+Totals: 72 complete, 45 remaining of 117. No source execution flag enabled.
+
+Implementation:
+- src/runbook_hooks.rs adds bounded, allowlisted, default-off adapters. Passive
+  HTTP persists event_type and a reviewed reference-only projection into the
+  existing daemon ledger. The central daemon insert hook re-reads owner storage
+  for matching; repeated inserts use existing dispatch receipts.
+- src/daemon_runtime.rs reuses health-maintenance wake/timer passes for waits.
+  No independent scheduler or tool/model execution is introduced.
+- src/runbook_activity.rs provides bounded instance/activity projections and
+  semantic views. src/server/runbook_routes.rs adds listing and narrow
+  enable/disable successor requests without normal UI fetching raw definitions.
+- RunbookPanel, RunbookQuestionCard and runbookState integrate with AgentFleetView,
+  DecisionQueueView and A2UIRenderer. Reuse DialogShell, EmptyState, toast and
+  existing navigation. Typed answers, stale errors, export confirmation, account
+  changes and session expiry are handled without raw backend errors or answers
+  leaking into summaries. Semantic cards reload authenticated state.
+- src/db.rs acquires users AccessExclusive before tenant DDL in account erasure.
+  PostgreSQL logs proved a users/tenant agent_task_queue FK lock inversion during
+  concurrent erasure; the fixed parallel suite and explicit concurrent erase pass.
+  This lock is already required by dropping tenant FK constraints but is acquired
+  earlier now; measure its account-wide blocking duration before deployment.
+- src/server/mod.rs mounts existing production proactive routes in the test router.
+  Tests live in runbook_api_postgres.rs, runbook_hooks_postgres.rs, frontend
+  runbook-state.test.ts and the runbook-controls Playwright fixture/config/spec.
+
+Final verification on the frozen SHA:
+- Rust 1.95.0, CARGO_TARGET_DIR=C:/cargo-target, incremental off, -j 2,
+  profile.test.package.omnyid-homeserver.debug=0 and codegen-units=16:
+  runbook_foundation, runbook_storage_postgres, runbook_runtime_postgres,
+  runbook_evidence_postgres, runbook_authority, runbook_authority_postgres,
+  runbook_controls_postgres, runbook_event_adapter, runbook_api_postgres and
+  runbook_hooks_postgres: 34 tests, exit 0, ordinary parallel test execution.
+- cargo +1.95.0 build --lib with matching dev package settings: exit 0.
+  Pinned toolchain unchanged; 1.95 remains the documented workaround for the host
+  1.94 compiler crash.
+- SDK npm ci then npm run build; frontend npm ci (lockfile unchanged), npx tsc
+  --noEmit and npm run build: exit 0. Vite emitted existing responsive-screen and
+  large-chunk warnings; this is a local production build, not a deployment.
+- 49 Node tests passed across runbook state, A2UI content, four Fleet state suites,
+  Decision Queue model/navigation/presentation and continuity navigation.
+  Command uses --import ./tests/node-ts-specifier-hooks.mjs --experimental-strip-types.
+- npx playwright test --config playwright.runbooks.config.ts: seven scenarios
+  passed, including 320/375/1280 px, 200% zoom, axe serious/critical checks,
+  confirmations/focus restoration, answer/cancel requests, stale errors,
+  confirmed downloads, aborted exports on account/session change, flag-off hiding,
+  and expired-session request-loop prevention.
+- git diff --check clean. New source/test files are at most 205 lines.
+  Global npm run test:line-budget remains failing: server/mod.rs 45,733 vs 45,717
+  limit (baseline 45,732); db.rs 18,045 vs 17,986 (baseline 18,038). The focused
+  Wedding file budget passes. No baseline inflation or unrelated extraction done.
+
+Intermediate failures were resolved: a test moved-value error; missing proactive
+route in the test router; cold Vite startup timeout; missing built local SDK for
+Node integration tests; and the actual parallel erasure deadlock. Final source
+was reverified after corrections; earlier evidence is superseded.
+
+Remaining limitations: event-hook failures retain the source but need redelivery
+or explicit internal retry; no automatic backlog recovery was added. Daemon
+delivery is eventual at the maintenance cadence, with throughput/fairness review
+required for large allowlists or persistent failing records. Stored definitions
+contain user-authored text: explicit exports omit storage/provider credentials,
+evidence and answers, but users should review authored text before sharing.
+Existing six dependency advisories remain open; manifests/lockfiles unchanged,
+so the prior audit was not rerun. Full legacy unit suites and full Wedding suites
+were not run: focused affected frontend and backend tests were used; comprehensive
+rollout gates remain unchecked. No remote CI for this local candidate, PR review,
+hosted verification or deployment. GitHub returned old unrelated main failure
+23703104075 and no deployments. No worktrees deleted.
+
+Next: immutable definition caching with erasure semantics; typed entity and
+shared-budget integration; deterministic executor/tool schema/approval contracts;
+bounded models, provenance/outcome memory, retention and end-to-end starters.
+Keep the flags off until the remaining rollout prerequisites and security review.
+Dedicated disposable database container omnyid-runbook-wed375-pg stopped after verification.

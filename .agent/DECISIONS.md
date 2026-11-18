@@ -3851,3 +3851,53 @@ Indexes cover all private envelope types to support prepared parameterized queri
 Creating these indexes can lock writes during bootstrap on large existing tenant
 tables; assess tenant sizes and rollout timing before any deployment. No production
 migration or deployment is performed in this implementation slice.
+
+### WED-375: gated existing-event hooks and ledger-backed UI (2026-11-18)
+
+Use the existing daemon AFP insert boundary for Watcher alert/resolution matching.
+The passive HTTP route calls a small bridge only after persistence and preserves
+the requested event_type (previously omitted from its content). The bridge writes
+a bounded unsigned server-derived projection into the existing daemon ledger,
+retaining the source ID and reviewed references/metadata without duplicating raw
+payloads or mail context or misrepresenting the original source signature.
+Dispatch re-reads the owner partition and uses existing durable dedupe receipts.
+Both event hooks and follow-up delivery are default-off, require an explicit
+valid account allowlist (at most 100 owners), and do not start any executor.
+Event hooks have a five-second timeout; failures leave the source persisted and
+log a fixed content-free warning. Recovery currently requires source redelivery
+or explicit internal dispatch; there is no automatic ingress backlog scanner.
+
+Use the existing health-maintenance daemon's wake/timer path for due waits,
+regardless of its unrelated maintenance cursor. Process at most 20 due schedules
+per allowlisted owner within a ten-second pass; delivery retains existing owner,
+revision, declaration and terminal-state checks. No per-runbook scheduler exists.
+This is eventual delivery at the maintenance cadence, not a precise deadline SLA.
+Large allowlists and persistent failing due records need fairness/throughput
+evaluation before rollout; do not enable execution from these internal tests.
+
+The Fleet owns starter selection, enable/disable successor controls and activity.
+The existing Decision Queue hosts runbook question forms. Semantic A2UI kinds
+reload authenticated summaries before offering controls; card payloads never
+grant authority. Narrow enable/disable requests prevent normal UI from fetching
+raw definitions. Export is explicit, confirmed and aborted on session change.
+The server's closed definition schema excludes credentials/storage keys; exported
+user-authored text still needs review before sharing. No raw tool/model inputs,
+saved answers or evidence bodies enter the normal projection. Summary references
+remain visible for audit; approval links navigate to the existing Decision Queue.
+Use existing DialogShell focus handling, EmptyState and toast primitives. Mutations
+carry expected revisions/parents and stale/error states require refresh.
+Instance listings validate immutable inputs, prioritize waiting questions and
+fully validate displayed histories under the owner lock; a 50-run cap is explicit.
+
+### WED-375: account-erasure lock ordering (2026-11-18)
+
+Parallel control tests exposed PostgreSQL 40P01: one erasure held a users
+RowExclusive lock while its FK cascade waited on another tenant's agent_task_queue;
+the other erasure held that tenant's DDL lock while DROP SCHEMA waited for
+AccessExclusive on users. An ordinary Runbook KEY SHARE read was also a victim.
+Account erasure now acquires the users AccessExclusive lock first, before all
+other locks, matching the lock already required when tenant FK constraints drop.
+This serializes erasures and lets existing users-first Runbook transactions
+finish before DDL begins. It deliberately blocks account-table access during
+erasure; measure deletion latency before deployment. Concurrent erasure is tested;
+the fix does not claim to redesign all unrelated worker lock ordering.
