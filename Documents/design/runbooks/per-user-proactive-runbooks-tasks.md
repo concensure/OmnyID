@@ -33,8 +33,8 @@ only the typed definition and its revision reference, with no storage keys or
 provider credentials. Responses are no-store. No frontend control or first-run
 screen is wired yet; the setup endpoint copies the user's selected starters.
 
-The frozen evidence source candidate is `51407f514eecc683fac3695c9005d731f4c72b76`.
-All 20 focused integration tests and the library build completed in the clean exact-SHA worktree
+The frozen policy source candidate is `5c539bbc2fcdad46f539824eb581588e15e481ca`.
+All 25 focused integration tests and the library build completed in the clean exact-SHA worktree
 `C:/temp/wt/omnyid-runbooks-verify-43d7c830` using Rust 1.95, two jobs,
 16 package codegen units, incremental compilation off and package debug info
 disabled. The project toolchain pin is unchanged; see the final handoff evidence.
@@ -57,7 +57,7 @@ owner-scoped evidence, encrypts the resulting receipt and advances atomically.
 It does not grant tool authority or wire live ingress.
 
 Stages 4–17 remain open except for checked items below. Complete adapters,
-remaining step-kind execution, bounded evidence, authority/approval integration,
+remaining step-kind execution, bounded evidence, approval emission/resume integration,
 retries/cooldowns, model budgets, timer delivery/resume, outcomes, activity/A2UI
 and rollout remain unfinished. No live ingress, scheduler or daemon hook is
 connected. The management API cannot start execution.
@@ -206,12 +206,36 @@ above retain entity-specific resolution and account-level budget integration.
 
 Depends on: 6, 7
 
-- [ ] Add `src/runbook_authority.rs` to intersect definition tools, step tools, connected capabilities, account policy, and existing autonomy decisions.
-- [ ] Reuse `ProactiveAutonomyTier`, `AutonomyDecision`, `proactive_policy`, and per-user overrides; do not add runbook-specific ambient authority.
-- [ ] Treat external messages, spend, booking, publication, destructive action, and irreversible mutation as hard approval boundaries unless existing policy explicitly permits the exact action.
+- [x] Add `src/runbook_authority.rs` to intersect definition tools, step tools, connected capabilities, account policy, and existing autonomy decisions.
+- [x] Reuse `ProactiveAutonomyTier`, `AutonomyDecision`, `proactive_policy`, and per-user overrides; do not add runbook-specific ambient authority.
+- [x] Treat external messages, spend, booking, publication, destructive action, and irreversible mutation as hard approval boundaries unless existing policy explicitly permits the exact action.
 - [ ] Emit the existing action/approval AFP contract so `approval_surfaces.rs` and DecisionOS render it without a second queue.
-- [ ] On policy denial, append a trace and fail or escalate; never ask an LLM to overrule policy.
-- [ ] Add adversarial tests for unallowlisted tools, forged capability IDs, prompt-injected tools, excessive autonomy, approval replay, revoked capability, and cross-tenant execution.
+- [x] On policy denial, append a trace and fail or escalate; never ask an LLM to overrule policy.
+- [x] Add adversarial tests for unallowlisted tools, forged capability IDs, prompt-injected tools, excessive autonomy, approval replay, revoked capability, and cross-tenant execution.
+
+Policy implementation checkpoint: `RunbookRuntime::check_tool_policy` loads the
+frozen Tool step and intersects it with the latest definition restrictions,
+one unambiguous healthy/unrevoked owner connection, existing capability approval
+mode, global proactivity level and the existing override table using
+`runbook:<runbook_id>` keys. Missing, foreign, ambiguous, revoked and suggestion-only
+capabilities fail closed. Definition edits cannot widen a frozen autonomy ceiling.
+
+The pure decision reuses ProactiveAutonomyTier, AutonomyDecision and proactive_policy.
+Only reviewed read/draft capability names avoid the consequential classification;
+all other tools require hard approval. Even reviewed capabilities currently stop
+at review because action schemas, dispatch and approval resume are not integrated.
+A policy receipt is an audit record, never an authorization token. Denials append
+an encrypted Denied trace and fail the instance; review appends a Waiting trace
+and transitions to AwaitingApproval. Both changes commit atomically with an
+encrypted receipt. Exact retries return that receipt without executing or
+reopening anything. No model is asked to override policy.
+
+The fifth selected item is adversarial tests, before the approval-card item:
+existing action/approval AFP emission remains unchecked until a validated exact
+action payload can be rendered and resumed. No new approval queue was added.
+The existing Db account-policy getters/setters now target the actual migration
+0047/0048 tables (`heuristic_autonomy_overrides`, `user_proactivity_config`);
+account deletion also removes those owner settings, which lack foreign keys.
 
 ## 9. Deterministic executor
 

@@ -3746,3 +3746,33 @@ saved packet. Missing facts remain explicit in evidence for downstream
 escalation; read completion makes no claim that those facts are resolved.
 There is no HTTP route or live event hook for this internal executor. Tool,
 approval and account-budget integration remain separate prerequisites.
+
+## WED-375 tool policy intersection and denial receipts - 2026-11-18
+
+The internal tool preflight accepts only owner, instance, current step and
+expected revision. The tool identity comes from the frozen definition; source,
+model and connection metadata cannot name an alternative tool or claim approval.
+It reads a unique healthy, unrevoked owner capability and existing account
+policy under the same transaction. Unknown/ambiguous connections and
+suggestion-only modes fail closed. Latest definition edits may restrict frozen
+authority but cannot expand it, including an observe-only frozen ceiling.
+
+Existing ProactiveAutonomyTier, AutonomyDecision and proactive_policy determine
+the capped account preference and surface policy. The receipt's tier records
+that preference; it is not an execute grant. Every permitted proposal still
+requires review pending validated action dispatch. Unknown tools and all writes,
+sends, spending, booking, publication and irreversible/destructive changes are
+hard approval boundaries. No policy exception currently permits exact execution.
+
+Denials atomically append an encrypted Denied trace, failed instance revision
+and encrypted runbook_policy receipt. Review appends a Waiting trace and an
+AwaitingApproval revision. No new approval queue/card is emitted. Receipts are
+historical audit results; retries neither execute nor resume anything. A future
+approval executor must bind exact action inputs and recheck live policy and
+revocation, rather than treating these receipts as approval tokens.
+
+Fresh-database verification exposed existing Db helpers querying nonexistent
+account-policy tables. The helpers and preflight now use the actual migration
+0047/0048 tables, heuristic_autonomy_overrides and user_proactivity_config.
+No parallel settings table or migration was added. These older tables lack
+user foreign keys, so account deletion explicitly removes their owner rows.

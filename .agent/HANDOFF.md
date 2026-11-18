@@ -9599,3 +9599,63 @@ Other prerequisites: entity-specific refs, account read/decrypt budget,
 remaining deterministic steps, epistemic escalation, approval/resume, timers,
 models, UI and rollout. No PR or deployment. GitHub still shows the old unrelated
 main CI failure and an empty deployment list; no current-branch remote checks.
+
+## WED-375 five policy tasks completed - 2026-11-18
+
+Implementation worktree: C:/temp/wt/omnyid-runbooks
+Branch: agent/codex/WED-375
+Frozen source: 5c539bbc2fcdad46f539824eb581588e15e481ca
+Verification worktree: C:/temp/wt/omnyid-runbooks-verify-43d7c830
+
+Completed stage 8 items 1, 2, 3, 5 and 6 as announced: policy intersections,
+existing autonomy reuse, consequential-action approval boundaries, durable
+policy-denial handling and adversarial tests. Item 4 (existing action/approval
+AFP emission) stays open until the executor provides a validated exact action
+payload. No second approval queue or live execution was introduced.
+
+Files: src/runbook_authority.rs, src/lib.rs, src/runbook_store.rs, src/db.rs,
+tests/runbook_authority.rs, tests/runbook_authority_postgres.rs and coordination/
+checklist docs. Frozen tool identity intersects latest restrictions, one owner
+connection, approval mode and existing account policy. Denials fail the instance
+with an encrypted trace/receipt; permitted proposals wait for review. Historical
+receipts never execute or resume actions. No LLM policy override path exists.
+A newer definition cannot expand a frozen observe-only/draft-only ceiling.
+
+An initial 921389a0 candidate passed four pure policy tests but its PostgreSQL
+scenario found existing helper queries targeting nonexistent tables. Corrected
+the helpers to heuristic_autonomy_overrides and user_proactivity_config, matching
+migrations 0047/0048, without adding tables. Existing account deletion now removes
+those settings because these older tables have no user foreign keys. The main
+checkout had no db.rs modifications; only the isolated task worktree was changed.
+
+The final source above completed 25 tests with zero failures, including capability
+revocation, foreign ownership, forged tool claims, injected source/connection
+instructions, excessive autonomy, terminal/review receipt replay, concurrent
+policy checks, latest-definition revocation, frozen ceiling preservation,
+owner settings roundtrip/isolation, encrypted audit records and account erasure.
+Before each test/build, commands printed the verification toplevel, full HEAD
+and clean status. Environment: CARGO_TARGET_DIR=C:/cargo-target,
+CARGO_INCREMENTAL=0, disposable TEST_DATABASE_URL on localhost:55475/omnyid_test.
+`cargo +1.95.0 test --test runbook_foundation --test runbook_storage_postgres
+ --test runbook_runtime_postgres --test runbook_evidence_postgres
+ --test runbook_authority --test runbook_authority_postgres -j 2
+ --config 'profile.test.package.omnyid-homeserver.debug=0'
+ --config 'profile.test.package.omnyid-homeserver.codegen-units=16'`
+completed, as did the library build:
+`cargo +1.95.0 build --lib -j 2
+ --config 'profile.dev.package.omnyid-homeserver.debug=0'
+ --config 'profile.dev.package.omnyid-homeserver.codegen-units=16'`.
+The Rust pin remains unchanged. Focused rustfmt/diff checks completed. New source
+and test files are 385, 158 and 320 lines, respectively; db.rs changed by four
+query fixes and six erasure lines, with no global formatting. The dedicated
+omnyid-runbook-wed375-pg container was stopped after verification. No worktree
+was deleted. Documentation commits follow the verified source SHA.
+
+Checklist now has 44 complete and 73 unchecked items out of 117, exactly five
+more complete. Next: validated action payloads and existing approval AFP emission,
+then current-policy revalidation and exact approved-input resume at dispatch.
+No provider execution or approval-card route is enabled by this preflight.
+Other remaining work is unchanged: entity/account budgets, other executor steps,
+models, timers, outcomes, UI and rollout. No PR/cross-review or deployment was
+performed. GitHub queries showed only the old unrelated main CI failure and
+an empty deployment list; local verification is not remote CI evidence.
