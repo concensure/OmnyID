@@ -1608,6 +1608,7 @@ pub async fn build_test_router(database_url: &str) -> Router {
         pdf_semaphore: Arc::new(tokio::sync::Semaphore::new(1)),
     });
     let app = Router::new()
+        .merge(proactive_routes::routes())
         .merge(runbook_routes::routes())
         .route("/healthz", get(healthz_http))
         .route("/send", post(send_http))
