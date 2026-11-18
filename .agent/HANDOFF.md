@@ -1,3 +1,42 @@
+## 2026-11-18: WED-375 quote category-gap assessment
+
+Implementation: `C:/temp/wt/omnyid-runbooks`, `agent/codex/WED-375`.
+Frozen tested source: `26d3d5531ec33669d11c72b782f3a4b5d1589c4c`.
+Clean verification worktree: `C:/temp/wt/omnyid-runbooks-verify-43d7c830`.
+
+- Changed src/runbook_quote.rs, src/runbook_transform.rs and their two test files.
+  Shared the frozen normalized-quote loader with ReviewStoredQuote and implemented
+  FindQuoteGaps using the existing generic/venue category registry.
+- Required categories are bounded to 32, alias-resolved, sorted and deduplicated;
+  unknown categories/registry versions fail closed. Findings distinguish absent,
+  uncertain/excluded and recorded facts, retaining structured source paths and
+  quote/registry fingerprints. Recorded is not commercial completeness.
+- At most three internal question candidates use registry-authored templates.
+  Vendor prose is not copied. No normalization, sending, approval grant or action
+  dispatch is added; the unchanged missing-items starter stops at Draft.
+- All 51 focused Rust tests and the library build completed on the exact source.
+  Unit coverage includes aliases, duplicate/unknown/unbounded inputs, tax/validity,
+  evidence uncertainty, confirmed exclusion, deterministic ordering and no copied
+  vendor instructions. Postgres coverage mutates the source after Read, exercises
+  concurrent/foreign/revision retries and confirms emission/completion cannot skip
+  Draft; no suggestion/action/approval records are created.
+- Rust +1.95.0, -j1, CARGO_INCREMENTAL=0, CARGO_TARGET_DIR=C:/cargo-target,
+  package debug=0/codegen-units=16. No compiler crash this batch. Disposable local
+  Postgres :55475 used and stopped after verification. Frontend and dependencies
+  unchanged, so frontend tests/build and dependency audit were not repeated.
+- Checklist stays 85 complete / 32 remaining. This closes the assessment dependency,
+  not full draft/approval/provider acceptance. No rollout/deployment or flags changed.
+- No WED-375 GitHub Actions runs. Unrelated origin/main history still blocks an
+  appropriate PR; no push or unrelated-history merge. Prior dependency advisories
+  and line-budget overages remain outside this change.
+- Next execution dependency: model/draft output and existing approval/action
+  integration. Existing quotation send authority lives in
+  src/server/quotation_routes/clarification_routes.rs and src/quotation/clarification.rs;
+  it binds draft hash, recipient, quote/comparison revision, expiry and receipt.
+  Candidate questions are not a ClarificationDraft and must not bypass those checks.
+  Calendar/runsheet transforms and full Documents projection also remain open.
+  Claude retains sitemap ownership; prior SEO release unchanged.
+
 ## 2026-11-18: WED-375 stored vendor quotation review dependency
 
 Implementation: `C:/temp/wt/omnyid-runbooks`, branch `agent/codex/WED-375`.

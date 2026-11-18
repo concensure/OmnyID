@@ -1,3 +1,19 @@
+## 2026-11-18: Quote category findings are not commercial completeness or send authority
+
+FindQuoteGaps shares the exact frozen normalized-quote resolver with
+ReviewStoredQuote and uses the existing generic/venue category registry. Required
+categories are bounded, alias-resolved, deduplicated and sorted; unknown categories
+or registry versions fail closed. Findings reference structured source paths and
+distinguish absent facts, uncertain/excluded facts and recorded facts. Recorded
+means presence with recorded evidence, not verification of the complete offer.
+Tax and quotation-validity fields use their existing normalized contract slots.
+
+At most three candidate questions come from registry templates, never vendor
+labels or prose. This is an internal transform result, not a clarification draft
+or permission to send. The unchanged quote_missing_items starter still stops at
+its Draft step; private review emission and completion cannot skip that step or
+the later approval. No new provider calls, approval grants or execution routes.
+
 ## 2026-11-18: Runbook quote review consumes a frozen normalization
 
 ReviewStoredQuote resolves normalised_quote_ref only inside the owner-scoped

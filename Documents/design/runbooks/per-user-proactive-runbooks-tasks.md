@@ -545,3 +545,19 @@ permission. Full Documents/response projection and separate booking approval
 remain unimplemented in this path, so the vendor checklist item stays open.
 
 Checklist unchanged: **85 complete, 32 remaining of 117**.
+
+
+## 2026-11-18 continuation: quote category-gap assessment
+
+Frozen source `26d3d5531ec33669d11c72b782f3a4b5d1589c4c`, verified in the clean worktree
+`C:/temp/wt/omnyid-runbooks-verify-43d7c830`: all 51 focused Rust tests and the
+library build completed. FindQuoteGaps now consumes the saved normalized quotation
+and existing category registry, with bounded alias-resolved required categories,
+source paths, evidence uncertainty and quote/registry fingerprints. Up to three
+internal questions use registry templates. Recorded category presence does not
+certify commercial completeness or authorize sending/booking.
+
+The unchanged quote_missing_items starter advances to Draft and cannot skip it
+through review emission or completion. Concurrent replay and source mutation are
+covered by Postgres tests. Full draft/approval/provider acceptance remains open,
+so checklist counts stay **85 complete, 32 remaining of 117**. No rollout changes.
