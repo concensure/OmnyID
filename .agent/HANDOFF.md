@@ -1,3 +1,58 @@
+## 2026-11-19: WED-375 tool contracts implemented; full verification blocked
+
+Implementation: `C:/temp/wt/omnyid-runbooks`, branch `agent/codex/WED-375`.
+Candidate: `96ce14bdfe5797a5733b1ad20743d1f68af42ec9`.
+Verification checkout: `C:/temp/wt/omnyid-runbooks-verify-43d7c830`, restored clean
+to that candidate after baseline diagnosis. This candidate is NOT fully verified.
+Last fully verified source remains `d8ebd36dbe2e53d1a83dcd7bbb9a85f9fa97e6af`.
+Checklist unchanged: **98 complete / 19 remaining of 117**.
+
+Changed: src/runbook_tool_schema.rs; src/tool_dispatch/runbook_contract.rs;
+module registrations in lib.rs and tool_dispatch.rs; tests/runbook_tool_schema.rs;
+canonical task/decision/handoff notes; design checklist and new
+Documents/design/runbooks/tool-contract-boundary.md. No runtime executor, routes,
+migrations, dependencies, frontend, sitemap or production configuration changed.
+
+The schema boundary rejects unknown fields/keywords, missing schemas, open
+objects, malformed required/enum fields, unbounded arrays/strings, coercion,
+unsupported types, provider errors and text fallback. Traversal/depth/node/byte
+limits precede recursive parsing. Exact selection rejects unknown/ambiguous
+capabilities; hashes bind owner, endpoint/provider, schemas and arguments. The
+opaque prepared value retains no API key and cannot execute anything.
+
+Discovery: Db::list_tool_execution_registry at src/db.rs:10849 is an empty stub,
+introduced in 02faaf6fb. Consequently all real preparations currently fail closed.
+Do not equate MCP connection presence with authority or silently restore global
+execution. Registry restoration must cover non-runbook callers too, including
+account scope, health/revocation, approval mode and credential handling. No
+provider was called and no database was started for this batch.
+
+Verification attempted from clean named SHAs:
+- Candidate cargo test --lib --test runbook_tool_schema runbook_: two attempts
+  with Rust 1.95.0, -j1, debug=0, codegen-units=8, incremental off, 64 MiB stack;
+  another with codegen-units=16 and 128 MiB stack. All crashed compiling the
+  library with Windows exit 0xc0000005 STATUS_ACCESS_VIOLATION, no Rust diagnostic.
+- Candidate cargo check --lib also crashed. The same check on clean prior
+  verified d8ebd36d also crashed. About 11 GiB RAM was free during diagnosis.
+  This establishes reproduction without these new source changes, not a pass.
+- An isolated rustc probe compiled the exact candidate schema module and six
+  integration test functions, substituting only the Result type alias needed
+  from the parent contract module. All six passed. Probe artifacts:
+  C:/temp/wt/runbook-schema-probe-96ce14bd/probe.rs and probe.exe.
+  This is limited schema evidence, NOT whole-project/build evidence. The exact
+  selection unit test has not run; the original library build must still pass.
+- Global line budget remains failing at server/mod.rs 45734/45717 and db.rs
+  18045/17986, unchanged in this batch. git diff --check completed.
+- GitHub run and deployment queries returned no records; unsuitable remote
+  lineage still prevents a meaningful PR/CI boundary. No push or PR created.
+
+Next: resolve the Windows rustc/build blocker and run the new schema integration
+and exact-selection unit tests plus existing tool_dispatch regressions and the
+library build. Then restore the canonical execution registry with appropriate
+authority tests and implement durable approved dispatch/AFP persistence. Keep
+schema/dispatch parent entries open until integrated and verified. No deployment
+was attempted. No test/build/production health was manually declared passing.
+
 ## 2026-11-19: WED-375 six approval-continuation subtasks verified
 
 Implementation worktree: `C:/temp/wt/omnyid-runbooks`, branch `agent/codex/WED-375`.

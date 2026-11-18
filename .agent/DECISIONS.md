@@ -1,3 +1,20 @@
+## 2026-11-19: WED-375 exact tool preparation and closed contracts
+
+Tool preparation belongs inside the existing dispatcher. It selects one exact
+owner-registry tool/capability and validates both input and structured output
+against a versioned descriptor contract. Natural-language capability inference,
+text-as-JSON output fallback and allow-all missing schemas are excluded.
+Unsupported schema keywords/types fail closed; resource bounds are checked
+before recursive parsing. The prepared value retains no credentials and grants
+no authority. Current private-review approvals still cannot execute tools.
+
+The canonical Db tool execution registry is currently an empty stub, introduced
+in 02faaf6fb. Do not bypass it by silently treating MCP connection rows as action
+authority. Restoring it affects existing non-runbook dispatcher callers and needs
+explicit health/revocation/approval/account/credential regression coverage.
+Durable reservation, live policy recheck, transport ceilings, unknown-outcome
+handling and authenticated AFP result persistence remain separate work.
+
 ## 2026-11-19: WED-375 approval permits private continuation only
 
 Runbook review decisions use the existing authenticated /actions/decision route.

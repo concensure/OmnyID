@@ -692,3 +692,17 @@ integration, full provenance/tool coverage and hosted rollout remain open.
 Frozen candidate: `d8ebd36dbe2e53d1a83dcd7bbb9a85f9fa97e6af` in
 `C:/temp/wt/omnyid-runbooks-verify-43d7c830`. See the latest canonical handoff for
 verification results and unresolved repository release gates.
+
+
+## Tool contract preparation — 2026-11-19 (verification incomplete)
+
+Candidate `96ce14bdfe5797a5733b1ad20743d1f68af42ec9` adds closed bounded schemas
+for tool inputs and structured outputs, plus exact capability preparation in the
+existing dispatcher. See `tool-contract-boundary.md` for the supported subset,
+limits and authority boundaries. The existing execution-registry method returns
+an empty list; no fallback or external execution was enabled.
+
+Six isolated schema tests pass against the candidate source. Full Cargo checks
+and tests crash inside Windows rustc, also reproduced on the prior verified
+candidate. Selection tests and full build verification remain incomplete. No
+parent checklist entry is closed: **98 complete / 19 remaining of 117**.
