@@ -284,7 +284,7 @@ async fn exact_approval_concurrent_execution_and_private_atomic_receipt() {
     );
     let table = format!(
         "\"{}\".messages",
-        omnyid_homeserver::db::tenant_schema_name(&owner.id)
+        format!("user_{}", owner.id.to_lowercase())
     );
     let private_count:i64=sqlx::query_scalar(&format!("SELECT count(*) FROM {table} WHERE type LIKE 'runbook_tool_%' AND content='{{}}'::jsonb AND encryption IS NOT NULL AND signature<>''"))
         .fetch_one(&db.pool).await.unwrap();
@@ -476,7 +476,7 @@ async fn result_failure_rolls_back_trace_and_provenance_but_keeps_reservation() 
     let pid = approve(&runtime, &owner.id, &instance).await;
     let table = format!(
         "\"{}\".messages",
-        omnyid_homeserver::db::tenant_schema_name(&owner.id)
+        format!("user_{}", owner.id.to_lowercase())
     );
     sqlx::query(&format!(
         "ALTER TABLE {table} ADD CONSTRAINT fail_tool_result CHECK (type<>'runbook_tool_result')"
@@ -584,7 +584,7 @@ async fn completion_requires_the_saved_tool_result_not_only_a_completed_trace() 
         .unwrap();
     let table = format!(
         "\"{}\".messages",
-        omnyid_homeserver::db::tenant_schema_name(&owner.id)
+        format!("user_{}", owner.id.to_lowercase())
     );
     sqlx::query(&format!(
         "DELETE FROM {table} WHERE type='runbook_tool_result'"
