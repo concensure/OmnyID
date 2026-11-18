@@ -227,6 +227,18 @@ async fn model_steps_store_private_outputs_usage_provenance_and_suppress_unchang
             .await
             .unwrap();
         assert!(receipt.applied);
+        if kind == StepKind::Draft {
+            let draft: omnyid_homeserver::message::AFPMessage =
+                serde_json::from_value(receipt.draft_afp.clone().unwrap()).unwrap();
+            assert_eq!(draft.from, owner.id);
+            assert_eq!(draft.to, vec![owner.id.clone()]);
+            assert_eq!(draft.r#type, "draft");
+            assert_eq!(draft.content["requires_approval"], true);
+            assert_eq!(draft.metadata.unwrap()["approval_state"], "not_requested");
+        } else {
+            assert!(receipt.draft_afp.is_none());
+        }
+
         assert_eq!(receipt.trace.status, TraceStatus::Completed);
         assert_eq!(receipt.trace.model.as_deref(), Some(BASE_MODEL));
         assert_eq!(

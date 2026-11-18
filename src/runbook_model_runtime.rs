@@ -33,6 +33,7 @@ pub struct ModelReceipt {
     pub reservation_ref: String,
     pub request_hash: String,
     pub evaluation: ModelEvaluation,
+    pub draft_afp: Option<Value>,
     pub trace: StepTrace,
     pub applied: bool,
 }
@@ -52,6 +53,26 @@ fn envelope(
         "parent_id":parent,"from":owner,"to":[owner],"timestamp":Utc::now().to_rfc3339(),
         "type":kind,"subtype":"v1","content":content,"metadata":{"private":true,"store":true,"instance_id":instance,"step_id":step},
         "references":[],"supertags":[kind],"store_in_relational":true})
+}
+
+fn private_draft(
+    owner: &str,
+    instance: &str,
+    step: &str,
+    started_at: DateTime<Utc>,
+    evaluation: &ModelEvaluation,
+) -> Option<Value> {
+    let output = evaluation.output.as_ref()?;
+    if output["type"] != "draft" {
+        return None;
+    }
+    Some(
+        json!({"protocol":"afp-v1","id":record_id("runbook_model_draft",owner,instance,step),
+        "thread_id":format!("runbook:{instance}"),"parent_id":record_id("runbook_model_reservation",owner,instance,step),
+        "from":owner,"to":[owner],"timestamp":started_at.to_rfc3339(),"type":"draft","subtype":"runbook_sourced_draft_v1",
+        "content":output["content"],"metadata":{"private":true,"store":true,"approval_state":"not_requested"},
+        "references":[],"supertags":["runbook_draft"],"store_in_relational":true,"signature":""}),
+    )
 }
 
 impl RunbookRuntime<'_, '_> {
@@ -232,6 +253,7 @@ impl RunbookRuntime<'_, '_> {
             && evaluation.output.is_some()
             && evaluation.failure.is_none();
         let last = evaluation.attempts.last().ok_or("model_attempt_missing")?;
+        let draft_afp = private_draft(owner, id, step_id, reservation.started_at, &evaluation);
         let mut trace = StepTrace {
             trace_id: digest(&json!(["runbook_step.v1", owner, id, step_id])),
             instance_id: id.into(),
@@ -250,7 +272,7 @@ impl RunbookRuntime<'_, '_> {
             ],
             output_refs: vec![format!("private_message:{receipt_id}")],
             input_hash: reservation.input_hash.clone(),
-            output_hash: Some(digest(&json!(evaluation))),
+            output_hash: Some(digest(&json!([evaluation, draft_afp]))),
             tool_id: None,
             model: Some(last.model.clone()),
             prompt_version: Some(model::PROMPT_VERSION.into()),
@@ -308,6 +330,7 @@ impl RunbookRuntime<'_, '_> {
             reservation_ref: reservation_id,
             request_hash,
             evaluation,
+            draft_afp,
             trace,
             applied,
         };
@@ -384,6 +407,14 @@ pub(crate) fn validate(owner: &str, value: &Value) -> Result<()> {
         let r: ModelReceipt = serde_json::from_value(value["content"].clone())
             .map_err(|_| "invalid_model_receipt")?;
         RuntimeRecord::Trace(r.trace.clone()).validate()?;
+        if r.draft_afp != private_draft(owner, instance, step, r.trace.started_at, &r.evaluation) {
+            return Err("invalid_model_draft");
+        }
+        if let Some(draft) = &r.draft_afp {
+            serde_json::from_value::<crate::message::AFPMessage>(draft.clone())
+                .map_err(|_| "invalid_model_draft")?;
+        }
+
         let schema = model::schema_for(r.trace.step_kind)?;
         let attempts = &r.evaluation.attempts;
         if attempts.is_empty() || attempts.len() > 2 {
@@ -449,7 +480,7 @@ pub(crate) fn validate(owner: &str, value: &Value) -> Result<()> {
             || !hash(&r.request_hash)
             || r.reservation_ref != record_id("runbook_model_reservation", owner, instance, step)
             || r.trace.trace_id != digest(&json!(["runbook_step.v1", owner, instance, step]))
-            || r.trace.output_hash != Some(digest(&json!(r.evaluation)))
+            || r.trace.output_hash != Some(digest(&json!([r.evaluation, r.draft_afp])))
             || r.trace.output_refs
                 != vec![format!(
                     "private_message:{}",
