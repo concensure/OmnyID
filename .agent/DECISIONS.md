@@ -1,3 +1,25 @@
+## 2026-11-18: Review emission is an AFP projection, not action approval
+
+Runbook Emit currently supports only proactive_suggestion reviews immediately
+following a verified deterministic transform. It uses the existing AFP content
+contract in the owner's signed/encrypted ledger, with no action payload, approval
+grant or provider dispatch. Draft/approval-dependent operations, arbitrary output
+selectors, follow-up emission and required-fact emission remain unavailable.
+The generic trusted local-result API still rejects Emit; only the dedicated
+emitter may atomically append its suggestion, provenance, trace and revision.
+
+Completion resolves a real emission receipt and hash-matching suggestion before
+populating instance.outputs.review_ref. A claimed output reference or completed
+trace alone cannot satisfy that business criterion. Multiple review emissions
+are rejected as ambiguous by completion until a richer selector is designed.
+
+Activity exposes only titles, deterministic summary lines and source references,
+not raw evidence or answers. Existing Runbook controls in Fleet/Decision Queue
+render these as escaped, read-only findings, including completed instances. They
+do not create a separate task/approval queue or provide execution controls.
+Definitions and source evidence remain frozen; latest disable blocks fresh work,
+while exact historical retries return their original receipt.
+
 ## 2026-11-18: Runbook transforms produce review data; retention removes only derived outcomes
 
 Eight deterministic review operations consume selected, typed facts from the frozen

@@ -1,3 +1,43 @@
+## 2026-11-18: WED-375 private review emission and starter completion
+
+Implementation: `C:/temp/wt/omnyid-runbooks`, `agent/codex/WED-375`.
+Frozen source: `2e0583563cdaaba505c8c50638eaf35f5e9ecd7e`.
+Clean verification worktree: `C:/temp/wt/omnyid-runbooks-verify-43d7c830`.
+
+- Added src/runbook_emit.rs and tests/runbook_emit_postgres.rs; changed private
+  store validation, internal step persistence, completion and activity projection.
+  Updated existing RunbookPanel/runbookState and browser scenarios.
+- Dedicated Emit consumes frozen transform output and atomically writes the
+  existing proactive_suggestion contract plus receipt/provenance/trace/revision.
+  No action payload, approval grant or provider dispatch. Generic local-result
+  calls still reject Emit. Only supported review operations/selectors are allowed.
+- Completion requires the real emission and hash-matching suggestion for review_ref.
+  Activity/Fleet/Decision Queue display bounded, escaped, read-only review summaries,
+  including completed instances, with account-switch clearing and no execution UI.
+- Unmodified budget/task/file starters complete in one integration scenario. It
+  covers cross-owner/stale access, disable/reenable, concurrent replay, forced
+  trace collision rollback, encrypted content and no task/action/approval creation.
+  Budget/task checklist items closed: 85 complete, 32 remaining. File path is
+  verified, but the grouped general-starter item remains open for workflow/info-gap.
+- Local checks on exact source: 47 Rust tests, library build, TypeScript, 10 focused
+  frontend tests, eight Playwright scenarios, production frontend build completed.
+  Disposable Postgres container stopped after verification.
+  Rust +1.95.0, -j1, CARGO_INCREMENTAL=0, CARGO_TARGET_DIR=C:/cargo-target, package
+  debug=0/codegen-units=16. Disposable local Postgres :55475 used for integration.
+  Playwright config: solid-ui/playwright.runbooks.config.ts (8 scenarios, includes
+  narrow layouts, 200% zoom, serious/critical axe checks and malicious text escaping).
+- Initial compiler at 6eb2931f crashed with STATUS_ILLEGAL_INSTRUCTION. Final source
+  compiled normally. Initial direct Node test lacked the repo import hook; use
+  --import ./tests/node-ts-specifier-hooks.mjs with --experimental-strip-types.
+- Line-budget still fails only unchanged server/mod.rs 45733/45717 and db.rs
+  18045/17986. No dependencies changed; prior six advisories/five warnings persist.
+- No candidate CI or PR: origin/main still has unrelated open-source history,
+  so no push or unrelated-history merge. No Runbook deployment/flag changes.
+- Next: existing approval/action contracts and tool schema/dispatch integration,
+  then remaining domain transforms/model steps. Do not infer approval authority
+  from a review, feedback, trace or historical policy receipt. Other agent retains
+  sitemap ownership. The prior SEO static release is unaffected.
+
 ## 2026-11-18: WED-375 deterministic review and retention continuation
 
 Implementation worktree: `C:/temp/wt/omnyid-runbooks`, branch `agent/codex/WED-375`.

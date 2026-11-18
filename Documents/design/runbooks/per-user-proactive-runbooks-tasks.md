@@ -405,8 +405,8 @@ Depends on: 2, 5–14
 - [ ] `calendar_conflict`: conflicting events -> alternatives -> epistemic question when priority is missing.
 - [ ] `vendor_quote_received`: quote event -> one normalization -> Documents/response projection -> separate booking approval.
 - [ ] `quote_missing_items`: normalized gaps -> exact questions -> no send before approval.
-- [ ] `budget_threshold`: changed commitment -> category/total projection -> no invented target or spend.
-- [ ] `wedding_task_deadline`: due task -> correct owner/context -> no duplicate decision task.
+- [x] `budget_threshold`: changed commitment -> category/total projection -> no invented target or spend.
+- [x] `wedding_task_deadline`: due task -> correct owner/context -> no duplicate decision task.
 - [ ] `rsvp_non_response`: permission check -> reminder draft -> no send if permission absent.
 - [ ] `runsheet_change`: timing diff -> affected viewers -> no publish before approval.
 - [ ] General workflow/file/info-gap runbooks behave as specified.
@@ -490,3 +490,40 @@ above 4096 receipts fail closed pending archival/index work.
 Checklist: **83 complete, 34 remaining of 117**. SEO static integration was
 released separately at 7aaa3b4ee42c0e890d587e72d59f68845525ee5b; this Runbook
 candidate has not been deployed and all execution flags remain off.
+
+
+## Private review emission continuation — 2026-11-18
+
+Source `2e0583563cdaaba505c8c50638eaf35f5e9ecd7e`, clean verification worktree
+`C:/temp/wt/omnyid-runbooks-verify-43d7c830`: all 47 focused Rust tests and the
+library build completed with Rust 1.95.0, one job, package debug off, 16 package
+codegen units and incremental off. TypeScript, 10 focused frontend tests, eight
+browser scenarios and the production frontend build completed. Browser coverage
+includes 320/375 px, 200% zoom, serious/critical axe checks, escaped review text,
+no execution controls, and account-change clearing. The initial Rust attempt at
+6eb2931f failed inside the compiler with STATUS_ILLEGAL_INSTRUCTION; final source
+completed. A direct Node invocation lacked the repository's TS import hook;
+rerunning with tests/node-ts-specifier-hooks.mjs completed all 10 frontend tests.
+
+The dedicated Emit adapter consumes the preceding frozen transform receipt and
+appends a standard proactive_suggestion, emission receipt, provenance, trace and
+instance revision in one owner transaction. It emits no action/approval payload.
+A forced trace collision proves rollback after suggestion insertion. Concurrent
+replays return one encrypted suggestion; stale/foreign requests and fresh work
+after disable are rejected. The public local-result API still cannot emit.
+Completion derives review_ref only from an actual hash-matching stored review.
+
+Unmodified enabled budget, task-deadline and file-review starter copies now reach
+completion in disposable-Postgres integration tests. Budget calculations retain
+integer category/total projections and reject absent targets/mixed currencies;
+reviews authorise no spend. Task reviews preserve the recorded task/owner context
+and create no task/action/approval records. Activity exposes bounded derived
+review summaries in the existing Fleet/Decision Queue Runbook controls; evidence
+and answers remain private. The grouped general-workflow/file/info-gap item stays
+open because workflow approval and information-gap full acceptance remain open.
+
+Checklist: **85 complete, 32 remaining of 117**. The general deterministic-step,
+approval contract, tools, model, full provenance and rollout items remain open.
+No Runbook deployment or flag change. Existing six dependency advisories/five
+warnings and two unchanged line-budget overages remain. Remote PR/CI remains
+unavailable because origin/main has unrelated open-source history; no push made.
