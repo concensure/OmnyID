@@ -212,6 +212,9 @@ pub async fn call_tool(
             }
             bytes.extend_from_slice(&chunk);
         }
+        if bytes.iter().copied().find(|b| !b.is_ascii_whitespace()) != Some(b'{') {
+            return Err(unknown("invalid_tool_envelope"));
+        }
         let envelope: Envelope =
             serde_json::from_slice(&bytes).map_err(|_| unknown("invalid_tool_envelope"))?;
         if envelope.jsonrpc != "2.0" || envelope.id != id {

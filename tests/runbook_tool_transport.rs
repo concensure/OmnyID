@@ -264,7 +264,7 @@ async fn one_deadline_covers_stalled_headers_and_stalled_body() {
 }
 #[tokio::test]
 async fn malformed_mismatched_duplicate_and_provider_error_envelopes_fail_closed() {
-    for case in 0..10 {
+    for case in 0..11 {
         let (url, task)=server(move |v| {
             let id=v["id"].as_str().unwrap();
             let body=match case {
@@ -277,6 +277,7 @@ async fn malformed_mismatched_duplicate_and_provider_error_envelopes_fail_closed
                 6=>format!("{} trailing",success(v)),
                 7=>"[1,2,3]".into(),
                 8=>json!({"jsonrpc":"2.0","id":3,"result":{}}).to_string(),
+                9=>json!(["2.0",id,{}]).to_string(),
                 _=>"{".into(),
             };response(&body).into()
         }).await;
