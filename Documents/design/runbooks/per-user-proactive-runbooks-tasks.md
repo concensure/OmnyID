@@ -324,14 +324,14 @@ The Decision Queue/A2UI adapter now reloads authenticated questions and posts ty
 
 Depends on: 7–10
 
-- [ ] Add `src/runbook_llm_step.rs` for only `classify`, `reason`, and `draft` step kinds.
+- [x] Add `src/runbook_llm_step.rs` for only `classify`, `reason`, and `draft` step kinds.
 - [ ] Resolve inference through the current user BYOK/shared model ladder; do not read API keys directly in the runbook runtime.
 - [ ] Start with `gpt-6-luna` low/medium for bounded frequent tasks and permit policy-controlled `gpt-6.1-sol` medium escalation only after acceptance criteria fail.
-- [ ] Require structured output schema for classification/reasoning and AFP draft objects for draft steps.
-- [ ] Use reusable cached prompt prefixes, source references, strict evidence limits, and generate only on meaningful input changes.
-- [ ] Record model, prompt version, tokens, cost, approval state, revision, input/output hashes, and source refs in the step trace/provenance.
+- [x] Require structured output schema for classification/reasoning and AFP draft objects for draft steps.
+- [x] Use reusable cached prompt prefixes, source references, strict evidence limits, and generate only on meaningful input changes.
+- [x] Record model, prompt version, tokens, cost, approval state, revision, input/output hashes, and source refs in the step trace/provenance.
 - [ ] Enforce account/runbook/instance budgets with graceful pause or simpler-model fallback; never silently exceed budget.
-- [ ] Add mocked-provider tests for valid output, invalid schema, timeout, provider failure, cost ceiling, cached prefix, unchanged-input suppression, and escalation.
+- [x] Add mocked-provider tests for valid output, invalid schema, timeout, provider failure, cost ceiling, cached prefix, unchanged-input suppression, and escalation.
 
 ## 12. Follow-up event scheduling
 
@@ -561,3 +561,37 @@ The unchanged quote_missing_items starter advances to Draft and cannot skip it
 through review emission or completion. Concurrent replay and source mutation are
 covered by Postgres tests. Full draft/approval/provider acceptance remains open,
 so checklist counts stay **85 complete, 32 remaining of 117**. No rollout changes.
+
+## 2026-11-18 continuation: five bounded model-step implementation tasks
+
+Frozen source `cbd753ebb56a45c2252cb273a5bde9b5ec175d6c` completed all 57 focused Rust tests and
+the library build in clean worktree `C:/temp/wt/omnyid-runbooks-verify-43d7c830`.
+The five checked items are the classify/reason/draft executor, strict structured
+and AFP draft outputs, reusable prefixes/bounded evidence/unchanged-input replay,
+model usage/hash/source provenance, and mocked-provider coverage.
+
+The executor accepts only a verified preceding Transform receipt. It commits an
+owner-private reservation before calling an injected provider and atomically saves
+result, trace, provenance and any instance advance after rechecking current state.
+Same owner/instance/step/frozen input retries return the saved receipt; uncertain
+crash-interrupted calls stay pending reconciliation. Cancellation, disable and
+erasure cannot be overridden by a late response. Draft AFP envelopes are server
+owned, private, approval-required and nested in the encrypted result receipt.
+No action/approval event is published. Completion checks the actual applied receipt.
+
+Requests use stable owner/schema/model cache keys and bounded evidence; actual
+provider cache effectiveness has not been measured. Usage is recorded per attempt;
+timeout/provider-error usage is marked unknown with its reserved ceiling, rather
+than claimed as known zero. Only well-formed low-confidence results may escalate
+once when policy, retry and remaining step budget allow. No real provider calls
+were made. The live BYOK/shared ladder, production model policy, account/runbook/
+instance-wide budgets and rollout/evaluation tasks remain open.
+
+Final verification used Rust +1.95.0, -j1, incremental off, C:/cargo-target,
+package debug=0/codegen-units=8 and RUST_MIN_STACK=67108864. Earlier compiler
+attempts hit Windows access violations, a stack overflow and 0x80000004; final
+same-source retry completed. Line budget still reports only the unchanged
+server/mod.rs and db.rs overages. Frontend/dependencies unchanged; no deployment.
+Unrelated origin/main history still prevents an appropriate PR/CI run.
+
+Checklist: **90 complete, 27 remaining of 117**.

@@ -1,3 +1,34 @@
+## 2026-11-18: Model calls use durable reservations and private draft receipts
+
+The internal model executor accepts only classify/reason/draft and only the
+immediately preceding verified Transform receipt. Raw Read bodies, caller facts,
+credentials and arbitrary selectors are excluded. Requests carry a versioned
+reusable prefix, an owner/schema/model-scoped cache key, strict JSON schema,
+bounded evidence, output tokens and per-attempt cost ceiling. There is no live
+provider implementation, route, event-hook dispatch or credential access yet.
+
+Reservation commits before calling the injected provider. Finalization uses a
+new owner transaction, checks current state/enablement, and atomically persists
+result, trace, existing action provenance and any instance advance. Concurrent
+or crash-interrupted calls remain pending reconciliation and cannot spend again.
+Cancellation, disable and account deletion win over a late provider response.
+
+Only well-formed low-confidence output can trigger one policy-permitted Luna to
+Sol escalation, within declared retries and remaining step cost. Other failures
+are terminal for this instance and preserve a replayable receipt. Timeout and
+provider-error usage is explicitly unknown: the reservation ceiling is retained,
+not misrepresented as known zero spend. Trace counters sum observed responses;
+the hashed result contains every attempt and its usage-known flag. Account and
+runbook-wide budget reservation, live BYOK/shared inference routing and provider
+cache effectiveness remain separate uncompleted integration/release gates.
+
+Model-produced draft fragments cannot name recipients or routing. The runtime
+builds a full private AFP draft envelope addressed only to its owner, with
+requires_approval=true and approval_state=not_requested, inside the encrypted
+result receipt. The provenance output hash binds evaluation and the draft AFP.
+It is not published as an action or approval request. Completion requires the
+actual applied model receipt and matching trace, not a claimed output reference.
+
 ## 2026-11-18: Quote category findings are not commercial completeness or send authority
 
 FindQuoteGaps shares the exact frozen normalized-quote resolver with

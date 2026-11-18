@@ -1,3 +1,58 @@
+## 2026-11-18: WED-375 five model-step implementation tasks completed
+
+Implementation: `C:/temp/wt/omnyid-runbooks`, `agent/codex/WED-375`.
+Frozen tested source: `cbd753ebb56a45c2252cb273a5bde9b5ec175d6c`.
+Clean verification worktree: `C:/temp/wt/omnyid-runbooks-verify-43d7c830`.
+
+- Added src/runbook_llm_step.rs, src/runbook_model_runtime.rs and
+  tests/runbook_model_postgres.rs. Updated lib exports, store validation and
+  completion receipt checks. Coordination/checklist/decisions updated separately.
+- Closed exactly five checklist items: bounded classify/reason/draft executor;
+  strict structured/AFP draft outputs; reusable prefixes/source limits/unchanged
+  input suppression; usage/hash/revision/source provenance; mocked-provider tests.
+  Checklist now 90 complete / 27 remaining of 117.
+- Only a preceding verified Transform receipt can feed a model. Schema/size/source
+  validation rejects unknown/duplicate fields, forged citations and draft routing.
+  Runtime-generated full AFP draft envelopes are private, owner-addressed and
+  approval-required, nested in encrypted results; nothing is sent/published.
+  Draft/request/result Debug implementations redact private generated content.
+- Reserve in the private ledger before calling, release the transaction for the
+  provider, then recheck state/enablement before atomic result/trace/provenance/
+  revision persistence. Concurrent/crash retries cannot duplicate calls. Pending
+  uncertain calls require future explicit reconciliation. Cancellation, disable
+  and account deletion win over late responses. Completion resolves the real
+  applied model receipt. Generic local-result callers still cannot create models.
+- Request prefixes and owner/schema/model cache keys are reusable; suppression
+  is owner/instance/step/frozen-input scoped. No observed provider cache savings
+  are claimed. Per-attempt observed usage and unknown-usage flags are preserved;
+  unknown timeout/error spend retains its reservation ceiling. Trace counters
+  sum observed response usage. One Luna-to-Sol escalation requires a valid but
+  below-threshold result plus policy, retry and remaining step-cost allowance.
+- Final source completed all 57 focused Rust tests (including six model suites)
+  and cargo build --lib. Mock scenarios cover the three output kinds, schema and
+  duplicate-field rejection, foreign citations/owners, routing/approval injection,
+  timeout/provider failure, cost/token/model mismatch, cache prefix, historical
+  replay, escalation denial/caps, interrupted/concurrent calls, cancellation,
+  disable, account erasure, encrypted records, provenance and debug redaction.
+- Final successful settings: Rust +1.95.0, CARGO_TARGET_DIR=C:/cargo-target,
+  CARGO_INCREMENTAL=0, RUST_MIN_STACK=67108864, -j1, package debug=0 and
+  codegen-units=8 for both test/dev profiles. Earlier attempts at 16 codegen units
+  hit access violations/stack overflow/0x80000004. At 8, a test-binary compiler
+  crash was followed by successful same-source retry. Do not count crashed runs
+  as test execution. Project toolchain/profile files were not changed.
+- Disposable Postgres :55475 was used and stopped after verification. No schema
+  migrations, frontend or dependency changes. Frontend suites/build/audit were
+  not repeated. Line-budget on final source reports only unchanged server/mod.rs
+  45733/45717 and db.rs 18045/17986. Prior dependency advisories remain unresolved.
+- No live inference adapter or provider calls, no HTTP/event-hook model execution,
+  no rollout flags or deployment. BYOK/shared inference routing, production model
+  policy/evaluation and persistent account/runbook/instance budgets remain open.
+- GitHub Actions still has no WED-375 run. Unrelated origin/main history prevents
+  a suitable PR; no push/unrelated-history merge made. Author retains SEO ownership.
+- Next: owner-scoped inference ladder plus durable aggregate budget reservation,
+  then existing approval/action/tool integration. Do not connect a live provider
+  before those gates. Calendar/runsheet and full Documents projection remain open.
+
 ## 2026-11-18: WED-375 quote category-gap assessment
 
 Implementation: `C:/temp/wt/omnyid-runbooks`, `agent/codex/WED-375`.
