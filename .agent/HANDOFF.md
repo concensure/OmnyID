@@ -9725,3 +9725,61 @@ remain off; no user/provider action or live timer delivery was enabled.
 Documentation commits follow the frozen source; no worktree was deleted.
 
 Dedicated disposable container omnyid-runbook-wed375-pg stopped after verification.
+
+## WED-375 API, events, completion and security review - 2026-11-18
+
+Implementation: C:/temp/wt/omnyid-runbooks, branch agent/codex/WED-375.
+Frozen source: 152d6f38980245bee25d39814f35b45bb00cec19.
+Verification: C:/temp/wt/omnyid-runbooks-verify-43d7c830, clean detached at source.
+Seven additional checklist items completed: stage 4 items 1/2/6, stage 9 item 4,
+stage 14 item 1, stage 16 item 1, stage 17 item 2. Total 61 complete, 56 remaining.
+
+Changes: new runbook_activity.rs and runbook_complete.rs; extended event adapter,
+contract/validation, focused server/runbook_routes.rs and module declarations.
+New tests/runbook_api_postgres.rs and runbook_event_adapter.rs; controls and
+foundation tests extended. Documentation adds runbook-threat-model.md.
+Owner-authenticated detail/activity/cancel/answer routes retain default-off
+management, rate/body limits and no-store. Projections omit raw evidence/answers.
+No start/complete/provider route. Answering resumes ledger state only.
+Completion derives predicates from committed prior traces, checks required facts,
+and atomically records success/failure; missing outputs cannot become success.
+Event adapters preserve bounded refs, urgency and causation, use native Watcher
+contracts, and isolate private delivered events from untrusted public claims.
+Older dispatch hashes may conflict when newly recognized fields are present;
+fail closed and require explicit reviewed migration/restart before live rollout.
+
+Verification commands printed toplevel, full SHA and clean status. Environment:
+CARGO_TARGET_DIR=C:/cargo-target; CARGO_INCREMENTAL=0; disposable TEST_DATABASE_URL
+on localhost:55475/omnyid_test. Rust +1.95.0; repository toolchain pin unchanged.
+`cargo +1.95.0 test --test runbook_foundation --test runbook_storage_postgres
+ --test runbook_runtime_postgres --test runbook_evidence_postgres
+ --test runbook_authority --test runbook_authority_postgres
+ --test runbook_controls_postgres --test runbook_event_adapter
+ --test runbook_api_postgres -j 2
+ --config 'profile.test.package.omnyid-homeserver.debug=0'
+ --config 'profile.test.package.omnyid-homeserver.codegen-units=16'`
+completed 33 tests, zero failures. Library build at the same SHA completed:
+`cargo +1.95.0 build --lib -j 2
+ --config 'profile.dev.package.omnyid-homeserver.debug=0'
+ --config 'profile.dev.package.omnyid-homeserver.codegen-units=16'`.
+Focused rustfmt, diff checks and all runbook file counts checked; maximum 620
+lines, with no material expansion of existing oversized shared modules.
+
+Security audit is NOT passing. `cargo audit --json` returned six dependency
+advisories; registry/yanked checks timed out. A no-fetch/no-yanked rerun preserved
+results in C:/temp/wt/runbook-audit-152d6f38.json. See the threat model for exact
+advisories and fetched database commit. Five additional warnings were reported.
+Cargo.toml and Cargo.lock are unchanged by this batch. Dependency remediation/
+applicability review and complete registry checks remain a release blocker;
+the security-scan task stays unchecked. No runbook source modules log inputs.
+
+No frontend changes: full frontend/accessibility/legacy unit suites were not
+run. No PR review, hosted verification or deployment. GitHub still returned only
+old unrelated main failure 23703104075 and no deployments. Local tests are not
+remote CI evidence. Next: dependency-security triage alongside existing UI/daemon
+integration; exact tool approval/dispatch and typed outputs remain prerequisite
+work before enabling execution. Shared budgets, models, provenance, outcomes,
+retention, starter end-to-end cases and rollout are still open. No live execution
+flags enabled. Documentation commits follow the frozen source; no worktrees removed.
+
+Dedicated disposable container omnyid-runbook-wed375-pg stopped after verification.

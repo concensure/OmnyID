@@ -33,8 +33,8 @@ only the typed definition and its revision reference, with no storage keys or
 provider credentials. Responses are no-store. No frontend control or first-run
 screen is wired yet; the setup endpoint copies the user's selected starters.
 
-The frozen control-flow source candidate is `fc20e2f156bdbfd34d1b8bddfa67ec4c74b405d9`.
-All 30 focused integration tests and the library build completed in the clean exact-SHA worktree
+The frozen API/event/completion source candidate is `152d6f38980245bee25d39814f35b45bb00cec19`.
+All 33 focused integration tests and the library build completed in the clean exact-SHA worktree
 `C:/temp/wt/omnyid-runbooks-verify-43d7c830` using Rust 1.95, two jobs,
 16 package codegen units, incremental compilation off and package debug info
 disabled. The project toolchain pin is unchanged; see the final handoff evidence.
@@ -56,7 +56,7 @@ The new internal `execute_read` path binds frozen definition selectors to
 owner-scoped evidence, encrypts the resulting receipt and advances atomically.
 It does not grant tool authority or wire live ingress.
 
-Stages 4–17 remain open except for checked items below. Complete adapters,
+Stages 4–17 remain open except for checked items below. Live adapter hooks,
 remaining step-kind execution, bounded evidence, approval emission/resume integration,
 retries/cooldowns, model budgets, daemon timer integration, outcomes, activity/A2UI
 and rollout remain unfinished. No live ingress, scheduler or daemon hook is
@@ -77,6 +77,35 @@ schema identifiers and explicit token/cost limits. Epistemic answer schemas use 
 reviewed enum rather than arbitrary executable JSON schema. Runtime AFP content
 is private plaintext **before** the existing private storage/encryption boundary;
 a `private` metadata flag is not encryption or authorization.
+
+
+Latest checkpoint: seven additional items complete; **61 complete, 56 remaining**.
+Authenticated GET /runbooks/{id} returns summary detail; GET
+/runbooks/instances/{id}/activity projects status, trace links and question state.
+POST /runbooks/instances/{id}/cancel and /answers reuse revision-safe runtime
+transactions, deriving owner from authentication. Activity excludes raw evidence,
+supplied answers and definition bodies. No start, complete or provider endpoint
+is exposed; supplying an answer does not execute a step.
+
+Event normalization now preserves bounded refs, optional reviewed urgency and
+causation and handles actual Watcher alert/resolution builders. Resolution events
+without confidence retain unknown confidence (0.0). Delivered internal follow-ups
+normalize only through the signed/encrypted private-store path; public claims of
+that type remain rejected. Newly recognized fields can conflict with old saved
+dispatch hashes; do not rewrite receipts to hide the mismatch.
+
+The internal Complete executor requires the frozen prior-step sequence, completed
+traces and required facts. It evaluates every criterion against derived
+instance.outputs.<step_id>.{status,output_hash,output_refs}; unavailable business
+outputs fail closed. It records success/failure atomically and returns prior
+traces on exact retry. This does not complete the broader all-step executor item.
+
+The [threat model](runbook-threat-model.md) records controls, evidence and remaining
+rollout gates. All current runbook source/test files are below 999 lines; the
+largest is 620. Dependency audit reported six advisories and five warnings in
+unchanged dependencies, plus timed-out registry/yanked checks. The security-scan
+checkbox remains open; this is not a clean security result. No deployment or PR
+review was performed.
 
 ## 0. Freeze and inventory
 
@@ -100,7 +129,7 @@ Regression inventory (recorded, not a claim that all suites ran this turn):
 | Approval cards | `src/server/approval_surfaces.rs::tests` |
 | Erasure | `tests/runbook_storage_postgres.rs`, `tests/runbook_runtime_postgres.rs`, `tests/runbook_evidence_postgres.rs` exercise `Db::delete_user_account_and_data`; private tenant persistence is also covered in `src/db/tenant_roundtrip.rs` |
 
-The latest batch ran seven runbook integration targets (30 tests), not
+The latest batch ran nine runbook integration targets (33 tests), not
 all listed legacy unit suites. Later integrations must run the affected suites
 from a clean frozen worktree. A filtered unit-suite command is
 `cargo +1.95.0 test --lib <module_name>::tests` with the documented test-profile
@@ -144,12 +173,12 @@ Depends on: 1, 2
 
 Depends on: 1
 
-- [ ] Add a normalized proactive-event adapter over stored `passive_event`, Watcher alert/resolution, workflow, vendor, document, wedding, and internal due-event AFP kinds.
-- [ ] Preserve source and entity references, confidence, urgency, occurrence time, and causation without copying raw bodies.
+- [x] Add a normalized proactive-event adapter over stored `passive_event`, Watcher alert/resolution, workflow, vendor, document, wedding, and internal due-event AFP kinds.
+- [x] Preserve source and entity references, confidence, urgency, occurrence time, and causation without copying raw bodies.
 - [ ] Add a small post-persistence dispatcher hook to `proactive_routes.rs`; keep substantive logic out of that already-large file.
 - [ ] Add the same hook at the reviewed background-Watcher/daemon boundary for events that do not pass through the HTTP route.
 - [x] Make event normalization idempotent and reject events that are not owned by the current daemon partition.
-- [ ] Add tests for email, calendar, Watcher, vendor quote, RSVP, task, workflow failure, scheduled follow-up, malformed, and cross-tenant events.
+- [x] Add tests for email, calendar, Watcher, vendor quote, RSVP, task, workflow failure, scheduled follow-up, malformed, and cross-tenant events.
 
 ## 5. Pure matcher and dedupe
 
@@ -244,7 +273,7 @@ Depends on: 6–8
 - [ ] Implement `read`, `transform`, `tool`, `emit`, `wait`, `approval`, and `complete` steps without an LLM.
 - [ ] Validate tool input/output schemas and reject unknown fields.
 - [ ] Reuse existing capability/tool dispatch and AFP result persistence.
-- [ ] Check success criteria deterministically before completing an instance.
+- [x] Check success criteria deterministically before completing an instance.
 - [ ] Store each meaningful step as `runbook_step_trace` with input/output refs and provenance.
 - [ ] Add tests for every deterministic step, tool failure, schema failure, success criteria failure, and partial retry.
 
@@ -321,7 +350,7 @@ Depends on: 6, 8, 9, 11
 
 Depends on: 3, 6, 8, 10, 12
 
-- [ ] Add focused `src/server/runbook_routes.rs` endpoints for list/detail, enable/disable, validated successor edit, instance activity, cancel, and escalation answer.
+- [x] Add focused `src/server/runbook_routes.rs` endpoints for list/detail, enable/disable, validated successor edit, instance activity, cancel, and escalation answer.
 - [x] Derive owner from authentication on every endpoint and rate-limit writes.
 - [ ] Add semantic A2UI kinds for definition, instance, step trace summary, approval link, and epistemic question.
 - [ ] Reuse current activity/fleet, Decision Queue, settings controls, badges, timeline, confirmation, toast, and failure-state primitives.
@@ -347,7 +376,7 @@ Depends on: 2, 5–14
 
 Depends on: 1–15
 
-- [ ] Threat-model forged events, malicious definitions, prompt injection, capability escalation, cross-tenant refs, replay, timer abuse, and private-content leakage.
+- [x] Threat-model forged events, malicious definitions, prompt injection, capability escalation, cross-tenant refs, replay, timer abuse, and private-content leakage.
 - [ ] Verify encrypted/private content follows current storage and decrypt-budget rules.
 - [ ] Keep operational logs content-light and redact model/tool inputs.
 - [ ] Add retention for derived traces/projections without deleting immutable evidence that policy requires to retain.
@@ -359,7 +388,7 @@ Depends on: 1–15
 Depends on: 1–16
 
 - [ ] Run Rust unit/integration tests, migration checks, all relevant proactive/Watcher/Synthesizer/approval tests, frontend typecheck, line budget, full Wedding tests where wedding runbooks are enabled, production build, and accessibility checks.
-- [ ] Verify every new source file is below 999 lines and no existing oversized file is materially bloated.
+- [x] Verify every new source file is below 999 lines and no existing oversized file is materially bloated.
 - [ ] Run flags-off hosted shadow matching and compare expected definition/match counts without executing instances.
 - [ ] Run an internal allowlist with deterministic steps only and inspect duplicate, policy-denial, stale, and cross-tenant metrics.
 - [ ] Enable draft-only model steps after representative Luna-versus-Sol evaluation passes.

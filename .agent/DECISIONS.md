@@ -3805,3 +3805,35 @@ Cancellation/expiry resolve schedules in the same transaction as the instance.
 All control records use the existing encrypted/signed private ledger and account
 row lock, and disappear with private-schema account erasure. No independent timer,
 external action, public event injection or daemon hook has been enabled.
+
+## WED-375 activity, event normalization and completion - 2026-11-18
+
+Authenticated runbook management gains summary detail, instance activity, cancel
+and typed answer endpoints under the existing default-off flag, owner/session
+boundary, body limit, rate limiter and no-store response policy. Activity exposes
+trace links and question requirements/status but omits source bodies, answers,
+raw definitions and model/tool inputs. Answer submission only resumes ledger
+state; no executor is called. There remains no HTTP start or completion endpoint.
+
+Event normalization preserves bounded typed refs, optional reviewed urgency and
+explicit causation. Native Watcher resolution events lack confidence, represented
+as 0.0 rather than fabricated certainty. Absent urgency is omitted on serialization
+to preserve existing event hashes. Private follow-ups use a distinct authenticated
+store read that verifies signed/encrypted delivered records; the public adapter
+still rejects claimed follow-up kinds. Normalization cannot confer authority.
+
+Complete reads the frozen sequence and committed completed traces, checks required
+facts from saved evidence or answers to that same step's question, and derives
+instance.outputs.<step_id>.{status,output_hash,output_refs}. Every declared filter
+must match. Unknown outputs fail; starter review_ref business outputs are not
+invented. Completion/failure trace and terminal revision commit atomically, and
+exact retries return the original trace. Other typed output schemas/executors,
+provenance and provider approval integration remain prerequisites for rollout.
+
+Compatibility: absent urgency stays absent in serialized normalized events.
+Events that already contain newly recognized refs, urgency or causation can now
+hash differently from an old saved dispatch. Those old instances fail closed
+with event_replay_conflict; do not rewrite receipts to conceal the mismatch.
+There is no live runbook ingress deployment in this branch. Any future migration
+of such development/hosted instances requires an explicit reviewed versioning
+or cancellation/restart policy before rollout.
