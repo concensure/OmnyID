@@ -175,6 +175,11 @@ async fn setup(db: &Db, store: &RunbookStore<'_>, owner: &str, endpoint: &str) -
     complete.input_refs = vec![];
     complete.required_fields = vec![];
     d.steps = vec![tool, complete];
+    d.success_criteria = vec![Filter {
+        path: "instance.outputs.tool.status".into(),
+        op: FilterOp::Eq,
+        value: Some(json!("completed")),
+    }];
     store.save(owner, None, d).await.unwrap();
     let event = Ulid::new().to_string();
     db.insert_daemon_afp_message(&json!({"protocol":"afp-v1","id":event,"type":"workflow_failed","to":[owner],
@@ -284,6 +289,29 @@ async fn exact_approval_concurrent_execution_and_private_atomic_receipt() {
     let private_count:i64=sqlx::query_scalar(&format!("SELECT count(*) FROM {table} WHERE type LIKE 'runbook_tool_%' AND content='{{}}'::jsonb AND encryption IS NOT NULL AND signature<>''"))
         .fetch_one(&db.pool).await.unwrap();
     assert_eq!(private_count, 4);
+    let completed = runtime.complete(&owner.id, &instance, 5).await.unwrap();
+    assert_eq!(completed.status, TraceStatus::Completed);
+    assert_eq!(
+        runtime.complete(&owner.id, &instance, 5).await.unwrap(),
+        completed
+    );
+    assert_eq!(
+        runtime
+            .instance(&owner.id, &instance)
+            .await
+            .unwrap()
+            .instance
+            .status,
+        InstanceState::Completed
+    );
+    assert_eq!(
+        runtime
+            .execute_tool(&owner.id, &instance, &pid, &provider)
+            .await
+            .unwrap(),
+        receipt
+    );
+    assert_eq!(provider.calls.load(Ordering::SeqCst), 1);
     server.abort();
     erase(&db, &owner).await;
     erase(&db, &other).await;
@@ -539,4 +567,93 @@ async fn rejection_remains_possible_after_grant_revocation_and_cannot_be_approve
     assert_eq!(provider.calls.load(Ordering::SeqCst), 0);
     server.abort();
     erase(&db, &owner).await;
+}
+
+#[tokio::test]
+async fn completion_requires_the_saved_tool_result_not_only_a_completed_trace() {
+    let db = database().await;
+    let owner = user(&db).await;
+    let store = RunbookStore::new(&db, [31; 32], [32; 32]);
+    let runtime = RunbookRuntime::new(&store);
+    let (provider, server) = provider(json!({"structuredContent":{"limit":0}})).await;
+    let instance = setup(&db, &store, &owner.id, &provider.endpoint).await;
+    let pid = approve(&runtime, &owner.id, &instance).await;
+    runtime
+        .execute_tool(&owner.id, &instance, &pid, &provider)
+        .await
+        .unwrap();
+    let table = format!(
+        "\"{}\".messages",
+        omnyid_homeserver::db::tenant_schema_name(&owner.id)
+    );
+    sqlx::query(&format!(
+        "DELETE FROM {table} WHERE type='runbook_tool_result'"
+    ))
+    .execute(&db.pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        runtime.complete(&owner.id, &instance, 5).await.unwrap_err(),
+        "tool_receipt_required"
+    );
+    assert_eq!(
+        runtime
+            .execute_tool(&owner.id, &instance, &pid, &provider)
+            .await
+            .unwrap_err(),
+        "tool_attempt_reserved"
+    );
+    assert_eq!(provider.calls.load(Ordering::SeqCst), 1);
+    server.abort();
+    erase(&db, &owner).await;
+}
+struct FailedProvider(
+    omnyid_homeserver::mcp_client::bounded::CallOutcome,
+    AtomicUsize,
+);
+#[async_trait::async_trait]
+impl ToolProvider for FailedProvider {
+    async fn call(
+        &self,
+        _: &PreparedRunbookTool,
+    ) -> std::result::Result<CallResponse, CallFailure> {
+        self.1.fetch_add(1, Ordering::SeqCst);
+        Err(CallFailure {
+            code: "private provider error must not persist",
+            outcome: self.0,
+        })
+    }
+}
+#[tokio::test]
+async fn provider_failure_records_honest_outcomes_without_raw_error_or_retry() {
+    use omnyid_homeserver::mcp_client::bounded::CallOutcome;
+    let db = database().await;
+    for (failure, outcome) in [
+        (CallOutcome::NotSent, ToolOutcome::NotSent),
+        (CallOutcome::Unknown, ToolOutcome::Unknown),
+    ] {
+        let owner = user(&db).await;
+        let store = RunbookStore::new(&db, [31; 32], [32; 32]);
+        let runtime = RunbookRuntime::new(&store);
+        let instance = setup(&db, &store, &owner.id, "https://example.invalid/mcp").await;
+        let pid = approve(&runtime, &owner.id, &instance).await;
+        let provider = FailedProvider(failure, AtomicUsize::new(0));
+        let receipt = runtime
+            .execute_tool(&owner.id, &instance, &pid, &provider)
+            .await
+            .unwrap();
+        assert_eq!(receipt.outcome, outcome);
+        assert_eq!(receipt.failure.as_deref(), Some("tool_provider_failed"));
+        assert!(receipt.output.is_none());
+        assert!(!receipt.applied);
+        assert_eq!(
+            runtime
+                .execute_tool(&owner.id, &instance, &pid, &provider)
+                .await
+                .unwrap(),
+            receipt
+        );
+        assert_eq!(provider.1.load(Ordering::SeqCst), 1);
+        erase(&db, &owner).await;
+    }
 }

@@ -13,6 +13,7 @@ pub struct ToolRequest {
 #[derive(Clone, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct ToolProposal {
+    pub proposal_ref: String,
     pub instance_id: String,
     pub step_id: String,
     pub request: ToolRequest,
@@ -130,7 +131,8 @@ pub(crate) fn validate(owner: &str, v: &Value) -> Result<()> {
     match kind {
         "runbook_tool_proposal" => {
             let p: ToolProposal = decode(v)?;
-            if !identifier(&p.request.tool_slug)
+            if p.proposal_ref != id("runbook_tool_proposal", owner, instance, step)
+                || !identifier(&p.request.tool_slug)
                 || !identifier(&p.request.capability)
                 || !p.request.arguments.is_object()
                 || !identifier(&p.definition_ref)

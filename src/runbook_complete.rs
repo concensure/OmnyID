@@ -1,14 +1,14 @@
 //! Completion derives its context exclusively from committed owner-bound traces.
 //! Unknown or unavailable outputs fail criteria; callers cannot assert success.
 use crate::{
-    runbook_afp::{build_runtime_afp, parse_runtime_afp, RuntimeRecord},
+    runbook_afp::{RuntimeRecord, build_runtime_afp, parse_runtime_afp},
     runbook_contract::*,
     runbook_matcher::filter_matches,
     runbook_runtime::RunbookRuntime,
     runbook_store::digest,
 };
 use chrono::Utc;
-use serde_json::{json, Map};
+use serde_json::{Map, json};
 
 impl RunbookRuntime<'_, '_> {
     pub async fn complete(
@@ -160,6 +160,34 @@ impl RunbookRuntime<'_, '_> {
                 let receipt = crate::runbook_model_runtime::parse_receipt(owner, &value)?;
                 if !receipt.applied || receipt.trace != t {
                     return Err("model_trace_mismatch");
+                }
+            }
+            if prior_step.kind == StepKind::Tool {
+                let receipt_id = crate::runbook_tool_records::id(
+                    "runbook_tool_result",
+                    owner,
+                    id,
+                    &prior_step.step_id,
+                );
+                let value = self
+                    .store
+                    .read_kind(
+                        owner,
+                        "runbook_tool_result",
+                        Some(&receipt_id),
+                        None,
+                        &mut tx,
+                    )
+                    .await?
+                    .pop()
+                    .ok_or("tool_receipt_required")?;
+                let receipt: crate::runbook_tool_records::ToolReceipt =
+                    crate::runbook_tool_records::decode(&value)?;
+                if !receipt.applied
+                    || receipt.outcome != crate::runbook_tool_records::ToolOutcome::Completed
+                    || receipt.trace != t
+                {
+                    return Err("tool_trace_mismatch");
                 }
             }
             if prior_step.kind == StepKind::Approval {

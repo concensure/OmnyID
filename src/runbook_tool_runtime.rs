@@ -134,6 +134,7 @@ impl RunbookRuntime<'_, '_> {
             .prepare_current_tool(owner, &current.instance, request, &mut tx)
             .await?;
         let proposal = ToolProposal {
+            proposal_ref: pid.clone(),
             instance_id: instance.into(),
             step_id: step.into(),
             request: request.clone(),
