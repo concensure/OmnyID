@@ -364,3 +364,60 @@ fn quote_gaps_reject_unknown_duplicate_unbounded_and_unresolved_inputs() {
         "unsupported_quote_registry"
     );
 }
+
+#[test]
+fn calendar_rejects_ambiguous_invalid_and_unbounded_facts() {
+    let facts = json!({"priority":"event:a","travel_buffer":15,"event_times":[
+        {"id":"event:a","start_at":"2027-01-01T10:00:00Z","end_at":"2027-01-01T11:00:00Z"},
+        {"id":"event:b","start_at":"2027-01-01T10:30:00Z","end_at":"2027-01-01T11:30:00Z"}]});
+    let evaluate = |v| review(&step("calendar_conflict"), &packet(v), &BTreeMap::new());
+    assert_eq!(
+        evaluate(facts.clone()).unwrap().conclusions["conflicts"][0]["alternatives"]
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
+    for changed in 0..5 {
+        let mut v = facts.clone();
+        match changed {
+            0 => v["priority"] = json!("event:unknown"),
+            1 => v["travel_buffer"] = json!(241),
+            2 => v["event_times"][1]["id"] = json!("event:a"),
+            3 => v["event_times"][0]["start_at"] = json!("2027-01-01T10:00:00"),
+            _ => v["event_times"][0]["end_at"] = json!("2027-01-01T09:00:00Z"),
+        }
+        assert!(evaluate(v).is_err());
+    }
+    let mut v = facts.clone();
+    v["event_times"][1]["start_at"] = json!("2027-01-01T11:15:00Z");
+    assert_eq!(evaluate(v).unwrap().conclusions["conflicts"], json!([]));
+    let mut v = facts.clone();
+    for (id, start, end) in [
+        ("event:c", "2027-01-01T08:00:00Z", "2027-01-01T10:00:00Z"),
+        ("event:d", "2027-01-01T11:00:00Z", "2027-01-01T13:00:00Z"),
+    ] {
+        v["event_times"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!({"id":id,"start_at":start,"end_at":end}));
+    }
+    assert_eq!(
+        evaluate(v).unwrap().conclusions["conflicts"][0]["alternatives"],
+        json!([])
+    );
+}
+
+#[test]
+fn information_gap_cannot_ask_for_credentials_or_action_authority() {
+    for field in ["api_key", "password", "approval", "send_permission"] {
+        assert!(
+            review(
+                &step("info_gap_generic"),
+                &packet(json!({"required_field":field,"attempted_refs":["message:one"]})),
+                &BTreeMap::new()
+            )
+            .is_err()
+        );
+    }
+}

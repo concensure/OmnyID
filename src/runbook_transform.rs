@@ -26,6 +26,12 @@ impl std::fmt::Debug for TransformReview {
 pub fn reviewed_fields(op: TransformOperation) -> Result<&'static [&'static str]> {
     use TransformOperation::*;
     Ok(match op {
+        CompareCalendarConflicts => &["event_times", "travel_buffer", "priority"],
+        CompareRunsheetVersions => &[
+            "previous_version_ref",
+            "current_version_ref",
+            "affected_viewers",
+        ],
         FindQuoteGaps => &["normalised_quote_ref", "required_categories"],
         ReviewStoredQuote => &["normalised_quote_ref", "wedding_date"],
         CheckThreadReply => &["last_outbound_ref", "reply_status", "cooldown"],
@@ -36,9 +42,6 @@ pub fn reviewed_fields(op: TransformOperation) -> Result<&'static [&'static str]
         AssessWorkflowRetry => &["run_ref", "error_ref", "retry_consequences"],
         ReviewImportStatus => &["file_ref", "parser_status", "quarantine_status"],
         IdentifyMissingFacts => &["required_field", "attempted_refs"],
-        // These require their existing domain projections, not invented schemas
-        // or a second normalization engine. Keep them explicitly unavailable.
-        _ => return Err("transform_not_implemented"),
     })
 }
 
@@ -105,6 +108,8 @@ pub fn review(
             let cooldown = boolean("cooldown")?;
             json!({"review_needed":status=="pending"&&!cooldown,"send_authorized":false})
         }
+        CompareCalendarConflicts => crate::runbook_schedule_review::calendar(&facts)?,
+        CompareRunsheetVersions => crate::runbook_schedule_review::runsheet(&facts, packet)?,
         ReviewStoredQuote => crate::runbook_quote::review_quote(&facts, packet)?,
         FindQuoteGaps => crate::runbook_quote::review_gaps(&facts, packet)?,
         CalculateBudgetExposure => budget_exposure(&facts)?,
@@ -159,13 +164,12 @@ pub fn review(
             json!({"ready_for_review":parser=="ready"&&quarantine=="clear","release_authorized":false})
         }
         IdentifyMissingFacts => {
-            if !identifier(text("required_field")?) || text("required_field")?.contains(':') {
+            if !safe_question_field(text("required_field")?) {
                 return Err("invalid_required_field");
             }
             let attempted = references(&facts["attempted_refs"])?;
             json!({"missing_field":text("required_field")?,"attempted_refs":attempted,"question_required":true})
         }
-        _ => return Err("transform_not_implemented"),
     };
     Ok(TransformReview {
         operation: op,
@@ -274,4 +278,18 @@ fn references(value: &Value) -> Result<Vec<String>> {
         }
     }
     Ok(refs)
+}
+
+/// Generic questions can collect ordinary planning facts, never credentials or authority.
+pub(crate) fn safe_question_field(field: &str) -> bool {
+    matches!(
+        field,
+        "priority"
+            | "wedding_date"
+            | "guest_count"
+            | "total_budget"
+            | "venue"
+            | "task_owner"
+            | "deadline"
+    )
 }

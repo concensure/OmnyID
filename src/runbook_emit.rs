@@ -19,6 +19,8 @@ pub struct EmissionReceipt {
     pub step_id: String,
     pub request_hash: String,
     pub transform_ref: String,
+    #[serde(default)]
+    pub answer_ref: Option<String>,
     pub suggestion_ref: String,
     pub trace: StepTrace,
 }
@@ -96,7 +98,7 @@ fn suggestion(
         IdentifyMissingFacts => (
             "Review missing information",
             vec![format!(
-                "Still needed: {}.",
+                "Information supplied for: {}.",
                 review.facts["required_field"].as_str().unwrap_or("")
             )],
         ),
@@ -221,6 +223,44 @@ impl RunbookRuntime<'_, '_> {
         {
             return Err("transform_instance_mismatch");
         }
+        let mut answer_ref = None;
+        let mut answer_hash = None;
+        if transform.result.operation == TransformOperation::IdentifyMissingFacts {
+            let question_id = digest(&json!(["runbook_question.v1", owner, id, step_id]));
+            let field = transform.result.conclusions["missing_field"]
+                .as_str()
+                .ok_or("invalid_required_field")?;
+            for value in self
+                .store
+                .read_kind(
+                    owner,
+                    "runbook_input_supplied",
+                    None,
+                    Some(&current.instance.thread_id),
+                    &mut tx,
+                )
+                .await?
+            {
+                let answer: crate::runbook_input::InputSupplied =
+                    serde_json::from_value(value["content"].clone())
+                        .map_err(|_| "invalid_input_event")?;
+                if answer.instance_id == id
+                    && answer.escalation_id == question_id
+                    && answer.answers.contains_key(field)
+                {
+                    if answer_ref.is_some() {
+                        return Err("conflicting_evidence");
+                    }
+                    answer_ref = Some(answer.event_id);
+                    answer_hash = Some(digest(&value["content"]));
+                }
+            }
+            if answer_ref.is_none() {
+                return Err("missing_required_answer");
+            }
+        }
+        let mut input_refs = vec![format!("private_message:{transform_ref}")];
+        input_refs.extend(answer_ref.iter().map(|s| format!("private_message:{s}")));
         let message = suggestion(
             owner,
             &current.instance,
@@ -237,8 +277,16 @@ impl RunbookRuntime<'_, '_> {
                 expected_revision,
                 &LocalStepResult {
                     step_id: step_id.into(),
-                    input_hash: digest(&json!([request_hash, transform.trace.output_hash])),
-                    input_refs: vec![format!("private_message:{transform_ref}")],
+                    input_hash: if answer_hash.is_some() {
+                        digest(&json!([
+                            request_hash,
+                            transform.trace.output_hash,
+                            answer_hash
+                        ]))
+                    } else {
+                        digest(&json!([request_hash, transform.trace.output_hash]))
+                    },
+                    input_refs,
                     output_hash: digest(&message["content"]),
                     output_refs: vec![format!("private_message:{suggestion_ref}")],
                 },
@@ -252,6 +300,7 @@ impl RunbookRuntime<'_, '_> {
             step_id: step_id.into(),
             request_hash,
             transform_ref,
+            answer_ref,
             suggestion_ref,
             trace,
         };
@@ -370,7 +419,11 @@ pub(crate) fn validate_receipt(owner: &str, value: &Value) -> Result<EmissionRec
         || r.trace.step_kind != StepKind::Emit
         || r.trace.status != TraceStatus::Completed
         || r.trace.output_refs != vec![format!("private_message:{}", r.suggestion_ref)]
-        || r.trace.input_refs != vec![format!("private_message:{}", r.transform_ref)]
+        || r.answer_ref.as_deref().is_some_and(|s| !identifier(s))
+        || r.trace.input_refs
+            != std::iter::once(format!("private_message:{}", r.transform_ref))
+                .chain(r.answer_ref.iter().map(|s| format!("private_message:{s}")))
+                .collect::<Vec<_>>()
     {
         return Err("invalid_emission");
     }

@@ -374,6 +374,8 @@ impl<'a, 'db> RunbookRuntime<'a, 'db> {
             },
         )?;
         self.cancel_questions(owner, &current, &mut tx).await?;
+        self.cancel_review_gates(owner, &current.instance, &mut tx)
+            .await?;
         self.resolve_schedules(owner, &current, timeout, &mut tx)
             .await?;
         next.next_follow_up_at = None;

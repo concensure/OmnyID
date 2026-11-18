@@ -160,7 +160,7 @@ impl RunbookRuntime<'_, '_> {
         if receipt.instance_id != id {
             return Err("evidence_instance_mismatch");
         }
-        let missing: Vec<String> = step
+        let mut missing: Vec<String> = step
             .required_fields
             .iter()
             .filter(|field| {
@@ -172,6 +172,29 @@ impl RunbookRuntime<'_, '_> {
             })
             .cloned()
             .collect();
+        if step.kind == StepKind::Emit {
+            let index = current.instance.completed_step_ids.len();
+            if let Some(prior) = index.checked_sub(1).and_then(|i| definition.steps.get(i)) {
+                if prior.operation == Some(TransformOperation::IdentifyMissingFacts) {
+                    let reference =
+                        digest(&json!(["runbook_transform.v1", owner, id, prior.step_id]));
+                    let value = self
+                        .store
+                        .read_kind(owner, "runbook_transform", Some(&reference), None, &mut tx)
+                        .await?
+                        .pop()
+                        .ok_or("transform_required")?;
+                    let transform = crate::runbook_transform_runtime::validate(owner, &value)?;
+                    let field = transform.result.conclusions["missing_field"]
+                        .as_str()
+                        .ok_or("invalid_required_field")?;
+                    if !crate::runbook_transform::safe_question_field(field) {
+                        return Err("unsafe_question_field");
+                    }
+                    missing = vec![field.into()];
+                }
+            }
+        }
         if missing.is_empty() {
             return Ok(None);
         }

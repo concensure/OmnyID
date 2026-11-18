@@ -1,10 +1,10 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 
-async function fixtures(page: Page, options: { empty?: boolean; conflict?: boolean; off?: boolean; review?: boolean } = {}) {
+async function fixtures(page: Page, options: { empty?: boolean; conflict?: boolean; off?: boolean; review?: boolean; approval?: boolean } = {}) {
   let installed = !options.empty;
   let enabled = false;
-  let status = options.review ? "completed" : "waiting_for_input";
+  let status = options.approval ? "awaiting_approval" : options.review ? "completed" : "waiting_for_input";
   let revision = 4;
   let exportRequests = 0;
   const writes: {path:string;body:unknown}[] = [];
@@ -12,6 +12,7 @@ async function fixtures(page: Page, options: { empty?: boolean; conflict?: boole
   const activity = () => ({instance:{instance_id:"i1",runbook_id:"calendar_conflict",revision,status},
     reviews: options.review ? [{id:"review1",trace_id:"emit1",title:"Review budget exposure",
       summary_lines:["Recorded commitments exceed the supplied budget.","No spending has been authorised.","<img src=x onerror=alert(1)>"],source_refs:["private_message:transform1"]}] : [],
+    approval_requests: options.approval ? [{action_ref:"action1",approval_review:{title:"Review calendar proposal",requires_human_review:true,consequence_summary_lines:["<img src=x onerror=alert(1)>"],source_refs:["private_message:transform1"]}}] : [],
     questions: status === "waiting_for_input" ? [{escalation_id:"q1",instance_id:"i1",step_id:"review",status:"open",
       question:"Which event has priority?",why_needed:"Your priority is needed to compare alternatives.",missing_fields:["priority"],
       attempted_refs:["message:calendar1"],answer_schema:"short_text",expires_at:"2099-01-01T00:00:00Z"}] : [],
@@ -146,4 +147,22 @@ test("completed reviews remain visible in Decision Queue without execution contr
   expect(audit.violations.filter(v=>v.impact==="serious"||v.impact==="critical")).toEqual([]);
   await page.evaluate(()=>window.dispatchEvent(new Event("omnyid:session-changed")));
   await expect(page.getByRole("heading",{name:"Review budget exposure",exact:true})).toHaveCount(0);
+});
+
+
+test("approval proposals reuse the review surface without execution controls",async({page})=>{
+  const state=await fixtures(page,{approval:true});
+  await page.setViewportSize({width:320,height:900});
+  await page.goto("/workspace/e2e/runbook-controls.html?questions");
+  await expect(page.getByText("Review calendar proposal",{exact:true})).toBeVisible();
+  await expect(page.getByText("Reviewing this proposal does not send or publish anything.")).toBeVisible();
+  await expect(page.getByText("<img src=x onerror=alert(1)>",{exact:true})).toBeVisible();
+  await expect(page.locator("img[src=x]")).toHaveCount(0);
+  await expect(page.getByRole("button",{name:/approve|execute|send|publish/i})).toHaveCount(0);
+  expect(state.writes).toEqual([]);
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth)).toBe(true);
+  const audit=await new AxeBuilder({page}).analyze();
+  expect(audit.violations.filter(v=>v.impact==="serious"||v.impact==="critical")).toEqual([]);
+  await page.evaluate(()=>window.dispatchEvent(new Event("omnyid:session-changed")));
+  await expect(page.getByText("Review calendar proposal",{exact:true})).toHaveCount(0);
 });

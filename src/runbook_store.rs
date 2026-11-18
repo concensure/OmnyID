@@ -279,6 +279,9 @@ pub(crate) fn digest(value: &Value) -> String {
 
 fn validate_record(owner: &str, value: &Value) -> Result<()> {
     match value["type"].as_str() {
+        Some("action" | "runbook_review_gate") => {
+            crate::runbook_review_gate::validate(owner, value)?
+        }
         Some("runbook_budget_policy") => {
             crate::runbook_budget::validate(owner, value)?;
         }

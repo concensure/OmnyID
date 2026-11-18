@@ -133,11 +133,32 @@ impl RunbookRuntime<'_, '_> {
                 return Err("review_limit");
             }
         }
+        let mut approval_requests = vec![];
+        for value in self
+            .store
+            .read_kind(owner, "runbook_review_gate", None, Some(&thread), tx)
+            .await?
+        {
+            let receipt = crate::runbook_review_gate::parse_receipt(owner, &value)?;
+            let action = self
+                .store
+                .read_kind(owner, "action", Some(&receipt.action_ref), None, tx)
+                .await?
+                .pop()
+                .ok_or("review_action_missing")?;
+            if receipt.trace.output_hash != Some(crate::runbook_store::digest(&action["content"])) {
+                return Err("review_action_mismatch");
+            }
+            approval_requests.push(json!({"action_ref":receipt.action_ref,"approval_review":action["content"]["approval_review"]}));
+            if approval_requests.len() > MAX_STEPS {
+                return Err("review_limit");
+            }
+        }
         let i = current.instance;
         let mut result = json!({"instance":{"instance_id":i.instance_id,"runbook_id":i.runbook_id,"runbook_version":i.runbook_version,
             "status":i.status,"revision":i.revision,"current_step_id":i.current_step_id,"completed_step_ids":i.completed_step_ids,
             "next_follow_up_at":i.next_follow_up_at,"wait_expires_at":i.wait_expires_at},
-            "reviews":reviews,"traces":traces,"questions":questions.into_values().collect::<Vec<_>>(),"execution_available":false});
+            "approval_requests":approval_requests,"reviews":reviews,"traces":traces,"questions":questions.into_values().collect::<Vec<_>>(),"execution_available":false});
         if i.status == InstanceState::WaitingForBudget {
             result["budget"] = json!(
                 self.model_budget_in(owner, &i, chrono::Utc::now(), tx)

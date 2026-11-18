@@ -198,6 +198,25 @@ impl RunbookRuntime<'_, '_> {
         if transform.instance_id != id || transform.step_id != prior.step_id {
             return Err("model_input_mismatch");
         }
+        if step.kind == StepKind::Draft {
+            let allowed = match transform.result.operation {
+                TransformOperation::CheckReminderPermission => {
+                    transform.result.conclusions["reminder_review_needed"] == true
+                }
+                TransformOperation::CheckThreadReply => {
+                    transform.result.conclusions["review_needed"] == true
+                }
+                TransformOperation::FindQuoteGaps => {
+                    transform.result.conclusions["clarification_candidates"]
+                        .as_array()
+                        .is_some_and(|v| !v.is_empty())
+                }
+                _ => true,
+            };
+            if !allowed {
+                return Err("draft_not_permitted_by_evidence");
+            }
+        }
         let request = model::prepare(
             owner,
             step,
@@ -254,7 +273,30 @@ impl RunbookRuntime<'_, '_> {
             .await?;
         tx.commit().await.map_err(|_| "storage_unavailable")?;
 
-        let evaluation = model::evaluate(provider, reservation.request.clone(), policy, step).await;
+        let mut evaluation =
+            model::evaluate(provider, reservation.request.clone(), policy, step).await;
+        if step.kind == StepKind::Draft
+            && transform.result.operation == TransformOperation::FindQuoteGaps
+        {
+            let exact = transform.result.conclusions["clarification_candidates"]
+                .as_array()
+                .ok_or("invalid_quote_questions")?
+                .iter()
+                .map(|v| v["question"].as_str().ok_or("invalid_quote_questions"))
+                .collect::<Result<Vec<_>>>()?
+                .join("\n");
+            if evaluation
+                .output
+                .as_ref()
+                .is_some_and(|v| v["content"]["body"] != exact)
+            {
+                evaluation.output = None;
+                evaluation.failure = Some(model::ModelFailure::InvalidSchema);
+                if let Some(last) = evaluation.attempts.last_mut() {
+                    last.failure = evaluation.failure;
+                }
+            }
+        }
         // Never hold the owner transaction across a provider call. Cancellation,
         // disable and deletion can proceed; their state wins at finalization.
         let mut tx = self.store.begin(owner).await?;
