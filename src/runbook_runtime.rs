@@ -7,7 +7,7 @@ use crate::runbook_matcher::{MatchDecision, MatchDisposition, match_event};
 use crate::runbook_registry::parse_definition_afp;
 use crate::runbook_store::{RunbookStore, digest};
 use crate::runbook_validation::identifier;
-use chrono::{DateTime, Duration, Utc};
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sqlx::{Postgres, Transaction};
@@ -278,7 +278,7 @@ impl<'a, 'db> RunbookRuntime<'a, 'db> {
         Ok(trace)
     }
 
-    /// Persist the wait only. No timer delivery or resume authority is implied.
+    /// Persist the wait and its declared follow-up schedule atomically.
     pub async fn wait(
         &self,
         owner: &str,
@@ -287,40 +287,9 @@ impl<'a, 'db> RunbookRuntime<'a, 'db> {
         due_at: DateTime<Utc>,
         expires_at: DateTime<Utc>,
     ) -> Result<InstanceRecord> {
-        if due_at <= Utc::now()
-            || expires_at <= due_at
-            || expires_at > Utc::now() + Duration::days(30)
-        {
-            return Err("invalid_wait_deadline");
-        }
-        let mut tx = self.store.begin(owner).await?;
-        let current = self.load_instance(owner, id, &mut tx).await?;
-        self.require_enabled(owner, &current.instance, &mut tx)
+        self.schedule_wait(owner, id, expected_revision, due_at, expires_at)
             .await?;
-        let definition = self.definition(owner, &current.instance, &mut tx).await?;
-        let step = definition
-            .steps
-            .get(current.instance.completed_step_ids.len())
-            .ok_or("step_not_found")?;
-        if step.kind != StepKind::Wait
-            || current.instance.current_step_id.as_deref() != Some(&step.step_id)
-            || step
-                .follow_up_event
-                .as_ref()
-                .is_none_or(|e| !definition.follow_up_events.contains(e))
-        {
-            return Err("invalid_wait_step");
-        }
-        let mut next = current
-            .instance
-            .transition(expected_revision, InstanceState::WaitingForEvent)?;
-        next.next_follow_up_at = Some(due_at);
-        next.wait_expires_at = Some(expires_at);
-        let result = self
-            .append_instance(owner, Some(&current.message_id), next, &mut tx)
-            .await?;
-        tx.commit().await.map_err(|_| "storage_unavailable")?;
-        Ok(result)
+        self.instance(owner, id).await
     }
 
     pub async fn cancel(
@@ -392,6 +361,9 @@ impl<'a, 'db> RunbookRuntime<'a, 'db> {
                 InstanceState::Cancelled
             },
         )?;
+        self.cancel_questions(owner, &current, &mut tx).await?;
+        self.resolve_schedules(owner, &current, timeout, &mut tx)
+            .await?;
         next.next_follow_up_at = None;
         next.wait_expires_at = None;
         let record = self
@@ -519,7 +491,10 @@ impl<'a, 'db> RunbookRuntime<'a, 'db> {
                     || (prior.instance.status != instance.status
                         && !prior.instance.status.can_transition_to(instance.status))
                     || (prior.instance.status == instance.status
-                        && instance.status != InstanceState::Running)
+                        && !matches!(
+                            instance.status,
+                            InstanceState::Running | InstanceState::WaitingForEvent
+                        ))
                     || instance.definition_ref != prior.instance.definition_ref
                     || instance.runbook_id != prior.instance.runbook_id
                     || instance.runbook_version != prior.instance.runbook_version
