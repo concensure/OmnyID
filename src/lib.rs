@@ -120,6 +120,7 @@ pub mod runbook_matcher;
 pub mod runbook_registry;
 pub mod runbook_read;
 pub mod runbook_runtime;
+pub mod runbook_budget;
 pub mod runbook_llm_step;
 pub mod runbook_model_runtime;
 pub mod runbook_starter_pack;

@@ -138,6 +138,12 @@ impl RunbookRuntime<'_, '_> {
             "status":i.status,"revision":i.revision,"current_step_id":i.current_step_id,"completed_step_ids":i.completed_step_ids,
             "next_follow_up_at":i.next_follow_up_at,"wait_expires_at":i.wait_expires_at},
             "reviews":reviews,"traces":traces,"questions":questions.into_values().collect::<Vec<_>>(),"execution_available":false});
+        if i.status == InstanceState::WaitingForBudget {
+            result["budget"] = json!(
+                self.model_budget_in(owner, &i, chrono::Utc::now(), tx)
+                    .await?
+            );
+        }
         result["views"] = activity_views(&result);
         Ok(result)
     }

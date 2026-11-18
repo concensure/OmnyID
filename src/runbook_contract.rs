@@ -153,6 +153,7 @@ pub enum InstanceState {
     Matched,
     Running,
     WaitingForInput,
+    WaitingForBudget,
     AwaitingApproval,
     WaitingForEvent,
     Completed,
@@ -169,6 +170,7 @@ impl InstanceState {
                 | (
                     Running,
                     WaitingForInput
+                        | WaitingForBudget
                         | AwaitingApproval
                         | WaitingForEvent
                         | Completed
@@ -176,7 +178,7 @@ impl InstanceState {
                         | Cancelled
                 )
                 | (
-                    WaitingForInput | AwaitingApproval | WaitingForEvent,
+                    WaitingForInput | WaitingForBudget | AwaitingApproval | WaitingForEvent,
                     Running | Failed | Cancelled
                 )
         )

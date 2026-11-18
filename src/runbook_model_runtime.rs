@@ -14,17 +14,19 @@ use serde_json::{Value, json};
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct Reservation {
-    instance_id: String,
-    step_id: String,
+pub(crate) struct Reservation {
+    pub(crate) instance_id: String,
+    pub(crate) step_id: String,
     expected_revision: u32,
-    request_hash: String,
+    #[serde(default)]
+    pub(crate) budget: Option<crate::runbook_budget::BudgetReservation>,
+    pub(crate) request_hash: String,
     input_hash: String,
     transform_ref: String,
     request: ModelRequest,
     policy: ModelPolicy,
     step: Step,
-    started_at: DateTime<Utc>,
+    pub(crate) started_at: DateTime<Utc>,
 }
 
 #[derive(Clone, Serialize, Deserialize, PartialEq)]
@@ -203,8 +205,28 @@ impl RunbookRuntime<'_, '_> {
             vec![format!("private_message:{transform_ref}")],
             policy,
         )?;
+        let amount = crate::runbook_budget::reservation_amount(step, policy)?;
+        let snapshot = self
+            .model_budget_in(owner, &current.instance, Utc::now(), &mut tx)
+            .await?;
+        if let Err(reason) = snapshot.check(amount) {
+            // Persist a resumable pause without creating a provider reservation.
+            let next = current
+                .instance
+                .transition(expected_revision, InstanceState::WaitingForBudget)?;
+            self.append_instance(owner, Some(&current.message_id), next, &mut tx)
+                .await?;
+            tx.commit().await.map_err(|_| "storage_unavailable")?;
+            return Err(reason);
+        }
+        let budget = crate::runbook_budget::BudgetReservation {
+            policy_ref: snapshot.policy_ref.ok_or("budget_policy_missing")?,
+            runbook_id: current.instance.runbook_id.clone(),
+            reserved_microunits: amount,
+        };
         let input_hash = digest(&json!([request_hash, request, transform.trace.output_hash]));
         let reservation = Reservation {
+            budget: Some(budget),
             instance_id: id.into(),
             step_id: step_id.into(),
             expected_revision,
@@ -396,6 +418,14 @@ pub(crate) fn validate(owner: &str, value: &Value) -> Result<()> {
     if kind == "runbook_model_reservation" {
         let r: Reservation = serde_json::from_value(value["content"].clone())
             .map_err(|_| "invalid_model_reservation")?;
+        if r.budget.as_ref().is_some_and(|b| {
+            !identifier(&b.runbook_id)
+                || !hash(&b.policy_ref)
+                || crate::runbook_budget::reservation_amount(&r.step, &r.policy).ok()
+                    != Some(b.reserved_microunits)
+        }) {
+            return Err("invalid_budget_reservation");
+        }
         if r.instance_id != instance
             || r.step_id != step
             || r.step.step_id != step

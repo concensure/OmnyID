@@ -26,3 +26,13 @@ test("semantic identities allow only reviewed kinds and safe ids; no embedded ac
   assert.equal(runbookViewIdentity({kind:"tool",instance_id:"i1"}),null);
   assert.equal(runbookTerminal("completed"),true);assert.equal(runbookTerminal("waiting_for_input"),false);
 });
+
+
+test("budget waits are visible, nonterminal and cannot accept epistemic answers", async()=>{
+  const {runbookStatus}=await import("../src/lib/runbookState.ts");
+  const waiting={...a,instance:{...a.instance,status:"waiting_for_budget"}};
+  assert.equal(runbookStatus("waiting_for_budget"),"Paused: model budget unavailable");
+  assert.equal(runbookTerminal("waiting_for_budget"),false);
+  assert.deepEqual(openRunbookQuestions(waiting),[]);
+  assert.throws(()=>runbookAnswerPayload(waiting,q,{priority:"Work"},"event1"));
+});

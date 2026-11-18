@@ -46,6 +46,7 @@ export function runbookAnswerPayload(activity: RunbookActivity, question: Runboo
 }
 export function runbookStatus(status: string) {
   const labels: Record<string, string> = { matched: "Matched — awaiting execution", running: "In progress",
+    waiting_for_budget: "Paused: model budget unavailable",
     waiting_for_input: "Needs your answer", awaiting_approval: "Waiting for approval",
     waiting_for_event: "Waiting for follow-up", completed: "Completed", failed: "Stopped with an error", cancelled: "Cancelled" };
   return labels[status] ?? "Status unavailable";

@@ -133,11 +133,31 @@ async fn database() -> Db {
     assert!(url.contains("@127.0.0.1:") && url.ends_with("/omnyid_test"));
     Db::new(&url).await.unwrap()
 }
+fn limits(
+    account: u64,
+    runbook: u64,
+    instance: u64,
+) -> omnyid_homeserver::runbook_budget::BudgetLimits {
+    omnyid_homeserver::runbook_budget::BudgetLimits {
+        account_daily_microunits: account,
+        runbook_daily_microunits: runbook,
+        instance_microunits: instance,
+    }
+}
 async fn fixture(
     db: &Db,
     kind: StepKind,
     cost: u64,
     retries: u8,
+) -> (UserRecord, String, RunbookDefinition, String) {
+    fixture_with_budget(db, kind, cost, retries, true).await
+}
+async fn fixture_with_budget(
+    db: &Db,
+    kind: StepKind,
+    cost: u64,
+    retries: u8,
+    funded: bool,
 ) -> (UserRecord, String, RunbookDefinition, String) {
     let uid = Ulid::new().to_string();
     let owner = UserRecord {
@@ -152,6 +172,12 @@ async fn fixture(
     db.create_user(&owner).await.unwrap();
     let store = RunbookStore::new(db, [21; 32], [22; 32]);
     let runtime = RunbookRuntime::new(&store);
+    if funded {
+        runtime
+            .configure_model_budget(&owner.id, 0, limits(1000, 1000, 1000))
+            .await
+            .unwrap();
+    }
     let mut d = starter_definitions()
         .into_iter()
         .find(|d| d.runbook_id == "file_requires_review")
@@ -493,6 +519,9 @@ async fn durable_reservation_prevents_concurrent_or_crashed_call_replay_and_canc
             // Otherwise dropping this future simulates a crash after reservation.
         }
         if action == 0 {
+            let usage = runtime.model_budget(&owner.id, &id).await.unwrap().usage;
+            assert_eq!(usage.account_daily_microunits, 20);
+            assert_eq!(usage.uncertain_reservations, 1);
             assert_eq!(
                 runtime
                     .execute_model(&owner.id, &id, "model", 4, &p, &provider)
@@ -568,4 +597,355 @@ async fn foreign_owners_and_preflight_denials_never_call_a_provider() {
     assert_eq!(provider.requests.lock().unwrap().len(), 0);
     cleanup(&db, &owner).await;
     cleanup(&db, &other).await;
+}
+
+async fn next_instance(db: &Db, owner: &str) -> String {
+    let store = RunbookStore::new(db, [21; 32], [22; 32]);
+    let runtime = RunbookRuntime::new(&store);
+    let event = Ulid::new().to_string();
+    db.insert_daemon_afp_message(&json!({"protocol":"afp-v1","id":event,"type":"workflow_failed","to":[owner],"thread_id":format!("budget:{event}"),"timestamp":Utc::now().to_rfc3339(),"content":{"confidence":0.9,"file_ref":"document:one","parser_status":"ready","quarantine_status":"clear"}})).await.unwrap();
+    let id = runtime.dispatch(owner, &event).await.unwrap().instance_ids[0].clone();
+    runtime.start(owner, &id, 1).await.unwrap();
+    runtime
+        .execute_read(
+            owner,
+            &id,
+            &ReadRequest {
+                step_id: "read".into(),
+                expected_revision: 2,
+                snapshot_ref: None,
+                decrypt_limit: 4,
+                byte_limit: 262144,
+            },
+        )
+        .await
+        .unwrap();
+    runtime
+        .execute_transform(owner, &id, "assess", 3)
+        .await
+        .unwrap();
+    id
+}
+
+#[test]
+fn budget_contracts_account_unknown_spend_and_utc_rollover_without_overflow() {
+    use omnyid_homeserver::runbook_budget::*;
+    assert!(serde_json::from_value::<BudgetLimits>(json!({"account_daily_microunits":1,"runbook_daily_microunits":1,"instance_microunits":1,"approved":true})).is_err());
+    let yesterday = "2026-11-17T23:59:59Z".parse().unwrap();
+    let today = "2026-11-18T00:00:00Z".parse().unwrap();
+    assert!(!counts_toward_day(yesterday, today, false));
+    assert!(counts_toward_day(yesterday, today, true));
+    assert!(counts_toward_day(today, yesterday, false));
+    assert_eq!(accounted_usage(None, 20), Ok((20, true, false)));
+    let mut e = ModelEvaluation {
+        attempts: vec![ModelAttempt {
+            model: BASE_MODEL.into(),
+            effort: Effort::Low,
+            input_hash: "a".repeat(64),
+            output_hash: None,
+            input_tokens: 0,
+            output_tokens: 0,
+            cost_microunits: 0,
+            reserved_cost_microunits: 10,
+            usage_known: false,
+            failure: Some(ModelFailure::Timeout),
+        }],
+        output: None,
+        failure: Some(ModelFailure::Timeout),
+    };
+    assert_eq!(accounted_usage(Some(&e), 20), Ok((10, true, false)));
+    e.attempts[0].usage_known = true;
+    e.attempts[0].cost_microunits = 11;
+    assert_eq!(accounted_usage(Some(&e), 20), Ok((11, false, true)));
+    e.attempts[0].cost_microunits = u64::MAX;
+    e.attempts.push(e.attempts[0].clone());
+    assert_eq!(accounted_usage(Some(&e), 20), Err("budget_usage_overflow"));
+    let snapshot = BudgetSnapshot {
+        policy_ref: None,
+        limits: limits(u64::MAX, u64::MAX, u64::MAX),
+        usage: BudgetUsage {
+            account_daily_microunits: u64::MAX,
+            ..Default::default()
+        },
+    };
+    assert_eq!(snapshot.check(1), Err("model_budget_exhausted"));
+}
+
+#[tokio::test]
+async fn budgets_default_off_pause_visibly_and_resume_only_after_current_limits_allow() {
+    let db = database().await;
+    let (owner, id, mut definition, saved) =
+        fixture_with_budget(&db, StepKind::Classify, 20, 1, false).await;
+    let store = RunbookStore::new(&db, [21; 32], [22; 32]);
+    let runtime = RunbookRuntime::new(&store);
+    let provider = Mock::new(Mode::Valid);
+    assert_eq!(
+        runtime
+            .execute_model(&owner.id, &id, "model", 4, &policy(), &provider)
+            .await
+            .unwrap_err(),
+        "model_budget_exhausted"
+    );
+    assert!(provider.requests.lock().unwrap().is_empty());
+    let activity = runtime.activity(&owner.id, &id).await.unwrap();
+    assert_eq!(activity["instance"]["status"], "waiting_for_budget");
+    assert_eq!(activity["instance"]["revision"], 5);
+    assert_eq!(activity["budget"]["limits"]["account_daily_microunits"], 0);
+    assert_eq!(
+        runtime
+            .resume_model_budget(&owner.id, &id, 5, &policy())
+            .await
+            .unwrap_err(),
+        "model_budget_exhausted"
+    );
+    assert_eq!(
+        runtime.start(&owner.id, &id, 5).await.unwrap_err(),
+        "instance_not_matched"
+    );
+    assert!(
+        runtime
+            .configure_model_budget(&owner.id, 0, limits(u64::MAX, 20, 20))
+            .await
+            .is_err()
+    );
+    let configured = runtime
+        .configure_model_budget(&owner.id, 0, limits(20, 20, 20))
+        .await
+        .unwrap();
+    assert_eq!(
+        runtime
+            .configure_model_budget(&owner.id, 0, limits(20, 20, 20))
+            .await
+            .unwrap(),
+        configured
+    );
+    assert_eq!(
+        runtime
+            .configure_model_budget(&owner.id, 0, limits(21, 20, 20))
+            .await
+            .unwrap_err(),
+        "stale_budget_revision"
+    );
+    assert_eq!(
+        runtime
+            .resume_model_budget(&owner.id, &id, 4, &policy())
+            .await
+            .unwrap_err(),
+        "stale_revision"
+    );
+    definition.enabled = false;
+    store
+        .save(&owner.id, Some(&saved), definition)
+        .await
+        .unwrap();
+    assert_eq!(
+        runtime
+            .resume_model_budget(&owner.id, &id, 5, &policy())
+            .await
+            .unwrap_err(),
+        "definition_disabled"
+    );
+    runtime.cancel(&owner.id, &id, 5).await.unwrap();
+    assert_eq!(
+        runtime
+            .resume_model_budget(&owner.id, &id, 6, &policy())
+            .await
+            .unwrap_err(),
+        "instance_not_waiting_for_budget"
+    );
+    cleanup(&db, &owner).await;
+}
+
+#[tokio::test]
+async fn all_three_budget_scopes_block_without_spending_and_resuming_rechecks_revision() {
+    let db = database().await;
+    for caps in [
+        limits(19, 100, 100),
+        limits(100, 19, 100),
+        limits(100, 100, 19),
+    ] {
+        let (owner, id, _, _) = fixture(&db, StepKind::Reason, 20, 1).await;
+        let store = RunbookStore::new(&db, [21; 32], [22; 32]);
+        let runtime = RunbookRuntime::new(&store);
+        runtime
+            .configure_model_budget(&owner.id, 1, caps)
+            .await
+            .unwrap();
+        let provider = Mock::new(Mode::Escalate);
+        assert_eq!(
+            runtime
+                .execute_model(&owner.id, &id, "model", 4, &policy(), &provider)
+                .await
+                .unwrap_err(),
+            "model_budget_exhausted"
+        );
+        assert!(provider.requests.lock().unwrap().is_empty());
+        runtime
+            .configure_model_budget(&owner.id, 2, limits(20, 20, 20))
+            .await
+            .unwrap();
+        assert_eq!(
+            runtime
+                .resume_model_budget(&owner.id, &id, 5, &policy())
+                .await
+                .unwrap()
+                .instance
+                .revision,
+            6
+        );
+        let result = runtime
+            .execute_model(&owner.id, &id, "model", 6, &policy(), &provider)
+            .await
+            .unwrap();
+        assert!(result.applied);
+        assert_eq!(result.evaluation.attempts.len(), 2);
+        let usage = runtime.model_budget(&owner.id, &id).await.unwrap().usage;
+        assert_eq!(
+            (
+                usage.account_daily_microunits,
+                usage.runbook_daily_microunits,
+                usage.instance_microunits
+            ),
+            (6, 6, 6)
+        );
+        assert_eq!(usage.uncertain_reservations, 0);
+        let again = runtime
+            .execute_model(&owner.id, &id, "model", 6, &policy(), &provider)
+            .await
+            .unwrap();
+        assert_eq!(result, again);
+        assert_eq!(provider.requests.lock().unwrap().len(), 2);
+        cleanup(&db, &owner).await;
+    }
+}
+
+#[tokio::test]
+async fn concurrent_instances_cannot_double_reserve_and_known_usage_releases_only_unused_capacity()
+{
+    let db = database().await;
+    let (owner, id, _, _) = fixture(&db, StepKind::Classify, 20, 1).await;
+    let second = next_instance(&db, &owner.id).await;
+    let (foreign, foreign_id, _, _) = fixture(&db, StepKind::Classify, 20, 1).await;
+    let store = RunbookStore::new(&db, [21; 32], [22; 32]);
+    let runtime = RunbookRuntime::new(&store);
+    runtime
+        .configure_model_budget(&owner.id, 1, limits(23, 23, 20))
+        .await
+        .unwrap();
+    let blocking = Blocking {
+        started: tokio::sync::Notify::new(),
+        release: tokio::sync::Notify::new(),
+    };
+    let mut p = policy();
+    p.timeout_ms = 30000;
+    let call = runtime.execute_model(&owner.id, &id, "model", 4, &p, &blocking);
+    tokio::pin!(call);
+    tokio::select! {_=blocking.started.notified()=>{},r=&mut call=>panic!("early {r:?}")}
+    // A fresh store/runtime simulates a different worker/process, not an in-memory lock.
+    let other_store = RunbookStore::new(&db, [21; 32], [22; 32]);
+    let other = RunbookRuntime::new(&other_store);
+    let snapshot = other.model_budget(&owner.id, &second).await.unwrap();
+    assert_eq!(snapshot.usage.account_daily_microunits, 20);
+    assert_eq!(snapshot.usage.instance_microunits, 0);
+    assert_eq!(snapshot.usage.uncertain_reservations, 1);
+    assert_eq!(
+        other
+            .model_budget(&foreign.id, &foreign_id)
+            .await
+            .unwrap()
+            .usage
+            .account_daily_microunits,
+        0
+    );
+    assert!(other.model_budget(&foreign.id, &id).await.is_err());
+    let provider = Mock::new(Mode::Valid);
+    assert_eq!(
+        other
+            .execute_model(&owner.id, &second, "model", 4, &policy(), &provider)
+            .await
+            .unwrap_err(),
+        "model_budget_exhausted"
+    );
+    assert!(provider.requests.lock().unwrap().is_empty());
+    blocking.release.notify_one();
+    assert!(call.await.unwrap().applied);
+    assert_eq!(
+        other
+            .model_budget(&owner.id, &second)
+            .await
+            .unwrap()
+            .usage
+            .account_daily_microunits,
+        3
+    );
+    other
+        .resume_model_budget(&owner.id, &second, 5, &policy())
+        .await
+        .unwrap();
+    assert!(
+        other
+            .execute_model(&owner.id, &second, "model", 6, &policy(), &provider)
+            .await
+            .unwrap()
+            .applied
+    );
+    assert_eq!(
+        other
+            .model_budget(&owner.id, &second)
+            .await
+            .unwrap()
+            .usage
+            .account_daily_microunits,
+        6
+    );
+    cleanup(&db, &owner).await;
+    cleanup(&db, &foreign).await;
+}
+
+#[tokio::test]
+async fn timeout_retains_unknown_spend_and_provider_overcharge_freezes_further_calls() {
+    let db = database().await;
+    for mode in [Mode::Timeout, Mode::Cost] {
+        let (owner, id, _, _) = fixture(&db, StepKind::Classify, 20, 1).await;
+        let store = RunbookStore::new(&db, [21; 32], [22; 32]);
+        let runtime = RunbookRuntime::new(&store);
+        let mut p = policy();
+        p.timeout_ms = 10;
+        let provider = Mock::new(mode);
+        assert!(
+            !runtime
+                .execute_model(&owner.id, &id, "model", 4, &p, &provider)
+                .await
+                .unwrap()
+                .applied
+        );
+        let usage = runtime.model_budget(&owner.id, &id).await.unwrap().usage;
+        if matches!(mode, Mode::Timeout) {
+            assert_eq!(usage.account_daily_microunits, 10);
+            assert_eq!(usage.uncertain_reservations, 1);
+        } else {
+            assert_eq!(usage.account_daily_microunits, 11);
+            assert!(usage.provider_ceiling_breached);
+            let second = next_instance(&db, &owner.id).await;
+            let next = Mock::new(Mode::Valid);
+            assert_eq!(
+                runtime
+                    .execute_model(&owner.id, &second, "model", 4, &policy(), &next)
+                    .await
+                    .unwrap_err(),
+                "model_budget_requires_reconciliation"
+            );
+            assert!(next.requests.lock().unwrap().is_empty());
+            assert_eq!(
+                runtime
+                    .instance(&owner.id, &second)
+                    .await
+                    .unwrap()
+                    .instance
+                    .status,
+                InstanceState::WaitingForBudget
+            );
+        }
+        cleanup(&db, &owner).await;
+    }
 }
