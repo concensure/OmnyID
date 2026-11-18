@@ -527,3 +527,21 @@ approval contract, tools, model, full provenance and rollout items remain open.
 No Runbook deployment or flag change. Existing six dependency advisories/five
 warnings and two unchanged line-budget overages remain. Remote PR/CI remains
 unavailable because origin/main has unrelated open-source history; no push made.
+
+
+## 2026-11-18 continuation: stored quotation review dependency
+
+Frozen source `1509438f2aa32adb1ec06fe1dcf763c94f0bb0c3` was verified in the clean worktree
+`C:/temp/wt/omnyid-runbooks-verify-43d7c830`: 48 focused Rust tests and library build
+completed. First compiler attempt hit STATUS_ACCESS_VIOLATION; same-source retry
+completed. No frontend changes or deployment.
+
+ReviewStoredQuote consumes the exact referenced normalized quote in the frozen
+owner evidence packet, validates the existing quotation contract and preserves
+its material fingerprint. Missing/ambiguous evidence, wrong context/schema,
+invalid dates and oversized quotations fail closed. The unchanged vendor starter
+completes through one encrypted standard AFP review with no booking/payment
+permission. Full Documents/response projection and separate booking approval
+remain unimplemented in this path, so the vendor checklist item stays open.
+
+Checklist unchanged: **85 complete, 32 remaining of 117**.

@@ -1,3 +1,39 @@
+## 2026-11-18: WED-375 stored vendor quotation review dependency
+
+Implementation: `C:/temp/wt/omnyid-runbooks`, branch `agent/codex/WED-375`.
+Frozen tested source: `1509438f2aa32adb1ec06fe1dcf763c94f0bb0c3`.
+Clean verification worktree: `C:/temp/wt/omnyid-runbooks-verify-43d7c830`.
+
+- Added src/runbook_quote.rs and tests/runbook_quote_fixture.json; registered the
+  module, extended runbook_transform/runbook_emit and their focused tests.
+- ReviewStoredQuote resolves exactly normalised_quote_ref inside the saved owner
+  Read packet and reuses NormalisedQuotation plus its existing validator. No
+  duplicate normalization, live refetch or fallback to an inline event quote.
+  Bounds, exact date syntax, wedding context, missing/duplicate evidence and
+  malformed schema/validity are checked. Findings retain the version fingerprint.
+- Existing private review emission supports this operation, with lifecycle and
+  evidence-review counts. It grants no availability, booking or payment authority.
+  The unchanged vendor starter now completes through its real stored review_ref.
+- Local evidence on the clean source: all 48 focused Rust tests and library build
+  completed. First test compilation crashed with Windows STATUS_ACCESS_VIOLATION
+  while building runbook_transform_postgres; retry of identical source succeeded.
+  Tests cover malformed/missing/ambiguous/oversized quote evidence and fingerprint
+  changes, plus concurrent replay, foreign/stale requests, disable, rollback,
+  encrypted review content and absence of task/action/approval creation.
+- Used Rust +1.95.0, CARGO_TARGET_DIR=C:/cargo-target, incremental off, -j1 and
+  package debug=0/codegen-units=16. Disposable local Postgres :55475 used; stopped
+  after verification. Frontend and dependency files unchanged; no frontend rerun.
+- Checklist remains 85 complete / 32 remaining. The vendor starter checklist item
+  includes Documents/response projection and separate booking approval, so it
+  remains open despite the now-verified private review dependency.
+- GitHub Actions query returned no WED-375 runs. Existing unrelated origin/main
+  history still prevents a suitable PR; no push or unrelated-history merge made.
+  No deployment attempted or flags changed. Existing dependency advisories and
+  line-budget overages were not addressed by this batch.
+- Next: consume existing Documents/quotation response projections and integrate
+  existing booking approval authority; then other domain/tool/model dependencies.
+  Claude retains ownership of sitemap work. No change to the prior SEO release.
+
 ## 2026-11-18: WED-375 private review emission and starter completion
 
 Implementation: `C:/temp/wt/omnyid-runbooks`, `agent/codex/WED-375`.

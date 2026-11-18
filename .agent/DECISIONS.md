@@ -1,3 +1,18 @@
+## 2026-11-18: Runbook quote review consumes a frozen normalization
+
+ReviewStoredQuote resolves normalised_quote_ref only inside the owner-scoped
+Read evidence packet. It accepts the existing quotation wrapper and validates
+NormalisedQuotation through the quotation module. It does not normalize raw
+vendor text, fetch replacements, or accept an inline event quote as a substitute
+for a missing referenced record. Duplicate references, invalid dates, unsupported
+schema/context and oversized quotes fail closed. Findings retain the material
+fingerprint and recorded lifecycle/validity, with no clock-dependent expiry claim.
+
+The standard private review projection summarizes evidence requiring review.
+No availability confirmation, booking/payment authority or provider action is
+inferred from any quotation lifecycle. The vendor starter's full Documents and
+separate booking approval acceptance remains open; this is its review dependency.
+
 ## 2026-11-18: Review emission is an AFP projection, not action approval
 
 Runbook Emit currently supports only proactive_suggestion reviews immediately
