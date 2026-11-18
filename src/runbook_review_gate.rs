@@ -82,13 +82,14 @@ fn preview(proposal: &Value) -> String {
                     "not scheduled".into()
                 } else {
                     format!(
-                        "{} to {}",
+                        "{} to {}{}",
                         change[key]["start_at"]
                             .as_str()
                             .unwrap_or("start time not supplied"),
                         change[key]["end_at"]
                             .as_str()
-                            .unwrap_or("end time not supplied")
+                            .unwrap_or("end time not supplied"),
+                        change[key]["duration_minutes"].as_u64().map(|n| format!(" ({n} minutes)")).unwrap_or_default()
                     )
                 }
             };
