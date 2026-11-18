@@ -1957,7 +1957,7 @@ export function A2UIRenderer(props: { message: AfpMessage; view?: AfpView }) {
   const renderMode = () => rendererState().renderMode;
 
   return (
-    <Show when={runbookView()} fallback={<div class="space-y-4">
+    <Show keyed when={runbookView()} fallback={<div class="space-y-4">
       <Show when={rendererState().showHeader}>
         <header class={rendererState().headerClass}>
           <Show when={rendererState().title}>
@@ -1984,8 +1984,8 @@ export function A2UIRenderer(props: { message: AfpMessage; view?: AfpView }) {
         </div>
       </Show>
     </div>}>
-      {identity => <RunbookPanel mode={identity().definitionId ? "manage" : "activity"}
-        instanceId={identity().instanceId} definitionId={identity().definitionId} />}
+      {identity => <RunbookPanel mode={identity.definitionId ? "manage" : "activity"}
+        instanceId={identity.instanceId} definitionId={identity.definitionId} />}
     </Show>
   );
 }

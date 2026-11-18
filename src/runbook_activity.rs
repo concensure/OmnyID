@@ -24,18 +24,24 @@ impl RunbookRuntime<'_, '_> {
             .store
             .read_kind(owner, "runbook_instance", None, None, &mut tx)
             .await?;
-        let mut ids = std::collections::BTreeSet::new();
+        // Use verified immutable records only to rank page candidates. Fully
+        // validate each displayed history in activity_in; avoid an extra query
+        // for every off-page instance on accounts with long histories.
+        let mut latest: BTreeMap<String, RunbookInstance> = BTreeMap::new();
         for record in records {
             if let RuntimeRecord::Instance(i) = parse_runtime_afp(owner, &record)? {
-                ids.insert(i.instance_id);
+                if latest
+                    .get(&i.instance_id)
+                    .is_none_or(|old| old.revision < i.revision)
+                {
+                    latest.insert(i.instance_id.clone(), i);
+                }
             }
         }
-        let mut current = Vec::new();
-        for id in ids {
-            let record = self.load_instance(owner, &id, &mut tx).await?;
-            let waiting = record.instance.status == InstanceState::WaitingForInput;
-            current.push((!waiting, id));
-        }
+        let mut current: Vec<_> = latest
+            .into_values()
+            .map(|i| (i.status != InstanceState::WaitingForInput, i.instance_id))
+            .collect();
         current.sort();
         let truncated = current.len() > 50;
         let mut activities = Vec::new();

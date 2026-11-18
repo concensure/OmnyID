@@ -94,27 +94,33 @@ pub async fn maintenance_pass(db: &Db) -> (u32, u32) {
     let runtime = RunbookRuntime::new(&store);
     let mut processed = 0;
     let mut errors = 0;
-    for owner in &policy.owners {
-        if policy.follow_ups {
-            match runtime.due_schedules(owner, 20).await {
-                Ok(due) => {
-                    for record in due {
-                        match runtime
-                            .deliver_follow_up(
-                                owner,
-                                &record.schedule.instance_id,
-                                &record.message_id,
-                            )
-                            .await
-                        {
-                            Ok(_) => processed += 1,
-                            Err(_) => errors += 1,
+    let pass = tokio::time::timeout(std::time::Duration::from_secs(10), async {
+        for owner in &policy.owners {
+            if policy.follow_ups {
+                match runtime.due_schedules(owner, 20).await {
+                    Ok(due) => {
+                        for record in due {
+                            match runtime
+                                .deliver_follow_up(
+                                    owner,
+                                    &record.schedule.instance_id,
+                                    &record.message_id,
+                                )
+                                .await
+                            {
+                                Ok(_) => processed += 1,
+                                Err(_) => errors += 1,
+                            }
                         }
                     }
+                    Err(_) => errors += 1,
                 }
-                Err(_) => errors += 1,
             }
         }
+    })
+    .await;
+    if pass.is_err() {
+        errors += 1;
     }
     (processed, errors)
 }

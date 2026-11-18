@@ -325,7 +325,7 @@ async fn authenticated_activity_answer_cancel_and_deterministic_completion() {
     d.success_criteria[0].op = FilterOp::Exists;
     d.success_criteria[0].value = None;
     store
-        .save(&alice.id, saved["id"].as_str(), d)
+        .save(&alice.id, saved["id"].as_str(), d.clone())
         .await
         .unwrap();
     let failed = start(&db, &runtime, &alice.id).await;

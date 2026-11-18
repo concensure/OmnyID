@@ -95,3 +95,22 @@ test("export requires confirmation and rollout-off hides controls",async({page})
   await page.reload();
   await expect(page.getByRole("heading",{name:"Runbooks",exact:true})).toHaveCount(0);
 });
+
+test("account switch aborts pending export and clears confirmation",async({page})=>{
+  await fixtures(page);
+  let release: (()=>Promise<void>) | undefined;
+  let downloads=0;
+  page.on("download",()=>downloads++);
+  await page.route("**/runbooks/calendar_conflict/export",route=>new Promise<void>(resolve=>{
+    release=async()=>{await route.fulfill({json:{definition:{name:"old account"}}}).catch(()=>{});resolve();};
+  }));
+  await page.goto("/workspace/e2e/runbook-controls.html");
+  await page.getByRole("button",{name:"Export definition…"}).click();
+  await page.getByRole("button",{name:"Download definition JSON",exact:true}).click();
+  await expect.poll(()=>Boolean(release)).toBe(true);
+  await page.evaluate(()=>window.dispatchEvent(new Event("omnyid:session-changed")));
+  await release!();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.getByRole("button",{name:"Refresh runbooks"})).toBeEnabled();
+  expect(downloads).toBe(0);
+});

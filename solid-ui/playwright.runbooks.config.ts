@@ -1,5 +1,6 @@
 import { defineConfig } from "@playwright/test";
 export default defineConfig({
+  timeout: 90_000,
   testDir: "./tests/e2e", testMatch: /runbook-.*\.spec\.ts/, fullyParallel:false, workers:1,
   use:{baseURL:"http://127.0.0.1:4186",trace:"retain-on-failure"},
   webServer:{command:"npm run dev -- --host 127.0.0.1 --port 4186",

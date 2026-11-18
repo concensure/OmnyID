@@ -1,3 +1,4 @@
+import { navigateToView } from "@/lib/decisionosNavigation";
 import { createSignal, createUniqueId, For, onCleanup, onMount, Show } from "solid-js";
 import { apiFetch, SESSION_CHANGED_EVENT } from "@/lib/api";
 import { openRunbookQuestions, runbookIdentifier, runbookStatus, runbookTerminal,
@@ -80,7 +81,9 @@ export function RunbookPanel(props: { mode?: "manage" | "questions" | "activity"
     setConfirm({ run, title, detail, label });
   }
   async function exportDefinition(d: RunbookDefinitionSummary) {
-    const value = await apiFetch<unknown>(`/runbooks/${encodeURIComponent(d.runbook_id)}/export`);
+    const current = generation;
+    const value = await apiFetch<unknown>(`/runbooks/${encodeURIComponent(d.runbook_id)}/export`, { signal: controller?.signal });
+    if (current !== generation) throw new Error("session_changed");
     const blob = new Blob([JSON.stringify(value, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob); const link = document.createElement("a");
     link.href = url; link.download = `runbook-${d.runbook_id}.json`; link.click(); URL.revokeObjectURL(url);
@@ -155,7 +158,9 @@ export function RunbookPanel(props: { mode?: "manage" | "questions" | "activity"
                 <p>{t.step_id.replaceAll("_", " ")} — {t.status.replaceAll("_", " ")} · {new Date(t.started_at).toLocaleString()}</p>
                 <p class="break-all">Sources: {t.source_refs.length ? t.source_refs.join(", ") : "No source records"}</p>
                 <Show when={t.provenance_ref}><p class="break-all">Provenance record: {t.provenance_ref}</p></Show>
-                <Show when={t.approval_ref}><p class="break-all">Approval record: {t.approval_ref}. Review approvals in the Decision Queue.</p></Show>
+                <Show when={t.approval_ref}><p class="break-all">Approval record: {t.approval_ref}</p>
+                  <button type="button" class={buttonClass} onClick={() => navigateToView("decision_queue")}>Review in Decision Queue</button>
+                </Show>
               </li>
             }</For></ol>
           </details>

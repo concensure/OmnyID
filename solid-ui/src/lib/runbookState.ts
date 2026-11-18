@@ -31,7 +31,7 @@ export function openRunbookQuestions(activity: RunbookActivity, now = Date.now()
 export function runbookAnswer(schema: RunbookQuestion["answer_schema"], raw: string): string | number | boolean {
   if (schema === "boolean" && ["true", "false"].includes(raw)) return raw === "true";
   if (schema === "non_negative_number" && raw.trim() !== "" && Number.isFinite(Number(raw)) && Number(raw) >= 0) return Number(raw);
-  if (schema === "short_text" && raw.trim() && new TextEncoder().encode(raw).length <= 512 && !/[\u0000-\u001f\u007f]/.test(raw)) return raw;
+  if (schema === "short_text" && raw.trim() && new TextEncoder().encode(raw).length <= 512 && !/[\u0000-\u001f\u007f-\u009f]/.test(raw)) return raw;
   if (schema === "date" && /^\d{4}-\d{2}-\d{2}$/.test(raw) && Number.isFinite(Date.parse(raw)) && new Date(raw).toISOString().slice(0, 10) === raw) return raw;
   throw new Error("Enter a valid answer in each field.");
 }
