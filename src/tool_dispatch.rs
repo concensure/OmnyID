@@ -15,6 +15,7 @@ use crate::{
 
 mod result_format;
 pub mod runbook_contract;
+mod runbook_registry;
 use result_format::format_tool_result;
 
 pub struct ToolDispatchContext<'a> {

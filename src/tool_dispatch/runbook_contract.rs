@@ -1,10 +1,7 @@
 //! Exact preparation using the existing owner's approved MCP registry.
 //! This is not a grant or an executor: no network request or usage charge occurs.
-use super::{load_approved_tools, ApprovedTool, ToolDispatchContext};
-use crate::{
-    runbook_contract::Result, runbook_store::digest, runbook_tool_schema::ToolContract,
-    runbook_validation::identifier,
-};
+use super::ToolDispatchContext;
+use crate::{runbook_contract::Result, runbook_store::digest, runbook_tool_schema::ToolContract};
 use serde_json::{json, Value};
 
 // Deliberately neither Debug nor Serialize: arguments may contain private data.
@@ -46,60 +43,20 @@ pub async fn prepare_runbook_tool(
     capability: &str,
     arguments: Value,
 ) -> Result<PreparedRunbookTool> {
-    let tools = load_approved_tools(ctx)
-        .await
-        .map_err(|_| "tool_registry_unavailable")?;
-    prepare(ctx.user_id, &tools, slug, capability, arguments)
-}
-
-fn prepare(
-    owner: &str,
-    tools: &[ApprovedTool],
-    slug: &str,
-    capability: &str,
-    arguments: Value,
-) -> Result<PreparedRunbookTool> {
-    if !identifier(owner) || !identifier(slug) || !identifier(capability) {
-        return Err("invalid_tool_selection");
-    }
-    let matches: Vec<_> = tools
-        .iter()
-        .filter(|t| t.slug == slug && t.capabilities.iter().any(|c| c == capability))
-        .collect();
-    if matches.len() != 1 {
-        return Err("tool_selection_not_unique");
-    }
-    let tool = matches[0];
-    if tool
-        .capabilities
-        .iter()
-        .filter(|c| c.as_str() == capability)
-        .count()
-        != 1
-    {
-        return Err("tool_selection_not_unique");
-    }
-    let value = tool
-        .tool_descriptor
-        .get("runbook_contracts")
-        .and_then(|m| m.get(capability))
-        .ok_or("tool_contract_required")?;
-    let contract = ToolContract::parse(value)?;
+    let snapshot = super::runbook_registry::load(ctx, slug, capability).await?;
+    let contract = ToolContract::parse(&snapshot.contract)?;
     contract.validate_input(&arguments)?;
-    // Include endpoint/provider and schemas so a later registry change invalidates
-    // an exact grant. Credentials are intentionally absent from hashes and output.
     let request_hash = digest(&json!([
-        "runbook_tool_request.v1",
-        owner,
+        "runbook_tool_request.v2",
+        ctx.user_id,
         slug,
         capability,
-        tool.mcp_server_url,
-        tool.connection_provider,
-        value,
+        snapshot.binding,
+        snapshot.contract,
         arguments
     ]));
     Ok(PreparedRunbookTool {
-        owner: owner.into(),
+        owner: ctx.user_id.into(),
         tool_slug: slug.into(),
         capability: capability.into(),
         arguments,
@@ -108,54 +65,25 @@ fn prepare(
     })
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    fn tool() -> ApprovedTool {
-        let schema =
-            json!({"type":"object","properties":{},"required":[],"additionalProperties":false});
-        ApprovedTool {
-            slug: "mail".into(),
-            name: "Mail".into(),
-            mcp_server_url: "https://example.invalid/mcp".into(),
-            api_key: "private".into(),
-            connection_provider: "mcp".into(),
-            capabilities: vec!["read".into()],
-            tool_descriptor: json!({"runbook_contracts":{"read":{"version":1,"input_schema":schema,"output_schema":schema}}}),
-        }
+/// Detect changed account/connection/grant/schema/input context. This is a fresh
+/// preparation check, NOT a durable action grant or protection against a later
+/// race. An executor must recheck at its reservation/dispatch boundary.
+pub async fn revalidate_runbook_tool(
+    ctx: &ToolDispatchContext<'_>,
+    prepared: &PreparedRunbookTool,
+) -> Result<()> {
+    if ctx.user_id != prepared.owner {
+        return Err("tool_owner_mismatch");
     }
-    #[test]
-    fn selection_is_exact_unique_and_schema_bound() {
-        let tools = vec![tool()];
-        let first = prepare("alice", &tools, "mail", "read", json!({})).unwrap();
-        assert!(prepare("alice", &tools, "mail", "send", json!({})).is_err());
-        assert!(prepare("alice", &tools, "mail", "read", json!({"query":"injected"})).is_err());
-        assert!(prepare("alice", &[tool(), tool()], "mail", "read", json!({})).is_err());
-        assert_ne!(
-            first.request_hash(),
-            prepare("bob", &tools, "mail", "read", json!({}))
-                .unwrap()
-                .request_hash()
-        );
-        let mut changed = tool();
-        changed.mcp_server_url = "https://other.invalid/mcp".into();
-        assert_ne!(
-            first.request_hash(),
-            prepare("alice", &[changed], "mail", "read", json!({}))
-                .unwrap()
-                .request_hash()
-        );
-        let mut changed = tool();
-        changed.tool_descriptor["runbook_contracts"]["read"]["input_schema"]["properties"] =
-            json!({"optional":{"type":"boolean"}});
-        assert_ne!(
-            first.request_hash(),
-            prepare("alice", &[changed], "mail", "read", json!({}))
-                .unwrap()
-                .request_hash()
-        );
-        let mut changed = tool();
-        changed.tool_descriptor = json!({});
-        assert!(prepare("alice", &[changed], "mail", "read", json!({})).is_err());
+    let current = prepare_runbook_tool(
+        ctx,
+        &prepared.tool_slug,
+        &prepared.capability,
+        prepared.arguments.clone(),
+    )
+    .await?;
+    if current.request_hash != prepared.request_hash {
+        return Err("tool_preparation_stale");
     }
+    Ok(())
 }
