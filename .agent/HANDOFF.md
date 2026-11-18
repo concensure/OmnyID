@@ -9905,3 +9905,83 @@ shared-budget integration; deterministic executor/tool schema/approval contracts
 bounded models, provenance/outcome memory, retention and end-to-end starters.
 Keep the flags off until the remaining rollout prerequisites and security review.
 Dedicated disposable database container omnyid-runbook-wed375-pg stopped after verification.
+
+
+## WED-375: ten more items, privacy and outcome memory (2026-11-18)
+
+Implementation worktree: C:/temp/wt/omnyid-runbooks, branch agent/codex/WED-375.
+Frozen source SHA: b15d44920be2dd6c03de5adff5168186e94c722f.
+Verification worktree: C:/temp/wt/omnyid-runbooks-verify-43d7c830, clean detached
+at that exact source SHA. Base remains 5536b83b2f9d2f58488a075f383c24f8f4f73d6c.
+Documentation completion is a separate commit; do not build/deploy from primary.
+
+Completed ten checklist items; 82 complete, 35 remaining of 117. Added:
+- runbook_cache.rs and store/registry integration: bounded store-lifetime parsed
+  definitions keyed by owner/version/full verified envelope hash, successor
+  invalidation, owner/ledger/signature/decryption checks before every cache use.
+- runbook_privacy.rs and evidence integration: exact typed document/task private
+  AFP resolution, pre-body metadata/type/byte checks and persistent 128 source
+  decrypt attempts per account per UTC day across all Runbooks. Failed decrypts
+  charge allowance. Evidence Debug redacts bodies/references; logs remain fixed.
+- runbook_provenance.rs: existing shared provenance builder/content, private
+  companion records committed with current local, policy, wait and complete
+  traces. Shared proactive_provenance.rs only adds stable source deduplication.
+  Full actual tool/model/approval provenance stays unchecked until its executors
+  supply real output and validated approval evidence; no grant is inferred.
+- runbook_outcome.rs and authenticated outcomes route: immutable owner-bound
+  acceptance/dismissal/regret receipts, one shared proactive_outcomes projection
+  row per trace, exact retry suppression, regret without sample inflation,
+  30-day shared feedback/cooldown/family ranking. Only verified Runbook receipts
+  influence this runtime; generic proactive heuristic claims are ignored.
+  Acceptance never changes the instance revision/state or grants approval.
+- db.rs deletion list now includes behavioral_memory and proactive_outcomes.
+  The new erasure test exposed their missing FK/cleanup; existing users-first
+  lock order is retained. No extra lines added to the oversized file.
+- Tests: new runbook_privacy_outcome_postgres.rs; expanded API route abuse cases;
+  evidence test expectation reflects supported document references. No UI source.
+
+Final exact-SHA verification (toplevel/HEAD/clean status printed before commands):
+- Rust 1.95.0, CARGO_TARGET_DIR=C:/cargo-target, incremental off, -j 2,
+  profile.test.package.omnyid-homeserver.debug=0, codegen-units=16:
+  cargo test --test runbook_foundation --test runbook_storage_postgres
+  --test runbook_runtime_postgres --test runbook_evidence_postgres
+  --test runbook_authority --test runbook_authority_postgres
+  --test runbook_controls_postgres --test runbook_event_adapter
+  --test runbook_api_postgres --test runbook_hooks_postgres
+  --test runbook_privacy_outcome_postgres: all 39 tests passed, exit 0.
+  Includes concurrent erase/step/delivery races and new quota/cache/provenance/
+  feedback/owner isolation tests against disposable local omnyid_test port 55475.
+- cargo +1.95.0 build --lib -j 2 with matching dev package settings: exit 0.
+  Pinned Rust toolchain unchanged; 1.95 remains the host compiler workaround.
+- npm run test:line-budget: exit 1, same two pre-existing overages:
+  src/server/mod.rs 45,733 vs 45,717; src/db.rs 18,045 vs 17,986.
+  Focused Wedding line budget passes; new files max 493 lines. No budget inflation.
+- cargo +1.95.0 audit --no-yanked --json: exit 1. Advisory DB refresh completed,
+  latest DB commit 233155b4025b854c68a4b199c0e32d7fd53291a2 (2026-11-17).
+  Six vulnerabilities: ammonia 4.2.4 RUSTSEC-2026-0533; crypto-bigint 0.5.5
+  RUSTSEC-2026-0387; libsqlite3-sys 0.30.1 RUSTSEC-2026-0459;
+  pulldown-cmark 0.13.4 RUSTSEC-2026-0414/0433; rsa 0.9.10 RUSTSEC-2023-0071.
+  Also three unmaintained and two unsound warnings. Evidence:
+  C:/temp/wt/runbook-audit-b15d4492.json. No dependencies changed. Registry/yanked
+  checks excluded; scan execution complete does NOT mean security gate passing.
+- git diff --check clean. Frontend source is unchanged, so frontend typecheck,
+  production build and browser suites were not repeated. Comprehensive legacy
+  Rust/Wedding suites and hosted gates remain separate unfinished checklist items.
+
+Intermediate failures resolved before final verification: API test variable
+shadowed a saved definition; erasure left the behavioral-memory counter behind.
+The initial candidate 466c45890e6f4addedb5bee597fa45a699eb800c is superseded.
+
+Limits/next action: store-lifetime cache deliberately does not avoid authorized
+ledger reads or persist plaintext across requests. Shared decrypt reservations
+use a second committed connection while holding the owner transaction; pool
+exhaustion fails closed. Counter is Runbook source-evidence allowance, not an
+invented global Watcher/token budget. Unsupported entity/provider IDs remain
+omissions. Outcomes are API-backed; no new feedback UI was added. Retention,
+actual deterministic tool/approval dispatch, bounded model execution and full
+starter end-to-end cases remain. Keep rollout flags off and address dependency
+advisories/line-budget failures before release/security review. No PR review,
+remote CI for this candidate, hosted test or deployment. GitHub query returned
+old unrelated main failure 23703104075 and no deployment records. No worktrees
+were removed. Source commits and this handoff are available for the next review.
+Dedicated disposable database container omnyid-runbook-wed375-pg stopped after verification.

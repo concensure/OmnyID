@@ -181,7 +181,7 @@ Depends on: 1, 2
 - [x] Scope every query by derived owner and reject caller-supplied cross-user references.
 - [x] Build indexes/projections from AFP metadata only where possible; do not create an independent mutable definition source of truth. (Envelope-only type/id and type/thread/id indexes; required bootstrap upgrades existing schemas. No copied content or secondary authority.)
 - [x] Support enable, disable, supersede, archive, export, and validated import as AFP successor events.
-- [ ] Cache only immutable parsed definitions by owner/version/hash and invalidate on a successor event.
+- [x] Cache only immutable parsed definitions by owner/version/hash and invalidate on a successor event.
 - [x] Add tests for version ordering, archive, stale edit conflicts, forged owner, forged parent, cache invalidation, and account erasure. (No cache is used; fresh reads observe each committed successor.)
 
 ## 4. Existing-event adapter
@@ -223,16 +223,18 @@ Depends on: 1, 5
 
 Depends on: 4, 6
 
-- [ ] Add `src/runbook_evidence.rs` that resolves only typed source/entity references and bounded query limits.
+- [x] Add `src/runbook_evidence.rs` that resolves only typed source/entity references and bounded query limits.
 - [x] Reuse State Synthesizer snapshots and `SynthesizerToMasterHandoff` where relevant instead of synthesizing a parallel state model.
-- [ ] Reuse current metadata relevance/decrypt-budget rules before reading encrypted content.
+- [x] Reuse current metadata relevance/decrypt-budget rules before reading encrypted content.
 - [x] Record included refs, omitted categories, missing required fields, snapshot ref, hashes, and confidence.
 - [x] Reject unbounded history/RAG requests in a definition.
 - [x] Add tests for reference-only retrieval, bounded counts, missing records, private records, decrypt budget, stale synthesis, and cross-user refs.
 
 Evidence continuation: `runbook_evidence.rs` resolves explicit `message:`,
 `private_message:` and `snapshot:` IDs under owner/account and record locks.
-Unsupported entity kinds are reported without querying or following links.
+Exact private `document:` (parsed_document AFP) and `task:` references are now
+type checked before body access. Other entity kinds remain explicit omissions;
+there is no provider-ID search or link chasing.
 Headers precede body reads; existing Watcher relevance gates encrypted reads.
 Caller budgets have hard caps of 32 references/decrypt attempts, 64 KiB per
 record and 256 KiB total fetched content/ciphertext. Attempts consume budget
@@ -243,8 +245,12 @@ hashes and explicit omissions/missing fields are returned to trusted executor
 code. Packet content is private data and conveys no authority. Encrypted packet persistence and frozen runtime read-step binding now commit
 atomically with the trace and next instance revision. Exact request retries
 return the original saved packet even after source mutation or cancellation.
-Changed retry parameters conflict. No external execution is enabled. The two open items
-above retain entity-specific resolution and account-level budget integration.
+Changed retry parameters conflict. No external execution is enabled. Source
+evidence decrypts additionally reserve a persistent account-wide quota of 128
+attempts per UTC day before body access; failed decrypts still consume allowance.
+This quota is shared across Runbooks, while Watcher metadata relevance and
+per-request limits remain in force. Internal signed ledger validation is distinct
+from source-content retrieval.
 
 ## 8. Policy, tools, and approval integration
 
@@ -360,10 +366,23 @@ tenant DDL to prevent the parallel-erasure deadlock found by the control tests.
 Depends on: 6, 8, 9, 11
 
 - [ ] Reuse `build_action_provenance_record_afp` for actionable traces and hash definition, trigger, evidence packet, tool/model output, and approval.
-- [ ] Extend the proactive provenance adapter only where shared metadata is missing; do not create a competing provenance format.
-- [ ] Record outcomes under `runbook:<runbook_id>:<step_id>` and reuse proactive outcome/cooldown/priority functions.
-- [ ] Keep family-level feedback cautious; acceptance never grants authority or bypasses approval.
-- [ ] Add provenance hash, source dedupe, acceptance, dismissal, cooldown, retry-regret, and no-authority-escalation tests.
+- [x] Extend the proactive provenance adapter only where shared metadata is missing; do not create a competing provenance format.
+- [x] Record outcomes under `runbook:<runbook_id>:<step_id>` and reuse proactive outcome/cooldown/priority functions.
+- [x] Keep family-level feedback cautious; acceptance never grants authority or bypasses approval.
+- [x] Add provenance hash, source dedupe, acceptance, dismissal, cooldown, retry-regret, and no-authority-escalation tests.
+
+Provenance/outcome continuation: current read/local transform, policy, wait and
+completion traces now append private shared `provenance_record/action` companions
+atomically. Frozen definition/trigger/evidence and input/output hashes, revision,
+model/cost fields and explicit absent approval are recorded. The first item stays
+open for actual tool/model results and validated approval evidence when those
+executors land. Shared source deduplication is reused without a new provenance
+format. Immutable accepted/dismissed/regretted receipts project transactionally
+into existing proactive outcomes; exact retries and regrets count each trace once.
+Shared feedback functions suppress/cool down exact steps, cautiously rank families
+and never grant execution authority. Owner-bound routes reject foreign traces and
+unknown fields. Outcome memory is bounded to 30 days for feedback; immutable
+receipt retention remains a separate unfinished policy task.
 
 ## 14. API and A2UI projections
 
@@ -396,11 +415,11 @@ Depends on: 2, 5–14
 Depends on: 1–15
 
 - [x] Threat-model forged events, malicious definitions, prompt injection, capability escalation, cross-tenant refs, replay, timer abuse, and private-content leakage.
-- [ ] Verify encrypted/private content follows current storage and decrypt-budget rules.
-- [ ] Keep operational logs content-light and redact model/tool inputs.
+- [x] Verify encrypted/private content follows current storage and decrypt-budget rules.
+- [x] Keep operational logs content-light and redact model/tool inputs.
 - [ ] Add retention for derived traces/projections without deleting immutable evidence that policy requires to retain.
 - [x] Extend account deletion to definitions, instances, traces, waits, receipts, caches, and projections. (Existing private-schema erasure verified for all currently persisted runbook types; no separate caches/projections exist.)
-- [ ] Run dependency/security scans and targeted route abuse tests.
+- [x] Run dependency/security scans and targeted route abuse tests.
 
 ## 17. Verification and rollout
 
@@ -418,3 +437,18 @@ Depends on: 1–16
 ## Completion definition
 
 This work is complete only when event-to-instance dispatch is deterministic and per-user, missing information pauses visibly, no tool can exceed existing authority, follow-ups are AFP events, all outcomes and costs are auditable, and A2UI projections use the same underlying ledger state. A starter pack existing in code is not completion unless it is copied into and isolated within each user's ledger.
+
+
+Verification continuation (2026-11-18): source
+`b15d44920be2dd6c03de5adff5168186e94c722f` in the clean verification worktree
+passed all 39 focused Runbook Rust tests and the library build with Rust 1.95.0.
+The ten items above are closed: checklist 82 complete, 35 remaining of 117.
+The security-scan checkbox records execution, not a clean security gate:
+`cargo audit --no-yanked --json` refreshed the advisory database and exited 1
+with six existing advisories and five warnings. Registry/yanked checks were
+excluded. Route tests cover unauthenticated/foreign requests, unknown fields,
+invalid outcome enums and duplicate/stale mutations. The global line budget
+still fails on unchanged counts in server/mod.rs and db.rs; no baseline raised.
+No frontend source changed, no external executor enabled and no deployment done.
+Full tool/model/approval provenance remains open despite the verified companion
+records for current runtime paths; retention and wider rollout checks remain open.

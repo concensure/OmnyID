@@ -3901,3 +3901,51 @@ This serializes erasures and lets existing users-first Runbook transactions
 finish before DDL begins. It deliberately blocks account-table access during
 erasure; measure deletion latency before deployment. Concurrent erasure is tested;
 the fix does not claim to redesign all unrelated worker lock ordering.
+
+
+### WED-375: bounded evidence, private provenance and outcome feedback (2026-11-18)
+
+Keep parsed definitions in a bounded, store-lifetime cache keyed by owner,
+version and the verified full-envelope hash. Every access still locks the account,
+reads the ledger, verifies signatures and decrypts; successors invalidate older
+entries. No process-global plaintext cache or cached authorization is introduced.
+A missing account clears the store cache; other stores cannot bypass deletion.
+
+Typed document references identify exact private parsed_document AFP records;
+task references identify exact private task records. Do not search entity names,
+follow provider URLs, resolve an ambiguous entity ID or fall across stores.
+Header type, metadata relevance and existing per-request count/byte/decrypt
+limits precede body access. All runbooks for an account additionally share 128
+source-evidence decrypt attempts per UTC day. Reserve attempts atomically in the
+existing owner-keyed behavioral_memory counter on a separate committed connection
+while holding the account lock, so failed/deferred steps cannot reclaim allowance.
+This counter contains no evidence; it does not consume token/cost budgets or claim
+an existing global Watcher decrypt quota. Pool exhaustion fails closed and requires
+an available second connection; no decrypted evidence is read on reservation error.
+Internal signed definition/receipt validation is distinct from source retrieval.
+Erasure explicitly removes behavioral_memory and proactive_outcomes, which predate
+user foreign keys, in the existing users-first deletion transaction.
+
+Use the shared provenance_record/action AFP content and builder; store companion
+records with standard private encryption/signing in the same transaction as their
+trace. Hash the frozen definition, frozen normalized trigger, evidence packet,
+step input and output; record revision, model/cost fields and explicit absence of
+approval in current local/policy/wait/completion paths. The shared proactive adapter
+only gains reusable source deduplication. Never place source bodies in provenance
+metadata or operational logs. EvidenceItem Debug redacts content and references.
+Tool/model/approval executors are still separate unfinished work; their eventual
+adapter must supply actual output and validated approval evidence, not treat a
+policy receipt or accepted outcome as an execution grant.
+
+Feedback uses immutable encrypted owner-bound receipts and a transactional row
+in existing proactive_outcomes per trace. Exact retries do not add samples; one
+accepted result can be regretted, preserving its original receipt while updating
+the projection. Dismissals cannot turn into acceptance. Colon-bearing identifiers
+are escaped in runbook:<runbook_id>:<step_id> keys to avoid ambiguous grouping.
+Only verified private Runbook receipts influence matching, excluding arbitrary
+heuristic claims submitted through the older generic outcome endpoint. Reuse
+shared exact/family summaries, suppression and priority functions over 30 days;
+exact cooldowns expire from the latest outcome, family feedback changes ranking
+only, and feedback can never promote a deduped/capped match or expand authority.
+Do not backfill a suppressed winner in a frozen dispatch plan. No rollout flag
+or external execution is enabled by this batch.
