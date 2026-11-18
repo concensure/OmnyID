@@ -11385,6 +11385,7 @@ async fn ingest_passive_event_http(
         .unwrap_or_else(|| format!("passive:{}", user.id));
 
     let event_content = AfpPassiveEventContent {
+        event_type: req.event_type.clone(),
         source: req.source.clone(),
         entity_id: req.entity_id.clone(),
         event_at: req.event_at.clone(),
@@ -11545,6 +11546,16 @@ async fn ingest_passive_event_http(
         .await
         .map_err(internal_error)
         .map_err(status_to_http)?;
+
+    // Bridge only authenticated, already persisted passive events to the existing
+    // daemon AFP ledger. Its post-insert hook re-reads the owner partition.
+    if crate::runbook_hooks::HookPolicy::from_env().event_allowed(&user.id, "passive_event") {
+        if let Ok(value) = serde_json::to_value(&afp_msg) {
+            if state.db.insert_daemon_afp_message(&value).await.is_err() {
+                tracing::warn!("Runbook passive-event bridge deferred");
+            }
+        }
+    }
 
     // P2.3: Run heuristic evaluator synchronously — zero token cost.
     // P2.4: Apply acceptance-rate feedback to adjust confidence thresholds.

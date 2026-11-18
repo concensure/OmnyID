@@ -10465,6 +10465,7 @@ impl Db {
                     .await?;
             }
         }
+        crate::runbook_hooks::persisted_event(self, &owner_user_id, &id, &afp_type).await;
         Ok(())
     }
 

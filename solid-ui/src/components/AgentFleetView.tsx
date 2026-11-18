@@ -1,3 +1,4 @@
+import { RunbookPanel } from "./RunbookPanel";
 import { createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { cancelTask, createAgentDelegation, getFleet, revokeDelegation as revokeDelegationRequest, subscribeFleet } from "../lib/api";
 import { type AgentFleetFailureReceipt, type AgentFleetRunNotice } from "../lib/agentFleetFailureState";
@@ -206,6 +207,7 @@ export function AgentFleetView(props: { onClose?: () => void; onNavigate?: (view
 
   return (
     <div class="space-y-5">
+      <RunbookPanel mode="manage" />
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-2">
           <span class={`h-2 w-2 rounded-full ${fleetSummary().indicatorClass}`} />

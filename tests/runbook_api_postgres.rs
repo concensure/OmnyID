@@ -168,6 +168,20 @@ async fn authenticated_activity_answer_cancel_and_deterministic_completion() {
     assert_eq!(status, StatusCode::OK);
     assert_eq!(activity["questions"].as_array().unwrap().len(), 1);
     assert_eq!(activity["instance"]["status"], "waiting_for_input");
+    assert!(
+        activity["views"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|v| v["content"]["kind"] == "runbook_question")
+    );
+    let listing = request(&app, "GET", "/runbooks/instances", &auth, json!(null)).await;
+    assert_eq!(listing.0, StatusCode::OK);
+    assert_eq!(listing.1["activities"].as_array().unwrap().len(), 1);
+    assert!(!listing.1.to_string().contains("do_not_expose_this_body"));
+    let other_listing = request(&app, "GET", "/runbooks/instances", &bob_auth, json!(null)).await;
+    assert_eq!(other_listing.1["activities"], json!([]));
+
     assert!(!activity.to_string().contains("do_not_expose_this_body"));
     assert!(activity["traces"][0].get("input_hash").is_none());
     let detail = request(
@@ -329,6 +343,24 @@ async fn authenticated_activity_answer_cancel_and_deterministic_completion() {
             .instance
             .status,
         InstanceState::Failed
+    );
+    let current = store.registry(&alice.id).await.unwrap();
+    let head = current.get(&d.runbook_id).unwrap();
+    let toggle_path = format!("/runbooks/{}/enabled", d.runbook_id);
+    let toggle = json!({"expected_parent":head.message_id,"enabled":false});
+    assert_eq!(
+        request(&app, "POST", &toggle_path, &bob_auth, toggle.clone())
+            .await
+            .0,
+        StatusCode::NOT_FOUND
+    );
+    let disabled = request(&app, "POST", &toggle_path, &auth, toggle.clone()).await;
+    assert_eq!(disabled.0, StatusCode::OK);
+    assert_eq!(disabled.1["definitions"][0]["enabled"], false);
+    assert!(disabled.1["definitions"][0].get("steps").is_none());
+    assert_eq!(
+        request(&app, "POST", &toggle_path, &auth, toggle).await.0,
+        StatusCode::CONFLICT
     );
     db.delete_user_account_and_data(&alice.id, &alice.email, &[])
         .await

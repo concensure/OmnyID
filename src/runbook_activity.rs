@@ -11,12 +11,53 @@ use std::collections::BTreeMap;
 impl RunbookRuntime<'_, '_> {
     pub async fn activity(&self, owner: &str, id: &str) -> Result<Value> {
         let mut tx = self.store.begin(owner).await?;
-        let current = self.load_instance(owner, id, &mut tx).await?;
+        let value = self.activity_in(owner, id, &mut tx).await?;
+        tx.commit().await.map_err(|_| "storage_unavailable")?;
+        Ok(value)
+    }
+
+    /// Bounded ledger projection, with active questions first. A truncated page
+    /// is explicit rather than silently implying an empty/comprehensive queue.
+    pub async fn activities(&self, owner: &str) -> Result<Value> {
+        let mut tx = self.store.begin(owner).await?;
+        let records = self
+            .store
+            .read_kind(owner, "runbook_instance", None, None, &mut tx)
+            .await?;
+        let mut ids = std::collections::BTreeSet::new();
+        for record in records {
+            if let RuntimeRecord::Instance(i) = parse_runtime_afp(owner, &record)? {
+                ids.insert(i.instance_id);
+            }
+        }
+        let mut current = Vec::new();
+        for id in ids {
+            let record = self.load_instance(owner, &id, &mut tx).await?;
+            let waiting = record.instance.status == InstanceState::WaitingForInput;
+            current.push((!waiting, id));
+        }
+        current.sort();
+        let truncated = current.len() > 50;
+        let mut activities = Vec::new();
+        for (_, id) in current.into_iter().take(50) {
+            activities.push(self.activity_in(owner, &id, &mut tx).await?);
+        }
+        tx.commit().await.map_err(|_| "storage_unavailable")?;
+        Ok(json!({"activities":activities,"truncated":truncated,"execution_available":false}))
+    }
+
+    async fn activity_in(
+        &self,
+        owner: &str,
+        id: &str,
+        tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    ) -> Result<Value> {
+        let current = self.load_instance(owner, id, tx).await?;
         let thread = format!("runbook:{id}");
         let mut traces = vec![];
         for value in self
             .store
-            .read_kind(owner, "runbook_step_trace", None, Some(&thread), &mut tx)
+            .read_kind(owner, "runbook_step_trace", None, Some(&thread), tx)
             .await?
         {
             let RuntimeRecord::Trace(t) = parse_runtime_afp(owner, &value)? else {
@@ -35,7 +76,7 @@ impl RunbookRuntime<'_, '_> {
         let mut questions: BTreeMap<String, EpistemicEscalation> = BTreeMap::new();
         for value in self
             .store
-            .read_kind(owner, "epistemic_escalation", None, Some(&thread), &mut tx)
+            .read_kind(owner, "epistemic_escalation", None, Some(&thread), tx)
             .await?
         {
             let RuntimeRecord::Escalation(e) = parse_runtime_afp(owner, &value)? else {
@@ -52,11 +93,38 @@ impl RunbookRuntime<'_, '_> {
             }
         }
         let i = current.instance;
-        Ok(
-            json!({"instance":{"instance_id":i.instance_id,"runbook_id":i.runbook_id,"runbook_version":i.runbook_version,
+        let mut result = json!({"instance":{"instance_id":i.instance_id,"runbook_id":i.runbook_id,"runbook_version":i.runbook_version,
             "status":i.status,"revision":i.revision,"current_step_id":i.current_step_id,"completed_step_ids":i.completed_step_ids,
             "next_follow_up_at":i.next_follow_up_at,"wait_expires_at":i.wait_expires_at},
-            "traces":traces,"questions":questions.into_values().collect::<Vec<_>>(),"execution_available":false}),
-        )
+            "traces":traces,"questions":questions.into_values().collect::<Vec<_>>(),"execution_available":false});
+        result["views"] = activity_views(&result);
+        Ok(result)
     }
+}
+
+// Semantic views carry only the same bounded public summary fields. They never
+// supply authority; interactive clients reload authenticated activity before acting.
+pub fn activity_views(activity: &Value) -> Value {
+    let i = &activity["instance"];
+    let mut views = vec![json!({"format":"a2ui","content":{"kind":"runbook_instance",
+        "instance_id":i["instance_id"],"title":"Runbook activity"}})];
+    for trace in activity["traces"].as_array().into_iter().flatten() {
+        views.push(
+            json!({"format":"a2ui","content":{"kind":"runbook_step_summary",
+            "instance_id":i["instance_id"],"title":"Step activity","step_id":trace["step_id"]}}),
+        );
+        if trace["approval_ref"].as_str().is_some() {
+            views.push(
+                json!({"format":"a2ui","content":{"kind":"runbook_approval_link",
+                "instance_id":i["instance_id"],"title":"Approval evidence"}}),
+            );
+        }
+    }
+    for q in activity["questions"].as_array().into_iter().flatten() {
+        if q["status"] == "open" {
+            views.push(json!({"format":"a2ui","content":{"kind":"runbook_question",
+                "instance_id":i["instance_id"],"title":"Information needed"}}));
+        }
+    }
+    json!(views)
 }

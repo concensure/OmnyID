@@ -1,3 +1,4 @@
+import { RunbookPanel } from "./RunbookPanel";
 ﻿// @locs-version: 1.0
 import { createMemo, createSignal, onMount } from "solid-js";
 import type { DashboardBootstrap } from "@/lib/api";
@@ -89,6 +90,7 @@ export function DecisionQueueView(props: {
         onDismiss={() => setWeddingNavigationIntent(null)}
       />
 
+      <RunbookPanel mode="questions" />
       <DecisionQueueWorkspace
         queueState={viewState().workspaceQueueState}
         compact={viewState().workspaceCompactMode}

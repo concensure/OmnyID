@@ -176,3 +176,5 @@ pub mod workflow_supervisor;
 pub mod workflow_trace_events;
 pub mod workflow_trace_projection;
 pub mod workspace_filesystem;
+
+pub mod runbook_hooks;

@@ -112,7 +112,9 @@ pub fn start_health_maintenance_daemon(db: Db, mut shutdown: ShutdownRx) -> Join
                     warn!(%err, "Failed to prune daemon history; check DB connectivity and retention indexes")
                 }
             }
-            emit_daemon_heartbeats(&db, DaemonKind::HealthMaintenance, processed, errors).await;
+            let (runbook_processed, runbook_errors) = crate::runbook_hooks::maintenance_pass(&db).await;
+            emit_daemon_heartbeats(&db, DaemonKind::HealthMaintenance,
+                processed + runbook_processed, errors + runbook_errors).await;
             if processed > 0 {
                 idle_secs = 900;
             }

@@ -1,3 +1,5 @@
+import { RunbookPanel } from "@/components/RunbookPanel";
+import { runbookViewIdentity } from "@/lib/runbookState";
 import { createMemo, createSignal, For, Show } from "solid-js";
 import {
   watcherMessageSummary,
@@ -1942,6 +1944,9 @@ function A2UINodeRenderer(props: {
 
 export function A2UIRenderer(props: { message: AfpMessage; view?: AfpView }) {
   const { viewport } = useViewport();
+  const runbookView = createMemo(() => runbookViewIdentity(
+    props.message.encryption ? decryptedDisplayContent(props.message) : props.view?.content,
+  ));
   const rendererState = createMemo(() =>
     resolveA2UIRendererState({
       message: props.message,
@@ -1952,7 +1957,7 @@ export function A2UIRenderer(props: { message: AfpMessage; view?: AfpView }) {
   const renderMode = () => rendererState().renderMode;
 
   return (
-    <div class="space-y-4">
+    <Show when={runbookView()} fallback={<div class="space-y-4">
       <Show when={rendererState().showHeader}>
         <header class={rendererState().headerClass}>
           <Show when={rendererState().title}>
@@ -1978,6 +1983,9 @@ export function A2UIRenderer(props: { message: AfpMessage; view?: AfpView }) {
           </For>
         </div>
       </Show>
-    </div>
+    </div>}>
+      {identity => <RunbookPanel mode={identity().definitionId ? "manage" : "activity"}
+        instanceId={identity().instanceId} definitionId={identity().definitionId} />}
+    </Show>
   );
 }

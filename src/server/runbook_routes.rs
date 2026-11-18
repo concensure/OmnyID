@@ -12,6 +12,8 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
         .route("/runbooks", get(list))
         .route("/runbooks/starters", get(starters))
         .route("/runbooks/setup", post(setup))
+        .route("/runbooks/instances", get(instances))
+        .route("/runbooks/{id}/enabled", post(set_enabled))
         .route("/runbooks/{id}", get(detail))
         .route("/runbooks/instances/{id}/activity", get(activity))
         .route("/runbooks/instances/{id}/cancel", post(cancel))
@@ -117,6 +119,53 @@ async fn activity(
     ))
 }
 
+async fn instances(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> Result<Json<Value>, ApiError> {
+    let owner = owner(&state, &headers).await?;
+    let store = store(&state)?;
+    Ok(Json(
+        crate::runbook_runtime::RunbookRuntime::new(&store)
+            .activities(&owner)
+            .await
+            .map_err(error)?,
+    ))
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Enabled {
+    expected_parent: String,
+    enabled: bool,
+}
+
+async fn set_enabled(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    Json(request): Json<Enabled>,
+) -> Result<Json<Value>, ApiError> {
+    let owner = owner(&state, &headers).await?;
+    let store = store(&state)?;
+    let registry = store.registry(&owner).await.map_err(error)?;
+    let current = registry
+        .get(&id)
+        .ok_or_else(|| error("definition_not_found"))?;
+    if current.message_id != request.expected_parent {
+        return Err(error("stale_definition"));
+    }
+    let mut definition = current.definition.clone();
+    definition.enabled = request.enabled;
+    store
+        .save(&owner, Some(&request.expected_parent), definition)
+        .await
+        .map_err(error)?;
+    Ok(Json(
+        json!({"definitions":summaries(&store.registry(&owner).await.map_err(error)?)}),
+    ))
+}
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Revision {
@@ -173,7 +222,8 @@ fn summaries(registry: &crate::runbook_registry::Registry) -> Value {
                 let d = &record.definition;
                 json!({"runbook_id":d.runbook_id,"name":d.name,"version":d.version,
             "message_id":record.message_id,"enabled":d.enabled,"status":d.status,
-            "trigger_types":d.trigger.event_types,"max_autonomy":d.max_autonomy})
+            "trigger_types":d.trigger.event_types,"max_autonomy":d.max_autonomy,
+            "views":[{"format":"a2ui","content":{"kind":"runbook_definition","runbook_id":d.runbook_id,"title":d.name}}]})
             })
             .collect(),
     )
