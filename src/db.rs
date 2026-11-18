@@ -100,6 +100,8 @@ const TENANT_PRIVATE_SCHEMA_REQUIRED_INDEXES: &[&str] = &[
     "idx_references",
     "idx_supertags",
     "idx_messages_kind",
+    "idx_messages_type_id",
+    "idx_messages_type_thread_id",
     "idx_reference_targets",
     "idx_reference_types",
     "idx_link_types",
@@ -14746,6 +14748,9 @@ fn tenant_private_schema_bootstrap_sql(schema: &str) -> Vec<String> {
             "CREATE INDEX IF NOT EXISTS idx_supertags ON {schema_quoted}.messages USING GIN (supertags)"
         ),
         format!("CREATE INDEX IF NOT EXISTS idx_messages_kind ON {schema_quoted}.messages (kind)"),
+        // Envelope-only indexes: encrypted content remains exclusively in the AFP ledger.
+        format!("CREATE INDEX IF NOT EXISTS idx_messages_type_id ON {schema_quoted}.messages (type, id)"),
+        format!("CREATE INDEX IF NOT EXISTS idx_messages_type_thread_id ON {schema_quoted}.messages (type, thread_id, id)"),
         format!(
             "CREATE INDEX IF NOT EXISTS idx_reference_targets ON {schema_quoted}.messages USING GIN (reference_targets)"
         ),

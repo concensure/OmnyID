@@ -164,8 +164,24 @@ impl<'a> RunbookStore<'a> {
         tx: &mut Transaction<'_, Postgres>,
     ) -> Result<Vec<Value>> {
         let table = format!("\"{}\".messages", tenant_schema_name(owner));
-        let rows = sqlx::query(&format!("SELECT id,thread_id,parent_id,from_agent,to_agents,timestamp,type,kind,subtype,content,metadata,signature,encryption,\"references\",supertags,store_in_relational FROM {table} WHERE type=$2 AND ($1::text IS NULL OR id=$1) AND ($3::text IS NULL OR thread_id=$3) ORDER BY id LIMIT 4097"))
-            .bind(id).bind(kind).bind(thread).fetch_all(&mut **tx).await.map_err(|_| "storage_unavailable")?;
+        // Emit only applicable predicates so PostgreSQL can use envelope indexes
+        // even with generic prepared plans. Values remain bound parameters.
+        let mut query = sqlx::QueryBuilder::<Postgres>::new(format!(
+            "SELECT id,thread_id,parent_id,from_agent,to_agents,timestamp,type,kind,subtype,content,metadata,signature,encryption,\"references\",supertags,store_in_relational FROM {table} WHERE type="
+        ));
+        query.push_bind(kind);
+        if let Some(id) = id {
+            query.push(" AND id=").push_bind(id);
+        }
+        if let Some(thread) = thread {
+            query.push(" AND thread_id=").push_bind(thread);
+        }
+        query.push(" ORDER BY id LIMIT 4097");
+        let rows = query
+            .build()
+            .fetch_all(&mut **tx)
+            .await
+            .map_err(|_| "storage_unavailable")?;
         if rows.len() > 4096 {
             return Err("registry_history_limit");
         }
@@ -244,9 +260,15 @@ pub(crate) fn digest(value: &Value) -> String {
 
 fn validate_record(owner: &str, value: &Value) -> Result<()> {
     match value["type"].as_str() {
-        Some("runbook_input_supplied" | "runbook_schedule" | "runbook_follow_up") => { crate::runbook_control::validate(owner, value)?; }
-        Some("runbook_policy") => { crate::runbook_authority::parse_policy_receipt(owner, value)?; }
-        Some("runbook_evidence") => { crate::runbook_read::parse_receipt(owner, value)?; }
+        Some("runbook_input_supplied" | "runbook_schedule" | "runbook_follow_up") => {
+            crate::runbook_control::validate(owner, value)?;
+        }
+        Some("runbook_policy") => {
+            crate::runbook_authority::parse_policy_receipt(owner, value)?;
+        }
+        Some("runbook_evidence") => {
+            crate::runbook_read::parse_receipt(owner, value)?;
+        }
         Some("runbook_definition") => {
             crate::runbook_registry::parse_definition_afp(owner, value)?;
         }

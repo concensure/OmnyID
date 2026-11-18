@@ -114,6 +114,30 @@ async fn private_atomic_definition_lifecycle_and_authenticated_management() {
     let db = Db::new(&url).await.unwrap();
     let (alice, auth) = user(&db).await;
     let (bob, bob_auth) = user(&db).await;
+    // Existing private schemas receive the new envelope indexes on bootstrap.
+    // A fresh Db handle models restart; the old handle caches bootstrap completion.
+    let schema = format!("user_{}", alice.id.to_lowercase());
+    for index in ["idx_messages_type_id", "idx_messages_type_thread_id"] {
+        sqlx::query(&format!("DROP INDEX \"{schema}\".{index}"))
+            .execute(&db.pool)
+            .await
+            .unwrap();
+    }
+    let restarted = Db::from_pool(db.pool.clone());
+    restarted
+        .ensure_user_private_schema(&alice.id)
+        .await
+        .unwrap();
+    restarted
+        .ensure_user_private_schema(&alice.id)
+        .await
+        .unwrap();
+    let indexes: Vec<(String, String)> = sqlx::query_as(
+        "SELECT indexname,indexdef FROM pg_indexes WHERE schemaname=$1 AND indexname IN ('idx_messages_type_id','idx_messages_type_thread_id') ORDER BY indexname"
+    ).bind(&schema).fetch_all(&db.pool).await.unwrap();
+    assert_eq!(indexes.len(), 2);
+    assert!(indexes[0].1.ends_with("(type, id)"));
+    assert!(indexes[1].1.ends_with("(type, thread_id, id)"));
     let store = RunbookStore::new(&db, [11; 32], [12; 32]);
     let selected: Vec<String> = starter_definitions()
         .iter()
