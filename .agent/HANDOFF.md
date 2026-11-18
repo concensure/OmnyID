@@ -1,3 +1,51 @@
+## 2026-11-18: WED-375 aggregate model budgets verified
+
+Implementation worktree: `C:/temp/wt/omnyid-runbooks`, branch `agent/codex/WED-375`.
+Frozen tested source: `17e49657698f3d325570931b80569fc2e99ac211`.
+Verification worktree: `C:/temp/wt/omnyid-runbooks-verify-43d7c830` (clean, detached).
+
+- Completed six implementation items: strict owner policy contracts; durable
+  account/Runbook/instance reservations; conservative settlement; visible budget
+  pause/resume; concurrency/deletion/replay safeguards; regression tests. These
+  complete ONE parent checklist task. Count: 91 complete / 26 remaining of 117.
+- Added src/runbook_budget.rs. Updated model runtime, instance contract, private
+  store validation, activity, lib export, runbookState.ts and both model/UX tests.
+  Policies are encrypted revisioned AFP; default limits are zero. Configuration
+  is trusted/internal only. Limits apply to Runbook model spending, and do not
+  replace the existing shared-provider funding/billing controls.
+- Owner transaction locking serializes reservation with concurrent calls/config.
+  Reserve the maximum permitted call/escalation cost before releasing the lock.
+  Existing immutable model results settle actual usage. Missing results retain
+  full reservation; unknown attempts retain ceilings across UTC midnight. Known
+  spend belongs to the reservation's UTC day; instance usage is lifetime.
+- Provider over-ceiling responses stop subsequent account model calls pending
+  reconciliation. Limits never reset usage. Old reservations without budget
+  bindings fail closed for new spending; exact result replay still works.
+- Exhaustion creates WaitingForBudget without spending or advancing the step.
+  Activity exposes bounded usage, UI labels the pause. Internal resume checks
+  revision/enablement/capacity; execution rechecks before reserving. Cancellation
+  remains available. No HTTP configuration/resume route or live call path added.
+- Final source: all 63 focused Rust tests in 16 binaries completed, including 12
+  model/budget tests. Library build, TypeScript, 11 UI tests, eight Playwright
+  scenarios (responsive/keyboard/zoom/account isolation) and frontend build also
+  completed. Tests use only omnyid-runbook-wed375-pg on localhost:55475/omnyid_test.
+- Rust +1.95.0; CARGO_TARGET_DIR=C:/cargo-target; CARGO_INCREMENTAL=0;
+  RUST_MIN_STACK=67108864; -j1; package debug=0/codegen-units=8 (test/dev).
+  Initial final-source compiler attempt crashed with 0xc0000005; no tests ran in
+  that attempt. Same-source retry completed. Earlier candidate 9c97dab7 had also
+  completed 34 selected Rust tests, but final evidence above is for 17e49657.
+- Line-budget gate still fails only unchanged src/server/mod.rs 45733/45717 and
+  src/db.rs 18045/17986. Vite reports existing screen/chunk-size warnings.
+  No migrations/dependency changes, live provider calls or deployments.
+- PR/CI query returned no WED-375 PR/runs. origin/main is still the unrelated
+  public repository history; do not push this production lineage there. A suitable
+  integration/review remote/base remains necessary for the repo's PR workflow.
+- Next: owner BYOK/shared inference resolution, real provider-enforced cost
+  bounds and shared funding integration, then production model policy/evaluation
+  and existing approval/action/tool authority. Do not enable execution yet.
+  Unknown-spend reconciliation and bounded-ledger archival remain explicit future
+  work; never release uncertain funds automatically. Claude retains sitemap work.
+
 ## 2026-11-18: WED-375 five model-step implementation tasks completed
 
 Implementation: `C:/temp/wt/omnyid-runbooks`, `agent/codex/WED-375`.

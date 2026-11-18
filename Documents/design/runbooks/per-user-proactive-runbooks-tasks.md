@@ -330,7 +330,7 @@ Depends on: 7–10
 - [x] Require structured output schema for classification/reasoning and AFP draft objects for draft steps.
 - [x] Use reusable cached prompt prefixes, source references, strict evidence limits, and generate only on meaningful input changes.
 - [x] Record model, prompt version, tokens, cost, approval state, revision, input/output hashes, and source refs in the step trace/provenance.
-- [ ] Enforce account/runbook/instance budgets with graceful pause or simpler-model fallback; never silently exceed budget.
+- [x] Enforce account/runbook/instance budgets with graceful pause or simpler-model fallback; never silently exceed budget.
 - [x] Add mocked-provider tests for valid output, invalid schema, timeout, provider failure, cost ceiling, cached prefix, unchanged-input suppression, and escalation.
 
 ## 12. Follow-up event scheduling
@@ -595,3 +595,38 @@ server/mod.rs and db.rs overages. Frontend/dependencies unchanged; no deployment
 Unrelated origin/main history still prevents an appropriate PR/CI run.
 
 Checklist: **90 complete, 27 remaining of 117**.
+
+
+## 2026-11-18 continuation: six aggregate-budget implementation items
+
+Completed six implementation items within the aggregate-budget parent task:
+strict default-off owner policies; durable three-scope reservations; conservative
+usage settlement; visible pause and guarded resume; concurrency/deletion/replay
+safeguards; and adversarial regression coverage. This closes one of the original
+117 checklist entries, not six parent entries: **91 complete, 26 remaining**.
+
+The private ledger now enforces UTC-day account and per-Runbook spending plus
+lifetime instance spending. Reservations include possible escalation before a
+provider is called. Actual usage settles the reservation; failures/cancellation
+still count, uncertain calls retain their ceiling across midnight, and provider
+ceiling violations block further spending pending reconciliation. Configuration
+changes never reset usage. Missing configuration means zero spending authority.
+
+Budget exhaustion persists WaitingForBudget without a model call. Activity shows
+bounded totals, the UI labels the pause, and internal resume requires current
+revision, enablement and sufficient capacity. Execution rechecks under the owner
+lock. No public configuration/resume route or live inference has been enabled.
+Legacy reservations without budget bindings require reconciliation before new
+spending; existing result replay remains available without another provider call.
+
+Frozen source `17e49657698f3d325570931b80569fc2e99ac211` was verified in clean worktree
+`C:/temp/wt/omnyid-runbooks-verify-43d7c830`: 63 focused Rust tests across 16
+binaries, library build, TypeScript, 11 focused UI tests, all eight Playwright
+scenarios and frontend production build completed. Final Rust compilation first
+crashed with STATUS_ACCESS_VIOLATION; the same-source retry completed. Line budget
+still reports only the two unchanged server/mod.rs and db.rs overages. The
+unrelated origin/main history still blocks appropriate PR/CI integration.
+
+Owner BYOK/shared ladder integration, production model/evaluation policy,
+approval/tool execution, remaining starter flows and hosted rollout remain open.
+No deployment, live provider calls, migrations or dependency changes occurred.
