@@ -109,6 +109,7 @@ pub mod runbook_complete;
 pub mod runbook_afp;
 pub mod runbook_authority;
 pub mod runbook_contract;
+pub mod runbook_emit;
 mod runbook_control;
 pub mod runbook_input;
 pub mod runbook_schedule;

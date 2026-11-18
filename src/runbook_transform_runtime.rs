@@ -172,6 +172,7 @@ impl RunbookRuntime<'_, '_> {
                     output_refs: vec![format!("private_message:{receipt_id}")],
                 },
                 None,
+                false,
                 &mut tx,
             )
             .await?;

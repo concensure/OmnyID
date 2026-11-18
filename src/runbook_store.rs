@@ -279,6 +279,10 @@ pub(crate) fn digest(value: &Value) -> String {
 
 fn validate_record(owner: &str, value: &Value) -> Result<()> {
     match value["type"].as_str() {
+        Some("proactive_suggestion") => crate::runbook_emit::validate_suggestion(owner, value)?,
+        Some("runbook_emission") => {
+            crate::runbook_emit::validate_receipt(owner, value)?;
+        }
         Some("runbook_transform") => {
             crate::runbook_transform_runtime::validate(owner, value)?;
         }

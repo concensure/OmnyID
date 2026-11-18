@@ -135,6 +135,49 @@ impl RunbookRuntime<'_, '_> {
                 prior_step.step_id.clone(),
                 json!({"status":t.status,"output_hash":t.output_hash,"output_refs":t.output_refs}),
             );
+            if prior_step.kind == StepKind::Emit {
+                let receipt_id = digest(&json!([
+                    "runbook_emission.v1",
+                    owner,
+                    id,
+                    prior_step.step_id
+                ]));
+                let value = self
+                    .store
+                    .read_kind(owner, "runbook_emission", Some(&receipt_id), None, &mut tx)
+                    .await?
+                    .pop()
+                    .ok_or("emission_required")?;
+                let receipt = crate::runbook_emit::validate_receipt(owner, &value)?;
+                if receipt.trace != t {
+                    return Err("emission_trace_mismatch");
+                }
+                let suggestion = self
+                    .store
+                    .read_kind(
+                        owner,
+                        "proactive_suggestion",
+                        Some(&receipt.suggestion_ref),
+                        None,
+                        &mut tx,
+                    )
+                    .await?
+                    .pop()
+                    .ok_or("review_required")?;
+                crate::runbook_emit::validate_suggestion(owner, &suggestion)?;
+                if t.output_hash.as_deref() != Some(digest(&suggestion["content"]).as_str()) {
+                    return Err("review_hash_mismatch");
+                }
+                if outputs
+                    .insert(
+                        "review_ref".into(),
+                        json!(format!("private_message:{}", receipt.suggestion_ref)),
+                    )
+                    .is_some()
+                {
+                    return Err("ambiguous_review_output");
+                }
+            }
             refs.push(prior_id);
         }
         let context = json!({"instance":{"outputs":outputs}});

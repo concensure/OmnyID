@@ -178,7 +178,7 @@ impl<'a, 'db> RunbookRuntime<'a, 'db> {
     ) -> Result<StepTrace> {
         let mut tx = self.store.begin(owner).await?;
         let trace = self
-            .record_local_step_in(owner, id, expected_revision, result, None, &mut tx)
+            .record_local_step_in(owner, id, expected_revision, result, None, false, &mut tx)
             .await?;
         tx.commit().await.map_err(|_| "storage_unavailable")?;
         Ok(trace)
@@ -191,6 +191,7 @@ impl<'a, 'db> RunbookRuntime<'a, 'db> {
         expected_revision: u32,
         result: &LocalStepResult,
         evidence_ref: Option<&str>,
+        allow_review_emit: bool,
         tx: &mut Transaction<'_, Postgres>,
     ) -> Result<StepTrace> {
         let current = self.load_instance(owner, id, tx).await?;
@@ -226,7 +227,8 @@ impl<'a, 'db> RunbookRuntime<'a, 'db> {
         let index = current.instance.completed_step_ids.len();
         let step = definition.steps.get(index).ok_or("step_not_found")?;
         if step.step_id != result.step_id
-            || !matches!(step.kind, StepKind::Read | StepKind::Transform)
+            || !(matches!(step.kind, StepKind::Read | StepKind::Transform)
+                || (allow_review_emit && step.kind == StepKind::Emit))
         {
             return Err("step_requires_executor_integration");
         }
