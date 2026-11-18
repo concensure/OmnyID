@@ -3776,3 +3776,32 @@ account-policy tables. The helpers and preflight now use the actual migration
 0047/0048 tables, heuristic_autonomy_overrides and user_proactivity_config.
 No parallel settings table or migration was added. These older tables lack
 user foreign keys, so account deletion explicitly removes their owner rows.
+
+## WED-375 missing facts and durable follow-ups - 2026-11-18
+
+Missing-fact detection uses the frozen current step's required fields and the
+instance's saved bounded evidence packet, never caller-supplied evidence.
+The owner lock serializes one epistemic_escalation per instance/step. Its exact
+fields, reviewed scalar answer schema and expiry are immutable. A typed
+runbook_input_supplied event must answer exactly those fields; its authenticated
+owner, open question, instance, current step, revision and deadline must match.
+The input event, Answered successor and Running revision commit atomically.
+Answers remain separately attributed facts, not source edits or authority.
+Duplicate answers are rejected. Timeout and cancellation preserve the original
+question and append Expired/Cancelled successors. No generic start/resume can
+reopen a question or terminal instance. UI projection remains a separate task.
+
+Waits now atomically append runbook_schedule AFP and the waiting instance.
+Schedules contain a stable cancellation key, source refs, causation, declared
+follow-up type, due time and distinct expiry. Rescheduling appends a linked
+successor and updates the waiting instance revision; it never updates a row.
+Both frozen and latest declared follow-up lists constrain creation/rescheduling/
+delivery. A bounded due scan returns hints for a future shared daemon adapter.
+Delivery rechecks the latest schedule under the owner lock and appends one
+runbook_follow_up, completed Wait trace and next Running revision atomically.
+Exact delivered retries return historical receipts without advancing or reopening;
+stale rescheduled scans conflict. Expiry fails the instance without delivery.
+Cancellation/expiry resolve schedules in the same transaction as the instance.
+All control records use the existing encrypted/signed private ledger and account
+row lock, and disappear with private-schema account erasure. No independent timer,
+external action, public event injection or daemon hook has been enabled.

@@ -9659,3 +9659,69 @@ Other remaining work is unchanged: entity/account budgets, other executor steps,
 models, timers, outcomes, UI and rollout. No PR/cross-review or deployment was
 performed. GitHub queries showed only the old unrelated main CI failure and
 an empty deployment list; local verification is not remote CI evidence.
+
+## WED-375 ten input/scheduling items completed - 2026-11-18
+
+Implementation worktree: C:/temp/wt/omnyid-runbooks
+Branch: agent/codex/WED-375
+Frozen source: fc20e2f156bdbfd34d1b8bddfa67ec4c74b405d9
+Verification worktree: C:/temp/wt/omnyid-runbooks-verify-43d7c830
+
+Completed exactly ten selected checklist items: stage 10 items 1,2,4,5,6 and
+stage 12 items 1,3,4,5,6. Checklist: 54 complete / 63 remaining / 117 total.
+The UI question projection and shared-daemon wake-up hook remain unchecked.
+
+Added src/runbook_control.rs, src/runbook_input.rs, src/runbook_schedule.rs and
+tests/runbook_controls_postgres.rs; narrowly integrated src/lib.rs,
+src/runbook_store.rs and src/runbook_runtime.rs. Questions derive missing facts
+from frozen requirements and the saved bounded packet. One immutable question
+pauses the current step; typed owner-authenticated answer events must match the
+open question, exact fields, schema, instance, revision and deadline. Answers,
+Answered successors and resume commit atomically; duplicates are rejected.
+Expiry and cancellation append terminal question successors. Supplied answers
+remain separately attributed data for future executor consumption, not authority.
+
+Waits now atomically append AFP schedules with stable cancellation keys, source
+refs, causation, due time and separate expiry. Frozen and latest declarations
+constrain creation/rescheduling/delivery. The bounded due-scan API supplies hints;
+it starts no scheduler. Delivery revalidates and atomically emits one follow-up,
+Wait trace and next instance revision. Repeated delivery returns its historical
+receipt without reopening terminal state. Cancellation, expiry and rescheduling
+append successors, retaining original schedule records. All new records use
+existing private encryption/signatures, owner transactions and account erasure.
+
+Initial source f7ecf964ebcdd40cca723741f93ded57205c4939 compiled the library but
+new tests failed compilation because deletion fixture calls omitted email and
+agent IDs. Corrected those test calls in the frozen source above. Re-ran all
+seven focused test targets and required library build at that exact SHA.
+Commands printed git toplevel, full HEAD and clean status before each test/build.
+Environment: CARGO_TARGET_DIR=C:/cargo-target, CARGO_INCREMENTAL=0,
+TEST_DATABASE_URL on dedicated localhost:55475/omnyid_test. Rust +1.95.0 used;
+the project Rust pin was not changed.
+
+`cargo +1.95.0 test --test runbook_foundation --test runbook_storage_postgres
+ --test runbook_runtime_postgres --test runbook_evidence_postgres
+ --test runbook_authority --test runbook_authority_postgres
+ --test runbook_controls_postgres -j 2
+ --config 'profile.test.package.omnyid-homeserver.debug=0'
+ --config 'profile.test.package.omnyid-homeserver.codegen-units=16'`
+completed 30 tests, zero failures. Includes all previous 25 regressions plus
+new schema, question/answer/isolation, expiry, schedule lifecycle/concurrency/
+erasure and declaration-revocation scenarios. `cargo +1.95.0 build --lib -j 2
+ --config 'profile.dev.package.omnyid-homeserver.debug=0'
+ --config 'profile.dev.package.omnyid-homeserver.codegen-units=16'` completed.
+Focused rustfmt, diff checks and new-file line counts were checked; new source
+files are 67, 407 and 553 lines, and the new test file is 567 lines.
+
+No frontend or public routes changed; full frontend/legacy-unit suites were not
+run for this internal backend batch. No deployment, hosted verification or PR/
+cross-review. GitHub queries returned only old unrelated main CI failure
+23703104075 and an empty deployment list; local evidence is not remote CI.
+Next: existing Decision Queue question projection and authenticated input/activity
+routes, shared daemon hook, then remaining deterministic executors and exact
+approval integration. Account-level evidence budgets, model steps, provenance,
+outcomes, starter end-to-end coverage and rollout remain open. Execution flags
+remain off; no user/provider action or live timer delivery was enabled.
+Documentation commits follow the frozen source; no worktree was deleted.
+
+Dedicated disposable container omnyid-runbook-wed375-pg stopped after verification.

@@ -33,8 +33,8 @@ only the typed definition and its revision reference, with no storage keys or
 provider credentials. Responses are no-store. No frontend control or first-run
 screen is wired yet; the setup endpoint copies the user's selected starters.
 
-The frozen policy source candidate is `5c539bbc2fcdad46f539824eb581588e15e481ca`.
-All 25 focused integration tests and the library build completed in the clean exact-SHA worktree
+The frozen control-flow source candidate is `fc20e2f156bdbfd34d1b8bddfa67ec4c74b405d9`.
+All 30 focused integration tests and the library build completed in the clean exact-SHA worktree
 `C:/temp/wt/omnyid-runbooks-verify-43d7c830` using Rust 1.95, two jobs,
 16 package codegen units, incremental compilation off and package debug info
 disabled. The project toolchain pin is unchanged; see the final handoff evidence.
@@ -58,7 +58,7 @@ It does not grant tool authority or wire live ingress.
 
 Stages 4–17 remain open except for checked items below. Complete adapters,
 remaining step-kind execution, bounded evidence, approval emission/resume integration,
-retries/cooldowns, model budgets, timer delivery/resume, outcomes, activity/A2UI
+retries/cooldowns, model budgets, daemon timer integration, outcomes, activity/A2UI
 and rollout remain unfinished. No live ingress, scheduler or daemon hook is
 connected. The management API cannot start execution.
 
@@ -100,7 +100,7 @@ Regression inventory (recorded, not a claim that all suites ran this turn):
 | Approval cards | `src/server/approval_surfaces.rs::tests` |
 | Erasure | `tests/runbook_storage_postgres.rs`, `tests/runbook_runtime_postgres.rs`, `tests/runbook_evidence_postgres.rs` exercise `Db::delete_user_account_and_data`; private tenant persistence is also covered in `src/db/tenant_roundtrip.rs` |
 
-The current change ran the four runbook integration targets (20 tests), not
+The latest batch ran seven runbook integration targets (30 tests), not
 all listed legacy unit suites. Later integrations must run the affected suites
 from a clean frozen worktree. A filtered unit-suite command is
 `cargo +1.95.0 test --lib <module_name>::tests` with the documented test-profile
@@ -252,12 +252,23 @@ Depends on: 6–8
 
 Depends on: 6, 7
 
-- [ ] Detect required facts missing from the bounded evidence packet.
-- [ ] Emit one `epistemic_escalation` with what is missing, what was tried, why it matters, an exact question, answer schema, and expiry.
+- [x] Detect required facts missing from the bounded evidence packet.
+- [x] Emit one `epistemic_escalation` with what is missing, what was tried, why it matters, an exact question, answer schema, and expiry.
 - [ ] Project through the existing Decision Queue/A2UI input card rather than a new modal system.
-- [ ] Resume only from a typed `runbook_input_supplied` AFP event linked to the open escalation.
-- [ ] Reject wrong user, wrong instance, duplicate answer, invalid schema, late answer, and terminal instance.
-- [ ] Add missing-info, resume, timeout, malformed answer, and user-isolation tests.
+- [x] Resume only from a typed `runbook_input_supplied` AFP event linked to the open escalation.
+- [x] Reject wrong user, wrong instance, duplicate answer, invalid schema, late answer, and terminal instance.
+- [x] Add missing-info, resume, timeout, malformed answer, and user-isolation tests.
+
+Epistemic implementation checkpoint: the internal `request_missing_input` API
+compares frozen step requirements against the saved bounded evidence packet.
+One encrypted question is stored per owner/instance/step, with exact missing
+fields, attempted refs, reason, question, scalar schema and bounded expiry.
+`supply_input` atomically persists a typed `runbook_input_supplied` event, an
+Answered successor and a Running revision at the same paused step. Exact field
+sets and schemas are required; foreign, duplicate, stale, late and terminal
+answers fail closed. Answers remain attributed data exposed by `supplied_inputs`,
+never authority. Expiry/cancellation append successors and cannot reopen state.
+The Decision Queue/A2UI adapter and end-to-end executor wiring remain open.
 
 ## 11. Bounded model steps and cost controls
 
@@ -276,12 +287,25 @@ Depends on: 7–10
 
 Depends on: 4, 6, 9
 
-- [ ] Represent waits and scheduled follow-ups as AFP events with due time, cancellation key, causation, instance, and source refs.
+- [x] Represent waits and scheduled follow-ups as AFP events with due time, cancellation key, causation, instance, and source refs.
 - [ ] Reuse the existing daemon/Watcher wake-up path rather than starting one scheduler per runbook.
-- [ ] Enforce the definition's declared `follow_up_events` list before writing.
-- [ ] Make delivery and resume idempotent; repeated daemon scans must not duplicate a step.
-- [ ] Resolve cancel/reschedule by successor events, preserving the original schedule.
-- [ ] Add due, not-due, cancel, reschedule, duplicate scan, undeclared event, and account-deletion tests.
+- [x] Enforce the definition's declared `follow_up_events` list before writing.
+- [x] Make delivery and resume idempotent; repeated daemon scans must not duplicate a step.
+- [x] Resolve cancel/reschedule by successor events, preserving the original schedule.
+- [x] Add due, not-due, cancel, reschedule, duplicate scan, undeclared event, and account-deletion tests.
+
+Scheduling implementation checkpoint: `wait`/`schedule_wait` persist an
+append-only encrypted `runbook_schedule` with due time, expiry, cancellation
+key, instance/step, source refs and causation. Creation, rescheduling and delivery
+intersect frozen and latest declared event types. `due_schedules` returns bounded
+hints for the future shared daemon hook; it starts no independent timers.
+`deliver_follow_up` rechecks state and time under the owner lock, then atomically
+appends one `runbook_follow_up`, completed Wait trace and next instance revision.
+Exact delivery retries return the original receipt; stale scans cannot resume a
+rescheduled or cancelled wait. Cancellation, expiry and rescheduling preserve
+original AFP records and append successors. Tests cover due/not-due, concurrency,
+revocation, stale rescheduling, timeout, encrypted storage and account erasure.
+The existing daemon/Watcher hook remains unchecked and no live delivery is enabled.
 
 ## 13. Provenance and outcome memory
 

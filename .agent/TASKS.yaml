@@ -22,12 +22,12 @@ tasks:
     branch: agent/codex/WED-375
     worktree: C:/temp/wt/omnyid-runbooks
     base_sha: 5536b83b2f9d2f58488a075f383c24f8f4f73d6c
-    candidate_sha: 5c539bbc2fcdad46f539824eb581588e15e481ca
+    candidate_sha: fc20e2f156bdbfd34d1b8bddfa67ec4c74b405d9
     verification_worktree: C:/temp/wt/omnyid-runbooks-verify-43d7c830
     depends_on: [WED-308, WED-374]
     files: [src/runbook*.rs, src/lib.rs, src/db.rs, src/server/runbook_routes.rs, src/server/mod.rs, tests/runbook*, Documents/design/runbooks/**, .agent/**]
     acceptance: [Strict bounded contracts and terminal-safe transitions, immutable starter definitions and owner-scoped AFP projection, deterministic typed matching with stable dedupe and owner-bound keys, focused adversarial tests and clean-commit Rust build, execution remains disconnected until ledger transactions and authority integration are complete]
-    progress: "Current batch: stage 10 items 1,2,4,5,6 (bounded missing-fact detection, one durable question, typed answer resume, rejection boundaries and tests); stage 12 items 1,3,4,5,6 (AFP schedules, declared types, idempotent delivery/resume, successor cancellation/reschedule and tests). UI projection and daemon wake-up hook explicitly remain open. Previous verified source 5c539bbc2fcdad46f539824eb581588e15e481ca; baseline checklist 44 complete, 73 unchecked. Work confined to runbook modules/tests and coordination docs; no deployment."
+    progress: "Completed ten more items: stage 10 items 1,2,4,5,6 (bounded missing-fact detection, durable questions, typed answer resume, rejection boundaries and tests) and stage 12 items 1,3,4,5,6 (AFP schedules, declared types, idempotent delivery/resume, successor cancellation/rescheduling and tests). Source fc20e2f156bdbfd34d1b8bddfa67ec4c74b405d9 completed all 30 focused tests and library build from the clean verification worktree with Rust 1.95. Checklist 54 complete, 63 remaining of 117. UI question projection and shared-daemon hook remain open; no live ingress, external tools, PR or deployment. Other executor, approval, account-budget, model, provenance, UI and rollout tasks remain."
   - id: WED-374
     title: Restore Wedding Sprout rollout, complete projected databases, persona artwork, exports and planner-card affordances
     status: in_progress
