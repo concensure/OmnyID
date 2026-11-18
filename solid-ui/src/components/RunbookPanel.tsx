@@ -91,12 +91,12 @@ export function RunbookPanel(props: { mode?: "manage" | "questions" | "activity"
     link.href = url; link.download = `runbook-${d.runbook_id}.json`; link.click(); URL.revokeObjectURL(url);
   }
   const visibleActivities = () => props.mode === "questions"
-    ? activities().filter(a => openRunbookQuestions(a).length > 0) : activities();
+    ? activities().filter(a => openRunbookQuestions(a).length > 0 || (a.reviews?.length ?? 0) > 0) : activities();
   return <Show when={available()}>
     <section aria-labelledby={uid} class="min-w-0 space-y-3 rounded-2xl border border-slate-300 bg-slate-50 p-3 text-slate-900">
       <div class="flex min-w-0 flex-wrap items-center justify-between gap-2">
         <h2 id={uid} ref={heading} tabIndex={-1} class="break-words text-lg font-semibold">
-          {props.mode === "questions" ? "Runbook questions" : "Runbooks"}
+          {props.mode === "questions" ? "Runbook questions and reviews" : "Runbooks"}
         </h2>
         <button type="button" class={buttonClass} disabled={loading() || busy()} onClick={() => void load()}>Refresh runbooks</button>
       </div>
@@ -142,8 +142,8 @@ export function RunbookPanel(props: { mode?: "manage" | "questions" | "activity"
         </article>}</For>
       </Show>
       <Show when={!loading() && !error() && !visibleActivities().length}>
-        <EmptyState title={props.mode === "questions" ? "No open runbook questions" : "No runbook activity yet"}
-          body={props.mode === "questions" ? "Questions appear here when a run needs a fact from you." : "Matched events and waiting steps will appear here."} />
+        <EmptyState title={props.mode === "questions" ? "No runbook questions or reviews" : "No runbook activity yet"}
+          body={props.mode === "questions" ? "Questions and completed findings appear here when a run needs your attention." : "Matched events and waiting steps will appear here."} />
       </Show>
       <For each={visibleActivities()}>{a => <article class="min-w-0 space-y-3 rounded-xl border border-slate-300 bg-white p-3">
         <h3 class="break-words font-semibold">{a.instance.runbook_id.replaceAll("_", " ")}</h3>
@@ -153,6 +153,14 @@ export function RunbookPanel(props: { mode?: "manage" | "questions" | "activity"
           <RunbookQuestionCard activity={a} question={q} busy={busy() || loading() || !!error()}
             onAnswer={payload => act(() => apiFetch(`/runbooks/instances/${encodeURIComponent(a.instance.instance_id)}/answers`, { method: "POST", bodyJson: payload }), "Answer saved to this step.")} />
         }</For>
+        <For each={a.reviews ?? []}>{review => <section class="min-w-0 space-y-2 rounded-lg border border-slate-300 bg-slate-50 p-3" aria-label={review.title}>
+          <h4 class="break-words font-semibold">{review.title}</h4>
+          <ul class="list-disc space-y-1 pl-5 text-sm"><For each={review.summary_lines}>{line => <li class="break-words">{line}</li>}</For></ul>
+          <p class="text-sm">These are saved findings. No external action was taken.</p>
+          <details><summary class="min-h-11 cursor-pointer py-2 text-sm">Review sources</summary>
+            <ul class="space-y-1 text-sm"><For each={review.source_refs}>{ref => <li class="break-all">{ref}</li>}</For></ul>
+          </details>
+        </section>}</For>
         <Show when={props.mode !== "questions"}>
           <details class="min-w-0"><summary class="min-h-11 cursor-pointer py-2">Step history and evidence</summary>
             <ol class="space-y-3 border-l border-slate-300 pl-3"><For each={a.traces}>{t =>

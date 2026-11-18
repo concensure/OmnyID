@@ -96,7 +96,7 @@ fn suggestion(
         action_label: "Review findings".into(),
         description: "Review these sourced findings before deciding what to do.".into(),
         title: Some(title.into()),
-        destination_view: Some("decisions".into()),
+        destination_view: Some("decision_queue".into()),
         artifact_summary_lines: lines,
         source_count: Some(source_refs.len() as u32),
         source_refs,
@@ -314,7 +314,7 @@ pub(crate) fn validate_suggestion(owner: &str, value: &Value) -> Result<()> {
             )]
         || content.source_count != Some(1)
         || content.artifact_summary_lines.len() > 8
-        || content.destination_view.as_deref() != Some("decisions")
+        || content.destination_view.as_deref() != Some("decision_queue")
     {
         return Err("invalid_review");
     }

@@ -217,6 +217,12 @@ async fn unchanged_review_starters_emit_private_suggestions_and_complete_once() 
         assert!(!review.to_string().contains("secret-marker"));
         assert!(!review.to_string().contains("send without approval"));
         assert_eq!(review["parent_id"], receipt.transform_ref);
+        assert_eq!(review["content"]["destination_view"], "decision_queue");
+        let activity = runtime.activity(&owner.id, id).await.unwrap();
+        assert_eq!(activity["reviews"].as_array().unwrap().len(), 1);
+        assert_eq!(activity["reviews"][0]["id"], receipt.suggestion_ref);
+        assert!(!activity.to_string().contains("secret-marker"));
+        assert!(runtime.activity(&other.id, id).await.is_err());
         let completed = runtime.complete(&owner.id, id, 5).await.unwrap();
         assert_eq!(completed.status, TraceStatus::Completed);
         assert_eq!(

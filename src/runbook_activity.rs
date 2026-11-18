@@ -98,11 +98,46 @@ impl RunbookRuntime<'_, '_> {
                 questions.insert(e.escalation_id.clone(), e);
             }
         }
+        let mut reviews = vec![];
+        for value in self
+            .store
+            .read_kind(owner, "runbook_emission", None, Some(&thread), tx)
+            .await?
+        {
+            let receipt = crate::runbook_emit::validate_receipt(owner, &value)?;
+            if receipt.instance_id != id {
+                return Err("review_instance_mismatch");
+            }
+            let suggestion = self
+                .store
+                .read_kind(
+                    owner,
+                    "proactive_suggestion",
+                    Some(&receipt.suggestion_ref),
+                    None,
+                    tx,
+                )
+                .await?
+                .pop()
+                .ok_or("review_required")?;
+            crate::runbook_emit::validate_suggestion(owner, &suggestion)?;
+            if receipt.trace.output_hash.as_deref()
+                != Some(crate::runbook_store::digest(&suggestion["content"]).as_str())
+            {
+                return Err("review_hash_mismatch");
+            }
+            reviews.push(json!({"id":receipt.suggestion_ref,"trace_id":receipt.trace.trace_id,
+                "title":suggestion["content"]["title"],"summary_lines":suggestion["content"]["artifact_summary_lines"],
+                "source_refs":suggestion["content"]["source_refs"]}));
+            if reviews.len() > MAX_STEPS {
+                return Err("review_limit");
+            }
+        }
         let i = current.instance;
         let mut result = json!({"instance":{"instance_id":i.instance_id,"runbook_id":i.runbook_id,"runbook_version":i.runbook_version,
             "status":i.status,"revision":i.revision,"current_step_id":i.current_step_id,"completed_step_ids":i.completed_step_ids,
             "next_follow_up_at":i.next_follow_up_at,"wait_expires_at":i.wait_expires_at},
-            "traces":traces,"questions":questions.into_values().collect::<Vec<_>>(),"execution_available":false});
+            "reviews":reviews,"traces":traces,"questions":questions.into_values().collect::<Vec<_>>(),"execution_available":false});
         result["views"] = activity_views(&result);
         Ok(result)
     }
