@@ -292,7 +292,7 @@ account deletion also removes those owner settings, which lack foreign keys.
 Depends on: 6–8
 
 - [ ] Implement `read`, `transform`, `tool`, `emit`, `wait`, `approval`, and `complete` steps without an LLM.
-- [ ] Validate tool input/output schemas and reject unknown fields.
+- [x] Validate tool input/output schemas and reject unknown fields. (Bounded closed contracts, exact canonical grant preparation and structured-result validation; six schema and four PostgreSQL boundary tests. External dispatch remains separate.)
 - [ ] Reuse existing capability/tool dispatch and AFP result persistence.
 - [x] Check success criteria deterministically before completing an instance.
 - [ ] Store each meaningful step as `runbook_step_trace` with input/output refs and provenance.
@@ -706,3 +706,20 @@ Six isolated schema tests pass against the candidate source. Full Cargo checks
 and tests crash inside Windows rustc, also reproduced on the prior verified
 candidate. Selection tests and full build verification remain incomplete. No
 parent checklist entry is closed: **98 complete / 19 remaining of 117**.
+
+
+## Canonical tool preparation — 2026-11-19
+
+Four bounded prerequisites are implemented: credential-free canonical registry
+projection; exact owner/account/schema snapshot binding; live snapshot
+revalidation; and adversarial PostgreSQL coverage. These complete the schema
+validation parent item together with the prior contract work, not four parent
+items: **99 complete / 18 remaining of 117**.
+
+Frozen candidate: `9c9eda70785c8a53098ef70f327c1d4d01073f49`. All 84 tests across
+19 integration binaries passed on Linux Rust 1.94.1 with global test debug
+information disabled. This includes the previous batch's six schema tests and
+four new canonical registry tests. See the latest canonical handoff for build
+evidence and environment limitations. Preparation calls no providers; the
+legacy dispatcher registry remains empty. Durable approved dispatch, AFP result
+persistence, transport bounds and crash reconciliation are still required.

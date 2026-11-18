@@ -3,7 +3,8 @@
 Implementation task: WED-375. This is validated preparation, not execution authority.
 
 The existing tool dispatcher now exposes `prepare_runbook_tool`. It loads the
-existing owner registry and selects exactly one tool slug and capability. It
+owner-scoped connection and canonical capability grant in one database snapshot,
+then selects exactly one tool slug and capability. It
 never infers a capability from task text, calls a provider, or charges usage.
 No prepared value may substitute for a policy decision or action approval.
 
@@ -48,15 +49,27 @@ Validation does not establish that a provider ran, that a side effect succeeded,
 or that the runbook's success criterion passed. Future runtime integration must
 persist authenticated AFP receipts, check success criteria and bind provenance.
 
-## Unresolved prerequisite
+## Canonical preparation and revalidation
 
-`Db::list_tool_execution_registry` currently returns an empty list (introduced
-in commit 02faaf6fb). Consequently production preparation rejects all selections.
-It does not silently fall back to MCP connection rows, natural-language dispatch,
-or model-supplied tool names. Restore the canonical registry with explicit owner,
-account, capability health/revocation, approval and credential handling before
-connecting execution. Restoration also changes non-runbook callers and needs
-regression coverage for their authority boundaries.
+Preparation reads no credential values. A connection must match exactly one
+healthy, unrevoked canonical grant for the owner, tool, capability, transport
+and secret pointer. Suggestion-only grants are rejected. Direct MCP connections
+must not carry broker account fields; Composio requires the exact owner actor
+and a bounded account identifier. Ambiguous grants fail closed, including a
+second grant for a different account. The projected endpoint, provider and
+selected contract must match the current connection descriptor.
+
+The v2 request hash additionally binds connection/grant identities and epochs,
+provider account, approval mode and scopes. `revalidate_runbook_tool` reloads
+current state and rejects a different owner or changed snapshot. This is not an
+atomic dispatch reservation: a future executor must recheck live authority at
+its transaction/dispatch boundary. Credential rotation does not yet have an
+independent revision counter and must not be inferred solely from timestamps.
+
+The generic `Db::list_tool_execution_registry` remains an empty stub. This
+preparation-only projection does not enable its non-runbook callers or any
+provider execution. Adversarial PostgreSQL tests cover these boundaries and
+verify that preparation makes no connection to a local provider listener.
 
 The remaining execution work must bind exact action approval, freeze/reserve an
 attempt before any provider call, recheck current registry/policy, bound timeout

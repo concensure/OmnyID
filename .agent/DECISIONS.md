@@ -1,3 +1,15 @@
+## 2026-11-19: WED-375 canonical grant snapshot is preparation only
+
+Use one owner-scoped query joining the MCP connection and canonical capability
+grant for runbook preparation. Never select credential values. Require exact
+account/provider/descriptor projection, healthy unrevoked grants and a supported
+approval mode; reject ambiguity rather than selecting an account implicitly.
+Bind current connection/grant identities, epochs, scopes, approval mode, account,
+selected contract and arguments in the v2 request hash. Revalidation reloads
+current authority but is not an atomic execution reservation or an approval.
+The generic empty execution registry stays unchanged. No runtime/provider path
+is enabled. Durable approved dispatch and authenticated AFP results remain open.
+
 ## 2026-11-19: WED-375 exact tool preparation and closed contracts
 
 Tool preparation belongs inside the existing dispatcher. It selects one exact

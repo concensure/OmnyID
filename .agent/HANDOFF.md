@@ -1,3 +1,62 @@
+## 2026-11-19: WED-375 four canonical tool prerequisites verified
+
+Implementation: `C:/temp/wt/omnyid-runbooks`, branch `agent/codex/WED-375`.
+Frozen source: `9c9eda70785c8a53098ef70f327c1d4d01073f49`.
+Verification checkout: `C:/temp/wt/omnyid-runbooks-verify-43d7c830`, clean detached
+at that exact source. Documentation commits after it do not change this candidate.
+This supersedes the previous batch's full-verification blocker for this source.
+
+Four bounded subtasks: credential-free canonical grant projection; exact
+owner/account/schema snapshot binding; current-state preparation revalidation;
+PostgreSQL adversarial coverage. Together with the prior schema work this closes
+ONE parent checklist entry: **99 complete / 18 remaining of 117**.
+
+Changed: src/tool_dispatch/runbook_registry.rs (new), runbook_contract.rs,
+tool_dispatch.rs module declaration, tests/runbook_tool_registry_postgres.rs
+(new), canonical task/decision/handoff notes and runbook design docs. No runtime
+executor, migration, dependency, frontend, sitemap or deployment config changed.
+
+The preparation-only query requires a matching MCP connection AND canonical
+owner grant. It rejects revoked/unhealthy/suggestion-only grants, ambiguous
+accounts, wrong credential pointers, mismatched provider actors and stale schema
+projections. Credentials are never selected. The request hash binds the exact
+account, grant, connection, scopes, approval mode, contract and arguments.
+Revalidation reloads current state; it is not atomic execution authority. A
+future executor must recheck live policy and reserve an exact approved attempt.
+The generic execution registry remains empty and external execution disabled.
+
+Local verification, after printing root, full SHA and clean status:
+- 84 tests passed in 19 Rust integration binaries, exit 0. Includes all 17 prior
+  runbook binaries, six tool-schema tests and four new PostgreSQL registry tests.
+  PostgreSQL ran in disposable omnyid-runbook-wed375-pg; test networking shared
+  that container, never production. A local listener assertion verifies no
+  provider connection during preparation.
+- Standalone cargo build --lib completed, exit 0 (42.28s).
+- Linux Rust 1.94.1 in omnyid-wed318-builder-test:a42db33, image identity
+  sha256:21fe7471679891c3a083d0c167ee660873a8be66223ad205dd05405164c1f0fa.
+  Source mounted read-only. -j1, incremental off, RUST_MIN_STACK=134217728;
+  profile.test.debug=0 / profile.dev.debug=0 and root package codegen-units=64.
+  Existing cargo cache volumes reused; no production images were built.
+- Evidence: C:/temp/wt/runbook-9c9eda70-linux-tests.log and .exit;
+  C:/temp/wt/runbook-9c9eda70-linux-build.log and .exit.
+- Global line-budget still fails only the unchanged server/mod.rs 45734/45717
+  and db.rs 18045/17986 overages. git diff --check completed.
+- Windows Rust 1.94.0 also reproduced the prior 1.95 access violation. The first
+  Linux attempt hit an LLVM debug-info backtrace in Tokio; global debug=0
+  avoided that failure. This verifies the Linux candidate, not a Windows fix.
+- GitHub run/deployment queries returned no records. Configured remote lineage
+  remains unsuitable for pushing this task; no push/PR/CI record was created.
+
+No deployment or real provider calls occurred. Disposable verification container
+removed automatically; database stopped after checks. Other agents' primary and
+SEO worktrees were not changed. No production health assertion is made.
+
+Next: durable exact-action approved dispatch and authenticated AFP tool results,
+with transport bounds, live policy checks, atomic reservation and crash/unknown
+outcome reconciliation. Do not use private-review approval as tool authority.
+Credential rotation still lacks a separate revision counter; revalidation must
+not be treated as a durable authorization grant. Broader rollout stays gated.
+
 ## 2026-11-19: WED-375 tool contracts implemented; full verification blocked
 
 Implementation: `C:/temp/wt/omnyid-runbooks`, branch `agent/codex/WED-375`.
