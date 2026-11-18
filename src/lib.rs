@@ -102,6 +102,7 @@ pub mod runbook_privacy;
 pub mod runbook_provenance;
 pub mod runbook_outcome;
 pub mod runbook_retention;
+mod runbook_quote;
 pub mod runbook_transform;
 pub mod runbook_transform_runtime;
 pub mod runbook_activity;

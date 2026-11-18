@@ -183,3 +183,77 @@ fn inactive_branches_still_require_typed_boolean_facts() {
         );
     }
 }
+
+#[test]
+fn stored_quote_review_requires_exact_valid_frozen_evidence() {
+    let quote: Value = serde_json::from_str(include_str!("runbook_quote_fixture.json")).unwrap();
+    let mut evidence = packet(
+        json!({"normalised_quote_ref":"message:quote", "wedding_date":"2027-03-20", "quotation":quote}),
+    );
+    let step = step("vendor_quote_received");
+    let answers = BTreeMap::new();
+    assert_eq!(
+        review(&step, &evidence, &answers).unwrap_err(),
+        "quote_evidence_required"
+    );
+    evidence.included.push(EvidenceItem {
+        reference: "message:quote".into(),
+        content: json!({"quotation":quote}),
+        hash: "c".repeat(64),
+        relevance: 1.0,
+    });
+    let result = review(&step, &evidence, &answers).unwrap();
+    assert_eq!(result.conclusions["line_count"], 1);
+    assert_eq!(result.conclusions["unconfirmed_fact_count"], 2);
+    assert_eq!(result.conclusions["booking_authorized"], false);
+    assert_eq!(result.conclusions["availability_confirmed"], false);
+    assert_eq!(result.conclusions["valid_until"], Value::Null);
+    assert!(!result.facts.contains_key("quotation"));
+    assert_eq!(result, review(&step, &evidence, &answers).unwrap());
+    let original = evidence.clone();
+    evidence.included.push(evidence.included[1].clone());
+    assert_eq!(
+        review(&step, &evidence, &answers).unwrap_err(),
+        "ambiguous_quote_evidence"
+    );
+    for (field, value, error) in [
+        (
+            "schema_version",
+            json!("invented.v1"),
+            "invalid_normalised_quote",
+        ),
+        ("currency", json!("aud"), "invalid_normalised_quote"),
+        ("valid_until", json!("sometime"), "invalid_quote_validity"),
+    ] {
+        let mut bad = original.clone();
+        bad.included[1].content["quotation"][field] = value;
+        assert_eq!(review(&step, &bad, &answers).unwrap_err(), error);
+    }
+    let mut bad = original.clone();
+    bad.included[1].content["quotation"]["identity"]["context_namespace"] = json!("other_planner");
+    assert_eq!(
+        review(&step, &bad, &answers).unwrap_err(),
+        "invalid_normalised_quote"
+    );
+    for date in ["2027-02-30", "2027-3-2", "2027-03-20T00:00:00Z"] {
+        let mut bad = original.clone();
+        bad.included[0].content["wedding_date"] = json!(date);
+        assert_eq!(
+            review(&step, &bad, &answers).unwrap_err(),
+            "invalid_wedding_date"
+        );
+    }
+    let mut changed = original.clone();
+    changed.included[1].content["quotation"]["line_items"][0]["unit_price"]["amount_minor"] =
+        json!(20000);
+    assert_ne!(
+        result.conclusions["material_fingerprint"],
+        review(&step, &changed, &answers).unwrap().conclusions["material_fingerprint"]
+    );
+    let mut oversized = original;
+    oversized.included[1].content["quotation"]["extra"] = json!("x".repeat(32768));
+    assert_eq!(
+        review(&step, &oversized, &answers).unwrap_err(),
+        "quote_input_too_large"
+    );
+}

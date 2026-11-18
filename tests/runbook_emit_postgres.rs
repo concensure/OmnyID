@@ -59,6 +59,10 @@ async fn unchanged_review_starters_emit_private_suggestions_and_complete_once() 
     let runtime = RunbookRuntime::new(&store);
     let cases = [
         (
+            "vendor_quote_received",
+            json!({"normalised_quote_ref":"message:placeholder", "wedding_date":"2027-03-20"}),
+        ),
+        (
             "budget_threshold",
             json!({"commitments":[{"reference":"commitment:one","category":"venue","amount_minor":11000,"currency":"AUD"}],"category_target":{"venue":{"amount_minor":10000,"currency":"AUD"}},"total_budget":{"amount_minor":10000,"currency":"AUD"}}),
         ),
@@ -79,6 +83,15 @@ async fn unchanged_review_starters_emit_private_suggestions_and_complete_once() 
         d.enabled = true;
         let saved = store.save(&owner.id, None, d.clone()).await.unwrap();
         let event = Ulid::new().to_string();
+        if name == "vendor_quote_received" {
+            let quote: Value =
+                serde_json::from_str(include_str!("runbook_quote_fixture.json")).unwrap();
+            let quote_id = Ulid::new().to_string();
+            db.insert_daemon_afp_message(&json!({"protocol":"afp-v1","id":quote_id,"type":"ledger","subtype":"quotation_normalisation_confirmed","to":[owner.id],"thread_id":"review:test","timestamp":Utc::now().to_rfc3339(),"content":{"quotation":quote}})).await.unwrap();
+            facts["normalised_quote_ref"] = json!(format!("message:{quote_id}"));
+            facts["source_refs"] = json!([format!("message:{quote_id}")]);
+        }
+
         facts["event_type"] = json!(d.trigger.event_types[0]);
         facts["event_at"] = json!(Utc::now().to_rfc3339());
         facts["confidence"] = json!(0.9);

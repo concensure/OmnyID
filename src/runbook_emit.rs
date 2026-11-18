@@ -50,6 +50,21 @@ fn suggestion(
                 "No spending has been authorised.".into(),
             ],
         ),
+        ReviewStoredQuote => (
+            "Review stored vendor quote",
+            vec![
+                format!(
+                    "Recorded quote lifecycle: {}.",
+                    c["lifecycle"].as_str().unwrap_or("")
+                ),
+                format!(
+                    "Line items: {}. Facts needing evidence review: {}.",
+                    c["line_count"], c["unconfirmed_fact_count"]
+                ),
+                "Review the saved quote and its source evidence before deciding.".into(),
+                "Availability, booking and payment have not been authorised.".into(),
+            ],
+        ),
         ReviewTaskDependencies => (
             "Review task dependencies",
             vec![

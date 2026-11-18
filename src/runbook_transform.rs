@@ -26,6 +26,7 @@ impl std::fmt::Debug for TransformReview {
 pub fn reviewed_fields(op: TransformOperation) -> Result<&'static [&'static str]> {
     use TransformOperation::*;
     Ok(match op {
+        ReviewStoredQuote => &["normalised_quote_ref", "wedding_date"],
         CheckThreadReply => &["last_outbound_ref", "reply_status", "cooldown"],
         CalculateBudgetExposure => &["commitments", "category_target", "total_budget"],
         ReviewTaskDependencies => &["task_ref", "task_owner", "dependencies"],
@@ -103,6 +104,7 @@ pub fn review(
             let cooldown = boolean("cooldown")?;
             json!({"review_needed":status=="pending"&&!cooldown,"send_authorized":false})
         }
+        ReviewStoredQuote => crate::runbook_quote::review_quote(&facts, packet)?,
         CalculateBudgetExposure => budget_exposure(&facts)?,
         ReviewTaskDependencies => {
             reference("task_ref")?;
