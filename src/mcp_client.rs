@@ -8,6 +8,8 @@
 
 use serde_json::{Value, json};
 
+pub mod bounded;
+
 /// Reject non-HTTPS (and non-localhost HTTP) MCP server URLs to prevent SSRF.
 ///
 /// User-supplied `mcp_server_url` values are stored in the DB and passed here

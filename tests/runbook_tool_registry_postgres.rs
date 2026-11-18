@@ -3,11 +3,11 @@ use chrono::Utc;
 use omnyid_homeserver::{
     db::{Db, McpToolConnectionUpsert, UserConnectedCapabilityRecord, UserRecord},
     tool_dispatch::{
-        runbook_contract::{prepare_runbook_tool, revalidate_runbook_tool},
         ToolDispatchContext,
+        runbook_contract::{prepare_runbook_tool, revalidate_runbook_tool},
     },
 };
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use ulid::Ulid;
 
 async fn database() -> Db {
@@ -122,24 +122,31 @@ async fn exact_preparation_requires_owner_registry_and_never_enables_dispatch() 
         ("read", json!({"limit":0,"send":true})),
         ("read", json!({"limit":"0"})),
     ] {
-        assert!(prepare_runbook_tool(&ctx, "mail", cap, input)
-            .await
-            .is_err());
+        assert!(
+            prepare_runbook_tool(&ctx, "mail", cap, input)
+                .await
+                .is_err()
+        );
     }
     first
         .validate_result(&json!({"structuredContent":{"limit":0}}))
         .unwrap();
-    assert!(first
-        .validate_result(&json!({"structuredContent":{"limit":0,"extra":true}}))
-        .is_err());
-    assert!(first
-        .validate_result(&json!({"structuredContent":{"limit":0},"isError":true}))
-        .is_err());
-    assert!(db
-        .list_tool_execution_registry(&alice.id)
-        .await
-        .unwrap()
-        .is_empty());
+    assert!(
+        first
+            .validate_result(&json!({"structuredContent":{"limit":0,"extra":true}}))
+            .is_err()
+    );
+    assert!(
+        first
+            .validate_result(&json!({"structuredContent":{"limit":0},"isError":true}))
+            .is_err()
+    );
+    assert!(
+        db.list_tool_execution_registry(&alice.id)
+            .await
+            .unwrap()
+            .is_empty()
+    );
     assert!(
         tokio::time::timeout(std::time::Duration::from_millis(50), listener.accept())
             .await
@@ -256,8 +263,8 @@ async fn schemas_scopes_and_grant_replacement_invalidate_prepared_requests() {
         .await
         .unwrap();
     let mut conn = connection(&owner.id, endpoint);
-    conn.tool_descriptor.as_mut().unwrap()["runbook_contracts"]["read"]["input_schema"]
-        ["properties"]["limit"]["maximum"] = json!(4);
+    conn.tool_descriptor.as_mut().unwrap()["runbook_contracts"]["read"]["input_schema"]["properties"]
+        ["limit"]["maximum"] = json!(4);
     db.upsert_mcp_tool_connection(&conn).await.unwrap();
     assert!(
         prepare_runbook_tool(&ctx, "mail", "read", json!({"limit":1}))
@@ -339,4 +346,66 @@ async fn provider_identity_ambiguity_and_cross_account_binding_are_enforced() {
     );
     erase(&db, &owner).await;
     erase(&db, &other).await;
+}
+
+#[tokio::test]
+async fn correlated_transport_receipt_still_requires_frozen_output_schema() {
+    use omnyid_homeserver::mcp_client::bounded::{CallLimits, CallOutcome, call_tool};
+    let db = database().await;
+    let owner = user(&db).await;
+    for (result, valid) in [
+        (json!({"structuredContent":{"limit":0}}), true),
+        (json!({"structuredContent":{"limit":"0"}}), false),
+        (json!({"structuredContent":{"limit":0,"extra":true}}), false),
+        (
+            json!({"structuredContent":{"limit":0},"isError":true}),
+            false,
+        ),
+    ] {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let endpoint = format!("http://{}/", listener.local_addr().unwrap());
+        install(&db, &owner.id, &endpoint).await;
+        let ctx = ToolDispatchContext {
+            user_id: &owner.id,
+            db: &db,
+        };
+        let prepared = prepare_runbook_tool(&ctx, "mail", "read", json!({"limit":0}))
+            .await
+            .unwrap();
+        let app = axum::Router::new().route(
+            "/",
+            axum::routing::post(move |axum::Json(request): axum::Json<Value>| async move {
+                axum::Json(json!({"jsonrpc":"2.0","id":request["id"],"result":result}))
+            }),
+        );
+        let server = tokio::spawn(async move {
+            axum::serve(listener, app).await.unwrap();
+        });
+        let receipt = call_tool(
+            &endpoint,
+            None,
+            "read",
+            prepared.arguments(),
+            CallLimits::default(),
+        )
+        .await
+        .unwrap();
+        let validated = prepared.validate_response(&receipt);
+        if valid {
+            assert_eq!(validated.unwrap(), &json!({"limit":0}));
+        } else {
+            let err = validated.unwrap_err();
+            assert_eq!(err.code, "tool_output_schema_failed");
+            assert_eq!(err.outcome, CallOutcome::Unknown);
+        }
+        let different = prepare_runbook_tool(&ctx, "mail", "read", json!({"limit":1}))
+            .await
+            .unwrap();
+        assert_eq!(
+            different.validate_response(&receipt).unwrap_err().code,
+            "tool_response_request_mismatch"
+        );
+        server.abort();
+    }
+    erase(&db, &owner).await;
 }

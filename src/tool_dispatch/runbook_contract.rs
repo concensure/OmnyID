@@ -2,7 +2,7 @@
 //! This is not a grant or an executor: no network request or usage charge occurs.
 use super::ToolDispatchContext;
 use crate::{runbook_contract::Result, runbook_store::digest, runbook_tool_schema::ToolContract};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 // Deliberately neither Debug nor Serialize: arguments may contain private data.
 pub struct PreparedRunbookTool {
@@ -11,6 +11,7 @@ pub struct PreparedRunbookTool {
     capability: String,
     arguments: Value,
     request_hash: String,
+    transport_binding: String,
     contract: ToolContract,
 }
 impl PreparedRunbookTool {
@@ -29,6 +30,25 @@ impl PreparedRunbookTool {
     pub fn request_hash(&self) -> &str {
         &self.request_hash
     }
+    /// Validate a correlated transport receipt against this frozen output schema.
+    /// Schema rejection after a call is still an unknown side-effect outcome.
+    pub fn validate_response<'a>(
+        &self,
+        response: &'a crate::mcp_client::bounded::CallResponse,
+    ) -> std::result::Result<&'a Value, crate::mcp_client::bounded::CallFailure> {
+        if self.transport_binding != response.request_binding {
+            return Err(crate::mcp_client::bounded::CallFailure {
+                code: "tool_response_request_mismatch",
+                outcome: crate::mcp_client::bounded::CallOutcome::Unknown,
+            });
+        }
+        self.validate_result(response.result()).map_err(|_| {
+            crate::mcp_client::bounded::CallFailure {
+                code: "tool_output_schema_failed",
+                outcome: crate::mcp_client::bounded::CallOutcome::Unknown,
+            }
+        })
+    }
     pub fn validate_result<'a>(&self, result: &'a Value) -> Result<&'a Value> {
         self.contract.validate_result(result)
     }
@@ -46,6 +66,13 @@ pub async fn prepare_runbook_tool(
     let snapshot = super::runbook_registry::load(ctx, slug, capability).await?;
     let contract = ToolContract::parse(&snapshot.contract)?;
     contract.validate_input(&arguments)?;
+    let transport_binding = crate::mcp_client::bounded::request_binding(
+        snapshot.binding["endpoint"]
+            .as_str()
+            .ok_or("invalid_tool_endpoint")?,
+        capability,
+        &arguments,
+    );
     let request_hash = digest(&json!([
         "runbook_tool_request.v2",
         ctx.user_id,
@@ -61,6 +88,7 @@ pub async fn prepare_runbook_tool(
         capability: capability.into(),
         arguments,
         request_hash,
+        transport_binding,
         contract,
     })
 }
