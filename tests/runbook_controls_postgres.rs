@@ -258,9 +258,13 @@ async fn missing_facts_questions_answer_resume_and_isolation() {
         assert_eq!(content, json!({}));
         assert!(!metadata.to_string().contains("ceremony"));
     }
-    db.delete_user_account_and_data(&alice).await.unwrap();
+    db.delete_user_account_and_data(&alice, &format!("control-{alice}@omnyid.test"), &[])
+        .await
+        .unwrap();
     assert!(runtime.supplied_inputs(&alice, &id).await.is_err());
-    db.delete_user_account_and_data(&bob).await.unwrap();
+    db.delete_user_account_and_data(&bob, &format!("control-{bob}@omnyid.test"), &[])
+        .await
+        .unwrap();
 }
 
 #[tokio::test]
@@ -326,7 +330,9 @@ async fn question_expiry_rejects_late_answers_and_terminal_resume() {
             .status,
         EscalationStatus::Expired
     );
-    db.delete_user_account_and_data(&owner).await.unwrap();
+    db.delete_user_account_and_data(&owner, &format!("control-{owner}@omnyid.test"), &[])
+        .await
+        .unwrap();
 }
 
 #[tokio::test]
@@ -474,7 +480,9 @@ async fn follow_up_due_reschedule_cancel_delivery_retry_and_erasure() {
     assert_eq!(count, 1);
     let count:i64=sqlx::query_scalar(&format!("SELECT count(*) FROM {table} WHERE type='runbook_schedule' AND (content <> '{{}}'::jsonb OR encryption IS NULL)")).fetch_one(&db.pool).await.unwrap();
     assert_eq!(count, 0);
-    db.delete_user_account_and_data(&owner).await.unwrap();
+    db.delete_user_account_and_data(&owner, &format!("control-{owner}@omnyid.test"), &[])
+        .await
+        .unwrap();
     assert!(runtime.due_schedules(&owner, 10).await.is_err());
     assert!(
         runtime
@@ -482,7 +490,9 @@ async fn follow_up_due_reschedule_cancel_delivery_retry_and_erasure() {
             .await
             .is_err()
     );
-    db.delete_user_account_and_data(&other).await.unwrap();
+    db.delete_user_account_and_data(&other, &format!("control-{other}@omnyid.test"), &[])
+        .await
+        .unwrap();
 }
 
 #[tokio::test]
@@ -551,5 +561,7 @@ async fn latest_definition_can_revoke_follow_up_before_write_or_delivery() {
     );
     // Revocation never prevents cancellation and successor audit preservation.
     runtime.cancel(&owner, &waiting, 3).await.unwrap();
-    db.delete_user_account_and_data(&owner).await.unwrap();
+    db.delete_user_account_and_data(&owner, &format!("control-{owner}@omnyid.test"), &[])
+        .await
+        .unwrap();
 }
