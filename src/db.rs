@@ -5147,6 +5147,12 @@ impl Db {
         agent_ids: &[String],
     ) -> Result<(), sqlx::Error> {
         let mut tx = self.pool.begin().await?;
+        // Dropping tenant FK constraints already requires this lock on users.
+        // Acquire it before any tenant/public locks: simultaneous schema drops
+        // and DELETE cascades otherwise invert their lock order. Runbook work
+        // takes its users KEY SHARE lock first, so active owner work can finish.
+        sqlx::query("LOCK TABLE users IN ACCESS EXCLUSIVE MODE")
+            .execute(&mut *tx).await?;
 
         if !agent_ids.is_empty() {
             let thread_rows = sqlx::query(

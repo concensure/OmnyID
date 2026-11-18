@@ -195,10 +195,11 @@ async fn persisted_hooks_are_opt_in_owner_scoped_idempotent_and_share_due_pass()
         std::env::remove_var("OMNYID_RUNBOOK_FOLLOW_UPS_ENABLED");
         std::env::remove_var("OMNYID_RUNBOOK_ALLOWLIST");
     }
-    db.delete_user_account_and_data(&owner, &email, &[])
-        .await
-        .unwrap();
-    db.delete_user_account_and_data(&other, &other_email, &[])
-        .await
-        .unwrap();
+    // Concurrent erasure must not invert users/tenant FK locks.
+    let (a, b) = tokio::join!(
+        db.delete_user_account_and_data(&owner, &email, &[]),
+        db.delete_user_account_and_data(&other, &other_email, &[])
+    );
+    a.unwrap();
+    b.unwrap();
 }
