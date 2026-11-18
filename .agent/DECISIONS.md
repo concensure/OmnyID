@@ -1,3 +1,23 @@
+## 2026-11-18: Runbook transforms produce review data; retention removes only derived outcomes
+
+Eight deterministic review operations consume selected, typed facts from the frozen
+owner-private Read receipt and accepted answers for the same step. They do not
+read live replacement facts or dispatch actions. Missing/conflicting facts and
+unsupported calendar/quote/runsheet projections fail closed. Budget arithmetic
+uses checked integer minor units and rejects mixed currencies or absent targets.
+Results, provenance, step trace and instance advancement share one owner transaction;
+exact retries return the original receipt, including after later disable/completion.
+These internal executors remain disconnected from automatic execution.
+
+The false-default OMNYID_RUNBOOK_RETENTION_ENABLED flag reuses the existing
+allowlisted shared maintenance pass. Only derived proactive_outcomes rows with
+verified owner-private receipts can expire after 30 days, at most 100 per pass.
+A later regret extends retention. Immutable private evidence, traces, definitions,
+approvals, dedupe receipts and account quotas are retained; account erasure still
+removes account data. More than 4096 outcome receipts fails closed pending a
+separate archival/indexing design. Retention never trusts a generic outcome row's
+claimed runbook key as deletion authority.
+
 ## 2026-11-18: Wedding Sprout is bounded assistance, not a plan-data retrieval channel
 
 Wedding Sprout uses the server-held OpenAI credential only after authentication,

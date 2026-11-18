@@ -1,3 +1,64 @@
+## 2026-11-18: WED-375 deterministic review and retention continuation
+
+Implementation worktree: `C:/temp/wt/omnyid-runbooks`, branch `agent/codex/WED-375`.
+Frozen source SHA: `a9ed13670a74829387dcc8e9892ac61f818a4a9b`.
+Verification worktree: `C:/temp/wt/omnyid-runbooks-verify-43d7c830` at that SHA.
+
+- Added runbook_transform/runtime and retention modules; wired private receipt
+  validation and default-off allowlisted maintenance retention. Added three test
+  files and extended hook flag checks. Immutable private records are retained.
+- Eight transforms consume frozen reviewed facts and same-step answers, produce
+  review data only, and atomically persist receipt/provenance/trace/advancement.
+  Strict typed facts include inactive branches; money uses checked integer units.
+- All 46 focused Rust tests and library build completed locally on the clean SHA.
+  Rust 1.95.0, one job, CARGO_INCREMENTAL=0, package debug=0 and codegen-units=16;
+  CARGO_TARGET_DIR=C:/cargo-target. Test DB was disposable local Postgres :55475.
+  Initial 10f82f76 compiler crashed with STATUS_ACCESS_VIOLATION; final candidate
+  completed. Toolchain pin remains unchanged. No frontend changes in this batch.
+- Retention handles 100 rows per pass, verified with 101 rows, and never deletes
+  unproven generic outcomes or private evidence. Recent regret extends retention.
+  Histories over 4096 fail closed; sustained rollout needs archival/index design.
+- Checklist now 83/117 complete (34 remaining). Four domain transforms and all
+  actual model/tool/emit/approval execution plus full starter acceptance remain.
+  Internal transform fixture omits Emit and does not close full starter acceptance.
+- Existing line-budget gate fails only server/mod.rs 45733/45717 and db.rs
+  18045/17986. Prior audit has six advisories/five warnings; no dependencies changed.
+  No clean security-gate claim. No Runbook deployment or flag change.
+- Next: review this branch, consume existing calendar/quote/runsheet projections,
+  and connect existing approval/action contracts before any execution rollout.
+  SEO release is separately documented below; do not conflate its static source
+  SHA with this application candidate.
+
+## 2026-11-18: SEO-001 static release consumed from Claude
+
+Author snapshot `a2643ce12803ba9defa2cd48a745ee169a2b3adf` was cherry-picked onto
+`agent/codex/WED-375` as `7aaa3b4ee42c0e890d587e72d59f68845525ee5b`.
+Claude retains ongoing sitemap ownership in `C:/temp/wt/omnyid-seo`.
+Static release was packaged from clean detached worktree
+`C:/temp/wt/omnyid-runbooks-verify-43d7c830` at that exact SHA.
+The verification worktree has since advanced to the Runbook candidate; use the
+full static SHA above for reproducing this release, never its current HEAD.
+
+- Four smoke suites (metadata 93 pages, website, catalogue and CSP) and Caddy
+  config validation completed. Production Caddy had no server-only blocks.
+- Archive preflight initially rejected a Git-versus-archive CRLF hash mismatch
+  before changing production. The corrected manifest hashes actual archive bytes
+  and separately records Git blob hashes, checking newline-only normalization.
+- Static `docs`, `wedding` and Caddy content deployed; Caddy was recreated using
+  existing compose/env. Application container ID/image remained unchanged.
+- 328 deployed file hashes match the manifest. HTTPS llms/robots/sitemap and
+  representative updated pages match origin content after accounting solely for
+  Cloudflare email obfuscation. llms is 200 text/plain; llms-full remains 404.
+  Python urllib is denied 403 by the edge; curl checks from Oracle completed.
+- Public healthz/readyz return 401; this release makes no application-health claim.
+- Machine evidence: `C:/temp/wt/seo-001-hosted-verification.json` and
+  `C:/temp/wt/seo-001-7aaa3b4e-manifest.json`.
+- Retained rollback archive:
+  `/home/ubuntu/omnyid-static-backups/seo-001-7aaa3b4ee42c0e890d587e72d59f68845525ee5b/previous.tar`.
+  Restore it into `/home/ubuntu/omnyid`, then recreate Caddy with existing compose
+  configuration; a reload does not refresh the file bind mount.
+- No Runbook application deployment or flag change was part of this release.
+
 ## 2026-11-18: SEO-001 integration ownership (Codex)
 
 User supplied Claude handoff at 172a7c80, content a2643ce12803ba9defa2cd48a745ee169a2b3adf.

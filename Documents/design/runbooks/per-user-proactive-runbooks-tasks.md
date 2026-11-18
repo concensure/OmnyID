@@ -6,7 +6,7 @@ Order: dependency order
 Rule: reuse the proactive/Watcher/Synthesizer/policy/approval stack; do not create a parallel event, authority, memory, or UI system.
 
 
-## Implementation checkpoint — 2026-11-18
+## Original hooks/UI checkpoint — 2026-11-18 (later continuations below)
 
 Worktree: `C:/temp/wt/omnyid-runbooks`, branch `agent/codex/WED-375`.
 Original design commit: `dcbe97eff14f2b62a582fe76d340db3f831d9528`.
@@ -382,7 +382,8 @@ into existing proactive outcomes; exact retries and regrets count each trace onc
 Shared feedback functions suppress/cool down exact steps, cautiously rank families
 and never grant execution authority. Owner-bound routes reject foreign traces and
 unknown fields. Outcome memory is bounded to 30 days for feedback; immutable
-receipt retention remains a separate unfinished policy task.
+receipts remain immutable until account erasure. The opt-in derived projection
+retention policy is described in the latest continuation below.
 
 ## 14. API and A2UI projections
 
@@ -417,7 +418,7 @@ Depends on: 1–15
 - [x] Threat-model forged events, malicious definitions, prompt injection, capability escalation, cross-tenant refs, replay, timer abuse, and private-content leakage.
 - [x] Verify encrypted/private content follows current storage and decrypt-budget rules.
 - [x] Keep operational logs content-light and redact model/tool inputs.
-- [ ] Add retention for derived traces/projections without deleting immutable evidence that policy requires to retain.
+- [x] Add retention for derived traces/projections without deleting immutable evidence that policy requires to retain.
 - [x] Extend account deletion to definitions, instances, traces, waits, receipts, caches, and projections. (Existing private-schema erasure verified for all currently persisted runbook types; no separate caches/projections exist.)
 - [x] Run dependency/security scans and targeted route abuse tests.
 
@@ -452,3 +453,40 @@ still fails on unchanged counts in server/mod.rs and db.rs; no baseline raised.
 No frontend source changed, no external executor enabled and no deployment done.
 Full tool/model/approval provenance remains open despite the verified companion
 records for current runtime paths; retention and wider rollout checks remain open.
+
+
+## Deterministic review and retention continuation — 2026-11-18
+
+Source `a9ed13670a74829387dcc8e9892ac61f818a4a9b` was verified in clean detached
+`C:/temp/wt/omnyid-runbooks-verify-43d7c830`: all 46 focused Runbook Rust tests
+and the library build completed using Rust 1.95.0, one job, 16 package codegen
+units, package debug off and incremental off. The preceding candidate's compiler
+crashed with Windows STATUS_ACCESS_VIOLATION; the final candidate completed.
+The global line-budget check still reports only the two existing unchanged
+server/mod.rs and db.rs overages. Dependencies did not change; the prior six
+advisories/five warnings remain unresolved. No frontend or execution rollout.
+
+Eight deterministic transforms now cover reply review, integer budget exposure,
+task dependencies, reminder permission, commitment evidence, workflow retries,
+import status and missing facts. They consume frozen evidence plus accepted
+same-step answers; unrelated instructions are excluded. Missing/conflicting or
+malformed facts fail closed. No conclusion grants sending, spending, retrying,
+publishing or release authority. Output receipts, provenance, trace and revision
+advance atomically. Concurrent exact retries, subsequent source mutation,
+definition revocation, cross-owner access and encrypted storage are covered.
+Calendar, quote review/gaps and runsheet transforms remain unavailable pending
+existing domain projection integration. The all-step and full-starter checkboxes
+remain open: the integration fixture deliberately omits Emit and uses an explicit
+trace-completion criterion, so it is not full starter acceptance.
+
+Derived outcome projections expire after 30 days only with verified private
+owner receipts, at most 100 per pass; recent regret extends retention. Tests
+exercise 101 expired rows across batches, unproven generic rows and other owners,
+and confirm immutable private evidence remains. OMNYID_RUNBOOK_RETENTION_ENABLED
+is default-off, account-allowlisted and reuses shared maintenance. Private traces,
+evidence, approvals and dedupe receipts remain until account erasure. Histories
+above 4096 receipts fail closed pending archival/index work.
+
+Checklist: **83 complete, 34 remaining of 117**. SEO static integration was
+released separately at 7aaa3b4ee42c0e890d587e72d59f68845525ee5b; this Runbook
+candidate has not been deployed and all execution flags remain off.

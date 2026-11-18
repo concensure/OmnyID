@@ -32,14 +32,18 @@ Deletion cannot race an operation into recreating an erased private schema.
 | Timer abuse | Declared types, bounded dates, separate expiry, stable cancellation keys and append-only successors. Scans are bounded hints; delivery rechecks current state/time/declarations. | Control tests. Shared daemon fairness, per-account scan budgets and operational rate limits remain prerequisites. |
 | False completion | Complete requires the frozen prior-step sequence and committed completed traces, checks required facts, and evaluates all criteria against derived output summaries. Unknown outputs fail closed. | API/completion scenario covers success, failure, concurrent retry and foreign access. Business output schemas remain executor work. |
 | Private-content leakage | Private records are encrypted and signed. Activity omits raw evidence, supplied answers, definitions and model/tool inputs. Normal detail is a summary; export is explicit. Responses are no-store. | Storage and API tests. Operator log review, full UI rendering review and telemetry redaction remain open. |
-| Resource exhaustion | Definition/record/history/reference limits, read/decrypt caps, route body limit and owner rate limiting. | Foundation/evidence/management tests. Shared account decrypt/model budgets and retention are not yet complete. |
+| Resource exhaustion | Definition/record/history/reference limits, read/decrypt caps, route body limit and owner rate limiting. | Foundation/evidence/management tests. Shared account decrypt quota is implemented; model budgets remain open. Derived outcome retention has an opt-in bounded cleanup path. |
 | Erasure bypass | Account deletion drops the private schema and removes legacy owner policy rows; runtime does not create schemas. | Storage, runtime, evidence, authority and control erasure tests. Recheck every future cache/projection/export store. |
 
 ## Explicit residual risks and rollout conditions
 
-The shared account decrypt budget is not integrated; local hard caps are not a
-substitute. Derived traces need a retention policy. No cache exists yet, and any
-future cache must be owner-bound, immutable-version-bound and erased on deletion.
+The shared account decrypt budget is persisted across store instances. Immutable
+definition caching is scoped to the owner, version and store lifetime, after
+signature/decryption verification. Derived outcome projections can expire after
+30 days through an opt-in bounded cleanup pass; private evidence and traces are
+retained until account erasure. Histories above 4096 receipts fail closed and need
+a separate archival/indexing design before sustained rollout. Model budgets
+remain unimplemented.
 The public event adapters depend on trusted owner-partitioned persistence and do
 not independently establish the truth of a vendor document or email.
 
@@ -77,7 +81,10 @@ passing security result. Cargo manifests/lockfile are unchanged by this batch.
 
 The report also contains three unmaintained-package warnings and two unsoundness
 warnings. These are dependency-wide findings, not an exploitability assessment.
-The scan/abuse checklist gate remains open pending dependency remediation or
-reviewed applicability decisions and a successful registry/yanked check. Do not
+The scan/abuse execution checkbox is complete, but the security release gate
+remains failing pending dependency remediation or reviewed applicability decisions
+and a successful registry/yanked check. The later b15d4492 audit refreshed the
+advisory database and reproduced six advisories plus five warnings with yanked
+checks excluded; see C:/temp/wt/runbook-audit-b15d4492.json. Do not
 silence advisories merely to enable runbooks. Shared crypto, HTML/Markdown and
 SQLite dependencies require their own regression coverage when upgraded.
