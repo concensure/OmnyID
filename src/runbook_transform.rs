@@ -100,7 +100,8 @@ pub fn review(
             reference("last_outbound_ref")?;
             let status = text("reply_status")?;
             enum_value(status, &["received", "pending"])?;
-            json!({"review_needed":status=="pending"&&!boolean("cooldown")?,"send_authorized":false})
+            let cooldown = boolean("cooldown")?;
+            json!({"review_needed":status=="pending"&&!cooldown,"send_authorized":false})
         }
         CalculateBudgetExposure => budget_exposure(&facts)?,
         ReviewTaskDependencies => {
@@ -128,7 +129,8 @@ pub fn review(
             reference("invitation_ref")?;
             let attendance = text("attendance")?;
             enum_value(attendance, &["pending", "accepted", "declined"])?;
-            json!({"reminder_review_needed":attendance=="pending"&&boolean("reminder_permission")?,"send_authorized":false})
+            let permission = boolean("reminder_permission")?;
+            json!({"reminder_review_needed":attendance=="pending"&&permission,"send_authorized":false})
         }
         VerifyCommitmentEvidence => {
             reference("commitment_ref")?;

@@ -71,8 +71,19 @@ async fn persisted_hooks_are_opt_in_owner_scoped_idempotent_and_share_due_pass()
         std::env::set_var("OMNYID_RUNBOOK_ALLOWLIST", &owner);
         std::env::remove_var("OMNYID_RUNBOOK_EVENT_HOOKS_ENABLED");
         std::env::remove_var("OMNYID_RUNBOOK_FOLLOW_UPS_ENABLED");
+        std::env::remove_var("OMNYID_RUNBOOK_RETENTION_ENABLED");
     }
     assert!(!HookPolicy::from_env().event_allowed(&owner, "watcher_alert"));
+    assert!(!HookPolicy::from_env().retention);
+    assert_eq!(maintenance_pass(&db).await, (0, 0));
+    unsafe {
+        std::env::set_var("OMNYID_RUNBOOK_RETENTION_ENABLED", "true");
+    }
+    assert!(HookPolicy::from_env().retention);
+    assert_eq!(maintenance_pass(&db).await, (0, 0));
+    unsafe {
+        std::env::remove_var("OMNYID_RUNBOOK_RETENTION_ENABLED");
+    }
     let event = |owner: &str| {
         json!({"protocol":"afp-v1","id":Ulid::new().to_string(),
         "type":"watcher_alert","to":[owner],"thread_id":"watcher:test",
@@ -193,6 +204,7 @@ async fn persisted_hooks_are_opt_in_owner_scoped_idempotent_and_share_due_pass()
     unsafe {
         std::env::remove_var("OMNYID_RUNBOOK_EVENT_HOOKS_ENABLED");
         std::env::remove_var("OMNYID_RUNBOOK_FOLLOW_UPS_ENABLED");
+        std::env::remove_var("OMNYID_RUNBOOK_RETENTION_ENABLED");
         std::env::remove_var("OMNYID_RUNBOOK_ALLOWLIST");
     }
     // Concurrent erasure must not invert users/tenant FK locks.

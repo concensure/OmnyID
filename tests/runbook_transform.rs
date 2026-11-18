@@ -164,3 +164,22 @@ fn missing_conflicting_and_injected_facts_fail_closed() {
         "transform_not_implemented"
     );
 }
+
+#[test]
+fn inactive_branches_still_require_typed_boolean_facts() {
+    for (id, facts) in [
+        (
+            "no_reply_followup",
+            json!({"last_outbound_ref":"message:one","reply_status":"received","cooldown":"false"}),
+        ),
+        (
+            "rsvp_non_response",
+            json!({"invitation_ref":"invitation:one","attendance":"accepted","reminder_permission":"true"}),
+        ),
+    ] {
+        assert_eq!(
+            review(&step(id), &packet(facts), &BTreeMap::new()).unwrap_err(),
+            "invalid_transform_fact"
+        );
+    }
+}
