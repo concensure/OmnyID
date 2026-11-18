@@ -1,3 +1,67 @@
+## 2026-11-19: WED-375 durable tool lifecycle verified
+
+Implementation: `C:/temp/wt/omnyid-runbooks`, branch `agent/codex/WED-375`.
+Frozen source: `489b13f11968dced83a13e085dc619e00ff76771`.
+Verification: `C:/temp/wt/omnyid-runbooks-verify-43d7c830`, clean detached at that
+exact SHA. Subsequent documentation commits do not change the source candidate.
+Parent checklist: **100 complete / 17 remaining of 117**; the deterministic
+backend step implementation parent closes. WED-375 remains in progress.
+
+Implemented exact tool proposals, separate approval decisions, one-shot durable
+reservations, and atomic private signed/encrypted results, traces and provenance.
+Approval and reservation recheck canonical grants and policy. Reservation commits
+before provider I/O without holding database locks across the network. No retry
+is inferred from missing results. Cancellation/revocation prevents continuation
+but cannot undo a previously admitted external effect. Completion requires the
+saved applied tool receipt, not just a successful trace. Private-review approvals
+remain distinct from tool authority. ToolProvider is a trusted internal seam;
+no authenticated route, live credential adapter or production hook enables it.
+
+Changed: new src/runbook_tool_records.rs, runbook_tool_runtime.rs and
+runbook_tool_execution.rs; registrations in lib.rs; runbook_store.rs record
+validation, runbook_provenance.rs decision binding, runbook_complete.rs receipt
+validation; tool_dispatch/runbook_registry.rs and runbook_contract.rs transaction
+preparation; new tests/runbook_tool_runtime_postgres.rs; canonical coordination
+and runbook design/checklist docs. No migrations, dependencies, frontend,
+sitemap or production configuration changed. Other agents' work was untouched.
+
+Verification from the clean frozen checkout, with root/SHA/status printed:
+- 101 tests passed in 21 integration binaries, exit 0 (92 prior plus nine new).
+  Lifecycle coverage includes concurrent proposals/approvals/execution, owner
+  isolation, stale revisions/grants, revocation, cancellation during I/O,
+  abandoned execution, schema failure, rollback on result persistence failure,
+  rejection, missing receipt at completion, replay and sanitized provider errors.
+- Standalone cargo build --lib passed, exit 0, 38.09s.
+- Linux Rust 1.94.1; image omnyid-wed318-builder-test:a42db33, identity
+  sha256:21fe7471679891c3a083d0c167ee660873a8be66223ad205dd05405164c1f0fa.
+  Read-only source mount, existing cargo caches, -j1, CARGO_INCREMENTAL=0,
+  RUST_MIN_STACK=268435456; global test/dev debug=0 and root codegen-units=64.
+- Evidence: C:/temp/wt/runbook-489b13f1-linux-tests.log and .exit;
+  C:/temp/wt/runbook-489b13f1-linux-build.log and .exit.
+- Final line budget retains only existing server/mod.rs 45734/45717 and
+  db.rs 18045/17986 failures; Wedding-specific budget passes.
+- GitHub run/deployment queries returned no records. Configured remote lineage
+  is unsuitable for this private work; no push/PR created. Local evidence above
+  is not a GitHub Checks/build/deployment health assertion.
+
+Earlier attempts are superseded: 1f2510ff was stopped for receipt validation;
+Docker Desktop stopped during 2a26f240 and was restarted; a 128 MiB compiler
+stack then SIGSEGV'd, resolved with 256 MiB. The next attempt exposed three
+integration-test references to a private schema helper, fixed in 489b13f1 using
+the existing disposable-owner schema convention. Earlier logs remain under
+C:/temp/wt/runbook-2a26f240-*. Windows compiler limitations were not retried.
+
+Only disposable PostgreSQL and loopback/mock providers were used. The dedicated
+test database is stopped after verification; ephemeral build containers auto-remove.
+No deployment, real provider call or production health assertion.
+
+Next: authenticated human approval routes/queue and live owner/account-bound
+credential adapter; deterministic evidence-to-argument projection; normalized
+provider AFP projection; explicit crash/unknown-outcome reconciliation. Current
+Tool steps require explicit arguments and reject unsupported input selectors.
+Credential rotation/account semantics and DNS/destination isolation still need
+integration/security proof. Keep provider/sandbox and rollout parents open.
+
 ## 2026-11-19: WED-375 four bounded transport subtasks verified
 
 Implementation: `C:/temp/wt/omnyid-runbooks`, branch `agent/codex/WED-375`.

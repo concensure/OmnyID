@@ -111,3 +111,43 @@ provider-side idempotency still require the durable execution implementation.
 This client retains the existing HTTPS/localhost endpoint policy. Complete DNS
 and destination isolation, approved provider compatibility and sandbox evidence
 remain release prerequisites; this transport is not an SSRF protection claim.
+
+
+## Durable exact-action lifecycle
+
+The internal runtime now has propose_tool, decide_tool and execute_tool methods.
+A proposal names an exact tool/capability and arguments for the current Tool step;
+its full registry hash and original definition are frozen in the private ledger.
+The explicit-argument path rejects automatic input selectors and required-field
+selectors until their deterministic mapping is implemented. The proposal expires
+after ten minutes. The returned proposal_ref identifies the exact decision target.
+
+Decisions require the exact pending proposal and instance revision. Approval
+rechecks current canonical account/grant/schema state, both definition policies,
+and the existing account proactivity policy. Rejection remains possible after
+revocation. Decisions are separate runbook_tool_decision records: a private-review
+approval, policy receipt or model answer cannot substitute for this approval.
+Future routes must require a recent authenticated human session; no route is
+wired to this internal seam in this batch.
+
+Execution takes an owner lock, checks the saved decision and fresh policy, locks
+existing connection/grant rows while preparing, and appends a one-shot reservation
+before invoking the trusted ToolProvider adapter. Its commit is the authorization
+boundary. Cancellation/revocation after that point cannot undo an admitted call,
+but prevents successful continuation. No locks are held over provider I/O.
+A reservation without a result never permits automatic reissue, including after
+cancellation, process loss, or failure to persist the provider result.
+
+Finalization signs/encrypts the result in the existing private AFP store and
+atomically appends its StepTrace, existing-format provenance, and applicable
+instance revision. Provenance hashes the exact saved tool decision. A completed
+provider result can be retained with applied=false after cancellation/revocation;
+that is not permission to continue. Provider/schema failures retain NotSent or
+Unknown honestly and expose only fixed failure codes. Exact retries return the
+stored receipt. Completion additionally requires a matching applied tool receipt.
+
+The trusted adapter seam currently has loopback/mock coverage only. Selecting and
+loading live provider credentials, approved account binding in the live adapter,
+UI/route integration, deterministic evidence-to-argument mapping, normalized
+provider-specific AFP projections and explicit unknown-outcome reconciliation
+remain separate integration work. Nothing here enables production tool execution.

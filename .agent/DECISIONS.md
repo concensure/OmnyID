@@ -1,3 +1,19 @@
+## 2026-11-19: WED-375 durable tool approval is separate from private review
+
+A Tool proposal freezes its exact canonical registry request and current step.
+Its human decision uses a separate private record kind; existing private-review
+approvals and policy receipts cannot authorize it. Recheck current account,
+capability and definition policy at approval and one-shot reservation. Commit
+that reservation before any provider I/O; do not infer safe retry after process
+loss or failed result persistence. Later cancellation/revocation wins over
+continuation but cannot undo an admitted external effect.
+
+Use the existing signed/encrypted private AFP store for proposal, decision,
+reservation and result, and its shared provenance builder for the final trace.
+Finalize result/trace/provenance/instance atomically and require the actual applied
+receipt at completion. Keep authenticated UI/routes and live credential adapters
+disconnected until separately reviewed; ToolProvider is an internal trusted seam.
+
 ## 2026-11-19: WED-375 bounded tool transport preserves unknown outcomes
 
 Add an opt-in bounded MCP transport rather than changing existing dispatcher

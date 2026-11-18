@@ -291,7 +291,7 @@ account deletion also removes those owner settings, which lack foreign keys.
 
 Depends on: 6–8
 
-- [ ] Implement `read`, `transform`, `tool`, `emit`, `wait`, `approval`, and `complete` steps without an LLM.
+- [x] Implement `read`, `transform`, `tool`, `emit`, `wait`, `approval`, and `complete` steps without an LLM.
 - [x] Validate tool input/output schemas and reject unknown fields. (Bounded closed contracts, exact canonical grant preparation and structured-result validation; six schema and four PostgreSQL boundary tests. External dispatch remains separate.)
 - [ ] Reuse existing capability/tool dispatch and AFP result persistence.
 - [x] Check success criteria deterministically before completing an instance.
@@ -736,3 +736,21 @@ receipt test. See canonical handoff for build evidence. No production executor
 calls this opt-in client. Durable action authority, reservation and authenticated
 AFP result persistence remain open, so the parent count is unchanged:
 **99 complete / 18 remaining of 117**.
+
+
+## Durable tool lifecycle — 2026-11-19
+
+The deterministic backend step implementation parent closes: **100 complete /
+17 remaining of 117**. Tool execution now has an exact request proposal, separate
+approval decision, durable one-shot reservation, and atomic signed/encrypted
+private result, trace and provenance. Completion requires its saved applied
+receipt. Cancellation, stale grants, aborted calls, failed persistence and
+unknown outcomes cannot silently authorize another attempt.
+
+Candidate `489b13f11968dced83a13e085dc619e00ff76771` passes 101 integration tests in
+21 binaries, including nine new lifecycle tests using disposable PostgreSQL and
+loopback providers. See canonical handoff for build evidence and limitations.
+The tool executor is a trusted backend seam with explicit arguments; authenticated
+routes/queue, live credential adapter, evidence-to-argument projection, provider
+AFP projection and unknown-outcome reconciliation remain integration work. No
+live provider, production rollout or additional parent closure is claimed.
