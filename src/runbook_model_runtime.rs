@@ -27,7 +27,7 @@ struct Reservation {
     started_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct ModelReceipt {
     pub reservation_ref: String,
@@ -36,6 +36,17 @@ pub struct ModelReceipt {
     pub draft_afp: Option<Value>,
     pub trace: StepTrace,
     pub applied: bool,
+}
+
+impl std::fmt::Debug for ModelReceipt {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ModelReceipt")
+            .field("trace", &self.trace)
+            .field("applied", &self.applied)
+            .field("evaluation", &self.evaluation)
+            .field("draft", &"[REDACTED]")
+            .finish()
+    }
 }
 
 fn record_id(kind: &str, owner: &str, instance: &str, step: &str) -> String {

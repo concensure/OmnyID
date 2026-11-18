@@ -9,7 +9,7 @@ use omnyid_homeserver::{
     runbook_starter_pack::starter_definitions,
     runbook_store::RunbookStore,
 };
-use serde_json::{Value, json};
+use serde_json::json;
 use std::sync::Mutex;
 use ulid::Ulid;
 
@@ -227,6 +227,7 @@ async fn model_steps_store_private_outputs_usage_provenance_and_suppress_unchang
             .await
             .unwrap();
         assert!(receipt.applied);
+        assert!(!format!("{receipt:?}").contains("Please review this saved information."));
         if kind == StepKind::Draft {
             let draft: omnyid_homeserver::message::AFPMessage =
                 serde_json::from_value(receipt.draft_afp.clone().unwrap()).unwrap();
