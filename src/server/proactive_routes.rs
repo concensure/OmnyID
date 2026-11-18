@@ -11551,7 +11551,7 @@ async fn ingest_passive_event_http(
     // daemon AFP ledger. Its post-insert hook re-reads the owner partition.
     if crate::runbook_hooks::HookPolicy::from_env().event_allowed(&user.id, "passive_event") {
         if let Ok(value) = serde_json::to_value(&afp_msg) {
-            if state.db.insert_daemon_afp_message(&value).await.is_err() {
+            if crate::runbook_hooks::bridge_passive_event(&state.db, &user.id, &value).await.is_err() {
                 tracing::warn!("Runbook passive-event bridge deferred");
             }
         }

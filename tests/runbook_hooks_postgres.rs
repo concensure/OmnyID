@@ -146,7 +146,7 @@ async fn persisted_hooks_are_opt_in_owner_scoped_idempotent_and_share_due_pass()
                 .header("content-type", "application/json")
                 .body(Body::from(
                     json!({"event_type":"runbook_test_event","source":"workflow",
-            "event_at":Utc::now().to_rfc3339(),"metadata":{}})
+            "event_at":Utc::now().to_rfc3339(),"metadata":{"private_body":"private_ingress_body"}})
                     .to_string(),
                 ))
                 .unwrap(),
@@ -165,6 +165,8 @@ async fn persisted_hooks_are_opt_in_owner_scoped_idempotent_and_share_due_pass()
             .await
             .unwrap();
     assert_eq!(persisted["content"]["event_type"], "runbook_test_event");
+    assert!(!persisted.to_string().contains("private_ingress_body"));
+    assert!(persisted.get("signature").is_none());
     assert_eq!(
         runtime.activities(&owner).await.unwrap()["activities"]
             .as_array()

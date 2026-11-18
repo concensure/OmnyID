@@ -61,6 +61,32 @@ fn keys() -> Result<([u8; 32], [u8; 32])> {
     ))
 }
 
+/// Project an authenticated, already persisted passive event into the existing
+/// daemon ledger without copying raw bodies, mail context or arbitrary metadata.
+/// This is an unsigned server-derived projection, not the source's signature.
+pub async fn bridge_passive_event(db: &Db, owner: &str, source: &serde_json::Value) -> Result<()> {
+    use serde_json::json;
+    if !HookPolicy::from_env().event_allowed(owner, "passive_event") {
+        return Ok(());
+    }
+    if source["to"] != json!([owner]) || source["type"] != "passive_event" {
+        return Err("event_owner_mismatch");
+    }
+    let event = crate::runbook_event::normalize_stored_event(owner, owner, source)?;
+    let projected = json!({
+        "protocol":"afp-v1", "id":event.event_id, "type":"passive_event",
+        "from":"runbook_ingress", "to":[owner], "thread_id":source["thread_id"],
+        "timestamp":source["timestamp"], "references":event.source_refs,
+        "content":{"event_type":event.event_type,"event_at":event.occurred_at,
+            "confidence":event.confidence,"metadata":event.metadata,
+            "source_refs":event.source_refs,"entity_refs":event.entity_refs,
+            "urgency":event.urgency,"caused_by_event_id":event.caused_by_event_id}
+    });
+    db.insert_daemon_afp_message(&projected)
+        .await
+        .map_err(|_| "storage_unavailable")
+}
+
 /// Called only after the existing owner-partitioned AFP insert has completed.
 /// Dispatch re-reads that partition; incoming payload fields cannot grant authority.
 pub async fn persisted_event(db: &Db, owner: &str, id: &str, kind: &str) {
