@@ -63,6 +63,7 @@ fn registry(defs: &[RunbookDefinition]) -> Registry {
 }
 fn event() -> ProactiveEvent {
     ProactiveEvent {
+        urgency: None,
         event_id: "event-1".into(),
         event_type: "quote_received".into(),
         source_refs: vec!["document:quote-1".into()],

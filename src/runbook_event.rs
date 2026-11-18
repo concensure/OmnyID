@@ -61,27 +61,120 @@ pub fn normalize_stored_event(
             metadata.insert(key.into(), value.clone());
         }
     }
-    let source_refs = vec![format!("message:{id}")];
-    let mut entity_refs = Vec::new();
+    let watcher = kind == "watcher_alert" || kind == "watcher_resolution_event";
+    let mut source_refs = vec![format!("message:{id}")];
+    for field in ["source_refs", "entity_refs"] {
+        if let Some(value) = content.get(field) {
+            let refs: Vec<String> =
+                serde_json::from_value(value.clone()).map_err(|_| "invalid_event_refs")?;
+            if !crate::runbook_validation::identifiers(&refs, MAX_REFS)
+                || refs.iter().any(|r| !r.contains(':'))
+            {
+                return Err("invalid_event_refs");
+            }
+            if field == "source_refs" {
+                source_refs.extend(refs);
+            }
+        }
+    }
+    if watcher {
+        for field in ["source_event_id", "resolved_message_id"] {
+            if let Some(v) = content.get(field).filter(|v| !v.is_null()) {
+                let reference = v
+                    .as_str()
+                    .filter(|s| identifier(s))
+                    .ok_or("invalid_event_refs")?;
+                source_refs.push(format!("message:{reference}"));
+            }
+        }
+    }
+    source_refs.sort();
+    source_refs.dedup();
+    let mut entity_refs: Vec<String> = content
+        .get("entity_refs")
+        .map(|v| serde_json::from_value(v.clone()))
+        .transpose()
+        .map_err(|_| "invalid_event_refs")?
+        .unwrap_or_default();
     if let Some(entity) = content.get("entity_id").filter(|v| !v.is_null()) {
         let entity = entity.as_str().ok_or("invalid_entity_ref")?;
-        if !entity.contains(':') || !identifier(entity) {
+        if (!entity.contains(':') && !watcher) || !identifier(entity) {
             return Err("untyped_entity_ref");
         }
-        entity_refs.push(entity.to_string());
+        entity_refs.push(if entity.contains(':') {
+            entity.to_string()
+        } else {
+            format!("entity:{entity}")
+        });
     }
+    entity_refs.sort();
+    entity_refs.dedup();
+    let optional_string = |value: Option<&Value>| -> Result<Option<String>> {
+        value
+            .filter(|v| !v.is_null())
+            .map(|v| v.as_str().map(str::to_owned).ok_or("invalid_event_field"))
+            .transpose()
+    };
     let event = ProactiveEvent {
+        urgency: optional_string(content.get("urgency").or_else(|| content.get("severity")))?,
         event_id: id.to_string(),
         event_type: event_type.to_string(),
         source_refs,
         entity_refs,
         metadata,
-        confidence: content["confidence"]
-            .as_f64()
-            .ok_or("missing_event_confidence")?,
+        confidence: if kind == "watcher_resolution_event" && content.get("confidence").is_none() {
+            0.0
+        } else {
+            content["confidence"]
+                .as_f64()
+                .ok_or("missing_event_confidence")?
+        },
         occurred_at,
-        caused_by_event_id: None,
+        caused_by_event_id: optional_string(
+            content
+                .get("caused_by_event_id")
+                .or_else(|| content.get("source_event_id")),
+        )?,
     };
     validate_event(&event)?;
     Ok(event)
+}
+
+// Due events use a separate private-ledger entry point. A public AFP body that
+// merely claims to be runbook_follow_up is never eligible for dispatch.
+impl crate::runbook_store::RunbookStore<'_> {
+    pub async fn normalize_follow_up(&self, owner: &str, event_id: &str) -> Result<ProactiveEvent> {
+        if !identifier(event_id) {
+            return Err("invalid_event_id");
+        }
+        let mut tx = self.begin(owner).await?;
+        let value = self
+            .read_kind(owner, "runbook_follow_up", Some(event_id), None, &mut tx)
+            .await?
+            .pop()
+            .ok_or("event_not_found")?;
+        let schedule: crate::runbook_schedule::FollowUpSchedule =
+            serde_json::from_value(value["content"].clone()).map_err(|_| "invalid_schedule")?;
+        let mut refs = schedule.source_refs;
+        refs.push(format!("private_message:{event_id}"));
+        refs.sort();
+        refs.dedup();
+        let event = ProactiveEvent {
+            urgency: None,
+            event_id: event_id.into(),
+            event_type: schedule.event_type,
+            source_refs: refs,
+            entity_refs: vec![format!("instance:{}", schedule.instance_id)],
+            metadata: Map::new(),
+            confidence: 1.0,
+            occurred_at: DateTime::parse_from_rfc3339(
+                value["timestamp"].as_str().ok_or("invalid_timestamp")?,
+            )
+            .map_err(|_| "invalid_timestamp")?
+            .with_timezone(&Utc),
+            caused_by_event_id: Some(schedule.caused_by_event_id),
+        };
+        validate_event(&event)?;
+        Ok(event)
+    }
 }

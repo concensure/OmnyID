@@ -97,6 +97,8 @@ pub mod proactive_memory_capture;
 pub mod proactive_outcome_memory;
 pub mod proactive_policy;
 pub mod proactive_provenance;
+pub mod runbook_activity;
+pub mod runbook_complete;
 pub mod runbook_afp;
 pub mod runbook_authority;
 pub mod runbook_contract;

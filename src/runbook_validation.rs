@@ -222,7 +222,12 @@ pub fn validate_definition(d: &RunbookDefinition) -> Result<()> {
 }
 
 pub fn validate_event(e: &ProactiveEvent) -> Result<()> {
-    if !identifier(&e.event_id)
+    if e.urgency.as_deref().is_some_and(|v| {
+        !matches!(
+            v,
+            "low" | "normal" | "high" | "urgent" | "important" | "info" | "today"
+        )
+    }) || !identifier(&e.event_id)
         || !identifier(&e.event_type)
         || !identifiers(&e.source_refs, MAX_REFS)
         || !identifiers(&e.entity_refs, MAX_REFS)

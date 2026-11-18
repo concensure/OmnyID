@@ -12,6 +12,10 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
         .route("/runbooks", get(list))
         .route("/runbooks/starters", get(starters))
         .route("/runbooks/setup", post(setup))
+        .route("/runbooks/{id}", get(detail))
+        .route("/runbooks/instances/{id}/activity", get(activity))
+        .route("/runbooks/instances/{id}/cancel", post(cancel))
+        .route("/runbooks/instances/{id}/answers", post(answer))
         .route("/runbooks/{id}/definition", put(save))
         .route("/runbooks/{id}/export", get(export))
         .route("/runbooks/{id}/upgrade-preview", get(upgrade_preview))
@@ -64,8 +68,12 @@ fn store(state: &AppState) -> Result<RunbookStore<'_>, ApiError> {
 
 fn error(code: &'static str) -> ApiError {
     let status = match code {
-        "stale_definition" | "definition_exists" | "invalid_successor" => StatusCode::CONFLICT,
-        "definition_not_found" | "owner_not_found" => StatusCode::NOT_FOUND,
+        "stale_definition" | "definition_exists" | "invalid_successor" | "stale_revision"
+        | "question_not_open" | "answer_expired" | "invalid_transition" => StatusCode::CONFLICT,
+        "definition_not_found"
+        | "owner_not_found"
+        | "instance_not_found"
+        | "question_not_found" => StatusCode::NOT_FOUND,
         "storage_unavailable"
         | "invalid_stored_definition"
         | "definition_decryption_failed"
@@ -74,6 +82,87 @@ fn error(code: &'static str) -> ApiError {
         _ => StatusCode::UNPROCESSABLE_ENTITY,
     };
     (status, code.into())
+}
+
+async fn detail(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> Result<Json<Value>, ApiError> {
+    let owner = owner(&state, &headers).await?;
+    let registry = store(&state)?.registry(&owner).await.map_err(error)?;
+    let summaries = summaries(&registry);
+    let result = summaries
+        .as_array()
+        .and_then(|items| items.iter().find(|d| d["runbook_id"] == id))
+        .cloned()
+        .ok_or_else(|| error("definition_not_found"))?;
+    Ok(Json(
+        json!({"definition":result,"execution_available":false}),
+    ))
+}
+
+async fn activity(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> Result<Json<Value>, ApiError> {
+    let owner = owner(&state, &headers).await?;
+    let store = store(&state)?;
+    Ok(Json(
+        crate::runbook_runtime::RunbookRuntime::new(&store)
+            .activity(&owner, &id)
+            .await
+            .map_err(error)?,
+    ))
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Revision {
+    expected_revision: u32,
+}
+async fn cancel(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    Json(request): Json<Revision>,
+) -> Result<Json<Value>, ApiError> {
+    let owner = owner(&state, &headers).await?;
+    let store = store(&state)?;
+    let result = crate::runbook_runtime::RunbookRuntime::new(&store)
+        .cancel(&owner, &id, request.expected_revision)
+        .await
+        .map_err(error)?;
+    Ok(Json(
+        json!({"instance_id":id,"revision":result.instance.revision,"status":result.instance.status}),
+    ))
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Answer {
+    expected_revision: u32,
+    input: crate::runbook_input::InputSupplied,
+}
+async fn answer(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    Json(request): Json<Answer>,
+) -> Result<Json<Value>, ApiError> {
+    let owner = owner(&state, &headers).await?;
+    if request.input.instance_id != id {
+        return Err(error("instance_id_mismatch"));
+    }
+    let store = store(&state)?;
+    let result = crate::runbook_runtime::RunbookRuntime::new(&store)
+        .supply_input(&owner, &request.input, request.expected_revision)
+        .await
+        .map_err(error)?;
+    Ok(Json(
+        json!({"instance_id":id,"revision":result.instance.revision,"status":result.instance.status}),
+    ))
 }
 
 fn summaries(registry: &crate::runbook_registry::Registry) -> Value {

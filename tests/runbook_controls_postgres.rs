@@ -478,6 +478,29 @@ async fn follow_up_due_reschedule_cancel_delivery_retry_and_erasure() {
     .await
     .unwrap();
     assert_eq!(count, 1);
+    let event_id: String = sqlx::query_scalar(&format!(
+        "SELECT id FROM {table} WHERE type='runbook_follow_up'"
+    ))
+    .fetch_one(&db.pool)
+    .await
+    .unwrap();
+    let event = store.normalize_follow_up(&owner, &event_id).await.unwrap();
+    assert_eq!(event.event_type, delivered.schedule.event_type);
+    assert_eq!(
+        event.caused_by_event_id.as_deref(),
+        Some(delivered.schedule.caused_by_event_id.as_str())
+    );
+    assert_eq!(
+        event,
+        store.normalize_follow_up(&owner, &event_id).await.unwrap()
+    );
+    assert!(store.normalize_follow_up(&other, &event_id).await.is_err());
+    assert!(
+        store
+            .normalize_follow_up(&owner, &root.message_id)
+            .await
+            .is_err()
+    );
     let count:i64=sqlx::query_scalar(&format!("SELECT count(*) FROM {table} WHERE type='runbook_schedule' AND (content <> '{{}}'::jsonb OR encryption IS NULL)")).fetch_one(&db.pool).await.unwrap();
     assert_eq!(count, 0);
     db.delete_user_account_and_data(&owner, &format!("control-{owner}@omnyid.test"), &[])
