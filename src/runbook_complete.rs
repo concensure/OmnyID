@@ -135,6 +135,33 @@ impl RunbookRuntime<'_, '_> {
                 prior_step.step_id.clone(),
                 json!({"status":t.status,"output_hash":t.output_hash,"output_refs":t.output_refs}),
             );
+            if matches!(
+                prior_step.kind,
+                StepKind::Classify | StepKind::Reason | StepKind::Draft
+            ) {
+                let receipt_id = digest(&json!([
+                    "runbook_model_result",
+                    owner,
+                    id,
+                    prior_step.step_id
+                ]));
+                let value = self
+                    .store
+                    .read_kind(
+                        owner,
+                        "runbook_model_result",
+                        Some(&receipt_id),
+                        None,
+                        &mut tx,
+                    )
+                    .await?
+                    .pop()
+                    .ok_or("model_receipt_required")?;
+                let receipt = crate::runbook_model_runtime::parse_receipt(owner, &value)?;
+                if !receipt.applied || receipt.trace != t {
+                    return Err("model_trace_mismatch");
+                }
+            }
             if prior_step.kind == StepKind::Emit {
                 let receipt_id = digest(&json!([
                     "runbook_emission.v1",
