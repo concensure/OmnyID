@@ -160,7 +160,7 @@ async fn gate(runtime: &RunbookRuntime<'_, '_>, db: &Db, owner: &str, id: &str, 
     );
     let table = format!(
         "\"{}\".action_audit_log",
-        omnyid_homeserver::db::tenant_schema_name(owner)
+        format!("user_{}", owner.to_lowercase())
     );
     let count: i64 = sqlx::query_scalar(&format!(
         "SELECT count(*) FROM {table} WHERE external_reference=$1 AND status='pending'"
