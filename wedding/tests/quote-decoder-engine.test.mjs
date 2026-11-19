@@ -49,3 +49,13 @@ const changed = engine.compareFields(
 assert.deepEqual(Array.from(changed), ['Per-head package rate: 98 → 88']);
 
 console.log(JSON.stringify({ deterministicTotals: true, componentSubtotalProtected: true, unknownsPreserved: true, diff: true }));
+
+for (const total of [51110, 31096.4]) {
+  const proposal = { ...engine.blankProposal('sample'), pricingModel: 'fixed', packageTotal: total, quoteGuests: 120, gst: 'included' };
+  assert.equal(engine.calculate(proposal, 120, 6).estimatedTotal, total);
+  for (const guests of [8, 24, 60, 180]) {
+    const result = engine.calculate(proposal, guests, 6);
+    assert.equal(result.estimatedTotal, null, 'a quoted package is not a price for a different guest count');
+    assert.ok(result.unknowns.some(value => value.includes('revised package total')));
+  }
+}

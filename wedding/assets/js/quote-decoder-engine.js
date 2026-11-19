@@ -132,12 +132,19 @@
     if (!item.paymentSchedule) unknowns.push("payment schedule");
     if (!(item.inclusions || []).some((entry) => /beverage|drink/i.test(entry))) unknowns.push("beverage pricing or inclusion");
 
+    const packageGuestMismatch = item.packageTotal != null && item.quoteGuests != null && guests !== item.quoteGuests;
+    if (packageGuestMismatch) {
+      unknowns.push(`revised package total for ${guests} guests (quote is for ${item.quoteGuests})`);
+      assumptions.push(`The quoted package amount applies to ${item.quoteGuests} guests and has not been scaled to ${guests}.`);
+    }
+    if (item.minimumSpend != null) unknowns.push("minimum-spend scope and which components count toward it");
+
     const statedFields = [item.pricingModel !== "unclear", item.perHeadRate != null, item.quoteGuests != null, item.packageTotal != null, item.fixedFee != null, item.minimumSpend != null, item.gst !== "not_stated", item.servicePct != null, item.includedHours != null, item.overtimeRate != null, Boolean(item.paymentSchedule)].filter(Boolean).length;
     return {
       // A missing core price is unknown, not a zero-dollar wedding. Keep the
       // arithmetic working internally for gap detection, but do not expose a
       // total until a stated base amount exists.
-      estimatedTotal: baseKnown ? subtotal : null,
+      estimatedTotal: baseKnown && !packageGuestMismatch ? subtotal : null,
       lines,
       unknowns: unique(unknowns),
       assumptions: unique(assumptions),
