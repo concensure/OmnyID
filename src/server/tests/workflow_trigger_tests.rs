@@ -125,7 +125,7 @@ fn afp_subtype_wake_dispatch_constant_value() {
 fn relax_runtime_permissions_removes_world_access() {
     use std::os::unix::fs::PermissionsExt;
 
-    let root = std::env::temp_dir().join(format!("omnyid-runtime-perms-{}", Ulid::new()));
+    let root = std::env::temp_dir().join(format!("omnyid-runtime-perms-{}", ulid::Ulid::new()));
     let workspace = root.join("workspace");
     let data = workspace.join("data");
     let files = data.join("files");
@@ -144,7 +144,7 @@ fn relax_runtime_permissions_removes_world_access() {
         std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o777)).unwrap();
     }
 
-    super::relax_runtime_permissions(&root);
+    crate::server::relax_runtime_permissions(&root);
 
     for path in [
         &root, &workspace, &data, &files, &db, &vector, &secrets, &logs,
