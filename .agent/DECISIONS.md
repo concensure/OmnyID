@@ -1,3 +1,13 @@
+## 2026-11-19: WED-382 execution admission and durable reconciliation
+
+Private drafts and approval-gated tools use separate default-off HTTP cohort
+flags. Operator configuration pins owner, definition digest/version and step,
+expires within one hour, and is rechecked after owner-lock acquisition. Requests
+cannot choose model, cost policy, destination, credential or owner. Provider I/O
+can outlast admission: immutable definition lookup for provenance remains usable
+so final receipts/costs persist without advancing expired instances. Draft caps
+are the minimum of trusted route and reviewed step limits.
+
 ## 2026-11-19: WED-379 bounded deterministic execution
 
 The persisted-event hook may drive a separately configured expiring internal

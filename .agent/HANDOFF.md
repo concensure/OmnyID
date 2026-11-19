@@ -1,3 +1,24 @@
+## WED-382 application execution candidate (2026-11-19 UTC)
+
+Worktree C:/temp/wt/omnyid-wed382, branch agent/codex/WED-382. Code63a4d5e5
+adds default-off exact-owner/definition-hash/step HTTP execution cohorts with
+one-hour maximum admission. Draft policy cannot override reviewed step budgets;
+tools require recent authentication and immutable approval. Expiry blocks new
+admission and advancement but never blocks immutable audit/cost reconciliation.
+Added delayed-expiry regressions, policy tests and synthetic real-HTTP acceptance
+in the guarded sandbox probe. Native validation pending; production flags remain
+off. Follow-up cross-review requested. No GitHub upload.
+
+Independent WED-381 clean release candidate ca563ffa127f004fc7828e3a8768bd1779da9700
+at C:/temp/wt/omnyid-wed381-verify-r2 has frontend typecheck/build, 12 focused
+checks and mounted billing-failure browser test completed. Oracle native build,
+billing PostgreSQL/model-unit tests and corrected model evaluation are queued
+under /home/ubuntu/omnyid-candidates/wed381-ca563ffa. Production remains b9ead529.
+Rollback image/config and workspace volume archive captured there; no deployment
+performed. Old sandbox passed initial effect/replay checks then hit invalid
+changed_grant fixture enum; corrected to suggest_only in this candidate. Full
+sandbox gate remains open. WED-381 release is independent of enabling WED-382.
+
 ## WED-381: post-Google-login billing crash (2026-11-19 UTC)
 
 Worktree C:/temp/wt/omnyid-wed381, branch agent/codex/WED-381. Code commit
