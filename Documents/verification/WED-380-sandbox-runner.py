@@ -1,8 +1,9 @@
 """Single-use, internal-network real-adapter sandbox. No application credentials."""
-import datetime,hashlib,json,pathlib,secrets,subprocess,time
+import datetime,hashlib,json,os,pathlib,secrets,subprocess,time
 root=pathlib.Path(__file__).resolve().parent;sha=(root/'source-sha').read_text().strip()
 assert len(sha)==40 and all(c in '0123456789abcdef' for c in sha)
-prefix='omnyid-wed380-'+sha[:8]+'-sandbox';db=prefix+'-db';server=prefix+'-server';probe=prefix+'-probe'
+runner_digest=hashlib.sha256(pathlib.Path(__file__).read_bytes()).hexdigest()
+prefix='omnyid-wed380-'+sha[:8]+'-sandbox-'+runner_digest[:8];db=prefix+'-db';server=prefix+'-server';probe=prefix+'-probe'
 def run(args):return subprocess.run(args,text=True,capture_output=True,check=True)
 def inspect(name):return json.loads(run(['docker','inspect',name]).stdout)[0]
 before=inspect('omnyid-homeserver-1')['Image']
@@ -22,7 +23,7 @@ try:
   if subprocess.run(['docker','exec',db,'pg_isready','-h','127.0.0.1','-U','probe','-d','wed380_sandbox_probe'],capture_output=True).returncode==0:break
   time.sleep(1)
  else:raise RuntimeError('database not ready')
- run(['docker','run','-d','--name',server,'--network',prefix,'--memory','128m','--cpus','0.5','--read-only','--cap-drop','ALL','--security-opt','no-new-privileges','--env-file',str(env),'-v',str(root/'sandbox-server.py')+':/server.py:ro','-v',str(results)+':/sandbox-results','python:3.12-alpine','python','-B','/server.py'])
+ run(['docker','run','-d','--name',server,'--user',f'{os.getuid()}:{os.getgid()}','--network',prefix,'--memory','128m','--cpus','0.5','--read-only','--cap-drop','ALL','--security-opt','no-new-privileges','--env-file',str(env),'-v',str(root/'sandbox-server.py')+':/server.py:ro','-v',str(results)+':/sandbox-results','python:3.12-alpine','python','-B','/server.py'])
  for _ in range(30):
   ready=subprocess.run(['docker','exec',server,'python','-c',"import socket;s=socket.create_connection(('127.0.0.1',18380),1);s.close()"],capture_output=True)
   if ready.returncode==0:break
@@ -38,7 +39,7 @@ try:
  after=inspect('omnyid-homeserver-1')['Image'];assert before==after
  net=json.loads(run(['docker','network','inspect',prefix]).stdout)[0];assert net['Internal']
  for name in [db,server,probe]:assert not inspect(name)['HostConfig']['PortBindings']
- evidence={'source_sha':sha,'binary_sha256':hashlib.sha256((root/'output/runbook-sandbox-probe').read_bytes()).hexdigest(),'independent_validation_passed':False,'exit_code':r.returncode,'records':records,'independent_effects':effects,'internal_network':True,'server_image':inspect(server)['Image'],'production_image_before':before,'production_image_after':after,'collected_at':datetime.datetime.now(datetime.timezone.utc).isoformat()}
+ evidence={'source_sha':sha,'runner_sha256':runner_digest,'binary_sha256':hashlib.sha256((root/'output/runbook-sandbox-probe').read_bytes()).hexdigest(),'independent_validation_passed':False,'exit_code':r.returncode,'records':records,'independent_effects':effects,'internal_network':True,'server_image':inspect(server)['Image'],'production_image_before':before,'production_image_after':after,'collected_at':datetime.datetime.now(datetime.timezone.utc).isoformat()}
  (root/'sandbox-evidence.json').write_text(json.dumps(evidence,indent=2))
  assert r.returncode==0 and records[-1].get('event')=='complete','probe failed; inspect retained evidence'
  expected={'success','cancel','drop','delay','persistfail'}
