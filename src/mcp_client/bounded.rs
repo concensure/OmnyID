@@ -4,6 +4,7 @@ use reqwest::header::{ACCEPT, CONTENT_ENCODING, CONTENT_TYPE, HeaderValue};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::time::Duration;
+pub mod destination;
 mod unique_json;
 
 #[derive(Clone, Copy)]
@@ -82,6 +83,33 @@ pub async fn call_tool(
     arguments: &Value,
     limits: CallLimits,
 ) -> Result<CallResponse, CallFailure> {
+    call_tool_inner(endpoint, api_key, capability, arguments, limits, None).await
+}
+pub(crate) async fn call_tool_pinned(
+    target: &destination::PinnedMcpTarget,
+    api_key: Option<&str>,
+    capability: &str,
+    arguments: &Value,
+    limits: CallLimits,
+) -> Result<CallResponse, CallFailure> {
+    call_tool_inner(
+        target.endpoint(),
+        api_key,
+        capability,
+        arguments,
+        limits,
+        Some(target),
+    )
+    .await
+}
+async fn call_tool_inner(
+    endpoint: &str,
+    api_key: Option<&str>,
+    capability: &str,
+    arguments: &Value,
+    limits: CallLimits,
+    target: Option<&destination::PinnedMcpTarget>,
+) -> Result<CallResponse, CallFailure> {
     if limits.timeout.is_zero()
         || limits.timeout > Duration::from_secs(30)
         || limits.response_bytes == 0
@@ -141,12 +169,16 @@ pub async fn call_tool(
     if body.len() > 65536 {
         return Err(rejected("tool_request_too_large"));
     }
-    let client = reqwest::Client::builder()
+    let mut builder = reqwest::Client::builder()
         .redirect(reqwest::redirect::Policy::none())
         .retry(reqwest::retry::never())
         .no_proxy()
         .connect_timeout(limits.timeout)
-        .timeout(limits.timeout)
+        .timeout(limits.timeout);
+    if let Some(target) = target {
+        builder = target.pin(builder);
+    }
+    let client = builder
         .build()
         .map_err(|_| rejected("tool_client_unavailable"))?;
     let mut request = client

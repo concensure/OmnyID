@@ -14,6 +14,7 @@ pub struct PreparedRunbookTool {
     transport_binding: String,
     pub(crate) approval_mode: String,
     contract: ToolContract,
+    pub(super) binding: Value,
 }
 impl PreparedRunbookTool {
     pub fn owner(&self) -> &str {
@@ -94,7 +95,7 @@ fn from_snapshot(
         &arguments,
     );
     let request_hash = digest(&json!([
-        "runbook_tool_request.v2",
+        "runbook_tool_request.v3",
         ctx.user_id,
         slug,
         capability,
@@ -114,6 +115,7 @@ fn from_snapshot(
             .ok_or("invalid_tool_policy")?
             .into(),
         contract,
+        binding: snapshot.binding,
     })
 }
 

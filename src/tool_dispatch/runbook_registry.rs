@@ -33,6 +33,8 @@ pub(super) async fn load_in<'e, E: sqlx::Executor<'e, Database = sqlx::Postgres>
         r#"
         SELECT m.id AS connection_id, m.connected_at AS connection_epoch,
             m.mcp_server_url, m.connection_provider, m.external_user_id,
+            CASE WHEN octet_length(m.api_key_enc)<=32768 THEN
+                encode(sha256(convert_to(m.api_key_enc, 'UTF8')), 'hex') ELSE NULL END AS credential_fingerprint,
             m.composio_connected_account_id,
             CASE WHEN octet_length(m.tool_descriptor::text)<=65536
                  THEN m.tool_descriptor ELSE NULL END AS descriptor,
@@ -59,6 +61,9 @@ pub(super) async fn load_in<'e, E: sqlx::Executor<'e, Database = sqlx::Postgres>
         return Err("tool_selection_not_unique");
     }
     let row = &rows[0];
+    let credential_fingerprint: String = row
+        .get::<Option<String>, _>("credential_fingerprint")
+        .ok_or("invalid_tool_credential")?;
     let endpoint: String = row.get("mcp_server_url");
     let provider: String = row.get("connection_provider");
     let actor: Option<String> = row.get("external_user_id");
@@ -144,6 +149,7 @@ pub(super) async fn load_in<'e, E: sqlx::Executor<'e, Database = sqlx::Postgres>
     Ok(RegistrySnapshot {
         binding: json!({"connection_id":row.get::<String,_>("connection_id"),
             "connection_epoch":row.get::<String,_>("connection_epoch"),
+            "credential_fingerprint":credential_fingerprint,
             "grant_id":row.get::<String,_>("grant_id"),"grant_epoch":row.get::<String,_>("grant_epoch"),
             "endpoint":endpoint,"provider":provider,"external_user_id":actor,"account":account,
             "approval_mode":approval,"scopes":scopes}),
