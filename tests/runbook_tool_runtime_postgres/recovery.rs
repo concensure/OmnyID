@@ -190,3 +190,82 @@ async fn abandonment_after_cancellation_records_unknown_without_reopening_instan
     server.abort();
     erase(&db, &owner).await;
 }
+
+#[tokio::test]
+async fn repeated_tool_failures_suppress_new_dispatch_and_already_matched_start() {
+    let db = database().await;
+    let owner = user(&db).await;
+    let other = user(&db).await;
+    let store = RunbookStore::new(&db, [31; 32], [32; 32]);
+    let runtime = RunbookRuntime::new(&store);
+    let (provider, server) = provider(json!({"structuredContent":{"unexpected":true}})).await;
+    let first = setup(&db, &store, &owner.id, &provider.endpoint).await;
+    async fn trigger(
+        db: &Db,
+        runtime: &RunbookRuntime<'_, '_>,
+        owner: &str,
+    ) -> omnyid_homeserver::runbook_runtime::DispatchReceipt {
+        let event = Ulid::new().to_string();
+        db.insert_daemon_afp_message(&json!({"protocol":"afp-v1","id":event,"type":"workflow_failed","to":[owner],"thread_id":"cooldown:test","timestamp":Utc::now().to_rfc3339(),"content":{"confidence":0.9,"metadata":{"status":"failed"}}})).await.unwrap();
+        runtime.dispatch(owner, &event).await.unwrap()
+    }
+    let queued = trigger(&db, &runtime, &owner.id).await.instance_ids[0].clone();
+    for index in 0..3 {
+        let id = if index == 0 {
+            first.clone()
+        } else {
+            let id = trigger(&db, &runtime, &owner.id).await.instance_ids[0].clone();
+            runtime.start(&owner.id, &id, 1).await.unwrap();
+            id
+        };
+        let pid = approve(&runtime, &owner.id, &id).await;
+        let receipt = runtime
+            .execute_tool(&owner.id, &id, &pid, &provider)
+            .await
+            .unwrap();
+        assert_eq!(receipt.outcome, ToolOutcome::Unknown);
+        assert_eq!(
+            runtime
+                .execute_tool(&owner.id, &id, &pid, &provider)
+                .await
+                .unwrap(),
+            receipt
+        );
+    }
+    assert_eq!(provider.calls.load(Ordering::SeqCst), 3);
+    let suppressed = trigger(&db, &runtime, &owner.id).await;
+    assert!(suppressed.instance_ids.is_empty());
+    assert_eq!(
+        suppressed.decisions[0].disposition,
+        omnyid_homeserver::runbook_matcher::MatchDisposition::OutcomeCooldown
+    );
+    assert_eq!(
+        runtime
+            .dispatch(&owner.id, &suppressed.event_id)
+            .await
+            .unwrap(),
+        suppressed
+    );
+    assert_eq!(
+        runtime.start(&owner.id, &queued, 1).await.unwrap_err(),
+        "runbook_failure_cooldown"
+    );
+    assert_eq!(
+        runtime
+            .instance(&owner.id, &queued)
+            .await
+            .unwrap()
+            .instance
+            .status,
+        InstanceState::Matched
+    );
+    // Same runbook in a different account remains eligible.
+    setup(&db, &store, &other.id, &provider.endpoint).await;
+    assert_eq!(
+        trigger(&db, &runtime, &other.id).await.instance_ids.len(),
+        1
+    );
+    server.abort();
+    erase(&db, &other).await;
+    erase(&db, &owner).await;
+}

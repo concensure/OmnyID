@@ -1,6 +1,8 @@
 //! Disposable PostgreSQL and loopback mock provider only; no external calls.
 #[path = "runbook_tool_runtime_postgres/recovery.rs"]
 mod recovery;
+#[path = "runbook_tool_runtime_postgres/provenance.rs"]
+mod provenance;
 use chrono::Utc;
 use omnyid_homeserver::db::{
     Db, McpToolConnectionUpsert, UserConnectedCapabilityRecord, UserRecord,
@@ -266,6 +268,7 @@ async fn exact_approval_concurrent_execution_and_private_atomic_receipt() {
     assert_eq!(receipt.output, Some(json!({"limit":0})));
     assert!(receipt.trace.provenance_ref.is_some());
     assert!(receipt.trace.approval_ref.is_some());
+    provenance::assert_exact_tool_hashes(&db, &owner.id, &receipt).await;
     assert_eq!(provider.calls.load(Ordering::SeqCst), 1);
     assert_eq!(
         runtime

@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sqlx::{Postgres, Transaction};
 use std::collections::HashSet;
+mod failure_cooldown;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
@@ -81,7 +82,15 @@ impl<'a, 'db> RunbookRuntime<'a, 'db> {
         let registry = self.store.load(owner, &mut tx).await?;
         let decisions = match_event(owner, &registry, &event, &HashSet::new())?;
         let feedback = self.outcome_feedback_in(owner, &mut tx).await?;
-        let decisions = crate::runbook_outcome::apply_feedback(decisions, &registry, &feedback)?;
+        let mut decisions = crate::runbook_outcome::apply_feedback(decisions, &registry, &feedback)?;
+        let cooling = self.failure_cooldowns_in(owner, &mut tx).await?;
+        for decision in &mut decisions {
+            if decision.disposition == MatchDisposition::Matched
+                && cooling.contains(&decision.runbook_id)
+            {
+                decision.disposition = MatchDisposition::OutcomeCooldown;
+            }
+        }
         let mut instance_ids = vec![];
         for decision in &decisions {
             if decision.disposition != MatchDisposition::Matched {
@@ -151,6 +160,10 @@ impl<'a, 'db> RunbookRuntime<'a, 'db> {
         // dedicated future authority adapters, not an arbitrary state transition.
         if current.instance.status != InstanceState::Matched {
             return Err("instance_not_matched");
+        }
+        if self.failure_cooldowns_in(owner, &mut tx).await?
+            .contains(&current.instance.runbook_id) {
+            return Err("runbook_failure_cooldown");
         }
         self.require_enabled(owner, &current.instance, &mut tx)
             .await?;
