@@ -153,6 +153,7 @@ export function UsageView() {
   const [billing, { mutate: setBilling }] = createResource<BillingStatus | null>(
     async () => loadUsageViewBillingState(!!session?.token),
   );
+  const readBilling = () => billing.error ? null : billing();
   const [operatorResourceBundle, { refetch: refetchOperatorResourceBundle }] = createResource(
     () => (session?.token ? {
       nonce: operatorReloadNonce(),
@@ -203,8 +204,8 @@ export function UsageView() {
   const effectiveAdminThirdPartyToolPolicySourceLabel = () =>
     adminThirdPartyToolPolicySourceLabel() ?? operatorResourceBundle()?.adminThirdPartyToolPolicy?.sourceLabel ?? null;
   const externalToolDerivedState = createMemo(() => readExternalToolDerivedState({
-    billing: billing()?.external_tool_billing,
-    quotaState: billing()?.quota_state,
+    billing: readBilling()?.external_tool_billing,
+    quotaState: readBilling()?.quota_state,
     weddingApiStack: weddingApiStack(),
     adminThirdPartyToolPolicies: effectiveAdminThirdPartyToolPolicies(),
     adminThirdPartyToolPolicySourceLabel: effectiveAdminThirdPartyToolPolicySourceLabel(),
@@ -320,7 +321,7 @@ export function UsageView() {
 
   async function copyUpgradeRequest() {
     await copyUsageViewUpgradeRequest({
-      billing: billing(),
+      billing: readBilling(),
       sessionEmail: session?.user.email,
       guardState: {
         modeSaving: modeSaving(),
@@ -341,7 +342,7 @@ export function UsageView() {
       guardState: {
         modeSaving: modeSaving(),
         billingActionBusy: billingActionBusy(),
-        hasBilling: !!billing(),
+        hasBilling: !!readBilling(),
       },
       requestCounter: archiveOnlyModeRequestCounter,
       setBilling,
@@ -599,7 +600,7 @@ export function UsageView() {
   }
 
   const copyWorkspaceOperationalCommand = readUsageViewCopyWorkspaceOperationalCommand({
-    billing: billing(),
+    billing: readBilling(),
     copyOperationalCommand,
   });
   const copyOperatorCommand = readUsageViewCopyOperatorCommand({
@@ -625,7 +626,7 @@ export function UsageView() {
     clearOperatorActionError: () => setOperatorActionError(null),
   });
   const usageBillingSectionProps = createMemo(() => readUsageViewBillingMountedSectionProps({
-    billing: billing(),
+    billing: readBilling(),
     billingLoading: billing.loading,
     billingError: billing.error,
     sessionEmail: session?.user.email,

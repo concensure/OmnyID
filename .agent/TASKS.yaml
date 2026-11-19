@@ -15,6 +15,17 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-381
+    title: Fix post-Google-login billing crash and contain usage loading failures
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-381
+    worktree: C:/temp/wt/omnyid-wed381
+    base_sha: 07c9d02e
+    depends_on: [WED-376, WED-380]
+    files: [src/db.rs, solid-ui/src/components/UsageView.tsx, tests/billing_storage_postgres.rs, solid-ui/tests/**, solid-ui/e2e/billing-failure.html, solid-ui/playwright.billing.config.ts, Documents/verification/WED-380-model-runner.py, Documents/verification/WED-381*, .agent/**]
+    acceptance: [PostgreSQL BIGINT storage sum decodes for empty and nonempty accounts, rejected billing resource cannot crash entire workspace, real Google account-selection and authenticated workspace completion, clean staged exact-SHA Oracle release with rollback]
+    progress: "Reproduced real Google selection: auth/google200 then billing/status500 and top-level error boundary. Server log confirms i64 decoding of PostgreSQL NUMERIC aggregate. No production mutation yet."
   - id: WED-380
     model_candidate_sha: 4aff57ef621fb6066d4021a441bf9805ce7ebe94
     candidate_sha: 7d34e769ab48c5f01540510740f0d25c07932a85

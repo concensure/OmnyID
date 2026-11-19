@@ -10,8 +10,12 @@ def inspect(name):return json.loads(run(['docker','inspect',name]).stdout)[0]
 production=inspect('omnyid-homeserver-1'); before=production['Image']
 config=dict(v.split('=',1) for v in production['Config']['Env'] if '=' in v)
 secret_path=config['OMNYID_OPENAI_API_KEY_FILE']
-mounts=[m for m in production['Mounts'] if m['Destination']==secret_path]
-assert len(mounts)==1 and pathlib.Path(mounts[0]['Source']).is_file()
+secret_destination=pathlib.PurePosixPath(secret_path)
+mounts=[m for m in production['Mounts'] if secret_destination.is_relative_to(m['Destination'])]
+assert mounts, 'configured secret file has no mounted source'
+mount=max(mounts,key=lambda m:len(m['Destination']))
+secret_source=pathlib.Path(mount['Source'])/secret_destination.relative_to(mount['Destination'])
+assert secret_source.is_file()
 for name in [db,probe]:assert subprocess.run(['docker','inspect',name],capture_output=True).returncode!=0
 run(['docker','network','create',network])
 password=secrets.token_hex(32)
@@ -29,7 +33,7 @@ try:
   if subprocess.run(['docker','exec',db,'pg_isready','-h','127.0.0.1','-U','probe','-d','wed380_model_probe'],capture_output=True).returncode==0:break
   time.sleep(1)
  else:raise RuntimeError('database not ready')
- cmd=['docker','run','--name',probe,'--network',network,'--memory','768m','--cpus','1','--read-only','--cap-drop','ALL','--security-opt','no-new-privileges','--tmpfs','/tmp:rw,size=32m','--env-file',str(env),'-v',str(root/'output')+':/probe:ro','-v',mounts[0]['Source']+':/run/secrets/eval_openai:ro','omnyid-wed376-builder:rust1940','/probe/runbook-model-eval']
+ cmd=['docker','run','--name',probe,'--network',network,'--memory','768m','--cpus','1','--read-only','--cap-drop','ALL','--security-opt','no-new-privileges','--tmpfs','/tmp:rw,size=32m','--env-file',str(env),'-v',str(root/'output')+':/probe:ro','-v',str(secret_source)+':/run/secrets/eval_openai:ro','omnyid-wed376-builder:rust1940','/probe/runbook-model-eval']
  try:r=subprocess.run(cmd,text=True,capture_output=True,timeout=1050)
  except subprocess.TimeoutExpired:
   subprocess.run(['docker','stop',probe],capture_output=True)

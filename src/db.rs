@@ -3784,7 +3784,7 @@ impl Db {
     ) -> Result<i64, sqlx::Error> {
         let attachments_table = tenant_attachments_table(user_id);
         let used = sqlx::query_scalar::<_, i64>(&format!(
-            "SELECT COALESCE(SUM(size_bytes), 0) FROM {attachments_table}"
+            "SELECT COALESCE(SUM(size_bytes), 0)::BIGINT FROM {attachments_table}"
         ))
         .fetch_one(&self.pool)
         .await?;
