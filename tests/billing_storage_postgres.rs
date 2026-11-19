@@ -3,6 +3,7 @@ use omnyid_homeserver::db::Db;
 use ulid::Ulid;
 
 #[tokio::test]
+#[ignore = "requires an explicitly configured disposable PostgreSQL database"]
 async fn attachment_totals_decode_bigint_and_stay_owner_scoped() {
     let url = std::env::var("TEST_DATABASE_URL").expect("set disposable TEST_DATABASE_URL");
     assert!(url.contains("@127.0.0.1:") && url.ends_with("/omnyid_test"));
