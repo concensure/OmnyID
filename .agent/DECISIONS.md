@@ -1,3 +1,14 @@
+## 2026-11-19: WED-379 bounded deterministic execution
+
+The persisted-event hook may drive a separately configured expiring internal
+cohort. Both event and deterministic owner allowlists must permit the account;
+exact definition versions and full trusted starter step contracts bound the
+pipeline. Only read, transform, private review and completion are composed.
+Cohort deadlines are checked after owner-lock acquisition at each executor
+transaction admission. Already-admitted transactions may finish; later ones
+are denied. Existing receipts/revisions/definition disablement remain authoritative.
+No model/tool/approval/wait executor or production rollout is implied.
+
 ## 2026-11-19: WED-375 quote receipt and opt-in shared funding
 
 Canonical quote persistence may bridge a validated owner-private quote into a
