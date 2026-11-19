@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createResource, createSignal, Show } from "solid-js";
+import { createEffect, createMemo, createResource, createSignal, ErrorBoundary, Show } from "solid-js";
 import {
   createBillingCheckoutSession,
   createBillingPortalSession,
@@ -694,7 +694,12 @@ export function UsageView() {
           <UsageBillingSection {...usageBillingSectionProps()} />
 
           <Show when={operatorDerivedState().operatorSectionVisible}>
-            <UsageOperatorSection {...usageOperatorSectionProps()} />
+            <ErrorBoundary fallback={(_, reset) => <div role="alert">
+              <p>Admin tools could not be loaded. Your workspace is still available.</p>
+              <button type="button" onClick={reset}>Retry admin tools</button>
+            </div>}>
+              <UsageOperatorSection {...usageOperatorSectionProps()} />
+            </ErrorBoundary>
           </Show>
 
           <UsageExternalToolBillingSection {...externalToolSectionModel()} />

@@ -23,7 +23,7 @@ tasks:
     worktree: C:/temp/wt/omnyid-wed381
     base_sha: 07c9d02e
     depends_on: [WED-376, WED-380]
-    files: [src/db.rs, solid-ui/src/components/UsageView.tsx, tests/billing_storage_postgres.rs, solid-ui/tests/**, solid-ui/e2e/billing-failure.html, solid-ui/playwright.billing.config.ts, Documents/verification/WED-380-model-runner.py, Documents/verification/WED-381*, .agent/**]
+    files: [src/db.rs, solid-ui/src/components/UsageView.tsx, solid-ui/src/lib/operatorUsageSectionState.ts, tests/billing_storage_postgres.rs, solid-ui/tests/**, solid-ui/e2e/billing-failure.html, solid-ui/playwright.billing.config.ts, Documents/verification/WED-380-model-runner.py, Documents/verification/WED-381*, .agent/**]
     acceptance: [PostgreSQL BIGINT storage sum decodes for empty and nonempty accounts, rejected billing resource cannot crash entire workspace, real Google account-selection and authenticated workspace completion, clean staged exact-SHA Oracle release with rollback]
     progress: "Reproduced real Google selection: auth/google200 then billing/status500 and top-level error boundary. Server log confirms i64 decoding of PostgreSQL NUMERIC aggregate. No production mutation yet."
   - id: WED-380

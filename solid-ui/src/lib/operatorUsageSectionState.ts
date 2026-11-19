@@ -69,15 +69,9 @@ export function readOperatorDerivedState(args: {
   });
   const operatorSectionVisible = args.hasSessionToken
     && (
-      args.usersLoading
-      || args.profitLoading
-      || args.remediationHistoryLoading
-      || args.usersValue !== null
-      || args.profitValue !== null
-      || args.remediationHistoryValue !== null
-      || !!args.usersError
-      || !!args.profitError
-      || !!args.remediationHistoryError
+      args.usersValue != null
+      || args.profitValue != null
+      || args.remediationHistoryValue != null
     );
   const operatorLoadError = args.usersError ?? args.profitError ?? args.remediationHistoryError ?? null;
   const operatorMonthlyCost = operatorProfitUsers.reduce((sum, row) => sum + row.cost_usd, 0);

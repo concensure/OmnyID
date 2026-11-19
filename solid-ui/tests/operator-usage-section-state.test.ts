@@ -346,3 +346,18 @@ test("operator usage section builders preserve the mounted section contracts", (
     },
   );
 });
+
+
+test("operator panels wait for a successful authorized response", () => {
+  for (const value of [undefined, null]) {
+    const state = readOperatorDerivedState({
+      hasSessionToken: true, usersLoading: value === undefined,
+      profitLoading: value === undefined, remediationHistoryLoading: value === undefined,
+      usersValue: value, profitValue: value, remediationHistoryValue: value,
+      usersError: null, profitError: null, remediationHistoryError: null,
+      formatMoneyLabel: () => "", formatArtifactSummary: () => null,
+      runtimeRemediationBusy: false,
+    });
+    assert.equal(state.operatorSectionVisible, false);
+  }
+});
