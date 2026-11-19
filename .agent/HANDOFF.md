@@ -1,3 +1,30 @@
+## Oracle artifact retention and WED-382 queues (2026-11-19 14:14 UTC)
+
+WED-382 frozen source7f8abcf41bf06e72b3b995047cffe71ce7de05da remains at
+C:/temp/wt/omnyid-wed382-verify. Native build is running at
+/home/ubuntu/omnyid-candidates/wed382-7f8abcf4. Queued jobs: sandbox runner,
+application model runner, final-source36case comparison after application success,
+and runtime/cohort tests. Production is WED-381 ca563ffa, Google login verified.
+
+Disk reached df98% during retained artifact preparation. Only redundant generated
+binaries and verified upload archives were removed after local byte/hash verification.
+No source worktree, Docker image, rollback backup or database was removed. Retained
+archives: C:/temp/wt/wed382-retained-build-binaries.tar.gz and
+C:/temp/wt/wed382-retained-deterministic-binaries.tar.gz; adjacent JSON manifests
+contain source SHAs/member hashes/archive hashes. Oracle location manifests are
+/home/ubuntu/omnyid-candidates/wed382-retained-*-binaries-location.json. They cover
+WED-3794151825c/24948b23 outputs, WED-3804aff57ef/7d34e769 outputs and WED-381
+ca563ffa standalone homeserver binary. Live/rollback images still contain their
+binaries. Restore from these archives if old candidate output paths are needed.
+Disk returned to df96%. The final deployment script uses the actual df percentage
+(<98), not a differing reserved-block calculation.
+
+WED-382 source package was audited against1309 exact git blobs before build;
+binary image newline transformations in the initial transfer were corrected
+before compilation. WED-382 runtime rollback was captured from production381,
+including workspace-before.tar.gz; Caddy validates unchanged. Frontend7f8abcf4
+has typecheck/build,12focused tests and1mounted billing regression completed.
+
 ## WED-381 released; WED-376 Google acceptance complete (2026-11-19 14:05 UTC)
 
 Production source ca563ffa127f004fc7828e3a8768bd1779da9700, clean build worktree
