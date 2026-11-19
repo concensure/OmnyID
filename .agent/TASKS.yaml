@@ -16,6 +16,8 @@ lifecycle:
 
 tasks:
   - id: WED-376
+    candidate_sha: 2618fead7556ac8bfde987be7879a85247ef382e
+    verification_worktree: C:/temp/wt/omnyid-wed376-verify
     title: Repair OAuth login and vendor availability, directory and public agent entrypoints
     status: in_progress
     owner: codex

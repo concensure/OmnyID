@@ -1,3 +1,28 @@
+## WED-376 candidate verification in progress - 2026-11-19
+
+Implementation: C:/temp/wt/omnyid-wed376, agent/codex/WED-376.
+Frozen source: 2618fead7556ac8bfde987be7879a85247ef382e.
+Verification: C:/temp/wt/omnyid-wed376-verify (clean detached).
+User authorizes test-account creation if required, commits and Oracle release.
+Five existing saved test accounts returned 200 with sessions. Existing quote
+samples are in Documents/testing/venue-quote-samples. No credentials recorded.
+Current production application manifest: 5536b83b2f9d2f58488a075f383c24f8f4f73d6c;
+loopback port 18080. Existing isolated staging uses port 18081.
+
+Candidate fixes public Google GIS CSP, adds accessible public Sprout entrypoints,
+adds bounded all/category vendor calendar issuance preserving valid older grants,
+renews only valid links, restricts non-celebrants to dates, serializes mutations,
+curates default celebrants, supports literal partial-name search and deduplicates
+category labels. Import tool prepares transactional reconciliation without
+publishing workbook contact details. Spreadsheet has 1927 phone-bearing rows;
+12 vendor references match current production IDs. Import not yet applied.
+
+Cross-review caught and corrected request-generation and vendor/grant lock races.
+Google policy source: https://developers.google.com/identity/gsi/web/guides/get-google-api-clientid
+Preflight found ClamAV unhealthy (update database test killed by signal 9),
+root disk 83%. Resolve scanner and confirm headroom before deploying. No live
+configuration, database import, provider calls or release performed yet.
+
 ## 2026-11-19: WED-375 local pinned verification complete; five hosted gates remain
 
 Implementation worktree: `C:/temp/wt/omnyid-runbooks`, branch `agent/codex/WED-375`.
