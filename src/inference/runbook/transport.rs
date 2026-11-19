@@ -23,6 +23,17 @@ async fn inner(
     if key.is_empty() || key.len() > 8192 {
         return Err(ModelFailure::Provider);
     }
+    let body = preflight(request)?;
+    let client = reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .retry(reqwest::retry::never())
+        .no_proxy()
+        .build()
+        .map_err(|_| ModelFailure::Provider)?;
+    send(client, endpoint, key, request, body).await
+}
+
+pub(super) fn preflight(request: &ModelRequest) -> Result<Value, ModelFailure> {
     let body = body(request);
     let bytes = body.to_string().len();
     if bytes > 24576 {
@@ -38,12 +49,16 @@ async fn inner(
     {
         return Err(ModelFailure::CostCeiling);
     }
-    let client = reqwest::Client::builder()
-        .redirect(reqwest::redirect::Policy::none())
-        .retry(reqwest::retry::never())
-        .no_proxy()
-        .build()
-        .map_err(|_| ModelFailure::Provider)?;
+    Ok(body)
+}
+
+async fn send(
+    client: reqwest::Client,
+    endpoint: &str,
+    key: &str,
+    request: &ModelRequest,
+    body: Value,
+) -> Result<ModelResponse, ModelFailure> {
     let mut response = client
         .post(endpoint)
         .bearer_auth(key)

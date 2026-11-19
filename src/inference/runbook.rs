@@ -1,5 +1,5 @@
 //! Bounded owner-scoped runbook inference. No route or worker enables this adapter.
-//! Credentials come only from the application's existing user inference resolver.
+//! Credentials use existing owner resolution or explicitly gated shared funding.
 use super::InferenceBackend;
 use crate::{db::Db, runbook_contract::StepKind, runbook_llm_step::*};
 use serde_json::{Value, json};
@@ -11,6 +11,7 @@ pub struct OwnerRunbookModelProvider<'a> {
     db: &'a Db,
     owner: String,
     allow_escalation: bool,
+    allow_shared: bool,
 }
 impl<'a> OwnerRunbookModelProvider<'a> {
     /// Trusted application policy, not request/evidence/model data.
@@ -22,7 +23,20 @@ impl<'a> OwnerRunbookModelProvider<'a> {
             db,
             owner: owner.into(),
             allow_escalation,
+            allow_shared: false,
         })
+    }
+
+    /// Trusted composition opt-in. Also requires server rollout flags, account
+    /// allowlist, explicit compatible hosted config and both funding budgets.
+    pub fn with_shared_funding(
+        db: &'a Db,
+        owner: &str,
+        allow_escalation: bool,
+    ) -> Result<Self, ModelFailure> {
+        let mut provider = Self::new(db, owner, allow_escalation)?;
+        provider.allow_shared = true;
+        Ok(provider)
     }
 }
 #[async_trait::async_trait]
@@ -34,12 +48,35 @@ impl ModelProvider for OwnerRunbookModelProvider<'_> {
         if !active {
             return Err(ModelFailure::Provider);
         }
+        let cfg = self
+            .db
+            .get_llm_config(&self.owner)
+            .await
+            .map_err(|_| ModelFailure::Provider)?;
+        if self.allow_shared && cfg.as_ref().is_some_and(|c| c["backend"] == "hosted") {
+            transport::preflight(request)?;
+            let reservation = crate::server::llm_resolution::reserve_shared_runbook(
+                self.db,
+                &self.owner,
+                &request.model,
+                request.max_cost_microunits,
+            )
+            .await?;
+            let result = transport::call(
+                "https://api.openai.com/v1/chat/completions",
+                &reservation.api_key,
+                request,
+            )
+            .await?;
+            reservation.finish(self.db, &result).await?;
+            return Ok(result);
+        }
         let resolved =
             crate::server::llm_resolution::resolve_user_inference_backend(self.db, &self.owner)
                 .await
                 .map_err(|_| ModelFailure::Provider)?
                 .ok_or(ModelFailure::Provider)?;
-        // The existing shared ladder currently selects other model families.
+        // The default adapter remains BYOK-only; shared funding requires explicit opt-in.
         // Never silently override the owner's chosen model or use unfunded keys.
         if resolved.backend_name != "byok" {
             return Err(ModelFailure::Provider);

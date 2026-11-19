@@ -9,6 +9,7 @@ use crate::inference::InferenceBackend;
 use crate::secret_manager::read_process_secret_trimmed;
 
 use super::Db;
+pub(crate) use super::openrouter_funded_inference::runbook::reserve_shared_runbook;
 
 const DEFAULT_ANTHROPIC_MODEL: &str = "claude-haiku-4-5-20251001";
 const DEFAULT_RUNPOD_MODEL: &str = "Qwen/Qwen3.5-35B-A3B";

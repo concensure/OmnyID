@@ -6,6 +6,7 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 use sqlx::{PgPool, Row};
 use ulid::Ulid;
+pub(crate) mod runbook;
 
 const OPENROUTER_MODEL: &str = "openai/gpt-5-mini";
 const OPENAI_SPROUT_MODEL: &str = "gpt-5-mini";
