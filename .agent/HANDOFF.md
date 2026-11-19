@@ -1,3 +1,30 @@
+## WED-377 native build and staging quote/UI checks complete; Rust test compile pending
+
+Application source b9ead5298fb0cff77ef552c1dc4281e6d35c6bc8, verification worktree
+C:/temp/wt/omnyid-wed377-verify. Native optimized ARM build completed in16m51s.
+Binary SHA256 77d2dc08fa1ea73a77b91be820945d7ff74db1bf6b78d02d53050005c9a19db5.
+Candidate image sha256:a086dba378880b9a8d19e68dfc403efa27356c0ecee5e136755edc0bddff4fa6
+is running on isolated staging only. Production remains1e79ec2c.
+
+Oracle candidate wed377-b9ead529/staging-quote-evidence.json records five successful
+HTTP checks: both existing samples preserve51110/31096.4, GSTincluded and120guests;
+conflicting totals clear monetary inputs; wrapped extras do not become base prices.
+Authenticated staging health200. Browser exercised all five captured hosted responses,
+manual field application, Compare stated terms and guest counts8/24/60/120/180.
+Machine output C:/temp/wt/wed377-hosted-quote-browser-retry.log; exit0. Initial browser
+harness missed the Compare button; retained failed harness log, corrected harness passes.
+Both samples remain priced only at their quoted120guests; conflicts remain unpriced.
+
+Native cargo test --release --lib server::wedding_quote_decoder_routes is still compiling
+in omnyid-wed377-candidate-tests. Source unchanged; target cache retained. The encompassing
+build.exit is written after tests, so its absence is expected until then. No production
+switch until build.exit and tests.exit both0. Stage helper was permitted to overlap
+isolated test compilation after the optimized binary was copied and hashed; production
+helper explicitly checks both final exit files. Current live rollback image1e79ec2c
+is tagged omnyid-homeserver:wed377-rollback-1e79ec2c, snapshots in candidate rollback/.
+GitHub push remains permission-rejected; details below. Google account completion remains
+unverified and five Runbook rollout gates stay open.
+
 ## WED-377 reviewed follow-up b9ead529: verification and release pending — 2026-11-19
 
 Frozen source b9ead5298fb0cff77ef552c1dc4281e6d35c6bc8; clean verification

@@ -26,7 +26,7 @@ tasks:
     depends_on: [WED-376]
     files: [src/server/wedding_quote_decoder_routes.rs, src/server/wedding_quote_decoder_routes/**, wedding/assets/js/quote-decoder-engine.js, wedding/assets/js/wedding-agent.js, wedding/**/*.html, wedding/tests/**, src/server/wedding_vendor_directory_page.rs, .agent/**]
     acceptance: [Explicit standalone proposal totals and GST wording are preserved, supplemental per-person hourly charges cannot become core package prices, changed guest counts retain quoted totals with clear caveats, both existing fictional quote samples and adversarial cases pass, clean exact-SHA build and staged Oracle release evidence]
-    progress: "Discovered using user-requested existing samples in hosted staging. The pre-existing deterministic fallback mistakes the Bluegum extra beverage-hour rate for package rate and misses standalone TOTAL/GST-inclusive wording. No paid model calls or outreach needed to reproduce. Keep WED-376 frozen release evidence separate."
+    progress: "Reviewed candidate b9ead529 has clean frontend/browser evidence and native ARM build. Isolated staging quote and captured-response browser regressions pass; see candidate staging-quote-evidence.json and local wed377-hosted-quote-browser-retry.log. Native Rust test compilation and final production switch remain. No paid model calls or outreach. GitHub push was rejected for missing workflow scope."
   - id: WED-376
     candidate_sha: 1e79ec2c2397929680e1bd662e6f7123c22ba9d9
     verification_worktree: C:/temp/wt/omnyid-wed376-verify
