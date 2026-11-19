@@ -469,7 +469,7 @@ impl omnyid_homeserver::secret_manager::SecretBackend for Secrets {
     async fn get(
         &self,
         name: &str,
-    ) -> Result<Option<String>, omnyid_homeserver::secret_manager::SecretError> {
+    ) -> std::result::Result<Option<String>, omnyid_homeserver::secret_manager::SecretError> {
         self.reads.lock().unwrap().push(name.into());
         if self.fail {
             return Err(omnyid_homeserver::secret_manager::SecretError::Backend(
@@ -486,7 +486,7 @@ impl omnyid_homeserver::secret_manager::SecretBackend for Secrets {
         &self,
         _: &str,
         _: &str,
-    ) -> Result<(), omnyid_homeserver::secret_manager::SecretError> {
+    ) -> std::result::Result<(), omnyid_homeserver::secret_manager::SecretError> {
         unreachable!()
     }
 }
