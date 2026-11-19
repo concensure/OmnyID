@@ -131,7 +131,7 @@ fn relax_runtime_permissions_removes_world_access() {
     let files = data.join("files");
     let db = data.join("db");
     let vector = data.join("vector");
-    let secrets = root.join("secrets");
+    let secrets = workspace.join("secrets");
     let logs = root.join("logs");
 
     for path in [&files, &db, &vector, &secrets, &logs] {
