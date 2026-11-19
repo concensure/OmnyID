@@ -1,3 +1,18 @@
+## WED-381: post-Google-login billing crash (2026-11-19 UTC)
+
+Worktree C:/temp/wt/omnyid-wed381, branch agent/codex/WED-381. Code commit
+9dfee526fa7fcb652ff5d9888a6d6eb7bf8c0b17. Real Google account selection returned
+auth/google200 then billing/status500 and the workspace error boundary. Server
+log confirms PostgreSQL NUMERIC SUM(BIGINT) cannot decode as Rust i64. Cast to
+BIGINT and contain rejected billing resources. PostgreSQL and mounted browser
+regressions added. Cross-review found no blocker; frozen tests pending.
+Production remains b9ead529; real authenticated smoke still required after release.
+
+WED-380 model build4aff57ef completed but runner stopped before inference:
+production mounts a secret directory, not a single file. Runner now resolves
+only the configured file and mounts it read-only. No key printed or copied locally.
+Sandbox7d34e769 build is running sequentially on Oracle. Gates remain open.
+
 ## WED-379 automatic deterministic cohort — 2026-11-19
 
 Implementation worktree C:/temp/wt/omnyid-wed379, branch agent/codex/WED-379.
