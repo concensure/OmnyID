@@ -1,3 +1,70 @@
+## 2026-11-19: WED-375 exact tool review queue UI
+
+Implementation: `C:/temp/wt/omnyid-runbooks`, branch `agent/codex/WED-375`.
+Frozen source: `bb68a33c2d59c5ffe213b353008390f42cad413a`.
+Verification checkout: `C:/temp/wt/omnyid-runbooks-verify-43d7c830`, clean detached
+at that SHA. Documentation follow-ups do not change the source candidate.
+Parent checklist unchanged: **100 complete / 17 remaining of 117**. This closes
+the tool review projection/UI integration subtask; WED-375 remains in progress.
+
+Owner activity and Decision Queue now show separate tool action review cards.
+Summaries omit arguments/provider outputs and include exact proposal identity,
+capability, expiry and historical decision state. Exact arguments load only on
+explicit review, from the authenticated endpoint, and must match the summary.
+They render as escaped text with bounded scrolling. Approve/reject requires
+confirmation and exact current revision; expiry is checked again at confirmation.
+Expired pending proposals remain rejectable. Flags control review availability,
+account changes clear private detail/confirmation, and errors require refresh.
+Pending approvals share bounded queue-page priority with unanswered questions.
+Nothing calls a provider; the existing private-review boundary remains separate.
+
+Files: src/runbook_activity.rs, src/runbook_tool_runtime.rs,
+src/server/runbook_routes.rs and runbook_routes/tool_review.rs;
+solid-ui/src/components/RunbookPanel.tsx and new RunbookToolReviewCard.tsx;
+solid-ui/src/lib/runbookState.ts; runbook-state.test.ts, new browser
+runbook-tools.spec.ts, tests/runbook_tool_runtime_postgres.rs; canonical
+coordination and runbook design/checklist documents. No migrations, dependencies,
+provider adapter, sitemap or production configuration changes. Other agents'
+primary/SEO work was untouched.
+
+Verification from clean frozen checkout, with root/SHA/status printed:
+- 102 backend tests in 21 integration binaries passed, exit 0; compilation 8m 36s.
+  HTTP scenario now verifies pending/approved projection, argument omission and
+  review availability flag alongside existing authority/replay checks.
+- Five frontend state tests passed; TypeScript passed (exit 0).
+- All 15 Playwright scenarios passed, 39.7s. Three new scenarios cover exact
+  detail before approval, dedicated endpoint/payload, confirmation/focus return,
+  escaped false/zero/HTML-looking arguments, 320px layout, axe serious/critical
+  violations absent, expiry/rejection, flag off, sanitized errors and account
+  switch clearing. Prior private-review and question scenarios still pass.
+- Frontend production build passed, exit 0, 40.31s. Existing Tailwind screen
+  configuration warning retained.
+- Standalone Rust library build passed, exit 0, 7m 40s (fresh compilation).
+- Rust Linux 1.94.1 in omnyid-wed318-builder-test:a42db33; image identity
+  sha256:21fe7471679891c3a083d0c167ee660873a8be66223ad205dd05405164c1f0fa;
+  read-only source mount, shared cargo caches, -j1, CARGO_INCREMENTAL=0,
+  RUST_MIN_STACK=268435456, test/dev debug=0, root codegen-units=64.
+- Evidence prefix C:/temp/wt/runbook-bb68a33c-: linux-tests, linux-build,
+  typecheck, browser, ui-build and line-budget .log/.exit files. Five state
+  tests reported in the command transcript (exit 0).
+- Line budget retains only unchanged server/mod.rs 45734/45717 and
+  db.rs 18045/17986 failures; Wedding budget passes. git diff --check passed.
+- GitHub queries show failed runs at unrelated SHAs 509dc31b and 69fbc2b2, no
+  deployments and no candidate CI evidence. Unsuitable configured remote lineage
+  still prevents a meaningful push/PR. No push/PR created; local checks do not
+  assert hosted health. Prior Windows compiler limitation was not retried.
+
+Only disposable PostgreSQL and mock/loopback providers were used. No deployment,
+real provider call or production health assertion. Dedicated test PostgreSQL is
+stopped after verification; ephemeral Docker build containers auto-remove.
+
+Next: connect ToolProvider to an account-bound credential adapter, preserving
+reservation/approval hash semantics and credential-rotation checks. Existing
+runbook_registry.rs deliberately excludes api_key_enc; do not replace it with
+unbound credential lookup. Review destination isolation/provider compatibility
+before rollout. Evidence-to-argument mapping, normalized provider projections
+and explicit crash/unknown-outcome reconciliation remain open. Keep flags off.
+
 ## 2026-11-19: WED-375 authenticated tool review API verified
 
 Implementation worktree: `C:/temp/wt/omnyid-runbooks`, branch `agent/codex/WED-375`.

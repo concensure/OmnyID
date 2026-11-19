@@ -1,3 +1,16 @@
+## 2026-11-19: WED-375 tool review projection minimizes private arguments
+
+Activity/queue lists carry bounded tool proposal identity, capability, expiry and
+historical decision status, never arguments or provider results. Exact arguments
+are retrieved only when the authenticated owner opens the review; the client
+checks instance/proposal/hash/capability/expiry against the displayed summary.
+Approval binds the current revision and is rechecked at confirmation, including
+expiry. Expired pending proposals remain rejectable. The server remains the
+source of policy authority. The review flag controls interactive cards, not
+execution. Private-review cards retain their separate action boundary. Account
+changes abort detail requests and destroy argument/confirmation state. Pending
+approvals and unanswered questions both receive queue-page priority.
+
 ## 2026-11-19: WED-375 tool review routes never dispatch
 
 Add owner-authenticated proposal, exact proposal retrieval and decision endpoints

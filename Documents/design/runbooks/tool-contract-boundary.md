@@ -174,3 +174,24 @@ grants can still be declined. Runtime revision, hash, expiry and live policy
 checks remain authoritative; historical GET never implies current eligibility.
 There is no provider execution endpoint. Queue UI and live adapter wiring remain
 separate work, and neither management nor review flags enable dispatch.
+
+
+## Tool review queue projection
+
+Owner activity lists include `tool_reviews` with proposal reference, step,
+capability, request hash, expiry and status (pending, expired, approved, rejected
+or cancelled). Arguments and provider outputs are omitted. HTTP projections add
+`tool_review_available` from the default-off review flag; this is display state,
+never dispatch authority. Pending approvals share first-page priority with
+unanswered questions in the bounded 50-run listing.
+
+Runbook activity and Decision Queue use a separate Tool action review card. The
+owner explicitly opens the exact argument detail, fetched from the authenticated
+proposal endpoint and checked against the summary. Argument JSON is escaped text,
+including false/zero values, with bounded scrolling and wrapping. Approval and
+rejection use the dedicated endpoint and current revision after confirmation.
+Client expiry is rechecked on confirmation; the server independently checks all
+authority. Expired pending proposals can be rejected. Errors require refresh and
+never expose raw provider/server error bodies. Account change/unmount aborts
+fetches and clears private detail and confirmation state. No execution control
+or live provider adapter is introduced.

@@ -768,3 +768,22 @@ and these routes never invoke a provider. Candidate
 binaries, including the new HTTP boundary scenario. See canonical handoff for
 build evidence. Queue UI, live account-bound adapter and rollout remain open;
 parent checklist stays **100 complete / 17 remaining of 117**.
+
+
+## Exact tool review cards — 2026-11-19
+
+Tool action summaries now appear separately in Runbook activity and Decision
+Queue, with approvals prioritized alongside questions. Exact arguments load only
+on explicit owner review and must match the proposal identity. Approval/rejection
+requires confirmation and binds the current revision; expiry is rechecked at
+confirmation, expired pending actions remain rejectable, and account changes
+clear private detail. No provider execution control is introduced.
+
+Candidate `bb68a33c2d59c5ffe213b353008390f42cad413a` passes 102 backend tests,
+five frontend state tests, 15 browser scenarios, TypeScript and the frontend
+production build. Browser coverage includes phone width, accessibility, escaped
+arguments, exact endpoint/payload, expiry, errors, flags and account changes.
+See canonical handoff for standalone Rust build and limitations. This closes
+an integration subtask; parent count stays **100 complete / 17 remaining of 117**.
+Live account-bound dispatch, destination/provider validation and unknown-outcome
+reconciliation remain open.
