@@ -1,3 +1,43 @@
+## WED-382 final evidence accepted; library test pending (2026-11-19 15:03 UTC)
+
+Frozen source ae1ac01a2c285ac10b09404cffe3db67fbaaa034; clean verification worktree
+C:/temp/wt/omnyid-wed382-verify-r3. Oracle candidate
+/home/ubuntu/omnyid-candidates/wed382-ae1ac01a. Native release build.exit0,
+cohort1/model13/tool16 integration logs each exit0. model-unit.log is still
+compiling the final library policy test; tests.exit must exist and equal0 before
+production. Do not mark the final release gate complete yet.
+
+Final model/application/sandbox artifacts and scoped cross-review are committed
+under Documents/verification/WED-382*. Model36 structural acceptances,12grounded
+approval-required drafts, one conservative non-draft expectation deviation.
+Actual HTTP draft113microunits; comparison18162microunits. All12sandbox cases
+completed with6independently journaled effects; real expiry produced0effects.
+Both narrow internal HTTP gates are accepted; classification/reasoning, external
+provider interoperability, general production activation and UI execution are
+not approved or claimed. Native integration proof remains separate from the
+still-compiling library test.
+
+Staging image sha256:de181133e9463ae2d63b25137b80a4a402ad0bd3645d59dd1ae8cd43281f5706;
+authenticated health/billing200 and default-off execution404/no-store observed.
+Caddy validates unchanged; no schema changes; df97% below98% deployment gate.
+Frontend typecheck/build,12focused tests and1mounted billing regression completed.
+Source package1309files and workspace169files are hash verified.
+Production remains ca563ffa image27118c89 (full previous image in runtime-manifest).
+Rollback final candidate/rollback includes verified workspace archive, runtime
+compose and unchanged Caddy. Final production helper is
+C:/temp/wt/wed382-r3-production-deploy.py, not executed. It checks all exits,
+review hashes, disk, image and Caddy, and rolls back on failed smoke checks.
+Inject COUPLE_EMAIL/PASSWORD from primary .secrets/test-accounts.env only in memory;
+never print them. After deployment, browser fresh Google sign-in and archive
+production evidence, then close the3remaining checklist items and WED375/380/382.
+No GitHub upload/CI run; Oracle-only delivery uses native machine evidence.
+
+Redundant historical7f8binaries are retained in
+C:/temp/wt/wed382-7f8-retained-binaries.tar.gz with adjacent tar.json hash manifest;
+remote old candidate/binary-archive-location.json records this. Only those three
+verified archived standalone outputs and transfer archive were removed. Images,
+rollback assets, databases and worktrees were retained.
+
 ## WED-382 corrected fixture candidate (2026-11-19 14:30 UTC)
 
 Frozen source ae1ac01a2c285ac10b09404cffe3db67fbaaa034, clean verification worktree
