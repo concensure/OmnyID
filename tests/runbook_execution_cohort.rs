@@ -23,7 +23,10 @@ fn execution_cohort_is_default_off_bounded_and_owner_scoped() {
     config["expires_at"] = json!(now);
     assert!(parse("true", &config).is_err());
     config["expires_at"] = json!(now + Duration::minutes(5));
+    // Namespaced owners use the shared identifier grammar.
     config["members"][0]["owner"] = json!("owner:a");
+    assert!(parse("true", &config).is_ok());
+    config["members"][0]["owner"] = json!("owner/a");
     assert!(parse("true", &config).is_err());
     config["members"][0]["owner"] = json!("owner_a");
     config["members"][0]["definition_sha256"] = json!("A".repeat(64));
