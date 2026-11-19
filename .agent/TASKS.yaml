@@ -15,6 +15,17 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-376
+    title: Repair OAuth login and vendor availability, directory and public agent entrypoints
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-376
+    worktree: C:/temp/wt/omnyid-wed376
+    base_sha: 3eb406ca2abb4dffeabb4167c0e6c7b9ad7aa8f6
+    depends_on: [WED-375, WED-374, SEO-001-INTEGRATION]
+    files: [src/server/**, src/auth*, src/wedding*, postgres/migrations/**, postgres/data/**, solid-ui/src/**, solid-ui/tests/**, wedding/**, scripts/**, tests/**, Documents/verification/**, .agent/**]
+    acceptance: [Google workspace sign-in preserves secure state and returns to workspace, accessible agent icon on public Wedding pages, admin all/category availability links preserve prior unexpired links and renew only valid vendor-scoped grants, phone-bearing NSW spreadsheet celebrants reconciled without duplicating listings or exposing private data, curated default celebrant directory and literal partial-name search without duplicate category tags, isolated varied wedding test accounts and existing sample quote coverage, clean exact-SHA tests and build plus Oracle staging and production release with rollback and hosted workflow evidence]
+    progress: "User explicitly authorizes test account creation if needed, commit and Oracle deployment. Preserve security and owner boundaries; never renew expired/revoked links. Existing WED-375 hosted rollout gates remain tracked separately and must use evidence, not invented approvals. Primary checkout and sitemap author edits remain untouched."
   - id: SEO-001
     title: Search and AI-answer discoverability static surface
     status: review
