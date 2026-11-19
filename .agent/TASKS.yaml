@@ -16,8 +16,8 @@ lifecycle:
 
 tasks:
   - id: WED-379
-    candidate_sha: 4151825c98487bb3f2f15f57a8917393569d31e4
-    verification_worktree: C:/temp/wt/omnyid-wed379-verify
+    candidate_sha: 24948b23e4ec59b9af12ca08aa514a80d17d4c78
+    verification_worktree: C:/temp/wt/omnyid-wed379-verify-24948b23
     title: Add an expiring internal deterministic Runbook execution cohort
     status: in_progress
     owner: codex

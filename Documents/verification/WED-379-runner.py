@@ -1,11 +1,11 @@
 import subprocess,pathlib,json,secrets,hashlib,datetime,time
-root=pathlib.Path('/home/ubuntu/omnyid-candidates/wed379-4151825c')
+root=pathlib.Path('/home/ubuntu/omnyid-candidates/wed379-24948b23')
 assert (root/'build.exit').read_text().strip()=='0'
 sha=(root/'source-sha').read_text().strip()
-assert sha=='4151825c98487bb3f2f15f57a8917393569d31e4'
-network='omnyid-wed379-probe-internal'
-db='omnyid-wed379-probe-postgres'
-probe='omnyid-wed379-probe'
+assert sha=='24948b23e4ec59b9af12ca08aa514a80d17d4c78'
+network='omnyid-wed379-24948b23-internal'
+db='omnyid-wed379-24948b23-postgres'
+probe='omnyid-wed379-24948b23-probe'
 def run(cmd,**kw): return subprocess.run(cmd,check=True,text=True,capture_output=True,**kw)
 def inspect(name): return json.loads(run(['docker','inspect',name]).stdout)[0]
 before=inspect('omnyid-homeserver-1')['Image']
@@ -13,7 +13,7 @@ run(['docker','network','create','--internal',network])
 net=json.loads(run(['docker','network','inspect',network]).stdout)[0]
 assert net['Internal'] is True
 password=secrets.token_hex(24)
-env=root/'probe-private.env'; env.write_text('POSTGRES_PASSWORD='+password+'\nPOSTGRES_USER=probe\nPOSTGRES_DB=wed379_runbook_probe\nRUNBOOK_PROBE_DATABASE_URL=postgres://probe:'+password+'@'+db+':5432/wed379_runbook_probe\nRUNBOOK_PROBE_SOURCE_SHA='+sha+'\nRUNBOOK_PROBE_ISOLATED=wed379-disposable\n');env.chmod(0o600)
+env=root/'probe-private.env'; env.write_text('POSTGRES_PASSWORD='+password+'\nPOSTGRES_USER=probe\nPOSTGRES_DB=wed379_runbook_probe\nRUNBOOK_PROBE_DATABASE_URL=postgres://probe:'+password+'@'+'omnyid-wed379-probe-postgres'+':5432/wed379_runbook_probe\nRUNBOOK_PROBE_SOURCE_SHA='+sha+'\nRUNBOOK_PROBE_ISOLATED=wed379-disposable\n');env.chmod(0o600)
 cohort_owners='01ARZ3NDEKTSV4RRFFQ69G5FAV,01ARZ3NDEKTSV4RRFFQ69G5FAW'
 expires=(datetime.datetime.now(datetime.timezone.utc)+datetime.timedelta(minutes=15)).isoformat()
 with env.open('a') as private:
@@ -23,7 +23,7 @@ with env.open('a') as private:
  private.write('OMNYID_RUNBOOK_DETERMINISTIC_DEFINITIONS=budget_threshold@1,wed379_unsafe@1\nOMNYID_RUNBOOK_DETERMINISTIC_EXPIRES_AT='+expires+'\n')
  private.write('OMNYID_RUNBOOK_SHARED_INFERENCE_ENABLED=false\n')
 
-run(['docker','run','-d','--name',db,'--network',network,'--memory','768m','--cpus','1','--tmpfs','/var/lib/postgresql:rw,size=512m','--env-file',str(env),'pgvector/pgvector:pg18'])
+run(['docker','run','-d','--name',db,'--network',network,'--network-alias','omnyid-wed379-probe-postgres','--memory','768m','--cpus','1','--tmpfs','/var/lib/postgresql:rw,size=512m','--env-file',str(env),'pgvector/pgvector:pg18'])
 try:
  for i in range(30):
   r=subprocess.run(['docker','exec',db,'pg_isready','-h','127.0.0.1','-U','probe','-d','wed379_runbook_probe'],capture_output=True)
