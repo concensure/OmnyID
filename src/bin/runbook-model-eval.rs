@@ -7,11 +7,15 @@ use omnyid_homeserver::{
     runbook_contract::StepKind,
     runbook_llm_step::*,
     runbook_starter_pack::starter_definitions,
-    runbook_store::{RunbookStore, digest},
+    runbook_store::RunbookStore,
 };
 use serde_json::{Value, json};
 use sqlx::postgres::PgConnectOptions;
 use std::{str::FromStr, sync::Mutex};
+fn digest(value: &Value) -> String {
+    use sha2::{Digest, Sha256};
+    hex::encode(Sha256::digest(value.to_string().as_bytes()))
+}
 const OWNER: &str = "01ARZ3NDEKTSV4RRFFQ69G5FAY";
 struct Observed<'a> {
     inner: OwnerRunbookModelProvider<'a>,
