@@ -8,7 +8,7 @@ use omnyid_homeserver::{
     runbook_starter_pack::starter_definitions,
     runbook_store::RunbookStore,
 };
-use serde_json::{Value, json};
+use serde_json::json;
 use sqlx::postgres::PgConnectOptions;
 use std::str::FromStr;
 use ulid::Ulid;
@@ -103,12 +103,7 @@ async fn probe() {
     let policy = DeterministicPolicy::from_env();
     assert!(policy.owner_allowed(ALICE, Utc::now()) && policy.owner_allowed(BOB, Utc::now()));
     assert!(!policy.owner_allowed(FOREIGN, Utc::now()));
-    let mut scenarios = vec![];
-    for (owner, guests, budget, committed) in [
-        (ALICE, 24, 1800000, 1900000),
-        (BOB, 120, 4500000, 4000000),
-        (FOREIGN, 8, 800000, 500000),
-    ] {
+    for owner in [ALICE, BOB, FOREIGN] {
         db.create_user(&UserRecord {
             id: owner.into(),
             email: format!("wed379-{owner}@omnyid.test"),
@@ -120,6 +115,14 @@ async fn probe() {
         })
         .await
         .unwrap();
+        store.registry(owner).await.unwrap();
+    }
+    let mut scenarios = vec![];
+    for (owner, guests, budget, committed) in [
+        (ALICE, 24, 1800000, 1900000),
+        (BOB, 120, 4500000, 4000000),
+        (FOREIGN, 8, 800000, 500000),
+    ] {
         let mut definition = starter_definitions()
             .into_iter()
             .find(|d| d.runbook_id == "budget_threshold")
@@ -173,6 +176,11 @@ async fn probe() {
             runtime.instance(FOREIGN, id).await.unwrap_err(),
             "instance_not_found"
         );
+        let other_allowed = if owner == ALICE { BOB } else { ALICE };
+        assert_eq!(
+            runtime.instance(other_allowed, id).await.unwrap_err(),
+            "instance_not_found"
+        );
         assert_eq!(
             runtime
                 .start(owner, id, instance.revision)
@@ -224,7 +232,7 @@ async fn probe() {
         );
         scenarios.push(json!({"owner":owner,"guests":guests,"budget_minor":budget,"committed_minor":committed,
             "completed_via_persisted_hook":true,"over_budget":committed>budget,"trace_records":4,"private_reviews":1,
-            "duplicate_event_checks":2,"cross_owner_denials":1,"terminal_reopen_denials":1,"policy_denials":4}));
+            "duplicate_event_checks":2,"cross_owner_denials":2,"terminal_reopen_denials":1,"policy_denials":4}));
     }
     let mut bounded_definition = starter_definitions()
         .into_iter()
@@ -343,5 +351,5 @@ async fn probe() {
     println!("{}",serde_json::to_string_pretty(&json!({"source_sha":sha,"started_at":started,"finished_at":Utc::now(),
         "scenarios":scenarios,"non_allowlisted_owner_instance_records":0,"unsafe_pipeline_started":false,
         "unsafe_pipeline_policy_denials":1,"expired_lock_denials":1,"disabled_definition_denials":1,"unsupported_contract_denials":3,"stale_revision_denials":1,"cancelled_reopen_denials":1,
-        "models_or_tools_composed":false,"production_rollout":false})).unwrap());
+        "policy_configuration_denials":5,"models_or_tools_composed":false,"production_rollout":false})).unwrap());
 }
