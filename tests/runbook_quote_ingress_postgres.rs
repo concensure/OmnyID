@@ -72,9 +72,12 @@ async fn canonical_http_replay_private_evidence_and_missing_date_preserve_bookin
     let db = Db::new(&url).await.unwrap();
     let (owner, token) = user(&db).await;
     let (other, other_token) = user(&db).await;
+    let thread_id = Ulid::new().to_string();
     let table = format!("\"user_{}\".messages", owner.id.to_lowercase());
-    sqlx::query(&format!("INSERT INTO {table} (id,thread_id,from_agent,to_agents,timestamp,type,content,signature) VALUES ('source-one','quote-thread',$1,$2,NOW(),'document',$3,'')"))
-        .bind(&owner.id).bind(json!([owner.id])).bind(json!({"body":"private vendor source"})).execute(&db.pool).await.unwrap();
+    sqlx::query(&format!("INSERT INTO {table} (id,thread_id,from_agent,to_agents,timestamp,type,content,signature,metadata) VALUES ('source-one',$4,$1,$2,NOW(),'document',$3,'',$5)"))
+        .bind(&owner.id).bind(json!([owner.id])).bind(json!({"body":"private vendor source"}))
+        .bind(&thread_id).bind(json!({"wedding_plan_id":"wedding_plan:one","response_workspace_id":"response_workspace:one"}))
+        .execute(&db.pool).await.unwrap();
     let store = RunbookStore::new(&db, [21; 32], [22; 32]);
     let runtime = RunbookRuntime::new(&store);
     let mut definition = starter_definitions()
@@ -93,7 +96,7 @@ async fn canonical_http_replay_private_evidence_and_missing_date_preserve_bookin
     let app = omnyid_homeserver::server::build_test_router(&url).await;
     let quotation: Value =
         serde_json::from_str(include_str!("runbook_quote_fixture.json")).unwrap();
-    let request = json!({"thread_id":"quote-thread","quotation":quotation});
+    let request = json!({"thread_id":thread_id,"quotation":quotation});
     assert_eq!(
         post(&app, &other_token, &request).await.0,
         StatusCode::NOT_FOUND
@@ -163,7 +166,7 @@ async fn canonical_http_replay_private_evidence_and_missing_date_preserve_bookin
         .fetch_one(&db.pool)
         .await
         .unwrap();
-    let aad = json!({"protocol":"afp-v1","id":quote_id,"thread_id":"quote-thread","parent_id":"",
+    let aad = json!({"protocol":"afp-v1","id":quote_id,"thread_id":thread_id,"parent_id":"",
         "from":owner.id,"to":["agent://quotation-intelligence"],"timestamp":timestamp,"type":"ledger",
         "subtype":"quotation_normalisation_confirmed","metadata":metadata});
     let encryption = omnyid_homeserver::crypto::encrypt_content(
