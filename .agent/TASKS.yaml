@@ -16,8 +16,9 @@ lifecycle:
 
 tasks:
   - id: WED-380
-    candidate_sha: 4aff57ef621fb6066d4021a441bf9805ce7ebe94
-    verification_worktree: C:/temp/wt/omnyid-wed380-verify-4aff57ef
+    model_candidate_sha: 4aff57ef621fb6066d4021a441bf9805ce7ebe94
+    candidate_sha: 7d34e769ab48c5f01540510740f0d25c07932a85
+    verification_worktree: C:/temp/wt/omnyid-wed380-verify-7d34e769
     title: Verify representative Runbook models and real approval sandbox before final release
     status: in_progress
     owner: codex
