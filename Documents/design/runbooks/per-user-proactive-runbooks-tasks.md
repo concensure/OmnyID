@@ -293,7 +293,7 @@ Depends on: 6–8
 
 - [x] Implement `read`, `transform`, `tool`, `emit`, `wait`, `approval`, and `complete` steps without an LLM.
 - [x] Validate tool input/output schemas and reject unknown fields. (Bounded closed contracts, exact canonical grant preparation and structured-result validation; six schema and four PostgreSQL boundary tests. External dispatch remains separate.)
-- [ ] Reuse existing capability/tool dispatch and AFP result persistence.
+- [x] Reuse existing capability/tool dispatch and AFP result persistence. (Direct MCP adapter uses canonical owner connection/grant authority and durable private AFP receipts. Credential-service wiring and provider rollout remain separate.)
 - [x] Check success criteria deterministically before completing an instance.
 - [ ] Store each meaningful step as `runbook_step_trace` with input/output refs and provenance.
 - [ ] Add tests for every deterministic step, tool failure, schema failure, success criteria failure, and partial retry.
@@ -787,3 +787,21 @@ See canonical handoff for standalone Rust build and limitations. This closes
 an integration subtask; parent count stays **100 complete / 17 remaining of 117**.
 Live account-bound dispatch, destination/provider validation and unknown-outcome
 reconciliation remain open.
+
+## Credential-bound MCP adapter - 2026-11-19
+
+The capability dispatch/AFP persistence reuse parent closes: **101 complete /
+16 remaining of 117**. The direct MCP adapter revalidates the active owner and
+exact connection/grant before strict credential decryption. Hash v3 binds the
+encrypted credential fingerprint, invalidating approvals on rotation even within
+the same timestamp. Explicit reviewed HTTPS/public IPv4 destination pins retain
+hostname TLS verification; a separate loopback-only constructor supports tests.
+
+Frozen source `70ed7eb487b3fafae62e691bf8456d607be0713c` passes 107 tests in
+22 integration binaries, including five new adapter/destination scenarios.
+Tests cover approval before send, one-shot receipt persistence, rotation, wrong
+keys, plaintext rejection, revoked grants, deleted owners and unsupported
+transport without external provider traffic. See canonical handoff for standalone
+build evidence and limitations. Credential-service wiring, real provider/account
+compatibility, normalized projections, usage and unknown-outcome reconciliation
+remain open. No route, worker or rollout flag enables this adapter.

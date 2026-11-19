@@ -1,6 +1,6 @@
 # Runbook tool contract boundary
 
-Implementation task: WED-375. This is validated preparation, not execution authority.
+Implementation task: WED-375. Preparation, approval, reservation and provider dispatch have separate authority boundaries.
 
 The existing tool dispatcher now exposes `prepare_runbook_tool`. It loads the
 owner-scoped connection and canonical capability grant in one database snapshot,
@@ -13,7 +13,8 @@ The selected tool descriptor must contain a versioned contract under
 `output_schema`. Version 1 requires both schemas; absent schemas are rejected.
 Schema names and arguments supplied by a definition/model cannot replace this
 registry contract. The request hash binds owner, tool, capability, endpoint,
-connection provider, both schemas and exact arguments. It excludes credentials.
+connection provider, both schemas and exact arguments. It excludes plaintext
+credentials and includes an encrypted-credential fingerprint.
 The opaque prepared value is neither Debug nor Serialize and retains no API key.
 
 ## Supported schema subset
@@ -46,8 +47,8 @@ provider errors and malformed values cannot become successful structured output.
 Providers returning additional channels need a separately reviewed adapter.
 
 Validation does not establish that a provider ran, that a side effect succeeded,
-or that the runbook's success criterion passed. Future runtime integration must
-persist authenticated AFP receipts, check success criteria and bind provenance.
+or that the runbook's success criterion passed. The durable runtime separately
+persists authenticated AFP receipts, checks success criteria and binds provenance.
 
 ## Canonical preparation and revalidation
 
@@ -59,26 +60,25 @@ and a bounded account identifier. Ambiguous grants fail closed, including a
 second grant for a different account. The projected endpoint, provider and
 selected contract must match the current connection descriptor.
 
-The v2 request hash additionally binds connection/grant identities and epochs,
-provider account, approval mode and scopes. `revalidate_runbook_tool` reloads
+The v3 request hash additionally binds connection/grant identities and epochs,
+provider account, approval mode, scopes and encrypted-credential fingerprint. `revalidate_runbook_tool` reloads
 current state and rejects a different owner or changed snapshot. This is not an
-atomic dispatch reservation: a future executor must recheck live authority at
-its transaction/dispatch boundary. Credential rotation does not yet have an
-independent revision counter and must not be inferred solely from timestamps.
+atomic dispatch reservation: the durable executor rechecks live authority at
+its reservation boundary, and the MCP adapter rechecks the registry before send.
+Credential rotation is detected through the fingerprint, not timestamps alone.
 
 The generic `Db::list_tool_execution_registry` remains an empty stub. This
 preparation-only projection does not enable its non-runbook callers or any
 provider execution. Adversarial PostgreSQL tests cover these boundaries and
 verify that preparation makes no connection to a local provider listener.
 
-The remaining execution work must bind exact action approval, freeze/reserve an
-attempt before any provider call, recheck current registry/policy, bound timeout
-and result size at transport, persist verified private AFP results atomically,
-and define crash/unknown-outcome reconciliation without blind retries. Existing
+The durable executor binds exact approval, reserves an attempt before I/O and
+persists private AFP results atomically. Hosted provider integration, usage
+accounting and explicit crash/unknown-outcome reconciliation remain. Existing
 private-review approval never supplies external execution authority.
 
 
-## Bounded MCP transport (not yet connected to runbook execution)
+## Bounded MCP transport
 
 `mcp_client::bounded::call_tool` is an opt-in low-level transport alongside the
 legacy API. It does not load credentials, select an account, approve an action,
@@ -145,11 +145,11 @@ that is not permission to continue. Provider/schema failures retain NotSent or
 Unknown honestly and expose only fixed failure codes. Exact retries return the
 stored receipt. Completion additionally requires a matching applied tool receipt.
 
-The trusted adapter seam currently has loopback/mock coverage only. Selecting and
-loading live provider credentials, approved account binding in the live adapter,
-Queue UI integration, deterministic evidence-to-argument mapping, normalized
-provider-specific AFP projections and explicit unknown-outcome reconciliation
-remain separate integration work. Nothing here enables production tool execution.
+The trusted adapter currently has loopback/mock coverage only. Credential-service
+wiring, hosted provider/account compatibility, deterministic evidence-to-argument
+mapping, normalized provider-specific AFP projections and explicit unknown-outcome
+reconciliation remain separate integration work. The queue UI uses the exact
+review API below. Nothing here enables production tool execution.
 
 
 ## Authenticated tool review API
@@ -195,3 +195,36 @@ authority. Expired pending proposals can be rejected. Errors require refresh and
 never expose raw provider/server error bodies. Account change/unmount aborts
 fetches and clears private detail and confirmation state. No execution control
 or live provider adapter is introduced.
+
+
+## Credential-bound pinned MCP adapter
+
+`tool_dispatch::runbook_provider::McpRunbookProvider` implements the trusted
+provider seam using existing canonical capability grants, encrypted connection
+credentials and bounded MCP transport. Invoke it only through the runtime's
+approved one-shot execution flow. It accepts a trusted credential-service KEK
+and an explicit reviewed list of `PinnedMcpTarget`s; nothing constructs or enables
+it from HTTP, daemon hooks, model arguments or default environment configuration.
+
+Request hash v3 includes a bounded encrypted-credential fingerprint. Changing or
+re-encrypting the credential invalidates prior preparation and approval even with
+an unchanged connection timestamp. Old v2 proposals cannot be dispatched by this
+adapter. Before send, the adapter checks an active owner and re-prepares under
+connection/grant locks, compares the exact approved hash, then decrypts only the
+matched row's credential. Missing, plaintext, wrong-key and oversized credentials
+fail NotSent. There is no anonymous or Composio fallback. No database lock is held
+over provider I/O; later revocation/cancellation does not undo an admitted call.
+
+`PinnedMcpTarget::https` requires an exact HTTPS endpoint and one to eight reviewed
+public IPv4 addresses. The HTTP client uses those addresses directly while
+retaining ordinary hostname TLS verification; URL credentials, query/fragment,
+trailing-dot hosts, private/reserved pins and IPv6 are rejected. The dedicated
+`loopback_sandbox` constructor accepts only literal IPv4-loopback HTTP endpoints
+for local tests. Target selection must remain operator-controlled. Existing
+redirect, retry, proxy, deadline, size, correlation and schema safeguards apply.
+
+This is not hosted provider compatibility or a claim that every possible provider
+is safe. Real provider/account semantics, KEK service integration, destination
+review/updates, usage accounting and rollout evidence remain required. The adapter
+does not change the legacy dispatcher, instantiate itself, send real traffic in
+verification or grant authority independently of the runtime reservation.

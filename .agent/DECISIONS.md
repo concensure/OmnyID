@@ -1,3 +1,27 @@
+## 2026-11-19: WED-375 MCP adapter binds credential ciphertext and destinations
+
+Use request hash v3 with a SHA-256 fingerprint of the encrypted credential in
+the canonical registry snapshot. Preparation still returns no credential value.
+This invalidates approval after rotation even when connected_at is unchanged at
+second precision; old v2 proposals fail closed and require a fresh run/review.
+No migration or plaintext secret hash is needed. Ciphertexts are randomized;
+re-encryption also conservatively invalidates the approval.
+
+The trusted McpRunbookProvider takes an explicit credential-service KEK and a
+nonempty reviewed target list. Revalidate active owner and exact canonical
+connection/grant/hash in one transaction, load ciphertext under those row locks,
+and require authenticated decryption without plaintext or anonymous fallback.
+Release locks before network I/O; the earlier durable reservation remains the
+admission boundary. Unsupported transports, including Composio, are NotSent.
+
+External targets require HTTPS and explicit public IPv4 pins; preserve hostname
+TLS verification, disable DNS lookup for that host, and keep proxy/redirect/retry
+prohibitions. Reject URL credentials, query/fragment, private/reserved pins and
+IPv6 for this initial adapter. A separate explicit literal-loopback HTTP sandbox
+constructor exists for local provider tests only. Neither constructor is driven
+by a user/model argument. No route/worker/env default wires this adapter; real
+provider compatibility, credential-service wiring and rollout review remain.
+
 ## 2026-11-19: WED-375 tool review projection minimizes private arguments
 
 Activity/queue lists carry bounded tool proposal identity, capability, expiry and

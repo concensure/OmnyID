@@ -46,15 +46,15 @@ tasks:
     branch: agent/codex/WED-375
     worktree: C:/temp/wt/omnyid-runbooks
     base_sha: 5536b83b2f9d2f58488a075f383c24f8f4f73d6c
-    candidate_sha: bb68a33c2d59c5ffe213b353008390f42cad413a
+    candidate_sha: 70ed7eb487b3fafae62e691bf8456d607be0713c
     diagnostic_baseline_sha: d8ebd36dbe2e53d1a83dcd7bbb9a85f9fa97e6af
     verification_worktree: C:/temp/wt/omnyid-runbooks-verify-43d7c830
     depends_on: [WED-308, WED-374]
     files: [src/mcp_client.rs, src/mcp_client/**, src/tool_dispatch.rs, src/tool_dispatch/runbook*.rs, src/runbook*.rs, src/proactive_provenance.rs, src/lib.rs, src/db.rs, src/server/runbook_routes.rs, src/server/runbook_routes/**, src/server/types.rs, src/server/mod.rs, src/server/proactive_routes.rs, src/daemon_runtime.rs, solid-ui/src/components/Runbook*.tsx, solid-ui/src/components/AgentFleetView.tsx, solid-ui/src/components/DecisionQueueView.tsx, solid-ui/src/components/renderers/A2UIRenderer.tsx, solid-ui/src/lib/runbook*.ts, solid-ui/tests/runbook*, solid-ui/tests/e2e/runbook*, solid-ui/e2e/runbook*, solid-ui/playwright.runbooks.config.ts, tests/runbook*, Documents/design/runbooks/**, .agent/**]
     acceptance: [Strict bounded contracts and terminal-safe transitions, immutable starter definitions and owner-scoped AFP projection, deterministic typed matching with stable dedupe and owner-bound keys, focused adversarial tests and clean-commit Rust build, execution remains disconnected until ledger transactions and authority integration are complete]
     current_batch: "Credential-rotation-bound MCP adapter with exact canonical revalidation, explicit destination pinning, strict decryption and no retries; disposable authority/transport tests. No live rollout, execution endpoint or Composio fallback."
-    next_batch: "Bind ToolProvider to live owner/account credential authority with reviewed destination isolation and provider compatibility. Add evidence-to-argument mapping and explicit crash/unknown-outcome reconciliation; retain default-off rollout until provider sandbox/security evidence is complete."
-    progress: "100 complete / 17 remaining of 117, unchanged: separate tool review cards and bounded queue projection complete the UI integration subtask. Frozen candidate bb68a33c2d59c5ffe213b353008390f42cad413a passes 102 backend tests, five frontend state tests, 15 browser tests, TypeScript and frontend production build. See handoff for standalone Rust build and existing line-budget/remote limitations. Exact arguments load on demand; expiry/revision checks and account-change cleanup protect decisions. No deployment or live provider adapter; review remains default off."
+    next_batch: "Wire the explicit credential-service factory and validate provider/account compatibility in a reviewed sandbox. Add evidence-to-argument mapping, usage accounting and unknown-outcome reconciliation. Keep execution and rollout default off until security and provider evidence is complete."
+    progress: "101 complete / 16 remaining of 117: canonical capability dispatch and private AFP result persistence reuse closes for direct MCP. Frozen source 70ed7eb487b3fafae62e691bf8456d607be0713c passes 107 backend tests in 22 binaries and standalone Rust library build. Credential fingerprint v3, exact owner/grant revalidation, strict decryption and reviewed destination pins are implemented. See handoff for existing line-budget/remote limitations. Credential-service wiring and real provider validation remain open; no deployment or execution entrypoint."
   - id: WED-374
     title: Restore Wedding Sprout rollout, complete projected databases, persona artwork, exports and planner-card affordances
     status: in_progress

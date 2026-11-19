@@ -1,3 +1,67 @@
+## 2026-11-19: WED-375 credential-bound direct MCP adapter
+
+Implementation: `C:/temp/wt/omnyid-runbooks`, branch `agent/codex/WED-375`.
+Frozen source: `70ed7eb487b3fafae62e691bf8456d607be0713c`.
+Verification: `C:/temp/wt/omnyid-runbooks-verify-43d7c830`, clean detached at
+that SHA. Documentation follow-ups do not change the source candidate.
+Parent checklist: **101 complete / 16 remaining of 117**. Closes capability
+dispatch/AFP persistence reuse for direct MCP; WED-375 remains in progress.
+
+Added a trusted internal McpRunbookProvider using existing canonical owner
+connections/grants, strict encrypted credential decryption, bounded MCP transport
+and the runtime's one-shot reservation/private AFP result/provenance persistence.
+Request hash v3 binds a bounded ciphertext fingerprint, so same-second credential
+rotation invalidates pending approvals. Old v2 proposals need a fresh run/review.
+The adapter revalidates the active owner and exact connection/grant under locks,
+then releases the transaction before network I/O. No plaintext fallback.
+
+Explicit reviewed HTTPS targets pin public IPv4 addresses while retaining hostname
+TLS checks. URL credentials/query/fragment, private/reserved pins and IPv6 are
+rejected; redirects, retries and inherited proxies remain disabled. A separate
+literal-loopback HTTP constructor supports local sandbox tests. No route, worker
+or environment default instantiates this adapter. Composio is unsupported.
+
+Files: src/tool_dispatch/runbook_registry.rs, runbook_contract.rs, new
+runbook_provider.rs; src/tool_dispatch.rs; src/mcp_client/bounded.rs and new
+bounded/destination.rs; new tests/runbook_tool_provider_postgres.rs; canonical
+coordination and runbook design/checklist documents. No migrations, dependencies,
+frontend, sitemap or deployment configuration changes. Other agents' work intact.
+
+Verification at the clean frozen SHA, with root/SHA/status printed:
+- 107 tests passed in 22 Rust integration binaries, exit 0. Five new scenarios
+  cover exact approval/send/receipt/replay; unchanged-timestamp credential rotation;
+  wrong keys/plaintext/revoked grants/unreviewed targets; unsupported transports
+  and deleted owners; HTTPS/public-pin constructor boundaries.
+- Standalone Rust library build passed, exit 0, 58.73s.
+- Linux Rust 1.94.1, omnyid-wed318-builder-test:a42db33, image
+  sha256:21fe7471679891c3a083d0c167ee660873a8be66223ad205dd05405164c1f0fa.
+  Read-only source bind, shared cargo caches, -j1, CARGO_INCREMENTAL=0,
+  RUST_MIN_STACK=268435456, test/dev debug=0, root codegen-units=64.
+- Evidence: C:/temp/wt/runbook-70ed7eb4-linux-tests.log/.exit,
+  C:/temp/wt/runbook-70ed7eb4-linux-build.log/.exit and
+  C:/temp/wt/runbook-70ed7eb4-line-budget.log/.exit.
+- Line budget still reports unchanged server/mod.rs 45734/45717 and
+  db.rs 18045/17986 failures; Wedding budget passes.
+- GitHub queries returned failed runs at unrelated SHAs 509dc31b and 69fbc2b2,
+  no deployments and no candidate CI. Configured remote lineage remains unsuitable
+  for a meaningful push/PR; neither was created. Windows compiler issue not retried.
+
+Only disposable PostgreSQL, dummy credentials and loopback providers were used.
+Constructor tests do not establish external HTTPS/provider sandbox compatibility.
+The test file's copied introductory comment saying no provider is invoked is
+outdated: its fixture invokes a local loopback provider only. No actual provider
+traffic, deployment or production health assertion. Dedicated test PostgreSQL
+stopped after verification; build containers auto-remove.
+
+Next: wire a trusted credential-service factory supplying the correct KEK and
+reviewed targets; verify real provider/account compatibility in a sandbox. Existing
+legacy credential loading has fallback behavior and must not replace this strict
+path. Evidence-to-argument mapping, usage accounting, normalized provider
+projections and unknown-outcome reconciliation remain open. Preserve reservation
+as admission boundary: cancellation after admission cannot undo an external call.
+No automatic retries after unknown outcomes. Hosted rollout/security/evaluation
+and exact release gates remain separate checklist parents.
+
 ## 2026-11-19: WED-375 exact tool review queue UI
 
 Implementation: `C:/temp/wt/omnyid-runbooks`, branch `agent/codex/WED-375`.
