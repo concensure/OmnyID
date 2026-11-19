@@ -19,14 +19,14 @@ tasks:
     candidate_sha: b9ead5298fb0cff77ef552c1dc4281e6d35c6bc8
     verification_worktree: C:/temp/wt/omnyid-wed377-verify
     title: Correct sample quote fallback extraction and guest-count comparison warnings
-    status: in_progress
+    status: done
     owner: codex
     branch: agent/codex/WED-376
     worktree: C:/temp/wt/omnyid-wed376
     depends_on: [WED-376]
     files: [src/server/wedding_quote_decoder_routes.rs, src/server/wedding_quote_decoder_routes/**, wedding/assets/js/quote-decoder-engine.js, wedding/assets/js/wedding-agent.js, wedding/**/*.html, wedding/tests/**, src/server/wedding_vendor_directory_page.rs, .agent/**]
     acceptance: [Explicit standalone proposal totals and GST wording are preserved, supplemental per-person hourly charges cannot become core package prices, changed guest counts retain quoted totals with clear caveats, both existing fictional quote samples and adversarial cases pass, clean exact-SHA build and staged Oracle release evidence]
-    progress: "Reviewed candidate b9ead529 has clean frontend/browser evidence and native ARM build. Isolated staging quote and captured-response browser regressions pass; see candidate staging-quote-evidence.json and local wed377-hosted-quote-browser-retry.log. Native Rust test compilation and final production switch remain. No paid model calls or outreach. GitHub push was rejected for missing workflow scope."
+    progress: "Deployed source b9ead5298fb0cff77ef552c1dc4281e6d35c6bc8 to Oracle after clean frontend checks, native ARM build, seven Rust tests, staged sample/adversarial HTTP checks and browser comparison across five guest scenarios. Public paths, Sprout workspace form, literal directory search and category dedupe verified. Machine evidence Documents/verification/WED-377-release-evidence.json. Local commits retained; GitHub push permission-rejected for missing workflow scope."
   - id: WED-376
     candidate_sha: 1e79ec2c2397929680e1bd662e6f7123c22ba9d9
     verification_worktree: C:/temp/wt/omnyid-wed376-verify
@@ -39,7 +39,7 @@ tasks:
     depends_on: [WED-375, WED-374, SEO-001-INTEGRATION]
     files: [src/server/**, src/auth*, src/wedding*, postgres/migrations/**, postgres/data/**, solid-ui/src/**, solid-ui/tests/**, wedding/**, scripts/**, tests/**, Documents/verification/**, .agent/**]
     acceptance: [Google workspace sign-in preserves secure state and returns to workspace, accessible agent icon on public Wedding pages, admin all/category availability links preserve prior unexpired links and renew only valid vendor-scoped grants, phone-bearing NSW spreadsheet celebrants reconciled without duplicating listings or exposing private data, curated default celebrant directory and literal partial-name search without duplicate category tags, isolated varied wedding test accounts and existing sample quote coverage, clean exact-SHA tests and build plus Oracle staging and production release with rollback and hosted workflow evidence]
-    progress: "User explicitly authorizes test account creation if needed, commit and Oracle deployment. Preserve security and owner boundaries; never renew expired/revoked links. Existing WED-375 hosted rollout gates remain tracked separately and must use evidence, not invented approvals. Primary checkout and sitemap author edits remain untouched."
+    progress: "Calendar grants, all/category generation, scoped renewal, celebrant import, literal directory search/category dedupe and public agent entrypoints are live; release evidence is in WED-376 and WED-377 handoffs. Five existing test accounts and isolated varied wedding scenarios exercised with cross-owner denial. Actual Google account-selection/completion remains unverified: active workspace shows email/password and GIS button, but no signed-in Google browser account/error detail is available. Do not close OAuth acceptance or the five WED-375 rollout gates based on these checks."
   - id: SEO-001
     title: Search and AI-answer discoverability static surface
     status: review

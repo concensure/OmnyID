@@ -1,3 +1,43 @@
+## WED-377 deployed and verified — 2026-11-19 09:14 UTC
+
+Live application source b9ead5298fb0cff77ef552c1dc4281e6d35c6bc8. Clean verification:
+C:/temp/wt/omnyid-wed377-verify. Implementation: C:/temp/wt/omnyid-wed376,
+agent/codex/WED-376 (later commits are coordination/evidence only).
+Image sha256:a086dba378880b9a8d19e68dfc403efa27356c0ecee5e136755edc0bddff4fa6.
+Machine release evidence: Documents/verification/WED-377-release-evidence.json,
+C:/temp/wt/wed377-production-release-evidence.json and Oracle candidate
+/home/ubuntu/omnyid-candidates/wed377-b9ead529/production-release-evidence.json.
+Live release-manifest.json matches the actual running image and verified source.
+
+Quote fallback preserves both saved proposal totals/GST, excludes wrapped hourly extras,
+and withholds comparison prices for conflicting totals. Changed guest counts require
+revised package pricing. Versioned scripts prevent prior cached Sprout/directory/quote
+assets. Sprout now opens /workspace/?auth=signin&source=wedding, with visible email/password
+and Google button. All91 changed static files deployed; Caddy remained unchanged.
+
+Evidence: 2312 Wedding tests, typecheck, line budget, public-site checks, frontend build,
+mobile browser test, optimized native ARM build, seven Rust quote tests, five staged HTTP
+quote cases and browser use of all five responses across8/24/60/120/180guests. Native test
+compile took14m17s; all7 tests passed. Postdeploy authenticated health200 and five public
+browser paths200. Sprout click-through reaches active workspace form. Live bev search has
+six matching names including Celebrations By Bev; beva haszero; videographer chip countone.
+Initial directory smoke sampled pre-debounce results; the final check awaited the query
+response and matching rendered count. Google account completion is still not tested.
+
+Rollback: previous image sha256:88b5883d3a326608d6107a049c2931ea6dc9dbe1761fb4774199861633bd6024,
+tag omnyid-homeserver:wed377-rollback-1e79ec2c. Candidate rollback/ contains current runtime
+compose snapshots, Caddyfile.before and web-before.tar.gz. Restore homeserver with saved
+rollback compose (--no-build --no-deps --force-recreate), then restore saved static files;
+Caddy unchanged. No new migrations, no pruning and no outreach/paid model calls.
+
+WED-377 is complete. WED-376 remains open for actual Google account-selection error
+verification; the earlier async request for error detail has no reply. WED-375 retains
+five hosted/model/provider rollout gates. GitHub push/PR could not complete: OAuth
+credential lacks workflow scope for inherited .github/workflows/ci.yml changes. Local
+commits preserved; do not bypass permission or rewrite history to conceal the rejection.
+Recommended next work: obtain Google error details/owned browser completion and arrange
+hosted Runbook shadow/deterministic cohort evidence before any model/tool promotion.
+
 ## WED-377 native build and staging quote/UI checks complete; Rust test compile pending
 
 Application source b9ead5298fb0cff77ef552c1dc4281e6d35c6bc8, verification worktree
