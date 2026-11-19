@@ -16,6 +16,8 @@ lifecycle:
 
 tasks:
   - id: WED-377
+    candidate_sha: e9c4abb6a508c354c089ca83c4060d0c47db7fb5
+    verification_worktree: C:/temp/wt/omnyid-wed377-verify
     title: Correct sample quote fallback extraction and guest-count comparison warnings
     status: in_progress
     owner: codex

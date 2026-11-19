@@ -4326,3 +4326,27 @@ exact cooldowns expire from the latest outcome, family feedback changes ranking
 only, and feedback can never promote a deduped/capped match or expand authority.
 Do not backfill a suppressed winner in a frozen dispatch plan. No rollout flag
 or external execution is enabled by this batch.
+
+
+## 2026-11-19 — Independent vendor calendar capabilities (WED-376)
+
+Generating another calendar link preserves existing grants. Only a valid, unexpired,
+non-revoked grant for an active, participating vendor may renew to now + 14 days on
+exchange; expired links are never revived. Short sessions and CSRF checks remain.
+Non-celebrants receive wedding-date authority only. Vendor-before-grant locks serialize
+changes and opt-outs; independent grants share a single underlying calendar offer.
+All/category issuance uses bounded keyset pages and a frozen upper vendor ID. No link
+plaintext is persisted and generation never sends vendor outreach automatically.
+Workbook import withholds private contact details, preserves claimed existing records,
+and leaves newly created general celebrants out of the default curated directory.
+Literal substring search includes otherwise unfeatured active listings. Production
+import rejected non-ID mappings to avoid same-name identity conflation.
+
+## 2026-11-19 — Quote fallback boundaries (WED-377)
+
+An explicit proposal total takes precedence over component prices. Optional, additional,
+and hourly per-person charges cannot become the package's base per-person rate. A fixed
+package quoted for one guest count is not an estimate for a different count: retain its
+source line and return an unknown revised total until the vendor confirms pricing.
+Public changed scripts receive versioned URLs because the edge caches script assets.
+The active sign-in form is in /workspace/; the Docs preview modal has been retired.

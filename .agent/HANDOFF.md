@@ -1,3 +1,42 @@
+## WED-376 live; WED-377 exact-source follow-up builds running — 2026-11-19
+
+Production application: 1e79ec2c2397929680e1bd662e6f7123c22ba9d9; release evidence at
+C:/temp/wt/wed376-production-release-evidence.json and Oracle candidate directory
+/home/ubuntu/omnyid-candidates/wed376-1e79ec2c/production-release-evidence.json.
+Image sha256:88b5883d3a326608d6107a049c2931ea6dc9dbe1761fb4774199861633bd6024.
+First deployment auto-rolled back after Python urllib hit Cloudflare 1010. No browser
+outage was observed. Retry passed actual Playwright browser checks for five public
+paths and authenticated backend health. Imported 1915 records; 1927 workbook rows
+resolved. Live search bev returns six including Celebrations By Bev; beva returns zero.
+Preserve rollback directory; no prune/deletion performed. ClamAV remains repaired.
+
+Current follow-up source e9c4abb6a508c354c089ca83c4060d0c47db7fb5 on
+C:/temp/wt/omnyid-wed376 branch agent/codex/WED-376. Verification worktree is currently
+still on preceding 05e33078 while its Rust unit compile runs; do not change it until
+that compile ends. Then checkout frozen e9c4abb6 and rerun affected checks/build.
+Quote implementation is in src/server/wedding_quote_decoder_routes/fallback.rs with
+real sample and supplemental-rate regression tests; UI engine refuses fixed-total
+comparison across different guest counts. Sprout directs to the active workspace form.
+The earlier 05e33078 static agent.js hotfix is on origin but CDN may cache old unversioned
+asset for four hours; e9c4abb6 versions all public agent URLs, directory and quote engine.
+Deploy the versioned HTML/scripts after clean verification, then browser click through
+must reach visible workspace email/Google form (Docs query alone is a retired surface).
+
+Local 05e33078 frontend/typecheck/site/browser/linebudget checks pass. Docker Desktop
+was stopped; normal application startup restored it. First Rust run failed pipe missing;
+retry container omnyid-wed377-tests is compiling unit tests, log
+C:/temp/wt/wed377-05e33078-rust-retry.log. Do not treat missing exit file as pass.
+Native ARM frozen e9c4abb6 build is running outside the live tree in
+/home/ubuntu/omnyid-candidates/wed377-e9c4abb6; poll build.log/build.exit.
+Bounded builder: 2 CPUs, 12 GiB, Rust1.94, -j2, release root codegen64. Reuses a new
+isolated exec tmpfs at /home/ubuntu/omnyid-candidates/wed377-target-cache (8 GiB) and
+Docker registry volume omnyid-wed377-cargo-registry. Keep caches; no automatic prune.
+Remote disk was 91%, 4.4 GiB free; deployment threshold98%, monitor before more copies.
+Earlier 05e build was intentionally stopped to freeze versioned scripts; caches persist.
+Real Google account completion is still unverified; workspace GIS button renders but
+browser automation has no signed-in Google account. Do not claim that end-to-end passed.
+Five WED-375 model/provider/hosted rollout gates remain; no paid calls/execution enabled.
+
 ## WED-376 Oracle release in progress; WED-377 sample quote finding - 2026-11-19
 
 Implementation: C:/temp/wt/omnyid-wed376, agent/codex/WED-376.
