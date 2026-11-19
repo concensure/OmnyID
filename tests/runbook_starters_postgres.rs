@@ -1,3 +1,5 @@
+#[path = "runbook_starters_postgres/quote.rs"]
+mod quote;
 use async_trait::async_trait;
 use chrono::{Duration, Utc};
 use omnyid_homeserver::{

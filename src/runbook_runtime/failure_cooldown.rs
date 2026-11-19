@@ -113,5 +113,10 @@ mod tests {
         record["metadata"]["status"] = json!("cancelled");
         let records = vec![failed("a", now), failed("b", now), record];
         assert!(cooling_runbooks("owner", &records, now).unwrap().is_empty());
+        let mut other = failed("d", now);
+        other["content"]["runbook_id"] = json!("other_book");
+        other["metadata"]["runbook_id"] = json!("other_book");
+        let records = vec![failed("a", now), failed("b", now), other];
+        assert!(cooling_runbooks("owner", &records, now).unwrap().is_empty());
     }
 }

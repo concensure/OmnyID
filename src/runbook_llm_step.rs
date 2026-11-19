@@ -72,8 +72,8 @@ pub enum ModelFailure {
     ModelMismatch,
 }
 
-/// Future live adapters must use the existing owner-scoped inference ladder and
-/// honor pre-call budgets. This internal seam currently has mocked implementations only.
+/// Adapters use owner-scoped inference configuration and honor pre-call budgets.
+/// The bounded BYOK adapter is internal; no execution route or worker enables it.
 #[async_trait]
 pub trait ModelProvider: Send + Sync {
     async fn infer(
@@ -160,7 +160,7 @@ pub fn schema_for(kind: StepKind) -> Result<&'static str> {
     }
 }
 
-fn output_schema(kind: StepKind) -> Result<Value> {
+pub(crate) fn output_schema(kind: StepKind) -> Result<Value> {
     let refs = json!({"type":"array","minItems":1,"maxItems":8,"uniqueItems":true,"items":{"type":"string"}});
     let confidence = json!({"type":"integer","minimum":0,"maximum":10000});
     Ok(match kind {

@@ -7,6 +7,8 @@
 //! The backend is selected per-user from `user_llm_config` via the agent
 //! template system.
 
+pub mod runbook;
+
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
