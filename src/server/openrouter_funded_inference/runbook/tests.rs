@@ -151,16 +151,35 @@ async fn shared_runbook_funding_is_opt_in_atomic_owner_capped_and_conservative()
     let pending: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM platform_funded_ai_usage WHERE user_id=$1 AND status='reserved' AND actual_cost_usd IS NULL")
         .bind(&owner).fetch_one(&db.pool).await.unwrap();
     assert_eq!(pending, 1); // Uncertain/no-result exposure has not been released.
-    sqlx::query(
-        "DELETE FROM platform_funded_ai_usage WHERE user_id=$1 AND feature='runbook_model'",
-    )
-    .bind(&owner)
-    .execute(&db.pool)
-    .await
-    .unwrap();
     db.delete_user_account_and_data(&owner, &email, &[])
         .await
         .unwrap();
+    let linked: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM platform_funded_ai_usage WHERE user_id=$1")
+            .bind(&owner)
+            .fetch_one(&db.pool)
+            .await
+            .unwrap();
+    assert_eq!(linked, 0);
+    let retained: (Option<String>, String, String) = sqlx::query_as(
+        "SELECT user_id,request_fingerprint,status FROM platform_funded_ai_usage WHERE id=$1",
+    )
+    .bind(&reservation.id)
+    .fetch_one(&db.pool)
+    .await
+    .unwrap();
+    assert_eq!(retained, (None, reservation.id.clone(), "completed".into()));
+    // Only this test's anonymous accounting rows are removed from the disposable DB.
+    for id in [Some(reservation.id), first.ok(), second.ok()]
+        .into_iter()
+        .flatten()
+    {
+        sqlx::query("DELETE FROM platform_funded_ai_usage WHERE id=$1 AND user_id IS NULL")
+            .bind(id)
+            .execute(&db.pool)
+            .await
+            .unwrap();
+    }
     assert!(matches!(
         reserve(&db, &owner, BASE_MODEL, 1, i64::MAX, i64::MAX).await,
         Err(ModelFailure::Provider)

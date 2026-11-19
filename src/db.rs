@@ -5243,6 +5243,11 @@ impl Db {
                 .bind(user_id).execute(&mut *tx).await?;
         }
 
+        // Preserve aggregate cost exposure while erasing new Runbook funding
+        // owner links. Unknown reservations still consume the platform cap.
+        sqlx::query("UPDATE platform_funded_ai_usage SET user_id=NULL, wedding_plan_id=NULL, provider_request_id=NULL, request_fingerprint=id WHERE user_id=$1 AND feature='runbook_model'")
+            .bind(user_id).execute(&mut *tx).await?;
+
         // Drop the tenant-private schema so private AFP messages, per-user
         // workflow tables, and other user-scoped data cannot survive account
         // deletion in orphaned schemas.
