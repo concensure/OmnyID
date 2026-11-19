@@ -767,6 +767,23 @@ async fn authenticated_tool_review_is_dark_owner_bound_recent_and_never_dispatch
     );
     let saved = http(&app, "POST", &path, &auth, proposal.clone()).await;
     assert_eq!(saved.0, S::OK);
+    let activity_path = format!("/runbooks/instances/{id}/activity");
+    let activity = http(&app, "GET", &activity_path, &auth, json!(null)).await;
+    assert_eq!(activity.0, S::OK);
+    assert_eq!(activity.1["tool_review_available"], true);
+    assert_eq!(activity.1["tool_reviews"][0]["status"], "pending");
+    assert_eq!(activity.1["tool_reviews"][0]["proposal_ref"], pid);
+    assert!(activity.1["tool_reviews"][0].get("arguments").is_none());
+    assert!(activity.1["tool_reviews"][0].get("request").is_none());
+    unsafe {
+        std::env::remove_var("OMNYID_RUNBOOK_TOOL_REVIEW_ENABLED");
+    }
+    let dark = http(&app, "GET", &activity_path, &auth, json!(null)).await;
+    assert_eq!(dark.1["tool_review_available"], false);
+    unsafe {
+        std::env::set_var("OMNYID_RUNBOOK_TOOL_REVIEW_ENABLED", "true");
+    }
+
     assert_eq!(saved.1["execution_available"], false);
     assert_eq!(
         saved.1["proposal"]["request"]["arguments"],
@@ -818,6 +835,9 @@ async fn authenticated_tool_review_is_dark_owner_bound_recent_and_never_dispatch
     );
     let receipt = http(&app, "POST", &decision, &auth, yes.clone()).await;
     assert_eq!(receipt.0, S::OK);
+    let activity = http(&app, "GET", &activity_path, &auth, json!(null)).await;
+    assert_eq!(activity.1["tool_reviews"][0]["status"], "approved");
+
     assert_eq!(receipt.1["decision"]["approved"], true);
     assert_eq!(receipt.1["execution_available"], false);
     assert_eq!(http(&app, "POST", &decision, &auth, yes).await.1, receipt.1);

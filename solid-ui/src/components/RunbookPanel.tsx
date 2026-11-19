@@ -1,3 +1,4 @@
+import { RunbookToolReviewCard } from "./RunbookToolReviewCard";
 import { ApprovalReviewSummary } from "./ApprovalReviewSummary";
 import { navigateToView } from "@/lib/decisionosNavigation";
 import { createSignal, createUniqueId, For, onCleanup, onMount, Show } from "solid-js";
@@ -92,7 +93,7 @@ export function RunbookPanel(props: { mode?: "manage" | "questions" | "activity"
     link.href = url; link.download = `runbook-${d.runbook_id}.json`; link.click(); URL.revokeObjectURL(url);
   }
   const visibleActivities = () => props.mode === "questions"
-    ? activities().filter(a => openRunbookQuestions(a).length > 0 || (a.reviews?.length ?? 0) > 0 || (a.approval_requests?.length ?? 0) > 0) : activities();
+    ? activities().filter(a => openRunbookQuestions(a).length > 0 || (a.reviews?.length ?? 0) > 0 || (a.approval_requests?.length ?? 0) > 0 || (a.tool_reviews?.length ?? 0) > 0) : activities();
   return <Show when={available()}>
     <section aria-labelledby={uid} class="min-w-0 space-y-3 rounded-2xl border border-slate-300 bg-slate-50 p-3 text-slate-900">
       <div class="flex min-w-0 flex-wrap items-center justify-between gap-2">
@@ -105,7 +106,7 @@ export function RunbookPanel(props: { mode?: "manage" | "questions" | "activity"
       <Show when={loading()}><p role="status">Loading runbooks…</p></Show>
       <Show when={error()}><p role="alert" class="break-words text-red-800">{error()}</p></Show>
       <Show when={notice()}><p role="status" class="text-sm">{notice()}</p></Show>
-      <Show when={truncated()}><p role="status">Showing up to 50 runs, with questions first. Older runs may be omitted.</p></Show>
+      <Show when={truncated()}><p role="status">Showing up to 50 runs, with questions and approvals first. Older runs may be omitted.</p></Show>
       <Show when={manage() && !loading() && !error()}>
         <Show when={starters().length}>
           <details open={definitions().length === 0} class="min-w-0">
@@ -154,6 +155,8 @@ export function RunbookPanel(props: { mode?: "manage" | "questions" | "activity"
           <RunbookQuestionCard activity={a} question={q} busy={busy() || loading() || !!error()}
             onAnswer={payload => act(() => apiFetch(`/runbooks/instances/${encodeURIComponent(a.instance.instance_id)}/answers`, { method: "POST", bodyJson: payload }), "Answer saved to this step.")} />
         }</For>
+        <For each={a.tool_reviews ?? []}>{review => <RunbookToolReviewCard activity={a} review={review}
+          busy={busy() || loading() || !!error()} confirm={request} />}</For>
         <For each={a.approval_requests ?? []}>{proposal => <section aria-label="Runbook approval proposal" class="min-w-0 space-y-2">
           <ApprovalReviewSummary approvalReview={proposal.approval_review} />
           <p class="break-all text-sm">Review proposal: {proposal.action_ref}</p>

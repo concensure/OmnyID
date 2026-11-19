@@ -1,11 +1,11 @@
 //! Bounded owner-scoped projections. Raw evidence, answers and definitions are
 //! intentionally absent; questions expose only the fields required to answer.
 use crate::{
-    runbook_afp::{parse_runtime_afp, RuntimeRecord},
+    runbook_afp::{RuntimeRecord, parse_runtime_afp},
     runbook_contract::*,
     runbook_runtime::RunbookRuntime,
 };
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::collections::BTreeMap;
 
 impl RunbookRuntime<'_, '_> {
@@ -40,7 +40,15 @@ impl RunbookRuntime<'_, '_> {
         }
         let mut current: Vec<_> = latest
             .into_values()
-            .map(|i| (i.status != InstanceState::WaitingForInput, i.instance_id))
+            .map(|i| {
+                (
+                    !matches!(
+                        i.status,
+                        InstanceState::WaitingForInput | InstanceState::AwaitingApproval
+                    ),
+                    i.instance_id,
+                )
+            })
             .collect();
         current.sort();
         let truncated = current.len() > 50;
@@ -171,11 +179,12 @@ impl RunbookRuntime<'_, '_> {
                 return Err("review_limit");
             }
         }
+        let tool_reviews = self.tool_reviews_in(owner, &current.instance, tx).await?;
         let i = current.instance;
         let mut result = json!({"instance":{"instance_id":i.instance_id,"runbook_id":i.runbook_id,"runbook_version":i.runbook_version,
             "status":i.status,"revision":i.revision,"current_step_id":i.current_step_id,"completed_step_ids":i.completed_step_ids,
             "next_follow_up_at":i.next_follow_up_at,"wait_expires_at":i.wait_expires_at},
-            "review_actor":owner,"approval_requests":approval_requests,"reviews":reviews,"traces":traces,"questions":questions.into_values().collect::<Vec<_>>(),"execution_available":false});
+            "tool_reviews":tool_reviews,"review_actor":owner,"approval_requests":approval_requests,"reviews":reviews,"traces":traces,"questions":questions.into_values().collect::<Vec<_>>(),"execution_available":false});
         if i.status == InstanceState::WaitingForBudget {
             result["budget"] = json!(
                 self.model_budget_in(owner, &i, chrono::Utc::now(), tx)

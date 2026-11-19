@@ -13,8 +13,12 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
         )
 }
 
+pub(super) fn enabled() -> bool {
+    std::env::var("OMNYID_RUNBOOK_TOOL_REVIEW_ENABLED").as_deref() == Ok("true")
+}
+
 async fn actor(state: &AppState, headers: &HeaderMap) -> Result<String, ApiError> {
-    if std::env::var("OMNYID_RUNBOOK_TOOL_REVIEW_ENABLED").as_deref() != Ok("true") {
+    if !enabled() {
         return Err((StatusCode::NOT_FOUND, "not_found".into()));
     }
     owner(state, headers).await

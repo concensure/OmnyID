@@ -36,3 +36,19 @@ test("budget waits are visible, nonterminal and cannot accept epistemic answers"
   assert.deepEqual(openRunbookQuestions(waiting),[]);
   assert.throws(()=>runbookAnswerPayload(waiting,q,{priority:"Work"},"event1"));
 });
+
+
+test("tool decisions bind fetched exact action and revision; expiry permits rejection only", async()=>{
+  const {toolDecisionPayload,toolProposalMatches}=await import("../src/lib/runbookState.ts");
+  const review={proposal_ref:"p1",step_id:"tool",tool_slug:"mail",capability:"read",request_hash:"a".repeat(64),expires_at:"2099-01-01T00:00:00Z",status:"pending" as const};
+  const activity={...a,tool_review_available:true,instance:{...a.instance,status:"awaiting_approval",current_step_id:"tool",revision:3}};
+  const p={...review,instance_id:"i1",expected_revision:2,request:{tool_slug:"mail",capability:"read",arguments:{limit:0,confirmed:false}}};
+  assert.deepEqual(toolDecisionPayload(activity,review,p,true),{expected_revision:3,approved:true});
+  assert.equal(toolProposalMatches(activity,review,{...p,request_hash:"forged"}),false);
+  assert.throws(()=>toolDecisionPayload(activity,review,{...p,instance_id:"foreign"},true));
+  assert.throws(()=>toolDecisionPayload({...activity,tool_review_available:false},review,p,true));
+  assert.throws(()=>toolDecisionPayload({...activity,instance:{...activity.instance,revision:4}},review,p,true));
+  assert.throws(()=>toolDecisionPayload(activity,review,p,true,Date.parse("2100-01-01")));
+  assert.deepEqual(toolDecisionPayload(activity,{...review,status:"expired"},p,false),{expected_revision:3,approved:false});
+  assert.throws(()=>toolDecisionPayload(activity,{...review,status:"approved"},p,false));
+});

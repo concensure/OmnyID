@@ -2,9 +2,9 @@
 use super::*;
 mod tool_review;
 use crate::runbook_contract::RunbookDefinition;
-use crate::runbook_starter_pack::{starter_definitions, STARTER_PACK_VERSION};
+use crate::runbook_starter_pack::{STARTER_PACK_VERSION, starter_definitions};
 use crate::runbook_store::RunbookStore;
-use axum::http::{header, HeaderValue};
+use axum::http::{HeaderValue, header};
 use chrono::Utc;
 use serde::Deserialize;
 
@@ -114,12 +114,12 @@ async fn activity(
 ) -> Result<Json<Value>, ApiError> {
     let owner = owner(&state, &headers).await?;
     let store = store(&state)?;
-    Ok(Json(
-        crate::runbook_runtime::RunbookRuntime::new(&store)
-            .activity(&owner, &id)
-            .await
-            .map_err(error)?,
-    ))
+    let mut value = crate::runbook_runtime::RunbookRuntime::new(&store)
+        .activity(&owner, &id)
+        .await
+        .map_err(error)?;
+    value["tool_review_available"] = json!(tool_review::enabled());
+    Ok(Json(value))
 }
 
 async fn instances(
@@ -128,12 +128,16 @@ async fn instances(
 ) -> Result<Json<Value>, ApiError> {
     let owner = owner(&state, &headers).await?;
     let store = store(&state)?;
-    Ok(Json(
-        crate::runbook_runtime::RunbookRuntime::new(&store)
-            .activities(&owner)
-            .await
-            .map_err(error)?,
-    ))
+    let mut value = crate::runbook_runtime::RunbookRuntime::new(&store)
+        .activities(&owner)
+        .await
+        .map_err(error)?;
+    if let Some(activities) = value["activities"].as_array_mut() {
+        for activity in activities {
+            activity["tool_review_available"] = json!(tool_review::enabled());
+        }
+    }
+    Ok(Json(value))
 }
 
 #[derive(Deserialize)]

@@ -12,6 +12,8 @@ export type RunbookQuestion = {
 export type RunbookActivity = {
   instance: { instance_id: string; runbook_id: string; status: string; revision: number;
     next_follow_up_at?: string | null; current_step_id?: string | null };
+  tool_review_available?: boolean;
+  tool_reviews?: RunbookToolReview[];
   review_actor?: string;
   approval_requests?: { action_ref: string; status?: "pending" | "approved" | "rejected" | "cancelled"; approval_review: ApprovalReviewLike }[];
   reviews?: { id: string; trace_id: string; title: string; summary_lines: string[]; source_refs: string[] }[];
@@ -61,4 +63,31 @@ export function runbookViewIdentity(content: unknown): { instanceId?: string; de
   if (typeof value.kind !== "string" || !runbookKinds.has(value.kind)) return null;
   if (value.kind === "runbook_definition") return runbookIdentifier(value.runbook_id) ? { definitionId: value.runbook_id } : null;
   return runbookIdentifier(value.instance_id) ? { instanceId: value.instance_id } : null;
+}
+
+export type RunbookToolReview = {
+  proposal_ref: string; step_id: string; tool_slug: string; capability: string;
+  request_hash: string; expires_at: string;
+  status: "pending" | "expired" | "approved" | "rejected" | "cancelled";
+};
+export type RunbookToolProposal = {
+  proposal_ref: string; instance_id: string; step_id: string; request_hash: string;
+  expected_revision: number; expires_at: string;
+  request: {tool_slug: string; capability: string; arguments: Record<string, unknown>};
+};
+export function toolProposalMatches(a: RunbookActivity, r: RunbookToolReview, p: RunbookToolProposal): boolean {
+  return !!p && p.instance_id === a.instance.instance_id && p.proposal_ref === r.proposal_ref
+    && p.step_id === r.step_id && p.request_hash === r.request_hash && p.expires_at === r.expires_at
+    && p.request?.tool_slug === r.tool_slug && p.request?.capability === r.capability
+    && !!p.request.arguments && typeof p.request.arguments === "object" && !Array.isArray(p.request.arguments)
+    && Number.isSafeInteger(p.expected_revision) && p.expected_revision > 0;
+}
+export function toolDecisionPayload(a: RunbookActivity, r: RunbookToolReview, p: RunbookToolProposal, approved: boolean, now = Date.now()) {
+  if (a.tool_review_available !== true || !toolProposalMatches(a,r,p)
+      || !["pending","expired"].includes(r.status) || a.instance.status !== "awaiting_approval"
+      || a.instance.current_step_id !== r.step_id || p.expected_revision + 1 !== a.instance.revision
+      || !runbookIdentifier(a.instance.instance_id) || !runbookIdentifier(r.proposal_ref)
+      || (approved && (r.status !== "pending" || !Number.isFinite(Date.parse(r.expires_at)) || Date.parse(r.expires_at) <= now)))
+    throw new Error("This tool review is no longer current. Refresh runbooks.");
+  return {expected_revision:a.instance.revision, approved};
 }

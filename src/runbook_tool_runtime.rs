@@ -18,6 +18,60 @@ use serde_json::json;
 use sqlx::{Postgres, Transaction};
 
 impl RunbookRuntime<'_, '_> {
+    pub(crate) async fn tool_reviews_in(
+        &self,
+        owner: &str,
+        instance: &RunbookInstance,
+        tx: &mut Transaction<'_, Postgres>,
+    ) -> Result<serde_json::Value> {
+        let mut reviews = Vec::new();
+        let thread = format!("runbook:{}", instance.instance_id);
+        for value in self
+            .store
+            .read_kind(owner, "runbook_tool_proposal", None, Some(&thread), tx)
+            .await?
+        {
+            let p: ToolProposal = records::decode(&value)?;
+            if p.instance_id != instance.instance_id {
+                return Err("tool_proposal_mismatch");
+            }
+            let did = records::id("runbook_tool_decision", owner, &p.instance_id, &p.step_id);
+            let decision = self
+                .store
+                .read_kind(owner, "runbook_tool_decision", Some(&did), None, tx)
+                .await?
+                .pop();
+            let pending = instance.status == InstanceState::AwaitingApproval
+                && instance.current_step_id.as_deref() == Some(&p.step_id)
+                && p.expected_revision.checked_add(1) == Some(instance.revision);
+            let status = if let Some(value) = decision {
+                let d: ToolDecision = records::decode(&value)?;
+                if d.proposal_ref != p.proposal_ref
+                    || d.request_hash != p.request_hash
+                    || d.instance_id != p.instance_id
+                    || d.step_id != p.step_id
+                {
+                    return Err("tool_decision_mismatch");
+                }
+                if d.approved { "approved" } else { "rejected" }
+            } else if !pending {
+                "cancelled"
+            } else if p.expires_at <= Utc::now() {
+                "expired"
+            } else {
+                "pending"
+            };
+            reviews.push(json!({"proposal_ref":p.proposal_ref,"step_id":p.step_id,
+                "tool_slug":p.request.tool_slug,"capability":p.request.capability,
+                "request_hash":p.request_hash,"expires_at":p.expires_at,"status":status}));
+            if reviews.len() > MAX_STEPS {
+                return Err("review_limit");
+            }
+        }
+        reviews.sort_by(|a, b| a["proposal_ref"].as_str().cmp(&b["proposal_ref"].as_str()));
+        Ok(json!(reviews))
+    }
+
     /// Read the immutable exact request for an owner-authenticated review.
     /// Historical retrieval does not imply current approval or dispatch eligibility.
     pub async fn tool_proposal(
