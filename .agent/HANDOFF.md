@@ -1,3 +1,19 @@
+## WED-382 corrected fixture candidate (2026-11-19 14:30 UTC)
+
+Frozen source ae1ac01a2c285ac10b09404cffe3db67fbaaa034, clean verification worktree
+C:/temp/wt/omnyid-wed382-verify-r3. Only executable-source delta from7f8abcf4 is
+the cohort test fixture: colon is valid, slash invalid. Native build and fresh
+model/application/sandbox/test jobs are queued at Oracle candidate
+/home/ubuntu/omnyid-candidates/wed382-ae1ac01a. Production remains ca563ffa.
+Frontend typecheck, build,12focused checks and mounted billing regression ran
+from final clean source. New169file workspace payload uploaded and hashed.
+Review boundaries and historical classification failures are in
+Documents/verification/WED-382-review.md; no broad model/tool activation implied.
+Final helper C:/temp/wt/wed382-r3-production-deploy.py has not executed.
+All tests/evidence/review and df<98 gate it. No GitHub upload.
+Historical7f8 sandbox completed12cases with6independently verified effects,
+including the actual ten-minute expiry wait. New-source evidence still required.
+
 ## Oracle artifact retention and WED-382 queues (2026-11-19 14:14 UTC)
 
 WED-382 frozen source7f8abcf41bf06e72b3b995047cffe71ce7de05da remains at
