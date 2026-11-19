@@ -1,3 +1,61 @@
+## WED-379 automatic deterministic cohort — 2026-11-19
+
+Implementation worktree C:/temp/wt/omnyid-wed379, branch agent/codex/WED-379.
+Frozen source24948b23e4ec59b9af12ca08aa514a80d17d4c78; clean verification
+C:/temp/wt/omnyid-wed379-verify-24948b23. Later commits contain evidence/docs.
+Oracle delivery only; no GitHub upload/PR requested.
+
+Added runbook_deterministic.rs, wired persisted-event dispatch to a separate
+expiring owner/definition-version policy, and bounded runtime transaction
+admission by expiry after owner-lock acquisition. Only complete canonical
+Read/Transform/private Emit/Complete contracts are admitted; models, tools,
+approvals and followups are excluded. Existing runtime/read/transform/emit/
+complete transaction openings use the optional expiry guard; ordinary callers
+retain their existing behavior. Added the real application-hook acceptance
+binary, isolated runner and deterministic-cohort.md. Architecture decision is
+in .agent/DECISIONS.md. Expiry is a transaction-admission cutoff: an already
+admitted transaction may finish, but subsequent transactions are denied.
+
+Machine artifact Documents/verification/WED-379-hosted-evidence.json records
+native ARM Rust1.94.0 release build exit0 in15m27s and hosted probe exit0.
+All1,216 build inputs match frozen Git (1,054 CRLF-only differences; no actual
+mismatch or missing required file). Probe SHA256:
+723566d48e8ce14f3eb030ccc1682e8fbdad039d95b3aa08975839f7a38136ce.
+Application SHA256:
+105dddf16f64c26f3ea5001b8c53eb4d926846e29f06f63572f3f05b408775c5.
+Remote candidate /home/ubuntu/omnyid-candidates/wed379-24948b23 retains logs,
+source verification, runner, binaries and complete-evidence.json. Runner hash
+matches the committed runner. rustfmt and both line-budget tests passed on the
+clean candidate. No frontend code changed. Full release verification stays open.
+
+Two synthetic persisted budget scenarios (24guests/AUD18000 and120guests/
+AUD45000) automatically completed with4traces and1private review each, with
+correct opposite over-budget conclusions. Excluded owner produced no instance.
+Assertions cover4duplicate checks,4foreign-owner denials,8policy denials,
+2terminal reopen denials, stale revision, cancelled reopen, disabled definition,
+expiry while waiting for an owner lock,3altered contracts and5configuration
+rejections. Hook counters:2completed,2concurrent/stale,4terminal/waiting,
+2policy denied,0errors. This proves the exercised budget cohort; it does not
+claim all starters, model quality, tool safety or production activation.
+
+The earlier4151825c candidate compiled but its probe failed because the foreign
+fixture account had not yet been created.24948b23 creates all accounts first
+and adds denials between allowed owners. Failed logs/candidate retained; they
+are not acceptance evidence. Both corrected fixture containers are stopped,
+internal-only/no host ports, with disposable DB and synthetic keys. No provider
+credentials, model calls or external messages were involved.
+
+Production image was unchanged before/after and remains source
+b9ead5298fb0cff77ef552c1dc4281e6d35c6bc8, image
+sha256:a086dba378880b9a8d19e68dfc403efa27356c0ecee5e136755edc0bddff4fa6.
+No production Runbook enable flags were configured. No app/Caddy/static deploy
+or restart occurred; rollback artifacts from WED-377 remain retained below.
+Cross-review found no closure blocker for the isolated budget cohort. Checklist
+114complete/3remaining. Remaining gates: representative Luna/Sol evaluation, reviewed provider
+sandbox and final frozen release. Actual Google sign-in completion remains
+unverified separately in WED-376. Official model compatibility preflight is
+recorded in rollout-evidence.md; it is not live inference or funding proof.
+
 ## WED-378 Oracle shadow gate complete — 2026-11-19
 
 Implementation worktree C:/temp/wt/omnyid-wed378, branch agent/codex/WED-378.

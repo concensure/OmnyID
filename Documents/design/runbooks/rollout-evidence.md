@@ -1,8 +1,10 @@
 # WED-375 rollout evidence gates
 
 These are acceptance requirements, not a claim that any cohort or deployment
-has passed. All execution entrypoints remain disconnected. A successful local
-review, model response or sandbox request does not enable production actions.
+has passed. Execution remains default-off. WED-379 adds a separately expiring
+internal deterministic cohort; model and tool entrypoints remain disconnected
+from application execution. A successful local review, model response or sandbox
+request does not enable production actions.
 
 ## Separate promotion boundaries
 
@@ -96,3 +98,22 @@ It reads the persisted private record, emits a stable reference-only event and
 only matches instances. HTTP replay must not create another normalization or
 instance. Missing dates require the existing question flow; quote receipt
 never grants booking, payment or availability authority.
+
+
+## Model compatibility preflight — 2026-11-19
+
+The configured IDs remain `gpt-6-luna` and `gpt-6.1-sol`. Official model
+references confirm Luna low/medium and Sol medium reasoning support and
+structured outputs. Both support Chat Completions, which the current draft-only
+adapter uses without tools. Luna function calling at non-none reasoning and Sol
+tool calling require Responses; this does not authorize adding tools to the model
+cohort. Sources: [Luna](https://developers.openai.com/api/docs/models/gpt-6-luna)
+and [Sol](https://developers.openai.com/api/docs/models/gpt-6.1-sol).
+
+This was a documentation check, not an inference test or funding/access proof.
+No representative versioned corpus was found in the Runbook test/design paths.
+Next, freeze a synthetic corpus covering sufficient, missing, contradictory and
+instruction-injected evidence, with expected schema/source/authority outcomes;
+then record bounded provider runs and application acceptance results for all
+three model/effort configurations. Keep the model gate open until that evidence
+exists. No API requests or production flags were changed by this preflight.

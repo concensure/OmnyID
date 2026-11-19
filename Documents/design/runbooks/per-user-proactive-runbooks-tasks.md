@@ -499,7 +499,7 @@ Depends on: 1–16
 - [x] Run Rust unit/integration tests, migration checks, all relevant proactive/Watcher/Synthesizer/approval tests, frontend typecheck, line budget, full Wedding tests where wedding runbooks are enabled, production build, and accessibility checks.
 - [x] Verify every new source file is below 999 lines and no existing oversized file is materially bloated.
 - [x] Run flags-off hosted shadow matching and compare expected definition/match counts without executing instances. (WED-378: isolated synthetic Oracle fixture, exact counts and zero shadow instance writes; see Documents/verification/WED-378-hosted-evidence.json. Application rollout remains disabled.)
-- [ ] Run an internal allowlist with deterministic steps only and inspect duplicate, policy-denial, stale, and cross-tenant metrics.
+- [x] Run an internal allowlist with deterministic steps only and inspect duplicate, policy-denial, stale, and cross-tenant metrics.
 - [ ] Enable draft-only model steps after representative Luna-versus-Sol evaluation passes.
 - [ ] Enable approval-gated tools only after security/privacy review and provider/sandbox evidence.
 - [x] Keep reversible action rollout separate and require objective acceptance, undo, error, and cost criteria. (See rollout-evidence.md; no action cohort is enabled.)
@@ -930,3 +930,19 @@ Four unsafe configuration guards passed. Both fixture containers were stopped;
 production image remained unchanged. Cross-review supports the narrow shadow
 closure. Checklist: 113 complete / 4 remaining of 117. Google sign-in completion
 is tracked separately in WED-376. GitHub upload is not required by the user.
+
+
+WED-379 hosted continuation (2026-11-19): frozen source
+`24948b23e4ec59b9af12ca08aa514a80d17d4c78`, clean worktree
+`C:/temp/wt/omnyid-wed379-verify-24948b23`, passed native ARM release build and
+actual persisted-event automatic cohort assertions on isolated Oracle. Two
+budget scenarios each produced exactly one private review and four step traces.
+Replay, foreign-owner, stale revision, terminal/cancelled reopen, disabled
+policy/definition, unsupported contract and expiry-under-lock denials passed.
+Machine evidence: `Documents/verification/WED-379-hosted-evidence.json`.
+Cross-review supports the narrow internal deterministic allowlist gate; other
+starter pipelines, models, tools and production activation are not established.
+Fixture containers stopped and production image unchanged. Checklist:
+**114 complete / 3 remaining of 117**. Remaining: representative model evaluation,
+reviewed provider sandbox and final frozen release. Google completion remains
+separately open in WED-376. No GitHub upload.
