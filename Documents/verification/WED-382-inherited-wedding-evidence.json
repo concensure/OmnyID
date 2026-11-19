@@ -1,0 +1,25 @@
+{
+  "prior_release": {
+    "source_sha": "1e79ec2c2397929680e1bd662e6f7123c22ba9d9",
+    "deployed_at": "2026-11-19T08:26:55.740605+00:00",
+    "authenticated_health": 200,
+    "imported_listings": 1915,
+    "workbook_rows_reconciled": 1927,
+    "search_bev_count": 6,
+    "search_beva_count": 0,
+    "rollback_directory": "/home/ubuntu/omnyid-candidates/wed376-1e79ec2c/rollback"
+  },
+  "prior_staging_workflow": {
+    "source_sha": "1e79ec2c2397929680e1bd662e6f7123c22ba9d9",
+    "inventory_pages": 20,
+    "links_generated": 1953,
+    "category_filtered": true,
+    "independent_links": true,
+    "renewal_14_days": true,
+    "csrf_denied": true,
+    "date_update": true,
+    "noncelebrant_scope_enforced": true,
+    "revocation": true,
+    "authenticated_health": 200
+  }
+}
