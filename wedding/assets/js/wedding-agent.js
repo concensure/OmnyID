@@ -14,7 +14,7 @@
   dialog.setAttribute('aria-labelledby', 'weddingAgentTitle');
   var title = document.createElement('h2'); title.id = 'weddingAgentTitle'; title.textContent = 'Wedding Sprout';
   var description = document.createElement('p'); description.textContent = 'Your wedding planning assistant lives in your private workspace. Sign in to plan your wedding, or explore the guide first.';
-  var signin = document.createElement('a'); signin.className = 'btn btn-primary'; signin.href = '/docs/?auth=signin&source=wedding'; signin.textContent = 'Open my wedding workspace';
+  var signin = document.createElement('a'); signin.className = 'btn btn-primary'; signin.href = '/workspace/?auth=signin&source=wedding'; signin.textContent = 'Open my wedding workspace';
   var guide = document.createElement('a'); guide.href = '/wedding/user-guide.html'; guide.textContent = 'Explore the planning guide';
   var close = document.createElement('button'); close.type = 'button'; close.textContent = 'Close'; close.className = 'wedding-agent-close';
   close.addEventListener('click', function () { dialog.close(); });

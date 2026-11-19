@@ -50,7 +50,7 @@ try {
     const button = page.getByRole('button', { name: 'Open Wedding Sprout, your planning assistant' });
     await button.click();
     await page.getByRole('dialog', { name: 'Wedding Sprout' }).waitFor();
-    assert.equal(await page.getByRole('link', { name: 'Open my wedding workspace', exact: true }).getAttribute('href'), '/docs/?auth=signin&source=wedding');
+    assert.equal(await page.getByRole('link', { name: 'Open my wedding workspace', exact: true }).getAttribute('href'), '/workspace/?auth=signin&source=wedding');
     await page.keyboard.press('Escape');
     assert.equal(await button.evaluate(el => el === document.activeElement), true);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
