@@ -30,12 +30,18 @@ extraction request, cached replay, PDF-share request and no focus regression;
 `git diff --check`, focused scenario tests and direct rustfmt checks passed.
 The frontend suite, production build and browser smoke were repeated from the
 clean frozen implementation commit above.
-Windows rustc repeatedly terminated with `0xc0000005` without a Rust
-diagnostic, including a single-job non-incremental retry while compiling
-third-party `tungstenite`. Docker Desktop was unavailable, so a Linux Rust
-compile was not substituted. No Oracle deployment was attempted. Next action:
-review the commit, run Rust/clean exact-SHA verification in a healthy Linux or
-Windows toolchain, then use the normal production gate if release is requested.
+Windows rustc 1.94 and 1.95 repeatedly terminated with `0xc0000005` without a
+Rust diagnostic, in unrelated dependency crates including `tungstenite` and
+`futures-macro`. Docker Desktop was unavailable. A fresh WSL Ubuntu Rust 1.94
+toolchain was then tried with an isolated target: GCC first segfaulted building
+`aws-lc-sys`; Clang passed that dependency and reached the application crate,
+where rustc segfaulted. A final exact-HEAD archive on WSL's native filesystem,
+single job and a 32 MiB Rust worker stack caused the WSL VM to restart during
+dependency compilation. These cross-OS failures indicate host/virtualization
+instability; none emitted a repository diagnostic. No Oracle deployment was
+attempted. Next action: review the commit and run Rust/clean exact-SHA
+verification on a healthy host or CI runner, then use the normal production
+gate if release is requested.
 
 ## WED-382 released; bounded Runbook checklist complete (2026-11-19 15:09 UTC)
 
