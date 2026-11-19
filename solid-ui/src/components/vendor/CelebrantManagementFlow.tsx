@@ -71,7 +71,7 @@ export function CelebrantManagementFlow(props: { token: string }) {
     <section class="mx-auto w-full max-w-3xl rounded-xl bg-white p-5 shadow-sm sm:p-7" aria-labelledby="celebrant-management-title">
       <p class="text-xs font-bold uppercase tracking-[0.16em] text-wedding-accent">Private vendor link</p>
       <h1 id="celebrant-management-title" class="mt-2 text-2xl font-bold">Manage your availability</h1>
-      <p class="mt-2 text-sm leading-6 text-wedding-muted">This private link is scoped to one vendor’s wedding dates, with optional consultation hours for celebrants. Valid links renew for 14 days when opened. It cannot open couple details, messages, phone numbers or another listing.</p>
+      <p class="mt-2 text-sm leading-6 text-wedding-muted">This private link is scoped to one vendor's wedding dates, with optional consultation hours for celebrants. Valid links renew for 14 days when opened. It cannot open couple details, messages, phone numbers or another listing.</p>
       <Show when={busy() && !session()}><p class="mt-6" role="status">Opening your secure calendarâ€¦</p></Show>
       <Show when={error()}><p class="mt-5 rounded-lg bg-red-50 p-3 text-sm text-red-800" role="alert">{error()}</p></Show>
       <Show when={notice()}><p class="mt-5 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-900" role="status">{notice()}</p></Show>
