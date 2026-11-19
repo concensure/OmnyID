@@ -14,6 +14,6 @@ test("billing failure stays inline after authenticated workspace mount", async (
   await page.goto("/workspace/e2e/billing-failure.html");
   await expect(page.getByText("Unable to load billing status right now.", { exact: false })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Workspace remains available" })).toBeVisible();
-  await expect(page.getByText("Workspace crashed", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Workspace crashed", { exact: false })).toHaveCount(0);
   expect(billingRequests).toBe(1);
 });
