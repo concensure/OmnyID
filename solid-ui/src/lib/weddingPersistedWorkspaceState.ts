@@ -1,6 +1,7 @@
 // @locs-version: 2.0
 import type { AfpMessage } from "@/lib/api";
 import type { WeddingArtifactInput } from "@/lib/weddingArtifactState";
+import { weddingCanonicalQuoteArtifacts } from "@/lib/weddingCanonicalQuoteProjectionState";
 import type {
   WeddingPlanningScheduleItem,
   WeddingPlanningScheduleItemKind,
@@ -844,11 +845,11 @@ export function buildWeddingPersistedWorkspaceState(input: {
   });
   const scopedMessages = (input.messages ?? []).filter((message) => workspaceIdFrom(message) === metadata.responseWorkspaceId);
   const parsedAttachmentEvidence = parsedAttachmentEvidenceFromMessages(input.messages ?? [], metadata.responseWorkspaceId);
-  const artifacts = coalescePersistedArtifactInputs(scopedMessages.flatMap((message) => {
+  const artifacts = coalescePersistedArtifactInputs([...scopedMessages.flatMap((message) => {
     const artifact = messageToArtifactInput(message, metadata)
       ?? messageToVendorQuoteThreadArtifactInput(message, metadata, parsedAttachmentEvidence);
     return artifact ? [artifact] : [];
-  }));
+  }), ...weddingCanonicalQuoteArtifacts(input.messages ?? [], metadata)]);
   const contextItems = scopedMessages.flatMap((message) => {
     const item = messageToNeedToKnowContext(message, metadata);
     return item ? [{ item, timestamp: Date.parse(message.timestamp) || 0 }] : [];
