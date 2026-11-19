@@ -15,6 +15,17 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-380
+    title: Verify representative Runbook models and real approval sandbox before final release
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-380
+    worktree: C:/temp/wt/omnyid-wed380
+    base_sha: f4f738fa
+    depends_on: [WED-379]
+    files: [src/runbook_llm_step.rs, src/bin/runbook-model-eval.rs, src/bin/runbook-sandbox-probe.rs, tests/fixtures/runbook-model-eval.json, Documents/verification/WED-380*, Documents/design/runbooks/**, .agent/**]
+    acceptance: [Versioned synthetic corpus across Luna low and medium and Sol medium, actual owner provider and schema acceptance with bounded USD3 evaluation exposure, failure and usage evidence without hidden retries, real approval adapter against isolated effect-journal sandbox, review before enabling model or tool execution, final exact-SHA release remains gated until all evidence exists]
+    progress: "Read-only provider model access preflight returned200 for both configured model IDs. Register evaluation and isolated sandbox work; no production configuration changes."
   - id: WED-379
     candidate_sha: 24948b23e4ec59b9af12ca08aa514a80d17d4c78
     verification_worktree: C:/temp/wt/omnyid-wed379-verify-24948b23
@@ -105,7 +116,7 @@ tasks:
     acceptance: [Strict bounded contracts and terminal-safe transitions, immutable starter definitions and owner-scoped AFP projection, deterministic typed matching with stable dedupe and owner-bound keys, focused adversarial tests and clean-commit Rust build, execution remains disconnected until ledger transactions and authority integration are complete]
     current_batch: "Canonical quote ingress and explicit shared funding completed at 61fcdf0bb5c2f2f87e36c1203e8fedf454661d29. Reference-only persisted receipts are replay safe, bounded private evidence preserves decrypt budgets, missing dates ask the owner, and review never authorizes booking/payment. Shared inference reuses central credentials and funded ledger with locked account policy, existing-usage subtraction, atomic full-exposure reservations and account-erasure anonymization. Default off; no paid calls or execution cohort enabled."
     next_batch: "Three gates remain: representative Luna/Sol evaluation, reviewed provider sandbox, and final frozen release/deployment records. WED-378 supplies hosted shadow evidence; WED-379 supplies reviewed actual persisted-hook deterministic budget cohort evidence. Checklist114/117. User explicitly requests Oracle delivery, not GitHub upload. Production activation remains separate."
-    progress: "113 complete / 4 remaining of 117. WED-378 closes bounded hosted shadow evidence; see its artifact. Earlier foundation evidence: Machine-collected pinned proof C:/temp/wt/runbook-61fcdf0b-pinned-evidence.json: 19 successful checks, 124 Rust integrations, 385 distinct selected units, 2312 Wedding tests, five Runbook state tests, 15 browser scenarios, typecheck, both line budgets, frontend production and optimized Rust library/binary builds. Rust 1.94.0; full frozen source SHA and release binary hash in manifest. No paid calls, hosted rollout, candidate CI or deployment. Earlier local Docker interruption recovered without all-WSL shutdown; final compiler jobs ran sequentially with bounded RAM and existing swap."
+    progress: "114 complete / 3 remaining of 117. WED-378 and WED-379 close bounded shadow and deterministic cohort gates; see their artifacts. Earlier foundation evidence: Machine-collected pinned proof C:/temp/wt/runbook-61fcdf0b-pinned-evidence.json: 19 successful checks, 124 Rust integrations, 385 distinct selected units, 2312 Wedding tests, five Runbook state tests, 15 browser scenarios, typecheck, both line budgets, frontend production and optimized Rust library/binary builds. Rust 1.94.0; full frozen source SHA and release binary hash in manifest. No paid calls, hosted rollout, candidate CI or deployment. Earlier local Docker interruption recovered without all-WSL shutdown; final compiler jobs ran sequentially with bounded RAM and existing swap."
   - id: WED-374
     title: Restore Wedding Sprout rollout, complete projected databases, persona artwork, exports and planner-card affordances
     status: in_progress

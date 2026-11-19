@@ -223,7 +223,8 @@ pub fn prepare(
     })
 }
 
-pub(crate) fn output(
+/// Validate an untrusted response without granting action authority.
+pub fn output(
     text: &str,
     schema: &str,
     source_refs: &[String],
@@ -280,7 +281,7 @@ pub(crate) fn output(
 
 /// No retries on timeout/provider/schema failures. Only a well-formed result
 /// below the acceptance threshold can trigger one explicitly permitted escalation.
-pub(crate) async fn evaluate(
+pub async fn evaluate(
     provider: &dyn ModelProvider,
     mut request: ModelRequest,
     policy: &ModelPolicy,
