@@ -1,3 +1,69 @@
+## 2026-11-19: WED-375 canonical quote ingress and shared inference closure
+
+Implementation: `C:/temp/wt/omnyid-runbooks`, `agent/codex/WED-375`.
+Frozen source: `61fcdf0bb5c2f2f87e36c1203e8fedf454661d29`.
+Verification: `C:/temp/wt/omnyid-runbooks-verify-43d7c830`, clean detached at
+that SHA. Later documentation commits do not replace the source candidate.
+Checklist: **111 complete / 6 remaining of 117**. WED-375 remains in progress.
+
+Canonical quotation persistence now bridges an authenticated private record to
+a deterministic reference-only receipt under existing hook flags/allowlist.
+Replays retain one normalization/event/instance. Exact canonical evidence can
+bypass generic relevance scoring, never owner, byte or decrypt budgets. Empty
+or null encryption envelopes match private-message persistence semantics.
+Missing dates pause through the existing question flow. Existing canonical
+Documents/Responses projection remains draft-only, with no booking/payment grant.
+
+Shared inference is a separate trusted opt-in; default construction remains
+BYOK-only. Both funding flags, account allowlist and explicit compatible hosted
+configuration are required. Retain Luna/Sol policy and central secret handling.
+The existing funded ledger/global lock reserves full attempt exposure before I/O,
+rechecks locked account policy and subtracts existing monthly account usage.
+Only validated responses reconcile estimates; unknown outcomes retain exposure.
+Account erasure removes funding owner links/correlation fields while preserving
+anonymous cost totals and uncertain reservations. No worker/route enables this.
+
+Changed files: src/runbook_hooks.rs and quote.rs child; src/runbook_evidence.rs;
+src/server/quotation_routes.rs; tests/runbook_quote_ingress_postgres.rs;
+src/inference/runbook.rs and transport.rs child; src/server/llm_resolution.rs;
+src/server/openrouter_funded_inference.rs and runbook.rs/tests.rs children;
+src/db.rs account erasure; canonical task/checklist/decision/rollout docs.
+
+Machine-collected evidence: C:/temp/wt/runbook-61fcdf0b-evidence.json. It validates
+clean full-SHA provenance and 19 check exit codes/log hashes, with builder image
+identity and compiled unit-binary hash. Exact-candidate logs report 124 integration
+tests across 25 binaries, 385 distinct unit regressions (including migrations,
+Watcher, Synthesizer, proactive policy, workflows, approvals, tenant and inference
+resolution), 2312 Wedding tests, five Runbook state tests, 15 browser scenarios,
+typecheck, both line budgets, frontend production build and standalone Rust
+library/homeserver dev build. All selected checks exited zero; no real provider
+calls were made. Backend source mounted read-only in the existing pinned builder;
+Rust 1.94.1, debug=0, codegen-units=64, -j1, incremental off, 512 MiB compiler stack.
+Repository compiler pin is unchanged: this is local evidence, not pinned CI proof.
+The dedicated omnyid-runbook-wed375-pg database is now stopped. Other containers,
+worktrees, volumes and caches were not removed.
+
+Earlier c41e9d8e had 124 passing integrations but was superseded after review
+found missing prior-account-usage subtraction. d9ac6ec1 was superseded by erasure
+cleanup. Their queued builds were stopped; do not reuse their results. Earlier
+quote fixture/format corrections are committed; final source repeats all checks.
+
+GitHub queries return no candidate CI/deployments. Configured origin is PUBLIC
+concensure/OmnyID at 509dc31b1423d87c52fbebe5ab85efffacd0c750, the initial core
+release; local history is over 1000 commits ahead with a different lineage.
+No push/PR was attempted because this is not an established review destination
+for the accumulated workspace history. The intended private review/CI target was
+requested, alongside staging, internal test accounts and provider sandbox details.
+
+Six parents remain: full release verification, hosted flags-off shadow, internal
+deterministic allowlist, representative Luna/Sol evaluation and draft rollout,
+security/provider-sandbox approval-gated tool rollout, and final frozen release
+with matching deployment evidence. Do not close these from local tests. No
+production configuration, live service, sitemap or other agent worktree changed.
+Production/shared-stack deploy still requires AGENTS.md gates and a go-ahead for
+the concrete candidate. Recommended next action: resolve the review/staging
+inputs and pinned compiler gate, then execute the separate rollout-evidence gates.
+
 ## 2026-11-19: WED-375 canonical quotation workspace projection
 
 Implementation: `C:/temp/wt/omnyid-runbooks`, `agent/codex/WED-375`.

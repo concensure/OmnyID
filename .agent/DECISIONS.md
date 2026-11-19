@@ -1,3 +1,23 @@
+## 2026-11-19: WED-375 quote receipt and opt-in shared funding
+
+Canonical quote persistence may bridge a validated owner-private quote into a
+reference-only, deterministic Runbook receipt event under existing hook flags.
+Use persisted time/thread and stable owner/source identity for replay. Match
+only; never start execution or infer a wedding date. Exact canonical records
+may bypass generic relevance scoring, but never ownership, byte or decrypt
+budgets. Null and empty encryption envelopes represent plaintext, consistent
+with private-message persistence.
+
+Retain the specified Luna/Sol policy. Shared model composition is an explicit
+trusted opt-in in addition to rollout flags, allowlist and compatible hosted
+account configuration. Reuse the existing secret manager, funded ledger and
+global lock; reserve full attempt exposure before I/O, reconcile only validated
+responses and retain uncertainty. Re-read locked account policy and subtract
+existing usage before reservation. Account erasure removes funding owner links
+and correlation fields while retaining anonymous platform cost exposure.
+No automatic BYOK funding fallback, paid
+provider call, rollout enablement or deployment is implied.
+
 ## 2026-11-19: WED-375 canonical quotation display boundary
 
 Wedding workspace replay consumes confirmed/corrected quotation ledger records

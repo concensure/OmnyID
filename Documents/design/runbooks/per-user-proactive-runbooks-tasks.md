@@ -380,7 +380,7 @@ The Decision Queue/A2UI adapter now reloads authenticated questions and posts ty
 Depends on: 7–10
 
 - [x] Add `src/runbook_llm_step.rs` for only `classify`, `reason`, and `draft` step kinds.
-- [ ] Resolve inference through the current user BYOK/shared model ladder; do not read API keys directly in the runbook runtime.
+- [x] Resolve inference through the current user BYOK/shared model ladder; do not read API keys directly in the runbook runtime.
 - [x] Start with `gpt-6-luna` low/medium for bounded frequent tasks and permit policy-controlled `gpt-6.1-sol` medium escalation only after acceptance criteria fail.
 - [x] Require structured output schema for classification/reasoning and AFP draft objects for draft steps.
 - [x] Use reusable cached prompt prefixes, source references, strict evidence limits, and generate only on meaningful input changes.
@@ -458,7 +458,7 @@ Depends on: 2, 5–14
 
 - [x] `no_reply_followup`: idle event -> bounded context -> draft -> approval -> permitted follow-up event.
 - [x] `calendar_conflict`: conflicting events -> alternatives -> epistemic question when priority is missing.
-- [ ] `vendor_quote_received`: quote event -> one normalization -> Documents/response projection -> separate booking approval.
+- [x] `vendor_quote_received`: quote event -> one normalization -> Documents/response projection -> separate booking approval.
 - [x] `quote_missing_items`: normalized gaps -> exact questions -> no send before approval.
 - [x] `budget_threshold`: changed commitment -> category/total projection -> no invented target or spend.
 - [x] `wedding_task_deadline`: due task -> correct owner/context -> no duplicate decision task.
@@ -880,3 +880,23 @@ from an application route or worker.
 Frozen candidate `f30d31a365bc9a68b00d4fde16412a3df77abb95` passes 112 tests
 in 22 integration binaries, including five new secret-service/recovery tests.
 See handoff for the standalone build and the compiler-stack workaround.
+
+Verification continuation (2026-11-19): canonical private quotation ingress and
+explicit compatible shared funding are implemented at frozen source
+`61fcdf0bb5c2f2f87e36c1203e8fedf454661d29`. The HTTP replay/private encrypted
+evidence/missing-date regression and canonical Wedding projection verify the
+quote-to-review boundary without booking or payment authority. Shared funding
+reuses central credentials and the funded ledger, locks current account policy,
+subtracts existing usage, reserves full exposure and anonymizes accounting on
+account erasure without restoring platform spend. It remains default-off.
+
+Machine-collected local evidence: C:/temp/wt/runbook-61fcdf0b-evidence.json.
+124 integration tests, 385 distinct unit regressions, 2312 Wedding tests, five
+Runbook state tests, 15 browser scenarios, typecheck, both line budgets and
+frontend production/Rust library-binary dev builds have exit-zero logs for this
+exact clean source. Checklist: 111 complete / 6 remaining of 117. Full release
+verification remains open: Linux Rust 1.94.1 is a documented local workaround,
+not the repository-pinned compiler/CI gate. No hosted cohort or deployment was
+enabled. Staging/test-account/provider-sandbox details and the intended private
+review/CI remote remain needed; configured origin is the unrelated public core
+release and is not a suitable destination for the accumulated workspace history.

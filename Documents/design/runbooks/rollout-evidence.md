@@ -66,3 +66,33 @@ checks exist. Apply AGENTS.md production gates, retain previous images and Caddy
 recreate Caddy when required, and record hosted checks and rollback references.
 No hosted endpoint, test account, funding policy or rollout authorization is
 invented when it is unavailable. A gate stays open instead.
+
+## Shared model configuration (disabled until the model gate passes)
+
+`OwnerRunbookModelProvider::new` remains BYOK-only. Trusted application
+composition may select `with_shared_funding`; request bodies and model output
+cannot select it. Shared funding additionally requires both
+`OMNYID_OPENROUTER_FUNDED_ENABLED` and
+`OMNYID_RUNBOOK_SHARED_INFERENCE_ENABLED=true`, an owner in
+`OMNYID_RUNBOOK_ALLOWLIST`, and an explicitly compatible hosted account
+configuration (OpenAI, the specified Luna base model, positive monthly budget).
+No route or worker currently enables this adapter. Do not enable these controls
+as part of the flags-off or deterministic-only cohorts.
+
+The existing secret manager supplies the platform credential. The existing
+funded-usage ledger and global advisory lock reserve the full attempt ceiling
+against both the platform weekly cap and the owner's monthly cap before I/O.
+Account policy is re-read under a row lock and existing monthly usage from
+other inference paths is subtracted before admitting a reservation.
+A validated response reconciles usage-derived cost; timeout, cancellation and
+unknown outcomes retain the reservation. Usage-derived cost is not an invoice.
+Account deletion removes Runbook funding owner links and correlation fields,
+while retaining anonymous cost exposure so deletion cannot restore spent
+platform allowance. Failed BYOK requests never fall through into shared funding. Sol escalation
+retains the existing separate trusted policy and acceptance constraints.
+
+Canonical quotation ingress uses the existing event-hook flag and allowlist.
+It reads the persisted private record, emits a stable reference-only event and
+only matches instances. HTTP replay must not create another normalization or
+instance. Missing dates require the existing question flow; quote receipt
+never grants booking, payment or availability authority.
