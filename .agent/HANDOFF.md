@@ -1,3 +1,46 @@
+## WED-382 released; bounded Runbook checklist complete (2026-11-19 15:09 UTC)
+
+Frozen application source: ae1ac01a2c285ac10b09404cffe3db67fbaaa034.
+Clean verification worktree: C:/temp/wt/omnyid-wed382-verify-r3.
+Implementation/evidence branch: agent/codex/WED-382, C:/temp/wt/omnyid-wed382.
+Oracle image: sha256:de181133e9463ae2d63b25137b80a4a402ad0bd3645d59dd1ae8cd43281f5706.
+Machine evidence: Documents/verification/WED-382-release-evidence.json and its
+referenced model/application/sandbox/browser/review artifacts. The release
+started at 15:04:43 UTC; final evidence was collected at 15:08:41 UTC.
+
+The candidate adds separate default-off authenticated HTTP execution for private
+drafts and approved tools, bound to expiring exact owner/definition/step cohorts.
+It preserves receipts and costs when admission expires during provider I/O.
+Final source corrected the cohort test's invalid-identifier fixture; colon is
+valid under the shared grammar, slash is invalid. Historical failed evidence is
+retained and explicitly separated from final results.
+
+Required verification: native release build and 31 native tests; frontend typecheck,
+production build, 12 focused tests and 1 mounted billing regression; 36 model comparisons,
+actual HTTP private draft, 12 sandbox cases with 6 independent effects and real expiry;
+Caddy validation, unchanged configuration, no schema changes, df 97% below 98%.
+The release artifact records authenticated health/billing 200, public pages 200,
+fresh Google callback 200 with dialog closed and signed-in workspace without crash,
+and default-off execution 404/no-store. All verification is for the frozen SHA.
+Earlier wedding/calendar/import/sample-quote work remains included; historical
+vendor evidence is in WED-382-inherited-wedding-evidence.json and WED-377 artifacts.
+
+Checklist 117/117 complete, 0 remaining; WED-375/380/382 closed. Scope is bounded
+internal HTTP acceptance. Classification/reasoning activation, arbitrary external
+provider interoperability, general production automation, reversible actions and
+UI execution activation are not approved or claimed. No pending implementation
+item remains in this checklist; future promotion must meet its separate criteria.
+No GitHub upload or candidate CI was run, per the Oracle-only instruction.
+
+Rollback: /home/ubuntu/omnyid-candidates/wed382-ae1ac01a/rollback contains the
+previous runtime compose, workspace-before.tar.gz and Caddyfile.before. Previous
+image sha256:27118c8967e95975ce2d2b784eee35ac2b6559bbc80ef16407d54fe919a4dc89,
+retained tag omnyid-homeserver:wed382-rollback-ca563ffa. Caddy was unchanged in this
+release. Do not remove worktrees, images or rollback archives without approval.
+
+Final documentation validation parsed the task ledger after correcting a
+pre-existing indentation error on WED-319 progress; its task state was unchanged.
+
 ## WED-382 final evidence accepted; library test pending (2026-11-19 15:03 UTC)
 
 Frozen source ae1ac01a2c285ac10b09404cffe3db67fbaaa034; clean verification worktree

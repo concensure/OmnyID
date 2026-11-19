@@ -1,9 +1,16 @@
 # Current Project State
 
-Current branch: `main`
-Current release: latest local git tag `v0.1.0`
-Current HEAD: `c3c0399`
-Production SHA: see GitHub Deployment for the `production` environment
+Implementation branch: `agent/codex/WED-382`
+Frozen Oracle release source: `ae1ac01a2c285ac10b09404cffe3db67fbaaa034`
+Release authority: `Documents/verification/WED-382-release-evidence.json`
+Runtime authority: authenticated `/healthz`; the release artifact records the
+observed image, health, billing and browser results. No candidate GitHub CI or
+upload was performed because delivery was explicitly Oracle-only.
+Task authority: `.agent/TASKS.yaml`; WED-375/380/382 are closed for the bounded
+implementation and internal HTTP rollout scope. General production automation
+and UI execution activation remain separate and disabled.
+
+The following baseline notes predate that release and are historical context.
 
 ## Working
 

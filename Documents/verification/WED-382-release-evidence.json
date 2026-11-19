@@ -1,0 +1,90 @@
+{
+  "source_sha": "ae1ac01a2c285ac10b09404cffe3db67fbaaa034",
+  "image_id": "sha256:de181133e9463ae2d63b25137b80a4a402ad0bd3645d59dd1ae8cd43281f5706",
+  "previous_image": "sha256:27118c8967e95975ce2d2b784eee35ac2b6559bbc80ef16407d54fe919a4dc89",
+  "started_at": "2026-11-19T15:04:43.305120+00:00",
+  "checks": {
+    "authenticated_health": 200,
+    "authenticated_billing": 200,
+    "/wedding/": 200,
+    "/docs/": 200,
+    "/workspace/": 200
+  },
+  "workspace_files": 169,
+  "google_browser_smoke": {
+    "source_sha": "ae1ac01a2c285ac10b09404cffe3db67fbaaa034",
+    "observed_at": "2026-11-19T15:07:21.365Z",
+    "auth_dialog_closed": true,
+    "signed_in_account_menu": true,
+    "workspace_crash": 0,
+    "network": {
+      "paths": [
+        {
+          "path": "/wedding/",
+          "status": 200
+        },
+        {
+          "path": "/docs/?auth=signin&source=wedding",
+          "status": 200
+        },
+        {
+          "path": "/workspace/",
+          "status": 200
+        }
+      ],
+      "execution": [
+        {
+          "path": "/runbooks/instances/synthetic/steps/draft/draft",
+          "status": 404,
+          "cacheControl": "no-store"
+        },
+        {
+          "path": "/runbooks/instances/synthetic/tools/proposal/execute",
+          "status": 404,
+          "cacheControl": "no-store"
+        }
+      ]
+    },
+    "auth_google_network_request": "706. [POST] https://api.omnyid.com/auth/google => [200] ",
+    "auth_google_status": 200
+  },
+  "rollback_directory": "/home/ubuntu/omnyid-candidates/wed382-ae1ac01a/rollback",
+  "native_tests": {
+    "runbook_execution_cohort": {
+      "passed": 1,
+      "failed": 0,
+      "log_sha256": "2035d4e346f4f10ca1dab688cffc93615851534d0aefec72e1fd9123ffce9cb0"
+    },
+    "runbook_model_postgres": {
+      "passed": 13,
+      "failed": 0,
+      "log_sha256": "144b3dbc65444376f29121576b1ecc198637c5ac3fcca5dc0696b97abc5d547a"
+    },
+    "runbook_tool_runtime_postgres": {
+      "passed": 16,
+      "failed": 0,
+      "log_sha256": "5869f1c67e03852012b18b6a0e224e38b53d3c5e2d290c0f6a33f6a324e18654"
+    },
+    "model-unit": {
+      "passed": 1,
+      "failed": 0,
+      "log_sha256": "118bf692ceb8c3dd65b5b6a13a7244d41e12aa15f52a7bed6f22c302937dfad2"
+    }
+  },
+  "native_tests_total": 31,
+  "evidence_sha256": {
+    "build.log": "8aec605440b9d2676ead968ccc8de3bbc21c0a25dde4ba02a9a114a98277f6bc",
+    "tests-evidence.json": "6c30b6e140a370606eadee0921535402e38e0e671e2cac78cae8502688767e69",
+    "runtime-manifest.json": "51771bc57b7b588388de770329bd27f60055ebf47093ec372695bb545d6d6ac1",
+    "source-verification.json": "e29d5fdb33255601cfa8a3e38c8bff7e1214acc9ced845dd2118937dd0782014",
+    "staging-billing-evidence.json": "5814943edefe578e574964bb5cb235ffdb790fa92a25dea1de4d29dd99cf5838",
+    "preflight-evidence.json": "ca586f665dde7e287a2d578d03eb5fe9243ce26ad4ef46cd64dbfc099cf4a6cf",
+    "semantic-review.json": "89ff6e30fcfdeb1bb293833d33c2535352c3dfe941f140acfed0fbb6c3ece4dc",
+    "model-evidence.json": "5beaeeb1ebc657edca241a77d02cb81d1b7071683665cb8249347af8923f730b",
+    "comparison/model-evidence.json": "b83bfb319e9710274a4c458957283a72332c08549532a8afa4be5769af4812e6",
+    "sandbox-evidence.json": "ea8dcd0cf6d82a1ea22fa23ec5895959728a996862ad123072365cf687391595",
+    "browser-evidence.json": "124c0e3bbeedee080ac6b221fa67d7210b80b191f81013251adf5ac1169c6be6",
+    "wed382-workspace-manifest.json": "e4da61f60b992b0f8cfacea5c4528debbee08ce4d2decbb5b1ef984d41f086f3"
+  },
+  "verified_at": "2026-11-19T15:08:41.928986+00:00"
+}

@@ -500,10 +500,10 @@ Depends on: 1–16
 - [x] Verify every new source file is below 999 lines and no existing oversized file is materially bloated.
 - [x] Run flags-off hosted shadow matching and compare expected definition/match counts without executing instances. (WED-378: isolated synthetic Oracle fixture, exact counts and zero shadow instance writes; see Documents/verification/WED-378-hosted-evidence.json. Application rollout remains disabled.)
 - [x] Run an internal allowlist with deterministic steps only and inspect duplicate, policy-denial, stale, and cross-tenant metrics.
-- [ ] Enable draft-only model steps after representative Luna-versus-Sol evaluation passes.
-- [ ] Enable approval-gated tools only after security/privacy review and provider/sandbox evidence.
+- [x] Enable draft-only model steps after representative Luna-versus-Sol evaluation passes. (WED-382: expiring internal HTTP Luna-medium private-draft cohort;12/12 drafts and actual application acceptance. Classification/reasoning and broad production activation remain excluded.)
+- [x] Enable approval-gated tools only after security/privacy review and provider/sandbox evidence. (WED-382: reviewed internal HTTP marker-provider cohort;12 cases, 6 independently journaled effects and real expiry. External-provider interoperability and general production/UI activation are not claimed.)
 - [x] Keep reversible action rollout separate and require objective acceptance, undo, error, and cost criteria. (See rollout-evidence.md; no action cohort is enabled.)
-- [ ] Freeze the exact candidate SHA; all evidence, build manifests, and deployment records must name it.
+- [x] Freeze the exact candidate SHA; all evidence, build manifests, and deployment records must name it. (Final source ae1ac01a2c285ac10b09404cffe3db67fbaaa034; WED-382 release/model/application/sandbox artifacts name it. Earlier candidates remain labelled historical.)
 
 ## Completion definition
 
@@ -946,3 +946,22 @@ Fixture containers stopped and production image unchanged. Checklist:
 **114 complete / 3 remaining of 117**. Remaining: representative model evaluation,
 reviewed provider sandbox and final frozen release. Google completion remains
 separately open in WED-376. No GitHub upload.
+
+## Final bounded rollout and Oracle release — 2026-11-19
+
+Checklist:117/117 complete, 0 remaining. Final frozen source
+`ae1ac01a2c285ac10b09404cffe3db67fbaaa034` was built from the clean verification
+worktree C:/temp/wt/omnyid-wed382-verify-r3. Evidence and its hashes are in
+Documents/verification/WED-382-release-evidence.json. This records the Oracle
+image, authenticated health/billing, fresh Google account selection and public
+page checks, 31 native tests, and the matching model/application/sandbox artifacts.
+Frontend typecheck/build,12 focused checks and 1 mounted billing regression also
+ran from that source. No GitHub upload or candidate CI run was performed, per
+the Oracle-only delivery instruction; native and browser evidence is retained.
+
+Completion covers implementation and the explicitly bounded internal HTTP
+cohorts. Production execution remains default-off; no external vendor action,
+reversible-action cohort or UI execution activation is implied. The model review
+accepts private drafts only, with historical classification failures and a final
+non-draft expectation deviation recorded. Tools were reviewed against the
+isolated marker provider, not arbitrary external integrations.

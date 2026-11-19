@@ -1,3 +1,17 @@
+## 2026-11-19: WED-382 bounded acceptance is not broad activation
+
+The Runbook implementation checklist closes with reviewed internal HTTP cohorts:
+Luna-medium private drafts and approved calls to an isolated marker provider.
+Exact owner, definition digest/version, step and expiry remain mandatory.
+Representative draft acceptance does not approve classification or reasoning;
+historical classification failures and the final conservative non-draft
+expectation deviation remain in the review record. Marker-provider proof does
+not establish arbitrary external-provider interoperability. Production execution
+flags and UI activation remain off, and reversible actions retain their separate
+promotion criteria. Release evidence names frozen source
+`ae1ac01a2c285ac10b09404cffe3db67fbaaa034`; documentation commits record evidence
+without pretending to be the deployed application source.
+
 ## 2026-11-19: WED-382 execution admission and durable reconciliation
 
 Private drafts and approval-gated tools use separate default-off HTTP cohort

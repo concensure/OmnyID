@@ -17,7 +17,7 @@ lifecycle:
 tasks:
   - id: WED-382
     title: Add bounded authenticated application cohorts for private drafts and approved tools
-    status: in_progress
+    status: done
     owner: codex
     branch: agent/codex/WED-382
     candidate_sha: ae1ac01a2c285ac10b09404cffe3db67fbaaa034
@@ -27,7 +27,7 @@ tasks:
     depends_on: [WED-380, WED-381]
     files: [src/runbook_execution_cohort.rs, src/runbook_runtime.rs, src/runbook_model_runtime.rs, src/runbook_tool_execution.rs, src/runbook_tool_runtime.rs, src/server/runbook_routes.rs, src/server/runbook_routes/**, src/lib.rs, src/bin/runbook-model-eval.rs, src/bin/runbook-model-eval/**, tests/runbook_execution_cohort.rs, tests/runbook_model_postgres.rs, tests/runbook_model_postgres/**, tests/runbook_tool_runtime_postgres.rs, tests/runbook_tool_runtime_postgres/**, src/bin/runbook-sandbox-probe.rs, src/bin/runbook-sandbox-probe/**, Documents/verification/WED-382*, .agent/**]
     acceptance: [Default-off separate expiring exact-owner definition-hash step cohorts, admission checked after owner lock, trusted providers and recent human authentication for tool execution, no external request fields controlling provider or policy, final receipts reconcile without advancing expired cohorts, real HTTP application scenario plus expiry replay cancellation and cross-owner denials, model and sandbox evidence reviewed before any enabling]
-    progress: "Cross-review confirms operator probes are insufficient for application activation. Implement separate guarded HTTP composition; no production flags or routes enabled. WED-381 frozen ca563ffa remains isolated release candidate."
+    progress: "Completed bounded authenticated HTTP draft/tool composition and exact-source Oracle release. Evidence: Documents/verification/WED-382-release-evidence.json, WED-382-model-evidence.json, WED-382-application-model-evidence.json, WED-382-sandbox-evidence.json and WED-382-semantic-review.json. Source ae1ac01a2c285ac10b09404cffe3db67fbaaa034. 31 native tests, 12 focused frontend tests plus 1 mounted regression, 36 model and 12 sandbox scenarios recorded. General production automation, classification/reasoning and external-provider interoperability are not approved; production execution routes remain default-off. No GitHub upload."
   - id: WED-381
     title: Fix post-Google-login billing crash and contain usage loading failures
     status: done
@@ -44,7 +44,9 @@ tasks:
     candidate_sha: 7d34e769ab48c5f01540510740f0d25c07932a85
     verification_worktree: C:/temp/wt/omnyid-wed380-verify-7d34e769
     title: Verify representative Runbook models and real approval sandbox before final release
-    status: in_progress
+    status: done
+    completed_by: WED-382
+    release_sha: ae1ac01a2c285ac10b09404cffe3db67fbaaa034
     owner: codex
     branch: agent/codex/WED-380
     worktree: C:/temp/wt/omnyid-wed380
@@ -52,7 +54,7 @@ tasks:
     depends_on: [WED-379]
     files: [src/runbook_llm_step.rs, src/bin/runbook-model-eval.rs, src/bin/runbook-sandbox-probe.rs, tests/fixtures/runbook-model-eval.json, Documents/verification/WED-380*, Documents/design/runbooks/**, .agent/**]
     acceptance: [Versioned synthetic corpus across Luna low and medium and Sol medium, actual owner provider and schema acceptance with bounded USD3 evaluation exposure, failure and usage evidence without hidden retries, real approval adapter against isolated effect-journal sandbox, review before enabling model or tool execution, final exact-SHA release remains gated until all evidence exists]
-    progress: "Read-only provider model access preflight returned200 for both configured model IDs. Register evaluation and isolated sandbox work; no production configuration changes."
+    progress: "Completed through WED-382 final source ae1ac01a2c285ac10b09404cffe3db67fbaaa034. Historical failed candidates retained; final36-case representative comparison, real HTTP draft and12-case independently journaled approval sandbox reviewed for narrow internal scopes. See WED-382 review and release artifacts; this is not broad production activation."
   - id: WED-379
     candidate_sha: 24948b23e4ec59b9af12ca08aa514a80d17d4c78
     verification_worktree: C:/temp/wt/omnyid-wed379-verify-24948b23
@@ -130,7 +132,9 @@ tasks:
     progress: "Static snapshot 7aaa3b4ee42c0e890d587e72d59f68845525ee5b integrated from author commit a2643ce1. Four public smoke suites and Caddy validation completed. Oracle release recreated Caddy with unchanged application container; 328 deployed file hashes verified. Evidence C:/temp/wt/seo-001-hosted-verification.json; rollback archive /home/ubuntu/omnyid-static-backups/seo-001-7aaa3b4ee42c0e890d587e72d59f68845525ee5b/previous.tar. Public health endpoints return 401, so no application health assertion. Author retains ongoing sitemap ownership."
   - id: WED-375
     title: Implement per-user proactive Runbooks in dependency order
-    status: in_progress
+    status: done
+    completed_by: WED-382
+    release_sha: ae1ac01a2c285ac10b09404cffe3db67fbaaa034
     owner: codex
     branch: agent/codex/WED-375
     worktree: C:/temp/wt/omnyid-runbooks
@@ -141,9 +145,9 @@ tasks:
     depends_on: [WED-308, WED-374]
     files: [src/server/tests/workflow_trigger_tests.rs, solid-ui/tests/wedding-lead-magnet-import-state.test.ts, solid-ui/tests/wedding-run-sheet-context-cards.test.ts, src/db/tenant_names.rs, src/server/alias_validation.rs, src/inference.rs, src/inference/**, src/server/llm_resolution.rs, src/mcp_client.rs, src/mcp_client/**, src/tool_dispatch.rs, src/tool_dispatch/runbook*.rs, src/tool_dispatch/runbook_provider/**, src/runbook*.rs, src/runbook_runtime/**, src/runbook_schedule/**, src/proactive_provenance.rs, src/lib.rs, src/db.rs, src/server/runbook_routes.rs, src/server/runbook_routes/**, src/server/types.rs, src/server/mod.rs, src/server/proactive_routes.rs, src/daemon_runtime.rs, solid-ui/src/components/Runbook*.tsx, solid-ui/src/components/AgentFleetView.tsx, solid-ui/src/components/DecisionQueueView.tsx, solid-ui/src/components/renderers/A2UIRenderer.tsx, solid-ui/src/lib/runbook*.ts, solid-ui/tests/runbook*, solid-ui/tests/e2e/runbook*, solid-ui/e2e/runbook*, solid-ui/playwright.runbooks.config.ts, tests/runbook*, Documents/design/runbooks/**, .agent/**]
     acceptance: [Strict bounded contracts and terminal-safe transitions, immutable starter definitions and owner-scoped AFP projection, deterministic typed matching with stable dedupe and owner-bound keys, focused adversarial tests and clean-commit Rust build, execution remains disconnected until ledger transactions and authority integration are complete]
-    current_batch: "Canonical quote ingress and explicit shared funding completed at 61fcdf0bb5c2f2f87e36c1203e8fedf454661d29. Reference-only persisted receipts are replay safe, bounded private evidence preserves decrypt budgets, missing dates ask the owner, and review never authorizes booking/payment. Shared inference reuses central credentials and funded ledger with locked account policy, existing-usage subtraction, atomic full-exposure reservations and account-erasure anonymization. Default off; no paid calls or execution cohort enabled."
-    next_batch: "Three gates remain: representative Luna/Sol evaluation, reviewed provider sandbox, and final frozen release/deployment records. WED-378 supplies hosted shadow evidence; WED-379 supplies reviewed actual persisted-hook deterministic budget cohort evidence. Checklist114/117. User explicitly requests Oracle delivery, not GitHub upload. Production activation remains separate."
-    progress: "114 complete / 3 remaining of 117. WED-378 and WED-379 close bounded shadow and deterministic cohort gates; see their artifacts. Earlier foundation evidence: Machine-collected pinned proof C:/temp/wt/runbook-61fcdf0b-pinned-evidence.json: 19 successful checks, 124 Rust integrations, 385 distinct selected units, 2312 Wedding tests, five Runbook state tests, 15 browser scenarios, typecheck, both line budgets, frontend production and optimized Rust library/binary builds. Rust 1.94.0; full frozen source SHA and release binary hash in manifest. No paid calls, hosted rollout, candidate CI or deployment. Earlier local Docker interruption recovered without all-WSL shutdown; final compiler jobs ran sequentially with bounded RAM and existing swap."
+    current_batch: "Completed; final release and scope are recorded in WED-382 artifacts."
+    next_batch: "None in the 117-item implementation checklist; broader automation requires its separate promotion criteria."
+    progress: "117 complete / 0 remaining of 117 for the implementation and bounded rollout checklist. Final source ae1ac01a2c285ac10b09404cffe3db67fbaaa034 released through WED-382 with same-source model/application/sandbox/native evidence. Earlier WED-378 shadow and WED-379 deterministic proof remain explicitly historical. General production automation, reversible actions, external-provider interoperability and UI execution activation are separate and remain disabled/unapproved."
   - id: WED-374
     title: Restore Wedding Sprout rollout, complete projected databases, persona artwork, exports and planner-card affordances
     status: in_progress
@@ -915,7 +919,7 @@ tasks:
     depends_on: [WED-318, WED-316]
     files: [solid-ui/src/lib/weddingBudget**, solid-ui/src/lib/weddingPlanning**, solid-ui/src/**/wedding**, wedding/assets/js/**, wedding/assets/css/**, wedding/wedding-*.html, wedding/tests/**, src/server/wedding_site**, src/server/wedding_*routes.rs, Documents/marketing/wedding planning/posts/magnet/**, Documents/verification/**, .agent/**]
     acceptance: [Budget planning guidance is internally coherent and never presents overlapping ranges as a complete allocation, one canonical versioned model drives public and workspace projections with a parity test, existing Wedding capabilities are audited before lead-magnet copy or routes are added, the existing wedding understanding route is retained and image assessment occurs only after the visitor explicitly submits the complete set, image inference uses a bounded low-cost provider path with no per-keystroke calls, style matching is exposed only for a category with at least 50 populated vendor style_tags records, Countdown and workspace tasks consume one catalogue rather than parallel timelines, implementation remains local-first mobile accessible consented and AFP-compatible]
-      progress: "The 120-percent midpoint defect is confirmed and corrected with one versioned 100-percent target model, generated public copy, workspace/public parity test and matching blog copy. A local-only shared magnet envelope and print/mobile shell now support a first public Budget Reality Check with deterministic priority allocation and 25 conditional missing-cost questions. Capability audit confirms the six-stage model already exists, Countdown still needs one reconciled timing catalogue, the bounded image route is retained for explicit complete-batch submission, and hosted style-tag evidence currently clears the 50-listing threshold only for venues and photographers. Typecheck, 2,151 Wedding tests, line budgets, production build, static-site/CSP smoke and focused public-tool tests pass. Remaining programme work: consolidated consented import, profile registry/writers, venue decoder, shot-list builder, single Countdown catalogue/parity, licensed style library, and a benchmark before changing the image provider."
+    progress: "The 120-percent midpoint defect is confirmed and corrected with one versioned 100-percent target model, generated public copy, workspace/public parity test and matching blog copy. A local-only shared magnet envelope and print/mobile shell now support a first public Budget Reality Check with deterministic priority allocation and 25 conditional missing-cost questions. Capability audit confirms the six-stage model already exists, Countdown still needs one reconciled timing catalogue, the bounded image route is retained for explicit complete-batch submission, and hosted style-tag evidence currently clears the 50-listing threshold only for venues and photographers. Typecheck, 2,151 Wedding tests, line budgets, production build, static-site/CSP smoke and focused public-tool tests pass. Remaining programme work: consolidated consented import, profile registry/writers, venue decoder, shot-list builder, single Countdown catalogue/parity, licensed style library, and a benchmark before changing the image provider."
 
   - id: WED-318
     title: Release Family access, build the operator email relay, and close vendor-side workflow gaps
