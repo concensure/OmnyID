@@ -1,3 +1,26 @@
+## WED-381 released; WED-376 Google acceptance complete (2026-11-19 14:05 UTC)
+
+Production source ca563ffa127f004fc7828e3a8768bd1779da9700, clean build worktree
+C:/temp/wt/omnyid-wed381-verify-r2. Runtime image
+sha256:27118c8967e95975ce2d2b784eee35ac2b6559bbc80ef16407d54fe919a4dc89.
+Machine/observed evidence: Documents/verification/WED-381-release-evidence.json.
+Fresh Google account selection returned auth/google200, closed its dialog and
+left the signed-in workspace visible without top-level crash. Billing200,
+authenticated health200 and public wedding/docs/workspace200. WED-381 and WED-376
+are done. No GitHub upload. No Caddy change; live config was validated unchanged.
+
+Rollback directory /home/ubuntu/omnyid-candidates/wed381-ca563ffa/rollback contains
+homeserver-compose.json, Caddyfile.before and workspace-before.tar.gz. Previous
+image sha256:a086dba378880b9a8d19e68dfc403efa27356c0ecee5e136755edc0bddff4fa6,
+retained tag omnyid-homeserver:wed381-rollback-b9ead529.
+
+Native model suite first ran without its disposable DB and failed one funding
+test; retained log model-unit.log. Rerun model-unit-r2.log with disposable DB:
+7passed. Billing regression1passed; no test failure waived. WED-382 source
+7f8abcf41bf06e72b3b995047cffe71ce7de05da is now compiling separately; its
+application/sandbox gates and final rollout remain open.
+
+
 ## WED-382 application execution candidate (2026-11-19 UTC)
 
 Worktree C:/temp/wt/omnyid-wed382, branch agent/codex/WED-382. Code63a4d5e5

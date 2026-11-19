@@ -20,6 +20,8 @@ tasks:
     status: in_progress
     owner: codex
     branch: agent/codex/WED-382
+    candidate_sha: 7f8abcf41bf06e72b3b995047cffe71ce7de05da
+    verification_worktree: C:/temp/wt/omnyid-wed382-verify
     worktree: C:/temp/wt/omnyid-wed382
     base_sha: ee63f13b058df77d63f5e3caf6d8d9c78396f40c
     depends_on: [WED-380, WED-381]
@@ -28,7 +30,7 @@ tasks:
     progress: "Cross-review confirms operator probes are insufficient for application activation. Implement separate guarded HTTP composition; no production flags or routes enabled. WED-381 frozen ca563ffa remains isolated release candidate."
   - id: WED-381
     title: Fix post-Google-login billing crash and contain usage loading failures
-    status: in_progress
+    status: done
     owner: codex
     branch: agent/codex/WED-381
     worktree: C:/temp/wt/omnyid-wed381
@@ -36,7 +38,7 @@ tasks:
     depends_on: [WED-376, WED-380]
     files: [src/runbook_llm_step.rs, src/inference/runbook/tests.rs, src/bin/runbook-model-eval.rs, src/db.rs, solid-ui/src/components/UsageView.tsx, solid-ui/src/lib/operatorUsageSectionState.ts, tests/billing_storage_postgres.rs, solid-ui/tests/**, solid-ui/e2e/billing-failure.html, solid-ui/playwright.billing.config.ts, Documents/verification/WED-380-model-runner.py, Documents/verification/WED-381*, .agent/**]
     acceptance: [PostgreSQL BIGINT storage sum decodes for empty and nonempty accounts, rejected billing resource cannot crash entire workspace, real Google account-selection and authenticated workspace completion, clean staged exact-SHA Oracle release with rollback]
-    progress: "Reproduced real Google selection: auth/google200 then billing/status500 and top-level error boundary. Server log confirms i64 decoding of PostgreSQL NUMERIC aggregate. No production mutation yet."
+    progress: "Oracle release ca563ffa127f004fc7828e3a8768bd1779da9700 verified by WED-381-release-evidence.json: authenticated billing/health200 and fresh Google account selection auth/google200, sign-in dialog closed, workspace visible without crash. Native build, billing PostgreSQL regression, seven inference/funding tests, frontend build/typecheck/12checks and mounted failure test completed. Earlier vendor/calendar/import/search/agent-icon and varied-account evidence remains in WED-376/377. GitHub upload omitted per user instruction."
   - id: WED-380
     model_candidate_sha: 4aff57ef621fb6066d4021a441bf9805ce7ebe94
     candidate_sha: 7d34e769ab48c5f01540510740f0d25c07932a85
@@ -93,7 +95,7 @@ tasks:
     candidate_sha: 1e79ec2c2397929680e1bd662e6f7123c22ba9d9
     verification_worktree: C:/temp/wt/omnyid-wed376-verify
     title: Repair OAuth login and vendor availability, directory and public agent entrypoints
-    status: in_progress
+    status: done
     owner: codex
     branch: agent/codex/WED-376
     worktree: C:/temp/wt/omnyid-wed376
@@ -101,7 +103,7 @@ tasks:
     depends_on: [WED-375, WED-374, SEO-001-INTEGRATION]
     files: [src/server/**, src/auth*, src/wedding*, postgres/migrations/**, postgres/data/**, solid-ui/src/**, solid-ui/tests/**, wedding/**, scripts/**, tests/**, Documents/verification/**, .agent/**]
     acceptance: [Google workspace sign-in preserves secure state and returns to workspace, accessible agent icon on public Wedding pages, admin all/category availability links preserve prior unexpired links and renew only valid vendor-scoped grants, phone-bearing NSW spreadsheet celebrants reconciled without duplicating listings or exposing private data, curated default celebrant directory and literal partial-name search without duplicate category tags, isolated varied wedding test accounts and existing sample quote coverage, clean exact-SHA tests and build plus Oracle staging and production release with rollback and hosted workflow evidence]
-    progress: "Calendar grants, all/category generation, scoped renewal, celebrant import, literal directory search/category dedupe and public agent entrypoints are live; release evidence is in WED-376 and WED-377 handoffs. Five existing test accounts and isolated varied wedding scenarios exercised with cross-owner denial. Actual Google account-selection/completion remains unverified: active workspace shows email/password and GIS button, but no signed-in Google browser account/error detail is available. Do not close OAuth acceptance or the three remaining WED-375 rollout gates based on these checks."
+    progress: "Oracle release ca563ffa127f004fc7828e3a8768bd1779da9700 verified by WED-381-release-evidence.json: authenticated billing/health200 and fresh Google account selection auth/google200, sign-in dialog closed, workspace visible without crash. Native build, billing PostgreSQL regression, seven inference/funding tests, frontend build/typecheck/12checks and mounted failure test completed. Earlier vendor/calendar/import/search/agent-icon and varied-account evidence remains in WED-376/377. GitHub upload omitted per user instruction."
   - id: SEO-001
     title: Search and AI-answer discoverability static surface
     status: review
