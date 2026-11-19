@@ -1,3 +1,42 @@
+## WED-377 reviewed follow-up b9ead529: verification and release pending — 2026-11-19
+
+Frozen source b9ead5298fb0cff77ef552c1dc4281e6d35c6bc8; clean verification
+C:/temp/wt/omnyid-wed377-verify. Implementation C:/temp/wt/omnyid-wed376,
+agent/codex/WED-376. Production remains WED-376 1e79ec2c until release evidence says otherwise.
+Review found wrapped/plural hourly extras and conflicting-total/GST cases. The parser
+now rejects supplemental adjacent context and suppresses every monetary comparison input
+when proposal totals conflict. Mixed GST wording remains unknown. Independent read-only
+review found no further concrete blocker. Added sample and adversarial regressions.
+
+Machine-collected local evidence C:/temp/wt/wed377-b9ead529-local-evidence.json records
+2312 Wedding tests, public site suite, line budget, typecheck, frontend build and mobile
+browser checks, all exit0. Earlier 05e33078 local Rust attempt received SIGKILL under the
+4GiB WSL host; it is a failed attempt, not passing evidence. Native ARM release followed
+by targeted release-profile Rust tests now runs in isolated Oracle candidate
+/home/ubuntu/omnyid-candidates/wed377-b9ead529. Poll build.log/build.exit and tests.log/tests.exit.
+Do not ship unless both exit files exist and equal0. Source archive hash
+9aa940ce23a93aa8b4d97991ae1134d2a16b0fe37e3db0612d103096222b6d86; omitted external
+include files were restored from git show at the same SHA, recorded with hashes in
+supplemental-source-manifest.json. No source edits in candidate. Persistent isolated
+8GiB tmpfs target and registry cache retained. Build bounded to2CPUs/12GiB; no pruning.
+
+Preflight-evidence.json records91 static hashes, zero live drift, unchanged validated
+Caddy, >4GiB disk headroom and no migration change. Current production/staging runtime
+compose snapshots, Caddy and static backup are in this candidate's rollback directory.
+Use C:/temp/wt/wed377-stage.py only after native build/tests pass, then
+wed377-staged-quotes.py (five bounded quote calls, no model spend). Deployment helper
+wed377-production-deploy.py needs test credentials injected in memory; never store them
+in this handoff. Actual Playwright public smoke follows origin authenticated health;
+rollback if it fails. Versioned static URLs are still pending release.
+
+Git push was rejected by GitHub: connected OAuth credential lacks workflow scope to
+update .github/workflows/ci.yml in inherited branch history. No remote branch/PR created;
+local commits preserved. Do not bypass this permission by rewriting history. Latest CI
+runs returned failures for other SHAs, so local checks do not imply CI passed.
+Workspace browser presently renders email/password inputs and Google iframe; actual
+Google account completion remains unverified. Five WED-375 hosted/model/provider gates
+remain open. No external outreach, paid calls or Runbook action rollout enabled.
+
 ## WED-376 live; WED-377 exact-source follow-up builds running — 2026-11-19
 
 Production application: 1e79ec2c2397929680e1bd662e6f7123c22ba9d9; release evidence at
