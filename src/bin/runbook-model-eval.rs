@@ -1,4 +1,6 @@
 //! Operator-only synthetic evaluation; no application routes or action adapters.
+#[path = "runbook-model-eval/application.rs"]
+mod application;
 use chrono::Utc;
 use omnyid_homeserver::{
     agent_template::LlmConfig,
@@ -73,6 +75,10 @@ async fn run() {
     config.model = BASE_MODEL.into();
     config.monthly_budget_cents = 300;
     db.upsert_llm_config(&config).await.unwrap();
+    if std::env::var("RUNBOOK_APPLICATION_ONLY").as_deref() == Ok("true") {
+        application::run(&db, &store, &url, &sha).await;
+        return;
+    }
     let corpus: Value =
         serde_json::from_str(include_str!("../../tests/fixtures/runbook-model-eval.json")).unwrap();
     let cases = corpus["cases"].as_array().unwrap();
