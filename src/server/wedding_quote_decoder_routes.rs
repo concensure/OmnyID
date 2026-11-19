@@ -49,9 +49,18 @@ Return exactly this shape:
     "service_charge_pct":{"state":"extracted|ambiguous|not_found","value":number|null,"source_snippet":string|null,"confidence":"high|medium|low","reason":string},
     "venue_hours":{"state":"extracted|ambiguous|not_found","value":number|null,"source_snippet":string|null,"confidence":"high|medium|low","reason":string},
     "overtime_rate":{"state":"extracted|ambiguous|not_found","value":number|null,"source_snippet":string|null,"confidence":"high|medium|low","reason":string},
-    "payment_schedule":{"state":"extracted|ambiguous|not_found","value":string|null,"source_snippet":string|null,"confidence":"high|medium|low","reason":string}
+    "payment_schedule":{"state":"extracted|ambiguous|not_found","value":string|null,"source_snippet":string|null,"confidence":"high|medium|low","reason":string},
+    "deposit_amount":{"state":"extracted|ambiguous|not_found","value":number|null,"source_snippet":string|null,"confidence":"high|medium|low","reason":string},
+    "deposit_pct":{"state":"extracted|ambiguous|not_found","value":number|null,"source_snippet":string|null,"confidence":"high|medium|low","reason":string},
+    "deposit_due":{"state":"extracted|ambiguous|not_found","value":"YYYY-MM-DD"|null,"source_snippet":string|null,"confidence":"high|medium|low","reason":string},
+    "cancellation_terms":{"state":"extracted|ambiguous|not_found","value":string|null,"source_snippet":string|null,"confidence":"high|medium|low","reason":string},
+    "quote_expiry":{"state":"extracted|ambiguous|not_found","value":"YYYY-MM-DD"|null,"source_snippet":string|null,"confidence":"high|medium|low","reason":string},
+    "quoted_event_date":{"state":"extracted|ambiguous|not_found","value":"YYYY-MM-DD"|null,"source_snippet":string|null,"confidence":"high|medium|low","reason":string},
+    "date_status":{"state":"extracted|ambiguous|not_found","value":"available|conditional|unavailable|null","source_snippet":string|null,"confidence":"high|medium|low","reason":string},
+    "minimum_guests":{"state":"extracted|ambiguous|not_found","value":number|null,"source_snippet":string|null,"confidence":"high|medium|low","reason":string},
+    "maximum_guests":{"state":"extracted|ambiguous|not_found","value":number|null,"source_snippet":string|null,"confidence":"high|medium|low","reason":string}
   },
-  "line_items":[{"label":string,"unit":"per_head|fixed|included|unclear","amount":number|null,"source_snippet":string,"confidence":"high|medium|low"}],
+  "line_items":[{"label":string,"unit":"per_head|fixed|included|unclear","amount":number|null,"source_snippet":string,"confidence":"high|medium|low","changeability":"optional|mandatory|bundled|unknown","minimum_spend_eligible":boolean|null}],
   "inclusions":[{"label":string,"source_snippet":string}],
   "exclusions":[{"label":string,"source_snippet":string}]
 }
@@ -61,7 +70,8 @@ Classification rules:
 - whole_package_amount is only for wording that explicitly identifies a grand total, package total or total payable for the proposal as a whole.
 - fixed_fee is a stated room, ceremony, hire or other fixed commercial fee, not a calculated subtotal.
 - A minimum spend is not a quoted total.
-- Line items preserve catering, beverages and other components. Their amounts are quoted values only.
+- A deposit is part-payment toward the total unless the source explicitly says otherwise. Extract it separately and never add it to whole_package_amount.
+- Line items preserve catering, beverages and other components. Their amounts are quoted values only. Mark optional, mandatory or bundled only when the source says so. Mark minimum_spend_eligible only when the source establishes what counts.
 - An inclusion can be stated without a price. Missing information is useful: return not_found for every absent field with a short reason."#;
 
 #[derive(Deserialize)]
@@ -84,6 +94,12 @@ struct ExtractedField {
     reason: String,
 }
 
+impl Default for ExtractedField {
+    fn default() -> Self {
+        missing("The proposal did not state this term.")
+    }
+}
+
 #[derive(Deserialize)]
 struct ModelFields {
     pricing_model: ExtractedField,
@@ -97,6 +113,24 @@ struct ModelFields {
     venue_hours: ExtractedField,
     overtime_rate: ExtractedField,
     payment_schedule: ExtractedField,
+    #[serde(default)]
+    deposit_amount: ExtractedField,
+    #[serde(default)]
+    deposit_pct: ExtractedField,
+    #[serde(default)]
+    deposit_due: ExtractedField,
+    #[serde(default)]
+    cancellation_terms: ExtractedField,
+    #[serde(default)]
+    quote_expiry: ExtractedField,
+    #[serde(default)]
+    quoted_event_date: ExtractedField,
+    #[serde(default)]
+    date_status: ExtractedField,
+    #[serde(default)]
+    minimum_guests: ExtractedField,
+    #[serde(default)]
+    maximum_guests: ExtractedField,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -106,6 +140,10 @@ struct LineItem {
     amount: Option<f64>,
     source_snippet: String,
     confidence: String,
+    #[serde(default)]
+    changeability: String,
+    #[serde(default)]
+    minimum_spend_eligible: Option<bool>,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -505,6 +543,21 @@ fn sanitize_field(text: &str, mut field: ExtractedField, kind: &str) -> Extracte
             .as_ref()
             .and_then(Value::as_str)
             .is_some_and(|value| !value.trim().is_empty() && value.chars().count() <= 500),
+        "bounded_text" => field
+            .value
+            .as_ref()
+            .and_then(Value::as_str)
+            .is_some_and(|value| !value.trim().is_empty() && value.chars().count() <= 1_000),
+        "date" => field
+            .value
+            .as_ref()
+            .and_then(Value::as_str)
+            .is_some_and(|value| Regex::new(r"^\d{4}-\d{2}-\d{2}$").unwrap().is_match(value)),
+        "date_status" => field
+            .value
+            .as_ref()
+            .and_then(Value::as_str)
+            .is_some_and(|value| matches!(value, "available" | "conditional" | "unavailable")),
         "guest_count" => field
             .value
             .as_ref()
@@ -550,6 +603,12 @@ fn sanitize_line_items(text: &str, items: Vec<LineItem>) -> Vec<LineItem> {
             }
             item.label = bounded(&item.label, 120);
             item.source_snippet = bounded(&item.source_snippet, 260);
+            if !matches!(
+                item.changeability.as_str(),
+                "optional" | "mandatory" | "bundled" | "unknown"
+            ) {
+                item.changeability = "unknown".to_string();
+            }
             if !matches!(item.confidence.as_str(), "high" | "medium" | "low") {
                 item.confidence = "low".to_string();
             }
@@ -591,6 +650,15 @@ fn extraction_json(text: &str, payload: ModelPayload, model: &str) -> Value {
             "venue_hours": sanitize_field(text, fields.venue_hours, "venue_hours"),
             "overtime_rate": sanitize_field(text, fields.overtime_rate, "money"),
             "payment_schedule": sanitize_field(text, fields.payment_schedule, "payment_schedule"),
+            "deposit_amount": sanitize_field(text, fields.deposit_amount, "money"),
+            "deposit_pct": sanitize_field(text, fields.deposit_pct, "service_charge_pct"),
+            "deposit_due": sanitize_field(text, fields.deposit_due, "date"),
+            "cancellation_terms": sanitize_field(text, fields.cancellation_terms, "bounded_text"),
+            "quote_expiry": sanitize_field(text, fields.quote_expiry, "date"),
+            "quoted_event_date": sanitize_field(text, fields.quoted_event_date, "date"),
+            "date_status": sanitize_field(text, fields.date_status, "date_status"),
+            "minimum_guests": sanitize_field(text, fields.minimum_guests, "guest_count"),
+            "maximum_guests": sanitize_field(text, fields.maximum_guests, "guest_count"),
         },
         "line_items": sanitize_line_items(text, payload.line_items),
         "inclusions": sanitize_evidence(text, payload.inclusions),

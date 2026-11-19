@@ -8,7 +8,7 @@
 <link rel="icon" type="image/png" href="assets/logo/omnyid-mark.png">
 <link rel="stylesheet" href="assets/css/style.css">
 <link rel="stylesheet" href="assets/css/magnet.css">
-<link rel="stylesheet" href="assets/css/quote-decoder.css?v=20261110-354">
+<link rel="stylesheet" href="assets/css/quote-decoder.css?v=20261120-383">
 
 
 
@@ -57,9 +57,12 @@
     <section class="magnet-card" aria-labelledby="comparison-settings-title">
       <h2 id="comparison-settings-title">Use the same wedding for both quotes</h2>
       <div class="magnet-grid">
+        <label class="magnet-field">Wedding date<input name="comparison_date" type="date"></label>
         <label class="magnet-field">Guests to compare<input name="comparison_guests" type="number" min="1" max="500" step="1" value="100" inputmode="numeric" required></label>
         <label class="magnet-field">Event length (hours)<input name="comparison_hours" type="number" min="1" max="24" step="1" value="6" inputmode="numeric" required></label>
+        <label class="magnet-field">Wedding budget (AUD, optional)<input name="comparison_budget" type="number" min="0" step="1" inputmode="numeric" placeholder="Used only to show the remaining budget"></label>
       </div>
+      <p class="quote-context-note">These settings are shared by both proposals. Changing them or an optional item updates the comparison live. A changed result is labelled <strong>Scenario estimate</strong> until the vendor confirms it.</p>
     </section>
 
     <input class="quote-honeypot" name="company" tabindex="-1" autocomplete="off" aria-hidden="true" hidden>
@@ -68,7 +71,7 @@
         <h2 id="proposal-a-title">Proposal A</h2>
         <label class="magnet-field">Venue label<input name="a_label" maxlength="100" placeholder="Venue name (kept on this device)"></label>
         <label class="magnet-field">Paste proposal text<textarea name="a_text" rows="9" placeholder="Paste the wording from the proposal"></textarea></label><p class="quote-source-highlight" data-source-highlight="a" hidden aria-live="polite"></p>
-        <div class="quote-local-file"><label class="magnet-link-button" for="a_file">Choose local text file</label><input id="a_file" name="a_file" type="file" accept=".txt,.md,text/plain,text/markdown"><span data-file-status="a">TXT and Markdown are read locally. For PDF or Word, paste the text for now.</span></div>
+        <div class="quote-local-file"><label class="magnet-link-button" for="a_file">Choose quote or email text</label><input id="a_file" name="a_file" type="file" accept=".txt,.md,.eml,text/plain,text/markdown,message/rfc822"><span data-file-status="a">TXT, Markdown and email files are read locally. For PDF or Word, use the signed-in Quotes upload or paste the extracted text.</span></div>
         <div class="quote-analysis-actions"><button class="magnet-button" type="button" data-analyse="a">Analyse quote</button><button class="magnet-link-button" type="button" data-clear-analysis="a">Clear saved analysis</button></div>
         <p class="quote-analysis-status" data-analysis-status="a" role="status" aria-live="polite">Not analysed. Manual fields remain available.</p>
         <div class="quote-suggestions" data-suggestions="a"></div>
@@ -82,7 +85,7 @@
         <h2 id="proposal-b-title">Proposal B <span class="quote-optional">optional</span></h2>
         <label class="magnet-field">Venue label<input name="b_label" maxlength="100" placeholder="Venue name (kept on this device)"></label>
         <label class="magnet-field">Paste proposal text<textarea name="b_text" rows="9" placeholder="Paste the wording from the second proposal"></textarea></label><p class="quote-source-highlight" data-source-highlight="b" hidden aria-live="polite"></p>
-        <div class="quote-local-file"><label class="magnet-link-button" for="b_file">Choose local text file</label><input id="b_file" name="b_file" type="file" accept=".txt,.md,text/plain,text/markdown"><span data-file-status="b">TXT and Markdown are read locally. For PDF or Word, paste the text for now.</span></div>
+        <div class="quote-local-file"><label class="magnet-link-button" for="b_file">Choose quote or email text</label><input id="b_file" name="b_file" type="file" accept=".txt,.md,.eml,text/plain,text/markdown,message/rfc822"><span data-file-status="b">TXT, Markdown and email files are read locally. For PDF or Word, use the signed-in Quotes upload or paste the extracted text.</span></div>
         <div class="quote-analysis-actions"><button class="magnet-button" type="button" data-analyse="b">Analyse quote</button><button class="magnet-link-button" type="button" data-clear-analysis="b">Clear saved analysis</button></div>
         <p class="quote-analysis-status" data-analysis-status="b" role="status" aria-live="polite">Not analysed. Manual fields remain available.</p>
         <div class="quote-suggestions" data-suggestions="b"></div>
@@ -99,6 +102,11 @@
   <section class="magnet-result" data-quote-result hidden tabindex="-1" aria-labelledby="quote-result-title">
     <h2 id="quote-result-title">What the proposals actually state</h2>
     <p data-quote-summary></p>
+    <section class="quote-decision-support magnet-card" data-decision-support aria-labelledby="decision-support-title">
+      <div><p class="eyebrow">Decision support</p><h3 id="decision-support-title">Keep the choice open until the figures are comparable</h3><p data-decision-tradeoff></p><p data-decision-recommendation></p><p class="quote-material-unknown" data-material-unknown></p></div>
+      <div class="quote-choice-actions" role="group" aria-label="Save a quote preference on this device"><button type="button" class="magnet-link-button" data-choice="a">Prefer Proposal A</button><button type="button" class="magnet-link-button" data-choice="b">Prefer Proposal B</button><button type="button" class="magnet-button" data-choice="confirm">Confirm preferred choice</button><button type="button" class="magnet-link-button" data-choice="open">Keep open</button></div>
+      <p class="quote-choice-status" data-choice-status role="status" aria-live="polite">On this public page, the preference stays only on this device. Sign in to add it to the wedding ledger.</p>
+    </section>
     <div class="quote-formula-columns" data-formulas></div>
     <div class="magnet-table-wrap"><table class="magnet-table"><thead><tr><th scope="col">Decision factor</th><th scope="col" data-result-label="a">Proposal A</th><th scope="col" data-result-label="b">Proposal B</th></tr></thead><tbody data-result-body></tbody></table></div>
     <div class="quote-question-columns"><section class="magnet-card"><h3 data-question-title="a">Questions for Proposal A</h3><ul data-questions="a"></ul><button class="magnet-link-button" type="button" data-copy="a">Copy follow-up</button></section><section class="magnet-card" data-question-card="b"><h3 data-question-title="b">Questions for Proposal B</h3><ul data-questions="b"></ul><button class="magnet-link-button" type="button" data-copy="b">Copy follow-up</button></section></div>
@@ -120,8 +128,8 @@
 <footer class="site-footer"><div class="container"><div class="footer-bottom"><span>© <span data-year></span> OmnyID. All rights reserved.</span><span><a href="privacy.html">Privacy</a> · <a href="disclosures.html">Disclosures</a> · <a href="../workspace/vendor.html?source=vendor_claim" data-vendor-login>Vendor login</a></span></div></div></footer>
 <div class="signin-modal" id="signinModal" aria-hidden="true"><div class="signin-overlay" data-close-signin></div><div class="signin-panel" role="dialog" aria-modal="true" aria-labelledby="signinTitle"><button class="signin-close" type="button" data-close-signin aria-label="Close">&times;</button><p class="eyebrow">Continue to your workspace</p><h2 id="signinTitle">Keep the comparison with your wedding plan</h2><p class="signin-lede">Sign in or create a free account. You choose what to add; this public page does not save proposal text to your account.</p><div class="signin-options"><div class="signin-option"><a class="btn btn-primary btn-block" href="../workspace/?auth=register&amp;source=wedding&amp;from=quote-decoder">Create free account</a><a class="btn btn-outline btn-block" href="../workspace/?auth=signin&amp;source=wedding&amp;from=quote-decoder">Sign in</a></div></div><button type="button" class="link-btn" data-close-signin>Not now</button></div></div>
 <script src="assets/js/main.js"></script>
-<script src="assets/js/quote-decoder-engine.js?v=20261119-377"></script>
-<script src="assets/js/quote-decoder.js?v=20261110-354"></script>
+<script src="assets/js/quote-decoder-engine.js?v=20261120-383"></script>
+<script src="assets/js/quote-decoder.js?v=20261120-383"></script>
 <script src="/wedding/assets/js/wedding-agent.js?v=20261119-377" defer></script>
 </body>
 </html>

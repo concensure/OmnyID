@@ -8,6 +8,7 @@
   const money = new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD", maximumFractionDigits: 2 });
   const totalText = (result) => result.estimatedTotal == null ? "Not enough pricing stated" : money.format(result.estimatedTotal);
   const CACHE_KEY = "omnyid.wedding.quoteExtractionCache.v2";
+  const CHOICE_KEY = "omnyid.wedding.quoteComparisonChoice.v1";
   const fieldConfig = [
     ["pricing_model", "Pricing model", "select", [["unclear", "Not stated / unclear"], ["per_head", "Per-head package"], ["fixed", "Fixed or whole-package"], ["minimum_spend", "Minimum spend"], ["hybrid", "Fixed plus per-head"]]],
     ["per_head_rate", "Per-head package rate (AUD)", "number"],
@@ -20,6 +21,15 @@
     ["venue_hours", "Venue/package hours included", "number"],
     ["overtime_rate", "Overtime per hour (AUD)", "number"],
     ["payment_schedule", "Payment schedule", "text"],
+    ["deposit_amount", "Deposit amount (AUD)", "number", null, "A deposit is a payment toward the total, not an extra charge. It is shown separately and never counted twice."],
+    ["deposit_pct", "Deposit percentage (%)", "number"],
+    ["deposit_due", "Deposit due date", "date"],
+    ["cancellation_terms", "Cancellation and reschedule terms", "text"],
+    ["quote_expiry", "Quote valid until", "date"],
+    ["quoted_event_date", "Event date stated in quote", "date"],
+    ["date_status", "Date eligibility", "select", [["not_stated", "Not stated"], ["available", "Vendor says available"], ["conditional", "Conditional / confirm again"], ["unavailable", "Vendor says unavailable"]]],
+    ["minimum_guests", "Minimum guests", "number"],
+    ["maximum_guests", "Maximum guests or capacity", "number"],
   ];
   const formName = (prefix, key) => `${prefix}_${key}`;
   const field = (name) => form.elements.namedItem(name);
@@ -38,6 +48,8 @@
         ? `<select name="${name}" data-source-field="${prefix}:${key}">${options.map(([optionValue, optionLabel]) => `<option value="${optionValue}">${escapeHtml(optionLabel)}</option>`).join("")}</select>`
         : type === "text"
           ? `<textarea name="${name}" rows="2" maxlength="500" data-source-field="${prefix}:${key}" placeholder="Not stated"></textarea>`
+          : type === "date"
+            ? `<input name="${name}" type="date" data-source-field="${prefix}:${key}">`
           : `<input name="${name}" type="number" min="0" ${key === "guest_count" ? 'max="5000"' : key === "service_charge_pct" ? 'max="100"' : key === "venue_hours" ? 'max="48"' : ''} step="1" inputmode="numeric" data-source-field="${prefix}:${key}" placeholder="Not stated">`;
       return `<label class="magnet-field"><span>${escapeHtml(label)} ${helpMarkup}</span>${input}<small class="quote-field-state" data-field-state="${prefix}:${key}">Not analysed</small></label>`;
     }).join("");
@@ -48,26 +60,60 @@
   mountFields("a"); mountFields("b");
 
   function renderLineItems(prefix) {
+    // Rebuilding the editable line-item table must never reset reviewed
+    // commercial terms elsewhere in the proposal card. Preserve them
+    // explicitly because some mobile WebKit form implementations rehydrate
+    // nearby generated controls when a details subtree changes.
+    const preservedCommercialValues = Object.fromEntries(fieldConfig.map(([key]) => {
+      const control = field(formName(prefix, key));
+      return [key, control ? control.value : ""];
+    }));
     const host = document.querySelector(`[data-line-items="${prefix}"]`);
     const rows = lineItems[prefix];
-    host.innerHTML = rows.length ? `<div class="quote-line-table-wrap"><table class="quote-line-table"><thead><tr><th>Item</th><th>Basis</th><th>Amount</th><th><span title="Tick only when this is additional to the package figures above">Add to total</span></th><th></th></tr></thead><tbody>${rows.map((row, index) => `<tr>
+    host.innerHTML = rows.length ? `<div class="quote-line-table-wrap"><table class="quote-line-table"><thead><tr><th>Item</th><th>Quoted status</th><th>Basis</th><th>Amount</th><th><span title="Tick only when this is additional to the package figures above">In quoted total</span></th><th>Scenario</th><th>Quantity</th><th><span title="Tick only when this item's spend counts toward the stated minimum">Counts toward minimum</span></th><th></th></tr></thead><tbody>${rows.map((row, index) => `<tr>
       <td><input data-line-label="${prefix}:${index}" value="${escapeHtml(row.label)}" aria-label="Line item ${index + 1} name"><small>${escapeHtml(row.source_snippet || "Manually added")}</small></td>
+      <td><select data-line-changeability="${prefix}:${index}" aria-label="Line item ${index + 1} quoted status"><option value="optional" ${row.changeability === "optional" ? "selected" : ""}>Optional</option><option value="mandatory" ${row.changeability === "mandatory" ? "selected" : ""}>Mandatory</option><option value="bundled" ${row.changeability === "bundled" ? "selected" : ""}>Bundled</option><option value="unknown" ${!row.changeability || row.changeability === "unknown" ? "selected" : ""}>Unknown</option></select></td>
       <td><select data-line-unit="${prefix}:${index}" aria-label="Line item ${index + 1} basis"><option value="included" ${row.unit === "included" ? "selected" : ""}>Included / don't add</option><option value="per_head" ${row.unit === "per_head" ? "selected" : ""}>Per head</option><option value="fixed" ${row.unit === "fixed" ? "selected" : ""}>Fixed</option><option value="unclear" ${row.unit === "unclear" ? "selected" : ""}>Unclear</option></select></td>
       <td><input data-line-amount="${prefix}:${index}" type="number" min="0" step="1" inputmode="numeric" value="${row.amount ?? ""}" aria-label="Line item ${index + 1} amount"></td>
-      <td><input data-line-counted="${prefix}:${index}" type="checkbox" ${row.counted ? "checked" : ""} aria-label="Add line item ${index + 1} to total"></td>
+      <td><input data-line-counted="${prefix}:${index}" type="checkbox" ${row.counted ? "checked" : ""} aria-label="Add line item ${index + 1} to original quoted total"></td>
+      <td><label class="quote-scenario-toggle"><input data-line-scenario="${prefix}:${index}" type="checkbox" ${(row.scenarioIncluded ?? row.counted) ? "checked" : ""} ${(row.changeability === "mandatory" || row.changeability === "bundled") ? "disabled" : ""}><span>${row.changeability === "mandatory" ? "Required" : row.changeability === "bundled" ? "Bundled" : "Include"}</span></label></td>
+      <td><input data-line-quantity="${prefix}:${index}" type="number" min="0" step="1" inputmode="numeric" value="${row.scenarioQuantity ?? row.originalQuantity ?? 1}" ${(row.changeability === "mandatory" || row.changeability === "bundled") ? "disabled" : ""} aria-label="Scenario quantity for line item ${index + 1}"></td>
+      <td><input data-line-minimum="${prefix}:${index}" type="checkbox" ${row.minimumEligible ? "checked" : ""} aria-label="Line item ${index + 1} counts toward minimum spend"></td>
       <td><button type="button" class="quote-line-remove" data-remove-line="${prefix}:${index}" aria-label="Remove line item ${index + 1}">Remove</button></td>
     </tr>`).join("")}</tbody></table></div>` : `<p class="quote-empty-lines">No line items yet. Analyse the quote or add one manually.</p>`;
-    host.querySelectorAll("[data-line-label],[data-line-unit],[data-line-amount],[data-line-counted]").forEach((control) => control.addEventListener("change", () => {
-      const token = control.dataset.lineLabel || control.dataset.lineUnit || control.dataset.lineAmount || control.dataset.lineCounted;
+    host.querySelectorAll("[data-line-label],[data-line-changeability],[data-line-unit],[data-line-amount],[data-line-counted],[data-line-scenario],[data-line-quantity],[data-line-minimum]").forEach((control) => control.addEventListener("change", () => {
+      const token = control.dataset.lineLabel || control.dataset.lineChangeability || control.dataset.lineUnit || control.dataset.lineAmount || control.dataset.lineCounted || control.dataset.lineScenario || control.dataset.lineQuantity || control.dataset.lineMinimum;
       const index = Number(token.split(":")[1]);
       if (control.dataset.lineLabel) rows[index].label = control.value;
+      if (control.dataset.lineChangeability) rows[index].changeability = control.value;
       if (control.dataset.lineUnit) rows[index].unit = control.value;
       if (control.dataset.lineAmount) rows[index].amount = engine.finite(control.value);
-      if (control.dataset.lineCounted) rows[index].counted = control.checked;
+      if (control.dataset.lineCounted) { rows[index].counted = control.checked; rows[index].originalCounted = control.checked; if (rows[index].scenarioIncluded == null) rows[index].scenarioIncluded = control.checked; }
+      if (control.dataset.lineScenario) rows[index].scenarioIncluded = control.checked;
+      if (control.dataset.lineQuantity) rows[index].scenarioQuantity = engine.finite(control.value) ?? 0;
+      if (control.dataset.lineMinimum) rows[index].minimumEligible = control.checked;
+      if (control.dataset.lineChangeability) renderLineItems(prefix);
+      if (!document.querySelector("[data-quote-result]").hidden) renderComparison(false);
     }));
     host.querySelectorAll("[data-remove-line]").forEach((button) => button.addEventListener("click", () => {
-      rows.splice(Number(button.dataset.removeLine.split(":")[1]), 1); renderLineItems(prefix);
+      const row = rows[Number(button.dataset.removeLine.split(":")[1])];
+      if (row?.changeability === "mandatory" || row?.changeability === "bundled") {
+        const status = document.querySelector(`[data-analysis-status="${prefix}"]`);
+        status.textContent = row.changeability === "bundled" ? "This item is bundled into another quoted amount and cannot be deducted on its own." : "This item is mandatory under the quoted terms and cannot be removed from the scenario.";
+        status.dataset.kind = "error";
+        return;
+      }
+      if (row?.source_snippet) {
+        row.scenarioIncluded = false;
+        row.changeability = "optional";
+      } else rows.splice(Number(button.dataset.removeLine.split(":")[1]), 1);
+      renderLineItems(prefix);
+      if (!document.querySelector("[data-quote-result]").hidden) renderComparison(false);
     }));
+    for (const [key, preservedValue] of Object.entries(preservedCommercialValues)) {
+      const control = field(formName(prefix, key));
+      if (control) control.value = preservedValue;
+    }
   }
 
   renderLineItems("a"); renderLineItems("b");
@@ -155,8 +201,8 @@
   function useExtraction(prefix, result, previous) {
     extracted[prefix] = result;
     lineItems[prefix] = [
-      ...(result.line_items || []).map((item) => ({ ...item, counted: false })),
-      ...(result.inclusions || []).map((item) => ({ label: item.label, unit: "included", amount: null, source_snippet: item.source_snippet, counted: false })),
+      ...(result.line_items || []).map((item) => ({ ...item, counted: false, originalCounted: false, scenarioIncluded: false, originalQuantity: 1, scenarioQuantity: 1, changeability: item.changeability || "unknown", minimumEligible: item.minimum_spend_eligible === true })),
+      ...(result.inclusions || []).map((item) => ({ label: item.label, unit: "included", amount: null, source_snippet: item.source_snippet, counted: false, originalCounted: false, scenarioIncluded: true, originalQuantity: 1, scenarioQuantity: 1, changeability: "bundled", minimumEligible: false })),
     ];
     renderLineItems(prefix);
     renderSuggestions(prefix, result);
@@ -239,6 +285,16 @@
     item.includedHours = engine.finite(value(formName(prefix, "venue_hours")));
     item.overtimeRate = engine.finite(value(formName(prefix, "overtime_rate")));
     item.paymentSchedule = value(formName(prefix, "payment_schedule"));
+    item.depositAmount = engine.finite(value(formName(prefix, "deposit_amount")));
+    item.depositPct = engine.finite(value(formName(prefix, "deposit_pct")));
+    item.depositDue = value(formName(prefix, "deposit_due"));
+    item.cancellationTerms = value(formName(prefix, "cancellation_terms"));
+    item.quoteExpiry = value(formName(prefix, "quote_expiry"));
+    item.quotedEventDate = value(formName(prefix, "quoted_event_date"));
+    item.dateStatus = value(formName(prefix, "date_status"));
+    item.minimumGuests = engine.finite(value(formName(prefix, "minimum_guests")));
+    item.maximumGuests = engine.finite(value(formName(prefix, "maximum_guests")));
+    item.comparisonDate = value("comparison_date");
     item.lineItems = lineItems[prefix];
     item.inclusions = lineItems[prefix].filter((row) => row.unit === "included").map((row) => row.label);
     item.exclusions = (extracted[prefix]?.exclusions || []).map((row) => row.label);
@@ -251,17 +307,22 @@
     return item.prefix === "a" || Boolean(item.text || value(`${item.prefix}_label`) || item.perHeadRate != null || item.packageTotal != null || item.fixedFee != null || item.minimumSpend != null);
   }
 
-  function renderFormula(item, result) {
-    return `<section class="quote-formula magnet-card"><h3>${escapeHtml(item.label)}</h3><p class="quote-total-label">Estimated total from stated terms</p><strong class="quote-total">${escapeHtml(totalText(result))}</strong><ol>${result.lines.map((line) => `<li><span>${escapeHtml(line.label)} <small>${escapeHtml(line.basis)} · ${escapeHtml(line.kind)}</small></span><strong>${money.format(line.amount)}</strong></li>`).join("") || "<li>No core package price has been stated or applied yet.</li>"}</ol>${result.assumptions.length ? `<p class="quote-assumption"><strong>Calculation assumptions:</strong> ${escapeHtml(result.assumptions.join(" "))}</p>` : ""}</section>`;
+  function renderFormula(item, result, budget) {
+    const remaining = result.estimatedTotal == null || budget == null ? null : budget - result.estimatedTotal;
+    const label = result.scenarioChanged ? "Scenario estimate" : "Estimated total from stated terms";
+    const deposit = result.deposit ? `<p class="quote-deposit"><strong>Deposit (part of total, not added again):</strong> ${money.format(result.deposit.amount)}${result.deposit.due ? ` · due ${escapeHtml(result.deposit.due)}` : ""}</p>` : `<p class="quote-deposit quote-unknown">Deposit not stated</p>`;
+    const confirmation = result.confirmationReasons.length ? `<div class="quote-confirmation"><strong>Vendor confirmation needed</strong><ul>${result.confirmationReasons.map((reason) => `<li>${escapeHtml(reason)}</li>`).join("")}</ul></div>` : `<p class="quote-viable">Fits the stated date, guest and capacity terms currently entered.</p>`;
+    return `<section class="quote-formula magnet-card"><h3>${escapeHtml(item.label)}</h3><p class="quote-total-label">${label}</p><strong class="quote-total">${escapeHtml(totalText(result))}</strong>${remaining == null ? "" : `<p class="quote-remaining"><strong>Wedding budget remaining:</strong> ${money.format(remaining)}</p>`}<ol>${result.lines.map((line) => `<li><span>${escapeHtml(line.label)} <small>${escapeHtml(line.basis)} · ${escapeHtml(line.kind)}</small></span><strong>${money.format(line.amount)}</strong></li>`).join("") || "<li>No core package price has been stated or applied yet.</li>"}</ol>${deposit}${confirmation}${result.assumptions.length ? `<p class="quote-assumption"><strong>Calculation assumptions:</strong> ${escapeHtml(result.assumptions.join(" "))}</p>` : ""}</section>`;
   }
 
-  function renderComparison() {
+  function renderComparison(scroll = true) {
     const guests = engine.finite(value("comparison_guests"));
     const hours = engine.finite(value("comparison_hours"));
     const status = document.querySelector("[data-quote-status]");
     if (!guests || guests > 500 || !hours || hours > 24) { status.textContent = "Enter 1–500 guests and an event length between 1 and 24 hours."; status.dataset.kind = "error"; return; }
     const allItems = [proposal("a"), proposal("b")];
     const items = allItems.filter(isActive);
+    const budget = engine.finite(value("comparison_budget"));
     const results = Object.fromEntries(items.map((item) => [item.prefix, engine.calculate(item, guests, hours)]));
     status.textContent = "Comparison updated with deterministic arithmetic from the terms you reviewed or entered."; status.dataset.kind = "success";
     const bActive = items.some((item) => item.prefix === "b");
@@ -276,6 +337,10 @@
     const rows = [
       ["Pricing model", (item) => item.pricingModel.replaceAll("_", " "), ""],
       ["Estimated total from stated terms", (item) => totalText(results[item.prefix]), (item) => results[item.prefix].estimatedTotal == null ? "unknown" : ""],
+      ["Scenario status", (item) => results[item.prefix].scenarioChanged ? "Scenario estimate — vendor confirmation may be needed" : "Original reviewed terms", (item) => results[item.prefix].scenarioChanged ? "unknown" : "included"],
+      ["Date, guest and capacity check", (item) => results[item.prefix].viability === "viable_on_stated_terms" ? "Fits stated terms" : results[item.prefix].viability === "does_not_meet" ? "Does not meet a stated requirement" : "Vendor confirmation needed", (item) => results[item.prefix].viability === "viable_on_stated_terms" ? "included" : "unknown"],
+      ["Deposit", (item) => results[item.prefix].deposit ? `${money.format(results[item.prefix].deposit.amount)} — part of total, not added again` : "Not stated", (item) => results[item.prefix].deposit ? "" : "unknown"],
+      ["Remaining wedding budget", (item) => budget == null || results[item.prefix].estimatedTotal == null ? "Add a wedding budget to calculate" : money.format(budget - results[item.prefix].estimatedTotal), (item) => budget == null ? "unknown" : ""],
       ["Effective stated cost per guest", (item) => results[item.prefix].estimatedTotal == null ? "Not enough pricing stated" : money.format(results[item.prefix].estimatedTotal / guests), (item) => results[item.prefix].estimatedTotal == null ? "unknown" : ""],
       ["Commercial terms stated", (item) => `${results[item.prefix].statedFields} of ${results[item.prefix].totalFields}`, ""],
       ["Unknown or unanswered", (item) => `${results[item.prefix].unknowns.length} item${results[item.prefix].unknowns.length === 1 ? "" : "s"}`, "unknown"],
@@ -283,7 +348,7 @@
       ...inclusions.map((label) => [label, (item) => item.inclusions.includes(label) ? "Included" : item.exclusions.includes(label) ? "Not offered" : "Not stated", (item) => item.inclusions.includes(label) ? "included" : "unknown"]),
     ];
     document.querySelector("[data-result-body]").innerHTML = rows.map(([label, getter, kind]) => `<tr><th scope="row">${escapeHtml(label)}</th>${items.map((item) => { const cellKind = typeof kind === "function" ? kind(item) : kind; return `<td><span class="${cellKind === "unknown" ? "quote-unknown" : cellKind === "included" ? "quote-included" : ""}">${escapeHtml(getter(item))}</span></td>`; }).join("")}</tr>`).join("");
-    document.querySelector("[data-formulas]").innerHTML = items.map((item) => renderFormula(item, results[item.prefix])).join("");
+    document.querySelector("[data-formulas]").innerHTML = items.map((item) => renderFormula(item, results[item.prefix], budget)).join("");
     const summary = document.querySelector("[data-quote-summary]");
     if (bActive && results.a.estimatedTotal != null && results.b.estimatedTotal != null) {
       const difference = Math.abs(results.a.estimatedTotal - results.b.estimatedTotal);
@@ -296,7 +361,20 @@
     } else {
       summary.textContent = `${allItems[0].label} does not yet contain enough stated or applied pricing to estimate a total. Analyse the quote or enter its commercial terms, then compare again.`;
     }
-    const result = document.querySelector("[data-quote-result]"); result.hidden = false; result.focus({ preventScroll: true }); result.scrollIntoView({ behavior: "smooth", block: "start" });
+    const support = engine.decisionSupport(items, results, budget);
+    document.querySelector("[data-decision-tradeoff]").textContent = support.tradeOff;
+    document.querySelector("[data-decision-recommendation]").textContent = support.recommendation;
+    document.querySelector("[data-material-unknown]").textContent = support.materialUnknown ? `The missing fact most likely to change this choice: ${support.materialUnknown}.` : "No material unknown has been identified from the entered terms.";
+    document.querySelector("[data-decision-support] h3").textContent = support.lowerPrefix ? "A conditional preference, not a final booking decision" : "Keep the choice open until the figures are comparable";
+    const result = document.querySelector("[data-quote-result]");
+    result.hidden = false;
+    // Live recalculation must not steal focus while a couple is moving through
+    // the commercial-term fields. Focus and scroll only for an explicit
+    // Compare submission.
+    if (scroll) {
+      result.focus({ preventScroll: true });
+      result.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
   }
 
   function shareSnapshot() {
@@ -305,8 +383,10 @@
     const items = [proposal("a"), proposal("b")].filter(isActive);
     return {
       generated_at: new Date().toISOString(),
+      comparison_date: value("comparison_date") || null,
       comparison_guests: guests,
       comparison_hours: hours,
+      comparison_budget: engine.finite(value("comparison_budget")),
       proposals: items.map((item) => {
         const result = engine.calculate(item, guests, hours);
         return {
@@ -324,9 +404,22 @@
             venue_hours: item.includedHours,
             overtime_rate: item.overtimeRate,
             payment_schedule: item.paymentSchedule,
+            deposit_amount: item.depositAmount,
+            deposit_pct: item.depositPct,
+            deposit_due: item.depositDue,
+            cancellation_terms: item.cancellationTerms,
+            quote_expiry: item.quoteExpiry,
+            quoted_event_date: item.quotedEventDate,
+            date_status: item.dateStatus,
+            minimum_guests: item.minimumGuests,
+            maximum_guests: item.maximumGuests,
           },
           line_items: item.lineItems,
           estimated_total: result.estimatedTotal,
+          scenario_estimate: result.scenarioChanged,
+          viability: result.viability,
+          vendor_confirmation_reasons: result.confirmationReasons,
+          deposit: result.deposit,
           formula_lines: result.lines,
           assumptions: result.assumptions,
           unknowns: result.unknowns,
@@ -401,7 +494,7 @@
     const status = document.querySelector(`[data-file-status="${prefix}"]`);
     if (!file) return;
     const extension = file.name.split(".").pop()?.toLowerCase();
-    if (!["txt", "md"].includes(extension)) { status.textContent = "This public tool reads TXT and Markdown locally. Open PDF or Word files and paste the relevant text; nothing was uploaded."; return; }
+    if (!["txt", "md", "eml"].includes(extension)) { status.textContent = "This public tool reads TXT, Markdown and email files locally. Use the signed-in Quotes upload for PDF/Word, or paste extracted text; nothing was uploaded."; return; }
     if (file.size > 2_000_000) { status.textContent = "Choose a text file smaller than 2 MB or paste the relevant sections."; return; }
     try { field(`${prefix}_text`).value = await file.text(); status.textContent = `${file.name} was read on this device. Choose Analyse quote only if you want contextual extraction.`; }
     catch { status.textContent = "The file could not be read. Paste its text instead."; }
@@ -419,8 +512,11 @@
     const status = document.querySelector(`[data-analysis-status="${prefix}"]`); status.textContent = "Saved analysis for this proposal was cleared. Manual fields were left unchanged."; status.dataset.kind = "success";
   }));
   document.querySelectorAll("[data-extract-selection]").forEach((button) => button.addEventListener("click", () => extractSelection(button.dataset.extractSelection)));
-  document.querySelectorAll("[data-add-line]").forEach((button) => button.addEventListener("click", () => { const prefix = button.dataset.addLine; lineItems[prefix].push({ label: "", unit: "fixed", amount: null, counted: false, source_snippet: "" }); renderLineItems(prefix); const status = document.querySelector(`[data-analysis-status="${prefix}"]`); status.textContent = "Blank line item added below."; status.dataset.kind = "success"; }));
-  document.querySelectorAll("[data-source-field]").forEach((control) => control.addEventListener("click", () => { const [prefix, key] = control.dataset.sourceField.split(":"); highlightSource(prefix, acceptedSources[prefix][key]); }));
+  document.querySelectorAll("[data-add-line]").forEach((button) => button.addEventListener("click", (event) => { event.preventDefault(); const prefix = button.dataset.addLine; lineItems[prefix].push({ label: "", unit: "fixed", amount: null, counted: false, originalCounted: false, scenarioIncluded: false, originalQuantity: 1, scenarioQuantity: 1, changeability: "optional", minimumEligible: false, source_snippet: "" }); renderLineItems(prefix); const status = document.querySelector(`[data-analysis-status="${prefix}"]`); status.textContent = "Blank optional line item added below."; status.dataset.kind = "success"; }));
+  document.querySelectorAll("[data-source-field]").forEach((control) => {
+    control.addEventListener("click", () => { const [prefix, key] = control.dataset.sourceField.split(":"); highlightSource(prefix, acceptedSources[prefix][key]); });
+    control.addEventListener("change", () => { if (!document.querySelector("[data-quote-result]").hidden) renderComparison(false); });
+  });
   for (const prefix of ["a", "b"]) field(`${prefix}_file`).addEventListener("change", (event) => void readFile(prefix, event.currentTarget.files?.[0]));
   document.querySelectorAll("[data-copy]").forEach((button) => button.addEventListener("click", async () => {
     const prefix = button.dataset.copy; const item = proposal(prefix); const result = engine.calculate(item, engine.finite(value("comparison_guests")) || 100, engine.finite(value("comparison_hours")) || 6);
@@ -432,5 +528,25 @@
   document.querySelector("[data-open-share]")?.addEventListener("click", () => { shareForm.hidden = false; shareForm.querySelector('[name="share_email"]')?.focus(); shareForm.scrollIntoView({ behavior: "smooth", block: "center" }); });
   document.querySelector("[data-share-cancel]")?.addEventListener("click", () => { shareForm.hidden = true; });
   shareForm?.addEventListener("submit", sharePdf);
+  for (const name of ["comparison_date", "comparison_guests", "comparison_hours", "comparison_budget"]) {
+    field(name)?.addEventListener("input", () => { if (!document.querySelector("[data-quote-result]").hidden) renderComparison(false); });
+  }
+  document.querySelectorAll("[data-choice]").forEach((button) => button.addEventListener("click", () => {
+    const requested = button.dataset.choice;
+    let choice = requested;
+    if (requested === "confirm") {
+      let saved = null;
+      try { saved = JSON.parse(localStorage.getItem(CHOICE_KEY) || "null"); } catch { /* invalid local state is ignored */ }
+      choice = saved?.preference;
+      if (!choice || !["a", "b"].includes(choice)) {
+        document.querySelector("[data-choice-status]").textContent = "Choose Proposal A or Proposal B before confirming it.";
+        return;
+      }
+    }
+    const state = choice === "open" ? { status: "open", preference: null } : { status: requested === "confirm" ? "confirmed" : "preferred", preference: choice };
+    try { localStorage.setItem(CHOICE_KEY, JSON.stringify({ ...state, saved_at: new Date().toISOString() })); }
+    catch { document.querySelector("[data-choice-status]").textContent = "This browser could not save the preference. The comparison remains visible."; return; }
+    document.querySelector("[data-choice-status]").textContent = state.status === "open" ? "Choice kept open on this device." : `${choice === "a" ? "Proposal A" : "Proposal B"} ${state.status === "confirmed" ? "confirmed" : "saved as the current preference"} on this device. Sign in to add the choice to the wedding ledger.`;
+  }));
   window.OmnyVenueQuoteDecoder = { calculate: engine.calculate, proposal };
 })();

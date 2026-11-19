@@ -1,15 +1,17 @@
-# Venue Quote Comparison v2 — source-grounded extraction and deterministic comparison
+# Venue Quote Comparison v3 — source-grounded normalisation, scenarios and choice
 
-Status: implementation specification  
-Owner: WED-350  
+Status: incremental implementation specification
+Owner: WED-383
+Builds on: WED-350 and WED-377
 Supersedes: the no-model extraction constraint in sections 3.4, 5.5 and Q5 of `OmnyID_Wedding_Lead_Magnets_Spec.md` and `OmnyID_Wedding_Lead_Magnets_Tasks.md`. All other privacy, import and approval boundaries remain.
 
 ## 1. Outcome
 
-A visitor can paste one or two venue proposals and obtain an understandable,
-like-for-like comparison without searching for every commercial term or doing
-guest multiplication. The tool must distinguish quoted facts, deterministic
-calculations, user-entered assumptions and unknowns.
+A couple can use the dedicated authenticated **Quotes** section, separately
+from any vendor's **Quote received** lifecycle status, or the no-login public
+page to compare proposals for the same wedding. They can see what each vendor
+covers, whether its terms fit the event, the effect on the remaining wedding
+budget and the one missing fact most likely to change the choice.
 
 The tool is not a recommendation engine and must not describe the lowest
 displayed number as the best option. A quote with exclusions or unknowns is
@@ -19,6 +21,9 @@ not equivalent to a comprehensive quote.
 
 - Extend `wedding/compare-wedding-venue-quotes.html`; do not add a competing
   calculator or quote store.
+- Extend `WeddingBudgetEvidenceHub` and the canonical quotation/source
+  authorities for signed-in use. The vendor lifecycle panel may link to a
+  quote but is not the dedicated comparison authority.
 - Reuse the server's platform-funded OpenRouter gate, weekly USD 50
   configured ceiling, provider data-collection denial, server-held credential
   and persistent abuse rate limiter.
@@ -28,6 +33,25 @@ not equivalent to a comprehensive quote.
 - Keep the existing deterministic browser calculation layer authoritative.
 - Keep manual entry functional if contextual extraction is declined,
   unavailable or rate-limited.
+
+## 2.1 Existing capabilities to retain
+
+- The public contextual extractor, exact source snippets and deterministic
+  browser arithmetic from WED-350/WED-377.
+- Authenticated source files, vendor messages, normalised quotation evidence,
+  corrections and document reading in the Wedding Quotes hub.
+- Quote originals and revisions remain immutable source evidence. Scenarios
+  are projections and never overwrite a vendor quote.
+- AFP remains the authority for a signed-in couple's saved preference,
+  confirmed choice and decision-card projection.
+
+## 2.2 Capture sources
+
+Authenticated use accepts the existing PDF/DOCX/TXT/Markdown upload and vendor
+email/message paths. The public page accepts pasted email/manual text and local
+plain-text or email files; PDF support must use the existing client extraction
+or quotation ingestion capability rather than inventing a second parser. If a
+browser cannot safely extract a PDF, it must say so and retain manual entry.
 
 ## 3. Privacy and activation boundary
 
@@ -67,7 +91,7 @@ Each field returns:
 - confidence: high, medium or low;
 - a short reason.
 
-Fields:
+Fields (v2 fields remain valid; v3 adds the following where stated):
 
 - pricing model: per-head, fixed, minimum spend, hybrid or unclear;
 - per-head rate;
@@ -80,8 +104,14 @@ Fields:
 - venue/package hours;
 - overtime rate;
 - payment schedule;
+- deposit amount or percentage and its due date, kept separate from total;
+- cancellation/reschedule terms and quote expiry;
+- quoted event date or eligible date conditions;
+- minimum and maximum guest counts or capacity;
 - itemised per-head, fixed, included or unclear rows;
-- inclusions and exclusions.
+- inclusions and exclusions;
+- for each item, whether it is optional, mandatory, bundled or unknown and
+  whether its spend counts toward a stated minimum.
 
 The server rejects unsupported types, out-of-range numbers and any suggestion
 whose source snippet does not appear exactly in the submitted proposal. Model
@@ -113,20 +143,50 @@ Each proposal contains:
 7. Commercial terms fields separated from an editable line-item table.
 8. Extracted, not stated and not analysed states rendered distinctly.
 
-## 7. Deterministic total
+## 7. Deterministic total and viability
 
 For comparison guest count `G` and event hours `H`:
 
 1. Select the quoted base according to pricing model.
 2. Multiply quoted per-head rates by `G` in code.
 3. Add explicitly counted fixed rows and fees.
-4. Apply a minimum spend with `max(quoted variable subtotal, minimum spend)`.
+4. Apply a minimum spend only to components marked as eligible for that
+   minimum. Add ineligible fees outside the floor. Do not assume an unknown
+   component counts.
 5. Apply a service percentage only to the visible stated base used by this
    release; label the assumption and ask what the venue actually applies it to.
 6. Add overtime only when included hours and overtime rate are stated.
 7. Add 10% GST only when the quote explicitly says GST is excluded.
 8. Keep unclear GST, service basis and other missing amounts outside the total
    and list them as unknowns.
+
+Before calling a scenario viable, check the comparison date, guest count,
+event duration, stated capacity, minimum guests and date/rate conditions.
+Out-of-range or changed terms are labelled **Vendor confirmation needed**;
+the tool does not silently extend a quoted rate. A deposit is displayed with
+the payment schedule but never added to the event total a second time.
+
+## 7.1 Scenario edits
+
+Each proposal has an immutable **Original quote** basis and a separate
+**Scenario estimate**. A couple may add or remove optional items or change
+their quantity. Both proposal totals, their difference and remaining wedding
+budget update live. Every changed row is visible in the formula.
+
+- Optional items may be included/excluded and have a scenario quantity.
+- Mandatory items cannot be removed; explain that they are required.
+- Bundled items cannot be deducted independently; explain that their price is
+  part of another quoted amount.
+- Unknown prices remain unknown after selection.
+- A changed date, headcount, duration or quantity outside stated terms is
+  marked **Vendor confirmation needed**.
+- The edited result remains **Scenario estimate** until the vendor confirms a
+  revision. It never mutates the original source or accepted extraction.
+
+Minimum-spend invariant: if eligible food and drinks are A$5,200 including an
+optional A$400 upgrade, removing the upgrade produces eligible spend A$4,800,
+then a A$200 minimum-spend adjustment, for a A$5,000 scenario total—not
+A$4,800 and not A$5,200.
 
 Every result shows its formula lines and marks each as quoted, calculated,
 user-entered or assumed. The headline is **Estimated total from stated terms**,
@@ -142,6 +202,28 @@ never a final price.
 - Preserve `not_found`; never coerce it to zero.
 - A lower total can be described as lower on stated figures, with exclusions
   and unknown counts beside it. Do not say better, best or recommended.
+- Show quoted costs and estimated extras separately, along with the remaining
+  budget for each scenario.
+- Explain a price crossover such as A$120 per guest with a A$5,000 minimum
+  versus A$150 per guest: B is A$500 lower at 30 guests, while A is A$1,000
+  lower at 40 guests, assuming equivalent scope and no other known charges.
+
+## 8.1 Choice and decision projection
+
+The dedicated comparison provides **Prefer this**, **Confirm choice** and
+**Keep open** actions. Public visitors may retain the choice only on their
+device. Signed-in actions append to the canonical wedding ledger and update
+the existing decision card; they do not create a second decision system.
+
+The decision summary contains:
+
+1. the material trade-off on the current scenario;
+2. a conditional recommendation tied to budget and stated priorities;
+3. the single unknown most likely to change that recommendation; and
+4. a link back to the source evidence or correction surface.
+
+If staffing is unknown, both totals and the recommendation explicitly retain
+that uncertainty.
 
 ## 9. Cache and change detection
 
@@ -178,3 +260,13 @@ Clear-cache control must be available. Cache failure must not block the tool.
   produces a field-level diff.
 - Desktop and mobile browser smoke, Wedding site tests, Rust route tests,
   production build, exact-SHA deployment and hosted checks pass.
+- At 30 guests, A$120 per guest with a A$5,000 minimum produces A$5,000 and
+  A$150 per guest produces A$4,500. At 40 guests the same proposals produce
+  A$5,000 and A$6,000, and the explanation identifies why the cheaper option
+  flipped.
+- Removing a A$400 minimum-eligible optional upgrade from A$5,200 shows
+  A$4,800 eligible spend plus a A$200 minimum adjustment and a A$5,000
+  **Scenario estimate**, while preserving the A$5,200 original quote basis.
+- Changing optional quantity recalculates both totals, difference and
+  remaining budget without a reload. Mandatory/bundled rows cannot be
+  silently deducted, and out-of-term changes require vendor confirmation.

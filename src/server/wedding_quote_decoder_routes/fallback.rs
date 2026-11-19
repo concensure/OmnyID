@@ -198,6 +198,8 @@ pub(super) fn deterministic_quote_fallback(text: &str) -> ModelPayload {
             amount: Some(amount),
             source_snippet: field.as_ref()?.source_snippet.clone()?,
             confidence: "medium".to_string(),
+            changeability: "unknown".to_string(),
+            minimum_spend_eligible: None,
         })
     })
     .collect();
@@ -226,6 +228,19 @@ pub(super) fn deterministic_quote_fallback(text: &str) -> ModelPayload {
             overtime_rate: missing_field("No explicit overtime rate was identified."),
             payment_schedule: payment_schedule
                 .unwrap_or_else(|| missing_field("No explicit payment schedule was identified.")),
+            deposit_amount: missing_field("No explicit deposit amount was identified."),
+            deposit_pct: missing_field("No explicit deposit percentage was identified."),
+            deposit_due: missing_field("No explicit deposit due date was identified."),
+            cancellation_terms: missing_field(
+                "No explicit cancellation or reschedule terms were identified.",
+            ),
+            quote_expiry: missing_field("No explicit quote expiry date was identified."),
+            quoted_event_date: missing_field("No explicit event date was identified."),
+            date_status: missing_field("Availability for the event date was not stated."),
+            minimum_guests: missing_field("No explicit minimum guest count was identified."),
+            maximum_guests: missing_field(
+                "No explicit maximum guest count or capacity was identified.",
+            ),
         },
         line_items,
         inclusions: Vec::new(),

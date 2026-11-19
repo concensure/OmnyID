@@ -64,6 +64,43 @@ try {
   if (!summary.includes('unknown')) throw new Error(`Missing-term summary not visible: ${summary}`);
   if (!await page.locator('text=Not stated in quote').count()) throw new Error('Not-stated extraction state is absent');
 
+  // Scenario estimates preserve the quoted basis and apply minimum-spend
+  // floors only to eligible items.
+  await page.locator('[name=a_pricing_model]').selectOption('minimum_spend');
+  await page.locator('[name=a_per_head_rate]').fill('48');
+  await page.locator('[name=a_minimum_spend]').fill('5000');
+  await page.locator('[name=a_gst]').selectOption('included');
+  await page.locator('[name=a_venue_hours]').fill('6');
+  await page.locator('[name=a_payment_schedule]').fill('Deposit due on acceptance');
+  await page.locator('[name=a_deposit_amount]').fill('500');
+  if (await page.locator('[name=a_deposit_amount]').inputValue() !== '500') throw new Error('Deposit amount could not be entered');
+  await page.locator('[name=a_cancellation_terms]').fill('Cancellation terms stated');
+  await page.locator('[name=a_date_status]').selectOption('available');
+  await page.locator('[name=comparison_guests]').fill('100');
+  await page.locator('[name=comparison_budget]').fill('30000');
+  await page.locator('[data-add-line=a]').click();
+  if (await page.locator('[name=a_deposit_amount]').inputValue() !== '500') throw new Error('Adding a line item cleared the deposit');
+  const scenarioRow = page.locator('[data-line-items=a] tbody tr').last();
+  await scenarioRow.locator('[data-line-label]').fill('Optional drinks upgrade');
+  await scenarioRow.locator('[data-line-amount]').fill('400');
+  await scenarioRow.locator('[data-line-counted]').check();
+  await scenarioRow.locator('[data-line-scenario]').check();
+  await scenarioRow.locator('[data-line-minimum]').check();
+  const retainedDeposit = await page.locator('[name=a_deposit_amount]').inputValue();
+  if (retainedDeposit !== '500') throw new Error(`Deposit input did not retain the reviewed amount: ${retainedDeposit}`);
+  await page.locator('[data-quote-decoder]').evaluate((form) => form.requestSubmit());
+  if (!await page.locator('[data-formulas]').innerText().then((text) => text.includes('$5,200.00'))) throw new Error('Original eligible upgrade was not included');
+  await scenarioRow.locator('[data-line-scenario]').uncheck();
+  const scenarioText = await page.locator('[data-formulas]').innerText();
+  if (!scenarioText.toLowerCase().includes('scenario estimate') || !scenarioText.includes('$5,000.00') || !scenarioText.includes('Minimum-spend adjustment') || !scenarioText.includes('$200.00')) {
+    throw new Error(`Minimum-spend scenario was not explained correctly: ${scenarioText}`);
+  }
+  if (!scenarioText.includes('Deposit (part of total, not added again)')) throw new Error(`Deposit was not kept separate from total: ${scenarioText}`);
+  if (!scenarioText.includes('$25,000.00')) throw new Error('Remaining wedding budget did not update');
+  await page.locator('[data-choice=a]').click();
+  await page.locator('[data-choice=confirm]').click();
+  if (!await page.locator('[data-choice-status]').innerText().then((text) => text.includes('confirmed'))) throw new Error('Public device-only choice did not persist');
+
   await page.locator('[name=b_label]').fill('Terms-only sample');
   await page.locator('[name=b_text]').fill('GST treatment and the package total are not stated in this proposal.');
   await page.locator('[data-selection-target=b]').selectOption('gst');

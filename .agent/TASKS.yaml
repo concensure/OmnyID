@@ -1,5 +1,5 @@
 version: 1
-updated: 2026-11-19
+updated: 2026-11-20
 
 lifecycle:
   allowed_statuses:
@@ -15,6 +15,17 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-383
+    title: Complete source-grounded wedding quote normalisation and live scenario comparison
+    status: review
+    owner: codex
+    branch: agent/codex/WED-383
+    worktree: C:/temp/wt/omnyid-wed383
+    base_sha: 150f14038f3326760350e35b050a1a3fd439e86d
+    depends_on: [WED-350, WED-377, WED-382]
+    files: [Documents/marketing/wedding planning/posts/magnet/venue quote comparison/**, wedding/compare-wedding-venue-quotes.html, wedding/assets/js/quote-decoder*.js, wedding/assets/css/**, wedding/tests/**, solid-ui/src/components/WeddingQuoteScenarioComparison.tsx, solid-ui/src/lib/wedding*Quote*.ts, solid-ui/tests/**quote**, src/quotation/**, src/server/wedding_quote_decoder_routes.rs, src/server/wedding_quote_decoder_routes/**, .agent/**]
+    acceptance: [One dedicated account quote section stays distinct from per-vendor Quote received status, public and authenticated surfaces reuse the canonical quote engine, PDFs emails pasted text and manual entry retain original source evidence and explicit corrections, equivalent-scope scenarios enforce date capacity guest limits minimum spends deposits GST fees and unknowns without double counting, optional item quantities update both totals difference and remaining budget live while preserving originals and labelling scenario estimates, bundled mandatory and out-of-term changes explain why vendor confirmation is needed, side-by-side trade-offs update the decision authority with one material missing fact and allow prefer choose or keep-open actions, minimum-spend flip and A$5200-minus-A$400 floor cases pass deterministic tests]
+    progress: "Implemented from clean Runbook descendant 150f14038f3326760350e35b050a1a3fd439e86d, which contains user-named f4f738faffcc90dd2e615b6a020c3fad81e51188. Extends WED-350/WED-377 without a parallel quote store: public and authenticated comparisons now preserve originals, apply deterministic scenario/minimum-spend arithmetic, check viability, show budget effects and save wedding-scoped AFP choices. npm run test:wedding:ci passed 2318 Wedding tests, production build and mobile browser smoke passed. Direct rustfmt passed; Windows rustc repeatedly exited 0xc0000005 (including single-job non-incremental compilation in third-party tungstenite) and Docker Desktop was unavailable, so native Rust compilation and exact-SHA hosted release evidence remain review gates."
   - id: WED-382
     title: Add bounded authenticated application cohorts for private drafts and approved tools
     status: done

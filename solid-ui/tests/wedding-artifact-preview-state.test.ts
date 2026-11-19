@@ -174,6 +174,43 @@ test("buildWeddingArtifactPreviewState records extracted quote attachment eviden
   assert.ok(preview.attachmentEvidenceLabels?.includes("server document parser"));
 });
 
+test("buildWeddingArtifactPreviewState keeps scenario terms and source snippets attached to normalized quote rows", () => {
+  const preview = buildWeddingArtifactPreviewState({
+    artifactKind: "vendor_table",
+    bodyText: [
+      "# Harbour Garden quote",
+      "",
+      "Vendor: Harbour Garden",
+      "Quote amount: AUD $5,200",
+      "Minimum spend: AUD $5,000",
+      "Minimum guests: 20",
+      "Maximum guests: 120",
+      "Event length: 6 hours",
+      "Cancellation terms: Deposit retained within 60 days",
+      "",
+      "## Inclusions",
+      "",
+      "- Food and beverage AUD $4,800",
+      "",
+      "## Optional extras",
+      "",
+      "- Drinks upgrade AUD $400",
+    ].join("\n"),
+  });
+
+  assert.equal(preview?.kind, "quote");
+  if (preview?.kind !== "quote") return;
+  assert.equal(preview.minimumSpendAmount, 5_000);
+  assert.equal(preview.minGuestCount, 20);
+  assert.equal(preview.maxGuestCount, 120);
+  assert.equal(preview.quotedDurationHours, 6);
+  assert.match(preview.cancellationTerms ?? "", /Deposit retained/);
+  assert.equal(preview.scenarioItems?.length, 2);
+  assert.equal(preview.scenarioItems?.[1]?.inclusion, "optional");
+  assert.equal(preview.scenarioItems?.[1]?.unitAmount, 400);
+  assert.match(preview.scenarioItems?.[1]?.sourceSnippet ?? "", /Drinks upgrade/);
+});
+
 test("buildWeddingArtifactPreviewState keeps explicit quote currencies distinct from dollar fallback", () => {
   const usdPreview = buildWeddingArtifactPreviewState({
     artifactKind: "vendor_table",

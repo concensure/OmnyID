@@ -88,6 +88,24 @@ export type WeddingArtifactQuotePreview = {
   attachmentUrl: string | null;
   attachmentTextStatus?: "none" | "linked_unverified" | "extracted";
   attachmentEvidenceLabels?: string[];
+  minimumSpendAmount?: number | null;
+  minGuestCount?: number | null;
+  maxGuestCount?: number | null;
+  quotedDurationHours?: number | null;
+  cancellationTerms?: string | null;
+  scenarioItems?: WeddingArtifactQuoteScenarioItem[];
+};
+
+export type WeddingArtifactQuoteScenarioItem = {
+  id: string;
+  label: string;
+  inclusion: "included" | "required" | "optional" | "excluded" | "conditional" | "unknown";
+  priceBasis: "fixed" | "per_person" | "per_item" | "per_hour" | "percentage" | "minimum_spend";
+  unitAmount: number | null;
+  quantity: number;
+  includedInQuotedTotal: boolean;
+  minimumSpendEligible: boolean;
+  sourceSnippet: string;
 };
 
 export type WeddingArtifactPreviewState =
@@ -352,6 +370,52 @@ function numericMoney(value: string): number | null {
   return Number.isFinite(amount) ? amount : null;
 }
 
+function numericCount(value: string): number | null {
+  const match = value.match(/\d[\d,]*/);
+  if (!match) return null;
+  const amount = Number(match[0].replace(/,/g, ""));
+  return Number.isFinite(amount) && amount >= 0 ? amount : null;
+}
+
+function quoteScenarioItem(
+  line: string,
+  inclusion: WeddingArtifactQuoteScenarioItem["inclusion"],
+  index: number,
+): WeddingArtifactQuoteScenarioItem {
+  const minorUnits = line.match(/\b(\d+)\s+[A-Z]{3}\s+minor units\b/i);
+  const displayedMoney = line.match(/(?:A\$|\$|AUD\s*)\s*(\d[\d,]*(?:\.\d{1,2})?)/i);
+  const unitAmount = minorUnits
+    ? Number(minorUnits[1]) / 100
+    : displayedMoney
+      ? Number(displayedMoney[1].replace(/,/g, ""))
+      : null;
+  const priceBasis: WeddingArtifactQuoteScenarioItem["priceBasis"] = /\bminimum[_\s-]*spend\b/i.test(line)
+    ? "minimum_spend"
+    : /\b(?:per\s*(?:person|guest|head)|pp|p\/p)\b/i.test(line)
+      ? "per_person"
+      : /\bper\s*hour|\/\s*hour\b/i.test(line)
+        ? "per_hour"
+        : /\bper\s*item|\/\s*item\b/i.test(line)
+          ? "per_item"
+          : /\bpercent(?:age)?\b|%/.test(line)
+            ? "percentage"
+            : "fixed";
+  const quantityMatch = line.match(/\b(?:qty|quantity|x)\s*[:=]?\s*(\d+(?:\.\d+)?)/i);
+  const sourceLabel = line.replace(/^[-*]\s*/, "").replace(/;\s*(?:included|required|optional|excluded|conditional|unknown)\b.*$/i, "").trim();
+  return {
+    id: `quote-line-${index + 1}`,
+    label: sourceLabel || `Quote item ${index + 1}`,
+    inclusion,
+    priceBasis,
+    unitAmount: Number.isFinite(unitAmount) ? unitAmount : null,
+    quantity: quantityMatch ? Math.max(0, Number(quantityMatch[1])) : 1,
+    includedInQuotedTotal: inclusion === "included" || inclusion === "required" || inclusion === "conditional",
+    minimumSpendEligible: /\b(?:food|beverage|drink|cater|menu|canap|dinner|lunch)\b/i.test(line)
+      && !/\b(?:hire|security|staff|transport|accommodation|overtime)\b/i.test(line),
+    sourceSnippet: line.trim(),
+  };
+}
+
 function currencyFrom(value: string): string {
   if (/\b(usd|us\$)\b/i.test(value)) return "USD";
   if (/\b(gbp)\b|£/i.test(value)) return "GBP";
@@ -420,6 +484,23 @@ function parseQuotePreview(body: string): WeddingArtifactQuotePreview | null {
     ...sectionLines(body, "Assumptions", 8),
     ...sectionLines(body, "Estimate basis", 8),
   ];
+  const recordedLines = sectionLines(body, "Recorded line items", 32);
+  const optionalLines = [
+    ...sectionLines(body, "Optional extras", 16),
+    ...sectionLines(body, "Options", 16),
+  ];
+  const scenarioSource = recordedLines.length > 0
+    ? recordedLines.map((line) => {
+      const inclusion = line.match(/;\s*(included|required|optional|excluded|conditional|unknown)\b/i)?.[1]?.toLowerCase();
+      return { line, inclusion: (inclusion || "unknown") as WeddingArtifactQuoteScenarioItem["inclusion"] };
+    })
+    : [
+      ...inclusionLines.map((line) => ({ line, inclusion: "included" as const })),
+      ...mandatoryFees.map((line) => ({ line, inclusion: "required" as const })),
+      ...optionalLines.map((line) => ({ line, inclusion: "optional" as const })),
+      ...exclusions.map((line) => ({ line, inclusion: "excluded" as const })),
+    ];
+  const scenarioItems = scenarioSource.map((item, index) => quoteScenarioItem(item.line, item.inclusion, index));
   const eventDate = labeledValue(body, ["Wedding date", "Event date", "Date"]);
   const guestCountLabel = labeledValue(body, ["Guest count", "Guests", "Attendees"]);
   const validUntil = labeledValue(body, ["Valid until", "Quote valid until", "Expires"]);
@@ -437,6 +518,9 @@ function parseQuotePreview(body: string): WeddingArtifactQuotePreview | null {
   ]);
   const attachmentUrl = urlFrom(attachmentRaw);
   const attachmentTextStatus = attachmentTextStatusFrom(body, attachmentUrl);
+  const minimumSpendLabel = labeledValue(body, ["Minimum spend", "Food and beverage minimum", "F&B minimum"])
+    || [...mandatoryFees, ...assumptions].find((line) => /\bminimum\s+spend\b/i.test(line))
+    || "";
   return {
     kind: "quote",
     vendorName,
@@ -460,6 +544,12 @@ function parseQuotePreview(body: string): WeddingArtifactQuotePreview | null {
     attachmentUrl,
     attachmentTextStatus,
     attachmentEvidenceLabels: attachmentEvidenceLabelsFrom(body, attachmentUrl, attachmentTextStatus),
+    minimumSpendAmount: numericMoney(minimumSpendLabel),
+    minGuestCount: numericCount(labeledValue(body, ["Minimum guests", "Guest minimum", "Minimum guest count"])),
+    maxGuestCount: numericCount(labeledValue(body, ["Maximum guests", "Guest maximum", "Capacity", "Maximum capacity"])),
+    quotedDurationHours: numericCount(labeledValue(body, ["Event length", "Event duration", "Venue hours", "Package hours"])),
+    cancellationTerms: labeledValue(body, ["Cancellation", "Cancellation terms", "Cancellation policy"]) || null,
+    scenarioItems,
   };
 }
 

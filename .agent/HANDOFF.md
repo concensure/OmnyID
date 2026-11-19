@@ -1,3 +1,39 @@
+## WED-383 quote scenario implementation ready for review (2026-11-20)
+
+Worktree `C:/temp/wt/omnyid-wed383`, branch `agent/codex/WED-383`, based on
+`150f14038f3326760350e35b050a1a3fd439e86d`. That base is a clean descendant
+of the user-named Runbooks commit
+`f4f738faffcc90dd2e615b6a020c3fad81e51188`; no older wedding worktree was
+used.
+
+The public venue-quote page and authenticated Wedding Quotes hub now compare
+one common date, guest count, duration and budget. Original quotes stay
+source-linked and immutable; optional item/quantity edits are scenario
+estimates. Deterministic calculations enforce eligible minimum-spend floors,
+keep deposits separate, expose unknowns, check capacity/date/guest viability,
+show remaining budget and prevent a cheaper non-viable quote from becoming
+the recommendation. Signed-in preference/confirm/open actions reuse the AFP
+wedding ledger; public choices are device-only. The extraction contract was
+extended compatibly under `quote-extraction.v2` for deposits, cancellation,
+expiry, event date/status, capacity and item changeability/eligibility.
+
+Changed surfaces: the v3 quote spec/tasks; public HTML/CSS/controller/engine;
+quote extraction route/fallback; `WeddingBudgetEvidenceHub`,
+`WeddingQuoteScenarioComparison`, quote artifact parsing, AFP choice and
+scenario state; focused public/authenticated tests.
+
+Verification from this implementation tree: `npm run test:wedding:ci` passed
+typecheck, public Wedding checks and 2318 Wedding tests; `npm run build`
+passed; the 390px Playwright quote-decoder smoke passed with one explicit
+extraction request, cached replay, PDF-share request and no focus regression;
+`git diff --check`, focused scenario tests and direct rustfmt checks passed.
+Windows rustc repeatedly terminated with `0xc0000005` without a Rust
+diagnostic, including a single-job non-incremental retry while compiling
+third-party `tungstenite`. Docker Desktop was unavailable, so a Linux Rust
+compile was not substituted. No Oracle deployment was attempted. Next action:
+review the commit, run Rust/clean exact-SHA verification in a healthy Linux or
+Windows toolchain, then use the normal production gate if release is requested.
+
 ## WED-382 released; bounded Runbook checklist complete (2026-11-19 15:09 UTC)
 
 Frozen application source: ae1ac01a2c285ac10b09404cffe3db67fbaaa034.

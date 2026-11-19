@@ -1,3 +1,16 @@
+## 2026-11-20: WED-383 quote scenarios are projections over canonical evidence
+
+Authenticated quote comparison extends the existing Wedding Quotes hub and
+normalised source artifacts. An original vendor quote remains immutable;
+guest/date/duration and optional-item edits produce a labelled scenario
+estimate. Deterministic code, not the extraction model, applies per-person
+rates, minimum-spend eligibility, GST/fees and budget arithmetic. Preference,
+confirmation and keep-open actions append wedding-scoped AFP records that
+reference the source quote artifacts. The public no-login page uses the same
+calculation rules but stores a preference only on that device. Per-vendor
+`Quote received` remains a lifecycle status and is not a second comparison
+store or decision authority.
+
 ## 2026-11-19: WED-382 bounded acceptance is not broad activation
 
 The Runbook implementation checklist closes with reviewed internal HTTP cohorts:

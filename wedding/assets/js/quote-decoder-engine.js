@@ -13,6 +13,15 @@
     venue_hours: "Hours included",
     overtime_rate: "Overtime rate",
     payment_schedule: "Payment schedule",
+    deposit_amount: "Deposit amount",
+    deposit_pct: "Deposit percentage",
+    deposit_due: "Deposit due date",
+    cancellation_terms: "Cancellation and reschedule terms",
+    quote_expiry: "Quote expiry",
+    quoted_event_date: "Quoted event date",
+    date_status: "Date eligibility",
+    minimum_guests: "Minimum guests",
+    maximum_guests: "Maximum guests or capacity",
   };
 
   const finite = (value) => {
@@ -39,6 +48,15 @@
       includedHours: null,
       overtimeRate: null,
       paymentSchedule: "",
+      depositAmount: null,
+      depositPct: null,
+      depositDue: "",
+      cancellationTerms: "",
+      quoteExpiry: "",
+      quotedEventDate: "",
+      dateStatus: "not_stated",
+      minimumGuests: null,
+      maximumGuests: null,
       lineItems: [],
       inclusions: [],
       exclusions: [],
@@ -47,7 +65,7 @@
     };
   }
 
-  function calculate(item, guests, eventHours) {
+  function calculate(item, guests, eventHours, options = {}) {
     const lines = [];
     const unknowns = [];
     const assumptions = [];
@@ -57,6 +75,11 @@
     };
     let base = 0;
     let baseKnown = false;
+    let minimumEligibleBase = 0;
+    let minimumIneligibleBase = 0;
+    let minimumSpendApplies = false;
+    let scenarioChanged = false;
+    const confirmationReasons = [];
     const perHeadSubtotal = item.perHeadRate == null ? null : item.perHeadRate * guests;
     if (item.pricingModel === "per_head") {
       if (perHeadSubtotal == null) unknowns.push("per-head package rate");
@@ -72,11 +95,10 @@
       if (perHeadSubtotal != null) { spend += perHeadSubtotal; spendKnown = true; add("Per-head subtotal", perHeadSubtotal, `${guests} × ${item.perHeadRate}`, "calculated"); }
       if (item.fixedFee != null) { spend += item.fixedFee; spendKnown = true; add("Fixed fee", item.fixedFee, "quoted fixed amount"); }
       if (item.minimumSpend == null) unknowns.push("minimum-spend amount");
-      if (item.minimumSpend != null) {
-        base = Math.max(spendKnown ? spend : 0, item.minimumSpend);
-        baseKnown = true;
-        if (!spendKnown || spend < item.minimumSpend) add("Minimum-spend floor", item.minimumSpend - spend, `minimum ${item.minimumSpend}`, "calculated");
-      } else if (spendKnown) { base = spend; baseKnown = true; }
+      base = spend;
+      baseKnown = spendKnown || item.minimumSpend != null;
+      minimumEligibleBase = spend;
+      minimumSpendApplies = item.minimumSpend != null;
     } else if (item.pricingModel === "hybrid") {
       if (item.packageTotal != null) { base += item.packageTotal; baseKnown = true; add("Whole-package amount", item.packageTotal, "quoted amount"); }
       else {
@@ -91,18 +113,55 @@
       else unknowns.push("pricing model and base amount");
     }
 
-    for (const row of item.lineItems || []) {
-      if (!row.counted || row.amount == null || row.unit === "included") continue;
-      const amount = row.unit === "per_head" ? row.amount * guests : row.amount;
-      base += amount;
-      baseKnown = true;
-      add(row.label || "Line item", amount, row.unit === "per_head" ? `${guests} × ${row.amount}` : "quoted fixed item", row.unit === "per_head" ? "calculated" : "quoted");
+    if (item.minimumSpend != null && item.pricingModel !== "minimum_spend") {
+      minimumEligibleBase = base;
+      minimumSpendApplies = true;
+    } else if (!minimumSpendApplies) {
+      minimumIneligibleBase = base;
     }
 
-    let subtotal = base;
-    if (item.minimumSpend != null && item.pricingModel !== "minimum_spend" && subtotal < item.minimumSpend) {
-      add("Minimum-spend shortfall", item.minimumSpend - subtotal, `minimum ${item.minimumSpend}`, "calculated");
-      subtotal = item.minimumSpend;
+    let minimumEligibleItems = 0;
+    let minimumIneligibleItems = 0;
+    for (const row of item.lineItems || []) {
+      const originalIncluded = row.originalCounted ?? row.counted ?? false;
+      const originalQuantity = finite(row.originalQuantity ?? row.quantity) ?? 1;
+      const requestedIncluded = options.original ? originalIncluded : (row.scenarioIncluded ?? originalIncluded);
+      const requestedQuantity = options.original ? originalQuantity : (finite(row.scenarioQuantity) ?? originalQuantity);
+      const locked = row.changeability === "mandatory" || row.changeability === "bundled";
+      if (row.unit === "included") continue;
+      const included = locked ? originalIncluded : requestedIncluded;
+      const quantity = locked ? originalQuantity : requestedQuantity;
+      if (!options.original && (included !== originalIncluded || quantity !== originalQuantity)) scenarioChanged = true;
+      if (locked && (requestedIncluded !== originalIncluded || requestedQuantity !== originalQuantity)) {
+        assumptions.push(row.changeability === "bundled"
+          ? `${row.label || "A bundled item"} cannot be deducted independently because it is part of another quoted amount.`
+          : `${row.label || "A mandatory item"} cannot be removed under the stated quote terms.`);
+      }
+      if (!included) continue;
+      if (row.amount == null || row.unit === "unclear") {
+        unknowns.push(`${row.label || "selected line item"} price`);
+        continue;
+      }
+      const unitAmount = row.unit === "per_head" ? row.amount * guests : row.amount;
+      const amount = unitAmount * quantity;
+      const minimumEligible = row.minimumEligible === true;
+      if (minimumSpendApplies && minimumEligible) minimumEligibleItems += amount;
+      else minimumIneligibleItems += amount;
+      baseKnown = true;
+      add(row.label || "Line item", amount, row.unit === "per_head"
+        ? `${guests} × ${row.amount}${quantity !== 1 ? ` × ${quantity}` : ""}`
+        : `${row.amount}${quantity !== 1 ? ` × ${quantity}` : ""}`,
+      options.original ? "quoted" : scenarioChanged ? "scenario" : "quoted");
+    }
+
+    let subtotal = minimumIneligibleBase + minimumIneligibleItems;
+    if (minimumSpendApplies) {
+      const eligibleSpend = minimumEligibleBase + minimumEligibleItems;
+      const floor = Math.max(eligibleSpend, item.minimumSpend);
+      if (eligibleSpend < item.minimumSpend) add("Minimum-spend adjustment", item.minimumSpend - eligibleSpend, `${eligibleSpend} eligible spend; minimum ${item.minimumSpend}`, "calculated");
+      subtotal += floor;
+    } else {
+      subtotal += minimumEligibleBase + minimumEligibleItems;
     }
     if (item.servicePct != null) {
       if (baseKnown) {
@@ -130,7 +189,10 @@
       subtotal += gst;
     } else if (item.gst === "not_stated" || item.gst === "unclear") unknowns.push("GST treatment");
     if (!item.paymentSchedule) unknowns.push("payment schedule");
+    if (item.depositAmount == null && item.depositPct == null) unknowns.push("deposit amount or percentage");
+    if (!item.cancellationTerms) unknowns.push("cancellation and reschedule terms");
     if (!(item.inclusions || []).some((entry) => /beverage|drink/i.test(entry))) unknowns.push("beverage pricing or inclusion");
+    if (!(item.inclusions || []).some((entry) => /staff|coordinat|waiter|server/i.test(entry))) unknowns.push("staffing cost or inclusion");
 
     const packageGuestMismatch = item.packageTotal != null && item.quoteGuests != null && guests !== item.quoteGuests;
     if (packageGuestMismatch) {
@@ -139,11 +201,23 @@
     }
     if (item.minimumSpend != null) unknowns.push("minimum-spend scope and which components count toward it");
 
+    if (item.minimumGuests != null && guests < item.minimumGuests) confirmationReasons.push(`Guest count is below the quoted minimum of ${item.minimumGuests}.`);
+    if (item.maximumGuests != null && guests > item.maximumGuests) confirmationReasons.push(`Guest count exceeds the stated capacity or maximum of ${item.maximumGuests}.`);
+    if (item.dateStatus === "unavailable") confirmationReasons.push("The vendor marked this date unavailable.");
+    if (item.dateStatus === "conditional") confirmationReasons.push("The date or rate is conditional and needs vendor confirmation.");
+    if (item.dateStatus === "not_stated") unknowns.push("availability for the comparison date");
+    if (item.comparisonDate && item.quotedEventDate && item.comparisonDate !== item.quotedEventDate) confirmationReasons.push(`The quote is dated for ${item.quotedEventDate}, not ${item.comparisonDate}.`);
+    if (item.quoteExpiry && /^\d{4}-\d{2}-\d{2}$/.test(item.quoteExpiry) && item.quoteExpiry < new Date().toISOString().slice(0, 10)) confirmationReasons.push(`The quote expired on ${item.quoteExpiry}.`);
+    if (packageGuestMismatch) confirmationReasons.push(`The package total was quoted for ${item.quoteGuests} guests.`);
+
     const statedFields = [item.pricingModel !== "unclear", item.perHeadRate != null, item.quoteGuests != null, item.packageTotal != null, item.fixedFee != null, item.minimumSpend != null, item.gst !== "not_stated", item.servicePct != null, item.includedHours != null, item.overtimeRate != null, Boolean(item.paymentSchedule)].filter(Boolean).length;
     return {
       // A missing core price is unknown, not a zero-dollar wedding. Keep the
       // arithmetic working internally for gap detection, but do not expose a
       // total until a stated base amount exists.
+      // A whole-package figure tied to a different guest count cannot be
+      // scaled safely. Preserve it as the original quote and require a fresh
+      // vendor confirmation rather than presenting it as a scenario total.
       estimatedTotal: baseKnown && !packageGuestMismatch ? subtotal : null,
       lines,
       unknowns: unique(unknowns),
@@ -151,6 +225,14 @@
       statedFields,
       totalFields: 11,
       baseKnown,
+      deposit: item.depositAmount != null
+        ? { amount: item.depositAmount, basis: "quoted amount", due: item.depositDue || null }
+        : item.depositPct != null && baseKnown
+          ? { amount: subtotal * item.depositPct / 100, basis: `${item.depositPct}% of scenario total`, due: item.depositDue || null }
+          : null,
+      scenarioChanged: scenarioChanged || packageGuestMismatch,
+      confirmationReasons: unique(confirmationReasons),
+      viability: confirmationReasons.some((reason) => /unavailable|exceeds/i.test(reason)) ? "does_not_meet" : confirmationReasons.length ? "confirmation_needed" : "viable_on_stated_terms",
     };
   }
 
@@ -162,6 +244,10 @@
       [/overtime|hours/i, "How many event hours are included, and what is the overtime rate and curfew?"],
       [/beverage|drink/i, "What drinks service is included, for how many hours, and what costs extra?"],
       [/payment/i, "What deposit and payment schedule applies, including final payment and cancellation terms?"],
+      [/deposit/i, "What deposit is required, when is it due, and is it part of rather than additional to the quoted total?"],
+      [/cancellation|reschedule/i, "What cancellation and reschedule terms apply, including any non-refundable amounts?"],
+      [/staff/i, "Is staffing included for our guest count and event duration, and what could cost extra?"],
+      [/availability/i, "Can you confirm our date and that these rates still apply to it?"],
     ];
     const output = [];
     for (const missing of result.unknowns) {
@@ -186,5 +272,26 @@
     return changes;
   }
 
-  global.OmnyVenueQuoteEngine = { blankProposal, calculate, questions, compareFields, finite, fieldLabels };
+  function decisionSupport(items, results, budget) {
+    const complete = items.filter((item) => results[item.prefix]?.estimatedTotal != null);
+    const viable = complete.filter((item) => results[item.prefix]?.viability !== "does_not_meet");
+    const difference = viable.length > 1 ? Math.abs(results[viable[0].prefix].estimatedTotal - results[viable[1].prefix].estimatedTotal) : null;
+    const lower = viable.length > 1
+      ? viable.reduce((best, item) => results[item.prefix].estimatedTotal < results[best.prefix].estimatedTotal ? item : best)
+      : viable[0] || null;
+    const unknowns = unique(items.flatMap((item) => results[item.prefix]?.unknowns || []));
+    const materialUnknown = unknowns.find((value) => /staff/i.test(value)) || unknowns.find((value) => /availability|GST|minimum|service|beverage|deposit|cancellation/i.test(value)) || unknowns[0] || null;
+    const tradeOff = lower && difference != null
+      ? `${lower.label} is ${difference.toLocaleString("en-AU", { style: "currency", currency: "AUD" })} lower on this scenario's stated and reviewed figures.`
+      : lower && complete.length > viable.length
+        ? `${lower.label} is the only priced option that currently meets the common date, capacity and guest-count basis.`
+        : lower ? `${lower.label} is the only option with enough stated pricing for this scenario.`
+          : complete.length ? "The priced options do not currently meet the common comparison basis." : "Neither proposal has enough stated pricing for a cost comparison.";
+    const recommendation = lower
+      ? `${lower.label} is the current cost-led preference, conditional on equivalent scope${materialUnknown ? ` and confirmation of ${materialUnknown}` : ""}.`
+      : "Keep the choice open until each proposal has a comparable core price.";
+    return { lowerPrefix: lower?.prefix || null, difference, tradeOff, recommendation, materialUnknown, budget: finite(budget) };
+  }
+
+  global.OmnyVenueQuoteEngine = { blankProposal, calculate, questions, compareFields, decisionSupport, finite, fieldLabels };
 })(window);

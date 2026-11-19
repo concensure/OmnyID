@@ -1,18 +1,22 @@
 import { For, Match, Show, Switch, createEffect, createMemo, createSignal, onMount } from "solid-js";
 import { WeddingNormalizedQuoteSummary } from "@/components/WeddingNormalizedQuoteSummary";
+import { WeddingQuoteScenarioComparison } from "@/components/WeddingQuoteScenarioComparison";
 import type { SendAfpMessageInput } from "@/lib/api";
 import type { WeddingArtifactQuotePreview } from "@/lib/weddingArtifactPreviewState";
-import type { WeddingResponseWorkspaceViewState } from "@/lib/weddingResponseWorkspaceViewState";
+import type { WeddingResponseWorkspaceViewState, WeddingWorkspaceArtifactPreview } from "@/lib/weddingResponseWorkspaceViewState";
 import {
   weddingQuoteMessageCandidates,
   weddingQuoteMessageClassificationInput,
 } from "@/lib/weddingQuoteIntakeState";
+import { weddingQuoteScenarioChoiceToAfpSendInput } from "@/lib/weddingQuoteScenarioChoiceState";
 import {
   buildWeddingBudgetEvidenceHubState,
   type WeddingBudgetEvidenceDocument,
   type WeddingBudgetEvidenceMoneyRow,
   type WeddingBudgetEvidenceTabId,
 } from "@/lib/weddingBudgetEvidenceHubState";
+
+type QuoteArtifact = WeddingWorkspaceArtifactPreview & { preview: WeddingArtifactQuotePreview };
 
 function EmptyTab(props: { label: string; detail: string }) {
   return (
@@ -96,7 +100,7 @@ export function WeddingBudgetEvidenceHub(props: {
   let tabScroller: HTMLDivElement | undefined;
   let intakeDialog: HTMLElement | undefined;
   const state = createMemo(() => buildWeddingBudgetEvidenceHubState(props.state));
-  const quoteArtifacts = createMemo(() => props.state.artifactPreviews.filter((artifact) => artifact.preview?.kind === "quote"));
+  const quoteArtifacts = createMemo(() => props.state.artifactPreviews.filter((artifact): artifact is QuoteArtifact => artifact.preview?.kind === "quote"));
   const activeQuote = createMemo(() => quoteArtifacts().find((artifact) => artifact.artifactId === activeQuoteId()) ?? null);
   const comparisonQuotes = createMemo(() => quoteArtifacts().filter((artifact) => selectedQuoteIds().includes(artifact.artifactId)).slice(0, 4));
   const messageCandidates = createMemo(() => weddingQuoteMessageCandidates(props.state.afpMessages));
@@ -231,7 +235,20 @@ export function WeddingBudgetEvidenceHub(props: {
               <div class="mt-4"><Show when={activeQuote()} fallback={<div class="rounded-xl border border-dashed border-wedding-border p-6 text-center text-sm text-wedding-ink/65">Choose Reading mode beside a quote in the list.</div>}>{(artifact) => <div><div class="mb-3 flex flex-wrap items-center justify-between gap-2"><h4 class="font-semibold text-wedding-ink">{artifact().title}</h4><button type="button" class="min-h-10 rounded-lg border border-wedding-primary px-3 text-sm font-semibold text-wedding-primary" onClick={() => props.onOpenArtifact?.(artifact().artifactId)}>Open original in Documents</button></div><WeddingNormalizedQuoteSummary quote={artifact().preview as WeddingArtifactQuotePreview} onOpenSource={() => props.onOpenArtifact?.(artifact().artifactId)} /></div>}</Show></div>
             </Show>
             <Show when={mode() === "compare"}>
-              <div class="mt-4"><Show when={comparisonQuotes().length > 0} fallback={<div class="rounded-xl border border-dashed border-wedding-border p-6 text-center text-sm text-wedding-ink/65">Select up to four quote documents from All quotes.</div>}><div class="grid gap-3 lg:grid-cols-2"><For each={comparisonQuotes()}>{(artifact) => <WeddingNormalizedQuoteSummary quote={artifact.preview as WeddingArtifactQuotePreview} compact onOpenSource={() => props.onOpenArtifact?.(artifact.artifactId)} />}</For></div></Show></div>
+              <div class="mt-4"><Show when={comparisonQuotes().length > 0} fallback={<div class="rounded-xl border border-dashed border-wedding-border p-6 text-center text-sm text-wedding-ink/65">Select up to four quote documents from All quotes.</div>}>
+                <WeddingQuoteScenarioComparison
+                  artifacts={comparisonQuotes()}
+                  defaultWeddingBudget={props.state.budgetTracking.budgetTargetAmount}
+                  onOpenArtifact={props.onOpenArtifact}
+                  onSaveChoice={props.saveProjection ? async (choice) => {
+                    await props.saveProjection!(weddingQuoteScenarioChoiceToAfpSendInput({
+                      metadata: props.state.workspace.metadata,
+                      ...choice,
+                    }));
+                    props.onRefreshWorkspace?.();
+                  } : undefined}
+                />
+              </Show></div>
             </Show>
           </section>
         </div>

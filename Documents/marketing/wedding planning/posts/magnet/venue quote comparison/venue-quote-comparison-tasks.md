@@ -1,6 +1,6 @@
-# Venue Quote Comparison v2 — dependency-ordered tasks
+# Venue Quote Comparison v3 — dependency-ordered tasks
 
-Status: completed and released under WED-350 on 10 November 2026
+Status: v2 released under WED-350/WED-377; v3 implementation complete under WED-383, release evidence pending
 
 | ID | Task | Depends on | Acceptance |
 |---|---|---|---|
@@ -20,8 +20,34 @@ Status: completed and released under WED-350 on 10 November 2026
 
 ## Deliberately deferred
 
-- PDF/DOCX extraction remains the existing broader document-ingestion work;
-  the public tool reads TXT/Markdown locally and accepts pasted text.
+- PDF/DOCX extraction remains the existing authenticated document-ingestion
+  path; the public tool reads TXT/Markdown/EML locally and accepts pasted text.
 - Public-tool results are not persisted as AFP records. Import into an account
   remains an explicit later action through the canonical quote authority.
 - The model does not decide which venue to book and does not perform arithmetic.
+
+## WED-383 incremental tasks
+
+| ID | Task | Depends on | Acceptance |
+|---|---|---|---|
+| QV3-01 | Inventory and reuse the public decoder, authenticated Quotes hub, canonical quotation normal form and AFP decision authority. | QV2-13 | No parallel quote store, parser, calculator or decision ledger is introduced; Quote received remains a vendor status, not the comparison destination. |
+| QV3-02 | Extend the normal form for deposits, cancellation/expiry, date eligibility, capacity and item status/minimum eligibility. | QV3-01 | Deposit remains outside total; unknowns stay unknown; every correction retains source evidence. |
+| QV3-03 | Add immutable original-versus-scenario line-item state. | QV3-02 | Optional rows can be toggled or quantified; mandatory and bundled rows explain why they cannot be deducted; the source quote is unchanged. |
+| QV3-04 | Correct deterministic minimum-spend allocation. | QV3-03 | Only eligible spend meets the floor; A$5,200 less a A$400 eligible upgrade becomes A$4,800 plus A$200 shortfall = A$5,000. |
+| QV3-05 | Add viability and vendor-confirmation checks. | QV3-02 | Date, capacity, guest minimum/maximum, duration and changed-rate conditions are checked before viable language is shown. |
+| QV3-06 | Recalculate both scenarios, difference and remaining wedding budget live. | QV3-03, QV3-04 | Guest/date/duration/add-on edits update without navigation or reload and identify each material change. |
+| QV3-07 | Add trade-off, conditional recommendation and most-material-unknown summary. | QV3-05, QV3-06 | 30/40 guest crossover is explained; staffing unknown remains in totals and recommendation. |
+| QV3-08 | Add prefer, confirm and keep-open actions through the existing AFP decision authority. | QV3-07 | Authenticated choice is wedding-scoped and source-linked; public choice is explicitly device-only. |
+| QV3-09 | Complete source intake across canonical PDF, email/message, text and manual paths. | QV3-01 | Existing authenticated ingestion is reused; the public page accepts email/plain text and provides an honest PDF fallback where browser extraction is unavailable. |
+| QV3-10 | Verify public and authenticated experiences. | QV3-02..QV3-09 | Deterministic unit/property tests, browser scenario checks, quote-route tests, typecheck/build and exact-SHA evidence pass. |
+
+### Delivery order
+
+1. Public deterministic scenario engine and no-login comparison page:
+   QV3-02 through QV3-07 and the public portion of QV3-09.
+2. Authenticated Quotes-hub persistence and decision projection: QV3-08 and
+   the authenticated portion of QV3-09.
+3. Cross-surface and release verification: QV3-10.
+
+The first slice must remain useful if funded extraction is unavailable: manual
+terms, line items, minimum-spend scenarios and comparison continue locally.
