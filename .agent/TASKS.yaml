@@ -22,6 +22,7 @@ tasks:
     branch: agent/codex/WED-383
     worktree: C:/temp/wt/omnyid-wed383
     base_sha: 150f14038f3326760350e35b050a1a3fd439e86d
+    candidate_sha: 89fd5dcc5c579a70bf5e58eda1d05f2e5a1c1bbc
     depends_on: [WED-350, WED-377, WED-382]
     files: [Documents/marketing/wedding planning/posts/magnet/venue quote comparison/**, wedding/compare-wedding-venue-quotes.html, wedding/assets/js/quote-decoder*.js, wedding/assets/css/**, wedding/tests/**, solid-ui/src/components/WeddingQuoteScenarioComparison.tsx, solid-ui/src/lib/wedding*Quote*.ts, solid-ui/tests/**quote**, src/quotation/**, src/server/wedding_quote_decoder_routes.rs, src/server/wedding_quote_decoder_routes/**, .agent/**]
     acceptance: [One dedicated account quote section stays distinct from per-vendor Quote received status, public and authenticated surfaces reuse the canonical quote engine, PDFs emails pasted text and manual entry retain original source evidence and explicit corrections, equivalent-scope scenarios enforce date capacity guest limits minimum spends deposits GST fees and unknowns without double counting, optional item quantities update both totals difference and remaining budget live while preserving originals and labelling scenario estimates, bundled mandatory and out-of-term changes explain why vendor confirmation is needed, side-by-side trade-offs update the decision authority with one material missing fact and allow prefer choose or keep-open actions, minimum-spend flip and A$5200-minus-A$400 floor cases pass deterministic tests]

@@ -4,7 +4,8 @@ Worktree `C:/temp/wt/omnyid-wed383`, branch `agent/codex/WED-383`, based on
 `150f14038f3326760350e35b050a1a3fd439e86d`. That base is a clean descendant
 of the user-named Runbooks commit
 `f4f738faffcc90dd2e615b6a020c3fad81e51188`; no older wedding worktree was
-used.
+used. Frozen implementation commit:
+`89fd5dcc5c579a70bf5e58eda1d05f2e5a1c1bbc`.
 
 The public venue-quote page and authenticated Wedding Quotes hub now compare
 one common date, guest count, duration and budget. Original quotes stay
@@ -27,6 +28,8 @@ typecheck, public Wedding checks and 2318 Wedding tests; `npm run build`
 passed; the 390px Playwright quote-decoder smoke passed with one explicit
 extraction request, cached replay, PDF-share request and no focus regression;
 `git diff --check`, focused scenario tests and direct rustfmt checks passed.
+The frontend suite, production build and browser smoke were repeated from the
+clean frozen implementation commit above.
 Windows rustc repeatedly terminated with `0xc0000005` without a Rust
 diagnostic, including a single-job non-incremental retry while compiling
 third-party `tungstenite`. Docker Desktop was unavailable, so a Linux Rust
