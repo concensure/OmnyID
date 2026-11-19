@@ -15,8 +15,18 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-377
+    title: Correct sample quote fallback extraction and guest-count comparison warnings
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-376
+    worktree: C:/temp/wt/omnyid-wed376
+    depends_on: [WED-376]
+    files: [src/server/wedding_quote_decoder_routes.rs, src/server/wedding_quote_decoder_routes/**, wedding/assets/js/quote-decoder-engine.js, wedding/tests/quote-decoder-engine.test.mjs, .agent/**]
+    acceptance: [Explicit standalone proposal totals and GST wording are preserved, supplemental per-person hourly charges cannot become core package prices, changed guest counts retain quoted totals with clear caveats, both existing fictional quote samples and adversarial cases pass, clean exact-SHA build and staged Oracle release evidence]
+    progress: "Discovered using user-requested existing samples in hosted staging. The pre-existing deterministic fallback mistakes the Bluegum extra beverage-hour rate for package rate and misses standalone TOTAL/GST-inclusive wording. No paid model calls or outreach needed to reproduce. Keep WED-376 frozen release evidence separate."
   - id: WED-376
-    candidate_sha: 611c1b66de7144cb52963488dcb83c416504a1a7
+    candidate_sha: 1e79ec2c2397929680e1bd662e6f7123c22ba9d9
     verification_worktree: C:/temp/wt/omnyid-wed376-verify
     title: Repair OAuth login and vendor availability, directory and public agent entrypoints
     status: in_progress

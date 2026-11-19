@@ -1,3 +1,40 @@
+## WED-376 Oracle release in progress; WED-377 sample quote finding - 2026-11-19
+
+Implementation: C:/temp/wt/omnyid-wed376, agent/codex/WED-376.
+Frozen release source: 1e79ec2c2397929680e1bd662e6f7123c22ba9d9.
+Clean verification: C:/temp/wt/omnyid-wed376-verify.
+Local logs C:/temp/wt/wed376-1e79ec2c-*: 2312 Wedding tests, site suite,
+line budget, typecheck, frontend build, browser checks, 12 Rust contract/API tests.
+Native ARM release and isolated staging at /home/ubuntu/omnyid-candidates/wed376-1e79ec2c.
+Runtime manifest and staging-workflow-evidence.json there record full source/image hashes.
+Staging workflow generated 1953 links over 20 pages; category filter, independent links,
+14-day renewal, CSRF, date updates, non-celebrant restriction and revocation exercised.
+Phone-bearing workbook staging import is idempotent. Production dry run: 1927 rows,
+12 exact-ID matches, 1915 creations, no non-ID matches. Review flagged potential name-only
+collisions in general; production wrapper rejects all non-ID mappings before insertion.
+Existing five test accounts authenticated. New private synthetic intake scenarios saved
+through /send; all owner reads succeed and all tested cross-owner reads return 404.
+Evidence C:/temp/wt/wed376-account-scenario-results.json; no credentials committed.
+
+Production scanner was already OOM/unhealthy. Raised only ClamAV to 3 GiB and persisted
+OMNYID_CLAMAV_MEM_LIMIT=3g in private .env.oracle. Healthcheck, clean stream and EICAR
+stream scans passed. Previous config/limits at wed376-412c0753/rollback.
+Final release rollback snapshots at wed376-1e79ec2c/rollback include 707275478-byte
+validated pg_dump, Caddy, runtime compose snapshots, workspace/public archives.
+Previous image sha256:94f267dc1cccc2445e84f9391d3164d2ef1b1e47654a5c31e32d9aad1c17b039,
+retained tag omnyid-homeserver:wed376-rollback-5536b83b.
+Caddy candidate validates; only three policy lines change. Static drift differences
+were CRLF only; normalized content matches the integrated SEO baseline.
+Deployment was started; inspect production-release-evidence.json and running image
+before claiming completion. Caddy must be recreated. User already authorized deployment.
+
+WED-377: two existing fictional quotes exposed an older fallback extraction defect.
+HTTP 200 alone is not quote correctness: extra beverage-hour $14 was misclassified as
+base per-person price and explicit TOTAL/GST wording was missed. Fix separately and
+retest samples plus changed guest counts; never declare quote evaluation passed yet.
+Five WED-375 hosted/model/provider rollout gates remain separately tracked.
+Google real-account selection remains unproven; candidate fixes demonstrated GIS CSP.
+
 ## WED-376 candidate verification in progress - 2026-11-19
 
 Implementation: C:/temp/wt/omnyid-wed376, agent/codex/WED-376.
