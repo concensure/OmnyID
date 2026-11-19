@@ -22,7 +22,7 @@ tasks:
     branch: agent/codex/WED-376
     worktree: C:/temp/wt/omnyid-wed376
     depends_on: [WED-376]
-    files: [src/server/wedding_quote_decoder_routes.rs, src/server/wedding_quote_decoder_routes/**, wedding/assets/js/quote-decoder-engine.js, wedding/assets/js/wedding-agent.js, wedding/tests/**, .agent/**]
+    files: [src/server/wedding_quote_decoder_routes.rs, src/server/wedding_quote_decoder_routes/**, wedding/assets/js/quote-decoder-engine.js, wedding/assets/js/wedding-agent.js, wedding/**/*.html, wedding/tests/**, src/server/wedding_vendor_directory_page.rs, .agent/**]
     acceptance: [Explicit standalone proposal totals and GST wording are preserved, supplemental per-person hourly charges cannot become core package prices, changed guest counts retain quoted totals with clear caveats, both existing fictional quote samples and adversarial cases pass, clean exact-SHA build and staged Oracle release evidence]
     progress: "Discovered using user-requested existing samples in hosted staging. The pre-existing deterministic fallback mistakes the Bluegum extra beverage-hour rate for package rate and misses standalone TOTAL/GST-inclusive wording. No paid model calls or outreach needed to reproduce. Keep WED-376 frozen release evidence separate."
   - id: WED-376
