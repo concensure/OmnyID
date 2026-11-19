@@ -26,6 +26,10 @@ restart after cancellation fail. The foreign account has no instances or traces.
 No transform, emit, model or provider adapter is invoked. No invented result
 hashes stand in for executor output.
 
+The database uses tmpfs and is stopped at completion. Its ephemeral encryption
+keys are not retained. Only machine evidence and diagnostics survive; this is
+not a retained, decryptable fixture database.
+
 JSON output records source SHA, definition pack hash, synthetic account IDs,
 expected/observed counts, duration and limitations. The runner must attach binary
 hash, network inspection, container command, exit status and pre/post production
