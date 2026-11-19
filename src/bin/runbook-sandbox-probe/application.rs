@@ -98,6 +98,14 @@ pub async fn run(db: &Db, url: &str, key: &[u8; 32], token: &str) {
     .unwrap();
     assert_eq!(decision.status(), 200);
     assert!(
+        !send(execute.clone(), stale_auth, json!({}))
+            .await
+            .unwrap()
+            .status()
+            .is_success()
+    );
+    assert_eq!(effects("application_http"), 0);
+    assert!(
         !send(
             execute.clone(),
             auth.clone(),
