@@ -1,5 +1,5 @@
 version: 1
-updated: 2026-11-18
+updated: 2026-11-19
 
 lifecycle:
   allowed_statuses:
@@ -46,15 +46,15 @@ tasks:
     branch: agent/codex/WED-375
     worktree: C:/temp/wt/omnyid-runbooks
     base_sha: 5536b83b2f9d2f58488a075f383c24f8f4f73d6c
-    candidate_sha: 85467be438cfbf4f681057589de70f50306df7e1
+    candidate_sha: 77c58b5c215f4e19b706922f5be121176991f681
     diagnostic_baseline_sha: d8ebd36dbe2e53d1a83dcd7bbb9a85f9fa97e6af
     verification_worktree: C:/temp/wt/omnyid-runbooks-verify-43d7c830
     depends_on: [WED-308, WED-374]
     files: [src/server/tests/workflow_trigger_tests.rs, solid-ui/tests/wedding-lead-magnet-import-state.test.ts, solid-ui/tests/wedding-run-sheet-context-cards.test.ts, src/db/tenant_names.rs, src/server/alias_validation.rs, src/inference.rs, src/inference/**, src/server/llm_resolution.rs, src/mcp_client.rs, src/mcp_client/**, src/tool_dispatch.rs, src/tool_dispatch/runbook*.rs, src/tool_dispatch/runbook_provider/**, src/runbook*.rs, src/runbook_runtime/**, src/runbook_schedule/**, src/proactive_provenance.rs, src/lib.rs, src/db.rs, src/server/runbook_routes.rs, src/server/runbook_routes/**, src/server/types.rs, src/server/mod.rs, src/server/proactive_routes.rs, src/daemon_runtime.rs, solid-ui/src/components/Runbook*.tsx, solid-ui/src/components/AgentFleetView.tsx, solid-ui/src/components/DecisionQueueView.tsx, solid-ui/src/components/renderers/A2UIRenderer.tsx, solid-ui/src/lib/runbook*.ts, solid-ui/tests/runbook*, solid-ui/tests/e2e/runbook*, solid-ui/e2e/runbook*, solid-ui/playwright.runbooks.config.ts, tests/runbook*, Documents/design/runbooks/**, .agent/**]
     acceptance: [Strict bounded contracts and terminal-safe transitions, immutable starter definitions and owner-scoped AFP projection, deterministic typed matching with stable dedupe and owner-bound keys, focused adversarial tests and clean-commit Rust build, execution remains disconnected until ledger transactions and authority integration are complete]
-    current_batch: "Close remaining lifecycle gaps including wait-phase traces: repeated-failure cooldown for dispatch/start, audit trace/provenance and idempotence coverage, then address model and vendor-quote integration and extract unchanged helpers to restore line budgets before release gates. External sandbox/staging details requested while local work proceeds."
-    next_batch: "Validate provider/account compatibility in a reviewed sandbox and compose the credential factory only behind explicit execution policy. Add evidence-to-argument mapping, usage accounting and provider-evidence reconciliation for unknown outcomes. Explicit abandonment is available internally; no retry or rollout is enabled."
-    progress: "101 complete / 16 remaining of 117, unchanged: two integration subtasks completed for SecretBackend credential derivation and explicit abandoned-attempt closure. Frozen source f30d31a365bc9a68b00d4fde16412a3df77abb95 passes 112 tests in 22 binaries and standalone Rust library build. Unknown receipts persist atomically and late returns cannot advance abandoned runs. See handoff for build evidence, compiler workaround and existing line-budget/remote limitations. Provider-evidence reconciliation and rollout remain open; no deployment or execution entrypoint."
+    current_batch: "Verify frozen 77c58b5c215f4e19b706922f5be121176991f681: cooldown, atomic wait-phase traces, bounded owner inference, quote-review regression and line-budget fixes. Prior candidate checks exposed a wrong-path Unix fixture; the corrected candidate is being verified."
+    next_batch: "Resolve shared-model compatibility and funding policy; finish canonical quote-event normalization and Documents/response integration without duplicate normalization or booking authority. Then complete hosted shadow, deterministic allowlist, model evaluation and provider-sandbox gates before final release evidence. Sandbox/staging and shared-model choices are pending user input."
+    progress: "109 complete / 8 remaining of 117. Eight lifecycle, policy, provenance and rollout-criteria parents closed. Frozen source 77c58b5c215f4e19b706922f5be121176991f681 is being verified after the Unix fixture correction; prior source 85467be4 has 116 integration and seven new unit results and a standalone build. Final status is in the handoff. No execution entrypoint or rollout is enabled; shared-model and canonical quote integration remain open."
   - id: WED-374
     title: Restore Wedding Sprout rollout, complete projected databases, persona artwork, exports and planner-card affordances
     status: in_progress
