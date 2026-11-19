@@ -46,7 +46,7 @@ tasks:
     branch: agent/codex/WED-375
     worktree: C:/temp/wt/omnyid-runbooks
     base_sha: 5536b83b2f9d2f58488a075f383c24f8f4f73d6c
-    candidate_sha: 933259049470ba0629b3ef65616467c73f7096a6
+    candidate_sha: 85467be438cfbf4f681057589de70f50306df7e1
     diagnostic_baseline_sha: d8ebd36dbe2e53d1a83dcd7bbb9a85f9fa97e6af
     verification_worktree: C:/temp/wt/omnyid-runbooks-verify-43d7c830
     depends_on: [WED-308, WED-374]
