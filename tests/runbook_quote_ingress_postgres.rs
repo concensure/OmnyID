@@ -221,7 +221,12 @@ async fn canonical_http_replay_private_evidence_and_missing_date_preserve_bookin
         )
         .await
         .unwrap();
-    assert_eq!(read.packet.missing_required_fields, vec!["wedding_date"]);
+    assert!(
+        read.packet
+            .included
+            .iter()
+            .any(|item| item.reference == format!("private_message:{quote_id}"))
+    );
     assert_eq!(
         runtime
             .execute_transform(&owner.id, id, "assess", 3)
@@ -240,6 +245,7 @@ async fn canonical_http_replay_private_evidence_and_missing_date_preserve_bookin
         .await
         .unwrap()
         .unwrap();
+    assert_eq!(question.missing_fields, vec!["wedding_date"]);
     runtime
         .supply_input(
             &owner.id,
