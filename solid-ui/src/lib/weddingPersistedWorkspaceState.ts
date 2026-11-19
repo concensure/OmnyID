@@ -845,11 +845,12 @@ export function buildWeddingPersistedWorkspaceState(input: {
   });
   const scopedMessages = (input.messages ?? []).filter((message) => workspaceIdFrom(message) === metadata.responseWorkspaceId);
   const parsedAttachmentEvidence = parsedAttachmentEvidenceFromMessages(input.messages ?? [], metadata.responseWorkspaceId);
+  const canonicalQuotes = weddingCanonicalQuoteArtifacts(input.messages ?? [], metadata);
   const artifacts = coalescePersistedArtifactInputs([...scopedMessages.flatMap((message) => {
     const artifact = messageToArtifactInput(message, metadata)
       ?? messageToVendorQuoteThreadArtifactInput(message, metadata, parsedAttachmentEvidence);
     return artifact ? [artifact] : [];
-  }), ...weddingCanonicalQuoteArtifacts(input.messages ?? [], metadata)]);
+  }), ...canonicalQuotes]);
   const contextItems = scopedMessages.flatMap((message) => {
     const item = messageToNeedToKnowContext(message, metadata);
     return item ? [{ item, timestamp: Date.parse(message.timestamp) || 0 }] : [];
@@ -924,7 +925,7 @@ export function buildWeddingPersistedWorkspaceState(input: {
     inspirationItems,
     scheduleItems,
     taskItems: updatedTaskItems,
-    sourceMessageIds: scopedMessages.map((message) => message.id),
+    sourceMessageIds: [...new Set([...scopedMessages.map((message) => message.id), ...canonicalQuotes.map((artifact) => artifact.id!)])],
     hasPersistedData: artifacts.length > 0
       || contextItems.length > 0
       || approvalReceipts.length > 0

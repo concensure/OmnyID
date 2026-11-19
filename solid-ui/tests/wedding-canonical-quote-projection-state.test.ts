@@ -39,8 +39,19 @@ test("workspace replay consumes the existing normalized record without a new AFP
   const state = buildWeddingPersistedWorkspaceState({ messages: fixture(), ...metadata });
   assert.equal(state.artifacts.length, 1);
   assert.equal(state.artifacts[0].id, "normalized:one");
+  assert.ok(state.sourceMessageIds.includes("normalized:one"));
   assert.deepEqual(state.approvalReceipts, []);
   assert.deepEqual(state.decisionRecords, []);
+});
+
+test("encrypted content and metadata-only quotation claims are never displayed", () => {
+  const encrypted = fixture();
+  encrypted[1].encryption = { ciphertext: "locked" } as any;
+  assert.deepEqual(weddingCanonicalQuoteArtifacts(encrypted, metadata), []);
+  const metadataOnly = fixture();
+  metadataOnly[1].metadata = { quotation: quote(metadataOnly) };
+  metadataOnly[1].content = {};
+  assert.deepEqual(weddingCanonicalQuoteArtifacts(metadataOnly, metadata), []);
 });
 
 test("missing, foreign, ambiguous and cross-thread source evidence fails closed", () => {

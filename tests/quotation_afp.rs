@@ -20,6 +20,27 @@ fn quote_v2() -> NormalisedQuotation {
     quotation
 }
 
+#[test]
+fn wedding_normalisations_are_discoverable_without_assigning_plan_or_approval() {
+    for wedding in [false, true] {
+        let mut quotation = quote_v1();
+        if wedding {
+            quotation.identity.context_namespace = "wedding_planner".into();
+        }
+        let message = normalised_quotation_message(
+            &quotation, "thread-1", None, "2026-11-19T00:00:00Z", "owner",
+        );
+        for tag in ["template:wedding_planning", "event:wedding"] {
+            assert_eq!(message.supertags.iter().any(|value| value == tag), wedding);
+        }
+        assert_eq!(message.content["quotation"], serde_json::to_value(&quotation).unwrap());
+        let metadata = message.metadata.unwrap();
+        assert!(metadata.get("wedding_plan_id").is_none());
+        assert!(metadata.get("approval_state").is_none());
+        assert_eq!(metadata["privacy_scope"], "tenant_private");
+    }
+}
+
 fn scenario() -> ComparableScenario {
     ComparableScenario {
         scenario_id: "production-scenario".to_string(),

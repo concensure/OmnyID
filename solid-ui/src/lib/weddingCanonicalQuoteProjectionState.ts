@@ -33,7 +33,7 @@ export function weddingCanonicalQuoteArtifacts(
   for (const message of messages) byId.set(message.id, [...(byId.get(message.id) ?? []), message]);
   const artifacts: WeddingArtifactInput[] = [];
   for (const message of messages) {
-    if (message.protocol !== "afp-v1" || message.type !== "ledger"
+    if (message.type !== "ledger"
       || !kinds.has(message.kind ?? "") || message.subtype !== message.kind
       || !identifier(message.id) || byId.get(message.id)?.length !== 1) continue;
     const quote = record(decryptedDisplayContent(message).quotation);

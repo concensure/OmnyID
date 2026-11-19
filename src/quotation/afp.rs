@@ -137,6 +137,14 @@ pub fn normalised_quotation_message(
         format!("context:{}", quotation.identity.context_namespace),
         format!("currency:{}", quotation.currency.to_ascii_lowercase()),
     ]);
+    // Discovery only. Consumers still prove plan membership from the visible
+    // source messages; these tags grant no workspace or execution authority.
+    if quotation.identity.context_namespace == "wedding_planner" {
+        message.supertags.extend([
+            "template:wedding_planning".to_string(),
+            "event:wedding".to_string(),
+        ]);
+    }
     message.content = json!({
         "quotation": quotation,
         "source_policy": "immutable_refs_with_bounded_evidence_excerpts",
