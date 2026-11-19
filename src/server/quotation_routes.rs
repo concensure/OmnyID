@@ -199,6 +199,13 @@ async fn store_normalisation_http(
     )
     .await
     .map_err(|_| store_error())?;
+    if request.quotation.identity.context_namespace == "wedding_planner"
+        && !matches!(tokio::time::timeout(std::time::Duration::from_secs(5),
+            crate::runbook_hooks::bridge_normalised_quote(&state.db, &user.id, &id)).await, Ok(Ok(()))) {
+        // Persistence succeeded. Replay of this same canonical request retries
+        // the reference-only projection without normalizing or saving twice.
+        tracing::warn!("Runbook canonical quotation matching deferred; source remains in private ledger");
+    }
     Ok(Json(StoredResponse {
         message_ids: vec![id],
     }))

@@ -176,7 +176,14 @@ impl RunbookStore<'_> {
                 &header["metadata"],
             );
             let encrypted = header["encrypted"] == true;
-            if encrypted && relevance.score < RELEVANCE_DECRYPT_THRESHOLD {
+            // An exact private reference to the reviewed canonical quotation
+            // contract is useful evidence without pretending it is urgent.
+            // This is eligibility only: all byte/decrypt/account limits remain.
+            let canonical_quote = private && header["type"] == "ledger"
+                && matches!(header["subtype"].as_str(), Some("quotation_normalisation_confirmed" | "quotation_normalisation_corrected"))
+                && header["metadata"]["schema_version"] == "quotation.normalised.v1"
+                && header["metadata"]["privacy_scope"] == "tenant_private";
+            if encrypted && relevance.score < RELEVANCE_DECRYPT_THRESHOLD && !canonical_quote {
                 omit(&mut packet, "metadata_relevance");
                 continue;
             }

@@ -4,6 +4,8 @@ use crate::{
     db::Db, runbook_contract::Result, runbook_runtime::RunbookRuntime, runbook_store::RunbookStore,
 };
 use std::collections::BTreeSet;
+mod quote;
+pub use quote::bridge_normalised_quote;
 
 #[derive(Default)]
 pub struct HookPolicy {
