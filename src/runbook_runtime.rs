@@ -41,11 +41,35 @@ pub struct InstanceRecord {
 
 pub struct RunbookRuntime<'a, 'db> {
     pub(crate) store: &'a RunbookStore<'db>,
+    cohort_deadline: Option<DateTime<Utc>>,
 }
 
 impl<'a, 'db> RunbookRuntime<'a, 'db> {
     pub fn new(store: &'a RunbookStore<'db>) -> Self {
-        Self { store }
+        Self {
+            store,
+            cohort_deadline: None,
+        }
+    }
+
+    pub(crate) fn for_cohort(&self, deadline: DateTime<Utc>) -> Self {
+        Self {
+            store: self.store,
+            cohort_deadline: Some(deadline),
+        }
+    }
+
+    /// Recheck after pool/owner-lock waits, before a cohort executor can write.
+    /// An already admitted transaction may finish; no subsequent transaction is admitted.
+    pub(crate) async fn begin(&self, owner: &str) -> Result<Transaction<'_, Postgres>> {
+        let tx = self.store.begin(owner).await?;
+        if self
+            .cohort_deadline
+            .is_some_and(|deadline| Utc::now() >= deadline)
+        {
+            return Err("cohort_policy_denied");
+        }
+        Ok(tx)
     }
 
     /// Resolve the ID from the existing owner-partitioned event ledger, never
@@ -55,7 +79,7 @@ impl<'a, 'db> RunbookRuntime<'a, 'db> {
         if !identifier(event_id) {
             return Err("invalid_event_id");
         }
-        let mut tx = self.store.begin(owner).await?;
+        let mut tx = self.begin(owner).await?;
         let source: Option<Value> = sqlx::query_scalar("SELECT payload FROM afp_messages WHERE owner_user_id=$1 AND id=$2 AND octet_length(payload::text)<=65536 FOR SHARE")
             .bind(owner).bind(event_id).fetch_optional(&mut *tx).await.map_err(|_| "storage_unavailable")?;
         let source = source.ok_or("event_not_found_or_too_large")?;
@@ -82,7 +106,8 @@ impl<'a, 'db> RunbookRuntime<'a, 'db> {
         let registry = self.store.load(owner, &mut tx).await?;
         let decisions = match_event(owner, &registry, &event, &HashSet::new())?;
         let feedback = self.outcome_feedback_in(owner, &mut tx).await?;
-        let mut decisions = crate::runbook_outcome::apply_feedback(decisions, &registry, &feedback)?;
+        let mut decisions =
+            crate::runbook_outcome::apply_feedback(decisions, &registry, &feedback)?;
         let cooling = self.failure_cooldowns_in(owner, &mut tx).await?;
         for decision in &mut decisions {
             if decision.disposition == MatchDisposition::Matched
@@ -142,7 +167,7 @@ impl<'a, 'db> RunbookRuntime<'a, 'db> {
     }
 
     pub async fn instance(&self, owner: &str, id: &str) -> Result<InstanceRecord> {
-        let mut tx = self.store.begin(owner).await?;
+        let mut tx = self.begin(owner).await?;
         let record = self.load_instance(owner, id, &mut tx).await?;
         tx.commit().await.map_err(|_| "storage_unavailable")?;
         Ok(record)
@@ -154,15 +179,18 @@ impl<'a, 'db> RunbookRuntime<'a, 'db> {
         id: &str,
         expected_revision: u32,
     ) -> Result<InstanceRecord> {
-        let mut tx = self.store.begin(owner).await?;
+        let mut tx = self.begin(owner).await?;
         let current = self.load_instance(owner, id, &mut tx).await?;
         // No generic "resume" here: approval and epistemic waits require their
         // dedicated future authority adapters, not an arbitrary state transition.
         if current.instance.status != InstanceState::Matched {
             return Err("instance_not_matched");
         }
-        if self.failure_cooldowns_in(owner, &mut tx).await?
-            .contains(&current.instance.runbook_id) {
+        if self
+            .failure_cooldowns_in(owner, &mut tx)
+            .await?
+            .contains(&current.instance.runbook_id)
+        {
             return Err("runbook_failure_cooldown");
         }
         self.require_enabled(owner, &current.instance, &mut tx)
@@ -189,7 +217,7 @@ impl<'a, 'db> RunbookRuntime<'a, 'db> {
         expected_revision: u32,
         result: &LocalStepResult,
     ) -> Result<StepTrace> {
-        let mut tx = self.store.begin(owner).await?;
+        let mut tx = self.begin(owner).await?;
         let trace = self
             .record_local_step_in(owner, id, expected_revision, result, None, false, &mut tx)
             .await?;
@@ -341,7 +369,7 @@ impl<'a, 'db> RunbookRuntime<'a, 'db> {
         expected_revision: u32,
         timeout: bool,
     ) -> Result<InstanceRecord> {
-        let mut tx = self.store.begin(owner).await?;
+        let mut tx = self.begin(owner).await?;
         let current = self.load_instance(owner, id, &mut tx).await?;
         let reason = if timeout { "timed_out" } else { "cancelled" };
         let receipt_id = digest(&json!([

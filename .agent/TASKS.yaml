@@ -15,6 +15,17 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-379
+    title: Add an expiring internal deterministic Runbook execution cohort
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-379
+    worktree: C:/temp/wt/omnyid-wed379
+    base_sha: 8d7579d4
+    depends_on: [WED-378]
+    files: [src/runbook_deterministic.rs, src/runbook_hooks.rs, src/runbook_runtime.rs, src/runbook_read.rs, src/runbook_transform_runtime.rs, src/runbook_emit.rs, src/runbook_complete.rs, src/lib.rs, src/bin/runbook-deterministic-probe.rs, Documents/verification/WED-379*, Documents/design/runbooks/**, .agent/**]
+    acceptance: [Default-off expiring owner and definition-version allowlist, only complete read-transform-private-review-complete definitions admitted before start, bounded real application-hook execution and content-free counters, hosted isolated replay policy stale cross-owner and terminal checks, clean frozen native build with no production flag changes]
+    progress: "Registered continuation. Implement the actual persisted-event adapter path; keep model/provider authority unavailable and production unchanged until evidence is reviewed."
   - id: WED-378
     candidate_sha: f6d1fdd642f0ef6b8e025accc24cb5da324a8247
     verification_worktree: C:/temp/wt/omnyid-wed378-verify

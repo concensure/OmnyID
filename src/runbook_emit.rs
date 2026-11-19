@@ -10,7 +10,7 @@ use crate::{
 };
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
@@ -151,7 +151,7 @@ impl RunbookRuntime<'_, '_> {
         if !identifier(step_id) {
             return Err("invalid_step_id");
         }
-        let mut tx = self.store.begin(owner).await?;
+        let mut tx = self.begin(owner).await?;
         let current = self.load_instance(owner, id, &mut tx).await?;
         let receipt_id = digest(&json!(["runbook_emission.v1", owner, id, step_id]));
         let request_hash = digest(&json!([

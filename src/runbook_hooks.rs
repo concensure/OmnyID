@@ -1,5 +1,6 @@
 //! Opt-in adapters for existing persisted-event and shared maintenance paths.
-//! Hooks never start steps, invoke models, or execute tools. No payloads are logged.
+//! Matching stays default-off. A separately expiring internal cohort may execute
+//! deterministic private reviews; no model or tool executor is composed here.
 use crate::{
     db::Db, runbook_contract::Result, runbook_runtime::RunbookRuntime, runbook_store::RunbookStore,
 };
@@ -101,7 +102,22 @@ pub async fn persisted_event(db: &Db, owner: &str, id: &str, kind: &str) {
     let result = tokio::time::timeout(std::time::Duration::from_secs(5), async {
         let (encryption, signing) = keys()?;
         let store = RunbookStore::new(db, encryption, signing);
-        RunbookRuntime::new(&store).dispatch(owner, id).await?;
+        let runtime = RunbookRuntime::new(&store);
+        let receipt = runtime.dispatch(owner, id).await?;
+        let cohort = crate::runbook_deterministic::DeterministicPolicy::from_env();
+        if cohort.owner_allowed(owner, chrono::Utc::now()) {
+            let counts = runtime
+                .run_deterministic_cohort(owner, &receipt, &cohort)
+                .await;
+            tracing::info!(
+                completed = counts.completed,
+                policy_denied = counts.policy_denied,
+                terminal_or_waiting = counts.terminal_or_waiting,
+                concurrent_or_stale = counts.concurrent_or_stale,
+                errors = counts.errors,
+                "Runbook deterministic cohort pass"
+            );
+        }
         Ok::<_, &'static str>(())
     })
     .await;

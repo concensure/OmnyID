@@ -83,7 +83,7 @@ impl RunbookRuntime<'_, '_> {
         if !identifier(id) || !identifier(&request.step_id) {
             return Err("invalid_read_request");
         }
-        let mut tx = self.store.begin(owner).await?;
+        let mut tx = self.begin(owner).await?;
         let current = self.load_instance(owner, id, &mut tx).await?;
         let receipt_id = digest(&json!(["runbook_evidence.v1", owner, id, request.step_id]));
         let request_hash = digest(&json!([

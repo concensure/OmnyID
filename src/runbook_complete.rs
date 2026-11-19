@@ -17,7 +17,7 @@ impl RunbookRuntime<'_, '_> {
         id: &str,
         expected_revision: u32,
     ) -> Result<StepTrace> {
-        let mut tx = self.store.begin(owner).await?;
+        let mut tx = self.begin(owner).await?;
         let current = self.load_instance(owner, id, &mut tx).await?;
         let definition = self.definition(owner, &current.instance, &mut tx).await?;
         let step = definition
