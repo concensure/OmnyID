@@ -805,3 +805,23 @@ transport without external provider traffic. See canonical handoff for standalon
 build evidence and limitations. Credential-service wiring, real provider/account
 compatibility, normalized projections, usage and unknown-outcome reconciliation
 remain open. No route, worker or rollout flag enables this adapter.
+
+
+## Secret-service factory and abandoned-attempt closure - 2026-11-19
+
+Two integration subtasks implemented: the MCP adapter can derive its credential
+key through the existing trusted SecretBackend; an explicitly abandoned reserved
+attempt can persist an Unknown receipt, trace and provenance atomically. The
+latter never resends a request or claims an external action did not happen.
+First saved receipt wins across normal completion and abandonment; late success
+cannot advance an abandoned run, and cancellation remains terminal.
+
+The parent checklist stays **101 complete / 16 remaining of 117**. Provider
+compatibility/rollout, provider-evidence reconciliation, usage accounting and
+model routing remain separate work. See the canonical handoff for exact source
+and verification results; these two internal entrypoints do not enable execution
+from an application route or worker.
+
+Frozen candidate `f30d31a365bc9a68b00d4fde16412a3df77abb95` passes 112 tests
+in 22 integration binaries, including five new secret-service/recovery tests.
+See handoff for the standalone build and the compiler-stack workaround.

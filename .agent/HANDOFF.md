@@ -1,3 +1,78 @@
+## 2026-11-19: WED-375 secret-service factory and abandoned tool closure
+
+Implementation: `C:/temp/wt/omnyid-runbooks`, `agent/codex/WED-375`.
+Frozen source: `f30d31a365bc9a68b00d4fde16412a3df77abb95`.
+Verification: `C:/temp/wt/omnyid-runbooks-verify-43d7c830`, clean detached at
+that source SHA. Documentation follow-ups do not change the source candidate.
+Two integration subtasks implemented; parent count **101 complete / 16 remaining
+of 117**, unchanged. WED-375 remains in progress.
+
+McpRunbookProvider::from_secret_backend reuses SecretBackend and the existing
+MCP HKDF domain/version. Only reported absence of the primary encryption root
+permits signing-root compatibility. Malformed/zero/missing roots and backend
+errors fail closed with sanitized errors and a ten-second lookup deadline.
+Legacy storage and backend resolution behavior are unchanged; callers must
+supply the application's trusted backend and reviewed targets. This factory
+is not yet composed into an execution route or worker.
+
+RunbookRuntime::abandon_tool_attempt requires an owner-bound proposal, durable
+reservation and current revision. It atomically records an Unknown receipt,
+trace, provenance and Failed state for a still-current running attempt. Cancelled
+instances remain cancelled. Completion and abandonment now share the owner-
+serialized result writer: first receipt wins, late provider output cannot
+advance an abandoned run, and replay returns the existing receipt. A failed
+transaction leaves the reservation intact. No resend, automatic timeout cleanup,
+public endpoint, external cancellation or provider reconciliation is claimed.
+
+Files: src/runbook_tool_execution.rs; src/tool_dispatch/runbook_provider.rs and
+new runbook_provider/credentials.rs; tests/runbook_tool_provider_postgres.rs;
+tests/runbook_tool_runtime_postgres.rs and new child recovery.rs; canonical
+coordination and runbook contract/checklist notes. Corrected the previous test
+header to say loopback providers are invoked. No dependencies, migrations,
+frontend, sitemap or production configuration changes. Other agent's primary
+checkout remains untouched (extensive frontend/static changes, no src/tests diff).
+
+Verification at the frozen source:
+- 112 tests passed in 22 integration binaries, exit 0; compilation 8m 52s.
+- Five new tests cover secret-service derivation/failure handling and recovery:
+  missing reservation, cross-owner rejection, stale revision, transactional
+  rollback, concurrent/replayed abandonment, late success, completed receipt
+  preservation and cancellation remaining terminal.
+- Standalone library build passed, exit 0, 1m 03s. Evidence:
+  C:/temp/wt/runbook-f30d31a3-linux-build.log/.exit.
+- git diff --check passes; frontend unchanged, so no frontend rebuild this pass.
+Initial 256 MiB RUST_MIN_STACK compilation crashed with SIGSEGV and rustc's
+suggestion to use 512 MiB. Stopped that container after the crash (exit 137);
+retained its log and retried the exact source with RUST_MIN_STACK=536870912 and
+core dumps disabled. No test failure was reported by the crashed compiler. The 512 MiB retry
+compiled the library but caught a test-only Result alias conflict (exit 101).
+Commit f30d31a3 qualifies the SecretBackend fixture result types; verification
+was restarted from that new frozen source.
+Superseded evidence: C:/temp/wt/runbook-4e36fd13- linux-tests.log/.exit and
+linux-tests-stack512.log/.exit. Final candidate evidence uses
+C:/temp/wt/runbook-f30d31a3- linux-tests.log/.exit and line-budget.log/.exit.
+Linux Rust 1.94.1, builder omnyid-wed318-builder-test:a42db33, image
+sha256:21fe7471679891c3a083d0c167ee660873a8be66223ad205dd05405164c1f0fa;
+read-only source bind, shared cargo caches, -j1, CARGO_INCREMENTAL=0,
+test/dev debug=0, root codegen-units=64. Root/SHA/status printed before checks.
+Line budget reports only existing server/mod.rs 45734/45717 and db.rs
+18045/17986 failures; Wedding budget passes.
+
+GitHub runs still show failures at unrelated 509dc31b and 69fbc2b2; actual remote
+concensure/OmnyID has zero deployment records. An initial deployments query to
+an incorrect repository returned 404 and was corrected. No candidate CI evidence;
+remote lineage remains unsuitable for push/PR. No push or PR was created.
+No real provider calls, deployment or production health assertion. Tests use
+dummy secrets, in-memory SecretBackend and disposable PostgreSQL/loopback fixtures.
+Dedicated test PostgreSQL is stopped; ephemeral build containers auto-remove.
+
+Next: provider sandbox/account compatibility and trusted application composition;
+evidence-to-argument mapping and usage accounting. Unknown receipts now support
+explicit local closure, but provider-evidence reconciliation remains separate.
+Do not expose abandonment without authenticated owner/revision checks and clear
+notice that the external action may still occur. Do not reinterpret Unknown as
+NotSent or permission to retry. Remaining model/rollout/release gates stay open.
+
 ## 2026-11-19: WED-375 credential-bound direct MCP adapter
 
 Implementation: `C:/temp/wt/omnyid-runbooks`, branch `agent/codex/WED-375`.

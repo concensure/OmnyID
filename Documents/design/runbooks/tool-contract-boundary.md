@@ -224,7 +224,39 @@ for local tests. Target selection must remain operator-controlled. Existing
 redirect, retry, proxy, deadline, size, correlation and schema safeguards apply.
 
 This is not hosted provider compatibility or a claim that every possible provider
-is safe. Real provider/account semantics, KEK service integration, destination
+is safe. Real provider/account semantics, service composition, destination
 review/updates, usage accounting and rollout evidence remain required. The adapter
 does not change the legacy dispatcher, instantiate itself, send real traffic in
 verification or grant authority independently of the runtime reservation.
+
+
+## Secret service factory and explicit abandonment
+
+`McpRunbookProvider::from_secret_backend` consumes the application's trusted
+`SecretBackend`, using the same MCP HKDF domain/version as connection storage.
+A missing encryption root may use the existing signing-root compatibility path.
+A backend error or present malformed encryption root never falls through to the
+signing root. Missing, zero, non-hex or non-32-byte roots fail closed; backend
+messages are sanitized and lookup has a ten-second deadline. Backend selection
+and reviewed targets remain trusted composition inputs. No runtime, definition,
+model or request reads root keys. Existing EnvSecretBackend's own file/environment
+resolution behavior is unchanged; the factory relies on its reported absence or
+failure. No application execution route/worker is enabled by this factory.
+
+`abandon_tool_attempt` is an explicit trusted owner operation, bound to the
+proposal and current instance revision. It requires a durable reservation and
+records Unknown, never NotSent or success. It cannot establish whether the
+external action happened, cancel a request already admitted, or authorize a retry.
+This is conservative local closure, not provider-evidence reconciliation. There
+is no HTTP/worker entrypoint or automatic expiration policy for this operation.
+
+Abandonment and provider completion share the same owner-serialized transaction
+for result, trace, provenance and instance updates. The first saved receipt wins.
+A late provider response returns that receipt without overwriting it or advancing
+the instance; its output is not persisted as a second result. A current running
+attempt becomes Failed; an already cancelled instance remains cancelled. Replays
+return the immutable receipt even if the caller's revision is now stale. Before
+any result exists, a stale revision is rejected. Failed persistence rolls back the
+entire result/trace/provenance transition, leaving the reservation intact. A
+future reconciliation feature must append separate authenticated provider evidence
+rather than rewrite this receipt or silently reissue the tool call.

@@ -1,3 +1,18 @@
+## 2026-11-19: WED-375 secret-service composition and abandoned tool closure
+
+Reuse SecretBackend for MCP key loading with the existing HKDF domain/version.
+Only an absent primary root permits signing-root compatibility; reported backend
+errors, malformed/zero keys and missing roots fail closed, with sanitized errors
+and a bounded lookup. Leave backend implementations and legacy credential storage
+unchanged. No secret reading moves into the runbook runtime or model boundary.
+
+Explicit owner/revision-bound abandonment writes Unknown, not a claim that an
+external action was prevented or failed. Share atomic result/trace/provenance
+persistence with normal completion, serialized by the existing owner transaction.
+First saved receipt wins, including late provider returns after abandonment.
+No retries, automatic abandonment, public entrypoint or production activation.
+Real provider reconciliation requires separate authenticated evidence later.
+
 ## 2026-11-19: WED-375 MCP adapter binds credential ciphertext and destinations
 
 Use request hash v3 with a SHA-256 fingerprint of the encrypted credential in
