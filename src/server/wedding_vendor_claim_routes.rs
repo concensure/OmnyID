@@ -218,9 +218,15 @@ async fn public_directory_http(
         ) next_window ON TRUE
         LEFT JOIN wedding_vendor_agent_links link ON link.vendor_id = v.vendor_id
         WHERE v.status = 'active'
-          AND ($1::TEXT IS NULL OR lower(v.vendor_name) LIKE '%' || lower($1) || '%'
-               OR lower(v.category) LIKE '%' || lower($1) || '%'
-               OR lower(v.service_area) LIKE '%' || lower($1) || '%')
+          AND ($1::TEXT IS NULL OR strpos(lower(v.vendor_name),lower($1))>0
+               OR strpos(lower(v.category),lower($1))>0
+               OR strpos(lower(v.service_area),lower($1))>0)
+          AND ($1::TEXT IS NOT NULL OR lower(trim(v.category))<>'celebrant'
+               OR v.claim_status IN ('claimed','verified')
+               OR lower(concat_ws(' ',p.published_description,array_to_string(p.styles,' '),
+                    v.evidence #>> '{celebrant_profile,editorial_summary}',
+                    v.evidence #>> '{celebrant_profile,strengths}',
+                    v.evidence #>> '{celebrant_profile,ceremony_types}')) ~ '(elop|micro[ -]?wedding)')
           AND ($2::TEXT IS NULL OR lower(v.category) = lower($2))
           AND ($3::TEXT IS NULL OR lower(v.service_area) LIKE '%' || lower($3) || '%')
         ORDER BY
@@ -241,7 +247,11 @@ async fn public_directory_http(
         .into_iter()
         .map(public_vendor_from_row)
         .collect::<Vec<_>>();
-    Ok(Json(json!({ "items": items, "next_cursor": Value::Null })))
+    let categories = sqlx::query_scalar::<_,String>("SELECT DISTINCT lower(trim(category)) FROM wedding_vendors WHERE status='active' ORDER BY 1")
+        .fetch_all(&state.db.pool).await.map_err(database_failure)?;
+    Ok(Json(
+        json!({ "items": items, "categories":categories, "next_cursor": Value::Null }),
+    ))
 }
 
 async fn vendor_claim_suggestions_http(

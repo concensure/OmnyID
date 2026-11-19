@@ -1,0 +1,25 @@
+(function () {
+  'use strict';
+  if (document.getElementById('weddingAgentButton')) return;
+  var style = document.createElement('link');
+  style.rel = 'stylesheet'; style.href = '/wedding/assets/css/wedding-agent.css';
+  document.head.appendChild(style);
+  var button = document.createElement('button');
+  button.id = 'weddingAgentButton'; button.type = 'button'; button.className = 'wedding-agent-button';
+  button.setAttribute('aria-label', 'Open Wedding Sprout, your planning assistant');
+  button.setAttribute('aria-haspopup', 'dialog');
+  var icon = document.createElement('img'); icon.src = '/wedding/assets/images/wedding-agent.svg'; icon.alt = ''; icon.width = 30; icon.height = 30;
+  var label = document.createElement('span'); label.textContent = 'Ask Sprout'; button.append(icon, label);
+  var dialog = document.createElement('dialog'); dialog.className = 'wedding-agent-dialog';
+  dialog.setAttribute('aria-labelledby', 'weddingAgentTitle');
+  var title = document.createElement('h2'); title.id = 'weddingAgentTitle'; title.textContent = 'Wedding Sprout';
+  var description = document.createElement('p'); description.textContent = 'Your wedding planning assistant lives in your private workspace. Sign in to plan your wedding, or explore the guide first.';
+  var signin = document.createElement('a'); signin.className = 'btn btn-primary'; signin.href = '/docs/?auth=signin&source=wedding'; signin.textContent = 'Open my wedding workspace';
+  var guide = document.createElement('a'); guide.href = '/wedding/user-guide.html'; guide.textContent = 'Explore the planning guide';
+  var close = document.createElement('button'); close.type = 'button'; close.textContent = 'Close'; close.className = 'wedding-agent-close';
+  close.addEventListener('click', function () { dialog.close(); });
+  dialog.addEventListener('close', function () { button.focus(); });
+  dialog.append(title, description, signin, guide, close);
+  button.addEventListener('click', function () { dialog.showModal(); });
+  document.body.append(button, dialog);
+})();

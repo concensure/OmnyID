@@ -9,6 +9,11 @@
   var initialCategory = new URLSearchParams(window.location.search).get('category') || '';
   var selectedCategory = initialCategory;
   var categories = [];
+  var requestVersion = 0;
+  var searchTimer;
+  function categoryNames(values) {
+    return Array.from(new Set(values.map(function (value) { return String(value || '').trim().toLowerCase(); }).filter(Boolean))).sort();
+  }
   var initialQuery = new URLSearchParams(window.location.search).get('q') || '';
   if (initialQuery) input.value = initialQuery;
 
@@ -69,16 +74,19 @@
     });
   }
   function load(query) {
+    var version = ++requestVersion;
     status.textContent = 'Loading vendors…';
     var url = '/api/public/wedding/vendors?limit=500'; if (query) url += '&q=' + encodeURIComponent(query); if (selectedCategory) url += '&category=' + encodeURIComponent(selectedCategory);
     fetch(url, { headers: { Accept: 'application/json' } }).then(function (response) {
       if (!response.ok) throw new Error('Unable to load the vendor directory right now.'); return response.json();
     }).then(function (payload) {
+      if (version !== requestVersion) return;
       var items = Array.isArray(payload.items) ? payload.items : [];
-      if (!categories.length && !selectedCategory && !query) { categories = Array.from(new Set(items.map(function (vendor) { return vendor.category; }).filter(Boolean))).sort(); renderFilters(); }
+      if (!categories.length && !selectedCategory && !query) { categories = categoryNames(payload.categories || items.map(function (vendor) { return vendor.category; })); renderFilters(); }
       render(items); status.textContent = items.length ? items.length + ' vendor' + (items.length === 1 ? '' : 's') + ' found.' : 'No vendors found.';
-    }).catch(function (error) { clearGrid(); status.textContent = error.message || 'Unable to load the vendor directory.'; });
+    }).catch(function (error) { if (version !== requestVersion) return; clearGrid(); status.textContent = error.message || 'Unable to load the vendor directory.'; });
   }
+  input.addEventListener('input', function () { clearTimeout(searchTimer); ++requestVersion; searchTimer = setTimeout(function () { load((input.value || '').trim()); }, 180); });
   form.addEventListener('submit', function (event) { event.preventDefault(); load((input.value || '').trim()); });
-  fetch('/api/public/wedding/vendors?limit=500', { headers: { Accept: 'application/json' } }).then(function (response) { return response.ok ? response.json() : { items: [] }; }).then(function (payload) { categories = Array.from(new Set((Array.isArray(payload.items) ? payload.items : []).map(function (vendor) { return vendor.category; }).filter(Boolean))).sort(); if (selectedCategory && !categories.some(function (category) { return category.toLowerCase() === selectedCategory.toLowerCase(); })) selectedCategory = ''; else if (selectedCategory) selectedCategory = categories.find(function (category) { return category.toLowerCase() === selectedCategory.toLowerCase(); }) || selectedCategory; renderFilters(); load(initialQuery); }).catch(function () { categories = selectedCategory ? [selectedCategory] : []; renderFilters(); load(initialQuery); });
+  fetch('/api/public/wedding/vendors?limit=500', { headers: { Accept: 'application/json' } }).then(function (response) { return response.ok ? response.json() : { items: [] }; }).then(function (payload) { categories = categoryNames(payload.categories || (Array.isArray(payload.items) ? payload.items : []).map(function (vendor) { return vendor.category; })); if (selectedCategory && !categories.some(function (category) { return category.toLowerCase() === selectedCategory.toLowerCase(); })) selectedCategory = ''; else if (selectedCategory) selectedCategory = categories.find(function (category) { return category.toLowerCase() === selectedCategory.toLowerCase(); }) || selectedCategory; renderFilters(); if (requestVersion === 0) load(initialQuery); }).catch(function () { categories = selectedCategory ? [selectedCategory] : []; renderFilters(); if (requestVersion === 0) load(initialQuery); });
 })();

@@ -889,4 +889,9 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Account-linked celebrant consultation approval, calendar projection and delivery receipts",
         include_str!("../../postgres/migrations/0174_wedding_celebrant_consultation_approval.sql"),
     ),
+    (
+        "0175_vendor_calendar_independent_links",
+        "Independently expiring vendor calendar grants without rotation on creation",
+        include_str!("../../postgres/migrations/0175_vendor_calendar_independent_links.sql"),
+    ),
 ];

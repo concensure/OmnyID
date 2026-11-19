@@ -12,6 +12,8 @@ use omnyid_homeserver::db::{AuthSessionRecord, Db, UserRecord};
 use serde_json::{Value, json};
 use tower::ServiceExt;
 use ulid::Ulid;
+#[path = "wedding_celebrant_management_api/extended.rs"]
+mod extended;
 
 fn test_db_url() -> Option<String> {
     std::env::var("TEST_DATABASE_URL")
@@ -133,6 +135,13 @@ async fn concurrent_batches_create_one_once_only_link_and_preserve_it() {
         .expect("plaintext audit");
     assert_eq!(persisted_plaintext, 0);
 
+    let original = left.1["created"]
+        .as_array()
+        .unwrap()
+        .first()
+        .or_else(|| right.1["created"].as_array().unwrap().first())
+        .unwrap();
+    extended::verify(&app, &db, &operator_auth, &vendor_id, original, &suffix).await;
     let (opt_out_status, opt_out) = post(
         &app,
         &operator_auth,
@@ -147,7 +156,7 @@ async fn concurrent_batches_create_one_once_only_link_and_preserve_it() {
     )
     .await;
     assert_eq!(opt_out_status, StatusCode::OK, "opt out: {opt_out}");
-    assert_eq!(opt_out["revoked_links"], 1);
+    assert_eq!(opt_out["revoked_links"], 2);
     let (blocked_status, blocked) = post(&app, &operator_auth, batch_uri, body).await;
     assert_eq!(blocked_status, StatusCode::OK, "blocked batch: {blocked}");
     assert_eq!(blocked["created"].as_array().unwrap().len(), 0);

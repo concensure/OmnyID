@@ -17,7 +17,10 @@ fn migration_seeds_reviewed_profiles_and_scoped_capability_storage() {
 
 #[test]
 fn management_link_is_vendor_scoped_revocable_and_content_light() {
-    let routes = include_str!("../src/server/wedding_celebrant_management_link_routes.rs");
+    let routes = concat!(
+        include_str!("../src/server/wedding_celebrant_management_link_routes.rs"),
+        include_str!("../src/server/wedding_celebrant_management_link_routes/admin.rs")
+    );
 
     assert!(routes.contains("celebrant-calendar-v1\\0"));
     assert!(routes.contains("HttpOnly; Secure; SameSite=Strict"));
@@ -61,7 +64,10 @@ fn public_and_admin_surfaces_support_the_scoped_flow() {
 
 #[test]
 fn bulk_link_preparation_reuses_the_scoped_grant_and_preserves_active_links() {
-    let routes = include_str!("../src/server/wedding_celebrant_management_link_routes.rs");
+    let routes = concat!(
+        include_str!("../src/server/wedding_celebrant_management_link_routes.rs"),
+        include_str!("../src/server/wedding_celebrant_management_link_routes/admin.rs")
+    );
 
     assert!(routes.contains("/admin/wedding/celebrant-management/links/batch"));
     assert!(routes.contains("normalize_batch_vendor_ids"));
@@ -101,7 +107,10 @@ fn onboarding_operations_keep_consent_outreach_and_capabilities_separate() {
     let migration =
         include_str!("../postgres/migrations/0169_wedding_celebrant_onboarding_operations.sql");
     let operations = include_str!("../src/server/wedding_celebrant_management_ops_routes.rs");
-    let links = include_str!("../src/server/wedding_celebrant_management_link_routes.rs");
+    let links = concat!(
+        include_str!("../src/server/wedding_celebrant_management_link_routes.rs"),
+        include_str!("../src/server/wedding_celebrant_management_link_routes/admin.rs")
+    );
     let admin = include_str!("../solid-ui/src/components/UsageAdminWeddingCelebrantsPanel.tsx");
     let manager = include_str!("../solid-ui/src/components/vendor/CelebrantManagementFlow.tsx");
 
@@ -114,7 +123,7 @@ fn onboarding_operations_keep_consent_outreach_and_capabilities_separate() {
     assert!(!operations.contains("message_body"));
     assert!(links.contains("celebrant_funnel"));
     assert!(links.contains("wedding_date_availability"));
-    assert!(links.contains("ARRAY['consultation_availability','wedding_date_availability']"));
+    assert!(links.contains("vec![\"consultation_availability\", \"wedding_date_availability\"]"));
     assert!(links.contains("ensure_wedding_date_offer"));
     assert!(links.contains("authenticated_body(request).await?"));
     assert!(admin.contains("Open official register"));
