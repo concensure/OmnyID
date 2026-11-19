@@ -2,7 +2,7 @@
 //! Requires a dedicated empty database and an external network-isolation boundary.
 use chrono::Utc;
 use omnyid_homeserver::{
-    db::{Db, UserRecord, tenant_schema_name},
+    db::{Db, UserRecord},
     runbook_contract::InstanceState,
     runbook_event::normalize_stored_event,
     runbook_matcher::{MatchDecision, MatchDisposition, match_event},
@@ -25,7 +25,8 @@ fn counts(decisions: &[MatchDecision]) -> Value {
         "event_cap":count(MatchDisposition::EventCap)})
 }
 async fn count(db: &Db, owner: &str, kind: &str) -> i64 {
-    let schema = tenant_schema_name(owner).unwrap();
+    assert!(owner.len() == 26 && owner.bytes().all(|c| c.is_ascii_alphanumeric()));
+    let schema = format!("user_{}", owner.to_lowercase());
     sqlx::query_scalar(&format!(
         "SELECT count(*) FROM \"{schema}\".messages WHERE type=$1"
     ))
