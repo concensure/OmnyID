@@ -51,7 +51,8 @@ fn public_and_admin_surfaces_support_the_scoped_flow() {
     let directory = include_str!("../wedding/assets/js/directory.js");
 
     assert!(portal.contains("celebrant_management"));
-    assert!(manager.contains("Manage wedding dates and consultation times"));
+    assert!(manager.contains("Manage your availability"));
+    assert!(manager.contains("consultation_availability"));
     assert!(manager.contains("date_slot_upsert"));
     assert!(manager.contains("cannot open couple details, messages, phone numbers"));
     assert!(admin.contains("Generate link + QR"));
@@ -82,7 +83,10 @@ fn call_actions_and_operator_funnel_use_durable_evidence() {
     let directory = include_str!("../src/server/wedding_vendor_directory_page.rs");
     let calls =
         include_str!("../solid-ui/src/components/vendor/VendorCelebrantConsultationsPanel.tsx");
-    let admin = include_str!("../src/server/wedding_celebrant_management_link_routes.rs");
+    let admin = concat!(
+        include_str!("../src/server/wedding_celebrant_management_link_routes.rs"),
+        include_str!("../src/server/wedding_celebrant_management_link_routes/admin.rs")
+    );
     let migration =
         include_str!("../postgres/migrations/0160_wedding_vendor_funnel_metric_indexes.sql");
 
