@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sqlx::{Postgres, Transaction};
 use std::collections::BTreeMap;
+mod trace;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -167,7 +168,7 @@ impl RunbookRuntime<'_, '_> {
             source_refs: refs,
         };
         let result = self
-            .append_schedule(owner, &current.message_id, s, &mut tx)
+            .append_schedule(owner, &current.instance, &current.message_id, s, &mut tx)
             .await?;
         self.append_instance(owner, Some(&current.message_id), next, &mut tx)
             .await?;
@@ -226,7 +227,7 @@ impl RunbookRuntime<'_, '_> {
         s.due_at = due_at;
         s.expires_at = expires_at;
         let result = self
-            .append_schedule(owner, parent_schedule_ref, s, &mut tx)
+            .append_schedule(owner, &current.instance, parent_schedule_ref, s, &mut tx)
             .await?;
         let mut next = current.instance.clone();
         next.revision += 1;
@@ -328,7 +329,7 @@ impl RunbookRuntime<'_, '_> {
             ScheduleStatus::Delivered
         };
         let result = self
-            .append_schedule(owner, schedule_ref, s.clone(), &mut tx)
+            .append_schedule(owner, &current.instance, schedule_ref, s.clone(), &mut tx)
             .await?;
         let mut next = current.instance.transition(
             current.instance.revision,
@@ -445,6 +446,7 @@ impl RunbookRuntime<'_, '_> {
     async fn append_schedule(
         &self,
         owner: &str,
+        instance: &RunbookInstance,
         parent: &str,
         s: FollowUpSchedule,
         tx: &mut Transaction<'_, Postgres>,
@@ -463,6 +465,8 @@ impl RunbookRuntime<'_, '_> {
                 ),
                 tx,
             )
+            .await?;
+        self.trace_schedule(owner, instance, parent, &message_id, &s, tx)
             .await?;
         Ok(ScheduleRecord {
             message_id,
@@ -548,7 +552,8 @@ impl RunbookRuntime<'_, '_> {
             } else {
                 ScheduleStatus::Cancelled
             };
-            self.append_schedule(owner, &r.message_id, s, tx).await?;
+            self.append_schedule(owner, &current.instance, &r.message_id, s, tx)
+                .await?;
         }
         Ok(())
     }

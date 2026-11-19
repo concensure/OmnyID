@@ -1,4 +1,6 @@
 //! Actual private-ledger transactions; no external providers or live daemon.
+#[path = "runbook_controls_postgres/schedule_trace.rs"]
+mod schedule_trace;
 use chrono::{Duration, Utc};
 use omnyid_homeserver::{
     db::{Db, UserRecord},
@@ -503,6 +505,7 @@ async fn follow_up_due_reschedule_cancel_delivery_retry_and_erasure() {
     );
     let count:i64=sqlx::query_scalar(&format!("SELECT count(*) FROM {table} WHERE type='runbook_schedule' AND (content <> '{{}}'::jsonb OR encryption IS NULL)")).fetch_one(&db.pool).await.unwrap();
     assert_eq!(count, 0);
+    schedule_trace::assert_schedule_traces(&db, &owner, 7).await;
     db.delete_user_account_and_data(&owner, &format!("control-{owner}@omnyid.test"), &[])
         .await
         .unwrap();
