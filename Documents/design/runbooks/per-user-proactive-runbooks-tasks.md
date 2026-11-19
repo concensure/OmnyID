@@ -5,7 +5,19 @@ Implementation task: WED-375
 Order: dependency order
 Rule: reuse the proactive/Watcher/Synthesizer/policy/approval stack; do not create a parallel event, authority, memory, or UI system.
 
-## Canonical quotation display continuation — 2026-11-19
+## Current status — 2026-11-19
+
+**111 complete / 6 remaining of 117.** Canonical quote ingress and shared
+inference are complete. Frozen source: `61fcdf0bb5c2f2f87e36c1203e8fedf454661d29`.
+Pinned Linux Rust 1.94.0 passed 385 selected unit regressions. Integration and
+optimized release verification are incomplete after Docker/WSL became
+unresponsive; broad WSL recovery confirmation is pending. No additional parent
+is closed. Partial proof: C:/temp/wt/runbook-61fcdf0b-pinned-unit-evidence.json.
+The hosted shadow, deterministic allowlist, model evaluation, provider-sandbox
+and final deployment gates remain separate. See `.agent/HANDOFF.md` and
+`.agent/TASKS.yaml` for current evidence and missing environment inputs.
+
+## Historical canonical quotation display continuation — 2026-11-19
 
 Checklist remains **109 complete / 8 remaining of 117**. Candidate
 `96cab816b9bfb5d4a39514c28683fcedb82c28c5` adds source-bound canonical quotation

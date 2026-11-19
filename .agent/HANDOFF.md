@@ -1,3 +1,61 @@
+## 2026-11-19: WED-375 pinned compiler verification; local Docker recovery pending
+
+Implementation: `C:/temp/wt/omnyid-runbooks`, `agent/codex/WED-375`.
+Frozen source remains `61fcdf0bb5c2f2f87e36c1203e8fedf454661d29`.
+Verification checkout: `C:/temp/wt/omnyid-runbooks-verify-43d7c830`, clean at that
+SHA. No application source, deployment configuration or production service changed.
+Checklist remains **111 complete / 6 remaining of 117**.
+
+Built isolated local image omnyid-wed375-builder:rust1.94.0 from the existing
+omnyid-wed318-builder-test:a42db33 builder. Installed compiler reports
+rustc 1.94.0 (4a4ef493e 2026-03-02), matching rust-toolchain.toml.
+All 385 selected distinct unit regressions completed with exit zero on this
+compiler: eight Runbook tests plus workflow, proactive, Watcher, Synthesizer,
+autonomy, approvals, tenant, inference-resolution, migration and quote coverage.
+Machine-collected partial proof: C:/temp/wt/runbook-61fcdf0b-pinned-unit-evidence.json.
+It hashes all eleven completed check logs and the compiler installation log.
+The earlier full Rust 1.94.1/UI proof remains separate and is not relabelled.
+
+An optimized release build and pinned integration run did NOT record successful
+completion. Docker/WSL became unresponsive during compilation near the VM's
+memory limit. Docker API calls, including a stop of only the owned integration
+container, returned HTTP 500. A read-only WSL command failed with 0x8007274c.
+The Docker Desktop restart attempt failed after its 120-second timeout, reporting
+that Desktop/backend/WSL processes remained running. This is a LOCAL runtime
+incident, not a production deployment/outage. Other local container state cannot
+currently be verified. Do not describe the database or builds as stopped.
+
+Owned containers whose state must be checked on recovery:
+- omnyid-runbooks-61fcdf0b-rust1940-tests
+- omnyid-runbooks-61fcdf0b-rust1940-release-build
+- omnyid-runbook-wed375-pg
+
+The release container was briefly paused to serialize compilation, then explicitly
+unpaused when the Cargo lock showed it was ahead of integrations. No worktrees,
+volumes, images or caches were deleted. Container/database state remains unknown; build success must not be inferred
+from client exit or silence.
+Incomplete logs were snapshotted and hashed in the partial evidence manifest.
+Both verification Docker clients subsequently exited 125; these exits are
+recorded in the partial manifest and are not successful compiler/test results.
+
+User confirmation was requested before shutting down ALL WSL and restarting
+Docker, since that broader recovery also interrupts the separate Ubuntu distro
+and potentially another agent's work. No confirmation has arrived. Do not infer
+it from elapsed time. On recovery, first stop/inspect the owned old jobs, then
+run verification sequentially with resource containment. External runners now
+use --memory 2800m --memory-swap 3g --cpus 1. The release retry also uses package
+codegen-units=64 while retaining release optimization; record that build setting.
+Runners: C:/temp/wt/verify-runbook-pinned.ps1, verify-runbook-pinned-regressions.ps1,
+and verify-runbook-release.ps1. Never reuse incomplete results as pass evidence.
+
+The checklist now leads with its current count rather than the historical 109/8
+summary. No parent closed this pass. Accessible concensure repositories showed
+only the public OmnyID core repository, and its deployment-environment list was
+empty. Hosted target/test accounts, model evaluation/provider sandbox and the
+intended private review/CI target remain unresolved. No push, PR or deployment.
+Next: obtain WSL recovery confirmation, recover local tooling, rerun the pinned
+integration and bounded release build, then address the five hosted/release gates.
+
 ## 2026-11-19: WED-375 canonical quote ingress and shared inference closure
 
 Implementation: `C:/temp/wt/omnyid-runbooks`, `agent/codex/WED-375`.
