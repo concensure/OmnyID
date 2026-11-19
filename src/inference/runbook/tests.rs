@@ -160,3 +160,20 @@ async fn redirects_and_oversized_responses_are_not_followed_or_retried() {
     assert_eq!(calls.load(Ordering::SeqCst), 0);
     task.abort();
 }
+
+
+#[test]
+fn provider_schema_omits_unique_items_but_local_acceptance_rejects_duplicates() {
+    for kind in [StepKind::Classify, StepKind::Reason, StepKind::Draft] {
+        let schema = output_schema(kind).unwrap();
+        assert!(!schema.to_string().contains("uniqueItems"));
+    }
+    let schema = output_schema(StepKind::Draft).unwrap();
+    assert_eq!(schema["properties"]["protocol"]["type"], "string");
+    assert_eq!(schema["properties"]["content"]["properties"]["requires_approval"]["enum"], json!([true]));
+    let result = crate::runbook_llm_step::output(
+        &json!({"label":"relevant","confidence_bps":9000,"source_refs":["private_message:source","private_message:source"]}).to_string(),
+        "runbook_classification_v1", &["private_message:source".into()], 8000,
+    );
+    assert!(matches!(result, Err(ModelFailure::InvalidSchema)));
+}

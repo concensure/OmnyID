@@ -99,13 +99,13 @@ async fn run() {
             step.kind = kind;
             step.output_schema = Some(schema_for(kind).unwrap().into());
             step.token_limit = 2048;
-            step.cost_limit_microunits = 80000;
+            step.cost_limit_microunits = 75000;
             step.max_retries = 0;
             let policy = ModelPolicy {
                 effort,
                 allow_escalation: false,
                 minimum_confidence_bps: 8000,
-                attempt_cost_ceiling: 80000,
+                attempt_cost_ceiling: 75000,
                 timeout_ms: 26000,
             };
             let refs: Vec<String> = serde_json::from_value(case["source_refs"].clone()).unwrap();

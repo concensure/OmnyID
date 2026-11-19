@@ -161,7 +161,7 @@ pub fn schema_for(kind: StepKind) -> Result<&'static str> {
 }
 
 pub(crate) fn output_schema(kind: StepKind) -> Result<Value> {
-    let refs = json!({"type":"array","minItems":1,"maxItems":8,"uniqueItems":true,"items":{"type":"string"}});
+    let refs = json!({"type":"array","minItems":1,"maxItems":8,"items":{"type":"string"}});
     let confidence = json!({"type":"integer","minimum":0,"maximum":10000});
     Ok(match kind {
         StepKind::Classify => {
@@ -171,7 +171,7 @@ pub(crate) fn output_schema(kind: StepKind) -> Result<Value> {
             json!({"type":"object","additionalProperties":false,"required":["summary","confidence_bps","source_refs"],"properties":{"summary":{"type":"string","minLength":1,"maxLength":2000},"confidence_bps":confidence,"source_refs":refs}})
         }
         StepKind::Draft => {
-            json!({"type":"object","additionalProperties":false,"required":["protocol","type","content"],"properties":{"protocol":{"const":"afp-v1"},"type":{"const":"draft"},"content":{"type":"object","additionalProperties":false,"required":["body","source_refs","requires_approval"],"properties":{"body":{"type":"string","minLength":1,"maxLength":4000},"source_refs":refs,"requires_approval":{"const":true}}}}})
+            json!({"type":"object","additionalProperties":false,"required":["protocol","type","content"],"properties":{"protocol":{"type":"string","enum":["afp-v1"]},"type":{"type":"string","enum":["draft"]},"content":{"type":"object","additionalProperties":false,"required":["body","source_refs","requires_approval"],"properties":{"body":{"type":"string","minLength":1,"maxLength":4000},"source_refs":refs,"requires_approval":{"type":"boolean","enum":[true]}}}}})
         }
         _ => return Err("not_a_model_step"),
     })
