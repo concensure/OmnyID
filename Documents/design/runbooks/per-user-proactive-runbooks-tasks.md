@@ -7,15 +7,18 @@ Rule: reuse the proactive/Watcher/Synthesizer/policy/approval stack; do not crea
 
 ## Current status — 2026-11-19
 
-**111 complete / 6 remaining of 117.** Canonical quote ingress and shared
-inference are complete. Frozen source: `61fcdf0bb5c2f2f87e36c1203e8fedf454661d29`.
-Pinned Linux Rust 1.94.0 passed 385 selected unit regressions. Integration and
-optimized release verification are incomplete after Docker/WSL became
-unresponsive; broad WSL recovery confirmation is pending. No additional parent
-is closed. Partial proof: C:/temp/wt/runbook-61fcdf0b-pinned-unit-evidence.json.
-The hosted shadow, deterministic allowlist, model evaluation, provider-sandbox
-and final deployment gates remain separate. See `.agent/HANDOFF.md` and
-`.agent/TASKS.yaml` for current evidence and missing environment inputs.
+**112 complete / 5 remaining of 117.** Local verification is complete for frozen
+source `61fcdf0bb5c2f2f87e36c1203e8fedf454661d29`: pinned Linux Rust 1.94.0,
+124 integration tests, 385 distinct selected unit regressions, optimized backend
+library/binary build, and unchanged exact-source frontend verification (2312
+Wedding tests, five Runbook state tests, 15 browser scenarios including
+accessibility, typecheck, both line budgets and frontend production build).
+Machine-collected proof: `C:/temp/wt/runbook-61fcdf0b-pinned-evidence.json`.
+The manifest hashes 19 successful check logs and the optimized backend binary.
+This closes local verification only. Hosted shadow, deterministic allowlist,
+model evaluation, provider sandbox and final release/deployment evidence remain
+open. No cohort, paid call, CI result or production deployment is claimed.
+See `.agent/HANDOFF.md` and `.agent/TASKS.yaml` for environment blockers.
 
 ## Historical canonical quotation display continuation — 2026-11-19
 
@@ -493,7 +496,7 @@ Depends on: 1–15
 
 Depends on: 1–16
 
-- [ ] Run Rust unit/integration tests, migration checks, all relevant proactive/Watcher/Synthesizer/approval tests, frontend typecheck, line budget, full Wedding tests where wedding runbooks are enabled, production build, and accessibility checks.
+- [x] Run Rust unit/integration tests, migration checks, all relevant proactive/Watcher/Synthesizer/approval tests, frontend typecheck, line budget, full Wedding tests where wedding runbooks are enabled, production build, and accessibility checks.
 - [x] Verify every new source file is below 999 lines and no existing oversized file is materially bloated.
 - [ ] Run flags-off hosted shadow matching and compare expected definition/match counts without executing instances.
 - [ ] Run an internal allowlist with deterministic steps only and inspect duplicate, policy-denial, stale, and cross-tenant metrics.

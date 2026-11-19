@@ -1,3 +1,81 @@
+## 2026-11-19: WED-375 local pinned verification complete; five hosted gates remain
+
+Implementation worktree: `C:/temp/wt/omnyid-runbooks`, branch `agent/codex/WED-375`.
+Frozen application source: `61fcdf0bb5c2f2f87e36c1203e8fedf454661d29`.
+Clean verification worktree: `C:/temp/wt/omnyid-runbooks-verify-43d7c830`.
+This pass changes coordination/checklist documentation only; no application source.
+Checklist: **112 complete / 5 remaining of 117**.
+
+Machine-collected local evidence: `C:/temp/wt/runbook-61fcdf0b-pinned-evidence.json`.
+It records the source SHA, clean checkout, builder image identity, Rust 1.94.0,
+19 successful log hashes and optimized release binary hash. Pinned compiler
+checks: 124 integrations and 385 distinct selected units, including migrations,
+policy, Watcher, Synthesizer, approvals, quote ingress and shared funding.
+Exact-source frontend evidence is reused with log hashes rechecked: 2312 Wedding
+tests, five Runbook state tests, 15 browser scenarios including accessibility,
+typecheck, both line budgets and production frontend build.
+Optimized backend build: cargo +1.94.0 build --release -j1, root package
+codegen-units=64, library and homeserver binary. This is local evidence, not CI.
+Manifest SHA-256: `3f9a4bda621c3a5868ed10b77b1fdc58144962140cce3b4fdb176750ff1a1557`.
+The dedicated `omnyid-runbook-wed375-pg` test database is stopped.
+No shared containers, volumes, caches or worktrees were deleted.
+
+Earlier integration/release attempts ended with Docker exit 125 during local
+engine unresponsiveness. Normal Docker Desktop start recovered the engine;
+no all-WSL shutdown or WSL configuration change occurred. First bounded retry
+was killed with exit 101 because swap allowance was too small. Final integration
+and release jobs ran sequentially with --memory 2800m --memory-swap 6g --cpus 1,
+using existing WSL swap. Failed logs remain separate; none are counted as passes.
+Unrelated Agenton services cannot resolve their pre-existing stopped PostgreSQL
+dependency (Exited 127 seven months ago); left untouched. No production outage
+or production change occurred. Earlier recovery/pending notes below are history.
+
+Next: supply a hosted staging target and test-owner references, model/provider
+sandbox with bounded funding, and an appropriate private review/CI repository.
+The configured public concensure/OmnyID repository contains the old public core;
+its candidate Actions query returned zero runs and environments were empty.
+No push/PR was made because it would publish accumulated private workspace
+history. Hosted shadow, deterministic cohort, model evaluation, sandbox actions
+and final release/deployment evidence remain open. No execution entrypoint or
+cohort was enabled. Production deployment still requires the AGENTS.md gate and
+the user's go-ahead for the concrete candidate. Keep the source SHA unchanged
+when consuming this evidence; a source change requires new candidate checks.
+
+## 2026-11-19 resource-containment follow-up
+
+The first bounded pinned integration retry exited 101 after rustc received
+SIGKILL at the container limit. Docker stayed responsive. Host inspection found
+WSL memory=4GB and swap=4GB, with about 3.5GB swap free. The initial container
+--memory-swap=3g total allowed too little swap for this crate. No WSL settings
+were changed. A sequential retry now uses --memory 2800m --memory-swap 6g
+--cpus 1, allowing existing swap while bounding resident memory. A live cgroup
+read showed about 1.2GB swap in use and zero oom/oom_kill events.
+
+Current runner: C:/temp/wt/verify-runbook-pinned-swap.ps1; evidence prefix
+C:/temp/wt/runbook-61fcdf0b-linux-rust1940-swap-tests. Only if this succeeds,
+run C:/temp/wt/verify-runbook-release-swap.ps1 -Mode build at the same frozen
+SHA, sequentially. Release retains optimization and sets root codegen-units=64.
+Do not reuse the killed bounded attempt or the engine-interrupted attempts.
+
+## 2026-11-19 recovery update (supersedes pending-shutdown note below)
+
+After the failed restart, `docker desktop status` could no longer reach its
+control service. `docker desktop start --timeout 90` succeeded and the engine
+responded at version 29.9.2. No all-WSL shutdown was performed or is now needed;
+the earlier confirmation request is withdrawn. Old verification containers
+were removed during engine recovery. Existing local services restarted via their
+policies; agenton-homeserver-1 initially reported restarting, so do not infer
+all unrelated local services are healthy. Follow-up read-only logs show both
+agenton-homeserver-1 and agenton-electric-1 fail to resolve their postgres
+dependency; agenton-postgres-1 reports Exited (127) seven months ago. That
+pre-existing stopped dependency was left unchanged. Production was not touched.
+
+The dedicated PostgreSQL container was restarted for a sequential bounded
+integration retry at the unchanged frozen source. Runner:
+C:/temp/wt/verify-runbook-pinned-bounded.ps1. Evidence prefix:
+C:/temp/wt/runbook-61fcdf0b-linux-rust1940-bounded-tests.
+Do not overlap the optimized release build with another compiler job.
+
 ## 2026-11-19: WED-375 pinned compiler verification; local Docker recovery pending
 
 Implementation: `C:/temp/wt/omnyid-runbooks`, `agent/codex/WED-375`.
