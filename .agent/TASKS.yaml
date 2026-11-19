@@ -16,6 +16,8 @@ lifecycle:
 
 tasks:
   - id: WED-378
+    candidate_sha: f6d1fdd642f0ef6b8e025accc24cb5da324a8247
+    verification_worktree: C:/temp/wt/omnyid-wed378-verify
     title: Collect isolated Oracle Runbook shadow and deterministic cohort evidence
     status: in_progress
     owner: codex
