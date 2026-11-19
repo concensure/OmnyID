@@ -11,8 +11,7 @@ use crate::{
 use chrono::Utc;
 use serde_json::json;
 
-/// Trusted internal adapter seam, analogous to ModelProvider. A future live
-/// adapter must use the bound account and credential authority. No route invokes it.
+/// Trusted adapter seam. The cohort route uses the bound account and credential authority.
 #[async_trait::async_trait]
 pub trait ToolProvider: Send + Sync {
     async fn call(
@@ -28,7 +27,7 @@ impl RunbookRuntime<'_, '_> {
         proposal_ref: &str,
         provider: &dyn ToolProvider,
     ) -> Result<ToolReceipt> {
-        let mut tx = self.store.begin(owner).await?;
+        let mut tx = self.begin(owner).await?;
         let current = self.load_instance(owner, instance, &mut tx).await?;
         let value = self
             .store

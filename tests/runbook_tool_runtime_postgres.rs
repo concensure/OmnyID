@@ -1,4 +1,6 @@
-//! Disposable PostgreSQL and loopback mock provider only; no external calls.
+#[path = "runbook_tool_runtime_postgres/cohort.rs"]
+mod cohort;
+// Disposable PostgreSQL and loopback mock provider only; no external calls.
 #[path = "runbook_tool_runtime_postgres/recovery.rs"]
 mod recovery;
 #[path = "runbook_tool_runtime_postgres/provenance.rs"]

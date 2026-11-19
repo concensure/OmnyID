@@ -1,3 +1,5 @@
+#[path = "runbook_model_postgres/cohort.rs"]
+mod cohort;
 use async_trait::async_trait;
 use chrono::Utc;
 use omnyid_homeserver::{
@@ -184,6 +186,7 @@ async fn fixture_with_budget(
         .unwrap();
     d.enabled = true;
     d.trigger.event_types = vec!["workflow_failed".into()];
+    if kind == StepKind::Draft { d.max_autonomy = MaxAutonomy::DraftOnly; }
     d.steps[2].step_id = "model".into();
     d.steps[2].kind = kind;
     d.steps[2].output_kind = None;

@@ -1,6 +1,7 @@
 //! Owner-authenticated definition management. This flag never starts execution.
 use super::*;
 mod tool_review;
+mod execution;
 use crate::runbook_contract::RunbookDefinition;
 use crate::runbook_starter_pack::{STARTER_PACK_VERSION, starter_definitions};
 use crate::runbook_store::RunbookStore;
@@ -11,6 +12,7 @@ use serde::Deserialize;
 pub(super) fn routes() -> Router<Arc<AppState>> {
     Router::new()
         .merge(tool_review::routes())
+        .merge(execution::routes())
         .route("/runbooks", get(list))
         .route("/runbooks/starters", get(starters))
         .route("/runbooks/setup", post(setup))

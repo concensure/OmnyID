@@ -42,6 +42,7 @@ pub struct InstanceRecord {
 pub struct RunbookRuntime<'a, 'db> {
     pub(crate) store: &'a RunbookStore<'db>,
     cohort_deadline: Option<DateTime<Utc>>,
+    pub(crate) execution_cohort: Option<crate::runbook_execution_cohort::ExecutionCohort>,
 }
 
 impl<'a, 'db> RunbookRuntime<'a, 'db> {
@@ -49,6 +50,7 @@ impl<'a, 'db> RunbookRuntime<'a, 'db> {
         Self {
             store,
             cohort_deadline: None,
+            execution_cohort: None,
         }
     }
 
@@ -56,17 +58,35 @@ impl<'a, 'db> RunbookRuntime<'a, 'db> {
         Self {
             store: self.store,
             cohort_deadline: Some(deadline),
+            execution_cohort: None,
         }
+    }
+
+    pub fn for_execution_cohort(
+        &self,
+        policy: crate::runbook_execution_cohort::ExecutionCohort,
+    ) -> Self {
+        Self {
+            store: self.store,
+            cohort_deadline: Some(policy.expires_at),
+            execution_cohort: Some(policy),
+        }
+    }
+
+    fn cohort_open(&self, owner: &str) -> bool {
+        let now = Utc::now();
+        self.cohort_deadline.is_none_or(|deadline| now < deadline)
+            && self
+                .execution_cohort
+                .as_ref()
+                .is_none_or(|policy| policy.admits_owner(owner, now))
     }
 
     /// Recheck after pool/owner-lock waits, before a cohort executor can write.
     /// An already admitted transaction may finish; no subsequent transaction is admitted.
     pub(crate) async fn begin(&self, owner: &str) -> Result<Transaction<'_, Postgres>> {
         let tx = self.store.begin(owner).await?;
-        if self
-            .cohort_deadline
-            .is_some_and(|deadline| Utc::now() >= deadline)
-        {
+        if !self.cohort_open(owner) {
             return Err("cohort_policy_denied");
         }
         Ok(tx)
@@ -443,12 +463,34 @@ impl<'a, 'db> RunbookRuntime<'a, 'db> {
         instance: &RunbookInstance,
         tx: &mut Transaction<'_, Postgres>,
     ) -> Result<()> {
+        if !self.cohort_open(owner) {
+            return Err("cohort_policy_denied");
+        }
         let registry = self.store.load(owner, tx).await?;
         let current = registry
             .get(&instance.runbook_id)
             .ok_or("definition_not_found")?;
         if !current.definition.enabled || current.definition.status != DefinitionStatus::Active {
             return Err("definition_disabled");
+        }
+        Ok(())
+    }
+    // Admission is separate from immutable lookup: audit and cost reconciliation
+    // must still finish when a cohort expires during provider I/O.
+    pub(crate) fn admit_execution_definition(
+        &self,
+        owner: &str,
+        definition: &RunbookDefinition,
+        instance: &RunbookInstance,
+    ) -> Result<()> {
+        if self.execution_cohort.as_ref().is_some_and(|policy| {
+            !policy.admits_definition(
+                owner,
+                definition,
+                instance.current_step_id.as_deref().unwrap_or(""),
+            )
+        }) {
+            return Err("cohort_policy_denied");
         }
         Ok(())
     }

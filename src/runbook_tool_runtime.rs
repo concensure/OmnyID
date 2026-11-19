@@ -110,6 +110,7 @@ impl RunbookRuntime<'_, '_> {
         tx: &mut Transaction<'_, Postgres>,
     ) -> Result<PreparedRunbookTool> {
         let definition = self.definition(owner, instance, tx).await?;
+        self.admit_execution_definition(owner, &definition, instance)?;
         let step = definition
             .steps
             .get(instance.completed_step_ids.len())

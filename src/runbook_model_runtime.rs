@@ -89,8 +89,7 @@ fn private_draft(
 }
 
 impl RunbookRuntime<'_, '_> {
-    /// Internal injection seam only. There is deliberately no HTTP/event-hook
-    /// entry point and no live provider until owner inference/budget integration.
+    /// Two-phase execution used by trusted adapters and the default-off cohort route.
     pub async fn execute_model(
         &self,
         owner: &str,
@@ -103,7 +102,7 @@ impl RunbookRuntime<'_, '_> {
         if !identifier(step_id) {
             return Err("invalid_step_id");
         }
-        let mut tx = self.store.begin(owner).await?;
+        let mut tx = self.begin(owner).await?;
         let current = self.load_instance(owner, id, &mut tx).await?;
         let receipt_id = record_id("runbook_model_result", owner, id, step_id);
         let reservation_id = record_id("runbook_model_reservation", owner, id, step_id);
@@ -162,8 +161,18 @@ impl RunbookRuntime<'_, '_> {
         self.require_enabled(owner, &current.instance, &mut tx)
             .await?;
         let definition = self.definition(owner, &current.instance, &mut tx).await?;
+        self.admit_execution_definition(owner, &definition, &current.instance)?;
         let index = current.instance.completed_step_ids.len();
         let step = definition.steps.get(index).ok_or("step_not_found")?;
+        // The trusted route supplies an upper bound; the reviewed definition may
+        // impose a smaller cap. Never increase either limit.
+        let mut admitted_policy = policy.clone();
+        if self.execution_cohort.is_some() {
+            admitted_policy.attempt_cost_ceiling = admitted_policy
+                .attempt_cost_ceiling
+                .min(step.cost_limit_microunits);
+        }
+        let policy = &admitted_policy;
         model::schema_for(step.kind)?;
         if step.kind == StepKind::Draft && definition.max_autonomy == MaxAutonomy::ObserveOnly {
             return Err("model_policy_denied");

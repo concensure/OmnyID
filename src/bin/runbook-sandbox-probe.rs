@@ -1,4 +1,6 @@
 //! Isolated operator cohort against a real loopback marker provider.
+#[path = "runbook-sandbox-probe/application.rs"]
+mod application;
 use chrono::Utc;
 use omnyid_homeserver::{
     db::{Db, McpToolConnectionUpsert, UserConnectedCapabilityRecord, UserRecord},
@@ -229,7 +231,7 @@ async fn run() {
             let query = if scenario == "revoked" {
                 "UPDATE user_connected_capabilities SET revoked_at=now() WHERE user_id=$1"
             } else {
-                "UPDATE user_connected_capabilities SET approval_mode='changed' WHERE user_id=$1"
+                "UPDATE user_connected_capabilities SET approval_mode='suggest_only' WHERE user_id=$1"
             };
             sqlx::query(query)
                 .bind(&owner)
@@ -365,6 +367,7 @@ async fn run() {
             json!({"case":scenario,"effects":1,"receipt":receipt,"no_resend":true})
         );
     }
+    application::run(&db, &url, &key, &token).await;
     let (owner, id, proposal) = expiry.unwrap();
     println!(
         "{}",
@@ -384,6 +387,6 @@ async fn run() {
     println!("{}", json!({"case":"expired","effects":0,"denied":true}));
     println!(
         "{}",
-        json!({"event":"complete","source_sha":sha,"finished_at":Utc::now(),"cases":11,"expected_effects":5,"production_rollout":false,"external_provider":false})
+        json!({"event":"complete","source_sha":sha,"finished_at":Utc::now(),"cases":12,"expected_effects":6,"production_rollout":false,"external_provider":false})
     );
 }

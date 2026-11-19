@@ -199,3 +199,4 @@ pub mod workspace_filesystem;
 
 pub mod runbook_hooks;
 pub mod runbook_deterministic;
+pub mod runbook_execution_cohort;
