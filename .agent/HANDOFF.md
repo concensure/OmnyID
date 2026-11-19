@@ -1,3 +1,60 @@
+## 2026-11-19: WED-375 canonical quotation workspace projection
+
+Implementation: `C:/temp/wt/omnyid-runbooks`, `agent/codex/WED-375`.
+Frozen source: `96cab816b9bfb5d4a39514c28683fcedb82c28c5`.
+Verification: `C:/temp/wt/omnyid-runbooks-verify-43d7c830`, clean detached at
+that SHA. Documentation commits do not replace the source candidate.
+Checklist remains **109 complete / 8 remaining of 117**; no parent is closed
+by this partial quote integration.
+
+Canonical confirmed/corrected quotations now project into the existing Wedding
+Documents/Responses artifact path, retaining canonical message/version/source
+identities and uncertainty. Every source must be visible, unambiguous, in the
+same thread and explicitly bound to the current plan/workspace. Locked content,
+metadata-only payloads, missing/foreign sources and malformed display contracts
+fail closed. The projection remains private/draft and cannot create a quote reply,
+booking or payment approval. No comparable total is invented. New Wedding quote
+records receive existing template/event tags for workspace discovery; historical
+records are not rewritten. Partial source pages may intentionally omit a review.
+
+Files: src/quotation/afp.rs; tests/quotation_afp.rs;
+solid-ui/src/lib/weddingCanonicalQuoteProjectionState.ts;
+solid-ui/src/lib/weddingPersistedWorkspaceState.ts;
+solid-ui/tests/wedding-canonical-quote-projection-state.test.ts; canonical docs.
+
+Verification complete for this change: exact-candidate frontend typecheck, 2312 Wedding tests,
+both line budgets, production build and 15 Runbook browser scenarios completed
+with exit zero. Six new frontend regressions cover provenance, replay, foreign
+and missing sources, malformed data, locked content, corrections and authority.
+An additional view-level check confirms the canonical artifact reaches Wedding
+Documents with a document preview, draft status and no vendor reply flow.
+That check initially used noncanonical workspace IDs; the corrected normalized
+fixture passes. Initial source 0fb2df18 also exposed a protocol-field TypeScript
+mismatch; the frozen successor removes reliance on the absent UI type field.
+All 18 backend quotation/event/transform contract tests completed with exit zero.
+The standalone Rust library/binary dev build also completed with exit zero.
+Evidence prefix: C:/temp/wt/runbook-96cab816- (.log and .exit).
+Machine-collected manifest: C:/temp/wt/runbook-96cab816-evidence.json. It checks
+clean exact source identity, eight check exit codes and log hashes. The dedicated
+omnyid-runbook-wed375-pg test container was stopped after verification; no
+worktrees, containers belonging to others, volumes or caches were removed.
+
+GitHub returned no CI runs or deployments for this candidate. No push, PR or
+deployment was performed; the configured remote lineage remains unsuitable for
+blind task-branch publication. Local compiler remains the documented 1.94.1
+workaround, not proof of the project-pinned CI/release compiler gate.
+
+Next local work: connect canonical private quotation ingress to the bounded
+persisted Runbook event adapter, mapping date/context facts from reviewed source
+authority and respecting encrypted evidence selection. Current private quote
+metadata does not meet generic Watcher relevance selection; do not bypass this
+by inventing urgency. The stored-quote Runbook regression remains separate from
+the new UI projection and does not prove a complete canonical ingress path.
+Shared-model policy and approved sandbox/staging target questions remain pending.
+Hosted shadow/allowlist/model/security/provider rollout evidence and final release
+are still open. Production/shared-stack deployment requires the AGENTS.md gate
+and a go-ahead for the concrete frozen candidate. No production settings changed.
+
 ## 2026-11-19: WED-375 lifecycle closure and bounded owner model adapter
 
 Implementation: `C:/temp/wt/omnyid-runbooks`, `agent/codex/WED-375`.

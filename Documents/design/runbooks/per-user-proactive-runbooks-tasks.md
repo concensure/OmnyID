@@ -5,7 +5,22 @@ Implementation task: WED-375
 Order: dependency order
 Rule: reuse the proactive/Watcher/Synthesizer/policy/approval stack; do not create a parallel event, authority, memory, or UI system.
 
-## Latest continuation — 2026-11-19
+## Canonical quotation display continuation — 2026-11-19
+
+Checklist remains **109 complete / 8 remaining of 117**. Candidate
+`96cab816b9bfb5d4a39514c28683fcedb82c28c5` adds source-bound canonical quotation
+projection to the existing Wedding Documents/Responses artifact path. It keeps
+immutable version/source references, evidence uncertainty and private draft
+status, without another normalization, inferred total or booking approval.
+New canonical Wedding quotations carry existing workspace discovery tags.
+Historical records are not rewritten; partial source pages fail closed.
+
+The full quote task remains open: private canonical ingress must still connect
+to the bounded persisted Runbook event adapter, including reviewed date/context
+facts and encrypted evidence selection. No runtime execution cohort is enabled.
+See the latest handoff for exact-candidate verification and remaining gates.
+
+## Previous lifecycle continuation — 2026-11-19
 
 Checklist: **109 complete / 8 remaining of 117**. Frozen source candidate:
 `77c58b5c215f4e19b706922f5be121176991f681`, verified only from the clean detached

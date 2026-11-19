@@ -1,3 +1,26 @@
+## 2026-11-19: WED-375 canonical quotation display boundary
+
+Wedding workspace replay consumes confirmed/corrected quotation ledger records
+without another normalization or AFP write. Every referenced source must be
+visible in the authenticated input set, unambiguous, in the same thread, and
+explicitly bound to the current Wedding plan and response workspace. A namespace
+or discovery tag alone cannot establish plan membership. Locked content and
+metadata-only quotation claims are excluded.
+
+Preserve each canonical message/version identity, source-version references and
+recorded evidence uncertainty. Project a private draft review document through
+the existing artifact path; do not invent a comparable total, approval, reply,
+booking or payment. Corrected versions retain their supersedes reference rather
+than replacing prior evidence. Display text is escaped as data. New Wedding
+normalizations receive existing template/event discovery tags; no historical
+records are rewritten or re-normalized.
+
+This closes a display gap only. The canonical private quotation ingress still
+needs a bounded persisted Runbook event bridge and a reviewed date/context fact
+mapping. Existing generic private-ledger relevance filtering must also be
+respected; do not mark quotations urgent merely to bypass decryption selection.
+The full quote parent task remains open until that end-to-end path is verified.
+
 ## 2026-11-19: WED-375 cooldown, phase traces and owner inference
 
 Three distinct terminal Failed instances for the same owner/runbook within a
