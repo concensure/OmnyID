@@ -76,9 +76,13 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
             "/api/public/wedding/celebrants/manage/command",
             post(command_http),
         )
-        .layer(tower_http::set_header::SetResponseHeaderLayer::overriding(
-            header::CACHE_CONTROL,
-            HeaderValue::from_static("no-store"),
+        .layer(axum::middleware::map_response(
+            |mut response: Response| async move {
+                response
+                    .headers_mut()
+                    .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+                response
+            },
         ))
 }
 

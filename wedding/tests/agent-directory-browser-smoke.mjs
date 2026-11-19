@@ -20,6 +20,7 @@ const origin = `http://127.0.0.1:${server.address().port}`;
 const browser = await chromium.launch({ headless: true });
 try {
   const page = await browser.newPage({ viewport: { width: 320, height: 760 } });
+  page.setDefaultTimeout(15000);
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
   await page.route('https://**', route => route.abort());
@@ -56,4 +57,4 @@ try {
   }
   assert.deepEqual(errors, []);
   console.log(JSON.stringify({ categoryDeduplication: true, partialSearch: true, staleSearchSuppression: true, agentPages: 3, keyboardFocus: true, viewport: 320 }));
-} finally { await browser.close(); await new Promise(resolve => server.close(resolve)); }
+} finally { await browser.close(); server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
