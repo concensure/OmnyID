@@ -11,5 +11,9 @@
   ],
   "new_candidate_maximum_attempts": 37,
   "per_attempt_ceiling": 75000,
-  "total_maximum_exposure": 2891391
+  "total_maximum_exposure": 2891391,
+  "final_comparison_actual": 18162,
+  "final_application_actual": 113,
+  "cumulative_known_cost": 54666,
+  "cumulative_known_plus_unknown_reservation": 134666
 }

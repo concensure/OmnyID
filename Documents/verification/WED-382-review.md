@@ -28,3 +28,19 @@ to the shared grammar. Final source now explicitly accepts colon and rejects
 slash. That failed run is retained. Historical model13 and tool16 PostgreSQL
 tests passed, including expiry during provider execution and replay prevention.
 Final candidate verification must be collected again and name ae1ac01a in full.
+
+## Final-source draft acceptance
+
+Cross-review accepts the narrow Luna-medium draft-only gate for frozen source
+`ae1ac01a2c285ac10b09404cffe3db67fbaaa034`. Comparison:36/36 structural
+acceptances, zero rejections, all usage known, cost18,162microunits. All12drafts
+meet expectations, require approval and grant no action authority. One non-draft
+expectation deviation: Sol conflicting_dates asks for clarification but explicitly
+says differing dates do not establish a conflict; conservative and outside the
+draft-only scope. Classification/reasoning activation is not approved.
+
+The actual HTTP draft is grounded, owner-private and approval-required, retains
+receipt/provenance, and suppresses replay. One attempt cost113microunits. Combined
+final comparison/application cost18,275microunits (USD0.018275). Artifacts:
+WED-382-model-evidence.json and WED-382-application-model-evidence.json.
+Tool acceptance still requires the final independent sandbox/expiry evidence.
