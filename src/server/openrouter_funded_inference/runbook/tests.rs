@@ -86,11 +86,22 @@ async fn shared_runbook_funding_is_opt_in_atomic_owner_capped_and_conservative()
         Err(ModelFailure::Provider)
     ));
     env.set("OMNYID_RUNBOOK_ALLOWLIST", &owner);
+    // Existing hosted usage consumes the same account allowance even when it
+    // predates or bypasses the platform-funded usage ledger.
+    db.record_llm_usage(&owner, None, BASE_MODEL, 1, 1, 1)
+        .await
+        .unwrap();
+    assert!(matches!(
+        reserve_shared_runbook(&db, &owner, BASE_MODEL, 1).await,
+        Err(ModelFailure::CostCeiling)
+    ));
+    config.monthly_budget_cents = 2;
+    db.upsert_llm_config(&config).await.unwrap();
     let reservation = reserve_shared_runbook(&db, &owner, BASE_MODEL, 10000)
         .await
         .unwrap();
-    // Exactly one cent is reserved even though no provider call occurs here.
-    // A second reservation cannot exceed the explicitly configured monthly cent.
+    // One cent is already charged and one cent is reserved, without provider I/O.
+    // A second reservation cannot exceed the two-cent account allowance.
     assert!(matches!(
         reserve_shared_runbook(&db, &owner, BASE_MODEL, 1).await,
         Err(ModelFailure::CostCeiling)

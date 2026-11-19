@@ -82,6 +82,26 @@ async fn reserve(
     if active.is_none() {
         return Err(ModelFailure::Provider);
     }
+    // Lock and re-read account policy inside the reservation transaction. The
+    // other inference paths charge this counter; do not give that spent budget
+    // back merely because their costs are absent from the funded-feature ledger.
+    let table = format!(
+        "\"{}\".user_llm_config",
+        crate::db::tenant_schema_name(owner)
+    );
+    let account: Option<(String, String, String, i32, i32)> = sqlx::query_as(&format!(
+        "SELECT backend,provider,model,monthly_budget_cents,CASE WHEN usage_reset_at < DATE_TRUNC('month',NOW()) THEN 0 ELSE usage_cents_current_month END FROM {table} WHERE owner_user_id=$1 FOR SHARE"
+    )).bind(owner).fetch_optional(&mut *tx).await.map_err(|_| ModelFailure::Provider)?;
+    let (backend, provider, selected, budget, usage) = account.ok_or(ModelFailure::Provider)?;
+    if backend != "hosted" || provider != "openai" || selected != BASE_MODEL {
+        return Err(ModelFailure::ModelMismatch);
+    }
+    let remaining = i64::from(budget)
+        .checked_sub(i64::from(usage.max(0)))
+        .and_then(|v| v.checked_mul(10_000))
+        .filter(|v| *v > 0)
+        .ok_or(ModelFailure::CostCeiling)?;
+    let monthly = monthly.min(remaining);
     // Same lock as every existing funded feature: reservations cannot race the
     // shared weekly cap. Integer microdollars avoid float comparisons at the cap.
     sqlx::query("SELECT pg_advisory_xact_lock(hashtext('omnyid:platform-funded-ai:weekly-cap'))")
