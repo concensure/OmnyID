@@ -1,0 +1,160 @@
+{
+  "source_sha": "f6d1fdd642f0ef6b8e025accc24cb5da324a8247",
+  "binary_sha256": "4afcd5e189d7b0d29979cccda2559d836814a4d36c2ece34884d388276c46a89",
+  "environment": "Oracle isolated operator fixture database",
+  "collected_at": "2026-11-19T11:57:46.176663+00:00",
+  "network": {
+    "name": "omnyid-wed378-probe-internal",
+    "internal": true,
+    "active_members": [
+      "omnyid-wed378-probe-postgres"
+    ],
+    "host_port_bindings": false
+  },
+  "production_image_before": "sha256:a086dba378880b9a8d19e68dfc403efa27356c0ecee5e136755edc0bddff4fa6",
+  "production_image_after": "sha256:a086dba378880b9a8d19e68dfc403efa27356c0ecee5e136755edc0bddff4fa6",
+  "exit_code": 0,
+  "observations": {
+    "application_rollout_enabled": false,
+    "definition_ids": [
+      "wed378_0",
+      "wed378_1",
+      "wed378_2",
+      "wed378_3",
+      "wed378_4",
+      "wed378_5",
+      "wed378_6",
+      "wed378_7",
+      "wed378_8"
+    ],
+    "definition_pack_sha256": "88be4607f1f031144209a5a4ec81a44635cdbbd06efa4f6c848d32dd2652faa5",
+    "deterministic": {
+      "changed_replay_denials": 1,
+      "concurrent_dispatch_replay_checks": 1,
+      "concurrent_read_replay_checks": 1,
+      "cross_owner_denials": 3,
+      "foreign_instance_records": 0,
+      "foreign_trace_records": 0,
+      "instances": 5,
+      "read_traces": 1,
+      "stale_revision_denials": 1,
+      "started_instances": 1,
+      "terminal_reopen_denials": 1
+    },
+    "event_kinds": [
+      "workflow_failed"
+    ],
+    "finished_at": "2026-11-19T11:57:45.957300976Z",
+    "limitations": [
+      "operator fixture probe, not an enabled application worker cohort",
+      "only one read step executed; transform/emit/model/tool rollout gates remain open",
+      "network isolation and binary/source provenance are supplied by the external runner"
+    ],
+    "maximum_duration_seconds": 180,
+    "model_or_provider_adapters_composed": false,
+    "owners": [
+      {
+        "email": "wed378-micro-24-budget-18000-01M7STQ089E8P4PBRHCK40GCP4@omnyid.test",
+        "id": "01M7STQ089E8P4PBRHCK40GCP4"
+      },
+      {
+        "email": "wed378-garden-120-budget-45000-01M7STQ0B8HK1H9P1MTZ4JQT5F@omnyid.test",
+        "id": "01M7STQ0B8HK1H9P1MTZ4JQT5F"
+      }
+    ],
+    "schema": "runbook_hosted_probe.v1",
+    "shadow": {
+      "cross_owner_denials": 1,
+      "definitions": 9,
+      "expected": {
+        "dedupe_group": 1,
+        "duplicate": 0,
+        "event_cap": 2,
+        "matched": 5
+      },
+      "instance_records_after": 0,
+      "instance_records_before": 0,
+      "observed": {
+        "dedupe_group": 1,
+        "duplicate": 0,
+        "event_cap": 2,
+        "matched": 5
+      },
+      "replay_expected": {
+        "dedupe_group": 1,
+        "duplicate": 5,
+        "event_cap": 2,
+        "matched": 0
+      },
+      "replay_observed": {
+        "dedupe_group": 1,
+        "duplicate": 5,
+        "event_cap": 2,
+        "matched": 0
+      }
+    },
+    "source_sha": "f6d1fdd642f0ef6b8e025accc24cb5da324a8247",
+    "started_at": "2026-11-19T11:57:44.613315057Z"
+  },
+  "source_verification": {
+    "source_sha": "f6d1fdd642f0ef6b8e025accc24cb5da324a8247",
+    "files_verified": 1214,
+    "windows_crlf_only_files": 1061,
+    "mismatches": [],
+    "unexpected_files": [],
+    "missing_required_build_files": []
+  },
+  "guard_checks": {
+    "source_sha": "f6d1fdd642f0ef6b8e025accc24cb5da324a8247",
+    "cases": [
+      {
+        "case": "application_database",
+        "exit_code": 101,
+        "expected_rejection_observed": true,
+        "network": "none"
+      },
+      {
+        "case": "unexpected_host",
+        "exit_code": 101,
+        "expected_rejection_observed": true,
+        "network": "none"
+      },
+      {
+        "case": "enabled_rollout",
+        "exit_code": 101,
+        "expected_rejection_observed": true,
+        "network": "none"
+      },
+      {
+        "case": "provider_key",
+        "exit_code": 101,
+        "expected_rejection_observed": true,
+        "network": "none"
+      }
+    ]
+  },
+  "build_exit": 0,
+  "runner_exit": 0,
+  "guard_exit": 0,
+  "build_log": "   Compiling omnyid-homeserver v1.0.0 (/workspace)\n    Finished `release` profile [optimized] target(s) in 13m 30s\n4afcd5e189d7b0d29979cccda2559d836814a4d36c2ece34884d388276c46a89  /output/runbook-rollout-probe\n",
+  "runner_sha256": "d8ab0c17d49904a97ca5d8348ecb04ab0d4b5262e8c2727da43c50e302e3804a",
+  "guard_runner_sha256": "14a9aedd65d774b374d3a20e0dc0dd61ac905ebca7ec32e8d33f2722de8fb663",
+  "compiler": "rustc 1.94.0 (4a4ef493e 2026-03-02)",
+  "container_states": {
+    "omnyid-wed378-probe": {
+      "running": false,
+      "image_id": "sha256:6fd641d2ecb4205627dcd9a4ca1d31446bf3aeff4a335ba7978b8f1a7be8b65f"
+    },
+    "omnyid-wed378-probe-postgres": {
+      "running": false,
+      "image_id": "sha256:2ba9ca5f2e7daa0f0e7723cba1ee9167bab54efd3640516a44ac1a928dd67e7a"
+    },
+    "omnyid-homeserver-1": {
+      "running": true,
+      "image_id": "sha256:a086dba378880b9a8d19e68dfc403efa27356c0ecee5e136755edc0bddff4fa6"
+    }
+  },
+  "production_runbook_enabled_flags": {},
+  "verification_worktree": "C:/temp/wt/omnyid-wed378-verify",
+  "remote_candidate": "/home/ubuntu/omnyid-candidates/wed378-f6d1fdd6"
+}

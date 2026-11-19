@@ -1,3 +1,47 @@
+## WED-378 Oracle shadow gate complete — 2026-11-19
+
+Implementation worktree C:/temp/wt/omnyid-wed378, branch agent/codex/WED-378.
+Frozen executable source f6d1fdd642f0ef6b8e025accc24cb5da324a8247;
+clean verification C:/temp/wt/omnyid-wed378-verify. Later commits are evidence/docs.
+User clarification: delivery is Oracle, no GitHub upload or PR required. The
+previous GitHub permission rejection is not a deployment blocker.
+
+Added src/bin/runbook-rollout-probe.rs and documented its isolated runner.
+Native ARM Rust1.94 optimized build exited0 in13m30s. Binary SHA256
+4afcd5e189d7b0d29979cccda2559d836814a4d36c2ece34884d388276c46a89.
+All1,214 remote build inputs matched frozen Git content (1,061 CRLF-only
+checkout differences, zero actual mismatches or missing required files).
+Oracle candidate /home/ubuntu/omnyid-candidates/wed378-f6d1fdd6 contains logs,
+source manifest, executable, runner and complete-evidence.json. Repo machine
+artifact: Documents/verification/WED-378-hosted-evidence.json.
+
+Hosted probe exited0: nine definitions; first shadow5matches/1dedupe/2cap,
+replay5duplicates/1dedupe/2cap; zero instance records in shadow. Separate bounded
+runtime phase produced5instances, started1, executed1 real read, and passed
+concurrent dispatch/read replay,3cross-owner denials, stale revision, changed
+replay and cancelled-instance restart denial. All4 network-disabled unsafe
+configuration checks passed. rustfmt and git diff checks passed. Cross-review
+supports closing only the synthetic hosted shadow checklist item.
+
+The runner uses a dedicated empty DB, internal-only network, no host ports or
+application/provider credentials, and a180second execution bound. Both fixture
+containers are stopped. Database tmpfs and random encryption keys are not
+retained: only logs/evidence survive. Account names label24/120guest profiles;
+this probe does not configure wedding plans (earlier WED-376 tests did).
+Timeout cleanup was corrected during review. Production flags were not changed;
+no Runbook enable flags are configured on the inspected production container.
+No app/static/Caddy release occurred; no rollback needed. Production remains
+b9ead5298fb0cff77ef552c1dc4281e6d35c6bc8, image
+sha256:a086dba378880b9a8d19e68dfc403efa27356c0ecee5e136755edc0bddff4fa6.
+Prior WED-377 rollback artifacts remain unchanged and retained below.
+
+Checklist now113complete/4remaining. Next: actual deterministic application
+allowlist with policy-denial/transform/emit evidence, representative model eval,
+reviewed provider sandbox, final release freeze. These are not closed by this
+operator fixture. WED-376 still needs actual Google account-selection completion
+or error detail. Do not claim Google login fixed based only on the rendered GIS
+button. No paid model/provider calls or external messages were made.
+
 ## WED-377 deployed and verified — 2026-11-19 09:14 UTC
 
 Live application source b9ead5298fb0cff77ef552c1dc4281e6d35c6bc8. Clean verification:
