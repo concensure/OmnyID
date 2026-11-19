@@ -1,3 +1,34 @@
+## 2026-11-19: WED-375 cooldown, phase traces and owner inference
+
+Three distinct terminal Failed instances for the same owner/runbook within a
+rolling hour suppress new matches using OutcomeCooldown and block queued starts.
+Definition successors do not reset the limit. Exact dispatch replay remains its
+original receipt; start rechecks limits. No automatic retry or resend is added.
+
+Wait schedule revisions have independent private phase traces, committed with
+the schedule. These cannot substitute for the canonical completed wait trace.
+Cancellation is a denied wait, not proof of external undo; the schedule preserves
+its exact status. Trace persistence failure must roll back the schedule change.
+
+The internal model adapter consumes the existing owner inference resolver.
+Explicit OpenAI BYOK Luna configuration is required. Sol medium also requires
+trusted escalation policy; runtime permits it only after acceptance failure with
+retry and cost allowance. Shared funding and other selected models are never
+silently substituted. Shared-ladder compatibility remains open.
+
+The bounded transport requires strict JSON, exact model and usage evidence,
+default service tier, capped response size and a total deadline. Cost figures
+are conservative estimates, not invoice evidence. Official reference pages:
+https://developers.openai.com/api/docs/models/gpt-6-luna
+https://developers.openai.com/api/docs/models/gpt-6.1-sol
+https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create
+No execution route or worker composes the adapter. Provider compatibility and
+representative model evaluation remain separate gates.
+
+Reversible-action promotion is separate. The rollout-evidence.md document under
+Documents/design/runbooks defines exact-effect, verified undo, ambiguity,
+concurrency and cost acceptance requirements without enabling production actions.
+
 ## 2026-11-19: WED-375 secret-service composition and abandoned tool closure
 
 Reuse SecretBackend for MCP key loading with the existing HKDF domain/version.

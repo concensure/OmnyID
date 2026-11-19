@@ -5,6 +5,46 @@ Implementation task: WED-375
 Order: dependency order
 Rule: reuse the proactive/Watcher/Synthesizer/policy/approval stack; do not create a parallel event, authority, memory, or UI system.
 
+## Latest continuation — 2026-11-19
+
+Checklist: **109 complete / 8 remaining of 117**. Frozen source candidate:
+`77c58b5c215f4e19b706922f5be121176991f681`, verified only from the clean detached
+worktree `C:/temp/wt/omnyid-runbooks-verify-43d7c830`. See the latest handoff for
+command evidence and verification limitations; this is not a deployment claim.
+
+Eight parent items close through implementation and coverage audit: recorded
+design ancestry, per-step replay boundaries, bounded retries/failure cooldown,
+meaningful step traces including wait phases, deterministic executor regressions,
+Luna/Sol escalation policy, canonical provenance hashes, and separate reversible
+action acceptance requirements. The test matrix spans read/transform, tool
+schemas and failures, model reservation/acceptance, review/emit, scheduling,
+completion criteria, partial write rollback and terminal-safe exact replay.
+
+Three distinct Failed instances per owner/runbook within one hour suppress new
+dispatch and queued starts without resetting on definition successors. No failed
+run is reopened and no ambiguous external call is resent. Wait schedule revisions
+now carry private phase traces and provenance in the same transaction; only the
+separate canonical completion trace satisfies wait dependencies.
+
+The bounded owner model adapter reuses the current inference resolver and supports
+explicit compatible OpenAI BYOK configuration. It rejects incompatible shared
+models rather than substituting a model or using unaccounted shared funding.
+The BYOK/shared parent remains open pending the shared policy/integration choice.
+Pricing is an estimate; live compatibility and representative evaluation remain
+separate. There is no execution entrypoint or enabled provider cohort.
+
+The vendor quote regression proves reuse of frozen normalized evidence, exact
+replay, owner isolation and review-only output. It does not close the full
+canonical quote-event -> normalization -> Documents/response -> booking boundary
+integration. In particular, the canonical quote path uses ledger kind/subtype
+records while Runbook dispatch consumes its bounded persisted-event projection;
+the integration must preserve that distinction and avoid another normalization.
+
+The other open items are full release verification, hosted shadow matching,
+deterministic allowlist observation, representative model rollout, reviewed
+sandbox tool rollout, and final release/deployment evidence. Requirements for
+each promotion boundary are in [rollout-evidence.md](rollout-evidence.md).
+
 
 ## Original hooks/UI checkpoint — 2026-11-18 (later continuations below)
 
@@ -124,7 +164,7 @@ review was performed.
 
 ## 0. Freeze and inventory
 
-- [ ] Create the implementation worktree from the reviewed WED-308 documentation commit and record its full 40-character SHA.
+- [x] Create the implementation worktree from the reviewed WED-308 documentation commit and record its full 40-character SHA. (The recorded newer application base preserves the reviewed design commit in its ancestry; see the opening checkpoint.)
 - [x] Confirm the exact production SHA and current rollout flags before implementation.
 - [x] Inventory active work that overlaps proactive routes, AFP message contracts, daemon scheduling, approval surfaces, A2UI, or migrations.
 - [x] Record current tests for passive-event ingestion, Watcher, heuristic packs, autonomy, provenance, outcomes, State Synthesizer, approval cards, and account erasure.
@@ -213,9 +253,9 @@ Depends on: 1, 5
 
 - [x] Add `src/runbook_runtime.rs` with append-only instance revisions and one dedicated AFP thread per instance.
 - [x] Enforce the documented transition graph under an owner/instance advisory lock or equivalent transaction boundary.
-- [ ] Make every step idempotent on owner, instance, step, and input hash.
-- [x] Return prior trace/response on exact retry and a reviewable conflict on changed inputs. (Supported local steps; other step kinds fail closed pending executor integration.)
-- [ ] Bound retries and apply existing cooldown signals after repeated failures.
+- [x] Make every step idempotent on owner, instance, step, and input hash.
+- [x] Return prior trace/response on exact retry and a reviewable conflict on changed inputs.
+- [x] Bound retries and apply existing cooldown signals after repeated failures.
 - [x] Add cancel and timeout resolution events rather than deleting waits or instances.
 - [x] Add concurrency tests for duplicate dispatch, two workers advancing one step, stale revision, retry, cancel, timeout, and terminal state.
 
@@ -295,8 +335,8 @@ Depends on: 6–8
 - [x] Validate tool input/output schemas and reject unknown fields. (Bounded closed contracts, exact canonical grant preparation and structured-result validation; six schema and four PostgreSQL boundary tests. External dispatch remains separate.)
 - [x] Reuse existing capability/tool dispatch and AFP result persistence. (Direct MCP adapter uses canonical owner connection/grant authority and durable private AFP receipts. Credential-service wiring and provider rollout remain separate.)
 - [x] Check success criteria deterministically before completing an instance.
-- [ ] Store each meaningful step as `runbook_step_trace` with input/output refs and provenance.
-- [ ] Add tests for every deterministic step, tool failure, schema failure, success criteria failure, and partial retry.
+- [x] Store each meaningful step as `runbook_step_trace` with input/output refs and provenance.
+- [x] Add tests for every deterministic step, tool failure, schema failure, success criteria failure, and partial retry.
 
 ## 10. Epistemic escalation and resume
 
@@ -326,7 +366,7 @@ Depends on: 7–10
 
 - [x] Add `src/runbook_llm_step.rs` for only `classify`, `reason`, and `draft` step kinds.
 - [ ] Resolve inference through the current user BYOK/shared model ladder; do not read API keys directly in the runbook runtime.
-- [ ] Start with `gpt-6-luna` low/medium for bounded frequent tasks and permit policy-controlled `gpt-6.1-sol` medium escalation only after acceptance criteria fail.
+- [x] Start with `gpt-6-luna` low/medium for bounded frequent tasks and permit policy-controlled `gpt-6.1-sol` medium escalation only after acceptance criteria fail.
 - [x] Require structured output schema for classification/reasoning and AFP draft objects for draft steps.
 - [x] Use reusable cached prompt prefixes, source references, strict evidence limits, and generate only on meaningful input changes.
 - [x] Record model, prompt version, tokens, cost, approval state, revision, input/output hashes, and source refs in the step trace/provenance.
@@ -365,7 +405,7 @@ tenant DDL to prevent the parallel-erasure deadlock found by the control tests.
 
 Depends on: 6, 8, 9, 11
 
-- [ ] Reuse `build_action_provenance_record_afp` for actionable traces and hash definition, trigger, evidence packet, tool/model output, and approval.
+- [x] Reuse `build_action_provenance_record_afp` for actionable traces and hash definition, trigger, evidence packet, tool/model output, and approval.
 - [x] Extend the proactive provenance adapter only where shared metadata is missing; do not create a competing provenance format.
 - [x] Record outcomes under `runbook:<runbook_id>:<step_id>` and reuse proactive outcome/cooldown/priority functions.
 - [x] Keep family-level feedback cautious; acceptance never grants authority or bypasses approval.
@@ -432,7 +472,7 @@ Depends on: 1–16
 - [ ] Run an internal allowlist with deterministic steps only and inspect duplicate, policy-denial, stale, and cross-tenant metrics.
 - [ ] Enable draft-only model steps after representative Luna-versus-Sol evaluation passes.
 - [ ] Enable approval-gated tools only after security/privacy review and provider/sandbox evidence.
-- [ ] Keep reversible action rollout separate and require objective acceptance, undo, error, and cost criteria.
+- [x] Keep reversible action rollout separate and require objective acceptance, undo, error, and cost criteria. (See rollout-evidence.md; no action cohort is enabled.)
 - [ ] Freeze the exact candidate SHA; all evidence, build manifests, and deployment records must name it.
 
 ## Completion definition

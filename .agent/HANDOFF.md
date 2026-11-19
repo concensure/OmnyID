@@ -1,3 +1,101 @@
+## 2026-11-19: WED-375 lifecycle closure and bounded owner model adapter
+
+Implementation: `C:/temp/wt/omnyid-runbooks`, `agent/codex/WED-375`.
+Frozen source: `77c58b5c215f4e19b706922f5be121176991f681`.
+Verification: `C:/temp/wt/omnyid-runbooks-verify-43d7c830`, clean detached at
+that SHA. Later documentation commits do not replace this source candidate.
+Checklist: **109 complete / 8 remaining of 117**. WED-375 remains in progress.
+
+Implemented three-failure/hour owner/runbook cooldown at dispatch and start;
+definition successors cannot bypass it. Exact replay remains unchanged and
+unknown tool outcomes are never resent. Added wait-phase traces/provenance in
+the same transaction as every schedule revision, with separate identities from
+the canonical completion trace. Tests cover all wait phases and injected trace
+write rollback. Exact tool provenance hashes are checked against stored ground
+truth, including the real approval and explicit absent packet.
+
+Added OwnerRunbookModelProvider under src/inference/runbook.rs and child modules.
+It reuses server/llm_resolution, requires active owner and compatible OpenAI BYOK
+Luna configuration, validates owner/schema/prompt/model policy, and uses bounded
+strict-JSON transport with usage/cost checks. Sol medium requires trusted policy;
+runtime additionally requires acceptance failure, retry allowance and budget.
+No public execution route or worker enables it. The shared ladder currently
+selects other model families and is explicitly denied, not silently overridden.
+No real provider call was made; tests use dummy credentials and loopback HTTP.
+
+Added a frozen normalized quote review regression (no booking/payment authority).
+Moved unchanged tenant identifier helpers and alias validation into small modules
+to restore line budgets. Fixed a date-dependent Wedding fixture, a stale copy
+assertion, and two pre-existing Unix-only workflow test name-resolution errors.
+Defined separate reversible-action acceptance/undo/error/cost gates in
+Documents/design/runbooks/rollout-evidence.md. No migrations, dependencies,
+production configuration or other agent's sitemap/primary files were changed.
+
+Files: src/runbook_runtime/failure_cooldown.rs; src/runbook_runtime.rs;
+src/runbook_schedule.rs and trace.rs child; src/inference.rs and runbook children;
+src/runbook_llm_step.rs; src/db.rs and tenant_names.rs child; src/server/mod.rs,
+alias_validation.rs and tests/workflow_trigger_tests.rs; focused Runbook test
+files/children; two Wedding test fixtures; canonical task/checklist/decision notes.
+
+Local verification at the frozen source has exit 0 evidence: 116 integration
+tests across 23 binaries; 384 distinct unit regressions, including seven Runbook
+tests, seven workflow tests, 40 migration checks and related policy/Watcher/
+Synthesizer/approval/tenant/provider/quote coverage; frontend typecheck; both
+line budgets; 2306 Wedding tests; five Runbook state tests; 15 browser scenarios;
+production frontend build; and standalone Rust library plus homeserver binary
+dev-profile build. No ignored Rust tests were reported in these selected suites.
+This is candidate verification, not completion of the remaining integration,
+release or hosted rollout gates. The project-pinned compiler/CI release gate has
+not been established by the local Rust 1.94.1 workaround.
+
+Machine-collected local manifest: C:/temp/wt/runbook-77c58b5c-evidence.json.
+It validates clean source identity, all 19 selected check-log exit codes, log
+SHA-256 hashes, 116 integration results, 384 unique unit names, unit-binary hash,
+builder image identity, and empty candidate CI/deployment query results.
+
+Evidence prefix: C:/temp/wt/runbook-77c58b5c- with .log/.exit files for each
+check. Backend runner: C:/temp/wt/verify-runbook-candidate.ps1; verifies exact
+root/SHA/clean status before running. Linux Rust 1.94.1, pinned builder image
+omnyid-wed318-builder-test:a42db33, read-only source bind, dedicated disposable
+PostgreSQL, shared cargo caches, -j1, incremental off, debug=0, package codegen
+units=64, RUST_MIN_STACK=536870912 and core dumps disabled. Project compiler pin
+is unchanged. These are local artifacts, not GitHub Checks or deployment proof.
+The compiled unit binary was reused directly for filtered regressions, with the
+exact source mounted read-only at /workspace and that working directory selected.
+Its SHA-256 before and after those runs was
+5dace124b84981f322a8c7cd4901a470b93faa96fa2312e8b74f5222b7ae77f1.
+This avoids repeating Cargo fingerprint scans, not compilation or test coverage.
+The dedicated omnyid-runbook-wed375-pg container is stopped. Ephemeral verification
+containers removed themselves; no worktrees, volumes or caches were pruned.
+
+Superseded candidates: 8c036c26 passed 113 integrations; 9dc0ce57 passed 115;
+93325904 passed 116. The 227ffd14 compile found a misplaced module inner
+attribute (fixed in 9dc0ce57). The 93325904 unit build found existing Linux test
+references (fixed in 85467be4). Superseded queued/failed builds were stopped;
+retain their logs rather than presenting them as final candidate results.
+85467be4 passed integration, Runbook units and standalone build. Wider tests then
+found a wrong-path permissions fixture, corrected in 77c58b5c. An initial direct
+migration-test invocation omitted /workspace; rerunning with the exact source
+mount passed all 40 checks. Final source repeats those checks with the mount.
+
+Open tasks: shared model compatibility/funding policy; canonical quote event
+through normalization and Documents/response projection with separate booking
+approval; full release verification; hosted flags-off shadow; deterministic
+allowlist metrics; representative model evaluation/rollout; reviewed sandbox
+tool rollout; final release/deployment evidence. The quote fixture covers only
+frozen normalized review, not that entire canonical pipeline. Shared model policy
+and sandbox/staging details were requested asynchronously; no answer received yet.
+Tool rollout still includes trusted application composition, reviewed capability
+and evidence-to-argument mapping, and provider-evidence reconciliation. Approval
+alone does not complete those integrations or make an Unknown result safe to retry.
+
+GitHub queries for this SHA returned no CI runs and no deployments. The existing
+remote lineage remains unsuitable for push/PR; no PR or push was created. No
+deployment or production-health assertion. Production go-ahead is not inferred
+from the request to finish implementation. Next: resolve the shared-model choice
+and canonical quote integration, then satisfy the staged evidence gates. Never
+enable tools/models or deploy from the dirty implementation checkout.
+
 ## 2026-11-19: WED-375 secret-service factory and abandoned tool closure
 
 Implementation: `C:/temp/wt/omnyid-runbooks`, `agent/codex/WED-375`.
