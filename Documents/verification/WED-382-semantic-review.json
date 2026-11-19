@@ -1,0 +1,21 @@
+{
+  "source_sha": "ae1ac01a2c285ac10b09404cffe3db67fbaaa034",
+  "accepted": true,
+  "draft_scope": "Luna-medium private draft-only internal HTTP cohort",
+  "tool_scope": "approved isolated marker-provider internal HTTP cohort",
+  "security_privacy_accepted": true,
+  "comparison_structural_acceptances": 36,
+  "draft_semantic_acceptances": 12,
+  "non_draft_deviation": "Sol conflicting_dates asks clarification but says differing dates do not establish a conflict",
+  "classification_or_reasoning_activation_approved": false,
+  "external_provider_interoperability_verified": false,
+  "general_production_activation_approved": false,
+  "ui_execution_activation_verified": false,
+  "reviewer": "review_auth_availability",
+  "reviewed_at": "2026-11-19T14:56:14.327225+00:00",
+  "evidence_sha256": {
+    "model-evidence.json": "5beaeeb1ebc657edca241a77d02cb81d1b7071683665cb8249347af8923f730b",
+    "comparison/model-evidence.json": "b83bfb319e9710274a4c458957283a72332c08549532a8afa4be5769af4812e6",
+    "sandbox-evidence.json": "ea8dcd0cf6d82a1ea22fa23ec5895959728a996862ad123072365cf687391595"
+  }
+}

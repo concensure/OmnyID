@@ -44,3 +44,18 @@ receipt/provenance, and suppresses replay. One attempt cost113microunits. Combin
 final comparison/application cost18,275microunits (USD0.018275). Artifacts:
 WED-382-model-evidence.json and WED-382-application-model-evidence.json.
 Tool acceptance still requires the final independent sandbox/expiry evidence.
+
+## Final-source approval-tool acceptance
+
+Cross-review accepts the narrow isolated marker-provider tool gate for the same
+frozen ae1ac01a source. All12cases completed; independent journal has exactly
+six effects, one for each expected case and no duplicates. Actual HTTP approval,
+recent authentication, owner isolation, replay suppression, changed arguments
+and grants, revocation, cancellation, uncertain outcomes, persistence failure,
+and real ten-minute approval expiry were covered. The final expiry produced
+zero effects. Artifact: WED-382-sandbox-evidence.json.
+
+This accepts internal HTTP execution against the marker provider only. External
+provider interoperability, general production activation and UI execution remain
+outside the approved scope. The remaining library test and final release checks
+must complete before shipping; these reviews do not replace those checks.
