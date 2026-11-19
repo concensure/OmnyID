@@ -20,8 +20,8 @@ tasks:
     status: in_progress
     owner: codex
     branch: agent/codex/WED-382
-    candidate_sha: 7f8abcf41bf06e72b3b995047cffe71ce7de05da
-    verification_worktree: C:/temp/wt/omnyid-wed382-verify
+    candidate_sha: ae1ac01a2c285ac10b09404cffe3db67fbaaa034
+    verification_worktree: C:/temp/wt/omnyid-wed382-verify-r3
     worktree: C:/temp/wt/omnyid-wed382
     base_sha: ee63f13b058df77d63f5e3caf6d8d9c78396f40c
     depends_on: [WED-380, WED-381]
