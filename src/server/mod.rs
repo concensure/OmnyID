@@ -1,6 +1,5 @@
-mod alias_validation;
-use alias_validation::validate_alias;
 #![allow(dead_code)]
+mod alias_validation;
 
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap, VecDeque},

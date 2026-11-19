@@ -48,7 +48,8 @@ test("valid output-only record becomes anchored tradeoff input without raw visit
   assert.doesNotMatch(store.getItem(WEDDING_LEAD_MAGNET_RECORD_KEY) ?? "", /raw visitor text/i);
 });
 
-test("account import is idempotent, reviewable, and removes output only after save", async () => {
+test("account import is idempotent, reviewable, and removes output only after save", async (t) => {
+  t.mock.timers.enable({ apis: ["Date"], now: new Date("2026-10-17T00:00:00.000Z") });
   const store = storage();
   writeLeadMagnetRecord(store, {
     core_theme: "intimate garden warmth",

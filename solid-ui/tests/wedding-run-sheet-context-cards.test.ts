@@ -17,5 +17,5 @@ test("run-sheet contextual cards preserve the A2UI intent and authoritative-comm
   assert.match(database, /databaseRootRef\.requestFullscreen/);
   assert.match(database, /document\.exitFullscreen/);
   assert.match(database, /data-database-fullscreen/);
-  assert.match(database, /Run sheet are live read-only views/);
+  assert.match(database, /Run sheet are live views of the same Wedding ledger/);
 });
