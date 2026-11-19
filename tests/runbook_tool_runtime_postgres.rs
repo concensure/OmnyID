@@ -1,4 +1,6 @@
 //! Disposable PostgreSQL and loopback mock provider only; no external calls.
+#[path = "runbook_tool_runtime_postgres/recovery.rs"]
+mod recovery;
 use chrono::Utc;
 use omnyid_homeserver::db::{
     Db, McpToolConnectionUpsert, UserConnectedCapabilityRecord, UserRecord,

@@ -12,6 +12,7 @@ use crate::{
     runbook_tool_runtime::ToolProvider,
 };
 use sqlx::Row;
+mod credentials;
 
 pub struct McpRunbookProvider<'a> {
     db: &'a Db,
@@ -25,6 +26,23 @@ fn denied() -> CallFailure {
     }
 }
 impl<'a> McpRunbookProvider<'a> {
+    /// Trusted composition boundary: reuse the application's selected secret
+    /// backend. Never construct this backend or target list from request content.
+    /// Existing encrypted connections use the same HKDF domain and version.
+    pub async fn from_secret_backend(
+        db: &'a Db,
+        backend: &dyn crate::secret_manager::SecretBackend,
+        targets: Vec<PinnedMcpTarget>,
+    ) -> Result<Self, &'static str> {
+        let key = tokio::time::timeout(
+            std::time::Duration::from_secs(10),
+            credentials::load(backend),
+        )
+        .await
+        .map_err(|_| "tool_credential_service_unavailable")??;
+        Self::new(db, key, targets)
+    }
+
     /// Key is supplied by the trusted credential service, never the definition,
     /// model or request. Targets must be operator-reviewed and provider-tested.
     pub fn new(

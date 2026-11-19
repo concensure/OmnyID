@@ -175,8 +175,125 @@ impl RunbookRuntime<'_, '_> {
                 None,
             ),
         };
+        self.finish_tool(
+            owner,
+            &proposal,
+            &reservation,
+            outcome,
+            failure,
+            output,
+            None,
+        )
+        .await
+    }
+
+    /// Explicit abandonment, not provider reconciliation. The authenticated caller
+    /// acknowledges that an admitted external action may still happen. Never retry.
+    /// No HTTP/worker entrypoint exposes this operation yet.
+    pub async fn abandon_tool_attempt(
+        &self,
+        owner: &str,
+        instance: &str,
+        proposal_ref: &str,
+        expected_revision: u32,
+    ) -> Result<ToolReceipt> {
+        let mut tx = self.store.begin(owner).await?;
+        self.load_instance(owner, instance, &mut tx).await?;
+        let value = self
+            .store
+            .read_kind(
+                owner,
+                "runbook_tool_proposal",
+                Some(proposal_ref),
+                None,
+                &mut tx,
+            )
+            .await?
+            .pop()
+            .ok_or("tool_proposal_missing")?;
+        let proposal: ToolProposal = records::decode(&value)?;
+        if proposal.instance_id != instance {
+            return Err("tool_proposal_mismatch");
+        }
+        let rid = records::id(
+            "runbook_tool_reservation",
+            owner,
+            instance,
+            &proposal.step_id,
+        );
+        let value = self
+            .store
+            .read_kind(owner, "runbook_tool_reservation", Some(&rid), None, &mut tx)
+            .await?
+            .pop()
+            .ok_or("tool_reservation_missing")?;
+        let reservation: Reservation = records::decode(&value)?;
+        tx.commit().await.map_err(|_| "storage_unavailable")?;
+        self.finish_tool(
+            owner,
+            &proposal,
+            &reservation,
+            ToolOutcome::Unknown,
+            Some("tool_attempt_abandoned".into()),
+            None,
+            Some(expected_revision),
+        )
+        .await
+    }
+
+    async fn finish_tool(
+        &self,
+        owner: &str,
+        proposal: &ToolProposal,
+        reservation: &Reservation,
+        outcome: ToolOutcome,
+        failure: Option<String>,
+        output: Option<serde_json::Value>,
+        abandon_revision: Option<u32>,
+    ) -> Result<ToolReceipt> {
+        let instance = proposal.instance_id.as_str();
+        let proposal_ref = proposal.proposal_ref.as_str();
+        let step = &proposal.step_id;
+        let reservation_id = records::id("runbook_tool_reservation", owner, instance, step);
+        let result_id = records::id("runbook_tool_result", owner, instance, step);
+        let decision_id = records::id("runbook_tool_decision", owner, instance, step);
+        if reservation.instance_id != instance
+            || reservation.step_id != *step
+            || reservation.proposal_ref != proposal_ref
+            || reservation.request_hash != proposal.request_hash
+            || reservation.decision_ref != decision_id
+        {
+            return Err("tool_reservation_mismatch");
+        }
         let mut tx = self.store.begin(owner).await?;
         let current = self.load_instance(owner, instance, &mut tx).await?;
+        // Owner transaction serialization makes result persistence first-writer-wins.
+        // A late provider response cannot overwrite an explicit unknown receipt.
+        if let Some(value) = self
+            .store
+            .read_kind(
+                owner,
+                "runbook_tool_result",
+                Some(&result_id),
+                None,
+                &mut tx,
+            )
+            .await?
+            .pop()
+        {
+            let receipt: ToolReceipt = records::decode(&value)?;
+            if receipt.proposal_ref != proposal_ref || receipt.request_hash != proposal.request_hash
+            {
+                return Err("tool_replay_conflict");
+            }
+            tx.commit().await.map_err(|_| "storage_unavailable")?;
+            return Ok(receipt);
+        }
+        if let Some(revision) = abandon_revision {
+            if current.instance.revision != revision {
+                return Err("stale_revision");
+            }
+        }
         let saved = self
             .store
             .read_kind(
@@ -272,7 +389,7 @@ impl RunbookRuntime<'_, '_> {
             instance_id: instance.into(),
             step_id: step.clone(),
             proposal_ref: proposal_ref.into(),
-            request_hash: proposal.request_hash,
+            request_hash: proposal.request_hash.clone(),
             outcome,
             failure,
             output,

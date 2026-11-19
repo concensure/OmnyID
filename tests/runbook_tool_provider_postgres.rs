@@ -1,4 +1,4 @@
-//! Disposable local PostgreSQL only. No provider is invoked by these tests.
+//! Disposable PostgreSQL, dummy credentials and loopback providers only.
 use chrono::Utc;
 use omnyid_homeserver::{
     db::{Db, McpToolConnectionUpsert, UserConnectedCapabilityRecord, UserRecord},
@@ -455,4 +455,145 @@ async fn unsupported_transport_and_deleted_owner_never_send() {
     );
     assert_eq!(calls.load(Ordering::SeqCst), 0);
     server.abort();
+}
+
+// In-memory backend avoids process-global environment changes in parallel tests.
+struct Secrets {
+    primary: Option<String>,
+    signing: Option<String>,
+    fail: bool,
+    reads: std::sync::Mutex<Vec<String>>,
+}
+#[async_trait::async_trait]
+impl omnyid_homeserver::secret_manager::SecretBackend for Secrets {
+    async fn get(
+        &self,
+        name: &str,
+    ) -> Result<Option<String>, omnyid_homeserver::secret_manager::SecretError> {
+        self.reads.lock().unwrap().push(name.into());
+        if self.fail {
+            return Err(omnyid_homeserver::secret_manager::SecretError::Backend(
+                "private backend diagnostic".into(),
+            ));
+        }
+        Ok(if name == "OMNYID_ENCRYPTION_KEY_HEX" {
+            self.primary.clone()
+        } else {
+            self.signing.clone()
+        })
+    }
+    async fn set(
+        &self,
+        _: &str,
+        _: &str,
+    ) -> Result<(), omnyid_homeserver::secret_manager::SecretError> {
+        unreachable!()
+    }
+}
+#[tokio::test]
+async fn secret_backend_factory_derives_compatible_keys_and_fails_closed() {
+    let db = database().await;
+    let owner = user(&db).await;
+    let (endpoint, calls, server) = mock().await;
+    install(&db, &owner.id, &endpoint).await;
+    let root = [42u8; 32];
+    let derived = omnyid_homeserver::post_quantum::hkdf_sha256(
+        &root,
+        b"omnyid-tool-connection-kek",
+        b"v1",
+        32,
+    );
+    let key: [u8; 32] = derived.try_into().unwrap();
+    credential(
+        &db,
+        &owner.id,
+        &omnyid_homeserver::crypto::encrypt_secret("dummy-owner-key", &key),
+    )
+    .await;
+    let context = ToolDispatchContext {
+        user_id: &owner.id,
+        db: &db,
+    };
+    let prepared = prepare_runbook_tool(&context, "mail", "read", json!({"limit":0}))
+        .await
+        .unwrap();
+    for primary in [Some(hex::encode(root)), None] {
+        let expected_reads = if primary.is_some() { 1 } else { 2 };
+        let backend = Secrets {
+            primary,
+            signing: Some(hex::encode(root)),
+            fail: false,
+            reads: Default::default(),
+        };
+        let adapter = McpRunbookProvider::from_secret_backend(
+            &db,
+            &backend,
+            vec![PinnedMcpTarget::loopback_sandbox(&endpoint).unwrap()],
+        )
+        .await
+        .unwrap();
+        assert_eq!(backend.reads.lock().unwrap().len(), expected_reads);
+        adapter.call(&prepared).await.unwrap();
+    }
+    assert_eq!(calls.load(Ordering::SeqCst), 2);
+    for (primary, signing, fail, expected) in [
+        (None, None, false, "tool_credential_key_missing"),
+        (
+            Some("".into()),
+            Some(hex::encode(root)),
+            false,
+            "tool_credential_key_invalid",
+        ),
+        (
+            Some("garbage".into()),
+            Some(hex::encode(root)),
+            false,
+            "tool_credential_key_invalid",
+        ),
+        (
+            Some("00".repeat(32)),
+            Some(hex::encode(root)),
+            false,
+            "tool_credential_key_invalid",
+        ),
+        (
+            Some("ff".repeat(31)),
+            None,
+            false,
+            "tool_credential_key_invalid",
+        ),
+        (
+            Some("gg".repeat(32)),
+            None,
+            false,
+            "tool_credential_key_invalid",
+        ),
+        (
+            None,
+            Some(hex::encode(root)),
+            true,
+            "tool_credential_service_unavailable",
+        ),
+    ] {
+        let present = primary.is_some();
+        let backend = Secrets {
+            primary,
+            signing,
+            fail,
+            reads: Default::default(),
+        };
+        let result = McpRunbookProvider::from_secret_backend(
+            &db,
+            &backend,
+            vec![PinnedMcpTarget::loopback_sandbox(&endpoint).unwrap()],
+        )
+        .await;
+        assert_eq!(result.err(), Some(expected));
+        if present || fail {
+            assert_eq!(backend.reads.lock().unwrap().len(), 1);
+        }
+    }
+    assert_eq!(calls.load(Ordering::SeqCst), 2);
+    server.abort();
+    erase(&db, &owner).await;
 }
