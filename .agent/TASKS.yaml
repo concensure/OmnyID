@@ -15,6 +15,17 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-378
+    title: Collect isolated Oracle Runbook shadow and deterministic cohort evidence
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-378
+    worktree: C:/temp/wt/omnyid-wed378
+    base_sha: 805bd525
+    depends_on: [WED-375, WED-377]
+    files: [src/bin/runbook-rollout-probe.rs, Documents/design/runbooks/**, Documents/verification/WED-378*, .agent/**]
+    acceptance: [Clean frozen-source operator probe on isolated Oracle database, explicit synthetic owners and bounded event/definition cohort, expected versus observed shadow suppression counts and zero instance writes, deterministic replay and stale/cross-owner/cancellation denials, no model or tool dispatch and no production flag changes, machine evidence distinguishes hosted operator exercise from enabled application rollout]
+    progress: "Registered Oracle-only continuation. No GitHub upload or PR requested. Production remains b9ead529; isolated probe has no production credentials or provider network."
   - id: WED-377
     candidate_sha: b9ead5298fb0cff77ef552c1dc4281e6d35c6bc8
     verification_worktree: C:/temp/wt/omnyid-wed377-verify
