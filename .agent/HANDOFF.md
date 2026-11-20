@@ -11821,3 +11821,66 @@ remote CI for this candidate, hosted test or deployment. GitHub query returned
 old unrelated main failure 23703104075 and no deployment records. No worktrees
 were removed. Source commits and this handoff are available for the next review.
 Dedicated disposable database container omnyid-runbook-wed375-pg stopped after verification.
+## 2026-11-20 - WED-383 portal audit and public quote source intake (Codex, review candidate)
+
+Implementation worktree: `C:/temp/wt/omnyid-wed383`, branch
+`agent/codex/WED-383`. Clean verified application candidate:
+`b0f34656818c5c80a401c58bb55b197bf33406a1`. This branch descends from WED-382's
+completed Runbooks lineage and extends the existing WED-350/WED-377 quote engine;
+it does not consume the stale dirty primary checkout.
+
+Audit result:
+
+- VMP-01 through VMP-10 are implemented on this lineage and have prior exact-SHA
+  Oracle release evidence: first-release portal WED-347, publication/resources/
+  teams/entitlements WED-358 and sales operations WED-366.
+- A read-only hosted probe on 2026-11-20 returned 200 for the public comparison,
+  Wedding home and vendor entry. The public comparison HTML still referenced
+  `quote-decoder-engine.js?v=20261119-377` and lacked `Scenario estimate`,
+  `Vendor confirmation needed`, remaining-budget and minimum-spend scenario
+  markers. `/healthz` and `/readyz` remained authenticated (401 to anonymous).
+- Therefore WED-383 was not deployed and no earlier VMP release evidence was
+  reused to claim it was. No production mutation occurred in this continuation.
+
+Changed:
+
+- Reconciled the standalone `vendor management portal spec.md` into the advanced
+  worktree, updated it to version 1.1 and added FR-011A plus AT-19..22 for the
+  dedicated couple quote comparison, immutable scenario estimates, conditional
+  decisions and both numeric minimum-spend cases.
+- Added VMP-11 to the vendor portal task plan and corrected its release state:
+  implementation complete, Oracle release pending. Updated the focused venue
+  quote comparison spec/task plan consistently.
+- Extended the existing no-login page rather than adding another calculator.
+  TXT/Markdown/EML and selectable-text PDFs are read locally; PDF.js is reused
+  from the pinned frontend dependency, with its Apache-2.0 licence and only the
+  static module/worker vendored. Scanned/unreadable, oversized and over-80-page
+  PDFs receive an explicit manual or signed-in fallback.
+- Added browser/static regressions proving PDF text populates locally and causes
+  no contextual-extraction request until the user explicitly selects Analyse.
+
+Verification at the clean candidate SHA:
+
+- `npm run test:wedding:ci`: exit 0; TypeScript, both line budgets, public
+  metadata/security/static suites, quote engine/scenario cases and 2,318 Wedding
+  tests passed.
+- `npm run build`: exit 0; the existing object-screen and large-chunk warnings
+  remain warnings.
+- `node wedding/tests/quote-decoder-browser-smoke.mjs`: exit 0 at 390px plus
+  desktop scale checks; local PDF extraction, zero pre-analysis requests,
+  source-grounded analysis/cache, minimum-spend A$5,200 to A$5,000 scenario,
+  deposit separation, remaining budget, device-only choice and PDF share passed.
+- The first PDF smoke attempt correctly failed because cleanup called the
+  document proxy rather than the loading task; candidate `b0f34656` contains the
+  fix and the final clean rerun supersedes that failure.
+
+Unresolved/release boundary:
+
+- No Oracle deployment, static hot-sync, GitHub push or PR was performed. Release
+  requires explicit owner approval, a clean detached checkout of the exact
+  candidate, the repository pre-deploy gate, rollback capture and post-deploy
+  checks for `/wedding/`, the sign-in redirect, the no-login quote page, PDF.js
+  assets, authenticated health and exact runtime/source identity.
+- WED-384 must base on this reviewed descendant (not its older `3ac7ff94` pin) if
+  it proceeds, and must retain the quote-decoder files unchanged unless its scope
+  is deliberately expanded.

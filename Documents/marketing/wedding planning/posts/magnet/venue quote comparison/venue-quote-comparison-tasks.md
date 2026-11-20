@@ -1,6 +1,6 @@
 # Venue Quote Comparison v3 — dependency-ordered tasks
 
-Status: v2 released under WED-350/WED-377; v3 implementation continuing under WED-383, release evidence pending
+Status: v2 released under WED-350/WED-377; v3 implementation complete at `b0f34656818c5c80a401c58bb55b197bf33406a1`, Oracle release evidence pending
 
 | ID | Task | Depends on | Acceptance |
 |---|---|---|---|

@@ -11,6 +11,13 @@ calculation rules but stores a preference only on that device. Per-vendor
 `Quote received` remains a lifecycle status and is not a second comparison
 store or decision authority.
 
+The no-login page reuses the already pinned `pdfjs-dist` browser capability for
+selectable-text PDF extraction. It vendors only the same-origin minified module,
+worker and upstream licence needed by the static page. Merely choosing a PDF
+does not upload bytes or extracted text. Scanned, oversized, over-page-limit or
+unreadable PDFs fail to manual entry or the authenticated canonical Documents
+ingestion path; this does not add a second server parser or source authority.
+
 ## 2026-11-19: WED-382 bounded acceptance is not broad activation
 
 The Runbook implementation checklist closes with reviewed internal HTTP cohorts:
