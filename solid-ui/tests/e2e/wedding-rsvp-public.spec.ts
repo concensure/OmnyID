@@ -20,6 +20,7 @@ const scope = {
     { invitation_id: "invite:alex", person_id: "person:alex", event_id: "event:wedding-day", display_name: "Alex Rivera", invitation_status: "invited", response_revision: 1, plus_one_allowed: true, children_invited: false },
     { invitation_id: "invite:sam", person_id: "person:sam", event_id: "event:wedding-day", display_name: "Sam Rivera", invitation_status: "invited", response_revision: 1, plus_one_allowed: false, children_invited: true },
   ],
+  latest_responses: [],
 };
 
 async function mockRsvp(page: Page, delay = 0) {
@@ -31,7 +32,7 @@ async function mockRsvp(page: Page, delay = 0) {
     const body = route.request().postDataJSON() as { attendance: string; answers: Record<string, string> };
     expect(["attending", "not_attending"]).toContain(body.attendance);
     if (body.attendance === "not_attending") expect(body.answers).toEqual({});
-    await route.fulfill({ json: { replayed: false, explanation: "Saved", response: { revision: 2 }, impact_receipt: { effects: ["guest_attendance_updated"] } } });
+    await route.fulfill({ json: { replayed: false, explanation: "Saved", response: { revision: 2, responded_at: "2027-09-02T03:04:05Z" }, impact_receipt: { effects: ["guest_attendance_updated"] } } });
   });
 }
 
@@ -50,7 +51,7 @@ for (const viewport of [{ width: 320, height: 720 }, { width: 375, height: 812 }
     await page.getByRole("button", { name: "Review RSVP" }).click();
     await expect(page.getByRole("heading", { name: "Review before sending" })).toBeFocused();
     await page.getByRole("button", { name: "Submit RSVP" }).click();
-    await expect(page.getByRole("heading", { name: "Thank you — RSVP received" })).toBeFocused();
+    await expect(page.getByRole("heading", { name: "Your RSVP confirmation" })).toBeFocused();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
     const accessibility = await new AxeBuilder({ page }).analyze();
     expect(accessibility.violations.filter(({ impact }) => impact === "serious" || impact === "critical")).toEqual([]);
@@ -68,7 +69,46 @@ test("declining skips attendee questions and validation restores focus", async (
   await expect(page.getByLabel(/Meal choice/)).toHaveCount(0);
   await page.getByRole("button", { name: "Review RSVP" }).click();
   await page.getByRole("button", { name: "Submit RSVP" }).click();
-  await expect(page.getByRole("heading", { name: "Thank you — RSVP received" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Your RSVP confirmation" })).toBeVisible();
+});
+
+test("returning link shows the latest guest-safe confirmation and keeps private plaintext hidden", async ({ page }) => {
+  await page.route("**/wedding/rsvp/capabilities/open", (route) => route.fulfill({ json: {
+    ...scope,
+    latest_responses: [{ invitation_id: "invite:alex", person_id: "person:alex", event_id: "event:wedding-day", attendance: "attending", answers: { meal_choice: "Vegetarian" }, private_answer_question_ids: ["dietary_requirements"], has_private_answers: true, revision: 2, submitted_at: "2027-09-02T03:04:05Z", complete: true }],
+  } }));
+  await page.goto("/workspace/rsvp.html#returning-token", { waitUntil: "networkidle" });
+  await expect(page.getByRole("heading", { name: "Your RSVP confirmation" })).toBeVisible();
+  await expect(page.getByText("Vegetarian")).toBeVisible();
+  await expect(page.getByText("Private detail saved")).toBeVisible();
+  await expect(page.getByText("No response saved yet")).toBeVisible();
+  await expect(page.getByText(/encrypted:v1|must never/i)).toHaveCount(0);
+  await page.getByRole("button", { name: "Edit RSVP" }).click();
+  await expect(page.getByText(/private details are saved/i)).toBeVisible();
+  await expect(page.getByLabel(/Meal choice/).first()).toHaveValue("Vegetarian");
+});
+
+test("editing one named guest appends only that response and preserves unchanged household members", async ({ page }) => {
+  const submitted: string[] = [];
+  await page.route("**/wedding/rsvp/capabilities/open", (route) => route.fulfill({ json: {
+    ...scope,
+    latest_responses: [
+      { invitation_id: "invite:alex", person_id: "person:alex", event_id: "event:wedding-day", attendance: "attending", answers: { meal_choice: "Vegetarian" }, private_answer_question_ids: ["dietary_requirements"], has_private_answers: true, revision: 2, submitted_at: "2027-09-02T03:04:05Z", complete: true },
+      { invitation_id: "invite:sam", person_id: "person:sam", event_id: "event:wedding-day", attendance: "attending", answers: { meal_choice: "Chicken" }, private_answer_question_ids: [], has_private_answers: false, revision: 2, submitted_at: "2027-09-02T03:04:05Z", complete: true },
+    ],
+  } }));
+  await page.route("**/wedding/rsvp/capabilities/respond", async (route) => {
+    const body = route.request().postDataJSON() as { invitation_id: string };
+    submitted.push(body.invitation_id);
+    await route.fulfill({ json: { replayed: false, explanation: "Saved", response: { revision: 3, responded_at: "2027-09-03T03:04:05Z" }, impact_receipt: { effects: ["guest_attendance_updated"] } } });
+  });
+  await page.goto("/workspace/rsvp.html#returning-token", { waitUntil: "networkidle" });
+  await page.getByRole("button", { name: "Edit RSVP" }).click();
+  await page.getByLabel(/Meal choice/).nth(1).selectOption("Vegetarian");
+  await page.getByRole("button", { name: "Review RSVP" }).click();
+  await page.getByRole("button", { name: "Submit RSVP" }).click();
+  await expect(page.getByRole("heading", { name: "Your RSVP confirmation" })).toBeVisible();
+  expect(submitted).toEqual(["invite:sam"]);
 });
 
 test("public RSVP keeps a loading state and reflows at 200 percent text zoom", async ({ page }) => {

@@ -66,6 +66,9 @@ export type WeddingRsvpSetupDraftResult = {
 export type WeddingRsvpInvitationPreview = {
   householdId: string | null;
   householdLabel: string;
+  hostLabel: string;
+  eventLabel: string;
+  responseDeadline: string;
   recipients: Array<{
     displayName: string;
     invitationId: string;
@@ -74,6 +77,7 @@ export type WeddingRsvpInvitationPreview = {
     childrenInvited: boolean;
   }>;
   questionLabels: string[];
+  questions: Array<{ label: string; required: boolean; sensitive: boolean }>;
   privacyLabel: string;
 };
 
@@ -407,8 +411,16 @@ export function buildWeddingRsvpInvitationPreviews(
     .map(([householdLabel, household]) => ({
       householdId: household.householdId,
       householdLabel,
+      hostLabel: setup.hostLabel,
+      eventLabel: setup.eventLabel,
+      responseDeadline: setup.responseDeadline,
       recipients: household.recipients.sort((left, right) => left.displayName.localeCompare(right.displayName)),
       questionLabels,
+      questions: setup.questions.filter((question) => question.enabled).map((question) => ({
+        label: question.prompt || question.label,
+        required: question.required,
+        sensitive: question.sensitive,
+      })),
       privacyLabel: "Private answers stay with the couple unless they explicitly approve a minimum-necessary vendor brief.",
     }))
     .sort((left, right) => left.householdLabel.localeCompare(right.householdLabel));

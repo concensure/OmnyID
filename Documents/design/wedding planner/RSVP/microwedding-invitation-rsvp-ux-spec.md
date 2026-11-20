@@ -1,9 +1,11 @@
 # Microwedding invitation and RSVP UX extension specification
 
-Status: proposed implementation extension
-Work item: WED-385 planning slice
+Status: implementation in progress
+Work item: WED-385 planning slice; WED-386 implementation
 Extends: `wedding-rsvp-spec.md` and the existing WED-303 implementation
 Research input: `microwedding invitation wedding research.md`
+
+Implementation checkpoint (WED-386): the existing publishing panel now has a non-mutating household test preview; capability open returns a scoped guest-safe latest-response projection; reopening a valid link shows a confirmation and changed-person-only edit path; and the existing decision follow-up surface consumes a pure AFP/provider/response lifecycle projection. Test-to-self delivery, canonical venue/directions/calendar preflight, lock-state UX and hosted rollout remain explicitly unimplemented.
 
 ## 1. Outcome
 

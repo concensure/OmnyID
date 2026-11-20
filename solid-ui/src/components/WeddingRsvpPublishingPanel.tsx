@@ -38,6 +38,7 @@ export function WeddingRsvpPublishingPanel(props: {
   const [loaded, setLoaded] = createSignal(false);
   const [grants, setGrants] = createSignal<WeddingRsvpCapabilityGrant[]>([]);
   const [selectedHousehold, setSelectedHousehold] = createSignal<string | null>(null);
+  const [previewHousehold, setPreviewHousehold] = createSignal<string | null>(null);
   const [expiry, setExpiry] = createSignal(futureExpiry());
   const [confirmed, setConfirmed] = createSignal(false);
   const [requestContactDetails, setRequestContactDetails] = createSignal(false);
@@ -49,6 +50,7 @@ export function WeddingRsvpPublishingPanel(props: {
   const [createdContactRequest, setCreatedContactRequest] = createSignal(false);
   const [createdLoomUrl, setCreatedLoomUrl] = createSignal("");
   const priorLoomUrls = createMemo(() => [...new Set(grants().flatMap((grant) => grant.loom_video_url ? [grant.loom_video_url] : []))]);
+  const testPreview = createMemo(() => previews().find((preview) => preview.householdLabel === previewHousehold()) ?? null);
 
   onMount(async () => {
     try {
@@ -147,24 +149,37 @@ export function WeddingRsvpPublishingPanel(props: {
     <h4 id="rsvp-publish-title" class="text-sm font-semibold text-teal-950">Protected household links</h4>
     <p class="mt-1 text-xs leading-5 text-teal-950/70">Creating a link does not send it. Each link opens only the named people and event shown below.</p>
     <Show when={loaded()} fallback={<p role="status" class="mt-2 text-xs text-teal-900">Checking protected-link availability…</p>}>
-      <Show when={enabled()} fallback={<p class="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-950">Protected RSVP publishing is safely switched off in this environment. Draft setup and previews still work.</p>}>
+      <Show when={!enabled()}><p class="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-950">Protected RSVP publishing is safely switched off in this environment. Draft setup and previews still work.</p></Show>
         <div class="mt-3 grid gap-2">
           <For each={previews()}>{(preview) => {
             const grant = () => activeGrant(preview.householdId);
             return <article class="rounded-xl border border-teal-100 p-3">
               <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div class="min-w-0"><p class="break-words text-sm font-semibold text-teal-950">{preview.householdLabel}</p><p class="mt-0.5 break-words text-xs text-teal-950/65">{preview.recipients.map((recipient) => recipient.displayName).join(" · ")}</p></div>
-                <Show when={preview.householdId} fallback={<span class="text-xs font-semibold text-amber-800">Save this household before publishing</span>}>
-                  <Show when={grant()} fallback={<button type="button" class="min-h-11 rounded-lg border border-teal-300 px-3 text-sm font-semibold text-teal-950" onClick={() => { setSelectedHousehold(preview.householdId); setCreatedLink(""); setCreatedRecipients([]); setCreatedContactRequest(false); setNotice(""); }}>Create link</button>}>
-                    {(current) => <button type="button" disabled={busy()} class="min-h-11 rounded-lg border border-rose-200 px-3 text-sm font-semibold text-rose-900" onClick={() => void revoke(current().grant_id)}>Revoke link</button>}
+                <div class="grid gap-2 sm:grid-cols-2">
+                  <button type="button" class="min-h-11 rounded-lg border border-teal-300 px-3 text-sm font-semibold text-teal-950" onClick={() => { setPreviewHousehold(preview.householdLabel); setSelectedHousehold(null); }}>Preview as this household</button>
+                  <Show when={enabled()}>
+                    <Show when={preview.householdId} fallback={<span class="flex min-h-11 items-center text-xs font-semibold text-amber-800">Save this household before publishing</span>}>
+                      <Show when={grant()} fallback={<button type="button" class="min-h-11 rounded-lg border border-teal-300 px-3 text-sm font-semibold text-teal-950" onClick={() => { setSelectedHousehold(preview.householdId); setPreviewHousehold(null); setCreatedLink(""); setCreatedRecipients([]); setCreatedContactRequest(false); setNotice(""); }}>Create link</button>}>
+                        {(current) => <button type="button" disabled={busy()} class="min-h-11 rounded-lg border border-rose-200 px-3 text-sm font-semibold text-rose-900" onClick={() => void revoke(current().grant_id)}>Revoke link</button>}
+                      </Show>
+                    </Show>
                   </Show>
-                </Show>
+                </div>
               </div>
             </article>;
           }}</For>
         </div>
-      </Show>
     </Show>
+    <Show when={testPreview()}>{(preview) => <div role="dialog" aria-modal="true" aria-labelledby="rsvp-test-preview-title" class="mt-3 rounded-xl border-2 border-sky-300 bg-sky-50 p-3">
+      <p class="text-xs font-bold uppercase tracking-wide text-sky-800">Test preview — no link created and nothing sent</p>
+      <h5 id="rsvp-test-preview-title" class="mt-1 text-lg font-semibold text-teal-950">RSVP for {preview().eventLabel}</h5>
+      <p class="mt-1 text-sm text-teal-900">From {preview().hostLabel} · respond by <time datetime={preview().responseDeadline}>{new Date(`${preview().responseDeadline}T12:00:00`).toLocaleDateString(undefined, { dateStyle: "long" })}</time></p>
+      <div class="mt-3 grid gap-2"><For each={preview().recipients}>{(recipient) => <div class="rounded-lg border border-sky-100 bg-white p-3"><p class="font-semibold text-teal-950">{recipient.displayName}</p><p class="mt-1 text-xs text-teal-900/70">{recipient.plusOneAllowed ? "Plus-one included as a separately named guest. " : ""}{recipient.childrenInvited ? "Named children appear separately. " : ""}Current response: {recipient.responseStatus.replaceAll("_", " ")}.</p></div>}</For></div>
+      <div class="mt-3 rounded-lg border border-sky-100 bg-white p-3"><p class="text-sm font-semibold text-teal-950">Questions this household will see</p><ul class="mt-1 grid gap-1 text-xs leading-5 text-teal-900/75"><For each={preview().questions}>{(question) => <li>{question.label}{question.required ? " · required" : " · optional"}{question.sensitive ? " · encrypted private answer" : ""}</li>}</For></ul></div>
+      <p class="mt-3 text-xs leading-5 text-teal-900/75">{preview().privacyLabel}</p>
+      <button type="button" class="mt-3 min-h-11 rounded-lg border border-sky-300 bg-white px-4 text-sm font-semibold text-teal-950" onClick={() => setPreviewHousehold(null)}>Close test preview</button>
+    </div>}</Show>
     <Show when={selectedHousehold()}>
       <div role="dialog" aria-modal="true" aria-labelledby="rsvp-create-link-title" class="mt-3 rounded-xl border-2 border-teal-300 bg-teal-50 p-3">
         <h5 id="rsvp-create-link-title" class="text-sm font-semibold text-teal-950">Create this protected link?</h5>

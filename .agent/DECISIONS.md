@@ -4430,3 +4430,24 @@ returning confirmation/edit experience, and one evidence-based actionable follow
 card. Preview/test cannot mutate production lifecycle evidence; returning public
 views never expose private-answer plaintext; provider acceptance, delivery, link
 open and completed response remain distinct evidence.
+
+## 2026-11-20 — RSVP confirmation and follow-up reuse existing authorities (WED-386)
+
+The public capability open response may project the latest response only after the
+current capability has re-established owner, plan, workspace, household, invitation,
+person and event scope. The guest-safe projection contains attendance, controlled
+non-sensitive answers, private-question presence markers, revision, completeness and
+submission time. It never contains private plaintext, ciphertext or contact details.
+Expired and revoked capabilities return no confirmation.
+
+Returning edits continue to use the existing append-only response command, revision
+check and idempotency key. The browser hydrates public answers, skips unchanged named
+people and requires a changed person's private fields to be re-entered before replacing
+them. It does not introduce a mutable RSVP snapshot.
+
+Household preview remains a local projection of the saved setup and guest invitation
+facts; it does not create/open a capability or send a message. Host follow-up remains in
+`WeddingDecisionRsvpFollowUp`: a pure projection combines existing capability lifecycle
+AFP events, canonical response completeness, reminder provider receipts and the deadline.
+“Provider accepted”, “delivered”, “private link opened” and “RSVP complete” remain
+separate literal evidence. Completed households are omitted from the action list.

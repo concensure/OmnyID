@@ -27,6 +27,19 @@ export type WeddingRsvpCapabilityInvitation = {
   meal_requirement: "adult" | "child" | "none" | "unknown";
 };
 
+export type WeddingRsvpCapabilityLatestResponse = {
+  invitation_id: string;
+  person_id: string;
+  event_id: string;
+  attendance: "pending" | "attending" | "not_attending";
+  answers: Record<string, string>;
+  private_answer_question_ids: string[];
+  has_private_answers: boolean;
+  revision: number;
+  submitted_at: string;
+  complete: boolean;
+};
+
 export type WeddingRsvpCapabilityScope = {
   capability_id: string;
   household_id: string;
@@ -41,6 +54,7 @@ export type WeddingRsvpCapabilityScope = {
   request_contact_details: boolean;
   loom_video_url?: string | null;
   invitations: WeddingRsvpCapabilityInvitation[];
+  latest_responses?: WeddingRsvpCapabilityLatestResponse[];
 };
 
 export type WeddingRsvpCapabilityGrant = {

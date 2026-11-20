@@ -201,9 +201,17 @@ test("invitation preview groups exact household recipients without leaking priva
   const previews = buildWeddingRsvpInvitationPreviews(setup, tracking);
   assert.equal(previews.length, 1);
   assert.equal(previews[0]?.householdLabel, "Chen household");
+  assert.equal(previews[0]?.hostLabel, "The couple");
+  assert.equal(previews[0]?.eventLabel, "Wedding day");
+  assert.equal(previews[0]?.responseDeadline, "2027-03-01");
   assert.deepEqual(previews[0]?.recipients.map((recipient) => recipient.displayName), ["Alex Chen", "Sam Chen"]);
   assert.equal(previews[0]?.recipients[0]?.plusOneAllowed, true);
   assert.equal(previews[0]?.recipients[1]?.childrenInvited, true);
+  assert.deepEqual(previews[0]?.questions, [
+    { label: "Attendance", required: true, sensitive: false },
+    { label: "Dietary or allergy requirements", required: false, sensitive: true },
+    { label: "Accessibility requirements", required: false, sensitive: true },
+  ]);
   assert.doesNotMatch(JSON.stringify(previews), /example\.test|private allergy|private access|vegetarian/i);
 });
 

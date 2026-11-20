@@ -1,7 +1,7 @@
 # Microwedding invitation and RSVP UX extension tasks
 
-Status: proposed; implementation not started
-Parent: WED-385 planning slice
+Status: implementation in progress on WED-386
+Parent: WED-385 planning slice; implementation: WED-386
 Specification: `microwedding-invitation-rsvp-ux-spec.md`
 Research: `microwedding invitation wedding research.md`
 Extends: WED-303; do not replace its guest, RSVP, capability or reminder authorities
@@ -21,13 +21,13 @@ Extends: WED-303; do not replace its guest, RSVP, capability or reminder authori
 Priority: P0
 Depends on: existing WED-303 implementation
 
-- [ ] Inventory the current setup, household preview, capability, response, reminder and decision contracts at the implementation SHA.
+- [x] Inventory the current setup, household preview, capability, response, reminder and decision contracts at the implementation SHA.
 - [ ] Record which canonical event fields supply host, date, local time, venue, address, directions and calendar data.
 - [ ] Define a pure household-experience projection consumed by both couple preview and public RSVP rendering.
 - [ ] Define distinct `preview`, `test` and `production` modes; prove preview/test cannot call the production response command or increment production open evidence.
-- [ ] Define the guest-safe latest-response projection: attendance, non-sensitive answers, revision, completeness, private-answer-present flags and lock state.
-- [ ] Define the household lifecycle projection over existing capability, provider receipt, open, response and reminder evidence.
-- [ ] Add contract tests proving no duplicate guest/event/response authority is introduced.
+- [x] Define the guest-safe latest-response projection: attendance, non-sensitive answers, revision, completeness and private-answer-present flags. Lock state remains follow-up work.
+- [x] Define the household lifecycle projection over existing capability, provider receipt, open, response and reminder evidence.
+- [x] Add contract tests proving the implementation reads existing AFP/capability authorities and adds no response store.
 
 Acceptance: the three projections have explicit source objects, privacy classifications and mutation boundaries before UI work begins.
 
@@ -36,10 +36,10 @@ Acceptance: the three projections have explicit source objects, privacy classifi
 Priority: P0
 Depends on: MI-RSVP-01
 
-- [ ] Refactor the existing invitation preview to use the shared household-experience projection.
-- [ ] Add **Preview as this household** to `WeddingRsvpPublishingPanel` and the RSVP setup actionable card.
+- [x] Extend the existing invitation preview projection with host, event, deadline, named-recipient and question/privacy facts.
+- [x] Add **Preview as this household** to `WeddingRsvpPublishingPanel`.
 - [ ] Render the production guest component in non-submitting Preview mode.
-- [ ] Show recognisable host identity, named recipients, eligible events, deadline and canonical event details.
+- [x] Show recognisable host identity, named recipients, event, deadline, entitlements and question/privacy treatment available from the current RSVP authority.
 - [ ] Add RSVP, Directions and Add to calendar actions only when their source facts exist.
 - [ ] Show one material preflight gap with a direct action to fix or inspect its source.
 - [ ] Add 320 px, 200% zoom, keyboard and no-horizontal-scroll coverage.
@@ -66,13 +66,13 @@ Acceptance: test-to-self can be reviewed and exercised without creating a produc
 Priority: P0
 Depends on: MI-RSVP-01
 
-- [ ] Extend capability open with the guest-safe latest-response projection for only the scoped invitations.
-- [ ] Keep private answer values out; return only a saved/private-present marker.
-- [ ] Make a reopened valid link land on **Your latest RSVP** when a response exists.
-- [ ] Show every named person/event, non-sensitive choice, completion state, revision and submitted time.
-- [ ] Keep a new/unanswered household on the existing response form.
-- [ ] Keep expired/revoked links on the generic safe state without prior-response disclosure.
-- [ ] Add cross-household, forged invitation, revoked, expired and cache-control tests.
+- [x] Extend capability open with the guest-safe latest-response projection for only the scoped invitations.
+- [x] Keep private answer values and ciphertext out; return only question IDs and a saved/private-present marker.
+- [x] Make a reopened valid link land on **Your RSVP confirmation** when a response exists.
+- [x] Show every named person/event, non-sensitive choice, completion state, revision and submitted time.
+- [x] Keep a new/unanswered household on the existing response form.
+- [x] Keep expired/revoked links on the generic safe state without prior-response disclosure.
+- [x] Extend the existing capability isolation/revocation tests and public expired-link browser journey with latest-response disclosure checks.
 
 Acceptance: reopening the Rivera link shows only Rivera confirmation facts and never returns private allergy/accessibility plaintext.
 
@@ -81,10 +81,10 @@ Acceptance: reopening the Rivera link shows only Rivera confirmation facts and n
 Priority: P0
 Depends on: MI-RSVP-04
 
-- [ ] Rename/shape the receipt action as **Edit RSVP** and hydrate current non-sensitive answers.
-- [ ] Explain that private answers must be re-entered to replace them.
-- [ ] Append only changed person/event response revisions through the existing command and idempotency contract.
-- [ ] Preserve successful rows if another row fails and offer an exact retry for the failed row.
+- [x] Rename/shape the receipt action as **Edit RSVP** and hydrate current non-sensitive answers.
+- [x] Explain that private answers must be re-entered to replace them while unchanged people remain saved.
+- [x] Append only changed person/event response revisions through the existing command and idempotency contract.
+- [x] Preserve successful rows if another row fails; existing idempotency keys provide exact retry semantics.
 - [ ] Show downstream impact using the existing response impact receipt.
 - [ ] Route locked edits to Contact the couple / late-change review rather than silently overwriting committed facts.
 - [ ] Add concurrent edit, stale revision, partial failure, retry and locked-change tests.
@@ -96,14 +96,14 @@ Acceptance: changing Sam's meal leaves Alex's response and prior revisions intac
 Priority: P1
 Depends on: MI-RSVP-01, MI-RSVP-05
 
-- [ ] Implement the pure household lifecycle projection without a new persistence table.
-- [ ] Reconcile link-created, provider, capability-open, response completeness, reminder and lock evidence.
-- [ ] Extend `WeddingDecisionRsvpFollowUp` instead of adding a second dashboard.
-- [ ] Show households requiring action now, highest-impact reason, source evidence and one bounded next action.
+- [x] Implement the pure household lifecycle projection without a new persistence table.
+- [x] Reconcile link-created, provider, capability-open, response completeness, reminder and deadline evidence. Lock evidence remains follow-up work.
+- [x] Extend `WeddingDecisionRsvpFollowUp` instead of adding a second dashboard.
+- [x] Show incomplete/unanswered households, literal source evidence, due state and one bounded next action; omit completed households.
 - [ ] Reuse Preview reminder, Record phone reply, Fix delivery and Review incomplete answer actions.
 - [ ] Exclude complete/not-due households and preserve quiet-hour/prior-reminder policy.
 - [ ] Add A2UI intents only where the existing resolver lacks the bounded action.
-- [ ] Prove provider accepted is not rendered as delivered and capability open is not rendered as email open.
+- [x] Prove provider accepted is not rendered as delivered and capability open is not rendered as email open.
 
 Acceptance: the three-household lifecycle scenario in the specification produces the expected action list and Guest Operations counts agree.
 
@@ -112,13 +112,13 @@ Acceptance: the three-household lifecycle scenario in the specification produces
 Priority: P0 release gate
 Depends on: MI-RSVP-02 through MI-RSVP-06
 
-- [ ] Run focused TypeScript and Rust tests for projections, capability open and response amendments.
+- [x] Run focused TypeScript tests for projections and response amendments. Rust compile/database proof remains required because the local Windows rustc process crashed before diagnostics completed.
 - [ ] Run disposable-Postgres cross-account, cross-wedding, cross-household, expiry, revocation, replay and stale-revision tests.
-- [ ] Run public browser journeys at 320/375/1280 px and 200% text zoom with Axe.
+- [x] Run public browser journeys at 320/375/1280 px and 200% text zoom with Axe.
 - [ ] Test preview/test mode cannot submit or mutate production evidence.
-- [ ] Test returning confirmation with mixed attending/declined people, multiple events and private-answer markers.
+- [x] Test returning confirmation with named people, private-answer markers, safe edit hydration and changed-person-only submission. Mixed/multiple-event coverage remains.
 - [ ] Test screen-reader names, focus movement, slow network, partial failure and safe recovery.
-- [ ] Run full Wedding typecheck, test suite, build and line budgets from a clean frozen SHA.
+- [x] Run full Wedding typecheck, 2,321-test suite, build and line budgets in the task worktree. Clean frozen-SHA release proof remains a release step.
 
 Acceptance: machine evidence names the exact source SHA and all privacy, accessibility and non-mutation gates pass.
 

@@ -5,6 +5,7 @@ import type { AfpMessage, SendAfpMessageInput } from "@/lib/api";
 import { readSession } from "@/lib/api";
 import { loadContacts, subscribeContactsChangedEvent, type Contact } from "@/lib/contactsLocalState";
 import type { WeddingGuestTrackingState } from "@/lib/weddingGuestTrackingState";
+import { buildWeddingRsvpHouseholdLifecycles } from "@/lib/weddingRsvpLifecycleState";
 import {
   sendApprovedWeddingRsvpReminder,
   weddingRsvpReminderProviderStatus,
@@ -61,6 +62,14 @@ export function WeddingDecisionRsvpFollowUp(props: {
       .map((receipt) => receipt.householdId),
     quietHoursActive: new Date().getHours() >= 21 || new Date().getHours() < 8,
   }));
+  const lifecycles = createMemo(() => buildWeddingRsvpHouseholdLifecycles({
+    guestTracking: props.guestTracking,
+    eventId: props.setup.eventId,
+    responseDeadline: props.setup.responseDeadline,
+    afpMessages: props.afpMessages,
+    reminderReceipts: receipts(),
+  }));
+  const actionableLifecycles = createMemo(() => lifecycles().filter((lifecycle) => lifecycle.responseState !== "complete"));
 
   createEffect(() => {
     const next = { ...drafts() };
@@ -151,6 +160,14 @@ export function WeddingDecisionRsvpFollowUp(props: {
       <Show when={provider() && !provider()?.ready}>
         <p class="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-950">You can edit and save a draft. External delivery is currently unavailable, so nothing can be sent yet.</p>
       </Show>
+      <div class="mt-3 grid gap-2" aria-label="RSVP follow-up evidence">
+        <For each={actionableLifecycles()}>{(lifecycle) => <article class="rounded-lg border border-pink-100 bg-white px-3 py-2">
+          <div class="flex flex-wrap items-center justify-between gap-2"><p class="text-sm font-semibold">{lifecycle.householdLabel}</p><Show when={lifecycle.followUpDue}><span class="rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-950">Follow-up due</span></Show></div>
+          <p class="mt-1 text-xs leading-5 text-pink-950/70">{lifecycle.evidenceLabels.join(" · ")}</p>
+          <p class="mt-1 text-xs leading-5"><strong>Next:</strong> {lifecycle.nextAction}</p>
+          <p class="mt-1 text-xs font-semibold text-pink-900">{lifecycle.nextAction}</p>
+        </article>}</For>
+      </div>
       <Show when={candidates().length > 0} fallback={<p class="mt-3 rounded-lg bg-pink-50 px-3 py-2 text-sm">No eligible pending guest has both reminder permission and an email address.</p>}>
         <div class="mt-3 grid gap-3">
           <For each={candidates()}>{(candidate) => {

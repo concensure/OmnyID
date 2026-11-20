@@ -5,6 +5,7 @@ import {
   openWeddingRsvpCapability,
   submitWeddingRsvpCapabilityResponse,
   type WeddingRsvpCapabilityInvitation,
+  type WeddingRsvpCapabilityLatestResponse,
   type WeddingRsvpCapabilityQuestion,
   type WeddingRsvpCapabilityScope,
 } from "@/lib/weddingRsvpCapabilityApi";
@@ -22,6 +23,7 @@ type GuestDraft = {
   contactEmail: string;
   contactPhone: string;
   relationshipToCouple: string;
+  savedPrivateQuestionIds: string[];
 };
 
 function initialAttendance(invitation: WeddingRsvpCapabilityInvitation): Attendance {
@@ -30,14 +32,16 @@ function initialAttendance(invitation: WeddingRsvpCapabilityInvitation): Attenda
   return "";
 }
 
-function initialDraft(invitation: WeddingRsvpCapabilityInvitation): GuestDraft {
+function initialDraft(invitation: WeddingRsvpCapabilityInvitation, latest?: WeddingRsvpCapabilityLatestResponse): GuestDraft {
   return {
-    attendance: initialAttendance(invitation), answers: {}, privateAnswers: {}, dietaryCategory: "", dietaryDetail: "",
+    attendance: latest?.attendance === "attending" || latest?.attendance === "not_attending" ? latest.attendance : initialAttendance(invitation),
+    answers: { ...(latest?.answers ?? {}) }, privateAnswers: {}, dietaryCategory: "", dietaryDetail: "",
     // The public capability never returns the couple's private contact record.
     // Name is already part of the invitation; the guest supplies the other
     // details explicitly when the couple requests them.
     contactName: invitation.display_name, contactEmail: "",
     contactPhone: "", relationshipToCouple: "",
+    savedPrivateQuestionIds: [...(latest?.private_answer_question_ids ?? [])],
   };
 }
 
@@ -89,9 +93,28 @@ function WeddingRsvpPage() {
   const [error, setError] = createSignal("");
   const [notice, setNotice] = createSignal("");
   const [idempotencyKeys, setIdempotencyKeys] = createSignal<Record<string, string>>({});
+  const [latestResponses, setLatestResponses] = createSignal<WeddingRsvpCapabilityLatestResponse[]>([]);
 
   const attendeeQuestions = createMemo(() => (scope()?.questions ?? []).filter((question) => question.id !== "attendance"));
   const hasSensitiveQuestions = createMemo(() => attendeeQuestions().some((question) => question.sensitive));
+
+  function latestFor(invitationId: string): WeddingRsvpCapabilityLatestResponse | undefined {
+    return latestResponses().find((response) => response.invitation_id === invitationId);
+  }
+
+  function publicDraftChanged(invitationId: string, draft: GuestDraft): boolean {
+    const latest = latestFor(invitationId);
+    if (!latest) return true;
+    if (draft.attendance !== latest.attendance) return true;
+    const answers = draft.attendance === "attending" ? draft.answers : {};
+    return JSON.stringify(Object.entries(answers).sort()) !== JSON.stringify(Object.entries(latest.answers).sort());
+  }
+
+  function draftNeedsSubmission(invitationId: string, draft: GuestDraft): boolean {
+    if (scope()?.request_contact_details) return true;
+    if (publicDraftChanged(invitationId, draft)) return true;
+    return Boolean(draft.dietaryCategory || Object.values(draft.privateAnswers).some((value) => value.trim()));
+  }
 
   onMount(async () => {
     const fragmentToken = window.location.hash.slice(1).trim();
@@ -105,8 +128,19 @@ function WeddingRsvpPage() {
     try {
       const opened = await openWeddingRsvpCapability(fragmentToken);
       setScope(opened);
-      setDrafts(Object.fromEntries(opened.invitations.map((invitation) => [invitation.invitation_id, initialDraft(invitation)])));
-      setPhase("answer");
+      const latestByInvitation = new Map((opened.latest_responses ?? []).map((response) => [response.invitation_id, response]));
+      for (const invitation of opened.invitations) {
+        const latest = latestByInvitation.get(invitation.invitation_id);
+        if (latest && latest.revision > invitation.response_revision) invitation.response_revision = latest.revision;
+      }
+      setLatestResponses(opened.latest_responses ?? []);
+      setDrafts(Object.fromEntries(opened.invitations.map((invitation) => [invitation.invitation_id, initialDraft(invitation, latestByInvitation.get(invitation.invitation_id))])));
+      if ((opened.latest_responses ?? []).length > 0) {
+        setNotice("This is the latest RSVP saved through this private link.");
+        setPhase("receipt");
+      } else {
+        setPhase("answer");
+      }
     } catch {
       setError("This RSVP invitation is not available. It may have expired or been replaced. Ask the couple for a new link.");
       setPhase("error");
@@ -122,7 +156,7 @@ function WeddingRsvpPage() {
     setDrafts((current) => Object.fromEntries(Object.entries(current).map(([id, draft]) => [id, {
       ...draft,
       attendance,
-      ...(attendance === "not_attending" ? { answers: {}, privateAnswers: {}, dietaryCategory: "", dietaryDetail: "" } : {}),
+      ...(attendance === "not_attending" ? { answers: {}, privateAnswers: {}, dietaryCategory: "", dietaryDetail: "", savedPrivateQuestionIds: [] } : {}),
     }])));
     setNotice(`${attendance === "attending" ? "Attending" : "Not attending"} selected for each named guest. You can still change anyone individually.`);
   }
@@ -158,9 +192,9 @@ function WeddingRsvpPage() {
       if (draft.attendance === "not_attending") continue;
       for (const question of attendeeQuestions().filter((item) => item.required)) {
         const present = question.id === "dietary_requirements"
-          ? Boolean(draft.dietaryCategory)
+          ? Boolean(draft.dietaryCategory) || (!publicDraftChanged(invitation.invitation_id, draft) && draft.savedPrivateQuestionIds.includes(question.id))
           : question.sensitive
-            ? Boolean(draft.privateAnswers[question.id]?.trim())
+            ? Boolean(draft.privateAnswers[question.id]?.trim()) || (!publicDraftChanged(invitation.invitation_id, draft) && draft.savedPrivateQuestionIds.includes(question.id))
             : Boolean(draft.answers[question.id]?.trim());
         if (!present) {
           setNotice(`Answer “${questionLabel(question)}” for ${invitation.display_name}.`);
@@ -195,7 +229,14 @@ function WeddingRsvpPage() {
     setPhase("submitting");
     setNotice("Saving your RSVP securely…");
     try {
-      for (const invitation of currentScope.invitations) {
+      const changedInvitations = currentScope.invitations.filter((invitation) => draftNeedsSubmission(invitation.invitation_id, drafts()[invitation.invitation_id]!));
+      if (changedInvitations.length === 0) {
+        setNotice("No changes were submitted. Your latest RSVP remains saved.");
+        setPhase("receipt");
+        focusField("receipt-title");
+        return;
+      }
+      for (const invitation of changedInvitations) {
         const draft = drafts()[invitation.invitation_id]!;
         const privatePayload = draft.attendance === "attending"
           ? await encryptedPrivateAnswers(currentScope, invitation, draft)
@@ -219,9 +260,24 @@ function WeddingRsvpPage() {
         });
         const revision = Number(result.response.revision);
         if (Number.isSafeInteger(revision)) invitation.response_revision = revision;
+        const submittedAt = typeof result.response.responded_at === "string" ? result.response.responded_at : new Date().toISOString();
+        const safeResponse: WeddingRsvpCapabilityLatestResponse = {
+          invitation_id: invitation.invitation_id,
+          person_id: invitation.person_id,
+          event_id: invitation.event_id,
+          attendance: draft.attendance || "pending",
+          answers: draft.attendance === "attending" ? { ...draft.answers } : {},
+          private_answer_question_ids: [...privatePayload.ids],
+          has_private_answers: privatePayload.ids.length > 0,
+          revision: Number.isSafeInteger(revision) ? revision : invitation.response_revision,
+          submitted_at: submittedAt,
+          complete: true,
+        };
+        setLatestResponses((current) => [...current.filter((item) => item.invitation_id !== invitation.invitation_id), safeResponse]);
+        setDrafts((current) => ({ ...current, [invitation.invitation_id]: { ...current[invitation.invitation_id], savedPrivateQuestionIds: [...privatePayload.ids] } }));
       }
       setIdempotencyKeys({});
-      setNotice("Your RSVP has been recorded for each named guest.");
+      setNotice("Your RSVP changes have been recorded.");
       setPhase("receipt");
       focusField("receipt-title");
     } catch (caught) {
@@ -266,8 +322,9 @@ function WeddingRsvpPage() {
                         </div>
                       </div>
                     </Show>
-                    <div class="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2"><label class="flex min-h-12 items-center gap-3 rounded-xl border border-teal-200 p-3 font-semibold"><input type="radio" name={`attendance-${invitation.invitation_id}`} class="h-5 w-5 accent-teal-800" checked={draft().attendance === "attending"} onChange={() => updateDraft(invitation.invitation_id, (current) => ({ ...current, attendance: "attending" }))} />Attending</label><label class="flex min-h-12 items-center gap-3 rounded-xl border border-teal-200 p-3 font-semibold"><input type="radio" name={`attendance-${invitation.invitation_id}`} class="h-5 w-5 accent-teal-800" checked={draft().attendance === "not_attending"} onChange={() => updateDraft(invitation.invitation_id, (current) => ({ ...current, attendance: "not_attending", answers: {}, privateAnswers: {}, dietaryCategory: "", dietaryDetail: "" }))} />Not attending</label></div>
+                    <div class="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2"><label class="flex min-h-12 items-center gap-3 rounded-xl border border-teal-200 p-3 font-semibold"><input type="radio" name={`attendance-${invitation.invitation_id}`} class="h-5 w-5 accent-teal-800" checked={draft().attendance === "attending"} onChange={() => updateDraft(invitation.invitation_id, (current) => ({ ...current, attendance: "attending" }))} />Attending</label><label class="flex min-h-12 items-center gap-3 rounded-xl border border-teal-200 p-3 font-semibold"><input type="radio" name={`attendance-${invitation.invitation_id}`} class="h-5 w-5 accent-teal-800" checked={draft().attendance === "not_attending"} onChange={() => updateDraft(invitation.invitation_id, (current) => ({ ...current, attendance: "not_attending", answers: {}, privateAnswers: {}, dietaryCategory: "", dietaryDetail: "", savedPrivateQuestionIds: [] }))} />Not attending</label></div>
                     <Show when={draft().attendance === "attending"}><div class="mt-4 grid gap-4">
+                      <Show when={draft().savedPrivateQuestionIds.length > 0}><p class="rounded-xl border border-sky-200 bg-sky-50 p-3 text-sm leading-6 text-sky-950"><strong>Private details are saved.</strong> They are not displayed by this public link. If you change this person's public response, re-enter each private answer you want the couple to keep. Unchanged people remain saved.</p></Show>
                       <For each={attendeeQuestions()}>{(question) => <Show when={question.id === "meal_choice"} fallback={<Show when={question.id === "dietary_requirements"} fallback={<PrivateQuestion question={question} value={draft().privateAnswers[question.id] ?? ""} onInput={(value) => updateDraft(invitation.invitation_id, (current) => ({ ...current, privateAnswers: { ...current.privateAnswers, [question.id]: value } }))} />}>
                         <div id={`dietary_requirements-${invitation.invitation_id}`} tabindex="-1" class="grid gap-2"><label class="text-sm font-semibold">Dietary or allergy category {!question.required && <span class="font-normal text-teal-800">(optional)</span>}<select class="mt-1 min-h-12 w-full rounded-xl border border-teal-200 bg-white px-3" value={draft().dietaryCategory} onChange={(event) => updateDraft(invitation.invitation_id, (current) => ({ ...current, dietaryCategory: event.currentTarget.value }))}><option value="">Choose one</option><option value="none">None</option><option value="allergy">Allergy</option><option value="coeliac">Coeliac</option><option value="preference">Preference</option><option value="other">Other</option></select></label><Show when={draft().dietaryCategory && draft().dietaryCategory !== "none"}><label class="text-sm font-semibold">Details <span class="font-normal text-teal-800">(optional)</span><textarea rows="2" maxlength="400" class="mt-1 w-full rounded-xl border border-teal-200 p-3" value={draft().dietaryDetail} onInput={(event) => updateDraft(invitation.invitation_id, (current) => ({ ...current, dietaryDetail: event.currentTarget.value }))} /></label></Show></div>
                       </Show>}>
@@ -283,7 +340,7 @@ function WeddingRsvpPage() {
             </section>
           </Show>
           <Show when={phase() === "review" || phase() === "submitting"}><section class="mt-4 rounded-2xl border border-teal-100 bg-white p-5"><h2 id="review-title" tabindex="-1" class="text-xl font-bold focus:outline-none">Review before sending</h2><p class="mt-1 text-sm text-teal-800">Only the answers shown here will be submitted. Private answers remain encrypted for the couple.</p><div class="mt-4 grid gap-3"><For each={loaded().invitations}>{(invitation) => { const draft = () => drafts()[invitation.invitation_id]!; return <div class="rounded-xl border border-teal-100 p-3"><p class="font-bold">{invitation.display_name}</p><p class="mt-1 text-sm">{draft().attendance === "attending" ? "Attending" : "Not attending"}</p><Show when={loaded().request_contact_details}><p class="mt-2 text-sm text-teal-900/75"><strong>Contact:</strong> {draft().contactName} · {draft().relationshipToCouple} · {draft().contactEmail} · {draft().contactPhone}</p></Show><Show when={draft().attendance === "attending"}><For each={attendeeQuestions()}>{(question) => <p class="mt-1 break-words text-sm text-teal-900/75"><strong>{questionLabel(question)}:</strong> {question.id === "dietary_requirements" ? draft().dietaryCategory || "Not answered" : question.sensitive ? draft().privateAnswers[question.id] || "Not answered" : draft().answers[question.id] || "Not answered"}</p>}</For></Show></div>; }}</For></div><Show when={notice()}><p role="status" class="mt-4 text-sm">{notice()}</p></Show><div class="mt-4 grid gap-2 sm:grid-cols-2"><button type="button" disabled={phase() === "submitting"} class="min-h-12 rounded-xl border-2 border-teal-700 font-bold text-teal-900" onClick={() => setPhase("answer")}>Edit answers</button><button type="button" disabled={phase() === "submitting"} class="min-h-12 rounded-xl bg-teal-800 font-bold text-white disabled:bg-teal-300" onClick={() => void submit()}>{phase() === "submitting" ? "Saving…" : "Submit RSVP"}</button></div></section></Show>
-          <Show when={phase() === "receipt"}><section class="mt-4 rounded-2xl border border-emerald-200 bg-white p-5"><h2 id="receipt-title" tabindex="-1" class="text-2xl font-bold focus:outline-none">Thank you — RSVP received</h2><p class="mt-2 text-sm leading-6 text-teal-900/75">{notice()}</p><button type="button" class="mt-4 min-h-12 rounded-xl border-2 border-teal-700 px-4 font-bold text-teal-900" onClick={() => { setPhase("answer"); setNotice("Update the answers, then review and submit the amendment."); }}>Amend response</button></section></Show>
+          <Show when={phase() === "receipt"}><section class="mt-4 rounded-2xl border border-emerald-200 bg-white p-5"><h2 id="receipt-title" tabindex="-1" class="text-2xl font-bold focus:outline-none">Your RSVP confirmation</h2><p class="mt-2 text-sm leading-6 text-teal-900/75">{notice()}</p><div class="mt-4 grid gap-3"><For each={loaded().invitations}>{(invitation) => { const saved = () => latestResponses().find((response) => response.invitation_id === invitation.invitation_id); return <article class="rounded-xl border border-teal-100 p-3"><p class="font-bold">{invitation.display_name}</p><Show when={saved()} fallback={<p class="mt-1 text-sm font-semibold text-amber-800">No response saved yet</p>}>{(response) => <><p class="mt-1 text-sm font-semibold">{response().attendance === "attending" ? "Attending" : response().attendance === "not_attending" ? "Not attending" : "Response incomplete"}</p><For each={loaded().questions.filter((question) => question.id !== "attendance" && !question.sensitive && response().answers[question.id])}>{(question) => <p class="mt-1 text-sm text-teal-900/75"><strong>{questionLabel(question)}:</strong> {response().answers[question.id]}</p>}</For><For each={response().private_answer_question_ids}>{(questionId) => <p class="mt-1 text-sm text-teal-900/75"><strong>{questionLabel(loaded().questions.find((question) => question.id === questionId) ?? { id: questionId, label: "Private detail", required: false, sensitive: true, options: [] })}:</strong> Private detail saved</p>}</For><Show when={response().submitted_at}><p class="mt-2 text-xs text-teal-800">Saved {new Date(response().submitted_at).toLocaleString()} · revision {response().revision}</p></Show></>}</Show></article>; }}</For></div><button type="button" class="mt-4 min-h-12 rounded-xl border-2 border-teal-700 px-4 font-bold text-teal-900" onClick={() => { setPhase("answer"); setNotice("Your saved public answers are filled in. Unchanged people stay saved; re-enter private details only for a person whose response you change."); }}>Edit RSVP</button></section></Show>
           <p class="my-5 text-center text-xs text-teal-800">Private RSVP powered by OmnyID · No account required</p>
         </>}</Match>
       </Switch>

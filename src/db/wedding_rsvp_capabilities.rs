@@ -72,6 +72,20 @@ pub struct WeddingRsvpCapabilityQuestion {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+pub struct WeddingRsvpCapabilityLatestResponse {
+    pub invitation_id: String,
+    pub person_id: String,
+    pub event_id: String,
+    pub attendance: String,
+    pub answers: HashMap<String, String>,
+    pub private_answer_question_ids: Vec<String>,
+    pub has_private_answers: bool,
+    pub revision: i64,
+    pub submitted_at: String,
+    pub complete: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct WeddingRsvpCapabilityScope {
     pub capability_id: String,
     pub household_id: String,
@@ -86,6 +100,8 @@ pub struct WeddingRsvpCapabilityScope {
     pub request_contact_details: bool,
     pub loom_video_url: Option<String>,
     pub invitations: Vec<WeddingRsvpCapabilityInvitation>,
+    #[serde(default)]
+    pub latest_responses: Vec<WeddingRsvpCapabilityLatestResponse>,
 }
 
 #[derive(Clone, Debug)]
@@ -463,6 +479,140 @@ async fn setup_scope(
     )))
 }
 
+async fn latest_response_scope(
+    tx: &mut Transaction<'_, Postgres>,
+    owner_user_id: &str,
+    wedding_plan_id: &str,
+    response_workspace_id: &str,
+    invitations: &[WeddingRsvpCapabilityInvitation],
+    questions: &[WeddingRsvpCapabilityQuestion],
+) -> Result<Vec<WeddingRsvpCapabilityLatestResponse>, sqlx::Error> {
+    if invitations.is_empty() {
+        return Ok(Vec::new());
+    }
+    let invitation_ids = invitations
+        .iter()
+        .map(|invitation| invitation.invitation_id.clone())
+        .collect::<Vec<_>>();
+    let table = format!("\"{}\".messages", tenant_schema_name(owner_user_id));
+    let query = format!(
+        "SELECT DISTINCT ON (m.content->>'invitation_id') m.content FROM {table} m WHERE m.kind='wedding_rsvp_response' AND m.content->>'invitation_id'=ANY($1) AND {} ORDER BY m.content->>'invitation_id',(m.content->>'revision')::bigint DESC,m.timestamp DESC,m.id DESC",
+        metadata_scope("m", 2, 3)
+    );
+    let values = sqlx::query_scalar::<_, Value>(&query)
+        .bind(&invitation_ids)
+        .bind(wedding_plan_id)
+        .bind(response_workspace_id)
+        .fetch_all(&mut **tx)
+        .await?;
+    let values = values
+        .into_iter()
+        .filter_map(|value| {
+            let invitation_id = value
+                .get("invitation_id")
+                .and_then(Value::as_str)
+                .map(str::to_string)?;
+            Some((invitation_id, value))
+        })
+        .collect::<HashMap<_, _>>();
+    let question_by_id = questions
+        .iter()
+        .map(|question| (question.id.as_str(), question))
+        .collect::<HashMap<_, _>>();
+    let mut responses = Vec::new();
+    for invitation in invitations {
+        let Some(value) = values.get(&invitation.invitation_id) else {
+            continue;
+        };
+        if value.get("person_id").and_then(Value::as_str) != Some(invitation.person_id.as_str())
+            || value.get("event_id").and_then(Value::as_str) != Some(invitation.event_id.as_str())
+        {
+            continue;
+        }
+        let attendance = match value
+            .get("attendance")
+            .and_then(Value::as_str)
+            .unwrap_or("pending")
+        {
+            "attending" => "attending",
+            "not_attending" => "not_attending",
+            _ => "pending",
+        };
+        let answers = value
+            .get("answers")
+            .and_then(Value::as_object)
+            .into_iter()
+            .flatten()
+            .filter_map(|(id, answer)| {
+                let question = question_by_id.get(id.as_str())?;
+                if question.sensitive || id == "attendance" {
+                    return None;
+                }
+                answer
+                    .as_str()
+                    .map(|answer| (id.clone(), answer.to_string()))
+            })
+            .collect::<HashMap<_, _>>();
+        let mut private_answer_question_ids = value
+            .get("private_answer_question_ids")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .filter_map(Value::as_str)
+            .filter(|id| {
+                question_by_id
+                    .get(*id)
+                    .map(|question| question.sensitive)
+                    .unwrap_or(false)
+            })
+            .map(str::to_string)
+            .collect::<Vec<_>>();
+        private_answer_question_ids.sort();
+        private_answer_question_ids.dedup();
+        let has_private_answers = value.get("has_private_answers").and_then(Value::as_bool)
+            == Some(true)
+            && !private_answer_question_ids.is_empty();
+        if !has_private_answers {
+            private_answer_question_ids.clear();
+        }
+        let complete = match attendance {
+            "not_attending" => true,
+            "attending" => questions
+                .iter()
+                .filter(|question| question.required)
+                .all(|question| {
+                    question.id == "attendance"
+                        || if question.sensitive {
+                            private_answer_question_ids.contains(&question.id)
+                        } else {
+                            answers
+                                .get(&question.id)
+                                .map(|answer| !answer.trim().is_empty())
+                                .unwrap_or(false)
+                        }
+                }),
+            _ => false,
+        };
+        responses.push(WeddingRsvpCapabilityLatestResponse {
+            invitation_id: invitation.invitation_id.clone(),
+            person_id: invitation.person_id.clone(),
+            event_id: invitation.event_id.clone(),
+            attendance: attendance.to_string(),
+            answers,
+            has_private_answers,
+            private_answer_question_ids,
+            revision: value.get("revision").and_then(Value::as_i64).unwrap_or(0),
+            submitted_at: value
+                .get("responded_at")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_string(),
+            complete,
+        });
+    }
+    Ok(responses)
+}
+
 impl Db {
     pub async fn wedding_rsvp_submission_authority(
         &self,
@@ -816,6 +966,15 @@ impl Db {
         else {
             return Ok(None);
         };
+        let latest_responses = latest_response_scope(
+            &mut tx,
+            &owner_user_id,
+            &wedding_plan_id,
+            &response_workspace_id,
+            &invitations,
+            &questions,
+        )
+        .await?;
         let open_count: i64 = sqlx::query_scalar(
             "UPDATE wedding_rsvp_capability_grants SET open_count=open_count+1,last_opened_at=NOW() WHERE grant_id=$1 RETURNING open_count",
         )
@@ -850,6 +1009,7 @@ impl Db {
             request_contact_details,
             loom_video_url,
             invitations,
+            latest_responses,
         }))
     }
 }

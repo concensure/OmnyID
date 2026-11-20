@@ -164,6 +164,34 @@ async fn insert_setup_fixture(db: &Db, table: &str) {
         .expect("insert RSVP setup");
 }
 
+async fn insert_response_fixture(db: &Db, table: &str, invitation_id: &str) {
+    let insert = format!(
+        "INSERT INTO {table} (id,thread_id,from_agent,to_agents,timestamp,type,kind,subtype,content,signature,store_in_relational,metadata) VALUES ($1,'rsvp-capability-test','test','[]'::jsonb,NOW(),'ledger','wedding_rsvp_response','wedding_rsvp_response',$2,'test',TRUE,$3)"
+    );
+    sqlx::query(&insert)
+        .bind(ulid::Ulid::new().to_string())
+        .bind(json!({
+            "response_id": "wedding-rsvp-response:test",
+            "invitation_id": invitation_id,
+            "person_id": "wedding_guest:primary:alex",
+            "event_id": "wedding_event:primary:ceremony",
+            "attendance": "attending",
+            "answers": {"meal_choice": "Vegetarian", "dietary_requirements": "must never escape"},
+            "private_answer_question_ids": ["dietary_requirements"],
+            "has_private_answers": true,
+            "encrypted_private_payload": "encrypted:v1:must-never-return",
+            "revision": 2,
+            "responded_at": "2027-09-02T03:04:05Z"
+        }))
+        .bind(json!({
+            "weddingPlanId": "wedding_plan:primary",
+            "responseWorkspaceId": "response_workspace:primary"
+        }))
+        .execute(&db.pool)
+        .await
+        .expect("insert RSVP response");
+}
+
 #[tokio::test]
 async fn disposable_postgres_proves_capability_isolation_rotation_and_revocation() {
     let database_url = std::env::var("OMNYID_RSVP_TEST_DATABASE_URL")
@@ -275,6 +303,7 @@ async fn disposable_postgres_proves_capability_isolation_rotation_and_revocation
             .expect("outsider list")
             .is_empty()
     );
+    insert_response_fixture(&db, &table, invitation_id).await;
 
     let opened = db
         .open_wedding_rsvp_capability(&digest_one)
@@ -288,9 +317,25 @@ async fn disposable_postgres_proves_capability_isolation_rotation_and_revocation
     assert_eq!(opened.event_label, "Wedding ceremony");
     assert_eq!(opened.questions.len(), 3);
     assert_eq!(opened.questions[2].id, "dietary_requirements");
+    assert_eq!(opened.latest_responses.len(), 1);
+    assert_eq!(opened.latest_responses[0].attendance, "attending");
+    assert_eq!(
+        opened.latest_responses[0]
+            .answers
+            .get("meal_choice")
+            .map(String::as_str),
+        Some("Vegetarian")
+    );
+    assert_eq!(
+        opened.latest_responses[0].private_answer_question_ids,
+        vec!["dietary_requirements"]
+    );
+    assert!(opened.latest_responses[0].complete);
     let opened_json = serde_json::to_string(&opened).expect("serialize safe scope");
     assert!(!opened_json.contains("private@example.invalid"));
     assert!(!opened_json.contains("private dietary detail"));
+    assert!(!opened_json.contains("must never escape"));
+    assert!(!opened_json.contains("must-never-return"));
     let (left, right) = tokio::join!(
         db.open_wedding_rsvp_capability(&digest_one),
         db.open_wedding_rsvp_capability(&digest_one),

@@ -15,6 +15,18 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-386
+    title: Implement production-faithful RSVP preview, returning confirmation and evidence-based follow-up
+    status: review
+    owner: codex
+    reviewer: claude
+    branch: agent/codex/WED-386
+    worktree: C:/temp/wt/omnyid-wed386
+    base_sha: a5220923fdeb48c5a7d5f6bda5d9f7a7062c71da
+    depends_on: [WED-385, WED-303]
+    files: [solid-ui/src/rsvp.tsx, solid-ui/src/components/WeddingRsvpPublishingPanel.tsx, solid-ui/src/components/WeddingDecisionRsvpFollowUp.tsx, solid-ui/src/lib/weddingRsvp*.ts, solid-ui/tests/wedding-rsvp*.test.ts, solid-ui/tests/wedding-decision-rsvp-follow-up-render.test.ts, solid-ui/tests/e2e/wedding-rsvp-public.spec.ts, src/db/wedding_rsvp_capabilities.rs, src/server/wedding_rsvp_capability_routes.rs, src/server/wedding_rsvp_capability_routes_tests.rs, Documents/design/wedding planner/RSVP/microwedding-invitation-rsvp-ux-*.md, .agent/**]
+    acceptance: [Couples can preview the exact named household RSVP experience without creating a capability sending a message or changing guest lifecycle evidence, reopening a valid capability with saved responses shows a guest-safe latest confirmation and allows append-only edits while private answer plaintext stays hidden, the couple follow-up surface distinguishes link-created provider outcome production-link open incomplete complete and due-for-follow-up evidence without inferring email opens, existing AFP guest event capability response reminder and decision authorities remain canonical, focused backend frontend public-browser and full Wedding gates pass from a clean exact-SHA candidate, production flags remain false-default and no Oracle deployment occurs without a separately approved release]
+    progress: "Implemented against the existing WED-303 authorities from clean WED-385 head a5220923fdeb48c5a7d5f6bda5d9f7a7062c71da: local non-mutating household preview, capability-scoped guest-safe latest confirmation, changed-person-only append edit, and AFP/provider/response follow-up evidence in the existing decision surface. npm run test:wedding:ci passed 2321 tests, production build passed, and 8 public RSVP Playwright journeys passed. Rust source was rustfmt-clean for touched files, but Windows rustc 1.94 repeatedly exited 0xc0000005 while compiling unrelated syn/tokio dependencies even with a new target and one job; backend check still requires healthy CI/Linux proof. Flags remain false-default; no deploy was attempted."
   - id: WED-385
     title: Apply soft Wedding message, complete quote item controls, and specify high-value invitation RSVP UX
     status: review

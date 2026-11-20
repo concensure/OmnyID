@@ -15,4 +15,7 @@ test("RSVP decision follow-up exposes exact editable recipient, message, contact
   assert.match(source, /Save draft/);
   assert.match(source, /Send reminder/);
   assert.match(source, /weddingRsvpReminderApprovalToAfpSendInput/);
+  assert.match(source, /buildWeddingRsvpHouseholdLifecycles/);
+  assert.match(source, /RSVP follow-up evidence/);
+  assert.match(source, /Follow-up due/);
 });
