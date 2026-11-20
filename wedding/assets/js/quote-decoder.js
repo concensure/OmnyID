@@ -515,7 +515,7 @@
       if (!extractedText) throw new Error("no_selectable_text");
       return extractedText.slice(0, MAX_LOCAL_TEXT_CHARACTERS);
     } finally {
-      await pdf.destroy();
+      await task.destroy();
     }
   }
 
