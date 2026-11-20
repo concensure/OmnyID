@@ -1,3 +1,38 @@
+## WED-386 focused RSVP extension ready for review (2026-11-20)
+
+Worktree `C:/temp/wt/omnyid-wed386`, branch `agent/codex/WED-386`, based on the
+advanced WED-385 coordination head `a5220923fdeb48c5a7d5f6bda5d9f7a7062c71da`.
+Implementation commit: `6f6de0becc66eaa9d448d1d59a6042377f7482f1`.
+
+The existing RSVP flow now has three focused extensions. The publishing panel can
+preview the exact named household, host, event, deadline, entitlement and question
+privacy treatment without creating/opening a capability or sending anything. A valid
+returning capability projects only scoped guest-safe latest response fields and opens
+on a confirmation; sensitive plaintext, ciphertext and private contacts are never
+returned. Editing hydrates public answers and appends only changed named people through
+the existing revision/idempotency command. The existing decision follow-up component
+now derives literal link-created/opened, provider outcome, response completeness and
+deadline evidence from current AFP/provider/guest authorities; completed households
+are omitted. No parallel RSVP store or automatic send was added.
+
+Verification in the task worktree: `npm run test:wedding:ci` passed typecheck,
+line budgets, public Wedding/security tests and 2,321 Wedding tests; `npm run build`
+passed; the public RSVP Playwright file passed all 8 journeys, covering 320/375/1280
+px, 200% text zoom, Axe, guest-safe reopen, changed-person-only amendment and generic
+expired-link handling. Focused RSVP state tests passed and `git diff --check` passed.
+The disposable Postgres RSVP proof skips without its database environment variable.
+Windows Rust 1.94 repeatedly exited `0xc0000005` while compiling unrelated dependency
+crates (`syn`, `tokio`) even with an isolated target, 64 MiB worker stack and one job;
+no repository diagnostic was emitted. Re-run Rust check/database proof on healthy CI
+or Linux before release.
+
+The implementation/spec task documents record remaining non-release backlog:
+test-to-self provider delivery, canonical venue/directions/calendar preflight and
+locked-edit/contact UX. Production RSVP flags remain false-default. No Oracle build,
+configuration change, migration or deployment was attempted. Next action: review the
+implementation commit, run healthy-host Rust/DB evidence, then create a clean exact-SHA
+release candidate only if deployment is separately requested.
+
 ## WED-383 native container verification complete (2026-11-20)
 
 Worktree `C:/temp/wt/omnyid-wed383`, branch `agent/codex/WED-383`.
