@@ -11986,3 +11986,40 @@ Limits and next action:
 - The new RSVP documents are an implementation plan, not a claim that the three
   extension workflows are shipped. Review should first confirm the guest-safe latest
   response projection and preview/test non-mutation boundary in MI-RSVP-01.
+## WED-386 implemented and released false-default to Oracle (2026-11-20)
+
+Worktree `C:/temp/wt/omnyid-wed386`, branch `agent/codex/WED-386`. Exact deployed
+application SHA: `23b9c57007188e460135f0e0c71806180f69d7a9`. Native Oracle image:
+`sha256:f6ef45dee35b37772100c2798268af9315abc2f150a76b996cb22fad1a7c0e96`
+(`linux/arm64`), running with zero restarts. Public RSVP, test-send and reminder-send
+flags are false. `/wedding/`, wedding sign-in, `/workspace/rsvp.html` and
+`/wedding/compare-wedding-venue-quotes.html` return 200; the Soft headline and
+small-wedding wording are live. Caddy validates. Public `/healthz` retains its existing
+authenticated 401.
+
+The implementation adds the shared production/preview/test household renderer,
+canonical setup event facts, non-submitting short-lived test view, separately approved
+test-to-self provider events, guest-safe returning confirmation with locked/impact and
+partial-failure handling, and due-only bounded follow-up actions. It extends the
+existing WED-303 AFP/capability/response/reminder authorities and adds no parallel RSVP
+store.
+
+Evidence: `npm run test:wedding:ci` passed 2,323 tests; `npm run build` passed; 10 RSVP
+Playwright journeys passed at 320/375/1280, 200% zoom and Axe; 22 focused RSVP tests
+passed against disposable PostgreSQL; the exact SHA built successfully as a Linux
+release image. The first uploaded amd64 image restart-looped on the ARM64 host and was
+immediately rolled back to `sha256:de181133e9463ae2d63b25137b80a4a402ad0bd3645d59dd1ae8cd43281f5706`.
+The corrected ARM64 build required `RUST_MIN_STACK=16777216` after QEMU/rustc SIGSEGV.
+
+Rollback is retained at `/home/ubuntu/omnyid-candidates/wed386-23b9c570/rollback`
+with the prior image tag `omnyid-homeserver:wed386-rollback-de181133`, Caddy/Compose,
+source manifest and static snapshot. Backup verification passed. Full restore proof was
+blocked before mutation by disk preflight: 2,440,323,072 bytes free versus
+8,055,071,801 required for the 6,346,663,615-byte source DB. The production proof with
+restore explicitly skipped passed. Oracle root is 95% used; no backups, rollback
+artifacts, images or user data were deleted.
+
+Open gates: do not enable test-to-self or broaden the cohort until an authenticated
+allowlisted synthetic couple/household exercise and a real provider receipt prove
+non-mutation. Those two rollout checkboxes remain intentionally open. Proof artifacts:
+`C:/temp/wed386-oracle-production-proof-arm64`.

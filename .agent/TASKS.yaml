@@ -17,17 +17,17 @@ lifecycle:
 tasks:
   - id: WED-386
     title: Implement production-faithful RSVP preview, returning confirmation and evidence-based follow-up
-    status: in_progress
+    status: review
     owner: codex
     reviewer: claude
     branch: agent/codex/WED-386
     worktree: C:/temp/wt/omnyid-wed386
     base_sha: a5220923fdeb48c5a7d5f6bda5d9f7a7062c71da
-    implementation_sha: 6f6de0becc66eaa9d448d1d59a6042377f7482f1
+    implementation_sha: 23b9c57007188e460135f0e0c71806180f69d7a9
     depends_on: [WED-385, WED-303]
     files: [solid-ui/src/rsvp.tsx, solid-ui/src/components/WeddingRsvpPublishingPanel.tsx, solid-ui/src/components/WeddingDecisionRsvpFollowUp.tsx, solid-ui/src/lib/weddingRsvp*.ts, solid-ui/tests/wedding-rsvp*.test.ts, solid-ui/tests/wedding-decision-rsvp-follow-up-render.test.ts, solid-ui/tests/e2e/wedding-rsvp-public.spec.ts, src/db/wedding_rsvp_capabilities.rs, src/server/wedding_rsvp_capability_routes.rs, src/server/wedding_rsvp_capability_routes_tests.rs, Documents/design/wedding planner/RSVP/microwedding-invitation-rsvp-ux-*.md, .agent/**]
     acceptance: [Couples can preview the exact named household RSVP experience without creating a capability sending a message or changing guest lifecycle evidence, reopening a valid capability with saved responses shows a guest-safe latest confirmation and allows append-only edits while private answer plaintext stays hidden, the couple follow-up surface distinguishes link-created provider outcome production-link open incomplete complete and due-for-follow-up evidence without inferring email opens, existing AFP guest event capability response reminder and decision authorities remain canonical, focused backend frontend public-browser and full Wedding gates pass from a clean exact-SHA candidate, production flags remain false-default and no Oracle deployment occurs without a separately approved release]
-    progress: "Continuation requested to complete every RSVP task and release to Oracle. Existing implementation remains based on advanced WED-385 head a5220923fdeb48c5a7d5f6bda5d9f7a7062c71da; work resumes from clean WED-386 handoff bf173197dbe306df916a5a55a852b0f3d7f28755. Completing shared production/preview/test rendering, event facts, test-to-self delivery, locked/impact edit handling, bounded due follow-up actions, adversarial evidence and exact-SHA hosted rollout without replacing WED-303 authorities."
+    progress: "Implementation and false-default Oracle release are complete at exact application SHA 23b9c57007188e460135f0e0c71806180f69d7a9, native ARM64 image sha256:f6ef45dee35b37772100c2798268af9315abc2f150a76b996cb22fad1a7c0e96. Shared production/preview/test rendering, canonical event facts, bounded test-to-self contracts, locked/impact edit handling and due follow-up actions extend the existing WED-303 authorities. TypeScript/build/2,323-test gates, 10 Playwright journeys and 22 disposable-Postgres RSVP tests passed. The initial amd64 cutover restart-looped and was immediately rolled back to sha256:de181133e9463ae2d63b25137b80a4a402ad0bd3645d59dd1ae8cd43281f5706; the corrected native candidate is running with zero restarts. Backup verification and a non-restore production proof pass; the isolated restore drill was blocked before mutation by disk preflight (2.44 GB free, 8.06 GB required). Public, test-send and reminder-send flags remain false. Review remains open only for an authenticated allowlisted hosted exercise and real provider receipt before test-to-self cohort enablement."
   - id: WED-385
     title: Apply soft Wedding message, complete quote item controls, and specify high-value invitation RSVP UX
     status: review

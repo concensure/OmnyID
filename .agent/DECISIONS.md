@@ -4451,3 +4451,17 @@ facts; it does not create/open a capability or send a message. Host follow-up re
 AFP events, canonical response completeness, reminder provider receipts and the deadline.
 “Provider accepted”, “delivered”, “private link opened” and “RSVP complete” remain
 separate literal evidence. Completed households are omitted from the action list.
+
+## 2026-11-20 — RSVP test delivery is separate, false-default evidence (WED-386)
+
+Preview, test and production render from one pure household-experience projection.
+Canonical event date, local time, time zone, venue name and address remain optional
+fields on the existing RSVP setup AFP event; directions and calendar actions are
+derived only when their source facts exist. A short-lived test fragment is data-only,
+cannot satisfy the production capability-token contract and exposes no submit action.
+
+Test-to-self reuses approved-message/provider receipt infrastructure but records
+separate reservation and receipt AFP kinds explicitly marked as non-mutating for the
+household lifecycle. `OMNYID_WEDDING_RSVP_TEST_SEND_ENABLED` is false-default. A real
+allowlisted provider receipt plus non-mutation evidence is required before cohort
+enablement; deployment approval alone does not satisfy that gate.

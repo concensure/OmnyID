@@ -1,6 +1,6 @@
 # Microwedding invitation and RSVP UX extension tasks
 
-Status: implementation in progress on WED-386
+Status: implementation complete and released on WED-386; provider-send cohort remains gated off
 Parent: WED-385 planning slice; implementation: WED-386
 Specification: `microwedding-invitation-rsvp-ux-spec.md`
 Research: `microwedding invitation wedding research.md`
@@ -22,9 +22,9 @@ Priority: P0
 Depends on: existing WED-303 implementation
 
 - [x] Inventory the current setup, household preview, capability, response, reminder and decision contracts at the implementation SHA.
-- [ ] Record which canonical event fields supply host, date, local time, venue, address, directions and calendar data.
-- [ ] Define a pure household-experience projection consumed by both couple preview and public RSVP rendering.
-- [ ] Define distinct `preview`, `test` and `production` modes; prove preview/test cannot call the production response command or increment production open evidence.
+- [x] Record which canonical event fields supply host, date, local time, venue, address, directions and calendar data.
+- [x] Define a pure household-experience projection consumed by both couple preview and public RSVP rendering.
+- [x] Define distinct `preview`, `test` and `production` modes; prove preview/test cannot call the production response command or increment production open evidence.
 - [x] Define the guest-safe latest-response projection: attendance, non-sensitive answers, revision, completeness and private-answer-present flags. Lock state remains follow-up work.
 - [x] Define the household lifecycle projection over existing capability, provider receipt, open, response and reminder evidence.
 - [x] Add contract tests proving the implementation reads existing AFP/capability authorities and adds no response store.
@@ -38,11 +38,11 @@ Depends on: MI-RSVP-01
 
 - [x] Extend the existing invitation preview projection with host, event, deadline, named-recipient and question/privacy facts.
 - [x] Add **Preview as this household** to `WeddingRsvpPublishingPanel`.
-- [ ] Render the production guest component in non-submitting Preview mode.
+- [x] Render the production guest component in non-submitting Preview mode.
 - [x] Show recognisable host identity, named recipients, event, deadline, entitlements and question/privacy treatment available from the current RSVP authority.
-- [ ] Add RSVP, Directions and Add to calendar actions only when their source facts exist.
-- [ ] Show one material preflight gap with a direct action to fix or inspect its source.
-- [ ] Add 320 px, 200% zoom, keyboard and no-horizontal-scroll coverage.
+- [x] Add RSVP, Directions and Add to calendar actions only when their source facts exist.
+- [x] Show one material preflight gap with a direct action to fix or inspect its source.
+- [x] Add 320 px, 200% zoom, keyboard and no-horizontal-scroll coverage.
 
 Acceptance: the Rivera missing-address scenario passes and no preview interaction changes capability open counts, invitation lifecycle or responses.
 
@@ -51,13 +51,13 @@ Acceptance: the Rivera missing-address scenario passes and no preview interactio
 Priority: P1
 Depends on: MI-RSVP-02
 
-- [ ] Add a short-lived non-submitting test grant or equivalent authenticated preview URL that cannot be used at production endpoints.
-- [ ] Add **Open test view** with no external side effect.
-- [ ] Add optional **Send test to me** using the existing approved-message and provider-receipt infrastructure.
-- [ ] Preview the exact recipient, subject, recognisable host/sender label, fallback URL and message body.
-- [ ] Mark Test in the document title, visible heading and accessible name.
-- [ ] Record provider accepted/delivered/failed truthfully without changing the selected household's lifecycle.
-- [ ] Add expiry, replay, production-endpoint refusal and recipient-scope tests.
+- [x] Add a short-lived non-submitting test grant or equivalent authenticated preview URL that cannot be used at production endpoints.
+- [x] Add **Open test view** with no external side effect.
+- [x] Add optional **Send test to me** using the existing approved-message and provider-receipt infrastructure.
+- [x] Preview the exact recipient, subject, recognisable host/sender label, fallback URL and message body.
+- [x] Mark Test in the document title, visible heading and accessible name.
+- [x] Record provider accepted/delivered/failed truthfully without changing the selected household's lifecycle.
+- [x] Add expiry, replay, production-endpoint refusal and recipient-scope tests.
 
 Acceptance: test-to-self can be reviewed and exercised without creating a production reply or making the household appear contacted.
 
@@ -85,9 +85,9 @@ Depends on: MI-RSVP-04
 - [x] Explain that private answers must be re-entered to replace them while unchanged people remain saved.
 - [x] Append only changed person/event response revisions through the existing command and idempotency contract.
 - [x] Preserve successful rows if another row fails; existing idempotency keys provide exact retry semantics.
-- [ ] Show downstream impact using the existing response impact receipt.
-- [ ] Route locked edits to Contact the couple / late-change review rather than silently overwriting committed facts.
-- [ ] Add concurrent edit, stale revision, partial failure, retry and locked-change tests.
+- [x] Show downstream impact using the existing response impact receipt.
+- [x] Route locked edits to Contact the couple / late-change review rather than silently overwriting committed facts.
+- [x] Add concurrent edit, stale revision, partial failure, retry and locked-change tests.
 
 Acceptance: changing Sam's meal leaves Alex's response and prior revisions intact, updates shared projections once, and produces a truthful receipt.
 
@@ -100,9 +100,9 @@ Depends on: MI-RSVP-01, MI-RSVP-05
 - [x] Reconcile link-created, provider, capability-open, response completeness, reminder and deadline evidence. Lock evidence remains follow-up work.
 - [x] Extend `WeddingDecisionRsvpFollowUp` instead of adding a second dashboard.
 - [x] Show incomplete/unanswered households, literal source evidence, due state and one bounded next action; omit completed households.
-- [ ] Reuse Preview reminder, Record phone reply, Fix delivery and Review incomplete answer actions.
-- [ ] Exclude complete/not-due households and preserve quiet-hour/prior-reminder policy.
-- [ ] Add A2UI intents only where the existing resolver lacks the bounded action.
+- [x] Reuse Preview reminder, Record phone reply, Fix delivery and Review incomplete answer actions.
+- [x] Exclude complete/not-due households and preserve quiet-hour/prior-reminder policy.
+- [x] Add A2UI intents only where the existing resolver lacks the bounded action. No new intent was required because the existing resolver/actions cover the selected workflows.
 - [x] Prove provider accepted is not rendered as delivered and capability open is not rendered as email open.
 
 Acceptance: the three-household lifecycle scenario in the specification produces the expected action list and Guest Operations counts agree.
@@ -113,11 +113,11 @@ Priority: P0 release gate
 Depends on: MI-RSVP-02 through MI-RSVP-06
 
 - [x] Run focused TypeScript tests for projections and response amendments. Rust compile/database proof remains required because the local Windows rustc process crashed before diagnostics completed.
-- [ ] Run disposable-Postgres cross-account, cross-wedding, cross-household, expiry, revocation, replay and stale-revision tests.
+- [x] Run disposable-Postgres cross-account, cross-wedding, cross-household, expiry, revocation, replay and stale-revision tests.
 - [x] Run public browser journeys at 320/375/1280 px and 200% text zoom with Axe.
-- [ ] Test preview/test mode cannot submit or mutate production evidence.
+- [x] Test preview/test mode cannot submit or mutate production evidence.
 - [x] Test returning confirmation with named people, private-answer markers, safe edit hydration and changed-person-only submission. Mixed/multiple-event coverage remains.
-- [ ] Test screen-reader names, focus movement, slow network, partial failure and safe recovery.
+- [x] Test screen-reader names, focus movement, slow network, partial failure and safe recovery.
 - [x] Run full Wedding typecheck, 2,321-test suite, build and line budgets in the task worktree. Clean frozen-SHA release proof remains a release step.
 
 Acceptance: machine evidence names the exact source SHA and all privacy, accessibility and non-mutation gates pass.
@@ -127,12 +127,14 @@ Acceptance: machine evidence names the exact source SHA and all privacy, accessi
 Priority: P1 release gate
 Depends on: MI-RSVP-07
 
-- [ ] Deploy first with production publish/test-send flags off.
-- [ ] Verify existing RSVP and wedding routes remain healthy.
+- [x] Deploy first with production publish/test-send flags off.
+- [x] Verify existing RSVP and wedding routes remain healthy.
 - [ ] Run an allowlisted synthetic couple/household preview and return-confirmation exercise.
 - [ ] Enable test-to-self only after provider receipt and non-mutation evidence passes.
-- [ ] Record previous image/config, rollback path, runtime SHA and feature flags.
-- [ ] Do not broaden the cohort without usability review of the three selected workflows.
+- [x] Record previous image/config, rollback path, runtime SHA and feature flags.
+- [x] Do not broaden the cohort without usability review of the three selected workflows.
+
+Release note (2026-11-20): exact application SHA `23b9c57007188e460135f0e0c71806180f69d7a9` is live on Oracle as native ARM64 image `sha256:f6ef45dee35b37772100c2798268af9315abc2f150a76b996cb22fad1a7c0e96`. Public/test/reminder send flags remain false. The allowlisted hosted-account exercise and real provider receipt are deliberately still open because no authenticated allowlisted account/provider receipt was available; test-to-self must remain disabled until both are supplied. Backup verification passed. The isolated restore drill was blocked before mutation by disk preflight (2.44 GB free versus 8.06 GB required), and the non-restore production proof passed.
 
 Acceptance: rollout can be disabled without losing canonical setup or responses, and no unsupported research ideas are implied as shipped.
 
