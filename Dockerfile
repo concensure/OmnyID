@@ -18,6 +18,7 @@ COPY service-adapter-templates/ ./service-adapter-templates/
 COPY schemas/ ./schemas/
 COPY scripts/ ./scripts/
 COPY src/ ./src/
+COPY tests/fixtures/ ./tests/fixtures/
 COPY wedding/email/ ./wedding/email/
 COPY wedding/vendors.html ./wedding/vendors.html
 COPY solid-ui/src/lib/weddingFacetVocabulary.json ./solid-ui/src/lib/weddingFacetVocabulary.json
