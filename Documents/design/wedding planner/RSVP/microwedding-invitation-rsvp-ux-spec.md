@@ -1,11 +1,26 @@
 # Microwedding invitation and RSVP UX extension specification
 
-Status: implementation in progress
+Status: implemented; false-default Oracle rollout candidate
 Work item: WED-385 planning slice; WED-386 implementation
 Extends: `wedding-rsvp-spec.md` and the existing WED-303 implementation
 Research input: `microwedding invitation wedding research.md`
 
-Implementation checkpoint (WED-386): the existing publishing panel now has a non-mutating household test preview; capability open returns a scoped guest-safe latest-response projection; reopening a valid link shows a confirmation and changed-person-only edit path; and the existing decision follow-up surface consumes a pure AFP/provider/response lifecycle projection. Test-to-self delivery, canonical venue/directions/calendar preflight, lock-state UX and hosted rollout remain explicitly unimplemented.
+Implementation checkpoint (WED-386): the existing publishing panel and public route now consume one pure household-experience projection in explicit preview, test and production modes. RSVP setup remains the canonical AFP source for guest-facing event facts; a 15-minute data-only Test fragment cannot satisfy the production capability token shape and performs no open/respond request. Optional test-to-self delivery binds an exact draft and approval to the authenticated couple address and stores separate provider receipts with `changes_household_lifecycle=false`. Capability open returns scoped guest-safe latest responses including lock evidence; returning confirmation supports changed-person-only append revisions, impact receipts, partial recovery and late-change contact guidance. The existing due-only follow-up surface consumes capability/provider/response/reminder evidence and reuses bounded actions.
+
+### Canonical guest-facing event-field map
+
+| Guest fact | Canonical field | Derived action |
+| --- | --- | --- |
+| Host identity | `wedding_rsvp_setup.host_label` | Heading/sender recognition |
+| Event | `event_id`, `event_label` | Capability and invitation scope |
+| Date | `event_date` | Add to calendar when present |
+| Local time | `event_local_time` | Readable local start and calendar start |
+| Time zone | `event_time_zone` | Explicit local-time context |
+| Venue | `venue_name` | Place label |
+| Address | `venue_address` | Directions destination and calendar location |
+| Deadline | `response_deadline` | Response and deterministic follow-up policy |
+
+Directions are derived only from `venue_address`; calendar data is derived only from the date/time/time-zone/venue fields above. Neither derived URL is persisted as a second event authority. Legacy setup records project the new fields as null and show the single most material preflight gap instead of inventing facts.
 
 ## 1. Outcome
 

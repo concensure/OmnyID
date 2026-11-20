@@ -14,6 +14,7 @@ export type WeddingRsvpHouseholdLifecycle = {
   followUpDue: boolean;
   evidenceLabels: string[];
   nextAction: string;
+  actionLabel: "Preview reminder" | "Record phone reply" | "Fix delivery" | "Review incomplete answer";
 };
 
 function clean(value: unknown): string {
@@ -106,6 +107,13 @@ export function buildWeddingRsvpHouseholdLifecycles(input: {
             : responseState === "incomplete"
               ? "Ask only for the missing required RSVP detail."
               : "Review the exact recipient and reminder before sending.";
+    const actionLabel: WeddingRsvpHouseholdLifecycle["actionLabel"] = reminderState === "failed"
+      ? "Fix delivery"
+      : responseState === "incomplete"
+        ? "Review incomplete answer"
+        : linkState === "opened"
+          ? "Record phone reply"
+          : "Preview reminder";
     return {
       householdId: household.householdId,
       householdLabel: household.householdLabel,
@@ -117,6 +125,7 @@ export function buildWeddingRsvpHouseholdLifecycles(input: {
       followUpDue,
       evidenceLabels,
       nextAction,
+      actionLabel,
     };
   }).sort((left, right) => left.householdLabel.localeCompare(right.householdLabel));
 }

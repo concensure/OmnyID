@@ -34,6 +34,11 @@ export type WeddingRsvpSetupState = {
   eventLabel: string;
   hostLabel: string;
   responseDeadline: string;
+  eventDate: string | null;
+  eventLocalTime: string | null;
+  eventTimeZone: string | null;
+  venueName: string | null;
+  venueAddress: string | null;
   encryptionKeyId: string | null;
   encryptionPublicKeyHex: string | null;
   questions: WeddingRsvpQuestion[];
@@ -45,6 +50,11 @@ export type WeddingRsvpSetupDraftInput = {
   eventLabel: string;
   hostLabel?: string | null;
   responseDeadline: string;
+  eventDate?: string | null;
+  eventLocalTime?: string | null;
+  eventTimeZone?: string | null;
+  venueName?: string | null;
+  venueAddress?: string | null;
   enabledQuestionIds: readonly WeddingRsvpQuestionId[];
   requiredQuestionIds: readonly WeddingRsvpQuestionId[];
   customPrompt?: string | null;
@@ -69,6 +79,11 @@ export type WeddingRsvpInvitationPreview = {
   hostLabel: string;
   eventLabel: string;
   responseDeadline: string;
+  eventDate: string | null;
+  eventLocalTime: string | null;
+  eventTimeZone: string | null;
+  venueName: string | null;
+  venueAddress: string | null;
   recipients: Array<{
     displayName: string;
     invitationId: string;
@@ -193,6 +208,11 @@ export function buildWeddingRsvpSetupDraft(
   const eventLabel = clean(input.eventLabel).slice(0, 120);
   const hostLabel = clean(input.hostLabel).slice(0, 120) || "The couple";
   const responseDeadline = exactDate(input.responseDeadline);
+  const eventDate = exactDate(input.eventDate) || null;
+  const eventLocalTime = /^([01]\d|2[0-3]):[0-5]\d$/.test(clean(input.eventLocalTime)) ? clean(input.eventLocalTime) : null;
+  const eventTimeZone = clean(input.eventTimeZone).slice(0, 80) || null;
+  const venueName = clean(input.venueName).slice(0, 160) || null;
+  const venueAddress = clean(input.venueAddress).slice(0, 300) || null;
   const questions = normalizedQuestions(input);
   const errorLabels = [
     !eventId ? "Choose the wedding event this RSVP applies to." : null,
@@ -227,6 +247,11 @@ export function buildWeddingRsvpSetupDraft(
       eventLabel,
       hostLabel,
       responseDeadline,
+      eventDate,
+      eventLocalTime,
+      eventTimeZone,
+      venueName,
+      venueAddress,
       encryptionKeyId: null,
       encryptionPublicKeyHex: null,
       questions,
@@ -274,6 +299,11 @@ function setupFromMessage(message: AfpMessage): WeddingRsvpSetupState | null {
     eventLabel,
     hostLabel,
     responseDeadline,
+    eventDate: exactDate(content.event_date) || null,
+    eventLocalTime: /^([01]\d|2[0-3]):[0-5]\d$/.test(clean(content.event_local_time)) ? clean(content.event_local_time) : null,
+    eventTimeZone: clean(content.event_time_zone).slice(0, 80) || null,
+    venueName: clean(content.venue_name).slice(0, 160) || null,
+    venueAddress: clean(content.venue_address).slice(0, 300) || null,
     encryptionKeyId: clean(content.encryption_key_id) || null,
     encryptionPublicKeyHex: /^[0-9a-f]{64}$/i.test(clean(content.encryption_public_key_hex))
       ? clean(content.encryption_public_key_hex).toLowerCase()
@@ -330,6 +360,11 @@ export function weddingRsvpSetupToAfpSendInput(
       event_label: setup.eventLabel,
       host_label: setup.hostLabel,
       response_deadline: setup.responseDeadline,
+      event_date: setup.eventDate,
+      event_local_time: setup.eventLocalTime,
+      event_time_zone: setup.eventTimeZone,
+      venue_name: setup.venueName,
+      venue_address: setup.venueAddress,
       encryption_key_id: setup.encryptionKeyId,
       encryption_public_key_hex: setup.encryptionPublicKeyHex,
       questions: enabledQuestions.map((question) => ({
@@ -414,6 +449,11 @@ export function buildWeddingRsvpInvitationPreviews(
       hostLabel: setup.hostLabel,
       eventLabel: setup.eventLabel,
       responseDeadline: setup.responseDeadline,
+      eventDate: setup.eventDate,
+      eventLocalTime: setup.eventLocalTime,
+      eventTimeZone: setup.eventTimeZone,
+      venueName: setup.venueName,
+      venueAddress: setup.venueAddress,
       recipients: household.recipients.sort((left, right) => left.displayName.localeCompare(right.displayName)),
       questionLabels,
       questions: setup.questions.filter((question) => question.enabled).map((question) => ({

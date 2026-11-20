@@ -69,7 +69,7 @@ export function WeddingDecisionRsvpFollowUp(props: {
     afpMessages: props.afpMessages,
     reminderReceipts: receipts(),
   }));
-  const actionableLifecycles = createMemo(() => lifecycles().filter((lifecycle) => lifecycle.responseState !== "complete"));
+  const actionableLifecycles = createMemo(() => lifecycles().filter((lifecycle) => lifecycle.responseState !== "complete" && lifecycle.followUpDue));
 
   createEffect(() => {
     const next = { ...drafts() };
@@ -165,7 +165,7 @@ export function WeddingDecisionRsvpFollowUp(props: {
           <div class="flex flex-wrap items-center justify-between gap-2"><p class="text-sm font-semibold">{lifecycle.householdLabel}</p><Show when={lifecycle.followUpDue}><span class="rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-950">Follow-up due</span></Show></div>
           <p class="mt-1 text-xs leading-5 text-pink-950/70">{lifecycle.evidenceLabels.join(" · ")}</p>
           <p class="mt-1 text-xs leading-5"><strong>Next:</strong> {lifecycle.nextAction}</p>
-          <p class="mt-1 text-xs font-semibold text-pink-900">{lifecycle.nextAction}</p>
+          <button type="button" class="mt-2 min-h-11 rounded-lg border border-pink-200 bg-pink-50 px-3 text-xs font-semibold text-pink-900" onClick={() => (lifecycle.actionLabel === "Record phone reply" ? document.getElementById("wedding-guest-operations") : document.querySelector<HTMLElement>(`[data-rsvp-household='${CSS.escape(lifecycle.householdId)}']`))?.scrollIntoView({ behavior: "smooth", block: "center" })}>{lifecycle.actionLabel}</button>
         </article>}</For>
       </div>
       <Show when={candidates().length > 0} fallback={<p class="mt-3 rounded-lg bg-pink-50 px-3 py-2 text-sm">No eligible pending guest has both reminder permission and an email address.</p>}>
@@ -173,7 +173,7 @@ export function WeddingDecisionRsvpFollowUp(props: {
           <For each={candidates()}>{(candidate) => {
             const matchedContact = () => contactFor(candidate, contacts());
             const draft = () => drafts()[candidate.id] ?? { email: "", body: "" };
-            return <article class="rounded-xl border border-pink-100 bg-pink-50/40 p-3">
+            return <article data-rsvp-household={candidate.householdId ?? ""} class="rounded-xl border border-pink-100 bg-pink-50/40 p-3">
               <p class="text-sm font-semibold">{candidate.recipientLabels.join(" and ")}</p>
               <p class="mt-1 text-xs leading-5 text-pink-950/70">{candidate.reasonLabel}</p>
               <label class="mt-3 block text-xs font-semibold">Email address

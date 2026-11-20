@@ -38,6 +38,7 @@ export type WeddingRsvpCapabilityLatestResponse = {
   revision: number;
   submitted_at: string;
   complete: boolean;
+  locked_at?: string | null;
 };
 
 export type WeddingRsvpCapabilityScope = {
@@ -47,6 +48,11 @@ export type WeddingRsvpCapabilityScope = {
   event_id: string;
   event_label: string;
   response_deadline: string;
+  event_date?: string | null;
+  event_local_time?: string | null;
+  event_time_zone?: string | null;
+  venue_name?: string | null;
+  venue_address?: string | null;
   encryption_key_id: string;
   encryption_public_key_hex: string;
   questions: WeddingRsvpCapabilityQuestion[];

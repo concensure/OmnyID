@@ -1,5 +1,6 @@
 // @locs-version: 1.0
 import { For, Show, createEffect, createMemo, createSignal } from "solid-js";
+import type { SendAfpMessageInput } from "@/lib/api";
 
 import { WeddingRsvpPublishingPanel } from "@/components/WeddingRsvpPublishingPanel";
 import type { WeddingGuestTrackingState } from "@/lib/weddingGuestTrackingState";
@@ -55,6 +56,7 @@ export function WeddingRsvpSetupPanel(props: {
     confirmedAffectedResponses: boolean;
   }) => Promise<string>;
   onSave?: (setup: WeddingRsvpSetupState) => Promise<string>;
+  saveProjection?: ((input: SendAfpMessageInput) => Promise<unknown>) | null;
   onCulturallyDiverseCelebrationChange?: (enabled: boolean) => Promise<string>;
 }) {
   const metadata = normalizeWeddingPlanningMetadata(props.metadata);
@@ -74,6 +76,11 @@ export function WeddingRsvpSetupPanel(props: {
   const [newEventLabel, setNewEventLabel] = createSignal("Wedding day");
   const [newEventDate, setNewEventDate] = createSignal("");
   const [deadline, setDeadline] = createSignal(props.current?.responseDeadline ?? suggestedWeddingRsvpDeadline(props.weddingDate));
+  const [eventDate, setEventDate] = createSignal(props.current?.eventDate ?? props.weddingDate?.match(/\b(20\d{2}-\d{2}-\d{2})\b/)?.[1] ?? "");
+  const [eventLocalTime, setEventLocalTime] = createSignal(props.current?.eventLocalTime ?? "");
+  const [eventTimeZone, setEventTimeZone] = createSignal(props.current?.eventTimeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? "Australia/Sydney");
+  const [venueName, setVenueName] = createSignal(props.current?.venueName ?? "");
+  const [venueAddress, setVenueAddress] = createSignal(props.current?.venueAddress ?? "");
   const savedHostLabel = props.current?.hostLabel?.trim() ?? "";
   const [hostLabel, setHostLabel] = createSignal(
     savedHostLabel && savedHostLabel.toLowerCase() !== "the couple"
@@ -154,6 +161,11 @@ export function WeddingRsvpSetupPanel(props: {
     eventLabel: eventLabel(),
     hostLabel: hostLabel(),
     responseDeadline: deadline(),
+    eventDate: eventDate(),
+    eventLocalTime: eventLocalTime(),
+    eventTimeZone: eventTimeZone(),
+    venueName: venueName(),
+    venueAddress: venueAddress(),
     enabledQuestionIds: enabledQuestions(),
     requiredQuestionIds: requiredQuestions(),
     customPrompt: customPrompt(),
@@ -262,6 +274,17 @@ export function WeddingRsvpSetupPanel(props: {
         Names shown to guests
         <input maxlength="120" class="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-teal-950 focus:border-teal-500 focus:ring-2 focus:ring-teal-100" value={hostLabel()} onInput={(event) => { setHostLabelEdited(true); setHostLabel(event.currentTarget.value); }} placeholder="Priya and Daniel" />
       </label>
+      <fieldset class="mt-3 rounded-xl border border-teal-100 bg-white p-3">
+        <legend class="px-1 text-sm font-semibold text-teal-950">Guest-facing event facts</legend>
+        <p class="text-xs leading-5 text-teal-900/70">These canonical RSVP setup fields drive the preview and public page. Directions and calendar actions appear only when their source facts exist.</p>
+        <div class="mt-3 grid gap-3 sm:grid-cols-2">
+          <label class="text-xs font-semibold text-teal-950/75">Event date<input type="date" class="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm" value={eventDate()} onInput={(event) => setEventDate(event.currentTarget.value)} /></label>
+          <label class="text-xs font-semibold text-teal-950/75">Local start time <span class="font-normal">(optional)</span><input type="time" class="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm" value={eventLocalTime()} onInput={(event) => setEventLocalTime(event.currentTarget.value)} /></label>
+          <label class="text-xs font-semibold text-teal-950/75">Time zone<input class="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm" value={eventTimeZone()} onInput={(event) => setEventTimeZone(event.currentTarget.value)} placeholder="Australia/Sydney" /></label>
+          <label class="text-xs font-semibold text-teal-950/75">Venue name <span class="font-normal">(optional)</span><input maxlength="160" class="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm" value={venueName()} onInput={(event) => setVenueName(event.currentTarget.value)} /></label>
+          <label class="text-xs font-semibold text-teal-950/75 sm:col-span-2">Venue address <span class="font-normal">(optional)</span><input maxlength="300" class="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm" value={venueAddress()} onInput={(event) => setVenueAddress(event.currentTarget.value)} /></label>
+        </div>
+      </fieldset>
       <Show when={eventChoice() === "new_event"}>
         <fieldset class="mt-3 rounded-xl border border-teal-100 bg-white p-3">
           <legend class="px-1 text-xs font-semibold text-teal-950">Add an event</legend>
@@ -401,7 +424,7 @@ export function WeddingRsvpSetupPanel(props: {
           </Show>
         </div>
       </Show>
-      <Show when={localSetup()}>{(setup) => <WeddingRsvpPublishingPanel setup={setup()} guestTracking={props.guestTracking} metadata={metadata} />}</Show>
+      <Show when={localSetup()}>{(setup) => <WeddingRsvpPublishingPanel setup={setup()} guestTracking={props.guestTracking} metadata={metadata} saveProjection={props.saveProjection} />}</Show>
     </section>
   );
 }

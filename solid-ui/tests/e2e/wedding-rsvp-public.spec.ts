@@ -8,6 +8,11 @@ const scope = {
   event_id: "event:wedding-day",
   event_label: "Wedding day",
   response_deadline: "2027-10-01",
+  event_date: "2027-11-15",
+  event_local_time: "16:30",
+  event_time_zone: "Australia/Sydney",
+  venue_name: "Garden Room",
+  venue_address: "1 Harbour Street, Sydney NSW",
   encryption_key_id: "wedding-rsvp-browser-test",
   encryption_public_key_hex: "11".repeat(32),
   expires_at: "2027-10-02T00:00:00Z",
@@ -129,4 +134,35 @@ test("invalid and expired links use one generic safe state", async ({ page }) =>
   await expect(page.getByRole("heading", { name: "RSVP unavailable" })).toBeVisible();
   await expect(page.getByText(/expired or been replaced/i)).toBeVisible();
   await expect(page).toHaveURL(/\/workspace\/rsvp\.html$/);
+});
+
+test("short-lived Test view is labelled, accessible and makes no production RSVP request", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 720 });
+  let productionRequests = 0;
+  await page.route("**/wedding/rsvp/capabilities/**", (route) => { productionRequests += 1; return route.abort(); });
+  const envelope = {
+    version: 1, mode: "test", issuedAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 15 * 60_000).toISOString(),
+    experience: { mode: "test", householdLabel: "Rivera household", recipientLabels: ["Alex Rivera", "Sam Rivera"], hostLabel: "Alex and Taylor", eventLabel: "Wedding day", responseDeadline: "2027-10-01", eventDate: "2027-11-15", eventLocalTime: "16:30", eventTimeZone: "Australia/Sydney", venueName: "Garden Room", venueAddress: null, questions: [{ label: "Attendance", required: true, sensitive: false }], expiresAt: new Date(Date.now() + 15 * 60_000).toISOString() },
+  };
+  const fragment = Buffer.from(JSON.stringify(envelope)).toString("base64url");
+  await page.goto(`/workspace/rsvp.html#test.${fragment}`, { waitUntil: "networkidle" });
+  await expect(page).toHaveTitle(/Test RSVP/);
+  await expect(page.getByRole("heading", { name: "RSVP for Wedding day" })).toBeVisible();
+  await expect(page.getByText(/nothing can be submitted/i).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "RSVP" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Directions" })).toHaveCount(0);
+  expect(productionRequests).toBe(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+  const accessibility = await new AxeBuilder({ page }).analyze();
+  expect(accessibility.violations.filter(({ impact }) => impact === "serious" || impact === "critical")).toEqual([]);
+});
+
+test("locked returning RSVP routes changes to the couple instead of overwriting", async ({ page }) => {
+  await page.route("**/wedding/rsvp/capabilities/open", (route) => route.fulfill({ json: {
+    ...scope,
+    latest_responses: [{ invitation_id: "invite:alex", person_id: "person:alex", event_id: "event:wedding-day", attendance: "attending", answers: { meal_choice: "Vegetarian" }, private_answer_question_ids: [], has_private_answers: false, revision: 4, submitted_at: "2027-09-02T03:04:05Z", complete: true, locked_at: "2027-09-10T00:00:00Z" }],
+  } }));
+  await page.goto("/workspace/rsvp.html#locked-token", { waitUntil: "networkidle" });
+  await expect(page.getByText(/Contact the couple to request a late-change review/i)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Edit RSVP" })).toHaveCount(0);
 });

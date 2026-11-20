@@ -83,6 +83,7 @@ pub struct WeddingRsvpCapabilityLatestResponse {
     pub revision: i64,
     pub submitted_at: String,
     pub complete: bool,
+    pub locked_at: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
@@ -93,6 +94,11 @@ pub struct WeddingRsvpCapabilityScope {
     pub event_id: String,
     pub event_label: String,
     pub response_deadline: String,
+    pub event_date: Option<String>,
+    pub event_local_time: Option<String>,
+    pub event_time_zone: Option<String>,
+    pub venue_name: Option<String>,
+    pub venue_address: Option<String>,
     pub encryption_key_id: String,
     pub encryption_public_key_hex: String,
     pub questions: Vec<WeddingRsvpCapabilityQuestion>,
@@ -351,6 +357,11 @@ async fn setup_scope(
         String,
         String,
         String,
+        Option<String>,
+        Option<String>,
+        Option<String>,
+        Option<String>,
+        Option<String>,
         Vec<WeddingRsvpCapabilityQuestion>,
     )>,
     sqlx::Error,
@@ -475,6 +486,36 @@ async fn setup_scope(
         response_deadline.to_string(),
         encryption_key_id.to_string(),
         encryption_public_key_hex.to_ascii_lowercase(),
+        content
+            .get("event_date")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| value.len() == 10)
+            .map(str::to_string),
+        content
+            .get("event_local_time")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| value.len() == 5)
+            .map(str::to_string),
+        content
+            .get("event_time_zone")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty() && value.len() <= 80)
+            .map(str::to_string),
+        content
+            .get("venue_name")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty() && value.chars().count() <= 160)
+            .map(str::to_string),
+        content
+            .get("venue_address")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty() && value.chars().count() <= 300)
+            .map(str::to_string),
         questions,
     )))
 }
@@ -608,6 +649,10 @@ async fn latest_response_scope(
                 .unwrap_or_default()
                 .to_string(),
             complete,
+            locked_at: value
+                .get("locked_at")
+                .and_then(Value::as_str)
+                .map(str::to_string),
         });
     }
     Ok(responses)
@@ -954,6 +999,11 @@ impl Db {
             response_deadline,
             encryption_key_id,
             encryption_public_key_hex,
+            event_date,
+            event_local_time,
+            event_time_zone,
+            venue_name,
+            venue_address,
             questions,
         )) = setup_scope(
             &mut tx,
@@ -1002,6 +1052,11 @@ impl Db {
             event_id: invitations[0].event_id.clone(),
             event_label,
             response_deadline,
+            event_date,
+            event_local_time,
+            event_time_zone,
+            venue_name,
+            venue_address,
             encryption_key_id,
             encryption_public_key_hex,
             questions,

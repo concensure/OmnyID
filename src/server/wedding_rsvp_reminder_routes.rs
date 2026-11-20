@@ -43,6 +43,8 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
     Router::new()
         .route("/wedding/rsvp/reminders/status", get(status_http))
         .route("/wedding/rsvp/reminders/send", post(send_http))
+        .route("/wedding/rsvp/tests/status", get(test_status_http))
+        .route("/wedding/rsvp/tests/send", post(test_send_http))
 }
 
 #[derive(Deserialize)]
@@ -66,6 +68,34 @@ struct StatusResponse {
     ready: bool,
     provider: String,
     reason: String,
+}
+
+const TEST_DRAFT_KIND: &str = "wedding_rsvp_test_draft";
+const TEST_APPROVAL_KIND: &str = "wedding_rsvp_test_approval";
+const TEST_RESERVATION_KIND: &str = "wedding_rsvp_test_send_reserved";
+const TEST_RECEIPT_KIND: &str = "wedding_rsvp_test_receipt";
+
+#[derive(Clone, Debug)]
+struct ApprovedTest {
+    approval_message_id: String,
+    draft_message_id: String,
+    test_id: String,
+    recipient: String,
+    subject: String,
+    host_label: String,
+    fallback_url: String,
+    exact_content: String,
+    wedding_plan_id: String,
+    response_workspace_id: String,
+}
+
+fn test_send_enabled() -> bool {
+    std::env::var("OMNYID_WEDDING_RSVP_TEST_SEND_ENABLED").is_ok_and(|value| {
+        matches!(
+            value.trim().to_ascii_lowercase().as_str(),
+            "1" | "true" | "yes"
+        )
+    })
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -626,6 +656,293 @@ async fn send_http(
     }
 }
 
+fn parse_approved_test(
+    messages: &[AFPMessage],
+    approval_message_id: &str,
+) -> Result<ApprovedTest, (StatusCode, String)> {
+    let approval = messages
+        .iter()
+        .find(|message| message.id == approval_message_id && kind(message) == TEST_APPROVAL_KIND)
+        .ok_or((
+            StatusCode::NOT_FOUND,
+            "RSVP test approval is unavailable".to_string(),
+        ))?;
+    let test_id = clean(approval.content.get("test_id"));
+    let draft = messages
+        .iter()
+        .rev()
+        .find(|message| {
+            kind(message) == TEST_DRAFT_KIND && clean(message.content.get("test_id")) == test_id
+        })
+        .ok_or((
+            StatusCode::CONFLICT,
+            "The approved RSVP test draft is unavailable".to_string(),
+        ))?;
+    let fields = [
+        "test_id",
+        "recipient",
+        "subject",
+        "host_label",
+        "fallback_url",
+        "exact_content",
+    ];
+    if test_id.is_empty()
+        || clean(approval.content.get("approval_status")) != "approved"
+        || approval
+            .content
+            .get("sends_message")
+            .and_then(Value::as_bool)
+            != Some(false)
+        || approval
+            .content
+            .get("changes_household_lifecycle")
+            .and_then(Value::as_bool)
+            != Some(false)
+        || fields
+            .iter()
+            .any(|field| approval.content.get(*field) != draft.content.get(*field))
+    {
+        return Err((
+            StatusCode::CONFLICT,
+            "The RSVP test approval no longer matches its draft".to_string(),
+        ));
+    }
+    let recipient = clean(approval.content.get("recipient")).to_ascii_lowercase();
+    let subject = clean(approval.content.get("subject"));
+    let host_label = clean(approval.content.get("host_label"));
+    let fallback_url = clean(approval.content.get("fallback_url"));
+    let exact_content = clean(approval.content.get("exact_content"));
+    let scope = metadata_scope(approval);
+    if !valid_email(&recipient)
+        || subject.is_empty()
+        || subject.len() > 200
+        || host_label.is_empty()
+        || host_label.len() > 120
+        || exact_content.is_empty()
+        || exact_content.len() > 20_000
+        || scope != metadata_scope(draft)
+        || scope.0.is_empty()
+        || scope.1.is_empty()
+        || !fallback_url.starts_with("https://")
+        || !fallback_url.contains("/workspace/rsvp.html#test.")
+    {
+        return Err((
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "The approved RSVP test is invalid".to_string(),
+        ));
+    }
+    Ok(ApprovedTest {
+        approval_message_id: approval.id.clone(),
+        draft_message_id: draft.id.clone(),
+        test_id,
+        recipient,
+        subject,
+        host_label,
+        fallback_url,
+        exact_content,
+        wedding_plan_id: scope.0,
+        response_workspace_id: scope.1,
+    })
+}
+
+fn test_key(value: &ApprovedTest) -> String {
+    hex::encode(Sha256::digest(
+        format!(
+            "{}\n{}\n{}\n{}\n{}\n{}",
+            value.approval_message_id,
+            value.draft_message_id,
+            value.test_id,
+            value.recipient,
+            value.subject,
+            value.exact_content
+        )
+        .as_bytes(),
+    ))
+}
+
+fn test_event(
+    thread_id: &str,
+    parent_id: &str,
+    event_kind: &str,
+    test: &ApprovedTest,
+    key: &str,
+    detail: Value,
+) -> AFPMessage {
+    AFPMessage {
+        protocol: "afp-v1".to_string(),
+        id: ulid::Ulid::new().to_string(),
+        thread_id: thread_id.to_string(),
+        parent_id: Some(parent_id.to_string()),
+        from: "agent://wedding-planning".to_string(),
+        to: vec!["user://wedding-couple".to_string()],
+        timestamp: chrono::Utc::now().to_rfc3339(),
+        r#type: "ledger".to_string(),
+        kind: Some(event_kind.to_string()),
+        subtype: Some(event_kind.to_string()),
+        content: json!({"kind":event_kind,"contract_version":1,"test_id":test.test_id,"delivery_status":detail.get("delivery_status"),"provider":detail.get("provider"),"provider_message_id":detail.get("provider_message_id"),"failure_kind":detail.get("failure_kind"),"idempotency_key":key,"changes_household_lifecycle":false,"created_at":chrono::Utc::now().to_rfc3339()}),
+        metadata: Some(
+            json!({"store":true,"template":"wedding_planning","weddingPlanId":test.wedding_plan_id,"responseWorkspaceId":test.response_workspace_id,"origin":"wedding_rsvp_test_provider"}),
+        ),
+        supertags: vec![
+            "template:wedding_planning".to_string(),
+            "wedding_rsvp:test_delivery".to_string(),
+            "household_lifecycle:not_changed".to_string(),
+        ],
+        references: vec![
+            json!({"type":"approval","target":test.approval_message_id,"label":"Exact test approval"}),
+        ],
+        store_in_relational: true,
+        ..AFPMessage::default()
+    }
+}
+
+async fn test_status_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> Result<Json<StatusResponse>, (StatusCode, String)> {
+    let _user = authenticated_user(&state.db, &headers).await?;
+    if !test_send_enabled() {
+        return Ok(Json(StatusResponse {
+            enabled: false,
+            ready: false,
+            provider: "disabled".to_string(),
+            reason: "rollout_disabled".to_string(),
+        }));
+    }
+    let config = VendorMailConfig::from_env().map_err(|_| {
+        (
+            StatusCode::SERVICE_UNAVAILABLE,
+            "RSVP test provider configuration is invalid".to_string(),
+        )
+    })?;
+    let readiness = config.readiness();
+    Ok(Json(StatusResponse {
+        enabled: true,
+        ready: readiness.ready,
+        provider: readiness.provider.label().to_string(),
+        reason: readiness.reason.to_string(),
+    }))
+}
+
+async fn test_send_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(request): Json<SendRequest>,
+) -> Result<Json<SendResponse>, (StatusCode, String)> {
+    enforce_rate_limit(
+        &state,
+        authenticated_rate_limit_key("wedding_rsvp_test_send", &headers),
+        RateLimitPolicy {
+            max_requests: 4,
+            window: Duration::from_secs(60),
+        },
+    )
+    .await?;
+    let user = authenticated_user(&state.db, &headers).await?;
+    if !test_send_enabled() {
+        return Err((
+            StatusCode::SERVICE_UNAVAILABLE,
+            "RSVP test sending is disabled".to_string(),
+        ));
+    }
+    let messages = visible_messages(&state, &headers, &request.thread_id).await?;
+    let test = parse_approved_test(&messages, request.approval_message_id.trim())?;
+    let key = test_key(&test);
+    if let Some(receipt) = existing_lifecycle(&messages, &key, TEST_RECEIPT_KIND) {
+        let status = clean(receipt.content.get("delivery_status"));
+        return Ok(Json(SendResponse {
+            sent: matches!(status.as_str(), "provider_accepted" | "delivered"),
+            replayed: true,
+            delivery_status: status,
+            idempotency_key: key,
+            provider_receipt_id: Some(clean(receipt.content.get("provider_message_id")))
+                .filter(|value| !value.is_empty()),
+        }));
+    }
+    let config = VendorMailConfig::from_env().map_err(|_| {
+        (
+            StatusCode::SERVICE_UNAVAILABLE,
+            "RSVP test provider configuration is invalid".to_string(),
+        )
+    })?;
+    let readiness = config.readiness();
+    if !readiness.ready || !recipient_is_allowlisted(&test.recipient) {
+        return Err((
+            StatusCode::PRECONDITION_FAILED,
+            "RSVP test recipient is not in the reviewed provider cohort".to_string(),
+        ));
+    }
+    let mut reservation = test_event(
+        &request.thread_id,
+        &test.approval_message_id,
+        TEST_RESERVATION_KIND,
+        &test,
+        &key,
+        json!({}),
+    );
+    reservation.id = deterministic_message_id(&key);
+    let reservation_id = reservation.id.clone();
+    if !store(&state, &user.id, reservation).await? {
+        return Err((
+            StatusCode::CONFLICT,
+            "RSVP test send reservation already exists".to_string(),
+        ));
+    }
+    let provider_request = VendorMailSendRequest {
+        from: config.from_address,
+        to: test.recipient.clone(),
+        subject: test.subject.clone(),
+        text: format!(
+            "{}\n\nTest view: {}\n\nSent as a test for {}.",
+            test.exact_content, test.fallback_url, test.host_label
+        ),
+        reply_to: None,
+        message_id: format!("<rsvp-test-{key}@omnyid.com>"),
+    };
+    match send_allowlisted_cloudflare_vendor_mail(&state.db, &provider_request).await {
+        Ok(receipt) => {
+            let provider = receipt.provider.clone();
+            let provider_receipt_id = receipt.provider_receipt_key.clone();
+            let status = match receipt.state {
+                VendorMailDeliveryState::Accepted => "provider_accepted",
+                VendorMailDeliveryState::Delivered => "delivered",
+                VendorMailDeliveryState::Bounced | VendorMailDeliveryState::Suppressed => "failed",
+            };
+            let event = test_event(
+                &request.thread_id,
+                &reservation_id,
+                TEST_RECEIPT_KIND,
+                &test,
+                &key,
+                json!({"delivery_status":status,"provider":&provider,"provider_message_id":&provider_receipt_id,"failure_kind": if status == "failed" { Some("provider_refused") } else { None }}),
+            );
+            store(&state, &user.id, event).await?;
+            Ok(Json(SendResponse {
+                sent: status != "failed",
+                replayed: false,
+                delivery_status: status.to_string(),
+                idempotency_key: key,
+                provider_receipt_id: Some(provider_receipt_id),
+            }))
+        }
+        Err(code) => {
+            let event = test_event(
+                &request.thread_id,
+                &reservation_id,
+                TEST_RECEIPT_KIND,
+                &test,
+                &key,
+                json!({"delivery_status":"failed","provider":readiness.provider.label(),"failure_kind":code}),
+            );
+            store(&state, &user.id, event).await?;
+            Err((
+                StatusCode::BAD_GATEWAY,
+                "The RSVP test provider did not return a successful receipt".to_string(),
+            ))
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -657,6 +974,23 @@ mod tests {
         vec![
             message("01JDRAFT000000000000000000", DRAFT_KIND, draft),
             message("01JAPPROVAL000000000000000", APPROVAL_KIND, approval),
+        ]
+    }
+
+    fn approved_test_messages() -> Vec<AFPMessage> {
+        let bound = json!({
+            "test_id":"test-1", "recipient":"couple@example.test", "subject":"TEST — RSVP",
+            "host_label":"Maya and Sam", "fallback_url":"https://omnyid.com/workspace/rsvp.html#test.abc",
+            "exact_content":"TEST — nothing can be submitted.", "sends_message":false,
+            "changes_household_lifecycle":false,
+        });
+        let mut draft = bound.clone();
+        draft["approval_status"] = json!("draft");
+        let mut approval = bound;
+        approval["approval_status"] = json!("approved");
+        vec![
+            message("01JTESTDRAFT00000000000000", TEST_DRAFT_KIND, draft),
+            message("01JTESTAPPROVAL0000000000", TEST_APPROVAL_KIND, approval),
         ]
     }
 
@@ -700,8 +1034,17 @@ mod tests {
         assert_eq!(reservation.id, deterministic_message_id(&key));
         assert_eq!(reservation.id.len(), 26);
         assert!(reservation.id.starts_with('0'));
-        assert_eq!(reservation.metadata.as_ref().and_then(|value| value.get("store")).and_then(Value::as_bool), Some(true));
-        assert!(super::super::validate_proto_message(&super::super::app_to_proto(reservation.clone())));
+        assert_eq!(
+            reservation
+                .metadata
+                .as_ref()
+                .and_then(|value| value.get("store"))
+                .and_then(Value::as_bool),
+            Some(true)
+        );
+        assert!(super::super::validate_proto_message(
+            &super::super::app_to_proto(reservation.clone())
+        ));
         let retry = lifecycle_message(
             "01JTHREAD00000000000000000",
             &reservation.id,
@@ -713,5 +1056,23 @@ mod tests {
         assert_eq!(kind(&retry), RETRY_KIND);
         assert_eq!(retry.content["retry_decision"], "no_automatic_retry");
         assert!(!retry.content.to_string().contains("priya@example.test"));
+    }
+
+    #[test]
+    fn approved_test_is_exact_recipient_scoped_and_separate_from_household_lifecycle() {
+        let test = parse_approved_test(&approved_test_messages(), "01JTESTAPPROVAL0000000000")
+            .expect("approved test");
+        assert_eq!(test.recipient, "couple@example.test");
+        let event = test_event(
+            "01JTHREAD00000000000000000",
+            &test.approval_message_id,
+            TEST_RECEIPT_KIND,
+            &test,
+            &test_key(&test),
+            json!({"delivery_status":"provider_accepted"}),
+        );
+        assert_eq!(kind(&event), TEST_RECEIPT_KIND);
+        assert_eq!(event.content["changes_household_lifecycle"], false);
+        assert!(event.content.get("household_id").is_none());
     }
 }

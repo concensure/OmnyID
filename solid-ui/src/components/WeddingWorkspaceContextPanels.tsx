@@ -568,6 +568,7 @@ export function WeddingWorkspaceContextPanels(props: {
           mealChoiceState={mealChoiceState()}
           onSaveMealChoices={saveMealChoices}
           onSave={saveRsvpSetup}
+          saveProjection={props.saveProjection}
           onCulturallyDiverseCelebrationChange={saveCulturallyDiverseCelebration}
         />
         <Show when={rsvpSetup()}>{(setup) => (
