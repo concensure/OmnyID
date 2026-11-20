@@ -46,7 +46,9 @@ try {
   const pdfBytes = await pdfSource.pdf({ format: 'A4' });
   await pdfSource.close();
   await page.locator('[name=a_file]').setInputFiles({ name: 'venue-quote.pdf', mimeType: 'application/pdf', buffer: pdfBytes });
-  await page.waitForFunction(() => document.querySelector('[data-file-status="a"]')?.textContent?.includes('was read on this device'));
+  await page.waitForFunction(() => !document.querySelector('[data-file-status="a"]')?.textContent?.startsWith('Reading '));
+  const pdfStatus = await page.locator('[data-file-status=a]').innerText();
+  if (!pdfStatus.includes('was read on this device')) throw new Error(`Selectable-text PDF failed: ${pdfStatus}`);
   if (!await page.locator('[name=a_text]').inputValue().then((text) => text.includes('40 guests at $150 per guest'))) {
     throw new Error('Selectable-text PDF did not populate the local proposal text');
   }
