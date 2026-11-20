@@ -15,6 +15,17 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-387
+    title: Remove the public Wedding-home Ask Sprout control and harden its release boundary
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-387
+    worktree: C:/temp/wt/omnyid-wed387
+    base_sha: bbdfd704cf6db1debb9249ecec11bec261389718
+    depends_on: [WED-386]
+    files: [wedding/index.html, wedding/tests/wedding-website-smoke.mjs, wedding/tests/agent-directory-browser-smoke.mjs, Documents/verification/WED-387*, .agent/**]
+    acceptance: [the public /wedding/ home does not load render or expose an Ask Sprout control or dialog at mobile or desktop widths, authenticated workspace Sprout and intentional public subpage behavior are not removed, a static regression fails if the home reintroduces the wedding-agent script or identifiers, focused browser public-site and full Wedding checks pass from the committed exact SHA, the static-only Oracle release preserves the WED-386 application image configuration quote RSVP and Caddy routes and records an exact rollback copy]
+    progress: "Started from clean WED-386 coordination head bbdfd704cf6db1debb9249ecec11bec261389718 after confirming the production home still renders Ask Sprout. Scope is the public Wedding home only; authenticated workspace Sprout and public subpage behavior remain unchanged unless testing reveals a shared regression."
   - id: WED-386
     title: Implement production-faithful RSVP preview, returning confirmation and evidence-based follow-up
     status: done

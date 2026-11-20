@@ -45,7 +45,11 @@ try {
   await page.locator('#vendorSearch').fill('beva');
   await page.waitForTimeout(700);
   assert.equal(await page.locator('#vendorGrid h3').count(), 0);
-  for (const path of ['/wedding/index.html', '/wedding/vendors.html', '/wedding/blog/how-to-elope-in-australia-celebrant.html']) {
+  await page.goto(`${origin}/wedding/index.html`);
+  assert.equal(await page.getByRole('button', { name: 'Open Wedding Sprout, your planning assistant' }).count(), 0);
+  assert.equal(await page.getByRole('dialog', { name: 'Wedding Sprout' }).count(), 0);
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+  for (const path of ['/wedding/vendors.html', '/wedding/blog/how-to-elope-in-australia-celebrant.html']) {
     await page.goto(origin + path);
     const button = page.getByRole('button', { name: 'Open Wedding Sprout, your planning assistant' });
     await button.click();
@@ -56,5 +60,5 @@ try {
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
   }
   assert.deepEqual(errors, []);
-  console.log(JSON.stringify({ categoryDeduplication: true, partialSearch: true, staleSearchSuppression: true, agentPages: 3, keyboardFocus: true, viewport: 320 }));
+  console.log(JSON.stringify({ categoryDeduplication: true, partialSearch: true, staleSearchSuppression: true, homeAgentAbsent: true, agentPages: 2, keyboardFocus: true, viewport: 320 }));
 } finally { await browser.close(); server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }

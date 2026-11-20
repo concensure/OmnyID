@@ -342,6 +342,9 @@ if (!weddingJs.includes('focusableSigninEls') || !weddingJs.includes("e.key !== 
   failures.push('wedding/assets/js/main.js: sign-in bridge does not trap keyboard focus');
 }
 const weddingHome = htmlByPath.get(normalize(resolve(root, 'index.html')));
+if (weddingHome.includes('wedding-agent.js') || weddingHome.includes('weddingAgentButton') || weddingHome.includes('Ask Sprout')) {
+  failures.push('index.html: public Wedding home must not load or expose the Ask Sprout control');
+}
 const blogHome = htmlByPath.get(normalize(resolve(root, 'blog.html'))) ?? '';
 for (const required of [
   'data-blog-search',
