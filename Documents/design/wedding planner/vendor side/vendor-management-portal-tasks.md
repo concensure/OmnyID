@@ -1,6 +1,6 @@
 # Vendor management portal — dependency-ordered implementation tasks
 
-Status: first release, P1 extensions and sales-operations projection implemented (audited 15 November 2026)
+Status: VMP-01–VMP-10 released; VMP-11 implemented on WED-383 with exact-SHA Oracle release pending (audited 20 November 2026)
 
 Source: `vendor management portal spec.md` in the canonical project documents
 
@@ -20,8 +20,9 @@ Rule: extend existing AFP, claim, directory, availability, media, messaging and 
 | VMP-08 | Complete | Named resources extend `wedding_vendor_rooms`; bounded multi-date editing extends the existing Limited Specials authority with stale-revision and confirmed-booking guards. |
 | VMP-09 | Complete | Vendor memberships enforce server-side roles, per-user notifications keep security alerts mandatory, and `vendor_subscriptions` controls paid portal features without deleting canonical records on downgrade. |
 | VMP-10 | Complete | `0173_wedding_vendor_sales_operations.sql`, `wedding_vendor_portal_routes/operations.rs` and `VendorSalesOperationsPanel.tsx` project dated response history, non-linear journey state, 90-day totals/trends, exception escalation and room-level availability from the existing enquiry, resource and Limited Specials authorities. |
+| VMP-11 | Implemented, release pending | WED-383 extends the existing public decoder and authenticated Quotes hub with immutable scenarios, optional-item quantities, minimum-spend floors, viability checks, remaining-budget effects and canonical AFP choices. Oracle still serves WED-377-era public quote scripts; do not mark this row released until exact-SHA runtime evidence exists. |
 
-The first-release and P1 acceptance boundaries are implemented. Hosted release evidence remains tied to the exact deployed SHA in `.agent/HANDOFF.md`.
+The first-release and P1 portal boundaries are implemented and were released through WED-347, WED-358 and WED-366. The quote-comparison extension is implemented but not yet released. Hosted evidence remains tied to each exact deployed SHA in `.agent/HANDOFF.md`; later code cannot inherit an earlier release claim.
 
 ## Reuse and extension matrix
 
@@ -35,6 +36,7 @@ The first-release and P1 acceptance boundaries are implemented. Hosted release e
 | Enquiries and messages | `VendorQuotationResponsePanel`, sender identity and canonical conversation | Reuse; present as Enquiries. |
 | Proposal opportunities | `VendorProposalOpportunitiesPanel` | Reuse inside Enquiries. |
 | Quote construction | existing vendor quote draft/response controls | Reuse inside Enquiries; never send without vendor approval. |
+| Couple quote normalisation and comparison | public quote decoder, authenticated Quotes hub, canonical quotation normal form and wedding AFP decision records | Extend in place. Per-vendor `Quote received` remains lifecycle status only; scenarios never mutate source quotes. |
 | Directory/comparison preview | verified owner profile projection | Extend the existing preview to explain which saved fields are public; keep platform verification/ranking read-only. |
 | Team, entitlements and external calendars | existing grants and `vendor_subscriptions`; no external-calendar authority | Extend canonical roles and entitlement checks for VMP-09; keep external-calendar sync deferred and do not imply it exists. |
 
@@ -110,6 +112,19 @@ The first-release and P1 acceptance boundaries are implemented. Hosted release e
 - Surface unanswered enquiries, overdue next actions, expiring holds and approaching price reviews as vendor exceptions.
 - Project room-level availability from `wedding_vendor_rooms` and Limited Specials slots. Distinguish open, enquiry received, temporary hold, confirmed booking, unknown and set-aside-for-price-review states; unknown never means unavailable.
 
+### VMP-11 — Dedicated couple quote normalisation and live scenarios (P0 quote extension)
+
+- Keep one dedicated authenticated Quotes section separate from per-vendor `Quote received`; reuse the public decoder, canonical quotation normal form, source artifacts, corrections and AFP decision records.
+- Accept authenticated PDF/DOCX/text uploads and vendor email/messages. On the public no-login page, read paste, TXT/Markdown/EML and selectable-text PDFs locally; scanned/unreadable PDFs fall back honestly to paste/manual entry.
+- Compare on one date, guest count, duration and required scope. Apply per-person, fixed, minimum-spend, add-on, fee and GST rules deterministically and check capacity/date/guest limits before viable language.
+- Show included, excluded, optional and unknown gaps; keep deposits separate; expose booking/cancellation/expiry terms; never turn unknown fees into zero.
+- Preserve originals while optional items are added, removed or re-quantified. Recalculate both totals, difference and remaining budget live; label edits `Scenario estimate`, protect mandatory/bundled items and require vendor confirmation outside stated terms.
+- Update the existing decision projection with the trade-off, conditional recommendation and most material missing fact. Support prefer, confirm and keep-open without implying booking/payment/contact.
+- Deterministic tests must cover the 30/40-guest A$120-with-A$5,000-minimum versus A$150 crossover and the A$5,200 less A$400 upgrade yielding a A$5,000 floor.
+- Release only from a clean exact-SHA descendant of the completed Runbooks lineage. Verify the public no-login page, authenticated Quotes hub, source/manifest identity and rollback evidence on Oracle.
+
 ## First-release acceptance
 
-The release is acceptable when a vendor-source registrant reaches the vendor portal without generic study onboarding; a verified claimant can update public contact details, upload licensed photos, preview the listing, manage date offers or a secure staff link, review enquiries and construct a quote; the public quote decoder remains local and careful; Limited Specials is active only behind its existing authenticated authorities; and exact-SHA production evidence matches the deployed commit.
+The portal release is acceptable when a vendor-source registrant reaches the vendor portal without generic study onboarding; a verified claimant can update public contact details, upload licensed photos, preview the listing, manage date offers or a secure staff link, review enquiries and construct a quote; the public quote decoder remains local and careful; Limited Specials is active only behind its existing authenticated authorities; and exact-SHA production evidence matches the deployed commit.
+
+VMP-11 is additionally acceptable when the no-login page and authenticated Quotes hub expose the same deterministic scenario rules, both numeric acceptance cases pass, originals and unknowns remain intact, and Oracle serves the exact reviewed WED-383 descendant rather than the older WED-377 scripts.

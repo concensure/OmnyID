@@ -484,11 +484,14 @@ for (const methodCopy of ['How the budget method works', 'Target total', '100%',
   if (!calculator.includes(methodCopy)) failures.push(`wedding-cost-calculator.html: published method is missing "${methodCopy}"`);
 }
 const quoteDecoder = htmlByPath.get(normalize(resolve(root, 'compare-wedding-venue-quotes.html'))) ?? '';
-for (const required of ['manual comparison stays on this device', 'Not stated', 'Compare stated terms', 'assets/js/quote-decoder-engine.js', 'assets/js/quote-decoder.js', 'Analyse quote']) {
+for (const required of ['manual comparison stays on this device', 'Not stated', 'Compare stated terms', 'assets/js/quote-decoder-engine.js', 'assets/js/quote-decoder.js', 'Analyse quote', 'application/pdf', 'Selectable-text PDF']) {
   if (!quoteDecoder.includes(required)) failures.push(`compare-wedding-venue-quotes.html: missing ${required}`);
 }
-if (!quoteDecoderJs.includes('/wedding/quote-extract') || !quoteDecoderJs.includes('No new model request was made') || !quoteDecoderJs.includes('Not stated in quote')) {
-  failures.push('quote-decoder.js: explicit contextual extraction, local cache, or three-state evidence is missing');
+if (!quoteDecoderJs.includes('/wedding/quote-extract') || !quoteDecoderJs.includes('No new model request was made') || !quoteDecoderJs.includes('Not stated in quote') || !quoteDecoderJs.includes('pdfjs/pdf.min.mjs')) {
+  failures.push('quote-decoder.js: explicit contextual extraction, local cache, three-state evidence, or local PDF reader is missing');
+}
+for (const asset of ['pdf.min.mjs', 'pdf.worker.min.mjs', 'LICENSE']) {
+  if (!existsSync(resolve(root, 'assets', 'vendor', 'pdfjs', asset))) failures.push(`assets/vendor/pdfjs/${asset} is missing`);
 }
 if (!quoteDecoderEngine.includes('Estimated total') && !quoteDecoderEngine.includes('estimatedTotal')) {
   failures.push('quote-decoder-engine.js: deterministic total calculation is missing');

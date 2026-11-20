@@ -41,6 +41,16 @@ try {
   await page.goto(`${origin}/wedding/compare-wedding-venue-quotes.html`, { waitUntil: 'domcontentloaded' });
   if (await page.locator('[name=company]').isVisible()) throw new Error('Quote honeypot became a visible blank field');
   if (await page.locator('[data-selection-target=a] option').count() < 10) throw new Error('Selection mapping options did not initialise');
+  const pdfSource = await browser.newPage();
+  await pdfSource.setContent('<!doctype html><meta charset="utf-8"><p>PDF venue quote: 40 guests at $150 per guest. GST included.</p>');
+  const pdfBytes = await pdfSource.pdf({ format: 'A4' });
+  await pdfSource.close();
+  await page.locator('[name=a_file]').setInputFiles({ name: 'venue-quote.pdf', mimeType: 'application/pdf', buffer: pdfBytes });
+  await page.waitForFunction(() => document.querySelector('[data-file-status="a"]')?.textContent?.includes('was read on this device'));
+  if (!await page.locator('[name=a_text]').inputValue().then((text) => text.includes('40 guests at $150 per guest'))) {
+    throw new Error('Selectable-text PDF did not populate the local proposal text');
+  }
+  if (extractionRequests !== 0) throw new Error('Local PDF selection sent quote text before explicit analysis');
   await page.locator('[data-add-line=a]').click();
   if (await page.locator('[data-line-items=a] tbody tr').count() !== 1) throw new Error('Manual line item action did not initialise');
   await page.locator('[data-remove-line="a:0"]').click();

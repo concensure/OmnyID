@@ -1,6 +1,6 @@
 # Venue Quote Comparison v3 — dependency-ordered tasks
 
-Status: v2 released under WED-350/WED-377; v3 implementation complete under WED-383, release evidence pending
+Status: v2 released under WED-350/WED-377; v3 implementation continuing under WED-383, release evidence pending
 
 | ID | Task | Depends on | Acceptance |
 |---|---|---|---|
@@ -20,8 +20,9 @@ Status: v2 released under WED-350/WED-377; v3 implementation complete under WED-
 
 ## Deliberately deferred
 
-- PDF/DOCX extraction remains the existing authenticated document-ingestion
-  path; the public tool reads TXT/Markdown/EML locally and accepts pasted text.
+- DOCX and scanned-PDF extraction remain the existing authenticated
+  document-ingestion path. The public tool reads TXT/Markdown/EML and
+  selectable-text PDFs locally and accepts pasted text.
 - Public-tool results are not persisted as AFP records. Import into an account
   remains an explicit later action through the canonical quote authority.
 - The model does not decide which venue to book and does not perform arithmetic.
@@ -38,7 +39,7 @@ Status: v2 released under WED-350/WED-377; v3 implementation complete under WED-
 | QV3-06 | Recalculate both scenarios, difference and remaining wedding budget live. | QV3-03, QV3-04 | Guest/date/duration/add-on edits update without navigation or reload and identify each material change. |
 | QV3-07 | Add trade-off, conditional recommendation and most-material-unknown summary. | QV3-05, QV3-06 | 30/40 guest crossover is explained; staffing unknown remains in totals and recommendation. |
 | QV3-08 | Add prefer, confirm and keep-open actions through the existing AFP decision authority. | QV3-07 | Authenticated choice is wedding-scoped and source-linked; public choice is explicitly device-only. |
-| QV3-09 | Complete source intake across canonical PDF, email/message, text and manual paths. | QV3-01 | Existing authenticated ingestion is reused; the public page accepts email/plain text and provides an honest PDF fallback where browser extraction is unavailable. |
+| QV3-09 | Complete source intake across canonical PDF, email/message, text and manual paths. | QV3-01 | Existing authenticated ingestion is reused; the public page reads email/plain text and selectable-text PDFs locally through the existing `pdfjs-dist` capability, with an honest fallback for scanned/unreadable PDFs. |
 | QV3-10 | Verify public and authenticated experiences. | QV3-02..QV3-09 | Deterministic unit/property tests, browser scenario checks, quote-route tests, typecheck/build and exact-SHA evidence pass. |
 
 ### Delivery order

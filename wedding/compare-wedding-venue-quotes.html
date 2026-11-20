@@ -71,7 +71,7 @@
         <h2 id="proposal-a-title">Proposal A</h2>
         <label class="magnet-field">Venue label<input name="a_label" maxlength="100" placeholder="Venue name (kept on this device)"></label>
         <label class="magnet-field">Paste proposal text<textarea name="a_text" rows="9" placeholder="Paste the wording from the proposal"></textarea></label><p class="quote-source-highlight" data-source-highlight="a" hidden aria-live="polite"></p>
-        <div class="quote-local-file"><label class="magnet-link-button" for="a_file">Choose quote or email text</label><input id="a_file" name="a_file" type="file" accept=".txt,.md,.eml,text/plain,text/markdown,message/rfc822"><span data-file-status="a">TXT, Markdown and email files are read locally. For PDF or Word, use the signed-in Quotes upload or paste the extracted text.</span></div>
+        <div class="quote-local-file"><label class="magnet-link-button" for="a_file">Choose quote or email file</label><input id="a_file" name="a_file" type="file" accept=".pdf,.txt,.md,.eml,application/pdf,text/plain,text/markdown,message/rfc822"><span data-file-status="a" role="status" aria-live="polite">Selectable-text PDF, TXT, Markdown and email files are read on this device. Scanned PDF or Word files can be entered manually or uploaded in signed-in Quotes.</span></div>
         <div class="quote-analysis-actions"><button class="magnet-button" type="button" data-analyse="a">Analyse quote</button><button class="magnet-link-button" type="button" data-clear-analysis="a">Clear saved analysis</button></div>
         <p class="quote-analysis-status" data-analysis-status="a" role="status" aria-live="polite">Not analysed. Manual fields remain available.</p>
         <div class="quote-suggestions" data-suggestions="a"></div>
@@ -85,7 +85,7 @@
         <h2 id="proposal-b-title">Proposal B <span class="quote-optional">optional</span></h2>
         <label class="magnet-field">Venue label<input name="b_label" maxlength="100" placeholder="Venue name (kept on this device)"></label>
         <label class="magnet-field">Paste proposal text<textarea name="b_text" rows="9" placeholder="Paste the wording from the second proposal"></textarea></label><p class="quote-source-highlight" data-source-highlight="b" hidden aria-live="polite"></p>
-        <div class="quote-local-file"><label class="magnet-link-button" for="b_file">Choose quote or email text</label><input id="b_file" name="b_file" type="file" accept=".txt,.md,.eml,text/plain,text/markdown,message/rfc822"><span data-file-status="b">TXT, Markdown and email files are read locally. For PDF or Word, use the signed-in Quotes upload or paste the extracted text.</span></div>
+        <div class="quote-local-file"><label class="magnet-link-button" for="b_file">Choose quote or email file</label><input id="b_file" name="b_file" type="file" accept=".pdf,.txt,.md,.eml,application/pdf,text/plain,text/markdown,message/rfc822"><span data-file-status="b" role="status" aria-live="polite">Selectable-text PDF, TXT, Markdown and email files are read on this device. Scanned PDF or Word files can be entered manually or uploaded in signed-in Quotes.</span></div>
         <div class="quote-analysis-actions"><button class="magnet-button" type="button" data-analyse="b">Analyse quote</button><button class="magnet-link-button" type="button" data-clear-analysis="b">Clear saved analysis</button></div>
         <p class="quote-analysis-status" data-analysis-status="b" role="status" aria-live="polite">Not analysed. Manual fields remain available.</p>
         <div class="quote-suggestions" data-suggestions="b"></div>
@@ -129,7 +129,7 @@
 <div class="signin-modal" id="signinModal" aria-hidden="true"><div class="signin-overlay" data-close-signin></div><div class="signin-panel" role="dialog" aria-modal="true" aria-labelledby="signinTitle"><button class="signin-close" type="button" data-close-signin aria-label="Close">&times;</button><p class="eyebrow">Continue to your workspace</p><h2 id="signinTitle">Keep the comparison with your wedding plan</h2><p class="signin-lede">Sign in or create a free account. You choose what to add; this public page does not save proposal text to your account.</p><div class="signin-options"><div class="signin-option"><a class="btn btn-primary btn-block" href="../workspace/?auth=register&amp;source=wedding&amp;from=quote-decoder">Create free account</a><a class="btn btn-outline btn-block" href="../workspace/?auth=signin&amp;source=wedding&amp;from=quote-decoder">Sign in</a></div></div><button type="button" class="link-btn" data-close-signin>Not now</button></div></div>
 <script src="assets/js/main.js"></script>
 <script src="assets/js/quote-decoder-engine.js?v=20261120-383"></script>
-<script src="assets/js/quote-decoder.js?v=20261120-383"></script>
+<script src="assets/js/quote-decoder.js?v=20261120-383-pdf"></script>
 <script src="/wedding/assets/js/wedding-agent.js?v=20261119-377" defer></script>
 </body>
 </html>

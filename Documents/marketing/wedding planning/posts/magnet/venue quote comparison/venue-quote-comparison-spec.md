@@ -49,9 +49,11 @@ not equivalent to a comprehensive quote.
 
 Authenticated use accepts the existing PDF/DOCX/TXT/Markdown upload and vendor
 email/message paths. The public page accepts pasted email/manual text and local
-plain-text or email files; PDF support must use the existing client extraction
-or quotation ingestion capability rather than inventing a second parser. If a
-browser cannot safely extract a PDF, it must say so and retain manual entry.
+plain-text, email and selectable-text PDF files. It reuses the repository's
+existing `pdfjs-dist` client extraction dependency rather than inventing a
+second parser. PDF bytes and extracted text remain in the browser unless the
+visitor separately chooses contextual analysis. A scanned or unreadable PDF
+must say so and retain manual entry.
 
 ## 3. Privacy and activation boundary
 
@@ -131,7 +133,7 @@ code after quoted per-head and fixed inputs are assembled.
 
 Each proposal contains:
 
-1. Proposal text and local TXT/Markdown reader.
+1. Proposal text and local TXT/Markdown/EML/selectable-text PDF reader.
 2. An explicit contextual-analysis control and disclosure.
 3. Suggestion cards with state, confidence, value and an always-visible source
    snippet. Selecting a card selects the exact snippet in the textarea.

@@ -9,6 +9,12 @@
   const totalText = (result) => result.estimatedTotal == null ? "Not enough pricing stated" : money.format(result.estimatedTotal);
   const CACHE_KEY = "omnyid.wedding.quoteExtractionCache.v2";
   const CHOICE_KEY = "omnyid.wedding.quoteComparisonChoice.v1";
+  const PDFJS_VERSION = "6.0.227";
+  const PDFJS_MODULE_URL = `/wedding/assets/vendor/pdfjs/pdf.min.mjs?v=${PDFJS_VERSION}`;
+  const PDFJS_WORKER_URL = `/wedding/assets/vendor/pdfjs/pdf.worker.min.mjs?v=${PDFJS_VERSION}`;
+  const MAX_LOCAL_PDF_BYTES = 10_000_000;
+  const MAX_LOCAL_PDF_PAGES = 80;
+  const MAX_LOCAL_TEXT_CHARACTERS = 100_000;
   const fieldConfig = [
     ["pricing_model", "Pricing model", "select", [["unclear", "Not stated / unclear"], ["per_head", "Per-head package"], ["fixed", "Fixed or whole-package"], ["minimum_spend", "Minimum spend"], ["hybrid", "Fixed plus per-head"]]],
     ["per_head_rate", "Per-head package rate (AUD)", "number"],
@@ -490,14 +496,49 @@
     status.textContent = "Applied your selected source to the chosen field."; status.dataset.kind = "success";
   }
 
+  async function readPdfLocally(file) {
+    if (file.size > MAX_LOCAL_PDF_BYTES) throw new Error("too_large");
+    const pdfjs = await import(PDFJS_MODULE_URL);
+    pdfjs.GlobalWorkerOptions.workerSrc = PDFJS_WORKER_URL;
+    const task = pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()), isEvalSupported: false });
+    const pdf = await task.promise;
+    try {
+      if (pdf.numPages > MAX_LOCAL_PDF_PAGES) throw new Error("too_many_pages");
+      const pages = [];
+      for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+        const page = await pdf.getPage(pageNumber);
+        const content = await page.getTextContent();
+        const text = content.items.map((item) => "str" in item ? item.str : "").join(" ").replace(/\s+/g, " ").trim();
+        if (text) pages.push(text);
+      }
+      const extractedText = pages.join("\n\n").trim();
+      if (!extractedText) throw new Error("no_selectable_text");
+      return extractedText.slice(0, MAX_LOCAL_TEXT_CHARACTERS);
+    } finally {
+      await pdf.destroy();
+    }
+  }
+
   async function readFile(prefix, file) {
     const status = document.querySelector(`[data-file-status="${prefix}"]`);
     if (!file) return;
     const extension = file.name.split(".").pop()?.toLowerCase();
-    if (!["txt", "md", "eml"].includes(extension)) { status.textContent = "This public tool reads TXT, Markdown and email files locally. Use the signed-in Quotes upload for PDF/Word, or paste extracted text; nothing was uploaded."; return; }
-    if (file.size > 2_000_000) { status.textContent = "Choose a text file smaller than 2 MB or paste the relevant sections."; return; }
-    try { field(`${prefix}_text`).value = await file.text(); status.textContent = `${file.name} was read on this device. Choose Analyse quote only if you want contextual extraction.`; }
-    catch { status.textContent = "The file could not be read. Paste its text instead."; }
+    if (!["pdf", "txt", "md", "eml"].includes(extension)) { status.textContent = "This public tool reads selectable-text PDF, TXT, Markdown and email files locally. Use signed-in Quotes for Word files, or enter the terms manually; nothing was uploaded."; return; }
+    if (extension !== "pdf" && file.size > 2_000_000) { status.textContent = "Choose a text file smaller than 2 MB or paste the relevant sections."; return; }
+    try {
+      status.textContent = `Reading ${file.name} on this device…`;
+      const text = extension === "pdf" ? await readPdfLocally(file) : await file.text();
+      field(`${prefix}_text`).value = text;
+      const truncation = extension === "pdf" && text.length === MAX_LOCAL_TEXT_CHARACTERS ? " The local text was limited to 100,000 characters; keep the relevant quote sections before analysis." : "";
+      status.textContent = `${file.name} was read on this device and was not uploaded.${truncation} Choose Analyse quote only if you want contextual extraction.`;
+    } catch (error) {
+      const code = error instanceof Error ? error.message : "";
+      status.textContent = code === "too_large"
+        ? "Choose a PDF smaller than 10 MB, use signed-in Quotes, or enter the relevant terms manually. Nothing was uploaded."
+        : code === "too_many_pages"
+          ? "This PDF has more than 80 pages. Use signed-in Quotes or enter the relevant pages manually. Nothing was uploaded."
+          : "No selectable quote text could be read from this file. If it is scanned, use signed-in Quotes or enter the stated terms manually. Nothing was uploaded.";
+    }
   }
 
   form.addEventListener("submit", (event) => { event.preventDefault(); renderComparison(); });
