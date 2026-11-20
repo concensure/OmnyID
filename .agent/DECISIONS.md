@@ -4465,3 +4465,18 @@ separate reservation and receipt AFP kinds explicitly marked as non-mutating for
 household lifecycle. `OMNYID_WEDDING_RSVP_TEST_SEND_ENABLED` is false-default. A real
 allowlisted provider receipt plus non-mutation evidence is required before cohort
 enablement; deployment approval alone does not satisfy that gate.
+
+## 2026-11-21 — Workspace artifacts and RSVP send gates have separate release proof (WED-386)
+
+The homeserver image label is not evidence that the workspace volume contains the
+matching frontend. Every release that changes built workspace assets must record both
+the frozen application SHA and the packaged/static asset hash, then verify the public
+route loads that asset. A stale workspace bundle is a failed release even when the
+backend image and health endpoints are current.
+
+Test-to-self may remain enabled after a real provider-accepted receipt only while all
+three boundaries remain true: the action requires authenticated exact-content and
+exact-recipient approval, recipients are constrained by the reviewed allowlist, and
+test reservation/receipt events provably do not mutate production household lifecycle
+evidence. This does not enable public capability publishing, reminders, inbound mail
+or vendor welcome delivery. Any of those remains a separate false-default cohort.

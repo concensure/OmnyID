@@ -5,7 +5,7 @@ Parent: WED-303
 Specification: `wedding-rsvp-spec.md`
 Baseline: `f119f48ee96a44117b52eba3c60966af86cf794f`
 
-Focused follow-on plan: `microwedding-invitation-rsvp-ux-tasks.md` is the dependency-ordered extension for household preflight/test, durable confirmation/edit and evidence-based follow-up. It remains proposed and does not reopen completed WED-303 slices.
+Focused follow-on plan: `microwedding-invitation-rsvp-ux-tasks.md` is the completed WED-386 extension for household preflight/test, durable confirmation/edit and evidence-based follow-up. It extends rather than reopens the completed WED-303 slices.
 
 ## Working rules
 

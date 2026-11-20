@@ -1,3 +1,48 @@
+## WED-383/385/386 live and hosted rollout gates complete (2026-11-21)
+
+Worktree `C:/temp/wt/omnyid-wed386`, branch `agent/codex/WED-386`. Frozen
+application/static source `23b9c57007188e460135f0e0c71806180f69d7a9` is live on
+Oracle. The native homeserver image is
+`sha256:f6ef45dee35b37772100c2798268af9315abc2f150a76b996cb22fad1a7c0e96`.
+The exact-SHA workspace package hash is
+`996990B62B256A9EA3BCD2C83BF16FEAED7CED9BACF05E094B881ECBC2530049` and
+the deployed RSVP bundle hash is
+`e12d89349a810c5d9dae04fa71df3209e83c6ce743c8f1aae8583c5360c69a41`.
+
+Hosted evidence closes the remaining RSVP checklist. A dedicated synthetic couple
+and two named guests exercised production-faithful preview/test, append-only replies,
+returning revision-3 confirmation and edit, private-field exclusion and revocation.
+The allowlisted provider accepted test-to-self, exact replay was suppressed, and
+ledger before/after counts proved no mutation of capability, response, setup, profile
+or invitation lifecycle evidence. The final test envelope exposed no submit action at
+320 and 1280 px. The production capability was revoked after proof. Public RSVP and
+reminder send remain off and the pilot list is empty; test-to-self remains on only for
+the authenticated reviewed-recipient/provider path. Existing synthetic vendor and
+celebrant accounts were not reset or mutated because this final gate required only
+couple/guest authority; their retained role/account regression evidence still passes.
+
+The public quote page passed the deployed Playwright minimum-spend scenario at 390 px,
+including add/omit/delete optional item, A$5,200 to A$5,000 floor, A$200 explanation,
+remaining budget, separate deposit and preserved original. The authenticated quote
+engine passed 12 focused scenario/choice/surface tests. The Soft Wedding headline and
+small-to-larger-celebration supporting copy are live.
+
+The initial final proof revealed `.env.oracle` had become root-owned mode `0600`, so
+the normal `ubuntu` Compose operator could not inspect services. It was repaired to
+`ubuntu:ubuntu` mode `0600`; no secrets were printed and no restart was required. The
+rerun at `C:/temp/wed386-oracle-proof-final-r2` passed backup-service and homeserver
+state, manifest verification and the isolated PostgreSQL restore drill. Caddy,
+`/healthz`, `/readyz`, `/wedding/`, `/workspace/rsvp.html` and the public quote page
+passed. Full redacted evidence is in
+`Documents/verification/WED-386-hosted-release-evidence.md`.
+
+Rollback remains available through image
+`sha256:de181133e9463ae2d63b25137b80a4a402ad0bd3645d59dd1ae8cd43281f5706`
+tagged `omnyid-homeserver:wed386-rollback-de181133`, plus application/config and
+workspace backups under
+`/home/ubuntu/omnyid-candidates/wed386-23b9c570/hosted-proof/config-rollback/`.
+No unresolved implementation or hosted rollout task remains in WED-383/385/386.
+
 ## WED-386 focused RSVP extension ready for review (2026-11-20)
 
 Worktree `C:/temp/wt/omnyid-wed386`, branch `agent/codex/WED-386`, based on the

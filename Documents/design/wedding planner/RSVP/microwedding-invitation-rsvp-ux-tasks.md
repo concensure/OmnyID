@@ -1,6 +1,6 @@
 # Microwedding invitation and RSVP UX extension tasks
 
-Status: implementation complete and released on WED-386; provider-send cohort remains gated off
+Status: implementation and hosted proof complete on WED-386; production capability/reminder send remains off and reviewed test-to-self is allowlisted
 Parent: WED-385 planning slice; implementation: WED-386
 Specification: `microwedding-invitation-rsvp-ux-spec.md`
 Research: `microwedding invitation wedding research.md`
@@ -129,12 +129,12 @@ Depends on: MI-RSVP-07
 
 - [x] Deploy first with production publish/test-send flags off.
 - [x] Verify existing RSVP and wedding routes remain healthy.
-- [ ] Run an allowlisted synthetic couple/household preview and return-confirmation exercise.
-- [ ] Enable test-to-self only after provider receipt and non-mutation evidence passes.
+- [x] Run an allowlisted synthetic couple/household preview and return-confirmation exercise.
+- [x] Enable test-to-self only after provider receipt and non-mutation evidence passes.
 - [x] Record previous image/config, rollback path, runtime SHA and feature flags.
 - [x] Do not broaden the cohort without usability review of the three selected workflows.
 
-Release note (2026-11-20): exact application SHA `23b9c57007188e460135f0e0c71806180f69d7a9` is live on Oracle as native ARM64 image `sha256:f6ef45dee35b37772100c2798268af9315abc2f150a76b996cb22fad1a7c0e96`. Public/test/reminder send flags remain false. The allowlisted hosted-account exercise and real provider receipt are deliberately still open because no authenticated allowlisted account/provider receipt was available; test-to-self must remain disabled until both are supplied. Backup verification passed. The isolated restore drill was blocked before mutation by disk preflight (2.44 GB free versus 8.06 GB required), and the non-restore production proof passed.
+Release note (2026-11-21): exact application SHA `23b9c57007188e460135f0e0c71806180f69d7a9` remains live on Oracle as native ARM64 image `sha256:f6ef45dee35b37772100c2798268af9315abc2f150a76b996cb22fad1a7c0e96`. An allowlisted synthetic couple/household exercised preview, named responses, append-only return edits and guest-safe confirmation in the hosted runtime. The provider accepted the reviewed test-to-self message, exact replay was suppressed, and before/after ledger counts proved the test did not change capability, response, setup, profile or invitation lifecycle evidence. The final standards-compliant test URL rendered at mobile and desktop sizes with no submit action, while the returning production capability rendered revision 3 and private-answer plaintext remained absent. The synthetic capability was then revoked. Test-to-self remains enabled only behind the existing authenticated approval and two-recipient allowlist; public RSVP publishing, reminder send, inbound mail and vendor welcome mail remain off. After the host was pruned, backup verification and the isolated PostgreSQL restore drill both passed. Production `.env.oracle` ownership was restored to `ubuntu:ubuntu` mode `0600` after the rollout so the normal non-root Compose proof can inspect the running services.
 
 Acceptance: rollout can be disabled without losing canonical setup or responses, and no unsupported research ideas are implied as shipped.
 

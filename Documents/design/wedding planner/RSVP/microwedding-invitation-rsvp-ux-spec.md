@@ -1,11 +1,13 @@
 # Microwedding invitation and RSVP UX extension specification
 
-Status: implemented; false-default Oracle rollout candidate
+Status: implemented and released on Oracle; public capability/reminder send remains off and reviewed test-to-self is allowlisted
 Work item: WED-385 planning slice; WED-386 implementation
 Extends: `wedding-rsvp-spec.md` and the existing WED-303 implementation
 Research input: `microwedding invitation wedding research.md`
 
 Implementation checkpoint (WED-386): the existing publishing panel and public route now consume one pure household-experience projection in explicit preview, test and production modes. RSVP setup remains the canonical AFP source for guest-facing event facts; a 15-minute data-only Test fragment cannot satisfy the production capability token shape and performs no open/respond request. Optional test-to-self delivery binds an exact draft and approval to the authenticated couple address and stores separate provider receipts with `changes_household_lifecycle=false`. Capability open returns scoped guest-safe latest responses including lock evidence; returning confirmation supports changed-person-only append revisions, impact receipts, partial recovery and late-change contact guidance. The existing due-only follow-up surface consumes capability/provider/response/reminder evidence and reuses bounded actions.
+
+Hosted checkpoint (2026-11-21): exact application/static SHA `23b9c57007188e460135f0e0c71806180f69d7a9` is live. An allowlisted synthetic couple and two named guests passed preview/test, append-only response and revision-3 returning-confirmation journeys. Private-answer plaintext stayed absent, the test envelope had no submit action, the provider accepted the reviewed test message, exact replay was suppressed and ledger deltas proved that test delivery did not alter household lifecycle facts. The production capability was revoked after proof. Full redacted evidence and rollback identifiers are in `Documents/verification/WED-386-hosted-release-evidence.md`.
 
 ### Canonical guest-facing event-field map
 

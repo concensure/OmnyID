@@ -1,7 +1,7 @@
 # OmnyID Weddings — Vendor Management Portal Specification
 
 **Version:** 1.1 — Repository-reconciled implementation specification  
-**Status:** VMP-01–VMP-10 implemented and released; quote-comparison extension WED-383 implemented with Oracle release pending  
+**Status:** VMP-01–VMP-11 implemented and released on Oracle; latest exact descendant application/static SHA `23b9c57007188e460135f0e0c71806180f69d7a9`
 **Target:** OmnyID Weddings, initially Sydney  
 **Primary users:** Wedding venue operators and other wedding suppliers  
 **Design philosophy:** Minimum administration, trustworthy availability, vendor-controlled publishing, AFP-native operations.
@@ -902,3 +902,21 @@ The first release is complete only when:
 - No avoidable duplicate implementations or competing systems of record have been introduced.
 
 **Final implementation instruction:** Preserve OmnyID's existing architecture and working functionality. Make the smallest coherent set of changes that delivers the complete vendor workflow. Prioritise dependable state, operational clarity and code reuse over introducing new frameworks or unnecessary feature complexity.
+
+## 16. Release reconciliation — 21 November 2026
+
+VMP-11 is released through the WED-386 descendant without adding a second quote
+engine or store. The no-login page and authenticated Wedding Quotes hub preserve
+vendor originals while applying the same deterministic scenario rules. The deployed
+public browser proof covers add, omit and delete optional items, the A$5,200 less
+A$400 upgrade minimum-spend case, remaining-budget updates, separate deposits and
+mobile layout. Twelve focused authenticated tests cover item quantities, couple-added
+items, mandatory/bundled locks, unknowns, viability and AFP-scoped choices.
+
+Production serves application/static SHA
+`23b9c57007188e460135f0e0c71806180f69d7a9`; image, asset, package, rollback and
+Oracle restore evidence is recorded in
+`Documents/verification/WED-386-hosted-release-evidence.md`. Retained hosted account
+evidence confirms the synthetic celebrant and both synthetic vendor accounts can
+authenticate and that cross-account records return 404. No vendor/celebrant account
+mutation was necessary for the final couple/guest RSVP gate.

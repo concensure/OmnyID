@@ -1,6 +1,6 @@
 # Vendor management portal — dependency-ordered implementation tasks
 
-Status: VMP-01–VMP-10 released; VMP-11 implemented on WED-383 with exact-SHA Oracle release pending (audited 20 November 2026)
+Status: VMP-01–VMP-11 implemented and released on Oracle (audited 21 November 2026)
 
 Source: `vendor management portal spec.md` in the canonical project documents
 
@@ -20,9 +20,9 @@ Rule: extend existing AFP, claim, directory, availability, media, messaging and 
 | VMP-08 | Complete | Named resources extend `wedding_vendor_rooms`; bounded multi-date editing extends the existing Limited Specials authority with stale-revision and confirmed-booking guards. |
 | VMP-09 | Complete | Vendor memberships enforce server-side roles, per-user notifications keep security alerts mandatory, and `vendor_subscriptions` controls paid portal features without deleting canonical records on downgrade. |
 | VMP-10 | Complete | `0173_wedding_vendor_sales_operations.sql`, `wedding_vendor_portal_routes/operations.rs` and `VendorSalesOperationsPanel.tsx` project dated response history, non-linear journey state, 90-day totals/trends, exception escalation and room-level availability from the existing enquiry, resource and Limited Specials authorities. |
-| VMP-11 | Implemented, release pending | WED-383 extends the existing public decoder and authenticated Quotes hub with immutable scenarios, optional-item quantities, minimum-spend floors, viability checks, remaining-budget effects and canonical AFP choices. Oracle still serves WED-377-era public quote scripts; do not mark this row released until exact-SHA runtime evidence exists. |
+| VMP-11 | Complete and released | WED-383 extends the existing public decoder and authenticated Quotes hub with immutable scenarios, optional-item quantities, minimum-spend floors, viability checks, remaining-budget effects and canonical AFP choices. Exact descendant application/static SHA `23b9c57007188e460135f0e0c71806180f69d7a9` is live; the deployed public browser scenario and authenticated 12-test scenario suite passed. |
 
-The first-release and P1 portal boundaries are implemented and were released through WED-347, WED-358 and WED-366. The quote-comparison extension is implemented but not yet released. Hosted evidence remains tied to each exact deployed SHA in `.agent/HANDOFF.md`; later code cannot inherit an earlier release claim.
+The first-release, P1 portal boundaries and quote-comparison extension are implemented and released. Hosted evidence remains tied to each exact deployed SHA in `.agent/HANDOFF.md`; later code cannot inherit an earlier release claim. Retained production account evidence confirms both synthetic vendor accounts and the synthetic celebrant authenticate and keep account-scoped records isolated. The final WED-386 RSVP exercise used a dedicated couple/guest household because no vendor or celebrant authority was required for that gate.
 
 ## Reuse and extension matrix
 
