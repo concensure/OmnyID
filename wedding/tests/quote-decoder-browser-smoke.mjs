@@ -4,6 +4,7 @@ const origin = process.env.OMNYID_QUOTE_DECODER_ORIGIN ?? 'http://127.0.0.1:4187
 const browser = await chromium.launch({ headless: true });
 try {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  page.on('console', (message) => { if (message.type() === 'warning') console.warn(`browser warning: ${message.text()}`); });
   await page.addInitScript(() => localStorage.setItem('omnyid.public.privacy.v1', JSON.stringify({ version: 1, analytics: false, saved_at: '2026-11-09T00:00:00.000Z' })));
   let extractionRequests = 0;
   let shareRequests = 0;

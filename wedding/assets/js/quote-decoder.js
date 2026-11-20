@@ -533,6 +533,7 @@
       status.textContent = `${file.name} was read on this device and was not uploaded.${truncation} Choose Analyse quote only if you want contextual extraction.`;
     } catch (error) {
       const code = error instanceof Error ? error.message : "";
+      console.warn("Local PDF reader could not extract selectable text.", code || "unknown_error");
       status.textContent = code === "too_large"
         ? "Choose a PDF smaller than 10 MB, use signed-in Quotes, or enter the relevant terms manually. Nothing was uploaded."
         : code === "too_many_pages"
