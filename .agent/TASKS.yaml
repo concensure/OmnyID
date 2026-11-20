@@ -15,6 +15,18 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-385
+    title: Apply soft Wedding message, complete quote item controls, and specify high-value invitation RSVP UX
+    status: in_progress
+    owner: codex
+    reviewer: claude
+    branch: agent/codex/WED-385
+    worktree: C:/temp/wt/omnyid-wed385
+    base_sha: 38d0ed3f5518d418170277e63d5a209d1ce754ef
+    depends_on: [WED-383, WED-377]
+    files: [wedding/index.html, wedding/assets/js/landing-config.js, wedding/assets/js/quote-decoder*.js, wedding/compare-wedding-venue-quotes.html, wedding/tests/**, solid-ui/src/components/WeddingQuoteScenarioComparison.tsx, solid-ui/src/lib/weddingQuoteScenarioState.ts, solid-ui/tests/wedding-quote-scenario-state.test.ts, Documents/design/wedding planner/RSVP/**, .agent/**]
+    acceptance: [The default Wedding hero retains a general wedding-that-feels-like-you promise while naming intimate and small weddings alongside larger celebrations in static and runtime copy, public and authenticated quote comparisons let couples explicitly add remove and change quantities for optional scenario items while preserving originals and protecting bundled or mandatory items, both quote surfaces update totals difference and remaining budget without converting unknown fees to zero, an implementation-ready RSVP specification and dependency-ordered task document select only preview-as-household named household replies and editable confirmation/follow-up as the highest-value extensions and reuse existing AFP RSVP authorities decision surfaces and actionable UI, focused and full Wedding checks pass from a clean exact-SHA candidate, no production deployment occurs without a separate approved release]
+    progress: "Started from clean WED-383 descendant 38d0ed3f5518d418170277e63d5a209d1ce754ef after rejecting the stale dirty primary checkout. This task consumes the user's binding Soft message choice and extends the existing quote engine and RSVP contracts rather than introducing parallel stores."
   - id: WED-383
     title: Complete source-grounded wedding quote normalisation and live scenario comparison
     status: review

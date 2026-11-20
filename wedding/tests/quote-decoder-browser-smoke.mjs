@@ -94,6 +94,7 @@ try {
   await page.locator('[data-add-line=a]').click();
   if (await page.locator('[name=a_deposit_amount]').inputValue() !== '500') throw new Error('Adding a line item cleared the deposit');
   const scenarioRow = page.locator('[data-line-items=a] tbody tr').last();
+  if (!await scenarioRow.locator('[data-line-scenario]').isChecked()) throw new Error('A couple-added optional item was not included in the scenario');
   await scenarioRow.locator('[data-line-label]').fill('Optional drinks upgrade');
   await scenarioRow.locator('[data-line-amount]').fill('400');
   await scenarioRow.locator('[data-line-counted]').check();
@@ -110,6 +111,8 @@ try {
   }
   if (!scenarioText.includes('Deposit (part of total, not added again)')) throw new Error(`Deposit was not kept separate from total: ${scenarioText}`);
   if (!scenarioText.includes('$25,000.00')) throw new Error('Remaining wedding budget did not update');
+  await scenarioRow.locator('[data-remove-line]').click();
+  if (await page.locator('[data-line-items=a] tbody tr').count() !== 0) throw new Error('A couple-added scenario item could not be deleted');
   await page.locator('[data-choice=a]').click();
   await page.locator('[data-choice=confirm]').click();
   if (!await page.locator('[data-choice-status]').innerText().then((text) => text.includes('confirmed'))) throw new Error('Public device-only choice did not persist');

@@ -71,16 +71,19 @@ export function calculateWeddingQuoteScenario(input: {
   for (const item of items) {
     const edit = input.edits?.[item.id];
     const requestedIncluded = edit?.included ?? item.includedInQuotedTotal;
-    const included = requestedIncluded || (!canRemove(item) && item.includedInQuotedTotal);
-    const quantity = boundedNumber(edit?.quantity, boundedNumber(item.quantity, 1));
+    const originalQuantity = boundedNumber(item.quantity, 1);
+    const requestedQuantity = boundedNumber(edit?.quantity, originalQuantity);
+    const locked = !canRemove(item) && item.includedInQuotedTotal;
+    const included = requestedIncluded || locked;
+    const quantity = locked ? originalQuantity : requestedQuantity;
     const originalAmount = item.includedInQuotedTotal ? originalItemAmount(item, quote, input.context) : 0;
     const scenarioAmount = included ? itemAmount(item, input.context, quantity) : 0;
-    const itemChanged = included !== item.includedInQuotedTotal || quantity !== boundedNumber(item.quantity, 1)
+    const itemChanged = included !== item.includedInQuotedTotal || quantity !== originalQuantity
       || (item.priceBasis === "per_person" && input.context.guestCount !== boundedNumber(quote.guestCount, input.context.guestCount))
       || (item.priceBasis === "per_hour" && input.context.durationHours !== boundedNumber(quote.quotedDurationHours, input.context.durationHours));
     changed ||= itemChanged;
-    if (requestedIncluded !== included) {
-      confirmationReasons.push(`${item.label} is ${item.inclusion} and cannot simply be deducted.`);
+    if (locked && (requestedIncluded !== included || requestedQuantity !== quantity)) {
+      confirmationReasons.push(`${item.label} is ${item.inclusion} and cannot simply be deducted or resized under the quoted terms.`);
     }
     if (originalAmount === null || scenarioAmount === null) {
       if (itemChanged) confirmationReasons.push(`${item.label} has no reliable amount for this scenario.`);

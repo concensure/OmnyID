@@ -376,6 +376,12 @@ for (const context of ['starting', 'vendors', 'guests', 'final']) {
     failures.push(`landing context is missing from markup or typed config: ${context}`);
   }
 }
+if (!weddingHome.includes('Less wedding admin. More of a wedding that feels like you.')
+  || !weddingHome.includes('an intimate ceremony, a small wedding or a larger celebration')
+  || !landingConfig.includes("headline: 'Less wedding admin. More of a wedding that feels like you.'")
+  || !landingConfig.includes('an intimate ceremony, a small wedding or a larger celebration')) {
+  failures.push('index.html: Soft message must stay general and name small weddings alongside larger celebrations in static and runtime copy');
+}
 if (!weddingHome.includes('a good starting point for a spicy discussion') || weddingHome.includes('never a compatibility score')) {
   failures.push('index.html: animal-quiz discussion copy has not replaced the compatibility-score wording');
 }
@@ -489,6 +495,12 @@ for (const required of ['manual comparison stays on this device', 'Not stated', 
 }
 if (!quoteDecoderJs.includes('/wedding/quote-extract') || !quoteDecoderJs.includes('No new model request was made') || !quoteDecoderJs.includes('Not stated in quote') || !quoteDecoderJs.includes('pdfjs/pdf.min.mjs')) {
   failures.push('quote-decoder.js: explicit contextual extraction, local cache, three-state evidence, or local PDF reader is missing');
+}
+if (!quoteDecoder.includes('Add optional scenario item')
+  || !quoteDecoderJs.includes('scenarioIncluded: true')
+  || !quoteDecoderJs.includes('Remove from scenario')
+  || !quoteDecoderJs.includes('The original quote is unchanged.')) {
+  failures.push('public quote comparison: explicit add/remove scenario controls or immutable-original explanation is missing');
 }
 for (const asset of ['pdf.min.mjs', 'pdf.worker.min.mjs', 'LICENSE']) {
   if (!existsSync(resolve(root, 'assets', 'vendor', 'pdfjs', asset))) failures.push(`assets/vendor/pdfjs/${asset} is missing`);

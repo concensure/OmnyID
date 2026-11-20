@@ -40,11 +40,24 @@ test("removing an eligible optional upgrade cannot reduce the scenario below min
   assert.equal(result.label, "Scenario estimate");
 });
 
-test("mandatory inclusions cannot be silently removed and source uncertainty remains visible", () => {
+test("mandatory inclusions cannot be silently removed or resized and source uncertainty remains visible", () => {
   const mandatory: WeddingArtifactQuoteScenarioItem = { id: "security", label: "Required security", inclusion: "required", priceBasis: "fixed", unitAmount: 300, quantity: 1, includedInQuotedTotal: true, minimumSpendEligible: false, sourceSnippet: "Required security AUD $300" };
-  const result = calculateWeddingQuoteScenario({ quote: quote("Venue A", 5_300, 30, [mandatory]), context, edits: { security: { included: false, quantity: 1 } } });
+  const result = calculateWeddingQuoteScenario({ quote: quote("Venue A", 5_300, 30, [mandatory]), context, edits: { security: { included: false, quantity: 0 } } });
   assert.equal(result.scenarioTotal, 5_300);
-  assert.match(result.confirmationReasons.join(" "), /cannot simply be deducted/i);
+  assert.match(result.confirmationReasons.join(" "), /cannot simply be deducted or resized/i);
+});
+
+test("a couple-added optional item changes only the scenario and can be omitted again", () => {
+  const extra: WeddingArtifactQuoteScenarioItem = { id: "scenario-extra", label: "Extra welcome drinks", inclusion: "optional", priceBasis: "per_item", unitAmount: 20, quantity: 3, includedInQuotedTotal: false, minimumSpendEligible: false, sourceSnippet: "Couple-added scenario item" };
+  const original = quote("Venue A", 5_000, 30);
+  const added = calculateWeddingQuoteScenario({ quote: original, context, extraItems: [extra], edits: { [extra.id]: { included: true, quantity: 3 } } });
+  assert.equal(added.originalTotal, 5_000);
+  assert.equal(added.scenarioTotal, 5_060);
+  assert.equal(added.remainingBudget, 24_940);
+  assert.equal(added.label, "Scenario estimate");
+  const removed = calculateWeddingQuoteScenario({ quote: original, context, extraItems: [] });
+  assert.equal(removed.originalTotal, 5_000);
+  assert.equal(removed.scenarioTotal, 5_000);
 });
 
 test("decision support does not recommend a cheaper option that fails capacity", () => {

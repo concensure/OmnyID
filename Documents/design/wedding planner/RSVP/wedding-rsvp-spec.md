@@ -6,6 +6,8 @@ Implementation branch: `agent/codex/WED-303`
 Build baseline: `f119f48ee96a44117b52eba3c60966af86cf794f`
 Source direction: `Documents/design/wedding planner/RSVP feature.md`
 
+Focused invitation UX extension: `microwedding-invitation-rsvp-ux-spec.md` selects three incremental workflows—household preflight/test, durable confirmation/edit and evidence-based follow-up—without replacing this authority.
+
 ## 1. Outcome
 
 OmnyID turns an invitation into one private, structured guest workflow. A response updates the couple's existing guest list and all projections that depend on it: Wedding Home, catering counts, seating, reminders, decisions and approved vendor briefs.

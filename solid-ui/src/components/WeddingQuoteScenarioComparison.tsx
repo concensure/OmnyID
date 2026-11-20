@@ -93,7 +93,20 @@ export function WeddingQuoteScenarioComparison(props: {
       sourceSnippet: "Couple-added scenario item; not part of the original vendor quote.",
     };
     setExtras((current) => ({ ...current, [artifactId]: [...(current[artifactId] ?? []), item] }));
+    updateItem(artifactId, item, { included: true, quantity });
     setExtraDraft((current) => ({ ...current, [artifactId]: { label: "", amount: "", quantity: "1", basis: "fixed" } }));
+  }
+
+  function removeExtra(artifactId: string, itemId: string): void {
+    setExtras((current) => ({
+      ...current,
+      [artifactId]: (current[artifactId] ?? []).filter((item) => item.id !== itemId),
+    }));
+    setEdits((current) => {
+      const artifactEdits = { ...(current[artifactId] ?? {}) };
+      delete artifactEdits[itemId];
+      return { ...current, [artifactId]: artifactEdits };
+    });
   }
 
   async function saveChoice(label: string): Promise<void> {
@@ -168,10 +181,13 @@ export function WeddingQuoteScenarioComparison(props: {
               <div class="mt-3 space-y-2"><For each={allItems()}>{(item) => {
                 const edit = () => edits()[artifact.artifactId]?.[item.id];
                 const removable = item.inclusion === "optional" || item.inclusion === "conditional" || item.inclusion === "excluded";
-                return <div class="grid gap-2 rounded-lg border border-wedding-border p-2 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center">
+                const locked = !removable && item.includedInQuotedTotal;
+                const coupleAdded = () => (extras()[artifact.artifactId] ?? []).some((extra) => extra.id === item.id);
+                return <div class="grid gap-2 rounded-lg border border-wedding-border p-2 sm:grid-cols-[minmax(0,1fr)_auto_auto_auto] sm:items-center">
                   <div class="min-w-0"><p class="break-words text-sm font-semibold">{item.label}</p><p class="mt-0.5 text-xs text-wedding-ink/60">{item.unitAmount === null ? "Amount unknown" : `${money(item.unitAmount, artifact.preview.currency)} ${itemBasis(item)}`} · {item.inclusion}<br /><span class="break-words">Source: {item.sourceSnippet}</span></p></div>
-                  <label class="flex items-center gap-2 text-xs font-semibold"><input type="checkbox" disabled={!removable && item.includedInQuotedTotal} checked={edit()?.included ?? item.includedInQuotedTotal} onChange={(event) => updateItem(artifact.artifactId, item, { included: event.currentTarget.checked })} />Include</label>
-                  <label class="text-xs font-semibold">Qty<input type="number" min="0" step="1" class="ml-2 h-10 w-20 rounded-lg border border-wedding-border px-2" value={edit()?.quantity ?? item.quantity} onInput={(event) => updateItem(artifact.artifactId, item, { quantity: Math.max(0, Number(event.currentTarget.value) || 0) })} /></label>
+                  <label class="flex items-center gap-2 text-xs font-semibold"><input type="checkbox" disabled={locked} checked={edit()?.included ?? item.includedInQuotedTotal} onChange={(event) => updateItem(artifact.artifactId, item, { included: event.currentTarget.checked })} />Include in scenario</label>
+                  <label class="text-xs font-semibold">Qty<input type="number" min="0" step="1" disabled={locked} class="ml-2 h-10 w-20 rounded-lg border border-wedding-border px-2 disabled:bg-wedding-slate" value={edit()?.quantity ?? item.quantity} onInput={(event) => updateItem(artifact.artifactId, item, { quantity: Math.max(0, Number(event.currentTarget.value) || 0) })} /></label>
+                  <Show when={coupleAdded()}><button type="button" class="min-h-10 text-xs font-bold text-wedding-secondary underline" onClick={() => removeExtra(artifact.artifactId, item.id)}>Delete item</button></Show>
                 </div>;
               }}</For></div>
             </Show>

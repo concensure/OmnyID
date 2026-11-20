@@ -18,8 +18,8 @@
     starting: {
       id: 'starting',
       label: 'Just getting started',
-      headline: 'Less wedding admin. More wedding.',
-      description: 'Keep your vendors, quotes, guests and next decisions in one place, so you spend less time chasing details and more time enjoying the journey.',
+      headline: 'Less wedding admin. More of a wedding that feels like you.',
+      description: 'Keep vendors, quotes, guests and next decisions together for an intimate ceremony, a small wedding or a larger celebration—without turning planning into a second job.',
       benefit: 'Start with a clear plan showing the next decisions that need you.',
       detailKicker: 'Start here',
       detailTitle: 'Your calm first step',

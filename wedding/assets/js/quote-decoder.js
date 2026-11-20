@@ -82,10 +82,10 @@
       <td><select data-line-unit="${prefix}:${index}" aria-label="Line item ${index + 1} basis"><option value="included" ${row.unit === "included" ? "selected" : ""}>Included / don't add</option><option value="per_head" ${row.unit === "per_head" ? "selected" : ""}>Per head</option><option value="fixed" ${row.unit === "fixed" ? "selected" : ""}>Fixed</option><option value="unclear" ${row.unit === "unclear" ? "selected" : ""}>Unclear</option></select></td>
       <td><input data-line-amount="${prefix}:${index}" type="number" min="0" step="1" inputmode="numeric" value="${row.amount ?? ""}" aria-label="Line item ${index + 1} amount"></td>
       <td><input data-line-counted="${prefix}:${index}" type="checkbox" ${row.counted ? "checked" : ""} aria-label="Add line item ${index + 1} to original quoted total"></td>
-      <td><label class="quote-scenario-toggle"><input data-line-scenario="${prefix}:${index}" type="checkbox" ${(row.scenarioIncluded ?? row.counted) ? "checked" : ""} ${(row.changeability === "mandatory" || row.changeability === "bundled") ? "disabled" : ""}><span>${row.changeability === "mandatory" ? "Required" : row.changeability === "bundled" ? "Bundled" : "Include"}</span></label></td>
+      <td><label class="quote-scenario-toggle"><input data-line-scenario="${prefix}:${index}" type="checkbox" ${(row.scenarioIncluded ?? row.counted) ? "checked" : ""} ${(row.changeability === "mandatory" || row.changeability === "bundled") ? "disabled" : ""}><span>${row.changeability === "mandatory" ? "Required" : row.changeability === "bundled" ? "Bundled" : "Include in scenario"}</span></label></td>
       <td><input data-line-quantity="${prefix}:${index}" type="number" min="0" step="1" inputmode="numeric" value="${row.scenarioQuantity ?? row.originalQuantity ?? 1}" ${(row.changeability === "mandatory" || row.changeability === "bundled") ? "disabled" : ""} aria-label="Scenario quantity for line item ${index + 1}"></td>
       <td><input data-line-minimum="${prefix}:${index}" type="checkbox" ${row.minimumEligible ? "checked" : ""} aria-label="Line item ${index + 1} counts toward minimum spend"></td>
-      <td><button type="button" class="quote-line-remove" data-remove-line="${prefix}:${index}" aria-label="Remove line item ${index + 1}">Remove</button></td>
+      <td><button type="button" class="quote-line-remove" data-remove-line="${prefix}:${index}" aria-label="${row.source_snippet ? "Remove quoted item from scenario" : "Delete couple-added scenario item"} ${index + 1}">${row.source_snippet ? "Remove from scenario" : "Delete item"}</button></td>
     </tr>`).join("")}</tbody></table></div>` : `<p class="quote-empty-lines">No line items yet. Analyse the quote or add one manually.</p>`;
     host.querySelectorAll("[data-line-label],[data-line-changeability],[data-line-unit],[data-line-amount],[data-line-counted],[data-line-scenario],[data-line-quantity],[data-line-minimum]").forEach((control) => control.addEventListener("change", () => {
       const token = control.dataset.lineLabel || control.dataset.lineChangeability || control.dataset.lineUnit || control.dataset.lineAmount || control.dataset.lineCounted || control.dataset.lineScenario || control.dataset.lineQuantity || control.dataset.lineMinimum;
@@ -111,7 +111,6 @@
       }
       if (row?.source_snippet) {
         row.scenarioIncluded = false;
-        row.changeability = "optional";
       } else rows.splice(Number(button.dataset.removeLine.split(":")[1]), 1);
       renderLineItems(prefix);
       if (!document.querySelector("[data-quote-result]").hidden) renderComparison(false);
@@ -554,7 +553,7 @@
     const status = document.querySelector(`[data-analysis-status="${prefix}"]`); status.textContent = "Saved analysis for this proposal was cleared. Manual fields were left unchanged."; status.dataset.kind = "success";
   }));
   document.querySelectorAll("[data-extract-selection]").forEach((button) => button.addEventListener("click", () => extractSelection(button.dataset.extractSelection)));
-  document.querySelectorAll("[data-add-line]").forEach((button) => button.addEventListener("click", (event) => { event.preventDefault(); const prefix = button.dataset.addLine; lineItems[prefix].push({ label: "", unit: "fixed", amount: null, counted: false, originalCounted: false, scenarioIncluded: false, originalQuantity: 1, scenarioQuantity: 1, changeability: "optional", minimumEligible: false, source_snippet: "" }); renderLineItems(prefix); const status = document.querySelector(`[data-analysis-status="${prefix}"]`); status.textContent = "Blank optional line item added below."; status.dataset.kind = "success"; }));
+  document.querySelectorAll("[data-add-line]").forEach((button) => button.addEventListener("click", (event) => { event.preventDefault(); const prefix = button.dataset.addLine; lineItems[prefix].push({ label: "", unit: "fixed", amount: null, counted: false, originalCounted: false, scenarioIncluded: true, originalQuantity: 1, scenarioQuantity: 1, changeability: "optional", minimumEligible: false, source_snippet: "" }); renderLineItems(prefix); const status = document.querySelector(`[data-analysis-status="${prefix}"]`); status.textContent = "Blank optional item added to the scenario. The original quote is unchanged."; status.dataset.kind = "success"; }));
   document.querySelectorAll("[data-source-field]").forEach((control) => {
     control.addEventListener("click", () => { const [prefix, key] = control.dataset.sourceField.split(":"); highlightSource(prefix, acceptedSources[prefix][key]); });
     control.addEventListener("change", () => { if (!document.querySelector("[data-quote-result]").hidden) renderComparison(false); });
