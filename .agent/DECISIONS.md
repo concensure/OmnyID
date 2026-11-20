@@ -4480,3 +4480,11 @@ exact-recipient approval, recipients are constrained by the reviewed allowlist, 
 test reservation/receipt events provably do not mutate production household lifecycle
 evidence. This does not enable public capability publishing, reminders, inbound mail
 or vendor welcome delivery. Any of those remains a separate false-default cohort.
+
+## 2026-11-21 — Public Wedding home stays focused; Sprout remains contextual (WED-387)
+
+The public `/wedding/` home does not load or render the floating Ask Sprout control.
+Its primary planning and sign-in actions remain the intentional conversion path. This
+does not remove the authenticated Wedding assistant or the existing Sprout entry on
+public directory/article pages. The boundary is enforced in both static and browser
+tests so a shared public-script sweep cannot silently restore the home control.

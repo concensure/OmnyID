@@ -1,3 +1,39 @@
+## WED-387 public Wedding-home Sprout removal released (2026-11-21)
+
+Worktree `C:/temp/wt/omnyid-wed387`, branch `agent/codex/WED-387`, based on
+WED-386 coordination commit `bbdfd704cf6db1debb9249ecec11bec261389718`.
+Frozen implementation/static release SHA:
+`efad4b1cf7002649a7d53e3440c92f81cf01ca03`. Clean release worktree:
+`C:/temp/wt/omnyid-wed387-release-efad4b1c`.
+
+The public `/wedding/` home no longer loads `wedding-agent.js`, so it exposes no
+Ask Sprout button or dialog. A static regression checks the loader and identifiers,
+and the browser smoke proves absence at 320 and 1280 px while retaining intentional
+Sprout controls on the public vendor directory and article. Authenticated workspace
+Sprout was not changed.
+
+Exact-SHA verification passed: typecheck, both line budgets, public Wedding/security
+checks, all 2,323 Wedding tests, production build and the dedicated browser test. npm
+install still reports the inherited dependency audit summary of 38 moderate and one
+high finding; dependency changes were not mixed into this one-control release.
+
+This was a one-file static hot-sync. Deployed `wedding/index.html` SHA-256 is
+`3ad2016aa58295c6c1b9b3bd26d2e68f5c6ed8d9eccc85a83309d659193d224e`.
+The previous file hash was
+`e41a1f96a7fa4c0bb231b1bd5b76073e39cfd5fc34dead286c8544bb6df1a840` and its
+rollback copy is
+`/home/ubuntu/omnyid-candidates/wed387-efad4b1cf7002649a7d53e3440c92f81cf01ca03/rollback/index.html.before-e41a1f96a7fa4c0bb231b1bd5b76073e39cfd5fc34dead286c8544bb6df1a840`.
+
+Post-release Chromium returned 200, requested no Wedding agent asset, showed no
+Sprout control/dialog or overflow at 320/1280, and retained the Soft headline. All
+seven Compose services remained running; homeserver image
+`sha256:f6ef45dee35b37772100c2798268af9315abc2f150a76b996cb22fad1a7c0e96`
+retained zero restarts. Caddy validation, safety flags, backup verification and public
+Wedding, RSVP, quote and Docs 200 checks passed. The restore drill was skipped for
+this static-only release; WED-386's immediately preceding full isolated restore proof
+remains valid because no runtime image, database, migration or configuration changed.
+Full redacted evidence is in `Documents/verification/WED-387-static-release.md`.
+
 ## WED-383/385/386 live and hosted rollout gates complete (2026-11-21)
 
 Worktree `C:/temp/wt/omnyid-wed386`, branch `agent/codex/WED-386`. Frozen

@@ -17,15 +17,16 @@ lifecycle:
 tasks:
   - id: WED-387
     title: Remove the public Wedding-home Ask Sprout control and harden its release boundary
-    status: in_progress
+    status: done
     owner: codex
     branch: agent/codex/WED-387
     worktree: C:/temp/wt/omnyid-wed387
     base_sha: bbdfd704cf6db1debb9249ecec11bec261389718
+    implementation_sha: efad4b1cf7002649a7d53e3440c92f81cf01ca03
     depends_on: [WED-386]
     files: [wedding/index.html, wedding/tests/wedding-website-smoke.mjs, wedding/tests/agent-directory-browser-smoke.mjs, Documents/verification/WED-387*, .agent/**]
     acceptance: [the public /wedding/ home does not load render or expose an Ask Sprout control or dialog at mobile or desktop widths, authenticated workspace Sprout and intentional public subpage behavior are not removed, a static regression fails if the home reintroduces the wedding-agent script or identifiers, focused browser public-site and full Wedding checks pass from the committed exact SHA, the static-only Oracle release preserves the WED-386 application image configuration quote RSVP and Caddy routes and records an exact rollback copy]
-    progress: "Started from clean WED-386 coordination head bbdfd704cf6db1debb9249ecec11bec261389718 after confirming the production home still renders Ask Sprout. Scope is the public Wedding home only; authenticated workspace Sprout and public subpage behavior remain unchanged unless testing reveals a shared regression."
+    progress: "Done and live as a static-only exact-SHA release from efad4b1cf7002649a7d53e3440c92f81cf01ca03. The public Wedding home no longer loads wedding-agent.js and cannot render the Ask Sprout button/dialog; authenticated workspace Sprout and the existing directory/article controls remain unchanged. Static regression, dedicated 320/1280 Playwright proof, typecheck, both line budgets, production build, public/security checks and all 2,323 Wedding tests passed at the clean candidate. Live Chromium confirmed no button, dialog or agent asset request and no overflow at both widths. Deployed index SHA-256 is 3ad2016aa58295c6c1b9b3bd26d2e68f5c6ed8d9eccc85a83309d659193d224e. All seven services, the zero-restart WED-386 homeserver image, Caddy validation, RSVP/mail flags, backup verification and public Wedding/RSVP/quote/docs routes remained unchanged/healthy. Rollback: /home/ubuntu/omnyid-candidates/wed387-efad4b1cf7002649a7d53e3440c92f81cf01ca03/rollback/index.html.before-e41a1f96a7fa4c0bb231b1bd5b76073e39cfd5fc34dead286c8544bb6df1a840."
   - id: WED-386
     title: Implement production-faithful RSVP preview, returning confirmation and evidence-based follow-up
     status: done
