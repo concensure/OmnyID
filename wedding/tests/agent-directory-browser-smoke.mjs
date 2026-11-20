@@ -59,6 +59,12 @@ try {
     assert.equal(await button.evaluate(el => el === document.activeElement), true);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
   }
+  const desktop = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  await desktop.goto(`${origin}/wedding/index.html`);
+  assert.equal(await desktop.getByRole('button', { name: 'Open Wedding Sprout, your planning assistant' }).count(), 0);
+  assert.equal(await desktop.getByRole('dialog', { name: 'Wedding Sprout' }).count(), 0);
+  assert.equal(await desktop.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+  await desktop.close();
   assert.deepEqual(errors, []);
-  console.log(JSON.stringify({ categoryDeduplication: true, partialSearch: true, staleSearchSuppression: true, homeAgentAbsent: true, agentPages: 2, keyboardFocus: true, viewport: 320 }));
+  console.log(JSON.stringify({ categoryDeduplication: true, partialSearch: true, staleSearchSuppression: true, homeAgentAbsent: true, homeViewports: [320, 1280], agentPages: 2, keyboardFocus: true }));
 } finally { await browser.close(); server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
