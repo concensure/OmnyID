@@ -1,3 +1,36 @@
+## WED-388 Wedding database and Soft message release live (2026-11-21)
+
+Worktree `C:/temp/wt/omnyid-wed388`, branch `agent/codex/WED-388`. Exact deployed
+application/static SHA: `b4371ec6fadc3c2b375ece644669c39002cdc0b0`; clean release
+worktree: `C:/temp/wt/omnyid-wed388-release-b4371ec6`.
+
+Wedding Database now installs fixed Budget, Timeline, Guest list, RSVP, Seating,
+Run sheet and Selected vendors projections, plus the existing enhanced run-sheet
+surface without a user install action. RSVP and vendors remain read-time projections
+of canonical account ledgers, existing run-sheet definitions suppress duplicates,
+and guest/RSVP tables are no longer truncated at 80 rows. The public home keeps the
+general “a wedding that feels like you” headline, softly names micro weddings beside
+larger celebrations, uses inclusive small-celebration imagery, removes unsupported
+availability wording and still exposes no Ask Sprout.
+
+The clean SHA passed `npm run test:wedding:ci` (2,325 tests), production build,
+focused projection/registry tests, static site checks and local mobile/desktop
+Chromium. Oracle now serves byte-identical main/DatabaseView bundles and public
+files. Live 375/1440 Chromium, the 390-pixel quote scenario, public Wedding,
+workspace, RSVP, quote and Docs routes, Caddy validation, backup verification and
+runtime-script integrity passed. Anonymous `/healthz` retains its expected 401.
+The WED-386 homeserver image remains
+`sha256:f6ef45dee35b37772100c2798268af9315abc2f150a76b996cb22fad1a7c0e96`
+with zero restarts; root usage is 71%.
+
+Rollback is retained at
+`/home/ubuntu/omnyid-candidates/wed388-b4371ec6fadc3c2b375ece644669c39002cdc0b0/rollback`.
+It contains the prior workspace archive, public files, Caddyfile, Compose file and
+runtime inventory. Full hashes, test boundaries and hosted evidence are in
+`Documents/verification/WED-388-wedding-database-and-message-release.md`. No test
+celebrant/vendor/couple account was mutated because this release adds deterministic
+read projections and static copy, not a role-specific server workflow.
+
 ## WED-387 public Wedding-home Sprout removal released (2026-11-21)
 
 Worktree `C:/temp/wt/omnyid-wed387`, branch `agent/codex/WED-387`, based on

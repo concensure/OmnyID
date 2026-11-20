@@ -1,3 +1,15 @@
+## 2026-11-21: WED-388 Wedding Database tables are installed read-time projections
+
+Database discovery may register one deterministic `wedding_runsheet.v1` definition
+per Wedding plan when no dedicated run-sheet definition already exists. The Wedding
+planning database itself projects fixed RSVP and Selected vendors tables from the
+canonical guest/event-response and persisted decision ledgers. These definitions and
+rows are views, not new write authorities: they do not copy RSVP answers, vendor
+choices or run-sheet entries into another store. Existing structured run-sheet
+editing remains authoritative, an existing dedicated run sheet suppresses the
+synthetic definition, and table-specific columns expose provenance instead of
+generic inferred fields.
+
 ## 2026-11-20: WED-383 quote scenarios are projections over canonical evidence
 
 Authenticated quote comparison extends the existing Wedding Quotes hub and
