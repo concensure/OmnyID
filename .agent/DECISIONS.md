@@ -4405,3 +4405,28 @@ package quoted for one guest count is not an estimate for a different count: ret
 source line and return an unknown revised total until the vendor confirms pricing.
 Public changed scripts receive versioned URLs because the edge caches script assets.
 The active sign-in form is in /workspace/; the Docs preview modal has been retired.
+
+## 2026-11-20 — Soft Wedding message, scenario projections and focused RSVP extension (WED-385)
+
+The default Wedding promise remains broad: “Less wedding admin. More of a wedding
+that feels like you.” Intimate ceremonies and small weddings are named alongside
+larger celebrations in supporting copy, not used to narrow the product headline.
+Static `index.html` copy and the runtime starting context must remain identical in
+meaning because the context script replaces the static hero after load.
+
+Quote item changes remain projections over immutable vendor evidence. A couple-added
+optional item is included immediately in the Scenario estimate but is not added to
+the original quote; it can be deleted from the scenario. Extracted optional rows can
+be included or excluded without deleting their source. Mandatory and bundled rows
+lock both inclusion and quoted quantity; an attempted deduction or resize requires
+vendor confirmation. Public device-only and authenticated AFP choice boundaries from
+WED-383 remain unchanged, and no parallel quote calculator or store is introduced.
+
+The microwedding research is used directionally, not as authority to rebuild RSVP.
+WED-303 already supplies named household links, per-person/event replies, immediate
+amendment, reminders and AFP responses. The follow-on plan therefore selects only
+three remaining UX lifts: production-faithful household preflight/test, a durable
+returning confirmation/edit experience, and one evidence-based actionable follow-up
+card. Preview/test cannot mutate production lifecycle evidence; returning public
+views never expose private-answer plaintext; provider acceptance, delivery, link
+open and completed response remain distinct evidence.

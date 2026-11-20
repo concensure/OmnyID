@@ -11885,3 +11885,65 @@ Unresolved/release boundary:
 - WED-384 must base on this reviewed descendant (not its older `3ac7ff94` pin) if
   it proceeds, and must retain the quote-decoder files unchanged unless its scope
   is deliberately expanded.
+
+## 2026-11-20 - WED-385 Soft message, quote item controls and RSVP extension plan (Codex, review candidate)
+
+Implementation worktree: `C:/temp/wt/omnyid-wed385`, branch
+`agent/codex/WED-385`. Clean verified application candidate:
+`be93d032a8d4b66d5c13ba883fd61e50b15b8797`. Base:
+`38d0ed3f5518d418170277e63d5a209d1ce754ef`, the final WED-383 descendant.
+The stale dirty primary checkout was inspected for the user's Soft decision and
+research source only; implementation was not based on or copied from its code.
+
+Changed:
+
+- Kept the general `Less wedding admin. More of a wedding that feels like you.`
+  headline and named an intimate ceremony, a small wedding and a larger
+  celebration together in the supporting copy. The runtime `starting` context
+  now matches the static hero and its changed script has a versioned URL.
+- Extended the existing public quote decoder. A manually added optional row is
+  included in the scenario immediately, explicitly says the original quote is
+  unchanged, and can be deleted. Extracted source rows are removed only from the
+  scenario and retain their original quoted classification.
+- Extended the authenticated comparison. Couple-added optional items immediately
+  affect the total/difference/remaining budget and have a Delete item action.
+  Mandatory/bundled quoted items now lock quantity as well as inclusion and the
+  calculator explains that they cannot be deducted or resized under quoted terms.
+- Copied the supplied research source into the advanced lineage and added
+  `microwedding-invitation-rsvp-ux-spec.md` plus the dependency-ordered
+  `microwedding-invitation-rsvp-ux-tasks.md`. The plan deliberately selects only
+  household preflight/test, durable confirmation/edit and evidence-based follow-up.
+  It reuses WED-303 AFP guest/event/household/capability/response/reminder and
+  decision authorities and explicitly defers ornamental/template-heavy ideas.
+- Linked the extension from the existing RSVP spec and task document and recorded
+  the scope decision in `.agent/DECISIONS.md`.
+
+Verification at the clean application candidate:
+
+- Focused `wedding-quote-scenario-state.test.ts`: 5/5 passed, including added
+  optional-item arithmetic and mandatory quantity protection.
+- `npm run test:wedding-site`: passed all static/public metadata/security and
+  quote engine/scenario checks.
+- `node wedding/tests/quote-decoder-browser-smoke.mjs`: passed at 390 x 844,
+  including immediate scenario inclusion, quantity/minimum-spend recalculation,
+  deletion back to the extracted source-row count, remaining budget, device-only
+  decision, local PDF and no pre-analysis request.
+- `npm run test:wedding:ci`: passed typecheck, both line budgets, site checks and
+  2,319 Wedding tests.
+- `npm run build`: passed. Existing Tailwind object-screen and >1 MB chunk warnings
+  remain warnings.
+- The first browser run exposed an incorrect zero-row test assumption because
+  extraction had already created source rows; the assertion was corrected to the
+  pre-add count and the clean final candidate rerun passed.
+
+Limits and next action:
+
+- No Oracle deployment, static hot-sync, GitHub push or PR was performed. Production
+  therefore does not yet include WED-383 or WED-385. Release requires a separately
+  approved clean exact-SHA deployment, rollback capture and post-deploy checks.
+- `npm ci` reported 39 dependency advisories (38 moderate, 1 high) from the existing
+  lockfile; no dependency or lockfile changed in WED-385 and no automatic audit fix
+  was applied.
+- The new RSVP documents are an implementation plan, not a claim that the three
+  extension workflows are shipped. Review should first confirm the guest-safe latest
+  response projection and preview/test non-mutation boundary in MI-RSVP-01.
