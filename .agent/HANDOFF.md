@@ -11941,6 +11941,10 @@ Limits and next action:
 - No Oracle deployment, static hot-sync, GitHub push or PR was performed. Production
   therefore does not yet include WED-383 or WED-385. Release requires a separately
   approved clean exact-SHA deployment, rollback capture and post-deploy checks.
+- A final read-only production probe returned HTTP 200 for `/wedding/` and the
+  no-login quote page, but found neither the WED-385 Soft supporting copy/runtime
+  script version nor `Add optional scenario item`. The quote page still referenced
+  `quote-decoder.js?v=20261110-354`; availability must not be mistaken for release.
 - `npm ci` reported 39 dependency advisories (38 moderate, 1 high) from the existing
   lockfile; no dependency or lockfile changed in WED-385 and no automatic audit fix
   was applied.
