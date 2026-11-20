@@ -295,6 +295,12 @@ function recordFromProjection(decision: WeddingDecisionProjectionInput): Wedding
     selectedOptionLabel: decision.selectedOption.label,
     selectedOptionDetail: decision.selectedOption.detail,
     selectedOptionCells: decision.selectedOption.cells,
+    selectedOptionColumnCells: (decision.selectedOption.columnCells ?? []).map((cell) => ({
+      key: cell.header,
+      label: cell.label,
+      kind: cell.kind,
+      value: cell.value,
+    })),
     sourceLabels: decision.sourceLabels ? [...decision.sourceLabels] : [],
     sourceUrls: usableSourceUrls(decision.sourceUrls),
     sourceProviderLabels: decision.sourceProviderLabels ? [...decision.sourceProviderLabels] : [],

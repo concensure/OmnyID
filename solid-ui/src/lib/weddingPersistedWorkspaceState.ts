@@ -122,6 +122,12 @@ export type WeddingPersistedDecisionRecord = {
   selectedOptionLabel: string;
   selectedOptionDetail: string;
   selectedOptionCells: string[];
+  selectedOptionColumnCells: Array<{
+    key: string;
+    label: string;
+    kind: string;
+    value: string;
+  }>;
   sourceLabels?: string[];
   sourceUrls?: string[];
   sourceProviderLabels?: string[];
@@ -734,6 +740,19 @@ function messageToDecisionRecord(message: AfpMessage): WeddingPersistedDecisionR
   if (!id || !artifactId || !artifactTitle || !selectedOptionId || !selectedOptionLabel) return null;
 
   const selectedOptionDetail = clean(selectedOption?.detail) ?? "Selected option is saved for future wedding reports.";
+  const selectedOptionColumnCells = Array.isArray(selectedOption?.column_cells)
+    ? selectedOption.column_cells.flatMap((value) => {
+      const cell = record(value);
+      const label = clean(cell?.label);
+      if (!label) return [];
+      return [{
+        key: clean(cell?.key) ?? label.toLowerCase().replace(/[^a-z0-9]+/g, "_"),
+        label,
+        kind: clean(cell?.kind) ?? "text",
+        value: clean(cell?.value) ?? "",
+      }];
+    }).slice(0, 12)
+    : [];
   const rawSourceLabels = strings(contentValue(message, "source_labels") ?? message.metadata?.source_labels).slice(0, 12);
   const rawSourceUrls = usableSourceUrls(contentValue(message, "source_urls") ?? message.metadata?.source_urls).slice(0, 12);
   const sourceProviderLabels = strings(contentValue(message, "source_provider_labels") ?? message.metadata?.source_provider_labels).slice(0, 12);
@@ -769,6 +788,7 @@ function messageToDecisionRecord(message: AfpMessage): WeddingPersistedDecisionR
     selectedOptionLabel,
     selectedOptionDetail,
     selectedOptionCells: strings(selectedOption?.cells).slice(0, 12),
+    selectedOptionColumnCells,
     sourceLabels,
     sourceUrls,
     sourceProviderLabels,

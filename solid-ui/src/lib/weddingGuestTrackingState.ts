@@ -569,7 +569,7 @@ export function buildWeddingGuestTrackingState(input: {
   return {
     guestFileCount: guestArtifacts.length,
     guestRowCount,
-    guestRows: guestRows.slice(0, 80),
+    guestRows,
     attendingCount,
     declinedCount,
     pendingCount,

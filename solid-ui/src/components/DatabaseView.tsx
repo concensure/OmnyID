@@ -76,7 +76,11 @@ import {
   type WeddingRunSheetBufferSuggestion,
 } from "@/lib/weddingRunSheetIntelligenceState";
 import { applyQueueFontSize } from "@/lib/queueDensityLocalState";
-import { projectWeddingPlanningDatabaseRecords } from "@/lib/weddingPlanningDatabaseProjectionState";
+import {
+  projectWeddingPlanningDatabaseRecords,
+  weddingPlanningDatabaseTableColumns,
+  weddingPlanningDatabaseTableLabel,
+} from "@/lib/weddingPlanningDatabaseProjectionState";
 import { DatabaseExportShareControls } from "@/components/DatabaseExportShareControls";
 
 type DensityBucket = "compact" | "comfortable" | "spacious";
@@ -250,6 +254,10 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
   );
 
   const columns = createMemo((): ColDef[] => {
+    const weddingColumns = selectedDefinition()?.profileId === "wedding_plan_projection.v1"
+      ? weddingPlanningDatabaseTableColumns(activeTable())
+      : null;
+    if (weddingColumns) return weddingColumns;
     const discovered = databaseColumnDefs(
       visibleRecords(),
       ghostHeaders(),
@@ -262,6 +270,10 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
     );
     return databaseProfileColumns({ profileId: selectedDefinition()?.profileId, discovered }).slice(0, selectedProfilePlugin() ? 12 : 8);
   });
+
+  const tableRowCount = (table: string) => recordsForSelectedDatabase()
+    .filter((record) => record.table === table && !record.id.endsWith(":summary"))
+    .length;
 
   // These computations read visibleRecords()/columns(), whose createMemos run
   // immediately. Keep their declarations below those sources so a saved
@@ -819,7 +831,9 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
             {(t) => (
               <button type="button" onClick={() => setActiveTable(activeTable() === t ? null : t)}
                 class={`rounded-full px-3 py-1 text-xs font-medium transition border ${activeTable() === t ? "bg-primary text-white border-primary" : "border-outline/20 bg-white/40 text-on-surface-variant hover:bg-white/60"}`}>
-                {t}
+                {selectedDefinition()?.profileId === "wedding_plan_projection.v1"
+                  ? `${weddingPlanningDatabaseTableLabel(t)} · ${tableRowCount(t)}`
+                  : t}
               </button>
             )}
           </For>

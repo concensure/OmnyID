@@ -195,6 +195,23 @@ export function projectDatabaseDefinitions(input: {
       archiveRevision: 0,
       legacy: false,
     });
+    const hasRunSheet = Array.from(definitions.values()).some((definition) => (
+      definition.profileId === "wedding_runsheet.v1" && definition.weddingPlanId === weddingPlanId
+    ));
+    if (!hasRunSheet) {
+      const runSheetDatabaseId = `database:wedding-run-sheet:${weddingPlanId}`;
+      definitions.set(runSheetDatabaseId, {
+        databaseId: runSheetDatabaseId,
+        name: "Run sheet",
+        defaultTable: "run_sheet",
+        profileId: "wedding_runsheet.v1",
+        weddingPlanId,
+        revision: 1,
+        archived: false,
+        archiveRevision: 0,
+        legacy: false,
+      });
+    }
   }
 
   if (input.hasLegacyRecords || definitions.size === 0) {

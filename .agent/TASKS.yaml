@@ -15,6 +15,17 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-388
+    title: Install Wedding database projections and complete the soft small-wedding alignment
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-388
+    worktree: C:/temp/wt/omnyid-wed388
+    base_sha: bd154e91b88d2a328640ce211817709d5b525a2b
+    depends_on: [WED-374, WED-386, WED-387]
+    files: [solid-ui/src/components/DatabaseView.tsx, solid-ui/src/lib/databaseRegistryState.ts, solid-ui/src/lib/databaseProfilePluginState.ts, solid-ui/src/lib/weddingPlanningDatabaseProjectionState.ts, solid-ui/src/lib/weddingPersistedWorkspaceState.ts, solid-ui/src/lib/weddingGuestTrackingState.ts, solid-ui/tests/**database**, wedding/index.html, wedding/assets/js/landing-config.js, wedding/tests/wedding-website-smoke.mjs, Documents/design/views/DATABASE_VIEW_WEDDING_AUDIT.md, Documents/marketing/Brand/omnyid wedding small-wedding*.md, Documents/verification/WED-388*, .agent/**]
+    acceptance: [Wedding accounts receive an installed source-linked run-sheet database without an install action and retain the existing structured run-sheet controls, the installed Wedding planning database always exposes Guest list RSVP Run sheet and Selected vendors projections with table-specific columns counts and empty-state summaries, RSVP uses the current canonical guest and event-response ledger and selected vendors use persisted Wedding decisions without a parallel store, guest projections do not truncate at 80 rows, the public Wedding home keeps the general wedding-that-feels-like-you headline while supporting copy and truthful proof softly name elopements micro weddings and larger celebrations, Ask Sprout remains absent from the public home, focused and full Wedding checks and production build pass from a clean exact-SHA candidate, Oracle release preserves existing application routes configuration and rollback evidence]
+    progress: "Started from the clean WED-387 coordination SHA after confirming its WED-386 application/static ancestor is live. The 2026-11-20 audit and message documents exist only in the dirty stale primary checkout, so they are read-only inputs; implementation is being re-derived against this newer line. Existing WED-374 projections and structured run-sheet work are consumed rather than duplicated."
   - id: WED-387
     title: Remove the public Wedding-home Ask Sprout control and harden its release boundary
     status: done

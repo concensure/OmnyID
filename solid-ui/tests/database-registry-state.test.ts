@@ -119,4 +119,32 @@ test("wedding accounts open the ledger-backed planning database before unrelated
   assert.equal(planning?.defaultTable, "budget");
   assert.equal(planning?.weddingPlanId, "plan-2027");
   assert.equal(reconcileSelectedDatabaseId(projected, null), planning?.databaseId);
+  const runSheet = projected.find((entry) => entry.profileId === "wedding_runsheet.v1");
+  assert.equal(runSheet?.defaultTable, "run_sheet");
+  assert.equal(runSheet?.weddingPlanId, "plan-2027");
+  assert.equal(existingDatabaseDefinitionForProfile(projected, "wedding_runsheet.v1", "plan-2027"), runSheet);
+});
+
+test("an existing run-sheet definition prevents a duplicate installed projection", () => {
+  const projected = projectDatabaseDefinitions({
+    messages: [{
+      ...definition("database:custom-runsheet", 1, "Day plan"),
+      content: {
+        ...definition("database:custom-runsheet", 1, "Day plan").content,
+        profile_id: "wedding_runsheet.v1",
+        scope: { account_id: "account-1", wedding_plan_id: "plan-2027" },
+      },
+    }, {
+      id: "wedding-context",
+      type: "task",
+      timestamp: "2026-11-10T00:00:02Z",
+      content: { kind: "task", wedding_plan_id: "plan-2027", response_workspace_id: "workspace-2027" },
+    }],
+    accountId: "account-1",
+    hasLegacyRecords: false,
+  });
+  assert.deepEqual(
+    projected.filter((entry) => entry.profileId === "wedding_runsheet.v1").map((entry) => entry.databaseId),
+    ["database:custom-runsheet"],
+  );
 });

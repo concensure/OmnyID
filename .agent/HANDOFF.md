@@ -12104,3 +12104,59 @@ Open gates: do not enable test-to-self or broaden the cohort until an authentica
 allowlisted synthetic couple/household exercise and a real provider receipt prove
 non-mutation. Those two rollout checkboxes remain intentionally open. Proof artifacts:
 `C:/temp/wed386-oracle-production-proof-arm64`.
+## 2026-11-21 - WED-388 pre-edit reconciliation (Codex)
+
+Worktree `C:/temp/wt/omnyid-wed388`, branch `agent/codex/WED-388`, clean base
+`bd154e91b88d2a328640ce211817709d5b525a2b`. The referenced audit and brand
+documents are uncommitted inputs in the stale primary checkout; only their intent
+is consumed here. WED-374's projections and run-sheet implementation are already
+in this descendant and will be extended, not reimplemented.
+
+Database audit reconciliation:
+
+| Audit requirement | Status | Evidence on base |
+| --- | --- | --- |
+| Read-time projection, no duplicate records | ALREADY DONE | `weddingPlanningDatabaseProjectionState.ts` builds `database:wedding-plan:*` rows directly from the AFP workspace ledger. |
+| Guest list installed and source-linked | APPLY | The `guest_list` table and summary exist, but `guestRows.slice(0, 80)` truncates larger plans. |
+| RSVP installed as its own table | APPLY | RSVP is canonical and account-backed after WED-303/WED-386, but Database only embeds a status in `guest_list`. |
+| Structured run sheet | ALREADY DONE | The current line has `weddingRunSheetProjectorState`, editing, saved views, sharing and provenance. |
+| Run sheet needs no install action | APPLY | A basic `run_sheet` tab is in the virtual Wedding plan, while the enhanced `wedding_runsheet.v1` profile remains an optional add action. |
+| Selected vendors installed by category | APPLY | Persisted `wedding_decision_selection` records exist, but no `selected_vendors` projection exists. |
+| Fixed discoverable tables and useful columns | APPLY | Summary rows keep current tables visible, but RSVP/vendors are absent, labels/counts are raw and the Wedding plan still uses generic eight-column inference. |
+| RSVP changes are durable/account-scoped | ALREADY DONE | WED-303/WED-386 project public RSVP responses append-only into guest/event boundary objects. |
+| CSV/all-table export | OBSOLETE FOR THIS PASS | The owner asked for correct projection and an installed run sheet, not export redesign. Existing bounded export remains unchanged. |
+| Generic Database cleanup | OBSOLETE FOR THIS PASS | Unrelated to the Wedding projection request. |
+
+Message brief reconciliation (the owner's Soft choice overrides full-pivot copy):
+
+| Brief items | Status | Evidence / resolution |
+| --- | --- | --- |
+| MSG-01 | APPLY selectively | Keep the general H1; use only calm, scale-inclusive supporting language. Do not force the proposed campaign headline/CTA. |
+| MSG-02 | APPLY | `rich, ready plan` and `Everything a wedding touches` remain in `index.html`. Replace without narrowing out larger weddings. |
+| MSG-03 | APPLY | `Available your date` remains; remove it and keep legal/availability claims qualified. |
+| MSG-04 | APPLY | Gender-assuming alt text and large-crowd imagery remain in the home page. Reuse licensed local small-ceremony assets. |
+| LP-01 | APPLY selectively | Current metadata is generic/old. Add intimate and small-wedding search context while retaining broader Wedding positioning and update JSON-LD consistently. |
+| LP-02 | APPLY selectively | Soft H1 and scale-inclusive lede are already done. Keep them; adjust eyebrow/trust/image only where truthful. No format chips or hard-pivot CTA. |
+| LP-03 | ALREADY DONE | Current NSW/Sydney relevance strip is newer and smoke-locked. |
+| LP-04 | APPLY | Reword the two obsolete large-checklist phrases; retain current section and functionality. |
+| LP-05 | APPLY selectively | Keep the newer vendor flow; soften to supplier examples and inclusion clarity without changing mechanics. |
+| LP-06 | APPLY selectively | Preserve the newer interactive preview; remove the live-availability overclaim and scale its visible sample away from a 150-seat default. |
+| LP-07 | APPLY selectively | Replace the remaining whole-wedding/large-checklist framing; do not add unproven sharing claims. |
+| LP-08 | APPLY | Keep local licensed images but use small-celebration choices and inclusive alt text. |
+| LP-09 | APPLY selectively | Replace the crowd image and inclusive alt text; keep the current journey section. |
+| LP-10 | ALREADY DONE | Retired unverified stats are absent. Do not restore them. |
+| LP-11 | OBSOLETE | Retired testimonial/scenario slider is absent. Do not restore it. |
+| LP-12 | APPLY selectively | Keep the proven free register route and existing CTA label; supporting copy can mention any scale. |
+| LP-13 | ALREADY DONE | Newsletter remains and is smoke-locked. |
+| LP-14 | APPLY selectively | Keep current modal/footer behaviour; update only home-page scale framing where present. |
+| SP-01 | ALREADY DONE | Pricing remains truthful and no unverified guest-limit claim will be added. |
+| SP-02 | ALREADY DONE | User guide already covers the current full workflow; no route change is needed for this home-page alignment. |
+| SP-03 | ALREADY DONE | Small-wedding and elopement articles already exist; no card-system rewrite is needed. |
+| SP-04 | ALREADY DONE | Quiz is retained and current; no format bridge is required by this request. |
+| SP-05 | ALREADY DONE | Vendor directory is current and remains available. |
+| SP-06 | ALREADY DONE | Existing disclosures/privacy/licence handling remain. |
+
+No conflict remains after the owner's prior decisions: the hero stays general, small
+weddings are named alongside larger celebrations, and the public home must not restore
+Ask Sprout. The spec's hard-pivot H1, full CTA switch, format chips and template-format
+Slices B/C are therefore obsolete for this task.

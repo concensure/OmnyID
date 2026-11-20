@@ -367,6 +367,10 @@ for (const unsupported of [
   '$18,400 of $30,000 planned',
   'NOIM &amp; vendor timing, handled',
   'A full picture arrives at once',
+  'Available your date',
+  'Get a rich, ready plan',
+  'Everything a wedding touches',
+  'Bride and groom',
   'testi-wrap',
   'images.unsplash.com',
 ]) {
@@ -380,9 +384,9 @@ for (const context of ['starting', 'vendors', 'guests', 'final']) {
   }
 }
 if (!weddingHome.includes('Less wedding admin. More of a wedding that feels like you.')
-  || !weddingHome.includes('an intimate ceremony, a small wedding or a larger celebration')
+  || !weddingHome.includes('an intimate ceremony, a micro wedding or a larger celebration')
   || !landingConfig.includes("headline: 'Less wedding admin. More of a wedding that feels like you.'")
-  || !landingConfig.includes('an intimate ceremony, a small wedding or a larger celebration')) {
+  || !landingConfig.includes('an intimate ceremony, a micro wedding or a larger celebration')) {
   failures.push('index.html: Soft message must stay general and name small weddings alongside larger celebrations in static and runtime copy');
 }
 if (!weddingHome.includes('a good starting point for a spicy discussion') || weddingHome.includes('never a compatibility score')) {
