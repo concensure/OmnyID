@@ -1,3 +1,32 @@
+## WED-383 native container verification complete (2026-11-20)
+
+Worktree `C:/temp/wt/omnyid-wed383`, branch `agent/codex/WED-383`.
+Verified candidate `5ce2572080e7db2384affa6d43b7b4440d8f456b` is a clean descendant of
+the user-named Runbooks commit `f4f738faffcc90dd2e615b6a020c3fad81e51188`.
+The candidate adds the missing `tests/fixtures` copy to the production
+Docker builder because the inherited `runbook-model-eval` binary uses that
+JSON at compile time. No fixture is copied to the runtime image.
+
+Verification completed from the clean candidate: Rust 1.94 Linux production
+Docker release build passed and produced image manifest
+`sha256:c6ee5ce26c3b90a1ee1cc0ddc2c6c7c43c075ef463246f89594c2516f0aab832`
+with the full source SHA label; an ephemeral test-only Docker stage passed all
+7 `wedding_quote_decoder_routes` tests. `npm run test:wedding:ci` passed
+typecheck, public Wedding/site/security checks and 2318 Wedding tests;
+`npm run build` passed. The 390 px Playwright quote scenario passed with one
+explicit extraction request, cached replay, component-subtotal protection,
+minimum-spend scenario arithmetic, PDF-share request, no mobile overflow and
+the expected desktop zoom values. `git diff --check` passed and the checkout
+was clean after local smoke-server cleanup.
+
+The earlier Windows and WSL compiler failures are host/virtualization evidence,
+not an outstanding code gate; independent Linux compilation now succeeds.
+WED-383 remains in review only because no Oracle release was requested in this
+continuation. No production configuration, service, database or rollout flag
+was changed. If release is requested, freeze the current reviewed source,
+build a clean candidate image carrying that exact 40-character SHA, and use
+the normal staged Oracle gate and rollback procedure.
+
 ## WED-383 quote scenario implementation ready for review (2026-11-20)
 
 Worktree `C:/temp/wt/omnyid-wed383`, branch `agent/codex/WED-383`, based on
