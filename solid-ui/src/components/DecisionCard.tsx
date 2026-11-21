@@ -36,6 +36,7 @@ export function DecisionCard(props: {
   const regularActions = () => card().actions.filter((action) => action.id !== "why");
   const whyAction = () => card().actions.find((action) => action.id === "why") ?? null;
   const support = () => wedding() ? card().decisionSupport : null;
+  const checkableSource = (value: string) => /^https?:\/\//i.test(value);
   const handleKeyDown = (event: KeyboardEvent) => {
     if (!props.onSelect || (event.key !== "Enter" && event.key !== " ")) return;
     event.preventDefault();
@@ -122,7 +123,7 @@ export function DecisionCard(props: {
           </div>
         )}
       </Show>
-      <Show when={mode() !== "glance" && support() && (card().recommendation || support()?.compromise || support()?.alternative || support()?.unconfirmed)}>
+      <Show when={mode() !== "glance" && support() && (card().recommendation || support()?.compromise || support()?.alternative || support()?.unconfirmed || card().evidence.length > 0)}>
         <details class="mt-3 rounded-lg bg-wedding-slate px-3 py-2" data-deck-interactive>
           <summary class="min-h-8 cursor-pointer text-xs font-semibold text-wedding-ink">Recommendation and trade-offs</summary>
           <div class="grid gap-2 pb-1 pt-2 text-xs leading-5 text-wedding-ink/75">
@@ -130,6 +131,20 @@ export function DecisionCard(props: {
             <Show when={support()?.compromise}>{(value) => <p><strong class="text-wedding-ink">Compromise:</strong> {value()}</p>}</Show>
             <Show when={support()?.alternative}>{(value) => <p><strong class="text-wedding-ink">Alternative:</strong> {value()}</p>}</Show>
             <Show when={support()?.unconfirmed}>{(value) => <p><strong class="text-wedding-ink">Not confirmed:</strong> {value()}</p>}</Show>
+            <Show when={card().evidence.length > 0}>
+              <div>
+                <p class="font-semibold text-wedding-ink">Evidence to check</p>
+                <ul class="mt-1 grid gap-1">
+                  <For each={card().evidence.slice(0, 4)}>{(evidence) => (
+                    <li class="break-words [overflow-wrap:anywhere]">
+                      <Show when={checkableSource(evidence.ref)} fallback={<span>{evidence.label}</span>}>
+                        <a class="font-semibold underline decoration-wedding-secondary/40 underline-offset-2" href={evidence.ref} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()}>{evidence.label}</a>
+                      </Show>
+                    </li>
+                  )}</For>
+                </ul>
+              </div>
+            </Show>
           </div>
         </details>
       </Show>

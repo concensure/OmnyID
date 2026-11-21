@@ -1,7 +1,7 @@
 # Wedding decision-card clarity and recovery specification
 
-Status: implementation specification
-Task: WED-389
+Status: implemented design contract
+Tasks: WED-389, WED-390
 Source guidance: `decision card requirement.md` and the supplied 390-pixel mobile
 screenshot
 Existing authorities: AFP Wedding plan, tasks, decisions, evidence, deferrals,
@@ -167,3 +167,89 @@ Automated evidence must cover:
 - mobile 320/390/430 and 200% zoom keep primary and reminder actions visible and
   unobscured;
 - the full Wedding typecheck, line budgets and regression suite pass.
+
+## 8. Shared decision-selection contract
+
+WED-390 generalises the transport treatment to every Wedding planning-task kind.
+The planner chooses the decision before it writes presentation copy. Each decision
+definition declares:
+
+- its decision type and one answerable question;
+- the ordered prerequisites that make the choice meaningful;
+- the existing AFP or Wedding record that owns the answer;
+- whether priority follows a hard deadline, supplier lead time, workflow sequence or
+  no sourced deadline;
+- two or three open options and the outcome of the one primary action;
+- whether an external action must pass through the existing approval and provider
+  receipt flow.
+
+The shared registry covers research, vendor follow-up, budget review, guest list,
+legal, vows, rings, first dance, cake, transport, attire, pre-wedding celebration,
+beauty, music, contract review, RSVP, seating, vendor coordination, document
+checklists, run sheet, weather contingency, email drafts, registry, generic
+decisions and other planning tasks. Category recognition may specialise a task as a
+venue, quote, payment, transport, RSVP, seating, legal or run-sheet decision, but it
+does not create a parallel queue or record.
+
+Missing date, budget and guest-scope choices use the existing Wedding setup cards
+and records. While one of those setup cards is active, dependent cards are withheld
+instead of repeating the same prerequisite. Other missing prerequisites replace the
+dependent question with the prerequisite question. A completed or settled task is
+removed from the actionable queue rather than rewritten as another decision.
+
+Existing rank weights and saved deadlines remain the priority authority. A dated
+urgent blocker therefore outranks undated planning work, while the card explains
+whether urgency came from the saved deadline, lead time or sequence. No date or
+consequence is invented.
+
+## 9. One choice, evidence and approval boundary
+
+Every compact card shows one decision question and one primary action. It may show
+two or three options, but it does not combine choosing, booking and scheduling into
+one approval. A recommendation appears only when a confirmed quote or checkable
+source supports it. Otherwise the card keeps the choice open and names the one fact
+that could change it.
+
+Evidence is part of the card contract, not generic provenance copy. It can include a
+quote line, amount, inclusion, constraint, saved plan fact or vendor-source
+highlight. Checkable HTTP sources are links. Estimates and unknowns are labelled;
+an EXA highlight is discovery evidence, never proof of current price, availability
+or legal eligibility. Private imported source URLs remain redacted.
+
+Actions that could contact a vendor, send a guest message, sign, pay or otherwise
+create an external commitment continue through the existing prepared-action,
+explicit-approval and provider-receipt flows. Saving a preference is not represented
+as sending an enquiry or booking.
+
+## 10. Bulk audit and online-research boundary
+
+The projection emits audit findings for:
+
+- a compound source title whose card must use the single contract question;
+- a missing prerequisite that is not surfaced first;
+- recommendation wording without confirmed supporting evidence;
+- a settled choice that has incorrectly remained in the actionable queue.
+
+The shared selector and renderer are fixed before adding narrow per-category copy.
+Live EXA smoke checks cover representative transport, celebrant and florist
+decisions. The production provider already structures EXA responses as a title,
+source URL and bounded semantic highlight, excludes directory domains and routes
+the results through canonical vendor resolution. The live checks found that this
+structure is sufficient: no generative system-prompt rewrite is required. Query
+context and response grading must still retain location, scope and preference terms,
+and every surfaced result remains a source to verify rather than a recommendation to
+book.
+
+## 11. Production monitoring contract
+
+Twice each day, a read-only synthetic uses a dedicated Wedding monitor account to
+verify the public Wedding page, workspace shell, password login, authenticated
+session, workspace bootstrap, health, readiness and the current hashed JavaScript
+asset. Readiness must report the database and background daemons as healthy. The
+synthetic creates no Wedding record and revokes its session after each run.
+
+Credentials are root-owned systemd credentials, not environment values committed to
+Git or command-line arguments. The timer is persistent, uses Sydney time, randomises
+within ten minutes to avoid a thundering herd, records a machine-readable result and
+can post that result to a configured alert webhook. This complements, rather than
+replaces, public uptime checks and runtime `/healthz`/`/readyz` authorities.

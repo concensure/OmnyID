@@ -11,10 +11,7 @@ import {
 import type { WeddingRecommendationExplanation, WeddingRecommendationExplanationState } from "@/lib/weddingRecommendationExplanationState";
 import type { WeddingGeneratedArtifact } from "@/lib/weddingArtifactGenerationState";
 import type { WeddingDecisionProjectionInput } from "@/lib/weddingDecisionAfpProjectionState";
-import {
-  buildWeddingDecisionSelectionState,
-  loadWeddingDecisionSelections,
-} from "@/lib/weddingDecisionSelectionState";
+import { buildWeddingDecisionSelectionState, loadWeddingDecisionSelections } from "@/lib/weddingDecisionSelectionState";
 import type { WeddingPlanningScheduleItem, WeddingPlanningTaskItem } from "@/lib/weddingCalendarProjectionState";
 import { applyWeddingTaskResponsibilityProjection, weddingHelperContactNamesFromAfpMessages, weddingTaskResponsibilityAssigneeNames } from "@/lib/weddingTaskResponsibilityProjectionState";
 import type { WeddingNeedToKnowProjectionContext } from "@/lib/weddingNeedToKnowAfpProjectionState";
@@ -877,6 +874,7 @@ export function buildWeddingResponseWorkspaceViewState(input: WeddingResponseWor
     decisionItems: activeDecisions,
     approvalReceipts: input.approvalReceipts,
     decisionDeferrals: input.decisionDeferrals,
+    savedFacts: { weddingDate: planningWindow.weddingDate, budgetTargetAmount: budgetTracking.budgetTargetAmount, guestCount: guestTracking.guestRowCount },
     now: input.nowIso ? new Date(input.nowIso) : null,
   });
   const vendorLifecycle = projectWeddingVendorLifecycle(input.afpMessages ?? []);

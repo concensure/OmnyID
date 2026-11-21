@@ -172,6 +172,7 @@ export function WeddingMobileFocusHome(props: {
       deferCount: 0,
       returnedFromLater: false,
       external: false,
+      decisionContract: card.item.decisionContract,
     })));
     // Prepare a bounded look-ahead: the visible decision and the next two.
     const researchEligibleIds = mobileDecisionResearchEligibleIds(ranked);
@@ -183,6 +184,27 @@ export function WeddingMobileFocusHome(props: {
         ...item,
         recommendedActionLabel: vendor.summary,
         evidenceLabels: Array.from(new Set([...item.evidenceLabels, "Source-backed top-three vendor comparison", "Saved wedding preferences"])),
+        decisionContract: item.decisionContract ? (() => {
+          const prerequisites = item.decisionContract!.prerequisites.map((prerequisite) => prerequisite.key === "source_evidence"
+            ? { ...prerequisite, satisfied: vendor.artifact.sourceLinks.length > 0 }
+            : prerequisite);
+          const missingPrerequisite = prerequisites.find((prerequisite) => !prerequisite.satisfied) ?? null;
+          return {
+            ...item.decisionContract!,
+            prerequisites,
+            missingPrerequisite,
+            evidence: [
+              ...vendor.artifact.sourceLinks.slice(0, 4).map((source) => ({
+                label: source.label,
+                ref: source.url,
+                sourceKind: "vendor_source" as const,
+                status: "confirmed" as const,
+              })),
+              ...item.decisionContract!.evidence,
+            ].slice(0, 8),
+            recommendationSupported: vendor.artifact.sourceLinks.length > 0 && !missingPrerequisite,
+          };
+        })() : item.decisionContract,
         vendorComparison: { artifactId: vendor.artifact.artifactId, cards: vendor.cards },
       };
       const research = researchForDecision(item.id);
@@ -556,9 +578,13 @@ export function WeddingMobileFocusHome(props: {
   function primaryActionLabel(item: FocusDeckItem): string {
     const decision = decisionItemFor(item.id);
     if (decision && weddingVendorResearchQueryForDecision(decision)) {
+      if (item.decisionContract?.missingPrerequisite && item.decisionContract.missingPrerequisite.key !== "source_evidence") {
+        return item.decisionContract.primaryActionLabel;
+      }
       return hasVendorShortlist(item) ? "Open shortlist" : "Search vendors";
     }
     if (item.kind === "response") return "Review response";
+    if (item.decisionContract) return item.decisionContract.primaryActionLabel;
     if (researchForDecision(item.id)) return "View report";
     if (/pending RSVP/i.test(taskForDecision(item.id)?.title ?? item.title)) return "Message guest";
     return "Open task";

@@ -7,6 +7,7 @@ import {
   buildWeddingDecisionCardContent,
   type WeddingDecisionSupport,
 } from "@/lib/weddingDecisionCardContentState";
+import type { WeddingDecisionContract } from "@/lib/weddingDecisionDefinitionState";
 
 export const DECISION_CARD_PATTERNS = [
   "choose", "approve_act", "compare", "notice_decide", "clarify", "coordinate", "review", "record",
@@ -139,7 +140,9 @@ export function decisionCardFromQueueEntry(entry: QueueEntry): DecisionCardModel
 
 export function decisionCardFromWeddingFocus(card: WeddingDecisionFocusItemCard): DecisionCardModel {
   const item = card.item;
-  const evidence = evidenceFromLabels(item.evidenceLabels, `wedding:${item.id}`);
+  const contract = item.decisionContract;
+  const contractEvidence = evidenceFromWeddingContract(contract);
+  const evidence = contractEvidence.length > 0 ? contractEvidence : evidenceFromLabels(item.evidenceLabels, `wedding:${item.id}`);
   const pattern: DecisionCardPattern = item.sourceSurface === "approval_queue"
     ? "approve_act"
     : item.sourceSurface === "decision_queue" ? "choose" : item.pressureFamily === "knowledge" ? "clarify" : "review";
@@ -148,27 +151,40 @@ export function decisionCardFromWeddingFocus(card: WeddingDecisionFocusItemCard)
     pattern,
     patternVersion: "1.0",
     id: card.id,
-    title: card.title,
+    title: contract?.question ?? card.title,
     domain: "wedding",
     pressure: item.pressureFamily === "obligation" ? "high" : item.pressureFamily === "attention" ? "medium" : "low",
     whyItMatters: card.whyNowLabel,
-    recommendation: evidence.length > 0 ? { summary: card.recommendedActionLabel, reasons: [card.whyNowLabel] } : null,
+    recommendation: null,
     actions: [
-      { id: "open", label: card.compareLabel, role: "primary", effect: "Opens the related wedding workflow", intent: "review" },
+      { id: "open", label: contract?.primaryActionLabel ?? card.compareLabel, role: "primary", effect: contract?.approvalRequiredBeforeExternalAction ? "Opens the guarded review flow; nothing is sent or committed" : "Opens the related wedding workflow", intent: "review" },
       { id: "why", label: "Show me why", role: "secondary", effect: "Shows the ranking evidence", intent: "explain" },
       { id: "later", label: "Decide later", role: "dismiss", effect: "Records a deferral and brings forward the next item", intent: "defer" },
     ],
     evidence,
     timeSensitivity: { label: card.neededByLabel, at: item.dueAt },
     visual: { kind: "none" },
-    unknowns: evidence.length === 0 ? ["OmnyID has not attached evidence yet."] : [],
-    patternSlots: { payloadPreview: card.recommendedActionLabel },
+    unknowns: contract?.oneThingToConfirm ? [contract.oneThingToConfirm] : evidence.length === 0 ? ["OmnyID has not attached evidence yet."] : [],
+    patternSlots: {
+      payloadPreview: contract?.primaryOutcome ?? card.recommendedActionLabel,
+      options: contract?.options.map((option) => ({ id: option.id, name: option.label, summary: option.summary })) ?? [],
+    },
     verification: evidence.length > 0 ? { status: "partial", label: card.checkedLabel } : { status: "unverified", label: card.checkedLabel },
+    decisionSupport: contract ? {
+      statusLabel: contract.missingPrerequisite ? "Prerequisite needed" : "Needs your input",
+      knownFacts: contract.knownFacts,
+      oneThingToConfirm: contract.oneThingToConfirm,
+      primaryOutcome: contract.primaryOutcome,
+      compromise: null,
+      alternative: contract.options[1] ? `${contract.options[1].label}: ${contract.options[1].summary}` : null,
+      unconfirmed: contract.evidence.find((evidenceItem) => evidenceItem.status !== "confirmed")?.label ?? null,
+    } : null,
   };
 }
 
 export function decisionCardFromFocusDeckItem(item: FocusDeckItem): DecisionCardModel {
-  const evidence = evidenceFromLabels(item.evidenceLabels, `focus:${item.id}`);
+  const contractEvidence = evidenceFromWeddingContract(item.decisionContract);
+  const evidence = contractEvidence.length > 0 ? contractEvidence : evidenceFromLabels(item.evidenceLabels, `focus:${item.id}`);
   const vendorCards = item.vendorComparison?.cards.slice().sort((left, right) => left.rank - right.rank).slice(0, 3) ?? [];
   const recommendedVendor = vendorCards[0];
   const content = buildWeddingDecisionCardContent(item);
@@ -193,25 +209,44 @@ export function decisionCardFromFocusDeckItem(item: FocusDeckItem): DecisionCard
       id: "review",
       label: content.primaryActionLabel,
       role: "primary",
-      effect: vendorCards.length > 0 ? "Opens the source-backed three-vendor comparison" : "Opens the guarded review flow",
+      effect: vendorCards.length > 0
+        ? "Opens the source-backed three-vendor comparison"
+        : item.decisionContract?.approvalRequiredBeforeExternalAction
+          ? "Opens the guarded review flow; nothing is sent or committed"
+          : item.kind === "response" ? "Opens the guarded review flow" : "Opens the existing Wedding workflow",
       intent: "review",
     }],
     evidence,
     timeSensitivity: content.timeSensitivity,
     visual: { kind: "none" },
-    unknowns: evidence.length === 0 ? ["No source evidence is attached yet."] : [],
+    unknowns: item.decisionContract?.oneThingToConfirm
+      ? [item.decisionContract.oneThingToConfirm]
+      : evidence.length === 0 ? ["No source evidence is attached yet."] : [],
     patternSlots: {
       payloadPreview: item.recommendedActionLabel,
-      options: vendorCards.map((vendor, index) => ({
+      options: vendorCards.length > 0 ? vendorCards.map((vendor, index) => ({
         id: vendor.choiceId,
         name: vendor.title,
         summary: vendor.situationFit || vendor.preferenceMatch,
         recommended: index === 0,
+      })) : item.decisionContract?.options.map((option) => ({
+        id: option.id,
+        name: option.label,
+        summary: option.summary,
       })),
     },
     verification: evidence.length > 0 ? { status: "partial", label: `${evidence.length} evidence signal${evidence.length === 1 ? "" : "s"}` } : { status: "unverified", label: "Evidence pending" },
     decisionSupport: content.support,
   };
+}
+
+function evidenceFromWeddingContract(contract: WeddingDecisionContract | null | undefined): DecisionCardEvidence[] {
+  return (contract?.evidence ?? []).map((evidence) => ({
+    label: evidence.status === "confirmed" ? evidence.label : `${evidence.status === "estimate" ? "Estimate" : "Unknown"}: ${evidence.label}`,
+    ref: evidence.ref,
+    sourceKind: evidence.sourceKind,
+    freshness: evidence.status === "confirmed" ? "current" as const : "unknown" as const,
+  }));
 }
 
 export function decisionCardFromWeddingVendorComparison(preview: WeddingWorkspaceArtifactPreview): DecisionCardModel {

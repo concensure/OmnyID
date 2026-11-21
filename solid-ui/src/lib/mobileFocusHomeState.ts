@@ -3,6 +3,7 @@ import { createSignal, type Accessor } from "solid-js";
 import { accountScopedStorageKey } from "@/lib/accountScopedStorage";
 import type { WeddingWorkspaceArtifactPreview } from "@/lib/weddingResponseWorkspaceViewState";
 import type { WeddingVendorOutreachFlowState } from "@/lib/weddingVendorOutreachFlowState";
+import type { WeddingDecisionContract } from "@/lib/weddingDecisionDefinitionState";
 
 export type FocusMode = "decisions" | "responses" | "overview";
 export type FocusDeckItem = {
@@ -17,6 +18,7 @@ export type FocusDeckItem = {
   deferCount: number;
   returnedFromLater: boolean;
   external: boolean;
+  decisionContract?: WeddingDecisionContract | null;
   vendorComparison?: {
     artifactId: string;
     cards: WeddingWorkspaceArtifactPreview["vendorComparisonCards"];

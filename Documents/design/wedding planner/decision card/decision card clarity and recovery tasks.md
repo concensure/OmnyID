@@ -1,16 +1,16 @@
 # Wedding decision-card clarity and recovery tasks
 
-Task: WED-389
+Tasks: WED-389, WED-390
 Depends on: WED-386, WED-388
 Specification: `decision card clarity and recovery spec.md`
 
 The tasks below extend the existing Wedding planner. They do not authorize a new
 decision store, reminder service or parallel research queue.
 
-Implementation status (2026-11-21): DC-01 through DC-06 are implemented and verified
-on `agent/codex/WED-389`. The production compatibility
-repair restored the previous asset generation additively and did not deploy this
-uncommitted implementation.
+Implementation status (2026-11-21): DC-01 through DC-06 are live from WED-389.
+DC-07 through DC-11 are the WED-390 continuation that generalises the decision
+contract, audits the existing queue, verifies online research and installs production
+monitoring.
 
 ## DC-01 — Reproduce and recover the Wedding template failure
 
@@ -153,3 +153,117 @@ Acceptance:
   approval or privacy gates.
 - No deployment is claimed from local edits; a later production release uses a
   clean frozen SHA and retained rollback.
+
+## DC-07 — Select every decision before writing card copy
+
+Files:
+
+- `solid-ui/src/lib/weddingDecisionDefinitionState.ts`
+- `solid-ui/src/lib/weddingPersonalOsProjectionState.ts`
+- shared decision-card state modules and focused tests
+
+Work:
+
+- Declare a question, ordered prerequisites, answer record, deadline policy, options,
+  primary outcome and approval boundary for every Wedding task kind.
+- Use the existing plan, budget, guest, task, decision, quote, RSVP, seating,
+  run-sheet and approval authorities.
+- Surface a missing prerequisite first, suppress dependent cards while the canonical
+  date/budget/guest setup choice is active, and remove settled choices.
+- Keep existing deadline ranking and urgent blocker weights as the priority source.
+
+Acceptance:
+
+- Transport is no longer the only decision with a concrete content contract.
+- A card cannot present a dependent choice before its prerequisite or repeat a
+  settled answer.
+- The visible prerequisite points to the record that actually resolves it.
+
+## DC-08 — Put one choice and source evidence on every card
+
+Files:
+
+- `solid-ui/src/lib/decisionCardState.ts`
+- `solid-ui/src/lib/weddingDecisionCardContentState.ts`
+- `solid-ui/src/components/DecisionCard.tsx`
+- `solid-ui/src/components/WeddingMobileFocusHome.tsx`
+
+Work:
+
+- Derive the title, options, primary action and outcome from the shared contract.
+- Put quote lines, amounts, inclusions, constraints and vendor-source links beside
+  the recommendation.
+- Label estimates and unknowns and suppress unsupported recommendations.
+- Preserve the existing guarded enquiry, message, payment and approval flows.
+
+Acceptance:
+
+- The compact and detailed surfaces agree on the question and next action.
+- Checkable sources are links and an unknown is never restated as a fact.
+- An external commitment still requires explicit approval and a provider receipt.
+
+## DC-09 — Audit the existing queue in bulk
+
+Work:
+
+- Audit all projected cards for compound decisions, missing prerequisites,
+  unsupported recommendations and repeated settled choices.
+- Fix shared projection/rendering logic before category-specific definitions.
+- Cover every planning-task kind and representative setup, selected-decision,
+  calendar and approval records in tests.
+
+Acceptance:
+
+- Audit findings are available in the Wedding PersonalOS projection.
+- Focused regressions prove prerequisite suppression and settled-choice removal.
+
+## DC-10 — Verify online decision research
+
+Files:
+
+- `scripts/oracle-wedding-exa-decision-smoke.ps1`
+- WED-390 verification record
+
+Work:
+
+- Run bounded live EXA searches for transport, celebrant and florist decision
+  contexts using the configured Oracle secret without exposing it.
+- Require useful category matches and first-party-like sources, and retain bounded
+  titles, URLs and highlights for review.
+- Decide from evidence whether query shaping, system prompts or response structure
+  need changing.
+
+Acceptance:
+
+- All three searches return sensible source-linked results or the provider fails
+  closed with an actionable result.
+- Search highlights remain unconfirmed discovery evidence. No prompt is added where
+  deterministic provider/query structure is sufficient.
+
+## DC-11 — Install twice-daily Wedding production monitoring and release
+
+Files:
+
+- `scripts/omnyid-wedding-monitor.sh`
+- `scripts/install-oracle-wedding-monitor.sh`
+- `scripts/systemd/omnyid-wedding-monitor.*`
+- `Documents/website monitoring/Wedding production monitor.md`
+- WED-390 verification and coordination records
+
+Work:
+
+- Use a dedicated least-privilege Wedding synthetic account and root-owned systemd
+  credentials.
+- Check the public page, workspace shell, password login, session, bootstrap,
+  database/daemon readiness, health and the current JavaScript asset without writes.
+- Run at 08:00 and 20:00 Australia/Sydney with persistent scheduling, bounded jitter,
+  machine-readable status and optional webhook alerting.
+- Run the complete Wedding suite and production build from a clean exact-SHA release
+  worktree, retain rollback evidence, deploy and verify the timer plus live routes.
+
+Acceptance:
+
+- The local synthetic self-test and a manual Oracle service run pass.
+- The next two runs are visible in systemd and secrets do not appear in Git or logs.
+- The frozen candidate SHA is the deployed static source and production smoke checks
+  pass without changing the homeserver image unnecessarily.

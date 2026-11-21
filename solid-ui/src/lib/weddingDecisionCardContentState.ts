@@ -154,6 +154,41 @@ function transportContent(item: FocusDeckItem, facts: string[]): WeddingDecision
 
 export function buildWeddingDecisionCardContent(item: FocusDeckItem): WeddingDecisionCardContent {
   const facts = usefulFacts(item);
+  const contract = item.decisionContract;
+  if (contract) {
+    const knownFacts = Array.from(new Set([...contract.knownFacts, ...facts])).slice(0, 3);
+    const recommendation = clean(item.recommendedActionLabel);
+    const usableRecommendation = contract.recommendationSupported
+      && recommendation
+      && recommendation !== contract.primaryActionLabel
+      && !INTERNAL_COPY.test(recommendation)
+      ? recommendation
+      : null;
+    const date = formatWeddingDecisionDate(item.dueAt);
+    const unknownEvidence = contract.evidence.find((evidence) => evidence.status !== "confirmed")?.label ?? null;
+    const alternative = contract.options.find((option) => option.id !== "keep" && option.id !== "confirm") ?? contract.options[1] ?? null;
+    return {
+      title: contract.question,
+      whyItMatters: contract.missingPrerequisite
+        ? `${contract.missingPrerequisite.label} must be resolved before this decision can safely advance.`
+        : clean(item.whyNowLabel) && !INTERNAL_COPY.test(item.whyNowLabel)
+          ? sentence(clean(item.whyNowLabel))
+          : contract.deadlineReason,
+      primaryActionLabel: contract.primaryActionLabel,
+      recommendationSummary: usableRecommendation,
+      recommendationReasons: usableRecommendation ? knownFacts : [],
+      timeSensitivity: date && item.dueAt ? { label: `Task due ${date}`, at: item.dueAt } : null,
+      support: {
+        statusLabel: contract.missingPrerequisite ? "Prerequisite needed" : contract.recommendationSupported ? "Ready to choose" : "Needs your input",
+        knownFacts,
+        oneThingToConfirm: contract.oneThingToConfirm,
+        primaryOutcome: contract.primaryOutcome,
+        compromise: contract.recommendationSupported ? unknownEvidence : null,
+        alternative: alternative ? `${alternative.label}: ${alternative.summary}` : null,
+        unconfirmed: unknownEvidence ?? (contract.oneThingToConfirm ? `${contract.oneThingToConfirm} is not confirmed yet.` : null),
+      },
+    };
+  }
   if (/transport|limousine|pickup schedule|guest logistics|travel arrangement/i.test(item.title)) {
     return transportContent(item, facts);
   }

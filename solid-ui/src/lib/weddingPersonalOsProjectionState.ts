@@ -12,6 +12,7 @@ import {
 } from "@/lib/continuityProjectionState";
 import type { WeddingDecisionProjectionInput } from "@/lib/weddingDecisionAfpProjectionState";
 import {
+  isWeddingImportDecisionProjection,
   weddingDecisionSourceLabelsForProjection,
   weddingDecisionSourceUrlsForProjection,
 } from "@/lib/weddingDecisionAfpProjectionState";
@@ -19,6 +20,17 @@ import type {
   WeddingPersistedApprovalReceipt,
   WeddingPersistedDecisionDeferral,
 } from "@/lib/weddingPersistedWorkspaceState";
+import {
+  buildWeddingApprovalDecisionContract,
+  buildWeddingCalendarDecisionContract,
+  buildWeddingSelectedDecisionContract,
+  buildWeddingSetupDecisionContract,
+  buildWeddingTaskDecisionContract,
+  auditWeddingDecisionContracts,
+  type WeddingDecisionContract,
+  type WeddingDecisionAuditFinding,
+  type WeddingDecisionSavedFacts,
+} from "@/lib/weddingDecisionDefinitionState";
 
 export type WeddingPersonalOsPressureFamily = ContinuityPressureFamily;
 
@@ -33,12 +45,14 @@ export type WeddingPersonalOsRankedItem = ContinuityRankedItem<WeddingPersonalOs
   linkedArtifactId?: string | null;
   workspaceMenu?: string | null;
   actionMetadata?: Record<string, unknown>;
+  decisionContract?: WeddingDecisionContract | null;
 };
 
 export type WeddingDecisionLoadReliefState = ContinuityDecisionLoadReliefState<WeddingPersonalOsRankedItem>;
 
 export type WeddingPersonalOsProjectionState = Omit<ContinuityPersonalOsProjectionState<WeddingPersonalOsRankedItem>, "hasSignal"> & {
   hasWeddingPersonalOsSignal: boolean;
+  decisionAuditFindings: WeddingDecisionAuditFinding[];
 };
 
 function clean(value: unknown): string {
@@ -287,10 +301,16 @@ function taskWeight(task: WeddingPlanningTaskItem, now: Date): number {
     + outreachEscalationWeight(outreachEscalationStage(task.metadata));
 }
 
-function taskItem(task: WeddingPlanningTaskItem, now: Date): WeddingPersonalOsRankedItem | null {
+function taskItem(
+  task: WeddingPlanningTaskItem,
+  now: Date,
+  savedFacts: WeddingDecisionSavedFacts,
+): WeddingPersonalOsRankedItem | null {
   const title = clean(task.title);
   if (!title || task.reviewStatus === "ignored" || task.approvalState === "archived"
     || task.semanticTags?.some((tag) => tag.toLowerCase() === "wedding_task_status:done")) return null;
+  const decisionContract = buildWeddingTaskDecisionContract({ task, facts: savedFacts });
+  if (decisionContract.settled) return null;
   const family = familyForTask(task);
   const timing = dueExplanation(task.dueAt, clean(task.dueLabel) || null, now);
   const escalationStage = outreachEscalationStage(task.metadata);
@@ -385,6 +405,7 @@ function taskItem(task: WeddingPlanningTaskItem, now: Date): WeddingPersonalOsRa
     linkedArtifactId: clean(task.linkedArtifactId) || null,
     workspaceMenu: clean(metadata.wedding_workspace_menu) || null,
     actionMetadata: Object.keys(compactActionMetadata).length > 0 ? compactActionMetadata : undefined,
+    decisionContract,
     simulatorSeedKind: simulatorKindForFamily(family),
   };
 }
@@ -417,6 +438,7 @@ function scheduleItem(item: WeddingPlanningScheduleItem, now: Date): WeddingPers
       || "Wedding calendar commitment can shape today's planning order.",
     evidenceLabels: [clean(item.kind).replace(/_/g, " "), item.location ? `location: ${item.location}` : ""].filter(Boolean).slice(0, 4),
     sourceSurface: "calendar",
+    decisionContract: buildWeddingCalendarDecisionContract(item),
     simulatorSeedKind: simulatorKindForFamily(family),
   };
 }
@@ -425,9 +447,19 @@ function decisionItem(decision: WeddingDecisionProjectionInput): WeddingPersonal
   const title = clean(decision.selectedOption.label);
   if (!title) return null;
   const tradeoffs = decision.selectedOption.tradeoffLabels.length + decision.selectedOption.missingPreferenceLabels.length;
+  if (tradeoffs === 0) return null;
   const sourceProviderLabels = stringArray(decision.sourceProviderLabels).map((label) => `provider: ${label}`);
   const sourceLabels = weddingDecisionSourceLabelsForProjection(decision).slice(0, 3).map((label) => `source: ${label}`);
-  const sourceUrlCount = usableSourceUrlCount(weddingDecisionSourceUrlsForProjection(decision));
+  const sourceUrls = weddingDecisionSourceUrlsForProjection(decision);
+  const sourceUrlCount = usableSourceUrlCount(sourceUrls);
+  const decisionContract = buildWeddingSelectedDecisionContract({
+    label: title,
+    preferenceSummary: decision.selectedOption.preferenceSummaryLabel,
+    tradeoffLabels: decision.selectedOption.tradeoffLabels,
+    missingPreferenceLabels: decision.selectedOption.missingPreferenceLabels,
+    sourceLabels: weddingDecisionSourceLabelsForProjection(decision),
+    sourceUrls: isWeddingImportDecisionProjection(decision) ? [] : sourceUrls,
+  });
   return {
     id: `decision:${decision.id}`,
     kind: "decision",
@@ -449,6 +481,7 @@ function decisionItem(decision: WeddingDecisionProjectionInput): WeddingPersonal
       ...decision.selectedOption.missingPreferenceLabels,
     ].filter(Boolean).slice(0, 6),
     sourceSurface: "decision_queue",
+    decisionContract,
     simulatorSeedKind: tradeoffs > 0 ? "context" : "decision",
   };
 }
@@ -472,6 +505,11 @@ function approvalItem(receipt: WeddingPersistedApprovalReceipt): WeddingPersonal
       ...receipt.riskLabels,
     ].filter(Boolean).slice(0, 6),
     sourceSurface: "approval_queue",
+    decisionContract: buildWeddingApprovalDecisionContract({
+      title,
+      blockedReason: receipt.blockedReason,
+      riskLabels: receipt.riskLabels,
+    }),
     simulatorSeedKind: "response",
   };
 }
@@ -533,19 +571,41 @@ export function buildWeddingPersonalOsProjectionState(input: {
   decisionItems?: readonly WeddingDecisionProjectionInput[] | null;
   approvalReceipts?: readonly WeddingPersistedApprovalReceipt[] | null;
   decisionDeferrals?: readonly WeddingPersistedDecisionDeferral[] | null;
+  savedFacts?: WeddingDecisionSavedFacts | null;
   now?: Date | null;
   limit?: number | null;
   decisionFocusLimit?: number | null;
 }): WeddingPersonalOsProjectionState {
   const now = input.now ?? new Date();
-  const candidateItems = [
-    ...(input.setupItems ?? []),
-    ...(input.taskItems ?? []).map((item) => taskItem(item, now)),
+  const selectedDecisionLabels = (input.decisionItems ?? []).flatMap((decision) => [
+    decision.artifactTitle,
+    decision.artifactKind,
+    decision.selectedOption.label,
+  ]).filter(Boolean);
+  const savedFacts: WeddingDecisionSavedFacts = {
+    ...(input.savedFacts ?? {}),
+    selectedDecisionLabels,
+  };
+  const projectedItems = [
+    ...(input.setupItems ?? []).map((item) => {
+      const setup = clean(item.actionMetadata?.wedding_setup_decision);
+      if (setup !== "date" && setup !== "budget" && setup !== "guests") return item;
+      return { ...item, decisionContract: buildWeddingSetupDecisionContract(setup) };
+    }),
+    ...(input.taskItems ?? []).map((item) => taskItem(item, now, savedFacts)),
     ...(input.scheduleItems ?? []).map((item) => scheduleItem(item, now)),
     ...(input.decisionItems ?? []).map(decisionItem),
     ...(input.approvalReceipts ?? []).map(approvalItem),
   ]
     .filter((item): item is WeddingPersonalOsRankedItem => Boolean(item));
+  const setupPrerequisites = new Set(projectedItems.flatMap((item) => {
+    const setup = clean(item.actionMetadata?.wedding_setup_decision);
+    if (setup === "date") return ["wedding_date"];
+    if (setup === "budget") return ["budget_target"];
+    if (setup === "guests") return ["guest_scope"];
+    return [];
+  }));
+  const candidateItems = projectedItems;
   const limit = Math.max(1, Math.trunc(input.limit ?? Math.max(1, candidateItems.length)));
   const decisionFocusLimit = Math.max(1, Math.trunc(input.decisionFocusLimit ?? limit));
   const candidateById = new Map(candidateItems.map((item) => [item.id, item]));
@@ -566,7 +626,13 @@ export function buildWeddingPersonalOsProjectionState(input: {
     decisionFocusLimit,
     summarySubject: "wedding",
     familySummary,
-    decisionLoadCandidate,
+    decisionLoadCandidate: (item) => {
+      // Keep dependent work visible in Tasks/PersonalOS, but let the canonical
+      // setup card own the decision deck until the shared fact is saved.
+      const missing = item.decisionContract?.missingPrerequisite?.key;
+      if (!clean(item.actionMetadata?.wedding_setup_decision) && missing && setupPrerequisites.has(missing)) return false;
+      return decisionLoadCandidate(item);
+    },
     decisionLoadReliefLabels,
     guardrailLabels: [
       "Uses existing PersonalOS field engine and simulator only.",
@@ -580,5 +646,6 @@ export function buildWeddingPersonalOsProjectionState(input: {
   return {
     ...projection,
     hasWeddingPersonalOsSignal: hasSignal,
+    decisionAuditFindings: auditWeddingDecisionContracts(candidateItems),
   };
 }

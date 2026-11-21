@@ -49,12 +49,18 @@ function neededByLabel(item: WeddingPersonalOsRankedItem): string {
 }
 
 function checkedLabel(item: WeddingPersonalOsRankedItem): string {
+  if (item.decisionContract) {
+    const confirmed = item.decisionContract.evidence.filter((evidence) => evidence.status === "confirmed");
+    if (confirmed.length > 0) return `${confirmed.length} source detail${confirmed.length === 1 ? "" : "s"} attached.`;
+    if (item.decisionContract.missingPrerequisite) return `${item.decisionContract.missingPrerequisite.label} is needed first.`;
+  }
   const labels = item.evidenceLabels.map(clean).filter(Boolean).slice(0, 3);
   if (labels.length === 0) return "OmnyID has not attached evidence yet.";
   return `OmnyID checked ${labels.join(", ")}.`;
 }
 
 function recommendedActionLabel(item: WeddingPersonalOsRankedItem): string {
+  if (item.decisionContract) return item.decisionContract.primaryActionLabel;
   if (item.actionMetadata?.wedding_setup_decision === "budget") {
     return "Set a starting budget and adjust the suggested category amounts";
   }
@@ -81,6 +87,7 @@ function recommendedActionLabel(item: WeddingPersonalOsRankedItem): string {
 }
 
 function compareLabel(item: WeddingPersonalOsRankedItem): string {
+  if (item.decisionContract) return item.decisionContract.primaryActionLabel;
   if (item.actionMetadata?.wedding_setup_decision === "budget") return "Set budget";
   if (/pending RSVP/i.test(item.title)) return "Message guest";
   if (/hen'?s night|hen party/i.test(item.title)) return "View research";
@@ -98,7 +105,11 @@ function compareLabel(item: WeddingPersonalOsRankedItem): string {
  * separate from recommendations: it creates a search surface, never a
  * vendor choice or an enquiry.
  */
-export function weddingVendorResearchQueryForDecision(item: Pick<WeddingPersonalOsRankedItem, "title" | "evidenceLabels">): string | null {
+export function weddingVendorResearchQueryForDecision(
+  item: Pick<WeddingPersonalOsRankedItem, "title" | "evidenceLabels"> & Partial<Pick<WeddingPersonalOsRankedItem, "decisionContract">>,
+): string | null {
+  const missing = item.decisionContract?.missingPrerequisite?.key;
+  if (missing && missing !== "source_evidence" && missing !== "selected_option") return null;
   const text = `${item.title} ${(item.evidenceLabels ?? []).join(" ")}`.toLowerCase();
   if (/\b(ring|rings|jewell?er|jewell?ry|wedding band)\b/.test(text)) return "wedding ring jewellers";
   // Do not hijack a payment, contract, or calendar decision merely because it
@@ -128,9 +139,9 @@ export function buildWeddingDecisionFocusItemCard(item: WeddingPersonalOsRankedI
   return {
     id: item.id,
     item,
-    title: item.title,
+    title: item.decisionContract?.question ?? item.title,
     neededByLabel: neededByLabel(item),
-    whyNowLabel: compactSentence(item.explanation, "This is worth checking before the planner narrows the next step."),
+    whyNowLabel: compactSentence(item.decisionContract?.deadlineReason ?? item.explanation, "This is worth checking before the planner narrows the next step."),
     checkedLabel: checkedLabel(item),
     recommendedActionLabel: recommendedActionLabel(item),
     compareLabel: compareLabel(item),

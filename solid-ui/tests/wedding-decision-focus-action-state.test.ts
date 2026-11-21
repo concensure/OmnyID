@@ -11,6 +11,7 @@ import {
   weddingVendorResearchQueryForDecision,
 } from "../src/lib/weddingDecisionFocusDisplayState.ts";
 import { weddingDecisionDeferralActionToAfpSendInput } from "../src/lib/weddingDecisionDeferralAfpState.ts";
+import { buildWeddingTaskDecisionContract } from "../src/lib/weddingDecisionDefinitionState.ts";
 import type { WeddingPersonalOsRankedItem } from "../src/lib/weddingPersonalOsProjectionState.ts";
 
 function item(input: Partial<WeddingPersonalOsRankedItem> & Pick<WeddingPersonalOsRankedItem, "sourceSurface" | "title">): WeddingPersonalOsRankedItem {
@@ -392,6 +393,26 @@ test("weddingDecisionDeferralActionToAfpSendInput projects deferrals into AFP le
   assert.equal(sendInput.metadata.projection, "wedding_decision_deferral_to_afp");
   assert.equal(sendInput.metadata.resurface_policy, "Due in 3 days, unchanged for 7 days, or when the evidence changes.");
   assert.equal(sendInput.references?.some((ref) => ref.type === "deferred_focus_item" && ref.target === "item:choose-photographer"), true);
+});
+
+test("vendor research waits when the visible decision is an earlier prerequisite", () => {
+  const transport = item({
+    title: "Book wedding transport",
+    sourceSurface: "tasks",
+    decisionContract: buildWeddingTaskDecisionContract({
+      task: {
+        id: "transport",
+        title: "Book wedding transport",
+        kind: "transport",
+        reviewStatus: "accepted",
+        approvalState: "draft",
+      },
+      facts: { weddingDate: "2028-09-18", budgetTargetAmount: 2_000, guestCount: 40 },
+    }),
+  });
+
+  assert.equal(transport.decisionContract?.missingPrerequisite?.key, "requirements");
+  assert.equal(weddingVendorResearchQueryForDecision(transport), null);
 });
 
 test("a couple-selected reminder date survives the existing AFP deferral path", () => {

@@ -11,6 +11,36 @@ import type {
 
 const now = new Date("2026-09-13T10:00:00.000Z");
 
+test("a dedicated setup choice suppresses dependent cards until the shared prerequisite is saved", () => {
+  const state = buildWeddingPersonalOsProjectionState({
+    now,
+    setupItems: [{
+      id: "wedding-setup:date",
+      kind: "decision",
+      title: "Add wedding date",
+      pressureFamily: "obligation",
+      rankWeight: 100_000,
+      dueLabel: "Start here",
+      dueAt: null,
+      explanation: "The date unlocks planning.",
+      evidenceLabels: ["date needed"],
+      sourceSurface: "decision_queue",
+      actionMetadata: { wedding_setup_decision: "date", wedding_workspace_menu: "timeline" },
+    }],
+    taskItems: [{
+      id: "legal-after-date",
+      title: "Prepare the notice of intended marriage",
+      kind: "legal",
+      reviewStatus: "accepted",
+      approvalState: "draft",
+    }],
+  });
+
+  assert.ok(state.rankedItems.some((item) => item.id === "task:legal-after-date"));
+  assert.deepEqual(state.decisionLoadRelief.focusItems.map((item) => item.id), ["wedding-setup:date"]);
+  assert.equal(state.decisionLoadRelief.focusItems[0]?.decisionContract?.answerRecord, "wedding_event_setup");
+});
+
 test("wedding PersonalOS projection ranks evidence-backed bride/groom action items for existing field and simulator lanes", () => {
   const state = buildWeddingPersonalOsProjectionState({
     now,
@@ -114,7 +144,7 @@ test("wedding PersonalOS projection counts only usable selected-decision source 
         cells: ["Harbour House", "Outdoor"],
         preferenceSummaryLabel: "No explicit preference-fit signals were detected for this row.",
         preferenceFitLabels: [],
-        tradeoffLabels: [],
+        tradeoffLabels: ["Verify wet-weather terms"],
         missingPreferenceLabels: [],
       },
     }],

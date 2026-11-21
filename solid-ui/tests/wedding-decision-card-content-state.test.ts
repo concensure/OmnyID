@@ -31,3 +31,37 @@ test("decision dates are presented for people rather than as raw ISO values", ()
   assert.equal(formatWeddingDecisionDate("2028-09-18"), "18 September 2028");
   assert.equal(formatWeddingDecisionDate("not-a-date"), null);
 });
+
+test("the declared decision contract drives non-transport card question, action and evidence", () => {
+  const contractItem: FocusDeckItem = {
+    ...transport,
+    id: "task:venue-quote",
+    title: "Compare venue quote and approve booking",
+    recommendedActionLabel: "Venue A currently fits the stated scope",
+    decisionContract: {
+      decisionType: "quote_choice",
+      question: "Which venue quote fits the agreed scope and budget?",
+      options: [{ id: "a", label: "Venue A", summary: "A$5,000 minimum spend" }, { id: "open", label: "Keep it open", summary: "Confirm staffing first" }],
+      prerequisites: [],
+      missingPrerequisite: null,
+      answerRecord: "quotation_comparison",
+      deadlinePolicy: "hard_deadline",
+      deadlineReason: "The saved quote expiry determines priority.",
+      primaryActionLabel: "Compare your quotes",
+      primaryOutcome: "Save a preference without booking or sending anything.",
+      knownFacts: ["Venue A food and beverage minimum: A$5,000"],
+      oneThingToConfirm: "Staffing fee",
+      evidence: [{ label: "Food and beverage minimum A$5,000", ref: "https://example.com/quote-a", sourceKind: "quote", status: "confirmed" }],
+      recommendationSupported: true,
+      approvalRequiredBeforeExternalAction: true,
+      settled: false,
+    },
+  };
+  const content = buildWeddingDecisionCardContent(contractItem);
+
+  assert.equal(content.title, "Which venue quote fits the agreed scope and budget?");
+  assert.equal(content.primaryActionLabel, "Compare your quotes");
+  assert.equal(content.recommendationSummary, "Venue A currently fits the stated scope");
+  assert.match(content.support.knownFacts[0] ?? "", /A\$5,000/);
+  assert.equal(content.support.oneThingToConfirm, "Staffing fee");
+});
