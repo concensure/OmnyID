@@ -42,7 +42,9 @@ import { weddingTaskCompletionToAfpSendInput } from "@/lib/weddingTaskCompletion
 import {
   dispatchWeddingVendorSearchLaunch,
   saveWeddingVendorSearchLaunch,
+  weddingVendorSearchLaunchResultFromEvent,
   weddingVendorSearchQueryFromIntake,
+  WEDDING_VENDOR_SEARCH_LAUNCH_RESULT_EVENT,
 } from "@/lib/weddingVendorSearchLaunchState";
 import { weddingRsvpSetupFromAfpMessages } from "@/lib/weddingRsvpSetupState";
 import {
@@ -99,12 +101,14 @@ export function WeddingDecisionFocusCard(props: {
   const [expandedSetupItemId, setExpandedSetupItemId] = createSignal<string | null>(null);
   const [fundedResearch, setFundedResearch] = createSignal<Record<string, WeddingDecisionResearchState>>({});
   const [fundedResearchStatus, setFundedResearchStatus] = createSignal<Record<string, "loading" | "failed">>({});
+  const [researchRetryRevision, setResearchRetryRevision] = createSignal(0);
   const [finalCountSelections, setFinalCountSelections] = createSignal<Record<string, string>>({});
   const [finalCountApprovalBusyId, setFinalCountApprovalBusyId] = createSignal<string | null>(null);
   const [reviewObservations, setReviewObservations] = createSignal<Record<string, WeddingReviewDecisionObservation | null>>({});
   const [reminderItem, setReminderItem] = createSignal<WeddingPersonalOsRankedItem | null>(null);
   const [reminderDate, setReminderDate] = createSignal("");
   const fundedResearchAttempts = new Set<string>();
+  const vendorPrefetchAttempts = new Set<string>();
   const reviewObservationAttempts = new Set<string>();
   const rsvpSetup = createMemo(() => weddingRsvpSetupFromAfpMessages(
     props.state.afpMessages,
@@ -135,10 +139,22 @@ export function WeddingDecisionFocusCard(props: {
     refresh();
     const unsubscribe = subscribeContactsChangedEvent(refresh);
     const completionListener = () => setCompletionRevision((value) => value + 1);
+    const vendorResultListener = (event: Event) => {
+      const result = weddingVendorSearchLaunchResultFromEvent(event);
+      if (!result) return;
+      setFundedResearchStatus((current) => {
+        const next = { ...current };
+        if (!result.ok) next[result.sourceDecisionId] = "failed";
+        return next;
+      });
+      if (result.ok) props.onRefreshWorkspace?.();
+    };
     window.addEventListener(WEDDING_TASK_COMPLETION_EVENT, completionListener);
+    window.addEventListener(WEDDING_VENDOR_SEARCH_LAUNCH_RESULT_EVENT, vendorResultListener);
     onCleanup(() => {
       unsubscribe();
       window.removeEventListener(WEDDING_TASK_COMPLETION_EVENT, completionListener);
+      window.removeEventListener(WEDDING_VENDOR_SEARCH_LAUNCH_RESULT_EVENT, vendorResultListener);
     });
   });
   const completedFocusIds = createMemo(() => {
@@ -153,6 +169,7 @@ export function WeddingDecisionFocusCard(props: {
     locallyHiddenIds: completedFocusIds(),
   }));
   createEffect(() => {
+    researchRetryRevision();
     const context = props.state.contextCards.flatMap((card) => [
       card.planningContext.location,
       card.planningContext.atmosphereDescription,
@@ -258,6 +275,48 @@ export function WeddingDecisionFocusCard(props: {
       || /preferred vendors|vendor comparison/i.test(item.title);
     if (!isComparison) return null;
     return props.state.artifactPreviews.find((artifact) => artifact.vendorComparisonCards.length > 0) ?? null;
+  }
+  createEffect(() => {
+    researchRetryRevision();
+    for (const { item } of weddingDecisionResearchQueueWindow(display().queuedFocusItems)) {
+      const query = weddingVendorResearchQueryForDecision(item);
+      if (!query || comparisonFor(item)) continue;
+      const attemptKey = `${props.state.workspace.metadata.weddingPlanId}:${item.id}:${query}`;
+      if (vendorPrefetchAttempts.has(attemptKey)) continue;
+      vendorPrefetchAttempts.add(attemptKey);
+      setFundedResearchStatus((current) => ({ ...current, [item.id]: "loading" }));
+      const launch = saveWeddingVendorSearchLaunch(query, {
+        source: "wedding_home",
+        runImmediately: true,
+        background: true,
+        sourceDecisionId: item.id,
+      });
+      if (launch) dispatchWeddingVendorSearchLaunch(launch);
+    }
+  });
+  const decisionPreparation = createMemo(() => {
+    const labels = ["Current step", "Next step", "Following step"];
+    const steps = weddingDecisionResearchQueueWindow(display().queuedFocusItems).map(({ item, queueRank }) => {
+      const task = taskFor(item.id);
+      const vendorQuery = weddingVendorResearchQueryForDecision(item);
+      const ready = !task
+        || isPendingRsvpFollowUp(item.id)
+        || (vendorQuery ? Boolean(comparisonFor(item)) : Boolean(researchFor(item.id)) || !needsFundedResearch(item, task));
+      const status = fundedResearchStatus()[item.id];
+      return {
+        id: item.id,
+        label: labels[queueRank] ?? `Step ${queueRank + 1}`,
+        title: item.title,
+        state: ready ? "ready" as const : status === "failed" ? "failed" as const : "preparing" as const,
+      };
+    });
+    return { steps, ready: steps.every((step) => step.state === "ready") };
+  });
+  function retryDecisionPreparation() {
+    fundedResearchAttempts.clear();
+    vendorPrefetchAttempts.clear();
+    setFundedResearchStatus((current) => Object.fromEntries(Object.entries(current).filter(([, status]) => status !== "failed")));
+    setResearchRetryRevision((value) => value + 1);
   }
   createEffect(() => {
     const weddingPlanId = props.state.workspace.metadata.weddingPlanId;
@@ -510,6 +569,23 @@ export function WeddingDecisionFocusCard(props: {
           </p>
           )}
         </Show>
+        <Show when={decisionPreparation().ready} fallback={(
+          <section class="mt-3 rounded-2xl border border-pink-100 bg-white/80 p-4" role="status" aria-live="polite">
+            <p class="text-xs font-semibold uppercase tracking-[0.12em] text-pink-900">Preparing your decisions</p>
+            <p class="mt-1 text-sm leading-6 text-pink-950/75">Checking the current step and the two after it before showing a recommendation.</p>
+            <ul class="mt-3 grid gap-2">
+              <For each={decisionPreparation().steps}>{(step) => (
+                <li class="flex items-start justify-between gap-3 rounded-xl border border-pink-100 bg-white px-3 py-2">
+                  <div><p class="text-[10px] font-semibold uppercase tracking-[0.1em] text-pink-900/70">{step.label}</p><p class="mt-1 text-sm font-semibold text-pink-950">{step.title}</p></div>
+                  <span class="shrink-0 text-xs font-semibold text-pink-900">{step.state === "ready" ? "Ready" : step.state === "failed" ? "Needs retry" : "Researching…"}</span>
+                </li>
+              )}</For>
+            </ul>
+            <Show when={decisionPreparation().steps.some((step) => step.state === "failed")}>
+              <button type="button" class="mt-3 min-h-11 rounded-full border border-pink-300 bg-white px-4 text-sm font-semibold text-pink-950" onClick={retryDecisionPreparation}>Retry research</button>
+            </Show>
+          </section>
+        )}>
         <Show when={display().visibleFocusItems.length > 0} fallback={<p class="mt-3 rounded-2xl border border-pink-100 bg-white/70 px-3 py-2 text-sm leading-6 text-pink-950/75">Nothing needs a yes/no right now.</p>}>
           <div class="mt-3 space-y-2">
             <For each={display().itemCards}>
@@ -830,6 +906,7 @@ export function WeddingDecisionFocusCard(props: {
               {(record) => <div class="rounded-xl border border-pink-100 bg-white px-3 py-2"><p class="text-xs font-semibold text-pink-950">{record.title}</p><p class="mt-1 text-xs leading-5 text-pink-950/75">{record.detailLabel}</p></div>}
             </For>
           </section>
+        </Show>
         </Show>
         <Show when={reminderItem()}>
           {(item) => (

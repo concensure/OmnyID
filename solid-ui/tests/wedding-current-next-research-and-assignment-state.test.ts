@@ -24,6 +24,12 @@ test("funded research follows a moving current-next-following window", () => {
   const server = read("../src/server/wedding_decision_research_routes.rs");
   assert.match(server, /request\.queue_rank > 2/);
   assert.match(server, /Only the current, next and following decision can be researched/);
+  const mobile = read("src/components/WeddingMobileFocusHome.tsx");
+  const detailed = read("src/components/WeddingDecisionFocusCard.tsx");
+  assert.match(mobile, /decisionPreparation\(\)\.ready/);
+  assert.match(detailed, /decisionPreparation\(\)\.ready/);
+  assert.match(detailed, /background:\s*true/);
+  assert.match(detailed, /Following step/);
 });
 
 test("assignment delivery uses the server-side research and registered-agent path", () => {
