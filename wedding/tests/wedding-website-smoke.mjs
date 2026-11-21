@@ -389,6 +389,26 @@ if (!weddingHome.includes('Less wedding admin. More of a wedding that feels like
   || !landingConfig.includes('an intimate ceremony, a micro wedding or a larger celebration')) {
   failures.push('index.html: Soft message must stay general and name small weddings alongside larger celebrations in static and runtime copy');
 }
+if (!weddingHome.includes('id="guest-journey"')
+  || !weddingHome.includes('One guest journey, not four disconnected lists')
+  || !weddingHome.includes('rather than being merged because they share a surname')
+  || !weddingHome.includes('Unknown or ambiguous answers stay pending')) {
+  failures.push('index.html: the source-linked guest journey is missing its household and ambiguous-RSVP trust boundaries');
+}
+if (!weddingHome.includes('id="plan-together"')
+  || !weddingHome.includes('Two accounts, one Wedding plan')
+  || !weddingHome.includes('A pending or expired link grants no access')
+  || !weddingHome.includes('Personal stays personal')) {
+  failures.push('index.html: the couple coworking journey or personal-data boundary is missing');
+}
+if (weddingHome.includes('Venues, vendors and guests, mapped') || weddingHome.includes('accommodation clusters')) {
+  failures.push('index.html: unsupported guest travel and accommodation mapping claim must stay removed');
+}
+if (!weddingHome.includes('landing-config.js?v=wed391-guest-coworking')
+  || !landingConfig.includes("detailDestination: '#guest-journey'")
+  || !landingConfig.includes("destinationPath: '/wedding/#guest-journey'")) {
+  failures.push('Wedding guest context must point to the versioned public guest journey');
+}
 if (!weddingHome.includes('a good starting point for a spicy discussion') || weddingHome.includes('never a compatibility score')) {
   failures.push('index.html: animal-quiz discussion copy has not replaced the compatibility-score wording');
 }

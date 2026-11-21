@@ -155,8 +155,9 @@ function guestSourceLabel(artifact: WeddingArtifactInput): string {
 }
 
 function rsvpStatus(value: string): "attending" | "declined" | "pending" {
-  if (/\b(yes|attending|accepted|confirmed|coming)\b/i.test(value)) return "attending";
-  if (/\b(no|declined|not attending|unable)\b/i.test(value)) return "declined";
+  const normalized = clean(value).toLowerCase().replace(/[._-]+/g, " ").replace(/\s+/g, " ");
+  if (["yes", "y", "attending", "accepted", "confirmed", "coming", "rsvp yes"].includes(normalized)) return "attending";
+  if (["no", "n", "declined", "not attending", "unable", "rsvp no"].includes(normalized)) return "declined";
   return "pending";
 }
 
@@ -175,11 +176,12 @@ function invitationAttendance(
   return "Pending";
 }
 
-function uniqueHouseholdKey(name: string, household: string): string {
+function uniqueHouseholdKey(name: string, household: string, ungroupedId?: string): string {
   const key = clean(household).toLowerCase();
   if (key) return key;
-  const familyGuess = clean(name).split(/\s+/).slice(-1)[0]?.toLowerCase() ?? "";
-  return familyGuess || clean(name).toLowerCase();
+  // A surname is not household evidence. Keep each ungrouped person separate
+  // until the couple confirms a household explicitly.
+  return `ungrouped:${clean(ungroupedId) || clean(name).toLowerCase()}`;
 }
 
 function finalCountOptions(input: {
@@ -443,7 +445,7 @@ export function buildWeddingGuestTrackingState(input: {
       const dietaryNote = cell(row, dietaryIndex);
       const accessibilityNote = cell(row, accessibilityIndex);
       guestRowCount += 1;
-      householdKeys.add(uniqueHouseholdKey(displayName, rawHouseholdLabel));
+      householdKeys.add(uniqueHouseholdKey(displayName, rawHouseholdLabel, `${clean(artifact.id) || clean(artifact.title) || "guest_list"}:${rowIndex}`));
       const status = rsvpStatus(cell(row, rsvpIndex));
       if (status === "attending") attendingCount += 1;
       else if (status === "declined") declinedCount += 1;
@@ -487,10 +489,10 @@ export function buildWeddingGuestTrackingState(input: {
     const invitations = (boundaryInvitations.get(profile.personId) ?? [])
       .filter((invitation) => invitation.invitationStatus !== "not_invited");
     guestRowCount += 1;
-    const householdLabel = (boundaryHouseholds.get(profile.householdId ?? "")?.displayName
-      ?? clean(profile.householdId)
-      ?? "Ungrouped");
-    householdKeys.add(uniqueHouseholdKey(profile.displayName, householdLabel));
+    const householdLabel = boundaryHouseholds.get(profile.householdId ?? "")?.displayName
+      || clean(profile.householdId)
+      || "Ungrouped";
+    householdKeys.add(uniqueHouseholdKey(profile.displayName, householdLabel, profile.personId));
     const attendance = invitations.some((invitation) => invitation.invitationStatus === "rsvp_yes")
       ? "Attending"
       : invitations.length > 0 && invitations.every((invitation) => ["rsvp_no", "declined_by_couple"].includes(invitation.invitationStatus))

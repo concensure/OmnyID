@@ -134,6 +134,46 @@ test("buildWeddingGuestTrackingState groups households and estimates final-count
   assert.ok(state.finalCountOptions[1]?.riskLabel.includes("late-count fees"));
 });
 
+test("buildWeddingGuestTrackingState never infers households from surnames", () => {
+  const state = buildWeddingGuestTrackingState({
+    artifacts: [{
+      id: "guest-list:no-households",
+      title: "Guest list",
+      kind: "guest_list",
+      bodyText: [
+        "| Name | RSVP |",
+        "| --- | --- |",
+        "| Alex Lee | Yes |",
+        "| Morgan Lee | Yes |",
+      ].join("\n"),
+    }],
+  });
+
+  assert.equal(state.householdCount, 2);
+  assert.deepEqual(state.guestRows?.map((row) => row.householdLabel), ["Ungrouped", "Ungrouped"]);
+});
+
+test("buildWeddingGuestTrackingState treats ambiguous RSVP prose as pending", () => {
+  const state = buildWeddingGuestTrackingState({
+    artifacts: [{
+      title: "Guest list",
+      kind: "guest_list",
+      bodyText: [
+        "| Name | RSVP |",
+        "| --- | --- |",
+        "| Alex | No dietary issues |",
+        "| Blair | Yes, likely |",
+        "| Casey | Not attending |",
+      ].join("\n"),
+    }],
+  });
+
+  assert.equal(state.attendingCount, 0);
+  assert.equal(state.declinedCount, 1);
+  assert.equal(state.pendingCount, 2);
+  assert.deepEqual(state.guestRows?.map((row) => row.rsvpStatus), ["Pending", "Pending", "Not attending"]);
+});
+
 test("buildWeddingGuestTrackingState summarizes active boundary rules and invitation scope", () => {
   const state = buildWeddingGuestTrackingState({
     boundaryObjects: [{

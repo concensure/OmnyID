@@ -69,16 +69,16 @@
       detailTitle: 'One guest list, including replies',
       detailCopy: 'Track households, RSVP status, meal choices and access needs without copying updates between lists.',
       detailCtaLabel: 'See guest planning',
-      detailDestination: '#preview',
+      detailDestination: '#guest-journey',
       demoId: 'overview',
       ctaLabel: 'Explore guest planning',
-      destination: '#preview',
+      destination: '#guest-journey',
       granularity: 'G4 capability',
       variant: 'default',
       retrieval: {
         question: 'How do I manage wedding RSVPs, dietary needs and seating?',
         directAnswer: 'Keep each guest, household, RSVP, meal choice, access need and seating assignment in one connected guest record.',
-        destinationPath: '/wedding/#preview'
+        destinationPath: '/wedding/#guest-journey'
       }
     },
     final: {

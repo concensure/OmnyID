@@ -2,8 +2,9 @@
 
 Dependency order is authoritative. Task: WED-365.
 
-Status: implementation started 12 November 2026. Checked items are repository
-claims only; hosted and full-account release gates remain separate.
+Status: foundation implemented; WED-391 continuation started 22 November 2026.
+Checked items are repository claims only; hosted and full-account release
+gates remain separate.
 
 ## Phase 1 — Shared-scope foundation
 
@@ -97,6 +98,20 @@ no access.
 - Allow assign-to-self, partner or both; attach discussions to source objects.
 - Do not copy tasks into both accounts.
 - Depends on COW-06 and COW-07.
+
+#### COW-08A — Membership-backed first task (WED-391)
+
+- [x] Replace the invented “Your partner” assignee with accepted co-owner names
+  from the existing Wedding membership route; keep saved contacts and inferred
+  couple facts only as clearly separate helper choices.
+- [x] Save responsibility through the existing AFP Wedding task record rather
+  than a coworking-only task list.
+- [x] Show current, next and following collaboration steps for private, pending,
+  accepted and expired/revoked membership states.
+- [x] Keep supplier enquiry and external commitment behind the existing approval
+  flow after the task is assigned.
+- This is the first usable COW-08 slice. It does not mark COW-06, COW-07 or the
+  full comments/joint-decision work complete.
 
 ### COW-09 — Shared activity and catch-up (P1)
 

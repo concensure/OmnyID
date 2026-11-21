@@ -15,6 +15,7 @@ import {
   type WeddingSharedContact,
 } from "@/lib/api";
 import { loadContacts } from "@/lib/contactsLocalState";
+import { buildWeddingCoworkingJourneyState } from "@/lib/weddingCoworkingJourneyState";
 import type { WeddingPlanningMetadata } from "@/lib/weddingPlanningTemplateState";
 import type {
   WeddingCollaborationState,
@@ -48,6 +49,7 @@ export function WeddingCollaborationAccessCard(props: {
   const [selectedContactIds, setSelectedContactIds] = createSignal<string[]>([]);
   const [sharingNotice, setSharingNotice] = createSignal<string | null>(null);
   const [busy, setBusy] = createSignal(false);
+  const journey = createMemo(() => buildWeddingCoworkingJourneyState({ members: members(), invites: invites() }));
   const contacts = createMemo(() => loadContacts(props.contactUserId));
   const contactRoles = createMemo(() => Array.from(new Set(contacts().flatMap((contact) => contact.roles ?? []))).sort());
   const visibleContacts = createMemo(() => contactRoleFilter() === "all"
@@ -202,6 +204,17 @@ export function WeddingCollaborationAccessCard(props: {
       <p class="mt-2 rounded-2xl border border-sky-100 bg-white/75 px-3 py-2 text-xs leading-5 text-sky-950/75">
         A partner gets equal access to this Wedding plan only. Your personal contacts, diary, chats, files, databases and AI memory stay in your own account unless you explicitly share an item.
       </p>
+      <section class="mt-3 rounded-2xl border border-sky-100 bg-white/75 p-3" aria-label="Partner collaboration steps">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <p class="text-sm font-semibold text-sky-950">Plan together, one step at a time</p>
+          <span class="rounded-full bg-sky-50 px-2 py-1 text-[11px] font-semibold text-sky-900">{journey().actionLabel}</span>
+        </div>
+        <ol class="mt-2 grid gap-2 md:grid-cols-3">
+          <li class="rounded-xl border border-sky-100 bg-sky-50/60 p-2 text-xs leading-5 text-sky-950/75"><strong class="block text-sky-950">Current</strong>{journey().currentStep}</li>
+          <li class="rounded-xl border border-sky-100 bg-sky-50/60 p-2 text-xs leading-5 text-sky-950/75"><strong class="block text-sky-950">Next</strong>{journey().nextStep}</li>
+          <li class="rounded-xl border border-sky-100 bg-sky-50/60 p-2 text-xs leading-5 text-sky-950/75"><strong class="block text-sky-950">Then</strong>{journey().followingStep}</li>
+        </ol>
+      </section>
       <Show when={members().length > 0}>
         <div class="mt-3 rounded-2xl border border-sky-100 bg-white/75 p-3">
           <p class="text-sm font-semibold text-sky-950">People sharing this Wedding</p>

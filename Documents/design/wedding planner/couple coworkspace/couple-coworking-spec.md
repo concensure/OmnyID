@@ -1,8 +1,8 @@
 # Couple coworking specification
 
-Status: implementation in progress
-Date: 12 November 2026
-Task: WED-365
+Status: implemented foundation; incremental enforcement and coworking UX continue
+Date: 22 November 2026
+Tasks: WED-365, WED-391
 Source guidance: `couple coworking.md`
 
 ## Outcome
@@ -17,6 +17,35 @@ This extends the existing membership, invitation and selected-contact sharing
 foundation in migration `0168_wedding_partner_sharing.sql` and
 `src/server/wedding_partner_sharing_routes.rs`. It does not add a second
 wedding ledger, contact store, task engine, quote store or AI memory system.
+
+## 2026-11-22 reconciliation
+
+The source guidance has already produced this specification and the companion
+task document. WED-391 therefore updates these existing documents rather than
+creating a second coworking plan.
+
+Implemented and retained:
+
+- independently authenticated owner and co-owner accounts;
+- one active co-owner limit, authenticated seven-day invitation acceptance,
+  expiry, revocation and partner leave;
+- canonical `WeddingScope` with owner, plan, response workspace, actor, role
+  and membership revision;
+- explicit selected-contact publication and the existing AFP Wedding task
+  responsibility record;
+- a sharing surface that states the personal-versus-Wedding boundary.
+
+The WED-391 slice makes the membership journey actionable: it states the
+current, next and following collaboration step, and accepted co-owner names
+become the partner choices in task responsibility rather than a guessed
+“Your partner” label. This is a projection of membership and task truth; it is
+not a new collaborator or task store.
+
+Still not claimed complete: systematic `WeddingScope` enforcement across
+every Wedding domain, shared activity/catch-up, scoped AI retrieval,
+private-to-shared AI publication and permission-filtered live delivery. Those
+remain dependency-ordered below and must not be represented as production
+proof merely because their UI concepts exist.
 
 ## Existing foundation and gaps
 

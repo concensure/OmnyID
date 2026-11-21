@@ -3,7 +3,7 @@ import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show }
 
 import { WeddingDashboardIcon } from "@/components/WeddingDashboardIcons";
 import { WeddingInfoTip } from "@/components/WeddingInfoTip";
-import type { SendAfpMessageInput } from "@/lib/api";
+import { listWeddingPartnerMembers, type SendAfpMessageInput } from "@/lib/api";
 import { loadContacts, saveContacts } from "@/lib/contactsLocalState";
 import {
   buildWeddingHelperPeople,
@@ -62,11 +62,13 @@ export function WeddingHelpersPanel(props: {
   const [customHelperPhone, setCustomHelperPhone] = createSignal("");
   const [customHelperRole, setCustomHelperRole] = createSignal("Helper");
   const [customHelpers, setCustomHelpers] = createSignal<string[]>(initialState.customHelpers);
+  const [activePartnerNames, setActivePartnerNames] = createSignal<string[]>([]);
   const [saveNotice, setSaveNotice] = createSignal<string | null>(null);
   const [agendaDueDateTaskId, setAgendaDueDateTaskId] = createSignal<string | null>(null);
   const [agendaDueDateDraft, setAgendaDueDateDraft] = createSignal("");
   const inferredPartnerNames = createMemo(() => inferWeddingPartnerNames(props.state));
-  const helperPeople = createMemo(() => buildWeddingHelperPeople(props.state.helperContactNames, customHelpers(), inferredPartnerNames()));
+  const partnerNames = createMemo(() => activePartnerNames().length > 0 ? activePartnerNames() : inferredPartnerNames());
+  const helperPeople = createMemo(() => buildWeddingHelperPeople(props.state.helperContactNames, customHelpers(), partnerNames()));
   const helperTasks = createMemo(() => props.state.planningTaskItems.slice(0, 30).map((task) => {
     const localDueDate = taskDueDates()[task.id];
     return {
@@ -99,6 +101,18 @@ export function WeddingHelpersPanel(props: {
   }));
 
   onMount(() => {
+    void listWeddingPartnerMembers(
+      props.state.workspace.metadata.weddingPlanId,
+      props.state.workspace.metadata.responseWorkspaceId,
+    ).then((response) => {
+      setActivePartnerNames(response.members
+        .filter((member) => member.role === "co_owner")
+        .map((member) => member.display_name.trim())
+        .filter(Boolean));
+    }).catch(() => {
+      // A plan without an accepted sharing membership remains assignable to
+      // the signed-in person and any explicitly saved helpers.
+    });
     const handler = (event: Event) => {
       const nextTab = weddingHelperTaskTabFromEvent(event);
       if (nextTab) setTaskTab(nextTab);
@@ -285,6 +299,9 @@ export function WeddingHelpersPanel(props: {
           <p class="mt-1 text-sm leading-6 text-fuchsia-900/75">
             Give every wedding task one clear owner, a due date, and someone to consult when needed.
           </p>
+          <Show when={activePartnerNames().length > 0}>
+            <p class="mt-1 text-xs leading-5 text-fuchsia-900/65">Accepted co-owner: {activePartnerNames().join(" and ")}. Assignments below save through the existing Wedding task responsibility record.</p>
+          </Show>
         </div>
         <span class="max-w-full break-words rounded-full bg-white/80 px-2 py-1 text-xs font-semibold text-fuchsia-900">
           {openHelperTasks().length} to do
