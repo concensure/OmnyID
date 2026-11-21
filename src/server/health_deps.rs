@@ -191,11 +191,14 @@ pub fn check_stripe_billing_readiness() -> String {
         .or_else(|| read_process_secret_trimmed("STRIPE_TEAM_PRICE_ID"));
     let return_url_ready = billing_workspace_base_url_is_configured();
 
+    // The workspace URL is shared application configuration, not evidence that
+    // Stripe billing has been enabled. Treat Stripe as configured only when a
+    // Stripe-specific value is present; once it is, still require the return
+    // URL along with the remaining billing settings below.
     let any_present = secret.is_some()
         || webhook_secret.is_some()
         || pro_checkout_reference.is_some()
-        || team_price_raw.is_some()
-        || return_url_ready;
+        || team_price_raw.is_some();
     if !any_present {
         return "not_configured".to_string();
     }
@@ -501,6 +504,17 @@ mod tests {
         let _guard = llm_probe_env_lock().lock().expect("lock llm probe env");
         clear_stripe_probe_env();
         assert_eq!(check_stripe_billing_readiness(), "not_configured");
+    }
+
+    #[test]
+    fn stripe_billing_probe_ignores_shared_workspace_url_without_stripe_settings() {
+        let _guard = llm_probe_env_lock().lock().expect("lock llm probe env");
+        clear_stripe_probe_env();
+        unsafe {
+            std::env::set_var("OMNYID_WORKSPACE_BASE_URL", "https://omnyid.com/workspace");
+        }
+        assert_eq!(check_stripe_billing_readiness(), "not_configured");
+        clear_stripe_probe_env();
     }
 
     #[test]
