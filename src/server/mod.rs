@@ -48,7 +48,7 @@ use crate::{
     daemon_registry,
     daemon_runtime::{
         emit_daemon_heartbeats, shutdown_channel, start_archive_daemon,
-        start_health_maintenance_daemon,
+        start_daemon_liveness_reporter, start_health_maintenance_daemon,
     },
     db::{
         AuthSessionRecord, Db, ManagedAgentRecord, RuntimeBackupPolicyRecord, RuntimeBackupRecord,
@@ -1107,6 +1107,7 @@ pub async fn run() {
         start_ledger_ingestion_daemon(db.clone(), shutdown_rx.clone()),
         start_archive_daemon(db.clone(), shutdown_rx.clone()),
         start_health_maintenance_daemon(db.clone(), shutdown_rx.clone()),
+        start_daemon_liveness_reporter(db.clone(), shutdown_rx.clone()),
         start_vendor_email_quarantine_retention(db.clone(), shutdown_rx.clone()),
         crate::wedding_vendor_special_offer_maintenance::start_vendor_special_offer_maintenance(
             db.clone(),

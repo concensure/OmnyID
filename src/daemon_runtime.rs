@@ -32,6 +32,7 @@ pub fn shutdown_channel() -> (ShutdownTx, ShutdownRx) {
 
 const ARCHIVE_MIN_IDLE_SECS: u64 = 30;
 const HEALTH_MIN_IDLE_SECS: u64 = 60;
+const DAEMON_LIVENESS_INTERVAL_SECS: u64 = 60;
 const HEALTH_MAINTENANCE_AGENT: &str = "omnyid://daemon/health-maintenance";
 const HEALTH_MAINTENANCE_SUMMARY_TYPE: &str = "insight";
 const HEALTH_MAINTENANCE_SUMMARY_SUBTYPE: &str = "maintenance_summary";
@@ -144,6 +145,40 @@ pub fn start_health_maintenance_daemon(db: Db, mut shutdown: ShutdownRx) -> Join
             }
         }
     })
+}
+
+/// Keeps the per-user system-daemon registrations tied to the liveness of the
+/// shared homeserver runtime, including daemon kinds that may be legitimately
+/// idle and therefore have no work event from which to emit a heartbeat.
+pub fn start_daemon_liveness_reporter(db: Db, mut shutdown: ShutdownRx) -> JoinHandle<()> {
+    tokio::spawn(async move {
+        info!("System daemon liveness reporter started");
+        loop {
+            for daemon_kind in daemon_liveness_kinds() {
+                emit_daemon_heartbeats(&db, daemon_kind, 0, 0).await;
+            }
+            tokio::select! {
+                _ = tokio::time::sleep(Duration::from_secs(DAEMON_LIVENESS_INTERVAL_SECS)) => {}
+                _ = shutdown.changed() => {
+                    if *shutdown.borrow() {
+                        info!("System daemon liveness reporter: graceful shutdown");
+                        break;
+                    }
+                }
+            }
+        }
+    })
+}
+
+fn daemon_liveness_kinds() -> [DaemonKind; 6] {
+    [
+        DaemonKind::KnowledgeCurator,
+        DaemonKind::LedgerIngestion,
+        DaemonKind::EmailGateway,
+        DaemonKind::RelationalSync,
+        DaemonKind::ArchiveColdStorage,
+        DaemonKind::HealthMaintenance,
+    ]
 }
 
 pub async fn emit_daemon_heartbeats(db: &Db, daemon_kind: DaemonKind, processed: u32, errors: u32) {
@@ -1006,10 +1041,26 @@ pub struct ObjectStoreClient {
 mod tests {
     use super::{
         HEALTH_DUPLICATE_SUGGESTION_TYPE, canonical_graph_references_for_message,
-        canonical_message_reference, references_need_graph_normalization,
+        canonical_message_reference, daemon_liveness_kinds, references_need_graph_normalization,
         should_emit_health_insight,
     };
+    use crate::knowledge_curator::DaemonKind;
     use serde_json::json;
+
+    #[test]
+    fn liveness_reporter_covers_every_registered_system_daemon_kind() {
+        assert_eq!(
+            daemon_liveness_kinds(),
+            [
+                DaemonKind::KnowledgeCurator,
+                DaemonKind::LedgerIngestion,
+                DaemonKind::EmailGateway,
+                DaemonKind::RelationalSync,
+                DaemonKind::ArchiveColdStorage,
+                DaemonKind::HealthMaintenance,
+            ]
+        );
+    }
 
     #[test]
     fn canonical_message_reference_uses_structured_afp_shape() {
