@@ -12268,3 +12268,40 @@ tests and the production build; the coordination-only completion commit is reche
 from a clean exact SHA before handoff. Whole-repository `cargo fmt --check` remains red
 on broad pre-existing formatting drift outside WED-389; no unrelated Rust was rewritten.
 This implementation has not been deployed.
+## WED-390 shared Wedding decisions and production monitor live (2026-11-22)
+
+Worktree `C:/temp/wt/omnyid-wed389`, branch `agent/codex/WED-390`. Exact deployed
+application/static source `3c22a9c7766455fa591ddd5b19ee14f9b2fc8517`; clean release
+worktree `C:/temp/wt/omnyid-wed390-release-3c22a9c7`.
+
+All current Wedding decision cards now use the shared definition-first contract across
+25 planning-task kinds plus setup, calendar, selected-decision and approval records.
+Definitions own prerequisites, answer authority, deadline priority, options, evidence
+and external approval. Missing prerequisites surface first, settled choices leave the
+queue, source-linked facts/estimates/unknowns appear on the card, and bulk audit flags
+compound, unsupported and repeated-settled cards. Current, next and following remain
+research-gated; Defer retains the existing AFP reminder authority.
+
+Clean exact-SHA verification passed all 2,336 Wedding tests, production build,
+monitor self-test and focused daemon-liveness/PostgreSQL timestamp regressions. Live
+Exa smoke passed transport, celebrant and florist with five relevant first-party-like
+results each; no prompt rewrite was added and highlights remain unconfirmed.
+
+Oracle runs ARM64 image
+`sha256:3a3301fa2b925e1fbf03387ea4978c152d1e7a226cda279e057965f59a6efb15`
+with revision label `3c22a9c7766455fa591ddd5b19ee14f9b2fc8517` and zero restarts.
+Authenticated readiness is green for database, object store, daemons and configured
+dependencies. The read-only eight-check synthetic passes, and its 08:00/20:00
+Australia/Sydney systemd timer is enabled and active. Credentials are 0600 root-only
+and absent from the journal. Public Wedding, workspace and Docs return 200; deployed
+static hashes match the clean build; Caddy validates unchanged; disk is 79%.
+
+Candidate and evidence:
+`/home/ubuntu/omnyid-candidates/wed390-3c22a9c7766455fa591ddd5b19ee14f9b2fc8517`.
+Rollback:
+`/home/ubuntu/omnyid-candidates/wed390-3c22a9c7766455fa591ddd5b19ee14f9b2fc8517/rollback-20261121T162505Z`,
+including previous image
+`sha256:78551e7e1379087c6b49a3675f04bc0f1ad20c9a3c38970900809e3731f2cc6e`,
+workspace, Caddy, Compose, monitor and container inventory. Full hashes, failed-closed
+rollout diagnosis and hosted evidence are in
+`Documents/verification/WED-390-wedding-decision-and-monitor-release.md`.

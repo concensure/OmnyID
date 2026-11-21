@@ -1,3 +1,19 @@
+# 2026-11-22: WED-390 Wedding decisions are definition-first projections
+
+Every displayed Wedding decision is selected from a shared definition before card
+copy is written. The definition owns ordered prerequisites, canonical answer record,
+deadline policy, options, evidence requirements and external-approval boundary.
+Missing setup facts become the active choice, settled answers leave the actionable
+queue, and existing deadlines plus urgent blockers rank the remainder. Card rendering
+does not create a parallel decision, reminder, quote or research authority.
+
+Production readiness remains strict. Shared idle daemons emit liveness heartbeats for
+all six registered system-daemon kinds, and health parsing accepts both RFC 3339 and
+PostgreSQL timestamptz text. Optional Stripe is not considered partially configured by
+an unrelated workspace URL. The twice-daily Wedding synthetic authenticates read-only
+and requires public shell, session, bootstrap, dependency readiness and current asset
+checks to pass; it does not weaken readiness or mutate Wedding records.
+
 ## 2026-11-21: WED-388 Wedding Database tables are installed read-time projections
 
 Database discovery may register one deterministic `wedding_runsheet.v1` definition

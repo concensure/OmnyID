@@ -7,10 +7,11 @@ Specification: `decision card clarity and recovery spec.md`
 The tasks below extend the existing Wedding planner. They do not authorize a new
 decision store, reminder service or parallel research queue.
 
-Implementation status (2026-11-21): DC-01 through DC-06 are live from WED-389.
-DC-07 through DC-11 are the WED-390 continuation that generalises the decision
-contract, audits the existing queue, verifies online research and installs production
-monitoring.
+Implementation status (2026-11-22): DC-01 through DC-11 are implemented and live.
+WED-390 generalised the contract across every current Wedding decision kind, added the
+bulk audit and source evidence, verified bounded online research, and installed the
+passing twice-daily production monitor. Exact release evidence is in
+`Documents/verification/WED-390-wedding-decision-and-monitor-release.md`.
 
 ## DC-01 — Reproduce and recover the Wedding template failure
 
@@ -267,3 +268,14 @@ Acceptance:
 - The next two runs are visible in systemd and secrets do not appear in Git or logs.
 - The frozen candidate SHA is the deployed static source and production smoke checks
   pass without changing the homeserver image unnecessarily.
+
+## Completion evidence
+
+- Exact deployed source: `3c22a9c7766455fa591ddd5b19ee14f9b2fc8517`.
+- Full Wedding suite: 2,336 tests passed; production build passed.
+- Shared definitions and audit cover all 25 planning-task kinds plus setup, calendar,
+  selected-decision and approval projections.
+- Live Exa transport, celebrant and florist checks each returned five relevant
+  first-party-like sources; highlights remain unconfirmed.
+- Oracle readiness is green, the read-only eight-check synthetic passes, and the
+  08:00/20:00 Australia/Sydney timer is enabled and active.
