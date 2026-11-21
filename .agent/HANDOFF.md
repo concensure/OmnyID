@@ -12220,8 +12220,9 @@ an explicit editable reminder-date sheet backed by the existing AFP deferral, an
 current/next/following research gate. The mobile card scrolls independently while its
 two labelled actions remain outside the clipped area. Focused tests and typecheck pass
 in the implementation worktree. Implementation SHA
-`efe19e903ae755fe407a8d433116525550626138` passes the focused 320/390/430-pixel
-browser proof and 200% text reflow with both actions in view, editable reminder-date
+`568dcb3e332ebb0fc8244cef9e5e923485de05d2` applies the research gate to both the
+mobile deck and detailed Wedding card. The mobile surface passes the focused
+320/390/430-pixel browser proof and 200% text reflow with both actions in view, editable reminder-date
 serialization, no horizontal overflow and working vertical swipes. Its preceding code
 candidate passed typecheck, both line budgets, public Wedding checks, all 2,328 Wedding
 tests and the production build; the coordination-only completion commit is rechecked
