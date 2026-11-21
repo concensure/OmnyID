@@ -4514,3 +4514,18 @@ the consequence of the primary action before optional recommendation detail. Def
 continues to use the existing `wedding_decision_deferral` AFP record. A couple-selected
 future reminder date is additional input to that same authority, not a reminder store
 or scheduler, and dependency-change resurfacing remains intact.
+
+## 2026-11-21 — Workspace releases preserve stale-client asset graphs (WED-389)
+
+Hashed workspace assets are published additively before the new HTML shell becomes
+visible. At least the active and immediately preceding client graphs remain available
+through the release transition; an old browser tab must not fail merely because its
+HTML references a prior hash. Retention is paired with application-level recovery:
+an unrecoverable lazy-import failure reloads the current shell instead of retrying the
+same rejected module promise indefinitely.
+
+Oracle health probes follow the deployed authentication contract. Anonymous 401 from
+`/healthz` or `/readyz` is healthy when the endpoint is deliberately protected; swap
+logic must verify the expected status and container readiness instead of requiring an
+anonymous 2xx. A mismatched probe is a release-script failure, not evidence that a
+listening authenticated service is unhealthy.

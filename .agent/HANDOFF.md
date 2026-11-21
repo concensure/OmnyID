@@ -1,3 +1,42 @@
+## WED-389 Wedding template and decision-card release live (2026-11-21)
+
+Worktree `C:/temp/wt/omnyid-wed389`, branch `agent/codex/WED-389`. Exact deployed
+application/static SHA: `c445e740a000f0faf5cc99562a88db15ed441eba`; implementation
+SHA: `568dcb3e332ebb0fc8244cef9e5e923485de05d2`; clean release worktree:
+`C:/temp/wt/omnyid-wed389-release-c445e740`.
+
+The Wedding template now recovers from a rejected stale lazy import by loading the
+latest shell instead of repeating Retry. The Oracle asset release is additive and
+retains prior hashed chunks for already-open clients. Decision cards state a concrete
+question, known and missing facts and a readiness-matched action; recommendation
+detail is progressive. Defer shows and edits the exact reminder date through the
+existing AFP deferral authority. Current, next and following decisions must be
+research-ready before presentation, with no research spill into a fourth item. Mobile
+content scrolls independently while its actions remain clear of fixed controls.
+
+The clean exact SHA passed `npm run test:wedding:ci` (2,328 tests), production build
+and the focused 320/390/430 plus 200%-zoom browser proof. Oracle runs native ARM64
+image `sha256:78551e7e1379087c6b49a3675f04bc0f1ad20c9a3c38970900809e3731f2cc6e`
+with zero restarts. Workspace hashes match the clean build. Public Wedding, workspace,
+Docs and sign-in Chromium checks passed without errors or overflow; current and retained
+Templates bundles return 200. Caddy validates and is unchanged. Backup verification,
+runtime-script integrity and the isolated restore drill passed; root usage is 73%.
+
+Rollback is retained at
+`/home/ubuntu/omnyid-candidates/wed389-c445e740a000f0faf5cc99562a88db15ed441eba/rollback`.
+It includes the prior image tag `omnyid-homeserver:wed389-rollback-f6ef45`, prior
+workspace archive, Caddyfile, Compose file and runtime inventory. Complete hashes and
+evidence are in
+`Documents/verification/WED-389-wedding-template-and-decision-card-release.md`.
+
+The old synthetic couple credential was rejected by production, so no authenticated
+live-card claim or account mutation was made; exact-SHA tests cover that behavior. The
+runtime staging helper omitted fixtures and two compile-time scripts, which were added
+from the exact commit only to the isolated candidate; fix the helper separately. The
+local full-proof collector also kept polling after the remote audit had passed, although
+the remote evidence was captured and the subsequent JSON proof passed. These are
+operational follow-ups, not release failures.
+
 ## WED-388 Wedding database and Soft message release live (2026-11-21)
 
 Worktree `C:/temp/wt/omnyid-wed388`, branch `agent/codex/WED-388`. Exact deployed
