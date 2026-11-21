@@ -12219,5 +12219,12 @@ human-readable dates, known/missing facts, progressive recommendation trade-offs
 an explicit editable reminder-date sheet backed by the existing AFP deferral, and a
 current/next/following research gate. The mobile card scrolls independently while its
 two labelled actions remain outside the clipped area. Focused tests and typecheck pass
-in the implementation worktree; exact-SHA full verification and browser viewport proof
-remain to be recorded after commit. This implementation has not been deployed.
+in the implementation worktree. Implementation SHA
+`efe19e903ae755fe407a8d433116525550626138` passes the focused 320/390/430-pixel
+browser proof and 200% text reflow with both actions in view, editable reminder-date
+serialization, no horizontal overflow and working vertical swipes. Its preceding code
+candidate passed typecheck, both line budgets, public Wedding checks, all 2,328 Wedding
+tests and the production build; the coordination-only completion commit is rechecked
+from a clean exact SHA before handoff. Whole-repository `cargo fmt --check` remains red
+on broad pre-existing formatting drift outside WED-389; no unrelated Rust was rewritten.
+This implementation has not been deployed.

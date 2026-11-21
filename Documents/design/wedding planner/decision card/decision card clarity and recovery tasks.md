@@ -7,8 +7,8 @@ Specification: `decision card clarity and recovery spec.md`
 The tasks below extend the existing Wedding planner. They do not authorize a new
 decision store, reminder service or parallel research queue.
 
-Implementation status (2026-11-21): DC-01 through DC-05 are implemented on
-`agent/codex/WED-389`; DC-06 verification is in progress. The production compatibility
+Implementation status (2026-11-21): DC-01 through DC-06 are implemented and verified
+on `agent/codex/WED-389`. The production compatibility
 repair restored the previous asset generation additively and did not deploy this
 uncommitted implementation.
 
