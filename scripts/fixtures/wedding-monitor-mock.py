@@ -21,7 +21,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         length = int(self.headers.get("Content-Length", "0"))
         payload = json.loads(self.rfile.read(length) or b"{}")
-        if self.path == "/api/auth/login" and payload == {"email": "monitor@example.test", "password": "correct horse battery staple"}:
+        if self.path == "/auth/login" and payload == {"email": "monitor@example.test", "password": "correct horse battery staple"}:
             self.reply(200, json.dumps({"token": "monitor-token", "user": {"id": "monitor", "email": "monitor@example.test"}}), headers=[("Set-Cookie", "omnyid_session=monitor-token; Path=/; HttpOnly")])
         else:
             self.reply(401, json.dumps({"error": "unauthorised"}))
@@ -38,9 +38,9 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(200, "console.log('ok')", "text/javascript", [("Cache-Control", "public,max-age=31536000,immutable")])
         if self.headers.get("Authorization") != "Bearer monitor-token":
             return self.reply(401, json.dumps({"error": "unauthorised"}))
-        if self.path == "/api/auth/session":
+        if self.path == "/auth/session":
             return self.reply(200, json.dumps({"id": "monitor", "email": "monitor@example.test"}))
-        if self.path == "/api/dashboard/bootstrap":
+        if self.path == "/dashboard/bootstrap":
             return self.reply(200, json.dumps({"messages": [], "threads": [], "monitor_workspace": True}))
         if self.path == "/healthz":
             return self.reply(200, json.dumps({"status": "ok", "service": "omnyid-homeserver"}))

@@ -18,7 +18,6 @@ server_pid=$!
 for _ in $(seq 1 50); do [[ -s "$tmp_dir/port" ]] && break; sleep 0.1; done
 port="$(cat "$tmp_dir/port")"
 OMNYID_WEDDING_MONITOR_BASE_URL="http://127.0.0.1:$port" \
-OMNYID_WEDDING_MONITOR_API_BASE_URL="http://127.0.0.1:$port/api" \
 OMNYID_WEDDING_MONITOR_EMAIL_FILE="$tmp_dir/email" \
 OMNYID_WEDDING_MONITOR_PASSWORD_FILE="$tmp_dir/password" \
 OMNYID_WEDDING_MONITOR_OUTPUT_FILE="$tmp_dir/result.json" \
