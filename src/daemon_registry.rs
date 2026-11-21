@@ -93,7 +93,8 @@ fn missing_system_daemon_kinds(existing_kinds: &HashSet<DaemonKind>) -> Vec<Daem
 #[cfg(test)]
 mod tests {
     use super::{
-        daemon_kind_from_str, missing_system_daemon_kinds, positive_limit, system_daemon_kinds,
+        daemon_kind_from_str, missing_system_daemon_kinds, parse_timestamp, positive_limit,
+        system_daemon_kinds,
     };
     use crate::knowledge_curator::DaemonKind;
     use std::collections::HashSet;
@@ -219,6 +220,16 @@ mod tests {
         assert!(function_source.contains("if let Some(uid) = user_id"));
         assert!(function_source.contains("WHERE status = 'active' AND user_id = $1"));
         assert!(function_source.contains("WHERE status = 'active'"));
+    }
+
+    #[test]
+    fn daemon_health_timestamp_accepts_rfc3339_and_postgres_text() {
+        let rfc3339 = parse_timestamp("2026-11-21T15:14:19.674875+00:00")
+            .expect("RFC 3339 heartbeat timestamp");
+        let postgres = parse_timestamp("2026-11-21 15:14:19.674875+00")
+            .expect("PostgreSQL timestamptz text");
+
+        assert_eq!(rfc3339, postgres);
     }
 }
 
@@ -712,6 +723,7 @@ fn daemon_kind_slug(kind: &DaemonKind) -> &'static str {
 
 fn parse_timestamp(value: &str) -> Option<DateTime<Utc>> {
     DateTime::parse_from_rfc3339(value)
+        .or_else(|_| DateTime::parse_from_str(value, "%Y-%m-%d %H:%M:%S%.f%#z"))
         .ok()
         .map(|value| value.with_timezone(&Utc))
 }
