@@ -2,7 +2,7 @@
 
 Status: implemented foundation; incremental enforcement and coworking UX continue
 Date: 22 November 2026
-Tasks: WED-365, WED-391
+Tasks: WED-365, WED-391, WED-392
 Source guidance: `couple coworking.md`
 
 ## Outcome
@@ -40,6 +40,15 @@ current, next and following collaboration step, and accepted co-owner names
 become the partner choices in task responsibility rather than a guessed
 “Your partner” label. This is a projection of membership and task truth; it is
 not a new collaborator or task store.
+
+The WED-392 continuation completes the selected-contact publication boundary.
+Either active member may choose the other member, select individual contacts
+and fields, inspect the exact Wedding-only snapshots, and confirm before they
+are encrypted and published. Incoming and outgoing snapshots show human
+provenance. Only the original sharer may revoke a snapshot, and every list,
+share and revoke operation resolves the exact canonical owner/plan/workspace
+scope first. Membership still does not enumerate either account's general
+contacts.
 
 Still not claimed complete: systematic `WeddingScope` enforcement across
 every Wedding domain, shared activity/catch-up, scoped AI retrieval,

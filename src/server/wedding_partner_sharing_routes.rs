@@ -275,7 +275,7 @@ async fn revoke_member_http(
     if !scope.can_manage_membership() || member_user_id == scope.owner_user_id { return Err((StatusCode::FORBIDDEN, "Only the plan owner can remove a partner.".into())); }
     let affected = sqlx::query("UPDATE wedding_plan_memberships SET status='revoked',revoked_at=NOW(),membership_revision=membership_revision+1,updated_at=NOW() WHERE wedding_owner_user_id=$1 AND wedding_plan_id=$2 AND member_user_id=$3 AND status='active'")
         .bind(&scope.owner_user_id).bind(&scope.wedding_plan_id).bind(clean(&member_user_id,200)).execute(&state.db.pool).await.map_err(db_error)?.rows_affected();
-    sqlx::query("UPDATE wedding_shared_contact_grants SET status='revoked',revoked_at=NOW(),updated_at=NOW() WHERE wedding_owner_user_id=$1 AND wedding_plan_id=$2 AND recipient_user_id=$3 AND status='active'")
+    sqlx::query("UPDATE wedding_shared_contact_grants SET status='revoked',revoked_at=NOW(),updated_at=NOW() WHERE wedding_owner_user_id=$1 AND wedding_plan_id=$2 AND (recipient_user_id=$3 OR shared_by_user_id=$3) AND status='active'")
         .bind(&scope.owner_user_id).bind(&scope.wedding_plan_id).bind(clean(&member_user_id,200)).execute(&state.db.pool).await.map_err(db_error)?;
     super::dashboard_routes::invalidate_dashboard_message_cache(&member_user_id);
     super::dashboard_routes::invalidate_dashboard_message_cache(&scope.owner_user_id);
@@ -318,7 +318,7 @@ async fn leave_plan_http(
         "UPDATE wedding_shared_contact_grants
             SET status='revoked',revoked_at=NOW(),updated_at=NOW()
           WHERE wedding_owner_user_id=$1 AND wedding_plan_id=$2
-            AND recipient_user_id=$3 AND status='active'",
+            AND (recipient_user_id=$3 OR shared_by_user_id=$3) AND status='active'",
     )
     .bind(&scope.owner_user_id)
     .bind(&scope.wedding_plan_id)
@@ -357,11 +357,26 @@ async fn share_contact_http(
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let user = authenticated_user(&state.db, &headers).await?;
     let scope = resolve_wedding_scope(&state.db, &user.id, &request.wedding_plan_id, &request.response_workspace_id).await?;
-    let owner = scope.owner_user_id;
     let recipient = clean(&request.recipient_user_id, 200);
-    let active = sqlx::query_scalar::<_, bool>("SELECT EXISTS(SELECT 1 FROM wedding_plan_memberships WHERE wedding_owner_user_id=$1 AND wedding_plan_id=$2 AND member_user_id=$3 AND status='active')")
-        .bind(&owner).bind(clean(&request.wedding_plan_id,200)).bind(&recipient).fetch_one(&state.db.pool).await.map_err(db_error)?;
-    if !active || recipient == user.id { return Err((StatusCode::BAD_REQUEST, "Choose an active partner.".into())); }
+    let contact_ref = clean(&request.contact_ref, 200);
+    let active = sqlx::query_scalar::<_, bool>(
+        "SELECT EXISTS(SELECT 1 FROM wedding_plan_memberships
+          WHERE wedding_owner_user_id=$1 AND wedding_plan_id=$2
+            AND response_workspace_id=$3 AND member_user_id=$4 AND status='active')",
+    )
+    .bind(&scope.owner_user_id)
+    .bind(&scope.wedding_plan_id)
+    .bind(&scope.response_workspace_id)
+    .bind(&recipient)
+    .fetch_one(&state.db.pool)
+    .await
+    .map_err(db_error)?;
+    if !active || recipient == scope.member_user_id {
+        return Err((StatusCode::BAD_REQUEST, "Choose an active partner.".into()));
+    }
+    if contact_ref.is_empty() {
+        return Err((StatusCode::BAD_REQUEST, "Choose a contact to share.".into()));
+    }
     let name = clean(&request.contact.name, 160);
     if name.is_empty() { return Err((StatusCode::BAD_REQUEST, "Contact name is required.".into())); }
     let payload = SharedContactPayload { name, email: request.contact.email.map(|v| clean(&v,254)).filter(|v| !v.is_empty()), phone: request.contact.phone.map(|v| clean(&v,60)).filter(|v| !v.is_empty()), relationship_kind: request.contact.relationship_kind.map(|v| clean(&v,80)).filter(|v| !v.is_empty()), roles: request.contact.roles.into_iter().map(|v| clean(&v,80)).filter(|v| !v.is_empty()).take(20).collect() };
@@ -369,7 +384,18 @@ async fn share_contact_http(
     let share_id = format!("wedding_contact_share_{}", Ulid::new().to_string().to_lowercase());
     let roles = payload.roles.clone();
     let row = sqlx::query("INSERT INTO wedding_shared_contact_grants (share_id,wedding_owner_user_id,wedding_plan_id,response_workspace_id,shared_by_user_id,recipient_user_id,contact_ref,role_labels,contact_ciphertext) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT (wedding_owner_user_id,wedding_plan_id,shared_by_user_id,recipient_user_id,contact_ref) DO UPDATE SET role_labels=EXCLUDED.role_labels,contact_ciphertext=EXCLUDED.contact_ciphertext,status='active',revoked_at=NULL,updated_at=NOW() RETURNING share_id")
-        .bind(&share_id).bind(&owner).bind(clean(&request.wedding_plan_id,200)).bind(clean(&request.response_workspace_id,200)).bind(&user.id).bind(&recipient).bind(clean(&request.contact_ref,200)).bind(&roles).bind(ciphertext).fetch_one(&state.db.pool).await.map_err(db_error)?;
+        .bind(&share_id)
+        .bind(&scope.owner_user_id)
+        .bind(&scope.wedding_plan_id)
+        .bind(&scope.response_workspace_id)
+        .bind(&scope.member_user_id)
+        .bind(&recipient)
+        .bind(&contact_ref)
+        .bind(&roles)
+        .bind(ciphertext)
+        .fetch_one(&state.db.pool)
+        .await
+        .map_err(db_error)?;
     Ok(Json(json!({"shared":true,"share_id":row.get::<String,_>("share_id")})))
 }
 
@@ -379,26 +405,79 @@ async fn list_shared_contacts_http(
     Query(query): Query<ScopeQuery>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let user = authenticated_user(&state.db, &headers).await?;
-    let _scope = resolve_wedding_scope(&state.db, &user.id, &query.wedding_plan_id, &query.response_workspace_id).await?;
-    let rows = sqlx::query("SELECT share_id,shared_by_user_id,contact_ciphertext,updated_at::text AS updated_at FROM wedding_shared_contact_grants WHERE recipient_user_id=$1 AND wedding_plan_id=$2 AND response_workspace_id=$3 AND status='active' ORDER BY updated_at DESC")
-        .bind(&user.id).bind(clean(&query.wedding_plan_id,200)).bind(clean(&query.response_workspace_id,200)).fetch_all(&state.db.pool).await.map_err(db_error)?;
+    let scope = resolve_wedding_scope(&state.db, &user.id, &query.wedding_plan_id, &query.response_workspace_id).await?;
+    let rows = sqlx::query(
+        "SELECT contact_grant.share_id,contact_grant.shared_by_user_id,contact_grant.recipient_user_id,
+                contact_grant.contact_ciphertext,contact_grant.updated_at::text AS updated_at,
+                sharer.display_name AS shared_by_display_name,
+                recipient.display_name AS recipient_display_name
+           FROM wedding_shared_contact_grants contact_grant
+           JOIN users sharer ON sharer.id=contact_grant.shared_by_user_id
+           JOIN users recipient ON recipient.id=contact_grant.recipient_user_id
+          WHERE (contact_grant.recipient_user_id=$1 OR contact_grant.shared_by_user_id=$1)
+            AND contact_grant.wedding_owner_user_id=$2 AND contact_grant.wedding_plan_id=$3
+            AND contact_grant.response_workspace_id=$4 AND contact_grant.status='active'
+          ORDER BY contact_grant.updated_at DESC",
+    )
+    .bind(&scope.member_user_id)
+    .bind(&scope.owner_user_id)
+    .bind(&scope.wedding_plan_id)
+    .bind(&scope.response_workspace_id)
+    .fetch_all(&state.db.pool)
+    .await
+    .map_err(db_error)?;
     let key = encryption_key()?;
-    let contacts = rows.into_iter().filter_map(|row| {
-        let plaintext = crate::crypto::decrypt_secret(&row.get::<String,_>("contact_ciphertext"), &key)?;
-        let contact: SharedContactPayload = serde_json::from_str(&plaintext).ok()?;
-        Some(json!({"share_id":row.get::<String,_>("share_id"),"shared_by_user_id":row.get::<String,_>("shared_by_user_id"),"updated_at":row.get::<String,_>("updated_at"),"contact":contact}))
-    }).collect::<Vec<_>>();
-    Ok(Json(json!({"contacts":contacts})))
+    let mut contacts = Vec::new();
+    let mut shared_by_me = Vec::new();
+    for row in rows {
+        let Some(plaintext) = crate::crypto::decrypt_secret(&row.get::<String,_>("contact_ciphertext"), &key) else {
+            continue;
+        };
+        let Ok(contact) = serde_json::from_str::<SharedContactPayload>(&plaintext) else {
+            continue;
+        };
+        let shared_by_user_id = row.get::<String,_>("shared_by_user_id");
+        let grant = json!({
+            "share_id": row.get::<String,_>("share_id"),
+            "shared_by_user_id": shared_by_user_id,
+            "shared_by_display_name": row.get::<String,_>("shared_by_display_name"),
+            "recipient_user_id": row.get::<String,_>("recipient_user_id"),
+            "recipient_display_name": row.get::<String,_>("recipient_display_name"),
+            "updated_at": row.get::<String,_>("updated_at"),
+            "contact": contact,
+        });
+        if shared_by_user_id == scope.member_user_id {
+            shared_by_me.push(grant);
+        } else {
+            contacts.push(grant);
+        }
+    }
+    Ok(Json(json!({"contacts":contacts,"shared_by_me":shared_by_me})))
 }
 
 async fn revoke_shared_contact_http(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Path(share_id): Path<String>,
+    Query(query): Query<ScopeQuery>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let user = authenticated_user(&state.db, &headers).await?;
-    let affected = sqlx::query("UPDATE wedding_shared_contact_grants SET status='revoked',revoked_at=NOW(),updated_at=NOW() WHERE share_id=$1 AND shared_by_user_id=$2 AND status='active'")
-        .bind(clean(&share_id,200)).bind(&user.id).execute(&state.db.pool).await.map_err(db_error)?.rows_affected();
+    let scope = resolve_wedding_scope(&state.db, &user.id, &query.wedding_plan_id, &query.response_workspace_id).await?;
+    let affected = sqlx::query(
+        "UPDATE wedding_shared_contact_grants
+            SET status='revoked',revoked_at=NOW(),updated_at=NOW()
+          WHERE share_id=$1 AND shared_by_user_id=$2 AND wedding_owner_user_id=$3
+            AND wedding_plan_id=$4 AND response_workspace_id=$5 AND status='active'",
+    )
+    .bind(clean(&share_id,200))
+    .bind(&scope.member_user_id)
+    .bind(&scope.owner_user_id)
+    .bind(&scope.wedding_plan_id)
+    .bind(&scope.response_workspace_id)
+    .execute(&state.db.pool)
+    .await
+    .map_err(db_error)?
+    .rows_affected();
     Ok(Json(json!({"revoked":affected > 0})))
 }
 
@@ -410,7 +489,8 @@ mod tests {
         let migration = include_str!("../../postgres/migrations/0168_wedding_partner_sharing.sql");
         assert!(source.contains("exact Wedding plan"));
         assert!(source.contains("wedding_shared_contact_grants"));
-        assert!(source.contains("recipient_user_id=$1 AND wedding_plan_id=$2 AND response_workspace_id=$3"));
+        assert!(source.contains("contact_grant.recipient_user_id=$1 OR contact_grant.shared_by_user_id=$1"));
+        assert!(source.contains("contact_grant.wedding_owner_user_id=$2 AND contact_grant.wedding_plan_id=$3"));
         assert!(migration.contains("owner_user_id, wedding_plan_id, response_workspace_id, vendor_id"));
     }
 }

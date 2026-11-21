@@ -4776,6 +4776,9 @@ export type WeddingPartnerScope = {
 export type WeddingSharedContact = {
   share_id: string;
   shared_by_user_id: string;
+  shared_by_display_name: string;
+  recipient_user_id: string;
+  recipient_display_name: string;
   updated_at: string;
   contact: {
     name: string;
@@ -4851,7 +4854,12 @@ export const shareWeddingContact = (input: {
 });
 
 export const listWeddingSharedContacts = (weddingPlanId: string, responseWorkspaceId: string) =>
-  apiFetch<{ contacts: WeddingSharedContact[] }>(`/wedding/partners/contacts?${weddingPartnerScopeQuery(weddingPlanId, responseWorkspaceId)}`);
+  apiFetch<{ contacts: WeddingSharedContact[]; shared_by_me: WeddingSharedContact[] }>(`/wedding/partners/contacts?${weddingPartnerScopeQuery(weddingPlanId, responseWorkspaceId)}`);
+
+export const revokeWeddingSharedContact = (weddingPlanId: string, responseWorkspaceId: string, shareId: string) =>
+  apiFetch<{ revoked: boolean }>(`/wedding/partners/contacts/${encodeURIComponent(shareId)}?${weddingPartnerScopeQuery(weddingPlanId, responseWorkspaceId)}`, {
+    method: "DELETE",
+  });
 export const saveThreadMessage = (payload: Record<string, unknown>) =>
   apiFetch<unknown>("/messages", {
     method: "POST",

@@ -20,6 +20,8 @@ fn partner_routes_reuse_scope_without_broadening_personal_data() {
     assert!(!PARTNER_ROUTES.contains("async fn require_scope_access"));
     assert!(PARTNER_ROUTES.contains("membership_revision=membership_revision+1"));
     assert!(PARTNER_ROUTES.contains("wedding_shared_contact_grants"));
-    assert!(PARTNER_ROUTES.contains("recipient_user_id=$1 AND wedding_plan_id=$2 AND response_workspace_id=$3"));
+    assert!(PARTNER_ROUTES.contains("contact_grant.recipient_user_id=$1 OR contact_grant.shared_by_user_id=$1"));
+    assert!(PARTNER_ROUTES.contains("contact_grant.wedding_owner_user_id=$2 AND contact_grant.wedding_plan_id=$3"));
+    assert!(PARTNER_ROUTES.contains("shared_by_user_id=$2 AND wedding_owner_user_id=$3"));
     assert!(SERVER.contains("mod wedding_scope;"));
 }

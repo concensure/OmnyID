@@ -88,7 +88,14 @@ async fn membership_is_two_person_revisioned_and_revocable() {
     let Some(db_url) = test_db_url() else { return };
     let suffix = Ulid::new().to_string().to_lowercase();
     let prior_origin = std::env::var_os("OMNYID_PUBLIC_ORIGIN");
+    let prior_encryption_key = std::env::var_os("OMNYID_ENCRYPTION_KEY_HEX");
     unsafe { std::env::set_var("OMNYID_PUBLIC_ORIGIN", "https://example.test") };
+    unsafe {
+        std::env::set_var(
+            "OMNYID_ENCRYPTION_KEY_HEX",
+            "1111111111111111111111111111111111111111111111111111111111111111",
+        )
+    };
 
     let db = Db::new(&db_url).await.expect("database");
     let owner_email = format!("owner-{suffix}@omnyid.test");
@@ -194,6 +201,94 @@ async fn membership_is_two_person_revisioned_and_revocable() {
     assert_eq!(partner_members["members"].as_array().map(Vec::len), Some(2));
     assert_eq!(partner_members["invites"].as_array().map(Vec::len), Some(0));
 
+    let (share_status, shared) = request_json(
+        &app,
+        Method::POST,
+        "/wedding/partners/contacts",
+        &owner_auth,
+        Some(&json!({
+            "wedding_plan_id":plan_id,
+            "response_workspace_id":workspace_id,
+            "recipient_user_id":partner_id,
+            "contact_ref":"contact-celebrant",
+            "contact":{
+                "name":"Casey Celebrant",
+                "email":"casey@example.test",
+                "roles":["Celebrant"]
+            }
+        })),
+    )
+    .await;
+    assert_eq!(share_status, StatusCode::OK, "share contact: {shared}");
+    let share_id = shared["share_id"].as_str().expect("share id");
+
+    let (owner_contacts_status, owner_contacts) = request_json(
+        &app,
+        Method::GET,
+        &format!("/wedding/partners/contacts?{scope_query}"),
+        &owner_auth,
+        None,
+    )
+    .await;
+    assert_eq!(owner_contacts_status, StatusCode::OK);
+    assert_eq!(owner_contacts["contacts"].as_array().map(Vec::len), Some(0));
+    assert_eq!(owner_contacts["shared_by_me"].as_array().map(Vec::len), Some(1));
+    assert_eq!(owner_contacts["shared_by_me"][0]["recipient_display_name"], "Partner tester");
+    assert!(owner_contacts["shared_by_me"][0]["contact"]["phone"].is_null());
+
+    let (partner_contacts_status, partner_contacts) = request_json(
+        &app,
+        Method::GET,
+        &format!("/wedding/partners/contacts?{scope_query}"),
+        &partner_auth,
+        None,
+    )
+    .await;
+    assert_eq!(partner_contacts_status, StatusCode::OK);
+    assert_eq!(partner_contacts["contacts"].as_array().map(Vec::len), Some(1));
+    assert_eq!(partner_contacts["contacts"][0]["shared_by_user_id"], owner_id);
+    assert_eq!(partner_contacts["contacts"][0]["contact"]["email"], "casey@example.test");
+    assert!(partner_contacts["contacts"][0].get("contact_ref").is_none());
+
+    let (recipient_revoke_status, recipient_revoke) = request_json(
+        &app,
+        Method::DELETE,
+        &format!("/wedding/partners/contacts/{share_id}?{scope_query}"),
+        &partner_auth,
+        None,
+    )
+    .await;
+    assert_eq!(recipient_revoke_status, StatusCode::OK);
+    assert_eq!(recipient_revoke["revoked"], false);
+
+    let (owner_revoke_status, owner_revoke) = request_json(
+        &app,
+        Method::DELETE,
+        &format!("/wedding/partners/contacts/{share_id}?{scope_query}"),
+        &owner_auth,
+        None,
+    )
+    .await;
+    assert_eq!(owner_revoke_status, StatusCode::OK);
+    assert_eq!(owner_revoke["revoked"], true);
+
+    let (partner_share_status, partner_share) = request_json(
+        &app,
+        Method::POST,
+        "/wedding/partners/contacts",
+        &partner_auth,
+        Some(&json!({
+            "wedding_plan_id":plan_id,
+            "response_workspace_id":workspace_id,
+            "recipient_user_id":owner_id,
+            "contact_ref":"contact-photographer",
+            "contact":{"name":"Morgan Photo","phone":"0400 000 002","roles":["Photographer"]}
+        })),
+    )
+    .await;
+    assert_eq!(partner_share_status, StatusCode::OK, "partner share: {partner_share}");
+    let partner_share_id = partner_share["share_id"].as_str().expect("partner share id").to_string();
+
     let (third_invite_status, _) = request_json(
         &app,
         Method::POST,
@@ -231,6 +326,14 @@ async fn membership_is_two_person_revisioned_and_revocable() {
     .await;
     assert_eq!(revoke_status, StatusCode::OK, "revoke partner: {revoked}");
     assert_eq!(revoked["revoked"], true);
+    let partner_share_status: String = sqlx::query_scalar(
+        "SELECT status FROM wedding_shared_contact_grants WHERE share_id=$1",
+    )
+    .bind(&partner_share_id)
+    .fetch_one(&db.pool)
+    .await
+    .expect("partner share status");
+    assert_eq!(partner_share_status, "revoked");
     let (revoked_status, _) = request_json(
         &app,
         Method::GET,
@@ -265,5 +368,9 @@ async fn membership_is_two_person_revisioned_and_revocable() {
     match prior_origin {
         Some(value) => unsafe { std::env::set_var("OMNYID_PUBLIC_ORIGIN", value) },
         None => unsafe { std::env::remove_var("OMNYID_PUBLIC_ORIGIN") },
+    }
+    match prior_encryption_key {
+        Some(value) => unsafe { std::env::set_var("OMNYID_ENCRYPTION_KEY_HEX", value) },
+        None => unsafe { std::env::remove_var("OMNYID_ENCRYPTION_KEY_HEX") },
     }
 }

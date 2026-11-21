@@ -8,6 +8,7 @@ import {
   listWeddingPartnerMembers,
   listWeddingSharedContacts,
   revokeWeddingPartner,
+  revokeWeddingSharedContact,
   shareWeddingContact,
   type WeddingPartnerMember,
   type WeddingPartnerInviteSummary,
@@ -16,6 +17,11 @@ import {
 } from "@/lib/api";
 import { loadContacts } from "@/lib/contactsLocalState";
 import { buildWeddingCoworkingJourneyState } from "@/lib/weddingCoworkingJourneyState";
+import {
+  buildWeddingSharedContactDrafts,
+  DEFAULT_WEDDING_SHARED_CONTACT_FIELDS,
+  type WeddingSharedContactFieldSelection,
+} from "@/lib/weddingSharedContactState";
 import type { WeddingPlanningMetadata } from "@/lib/weddingPlanningTemplateState";
 import type {
   WeddingCollaborationState,
@@ -44,9 +50,12 @@ export function WeddingCollaborationAccessCard(props: {
   const [invites, setInvites] = createSignal<WeddingPartnerInviteSummary[]>([]);
   const [scope, setScope] = createSignal<WeddingPartnerScope | null>(null);
   const [sharedWithMe, setSharedWithMe] = createSignal<WeddingSharedContact[]>([]);
+  const [sharedByMe, setSharedByMe] = createSignal<WeddingSharedContact[]>([]);
   const [selectedRecipient, setSelectedRecipient] = createSignal("");
   const [contactRoleFilter, setContactRoleFilter] = createSignal("all");
   const [selectedContactIds, setSelectedContactIds] = createSignal<string[]>([]);
+  const [sharedContactFields, setSharedContactFields] = createSignal<WeddingSharedContactFieldSelection>({ ...DEFAULT_WEDDING_SHARED_CONTACT_FIELDS });
+  const [reviewingContacts, setReviewingContacts] = createSignal(false);
   const [sharingNotice, setSharingNotice] = createSignal<string | null>(null);
   const [busy, setBusy] = createSignal(false);
   const journey = createMemo(() => buildWeddingCoworkingJourneyState({ members: members(), invites: invites() }));
@@ -55,6 +64,13 @@ export function WeddingCollaborationAccessCard(props: {
   const visibleContacts = createMemo(() => contactRoleFilter() === "all"
     ? contacts()
     : contacts().filter((contact) => (contact.roles ?? []).includes(contactRoleFilter())));
+  const sharingRecipients = createMemo(() => members().filter((member) => member.user_id !== scope()?.member_user_id));
+  const selectedRecipientName = createMemo(() => sharingRecipients().find((member) => member.user_id === selectedRecipient())?.display_name ?? "your partner");
+  const selectedContactDrafts = createMemo(() => buildWeddingSharedContactDrafts(
+    contacts(),
+    selectedContactIds(),
+    sharedContactFields(),
+  ));
 
   async function refreshMembers() {
     try {
@@ -66,7 +82,8 @@ export function WeddingCollaborationAccessCard(props: {
       setInvites(response.invites ?? []);
       setScope(response.scope);
       setSharedWithMe(sharedContacts.contacts);
-      const recipient = response.members.find((member) => member.role === "co_owner");
+      setSharedByMe(sharedContacts.shared_by_me ?? []);
+      const recipient = response.members.find((member) => member.user_id !== response.scope.member_user_id);
       if (recipient && !selectedRecipient()) setSelectedRecipient(recipient.user_id);
     } catch {
       // The plan may not have a sharing membership until its first invitation.
@@ -120,9 +137,15 @@ export function WeddingCollaborationAccessCard(props: {
   }
 
   function toggleContact(contactId: string) {
+    setReviewingContacts(false);
     setSelectedContactIds((current) => current.includes(contactId)
       ? current.filter((id) => id !== contactId)
       : [...current, contactId]);
+  }
+
+  function setSharedContactField(field: keyof WeddingSharedContactFieldSelection, value: boolean) {
+    setReviewingContacts(false);
+    setSharedContactFields((current) => ({ ...current, [field]: value }));
   }
 
   async function shareSelectedContacts() {
@@ -131,20 +154,43 @@ export function WeddingCollaborationAccessCard(props: {
     setBusy(true);
     setSharingNotice(null);
     try {
-      const selected = contacts().filter((contact) => selectedContactIds().includes(contact.id));
-      for (const contact of selected) {
+      const drafts = selectedContactDrafts();
+      for (const draft of drafts) {
         await shareWeddingContact({
           weddingPlanId: props.metadata.weddingPlanId,
           responseWorkspaceId: props.metadata.responseWorkspaceId,
           recipientUserId: recipient,
-          contactRef: contact.id,
-          contact,
+          contactRef: draft.contactRef,
+          contact: draft.contact,
         });
       }
       setSelectedContactIds([]);
-      setSharingNotice(`${selected.length} selected contact${selected.length === 1 ? "" : "s"} shared with this partner. Other contacts remain private.`);
+      setReviewingContacts(false);
+      setSharingNotice(`${drafts.length} selected contact${drafts.length === 1 ? "" : "s"} shared with this partner. Unselected fields and other contacts remain private.`);
+      await refreshMembers();
     } catch (error) {
       setSharingNotice(error instanceof Error ? error.message : "The selected contacts could not be shared.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function revokeSharedContact(grant: WeddingSharedContact) {
+    if (!window.confirm(`Stop sharing ${grant.contact.name} with ${grant.recipient_display_name}?`)) return;
+    setBusy(true);
+    setSharingNotice(null);
+    try {
+      const result = await revokeWeddingSharedContact(
+        props.metadata.weddingPlanId,
+        props.metadata.responseWorkspaceId,
+        grant.share_id,
+      );
+      setSharingNotice(result.revoked
+        ? `${grant.contact.name} is no longer shared with ${grant.recipient_display_name}.`
+        : "That contact snapshot was already revoked.");
+      await refreshMembers();
+    } catch (error) {
+      setSharingNotice(error instanceof Error ? error.message : "The shared contact could not be revoked.");
     } finally {
       setBusy(false);
     }
@@ -359,14 +405,14 @@ export function WeddingCollaborationAccessCard(props: {
           </div>
         </Show>
       </div>
-      <Show when={members().some((member) => member.role === "co_owner") && contacts().length > 0}>
+      <Show when={sharingRecipients().length > 0 && contacts().length > 0}>
         <div class="mt-3 rounded-2xl border border-sky-100 bg-white/75 p-3">
           <p class="text-sm font-semibold text-sky-950">Share selected contacts</p>
-          <p class="mt-1 text-xs leading-5 text-sky-950/70">Contacts stay in your account unless you select them here. Filter by role, then choose exactly what this partner receives.</p>
+          <p class="mt-1 text-xs leading-5 text-sky-950/70">Contacts stay in your account unless you select them here. Review the recipient, contacts and exact fields before confirming.</p>
           <div class="mt-3 grid gap-2 sm:grid-cols-2">
             <label class="text-xs font-semibold text-sky-950">Partner
-              <select class="mt-1 w-full rounded-full border border-sky-100 bg-white px-3 py-2" value={selectedRecipient()} onChange={(event) => setSelectedRecipient(event.currentTarget.value)}>
-                <For each={members().filter((member) => member.role === "co_owner")}>
+              <select class="mt-1 w-full rounded-full border border-sky-100 bg-white px-3 py-2" value={selectedRecipient()} onChange={(event) => { setSelectedRecipient(event.currentTarget.value); setReviewingContacts(false); }}>
+                <For each={sharingRecipients()}>
                   {(member) => <option value={member.user_id}>{member.display_name}</option>}
                 </For>
               </select>
@@ -378,6 +424,30 @@ export function WeddingCollaborationAccessCard(props: {
               </select>
             </label>
           </div>
+          <fieldset class="mt-3 rounded-2xl border border-sky-100 bg-sky-50/60 p-3">
+            <legend class="px-1 text-xs font-semibold text-sky-950">Fields to include</legend>
+            <div class="flex flex-wrap gap-x-4 gap-y-2 text-xs text-sky-950">
+              <span class="font-semibold">Name (required)</span>
+              <For each={([
+                ["email", "Email"],
+                ["phone", "Phone"],
+                ["relationship", "Relationship"],
+                ["roles", "Wedding roles"],
+              ] as const)}>
+                {([field, label]) => (
+                  <label class="flex items-center gap-1.5">
+                    <input
+                      type="checkbox"
+                      checked={sharedContactFields()[field]}
+                      onChange={(event) => setSharedContactField(field, event.currentTarget.checked)}
+                    />
+                    {label}
+                  </label>
+                )}
+              </For>
+            </div>
+            <p class="mt-2 text-[11px] leading-5 text-sky-950/65">Private notes, agent IDs and unselected fields never cross this sharing boundary.</p>
+          </fieldset>
           <div class="mt-3 grid gap-2 sm:grid-cols-2">
             <For each={visibleContacts()}>
               {(contact) => (
@@ -388,9 +458,56 @@ export function WeddingCollaborationAccessCard(props: {
               )}
             </For>
           </div>
-          <button type="button" class="mt-3 rounded-full bg-sky-900 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50" disabled={busy() || !selectedRecipient() || selectedContactIds().length === 0} onClick={() => void shareSelectedContacts()}>
-            Share selected contacts
-          </button>
+          <Show when={!reviewingContacts()}>
+            <button type="button" class="mt-3 rounded-full bg-sky-900 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50" disabled={busy() || !selectedRecipient() || selectedContactDrafts().length === 0} onClick={() => setReviewingContacts(true)}>
+              Review before sharing
+            </button>
+          </Show>
+          <Show when={reviewingContacts()}>
+            <div class="mt-3 rounded-2xl border border-sky-200 bg-white p-3" role="region" aria-label="Contact sharing review">
+              <p class="text-sm font-semibold text-sky-950">Confirm what {selectedRecipientName()} will receive</p>
+              <p class="mt-1 text-xs leading-5 text-sky-950/70">This creates Wedding-only snapshots. It does not copy your private contact list.</p>
+              <div class="mt-2 grid gap-2 sm:grid-cols-2">
+                <For each={selectedContactDrafts()}>
+                  {(draft) => (
+                    <article class="rounded-2xl border border-sky-100 bg-sky-50/60 p-3 text-xs text-sky-950">
+                      <p class="font-semibold">{draft.contact.name}</p>
+                      <Show when={draft.contact.email}><p class="mt-1 break-all">{draft.contact.email}</p></Show>
+                      <Show when={draft.contact.phone}><p class="mt-1">{draft.contact.phone}</p></Show>
+                      <Show when={draft.contact.relationshipKind}><p class="mt-1">Relationship: {draft.contact.relationshipKind}</p></Show>
+                      <Show when={(draft.contact.roles?.length ?? 0) > 0}><p class="mt-1">Roles: {draft.contact.roles?.join(", ")}</p></Show>
+                      <p class="mt-2 text-[11px] text-sky-950/65">Included: {draft.includedFieldLabels.join(", ")}</p>
+                      <Show when={draft.privateFieldLabels.length > 0}><p class="mt-1 text-[11px] text-sky-950/65">Stays private: {draft.privateFieldLabels.join(", ")}</p></Show>
+                    </article>
+                  )}
+                </For>
+              </div>
+              <div class="mt-3 flex flex-wrap gap-2">
+                <button type="button" class="rounded-full border border-sky-200 bg-white px-3 py-2 text-xs font-semibold text-sky-950" disabled={busy()} onClick={() => setReviewingContacts(false)}>Back</button>
+                <button type="button" class="rounded-full bg-sky-900 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50" disabled={busy() || selectedContactDrafts().length === 0} onClick={() => void shareSelectedContacts()}>
+                  {busy() ? "Sharing…" : `Confirm share with ${selectedRecipientName()}`}
+                </button>
+              </div>
+            </div>
+          </Show>
+        </div>
+      </Show>
+      <Show when={sharedByMe().length > 0}>
+        <div class="mt-3 rounded-2xl border border-sky-100 bg-white/75 p-3">
+          <p class="text-sm font-semibold text-sky-950">Contacts you shared</p>
+          <p class="mt-1 text-xs leading-5 text-sky-950/70">Each snapshot names its recipient. Revoke it here without deleting the source contact from your account.</p>
+          <div class="mt-3 grid gap-2 sm:grid-cols-2">
+            <For each={sharedByMe()}>
+              {(grant) => (
+                <article class="rounded-2xl border border-sky-100 bg-sky-50/60 p-3 text-xs text-sky-950">
+                  <p class="font-semibold">{grant.contact.name}</p>
+                  <p class="mt-1 text-sky-950/65">Shared by {grant.shared_by_display_name} with {grant.recipient_display_name}</p>
+                  <p class="mt-1 text-sky-950/65">Fields: {[grant.contact.email ? "email" : null, grant.contact.phone ? "phone" : null, grant.contact.relationship_kind ? "relationship" : null, grant.contact.roles.length > 0 ? "roles" : null].filter(Boolean).join(", ") || "name only"}</p>
+                  <button type="button" class="mt-2 rounded-full border border-sky-200 bg-white px-3 py-1.5 text-xs font-semibold text-sky-950 disabled:opacity-50" disabled={busy()} onClick={() => void revokeSharedContact(grant)}>Stop sharing</button>
+                </article>
+              )}
+            </For>
+          </div>
         </div>
       </Show>
       <Show when={sharedWithMe().length > 0}>
@@ -404,6 +521,7 @@ export function WeddingCollaborationAccessCard(props: {
               {(grant) => (
                 <article class="rounded-2xl border border-sky-100 bg-sky-50/60 p-3 text-xs text-sky-950">
                   <p class="font-semibold">{grant.contact.name}</p>
+                  <p class="mt-1 text-sky-950/65">Shared by {grant.shared_by_display_name} with {grant.recipient_display_name}</p>
                   <Show when={grant.contact.roles.length > 0 || grant.contact.relationship_kind}>
                     <p class="mt-1 text-sky-950/65">
                       {[...grant.contact.roles, grant.contact.relationship_kind].filter(Boolean).join(", ")}

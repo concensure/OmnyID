@@ -2,7 +2,7 @@
 
 Dependency order is authoritative. Task: WED-365.
 
-Status: foundation implemented; WED-391 continuation started 22 November 2026.
+Status: foundation implemented; WED-392 selected-contact continuation completed 22 November 2026.
 Checked items are repository claims only; hosted and full-account release
 gates remain separate.
 
@@ -23,15 +23,17 @@ gates remain separate.
   role/revision.
 - [x] Require an active membership and exact scope IDs in the membership query.
 - [x] Add owner bootstrap through the same path.
-- [ ] Tests: owner, partner, revoked member, guessed plan/workspace and role
+- [x] Tests: owner, partner, revoked member, guessed plan/workspace and role
   escalation.
 - Depends on COW-01.
 
 Implementation evidence: `0171_wedding_scope_revision.sql`,
 `src/server/wedding_scope.rs`, and the refactored
 `wedding_partner_sharing_routes.rs`. Unit coverage proves bounded IDs,
-revisioned cache names and role behaviour; disposable-Postgres route coverage
-remains open.
+revisioned cache names and role behaviour. The disposable-Postgres
+`wedding_partner_sharing_api` proves owner bootstrap, authenticated partner
+acceptance, guessed-workspace refusal, role escalation refusal, revisioned
+revocation and post-revocation denial.
 
 ### COW-03 — Cross-domain server enforcement (P0)
 
@@ -66,12 +68,21 @@ no access.
 
 ### COW-05 — Selected-contact sharing (P0)
 
-- Connect existing encrypted contact grants to role filters and a field-level
+- [x] Connect existing encrypted contact grants to role filters and a field-level
   preview/confirmation UI.
-- Show provenance and shared-by identity; do not expose the source contact ID
+- [x] Show provenance and shared-by identity; do not expose the source contact ID
   through an unrestricted personal-contact fetch.
-- Support explicit update and revoke of the shared snapshot.
+- [x] Support explicit update and revoke of the shared snapshot.
 - Depends on COW-02.
+
+Implementation evidence: WED-392 keeps name as the only mandatory field,
+offers email, phone, relationship and Wedding-role controls, and always excludes
+private notes and agent IDs. A review step names the recipient and exact values
+before the existing encrypted grant is upserted. Incoming and outgoing grants
+show sharer and recipient display names; only the original sharer can revoke.
+The server binds grant list/share/revoke to the resolved canonical owner, plan,
+workspace and active member. Disposable-Postgres coverage proves recipient
+read, sharer provenance, omitted-field redaction and sharer-only revocation.
 
 ## Phase 2 — Core Wedding collaboration
 

@@ -15,6 +15,17 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-392
+    title: Reframe guest-list proof through the growth journey and complete selected-contact coworking
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-392
+    worktree: C:/temp/wt/omnyid-wed389
+    base_sha: 70db63895395dbbc7fdd394768edebe3ea9ccf2d
+    depends_on: [WED-391, WED-365]
+    files: [wedding/index.html, wedding/assets/js/landing-config.js, wedding/assets/css/style.css, wedding/tests/wedding-website-smoke.mjs, solid-ui/src/components/WeddingCollaborationAccessCard.tsx, solid-ui/src/lib/api.ts, solid-ui/src/lib/weddingSharedContactState.ts, solid-ui/tests/wedding-shared-contact-state.test.ts, src/server/wedding_partner_sharing_routes.rs, tests/wedding_partner_sharing_api.rs, Documents/design/wedding planner/couple coworkspace/couple-coworking-*.md, Documents/verification/WED-392*, .agent/**]
+    acceptance: [the guest enrichment on the public Wedding page follows the existing J0-J6 growth journey rather than presenting a feature-process checklist, the guest context moves from spreadsheet pain to a truthful reviewable import demonstration and then to a guest-specific first action, every claim remains bounded to implemented CSV TSV or pasted-text import explicit household review RSVP facts approval-gated policy and downstream count impact, illustrative values remain labelled and the selected Soft small-wedding message is preserved, selected-contact sharing shows the exact recipient contacts and fields before confirmation and keeps unselected fields private, incoming and outgoing shared snapshots show human provenance and the original sharer can revoke an active snapshot, partner membership still grants no general account or contact access and all reads and mutations bind the canonical Wedding scope, the existing coworking spec and task document record the completed COW-02 proof and COW-05 boundary without claiming cross-domain enforcement, focused public frontend server and full Wedding checks pass from a clean committed candidate, any Oracle release uses the frozen exact SHA with rollback and hosted proof]
+    progress: "Started from the clean WED-391 release-record commit after the user clarified that the guest-list report should shape the public customer-growth journey rather than add a literal guest workflow section. Reference documents are guidance, not implementation instructions. The dependency-safe coworking continuation is COW-05 field-preview provenance and revocation over the existing encrypted selected-contact grants; COW-03 and later cross-domain scope remain separate."
   - id: WED-391
     title: Preserve the Soft small-wedding message, strengthen the guest journey, and advance couple coworking
     status: done
