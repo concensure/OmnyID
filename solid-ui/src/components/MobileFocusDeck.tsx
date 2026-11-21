@@ -210,9 +210,9 @@ export function MobileFocusDeck(props: {
             <button type="button" class={ICON_BUTTON_CLASS} aria-label={`Next ${props.label.toLowerCase()}`} onClick={() => navigate(1)}><DeckIcon d="M9 5l7 7-7 7" /></button>
           </div>
         </Show>
-        <nav class="flex shrink-0 gap-2 px-2 pb-2 pt-2" aria-label={`${props.label} actions`}>
-          <button type="button" class="inline-flex min-h-12 items-center justify-center gap-1.5 rounded-lg border border-wedding-muted bg-white px-3 text-sm font-semibold text-wedding-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-accent focus-visible:ring-offset-2" onClick={openReminder}><DeckIcon d="M12 6v6l4 2M12 21a9 9 0 100-18 9 9 0 000 18z" />Remind me {reminderLabel()}</button>
-          <button type="button" class="inline-flex min-h-12 flex-1 items-center justify-center gap-1.5 rounded-lg border-2 border-wedding-cta bg-white px-4 text-sm font-bold text-wedding-text hover:bg-wedding-surface-blush focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-accent focus-visible:ring-offset-2" aria-label={primaryActionLabel()} onClick={() => commit("approve", "button")}><DeckIcon d="M5 13l4 4L19 7" />{primaryActionLabel()}</button>
+        <nav class="flex min-w-0 shrink-0 gap-2 px-2 pb-2 pt-2" aria-label={`${props.label} actions`}>
+          <button type="button" class="inline-flex min-h-12 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg border border-wedding-muted bg-white px-2 text-center text-sm font-semibold leading-tight text-wedding-text [overflow-wrap:anywhere] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-accent focus-visible:ring-offset-2" onClick={openReminder}><DeckIcon d="M12 6v6l4 2M12 21a9 9 0 100-18 9 9 0 000 18z" />Remind me {reminderLabel()}</button>
+          <button type="button" class="inline-flex min-h-12 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg border-2 border-wedding-cta bg-white px-2 text-center text-sm font-bold leading-tight text-wedding-text [overflow-wrap:anywhere] hover:bg-wedding-surface-blush focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-accent focus-visible:ring-offset-2" aria-label={primaryActionLabel()} onClick={() => commit("approve", "button")}><DeckIcon d="M5 13l4 4L19 7" />{primaryActionLabel()}</button>
         </nav>
         <Show when={reminderItem()}>
           <div class="fixed inset-0 z-[80] flex items-end bg-black/35 p-3" role="presentation" onClick={() => setReminderItem(null)}>
