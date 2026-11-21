@@ -364,6 +364,17 @@
         import omnyid_proxy
     }
 
+    # Authenticated two-account Wedding collaboration and selectively shared
+    # contacts. Keep these routes ahead of the static /wedding/* handler so
+    # membership and exact-scope checks are always enforced by the homeserver.
+    handle /wedding/partners {
+        import omnyid_proxy
+    }
+
+    handle /wedding/partners/* {
+        import omnyid_proxy
+    }
+
     handle /wedding/vendor-search {
         import omnyid_proxy
     }

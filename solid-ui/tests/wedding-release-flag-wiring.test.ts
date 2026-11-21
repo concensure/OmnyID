@@ -63,6 +63,7 @@ test("RSVP reminder delivery stays default-off and its authenticated routes bypa
   assert.match(read("Caddyfile"), /handle \/wedding\/rsvp\/reminders\/\*/);
   assert.match(read("Caddyfile"), /handle \/wedding\/rsvp\/capabilities\*/);
   assert.match(read("Caddyfile"), /handle \/wedding\/rsvp\/responses/);
+  assert.match(read("Caddyfile"), /handle \/wedding\/partners\/\*/);
   assert.match(read("scripts/deploy-oracle.ps1"), /staged Caddyfile is missing the RSVP reminder proxy route/);
   assert.match(read("scripts/deploy-oracle.ps1"), /running Caddyfile is missing the RSVP reminder proxy route/);
   assert.match(read("scripts/deploy-oracle.ps1"), /staged Caddyfile is missing the RSVP capability proxy route/);
