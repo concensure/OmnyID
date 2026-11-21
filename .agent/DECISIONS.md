@@ -1,3 +1,19 @@
+# 2026-11-22: WED-391 guest and coworking surfaces project canonical records
+
+Public Wedding guidance may explain a discovery-to-final-count guest journey,
+but it must name only work backed by the canonical guest, RSVP and approval
+records. Imported people without an explicit household remain separate, and an
+ambiguous RSVP cell remains pending for review; surname and substring guesses
+are not authority.
+
+Couple coworking continues to use independent accounts joined by the existing
+Wedding membership and `WeddingScope`. Partner task choices project accepted
+membership names and save through the existing AFP task-responsibility record.
+The current/next/following collaboration copy is derived from membership state;
+it does not create a second collaborator, task, decision or guest store.
+Unfinished cross-domain sharing, activity, AI and live-delivery phases remain
+explicitly unclaimed in the couple-coworking task document.
+
 # 2026-11-22: WED-390 Wedding decisions are definition-first projections
 
 Every displayed Wedding decision is selected from a shared definition before card

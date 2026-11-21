@@ -1,3 +1,39 @@
+## WED-391 guest journey and couple-coworking first slice live (2026-11-22)
+
+Worktree `C:/temp/wt/omnyid-wed389`, branch `agent/codex/WED-391`. Exact deployed
+implementation/static SHA: `8899d796ea6b6a5472d89bc751741f34685fb411`; clean
+release worktree: `C:/temp/wt/omnyid-wed391-release-8899d796`.
+
+Direct production inspection proved the selected Soft WED-388 headline and the
+runtime sentence naming intimate ceremonies, micro weddings and larger
+celebrations were already live. WED-391 preserved those words and selectively
+added a source-linked guest journey plus a truthful two-account collaboration
+journey. It removed the unsupported accommodation-cluster claim. Guest import
+now keeps ungrouped people separate instead of inferring a household from their
+surname, and only exact RSVP cells become accepted/declined/tentative.
+
+The existing couple-coworking spec and task document were reconciled rather than
+duplicated. Accepted Wedding co-owner membership supplies real partner names to
+the existing AFP responsibility record, and the collaboration card derives its
+current, next and following steps from membership state. This is COW-08A, not a
+claim that the dependency-ordered cross-domain, activity, AI or live-update
+phases are complete.
+
+The clean exact SHA passed `npm run test:wedding:ci` (2,342 tests) and the
+production build. Oracle serves byte-identical landing, runtime, workspace shell
+and Wedding workspace bundle hashes. Live Wedding, workspace, Docs, landing
+runtime and bundle requests return 200; anonymous `/healthz` retains its expected
+401. Mobile Chromium at 390 px reports no horizontal overflow or console errors,
+and the sign-in workspace route loads successfully. Caddy validates unchanged;
+Caddy and homeserver retained zero restarts. The enabled twice-daily Wedding
+monitor completed manually with result `success` and exit status 0.
+
+Rollback is retained at
+`/home/ubuntu/omnyid-candidates/wed391-8899d796ea6b6a5472d89bc751741f34685fb411/rollback`.
+It contains the pre-release workspace archive, public files, Caddyfile, Compose
+metadata and container inventory. Full hashes and proof are in
+`Documents/verification/WED-391-wedding-guest-and-coworking-release.md`.
+
 ## WED-389 Wedding template and decision-card release live (2026-11-21)
 
 Worktree `C:/temp/wt/omnyid-wed389`, branch `agent/codex/WED-389`. Exact deployed
