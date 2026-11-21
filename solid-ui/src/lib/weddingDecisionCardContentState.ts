@@ -168,7 +168,7 @@ export function buildWeddingDecisionCardContent(item: FocusDeckItem): WeddingDec
     whyItMatters: facts[0] ?? (response
       ? "Review what changed and choose the safe next action before anything is sent."
       : "Resolve this one planning question before moving to its booking or coordination work."),
-    primaryActionLabel: response ? "Review response" : vendorComparison ? "Compare options" : "Open next step",
+    primaryActionLabel: response ? "Review response" : vendorComparison ? "Open shortlist" : "Open next step",
     recommendationSummary: usableRecommendation,
     recommendationReasons: facts,
     timeSensitivity: date && item.dueAt ? { label: `Task due ${date}`, at: item.dueAt } : null,
@@ -183,4 +183,3 @@ export function buildWeddingDecisionCardContent(item: FocusDeckItem): WeddingDec
     },
   };
 }
-

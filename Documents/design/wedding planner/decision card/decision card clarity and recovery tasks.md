@@ -1,7 +1,7 @@
 # Wedding decision-card clarity and recovery tasks
 
-Task: WED-389  
-Depends on: WED-386, WED-388  
+Task: WED-389
+Depends on: WED-386, WED-388
 Specification: `decision card clarity and recovery spec.md`
 
 The tasks below extend the existing Wedding planner. They do not authorize a new

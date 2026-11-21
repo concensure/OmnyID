@@ -85,7 +85,10 @@ export function defaultWeddingDecisionReminderAt(
   const now = Date.parse(nowIso);
   const sevenDays = new Date((Number.isFinite(now) ? now : Date.now()) + 7 * 86_400_000).toISOString();
   const beforeDue = isoBeforeDays(item.dueAt, 3);
-  return beforeDue && Date.parse(beforeDue) > Date.parse(nowIso) ? beforeDue : sevenDays;
+  // Preserve the existing due-window authority even when it means the item is
+  // already due to return; callers should then keep it active rather than
+  // silently pushing it out by another week.
+  return beforeDue ?? sevenDays;
 }
 
 function requestedReminderAt(value: string | null | undefined, nowIso: string): string | null {

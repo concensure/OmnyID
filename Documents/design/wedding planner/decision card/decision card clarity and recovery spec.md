@@ -1,9 +1,9 @@
 # Wedding decision-card clarity and recovery specification
 
-Status: implementation specification  
-Task: WED-389  
+Status: implementation specification
+Task: WED-389
 Source guidance: `decision card requirement.md` and the supplied 390-pixel mobile
-screenshot  
+screenshot
 Existing authorities: AFP Wedding plan, tasks, decisions, evidence, deferrals,
 quotes, RSVP and run-sheet projections
 
@@ -167,4 +167,3 @@ Automated evidence must cover:
 - mobile 320/390/430 and 200% zoom keep primary and reminder actions visible and
   unobscured;
 - the full Wedding typecheck, line budgets and regression suite pass.
-
