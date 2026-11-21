@@ -4500,3 +4500,17 @@ Its primary planning and sign-in actions remain the intentional conversion path.
 does not remove the authenticated Wedding assistant or the existing Sprout entry on
 public directory/article pages. The boundary is enforced in both static and browser
 tests so a shared public-script sweep cannot silently restore the home control.
+
+## 2026-11-21 — Wedding cards wait for a bounded three-step evidence window (WED-389)
+
+Wedding decision presentation may prepare only the current, next and following queue
+items. The deck stays behind an explicit preparation state until every available item
+in that window is research-ready; a fourth item cannot trigger advance research. This
+prevents loading prose or internal ranking language from being presented as advice
+while keeping inference bounded.
+
+Decision cards state one question, known facts, the most important missing fact and
+the consequence of the primary action before optional recommendation detail. Deferral
+continues to use the existing `wedding_decision_deferral` AFP record. A couple-selected
+future reminder date is additional input to that same authority, not a reminder store
+or scheduler, and dependency-change resurfacing remains intact.

@@ -15,6 +15,17 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-389
+    title: Recover Wedding template launch and make mobile decision cards actionable
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-389
+    worktree: C:/temp/wt/omnyid-wed389
+    base_sha: c2c7204b0dd348450823f71f9a535f8c42de55eb
+    depends_on: [WED-386, WED-388]
+    files: [solid-ui/src/App.tsx, solid-ui/src/components/DecisionCard.tsx, solid-ui/src/components/MobileFocusDeck.tsx, solid-ui/src/components/WeddingDecisionFocusCard.tsx, solid-ui/src/components/WeddingMobileFocusHome.tsx, solid-ui/src/lib/decisionCardState.ts, solid-ui/src/lib/weddingDecisionResearchState.ts, solid-ui/src/lib/weddingDecisionFocusActionState.ts, solid-ui/src/lib/weddingDecisionDeferralAfpState.ts, solid-ui/tests/**decision**, solid-ui/tests/**template**, solid-ui/tests/e2e/wedding-mobile-focus-deck*, Documents/design/wedding planner/decision card/**, .agent/**]
+    acceptance: [a fresh or stale client can recover from a Wedding template lazy-chunk or planner render failure without an endless Retry loop and without losing saved Wedding data, the first mobile viewport states one answerable decision question the known relevant facts the single missing fact and a readiness-matched primary action without internal-processing language, urgency is shown only with a labelled actionable date or consequence, the existing Defer path states the exact reminder date before saving and permits an explicit date change while retaining AFP account sync and dependency-change resurfacing, current next and following decision items are prepared and research-ready before any of those cards are presented and a bounded preparation state replaces vague provisional recommendations, detailed evidence recommendation trade-off alternative and source material remain progressively disclosed, mobile actions remain visible clear of the bottom navigation and agent control at 320 through 430 pixels and 200 percent zoom, the requirement source is treated as guidance and a scoped spec plus dependency-ordered task document are committed beside it, focused browser and full Wedding checks pass from a clean committed candidate]
+    progress: "Started from the clean WED-388 coordination head after confirming the fresh public Templates chunk returns 200 and renders in a new Chromium session. The reported repeated retry is therefore being handled as a stale-module or account-data planner recovery failure, not assumed to be a missing public route. The supplied mobile screenshot confirms a compound transport task, raw ISO timing, internal-processing copy and below-fold action. Current code researches only two queue items and can present loading copy as a recommendation; WED-389 will gate current/next/following on bounded research readiness and make deferral timing explicit."
   - id: WED-388
     title: Install Wedding database projections and complete the soft small-wedding alignment
     status: done

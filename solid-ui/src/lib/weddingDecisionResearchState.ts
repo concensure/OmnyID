@@ -13,7 +13,7 @@ export type WeddingDecisionResearchState = {
 };
 
 export function weddingDecisionResearchQueueWindow<T>(items: readonly T[]): Array<{ item: T; queueRank: number }> {
-  return items.slice(0, 2).map((item, queueRank) => ({ item, queueRank }));
+  return items.slice(0, 3).map((item, queueRank) => ({ item, queueRank }));
 }
 
 function clean(value: unknown): string {

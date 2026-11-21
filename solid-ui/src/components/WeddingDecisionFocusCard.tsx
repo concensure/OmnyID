@@ -27,12 +27,15 @@ import {
   weddingVendorResearchQueryForDecision,
 } from "@/lib/weddingDecisionFocusDisplayState";
 import { decisionCardFromWeddingFocus, type DecisionCardModel } from "@/lib/decisionCardState";
+import { formatWeddingDecisionDate } from "@/lib/weddingDecisionCardContentState";
+import { defaultWeddingDecisionReminderAt } from "@/lib/weddingDecisionDeferralAfpState";
 import {
   weddingGuestFinalCountApprovalToAfpSendInput,
   weddingGuestFinalCountChoices,
 } from "@/lib/weddingGuestFinalCountApprovalState";
 import type { useWeddingVendorOutreachOwner } from "@/lib/useWeddingVendorOutreachOwner";
 import type { WeddingResponseWorkspaceViewState } from "@/lib/weddingResponseWorkspaceViewState";
+import type { WeddingPersonalOsRankedItem } from "@/lib/weddingPersonalOsProjectionState";
 import type { WeddingWorkspaceSidebarAction } from "@/lib/weddingWorkspaceActionState";
 import { loadWeddingTaskCompletion, saveWeddingTaskCompletion, WEDDING_TASK_COMPLETION_EVENT } from "@/lib/weddingTaskCompletionLocalState";
 import { weddingTaskCompletionToAfpSendInput } from "@/lib/weddingTaskCompletionProjectionState";
@@ -99,6 +102,8 @@ export function WeddingDecisionFocusCard(props: {
   const [finalCountSelections, setFinalCountSelections] = createSignal<Record<string, string>>({});
   const [finalCountApprovalBusyId, setFinalCountApprovalBusyId] = createSignal<string | null>(null);
   const [reviewObservations, setReviewObservations] = createSignal<Record<string, WeddingReviewDecisionObservation | null>>({});
+  const [reminderItem, setReminderItem] = createSignal<WeddingPersonalOsRankedItem | null>(null);
+  const [reminderDate, setReminderDate] = createSignal("");
   const fundedResearchAttempts = new Set<string>();
   const reviewObservationAttempts = new Set<string>();
   const rsvpSetup = createMemo(() => weddingRsvpSetupFromAfpMessages(
@@ -209,7 +214,7 @@ export function WeddingDecisionFocusCard(props: {
     ...props.state.personalOsProjection.decisionLoadRelief,
     focusItems: display().visibleFocusItems,
   }, "review_all");
-  function deferItem(item: (typeof props.state.personalOsProjection.decisionLoadRelief.focusItems)[number]) {
+  function deferItem(item: (typeof props.state.personalOsProjection.decisionLoadRelief.focusItems)[number], deferredUntilAt?: string | null) {
     const deferred = new Set([...locallyDeferredIds(), item.id]);
     setLocallyDeferredIds(deferred);
     // Persist the optimistic removal across the workspace refresh that follows the AFP write.
@@ -220,7 +225,18 @@ export function WeddingDecisionFocusCard(props: {
         expiresAt: Date.now() + LOCAL_DEFER_TTL_MS,
       }));
     } catch { /* storage is optional */ }
-    queueMicrotask(() => props.onSidebarAction(buildWeddingDecisionDeferSidebarAction(item)));
+    queueMicrotask(() => props.onSidebarAction(buildWeddingDecisionDeferSidebarAction(item, deferredUntilAt)));
+  }
+  function openReminderPicker(item: WeddingPersonalOsRankedItem) {
+    setReminderItem(item);
+    setReminderDate(defaultWeddingDecisionReminderAt(item).slice(0, 10));
+  }
+  function saveReminder() {
+    const item = reminderItem();
+    if (!item || !reminderDate()) return;
+    const requested = new Date(`${reminderDate()}T12:00:00`).toISOString();
+    setReminderItem(null);
+    deferItem(item, requested);
   }
   function taskFor(itemId: string) {
     const taskId = itemId.replace(/^task:/, "");
@@ -541,7 +557,7 @@ export function WeddingDecisionFocusCard(props: {
                     onRecommendationSelect={researchFor(item.id) ? () => toggleResearch(item.id) : undefined}
                     onAction={(action) => {
                       if (action.id === "later") {
-                        deferItem(item);
+                        openReminderPicker(item);
                       } else if (action.id === "approve_guest_count") {
                         void approveFinalGuestCount(item.id);
                       } else if (action.id === "select_recommended" && comparison() && recommendedVendor()) {
@@ -814,6 +830,22 @@ export function WeddingDecisionFocusCard(props: {
               {(record) => <div class="rounded-xl border border-pink-100 bg-white px-3 py-2"><p class="text-xs font-semibold text-pink-950">{record.title}</p><p class="mt-1 text-xs leading-5 text-pink-950/75">{record.detailLabel}</p></div>}
             </For>
           </section>
+        </Show>
+        <Show when={reminderItem()}>
+          {(item) => (
+            <div class="fixed inset-0 z-[80] flex items-end bg-black/35 p-3" role="presentation" onClick={() => setReminderItem(null)}>
+              <section class="w-full rounded-2xl bg-white p-4 shadow-xl" role="dialog" aria-modal="true" aria-labelledby="decision-focus-reminder-title" onClick={(event) => event.stopPropagation()}>
+                <h3 id="decision-focus-reminder-title" class="text-base font-semibold text-wedding-ink">When should this decision return?</h3>
+                <p class="mt-1 text-sm leading-5 text-wedding-ink/70">Suggested: {formatWeddingDecisionDate(defaultWeddingDecisionReminderAt(item()))}. Choose another date if that works better.</p>
+                <label for="decision-focus-reminder-date" class="mt-3 block text-xs font-semibold text-wedding-ink">Reminder date</label>
+                <input id="decision-focus-reminder-date" type="date" min={new Date(Date.now() + 86_400_000).toISOString().slice(0, 10)} value={reminderDate()} onInput={(event) => setReminderDate(event.currentTarget.value)} class="mt-1 min-h-12 w-full rounded-lg border border-wedding-border px-3 text-base text-wedding-ink" />
+                <div class="mt-4 grid grid-cols-2 gap-2">
+                  <button type="button" class="min-h-12 rounded-lg border border-wedding-border text-sm font-semibold text-wedding-ink" onClick={() => setReminderItem(null)}>Keep it here</button>
+                  <button type="button" class="min-h-12 rounded-lg bg-wedding-primary text-sm font-bold text-wedding-page" onClick={saveReminder}>Set reminder</button>
+                </div>
+              </section>
+            </div>
+          )}
         </Show>
       </div>
     </Show>

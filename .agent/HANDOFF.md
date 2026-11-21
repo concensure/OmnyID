@@ -12193,3 +12193,31 @@ No conflict remains after the owner's prior decisions: the hero stays general, s
 weddings are named alongside larger celebrations, and the public home must not restore
 Ask Sprout. The spec's hard-pivot H1, full CTA switch, format chips and template-format
 Slices B/C are therefore obsolete for this task.
+
+## 2026-11-21 - WED-389 implementation and live compatibility repair (Codex)
+
+Worktree `C:/temp/wt/omnyid-wed389`, branch `agent/codex/WED-389`, based on
+`c2c7204b0dd348450823f71f9a535f8c42de55eb`. The requirement document was treated as
+design guidance; the owner's request and existing AFP/Decision Card authorities remain
+the implementation contract. New spec and task documents are under
+`Documents/design/wedding planner/decision card/`.
+
+The observed “Retry Wedding Planner” loop was a stale module graph: the WED-388 static
+volume replacement removed WED-386 hashed chunks still referenced by an open Safari
+tab, while resetting the same rejected lazy import could never recover. As an immediate
+bounded production repair, 62 missing WED-386 asset files were copied additively from
+clean SHA `23b9c57007188e460135f0e0c71806180f69d7a9`; current index/assets were not
+overwritten and no process restarted. Candidate evidence is at
+`/home/ubuntu/omnyid-candidates/wed389-compat-23b9c57007188e460135f0e0c71806180f69d7a9`.
+Archive SHA-256: `647d5cfb8b0d72b9cfab60f045cb93996a91b078c942764f6df44622f94f6890`.
+Rollback is deletion of only the files listed in `evidence/assets.added.txt`.
+Fresh Templates and current/prior key chunks returned HTTP 200; homeserver remained at
+zero restarts.
+
+Implementation adds stale-module reload recovery, stage-specific card content,
+human-readable dates, known/missing facts, progressive recommendation trade-offs,
+an explicit editable reminder-date sheet backed by the existing AFP deferral, and a
+current/next/following research gate. The mobile card scrolls independently while its
+two labelled actions remain outside the clipped area. Focused tests and typecheck pass
+in the implementation worktree; exact-SHA full verification and browser viewport proof
+remain to be recorded after commit. This implementation has not been deployed.

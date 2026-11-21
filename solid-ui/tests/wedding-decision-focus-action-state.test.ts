@@ -393,3 +393,19 @@ test("weddingDecisionDeferralActionToAfpSendInput projects deferrals into AFP le
   assert.equal(sendInput.metadata.resurface_policy, "Due in 3 days, unchanged for 7 days, or when the evidence changes.");
   assert.equal(sendInput.references?.some((ref) => ref.type === "deferred_focus_item" && ref.target === "item:choose-photographer"), true);
 });
+
+test("a couple-selected reminder date survives the existing AFP deferral path", () => {
+  const action = buildWeddingDecisionDeferSidebarAction(item({
+    title: "Choose photographer",
+    sourceSurface: "decision_queue",
+    dueAt: "2026-11-20T09:00:00.000Z",
+  }), "2026-10-14T12:00:00.000Z");
+  const sendInput = weddingDecisionDeferralActionToAfpSendInput(action, {
+    weddingPlanId: "wedding_plan:focus",
+    responseWorkspaceId: "response_workspace:focus",
+  }, "2026-10-01T09:00:00.000Z");
+
+  assert.equal(sendInput?.content.deferred_until_at, "2026-10-14T12:00:00.000Z");
+  assert.equal(sendInput?.content.reminder_date_chosen_by_couple, true);
+  assert.equal(sendInput?.metadata?.deferred_until_at, "2026-10-14T12:00:00.000Z");
+});

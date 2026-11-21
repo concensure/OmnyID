@@ -11,18 +11,19 @@ import {
 
 const read = (path: string) => readFileSync(resolve(process.cwd(), path), "utf8");
 
-test("funded research follows a moving current-and-next window", () => {
+test("funded research follows a moving current-next-following window", () => {
   assert.deepEqual(weddingDecisionResearchQueueWindow(["current", "next", "later"]), [
     { item: "current", queueRank: 0 },
     { item: "next", queueRank: 1 },
+    { item: "later", queueRank: 2 },
   ]);
   assert.deepEqual(weddingDecisionResearchQueueWindow(["next", "later"]), [
     { item: "next", queueRank: 0 },
     { item: "later", queueRank: 1 },
   ]);
   const server = read("../src/server/wedding_decision_research_routes.rs");
-  assert.match(server, /request\.queue_rank > 1/);
-  assert.match(server, /Only the current and next decision can be researched/);
+  assert.match(server, /request\.queue_rank > 2/);
+  assert.match(server, /Only the current, next and following decision can be researched/);
 });
 
 test("assignment delivery uses the server-side research and registered-agent path", () => {

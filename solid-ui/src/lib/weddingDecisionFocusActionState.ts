@@ -70,6 +70,7 @@ export function buildWeddingDecisionFocusSidebarAction(
 
 export function buildWeddingDecisionDeferSidebarAction(
   item: WeddingPersonalOsRankedItem,
+  deferredUntilAt?: string | null,
 ): WeddingWorkspaceSidebarAction {
   return {
     kind: "defer_decision",
@@ -89,6 +90,7 @@ export function buildWeddingDecisionDeferSidebarAction(
         explanation: item.explanation,
         evidence_labels: item.evidenceLabels,
         requested_state: "deferred",
+        requested_deferred_until_at: deferredUntilAt ?? null,
         user_reason: "The couple chose Decide later from the wedding attention list.",
         resurface_policy: "Bring this back before the due date, after 7 days, or when the evidence changes.",
       },

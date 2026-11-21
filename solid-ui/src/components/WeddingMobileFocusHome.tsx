@@ -17,6 +17,7 @@ import {
   weddingVendorResearchQueryForDecision,
 } from "@/lib/weddingDecisionFocusDisplayState";
 import { buildWeddingDecisionDeferSidebarAction } from "@/lib/weddingDecisionFocusActionState";
+import { defaultWeddingDecisionReminderAt } from "@/lib/weddingDecisionDeferralAfpState";
 import type { WeddingResponseWorkspaceViewState } from "@/lib/weddingResponseWorkspaceViewState";
 import type { WeddingPersonalOsRankedItem } from "@/lib/weddingPersonalOsProjectionState";
 import type { WeddingWorkspaceSidebarAction } from "@/lib/weddingWorkspaceActionState";
@@ -95,6 +96,7 @@ export function WeddingMobileFocusHome(props: {
   const [completionRevision, setCompletionRevision] = createSignal(0);
   const [fundedResearch, setFundedResearch] = createSignal<Record<string, WeddingDecisionResearchState>>({});
   const [fundedResearchStatus, setFundedResearchStatus] = createSignal<Record<string, "loading" | "failed">>({});
+  const [researchRetryRevision, setResearchRetryRevision] = createSignal(0);
   const fundedResearchAttempts = new Set<string>();
   const vendorPrefetchAttempts = new Set<string>();
   const persistedTriage = createMemo(() => buildDecisionTriageProjectionState(props.state.afpMessages));
@@ -171,8 +173,7 @@ export function WeddingMobileFocusHome(props: {
       returnedFromLater: false,
       external: false,
     })));
-    // Do not eagerly prepare the whole future queue. Only the decision in
-    // front of the couple and the one immediately behind it are enriched.
+    // Prepare a bounded look-ahead: the visible decision and the next two.
     const researchEligibleIds = mobileDecisionResearchEligibleIds(ranked);
     return ranked.map((item) => {
       if (!researchEligibleIds.has(item.id)) return item;
@@ -211,7 +212,26 @@ export function WeddingMobileFocusHome(props: {
       && !weddingVendorResearchQueryForDecision(item)
       && !builtResearchForDecision(item.id));
   };
+  const decisionPreparation = createMemo(() => {
+    const labels = ["Current step", "Next step", "Following step"];
+    const steps = weddingDecisionResearchQueueWindow(display().queuedFocusItems).map(({ item, queueRank }) => {
+      const task = taskForDecision(item.id);
+      const status = fundedResearchStatus()[item.id];
+      const vendorQuery = weddingVendorResearchQueryForDecision(item);
+      const ready = !task
+        || /pending RSVP/i.test(task.title)
+        || (vendorQuery ? Boolean(vendorShortlistForDecision(item)) : Boolean(researchForDecision(item.id)) || !needsFundedResearch(item));
+      return {
+        id: item.id,
+        label: labels[queueRank] ?? `Step ${queueRank + 1}`,
+        title: item.title,
+        state: ready ? "ready" as const : status === "failed" ? "failed" as const : "preparing" as const,
+      };
+    });
+    return { steps, ready: steps.every((step) => step.state === "ready") };
+  });
   createEffect(() => {
+    researchRetryRevision();
     const context = savedResearchContext();
     weddingDecisionResearchQueueWindow(display().queuedFocusItems).forEach(({ item, queueRank }) => {
       const task = taskForDecision(item.id);
@@ -245,6 +265,7 @@ export function WeddingMobileFocusHome(props: {
     });
   });
   createEffect(() => {
+    researchRetryRevision();
     for (const { item } of weddingDecisionResearchQueueWindow(display().queuedFocusItems)) {
       const query = weddingVendorResearchQueryForDecision(item);
       if (!query || vendorShortlistForDecision(item)) continue;
@@ -259,9 +280,14 @@ export function WeddingMobileFocusHome(props: {
         sourceDecisionId: item.id,
       });
       if (launch) dispatchWeddingVendorSearchLaunch(launch);
-      break;
     }
   });
+  function retryDecisionPreparation() {
+    fundedResearchAttempts.clear();
+    vendorPrefetchAttempts.clear();
+    setFundedResearchStatus((current) => Object.fromEntries(Object.entries(current).filter(([, status]) => status !== "failed")));
+    setResearchRetryRevision((value) => value + 1);
+  }
   const responses = createMemo(() => rankFocusDeckItems(props.state.activeVendorQuoteReplyFlows
     .filter((flow) => !hiddenIds().has(flow.id))
     .map((flow) => ({
@@ -293,6 +319,7 @@ export function WeddingMobileFocusHome(props: {
         if (!result.ok) next[result.sourceDecisionId] = "failed";
         return next;
       });
+      if (result.ok) props.onRefreshWorkspace?.();
     };
     window.addEventListener(WEDDING_TASK_COMPLETION_EVENT, listener);
     window.addEventListener(WEDDING_VENDOR_SEARCH_LAUNCH_RESULT_EVENT, vendorResultListener);
@@ -478,11 +505,11 @@ export function WeddingMobileFocusHome(props: {
     });
   }
 
-  async function defer(item: FocusDeckItem, method: InputMethod): Promise<boolean> {
+  async function defer(item: FocusDeckItem, method: InputMethod, deferredUntilAt?: string | null): Promise<boolean> {
     await triage("defer", item, method, () => {
       if (item.kind === "decision") {
         const decision = decisionItemFor(item.id);
-        if (decision) props.onSidebarAction(buildWeddingDecisionDeferSidebarAction(decision));
+        if (decision) props.onSidebarAction(buildWeddingDecisionDeferSidebarAction(decision, deferredUntilAt));
       }
       rememberTriage("defer", item.id);
     });
@@ -609,12 +636,36 @@ export function WeddingMobileFocusHome(props: {
           <Show
             when={mobileFocusMode() === "overview"}
             fallback={(
+              <Show when={mobileFocusMode() !== "decisions" || decisionPreparation().ready} fallback={(
+                <section class="mx-auto w-full max-w-lg rounded-2xl border border-wedding-border bg-white p-4 shadow-card" role="status" aria-live="polite">
+                  <p class="text-xs font-semibold uppercase tracking-[0.12em] text-wedding-accent">Preparing your decisions</p>
+                  <h2 class="mt-2 text-lg font-semibold text-wedding-text">Checking the current step and the two after it</h2>
+                  <p class="mt-1 text-sm leading-6 text-wedding-muted">Your first decision card will appear only after these steps have enough context for a specific recommendation.</p>
+                  <ol class="mt-4 grid gap-2">
+                    {decisionPreparation().steps.map((step) => (
+                      <li class="rounded-xl border border-wedding-border px-3 py-2">
+                        <div class="flex items-start justify-between gap-3">
+                          <div><p class="text-[10px] font-semibold uppercase tracking-[0.1em] text-wedding-muted">{step.label}</p><p class="mt-1 text-sm font-semibold text-wedding-text">{step.title}</p></div>
+                          <span class="shrink-0 text-xs font-semibold text-wedding-accent">{step.state === "ready" ? "Ready" : step.state === "failed" ? "Needs retry" : "Researching…"}</span>
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                  <Show when={decisionPreparation().steps.some((step) => step.state === "failed")}>
+                    <button type="button" class="mt-4 min-h-12 w-full rounded-xl border-2 border-wedding-cta bg-white px-4 text-sm font-bold text-wedding-text" onClick={retryDecisionPreparation}>Retry research</button>
+                  </Show>
+                </section>
+              )}>
               <MobileFocusDeck
                 items={items()}
                 position={position()}
                 onPositionChange={setPosition}
                 onApprove={requestApproval}
                 onDefer={defer}
+                defaultReminderAt={(item) => {
+                  const decision = decisionItemFor(item.id);
+                  return defaultWeddingDecisionReminderAt({ dueAt: decision?.dueAt ?? item.dueAt });
+                }}
                 label={mobileFocusMode() === "responses" ? "Response" : "Decision"}
                 sequential
                 primaryActionLabel={primaryActionLabel}
@@ -648,6 +699,7 @@ export function WeddingMobileFocusHome(props: {
                   />
                 )}
               />
+              </Show>
             )}
           >
             <WeddingHomeOverviewGrid dense state={props.state} onSidebarAction={props.onSidebarAction} onSelectMenu={props.onSelectMenu} saveProjection={props.saveProjection} onRefreshWorkspace={props.onRefreshWorkspace} />
@@ -677,9 +729,9 @@ function DeckCard(props: {
       <DecisionCard
         card={decisionCardFromFocusDeckItem(props.item)}
         mode="standard"
-        showActions
+        showActions={false}
         onAction={props.onOpen}
-        class="h-full w-full rounded-none border-x-0 shadow-none"
+        class="h-full w-full overflow-y-auto rounded-none border-x-0 pb-6 shadow-none"
       />
     </div>
   );

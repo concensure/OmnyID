@@ -12,6 +12,7 @@ export type WeddingDecisionDeferralProjectionInput = {
   item: WeddingPersonalOsRankedItem;
   metadata?: unknown;
   createdAt?: string | null;
+  deferredUntilAt?: string | null;
 };
 
 function clean(value: unknown): string {
@@ -77,6 +78,22 @@ function isoBeforeDays(value: string | null | undefined, days: number): string |
   return new Date(parsed - days * 86_400_000).toISOString();
 }
 
+export function defaultWeddingDecisionReminderAt(
+  item: Pick<WeddingPersonalOsRankedItem, "dueAt">,
+  nowIso = new Date().toISOString(),
+): string {
+  const now = Date.parse(nowIso);
+  const sevenDays = new Date((Number.isFinite(now) ? now : Date.now()) + 7 * 86_400_000).toISOString();
+  const beforeDue = isoBeforeDays(item.dueAt, 3);
+  return beforeDue && Date.parse(beforeDue) > Date.parse(nowIso) ? beforeDue : sevenDays;
+}
+
+function requestedReminderAt(value: string | null | undefined, nowIso: string): string | null {
+  const parsed = Date.parse(clean(value));
+  if (!Number.isFinite(parsed) || parsed <= Date.parse(nowIso)) return null;
+  return new Date(parsed).toISOString();
+}
+
 function dependencyFingerprint(item: WeddingPersonalOsRankedItem): string {
   return uniqueStrings([
     item.id,
@@ -117,7 +134,8 @@ export function weddingDecisionDeferralToAfpMessage(
   const timestamp = clean(input.createdAt) || nowIso;
   const markdown = markdownFor(item);
   const staleAfterAt = isoAfterDays(timestamp, 7);
-  const deferredUntilAt = isoBeforeDays(item.dueAt, 3) ?? staleAfterAt;
+  const deferredUntilAt = requestedReminderAt(input.deferredUntilAt, timestamp)
+    ?? defaultWeddingDecisionReminderAt(item, timestamp);
   const fingerprint = dependencyFingerprint(item);
   return {
     id: `afp-${id}`,
@@ -158,6 +176,7 @@ export function weddingDecisionDeferralToAfpMessage(
         stale_after_days: 7,
         resurface_on_dependency_change: true,
       },
+      reminder_date_chosen_by_couple: Boolean(requestedReminderAt(input.deferredUntilAt, timestamp)),
       markdown,
       wedding_plan_id: metadata.weddingPlanId,
       response_workspace_id: metadata.responseWorkspaceId,
@@ -234,6 +253,7 @@ export function weddingDecisionDeferralActionToAfpSendInput(
   return weddingDecisionDeferralToAfpSendInput({
     metadata,
     createdAt: nowIso,
+    deferredUntilAt: clean(packet?.requested_deferred_until_at) || null,
     item: {
       id,
       kind: clean(packet?.kind) as WeddingPersonalOsRankedItem["kind"] || "task",

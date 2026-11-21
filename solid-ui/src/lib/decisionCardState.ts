@@ -3,6 +3,10 @@ import type { QueueEntry } from "@/lib/decisionQueueModel";
 import type { FocusDeckItem } from "@/lib/mobileFocusHomeState";
 import type { WeddingDecisionFocusItemCard } from "@/lib/weddingDecisionFocusDisplayState";
 import type { WeddingWorkspaceArtifactPreview } from "@/lib/weddingResponseWorkspaceViewState";
+import {
+  buildWeddingDecisionCardContent,
+  type WeddingDecisionSupport,
+} from "@/lib/weddingDecisionCardContentState";
 
 export const DECISION_CARD_PATTERNS = [
   "choose", "approve_act", "compare", "notice_decide", "clarify", "coordinate", "review", "record",
@@ -64,6 +68,7 @@ export type DecisionCardModel = {
     recordSummary?: string | null;
   };
   verification: { status: "verified" | "partial" | "unverified"; label: string };
+  decisionSupport?: WeddingDecisionSupport | null;
 };
 
 function clean(value: unknown): string {
@@ -166,30 +171,33 @@ export function decisionCardFromFocusDeckItem(item: FocusDeckItem): DecisionCard
   const evidence = evidenceFromLabels(item.evidenceLabels, `focus:${item.id}`);
   const vendorCards = item.vendorComparison?.cards.slice().sort((left, right) => left.rank - right.rank).slice(0, 3) ?? [];
   const recommendedVendor = vendorCards[0];
+  const content = buildWeddingDecisionCardContent(item);
   return {
     schema: "content.decision_card",
     pattern: vendorCards.length > 0 ? "choose" : item.kind === "response" ? "approve_act" : "review",
     patternVersion: "1.0",
     id: item.id,
-    title: item.title,
+    title: content.title,
     domain: "wedding",
     pressure: "medium",
-    whyItMatters: item.whyNowLabel,
-    recommendation: evidence.length > 0 ? {
-      summary: item.recommendedActionLabel,
-      reasons: recommendedVendor
-        ? [recommendedVendor.situationFit || recommendedVendor.preferenceMatch || item.whyNowLabel]
-        : [item.whyNowLabel],
+    whyItMatters: content.whyItMatters,
+    recommendation: content.recommendationSummary ? {
+      summary: content.recommendationSummary,
+      reasons: content.recommendationReasons.length > 0
+        ? content.recommendationReasons
+        : recommendedVendor
+          ? [recommendedVendor.situationFit || recommendedVendor.preferenceMatch || content.whyItMatters]
+          : [content.whyItMatters],
     } : null,
     actions: [{
       id: "review",
-      label: item.kind === "response" ? "Open agent draft" : vendorCards.length > 0 ? "Open shortlist" : "Open task",
+      label: content.primaryActionLabel,
       role: "primary",
       effect: vendorCards.length > 0 ? "Opens the source-backed three-vendor comparison" : "Opens the guarded review flow",
       intent: "review",
     }],
     evidence,
-    timeSensitivity: item.dueAt ? { label: "Time-sensitive", at: item.dueAt } : null,
+    timeSensitivity: content.timeSensitivity,
     visual: { kind: "none" },
     unknowns: evidence.length === 0 ? ["No source evidence is attached yet."] : [],
     patternSlots: {
@@ -202,6 +210,7 @@ export function decisionCardFromFocusDeckItem(item: FocusDeckItem): DecisionCard
       })),
     },
     verification: evidence.length > 0 ? { status: "partial", label: `${evidence.length} evidence signal${evidence.length === 1 ? "" : "s"}` } : { status: "unverified", label: "Evidence pending" },
+    decisionSupport: content.support,
   };
 }
 

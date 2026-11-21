@@ -62,10 +62,10 @@ async fn research_http(
             "Wedding research is temporarily unavailable.".to_string(),
         ));
     }
-    if request.queue_rank > 1 {
+    if request.queue_rank > 2 {
         return Err((
             StatusCode::BAD_REQUEST,
-            "Only the current and next decision can be researched.".to_string(),
+            "Only the current, next and following decision can be researched.".to_string(),
         ));
     }
     enforce_rate_limit(

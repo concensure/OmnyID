@@ -20,12 +20,12 @@ test("mobile focus makes repeat deferrals visible within their urgency tier", ()
   assert.equal(hiddenAttentionCount({ responseCount: 2, overdueDecisionCount: 3 }), 5);
 });
 
-test("mobile research is limited to the active decision and immediate successor", () => {
+test("mobile research covers the active decision and the next two steps", () => {
   const eligible = mobileDecisionResearchEligibleIds([
     item("active", null), item("next", null), item("future", null), item("much-later", null),
   ]);
-  assert.deepEqual([...eligible], ["active", "next"]);
-  assert.equal(eligible.has("future"), false);
+  assert.deepEqual([...eligible], ["active", "next", "future"]);
+  assert.equal(eligible.has("much-later"), false);
 });
 
 test("mobile focus keeps completed vendor triage through a route remount", () => {

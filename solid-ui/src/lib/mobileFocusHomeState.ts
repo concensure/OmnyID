@@ -156,7 +156,7 @@ export function rankFocusDeckItems<T extends FocusDeckItem>(items: readonly T[],
     .map(({ item }) => item);
 }
 export function mobileDecisionResearchEligibleIds(items: readonly Pick<FocusDeckItem, "id">[]): Set<string> {
-  return new Set(items.slice(0, 2).map((item) => item.id));
+  return new Set(items.slice(0, 3).map((item) => item.id));
 }
 export function hiddenAttentionCount(input: { responseCount: number; overdueDecisionCount: number }): number {
   return Math.max(0, input.responseCount) + Math.max(0, input.overdueDecisionCount);

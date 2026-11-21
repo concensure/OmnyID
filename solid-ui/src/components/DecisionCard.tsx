@@ -35,6 +35,7 @@ export function DecisionCard(props: {
   const text = (value: string | null | undefined, fallback: string) => wedding() ? safeWeddingUiText(value, fallback) : value ?? fallback;
   const regularActions = () => card().actions.filter((action) => action.id !== "why");
   const whyAction = () => card().actions.find((action) => action.id === "why") ?? null;
+  const support = () => wedding() ? card().decisionSupport : null;
   const handleKeyDown = (event: KeyboardEvent) => {
     if (!props.onSelect || (event.key !== "Enter" && event.key !== " ")) return;
     event.preventDefault();
@@ -58,7 +59,7 @@ export function DecisionCard(props: {
     >
       <div class="flex flex-wrap items-center justify-between gap-2">
         <span class={`rounded-lg px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${wedding() ? "bg-wedding-primary text-wedding-page" : "bg-primary/10 text-primary"}`}>
-          {wedding() && card().recommendation ? "Best fit" : patternLabel(card().pattern)}
+          {support()?.statusLabel ?? (wedding() && card().recommendation ? "Best fit" : patternLabel(card().pattern))}
         </span>
         <Show when={card().timeSensitivity}>
           {(time) => <span class={`text-xs font-medium ${muted()}`}>{time().label}</span>}
@@ -70,6 +71,24 @@ export function DecisionCard(props: {
       </Show>
       <Show when={props.hero}>
         {(hero) => <div class="mt-3">{hero()}</div>}
+      </Show>
+      <Show when={mode() !== "glance" && support()}>
+        {(decision) => (
+          <div class="mt-3 grid gap-2">
+            <Show when={decision().knownFacts.length > 0}>
+              <div class="rounded-lg border border-wedding-border bg-white/70 px-3 py-2">
+                <p class="text-[10px] font-semibold uppercase tracking-[0.12em] text-wedding-muted">What we know</p>
+                <ul class="mt-1 grid gap-1 text-xs leading-5 text-wedding-ink">
+                  <For each={decision().knownFacts}>{(fact) => <li class="break-words [overflow-wrap:anywhere]">• {fact}</li>}</For>
+                </ul>
+              </div>
+            </Show>
+            <Show when={decision().oneThingToConfirm}>
+              {(missing) => <p class="rounded-lg bg-wedding-status-progress-bg px-3 py-2 text-xs leading-5 text-wedding-status-progress-ink"><strong>Confirm next:</strong> {missing()}</p>}
+            </Show>
+            <p class="text-xs leading-5 text-wedding-ink"><strong>What this does:</strong> {decision().primaryOutcome}</p>
+          </div>
+        )}
       </Show>
       <Show when={!props.hero && card().patternSlots.options && card().patternSlots.options!.length > 0 && mode() !== "glance"}>
         <div class="mt-3 grid gap-2">
@@ -86,7 +105,7 @@ export function DecisionCard(props: {
           </For>
         </div>
       </Show>
-      <Show when={mode() !== "glance" ? card().recommendation : null}>
+      <Show when={mode() !== "glance" && !support() ? card().recommendation : null}>
         {(recommendation) => (
           <div class={`mt-3 rounded-lg px-3 py-3 ${wedding() ? "bg-wedding-slate" : "bg-primary/5"}`}>
             <p class="text-[10px] font-semibold uppercase tracking-[0.12em] opacity-70">Recommendation</p>
@@ -103,7 +122,18 @@ export function DecisionCard(props: {
           </div>
         )}
       </Show>
-      <Show when={mode() === "standard" || mode() === "full"}>
+      <Show when={mode() !== "glance" && support() && (card().recommendation || support()?.compromise || support()?.alternative || support()?.unconfirmed)}>
+        <details class="mt-3 rounded-lg bg-wedding-slate px-3 py-2" data-deck-interactive>
+          <summary class="min-h-8 cursor-pointer text-xs font-semibold text-wedding-ink">Recommendation and trade-offs</summary>
+          <div class="grid gap-2 pb-1 pt-2 text-xs leading-5 text-wedding-ink/75">
+            <Show when={card().recommendation}>{(recommendation) => <p><strong class="text-wedding-ink">Current recommendation:</strong> {recommendation().summary}</p>}</Show>
+            <Show when={support()?.compromise}>{(value) => <p><strong class="text-wedding-ink">Compromise:</strong> {value()}</p>}</Show>
+            <Show when={support()?.alternative}>{(value) => <p><strong class="text-wedding-ink">Alternative:</strong> {value()}</p>}</Show>
+            <Show when={support()?.unconfirmed}>{(value) => <p><strong class="text-wedding-ink">Not confirmed:</strong> {value()}</p>}</Show>
+          </div>
+        </details>
+      </Show>
+      <Show when={(mode() === "standard" || mode() === "full") && !support()}>
         <div class="mt-3 flex flex-wrap gap-1.5">
           <For each={card().evidence.slice(0, 4)}>{(item) => <span class="max-w-full break-words rounded-lg border border-current/10 bg-white/70 px-2 py-1 text-[10px] opacity-75">{text(item.label, "Checked detail")}</span>}</For>
           <span class="rounded-lg border border-current/10 px-2 py-1 text-[10px] opacity-75">{text(card().verification.label, "Details checked")}</span>

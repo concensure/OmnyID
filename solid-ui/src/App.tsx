@@ -1,4 +1,5 @@
 import { createEffect, createMemo, createSignal, ErrorBoundary, For, lazy, onCleanup, onMount, Show, Suspense } from "solid-js";
+import { isWorkspaceModuleLoadFailure, workspaceFailureReference } from "@/lib/workspaceModuleRecoveryState";
 import { GlassPanel } from "@/components/GlassPanel";
 import { LoraStatusWidget } from "@/components/LoraStatusWidget";
 import { MaskSwitcher } from "@/components/MaskSwitcher";
@@ -4344,6 +4345,13 @@ function App() {
                     error={err}
                     onBack={() => selectView("home")}
                     onRetry={() => {
+                      if (isWorkspaceModuleLoadFailure(err)) {
+                        // The Wedding navigation intent and active view are already
+                        // persisted. Reloading fetches the latest hashed module graph;
+                        // resetting the same rejected lazy promise would loop forever.
+                        window.location.reload();
+                        return;
+                      }
                       returnToWeddingPlannerHome();
                       reset();
                     }}
@@ -4883,24 +4891,29 @@ function ResponseQueueRouteFallback(props: {
   onRetry: () => void;
 }) {
   const message = () => (props.error instanceof Error ? props.error.message : String(props.error || "Unknown error"));
+  const staleModule = () => isWorkspaceModuleLoadFailure(props.error);
+  const reference = () => workspaceFailureReference(props.error, "wedding-planner");
 
   return (
     <div class="view-enter rounded-3xl border border-fuchsia-200/70 bg-fuchsia-50/85 p-6 text-fuchsia-950 shadow-card animate-fade-in">
       <p class="font-mono text-[10px] uppercase tracking-[0.18em] text-fuchsia-700">Wedding Planner</p>
-      <h2 class="mt-2 text-xl font-semibold text-fuchsia-950">Planner view could not open</h2>
+      <h2 class="mt-2 text-xl font-semibold text-fuchsia-950">{staleModule() ? "Wedding template update needed" : "Planner view could not open"}</h2>
       <p class="mt-2 max-w-2xl text-sm leading-6 text-fuchsia-900/85">
-        The workspace stayed open, but the wedding planner surface hit a render error. Retry the planner, or return home and use the Master Agent while the saved wedding data remains intact.
+        {staleModule()
+          ? "This tab still has an older Wedding template open. Reload the latest template to continue; your saved wedding plan and the place you were opening are retained."
+          : "The workspace stayed open, but the wedding planner surface hit a render error. Retry the planner, or return home while the saved wedding data remains intact."}
       </p>
-      <p class="mt-4 max-w-2xl rounded-2xl border border-fuchsia-200/70 bg-white/70 px-3 py-2 font-mono text-xs leading-5 text-fuchsia-900">
-        {message()}
-      </p>
+      <details class="mt-4 max-w-2xl rounded-2xl border border-fuchsia-200/70 bg-white/70 px-3 py-2 text-xs leading-5 text-fuchsia-900">
+        <summary class="cursor-pointer font-semibold">Technical details · {reference()}</summary>
+        <p class="mt-2 break-words font-mono">{message()}</p>
+      </details>
       <div class="mt-5 flex flex-wrap gap-3">
         <button
           type="button"
           class="rounded-full border border-fuchsia-300 bg-white px-4 py-2 text-sm font-semibold text-fuchsia-950 transition hover:bg-fuchsia-100"
           onClick={props.onRetry}
         >
-          Retry Wedding Planner
+          {staleModule() ? "Reload latest Wedding template" : "Retry Wedding Planner"}
         </button>
         <button
           type="button"
