@@ -2,6 +2,7 @@
 
 Worktree `C:/temp/wt/omnyid-wed389`, branch `agent/codex/WED-393`, based on clean
 WED-392 release-record SHA `fb418abb938b99bec4731156861b49fbffaebc60`.
+Exact implementation candidate: `60713cd4fba82b5d4d5784c73530b7750be85bf8`.
 
 The shared vendor lead-time builder now creates the venue research task when the
 couple has only a season or no saved date. A specific discovery contract keeps this
@@ -11,9 +12,10 @@ commitment. Other unknown-date vendor tasks remain withheld.
 
 `mustDecideFirst` now survives recommendation-to-task projection and supplies a
 bounded two-point PersonalOS tie-break. Venue outranks an equally urgent florist,
-while higher priority and deadline pressure remain authoritative. Focused tests pass
-for exact-date, season-only, date-less, booked/skipped and urgency-tie cases. Full
-clean-SHA Wedding CI and production build are the next release-candidate gates.
+while higher priority and deadline pressure remain authoritative. Clean exact-SHA
+typecheck, both line budgets, public Wedding checks, all 2,348 Wedding tests and the
+production build pass, including exact-date, season-only, date-less, booked/skipped
+and urgency-tie regressions.
 
 No Oracle deployment has been made for WED-393. The currently live application
 source remains `afd6d5cc04d3c5996256ca1df131ba7e1de659fb` from WED-392.

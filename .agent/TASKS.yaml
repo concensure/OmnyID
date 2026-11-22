@@ -17,15 +17,16 @@ lifecycle:
 tasks:
   - id: WED-393
     title: Keep venue decisions actionable before an exact wedding date and preserve their sequence priority
-    status: in_progress
+    status: done
     owner: codex
     branch: agent/codex/WED-393
     worktree: C:/temp/wt/omnyid-wed389
     base_sha: fb418abb938b99bec4731156861b49fbffaebc60
+    implementation_sha: 60713cd4fba82b5d4d5784c73530b7750be85bf8
     depends_on: [WED-390, WED-392, WED-329]
     files: [solid-ui/src/lib/weddingVendorLeadTimeState.ts, solid-ui/src/lib/weddingDecisionDefinitionState.ts, solid-ui/src/lib/weddingPersonalOsProjectionState.ts, solid-ui/tests/wedding-vendor-lead-time-state.test.ts, solid-ui/tests/wedding-personal-os-projection-state.test.ts, Documents/design/wedding planner/decision card/decision card clarity and recovery spec.md, Documents/design/wedding planner/decision card/decision card clarity and recovery tasks.md, .agent/**]
     acceptance: [a venue research decision can enter Decision Focus when the couple has only a season or has not set a date, the card does not invent availability or a deadline and makes exact-date confirmation explicit before booking, a declarative must-decide-first signal survives conversion from lead-time recommendation to planning task and gives venue a bounded tie-break over another vendor with the same urgency, genuinely more urgent work can still outrank venue, settled booked or skipped venue categories remain suppressed, focused and full Wedding checks pass from a clean committed candidate]
-    progress: "Implementation started from the clean WED-392 release-record SHA."
+    progress: "Implemented and verified from clean exact candidate 60713cd4fba82b5d4d5784c73530b7750be85bf8. Venue discovery now reaches Decision Focus with only a season or no date, uses a non-booking discovery contract with explicit date/availability uncertainty, and carries the catalogue mustDecideFirst signal into a bounded two-point task-ranking tie-break. Exact-date, season-only, date-less, skipped/booked and equal-versus-materially-higher urgency regressions pass. Clean typecheck, both line budgets, public Wedding checks, all 2,348 Wedding tests and the production build pass. No Oracle deployment was requested or performed; production remains on WED-392."
   - id: WED-392
     title: Reframe guest-list proof through the growth journey and complete selected-contact coworking
     status: done

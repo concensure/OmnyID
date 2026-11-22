@@ -12,7 +12,7 @@ WED-390 generalised the contract across every current Wedding decision kind, add
 bulk audit and source evidence, verified bounded online research, and installed the
 passing twice-daily production monitor. Exact release evidence is in
 `Documents/verification/WED-390-wedding-decision-and-monitor-release.md`.
-DC-12 is implemented on WED-393 and awaits the normal clean-candidate release gate.
+DC-12 is implemented and clean-candidate verified on WED-393; it is not yet deployed.
 
 ## DC-01 — Reproduce and recover the Wedding template failure
 
@@ -299,6 +299,11 @@ Acceptance:
 - Venue ranks ahead of an equally urgent florist, while a materially more urgent
   florist or blocker can still rank first.
 - Booked and skipped venue categories remain absent.
+
+Implementation evidence: clean exact candidate
+`60713cd4fba82b5d4d5784c73530b7750be85bf8` passed typecheck, both line budgets,
+the public Wedding checks, all 2,348 Wedding tests and the production build. No
+Oracle release is claimed for DC-12.
 
 ## Completion evidence
 
