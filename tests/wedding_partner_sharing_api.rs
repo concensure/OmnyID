@@ -117,7 +117,7 @@ async fn membership_is_two_person_revisioned_and_revocable() {
     let owner_email = format!("owner-{suffix}@omnyid.test");
     let partner_email = format!("partner-{suffix}@omnyid.test");
     let third_email = format!("third-{suffix}@omnyid.test");
-    let (owner_id, owner_auth) = seed_user(&db, owner_email).await;
+    let (owner_id, owner_auth) = seed_user(&db, owner_email.clone()).await;
     let (partner_id, partner_auth) = seed_user(&db, partner_email.clone()).await;
     let (third_id, third_auth) = seed_user(&db, third_email.clone()).await;
     let plan_id = format!("couple-plan-{suffix}");
