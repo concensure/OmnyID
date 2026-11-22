@@ -12684,3 +12684,37 @@ COW-07C is complete for Budget only. COW-07 remains open for other protected
 domains and general archive/restore UX. No Oracle deployment, GitHub push or PR
 occurred; production remains on WED-392 source
 `afd6d5cc04d3c5996256ca1df131ba7e1de659fb`.
+
+## WED-402 implementation ready for exact-SHA release (2026-11-23)
+
+Worktree `C:/temp/wt/omnyid-wed402`, branch `agent/codex/WED-402`, based on the
+WED-401 record SHA `b1e3d7c929e7cdf02dab294d355d829ed13e1c86`.
+
+The small-wedding alignment task document now has an overriding completion table for
+T1-T16. The public site keeps the selected Soft headline and the mobile-visible
+inclusive elopement, intimate/micro and larger-celebration wording. Existing Wedding
+intake and planning context now support an optional explicit format with conservative
+extraction, deep-link allowlisting, persistence, revision fingerprints, format-aware
+starter/vendor/legal/next-step defaults and a 24-person micro demo. No parallel quote,
+task, menu or planning store was added.
+
+Pricing retains every existing package and adds explicit labels for the first 100
+founding couples receiving the complete Couple's Plan free for two years and the
+first 100 founding vendors receiving the Vendor Management Portal free for life. The
+provided eucalyptus-wreath SVG is the Wedding-mode persona icon. Sprout and the Master
+Agent use the same authenticated Wedding-only route, allowlisted navigation and
+account-scoped staged Budget draft. They can open the current account's Today photo
+picker and first-party Wedding guidance, but cannot use browser plan ids as authority,
+inspect another account, expose project/admin/API/secret material, or bypass existing
+save/send/commit approvals. Mobile Gantt labels now show bounded start/end ticks on
+phones and no longer depend on an 860px minimum chart width.
+
+Working-tree verification passed `npm run typecheck`, all 2,377 Wedding tests,
+`npm run test:wedding-site`, and the production Vite build with
+`NODE_OPTIONS=--max-old-space-size=8192` (1,855 modules). The touched Rust route passes
+targeted rustfmt. Both `cargo test wedding_assistant_routes --lib` attempts crashed the
+Windows compiler with `0xc0000005`, and `cargo check --lib` crashed it with
+`0xc000001d`, before any code diagnostic; the clean Linux release image must therefore
+be the server compile proof. Exact implementation SHA, clean-candidate verification,
+Oracle image/static rollout, rollback location and hosted authenticated evidence are
+still to be appended after release.

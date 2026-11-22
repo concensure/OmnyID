@@ -34,6 +34,7 @@ import type {
   WeddingPlanningScheduleItem,
   WeddingPlanningTaskItem,
 } from "@/lib/weddingCalendarProjectionState";
+import { WEDDING_FORMAT_RECOMMENDED_STARTERS, type WeddingFormat } from "@/lib/weddingFormatState";
 
 export type WeddingTemplateStarterIntent =
   | "venue_search"
@@ -95,36 +96,40 @@ function demoProjectionStorage(): Storage {
   };
 }
 
-function starterPrompts(): WeddingTemplateStarterPrompt[] {
+export function weddingTemplateStarterPrompts(weddingFormat?: WeddingFormat | null): WeddingTemplateStarterPrompt[] {
+  const intimate = weddingFormat === "elopement" || weddingFormat === "micro";
+  const recommended = new Set(weddingFormat ? WEDDING_FORMAT_RECOMMENDED_STARTERS[weddingFormat] : ["venue_search"]);
   return [
     {
       intent: "venue_search",
       label: "Find venues",
-      prompt: "Help me compare wedding venues for our date, guest count, budget comfort, priorities, and location.",
-      recommended: true,
+      prompt: intimate
+        ? "Help me compare ceremony and reception options that work for our smaller guest count, priorities, minimum spends, accessibility, and location."
+        : "Help me compare wedding venues for our date, guest count, budget comfort, priorities, and location.",
+      recommended: recommended.has("venue_search"),
     },
     {
       intent: "budget_plan",
       label: "Build budget",
-      prompt: "Create a wedding budget sheet with estimates, deposits, due amounts, hidden-cost warnings, and next checks.",
-      recommended: false,
+      prompt: weddingFormat === "undecided" ? "Compare what 10, 30 and 80 guests would mean for our budget and plan." : "Create a wedding budget sheet with estimates, deposits, due amounts, hidden-cost warnings, and next checks.",
+      recommended: recommended.has("budget_plan"),
     },
     {
       intent: "guest_list",
       label: "Organize guests",
       prompt: "Help me structure a guest list, RSVP tracking plan, family groups, dietary notes, and privacy-safe sharing.",
-      recommended: false,
+      recommended: recommended.has("guest_list"),
     },
     {
       intent: "vendor_emails",
       label: "Draft vendor emails",
-      prompt: "Draft approval-gated vendor emails that ask for availability, packages, inclusions, and next steps.",
-      recommended: false,
+      prompt: weddingFormat === "elopement" ? "Draft approval-gated enquiries to a celebrant and photographer asking about availability, inclusions and legal paperwork." : "Draft approval-gated vendor emails that ask for availability, packages, inclusions, and next steps.",
+      recommended: recommended.has("vendor_emails"),
     },
     {
       intent: "run_sheet",
       label: "Make run sheet",
-      prompt: "Create a wedding run sheet with ceremony, reception, vendor arrival, photos, transport, and contingency timing.",
+      prompt: weddingFormat === "elopement" ? "Create a wedding run sheet with ceremony, vendor arrival, photos, and contingency timing." : "Create a wedding run sheet with ceremony, reception, vendor arrival, photos, transport, and contingency timing.",
       recommended: false,
     },
     {
@@ -139,6 +144,7 @@ function starterPrompts(): WeddingTemplateStarterPrompt[] {
 export function buildWeddingTemplateEntryState(input: {
   seed?: string | null;
   sourceResponseId?: string | null;
+  weddingFormat?: "elopement" | "micro" | "undecided" | "larger" | null;
 } = {}): WeddingTemplateEntryState {
   const seed = clean(input.seed) || "wedding planning";
   const weddingPlanId = weddingPlanIdFromSeed(seed);
@@ -153,13 +159,14 @@ export function buildWeddingTemplateEntryState(input: {
   return {
     templateId: "wedding_planning",
     label: "Wedding Planning",
-    description: "Plan venues, budgets, vendors, guests, drafts, run sheets, and registry ideas as saved wedding documents.",
+    description: "Plan only what your kind of wedding needs, from legal essentials and a small ceremony to a larger celebration.",
     metadata,
-    starterPrompts: starterPrompts(),
+    starterPrompts: weddingTemplateStarterPrompts(input.weddingFormat),
     firstResponseInstruction: [
       "Create a wedding planning response with one simple question if details are missing.",
       "Attach generated wedding documents and keep emails or sharing approval-gated.",
       "Do not claim live availability, payment, booking, registry publishing, or external calendar sync unless an integration proves it.",
+      "Use the saved celebration format to order suggestions, but never infer that format as a settled choice from guest count alone.",
     ].join(" "),
     canStartUnder60Seconds: true,
   };
@@ -169,6 +176,7 @@ export function buildWeddingTemplateDemoState(): WeddingTemplateDemoState {
   const entry = buildWeddingTemplateEntryState({
     seed: "sample harbour wedding",
     sourceResponseId: "demo:wedding-response",
+    weddingFormat: "micro",
   });
   const demoMetadata = {
     weddingPlanId: entry.metadata.weddingPlanId,
@@ -183,7 +191,7 @@ export function buildWeddingTemplateDemoState(): WeddingTemplateDemoState {
       "Sample venue comparison focuses on water views, wet-weather backup, and transport access.",
       "Sample timeline assumes a spring ceremony and early-evening reception.",
     ],
-    assumptions: ["Sample data only; not real vendor availability.", "Guest count example: 90."],
+    assumptions: ["Sample data only; not real vendor availability.", "Guest count example: 24.", "Celebration format: micro wedding."],
     verificationActions: ["Replace sample vendors with real venues.", "Confirm live pricing and inclusions before booking."],
     sourceLabels: ["Sample demo data"],
     locationLabels: ["Sydney Harbour"],
@@ -193,7 +201,7 @@ export function buildWeddingTemplateDemoState(): WeddingTemplateDemoState {
         category: "venue",
         location: "Sydney Harbour",
         priceEstimate: "Sample $22k-$30k",
-        capacity: "Sample 90-120",
+        capacity: "Sample 20-40",
         fitReason: "Water views and indoor backup.",
         risks: "Sample only; availability unverified.",
         contact: "demo-only@example.invalid",
@@ -280,10 +288,12 @@ export function buildWeddingTemplateDemoState(): WeddingTemplateDemoState {
     title: "Sample harbour wedding plan",
     metadata: demoMetadata,
     planningContext: {
+      weddingFormat: "micro",
+      weddingFormatSource: "explicit",
       dateOrSeason: "Spring 2027",
       location: "Sydney",
       countryCode: "AU",
-      guestCount: 90,
+      guestCount: 24,
       budgetComfort: "mid-range",
       topPriorities: ["water views", "low stress", "food"],
       noimDownloaded: "unknown",

@@ -1,5 +1,5 @@
 // @locs-version: 1.0
-import { createEffect, createSignal, For, Show } from "solid-js";
+import { createEffect, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { blobAsDataUrl, compressImageCardUpload } from "@/lib/imageCardCompression";
 import { loadWeddingHomePhotoCards, saveWeddingHomePhotoCards, type WeddingHomePhotoCard } from "@/lib/weddingHomePhotoCardState";
 
@@ -7,6 +7,13 @@ export function WeddingHomePhotoCards(props: { userId?: string | null }) {
   const [cards, setCards] = createSignal<WeddingHomePhotoCard[]>([]);
   const [notice, setNotice] = createSignal<string | null>(null);
   let input: HTMLInputElement | undefined;
+  let addButton: HTMLButtonElement | undefined;
+
+  onMount(() => {
+    const openPicker = () => { addButton?.focus(); input?.click(); };
+    window.addEventListener("omnyid:wedding-add-photo", openPicker);
+    onCleanup(() => window.removeEventListener("omnyid:wedding-add-photo", openPicker));
+  });
 
   createEffect(() => setCards(loadWeddingHomePhotoCards(props.userId)));
   const persist = (next: WeddingHomePhotoCard[]) => {
@@ -48,7 +55,7 @@ export function WeddingHomePhotoCards(props: { userId?: string | null }) {
         <button type="button" class="absolute bottom-2 right-2 rounded-lg bg-white/95 px-2 py-1 text-[11px] font-semibold shadow-sm" onClick={() => element && updateSize(card.id, element)}>Save size</button>
       </article>;
     }}</For></div>
-    <button type="button" class="mt-3 flex min-h-28 w-full items-center justify-center rounded-2xl border border-dashed border-wedding-primary/45 bg-wedding-page text-wedding-primary transition hover:bg-wedding-slate" onClick={() => input?.click()} aria-label={cards().length ? "Add another wedding photo" : "Add a wedding photo"}>
+    <button ref={addButton} type="button" class="mt-3 flex min-h-28 w-full items-center justify-center rounded-2xl border border-dashed border-wedding-primary/45 bg-wedding-page text-wedding-primary transition hover:bg-wedding-slate" onClick={() => input?.click()} aria-label={cards().length ? "Add another wedding photo" : "Add a wedding photo"}>
       <span class="flex flex-col items-center gap-2"><span class="flex h-11 w-11 items-center justify-center rounded-full border border-current text-2xl">+</span><span class="text-sm font-semibold">{cards().length ? "Add another photo" : "Add a photo"}</span></span>
     </button>
     <input ref={input} type="file" accept="image/*" class="hidden" onChange={(event) => void add(event)} />

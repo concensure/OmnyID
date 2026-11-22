@@ -5,9 +5,14 @@ import {
   weddingTargetDateOrSeasonLabel,
   weddingTimelineWeddingDateLabel,
 } from "@/lib/weddingTimelineWeddingDateState";
+import { weddingFormatFromWorkspace } from "@/lib/weddingFormatState";
 
 export type WeddingNextStepPriority =
   | "wedding_date"
+  | "ceremony_place"
+  | "celebrant_legal"
+  | "witnesses"
+  | "format_tradeoff"
   | "budget"
   | "guests"
   | "vendor_follow_up"
@@ -100,6 +105,14 @@ export function buildWeddingNextStepState(state: WeddingResponseWorkspaceViewSta
   });
   const assignedTaskCount = openTasks.filter((task) => typeof task.assignee === "string" && task.assignee.trim().length > 0).length;
   const vendorsNeedingAction = state.vendorContactCards.filter((card) => card.tone === "urgent" || card.tone === "due");
+  const weddingFormat = weddingFormatFromWorkspace(state);
+  const decisionText = JSON.stringify(state.decisionRecordCards ?? []).toLowerCase();
+  const hasVenueDecision = /venue|ceremony (?:spot|place)|location/.test(decisionText);
+  const hasOfficiantDecision = /officiant|celebrant/.test(decisionText);
+  const hasPhotographerDecision = /photograph/.test(decisionText);
+  const witnessTask = state.planningTaskItems.find((task) => task.id.startsWith("wedding-legal-witnesses:"));
+  const witnessDone = Boolean(witnessTask && /done|complete|accepted/i.test(witnessTask.reviewStatus ?? ""));
+  const celebrantPath = (state.contextCards ?? []).map((card) => String(card.planningContext?.celebrantPath ?? "")).find(Boolean) ?? "";
 
   const baseLabels = [
     `Budget left: ${currencyLabel(state.budgetTracking.remainingAmount)}`,
@@ -126,6 +139,24 @@ export function buildWeddingNextStepState(state: WeddingResponseWorkspaceViewSta
         ...baseLabels.slice(0, 2),
       ],
     });
+  }
+  if (weddingFormat === "elopement" && !hasVenueDecision) {
+    return make({ priority: "ceremony_place", title: "Choose the ceremony spot", detail: "Choose the place before comparing availability and the travel or permit details that depend on it.", actionLabel: "Review ceremony places", menuId: "plan", secondaryLabels: ["Your elopement format keeps this decision ahead of reception-only work.", ...baseLabels] });
+  }
+  if (weddingFormat === "elopement" && celebrantPath !== "own_celebrant" && !hasOfficiantDecision) {
+    return make({ priority: "celebrant_legal", title: "Choose a celebrant and check NOIM timing", detail: "Compare an authorised celebrant and confirm the legal notice steps before treating the ceremony plan as settled.", actionLabel: "Review legal setup", menuId: "plan", secondaryLabels: ["External enquiries still require your approval.", ...baseLabels] });
+  }
+  if (weddingFormat === "elopement" && !(witnessDone && hasPhotographerDecision)) {
+    return make({ priority: "witnesses", title: "Confirm two witnesses and a photographer", detail: "Record the two adult witnesses and decide whether a photographer fits the day before the run sheet is final.", actionLabel: "Open people", menuId: "people", secondaryLabels: [`Witnesses: ${witnessDone ? "confirmed" : "not yet confirmed"}`, ...baseLabels.slice(0, 2)] });
+  }
+  if (weddingFormat === "micro" && guestCount === 0) {
+    return make({ priority: "guests", title: "Settle the guest-count range", detail: "A working range makes venue minimums, catering and accessibility checks comparable.", actionLabel: "Open people", menuId: "people", secondaryLabels: ["No guests are saved yet.", ...baseLabels.slice(0, 1)] });
+  }
+  if (weddingFormat === "micro" && !hasVenueDecision) {
+    return make({ priority: "ceremony_place", title: "Choose the venue or meal format", detail: "Compare minimum spends and what each option includes for your smaller guest count.", actionLabel: "Review venues", menuId: "plan", secondaryLabels: ["Keep unknown fees separate until confirmed.", ...baseLabels] });
+  }
+  if (weddingFormat === "undecided") {
+    return make({ priority: "format_tradeoff", title: "Compare 10, 30 and 80 guests", detail: "See how each size changes the budget, venue minimums and the planning tools you need, then choose only when ready.", actionLabel: "Compare in budget", menuId: "budget", secondaryLabels: ["This remains open until you choose a celebration format.", ...baseLabels] });
   }
   if (budgetTarget === null) {
     return make({

@@ -39,8 +39,8 @@ test("buildWeddingTemplateLaunchState creates a real starter workspace for templ
   assert.equal(state.richResponse.renderer, "wedding_travel_style_response");
   assert.equal(state.richResponse.workspaceId, "response_workspace:harbour-first-response");
   assert.equal(state.richResponse.primaryAction.kind, "open_planning_files");
-  assert.equal(state.presentation.probing.nextQuestion?.slot, "date_or_season");
-  assert.match(state.nextQuestionLabel, /wedding date, month, or season/i);
+  assert.equal(state.presentation.probing.nextQuestion?.slot, "wedding_format");
+  assert.match(state.nextQuestionLabel, /kind of wedding/i);
 });
 
 test("buildWeddingTemplateLaunchState carries starter prompts without demo claims", () => {

@@ -15,6 +15,18 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-402
+    title: Complete small-wedding alignment, founding pricing labels, scoped Wedding agent actions and mobile timeline recovery
+    status: in_progress
+    owner: codex
+    reviewer: claude
+    branch: agent/codex/WED-402
+    worktree: C:/temp/wt/omnyid-wed402
+    base_sha: b1e3d7c929e7cdf02dab294d355d829ed13e1c86
+    depends_on: [WED-401, WED-400, WED-390, WED-384]
+    files: [wedding/**, solid-ui/src/**, solid-ui/public/**, solid-ui/tests/**, src/server/**, src/wedding_*.rs, tests/**, Documents/marketing/Brand/**, Documents/images/characters/omnyid-wedding-eucalyptus-wreath-icon.svg, .agent/**]
+    acceptance: [reconcile every item in the small-wedding alignment task document against the latest Wedding implementation and complete or explicitly retire only genuinely obsolete work, add non-destructive founding-couple and founding-vendor labels to the existing pricing packages with clear eligibility limits and regression coverage, use the existing eucalyptus wreath SVG as the initial Wedding agent persona icon without introducing a parallel persona system, let the Master Agent and Sprout answer general or current-user Wedding questions and propose or perform only allowlisted current-account Wedding workspace changes through existing approval and AFP action flows, support account-scoped view activation and Today image-card additions while preventing admin project API secret and other-user access or mutation, point to relevant first-party Wedding blog guidance when useful, make the mobile Wedding timeline horizontally complete and date labels legible without changing decision-card design, pass focused full Wedding typecheck build security and browser tests from a clean exact candidate, deploy the exact committed candidate to Oracle with rollback and authenticated post-deploy proof]
+    progress: "Implementation complete on the WED-401 release lineage. The old T1-T16 small-wedding document is reconciled in-place: Soft public copy remains inclusive, the existing intake now carries an optional explicit format through revisioned planning context, and format-aware starters, vendors, legal witness work, next steps, deep links and demo state extend rather than replace current planning. Pricing adds founding-couple and founding-vendor labels without replacing packages. Wedding mode uses the eucalyptus persona; Sprout and Master Agent share the authenticated bounded assistant, allowlisted current-account navigation/staged Budget draft flow and first-party guides, while refusing internals, secrets and other accounts. Today photo addition opens the account-scoped image-card picker and still requires the user's file choice. Mobile Gantt endpoints remain in bounds and phone labels reduce to legible start/end dates. Working-tree proof: TypeScript, 2,377/2,377 Wedding tests, public/security Wedding site suite and the 1,855-module production build pass. The touched Rust route is formatted and has unit coverage; Windows rustc crashes with host exceptions before diagnostics, so the clean Linux release image is the authoritative server compile gate. Exact-SHA clean release verification and Oracle rollout remain."
   - id: WED-401
     title: Recover OAuth workspace rendering and propagate material Wedding plan changes into decisions
     status: done

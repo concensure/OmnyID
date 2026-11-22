@@ -18,6 +18,7 @@ import { weddingVendorMustDecideFirstCategories } from "@/lib/weddingVendorLeadT
 import type { WeddingVendorSearchResultAction } from "@/lib/weddingVendorSearchResultActionState";
 import { WEDDING_VOW_STYLE_OPTIONS } from "@/lib/weddingVowPlanningState";
 import { australianWeddingLocationSuggestions } from "@/lib/australianWeddingLocationSuggestionState";
+import { inferWeddingFormatFromGuestCount, WEDDING_FORMAT_OPTIONS, weddingFormatLabel, type WeddingFormat } from "@/lib/weddingFormatState";
 
 const STEP_LABELS = ["The basics", "Vendors", "Legal & vows", "Review"] as const;
 const LAST_STEP = STEP_LABELS.length - 1;
@@ -80,6 +81,8 @@ export function WeddingSiteIntakeWizard(props: {
   onWeddingFollowUpLocationInput: (value: string) => void;
   weddingFollowUpGuests: () => string;
   onWeddingFollowUpGuestsInput: (value: string) => void;
+  weddingFollowUpFormat: () => WeddingFormat | "";
+  onWeddingFollowUpFormatChange: (value: WeddingFormat) => void;
   weddingFollowUpBudget: () => string;
   onWeddingFollowUpBudgetInput: (value: string) => void;
   weddingFollowUpPriorities: () => string;
@@ -136,7 +139,7 @@ export function WeddingSiteIntakeWizard(props: {
   const atFirstStep = () => step() === 0;
   const goNext = () => { props.onSaveProgress(); setProgressSaved(true); setStep((current) => Math.min(LAST_STEP, current + 1)); };
   const goBack = () => setStep((current) => Math.max(0, current - 1));
-  const firstVendorCategories = weddingVendorMustDecideFirstCategories();
+  const firstVendorCategories = createMemo(() => weddingVendorMustDecideFirstCategories(props.weddingFollowUpFormat() || null));
 
   const inputClass = "w-full rounded-lg border border-wedding-border bg-white px-3 py-2.5 text-sm font-normal text-wedding-ink outline-none focus:border-wedding-primary focus:ring-2 focus:ring-wedding-primary/15 sm:py-2";
   const labelClass = "space-y-1 text-xs font-semibold text-wedding-ink";
@@ -160,6 +163,8 @@ export function WeddingSiteIntakeWizard(props: {
     props.weddingFollowUpLocation(),
     [],
   ).slice(0, 8));
+  const inferredFormat = createMemo(() => inferWeddingFormatFromGuestCount(props.weddingFollowUpGuests()));
+  const suggestedInferredFormat = createMemo(() => props.weddingFollowUpFormat() ? null : inferredFormat());
   createEffect(() => {
     if (guestDefaultApplied()) return;
     if (!props.weddingFollowUpGuests().trim()) props.onWeddingFollowUpGuestsInput("20");
@@ -228,7 +233,7 @@ export function WeddingSiteIntakeWizard(props: {
   return (
     <section class="min-w-0 rounded-xl border border-wedding-border bg-wedding-card p-3 text-wedding-ink shadow-wedding-card sm:p-4">
       <p class="text-[10px] font-semibold uppercase tracking-[0.18em] text-wedding-primary">
-        Let's set up your wedding
+        Let's start with your kind of day
       </p>
       <h2 class="mt-1 break-words font-display text-lg font-semibold text-wedding-ink">{STEP_LABELS[step()]}</h2>
       <p class="mt-1 break-words text-sm leading-6 text-wedding-ink/70">{headerHint()}</p>
@@ -284,6 +289,16 @@ export function WeddingSiteIntakeWizard(props: {
             vendorCategories: props.weddingFollowUpVendorIds(),
           }}
         />}</Show>
+        <fieldset class="mb-3 rounded-xl border border-wedding-border bg-white p-3">
+          <legend class="px-1 text-xs font-semibold text-wedding-ink">What kind of day feels like yours?</legend>
+          <p class="mt-1 text-[11px] leading-5 text-wedding-ink/65">Optional and changeable. This only tailors the order of your first suggestions.</p>
+          <div class="mt-2 grid gap-2 sm:grid-cols-2">
+            <For each={WEDDING_FORMAT_OPTIONS}>{(option) => <label class={`flex min-h-11 cursor-pointer items-start gap-2 rounded-xl border px-3 py-2 ${props.weddingFollowUpFormat() === option.value ? "border-wedding-primary bg-wedding-page" : "border-wedding-border"}`}>
+              <input type="radio" name="wedding-format" value={option.value} checked={props.weddingFollowUpFormat() === option.value} onChange={() => props.onWeddingFollowUpFormatChange(option.value)} class="mt-1 accent-wedding-primary" />
+              <span><span class="block text-xs font-semibold">{option.label}</span><span class="block text-[11px] leading-4 text-wedding-ink/65">{option.hint}</span></span>
+            </label>}</For>
+          </div>
+        </fieldset>
         <div class="mb-3 rounded-xl border border-wedding-border bg-white px-3 py-2 text-xs leading-5 text-wedding-ink">
           Not sure where to start? Try the <a class="font-semibold text-wedding-secondary underline underline-offset-2" href="/wedding/blog/couples-barely-know-each-other.html">wedding animal quiz</a> to gather your style.
           <Show when={(props.quizSuggestions?.length ?? 0) > 0}>
@@ -318,7 +333,7 @@ export function WeddingSiteIntakeWizard(props: {
               class="min-h-28 w-full rounded-lg border border-wedding-border bg-white px-3 py-2 text-sm font-normal text-wedding-ink outline-none focus:border-wedding-primary focus:ring-2 focus:ring-wedding-primary/15"
               value={props.weddingExtractionText()}
               onInput={(event) => props.onWeddingExtractionTextInput(event.currentTarget.value)}
-              placeholder="Example: We are planning for October 2027 in Sydney for about 90 guests. Our budget is around $40,000 and food and photos matter most."
+              placeholder="Example: We want a personal ceremony and long dinner for about 24 people in Sydney. Photos and time together matter most."
             />
           </label>
           <div class="grid gap-2 sm:flex sm:flex-wrap sm:items-center md:col-span-2">
@@ -437,9 +452,15 @@ export function WeddingSiteIntakeWizard(props: {
             Guest count
             <div class="grid grid-cols-[2.75rem_minmax(0,1fr)_2.75rem] gap-1">
               <button type="button" class="min-h-11 rounded-lg border border-wedding-border bg-white text-lg font-bold" aria-label="Reduce guest count by 10" onClick={() => adjustGuestCount(-10)}>−</button>
-              <input class={`${inputClass} text-center`} type="number" min="0" step="10" inputmode="numeric" value={props.weddingFollowUpGuests()} onInput={(event) => props.onWeddingFollowUpGuestsInput(event.currentTarget.value)} placeholder="20" />
+              <input class={`${inputClass} text-center`} type="text" inputmode="numeric" value={props.weddingFollowUpGuests()} onInput={(event) => props.onWeddingFollowUpGuestsInput(event.currentTarget.value)} placeholder="20" />
               <button type="button" class="min-h-11 rounded-lg border border-wedding-border bg-white text-lg font-bold" aria-label="Increase guest count by 10" onClick={() => adjustGuestCount(10)}>+</button>
             </div>
+            <div class="mt-2 flex flex-wrap gap-1.5">
+              <For each={["0–10", "11–20", "21–40", "41+"]}>{(count) => <button type="button" class="rounded-full border border-wedding-border bg-white px-2.5 py-1 text-[11px] font-semibold" onClick={() => props.onWeddingFollowUpGuestsInput(count)}>{count}</button>}</For>
+              <button type="button" class="rounded-full border border-wedding-border bg-white px-2.5 py-1 text-[11px] font-semibold" onClick={() => props.onWeddingFollowUpGuestsInput("")}>Not sure</button>
+            </div>
+            <p class="mt-1 text-[11px] leading-4 text-wedding-ink/65">Suppliers don't count. A legal ceremony needs two adult witnesses.</p>
+            <Show when={suggestedInferredFormat()}>{(format) => <p class="mt-1 text-[11px] leading-4 text-wedding-ink/65">Based on this guest count, “{weddingFormatLabel(format())}” may fit. Choose it above only if that feels right.</p>}</Show>
           </label>
           <label class={labelClass}>
             Budget comfort
@@ -545,7 +566,7 @@ export function WeddingSiteIntakeWizard(props: {
             </Show>
           </div>
           <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            <For each={firstVendorCategories}>
+            <For each={firstVendorCategories()}>
               {(vendor) => {
                 const checked = () => props.weddingFollowUpVendorIds().includes(vendor.categoryId);
                 return (
@@ -698,6 +719,7 @@ export function WeddingSiteIntakeWizard(props: {
             A starter brief has been created as the first planning file. Approve planning outputs to keep it in Files before adding private details.
           </p>
           <p class="text-xs font-semibold text-on-surface">Choose what OmnyID should prepare first.</p>
+          <p class="text-xs leading-5 text-on-surface-variant">Celebration format: <strong>{weddingFormatLabel(props.weddingFollowUpFormat() || null)}</strong>. You can change this later without losing your plan.</p>
           <div class="grid gap-2 md:grid-cols-3">
             <For each={props.launch.starterCards.slice(0, 6)}>
               {(starter) => (
@@ -738,7 +760,7 @@ export function WeddingSiteIntakeWizard(props: {
               onClick={() => void finishSetup()}
               disabled={finishing()}
             >
-              {finishing() ? "Creating your wedding plan…" : "Create my wedding plan"}
+              {finishing() ? "Creating your wedding plan…" : "Make our starter plan"}
             </button>
             <Show when={props.weddingTemplateFollowUp()}>
               {(followUp) => (

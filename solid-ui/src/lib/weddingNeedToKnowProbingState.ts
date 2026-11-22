@@ -1,5 +1,8 @@
 // @locs-version: 2.0
+import { inferWeddingFormatFromGuestCount, parseWeddingFormat } from "@/lib/weddingFormatState";
+
 export type WeddingProbeSlot =
+  | "wedding_format"
   | "date_or_season"
   | "location"
   | "guest_count"
@@ -31,6 +34,8 @@ export type WeddingDecisionContext =
   | "run_sheet";
 
 export type WeddingPlanningContext = {
+  weddingFormat?: "elopement" | "micro" | "undecided" | "larger" | null;
+  weddingFormatSource?: "explicit" | "deep_link" | "extracted" | null;
   dateOrSeason?: string | null;
   location?: string | null;
   guestCount?: number | string | null;
@@ -135,6 +140,16 @@ const AU_MARRIAGE_SOURCE_LABELS = [
 
 const PROBE_RULES: WeddingProbeRule[] = [
   {
+    slot: "wedding_format",
+    sensitivity: "low",
+    isAnswered: (context) => parseWeddingFormat(context.weddingFormat) !== null || inferWeddingFormatFromGuestCount(context.guestCount) !== null,
+    shouldAsk: () => true,
+    question: "What feels closest to your kind of wedding?",
+    reason: "The format changes which decisions come first and which tools you need.",
+    improves: "first decisions, vendor priorities, workspace tools",
+    suggestedAnswers: ["Just us", "Our closest people", "Not sure yet", "A bigger celebration"],
+  },
+  {
     slot: "date_or_season",
     sensitivity: "low",
     isAnswered: (context) => hasText(context.dateOrSeason),
@@ -162,7 +177,7 @@ const PROBE_RULES: WeddingProbeRule[] = [
     question: "Roughly how many guests should I plan for?",
     reason: "Guest count constrains venue capacity, catering, seating, transport, budget, and run-sheet timing.",
     improves: "budget, venues, catering, seating, run sheet",
-    suggestedAnswers: ["Under 50", "50-100", "100-180"],
+    suggestedAnswers: ["0–10", "11–40", "41–100", "100+"],
   },
   {
     slot: "budget_comfort",

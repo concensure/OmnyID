@@ -3,10 +3,12 @@ import { createMemo, For, Show } from "solid-js";
 import type { UiCommandResponse } from "@/lib/api";
 import { renderMarkdown } from "@/lib/markdownRenderer";
 import { buildMasterAgentConversationState } from "@/lib/masterAgentConversationState";
+import type { WeddingWorkspaceMenuId } from "@/lib/weddingWorkspaceMenuState";
 
 export function MasterAgentConversationResponse(props: {
   query: string;
   response: UiCommandResponse;
+  onWeddingNavigate?: (menu: WeddingWorkspaceMenuId) => void;
 }) {
   const state = createMemo(() => buildMasterAgentConversationState(props.query, props.response));
   const assistantHtml = createMemo(() => renderMarkdown(state().assistantMarkdown));
@@ -42,7 +44,16 @@ export function MasterAgentConversationResponse(props: {
             </p>
             <div class="mt-2 flex flex-wrap gap-2">
               <For each={state().links}>
-                {(link) => (
+                {(link) => link.kind === "wedding_workspace" ? (
+                  <button
+                    type="button"
+                    class="max-w-full break-words rounded-full border border-primary/20 bg-primary/5 px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary/10"
+                    onClick={() => {
+                      const target = new URL(link.url, window.location.origin).searchParams.get("weddingMenu");
+                      if (target) props.onWeddingNavigate?.(target as WeddingWorkspaceMenuId);
+                    }}
+                  >{link.title}</button>
+                ) : (
                   <a
                     href={link.url}
                     target="_blank"

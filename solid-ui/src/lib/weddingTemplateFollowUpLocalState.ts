@@ -1,11 +1,14 @@
 // @locs-version: 2.0
 import type { WeddingPlanningContext } from "@/lib/weddingNeedToKnowProbingState";
 import { normalizeWeddingVendorSelections } from "@/lib/weddingVendorChecklistState";
+import { normalizeWeddingFormat, normalizeWeddingFormatSource, type WeddingFormat, type WeddingFormatSource } from "@/lib/weddingFormatState";
 
 export const WEDDING_TEMPLATE_FOLLOW_UP_KEY_PREFIX = "omnyid.wedding-template-follow-up";
 
 export type WeddingTemplateFollowUpDraft = {
   responseWorkspaceId: string;
+  weddingFormat: WeddingFormat | "";
+  weddingFormatSource: WeddingFormatSource | "";
   dateOrSeason: string;
   location: string;
   guestCount: string;
@@ -80,6 +83,8 @@ export function weddingTemplateFollowUpDraftFromPlanningContext(
   const context = planningContext ?? {};
   return {
     responseWorkspaceId: clean(responseWorkspaceId),
+    weddingFormat: normalizeWeddingFormat(context.weddingFormat) ?? "",
+    weddingFormatSource: normalizeWeddingFormatSource(context.weddingFormatSource) ?? "",
     dateOrSeason: clean(context.dateOrSeason),
     location: clean(context.location),
     guestCount: cleanText(context.guestCount),
@@ -115,6 +120,8 @@ export function mergeWeddingTemplateFollowUpDraftWithApprovedContext(
   const approved = input.approved;
   return {
     responseWorkspaceId: clean(approved.responseWorkspaceId) || clean(current.responseWorkspaceId),
+    weddingFormat: approved.weddingFormat || current.weddingFormat,
+    weddingFormatSource: approved.weddingFormatSource || current.weddingFormatSource,
     dateOrSeason: preferredText(approved.dateOrSeason, current.dateOrSeason),
     location: preferredText(approved.location, current.location),
     guestCount: preferredText(approved.guestCount, current.guestCount),
@@ -145,6 +152,8 @@ function normalizeDraft(value: unknown): WeddingTemplateFollowUpDraft | null {
   if (!responseWorkspaceId || !savedAt) return null;
   return {
     responseWorkspaceId,
+    weddingFormat: normalizeWeddingFormat(record.weddingFormat) ?? "",
+    weddingFormatSource: normalizeWeddingFormatSource(record.weddingFormatSource) ?? "",
     dateOrSeason: clean(record.dateOrSeason),
     location: clean(record.location),
     guestCount: clean(record.guestCount),
@@ -175,6 +184,8 @@ export function saveWeddingTemplateFollowUpDraft(
   if (!target || !key) return null;
   const draft: WeddingTemplateFollowUpDraft = {
     responseWorkspaceId: clean(input.responseWorkspaceId),
+    weddingFormat: normalizeWeddingFormat(input.weddingFormat) ?? "",
+    weddingFormatSource: normalizeWeddingFormatSource(input.weddingFormatSource) ?? "",
     dateOrSeason: clean(input.dateOrSeason),
     location: clean(input.location),
     guestCount: clean(input.guestCount),

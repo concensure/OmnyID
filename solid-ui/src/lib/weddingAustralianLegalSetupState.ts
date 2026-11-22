@@ -14,6 +14,7 @@ import {
   safeWeddingLabel,
   type WeddingPlanningMetadata,
 } from "@/lib/weddingPlanningTemplateState";
+import type { WeddingFormat } from "@/lib/weddingFormatState";
 
 export type WeddingAustralianCelebrantPath =
   | "own_celebrant"
@@ -30,6 +31,7 @@ export type WeddingAustralianLegalSetupInput = {
   celebrantPath?: WeddingAustralianCelebrantPath | string | null;
   celebrantName?: string | null;
   sourceLabels?: readonly string[] | null;
+  weddingFormat?: WeddingFormat | null;
 };
 
 export type WeddingAustralianLegalSetupState = {
@@ -247,7 +249,7 @@ function taskItems(
 ): WeddingPlanningTaskItem[] {
   const noim = noimStatus(input.noimDownloaded);
   const celebrant = celebrantStatus(input.celebrantPath);
-  return [
+  const tasks: WeddingPlanningTaskItem[] = [
     noim === "downloaded"
       ? {
         id: `${legalArtifactId}:task:give-noim-to-celebrant`,
@@ -299,6 +301,22 @@ function taskItems(
         notes: "Research only. Do not claim booking, live availability, or fee certainty until verified with the provider.",
       },
   ];
+  if (input.weddingFormat === "elopement" || input.weddingFormat === "micro") {
+    tasks.push({
+      id: `wedding-legal-witnesses:${metadata.weddingPlanId}`,
+      title: "Confirm two adult witnesses",
+      kind: "legal",
+      priority: "high",
+      dueAt: clean(input.weddingDateIso) ? subtractOneMonth(clean(input.weddingDateIso)) : null,
+      source: "agent",
+      reviewStatus: "accepted",
+      approvalState: "draft",
+      metadata,
+      linkedArtifactId: legalArtifactId,
+      notes: "Your celebrant confirms the exact requirements.",
+    });
+  }
+  return tasks;
 }
 
 function scheduleItems(

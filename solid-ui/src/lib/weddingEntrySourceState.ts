@@ -2,9 +2,12 @@
 // Distinguishes a visitor who deep-linked in from the wedding marketing site
 // (omnyid.com/wedding, via ?source=wedding) from everyone else, so the wedding
 // intake can show the right variant and never flip once a user has seen one.
+import { parseWeddingFormat, type WeddingFormat } from "@/lib/weddingFormatState";
+
 export type WeddingEntrySource = "wedding_site" | "wedding_quiz" | "generic";
 
 const WEDDING_ENTRY_SOURCE_KEY = "omnyid.wedding.entry-source";
+const WEDDING_ENTRY_FORMAT_KEY = "omnyid.wedding.entry-format";
 
 function scopedKey(baseKey: string, userId?: string | null): string {
   const scope = userId?.trim();
@@ -36,6 +39,21 @@ export function loadWeddingEntrySource(userId?: string | null): WeddingEntrySour
   } catch {
     return null;
   }
+}
+
+export function saveWeddingEntryFormat(format: unknown, userId?: string | null): void {
+  const parsed = parseWeddingFormat(format);
+  if (!parsed) return;
+  try { localStorage.setItem(scopedKey(WEDDING_ENTRY_FORMAT_KEY, userId), parsed); } catch { /* convenience state only */ }
+}
+
+export function loadWeddingEntryFormat(userId?: string | null): WeddingFormat | null {
+  try { return parseWeddingFormat(localStorage.getItem(scopedKey(WEDDING_ENTRY_FORMAT_KEY, userId))); }
+  catch { return null; }
+}
+
+export function clearWeddingEntryFormat(userId?: string | null): void {
+  try { localStorage.removeItem(scopedKey(WEDDING_ENTRY_FORMAT_KEY, userId)); } catch { /* convenience state only */ }
 }
 
 /** Locks in which intake variant a given wedding plan has already shown, so it can't flip mid-flow. */

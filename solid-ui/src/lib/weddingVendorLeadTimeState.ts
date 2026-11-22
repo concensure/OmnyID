@@ -8,6 +8,7 @@ import {
   safeWeddingLabel,
 } from "@/lib/weddingPlanningTemplateState";
 import { WEDDING_VENDOR_LEAD_TIME_RULES } from "@/lib/weddingTaskCatalogueState";
+import { WEDDING_FORMAT_MUST_DECIDE_FIRST, type WeddingFormat } from "@/lib/weddingFormatState";
 
 export type WeddingVendorLeadTimeCategory = {
   categoryId: string;
@@ -108,8 +109,12 @@ export function weddingVendorLeadTimeCoverageState(): { checklistCount: number; 
   };
 }
 
-export function weddingVendorMustDecideFirstCategories(): WeddingVendorLeadTimeCategory[] {
-  return WEDDING_VENDOR_LEAD_TIME_CATEGORIES.filter((item) => item.mustDecideFirst === true);
+export function weddingVendorMustDecideFirstCategories(format?: WeddingFormat | null): WeddingVendorLeadTimeCategory[] {
+  const ids = new Set(format ? WEDDING_FORMAT_MUST_DECIDE_FIRST[format] : WEDDING_VENDOR_LEAD_TIME_CATEGORIES.filter((item) => item.mustDecideFirst).map((item) => item.categoryId));
+  return WEDDING_VENDOR_CHECKLIST.filter((item) => ids.has(item.id)).map((item) => {
+    const known = WEDDING_VENDOR_LEAD_TIME_CATEGORIES.find((category) => category.categoryId === item.id);
+    return known ?? { categoryId: item.id, label: item.label, idealLeadMonths: [6, 12] as const, hardDeadlineMonths: 2, mustDecideFirst: true };
+  });
 }
 
 function terminalCategoryIds(input: {
@@ -140,6 +145,7 @@ function terminalCategoryIds(input: {
 }
 
 export function buildWeddingVendorLeadTimeRecommendations(input: {
+  weddingFormat?: WeddingFormat | null;
   weddingDateOrSeason?: string | null;
   now?: Date | string | null;
   selectedCategoryIds?: readonly unknown[] | null;
@@ -153,6 +159,7 @@ export function buildWeddingVendorLeadTimeRecommendations(input: {
   const selected = new Set(normalizeWeddingVendorSelections(input.selectedCategoryIds));
   const skipped = new Set(normalizeWeddingVendorSelections(input.skippedCategoryIds));
   const terminal = terminalCategoryIds(input);
+  const formatFirst = new Set(weddingVendorMustDecideFirstCategories(input.weddingFormat).map((item) => item.categoryId));
   return WEDDING_VENDOR_LEAD_TIME_CATEGORIES
     .filter((category) => !skipped.has(category.categoryId))
     .filter((category) => !terminal.has(category.categoryId))
@@ -165,14 +172,14 @@ export function buildWeddingVendorLeadTimeRecommendations(input: {
           label: category.label,
           idealLeadMonths: category.idealLeadMonths,
           hardDeadlineMonths: category.hardDeadlineMonths ?? null,
-          mustDecideFirst: category.mustDecideFirst === true,
-          urgencyScore: category.mustDecideFirst ? 30 : selected.has(category.categoryId) ? 18 : 8,
-          rankWeight: category.mustDecideFirst ? 42 : selected.has(category.categoryId) ? 28 : 16,
+          mustDecideFirst: formatFirst.has(category.categoryId),
+          urgencyScore: formatFirst.has(category.categoryId) ? 30 : selected.has(category.categoryId) ? 18 : 8,
+          rankWeight: formatFirst.has(category.categoryId) ? 42 : selected.has(category.categoryId) ? 28 : 16,
           windowOpenAt: null,
           windowCloseAt: null,
           status: "unknown_date",
           timingLabel: `${category.label}: ideally research ${minMonths}-${maxMonths} months before the wedding.`,
-          reasonLabel: category.mustDecideFirst
+          reasonLabel: formatFirst.has(category.categoryId)
             ? hasPlanningWindow
               ? "Use the saved date or season as a search range, then confirm exact availability before treating a venue as viable."
               : "Venue availability can help set the wedding date; compare suitable options first, then confirm an exact date before booking."
@@ -199,9 +206,9 @@ export function buildWeddingVendorLeadTimeRecommendations(input: {
         label: category.label,
         idealLeadMonths: category.idealLeadMonths,
         hardDeadlineMonths: category.hardDeadlineMonths ?? null,
-        mustDecideFirst: category.mustDecideFirst === true,
+        mustDecideFirst: formatFirst.has(category.categoryId),
         urgencyScore,
-        rankWeight: 18 + urgencyScore + (category.mustDecideFirst ? 10 : 0) + (selected.has(category.categoryId) ? 8 : 0),
+        rankWeight: 18 + urgencyScore + (formatFirst.has(category.categoryId) ? 10 : 0) + (selected.has(category.categoryId) ? 8 : 0),
         windowOpenAt: isoDate(windowOpenAt),
         windowCloseAt: isoDate(windowCloseAt),
         status,

@@ -109,6 +109,7 @@ function boolLabel(value: WeddingPlanningContext["noimDownloaded"]): string | nu
 
 function answeredLabels(context: WeddingPlanningContext): string[] {
   return uniqueStrings([
+    hasAnswer(context.weddingFormat) ? `Celebration format: ${context.weddingFormat}` : null,
     hasAnswer(context.dateOrSeason) ? `Date/season: ${context.dateOrSeason}` : null,
     hasAnswer(context.location) ? `Location: ${context.location}` : null,
     hasAnswer(context.guestCount) ? `Guest count: ${context.guestCount}` : null,
@@ -129,6 +130,8 @@ function answeredLabels(context: WeddingPlanningContext): string[] {
 
 function normalizeContext(input: WeddingTemplateFollowUpInput): WeddingPlanningContext {
   return {
+    weddingFormat: input.weddingFormat ?? null,
+    weddingFormatSource: input.weddingFormatSource ?? null,
     dateOrSeason: clean(input.dateOrSeason) || null,
     location: clean(input.location) || null,
     guestCount: typeof input.guestCount === "number" ? input.guestCount : clean(input.guestCount) || null,
@@ -345,6 +348,7 @@ export function buildWeddingTemplateFollowUpState(input: WeddingTemplateFollowUp
       location: planningContext.location,
       noimDownloaded: planningContext.noimDownloaded,
       celebrantPath: planningContext.celebrantPath,
+      weddingFormat: planningContext.weddingFormat,
       sourceLabels: ["Wedding Planning Need-To-Know answers"],
     })
     : null;

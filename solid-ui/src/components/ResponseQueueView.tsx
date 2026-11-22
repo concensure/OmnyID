@@ -179,6 +179,8 @@ import {
   weddingTemplateFollowUpDraftFromPlanningContext,
   type WeddingTemplateFollowUpDraft,
 } from "@/lib/weddingTemplateFollowUpLocalState";
+import { inferWeddingFormatFromGuestCount, type WeddingFormat } from "@/lib/weddingFormatState";
+import { clearWeddingEntryFormat, loadWeddingEntryFormat } from "@/lib/weddingEntrySourceState";
 import {
   readWeddingAnimalQuizHandoff,
   weddingAnimalQuizHandoffToOnboardingSeed,
@@ -355,6 +357,7 @@ export function ResponseQueueView(props: {
   const [weddingFollowUpDate, setWeddingFollowUpDate] = createSignal("");
   const [weddingFollowUpLocation, setWeddingFollowUpLocation] = createSignal("");
   const [weddingFollowUpGuests, setWeddingFollowUpGuests] = createSignal("");
+  const [weddingFollowUpFormat, setWeddingFollowUpFormat] = createSignal<WeddingFormat | "">("");
   const [weddingFollowUpBudget, setWeddingFollowUpBudget] = createSignal("");
   const [weddingFollowUpPriorities, setWeddingFollowUpPriorities] = createSignal("");
   const [weddingFollowUpAtmosphere, setWeddingFollowUpAtmosphere] = createSignal("");
@@ -385,6 +388,13 @@ export function ResponseQueueView(props: {
   const [weddingExtractionNotice, setWeddingExtractionNotice] = createSignal("");
   const [weddingImportNotice, setWeddingImportNotice] = createSignal("");
   const [weddingImportRunning, setWeddingImportRunning] = createSignal(false);
+
+  onMount(() => {
+    const userId = weddingStorageUserId();
+    const format = loadWeddingEntryFormat(userId);
+    if (format && !weddingFollowUpFormat()) setWeddingFollowUpFormat(format);
+    clearWeddingEntryFormat(userId);
+  });
 
   createEffect(() => {
     if (!weddingImportNotice()) return;
@@ -447,6 +457,8 @@ export function ResponseQueueView(props: {
     const noimDownloaded = weddingFollowUpNoim();
     return {
       responseWorkspaceId,
+      weddingFormat: weddingFollowUpFormat(),
+      weddingFormatSource: weddingFollowUpFormat() ? "explicit" : "",
       dateOrSeason: weddingFollowUpDate(),
       location: weddingFollowUpLocation(),
       guestCount: weddingFollowUpGuests(),
@@ -486,6 +498,7 @@ export function ResponseQueueView(props: {
       approved: draft,
     });
     setWeddingFollowUpDate(merged.dateOrSeason);
+    setWeddingFollowUpFormat(merged.weddingFormat);
     setWeddingFollowUpLocation(merged.location);
     setWeddingFollowUpGuests(merged.guestCount);
     setWeddingFollowUpBudget(merged.budgetComfort);
@@ -754,6 +767,8 @@ export function ResponseQueueView(props: {
       responseWorkspaceId: intent.responseWorkspaceId,
       sourceResponseId: intent.sourceResponseId,
       dateOrSeason: weddingFollowUpDate(),
+      weddingFormat: weddingFollowUpFormat() || undefined,
+      weddingFormatSource: weddingFollowUpFormat() ? "explicit" : undefined,
       location: weddingFollowUpLocation(),
       guestCount: weddingFollowUpGuests(),
       budgetComfort: weddingFollowUpBudget(),
@@ -1190,6 +1205,7 @@ export function ResponseQueueView(props: {
       }
       const draft = loadWeddingTemplateFollowUpDraft(intent.responseWorkspaceId, localStorage, weddingStorageUserId());
       if (draft) {
+        setWeddingFollowUpFormat(draft.weddingFormat);
         setWeddingFollowUpDate(draft.dateOrSeason);
         setWeddingFollowUpLocation(draft.location);
         setWeddingFollowUpGuests(draft.guestCount);
@@ -1493,6 +1509,8 @@ export function ResponseQueueView(props: {
     if (intent) {
       saveWeddingTemplateFollowUpDraft({
         responseWorkspaceId: intent.responseWorkspaceId,
+        weddingFormat: weddingFollowUpFormat(),
+        weddingFormatSource: weddingFollowUpFormat() ? "explicit" : "",
         dateOrSeason: weddingFollowUpDate(),
         location: weddingFollowUpLocation(),
         guestCount: weddingFollowUpGuests(),
@@ -1604,8 +1622,13 @@ export function ResponseQueueView(props: {
       },
     });
     setWeddingFollowUpDate(state.draft.dateOrSeason ?? "");
+    if (state.draft.weddingFormat && !weddingFollowUpFormat()) setWeddingFollowUpFormat(state.draft.weddingFormat);
     setWeddingFollowUpLocation(state.draft.location ?? "");
     setWeddingFollowUpGuests(state.draft.guestCount ?? "");
+    if (!weddingFollowUpFormat()) {
+      const inferred = inferWeddingFormatFromGuestCount(state.draft.guestCount);
+      if (inferred) setWeddingFollowUpFormat(inferred);
+    }
     setWeddingFollowUpBudget(state.draft.budgetComfort ?? "");
     setWeddingFollowUpPriorities(state.draft.prioritiesCsv ?? "");
     setWeddingFollowUpAtmosphere(state.draft.atmosphereDescription ?? "");
@@ -2109,6 +2132,8 @@ export function ResponseQueueView(props: {
             onWeddingFollowUpLocationInput={setWeddingFollowUpLocation}
             weddingFollowUpGuests={weddingFollowUpGuests}
             onWeddingFollowUpGuestsInput={setWeddingFollowUpGuests}
+            weddingFollowUpFormat={weddingFollowUpFormat}
+            onWeddingFollowUpFormatChange={setWeddingFollowUpFormat}
             weddingFollowUpBudget={weddingFollowUpBudget}
             onWeddingFollowUpBudgetInput={setWeddingFollowUpBudget}
             weddingFollowUpPriorities={weddingFollowUpPriorities}

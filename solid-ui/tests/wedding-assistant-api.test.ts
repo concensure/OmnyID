@@ -9,6 +9,7 @@ test("normalizes a review-first Wedding navigation suggestion", () => {
     suggested_action: { kind: "stage_update", target: "budget", label: "Review Budget", draft_fields: { budget_target_aud: 35000 } },
   }), {
     answer: "Open Budget and review the amount before saving.",
+    links: [],
     model: "funded-model",
     suggestedAction: { kind: "stage_update", target: "budget", label: "Review Budget", draftFields: { budgetTargetAud: 35000 } },
   });

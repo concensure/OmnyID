@@ -1,7 +1,9 @@
 // @locs-version: 2.0
 import type { WeddingTemplateFollowUpDraftInput } from "@/lib/weddingTemplateFollowUpLocalState";
+import { normalizeWeddingFormat, normalizeWeddingFormatSource, type WeddingFormat } from "@/lib/weddingFormatState";
 
 export type WeddingNeedToKnowExtractedSlot =
+  | "wedding_format"
   | "date_or_season"
   | "location"
   | "guest_count"
@@ -64,6 +66,8 @@ function baseDraft(input: WeddingNeedToKnowExtractionInput): WeddingTemplateFoll
   const existing: Partial<WeddingTemplateFollowUpDraftInput> = input.existingDraft ?? {};
   return {
     responseWorkspaceId: input.responseWorkspaceId,
+    weddingFormat: normalizeWeddingFormat(existing.weddingFormat) ?? "",
+    weddingFormatSource: normalizeWeddingFormatSource(existing.weddingFormatSource) ?? "",
     dateOrSeason: clean(existing.dateOrSeason),
     location: clean(existing.location),
     guestCount: clean(existing.guestCount),
@@ -86,6 +90,13 @@ function baseDraft(input: WeddingNeedToKnowExtractionInput): WeddingTemplateFoll
     requested: existing.requested === true,
     nowIso: clean(input.nowIso) || existing.nowIso,
   };
+}
+
+function extractWeddingFormat(text: string): WeddingFormat | null {
+  if (/\belop(?:e|ed|es|ing|ement)\b|\bjust (?:the )?(?:two|2) of us\b|\bjust us\b/i.test(text)) return "elopement";
+  if (/\bmicro[- ]?wedding\b|\bsmall wedding\b|\bintimate (?:wedding|ceremony|celebration)\b/i.test(text)) return "micro";
+  if (/\bnot sure (?:how big|about size)\b|\bstill deciding (?:on )?(?:size|guests)\b/i.test(text)) return "undecided";
+  return null;
 }
 
 function extractDateOrSeason(text: string, nowIso?: string | null): string | null {
@@ -218,6 +229,13 @@ export function buildWeddingNeedToKnowExtractionState(
   const draft = baseDraft(input);
   const capturedSlots: WeddingNeedToKnowExtractedSlot[] = [];
   const needsReviewLabels: string[] = [];
+
+  const weddingFormat = extractWeddingFormat(text);
+  if (weddingFormat && draft.weddingFormatSource !== "explicit") {
+    draft.weddingFormat = weddingFormat;
+    draft.weddingFormatSource = "extracted";
+    capturedSlots.push("wedding_format");
+  }
 
   const dateOrSeason = extractDateOrSeason(text, input.nowIso);
   if (dateOrSeason) {

@@ -492,6 +492,11 @@ for (const retired of ['Revenue is your subscription', 'No vendor commissions', 
 }
 const pricing = htmlByPath.get(normalize(resolve(root, 'pricing.html'))) ?? '';
 if (!pricing.includes('$39 <small>AUD / one-off</small>')) failures.push('pricing.html: Couple\'s Plan must be $39 AUD / one-off');
+if (!pricing.includes('Founding couple offer · first 100 couples') || !pricing.includes('free for two years')) failures.push('pricing.html: founding couple two-year offer label is missing');
+if (!pricing.includes('Founding vendor offer · first 100 vendors') || !pricing.includes('Vendor Management Portal free for life')) failures.push('pricing.html: founding vendor lifetime portal offer label is missing');
+if (!pricing.includes('separate from the paid planner and studio plan')) failures.push('pricing.html: founding vendor offer must stay distinct from the paid Companies plan');
+const landing = htmlByPath.get(normalize(resolve(root, 'index.html'))) ?? '';
+for (const format of ['elopement', 'micro', 'undecided']) if (!landing.includes(`source=wedding&amp;format=${format}`)) failures.push(`index.html: missing allowlisted ${format} format chip`);
 if (pricing.includes('Full Autonomy') || pricing.includes('$69')) failures.push('pricing.html: Full Autonomy plan must be removed');
 if (pricing.includes('Up to 3 saved vendor comparisons')) failures.push('pricing.html: free plan must not cap vendor comparisons');
 if (!pricing.includes('Email drafting &amp; approval')) failures.push('pricing.html: free plan must include email drafting and approval');

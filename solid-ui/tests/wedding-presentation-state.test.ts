@@ -36,7 +36,7 @@ test("buildWeddingPresentationState creates sparse response with one need-to-kno
   assert.match(state.subtitle, /Needs one more detail/i);
   assert.equal(state.primaryAction.kind, "open_planning_files");
   assert.equal(state.primaryAction.responseWorkspaceId, "response_workspace:planning-pass");
-  assert.equal(state.probing.nextQuestion?.slot, "date_or_season");
+  assert.equal(state.probing.nextQuestion?.slot, "wedding_format");
   assert.equal(overview?.cards.length, 1);
   assert.equal(overview?.cards[0]?.primaryAction?.kind, "answer_probe");
   assert.equal(overview?.cards[0]?.secondaryAction?.kind, "continue_chat");

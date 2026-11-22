@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { buildWeddingGanttTimelineState } from "@/lib/weddingGanttTimelineState";
-import { weddingGanttAxisTicks } from "@/lib/weddingGanttAxisState";
+import { weddingGanttAxisLabelTransform, weddingGanttAxisTicks, weddingGanttMobileAxisTicks } from "@/lib/weddingGanttAxisState";
 
 test("buildWeddingGanttTimelineState maps legal vendor pricing and weather timelines into colored rows", () => {
   const state = buildWeddingGanttTimelineState({
@@ -100,6 +100,18 @@ test("weddingGanttAxisTicks labels the shared horizontal range from first to fin
   assert.equal(ticks.at(-1)?.offsetPercent, 100);
   assert.match(ticks[0]?.label ?? "", /12 Oct/);
   assert.match(ticks.at(-1)?.label ?? "", /12 Mar/);
+});
+
+test("phone Gantt labels keep only endpoints and stay inside the chart", () => {
+  const ticks = [
+    { label: "1 Jan", offsetPercent: 0 },
+    { label: "1 Feb", offsetPercent: 50 },
+    { label: "1 Mar", offsetPercent: 100 },
+  ];
+  assert.deepEqual(weddingGanttMobileAxisTicks(ticks), [ticks[0], ticks[2]]);
+  assert.equal(weddingGanttAxisLabelTransform(0), "translateX(0)");
+  assert.equal(weddingGanttAxisLabelTransform(50), "translateX(-50%)");
+  assert.equal(weddingGanttAxisLabelTransform(100), "translateX(-100%)");
 });
 
 test("schedule chart is anchored to the saved planning window and derives editable lead-time rows", () => {

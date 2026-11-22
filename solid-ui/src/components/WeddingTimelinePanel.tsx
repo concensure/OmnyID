@@ -6,7 +6,7 @@ import { WeddingTaskComposer } from "@/components/WeddingTaskComposer";
 import { WeddingTaskCompletionButton } from "@/components/WeddingTaskCompletionButton";
 import { WeddingTaskOwnerControl } from "@/components/WeddingTaskOwnerControl";
 import type { SendAfpMessageInput } from "@/lib/api";
-import { weddingGanttAxisTicks } from "@/lib/weddingGanttAxisState";
+import { weddingGanttAxisLabelTransform, weddingGanttAxisTicks, weddingGanttMobileAxisTicks } from "@/lib/weddingGanttAxisState";
 import type { WeddingResponseWorkspaceViewState } from "@/lib/weddingResponseWorkspaceViewState";
 import { weddingTaskDateToAfpSendInput } from "@/lib/weddingTaskDateProjectionState";
 import {
@@ -53,6 +53,7 @@ export function WeddingTimelinePanel(props: {
     startLabel: props.state.ganttTimeline.rangeStartLabel,
     endLabel: props.state.ganttTimeline.rangeEndLabel,
   }));
+  const mobileGanttAxisTicks = createMemo(() => weddingGanttMobileAxisTicks(ganttAxisTicks()));
   const taskActionFor = (itemId: string) => {
     const task = props.state.planningTaskItems.find((item) => item.id === itemId);
     return task ? weddingTaskSidebarAction(task, props.state) : weddingTimelineSidebarAction("open_tasks", props.state, itemId);
@@ -345,21 +346,24 @@ export function WeddingTimelinePanel(props: {
             }}
           </For>
           </div>}>
-            <div class="overflow-x-auto rounded-xl border border-wedding-border bg-white p-3">
-              <div class="min-w-[860px]">
-                <div class="grid grid-cols-[minmax(8rem,12rem)_1fr_minmax(11rem,14rem)] gap-x-3 border-b border-wedding-border pb-2 sm:grid-cols-[minmax(10rem,14rem)_1fr_minmax(11rem,14rem)]">
+            <div class="overflow-x-visible rounded-xl border border-wedding-border bg-white p-3 sm:overflow-x-auto">
+              <div class="min-w-0 sm:min-w-[860px]">
+                <div class="grid grid-cols-[minmax(6rem,7.5rem)_minmax(0,1fr)] gap-x-2 border-b border-wedding-border pb-2 sm:grid-cols-[minmax(10rem,14rem)_1fr_minmax(11rem,14rem)] sm:gap-x-3">
                   <p class="text-xs font-semibold uppercase tracking-wide text-wedding-ink/65">All tasks</p>
                   <div class="relative h-8">
+                    <For each={mobileGanttAxisTicks()}>
+                      {(tick) => <span class="absolute top-0 text-[10px] font-semibold text-wedding-ink/70 sm:hidden" style={{ left: `${tick.offsetPercent}%`, transform: weddingGanttAxisLabelTransform(tick.offsetPercent) }}>{tick.label}</span>}
+                    </For>
                     <For each={ganttAxisTicks()}>
-                      {(tick) => <span class="absolute top-0 text-xs font-semibold text-wedding-ink/70" style={{ left: `${tick.offsetPercent}%`, transform: "translateX(-50%)" }}>{tick.label}</span>}
+                      {(tick) => <span class="absolute top-0 hidden text-xs font-semibold text-wedding-ink/70 sm:block" style={{ left: `${tick.offsetPercent}%`, transform: weddingGanttAxisLabelTransform(tick.offsetPercent) }}>{tick.label}</span>}
                     </For>
                   </div>
-                  <p class="text-xs font-semibold uppercase tracking-wide text-wedding-ink/65">Owner</p>
+                  <p class="hidden text-xs font-semibold uppercase tracking-wide text-wedding-ink/65 sm:block">Owner</p>
                 </div>
                 <div class="mt-2 space-y-2">
                   <For each={filteredRows()}>
                     {(row) => (
-                      <div class="grid grid-cols-[minmax(8rem,12rem)_1fr_minmax(11rem,14rem)] items-center gap-x-3 sm:grid-cols-[minmax(10rem,14rem)_1fr_minmax(11rem,14rem)]">
+                      <div class="grid grid-cols-[minmax(6rem,7.5rem)_minmax(0,1fr)] items-center gap-x-2 sm:grid-cols-[minmax(10rem,14rem)_1fr_minmax(11rem,14rem)] sm:gap-x-3">
                         <button
                           type="button"
                           class="min-h-11 overflow-visible text-left text-xs font-semibold leading-4 text-wedding-ink"
@@ -376,7 +380,7 @@ export function WeddingTimelinePanel(props: {
                         >
                           <span class="absolute inset-y-3 rounded" style={{ "margin-left": `${row.offsetPercent}%`, width: `${weddingTimelineBarWidthPercent({ widthPercent: row.widthPercent, offsetPercent: row.offsetPercent, durationDays: row.durationDays })}%`, "background-color": row.color }} />
                         </button>
-                        <Show when={props.state.planningTaskItems.find((task) => task.id === row.id)}>{(task) => <WeddingTaskOwnerControl task={task()} weddingPlanId={props.state.workspace.metadata.weddingPlanId} responseWorkspaceId={props.state.workspace.metadata.responseWorkspaceId} people={props.state.helperContactNames} saveProjection={props.saveProjection} onRefreshWorkspace={props.onRefreshWorkspace} />}</Show>
+                        <div class="hidden sm:block"><Show when={props.state.planningTaskItems.find((task) => task.id === row.id)}>{(task) => <WeddingTaskOwnerControl task={task()} weddingPlanId={props.state.workspace.metadata.weddingPlanId} responseWorkspaceId={props.state.workspace.metadata.responseWorkspaceId} people={props.state.helperContactNames} saveProjection={props.saveProjection} onRefreshWorkspace={props.onRefreshWorkspace} />}</Show></div>
                       </div>
                     )}
                   </For>

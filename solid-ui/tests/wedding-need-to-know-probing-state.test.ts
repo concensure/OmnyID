@@ -5,25 +5,25 @@ import {
   buildWeddingNeedToKnowProbingState,
 } from "../src/lib/weddingNeedToKnowProbingState.ts";
 
-test("buildWeddingNeedToKnowProbingState starts sparse plans with one date question", () => {
+test("buildWeddingNeedToKnowProbingState starts sparse plans with one format question", () => {
   const state = buildWeddingNeedToKnowProbingState({});
 
   assert.equal(state.isReadyForFirstRecommendations, false);
-  assert.equal(state.nextQuestion?.slot, "date_or_season");
-  assert.match(state.nextQuestion?.question ?? "", /date, month, or season/i);
-  assert.deepEqual(state.missingSlots.slice(0, 3), ["date_or_season", "location", "guest_count"]);
+  assert.equal(state.nextQuestion?.slot, "wedding_format");
+  assert.match(state.nextQuestion?.question ?? "", /kind of wedding/i);
+  assert.deepEqual(state.missingSlots.slice(0, 4), ["wedding_format", "date_or_season", "location", "guest_count"]);
   assert.ok(state.deferredSensitiveSlots.includes("cultural_or_religious_requirements"));
   assert.ok(state.deferredSensitiveSlots.includes("accessibility_requirements"));
-  assert.match(state.progressLabel, /Needs date or season/i);
+  assert.match(state.progressLabel, /Needs wedding format/i);
 });
 
-test("buildWeddingNeedToKnowProbingState asks for location after date is known", () => {
+test("buildWeddingNeedToKnowProbingState asks format before location when date is known", () => {
   const state = buildWeddingNeedToKnowProbingState({
     dateOrSeason: "Spring 2027",
   });
 
-  assert.equal(state.nextQuestion?.slot, "location");
-  assert.match(state.nextQuestion?.improves ?? "", /maps/i);
+  assert.equal(state.nextQuestion?.slot, "wedding_format");
+  assert.match(state.nextQuestion?.improves ?? "", /first decisions/i);
   assert.ok(state.answeredSlots.includes("date_or_season"));
 });
 

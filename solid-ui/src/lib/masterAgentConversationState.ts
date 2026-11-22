@@ -4,6 +4,7 @@ import type { UiCommandResponse } from "@/lib/api";
 export type MasterAgentConversationLink = {
   title: string;
   url: string;
+  kind: string;
 };
 
 export type MasterAgentConversationState = {
@@ -35,7 +36,7 @@ export function buildMasterAgentConversationState(
     const url = link.url.trim();
     if (!safeConversationLink(url) || seenLinks.has(url)) return [];
     seenLinks.add(url);
-    return [{ title: link.title.trim() || url, url }];
+    return [{ title: link.title.trim() || url, url, kind: link.kind }];
   }).slice(0, 8);
 
   return {

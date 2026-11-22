@@ -11,6 +11,7 @@ export type WeddingAssistantAction = {
 export type WeddingAssistantResponse = {
   answer: string;
   suggestedAction: WeddingAssistantAction | null;
+  links: Array<{ title: string; url: string }>;
   model: string;
 };
 
@@ -46,6 +47,13 @@ export function normalizeWeddingAssistantResponse(value: unknown): WeddingAssist
   return {
     answer: typeof record.answer === "string" ? record.answer.trim() : "",
     suggestedAction: action,
+    links: Array.isArray(record.links) ? record.links.flatMap((entry) => {
+      if (!entry || typeof entry !== "object" || Array.isArray(entry)) return [];
+      const link = entry as Record<string, unknown>;
+      const url = typeof link.url === "string" ? link.url.trim() : "";
+      if (!url.startsWith("/wedding/blog/") || !url.endsWith(".html")) return [];
+      return [{ title: typeof link.title === "string" && link.title.trim() ? link.title.trim() : "Wedding guide", url }];
+    }).slice(0, 2) : [],
     model: typeof record.model === "string" ? record.model.trim() : "",
   };
 }

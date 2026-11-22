@@ -478,6 +478,7 @@ export function AgentPersonaFAB(props: {
                   <div class="rounded-2xl border border-primary/15 bg-primary/5 px-3 py-3">
                     <p class="whitespace-pre-wrap text-sm leading-6 text-on-surface">{answer().answer}</p>
                     <Show when={answer().suggestedAction}>{(action) => <button type="button" class="mt-3 rounded-xl border border-primary/30 bg-white px-3 py-2 text-xs font-semibold text-primary" onClick={() => { saveWeddingAssistantStagedUpdate(action()); props.onWeddingNavigate?.(action().target); closeSwitcher(); }}>{action().kind === "stage_update" ? `Review in ${action().label.replace(/^Open /, "")}` : action().label}</button>}</Show>
+                    <Show when={answer().links.length > 0}><div class="mt-3 flex flex-wrap gap-2"><For each={answer().links}>{(link) => <a class="rounded-full border border-primary/20 bg-white px-3 py-1.5 text-xs font-semibold text-primary" href={link.url}>{link.title}</a>}</For></div></Show>
                     <p class="mt-2 text-[0.625em] text-on-surface-variant">Sprout opens the relevant view; it never saves or sends without your review.</p>
                   </div>
                 )}</Show>
@@ -670,10 +671,13 @@ export function AgentPersonaFAB(props: {
         title={fabTitle()}
         aria-label={fabTitle()}
       >
+        <Show when={props.weddingMode}>
+          <img src="/workspace/icons/personas/omnyid-wedding-eucalyptus-wreath-icon.svg" alt="" class="h-9 w-9 rounded-xl object-contain" />
+        </Show>
         {/* Persona or mood emoji — replaces the static SVG when state is meaningful */}
         <Show
-          when={active() || avatarMood() !== "idle"}
-          fallback={
+          when={!props.weddingMode && (active() || avatarMood() !== "idle")}
+          fallback={props.weddingMode ? null : (
             <svg
               viewBox="0 0 20 20"
               fill="none"
@@ -687,7 +691,7 @@ export function AgentPersonaFAB(props: {
               <circle cx="10" cy="7" r="3.5" />
               <path d="M3,18 Q3,13 10,13 Q17,13 17,18" />
             </svg>
-          }
+          )}
         >
           <Show
             when={active()?.image_data_url}

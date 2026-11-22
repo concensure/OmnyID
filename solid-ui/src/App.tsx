@@ -17,6 +17,9 @@ import {
 } from "@/lib/agentPersonaFabMobileState";
 import { WeddingNavigationArrivalBanner } from "@/components/WeddingNavigationArrivalBanner";
 import { MasterAgentConversationResponse } from "@/components/MasterAgentConversationResponse";
+import { askWeddingAssistant } from "@/lib/weddingAssistantApi";
+import { saveWeddingAssistantStagedUpdate } from "@/lib/weddingAssistantStagedUpdateState";
+import { weddingAssistantToUiCommandResponse } from "@/lib/weddingAssistantMasterAgentState";
 import { WeddingReturnBanner } from "@/components/WeddingReturnBanner";
 import { ActiveTasksDecisionView } from "@/components/ActiveTasksDecisionView";
 import { WorkspaceBreadcrumbTrail } from "@/components/WorkspaceBreadcrumbTrail";
@@ -198,7 +201,8 @@ import {
   buildWeddingTemplateDeepLinkLaunch,
   dispatchWeddingTemplateDeepLinkLaunch,
 } from "@/lib/weddingTemplateDeepLinkLaunchState";
-import { loadWeddingEntrySource, saveWeddingEntrySource } from "@/lib/weddingEntrySourceState";
+import { loadWeddingEntrySource, saveWeddingEntryFormat, saveWeddingEntrySource } from "@/lib/weddingEntrySourceState";
+import { parseWeddingFormat } from "@/lib/weddingFormatState";
 import {
   dispatchWeddingVendorSearchLaunch,
   isWeddingVendorSearchIntent,
@@ -1426,6 +1430,7 @@ function App() {
       pendingWeddingQuizHandoff ? "wedding_quiz" : "wedding_site",
       userId() || initUserId,
     );
+    saveWeddingEntryFormat(parseWeddingFormat(deepLinkParams.get("format")), userId() || initUserId);
     setWorkspaceLens(saveWorkspaceLens(userId() || initUserId, "wedding"));
     // The auth handoff can complete without a document reload. Apply the
     // Wedding typography token before selecting the planner so mobile never
@@ -2533,6 +2538,20 @@ function App() {
     let cleanupMessageIds: string[] = [];
     let attachmentGroundingEvidence: AttachmentGroundingEvidence | null = null;
     try {
+      if (weddingLensEnabled() && attachedFiles.length === 0) {
+        const weddingResponse = await askWeddingAssistant({
+          question: query,
+          currentView: "Master Agent",
+        });
+        if (weddingResponse.suggestedAction) saveWeddingAssistantStagedUpdate(weddingResponse.suggestedAction);
+        setObjectSearchResult(null);
+        objectSearchRouterPreview.clear();
+        workspaceSearchRouterPreview.clear();
+        setCommandResult(weddingAssistantToUiCommandResponse(weddingResponse));
+        setSearchFeedback("Sprout answered within your current Wedding account. Review any suggested change before saving it.");
+        selectView("search");
+        return;
+      }
       if (attachedFiles.length > 0 && supportedAttachedFiles.length === 0) {
         const unsupportedNames = skippedUnsupportedFiles
           .slice(0, 3)
@@ -4013,7 +4032,11 @@ function App() {
                 </Show>
                 <Show when={commandResult()}>
                   {(result) => (
-                    <MasterAgentConversationResponse query={lastQuery()} response={result()} />
+                    <MasterAgentConversationResponse query={lastQuery()} response={result()} onWeddingNavigate={(menu) => {
+                      dispatchWeddingWorkspaceMenuSelection(menu);
+                      selectView("response_queue");
+                      if (menu === "home") window.setTimeout(() => window.dispatchEvent(new CustomEvent("omnyid:wedding-add-photo")), 80);
+                    }} />
                   )}
                 </Show>
                 {/* Search result card — shown when a command has been run */}
@@ -4651,6 +4674,7 @@ function App() {
           onWeddingNavigate={(menu) => {
             dispatchWeddingWorkspaceMenuSelection(menu);
             selectView("response_queue");
+            if (menu === "home") window.setTimeout(() => window.dispatchEvent(new CustomEvent("omnyid:wedding-add-photo")), 80);
           }}
         />
       </Show>

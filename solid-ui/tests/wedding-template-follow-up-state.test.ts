@@ -116,6 +116,7 @@ test("buildWeddingTemplateFollowUpState creates budget rows without inventing am
     location: "Hunter Valley",
     guestCount: "100-120",
     budgetComfort: "Keep it lean",
+    weddingFormat: "undecided",
     projectionStorage: memoryStorage(),
   });
 
@@ -154,7 +155,7 @@ test("buildWeddingTemplateFollowUpState remains useful before answers are captur
   assert.equal(state.artifactGeneration.artifacts.length, 1);
   assert.match(state.artifactGeneration.artifacts[0]?.markdown ?? "", /No answered Need-To-Know prompts/i);
   assert.equal(state.contextProjection.answeredLabels.length, 0);
-  assert.match(state.nextQuestionLabel, /wedding date, month, or season/i);
+  assert.match(state.nextQuestionLabel, /kind of wedding/i);
 });
 
 test("buildWeddingTemplateFollowUpState creates calendar-ready Australian legal reminders from exact dates", () => {

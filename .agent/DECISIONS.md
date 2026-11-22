@@ -4718,3 +4718,21 @@ up the former offline shell so an OAuth redirect cannot combine cached HTML with
 different deployment's hashed modules. Account-scoped API responses remain
 network-only. If startup still fails, the user sees a recovery action rather than a
 blank document.
+
+## 2026-11-23 — Wedding format and assistance extend existing authorities (WED-402)
+
+Wedding format is an optional planning-context fact, not a new template or planning
+store. Explicit selection wins over deep-link and extracted values; guest count may
+only produce an unsaved suggestion. Saving reuses the revisioned intake-profile AFP
+projection introduced by WED-401. Missing format therefore preserves the existing
+larger/general behaviour, and every existing route remains reachable.
+
+Wedding-mode Sprout and the Master Agent share one authenticated bounded assistant
+route. The browser cannot nominate a plan as an authorization boundary, model output
+cannot invent navigation or mutation targets, and first-party guidance is accepted
+only from the Wedding blog allowlist. The assistant receives no admin, source,
+deployment, secret or other-account data. It may open an allowlisted current-account
+view or stage a bounded Budget draft for review; canonical saves, vendor contact,
+bookings, payments and other external effects keep their existing approval paths.
+Today photo cards remain account-scoped data-image convenience state and a local file
+can be selected only through the user's browser gesture.

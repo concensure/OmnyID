@@ -38,3 +38,16 @@ export function weddingGanttAxisTicks(
     return { label: dayLabel(date, includeYear), offsetPercent };
   });
 }
+
+/** Keep phone labels legible: the range endpoints carry the useful context. */
+export function weddingGanttMobileAxisTicks(ticks: readonly WeddingGanttAxisTick[]): WeddingGanttAxisTick[] {
+  if (ticks.length <= 2) return [...ticks];
+  return [ticks[0]!, ticks[ticks.length - 1]!];
+}
+
+/** Endpoint labels stay inside the chart instead of being clipped at 0/100%. */
+export function weddingGanttAxisLabelTransform(offsetPercent: number): string {
+  if (offsetPercent <= 0) return "translateX(0)";
+  if (offsetPercent >= 100) return "translateX(-100%)";
+  return "translateX(-50%)";
+}
