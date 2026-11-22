@@ -80,4 +80,5 @@ printf 'google_places_reason=%s\n' "$places_reason"
 rm -f /tmp/omnyid-brave-smoke.json /tmp/omnyid-brave-smoke.err /tmp/omnyid-places-smoke.json /tmp/omnyid-places-smoke.err
 '@
 
+$remoteScript = $remoteScript -replace "`r`n", "`n"
 $remoteScript | & $env:SystemRoot\System32\OpenSSH\ssh.exe -i $KeyPath -o StrictHostKeyChecking=accept-new "$User@$RemoteHost" "bash -s"

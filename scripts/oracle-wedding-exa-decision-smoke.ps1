@@ -102,6 +102,7 @@ print(json.dumps({"schema":"omnyid.wedding_exa_decision_smoke.v1","generated_at"
 PY
 '@
 
+$remoteScript = $remoteScript -replace "`r`n", "`n"
 $encodedRemoteScript = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($remoteScript))
 $json = & $env:SystemRoot\System32\OpenSSH\ssh.exe -i $KeyPath -o StrictHostKeyChecking=accept-new "$User@$RemoteHost" "printf '%s' '$encodedRemoteScript' | base64 -d | bash"
 if ($LASTEXITCODE -ne 0) { throw "Oracle EXA smoke failed with exit code $LASTEXITCODE" }
