@@ -365,6 +365,8 @@ function taskItem(
     quote_valid_until: clean(metadata.quote_valid_until ?? metadata.valid_until) || undefined,
     venue_decision_state: clean(metadata.venue_decision_state) || undefined,
     recent_focus_switch_count: typeof metadata.recent_focus_switch_count === "number" ? metadata.recent_focus_switch_count : undefined,
+    decisions_opened_this_week: typeof metadata.decisions_opened_this_week === "number" ? metadata.decisions_opened_this_week : undefined,
+    decisions_closed_this_week: typeof metadata.decisions_closed_this_week === "number" ? metadata.decisions_closed_this_week : undefined,
     watcher_caught_kind: clean(metadata.watcher_caught_kind) || undefined,
     watcher_caught_at: clean(metadata.watcher_caught_at) || undefined,
     budget_pace_label: clean(metadata.budget_pace_label) || undefined,
@@ -708,7 +710,13 @@ export function buildWeddingPersonalOsProjectionState(input: {
     .filter((item) => !deferredIds.has(item.id))
     .filter((item) => item.rankWeight > 0);
   const decisionCandidateCount = activeItems.filter(decisionLoadCandidate).length;
-  const decisionFocusLimit = decisionCandidateCount >= 5 ? 1 : requestedDecisionFocusLimit;
+  const decisionVelocity = activeItems.reduce((current, item) => {
+    const opened = typeof item.actionMetadata?.decisions_opened_this_week === "number" ? item.actionMetadata.decisions_opened_this_week : 0;
+    const closed = typeof item.actionMetadata?.decisions_closed_this_week === "number" ? item.actionMetadata.decisions_closed_this_week : 0;
+    return opened > current.opened ? { opened, closed } : current;
+  }, { opened: 0, closed: 0 });
+  const queuePressure = decisionVelocity.opened >= 5 && decisionVelocity.opened - decisionVelocity.closed >= 4;
+  const decisionFocusLimit = decisionCandidateCount >= 5 && queuePressure ? 1 : requestedDecisionFocusLimit;
   const genericProjection = buildContinuityPersonalOsProjectionState({
     items: activeItems,
     limit,

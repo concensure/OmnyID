@@ -294,8 +294,9 @@ message remains prepared and approval-gated.
 
 Proactive copy is earned from saved records. A silent-vendor prompt may name “6
 days vs about 2” only when at least two comparable replied vendors establish that
-baseline. Five or more actionable decisions reduce Decision Focus to one while the
-ranked queue remains intact. Context-switch, completed-check, budget-pace and weekly
+baseline. Five or more decisions opened this week reduce Decision Focus to one only
+when saved velocity also shows at least four more opened than closed; the ranked queue
+remains intact. Context-switch, completed-check, budget-pace and weekly
 caught-work lines appear only when their source metadata exists and is current; no
 score or internal evidence label is shown to the couple. The weekly line counts
 expiring holds, over-budget quotes and stale vendors seen during the previous seven

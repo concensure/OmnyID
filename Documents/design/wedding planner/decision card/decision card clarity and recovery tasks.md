@@ -334,7 +334,8 @@ Work:
 
 - [x] Compare a silent vendor with the median reply time only when two same-category
   replied peers support the comparison.
-- [x] Reduce a five-or-more-decision focus to one item without deleting the queue.
+- [x] Reduce a five-or-more-decision focus to one item without deleting the queue,
+  but only when saved weekly opened/closed counts establish the pressure.
 - [x] Consume saved focus-switch, completed-check, budget-pace and watcher event
   metadata as plain-language relief lines.
 - [x] Count only current seven-day expiring-hold, over-budget-quote and stale-vendor

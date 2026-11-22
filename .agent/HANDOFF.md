@@ -14,6 +14,8 @@ than bookings or payments. Non-venue quotes cannot release those dependencies.
 
 Saved evidence can now support relative silent-vendor timing, one-card queue relief,
 focus-switch/check/budget pace lines, and a bounded weekly caught-work summary.
+One-card relief requires saved weekly velocity (at least five opened and four net
+open), so raw queue size does not collapse first-run setup or date-less venue work.
 Authenticated quote events keep using the existing passive reconciler; no Gmail,
 encrypted-mail or calendar-conflict integration is claimed. The public page restores
 `elvis-bekmanis-WJc87MVcDaA-unsplash.jpg` as its first image and keeps the selected

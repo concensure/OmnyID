@@ -740,6 +740,7 @@ test("wedding PersonalOS drops to one focus when decisions are piling up", () =>
     kind: "other" as const,
     priority: "normal" as const,
     approvalState: "draft" as const,
+    metadata: index === 0 ? { decisions_opened_this_week: 5, decisions_closed_this_week: 1 } : {},
   }));
   const state = buildWeddingPersonalOsProjectionState({ now, taskItems: tasks });
 
@@ -786,6 +787,8 @@ test("queue pressure explains venue-first relief and only reports sourced weekly
       vendor_lead_time_research_task: true,
       vendor_lead_time_category_id: "venue",
       vendor_lead_time_must_decide_first: true,
+      decisions_opened_this_week: 5,
+      decisions_closed_this_week: 1,
       recent_focus_switch_count: 4,
       watcher_caught_kind: "expiring_hold",
       watcher_caught_at: "2026-10-04T00:00:00Z",
