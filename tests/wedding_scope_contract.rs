@@ -10,6 +10,8 @@ const RSVP_CAPABILITY_ROUTES: &str =
     include_str!("../src/server/wedding_rsvp_capability_routes.rs");
 const RSVP_RESPONSE_ROUTES: &str = include_str!("../src/server/wedding_rsvp_response_routes.rs");
 const RSVP_CAPABILITY_STORE: &str = include_str!("../src/db/wedding_rsvp_capabilities.rs");
+const BUDGET_PROJECTION_ROUTES: &str =
+    include_str!("../src/server/wedding_budget_projection_routes.rs");
 const TASK_ASSIGNMENT_ACTOR_MIGRATION: &str =
     include_str!("../postgres/migrations/0176_wedding_task_assignment_actor.sql");
 const SERVER: &str = include_str!("../src/server/mod.rs");
@@ -82,4 +84,17 @@ fn couple_side_rsvp_management_keeps_canonical_owner_and_actor_separate() {
     assert!(RSVP_RESPONSE_ROUTES.contains("&scope.owner_user_id, &user.id"));
     assert!(RSVP_CAPABILITY_STORE.contains("\"actor_user_id\": actor_user_id"));
     assert!(RSVP_CAPABILITY_STORE.contains("actor_user_id: Option<&str>"));
+}
+
+#[test]
+fn budget_projections_keep_existing_decisions_in_the_canonical_owner_ledger() {
+    assert!(BUDGET_PROJECTION_ROUTES.contains("resolve_wedding_scope"));
+    assert!(BUDGET_PROJECTION_ROUTES.contains("&scope.owner_user_id"));
+    assert!(BUDGET_PROJECTION_ROUTES.contains("&actor.id"));
+    assert!(BUDGET_PROJECTION_ROUTES.contains("wedding-budget-allocation"));
+    assert!(BUDGET_PROJECTION_ROUTES.contains("wedding-budget-contribution:"));
+    assert!(BUDGET_PROJECTION_ROUTES.contains("wedding_decision_selection"));
+    assert!(BUDGET_PROJECTION_ROUTES.contains("exact_scope(content, plan, workspace)"));
+    assert!(BUDGET_PROJECTION_ROUTES.contains("exact_scope(metadata, plan, workspace)"));
+    assert!(!BUDGET_PROJECTION_ROUTES.contains("store_private_app_message(\n        &state.db,\n        &state.metrics,\n        &state.relay_tx,\n        &actor.id"));
 }

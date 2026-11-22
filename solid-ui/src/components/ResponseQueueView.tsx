@@ -3,7 +3,7 @@
 // @primary-capability: response-queue-wedding-workspace
 // @stability: beta
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
-import type { DashboardBootstrap, Session } from "@/lib/api";
+import type { DashboardBootstrap, SendAfpMessageInput, Session } from "@/lib/api";
 import { QueueDensityToggle } from "@/components/QueueDensityToggle";
 import { ResponseQueueSurface } from "@/components/ResponseQueueSurface";
 import { WeddingNavigationArrivalBanner } from "@/components/WeddingNavigationArrivalBanner";
@@ -119,6 +119,7 @@ import {
   weddingVendorSelectionLabels,
 } from "@/lib/weddingVendorChecklistState";
 import { WEDDING_BUDGET_ALLOCATION_LOCAL_SAVE_EVENT } from "@/lib/weddingBudgetAllocationState";
+import { sendWeddingBudgetProjection } from "@/lib/weddingBudgetProjectionApi";
 import {
   buildWeddingVendorComparisonArtifactState,
   buildWeddingVendorSearchArtifactState,
@@ -1317,6 +1318,16 @@ export function ResponseQueueView(props: {
     }
   }
 
+  async function saveWeddingWorkspaceProjection(input: SendAfpMessageInput) {
+    if (!input.supertags?.includes("wedding_budget")) return sendAfpMessage(input);
+    const workspace = weddingWorkspace();
+    if (!workspace) throw new Error("Open the Wedding workspace before saving its budget.");
+    return sendWeddingBudgetProjection({
+      weddingPlanId: workspace.workspace.metadata.weddingPlanId,
+      responseWorkspaceId: workspace.workspace.metadata.responseWorkspaceId,
+    }, input);
+  }
+
   function weddingWorkspaceRefreshBanner() {
     const state = weddingRefreshState();
     if (weddingRefreshRunning()) {
@@ -2175,7 +2186,7 @@ export function ResponseQueueView(props: {
               state={workspace()}
             query={weddingWorkspaceQuery()}
             refreshState={weddingWorkspaceRefreshBanner()}
-            saveProjection={sendAfpMessage}
+            saveProjection={saveWeddingWorkspaceProjection}
             approvalHandlers={weddingApprovalHandlers()}
             gmailStatus={weddingGmailStatus()}
             weddingVendorDirectory={weddingVendorDirectory()}

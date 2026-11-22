@@ -217,6 +217,92 @@ async fn membership_is_two_person_revisioned_and_revocable() {
     assert_eq!(partner_members["members"].as_array().map(Vec::len), Some(2));
     assert_eq!(partner_members["invites"].as_array().map(Vec::len), Some(0));
 
+    let budget_message_id = Ulid::new().to_string();
+    let budget_message = json!({
+        "id":budget_message_id,
+        "thread_id":Ulid::new().to_string(),
+        "from":"system://wedding-planning",
+        "to":["agent://wedding-planning"],
+        "timestamp":Utc::now().to_rfc3339(),
+        "type":"decision",
+        "kind":"note",
+        "subtype":"wedding_decision_selection",
+        "content":{
+            "kind":"wedding_decision_selection",
+            "artifact_id":"wedding-budget-allocation",
+            "artifact_kind":"budget_sheet",
+            "selected_option":{"id":"total-budget"},
+            "wedding_plan_id":plan_id,
+            "response_workspace_id":workspace_id
+        },
+        "metadata":{
+            "wedding_plan_id":plan_id,
+            "response_workspace_id":workspace_id
+        },
+        "supertags":["template:wedding_planning","event:wedding","wedding_budget"],
+        "views":[],
+        "attachments":[],
+        "references":[],
+        "store_in_relational":true,
+        "signature":"test"
+    });
+    let budget_request = json!({
+        "wedding_plan_id":plan_id,
+        "response_workspace_id":workspace_id,
+        "message":budget_message.clone()
+    });
+    let (partner_budget_write_status, partner_budget_write) = request_json(
+        &app,
+        Method::POST,
+        "/wedding/budget/projections",
+        &partner_auth,
+        Some(&budget_request),
+    )
+    .await;
+    assert_eq!(
+        partner_budget_write_status,
+        StatusCode::OK,
+        "partner budget write: {partner_budget_write}"
+    );
+    assert_eq!(partner_budget_write["owner_user_id"], owner_id);
+    assert_eq!(partner_budget_write["actor_user_id"], partner_id);
+    let (owner_budget_status, owner_budget) = request_json(
+        &app,
+        Method::GET,
+        &format!("/wedding/budget/projections?{scope_query}"),
+        &owner_auth,
+        None,
+    )
+    .await;
+    assert_eq!(
+        owner_budget_status,
+        StatusCode::OK,
+        "owner budget read: {owner_budget}"
+    );
+    assert_eq!(owner_budget["messages"][0]["id"], budget_message_id);
+    assert_eq!(
+        owner_budget["messages"][0]["metadata"]["ownerUserId"],
+        owner_id
+    );
+    assert_eq!(
+        owner_budget["messages"][0]["metadata"]["actorUserId"],
+        partner_id
+    );
+    let wrong_budget_request = json!({
+        "wedding_plan_id":plan_id,
+        "response_workspace_id":format!("guessed-{suffix}"),
+        "message":budget_message.clone()
+    });
+    let (wrong_budget_workspace_status, _) = request_json(
+        &app,
+        Method::POST,
+        "/wedding/budget/projections",
+        &partner_auth,
+        Some(&wrong_budget_request),
+    )
+    .await;
+    assert_eq!(wrong_budget_workspace_status, StatusCode::FORBIDDEN);
+
     let rsvp_grant_id = format!("rsvp-capability-shared-{suffix}");
     sqlx::query(
         "INSERT INTO wedding_rsvp_capability_grants
@@ -532,6 +618,15 @@ async fn membership_is_two_person_revisioned_and_revocable() {
     )
     .await;
     assert_eq!(cross_couple_rsvp_status, StatusCode::FORBIDDEN);
+    let (cross_couple_budget_status, _) = request_json(
+        &app,
+        Method::GET,
+        &format!("/wedding/budget/projections?{scope_query}"),
+        &third_auth,
+        None,
+    )
+    .await;
+    assert_eq!(cross_couple_budget_status, StatusCode::FORBIDDEN);
     let wrong_scope_response = json!({
         "wedding_plan_id":plan_id,
         "response_workspace_id":format!("guessed-{suffix}"),
@@ -755,6 +850,15 @@ async fn membership_is_two_person_revisioned_and_revocable() {
     )
     .await;
     assert_eq!(revoked_rsvp_status, StatusCode::FORBIDDEN);
+    let (revoked_budget_status, _) = request_json(
+        &app,
+        Method::GET,
+        &format!("/wedding/budget/projections?{scope_query}"),
+        &partner_auth,
+        None,
+    )
+    .await;
+    assert_eq!(revoked_budget_status, StatusCode::FORBIDDEN);
     let revision: i64 = sqlx::query_scalar(
         "SELECT membership_revision FROM wedding_plan_memberships
           WHERE wedding_owner_user_id=$1 AND wedding_plan_id=$2 AND member_user_id=$3",

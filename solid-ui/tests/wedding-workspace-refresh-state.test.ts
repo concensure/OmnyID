@@ -105,6 +105,33 @@ test("loadWeddingWorkspaceRefreshState surfaces bounded partial refresh state", 
   assert.match(state.detail, /more saved context is available/);
 });
 
+test("loadWeddingWorkspaceRefreshState merges canonical budget messages without duplicating the owner's copy", async () => {
+  const budgetMessage: AfpMessage = {
+    ...contextMessage,
+    id: "budget-shared-1",
+    subtype: "wedding_decision_selection",
+    supertags: [...contextMessage.supertags, "wedding_budget"],
+    content: {
+      kind: "wedding_decision_selection",
+      wedding_plan_id: metadata.weddingPlanId,
+      response_workspace_id: metadata.responseWorkspaceId,
+      artifact_id: "wedding-budget-allocation",
+      artifact_kind: "budget_sheet",
+      selected_option: { id: "total-budget", label: "A$20,000 total", cells: [] },
+    },
+  };
+  const state = await loadWeddingWorkspaceRefreshState({
+    signedIn: true,
+    weddingPlanId: metadata.weddingPlanId,
+    responseWorkspaceId: metadata.responseWorkspaceId,
+    loadMessages: async () => ({ tags: ["event:wedding"], match: "all", count: 2, messages: [contextMessage, budgetMessage] }),
+    loadBudgetMessages: async () => ({ tags: ["wedding_budget"], match: "all", count: 1, messages: [budgetMessage] }),
+  });
+
+  assert.equal(state.status, "loaded");
+  assert.deepEqual(state.messages.map((message) => message.id), [contextMessage.id, budgetMessage.id]);
+});
+
 test("loadWeddingWorkspaceRefreshState skips backend fetch for guest mode", async () => {
   let called = false;
   const state = await loadWeddingWorkspaceRefreshState({

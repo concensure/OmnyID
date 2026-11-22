@@ -15,6 +15,17 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-397
+    title: Share canonical Wedding budget allocation and contribution projections
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-397
+    worktree: C:/temp/wt/omnyid-wed389
+    base_sha: 28321abba524cdc3a0b3d385cbdd38a2ca9d97c5
+    depends_on: [WED-396, WED-395, WED-390, WED-369]
+    files: [src/server/wedding_budget_projection_routes.rs, src/server/mod.rs, solid-ui/src/lib/weddingBudgetProjectionApi.ts, solid-ui/src/lib/weddingWorkspaceRefreshState.ts, solid-ui/src/components/ResponseQueueView.tsx, tests/wedding_partner_sharing_api.rs, tests/wedding_scope_contract.rs, solid-ui/tests/wedding-budget*.test.ts, solid-ui/tests/wedding-workspace-refresh-state.test.ts, Documents/design/wedding planner/couple coworkspace/couple-coworking-*.md, .agent/**]
+    acceptance: [extend the existing AFP budget allocation and contribution decisions rather than create a budget store, resolve exact active WeddingScope before shared budget reads or writes and use only the canonical owner ledger, accept only the existing budget allocation and contribution decision shapes with exact plan and workspace metadata, keep canonical owner and acting member distinct in stored metadata, merge canonical shared budget decisions into Wedding workspace refresh without copying them to the partner account, preserve current local draft fallback and all non-budget personal message routes, deny guessed workspace cross-couple and revoked-member access, focused frontend Rust contract and disposable-Postgres partner tests pass from a clean exact candidate, record COW-03 and COW-06 as bounded Budget slices while leaving COW-07 conflict UX open]
+    progress: "Registered from clean advanced-worktree SHA 28321abba524cdc3a0b3d385cbdd38a2ca9d97c5 after confirming Wedding budget allocation and contribution are existing wedding_decision_selection AFP messages currently sent through the acting account's generic /send route."
   - id: WED-396
     title: Apply canonical WeddingScope to couple-side RSVP capability management and responses
     status: done

@@ -13,6 +13,7 @@ import {
   WEDDING_WORKSPACE_REFRESH_PAGE_SIZE,
   type WeddingWorkspaceRefreshPaginationState,
 } from "@/lib/weddingWorkspaceRefreshPaginationState";
+import { fetchWeddingBudgetProjectionMessages } from "@/lib/weddingBudgetProjectionApi";
 
 export type WeddingWorkspaceRefreshScope = {
   weddingPlanId: string;
@@ -55,6 +56,20 @@ export function weddingWorkspaceRefreshScopeMatches(
 }
 
 type LoadMessages = typeof fetchMessagesBySupertags;
+type LoadBudgetMessages = typeof fetchWeddingBudgetProjectionMessages;
+
+const emptyBudgetMessages: LoadBudgetMessages = async () => ({
+  tags: ["wedding_budget"], match: "all", count: 0, messages: [],
+});
+
+function distinctMessages(messages: readonly AfpMessage[]): AfpMessage[] {
+  const seen = new Set<string>();
+  return messages.filter((message) => {
+    if (!message.id || seen.has(message.id)) return false;
+    seen.add(message.id);
+    return true;
+  });
+}
 
 export async function loadWeddingWorkspaceRefreshState(input: {
   signedIn: boolean;
@@ -63,6 +78,7 @@ export async function loadWeddingWorkspaceRefreshState(input: {
   sourceResponseId?: string | null;
   fallbackMessages?: readonly AfpMessage[] | null;
   loadMessages?: LoadMessages;
+  loadBudgetMessages?: LoadBudgetMessages;
 }): Promise<WeddingWorkspaceRefreshState> {
   const fallbackMessages = [...(input.fallbackMessages ?? [])];
   const fallbackPersisted = buildWeddingPersistedWorkspaceState({
@@ -85,15 +101,24 @@ export async function loadWeddingWorkspaceRefreshState(input: {
   }
 
   const loadMessages = input.loadMessages ?? fetchMessagesBySupertags;
+  const loadBudgetMessages = input.loadBudgetMessages
+    ?? (input.loadMessages ? emptyBudgetMessages : fetchWeddingBudgetProjectionMessages);
   try {
-    const result: SupertagMessagesResponse = await loadMessages(["template:wedding_planning", "event:wedding"], {
-      match: "all",
-      limit: WEDDING_WORKSPACE_REFRESH_PAGE_SIZE,
-      offset: 0,
-      expandHierarchy: true,
-    });
+    const [result, budgetResult]: [SupertagMessagesResponse, SupertagMessagesResponse] = await Promise.all([
+      loadMessages(["template:wedding_planning", "event:wedding"], {
+        match: "all",
+        limit: WEDDING_WORKSPACE_REFRESH_PAGE_SIZE,
+        offset: 0,
+        expandHierarchy: true,
+      }),
+      loadBudgetMessages({
+        weddingPlanId: input.weddingPlanId,
+        responseWorkspaceId: input.responseWorkspaceId,
+      }),
+    ]);
+    const messages = distinctMessages([...result.messages, ...budgetResult.messages]);
     const persisted = buildWeddingPersistedWorkspaceState({
-      messages: result.messages,
+      messages,
       weddingPlanId: input.weddingPlanId,
       responseWorkspaceId: input.responseWorkspaceId,
       sourceResponseId: input.sourceResponseId,
@@ -102,8 +127,8 @@ export async function loadWeddingWorkspaceRefreshState(input: {
       requestedLimit: WEDDING_WORKSPACE_REFRESH_PAGE_SIZE,
       responseLimit: result.limit,
       responseOffset: result.offset,
-      loadedCount: result.messages.length,
-      hasMore: result.has_more,
+      loadedCount: messages.length,
+      hasMore: result.has_more || budgetResult.has_more,
       nextOffset: result.next_offset,
     });
     return {
@@ -111,7 +136,7 @@ export async function loadWeddingWorkspaceRefreshState(input: {
       responseWorkspaceId: input.responseWorkspaceId,
       sourceResponseId: input.sourceResponseId ?? null,
       status: "loaded",
-      messages: result.messages,
+      messages,
       persisted,
       messageCount: persisted.sourceMessageIds.length,
       pagination,

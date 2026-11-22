@@ -182,6 +182,7 @@ mod wedding_task_assignment_routes;
 mod wedding_ai_cost_policy;
 mod wedding_llm_ladder;
 mod wedding_boundary_routes;
+mod wedding_budget_projection_routes;
 mod wedding_preference_routes; mod wedding_quote_decoder_routes; mod wedding_quote_study_routes; mod wedding_rsvp_capability_routes; mod wedding_rsvp_reminder_routes; mod wedding_rsvp_response_routes; mod wedding_runsheet_projection_routes; mod wedding_runsheet_share_routes;
 mod wedding_review_routes;
 mod wedding_partner_sharing_routes;
@@ -1472,6 +1473,7 @@ pub async fn run() {
         .merge(wedding_rsvp_reminder_routes::routes())
         .merge(wedding_rsvp_response_routes::routes())
         .merge(wedding_boundary_routes::routes())
+        .merge(wedding_budget_projection_routes::routes())
         .merge(wedding_runsheet_projection_routes::routes())
         .merge(wedding_runsheet_share_routes::routes())
         .merge(wedding_understanding_routes::routes())
@@ -1628,6 +1630,7 @@ pub async fn build_test_router(database_url: &str) -> Router {
         .merge(wedding_rsvp_reminder_routes::routes())
         .merge(wedding_rsvp_response_routes::routes())
         .merge(wedding_boundary_routes::routes())
+        .merge(wedding_budget_projection_routes::routes())
         .merge(wedding_runsheet_projection_routes::routes())
         .merge(wedding_runsheet_share_routes::routes())
         .merge(wedding_decision_research_routes::routes())
