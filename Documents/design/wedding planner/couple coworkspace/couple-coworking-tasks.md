@@ -95,9 +95,8 @@ no access.
   keeping model usage and rate limits on the requesting account.
 - [x] Use canonical-owner idempotency for approved task delivery and record the
   acting member separately.
-- [ ] Execute the extended disposable-Postgres denial matrix for guessed
-  workspace, another couple and a revoked member when a local database is
-  available.
+- [x] Execute the disposable-Postgres denial matrix for guessed workspace,
+  another couple and a revoked member.
 - COW-03 remains open for the other domains and background/live paths.
 
 Implementation evidence: WED-392 keeps name as the only mandatory field,
@@ -124,10 +123,9 @@ read, sharer provenance, omitted-field redaction and sharer-only revocation.
 
 - [x] Carry the resolved response workspace through the Database view and every
   run-sheet projection request.
-- [ ] Execute the added disposable-Postgres proof that a co-owner can project a
+- [x] Execute the added disposable-Postgres proof that a co-owner can project a
   source-linked row and the owner reads the same checkpoint and AFP messages
-  without a copied database. The test also covers another couple and revocation;
-  local execution is pending because this host has no Postgres/Docker service.
+  without a copied database. The test also covers another couple and revocation.
 - [x] Keep personal Database definitions account-private; only the exact
   authorised Wedding run-sheet projection crosses the membership boundary.
 - Full COW-06 remains open until the other listed Wedding projections share the

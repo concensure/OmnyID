@@ -1,3 +1,13 @@
+# 2026-11-23: Shared research uses owner truth and actor-funded execution
+
+Decision research and explicit task delivery resolve the active plan/workspace
+before cache, model, recipient or mail work. Equivalent research is cached once
+against the canonical Wedding owner and plan so partners do not receive
+divergent copies. Model usage, abuse limits and user-facing sender identity stay
+with the acting member. Task delivery idempotency is owner-scoped, while the
+receipt stores that actor separately. A recipient-agent handoff remains personal
+to the recipient and explicitly grants no source-workspace access.
+
 # 2026-11-23: The installed run sheet is one scope-resolved owner ledger
 
 The Wedding Database view may install and project `wedding_runsheet.v1` only

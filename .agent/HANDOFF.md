@@ -1,3 +1,34 @@
+## WED-395 shared decision research and delivery scope (2026-11-23)
+
+Worktree `C:/temp/wt/omnyid-wed389`, branch `agent/codex/WED-395`, based on
+WED-394 record SHA `8682ff1ac0505ed8a971df4152be13aa244ec4ff`.
+Exact implementation candidate:
+`eb67301181ef6ca63999e9e4ba5dbdce91a71bda`.
+
+Decision research now requires the response workspace and resolves canonical
+membership before cache, feature or model access. Results are shared through
+the owner-plan cache; model usage and rate limiting retain the actor. Approved
+task delivery uses owner-scoped idempotency, actor wording and migration 0176's
+separate `actor_user_id`. Either partner may hand a task to the other's
+registered agent without granting the source workspace.
+
+Pass on the clean candidate: focused frontend 14/14, TypeScript, Linux Rust 1.94
+`cargo check --lib`, direct scope contracts 4/4, integration-target compile,
+and a real disposable `pgvector/pgvector:pg18` test. The database proof covers
+two couples, guessed workspace, cross-couple access, shared owner/partner
+run-sheet state, decision/task denial before side effects, selected contacts and
+post-revocation denial. The exact named tmpfs container
+`omnyid-wed395-pg` was inspected and removed after the pass; it is
+unrecoverable by design, while the pulled image remains cache. The Windows 1.94
+compiler crashed internally and Windows 1.95 also access-violated, so WSL/Linux
+provided the successful exact-source compiler evidence.
+
+WED-394's formerly pending database proof is therefore also satisfied and that
+slice is done. COW-03, COW-06, COW-07 and COW-10 remain open for their other
+listed domains. No Oracle deployment occurred; production still runs the
+WED-392 application SHA
+`afd6d5cc04d3c5996256ca1df131ba7e1de659fb`.
+
 ## WED-394 canonical shared run-sheet slice (2026-11-23)
 
 Worktree `C:/temp/wt/omnyid-wed389`, branch `agent/codex/WED-394`, based on

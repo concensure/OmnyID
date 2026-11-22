@@ -17,7 +17,7 @@ lifecycle:
 tasks:
   - id: WED-395
     title: Apply canonical WeddingScope to shared decision research and task delivery
-    status: in_progress
+    status: done
     owner: codex
     branch: agent/codex/WED-395
     worktree: C:/temp/wt/omnyid-wed389
@@ -25,10 +25,10 @@ tasks:
     depends_on: [WED-394, WED-390, WED-392, WED-332]
     files: [src/server/wedding_decision_research_routes.rs, src/server/wedding_task_assignment_routes.rs, src/server/mod.rs, solid-ui/src/lib/weddingDecisionResearchApi.ts, solid-ui/src/components/WeddingDecisionFocusCard.tsx, solid-ui/src/components/WeddingMobileFocusHome.tsx, postgres/migrations/0176_wedding_task_assignment_actor.sql, src/db/migration_catalog.rs, tests/wedding_scope_contract.rs, tests/wedding_partner_sharing_api.rs, solid-ui/tests/wedding-current-next-research-and-assignment-state.test.ts, Documents/design/wedding planner/couple coworkspace/couple-coworking-*.md, .agent/**]
     acceptance: [decision research and explicit task delivery resolve exact active WeddingScope before cache or delivery access, both partners reuse the canonical owner plan research cache while model usage and outward wording retain the acting member, task delivery records canonical owner and actor and permits one partner to assign the other without granting personal workspace access, wrong-workspace cross-couple and revoked-member requests fail before cache delivery or mail side effects, current next and following queue bounds plus existing explicit external approval flow remain intact, focused contract frontend Rust and disposable-Postgres tests are added and executed where local services permit, COW-03 COW-06 COW-07 and COW-10 remain accurately partial]
-    progress: "Started from the WED-394 record commit after inventory showed decision research and task delivery still key storage by the signed-in account despite carrying plan context."
+    progress: "Complete at exact implementation SHA eb67301181ef6ca63999e9e4ba5dbdce91a71bda. Exact WeddingScope now precedes decision-cache, model and approved task-delivery access; both partners reuse the owner-plan cache, model use remains actor-attributed, and migration 0176 records canonical owner plus actor for delivery receipts. Exact-SHA frontend contracts 14/14, typecheck, Linux cargo check --lib, direct scope contracts 4/4 and the real tmpfs pgvector/Postgres partner API test pass. The database test covers two couples, guessed workspaces, same owner/partner run-sheet state, research/task denial and post-revocation denial. The named disposable container was removed. Windows rustc remained unstable, so Linux/WSL supplied the clean compiler and database evidence."
   - id: WED-394
     title: Apply canonical WeddingScope to the installed run-sheet projection
-    status: review
+    status: done
     owner: codex
     branch: agent/codex/WED-394
     worktree: C:/temp/wt/omnyid-wed389
@@ -36,7 +36,7 @@ tasks:
     depends_on: [WED-392, WED-393, WED-291, WED-295]
     files: [src/db/wedding_runsheet_projection.rs, src/server/wedding_runsheet_projection_routes.rs, solid-ui/src/lib/databaseRegistryState.ts, solid-ui/src/lib/weddingRunSheetProjectionApi.ts, solid-ui/src/components/WeddingRunSheetProjectionStatus.tsx, solid-ui/src/components/DatabaseView.tsx, solid-ui/tests/database-registry-state.test.ts, solid-ui/tests/wedding-run-sheet-projection-api.test.ts, tests/wedding_scope_contract.rs, tests/wedding_partner_sharing_api.rs, Documents/design/wedding planner/couple coworkspace/couple-coworking-*.md, .agent/**]
     acceptance: [run-sheet projection reads and commits resolve an exact active WeddingScope before selecting the owner ledger, both partners use the same owner plan workspace database checkpoint and rows without copying them, wrong-workspace cross-couple and revoked-member requests fail before projection access, the frontend sends the discovered response workspace on every projection request and installed run-sheet definitions retain it, optimistic checkpoint and source-scope protections remain intact, focused server and frontend tests plus clean-candidate checks pass, COW-03 and COW-06 remain explicitly partial until their other domains are converted]
-    progress: "Implementation is complete at a02ec596b5e2471d42c48f864b03cf837d510cb0. Install/load/commit resolve exact WeddingScope and use the canonical owner ledger while retaining actor identity; Database view carries the plan workspace; server installation persists the existing run-sheet definition; two-couple/wrong-workspace/revoked-member coverage is added. Exact-SHA frontend tests 10/10, typecheck, cargo check --lib and wedding_scope_contract 3/3 pass. The Windows Rust 1.94 compiler repeatedly crashes internally while rebuilding lib/test (access violation, stack overflow and illegal instruction), Rust 1.95 also access-violates in serde_core, Docker is unavailable and TEST_DATABASE_URL is unset, so the new disposable-Postgres body is not executed and the slice remains in review rather than done."
+    progress: "Complete and subsequently re-proved in descendant exact SHA eb67301181ef6ca63999e9e4ba5dbdce91a71bda. Install/load/commit resolve exact WeddingScope and use the canonical owner ledger while retaining actor identity; Database view carries the plan workspace; server installation persists the existing run-sheet definition. Frontend contracts, typecheck, Linux cargo check, scope contracts and a real tmpfs pgvector/Postgres two-couple test pass, including same owner/partner state, guessed workspace, cross-couple and post-revocation denial. Windows rustc instability was bypassed with the matching Linux 1.94 toolchain."
   - id: WED-393
     title: Keep venue decisions actionable before an exact wedding date and preserve their sequence priority
     status: done
