@@ -733,7 +733,7 @@ test("wedding PersonalOS respects an explicit focus limit while retaining ordina
   assert.deepEqual(state.decisionLoadRelief.reliefLabels, []);
 });
 
-test("wedding PersonalOS queues every open planning task without a default three-item cap", () => {
+test("wedding PersonalOS drops to one focus when decisions are piling up", () => {
   const tasks = Array.from({ length: 7 }, (_, index) => ({
     id: `task-${index + 1}`,
     title: `Planning task ${index + 1}`,
@@ -743,9 +743,62 @@ test("wedding PersonalOS queues every open planning task without a default three
   }));
   const state = buildWeddingPersonalOsProjectionState({ now, taskItems: tasks });
 
-  assert.equal(state.decisionLoadRelief.focusItems.length, 7);
-  assert.equal(state.decisionLoadRelief.backlogCount, 0);
-  assert.ok(state.decisionLoadRelief.focusLimit >= 7);
+  assert.equal(state.decisionLoadRelief.focusItems.length, 1);
+  assert.equal(state.decisionLoadRelief.backlogCount, 6);
+  assert.equal(state.decisionLoadRelief.focusLimit, 1);
+  assert.equal(state.rankedItems.length, 7);
+});
+
+test("a vendor-stated hold inside seven days outranks an otherwise identical undated card", () => {
+  const task = (id: string, metadata: Record<string, unknown> = {}) => ({
+    id,
+    title: id === "hold" ? "Hold Harbour House for 20 November?" : "Review florist option",
+    kind: "decision" as const,
+    priority: "normal" as const,
+    reviewStatus: "accepted" as const,
+    approvalState: "draft" as const,
+    metadata: { requirements_confirmed: true, ...metadata },
+  });
+  const state = buildWeddingPersonalOsProjectionState({
+    now: new Date("2026-10-06T00:00:00Z"),
+    taskItems: [
+      task("undated"),
+      task("hold", { vendor_date_hold_expires_at: "2026-10-10T00:00:00Z", venue_decision_state: "hold_expiring" }),
+    ],
+  });
+  assert.equal(state.rankedItems[0]?.id, "task:hold");
+  assert.equal(state.rankedItems[0]?.dueAt, "2026-10-10T00:00:00Z");
+  assert.match(state.rankedItems[0]?.dueLabel ?? "", /date hold expires/i);
+  assert.ok(state.rankedItems[0]?.evidenceLabels.some((label) => /Vendor date hold expires 2026-10-10/.test(label)));
+  assert.equal(state.rankedItems[1]?.dueAt, null);
+});
+
+test("queue pressure explains venue-first relief and only reports sourced weekly catches", () => {
+  const tasks = Array.from({ length: 5 }, (_, index) => ({
+    id: `task-${index + 1}`,
+    title: index === 0 ? "Compare venue shortlist" : `Open decision ${index + 1}`,
+    kind: "decision" as const,
+    priority: index === 0 ? "high" as const : "normal" as const,
+    reviewStatus: "accepted" as const,
+    approvalState: "draft" as const,
+    metadata: index === 0 ? {
+      requirements_confirmed: true,
+      vendor_lead_time_research_task: true,
+      vendor_lead_time_category_id: "venue",
+      vendor_lead_time_must_decide_first: true,
+      recent_focus_switch_count: 4,
+      watcher_caught_kind: "expiring_hold",
+      watcher_caught_at: "2026-10-04T00:00:00Z",
+      checks_completed: 2,
+      checks_total: 3,
+    } : { requirements_confirmed: true },
+  }));
+  const state = buildWeddingPersonalOsProjectionState({ now: new Date("2026-10-06T00:00:00Z"), taskItems: tasks });
+  assert.equal(state.decisionLoadRelief.focusItems.length, 1);
+  assert.ok(state.decisionLoadRelief.reliefLabels.some((label) => /wait on the venue/i.test(label)));
+  assert.ok(state.decisionLoadRelief.reliefLabels.some((label) => /Finish the venue shortlist/i.test(label)));
+  assert.ok(state.decisionLoadRelief.reliefLabels.some((label) => /2 of 3 checks done/i.test(label)));
+  assert.ok(state.decisionLoadRelief.reliefLabels.some((label) => /This week OmnyID caught 1 expiring hold/i.test(label)));
 });
 
 test("wedding PersonalOS uses must-decide-first as a bounded vendor urgency tie-break", () => {

@@ -79,6 +79,9 @@ export type WeddingArtifactQuotePreview = {
   paymentSchedule?: string[];
   assumptions?: string[];
   eventDate?: string | null;
+  vendorCategory?: string | null;
+  dateHoldExpiresAt?: string | null;
+  bookingStatus?: "open" | "chosen" | "booked" | null;
   guestCount?: number | null;
   availabilityLabel?: string | null;
   packageLabel?: string | null;
@@ -504,6 +507,14 @@ function parseQuotePreview(body: string): WeddingArtifactQuotePreview | null {
   const eventDate = labeledValue(body, ["Wedding date", "Event date", "Date"]);
   const guestCountLabel = labeledValue(body, ["Guest count", "Guests", "Attendees"]);
   const validUntil = labeledValue(body, ["Valid until", "Quote valid until", "Expires"]);
+  const dateHoldExpiresAt = labeledValue(body, ["Date hold expires", "Hold expires", "Date held until", "Hold until"]);
+  const vendorCategory = labeledValue(body, ["Vendor category", "Category", "Supplier category"]);
+  const bookingStatusLabel = labeledValue(body, ["Booking status", "Venue status", "Selection status"]);
+  const bookingStatus = /\bbooked|booking confirmed\b/i.test(bookingStatusLabel)
+    ? "booked"
+    : /\bchosen|selected|preferred\b/i.test(bookingStatusLabel)
+      ? "chosen"
+      : "open";
   const attachmentRaw = labeledValue(body, [
     "Attachment",
     "Original file",
@@ -535,6 +546,9 @@ function parseQuotePreview(body: string): WeddingArtifactQuotePreview | null {
     paymentSchedule: [...new Set(paymentSchedule)],
     assumptions: [...new Set(assumptions)],
     eventDate: eventDate || null,
+    vendorCategory: vendorCategory || null,
+    dateHoldExpiresAt: dateHoldExpiresAt || null,
+    bookingStatus,
     guestCount: guestCountLabel ? numericMoney(guestCountLabel) : null,
     availabilityLabel: labeledValue(body, ["Availability", "Date availability", "Hold status"]) || null,
     packageLabel: labeledValue(body, ["Package", "Package name", "Option"]) || null,

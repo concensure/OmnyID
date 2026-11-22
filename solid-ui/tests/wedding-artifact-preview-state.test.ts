@@ -116,9 +116,12 @@ test("buildWeddingArtifactPreviewState creates structured quote previews before 
       "# Chloe's Florals quote",
       "",
       "Vendor: Chloe's Florals",
+      "Vendor category: Florist",
       "Quote amount: AUD $799",
       "Budget delta: $200 over budget",
       "Valid until: 2026-10-15",
+      "Date hold expires: 2026-10-12",
+      "Booking status: selected",
       "Wedding date: 20 November 2027",
       "Guests: 90",
       "Availability: Available for the date",
@@ -135,10 +138,13 @@ test("buildWeddingArtifactPreviewState creates structured quote previews before 
   assert.equal(preview?.kind, "quote");
   if (preview?.kind !== "quote") return;
   assert.equal(preview.vendorName, "Chloe's Florals");
+  assert.equal(preview.vendorCategory, "Florist");
   assert.equal(preview.amount, 799);
   assert.equal(preview.currency, "AUD");
   assert.equal(preview.budgetDeltaAmount, 200);
   assert.equal(preview.validUntil, "2026-10-15");
+  assert.equal(preview.dateHoldExpiresAt, "2026-10-12");
+  assert.equal(preview.bookingStatus, "chosen");
   assert.equal(preview.eventDate, "20 November 2027");
   assert.equal(preview.guestCount, 90);
   assert.equal(preview.availabilityLabel, "Available for the date");

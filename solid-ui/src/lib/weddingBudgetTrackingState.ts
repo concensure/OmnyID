@@ -10,6 +10,7 @@ import {
   type WeddingBudgetAllocationCategoryAmount,
 } from "@/lib/weddingBudgetAllocationState";
 import {
+  buildWeddingBudgetPaceLabel,
   buildWeddingBudgetInsightsState,
   type WeddingBudgetInsightsState,
 } from "@/lib/weddingBudgetInsightsState";
@@ -17,7 +18,6 @@ import {
   isWeddingBudgetContributionDecisionRecord,
   weddingBudgetContributionsFromDecisionRecords,
 } from "@/lib/weddingBudgetContributionState";
-
 export type WeddingBudgetLinePriceStatus = "quoted" | "projected" | "unknown";
 
 export type WeddingBudgetLineItem = {
@@ -689,6 +689,7 @@ export function buildWeddingBudgetQuoteTaskItems(input: WeddingBudgetQuoteTaskIn
       metadata: {
         ...metadata,
         budget_quote_verification: true,
+        budget_pace_label: buildWeddingBudgetPaceLabel({ targetAmount: budget.budgetTargetAmount, knownAmount: budget.totalKnownAmount, remainingAmount: budget.remainingAmount, unknownCount: budget.unknownCount }),
         budget_line_item_id: candidate.id.replace(/^wedding_budget_quote_task:/, ""),
         budget_vendor_label: candidate.vendorName,
         budget_category_label: candidate.categoryLabel,

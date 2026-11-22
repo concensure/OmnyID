@@ -159,11 +159,13 @@ export function weddingDecisionPatternAllowsProjection(
 }
 
 export type WeddingQuoteSafetyEnvelope = {
-  comfortableResurfaceAt: string;
-  latestSafeDecisionAt: string;
-  criticalAt: string;
-  externalDeadline: string;
-  deadlineSource: "vendor_quote" | "conservative_review_window";
+  comfortableResurfaceAt: string | null;
+  latestSafeDecisionAt: string | null;
+  criticalAt: string | null;
+  externalDeadline: string | null;
+  deadlineSource: "vendor_quote_validity" | "vendor_date_hold" | null;
+  quoteValidityDeadline: string | null;
+  dateHoldDeadline: string | null;
 };
 
 function validDate(value: string | null | undefined): Date | null {
@@ -173,17 +175,34 @@ function validDate(value: string | null | undefined): Date | null {
 
 export function weddingQuoteSafetyEnvelope(input: {
   validUntil?: string | null;
+  dateHoldExpiresAt?: string | null;
   now?: Date;
 }): WeddingQuoteSafetyEnvelope {
-  const now = input.now ?? new Date();
-  const explicit = validDate(input.validUntil);
-  const externalDeadline = explicit ?? new Date(now.getTime() + 14 * 86_400_000);
+  const quoteValidity = validDate(input.validUntil);
+  const dateHold = validDate(input.dateHoldExpiresAt);
+  const dated = [
+    quoteValidity ? { date: quoteValidity, source: "vendor_quote_validity" as const } : null,
+    dateHold ? { date: dateHold, source: "vendor_date_hold" as const } : null,
+  ].filter((value): value is { date: Date; source: "vendor_quote_validity" | "vendor_date_hold" } => Boolean(value));
+  const effective = dated.sort((left, right) => left.date.getTime() - right.date.getTime())[0] ?? null;
+  if (!effective) return {
+    comfortableResurfaceAt: null,
+    latestSafeDecisionAt: null,
+    criticalAt: null,
+    externalDeadline: null,
+    deadlineSource: null,
+    quoteValidityDeadline: null,
+    dateHoldDeadline: null,
+  };
+  const externalDeadline = effective.date;
   const before = (days: number) => new Date(externalDeadline.getTime() - days * 86_400_000).toISOString();
   return {
     comfortableResurfaceAt: before(7),
     latestSafeDecisionAt: before(3),
     criticalAt: new Date(externalDeadline.getTime() - 86_400_000).toISOString(),
     externalDeadline: externalDeadline.toISOString(),
-    deadlineSource: explicit ? "vendor_quote" : "conservative_review_window",
+    deadlineSource: effective.source,
+    quoteValidityDeadline: quoteValidity?.toISOString() ?? null,
+    dateHoldDeadline: dateHold?.toISOString() ?? null,
   };
 }

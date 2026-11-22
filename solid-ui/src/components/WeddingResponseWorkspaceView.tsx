@@ -529,6 +529,7 @@ export function WeddingResponseWorkspaceView(props: WeddingResponseWorkspaceView
       subject: base.subject,
       draftBody: latestDraft,
       quoteMessageId: base.quoteMessageId,
+      createdAt: base.createdAt,
       draftMessageId: quoteReplyDraftMessageIds()[base.id] ?? base.draftMessageId,
       approvedWording: typeof approvedWording === "boolean" ? approvedWording : base.approvedWording,
       budgetImpactAcknowledged: base.budgetImpactAcknowledged || quoteReplyBudgetAck()[base.id] === true,

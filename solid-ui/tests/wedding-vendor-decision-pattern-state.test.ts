@@ -41,17 +41,11 @@ test("quote verification permits labelled optional gaps but blocks missing contr
   assert.equal(weddingDecisionPatternAllowsProjection(blocked), false);
 });
 
-test("safety envelope keeps all four dates ordered and labels inferred deadlines", () => {
+test("safety envelope does not invent urgency when the vendor stated no deadline", () => {
   const envelope = weddingQuoteSafetyEnvelope({ now: new Date("2026-10-06T00:00:00Z") });
-  assert.equal(envelope.deadlineSource, "conservative_review_window");
-  const dates = [
-    envelope.comfortableResurfaceAt,
-    envelope.latestSafeDecisionAt,
-    envelope.criticalAt,
-    envelope.externalDeadline,
-  ].map(Date.parse);
-  assert.equal(dates.every(Number.isFinite), true);
-  assert.equal(dates.every((value, index) => index === 0 || value > dates[index - 1]), true);
+  assert.equal(envelope.deadlineSource, null);
+  assert.equal(envelope.externalDeadline, null);
+  assert.equal(envelope.comfortableResurfaceAt, null);
 });
 
 test("safety envelope preserves an expired vendor deadline for overdue escalation", () => {
@@ -59,9 +53,20 @@ test("safety envelope preserves an expired vendor deadline for overdue escalatio
     now: new Date("2026-10-06T00:00:00Z"),
     validUntil: "2026-10-05T00:00:00Z",
   });
-  assert.equal(envelope.deadlineSource, "vendor_quote");
+  assert.equal(envelope.deadlineSource, "vendor_quote_validity");
   assert.equal(envelope.externalDeadline, "2026-10-05T00:00:00.000Z");
-  assert.equal(Date.parse(envelope.criticalAt) < Date.parse(envelope.externalDeadline), true);
+  assert.equal(Date.parse(envelope.criticalAt!) < Date.parse(envelope.externalDeadline!), true);
+});
+
+test("safety envelope keeps quote validity and a date hold as separate facts", () => {
+  const envelope = weddingQuoteSafetyEnvelope({
+    validUntil: "2026-10-20T00:00:00Z",
+    dateHoldExpiresAt: "2026-10-10T00:00:00Z",
+  });
+  assert.equal(envelope.deadlineSource, "vendor_date_hold");
+  assert.equal(envelope.externalDeadline, "2026-10-10T00:00:00.000Z");
+  assert.equal(envelope.quoteValidityDeadline, "2026-10-20T00:00:00.000Z");
+  assert.equal(envelope.dateHoldDeadline, "2026-10-10T00:00:00.000Z");
 });
 
 test("legacy quote histories with no pattern metadata can be verified against v1", () => {

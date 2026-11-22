@@ -8,6 +8,7 @@ import { buildWeddingTaskHierarchyState } from "../src/lib/weddingTaskHierarchyS
 import {
   buildWeddingOutreachEscalationState,
   buildWeddingOutreachEscalationStateFromVendorContact,
+  buildWeddingVendorContactOutreachTaskItems,
 } from "../src/lib/weddingOutreachEscalationState.ts";
 
 const metadata = {
@@ -227,4 +228,30 @@ test("buildWeddingOutreachEscalationStateFromVendorContact converts due contact 
   assert.equal(state.taskItem.kind, "vendor_follow_up");
   assert.equal((state.taskItem.metadata as Record<string, unknown>).vendor_contact_method, "master_agent");
   assert.equal((state.taskItem.metadata as Record<string, unknown>).follow_up_due_at, "2026-09-14T00:00:00.000Z");
+});
+
+test("silent vendor follow-up names relative drift only when two peer replies support it", () => {
+  const tasks = buildWeddingVendorContactOutreachTaskItems({
+    metadata,
+    now: "2026-09-14T00:00:00.000Z",
+    vendors: [{
+      vendorName: "Harbour House",
+      category: "Venue",
+      userContact: { lastContactAt: "2026-09-08T00:00:00.000Z" },
+    }, {
+      vendorName: "Garden Hall",
+      category: "Venue",
+      userContact: { lastContactAt: "2026-09-01T00:00:00.000Z", responseReceivedAt: "2026-09-03T00:00:00.000Z" },
+    }, {
+      vendorName: "Stone Chapel",
+      category: "Venue",
+      userContact: { lastContactAt: "2026-09-04T00:00:00.000Z", responseReceivedAt: "2026-09-06T00:00:00.000Z" },
+    }],
+  });
+  const harbour = tasks.find((task) => task.title.includes("Harbour House"));
+  assert.ok(harbour);
+  assert.match(harbour?.notes ?? "", /6 days vs about 2/i);
+  assert.match(harbour?.notes ?? "", /Send the one follow-up/i);
+  assert.equal((harbour?.metadata as Record<string, unknown>).peer_typical_reply_days, 2);
+  assert.equal(harbour?.approvalState, "pending_user_approval");
 });

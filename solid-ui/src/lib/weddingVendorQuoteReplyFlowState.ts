@@ -25,7 +25,6 @@ import {
   weddingQuoteDisplayDateTime as displayDateTime,
   weddingVendorQuoteReplyDurableSentReceiptId,
 } from "@/lib/weddingVendorQuoteReplyUtilities";
-
 export {
   weddingVendorQuoteDraftAfpSendInput,
   weddingVendorQuoteIncomingAfpMessage,
@@ -974,6 +973,7 @@ export function buildWeddingVendorQuoteReplyFlowState(
     recommendationWhyLabels: recommendationHandoff.whyLabels,
     recommendationConfidenceLabel: recommendationHandoff.confidenceLabel,
     quoteMessageId,
+    createdAt: clean(input.createdAt) || null,
     draftMessageId,
     approvalRequest,
     approvedWording,

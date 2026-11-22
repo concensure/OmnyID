@@ -170,7 +170,6 @@ import {
   vendorContactCards,
   vendorQuoteReplyFlowsFromPreviews,
 } from "@/lib/weddingResponseWorkspacePresentationState";
-
 export type WeddingWorkspaceFilterKind =
   | "artifact_kind"
   | "approval_state"

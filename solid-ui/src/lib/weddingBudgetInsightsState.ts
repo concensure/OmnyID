@@ -87,6 +87,13 @@ function moneyLabel(amount: number | null, currency = "AUD"): string {
     : amount.toLocaleString(undefined, { style: "currency", currency, maximumFractionDigits: 0 });
 }
 
+export function buildWeddingBudgetPaceLabel(input: { targetAmount: number | null; knownAmount: number; remainingAmount: number | null; unknownCount: number }): string | null {
+  if (input.targetAmount === null || input.targetAmount <= 0) return null;
+  const unknown = input.unknownCount > 0 ? ` with ${input.unknownCount} cost${input.unknownCount === 1 ? "" : "s"} still unknown` : "";
+  const risk = input.remainingAmount !== null && input.remainingAmount < 0 ? ` Current choices exceed the budget by ${moneyLabel(Math.abs(input.remainingAmount))}.` : "";
+  return `${moneyLabel(input.knownAmount)} of ${moneyLabel(input.targetAmount)} committed or projected${unknown}.${risk}`;
+}
+
 function firstMatch(text: string, pattern: RegExp, fallback = "Ask vendor"): string {
   const match = text.match(pattern);
   return clean(match?.[1]) || fallback;

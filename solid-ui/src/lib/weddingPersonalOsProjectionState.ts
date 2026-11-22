@@ -182,6 +182,27 @@ function hasVendorLeadTimeResearchTask(metadata: unknown): boolean {
   return record(metadata).vendor_lead_time_research_task === true;
 }
 
+function vendorStatedDeadline(metadata: unknown): { at: string; kind: "date_hold" | "quote_validity" } | null {
+  const data = record(metadata);
+  const candidates = [
+    { at: clean(data.vendor_date_hold_expires_at ?? data.date_hold_expires_at), kind: "date_hold" as const },
+    { at: clean(data.quote_valid_until ?? data.valid_until), kind: "quote_validity" as const },
+  ].filter((candidate) => timestamp(candidate.at) !== null)
+    .sort((left, right) => (timestamp(left.at) ?? 0) - (timestamp(right.at) ?? 0));
+  return candidates[0] ?? null;
+}
+
+function effectiveTaskDeadline(task: WeddingPlanningTaskItem): { at: string; label: string | null } | null {
+  const own = clean(task.dueAt);
+  if (timestamp(own) !== null) return { at: own, label: clean(task.dueLabel) || null };
+  const vendor = vendorStatedDeadline(task.metadata);
+  if (!vendor) return null;
+  return {
+    at: vendor.at,
+    label: vendor.kind === "date_hold" ? "Vendor date hold expires" : "Vendor quote validity expires",
+  };
+}
+
 function hasVendorMustDecideFirstTask(metadata: unknown): boolean {
   const data = record(metadata);
   return data.vendor_lead_time_research_task === true
@@ -273,6 +294,7 @@ function simulatorKindForFamily(family: WeddingPersonalOsPressureFamily): Weddin
 }
 
 function taskWeight(task: WeddingPlanningTaskItem, now: Date): number {
+  const effectiveDeadline = effectiveTaskDeadline(task);
   const priority = task.priority === "urgent" ? 30 : task.priority === "high" ? 22 : task.priority === "normal" ? 8 : 0;
   const review = task.reviewStatus === "needs_review" ? -20 : task.reviewStatus === "ignored" ? -100 : 0;
   const approval = task.approvalState === "archived" ? -100 : task.approvalState === "pending_user_approval" ? 12 : 0;
@@ -303,7 +325,7 @@ function taskWeight(task: WeddingPlanningTaskItem, now: Date): number {
     : 0;
   const backgroundAutomation = hasBackgroundAutomationTask(task.metadata) ? 17 : 0;
   const providerHandoff = hasProviderHandoffTask(task.metadata) ? 23 : 0;
-  return 20 + priority + duePressure(task.dueAt, now) + approval + loop + review
+  return 20 + priority + duePressure(effectiveDeadline?.at, now) + approval + loop + review
     + quote + payment + guest + finalCount + postWedding + vow + seating + delegation + finalPhase + legalAdmin
     + vendorSearch + vendorLeadTime + vendorSequence + vendorComparison + vendorSeed + expectedBehaviorGap + oracleUpdatePlan + productionRemainingWork
     + backgroundAutomation + providerHandoff
@@ -318,12 +340,17 @@ function taskItem(
   const title = clean(task.title);
   if (!title || task.reviewStatus === "ignored" || task.approvalState === "archived"
     || task.semanticTags?.some((tag) => tag.toLowerCase() === "wedding_task_status:done")) return null;
-  const decisionContract = buildWeddingTaskDecisionContract({ task, facts: savedFacts });
+  const effectiveDeadline = effectiveTaskDeadline(task);
+  const decisionTask = effectiveDeadline && !task.dueAt
+    ? { ...task, dueAt: effectiveDeadline.at, dueLabel: effectiveDeadline.label ?? task.dueLabel }
+    : task;
+  const decisionContract = buildWeddingTaskDecisionContract({ task: decisionTask, facts: savedFacts });
   if (decisionContract.settled) return null;
   const family = familyForTask(task);
-  const timing = dueExplanation(task.dueAt, clean(task.dueLabel) || null, now);
+  const timing = dueExplanation(effectiveDeadline?.at, effectiveDeadline?.label ?? (clean(task.dueLabel) || null), now);
   const escalationStage = outreachEscalationStage(task.metadata);
   const metadata = record(task.metadata);
+  const vendorDeadline = vendorStatedDeadline(task.metadata);
   const actionMetadata = {
     vendor_lead_time_research_task: metadata.vendor_lead_time_research_task === true ? true : undefined,
     vendor_lead_time_category_id: clean(metadata.vendor_lead_time_category_id) || undefined,
@@ -334,6 +361,15 @@ function taskItem(
     vendor_search_action_id: clean(metadata.vendor_search_action_id) || undefined,
     vendor_search_categories: stringArray(metadata.vendor_search_categories).slice(0, 6),
     vendor_search_scope: clean(metadata.vendor_search_scope) || undefined,
+    vendor_date_hold_expires_at: clean(metadata.vendor_date_hold_expires_at ?? metadata.date_hold_expires_at) || undefined,
+    quote_valid_until: clean(metadata.quote_valid_until ?? metadata.valid_until) || undefined,
+    venue_decision_state: clean(metadata.venue_decision_state) || undefined,
+    recent_focus_switch_count: typeof metadata.recent_focus_switch_count === "number" ? metadata.recent_focus_switch_count : undefined,
+    watcher_caught_kind: clean(metadata.watcher_caught_kind) || undefined,
+    watcher_caught_at: clean(metadata.watcher_caught_at) || undefined,
+    budget_pace_label: clean(metadata.budget_pace_label) || undefined,
+    checks_completed: typeof metadata.checks_completed === "number" ? metadata.checks_completed : undefined,
+    checks_total: typeof metadata.checks_total === "number" ? metadata.checks_total : undefined,
   };
   const compactActionMetadata = Object.fromEntries(
     Object.entries(actionMetadata).filter(([, value]) =>
@@ -366,6 +402,12 @@ function taskItem(
     hasBackgroundAutomationTask(task.metadata) ? "automation setup gap" : "",
     hasProviderHandoffTask(task.metadata) ? "vendor connection gap" : "",
     outreachEscalationEvidenceLabel(escalationStage) ?? "",
+    vendorDeadline?.kind === "date_hold"
+      ? `Vendor date hold expires ${vendorDeadline.at.slice(0, 10)}`
+      : vendorDeadline?.kind === "quote_validity"
+        ? `Vendor quote validity expires ${vendorDeadline.at.slice(0, 10)}`
+        : "",
+    clean(metadata.budget_pace_label),
     ...secondOrderEvidence(task.metadata),
     ...stringArray(record(task.metadata).expected_behavior_blocker_labels),
     ...stringArray(record(task.metadata).oracle_update_blocker_labels),
@@ -376,8 +418,8 @@ function taskItem(
     title,
     pressureFamily: family,
     rankWeight: taskWeight(task, now),
-    dueLabel: clean(task.dueLabel) || null,
-    dueAt: clean(task.dueAt) || null,
+    dueLabel: effectiveDeadline?.label ?? (clean(task.dueLabel) || null),
+    dueAt: effectiveDeadline?.at ?? (clean(task.dueAt) || null),
     explanation: [
       timing,
       outreachEscalationExplanation(escalationStage),
@@ -574,10 +616,39 @@ function decisionLoadCandidate(item: WeddingPersonalOsRankedItem): boolean {
 }
 
 function decisionLoadReliefLabels(
-  _focusItems: readonly WeddingPersonalOsRankedItem[],
-  _backlogCount: number,
+  focusItems: readonly WeddingPersonalOsRankedItem[],
+  backlogCount: number,
+  activeItems: readonly WeddingPersonalOsRankedItem[],
+  now: Date,
 ): string[] {
-  return [];
+  const top = focusItems[0] ?? null;
+  const venueFirst = Boolean(top) && (
+    clean(top?.actionMetadata?.vendor_lead_time_category_id) === "venue"
+    || /\bvenue\b/i.test(top?.title ?? "")
+  );
+  const focusSwitches = activeItems.reduce((count, item) => Math.max(
+    count,
+    typeof item.actionMetadata?.recent_focus_switch_count === "number" ? item.actionMetadata.recent_focus_switch_count : 0,
+  ), 0);
+  const caught = activeItems.flatMap((item) => {
+    const kind = clean(item.actionMetadata?.watcher_caught_kind);
+    const at = timestamp(item.actionMetadata?.watcher_caught_at);
+    return kind && at !== null && now.getTime() - at <= 7 * 86_400_000 && at <= now.getTime() ? [kind] : [];
+  });
+  const caughtCount = (kind: string) => caught.filter((item) => item === kind).length;
+  const weeklyParts = [
+    caughtCount("expiring_hold") ? `${caughtCount("expiring_hold")} expiring hold${caughtCount("expiring_hold") === 1 ? "" : "s"}` : null,
+    caughtCount("over_budget_quote") ? `${caughtCount("over_budget_quote")} over-budget quote${caughtCount("over_budget_quote") === 1 ? "" : "s"}` : null,
+    caughtCount("stale_vendor") ? `${caughtCount("stale_vendor")} stale vendor${caughtCount("stale_vendor") === 1 ? "" : "s"}` : null,
+  ].filter((label): label is string => Boolean(label));
+  const completed = typeof top?.actionMetadata?.checks_completed === "number" ? top.actionMetadata.checks_completed : null;
+  const total = typeof top?.actionMetadata?.checks_total === "number" ? top.actionMetadata.checks_total : null;
+  return [
+    venueFirst && backlogCount >= 4 ? `These ${backlogCount + 1} choices wait on the venue. Start there.` : null,
+    focusSwitches >= 3 && venueFirst ? "Planning has moved between several categories. Finish the venue shortlist before opening another one." : null,
+    completed !== null && total !== null && total > 0 ? `${completed} of ${total} checks done for you.` : null,
+    weeklyParts.length > 0 ? `This week OmnyID caught ${weeklyParts.join(", ")}.` : null,
+  ].filter((label): label is string => Boolean(label));
 }
 
 export function buildWeddingPersonalOsProjectionState(input: {
@@ -623,7 +694,7 @@ export function buildWeddingPersonalOsProjectionState(input: {
   }));
   const candidateItems = projectedItems;
   const limit = Math.max(1, Math.trunc(input.limit ?? Math.max(1, candidateItems.length)));
-  const decisionFocusLimit = Math.max(1, Math.trunc(input.decisionFocusLimit ?? limit));
+  const requestedDecisionFocusLimit = Math.max(1, Math.trunc(input.decisionFocusLimit ?? limit));
   const candidateById = new Map(candidateItems.map((item) => [item.id, item]));
   const deferredIds = new Set((input.decisionDeferrals ?? [])
     .filter((deferral) => {
@@ -636,6 +707,8 @@ export function buildWeddingPersonalOsProjectionState(input: {
   const activeItems = candidateItems
     .filter((item) => !deferredIds.has(item.id))
     .filter((item) => item.rankWeight > 0);
+  const decisionCandidateCount = activeItems.filter(decisionLoadCandidate).length;
+  const decisionFocusLimit = decisionCandidateCount >= 5 ? 1 : requestedDecisionFocusLimit;
   const genericProjection = buildContinuityPersonalOsProjectionState({
     items: activeItems,
     limit,
@@ -649,7 +722,7 @@ export function buildWeddingPersonalOsProjectionState(input: {
       if (!clean(item.actionMetadata?.wedding_setup_decision) && missing && setupPrerequisites.has(missing)) return false;
       return decisionLoadCandidate(item);
     },
-    decisionLoadReliefLabels,
+    decisionLoadReliefLabels: (focusItems, backlogCount) => decisionLoadReliefLabels(focusItems, backlogCount, activeItems, now),
     guardrailLabels: [
       "Uses existing PersonalOS field engine and simulator only.",
       "Does not create a wedding-specific field engine or simulator.",

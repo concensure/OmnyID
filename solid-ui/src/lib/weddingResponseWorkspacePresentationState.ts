@@ -802,6 +802,7 @@ export function vendorQuoteReplyFlowsFromPreviews(input: {
       subject: clean(email?.subject) || `${quote.vendorName} quote`,
       draftBody,
       quoteMessageId: preview.artifactId,
+      createdAt: Number.isFinite(preview.createdAt) ? new Date(preview.createdAt).toISOString() : null,
       draftMessageId: matchingDraft?.artifactId ?? null,
     });
     const receipt = (input.approvalReceipts ?? []).find((item) => {
@@ -835,6 +836,7 @@ export function vendorQuoteReplyFlowsFromPreviews(input: {
       subject: provisionalFlow.subject,
       draftBody,
       quoteMessageId: preview.artifactId,
+      createdAt: Number.isFinite(preview.createdAt) ? new Date(preview.createdAt).toISOString() : null,
       draftMessageId: matchingDraft?.artifactId ?? null,
       approvedWording: receiptDeliveryProven,
       budgetImpactAcknowledged: receiptDeliveryProven,

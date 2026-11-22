@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   buildWeddingBudgetPaymentTaskItems,
+  buildWeddingBudgetQuoteTaskItems,
   buildWeddingBudgetTrackingState,
   buildWeddingBudgetVendorOutreachTaskItems,
   buildWeddingVendorPursuitClosureTaskItem,
@@ -303,6 +304,32 @@ test("buildWeddingBudgetPaymentTaskItems creates searchable payment-review task 
     }],
   });
   assert.equal(duplicate.length, 0);
+});
+
+test("quote review tasks carry a plain budget pace derived from the saved budget", () => {
+  const state = buildWeddingBudgetTrackingState({
+    budgetTargetAmount: 45_000,
+    decisionRecords: [decision({
+      selectedOptionDetail: "Projected venue package $31,000; current quote still needs confirmation",
+      selectedOptionCells: ["Harbour House", "Venue", "$31,000", "Projected package"],
+    })],
+  });
+  const tasks = buildWeddingBudgetQuoteTaskItems({
+    budgetTracking: {
+      ...state,
+      quoteTaskCandidates: [{
+        id: "wedding_budget_quote_task:venue",
+        title: "Verify Harbour House quote",
+        categoryLabel: "Venue",
+        vendorName: "Harbour House",
+        priorityLabel: "High",
+        reasonLabel: "Current quote needs confirmation.",
+        sourceLabel: "Saved venue comparison",
+      }],
+    },
+  });
+  assert.equal(tasks.length, 1);
+  assert.match(String(record(tasks[0]?.metadata).budget_pace_label), /\$31,000 of \$45,000 committed or projected/);
 });
 
 test("buildWeddingVendorPursuitClosureTaskItem archives a selected vendor and suppresses regenerated outreach", () => {

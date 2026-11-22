@@ -25,11 +25,22 @@ pub const QUOTE_ACTIONS: &[&str] = &[
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct QuoteSafetyEnvelope {
-    pub comfortable_resurface_at: String,
-    pub latest_safe_decision_at: String,
-    pub critical_at: String,
-    pub external_deadline: String,
-    pub deadline_source: &'static str,
+    pub comfortable_resurface_at: Option<String>,
+    pub latest_safe_decision_at: Option<String>,
+    pub critical_at: Option<String>,
+    pub external_deadline: Option<String>,
+    pub deadline_source: Option<&'static str>,
+    pub quote_validity_deadline: Option<String>,
+    pub date_hold_deadline: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct VenueQuoteDecisionContent {
+    pub state: &'static str,
+    pub question: String,
+    pub heading: String,
+    pub primary_action_label: &'static str,
+    pub one_thing_to_confirm: &'static str,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -158,29 +169,145 @@ fn parsed_time(value: Option<&str>) -> Option<DateTime<Utc>> {
         .map(|value| value.with_timezone(&Utc))
 }
 
-pub fn quote_safety_envelope(message: &AFPMessage, now: DateTime<Utc>) -> QuoteSafetyEnvelope {
-    let explicit = text_field(
+pub fn quote_safety_envelope(message: &AFPMessage, _now: DateTime<Utc>) -> QuoteSafetyEnvelope {
+    let quote_validity = text_field(message, &["valid_until", "validUntil", "quote_valid_until"])
+        .and_then(|value| parsed_time(Some(&value)));
+    let date_hold = text_field(
         message,
         &[
-            "valid_until",
-            "validUntil",
-            "external_deadline",
-            "externalDeadline",
+            "date_hold_expires_at",
+            "dateHoldExpiresAt",
+            "vendor_date_hold_expires_at",
         ],
     )
     .and_then(|value| parsed_time(Some(&value)));
-    let (deadline, source) = explicit
-        .map(|value| (value, "vendor_quote"))
-        .unwrap_or_else(|| (now + Duration::days(14), "conservative_review_window"));
+    let effective = match (quote_validity, date_hold) {
+        (Some(quote), Some(hold)) if hold <= quote => Some((hold, "vendor_date_hold")),
+        (Some(quote), Some(_)) => Some((quote, "vendor_quote_validity")),
+        (Some(quote), None) => Some((quote, "vendor_quote_validity")),
+        (None, Some(hold)) => Some((hold, "vendor_date_hold")),
+        (None, None) => None,
+    };
+    let Some((deadline, source)) = effective else {
+        return QuoteSafetyEnvelope {
+            comfortable_resurface_at: None,
+            latest_safe_decision_at: None,
+            critical_at: None,
+            external_deadline: None,
+            deadline_source: None,
+            quote_validity_deadline: None,
+            date_hold_deadline: None,
+        };
+    };
     let critical = deadline - Duration::hours(24);
     let latest_safe = deadline - Duration::days(3);
     let comfortable = deadline - Duration::days(7);
     QuoteSafetyEnvelope {
-        comfortable_resurface_at: comfortable.to_rfc3339(),
-        latest_safe_decision_at: latest_safe.to_rfc3339(),
-        critical_at: critical.to_rfc3339(),
-        external_deadline: deadline.to_rfc3339(),
-        deadline_source: source,
+        comfortable_resurface_at: Some(comfortable.to_rfc3339()),
+        latest_safe_decision_at: Some(latest_safe.to_rfc3339()),
+        critical_at: Some(critical.to_rfc3339()),
+        external_deadline: Some(deadline.to_rfc3339()),
+        deadline_source: Some(source),
+        quote_validity_deadline: quote_validity.map(|value| value.to_rfc3339()),
+        date_hold_deadline: date_hold.map(|value| value.to_rfc3339()),
+    }
+}
+
+pub fn venue_quote_decision_content(
+    message: &AFPMessage,
+    now: DateTime<Utc>,
+) -> VenueQuoteDecisionContent {
+    let vendor = text_field(
+        message,
+        &["vendor_name", "vendorName", "vendor_id", "vendorId"],
+    )
+    .unwrap_or_else(|| "this venue".to_string());
+    let event_date = text_field(
+        message,
+        &["event_date", "eventDate", "wedding_date", "weddingDate"],
+    )
+    .unwrap_or_else(|| "your wedding date".to_string());
+    let hold = text_field(
+        message,
+        &[
+            "date_hold_expires_at",
+            "dateHoldExpiresAt",
+            "vendor_date_hold_expires_at",
+        ],
+    )
+    .and_then(|value| parsed_time(Some(&value)));
+    let hold_days = hold.map(|value| (value - now).num_days());
+    let attachment_status =
+        text_field(message, &["attachment_text_status", "attachmentTextStatus"]);
+    let booking_status = text_field(message, &["booking_status", "bookingStatus"])
+        .unwrap_or_else(|| "open".to_string())
+        .to_ascii_lowercase();
+    let unreadable = attachment_status.as_deref() == Some("linked_unverified");
+    let state = if unreadable {
+        "unreadable_quote"
+    } else if booking_status == "booked" {
+        "booked"
+    } else if matches!(booking_status.as_str(), "chosen" | "selected" | "preferred") {
+        "chosen"
+    } else if hold_days.is_some_and(|days| days < 0) {
+        "hold_lapsed"
+    } else if hold_days.is_some_and(|days| days <= 7) {
+        "hold_expiring"
+    } else if number_field(message, &["budget_delta_amount", "budgetDeltaAmount"])
+        .is_some_and(|amount| amount > 0.0)
+    {
+        "over_budget"
+    } else {
+        "no_deadline"
+    };
+    let question = match state {
+        "booked" => format!("What should be confirmed next for {vendor}?"),
+        "chosen" => format!("Confirm {vendor} as your venue for {event_date}?"),
+        _ => format!("Hold {vendor} for {event_date}?"),
+    };
+    let (heading, primary_action_label, one_thing_to_confirm) = match state {
+        "unreadable_quote" => (
+            format!("{vendor}'s quote needs unlocking"),
+            "Open the original quote",
+            "The quote amount, inclusions and any stated date-hold deadline.",
+        ),
+        "over_budget" => (
+            format!("{vendor} is above the saved allowance"),
+            "Compare the budget trade-off",
+            "Whether the quoted scope justifies the budget difference.",
+        ),
+        "hold_expiring" => (
+            format!("{vendor}'s date hold is expiring"),
+            "Review the date hold",
+            "Whether to ask the venue to keep holding the date; sending still needs approval.",
+        ),
+        "hold_lapsed" => (
+            format!("{vendor}'s stated date hold has lapsed"),
+            "Check the date again",
+            "Whether the wedding date is still available.",
+        ),
+        "chosen" => (
+            format!("{vendor} is your saved preference"),
+            "Confirm our venue choice",
+            "Whether this preference is ready to become the couple's confirmed choice.",
+        ),
+        "booked" => (
+            format!("{vendor} is recorded as booked"),
+            "Add booking details",
+            "The contract, deposit, payment dates and run-sheet details.",
+        ),
+        _ => (
+            format!("No date-hold deadline is stated for {vendor}"),
+            "Ask about a date hold",
+            "Whether the venue can hold the date, and until when.",
+        ),
+    };
+    VenueQuoteDecisionContent {
+        state,
+        question,
+        heading,
+        primary_action_label,
+        one_thing_to_confirm,
     }
 }
 
@@ -195,14 +322,17 @@ pub fn quote_priority_signals(
     envelope: &QuoteSafetyEnvelope,
     now: DateTime<Utc>,
 ) -> QuotePrioritySignals {
-    let deadline = parsed_time(Some(&envelope.external_deadline)).unwrap_or(now);
-    let hours = (deadline - now).num_hours();
-    let quote_validity_deadline_pressure = match hours {
-        ..=24 => 25,
-        25..=72 => 20,
-        73..=168 => 12,
-        _ => 5,
-    };
+    let quote_validity_deadline_pressure = envelope
+        .external_deadline
+        .as_deref()
+        .and_then(|value| parsed_time(Some(value)))
+        .map(|deadline| match (deadline - now).num_hours() {
+            ..=24 => 25,
+            25..=72 => 20,
+            73..=168 => 12,
+            _ => 5,
+        })
+        .unwrap_or(0);
     let alternative_recovery_time =
         if bool_field(message, &["limited_availability", "limitedAvailability"]) {
             15
@@ -438,6 +568,12 @@ pub fn project_quote_event(source: &AFPMessage, now: DateTime<Utc>) -> QuoteProj
 
     let envelope = quote_safety_envelope(source, now);
     let priority = quote_priority_signals(source, &envelope, now);
+    let venue_decision = venue_quote_decision_content(source, now);
+    let watcher_caught_kind = match venue_decision.state {
+        "hold_expiring" => Some("expiring_hold"),
+        "over_budget" => Some("over_budget_quote"),
+        _ => None,
+    };
     let vendor_name = text_field(
         source,
         &["vendor_name", "vendorName", "vendor_id", "vendorId"],
@@ -478,6 +614,7 @@ pub fn project_quote_event(source: &AFPMessage, now: DateTime<Utc>) -> QuoteProj
             "unknown_fields": verification.optional_gaps,
         },
         "safety_envelope": envelope,
+        "venue_decision": &venue_decision,
         "priority_signals": priority,
         "pattern_verification": verification,
     });
@@ -494,6 +631,11 @@ pub fn project_quote_event(source: &AFPMessage, now: DateTime<Utc>) -> QuoteProj
         "wedding_plan_id": wedding_plan_id,
         "quote_message_id": source.id,
         "quote_thread_id": source.thread_id,
+        "venue_decision_state": venue_decision.state,
+        "vendor_date_hold_expires_at": text_field(source, &["date_hold_expires_at", "dateHoldExpiresAt", "vendor_date_hold_expires_at"]),
+        "quote_valid_until": text_field(source, &["valid_until", "validUntil", "quote_valid_until"]),
+        "watcher_caught_kind": watcher_caught_kind,
+        "watcher_caught_at": watcher_caught_kind.map(|_| now.to_rfc3339()),
         "lifecycle": "unresolved",
         "privacy_scope": "source_refs_and_bounded_decision_metadata",
     }));
@@ -645,7 +787,11 @@ mod tests {
         );
         assert_eq!(
             decision.content["safety_envelope"]["deadline_source"],
-            "vendor_quote"
+            "vendor_quote_validity"
+        );
+        assert_eq!(
+            decision.content["venue_decision"]["question"],
+            "Hold Harbour Studio for your wedding date?"
         );
         assert!(decision.content.get("quote").is_none());
     }
@@ -654,11 +800,61 @@ mod tests {
     fn expired_vendor_deadline_is_preserved_for_overdue_escalation() {
         let now = parsed_time(Some("2026-10-21T00:00:00Z")).unwrap();
         let envelope = quote_safety_envelope(&quote(), now);
-        assert_eq!(envelope.deadline_source, "vendor_quote");
-        assert_eq!(envelope.external_deadline, "2026-10-20T00:00:00+00:00");
+        assert_eq!(envelope.deadline_source, Some("vendor_quote_validity"));
+        assert_eq!(
+            envelope.external_deadline.as_deref(),
+            Some("2026-10-20T00:00:00+00:00")
+        );
         assert_eq!(
             quote_priority_signals(&quote(), &envelope, now).quote_validity_deadline_pressure,
             25
+        );
+    }
+
+    #[test]
+    fn missing_deadline_never_creates_a_countdown_or_priority_pressure() {
+        let now = parsed_time(Some("2026-10-06T00:00:00Z")).unwrap();
+        let mut source = quote();
+        source.content["quote"]
+            .as_object_mut()
+            .unwrap()
+            .remove("validUntil");
+        let envelope = quote_safety_envelope(&source, now);
+        assert_eq!(envelope.deadline_source, None);
+        assert_eq!(envelope.external_deadline, None);
+        assert_eq!(
+            quote_priority_signals(&source, &envelope, now).quote_validity_deadline_pressure,
+            0
+        );
+        assert_eq!(
+            venue_quote_decision_content(&source, now).state,
+            "no_deadline"
+        );
+    }
+
+    #[test]
+    fn date_hold_is_separate_and_earlier_than_quote_validity() {
+        let now = parsed_time(Some("2026-10-06T00:00:00Z")).unwrap();
+        let mut source = quote();
+        source.content["quote"]["dateHoldExpiresAt"] = json!("2026-10-10T00:00:00Z");
+        source.content["quote"]["eventDate"] = json!("2027-11-20");
+        let envelope = quote_safety_envelope(&source, now);
+        assert_eq!(envelope.deadline_source, Some("vendor_date_hold"));
+        assert_eq!(
+            envelope.date_hold_deadline.as_deref(),
+            Some("2026-10-10T00:00:00+00:00")
+        );
+        assert_eq!(
+            envelope.quote_validity_deadline.as_deref(),
+            Some("2026-10-20T00:00:00+00:00")
+        );
+        let decision = venue_quote_decision_content(&source, now);
+        assert_eq!(decision.state, "hold_expiring");
+        assert_eq!(decision.question, "Hold Harbour Studio for 2027-11-20?");
+        let projected = project_quote_event(&source, now);
+        assert_eq!(
+            projected.messages[0].metadata.as_ref().unwrap()["watcher_caught_kind"],
+            "expiring_hold"
         );
     }
 

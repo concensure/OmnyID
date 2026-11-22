@@ -267,3 +267,48 @@ Git or command-line arguments. The timer is persistent, uses Sydney time, random
 within ten minutes to avoid a thundering herd, records a machine-readable result and
 can post that result to a configured alert webhook. This complements, rather than
 replaces, public uptime checks and runtime `/healthz`/`/readyz` authorities.
+
+## 12. Venue hold and earned proactive-signal contract
+
+A venue quote card asks one concrete question: “Hold [venue] for [wedding date]?”
+The source record keeps three facts separate:
+
+- quote validity says how long the quoted price or package is offered;
+- a date-hold expiry is a vendor-stated temporary reservation deadline;
+- chosen and booked are separate couple/vendor lifecycle states.
+
+No deadline is derived from the day a quote arrived. If neither quote validity nor
+a date-hold expiry was stated, the card has no countdown and asks the couple to
+confirm whether the venue can hold the date. The shared content contract covers
+unreadable quote, no deadline, over budget, hold expiring, hold lapsed, chosen and
+booked. Each state changes the question and next action without changing the card
+layout. A vendor-stated deadline inside seven days contributes to the existing
+PersonalOS deadline pressure and outranks a comparable undated card. Quote validity
+and date hold remain visible separately even when the earlier one supplies ranking.
+
+Accepting a quote records a chosen venue, not a booking, payment or external send.
+The same AFP selection carries stable successor task identifiers for contract,
+deposit and cancellation review and releases the existing caterer and photographer
+research dependencies. Materialisation is once per stable task id. Any vendor
+message remains prepared and approval-gated.
+
+Proactive copy is earned from saved records. A silent-vendor prompt may name “6
+days vs about 2” only when at least two comparable replied vendors establish that
+baseline. Five or more actionable decisions reduce Decision Focus to one while the
+ranked queue remains intact. Context-switch, completed-check, budget-pace and weekly
+caught-work lines appear only when their source metadata exists and is current; no
+score or internal evidence label is shown to the couple. The weekly line counts
+expiring holds, over-budget quotes and stale vendors seen during the previous seven
+days.
+
+The passive quote reconciler remains the watcher ingress: it projects authenticated
+normalised quote events and replays them idempotently after restart. This slice does
+not claim a new Gmail trigger, encrypted-mail reader or calendar-conflict detector.
+Accessibility, dietary and old-preference topology must continue to use the existing
+guest, preference and vendor records; an individual card may not invent a cross-link
+that those records do not support.
+
+The public site retains the selected Soft message: a general “wedding that feels
+like you” headline, with intimate ceremonies and micro weddings named alongside
+larger celebrations. That sentence must remain present at mobile widths. This is a
+message alignment, not a small-wedding-only repositioning.

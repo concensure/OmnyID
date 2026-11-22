@@ -129,6 +129,8 @@ export function weddingVendorQuoteIncomingAfpMessage(input: {
       quote_amount: input.quote.amount,
       quote_currency: input.quote.currency,
       budget_delta_amount: input.quote.budgetDeltaAmount,
+      date_hold_expires_at: input.quote.dateHoldExpiresAt ?? null,
+      booking_status: input.quote.bookingStatus ?? "open",
       source_attachment_id: attachmentId,
       attachment_id: attachmentId,
       attachment_text_status: input.quote.attachmentTextStatus ?? (attachmentUrl ? "linked_unverified" : "none"),

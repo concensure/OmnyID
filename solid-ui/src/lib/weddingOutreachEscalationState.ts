@@ -32,6 +32,7 @@ export type WeddingOutreachEscalationState = {
   status: WeddingOutreachReplyStatus;
   stage: WeddingOutreachEscalationStage;
   dayCount: number | null;
+  peerTypicalReplyDays: number | null;
   stageLabel: string;
   decisionPrompt: string;
   options: WeddingOutreachEscalationOption[];
@@ -58,6 +59,7 @@ export type WeddingOutreachEscalationInput = {
   alternativeVendorLabels?: readonly string[] | null;
   sourceLabels?: readonly string[] | null;
   createdAt?: number | null;
+  peerTypicalReplyDays?: number | null;
 };
 
 export type WeddingVendorContactOutreachRecord = {
@@ -88,6 +90,7 @@ export type WeddingVendorContactOutreachInput = {
   now?: string | null;
   alternativeVendorLabels?: readonly string[] | null;
   createdAt?: number | null;
+  peerTypicalReplyDays?: number | null;
 };
 
 export type WeddingVendorContactOutreachTaskItemsInput = {
@@ -259,7 +262,13 @@ function decisionPrompt(input: {
   vendorLabel: string;
   dayCount: number | null;
   vendorReplySummary: string | null;
+  peerTypicalReplyDays: number | null;
 }): string {
+  const relativeDrift = input.dayCount !== null
+    && input.peerTypicalReplyDays !== null
+    && input.dayCount > input.peerTypicalReplyDays
+      ? `${input.dayCount} days vs about ${input.peerTypicalReplyDays}`
+      : null;
   if (input.stage === "escalate_to_user") {
     return `No reply from ${input.vendorLabel} after ${input.dayCount ?? 7} days. Choose: follow up again, move on, or call them.`;
   }
@@ -267,7 +276,9 @@ function decisionPrompt(input: {
     return `No reply from ${input.vendorLabel} after ${input.dayCount ?? 10} days. Mark as unresponsive and suggest alternatives.`;
   }
   if (input.stage === "follow_up_due") {
-    return `${input.vendorLabel} has not replied after ${input.dayCount ?? 5} days. Draft one follow-up?`;
+    return relativeDrift
+      ? `${input.vendorLabel} is slower than the others (${relativeDrift}). Send the one follow-up?`
+      : `${input.vendorLabel} has not replied after ${input.dayCount ?? 5} days. Draft one follow-up?`;
   }
   if (input.stage === "waiting_for_reply") {
     return `${input.vendorLabel} has been contacted. Wait until the planned follow-up date before nudging.`;
@@ -342,10 +353,13 @@ export function buildWeddingOutreachEscalationState(input: WeddingOutreachEscala
   const vendorReplySummary = clean(input.vendorReplySummary) || null;
   const now = parseDate(input.now) ?? new Date();
   const dayCount = initialSentAt ? wholeDaysBetween(initialSentAt, now) : null;
+  const peerTypicalReplyDays = typeof input.peerTypicalReplyDays === "number" && input.peerTypicalReplyDays >= 0
+    ? Math.round(input.peerTypicalReplyDays)
+    : null;
   const stage = stageFor({ initialSentAt, replyReceivedAt, followUpDueAt, now, dayCount });
   const label = stageLabel(stage);
   const options = optionsFor(stage, vendorPhoneLabel);
-  const prompt = decisionPrompt({ stage, vendorLabel, dayCount, vendorReplySummary });
+  const prompt = decisionPrompt({ stage, vendorLabel, dayCount, vendorReplySummary, peerTypicalReplyDays });
   const alternatives = uniqueStrings(input.alternativeVendorLabels, 8);
   const markdown = markdownFor({
     vendorLabel,
@@ -396,6 +410,7 @@ export function buildWeddingOutreachEscalationState(input: WeddingOutreachEscala
       vendor_contact_receipt_ref: vendorContactReceiptRef,
       vendor_contact_thread_id: vendorContactThreadId,
       day_count: dayCount,
+      peer_typical_reply_days: peerTypicalReplyDays,
       follow_up_due_at: followUpDueAt?.toISOString() ?? null,
       second_order_loop: "contact_follow_up",
       no_spam_policy: true,
@@ -438,6 +453,7 @@ export function buildWeddingOutreachEscalationState(input: WeddingOutreachEscala
     status: replyReceivedAt ? "replied" : stage === "mark_unresponsive" ? "unresponsive" : initialSentAt ? "waiting" : "not_sent",
     stage,
     dayCount,
+    peerTypicalReplyDays,
     stageLabel: label,
     decisionPrompt: prompt,
     options,
@@ -477,7 +493,26 @@ export function buildWeddingOutreachEscalationStateFromVendorContact(
     alternativeVendorLabels: input.alternativeVendorLabels,
     sourceLabels,
     createdAt: input.createdAt,
+    peerTypicalReplyDays: input.peerTypicalReplyDays,
   });
+}
+
+function peerTypicalReplyDays(
+  vendors: readonly WeddingVendorContactOutreachVendor[],
+  target: WeddingVendorContactOutreachVendor,
+): number | null {
+  const category = clean(target.category).toLowerCase();
+  const samples = vendors.flatMap((vendor) => {
+    if (vendor === target || (category && clean(vendor.category).toLowerCase() !== category)) return [];
+    const sent = parseDate(vendor.userContact?.lastContactAt);
+    const replied = parseDate(vendor.userContact?.responseReceivedAt);
+    return sent && replied && replied >= sent ? [wholeDaysBetween(sent, replied)] : [];
+  }).sort((left, right) => left - right);
+  if (samples.length < 2) return null;
+  const middle = Math.floor(samples.length / 2);
+  return samples.length % 2 === 0
+    ? Math.round(((samples[middle - 1] ?? 0) + (samples[middle] ?? 0)) / 2)
+    : samples[middle] ?? null;
 }
 
 export function buildWeddingVendorContactOutreachTaskItems(
@@ -485,7 +520,8 @@ export function buildWeddingVendorContactOutreachTaskItems(
 ): WeddingPlanningTaskItem[] {
   const existingIds = new Set((input.existingTaskItems ?? []).map((task) => task.id));
   const tasks: WeddingPlanningTaskItem[] = [];
-  for (const vendor of input.vendors ?? []) {
+  const vendors = input.vendors ?? [];
+  for (const vendor of vendors) {
     if (!vendor.userContact?.lastContactAt) continue;
     const state = buildWeddingOutreachEscalationStateFromVendorContact({
       metadata: input.metadata,
@@ -493,6 +529,7 @@ export function buildWeddingVendorContactOutreachTaskItems(
       now: input.now,
       alternativeVendorLabels: input.alternativeVendorLabels,
       createdAt: input.createdAt,
+      peerTypicalReplyDays: peerTypicalReplyDays(vendors, vendor),
     });
     if (state.stage === "closed" || state.stage === "waiting_for_reply") continue;
     if (existingIds.has(state.taskItem.id)) continue;

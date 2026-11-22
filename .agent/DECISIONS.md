@@ -4672,3 +4672,18 @@ keeps the unsaved draft, reloads canonical messages and explicitly tells the
 couple that their partner changed the shared budget. Historical actor-local
 Budget copies are excluded from the shared projection once canonical messages
 are available.
+
+## 2026-11-23 — Vendor-stated holds are not quote validity or booking (WED-400)
+
+Quote validity, a temporary date hold and booking lifecycle are separate source
+facts. Ranking may use the earlier explicit vendor deadline, but presentation keeps
+both deadlines visible and never derives urgency from quote arrival time. With no
+stated deadline there is no countdown. Accepted quote selection is a chosen state,
+not proof of booking, payment or vendor contact.
+
+Venue acceptance extends the existing AFP decision record with stable successor task
+ids and dependency releases. It does not create a second quote or task engine, and a
+non-venue quote cannot release venue-dependent caterer or photographer work. Proactive
+plain-language signals appear only from saved reply timing, decision-load, budget or
+watcher metadata. The existing card layout and approval/provider receipt boundary are
+unchanged.

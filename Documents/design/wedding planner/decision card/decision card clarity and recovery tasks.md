@@ -305,6 +305,59 @@ Implementation evidence: clean exact candidate
 the public Wedding checks, all 2,348 Wedding tests and the production build. No
 Oracle release is claimed for DC-12.
 
+## DC-13 — Separate venue holds from quote validity and booking
+
+Status: implemented in WED-400; release evidence pending the frozen candidate.
+
+Work:
+
+- [x] Parse vendor date-hold expiry and booking state from the existing normalised
+  quote record.
+- [x] Remove the fabricated 14-day quote-review countdown when no vendor deadline
+  exists.
+- [x] Keep quote validity and date hold as separate fields while ranking by the
+  earlier explicit vendor deadline.
+- [x] Define unreadable, no-deadline, over-budget, hold-expiring, hold-lapsed,
+  chosen and booked content states without changing the Decision Focus layout.
+- [x] Ask “Hold [venue] for [date]?” while the choice is open and retain explicit
+  approval before contact or commitment.
+- [x] Put stable contract/caterer/photographer successor task ids and dependency
+  releases on the existing accepted-quote AFP selection; acceptance remains neither
+  booking nor payment.
+
+## DC-14 — Surface derivative signals only from saved evidence
+
+Status: implemented bounded wiring in WED-400; unsupported watcher integrations
+remain explicitly out of scope.
+
+Work:
+
+- [x] Compare a silent vendor with the median reply time only when two same-category
+  replied peers support the comparison.
+- [x] Reduce a five-or-more-decision focus to one item without deleting the queue.
+- [x] Consume saved focus-switch, completed-check, budget-pace and watcher event
+  metadata as plain-language relief lines.
+- [x] Count only current seven-day expiring-hold, over-budget-quote and stale-vendor
+  events in the weekly caught-work line.
+- [x] Preserve the existing passive quote-event reconciler and approval boundary.
+- [ ] Do not claim Gmail auto-ingress, encrypted-mail reading or calendar clash
+  detection until those provider integrations have their own tasks and production
+  proof.
+
+## DC-15 — Restore the Soft public message on mobile
+
+Status: implemented in WED-400; Oracle publication pending the release gate.
+
+Work:
+
+- [x] Restore the existing Elvis Bekmanis hero asset directly from this worktree;
+  do not build an older checkout.
+- [x] Keep the general headline and name an intimate ceremony, a micro wedding and
+  a larger celebration in both static and runtime copy.
+- [x] Add public-site regression coverage that rejects a mobile rule hiding the
+  hero subtitle.
+- [ ] Record the clean candidate SHA and hosted mobile proof after deployment.
+
 ## Completion evidence
 
 - Exact deployed source: `3c22a9c7766455fa591ddd5b19ee14f9b2fc8517`.

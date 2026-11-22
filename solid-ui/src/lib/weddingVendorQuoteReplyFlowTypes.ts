@@ -46,6 +46,7 @@ export type WeddingVendorQuoteReplyFlowState = {
   recommendationWhyLabels: string[];
   recommendationConfidenceLabel: string;
   quoteMessageId: string | null;
+  createdAt: string | null;
   draftMessageId: string | null;
   approvalRequest: WeddingApprovalRequestState;
   approvedWording: boolean;

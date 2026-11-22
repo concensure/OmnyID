@@ -31,6 +31,7 @@ export function weddingVendorQuoteDecisionDispatches(input: {
       quote: flow.quote,
       metadata: flow.metadata,
       lifecycle,
+      createdAt: flow.createdAt,
     });
     if (projection.status === "not_projected" || !projection.sendInput
       || alreadyPersisted.has(projection.idempotencyKey)

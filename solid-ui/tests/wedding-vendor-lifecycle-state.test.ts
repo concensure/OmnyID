@@ -93,8 +93,9 @@ test("quote acceptance is one budget decision and does not imply booking or paym
     metadata,
     sourceId: "quote-1",
     quote: {
-      kind: "quote", vendorName: "Harbour House", amount: 8500, amountLabel: "$8,500", currency: "AUD",
-      budgetDeltaAmount: null, budgetDeltaLabel: null, inclusions: [], validUntil: "2027-01-31", attachmentUrl: null,
+      kind: "quote", vendorName: "Harbour House", vendorCategory: "Venue", amount: 8500, amountLabel: "$8,500", currency: "AUD",
+      budgetDeltaAmount: null, budgetDeltaLabel: null, inclusions: [], validUntil: "2027-01-31",
+      dateHoldExpiresAt: "2027-01-14T23:59:00+11:00", attachmentUrl: null,
     },
   });
   const acceptedMessage = message("accepted", accepted.kind ?? "note", accepted.timestamp ?? "2026-01-05T00:00:00Z", accepted.content);
@@ -106,6 +107,32 @@ test("quote acceptance is one budget decision and does not imply booking or paym
   assert.equal(accepted.subtype, "wedding_decision_selection");
   assert.equal(accepted.content.budget_decision, true);
   assert.equal(accepted.supertags?.includes("wedding_vendor_quote_accepted"), true);
+  assert.equal(accepted.content.venue_choice_status, "chosen");
+  assert.equal(accepted.content.date_hold_expires_at, "2027-01-14T23:59:00+11:00");
+  assert.equal(accepted.content.successor_task_creation_policy, "materialize_once_by_stable_task_id");
+  assert.deepEqual(
+    (accepted.content.successor_tasks as Array<{ id: string }>).map((task) => task.id),
+    [
+      "wedding_task:venue-choice:response_workspace:workspace-1:contract",
+      "wedding_task:venue-choice:response_workspace:workspace-1:caterer",
+      "wedding_task:venue-choice:response_workspace:workspace-1:photographer",
+    ],
+  );
+  assert.deepEqual(accepted.metadata?.dependency_releases, ["caterer", "photographer"]);
   assert.equal(record.quoteAccepted, true);
   assert.equal(record.booked, false);
+});
+
+test("non-venue quote acceptance does not release venue-dependent tasks", () => {
+  const accepted = weddingVendorQuoteAcceptanceToAfpSendInput({
+    metadata,
+    sourceId: "quote-photo",
+    quote: {
+      kind: "quote", vendorName: "Harbour Photos", vendorCategory: "Photographer", amount: 5000,
+      amountLabel: "$5,000", currency: "AUD", budgetDeltaAmount: null, budgetDeltaLabel: null,
+      inclusions: [], validUntil: null, attachmentUrl: null,
+    },
+  });
+  assert.deepEqual(accepted.content.successor_tasks, []);
+  assert.deepEqual(accepted.metadata?.dependency_releases, []);
 });

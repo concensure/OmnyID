@@ -22,6 +22,7 @@ const quoteStudyJs = readFileSync(resolve(root, 'assets', 'js', 'quote-study.js'
 const quoteDecoderEngine = readFileSync(resolve(root, 'assets', 'js', 'quote-decoder-engine.js'), 'utf8');
 const landingConfig = readFileSync(resolve(root, 'assets', 'js', 'landing-config.js'), 'utf8');
 const landingContext = readFileSync(resolve(root, 'assets', 'js', 'landing-context.js'), 'utf8');
+const landingCss = readFileSync(resolve(root, 'assets', 'css', 'style.css'), 'utf8');
 const privacyPreferences = readFileSync(resolve(root, 'assets', 'js', 'privacy-preferences.js'), 'utf8');
 const caddyfile = readFileSync(resolve(projectRoot, 'Caddyfile'), 'utf8');
 const expectedPages = [
@@ -388,6 +389,12 @@ if (!weddingHome.includes('Less wedding admin. More of a wedding that feels like
   || !landingConfig.includes("headline: 'Less wedding admin. More of a wedding that feels like you.'")
   || !landingConfig.includes('an intimate ceremony, a micro wedding or a larger celebration')) {
   failures.push('index.html: Soft message must stay general and name small weddings alongside larger celebrations in static and runtime copy');
+}
+if (!weddingHome.includes('assets/images/elvis-bekmanis-WJc87MVcDaA-unsplash.jpg')) {
+  failures.push('index.html: Hero must use the restored in-repository wedding photograph');
+}
+if (/\@media[^{}]*max-width[^{}]*\{[^{}]*\.hero-subtitle\s*\{[^{}]*display\s*:\s*none/is.test(landingCss)) {
+  failures.push('style.css: Mobile layout must keep the soft small-wedding message visible');
 }
 if (!weddingHome.includes('id="guest-journey"')
   || !weddingHome.includes('Bring the list you have. Review what OmnyID understood.')

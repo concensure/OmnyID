@@ -1,3 +1,32 @@
+## WED-400 venue holds and earned proactive signals (2026-11-23)
+
+Worktree `C:/temp/wt/omnyid-wed389`, branch `agent/codex/WED-400`, based on
+WED-399 SHA `c370e7eabe1fd2128f94096c5acf45808a6c16e8`.
+
+The existing normalised quote, DecisionOS and PersonalOS paths now distinguish
+quote validity, a vendor-stated date hold and chosen/booked lifecycle state.
+Undated quotes no longer receive an invented 14-day countdown. The seven venue
+states supply one question and next action while the existing card component and
+external approval boundary remain unchanged. Explicit holds contribute deadline
+pressure; venue retains its bounded equal-urgency tie-break. Accepted venue quotes
+carry stable contract/caterer/photographer successor ids and remain choices rather
+than bookings or payments. Non-venue quotes cannot release those dependencies.
+
+Saved evidence can now support relative silent-vendor timing, one-card queue relief,
+focus-switch/check/budget pace lines, and a bounded weekly caught-work summary.
+Authenticated quote events keep using the existing passive reconciler; no Gmail,
+encrypted-mail or calendar-conflict integration is claimed. The public page restores
+`elvis-bekmanis-WJc87MVcDaA-unsplash.jpg` as its first image and keeps the selected
+Soft intimate/micro/larger wording visible on mobile. Decision-card spec/tasks record
+the boundary and do not claim unsupported topology integrations.
+
+Implementation-worktree checks: TypeScript passed with an enlarged Node stack; 115
+focused tests and the full public Wedding site smoke passed. WSL rustc 1.94 crashed
+inside compiler/LLVM internals with SIGILL/SIGSEGV even with one job and enlarged
+stacks. Do not interpret that infrastructure failure as a source diagnostic; run the
+frozen clean candidate through the Docker Rust 1.94 build before release. Production
+is still the WED-392 SHA until that gate and Oracle smoke complete.
+
 ## WED-399 shared revision-safe Seating slice (2026-11-23)
 
 Worktree `C:/temp/wt/omnyid-wed389`, branch `agent/codex/WED-399`, based on
