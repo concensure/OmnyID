@@ -1,3 +1,31 @@
+## WED-399 shared revision-safe Seating slice (2026-11-23)
+
+Worktree `C:/temp/wt/omnyid-wed389`, branch `agent/codex/WED-399`, based on
+WED-398 record SHA `a29f6b9357a9b8b0c5fa708a4e612921d217ca15`.
+
+Seating constraints, current optimisation and draft archive/restore now resolve
+the exact Wedding scope and use the canonical owner's existing AFP ledger for
+both partners. Writes retain owner/actor provenance, require a per-artifact
+expected revision and serialize competing edits. A conflict preserves the local
+preview and refreshes canonical state. Hidden drafts remain in history and can
+be restored through the same lifecycle rather than deleted.
+
+Pass on the implementation candidate: frontend typecheck and 47 focused tests;
+Linux Rust 1.94 `cargo check --lib`; direct scope contracts 7/7; and the real
+disposable `pgvector/pgvector:pg18` partner API test. The database proof covers
+owner/partner same state, actor attribution, simultaneous revision-one writes
+yielding one accept and one conflict, guessed/cross-couple and post-revocation
+denial. The first rerun found the prior disposable container stopped and timed
+out before assertions; after explicitly starting the inspected container, the
+already-built test passed. `omnyid-wed399-pg` was then removed and is not
+recoverable. Whole-repository `cargo fmt --check` still reports extensive
+pre-existing formatting drift; the touched Rust files were formatted directly.
+
+COW-03E, COW-06E and COW-07D are recorded complete. The broader Guests,
+Vendors/Quotes, Documents, AI, activity and live-delivery coworking tasks remain
+open. No Oracle deployment occurred in this slice; production still runs
+`afd6d5cc04d3c5996256ca1df131ba7e1de659fb`.
+
 ## WED-395 shared decision research and delivery scope (2026-11-23)
 
 Worktree `C:/temp/wt/omnyid-wed389`, branch `agent/codex/WED-395`, based on

@@ -333,6 +333,7 @@ export type WeddingResponseWorkspaceViewState = {
   guestTracking: WeddingGuestTrackingState;
   seatingPlan: WeddingSeatingPlanState;
   seatingDraftCards: WeddingSeatingDraftCard[];
+  seatingArchivedDraftCards: WeddingSeatingDraftCard[];
   inspiration: WeddingInspirationState;
   experienceModel: WeddingExperienceModelState;
   importParserReadiness: WeddingImportParserReadinessState;
@@ -1003,6 +1004,8 @@ export function buildWeddingResponseWorkspaceViewState(input: WeddingResponseWor
       input.seatingOptimizations,
       input.seatingDraftArchives?.map((archive) => archive.fingerprint),
     ),
+    seatingArchivedDraftCards: buildWeddingSeatingDraftCards(input.seatingOptimizations)
+      .filter((draft) => input.seatingDraftArchives?.some((archive) => archive.fingerprint === draft.result.fingerprint)),
     inspiration,
     experienceModel,
     importParserReadiness,

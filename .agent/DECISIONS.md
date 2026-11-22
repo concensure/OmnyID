@@ -1,3 +1,14 @@
+# 2026-11-23: Shared Seating stays in the canonical AFP ledger
+
+Partner seating does not gain a separate collaborative store. The existing
+constraint, optimisation and draft-archive AFP records are selected from the
+canonical Wedding owner after exact plan/workspace resolution, while the acting
+member remains separately attributed. Protected writes use per-artifact
+optimistic revisions under a scope-and-artifact lock. A stale editor keeps the
+unsaved preview and reviews refreshed canonical state instead of overwriting it.
+Draft removal remains append-only and gains a restore action, so hiding is
+recoverable and does not delete Wedding history.
+
 # 2026-11-23: Shared research uses owner truth and actor-funded execution
 
 Decision research and explicit task delivery resolve the active plan/workspace

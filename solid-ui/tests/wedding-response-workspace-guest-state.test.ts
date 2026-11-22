@@ -261,6 +261,8 @@ test("buildWeddingResponseWorkspaceViewState hides archived seating drafts", () 
 
   assert.equal(state.seatingDraftCards.length, 1);
   assert.equal(state.seatingDraftCards[0]?.result.assignments[0]?.tableLabel, "Table 4");
+  assert.equal(state.seatingArchivedDraftCards.length, 1);
+  assert.equal(state.seatingArchivedDraftCards[0]?.result.assignments[0]?.tableLabel, "Table 3");
 });
 
 test("buildWeddingResponseWorkspaceViewState exposes inspiration preference state", () => {

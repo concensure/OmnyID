@@ -135,6 +135,34 @@ test("loadWeddingWorkspaceRefreshState merges canonical budget messages without 
   assert.deepEqual(state.messages.map((message) => message.id), [contextMessage.id, budgetMessage.id]);
 });
 
+test("loadWeddingWorkspaceRefreshState replaces actor-local seating copies with the canonical seating ledger", async () => {
+  const seatingMessage: AfpMessage = {
+    ...contextMessage,
+    id: "seating-shared-1",
+    kind: "wedding_seating_optimization",
+    subtype: "wedding_seating_optimization",
+    supertags: [...contextMessage.supertags, "wedding_seating"],
+    content: {
+      ledger_kind: "wedding_seating_optimization",
+      assignment_fingerprint: "guest-one:table-one",
+      assignments: [{ personId: "guest-one", personLabel: "Guest One", tableId: "table-one", tableLabel: "Table One" }],
+    },
+  };
+  const state = await loadWeddingWorkspaceRefreshState({
+    signedIn: true,
+    weddingPlanId: metadata.weddingPlanId,
+    responseWorkspaceId: metadata.responseWorkspaceId,
+    loadMessages: async () => ({
+      tags: ["event:wedding"], match: "all", count: 3,
+      messages: [contextMessage, seatingMessage, { ...seatingMessage, id: "stale-partner-seating-copy" }],
+    }),
+    loadSeatingMessages: async () => ({ tags: ["wedding_seating"], match: "all", count: 1, messages: [seatingMessage] }),
+  });
+
+  assert.equal(state.status, "loaded");
+  assert.deepEqual(state.messages.map((message) => message.id), [contextMessage.id, seatingMessage.id]);
+});
+
 test("loadWeddingWorkspaceRefreshState skips backend fetch for guest mode", async () => {
   let called = false;
   const state = await loadWeddingWorkspaceRefreshState({

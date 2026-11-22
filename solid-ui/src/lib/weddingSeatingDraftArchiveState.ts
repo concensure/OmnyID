@@ -8,6 +8,7 @@ export type WeddingSeatingDraftArchiveRecord = {
   statusLabel: string;
   reasonLabel: string | null;
   createdAt: string;
+  action?: "hide" | "restore";
 };
 
 function clean(value: unknown): string {
@@ -39,12 +40,14 @@ export function weddingSeatingDraftArchiveToAfpMessage(input: {
   metadata?: unknown;
   reasonLabel?: string | null;
   createdAt?: string;
+  action?: "hide" | "restore";
 }): AfpMessage {
   const metadata = normalizeWeddingPlanningMetadata(input.metadata);
   const fingerprint = clean(input.fingerprint);
   const timestamp = input.createdAt ?? new Date().toISOString();
   const archiveId = `wedding_seating_draft_archive:${safeWeddingLabel(fingerprint).slice(0, 96)}`;
-  const statusLabel = "Saved seating draft hidden.";
+  const action = input.action ?? "hide";
+  const statusLabel = action === "restore" ? "Saved seating draft restored." : "Saved seating draft hidden.";
   const reasonLabel = clean(input.reasonLabel) || null;
   const references = [
     afpRef("wedding_plan", metadata.weddingPlanId, "Wedding plan"),
@@ -74,6 +77,7 @@ export function weddingSeatingDraftArchiveToAfpMessage(input: {
       ledger_kind: "wedding_seating_draft_archive",
       archive_id: archiveId,
       seating_draft_fingerprint: fingerprint,
+      archive_action: action,
       status_label: statusLabel,
       reason_label: reasonLabel,
       created_at: timestamp,
@@ -83,6 +87,7 @@ export function weddingSeatingDraftArchiveToAfpMessage(input: {
       ...metadata,
       seating_draft_archive: true,
       seating_draft_fingerprint: fingerprint,
+      seating_draft_archive_action: action,
       e2ee_required: true,
       searchable_terms: uniqueStrings([
         "wedding seating",
@@ -96,8 +101,10 @@ export function weddingSeatingDraftArchiveToAfpMessage(input: {
       format: "a2ui",
       content: {
         kind: "wedding_seating_draft_archive",
-        title: "Saved seating draft hidden",
-        summary: reasonLabel ?? "This old seating option is hidden from the saved draft list.",
+        title: action === "restore" ? "Saved seating draft restored" : "Saved seating draft hidden",
+        summary: reasonLabel ?? (action === "restore"
+          ? "This seating option is visible in the saved draft list again."
+          : "This old seating option is hidden from the saved draft list."),
         primary_action: "Show saved drafts",
       },
     }],
@@ -111,6 +118,7 @@ export function weddingSeatingDraftArchiveToAfpSendInput(input: {
   metadata?: unknown;
   reasonLabel?: string | null;
   createdAt?: string;
+  action?: "hide" | "restore";
 }): SendAfpMessageInput {
   const message = weddingSeatingDraftArchiveToAfpMessage(input);
   return {
@@ -137,11 +145,13 @@ export function weddingSeatingDraftArchiveFromAfpMessage(message: AfpMessage): W
   const fingerprint = clean(content.seating_draft_fingerprint)
     || clean(message.references?.find((reference) => reference.type === "seating_draft_fingerprint")?.target);
   if (!fingerprint) return null;
+  const action = clean(content.archive_action) === "restore" ? "restore" : "hide";
   return {
     id: clean(content.archive_id) || `wedding_seating_draft_archive:${safeWeddingLabel(fingerprint).slice(0, 96)}`,
     fingerprint,
-    statusLabel: clean(content.status_label) || "Saved seating draft hidden.",
+    statusLabel: clean(content.status_label) || (action === "restore" ? "Saved seating draft restored." : "Saved seating draft hidden."),
     reasonLabel: clean(content.reason_label) || null,
     createdAt: clean(content.created_at) || message.timestamp,
+    action,
   };
 }

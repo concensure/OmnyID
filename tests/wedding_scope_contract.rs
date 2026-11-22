@@ -12,6 +12,8 @@ const RSVP_RESPONSE_ROUTES: &str = include_str!("../src/server/wedding_rsvp_resp
 const RSVP_CAPABILITY_STORE: &str = include_str!("../src/db/wedding_rsvp_capabilities.rs");
 const BUDGET_PROJECTION_ROUTES: &str =
     include_str!("../src/server/wedding_budget_projection_routes.rs");
+const SEATING_PROJECTION_ROUTES: &str =
+    include_str!("../src/server/wedding_seating_projection_routes.rs");
 const TASK_ASSIGNMENT_ACTOR_MIGRATION: &str =
     include_str!("../postgres/migrations/0176_wedding_task_assignment_actor.sql");
 const SERVER: &str = include_str!("../src/server/mod.rs");
@@ -101,4 +103,17 @@ fn budget_projections_keep_existing_decisions_in_the_canonical_owner_ledger() {
     assert!(BUDGET_PROJECTION_ROUTES.contains("wedding_budget_revision_conflict"));
     assert!(BUDGET_PROJECTION_ROUTES.contains("budgetRevision"));
     assert!(!BUDGET_PROJECTION_ROUTES.contains("store_private_app_message(\n        &state.db,\n        &state.metrics,\n        &state.relay_tx,\n        &actor.id"));
+}
+
+#[test]
+fn seating_projections_keep_existing_records_in_the_canonical_owner_ledger() {
+    assert!(SEATING_PROJECTION_ROUTES.contains("resolve_wedding_scope"));
+    assert!(SEATING_PROJECTION_ROUTES.contains("&scope.owner_user_id"));
+    assert!(SEATING_PROJECTION_ROUTES.contains("&actor.id"));
+    assert!(SEATING_PROJECTION_ROUTES.contains("wedding_seating_constraint"));
+    assert!(SEATING_PROJECTION_ROUTES.contains("wedding_seating_optimization"));
+    assert!(SEATING_PROJECTION_ROUTES.contains("wedding_seating_draft_archive"));
+    assert!(SEATING_PROJECTION_ROUTES.contains("wedding_seating_revision_conflict"));
+    assert!(SEATING_PROJECTION_ROUTES.contains("pg_advisory_xact_lock"));
+    assert!(!SEATING_PROJECTION_ROUTES.contains("store_private_app_message(\n        &state.db,\n        &state.metrics,\n        &state.relay_tx,\n        &actor.id"));
 }

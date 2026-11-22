@@ -124,6 +124,11 @@ import {
   weddingBudgetProjectionExpectedRevision,
 } from "@/lib/weddingBudgetProjectionApi";
 import {
+  isWeddingSeatingProjection,
+  sendWeddingSeatingProjection,
+  weddingSeatingProjectionExpectedRevision,
+} from "@/lib/weddingSeatingProjectionApi";
+import {
   buildWeddingVendorComparisonArtifactState,
   buildWeddingVendorSearchArtifactState,
 } from "@/lib/weddingVendorSearchArtifactState";
@@ -1322,13 +1327,22 @@ export function ResponseQueueView(props: {
   }
 
   async function saveWeddingWorkspaceProjection(input: SendAfpMessageInput) {
-    if (!input.supertags?.includes("wedding_budget")) return sendAfpMessage(input);
     const workspace = weddingWorkspace();
-    if (!workspace) throw new Error("Open the Wedding workspace before saving its budget.");
-    return sendWeddingBudgetProjection({
-      weddingPlanId: workspace.workspace.metadata.weddingPlanId,
-      responseWorkspaceId: workspace.workspace.metadata.responseWorkspaceId,
-    }, input, weddingBudgetProjectionExpectedRevision(workspace.afpMessages, input));
+    if (input.supertags?.includes("wedding_budget")) {
+      if (!workspace) throw new Error("Open the Wedding workspace before saving its budget.");
+      return sendWeddingBudgetProjection({
+        weddingPlanId: workspace.workspace.metadata.weddingPlanId,
+        responseWorkspaceId: workspace.workspace.metadata.responseWorkspaceId,
+      }, input, weddingBudgetProjectionExpectedRevision(workspace.afpMessages, input));
+    }
+    if (isWeddingSeatingProjection(input)) {
+      if (!workspace) throw new Error("Open the Wedding workspace before saving its seating plan.");
+      return sendWeddingSeatingProjection({
+        weddingPlanId: workspace.workspace.metadata.weddingPlanId,
+        responseWorkspaceId: workspace.workspace.metadata.responseWorkspaceId,
+      }, input, weddingSeatingProjectionExpectedRevision(workspace.afpMessages, input));
+    }
+    return sendAfpMessage(input);
   }
 
   function weddingWorkspaceRefreshBanner() {

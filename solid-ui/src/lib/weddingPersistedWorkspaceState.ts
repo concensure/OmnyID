@@ -903,13 +903,17 @@ export function buildWeddingPersistedWorkspaceState(input: {
     })
     .sort((left, right) => left.timestamp - right.timestamp)
     .map((entry) => entry.item);
-  const seatingDraftArchives = scopedMessages
+  const seatingDraftArchiveEvents = scopedMessages
     .flatMap((message) => {
       const item = weddingSeatingDraftArchiveFromAfpMessage(message);
       return item ? [{ item, timestamp: Date.parse(message.timestamp) || 0 }] : [];
     })
     .sort((left, right) => left.timestamp - right.timestamp)
     .map((entry) => entry.item);
+  const seatingDraftArchiveByFingerprint = new Map<string, WeddingSeatingDraftArchiveRecord>();
+  for (const event of seatingDraftArchiveEvents) seatingDraftArchiveByFingerprint.set(event.fingerprint, event);
+  const seatingDraftArchives = Array.from(seatingDraftArchiveByFingerprint.values())
+    .filter((event) => event.action !== "restore");
   const inspirationItems = buildWeddingInspirationState(scopedMessages
     .flatMap((message) => weddingInspirationItemsFromAfpMessage(message).map((item) => ({
       item,

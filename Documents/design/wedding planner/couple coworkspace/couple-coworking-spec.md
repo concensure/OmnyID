@@ -2,7 +2,8 @@
 
 Status: implemented foundation; incremental enforcement and coworking UX continue
 Date: 23 November 2026
-Tasks: WED-365, WED-391, WED-392, WED-394, WED-395, WED-396, WED-397
+Tasks: WED-365, WED-391, WED-392, WED-394, WED-395, WED-396, WED-397,
+WED-398, WED-399
 Source guidance: `couple coworking.md`
 
 ## Outcome
@@ -93,6 +94,16 @@ ledger. A stale editor keeps their unsaved draft, refreshes the canonical
 budget and is told to review the newer values; it is not misreported as an
 offline save. This closes Budget conflict presentation only. It does not claim
 revision/recovery completion for other shared domains.
+
+WED-399 applies the same bounded contract to Seating without replacing its
+existing optimiser or AFP records. Either active partner reads the canonical
+owner's constraints, latest optimisation and archive lifecycle; protected
+writes require the current artifact revision and preserve owner/actor
+provenance. A stale editor retains the unsaved preview while canonical seating
+refreshes for review. Hiding a draft is append-only and reversible through a
+restore event, so recovery does not require destructive deletion or a second
+seating store. This closes the scoped Seating projection and conflict slice,
+not the remaining Guests, Vendors/Quotes, Documents or live-update domains.
 
 Still not claimed complete: systematic `WeddingScope` enforcement across
 every Wedding domain, shared activity/catch-up, scoped AI retrieval,

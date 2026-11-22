@@ -22,6 +22,7 @@ import {
   type WeddingSeatingConstraintRunResult,
 } from "@/lib/weddingSeatingConstraintActionState";
 import { buildWeddingSeatingDraftSidebarAction } from "@/lib/weddingSeatingPanelActionState";
+import { WeddingSeatingProjectionConflictError } from "@/lib/weddingSeatingProjectionApi";
 import type { WeddingWorkspaceSidebarAction } from "@/lib/weddingWorkspaceActionState";
 import type { WeddingWorkspaceMenuId } from "@/lib/weddingWorkspaceMenuState";
 
@@ -60,10 +61,19 @@ export function WeddingSeatingPanel(props: {
   const [alternatives, setAlternatives] = createSignal<WeddingSeatingOptimizationResult[]>([]);
   const [saving, setSaving] = createSignal(false);
   const [confirmation, setConfirmation] = createSignal<{
-    kind: "apply" | "alternative" | "hide";
+    kind: "apply" | "alternative" | "hide" | "restore";
     result?: WeddingSeatingOptimizationResult;
   } | null>(null);
   const displayedPreview = createMemo(() => constraintRun()?.optimization ?? props.state.seatingPlan.optimizationPreview);
+
+  function showConflict(error: unknown, target: "save" | "instruction"): boolean {
+    if (!(error instanceof WeddingSeatingProjectionConflictError)) return false;
+    props.onRefreshWorkspace?.();
+    const notice = "Your partner changed this shared seating plan. Your unsaved preview is still here; review the refreshed plan before saving it again.";
+    if (target === "instruction") setInstructionNotice(notice);
+    else setSaveNotice(notice);
+    return true;
+  }
 
   async function applySeatingDraft() {
     const preview = displayedPreview();
@@ -84,7 +94,8 @@ export function WeddingSeatingPanel(props: {
       }));
       setSaveNotice(`Seating plan applied for ${preview.assignments.length} guest${preview.assignments.length === 1 ? "" : "s"}.`);
       props.onRefreshWorkspace?.();
-    } catch {
+    } catch (error) {
+      if (showConflict(error, "save")) return;
       setSaveNotice("The seating plan could not be applied. Your current plan has not changed.");
     } finally {
       setSaving(false);
@@ -116,7 +127,8 @@ export function WeddingSeatingPanel(props: {
       }));
       setSaveNotice("Alternative seating draft saved with this wedding.");
       props.onRefreshWorkspace?.();
-    } catch {
+    } catch (error) {
+      if (showConflict(error, "save")) return;
       setSaveNotice("This option is ready, but it could not be saved.");
     } finally {
       setSaving(false);
@@ -142,8 +154,33 @@ export function WeddingSeatingPanel(props: {
       }));
       setSaveNotice("Old seating draft hidden.");
       props.onRefreshWorkspace?.();
-    } catch {
+    } catch (error) {
+      if (showConflict(error, "save")) return;
       setSaveNotice("This old draft could not be hidden.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function restoreSavedDraft(result: WeddingSeatingOptimizationResult) {
+    const fingerprint = result.fingerprint || weddingSeatingOptimizationFingerprint(result);
+    if (!fingerprint || !props.saveProjection) {
+      setSaveNotice("This seating draft cannot be restored until account saving is connected.");
+      return;
+    }
+    setSaving(true);
+    try {
+      await props.saveProjection(weddingSeatingDraftArchiveToAfpSendInput({
+        fingerprint,
+        metadata: props.state.workspace.metadata,
+        action: "restore",
+        reasonLabel: "Restored to the saved draft list by the couple.",
+      }));
+      setSaveNotice("Seating draft restored to the saved list.");
+      props.onRefreshWorkspace?.();
+    } catch (error) {
+      if (showConflict(error, "save")) return;
+      setSaveNotice("This seating draft could not be restored.");
     } finally {
       setSaving(false);
     }
@@ -186,7 +223,8 @@ export function WeddingSeatingPanel(props: {
       }));
       setInstructionNotice("Seating change saved with this wedding.");
       props.onRefreshWorkspace?.();
-    } catch {
+    } catch (error) {
+      if (showConflict(error, "instruction")) return;
       setInstructionNotice("The seating change preview is ready, but it could not be saved.");
     } finally {
       setSaving(false);
@@ -200,6 +238,7 @@ export function WeddingSeatingPanel(props: {
     if (pending.kind === "apply") void applySeatingDraft();
     else if (pending.kind === "alternative" && pending.result) void saveAlternativeDraft(pending.result);
     else if (pending.kind === "hide" && pending.result) void hideSavedDraft(pending.result);
+    else if (pending.kind === "restore" && pending.result) void restoreSavedDraft(pending.result);
   }
 
   return (
@@ -476,6 +515,36 @@ export function WeddingSeatingPanel(props: {
                 </div>
               </div>
             </Show>
+            <Show when={props.state.seatingArchivedDraftCards.length > 0}>
+              <div class="mt-3 rounded-2xl border border-sky-100 bg-white/75 p-3">
+                <p class="text-xs font-semibold text-sky-950/70">Hidden drafts</p>
+                <p class="mt-1 text-[11px] leading-4 text-sky-950/60">Hidden drafts remain in the Wedding history and can be restored.</p>
+                <div class="mt-2 space-y-2">
+                  <For each={props.state.seatingArchivedDraftCards.slice(0, 4)}>
+                    {(draft) => (
+                      <div class="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-sky-100 bg-sky-50/70 p-3">
+                        <div>
+                          <p class="text-xs font-semibold text-sky-950">{draft.title}</p>
+                          <p class="mt-1 text-[11px] leading-4 text-sky-950/60">{draft.detailLabel}</p>
+                        </div>
+                        <button
+                          type="button"
+                          disabled={saving()}
+                          class="rounded-full border border-sky-200 bg-white px-3 py-1.5 text-xs font-semibold text-sky-950 transition hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-50"
+                          data-magic-action="restore"
+                          data-magic-icon="restore"
+                          data-magic-label={`Restore hidden draft: ${draft.title}`}
+                          data-magic-id={`wedding:seating:saved-draft:${draft.id}:restore`}
+                          onClick={() => setConfirmation({ kind: "restore", result: draft.result })}
+                        >
+                          Restore draft
+                        </button>
+                      </div>
+                    )}
+                  </For>
+                </div>
+              </div>
+            </Show>
             <div class="mt-3 rounded-2xl border border-sky-100 bg-sky-50/70 p-3">
               <p class="text-xs font-semibold text-sky-950/70">Tell OmnyID what to change</p>
               <textarea
@@ -532,11 +601,17 @@ export function WeddingSeatingPanel(props: {
         />
         <WeddingConfirmDialog
           open={Boolean(confirmation())}
-          title={confirmation()?.kind === "hide" ? "Hide this seating draft?" : "Apply this seating change?"}
+          title={confirmation()?.kind === "hide"
+            ? "Hide this seating draft?"
+            : confirmation()?.kind === "restore"
+              ? "Restore this seating draft?"
+              : "Apply this seating change?"}
           detail={confirmation()?.kind === "hide"
             ? "The draft will leave the active saved-draft list. Your guest list and other seating drafts will not change."
+            : confirmation()?.kind === "restore"
+              ? "The draft will return to the saved-draft list without changing the current table assignments."
             : "This saves the displayed table assignments as the current seating draft. Review the people and table counts before confirming."}
-          confirmLabel={confirmation()?.kind === "hide" ? "Hide draft" : "Apply plan"}
+          confirmLabel={confirmation()?.kind === "hide" ? "Hide draft" : confirmation()?.kind === "restore" ? "Restore draft" : "Apply plan"}
           destructive={confirmation()?.kind === "hide"}
           busy={saving()}
           onCancel={() => setConfirmation(null)}

@@ -363,6 +363,156 @@ async fn membership_is_two_person_revisioned_and_revocable() {
     .await;
     assert_eq!(wrong_budget_workspace_status, StatusCode::FORBIDDEN);
 
+    let seating_message = json!({
+        "id":Ulid::new().to_string(),
+        "thread_id":format!("wedding_seating:{workspace_id}"),
+        "from":"system://wedding-planning",
+        "to":["agent://wedding-planning"],
+        "timestamp":Utc::now().to_rfc3339(),
+        "type":"ledger",
+        "kind":"wedding_seating_optimization",
+        "subtype":"wedding_seating_optimization",
+        "content":{
+            "ledger_kind":"wedding_seating_optimization",
+            "assignment_fingerprint":format!("guest-{suffix}:table-1"),
+            "assignments":[{"personId":format!("guest-{suffix}"),"tableId":"table-1","personLabel":"Guest","tableLabel":"Table 1"}]
+        },
+        "metadata":{"weddingPlanId":plan_id,"responseWorkspaceId":workspace_id},
+        "supertags":["template:wedding_planning","event:wedding","wedding_seating"],
+        "views":[],
+        "attachments":[],
+        "references":[
+            {"type":"wedding_plan","target":plan_id,"label":"Wedding plan"},
+            {"type":"response_workspace","target":workspace_id,"label":"Wedding workspace"}
+        ],
+        "store_in_relational":true,
+        "signature":"test"
+    });
+    let seating_request = json!({
+        "wedding_plan_id":plan_id,
+        "response_workspace_id":workspace_id,
+        "expected_revision":0,
+        "message":seating_message.clone()
+    });
+    let (partner_seating_write_status, partner_seating_write) = request_json(
+        &app,
+        Method::POST,
+        "/wedding/seating/projections",
+        &partner_auth,
+        Some(&seating_request),
+    )
+    .await;
+    assert_eq!(
+        partner_seating_write_status,
+        StatusCode::OK,
+        "partner seating write: {partner_seating_write}"
+    );
+    assert_eq!(partner_seating_write["owner_user_id"], owner_id);
+    assert_eq!(partner_seating_write["actor_user_id"], partner_id);
+    assert_eq!(partner_seating_write["revision"], 1);
+    assert_ne!(partner_seating_write["message_id"], seating_message["id"]);
+    let (owner_seating_status, owner_seating) = request_json(
+        &app,
+        Method::GET,
+        &format!("/wedding/seating/projections?{scope_query}"),
+        &owner_auth,
+        None,
+    )
+    .await;
+    assert_eq!(
+        owner_seating_status,
+        StatusCode::OK,
+        "owner seating read: {owner_seating}"
+    );
+    assert_eq!(
+        owner_seating["messages"][0]["metadata"]["ownerUserId"],
+        owner_id
+    );
+    assert_eq!(
+        owner_seating["messages"][0]["metadata"]["actorUserId"],
+        partner_id
+    );
+    assert_eq!(
+        owner_seating["messages"][0]["metadata"]["seatingRevision"],
+        1
+    );
+
+    let mut owner_seating_message = seating_message.clone();
+    owner_seating_message["id"] = json!(Ulid::new().to_string());
+    owner_seating_message["timestamp"] = json!(Utc::now().to_rfc3339());
+    let mut partner_seating_message = seating_message.clone();
+    partner_seating_message["id"] = json!(Ulid::new().to_string());
+    partner_seating_message["timestamp"] = json!(Utc::now().to_rfc3339());
+    let owner_seating_update = json!({
+        "wedding_plan_id":plan_id,
+        "response_workspace_id":workspace_id,
+        "expected_revision":1,
+        "message":owner_seating_message
+    });
+    let partner_seating_update = json!({
+        "wedding_plan_id":plan_id,
+        "response_workspace_id":workspace_id,
+        "expected_revision":1,
+        "message":partner_seating_message
+    });
+    let owner_seating_update_request = request_json(
+        &app,
+        Method::POST,
+        "/wedding/seating/projections",
+        &owner_auth,
+        Some(&owner_seating_update),
+    );
+    let partner_seating_update_request = request_json(
+        &app,
+        Method::POST,
+        "/wedding/seating/projections",
+        &partner_auth,
+        Some(&partner_seating_update),
+    );
+    let ((owner_seating_update_status, _), (partner_seating_update_status, _)) =
+        tokio::join!(owner_seating_update_request, partner_seating_update_request);
+    let mut seating_competing_statuses =
+        [owner_seating_update_status, partner_seating_update_status];
+    seating_competing_statuses.sort_by_key(|status| status.as_u16());
+    assert_eq!(
+        seating_competing_statuses,
+        [StatusCode::OK, StatusCode::CONFLICT]
+    );
+    let (_, seating_after_competing_writes) = request_json(
+        &app,
+        Method::GET,
+        &format!("/wedding/seating/projections?{scope_query}"),
+        &owner_auth,
+        None,
+    )
+    .await;
+    assert_eq!(
+        seating_after_competing_writes["messages"]
+            .as_array()
+            .map(|messages| messages
+                .iter()
+                .filter(|message| message["metadata"]["seatingRevision"] == 2)
+                .count()),
+        Some(1),
+        "one competing write must append seating revision two"
+    );
+
+    let wrong_seating_request = json!({
+        "wedding_plan_id":plan_id,
+        "response_workspace_id":format!("guessed-{suffix}"),
+        "expected_revision":1,
+        "message":seating_message.clone()
+    });
+    let (wrong_seating_workspace_status, _) = request_json(
+        &app,
+        Method::POST,
+        "/wedding/seating/projections",
+        &partner_auth,
+        Some(&wrong_seating_request),
+    )
+    .await;
+    assert_eq!(wrong_seating_workspace_status, StatusCode::FORBIDDEN);
+
     let rsvp_grant_id = format!("rsvp-capability-shared-{suffix}");
     sqlx::query(
         "INSERT INTO wedding_rsvp_capability_grants
@@ -687,6 +837,15 @@ async fn membership_is_two_person_revisioned_and_revocable() {
     )
     .await;
     assert_eq!(cross_couple_budget_status, StatusCode::FORBIDDEN);
+    let (cross_couple_seating_status, _) = request_json(
+        &app,
+        Method::GET,
+        &format!("/wedding/seating/projections?{scope_query}"),
+        &third_auth,
+        None,
+    )
+    .await;
+    assert_eq!(cross_couple_seating_status, StatusCode::FORBIDDEN);
     let wrong_scope_response = json!({
         "wedding_plan_id":plan_id,
         "response_workspace_id":format!("guessed-{suffix}"),
@@ -919,6 +1078,15 @@ async fn membership_is_two_person_revisioned_and_revocable() {
     )
     .await;
     assert_eq!(revoked_budget_status, StatusCode::FORBIDDEN);
+    let (revoked_seating_status, _) = request_json(
+        &app,
+        Method::GET,
+        &format!("/wedding/seating/projections?{scope_query}"),
+        &partner_auth,
+        None,
+    )
+    .await;
+    assert_eq!(revoked_seating_status, StatusCode::FORBIDDEN);
     let revision: i64 = sqlx::query_scalar(
         "SELECT membership_revision FROM wedding_plan_memberships
           WHERE wedding_owner_user_id=$1 AND wedding_plan_id=$2 AND member_user_id=$3",

@@ -127,6 +127,18 @@ no access.
 - COW-03 remains open for broader Guests, Seating, Vendors/Quotes, Documents,
   general search/AI and remaining background/live paths.
 
+#### COW-03E — Seating projection enforcement (WED-399)
+
+- [x] Resolve exact active `WeddingScope` before canonical seating reads and
+  protected seating writes.
+- [x] Reuse the existing constraint, optimisation and draft-archive AFP
+  records in the canonical owner's ledger; do not introduce a seating store.
+- [x] Accept only seating records for the resolved plan and workspace, retain
+  canonical owner and acting member separately, and deny guessed, cross-couple
+  and revoked-member access.
+- COW-03 remains open for broader Guests, Vendors/Quotes, Documents, general
+  search/AI and remaining background/live paths.
+
 Implementation evidence: WED-392 keeps name as the only mandatory field,
 offers email, phone, relationship and Wedding-role controls, and always excludes
 private notes and agent IDs. A review step names the recipient and exact values
@@ -189,6 +201,16 @@ read, sharer provenance, omitted-field redaction and sharer-only revocation.
   presentation and recoverability before protected-write collaboration is
   complete.
 
+#### COW-06E — Shared Seating projection (WED-399)
+
+- [x] Merge the canonical owner's seating constraints, latest optimisation and
+  archive lifecycle into either partner's normal Wedding refresh without
+  copying records into the partner account.
+- [x] Filter older actor-local seating copies once canonical records load, while
+  preserving local presentation preferences and the existing optimiser UI.
+- Full COW-06 remains open for broader guest projections, Vendors/Quotes,
+  Documents and the complete personal-object isolation matrix.
+
 ### COW-07 — Actor, revision and recoverability (P0)
 
 - Add actor/provenance presentation from existing AFP/event facts.
@@ -228,6 +250,19 @@ read, sharer provenance, omitted-field redaction and sharer-only revocation.
   revision-two append and one conflict in disposable PostgreSQL.
 - Full COW-07 remains open for confirmed decisions, guests, seating,
   vendors/quotes, documents and general archive/restore UX.
+
+#### COW-07D — Seating revision conflict and archive recovery (WED-399)
+
+- [x] Require the current per-artifact seating revision and serialize competing
+  owner/partner writes before appending to the existing AFP ledger.
+- [x] On conflict, retain the unsaved seating preview, refresh canonical state
+  and ask for explicit review instead of silently overwriting a partner.
+- [x] Extend the append-only seating draft archive lifecycle with restore and
+  expose hidden drafts for recoverable review rather than destructive deletion.
+- [x] Prove simultaneous owner/partner revision-one writes yield one accepted
+  next revision and one conflict in disposable PostgreSQL.
+- Full COW-07 remains open for confirmed decisions, guests, Vendors/Quotes,
+  Documents and the remaining protected-write domains.
 
 ### COW-08 — Assignments, comments and joint decisions (P1)
 

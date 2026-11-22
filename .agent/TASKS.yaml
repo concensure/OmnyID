@@ -15,6 +15,17 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-399
+    title: Share revision-safe Wedding seating plans and recover archived drafts
+    status: done
+    owner: codex
+    branch: agent/codex/WED-399
+    worktree: C:/temp/wt/omnyid-wed389
+    base_sha: a29f6b9357a9b8b0c5fa708a4e612921d217ca15
+    depends_on: [WED-398, WED-396, WED-390, WED-271]
+    files: [src/server/wedding_seating_projection_routes.rs, src/server/mod.rs, solid-ui/src/lib/weddingSeatingProjectionApi.ts, solid-ui/src/lib/weddingSeatingOptimizationState.ts, solid-ui/src/lib/weddingSeatingDraftArchiveState.ts, solid-ui/src/lib/weddingWorkspaceRefreshState.ts, solid-ui/src/components/ResponseQueueView.tsx, solid-ui/src/components/WeddingSeatingPanel.tsx, tests/wedding_partner_sharing_api.rs, tests/wedding_scope_contract.rs, solid-ui/tests/wedding-seating*.test.ts, solid-ui/tests/wedding-workspace-refresh-state.test.ts, Documents/design/wedding planner/couple coworkspace/couple-coworking-*.md, .agent/**]
+    acceptance: [extend the existing seating constraint optimization and archive AFP records rather than add a seating store, resolve exact active WeddingScope before shared seating reads and writes and use only the canonical owner ledger, accept only exact seating projection shapes for the active plan and workspace, keep canonical owner and acting member distinct, require the current seating stream revision for protected plan and archive changes and reject stale partner writes before mutation, preserve the unsaved seating preview on conflict while refreshing canonical state for explicit review, support restore through the existing seating draft archive lifecycle instead of destructive deletion, filter historical actor-local seating copies when canonical projections load, deny guessed workspace cross-couple and revoked-member access, prove owner and partner concurrency against disposable PostgreSQL and pass focused frontend Rust and scope tests from a clean exact candidate, record bounded COW-03 COW-06 and COW-07 Seating slices without claiming full coworking completion]
+    progress: "Complete on the WED-399 implementation candidate. Exact WeddingScope now gates canonical seating reads and protected writes; the existing constraint, optimisation and archive AFP records carry separate owner/actor provenance and per-artifact revisions. Stale partner writes fail before mutation while the UI retains its preview and refreshes canonical state. Hidden drafts are append-only and restorable. Frontend typecheck and 47 focused tests pass; Linux cargo check --lib, direct scope contracts 7/7 and the real pgvector/PostgreSQL partner API proof pass, including simultaneous owner/partner writes, same-state projection and guessed/cross/revoked denial. The disposable container was removed. COW-03E, COW-06E and COW-07D are bounded complete; broader coworking remains open."
   - id: WED-398
     title: Add revision-safe shared Wedding budget conflict recovery
     status: done
