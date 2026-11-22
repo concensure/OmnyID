@@ -1,3 +1,58 @@
+## WED-392 guest growth and selected-contact coworking live (2026-11-22)
+
+Worktree `C:/temp/wt/omnyid-wed389`, branch `agent/codex/WED-392`. Exact deployed
+application/static SHA: `afd6d5cc04d3c5996256ca1df131ba7e1de659fb`; clean release
+worktree: `C:/temp/wt/omnyid-wed392-release-ba6fbdd5` (detached at the final SHA).
+
+The guest-list report now informs a selective J0-J6 growth journey on `/wedding/`:
+spreadsheet pain, a visibly illustrative review, bounded CSV/TSV/pasted-table
+proof, privacy context and `Bring in my guest list`. It is not presented as a
+literal public guest workflow. The exact Soft headline and intimate/micro/larger
+celebration lede remain intact.
+
+COW-05 is live over the existing encrypted contact-grant table. The sharer selects
+contacts and optional email/phone/relationship/role fields, reviews exact values
+and private omissions, then confirms. Incoming/outgoing grants name the people
+involved; only the original sharer can revoke. Server list/share/revoke operations
+bind canonical Wedding scope and active membership, and member removal revokes
+stale incoming and outgoing grants. The partner API Caddy route was added ahead of
+the static Wedding handler and is enforced by tests and deploy smoke guards.
+
+Clean exact-SHA verification passed `npm run test:wedding:ci` (2,345 tests), the
+production build, focused field tests, Rust checks and disposable-Postgres HTTP
+scope/provenance/revocation tests. Live Chromium at 390/1440 px passes default and
+guest-intent contexts without errors, failed requests or overflow. The workspace
+serves the exact new shell and bundles, partner probes reach backend validation,
+and the read-only Wedding monitor passes.
+
+Oracle runs ARM64 image
+`sha256:b4568e0e1433df09676c2f9fdd6ec87ac7345244efd218a8db7a120e9a6f4554`
+with OCI revision equal to the full SHA and zero restarts. Caddy image
+`sha256:1e40b251ca9639ead7b5cd2cedcc8765adfbabb99450fe23f130eefabf50f4bc`
+also has zero restarts; its installed config hash is
+`a3c24e8af0d99fda4cceaa26679fc467512c151ad4f98bd50c998ba658d557fa`.
+The full remote audit passed backup verification, runtime integrity and isolated
+restore. The detached local poller again failed to notice the completed exit file;
+the preserved remote stdout hash is
+`a4003d2dbd8e9a1b4c2172540cea7ae8c407915979b4a92dc0672769a0d1f4fc`,
+and the final light JSON hash is
+`fc0def50314a4411ba7edf4d8f71e837bbaced20eb25dbaff27539ef684179a0`.
+
+Rollback/evidence root:
+`/home/ubuntu/omnyid-candidates/wed392-afd6d5cc04d3c5996256ca1df131ba7e1de659fb`.
+It retains the WED-391 workspace archive (index hash
+`04970a9a58d79b8e6948d17c735d049b946408e1e36a2ad0163866707a01547f`),
+the post-release workspace archive, prior Caddyfile and container evidence. The
+true pre-release homeserver remains tagged
+`omnyid-homeserver:wed392-rollback-3a3301fa`. Expanded candidate directories, an
+unused amd64 WED-386 image and the superseded WED-392 intermediate image were
+removed as recoverable build material to let the full restore drill run; no
+volume, backup, database, current image or true rollback image was removed. Root
+use is 82% after the drill.
+
+Broader COW-03 and later cross-domain, projection, activity, AI and live-delivery
+tasks remain explicitly open in `couple-coworking-tasks.md`.
+
 ## WED-391 guest journey and couple-coworking first slice live (2026-11-22)
 
 Worktree `C:/temp/wt/omnyid-wed389`, branch `agent/codex/WED-391`. Exact deployed

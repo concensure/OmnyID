@@ -1,3 +1,24 @@
+# 2026-11-22: WED-392 guest growth proof and selected contacts stay bounded
+
+The public Wedding page uses guest-list evidence as a J0-J6 customer-growth
+journey: recognise unreliable spreadsheet work, show a labelled review result,
+state the privacy boundary and offer one guest-specific activation. It is not a
+public guest workflow or a claim of Excel, PDF, OCR or autonomous import. The
+selected Soft headline and the inclusive intimate, micro and larger celebration
+message remain the default context.
+
+Selected-contact coworking extends the existing encrypted Wedding grant instead
+of synchronising personal address books. Name is mandatory; email, phone,
+relationship and Wedding roles are explicit opt-ins; notes and agent IDs remain
+private. The sharer reviews exact recipient, contacts and fields before write,
+and only the original sharer may revoke. Every read/write/revoke binds the
+canonical owner, plan, workspace and active membership. The corresponding
+`/wedding/partners/*` paths are application routes and must precede the static
+Wedding file server in Caddy and deployment smoke checks.
+
+This closes COW-05 and re-proves COW-02. It does not claim the COW-03 cross-domain
+enforcement, canonical shared projections, AI retrieval or live-delivery phases.
+
 # 2026-11-22: WED-391 guest and coworking surfaces project canonical records
 
 Public Wedding guidance may explain a discovery-to-final-count guest journey,
