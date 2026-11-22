@@ -2,7 +2,8 @@
 
 Dependency order is authoritative. Task: WED-365.
 
-Status: foundation implemented; WED-394 run-sheet enforcement slice implemented 23 November 2026.
+Status: foundation implemented; WED-394 through WED-396 add bounded run-sheet,
+decision/task and RSVP enforcement slices through 23 November 2026.
 Checked items are repository claims only; hosted and full-account release
 gates remain separate.
 
@@ -99,6 +100,20 @@ no access.
   another couple and a revoked member.
 - COW-03 remains open for the other domains and background/live paths.
 
+#### COW-03C — Couple-side RSVP enforcement (WED-396)
+
+- [x] Resolve exact active `WeddingScope` before authenticated protected-link
+  status, list, create, revoke and regenerate operations.
+- [x] Resolve the same scope before a couple records a manual RSVP response,
+  then write through the canonical owner's existing guest ledger.
+- [x] Keep public RSVP open/respond restricted to the existing digest-held,
+  household/invitation capability rather than granting membership access.
+- [x] Prove same-state owner/partner reads plus guessed-workspace,
+  cross-couple, direct-response and post-revocation denial in disposable
+  PostgreSQL.
+- COW-03 remains open for Budget, Seating, Vendors/Quotes, Documents,
+  general search/AI and remaining background/live paths.
+
 Implementation evidence: WED-392 keeps name as the only mandatory field,
 offers email, phone, relationship and Wedding-role controls, and always excludes
 private notes and agent IDs. A review step names the recipient and exact values
@@ -139,6 +154,15 @@ read, sharer provenance, omitted-field redaction and sharer-only revocation.
   preserving the current/next/following queue.
 - Full COW-06 remains open for the remaining canonical projections.
 
+#### COW-06C — Shared RSVP protected-link state (WED-396)
+
+- [x] List and manage one canonical owner's protected household grants for
+  either active partner; do not copy grants into the partner account.
+- [x] Preserve the existing RSVP setup, response, revision and capability
+  authorities while changing only authenticated couple ledger selection.
+- Full COW-06 remains open for Budget, broader guest projections, Seating,
+  Vendors/Quotes and Documents.
+
 ### COW-07 — Actor, revision and recoverability (P0)
 
 - Add actor/provenance presentation from existing AFP/event facts.
@@ -154,6 +178,15 @@ read, sharer provenance, omitted-field redaction and sharer-only revocation.
 - [x] Keep recipient-agent handoff private and explicitly deny source-workspace
   access.
 - Full COW-07 remains open for protected-write conflicts and recoverability.
+
+#### COW-07B — RSVP lifecycle actor attribution (WED-396)
+
+- [x] Record canonical owner and acting member separately on authenticated
+  protected-link grant, revoke and regenerate lifecycle events.
+- [x] Retain the existing expected-revision and idempotency checks on RSVP
+  responses; public guest events have no invented account actor.
+- Full COW-07 remains open for conflict presentation and recoverability across
+  money, confirmed decisions and the other shared domains.
 
 ### COW-08 — Assignments, comments and joint decisions (P1)
 

@@ -4617,3 +4617,18 @@ The vendor catalogue's declarative `mustDecideFirst` signal is carried into plan
 task metadata. PersonalOS uses it as a two-point sequence tie-break only after the
 normal priority, deadline and lead-time urgency weights. Equal-urgency venue work
 therefore precedes another vendor; materially more urgent work still wins.
+
+## 2026-11-23 — Couple-side RSVP management shares scope; guest links do not (WED-396)
+
+Authenticated protected-link status, list, create, revoke and regenerate
+operations resolve the exact active `WeddingScope` before selecting a ledger.
+Both partners therefore manage the canonical owner's existing grants without a
+copy, and lifecycle AFP records retain canonical owner and acting member as
+separate facts. Authenticated manual RSVP responses follow the same scope and
+continue to use the existing expected-revision and idempotency contract.
+
+The public RSVP open/respond boundary remains a separate restricted-external
+authority: a digest-held token is limited to its recorded household,
+invitations and event. It does not resolve partner membership and does not
+grant general Wedding access. A public guest action has no invented account
+actor.

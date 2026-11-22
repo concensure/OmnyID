@@ -12474,3 +12474,26 @@ including previous image
 workspace, Caddy, Compose, monitor and container inventory. Full hashes, failed-closed
 rollout diagnosis and hosted evidence are in
 `Documents/verification/WED-390-wedding-decision-and-monitor-release.md`.
+
+## WED-396 canonical couple-side RSVP scope (2026-11-23)
+
+Worktree `C:/temp/wt/omnyid-wed389`, branch `agent/codex/WED-396`. Exact
+implementation SHA `841fc8a38eabd698298db4a83f3b29650332364b`.
+
+Authenticated RSVP capability status/list/create/revoke/regenerate and manual
+couple responses now resolve exact Wedding scope and use the canonical owner's
+existing ledger. Lifecycle events preserve owner and actor separately. Public
+fragment-token open/respond stays capability-bound and unchanged.
+
+Exact-SHA proof: focused frontend RSVP contracts 6/6, TypeScript, standalone
+scope contracts 5/5 and Linux `cargo check --lib` pass. Rust 1.94 first
+SIGSEGV'd in `aws-sdk-s3`; retry with `RUST_MIN_STACK=33554432` passed. A real
+disposable pgvector/PostgreSQL test passes owner/partner same state, partner
+revoke plus actor audit, guessed workspace, cross-couple, direct-response and
+revoked-member denials. Container `omnyid-wed396-pg` was removed.
+
+COW-03C, COW-06C and COW-07B are complete slices; their parent phases remain
+open for Budget, broader Guests, Seating, Vendors/Quotes, Documents, retrieval
+and conflict/recovery UX. No Oracle deploy, GitHub push or PR occurred;
+production remains on WED-392 source
+`afd6d5cc04d3c5996256ca1df131ba7e1de659fb`.

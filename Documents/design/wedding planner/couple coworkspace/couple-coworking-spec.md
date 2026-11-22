@@ -1,8 +1,8 @@
 # Couple coworking specification
 
 Status: implemented foundation; incremental enforcement and coworking UX continue
-Date: 22 November 2026
-Tasks: WED-365, WED-391, WED-392, WED-394, WED-395
+Date: 23 November 2026
+Tasks: WED-365, WED-391, WED-392, WED-394, WED-395, WED-396
 Source guidance: `couple coworking.md`
 
 ## Outcome
@@ -69,6 +69,15 @@ separately, and may hand the task to the other partner's personal agent without
 granting access to the source workspace. This preserves the existing
 current/next/following research window and explicit external-send action.
 
+WED-396 applies the authority to authenticated RSVP protected-link management
+and manual couple responses. Either active partner now lists and manages the
+same canonical owner's grants, while lifecycle AFP records distinguish the
+canonical owner from the acting member. Manual responses resolve exact scope
+before selecting the owner guest ledger and retain the existing expected-
+revision/idempotency checks. Public RSVP open/respond remains bound only to its
+digest-held household and invitation capability; it does not gain membership
+or general Wedding access.
+
 Still not claimed complete: systematic `WeddingScope` enforcement across
 every Wedding domain, shared activity/catch-up, scoped AI retrieval,
 private-to-shared AI publication and permission-filtered live delivery. Those
@@ -103,7 +112,7 @@ does not mean every route in that domain has completed partner enforcement.
 | --- | --- | --- | --- |
 | Membership and selected contacts | `wedding_plan_memberships`, `wedding_partner_invites`, encrypted `wedding_shared_contact_grants` | Membership-ready | Reuse `WeddingScope`; retain field-preview publication and revocation. |
 | Budget and contributions | Existing Wedding AFP projections and budget records | Mixed owner/browser assumptions | Resolve `WeddingScope` before read/write and add expected revision to protected money changes. |
-| Guests, RSVP and households | Canonical RSVP setup/response/capability routes and guest AFP projections | External capability is narrow; couple routes are mixed | Bind authenticated couple routes to the canonical owner/plan/workspace without broadening guest capabilities. |
+| Guests, RSVP and households | Canonical RSVP setup/response/capability routes and guest AFP projections | Authenticated protected-link management and manual response recording now resolve canonical scope; external capability stays narrow; broader guest projections remain mixed | Extend the same authority to remaining authenticated guest/household reads and background delivery without broadening guest capabilities. |
 | Seating | Canonical guest/seating AFP projections plus account-keyed presentation state | Partly browser-local | Move authoritative placement mutations behind scoped server commands; keep only view preferences local. |
 | Vendors, enquiries and quotes | Canonical vendor IDs, enquiry envelopes, messages and Quote Intelligence | Mostly plan-referenced, not uniformly membership-resolved | Apply scope to authenticated couple reads, messages, attachments and quote selection. |
 | Tasks and decisions | Wedding task AFP records, assignment routes and DecisionOS projections | Mixed owner ID and response-workspace checks | Use canonical owner for shared task truth while retaining actor ID for attribution. |

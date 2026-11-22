@@ -17,7 +17,7 @@ lifecycle:
 tasks:
   - id: WED-396
     title: Apply canonical WeddingScope to couple-side RSVP capability management and responses
-    status: in_progress
+    status: done
     owner: codex
     branch: agent/codex/WED-396
     worktree: C:/temp/wt/omnyid-wed389
@@ -25,7 +25,7 @@ tasks:
     depends_on: [WED-395, WED-394, WED-390, WED-386]
     files: [src/db/wedding_rsvp_capabilities.rs, src/server/wedding_rsvp_capability_routes.rs, src/server/wedding_rsvp_response_routes.rs, src/server/mod.rs, solid-ui/src/lib/weddingRsvpCapabilityApi.ts, solid-ui/src/components/WeddingRsvpPublishingPanel.tsx, tests/wedding_partner_sharing_api.rs, solid-ui/tests/wedding-rsvp*.test.ts, Documents/design/wedding planner/couple coworkspace/couple-coworking-*.md, .agent/**]
     acceptance: [authenticated RSVP capability status list create revoke and regenerate requests carry and resolve the exact active WeddingScope before touching a private ledger, direct authenticated RSVP response recording resolves the exact scope and writes to the canonical owner ledger while public token open and respond remain capability-bound and unchanged, both partners see and manage the same protected household grants without copying them, guessed workspaces cross-couple scopes and revoked members fail before capability or guest-response access, actor identity remains distinct from the canonical owner where audit data exists, frontend requests always send both plan and workspace identifiers, focused frontend Rust contract and disposable-Postgres partner tests pass from a clean exact candidate, COW-03 and COW-06 record the bounded RSVP slice without claiming full completion]
-    progress: "Registered from clean advanced-worktree SHA 12c951b519d81a7ae9c38217d7b9226a951e51f2 after auditing the existing RSVP capability, response and WeddingScope contracts."
+    progress: "Complete at exact implementation SHA 841fc8a38eabd698298db4a83f3b29650332364b. Authenticated capability status/list/create/revoke/regenerate and direct manual responses resolve exact WeddingScope and select the canonical owner ledger; protected-link lifecycle events keep owner and actor separate, while public fragment-token open/respond remains unchanged and capability-bound. Clean-SHA frontend contracts 6/6, TypeScript, standalone scope contracts 5/5, Linux cargo check --lib with enlarged compiler stack and a real disposable pgvector/Postgres owner/partner API test pass. The database proof covers same grant state, partner revoke plus actor audit, guessed workspace, cross-couple, direct-response and post-revocation denial. The exact temporary container was removed. COW-03, COW-06 and COW-07 remain explicitly partial."
   - id: WED-395
     title: Apply canonical WeddingScope to shared decision research and task delivery
     status: done
