@@ -87,6 +87,19 @@ no access.
 - COW-03 remains open for Budget, RSVP/Guests, Seating, Vendors/Quotes,
   Tasks/Decisions, Documents, search/AI and live-delivery routes.
 
+#### COW-03B — Decision research and task-delivery enforcement (WED-395)
+
+- [x] Resolve exact active `WeddingScope` before decision cache, model or task
+  delivery access.
+- [x] Store decision research once against the canonical owner plan while
+  keeping model usage and rate limits on the requesting account.
+- [x] Use canonical-owner idempotency for approved task delivery and record the
+  acting member separately.
+- [ ] Execute the extended disposable-Postgres denial matrix for guessed
+  workspace, another couple and a revoked member when a local database is
+  available.
+- COW-03 remains open for the other domains and background/live paths.
+
 Implementation evidence: WED-392 keeps name as the only mandatory field,
 offers email, phone, relationship and Wedding-role controls, and always excludes
 private notes and agent IDs. A review step names the recipient and exact values
@@ -120,6 +133,14 @@ read, sharer provenance, omitted-field redaction and sharer-only revocation.
 - Full COW-06 remains open until the other listed Wedding projections share the
   same canonical plan and the personal-object isolation matrix is complete.
 
+#### COW-06B — Shared decision research cache (WED-395)
+
+- [x] Reuse one canonical owner/plan research result for either active partner;
+  do not create partner-specific copies of the same decision research.
+- [x] Require the response workspace in both desktop and mobile requests while
+  preserving the current/next/following queue.
+- Full COW-06 remains open for the remaining canonical projections.
+
 ### COW-07 — Actor, revision and recoverability (P0)
 
 - Add actor/provenance presentation from existing AFP/event facts.
@@ -127,6 +148,14 @@ read, sharer provenance, omitted-field redaction and sharer-only revocation.
   other protected writes; show a merge/review surface on conflict.
 - Prefer archive/restore over destructive deletion.
 - Depends on COW-06.
+
+#### COW-07A — Task-delivery actor attribution (WED-395)
+
+- [x] Add canonical-owner plus acting-member attribution to idempotent Wedding
+  task-delivery receipts, including a forward backfill for existing owner sends.
+- [x] Keep recipient-agent handoff private and explicitly deny source-workspace
+  access.
+- Full COW-07 remains open for protected-write conflicts and recoverability.
 
 ### COW-08 — Assignments, comments and joint decisions (P1)
 
@@ -165,6 +194,14 @@ read, sharer provenance, omitted-field redaction and sharer-only revocation.
 - Namespace caches by canonical scope plus membership revision.
 - Adversarial tests cover guessed IDs, prompt injection and stale caches.
 - Depends on COW-03.
+
+#### COW-10A — Decision research cache boundary (WED-395)
+
+- [x] Resolve membership before feature/model execution and cache lookup.
+- [x] Keep the existing non-invention prompt and separate saved evidence,
+  guidance, unknowns and checks still needed.
+- Full COW-10 remains open for search, embeddings, documents, agent memory,
+  cache-revision invalidation and adversarial retrieval coverage.
 
 ### COW-11 — Private-to-shared proposal (P1)
 

@@ -894,4 +894,9 @@ pub const MIGRATIONS: &[(&str, &str, &str)] = &[
         "Independently expiring vendor calendar grants without rotation on creation",
         include_str!("../../postgres/migrations/0175_vendor_calendar_independent_links.sql"),
     ),
+    (
+        "0176_wedding_task_assignment_actor",
+        "Acting member attribution for canonical shared Wedding task delivery",
+        include_str!("../../postgres/migrations/0176_wedding_task_assignment_actor.sql"),
+    ),
 ];

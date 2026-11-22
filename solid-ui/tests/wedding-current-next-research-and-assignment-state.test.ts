@@ -24,8 +24,14 @@ test("funded research follows a moving current-next-following window", () => {
   const server = read("../src/server/wedding_decision_research_routes.rs");
   assert.match(server, /request\.queue_rank > 2/);
   assert.match(server, /Only the current, next and following decision can be researched/);
+  assert.match(server, /resolve_wedding_scope/);
+  assert.match(server, /scope\.owner_user_id/);
   const mobile = read("src/components/WeddingMobileFocusHome.tsx");
   const detailed = read("src/components/WeddingDecisionFocusCard.tsx");
+  const api = read("src/lib/weddingDecisionResearchApi.ts");
+  assert.match(api, /response_workspace_id: input\.responseWorkspaceId/);
+  assert.match(mobile, /responseWorkspaceId: props\.state\.workspace\.metadata\.responseWorkspaceId/);
+  assert.match(detailed, /responseWorkspaceId: props\.state\.workspace\.metadata\.responseWorkspaceId/);
   assert.match(mobile, /decisionPreparation\(\)\.ready/);
   assert.match(detailed, /decisionPreparation\(\)\.ready/);
   assert.match(detailed, /background:\s*true/);
@@ -42,6 +48,9 @@ test("assignment delivery uses the server-side research and registered-agent pat
   assert.match(server, /wedding-task-research\.md/);
   assert.match(server, /store_recipient_handoff/);
   assert.match(server, /source_workspace_access_granted/);
+  assert.match(server, /resolve_wedding_scope/);
+  assert.match(server, /scope\.owner_user_id/);
+  assert.match(server, /actor_user_id/);
 });
 
 test("seating requests the existing RSVP quick-action destination", () => {

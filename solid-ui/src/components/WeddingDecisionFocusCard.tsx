@@ -185,6 +185,7 @@ export function WeddingDecisionFocusCard(props: {
       setFundedResearchStatus((current) => ({ ...current, [item.id]: "loading" }));
       void requestFundedWeddingDecisionResearch({
         weddingPlanId: props.state.workspace.metadata.weddingPlanId,
+        responseWorkspaceId: props.state.workspace.metadata.responseWorkspaceId,
         taskId: task.id,
         title: task.title,
         notes: task.notes,

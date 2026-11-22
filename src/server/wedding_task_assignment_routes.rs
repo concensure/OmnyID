@@ -23,6 +23,7 @@ use crate::{
 use super::{
     AppState, RateLimitPolicy, app_to_proto,
     auth::{authenticated_rate_limit_key, authenticated_user, enforce_rate_limit},
+    wedding_scope::resolve_wedding_scope,
 };
 
 #[derive(Deserialize)]
@@ -226,7 +227,7 @@ async fn deliver_http(
     headers: HeaderMap,
     Json(request): Json<DeliveryRequest>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
-    let owner = authenticated_user(&state.db, &headers).await?;
+    let actor = authenticated_user(&state.db, &headers).await?;
     enforce_rate_limit(
         &state,
         authenticated_rate_limit_key("wedding_task_assignment_delivery", &headers),
@@ -240,10 +241,11 @@ async fn deliver_http(
         StatusCode::BAD_REQUEST,
         "Wedding plan is required.".to_string(),
     ))?;
-    bounded(&request.response_workspace_id, 160).ok_or((
+    let workspace_id = bounded(&request.response_workspace_id, 160).ok_or((
         StatusCode::BAD_REQUEST,
         "Wedding workspace is required.".to_string(),
     ))?;
+    let scope = resolve_wedding_scope(&state.db, &actor.id, &plan_id, &workspace_id).await?;
     bounded(&request.task_id, 200)
         .ok_or((StatusCode::BAD_REQUEST, "Task is required.".to_string()))?;
     bounded(&request.task_title, 240).ok_or((
@@ -266,12 +268,18 @@ async fn deliver_http(
         ));
     }
 
-    let research = latest_research(&state, &owner.id, &plan_id, request.task_id.trim()).await?;
+    let research = latest_research(
+        &state,
+        &scope.owner_user_id,
+        &scope.wedding_plan_id,
+        request.task_id.trim(),
+    )
+    .await?;
     let research_hash = research
         .as_ref()
         .map(|item| item.input_hash.as_str())
         .unwrap_or("none");
-    let fingerprint = assignment_fingerprint(&owner.id, &request, research_hash);
+    let fingerprint = assignment_fingerprint(&scope.owner_user_id, &request, research_hash);
     let delivery_id = format!("wedding-task-delivery-{}", &fingerprint[..24]);
     let email_digest = digest(&recipient_email);
     let recipient = state
@@ -279,9 +287,9 @@ async fn deliver_http(
         .find_user_by_email(&recipient_email)
         .await
         .map_err(|error| (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?
-        .filter(|user| user.id != owner.id);
+        .filter(|user| user.id != actor.id);
     let existing = sqlx::query("SELECT status,provider_message_id,agent_message_id FROM wedding_task_assignment_deliveries WHERE owner_user_id=$1 AND assignment_fingerprint=$2")
-        .bind(&owner.id).bind(&fingerprint).fetch_optional(&state.db.pool).await
+        .bind(&scope.owner_user_id).bind(&fingerprint).fetch_optional(&state.db.pool).await
         .map_err(|error| (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?;
     if let Some(row) = existing {
         if row.get::<String, _>("status") == "sent" {
@@ -294,13 +302,13 @@ async fn deliver_http(
             })));
         }
     }
-    sqlx::query("INSERT INTO wedding_task_assignment_deliveries (delivery_id,owner_user_id,recipient_email_digest,recipient_user_id,wedding_plan_id,response_workspace_id,task_id,assignment_fingerprint,research_input_hash,status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'prepared') ON CONFLICT (owner_user_id,assignment_fingerprint) DO NOTHING")
-        .bind(&delivery_id).bind(&owner.id).bind(&email_digest).bind(recipient.as_ref().map(|user| user.id.as_str()))
-        .bind(&plan_id).bind(request.response_workspace_id.trim()).bind(request.task_id.trim())
+    sqlx::query("INSERT INTO wedding_task_assignment_deliveries (delivery_id,owner_user_id,actor_user_id,recipient_email_digest,recipient_user_id,wedding_plan_id,response_workspace_id,task_id,assignment_fingerprint,research_input_hash,status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'prepared') ON CONFLICT (owner_user_id,assignment_fingerprint) DO NOTHING")
+        .bind(&delivery_id).bind(&scope.owner_user_id).bind(&actor.id).bind(&email_digest).bind(recipient.as_ref().map(|user| user.id.as_str()))
+        .bind(&scope.wedding_plan_id).bind(&scope.response_workspace_id).bind(request.task_id.trim())
         .bind(&fingerprint).bind(research.as_ref().map(|item| item.input_hash.as_str()))
         .execute(&state.db.pool).await.map_err(|error| (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?;
     let claimed = sqlx::query_scalar::<_, String>("UPDATE wedding_task_assignment_deliveries SET status='sending',last_error=NULL,updated_at=NOW() WHERE owner_user_id=$1 AND assignment_fingerprint=$2 AND (status IN ('prepared','failed') OR (status='sending' AND updated_at < NOW() - INTERVAL '5 minutes')) RETURNING delivery_id")
-        .bind(&owner.id).bind(&fingerprint).fetch_optional(&state.db.pool).await
+        .bind(&scope.owner_user_id).bind(&fingerprint).fetch_optional(&state.db.pool).await
         .map_err(|error| (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?;
     if claimed.is_none() {
         return Ok(Json(json!({
@@ -319,7 +327,7 @@ async fn deliver_http(
             &recipient.id,
             assignment_message(
                 &message_id,
-                &owner.display_name,
+                &actor.display_name,
                 &request,
                 research.as_ref(),
             ),
@@ -349,10 +357,10 @@ async fn deliver_http(
         to: vec![recipient_email],
         subject: format!(
             "{} assigned you: {}",
-            owner.display_name,
+            actor.display_name,
             request.task_title.trim()
         ),
-        body: email_body(&owner.display_name, &request, research.as_ref()),
+        body: email_body(&actor.display_name, &request, research.as_ref()),
         in_reply_to: None,
         references: vec![],
         attachments,

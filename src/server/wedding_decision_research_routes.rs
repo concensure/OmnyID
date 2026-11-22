@@ -19,11 +19,13 @@ use super::{
     auth::{authenticated_rate_limit_key, authenticated_user, enforce_rate_limit},
     openrouter_funded_inference::{self, FundedInferenceRequest},
     wedding_admin_ai_policy,
+    wedding_scope::resolve_wedding_scope,
 };
 
 #[derive(Deserialize)]
 struct Request {
     wedding_plan_id: String,
+    response_workspace_id: String,
     task_id: String,
     title: String,
     #[serde(default)]
@@ -55,17 +57,26 @@ async fn research_http(
     headers: HeaderMap,
     Json(request): Json<Request>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
-    let user = authenticated_user(&state.db, &headers).await?;
-    if !wedding_admin_ai_policy::execution_enabled() {
-        return Err((
-            StatusCode::SERVICE_UNAVAILABLE,
-            "Wedding research is temporarily unavailable.".to_string(),
-        ));
-    }
+    let actor = authenticated_user(&state.db, &headers).await?;
     if request.queue_rank > 2 {
         return Err((
             StatusCode::BAD_REQUEST,
             "Only the current, next and following decision can be researched.".to_string(),
+        ));
+    }
+    let plan = bounded(&request.wedding_plan_id, 160).ok_or((
+        StatusCode::BAD_REQUEST,
+        "Wedding plan is required.".to_string(),
+    ))?;
+    let workspace = bounded(&request.response_workspace_id, 160).ok_or((
+        StatusCode::BAD_REQUEST,
+        "Wedding workspace is required.".to_string(),
+    ))?;
+    let scope = resolve_wedding_scope(&state.db, &actor.id, &plan, &workspace).await?;
+    if !wedding_admin_ai_policy::execution_enabled() {
+        return Err((
+            StatusCode::SERVICE_UNAVAILABLE,
+            "Wedding research is temporarily unavailable.".to_string(),
         ));
     }
     enforce_rate_limit(
@@ -79,10 +90,6 @@ async fn research_http(
         },
     )
     .await?;
-    let plan = bounded(&request.wedding_plan_id, 160).ok_or((
-        StatusCode::BAD_REQUEST,
-        "Wedding plan is required.".to_string(),
-    ))?;
     let task_id = bounded(&request.task_id, 200)
         .ok_or((StatusCode::BAD_REQUEST, "Task is required.".to_string()))?;
     let title = bounded(&request.title, 240).ok_or((
@@ -102,7 +109,7 @@ async fn research_http(
     );
     let input_hash = hex::encode(Sha256::digest(prompt.as_bytes()));
     if let Some(row) = sqlx::query("SELECT recommendation, report_markdown, model FROM wedding_decision_research_cache WHERE user_id=$1 AND wedding_plan_id=$2 AND task_id=$3 AND input_hash=$4")
-        .bind(&user.id).bind(&plan).bind(&task_id).bind(&input_hash).fetch_optional(&state.db.pool).await.map_err(|error| (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))? {
+        .bind(&scope.owner_user_id).bind(&scope.wedding_plan_id).bind(&task_id).bind(&input_hash).fetch_optional(&state.db.pool).await.map_err(|error| (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))? {
         return Ok(Json(json!({"recommendation": row.get::<String,_>("recommendation"), "report_markdown": row.get::<String,_>("report_markdown"), "model": row.get::<String,_>("model"), "cached": true})));
     }
     let system = "You are OmnyID's wedding planning research assistant. Analyse only the supplied wedding facts and task. Never invent a venue, route, live weather, price, availability, legal conclusion or web finding. Clearly separate saved evidence, reasonable planning guidance, unknowns and checks still needed. Give one specific user-facing recommendation, then a concise readable Markdown report with headings: What we know, Recommendation, What to verify, Next actions. Return only JSON with recommendation and report_markdown.";
@@ -111,9 +118,9 @@ async fn research_http(
         &state.http_client,
         FundedInferenceRequest {
             feature: "wedding_decision_research",
-            user_id: Some(&user.id),
-            wedding_plan_id: Some(&plan),
-            abuse_id: &user.id,
+            user_id: Some(&actor.id),
+            wedding_plan_id: Some(&scope.wedding_plan_id),
+            abuse_id: &actor.id,
             system,
             prompt: &prompt,
             max_tokens: 750,
@@ -144,7 +151,7 @@ async fn research_http(
         "Research was incomplete.".to_string(),
     ))?;
     sqlx::query("INSERT INTO wedding_decision_research_cache (user_id,wedding_plan_id,task_id,input_hash,recommendation,report_markdown,model,usage_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT DO NOTHING")
-        .bind(&user.id).bind(&plan).bind(&task_id).bind(&input_hash).bind(&recommendation).bind(&report).bind(&result.model).bind(&result.usage_id)
+        .bind(&scope.owner_user_id).bind(&scope.wedding_plan_id).bind(&task_id).bind(&input_hash).bind(&recommendation).bind(&report).bind(&result.model).bind(&result.usage_id)
         .execute(&state.db.pool).await.map_err(|error| (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?;
     Ok(Json(
         json!({"recommendation": recommendation, "report_markdown": report, "model": result.model, "cached": false}),

@@ -9,6 +9,7 @@ export type FundedWeddingDecisionResearch = {
 
 export async function requestFundedWeddingDecisionResearch(input: {
   weddingPlanId: string;
+  responseWorkspaceId: string;
   taskId: string;
   title: string;
   notes?: string | null;
@@ -19,6 +20,7 @@ export async function requestFundedWeddingDecisionResearch(input: {
     method: "POST",
     bodyJson: {
       wedding_plan_id: input.weddingPlanId,
+      response_workspace_id: input.responseWorkspaceId,
       task_id: input.taskId,
       title: input.title,
       notes: input.notes ?? "",

@@ -15,6 +15,17 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-395
+    title: Apply canonical WeddingScope to shared decision research and task delivery
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-395
+    worktree: C:/temp/wt/omnyid-wed389
+    base_sha: 8682ff1ac0505ed8a971df4152be13aa244ec4ff
+    depends_on: [WED-394, WED-390, WED-392, WED-332]
+    files: [src/server/wedding_decision_research_routes.rs, src/server/wedding_task_assignment_routes.rs, solid-ui/src/lib/weddingDecisionResearchApi.ts, solid-ui/src/components/WeddingDecisionFocusCard.tsx, solid-ui/src/components/WeddingMobileFocusHome.tsx, postgres/migrations/0176_wedding_task_assignment_actor.sql, src/db/migration_catalog.rs, tests/wedding_scope_contract.rs, tests/wedding_partner_sharing_api.rs, solid-ui/tests/wedding-current-next-research-and-assignment-state.test.ts, Documents/design/wedding planner/couple coworkspace/couple-coworking-*.md, .agent/**]
+    acceptance: [decision research and explicit task delivery resolve exact active WeddingScope before cache or delivery access, both partners reuse the canonical owner plan research cache while model usage and outward wording retain the acting member, task delivery records canonical owner and actor and permits one partner to assign the other without granting personal workspace access, wrong-workspace cross-couple and revoked-member requests fail before cache delivery or mail side effects, current next and following queue bounds plus existing explicit external approval flow remain intact, focused contract frontend Rust and disposable-Postgres tests are added and executed where local services permit, COW-03 COW-06 COW-07 and COW-10 remain accurately partial]
+    progress: "Started from the WED-394 record commit after inventory showed decision research and task delivery still key storage by the signed-in account despite carrying plan context."
   - id: WED-394
     title: Apply canonical WeddingScope to the installed run-sheet projection
     status: review

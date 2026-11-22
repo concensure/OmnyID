@@ -348,6 +348,40 @@ async fn membership_is_two_person_revisioned_and_revocable() {
     )
     .await;
     assert_eq!(wrong_runsheet_workspace_status, StatusCode::FORBIDDEN);
+    let wrong_workspace_research = json!({
+        "wedding_plan_id":plan_id,
+        "response_workspace_id":format!("guessed-{suffix}"),
+        "task_id":format!("decision-{suffix}"),
+        "title":"Choose the ceremony start time",
+        "context":[],
+        "queue_rank":0
+    });
+    let (wrong_research_workspace_status, _) = request_json(
+        &app,
+        Method::POST,
+        "/wedding/decision-research",
+        &partner_auth,
+        Some(&wrong_workspace_research),
+    )
+    .await;
+    assert_eq!(wrong_research_workspace_status, StatusCode::FORBIDDEN);
+    let wrong_workspace_delivery = json!({
+        "wedding_plan_id":plan_id,
+        "response_workspace_id":format!("guessed-{suffix}"),
+        "task_id":format!("task-{suffix}"),
+        "task_title":"Confirm ceremony start",
+        "assignee_name":"Owner tester",
+        "assignee_email":owner_email
+    });
+    let (wrong_delivery_workspace_status, _) = request_json(
+        &app,
+        Method::POST,
+        "/wedding/task-assignment/deliver",
+        &partner_auth,
+        Some(&wrong_workspace_delivery),
+    )
+    .await;
+    assert_eq!(wrong_delivery_workspace_status, StatusCode::FORBIDDEN);
     let other_plan_id = format!("other-plan-{suffix}");
     let other_workspace_id = format!("other-workspace-{suffix}");
     sqlx::query("INSERT INTO wedding_user_onboarding_state (user_id,wedding_plan_id,intake_variant,entry_source) VALUES ($1,$2,'wedding_site','wedding_site')")
@@ -374,6 +408,40 @@ async fn membership_is_two_person_revisioned_and_revocable() {
     )
     .await;
     assert_eq!(cross_couple_runsheet_status, StatusCode::FORBIDDEN);
+    let scoped_research = json!({
+        "wedding_plan_id":plan_id,
+        "response_workspace_id":workspace_id,
+        "task_id":format!("decision-{suffix}"),
+        "title":"Choose the ceremony start time",
+        "context":[],
+        "queue_rank":0
+    });
+    let (cross_couple_research_status, _) = request_json(
+        &app,
+        Method::POST,
+        "/wedding/decision-research",
+        &third_auth,
+        Some(&scoped_research),
+    )
+    .await;
+    assert_eq!(cross_couple_research_status, StatusCode::FORBIDDEN);
+    let scoped_delivery = json!({
+        "wedding_plan_id":plan_id,
+        "response_workspace_id":workspace_id,
+        "task_id":format!("task-{suffix}"),
+        "task_title":"Confirm ceremony start",
+        "assignee_name":"Owner tester",
+        "assignee_email":owner_email
+    });
+    let (cross_couple_delivery_status, _) = request_json(
+        &app,
+        Method::POST,
+        "/wedding/task-assignment/deliver",
+        &third_auth,
+        Some(&scoped_delivery),
+    )
+    .await;
+    assert_eq!(cross_couple_delivery_status, StatusCode::FORBIDDEN);
 
     let (share_status, shared) = request_json(
         &app,
@@ -547,6 +615,24 @@ async fn membership_is_two_person_revisioned_and_revocable() {
     )
     .await;
     assert_eq!(revoked_runsheet_status, StatusCode::FORBIDDEN);
+    let (revoked_research_status, _) = request_json(
+        &app,
+        Method::POST,
+        "/wedding/decision-research",
+        &partner_auth,
+        Some(&scoped_research),
+    )
+    .await;
+    assert_eq!(revoked_research_status, StatusCode::FORBIDDEN);
+    let (revoked_delivery_status, _) = request_json(
+        &app,
+        Method::POST,
+        "/wedding/task-assignment/deliver",
+        &partner_auth,
+        Some(&scoped_delivery),
+    )
+    .await;
+    assert_eq!(revoked_delivery_status, StatusCode::FORBIDDEN);
     let revision: i64 = sqlx::query_scalar(
         "SELECT membership_revision FROM wedding_plan_memberships
           WHERE wedding_owner_user_id=$1 AND wedding_plan_id=$2 AND member_user_id=$3",

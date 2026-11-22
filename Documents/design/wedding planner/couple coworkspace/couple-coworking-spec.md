@@ -2,7 +2,7 @@
 
 Status: implemented foundation; incremental enforcement and coworking UX continue
 Date: 22 November 2026
-Tasks: WED-365, WED-391, WED-392, WED-394
+Tasks: WED-365, WED-391, WED-392, WED-394, WED-395
 Source guidance: `couple coworking.md`
 
 ## Outcome
@@ -59,6 +59,15 @@ on every projection request, so a guessed workspace, another couple or a
 revoked member cannot select the ledger. Installation creates the existing
 `wedding_runsheet.v1` database definition server-side when absent; it does not
 ask the user to install a table and does not create a second run-sheet store.
+
+WED-395 extends the same rule to the decision-research cache and explicit task
+delivery. Research is authorised by exact plan/workspace before feature or
+model execution, cached once against the canonical owner plan, and billed/
+rate-limited against the acting account. An approved task delivery uses the
+same owner-scoped idempotency key for either partner, records the actor
+separately, and may hand the task to the other partner's personal agent without
+granting access to the source workspace. This preserves the existing
+current/next/following research window and explicit external-send action.
 
 Still not claimed complete: systematic `WeddingScope` enforcement across
 every Wedding domain, shared activity/catch-up, scoped AI retrieval,

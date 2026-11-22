@@ -2,6 +2,12 @@ const MIGRATION: &str = include_str!("../postgres/migrations/0171_wedding_scope_
 const SCOPE: &str = include_str!("../src/server/wedding_scope.rs");
 const PARTNER_ROUTES: &str = include_str!("../src/server/wedding_partner_sharing_routes.rs");
 const RUNSHEET_ROUTES: &str = include_str!("../src/server/wedding_runsheet_projection_routes.rs");
+const DECISION_RESEARCH_ROUTES: &str =
+    include_str!("../src/server/wedding_decision_research_routes.rs");
+const TASK_ASSIGNMENT_ROUTES: &str =
+    include_str!("../src/server/wedding_task_assignment_routes.rs");
+const TASK_ASSIGNMENT_ACTOR_MIGRATION: &str =
+    include_str!("../postgres/migrations/0176_wedding_task_assignment_actor.sql");
 const SERVER: &str = include_str!("../src/server/mod.rs");
 
 #[test]
@@ -43,4 +49,21 @@ fn run_sheet_projection_resolves_canonical_scope_before_owner_storage() {
     assert!(
         !RUNSHEET_ROUTES.contains("load_wedding_runsheet_projection_state(\n            &user.id")
     );
+}
+
+#[test]
+fn decision_research_and_task_delivery_keep_canonical_owner_and_actor_separate() {
+    assert!(DECISION_RESEARCH_ROUTES.contains("response_workspace_id"));
+    assert!(DECISION_RESEARCH_ROUTES.contains("resolve_wedding_scope"));
+    assert!(DECISION_RESEARCH_ROUTES.contains(".bind(&scope.owner_user_id)"));
+    assert!(DECISION_RESEARCH_ROUTES.contains("user_id: Some(&actor.id)"));
+    assert!(!DECISION_RESEARCH_ROUTES.contains(".bind(&actor.id).bind(&plan)"));
+
+    assert!(TASK_ASSIGNMENT_ROUTES.contains("resolve_wedding_scope"));
+    assert!(TASK_ASSIGNMENT_ROUTES.contains(".bind(&scope.owner_user_id)"));
+    assert!(TASK_ASSIGNMENT_ROUTES.contains(".bind(&actor.id)"));
+    assert!(TASK_ASSIGNMENT_ROUTES.contains("&scope.response_workspace_id"));
+    assert!(TASK_ASSIGNMENT_ROUTES.contains("&actor.display_name"));
+    assert!(TASK_ASSIGNMENT_ACTOR_MIGRATION.contains("actor_user_id TEXT"));
+    assert!(TASK_ASSIGNMENT_ACTOR_MIGRATION.contains("ALTER COLUMN actor_user_id SET NOT NULL"));
 }
