@@ -7,7 +7,7 @@ use axum::{
 };
 use chrono::{Duration, Utc};
 use http_body_util::BodyExt;
-use omnyid_homeserver::db::{AuthSessionRecord, Db, UserRecord, tenant_schema_name};
+use omnyid_homeserver::db::{AuthSessionRecord, Db, UserRecord};
 use serde_json::{Value, json};
 use tower::ServiceExt;
 use ulid::Ulid;
@@ -23,6 +23,22 @@ fn test_db_url() -> Option<String> {
                 "Wedding partner tests require disposable local omnyid_test",
             )
         })
+}
+
+fn tenant_schema_name(user_id: &str) -> String {
+    let suffix: String = user_id
+        .chars()
+        .flat_map(|character| character.to_lowercase())
+        .map(|character| {
+            if character.is_ascii_alphanumeric() {
+                character
+            } else {
+                '_'
+            }
+        })
+        .take(55)
+        .collect();
+    format!("user_{suffix}")
 }
 
 async fn seed_user(db: &Db, email: String) -> (String, String) {
