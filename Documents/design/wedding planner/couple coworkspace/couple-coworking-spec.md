@@ -2,7 +2,7 @@
 
 Status: implemented foundation; incremental enforcement and coworking UX continue
 Date: 23 November 2026
-Tasks: WED-365, WED-391, WED-392, WED-394, WED-395, WED-396
+Tasks: WED-365, WED-391, WED-392, WED-394, WED-395, WED-396, WED-397
 Source guidance: `couple coworking.md`
 
 ## Outcome
@@ -78,6 +78,14 @@ revision/idempotency checks. Public RSVP open/respond remains bound only to its
 digest-held household and invitation capability; it does not gain membership
 or general Wedding access.
 
+WED-397 applies the authority to budget allocation and contribution. These
+remain the existing `wedding_decision_selection` AFP records and account-local
+drafts remain convenience state. Either active partner reads or writes the
+same canonical owner ledger through an exact plan/workspace scope; stored
+metadata keeps owner and actor separate, and no record is copied into the
+partner account. Expected-revision conflict presentation and recovery for
+protected money changes remain a later COW-07 slice.
+
 Still not claimed complete: systematic `WeddingScope` enforcement across
 every Wedding domain, shared activity/catch-up, scoped AI retrieval,
 private-to-shared AI publication and permission-filtered live delivery. Those
@@ -111,7 +119,7 @@ does not mean every route in that domain has completed partner enforcement.
 | Domain | Canonical authority | Current state | Required next action |
 | --- | --- | --- | --- |
 | Membership and selected contacts | `wedding_plan_memberships`, `wedding_partner_invites`, encrypted `wedding_shared_contact_grants` | Membership-ready | Reuse `WeddingScope`; retain field-preview publication and revocation. |
-| Budget and contributions | Existing Wedding AFP projections and budget records | Mixed owner/browser assumptions | Resolve `WeddingScope` before read/write and add expected revision to protected money changes. |
+| Budget and contributions | Existing Wedding AFP projections and budget records | Allocation/contribution reads and writes now resolve canonical scope; local drafts remain convenience state | Add expected revision, conflict presentation and recovery to protected money changes. |
 | Guests, RSVP and households | Canonical RSVP setup/response/capability routes and guest AFP projections | Authenticated protected-link management and manual response recording now resolve canonical scope; external capability stays narrow; broader guest projections remain mixed | Extend the same authority to remaining authenticated guest/household reads and background delivery without broadening guest capabilities. |
 | Seating | Canonical guest/seating AFP projections plus account-keyed presentation state | Partly browser-local | Move authoritative placement mutations behind scoped server commands; keep only view preferences local. |
 | Vendors, enquiries and quotes | Canonical vendor IDs, enquiry envelopes, messages and Quote Intelligence | Mostly plan-referenced, not uniformly membership-resolved | Apply scope to authenticated couple reads, messages, attachments and quote selection. |

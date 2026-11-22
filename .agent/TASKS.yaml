@@ -17,7 +17,7 @@ lifecycle:
 tasks:
   - id: WED-397
     title: Share canonical Wedding budget allocation and contribution projections
-    status: in_progress
+    status: done
     owner: codex
     branch: agent/codex/WED-397
     worktree: C:/temp/wt/omnyid-wed389
@@ -25,7 +25,7 @@ tasks:
     depends_on: [WED-396, WED-395, WED-390, WED-369]
     files: [src/server/wedding_budget_projection_routes.rs, src/server/mod.rs, solid-ui/src/lib/weddingBudgetProjectionApi.ts, solid-ui/src/lib/weddingWorkspaceRefreshState.ts, solid-ui/src/components/ResponseQueueView.tsx, tests/wedding_partner_sharing_api.rs, tests/wedding_scope_contract.rs, solid-ui/tests/wedding-budget*.test.ts, solid-ui/tests/wedding-workspace-refresh-state.test.ts, Documents/design/wedding planner/couple coworkspace/couple-coworking-*.md, .agent/**]
     acceptance: [extend the existing AFP budget allocation and contribution decisions rather than create a budget store, resolve exact active WeddingScope before shared budget reads or writes and use only the canonical owner ledger, accept only the existing budget allocation and contribution decision shapes with exact plan and workspace metadata, keep canonical owner and acting member distinct in stored metadata, merge canonical shared budget decisions into Wedding workspace refresh without copying them to the partner account, preserve current local draft fallback and all non-budget personal message routes, deny guessed workspace cross-couple and revoked-member access, focused frontend Rust contract and disposable-Postgres partner tests pass from a clean exact candidate, record COW-03 and COW-06 as bounded Budget slices while leaving COW-07 conflict UX open]
-    progress: "Registered from clean advanced-worktree SHA 28321abba524cdc3a0b3d385cbdd38a2ca9d97c5 after confirming Wedding budget allocation and contribution are existing wedding_decision_selection AFP messages currently sent through the acting account's generic /send route."
+    progress: "Complete at exact implementation SHA 8c5af928041f2320ce540e94446fb52bcc075541. The scoped adapter accepts only the existing allocation/contribution decision shapes, resolves exact WeddingScope, stores once in the canonical owner ledger with separate actor metadata and merges those messages into either member's Wedding refresh. Clean-SHA frontend contracts 6/6, TypeScript, standalone scope contracts 6/6, Linux cargo check --lib and a real disposable pgvector/PostgreSQL partner API test pass. The database proof covers same state plus guessed workspace, cross-couple and post-revocation denial; the container was removed. COW-03D and COW-06D are bounded complete slices while COW-07 money conflict/recovery UX remains open."
   - id: WED-396
     title: Apply canonical WeddingScope to couple-side RSVP capability management and responses
     status: done

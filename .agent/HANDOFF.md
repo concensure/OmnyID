@@ -12497,3 +12497,28 @@ open for Budget, broader Guests, Seating, Vendors/Quotes, Documents, retrieval
 and conflict/recovery UX. No Oracle deploy, GitHub push or PR occurred;
 production remains on WED-392 source
 `afd6d5cc04d3c5996256ca1df131ba7e1de659fb`.
+
+## WED-397 canonical shared Budget decisions (2026-11-23)
+
+Worktree `C:/temp/wt/omnyid-wed389`, branch `agent/codex/WED-397`. Exact
+implementation SHA `8c5af928041f2320ce540e94446fb52bcc075541`.
+
+Wedding allocation and contribution continue to use their existing AFP
+decision shapes. The narrow scoped adapter resolves exact active
+`WeddingScope`, writes once to the canonical owner's ledger with separate actor
+metadata, and merges those messages into either partner's normal Wedding
+refresh. It rejects other Wedding message shapes and preserves account-local
+draft fallback plus non-budget personal message routes.
+
+Exact-SHA proof: focused frontend contracts 6/6, TypeScript, standalone scope
+contracts 6/6 and Linux `cargo check --lib` pass. The real disposable
+pgvector/PostgreSQL test passes owner/partner shared state, actor attribution,
+guessed workspace, cross-couple and revoked-member denials. Rust 1.94 required
+`RUST_MIN_STACK=134217728` for the test binary after smaller-stack compiler
+SIGSEGVs. Container `omnyid-wed397-pg` was removed.
+
+COW-03D and COW-06D are complete bounded slices. COW-07 remains open for
+expected-revision money conflict presentation/recovery, and COW-03/COW-06 still
+cover broader Guests, Seating, Vendors/Quotes, Documents and retrieval/live
+paths. No Oracle deploy, GitHub push or PR occurred; production remains on
+WED-392 source `afd6d5cc04d3c5996256ca1df131ba7e1de659fb`.

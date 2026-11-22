@@ -2,8 +2,8 @@
 
 Dependency order is authoritative. Task: WED-365.
 
-Status: foundation implemented; WED-394 through WED-396 add bounded run-sheet,
-decision/task and RSVP enforcement slices through 23 November 2026.
+Status: foundation implemented; WED-394 through WED-397 add bounded run-sheet,
+decision/task, RSVP and Budget enforcement slices through 23 November 2026.
 Checked items are repository claims only; hosted and full-account release
 gates remain separate.
 
@@ -114,6 +114,19 @@ no access.
 - COW-03 remains open for Budget, Seating, Vendors/Quotes, Documents,
   general search/AI and remaining background/live paths.
 
+#### COW-03D — Budget allocation and contribution enforcement (WED-397)
+
+- [x] Reuse the existing `wedding_decision_selection` allocation and
+  contribution messages; do not create another budget authority.
+- [x] Resolve exact active `WeddingScope` before budget reads or writes, then
+  select only the canonical owner's existing AFP ledger.
+- [x] Keep canonical owner and acting member separate in stored metadata and
+  reject unrelated Wedding message shapes from the scoped route.
+- [x] Prove owner/partner same-state reads plus guessed-workspace,
+  cross-couple and post-revocation denial in disposable PostgreSQL.
+- COW-03 remains open for broader Guests, Seating, Vendors/Quotes, Documents,
+  general search/AI and remaining background/live paths.
+
 Implementation evidence: WED-392 keeps name as the only mandatory field,
 offers email, phone, relationship and Wedding-role controls, and always excludes
 private notes and agent IDs. A review step names the recipient and exact values
@@ -162,6 +175,19 @@ read, sharer provenance, omitted-field redaction and sharer-only revocation.
   authorities while changing only authenticated couple ledger selection.
 - Full COW-06 remains open for Budget, broader guest projections, Seating,
   Vendors/Quotes and Documents.
+
+#### COW-06D — Shared Budget decisions (WED-397)
+
+- [x] Merge canonical allocation and contribution decisions into either
+  partner's normal Wedding refresh without copying records to the partner
+  account.
+- [x] Preserve account-local draft fallback and all existing non-budget
+  personal message routes.
+- Full COW-06 remains open for broader guest projections, Seating,
+  Vendors/Quotes, Documents and the complete personal-object isolation matrix.
+- Full COW-07 remains open: money changes still need expected-revision conflict
+  presentation and recoverability before protected-write collaboration is
+  complete.
 
 ### COW-07 — Actor, revision and recoverability (P0)
 

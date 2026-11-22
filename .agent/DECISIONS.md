@@ -4632,3 +4632,18 @@ authority: a digest-held token is limited to its recorded household,
 invitations and event. It does not resolve partner membership and does not
 grant general Wedding access. A public guest action has no invented account
 actor.
+
+## 2026-11-23 — Shared Budget reuses existing Wedding decisions (WED-397)
+
+Budget allocation and contribution remain the existing
+`wedding_decision_selection` AFP records and local drafts remain convenience
+state. A scoped adapter may select the canonical Wedding owner ledger only for
+the two established budget decision shapes with exact plan/workspace metadata;
+it must not become a parallel budget store or a general cross-account message
+route.
+
+Canonical owner and acting member are separate stored facts. Either active
+partner reads the same allocation/contribution records through normal Wedding
+refresh without receiving copied messages. Money conflict/recovery UX is a
+separate protected-write slice: actor attribution is not an expected-revision
+substitute.
