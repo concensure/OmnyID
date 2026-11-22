@@ -1,6 +1,6 @@
 use super::{
     AppState, RateLimitPolicy, auth::authenticated_user, authenticated_rate_limit_key,
-    enforce_rate_limit,
+    enforce_rate_limit, wedding_scope::resolve_wedding_scope,
 };
 use crate::db::{Db, tenant_schema_name};
 use axum::{
@@ -735,9 +735,33 @@ async fn record_response_http(
     )
     .await?;
     let user = authenticated_user(&state.db, &headers).await?;
-    record_response_for_user(&state.db, &user.id, request)
+    let scope = resolve_wedding_scope(
+        &state.db,
+        &user.id,
+        &request.wedding_plan_id,
+        &request.response_workspace_id,
+    )
+    .await?;
+    record_response_for_actor(&state.db, &scope.owner_user_id, &user.id, request)
         .await
         .map(Json)
+}
+
+async fn record_response_for_actor(
+    db: &Db,
+    owner_user_id: &str,
+    actor_user_id: &str,
+    request: RecordResponseRequest,
+) -> Result<RecordResponseReply, (StatusCode, String)> {
+    record_response_for_user_with_source(
+        db,
+        owner_user_id,
+        request,
+        ResponseSource::CoupleManual,
+        None,
+        Some(actor_user_id),
+    )
+    .await
 }
 
 pub(crate) async fn record_response_for_user(
@@ -751,6 +775,7 @@ pub(crate) async fn record_response_for_user(
         request,
         ResponseSource::CoupleManual,
         None,
+        Some(owner_user_id),
     )
     .await
 }
@@ -767,6 +792,7 @@ pub(crate) async fn record_guest_response_for_user(
         request,
         ResponseSource::Guest,
         Some(proof),
+        None,
     )
     .await
 }
@@ -777,6 +803,7 @@ async fn record_response_for_user_with_source(
     request: RecordResponseRequest,
     source: ResponseSource,
     capability: Option<CapabilityProof>,
+    actor_user_id: Option<&str>,
 ) -> Result<RecordResponseReply, (StatusCode, String)> {
     validate_request(&request)?;
     db.ensure_user_private_schema(owner_user_id)
@@ -844,6 +871,8 @@ async fn record_response_for_user_with_source(
         "person_id": request.person_id,
         "event_id": request.event_id,
         "source": source.label(),
+        "owner_user_id": owner_user_id,
+        "actor_user_id": actor_user_id,
         "capability_id": capability.as_ref().map(|value| value.capability_id.as_str()),
         "attendance": request.attendance,
         "answers": request.answers,
@@ -896,6 +925,8 @@ async fn record_response_for_user_with_source(
         "responseWorkspaceId": request.response_workspace_id,
         "idempotency_key": request.idempotency_key,
         "origin": source.origin(),
+        "ownerUserId": owner_user_id,
+        "actorUserId": actor_user_id,
         "model_calls": 0,
         "e2ee_required": request.private_answers_ciphertext.is_some(),
         "private_fields": if request.private_answers_ciphertext.is_some() { vec!["encrypted_private_payload"] } else { Vec::<&str>::new() },

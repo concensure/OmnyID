@@ -217,10 +217,91 @@ async fn membership_is_two_person_revisioned_and_revocable() {
     assert_eq!(partner_members["members"].as_array().map(Vec::len), Some(2));
     assert_eq!(partner_members["invites"].as_array().map(Vec::len), Some(0));
 
+    let rsvp_grant_id = format!("rsvp-capability-shared-{suffix}");
+    sqlx::query(
+        "INSERT INTO wedding_rsvp_capability_grants
+            (grant_id,owner_user_id,wedding_plan_id,response_workspace_id,
+             household_id,invitation_ids,token_digest,expires_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,NOW()+INTERVAL '2 days')",
+    )
+    .bind(&rsvp_grant_id)
+    .bind(&owner_id)
+    .bind(&plan_id)
+    .bind(&workspace_id)
+    .bind(format!("household-{suffix}"))
+    .bind(json!([format!("invitation-{suffix}")]))
+    .bind(format!("{suffix:0>64}"))
+    .execute(&db.pool)
+    .await
+    .expect("shared RSVP grant");
+    let rsvp_scope_query =
+        format!("wedding_plan_id={plan_id}&response_workspace_id={workspace_id}");
+    let (partner_rsvp_status, partner_rsvp_grants) = request_json(
+        &app,
+        Method::GET,
+        &format!("/wedding/rsvp/capabilities?{rsvp_scope_query}"),
+        &partner_auth,
+        None,
+    )
+    .await;
+    assert_eq!(
+        partner_rsvp_status,
+        StatusCode::OK,
+        "partner RSVP grants: {partner_rsvp_grants}"
+    );
+    assert_eq!(partner_rsvp_grants[0]["grant_id"], rsvp_grant_id);
+    let (owner_rsvp_status, owner_rsvp_grants) = request_json(
+        &app,
+        Method::GET,
+        &format!("/wedding/rsvp/capabilities?{rsvp_scope_query}"),
+        &owner_auth,
+        None,
+    )
+    .await;
+    assert_eq!(owner_rsvp_status, StatusCode::OK);
+    assert_eq!(owner_rsvp_grants, partner_rsvp_grants);
+    let (wrong_rsvp_workspace_status, _) = request_json(
+        &app,
+        Method::GET,
+        &format!("/wedding/rsvp/capabilities?wedding_plan_id={plan_id}&response_workspace_id=guessed-{suffix}"),
+        &partner_auth,
+        None,
+    )
+    .await;
+    assert_eq!(wrong_rsvp_workspace_status, StatusCode::FORBIDDEN);
+    let (partner_rsvp_revoke_status, partner_rsvp_revoke) = request_json(
+        &app,
+        Method::POST,
+        &format!("/wedding/rsvp/capabilities/{rsvp_grant_id}/revoke"),
+        &partner_auth,
+        Some(&json!({
+            "wedding_plan_id":plan_id,
+            "response_workspace_id":workspace_id
+        })),
+    )
+    .await;
+    assert_eq!(
+        partner_rsvp_revoke_status,
+        StatusCode::OK,
+        "partner RSVP revoke: {partner_rsvp_revoke}"
+    );
+    assert!(partner_rsvp_revoke["revoked_at"].is_string());
+
     db.ensure_user_private_schema(&owner_id)
         .await
         .expect("owner private schema");
     let owner_table = format!("\"{}\".messages", tenant_schema_name(&owner_id));
+    let rsvp_actor_query = format!(
+        "SELECT content->>'actor_user_id' FROM {owner_table}
+          WHERE kind='wedding_rsvp_capability_revoked'
+            AND content->>'capability_id'=$1"
+    );
+    let rsvp_actor: String = sqlx::query_scalar(&rsvp_actor_query)
+        .bind(&rsvp_grant_id)
+        .fetch_one(&db.pool)
+        .await
+        .expect("RSVP lifecycle actor");
+    assert_eq!(rsvp_actor, partner_id);
     let source_id = format!("runsheet-source-{suffix}");
     let source_insert = format!(
         "INSERT INTO {owner_table} (id,thread_id,from_agent,to_agents,timestamp,type,kind,content,signature,store_in_relational,metadata) VALUES ($1,$2,'agent://wedding-planning','[]'::jsonb,NOW(),'task','wedding_task',$3,'test',TRUE,$4)"
@@ -442,6 +523,38 @@ async fn membership_is_two_person_revisioned_and_revocable() {
     )
     .await;
     assert_eq!(cross_couple_delivery_status, StatusCode::FORBIDDEN);
+    let (cross_couple_rsvp_status, _) = request_json(
+        &app,
+        Method::GET,
+        &format!("/wedding/rsvp/capabilities?{rsvp_scope_query}"),
+        &third_auth,
+        None,
+    )
+    .await;
+    assert_eq!(cross_couple_rsvp_status, StatusCode::FORBIDDEN);
+    let wrong_scope_response = json!({
+        "wedding_plan_id":plan_id,
+        "response_workspace_id":format!("guessed-{suffix}"),
+        "invitation_id":format!("invitation-{suffix}"),
+        "person_id":format!("person-{suffix}"),
+        "event_id":format!("event-{suffix}"),
+        "attendance":"attending",
+        "expected_revision":0,
+        "idempotency_key":format!("response-{suffix}"),
+        "answers":{},
+        "private_answer_question_ids":[],
+        "private_answers_ciphertext":null,
+        "contact_details":null
+    });
+    let (wrong_scope_response_status, _) = request_json(
+        &app,
+        Method::POST,
+        "/wedding/rsvp/responses",
+        &partner_auth,
+        Some(&wrong_scope_response),
+    )
+    .await;
+    assert_eq!(wrong_scope_response_status, StatusCode::FORBIDDEN);
 
     let (share_status, shared) = request_json(
         &app,
@@ -633,6 +746,15 @@ async fn membership_is_two_person_revisioned_and_revocable() {
     )
     .await;
     assert_eq!(revoked_delivery_status, StatusCode::FORBIDDEN);
+    let (revoked_rsvp_status, _) = request_json(
+        &app,
+        Method::GET,
+        &format!("/wedding/rsvp/capabilities?{rsvp_scope_query}"),
+        &partner_auth,
+        None,
+    )
+    .await;
+    assert_eq!(revoked_rsvp_status, StatusCode::FORBIDDEN);
     let revision: i64 = sqlx::query_scalar(
         "SELECT membership_revision FROM wedding_plan_memberships
           WHERE wedding_owner_user_id=$1 AND wedding_plan_id=$2 AND member_user_id=$3",

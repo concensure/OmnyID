@@ -105,8 +105,8 @@ export function WeddingRsvpPublishingPanel(props: {
     void weddingRsvpTestDeliveryProviderStatus().then(setTestProvider).catch(() => setTestProvider({ enabled: false, ready: false, provider: "disabled", reason: "unavailable" }));
     try {
       const [status, current] = await Promise.all([
-        loadWeddingRsvpCapabilityStatus(),
-        listWeddingRsvpCapabilities(metadata.responseWorkspaceId),
+        loadWeddingRsvpCapabilityStatus(metadata.weddingPlanId, metadata.responseWorkspaceId),
+        listWeddingRsvpCapabilities(metadata.weddingPlanId, metadata.responseWorkspaceId),
       ]);
       setEnabled(status.enabled);
       setGrants(current);
@@ -167,7 +167,11 @@ export function WeddingRsvpPublishingPanel(props: {
     setBusy(true);
     setNotice("");
     try {
-      const revoked = await revokeWeddingRsvpCapability(grantId);
+      const revoked = await revokeWeddingRsvpCapability({
+        grantId,
+        weddingPlanId: metadata.weddingPlanId,
+        responseWorkspaceId: metadata.responseWorkspaceId,
+      });
       setGrants((current) => current.map((grant) => grant.grant_id === grantId ? revoked : grant));
       setNotice("Protected link revoked. It can no longer open the RSVP.");
     } catch (error) {

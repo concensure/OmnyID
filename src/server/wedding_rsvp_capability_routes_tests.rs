@@ -252,6 +252,7 @@ async fn disposable_postgres_proves_capability_isolation_rotation_and_revocation
         .create_wedding_rsvp_capability_grant(
             &owner,
             WeddingRsvpCapabilityGrantCreate {
+                actor_user_id: owner.clone(),
                 grant_id: format!("rsvp-capability-invalid-{unique}"),
                 wedding_plan_id: "wedding_plan:primary".into(),
                 response_workspace_id: "response_workspace:primary".into(),
@@ -276,6 +277,7 @@ async fn disposable_postgres_proves_capability_isolation_rotation_and_revocation
         .create_wedding_rsvp_capability_grant(
             &owner,
             WeddingRsvpCapabilityGrantCreate {
+                actor_user_id: owner.clone(),
                 grant_id: grant_id.clone(),
                 wedding_plan_id: "wedding_plan:primary".into(),
                 response_workspace_id: "response_workspace:primary".into(),
@@ -292,7 +294,7 @@ async fn disposable_postgres_proves_capability_isolation_rotation_and_revocation
         .expect("valid capability scope");
     assert_eq!(created.open_count, 0);
     assert!(
-        db.revoke_wedding_rsvp_capability_grant(&outsider, &grant_id)
+        db.revoke_wedding_rsvp_capability_grant(&outsider, &outsider, &grant_id)
             .await
             .expect("outsider revoke query")
             .is_none()
@@ -347,6 +349,7 @@ async fn disposable_postgres_proves_capability_isolation_rotation_and_revocation
         .create_wedding_rsvp_capability_grant(
             &owner,
             WeddingRsvpCapabilityGrantCreate {
+                actor_user_id: owner.clone(),
                 grant_id: format!("rsvp-capability-collision-{unique}"),
                 wedding_plan_id: "wedding_plan:primary".into(),
                 response_workspace_id: "response_workspace:primary".into(),
@@ -367,6 +370,7 @@ async fn disposable_postgres_proves_capability_isolation_rotation_and_revocation
         .rotate_wedding_rsvp_capability_grant(
             &owner,
             WeddingRsvpCapabilityGrantRotation {
+                actor_user_id: owner.clone(),
                 source_grant_id: grant_id.clone(),
                 grant_id: format!("rsvp-capability-rotated-{unique}"),
                 token_digest: digest_two.clone(),
@@ -388,7 +392,7 @@ async fn disposable_postgres_proves_capability_isolation_rotation_and_revocation
             .expect("new open")
             .is_some()
     );
-    db.revoke_wedding_rsvp_capability_grant(&owner, &rotated.grant_id)
+    db.revoke_wedding_rsvp_capability_grant(&owner, &owner, &rotated.grant_id)
         .await
         .expect("revoke rotated capability")
         .expect("rotated capability exists");
@@ -405,6 +409,7 @@ async fn disposable_postgres_proves_capability_isolation_rotation_and_revocation
     db.create_wedding_rsvp_capability_grant(
         &owner,
         WeddingRsvpCapabilityGrantCreate {
+            actor_user_id: owner.clone(),
             grant_id: expiring_id.clone(),
             wedding_plan_id: "wedding_plan:primary".into(),
             response_workspace_id: "response_workspace:primary".into(),

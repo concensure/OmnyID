@@ -79,12 +79,19 @@ export type WeddingRsvpCapabilityGrant = {
   loom_video_url?: string | null;
 };
 
-export function loadWeddingRsvpCapabilityStatus() {
-  return apiFetch<{ enabled: boolean; max_expiry_days: number; token_in_fragment: boolean }>("/wedding/rsvp/capabilities/status");
+function scopeQuery(weddingPlanId: string, responseWorkspaceId: string): string {
+  return new URLSearchParams({
+    wedding_plan_id: weddingPlanId,
+    response_workspace_id: responseWorkspaceId,
+  }).toString();
 }
 
-export function listWeddingRsvpCapabilities(responseWorkspaceId: string) {
-  return apiFetch<WeddingRsvpCapabilityGrant[]>(`/wedding/rsvp/capabilities?response_workspace_id=${encodeURIComponent(responseWorkspaceId)}`);
+export function loadWeddingRsvpCapabilityStatus(weddingPlanId: string, responseWorkspaceId: string) {
+  return apiFetch<{ enabled: boolean; max_expiry_days: number; token_in_fragment: boolean }>(`/wedding/rsvp/capabilities/status?${scopeQuery(weddingPlanId, responseWorkspaceId)}`);
+}
+
+export function listWeddingRsvpCapabilities(weddingPlanId: string, responseWorkspaceId: string) {
+  return apiFetch<WeddingRsvpCapabilityGrant[]>(`/wedding/rsvp/capabilities?${scopeQuery(weddingPlanId, responseWorkspaceId)}`);
 }
 
 export function createWeddingRsvpCapability(input: {
@@ -110,8 +117,14 @@ export function createWeddingRsvpCapability(input: {
   });
 }
 
-export function revokeWeddingRsvpCapability(grantId: string) {
-  return apiFetch<WeddingRsvpCapabilityGrant>(`/wedding/rsvp/capabilities/${encodeURIComponent(grantId)}/revoke`, { method: "POST" });
+export function revokeWeddingRsvpCapability(input: { grantId: string; weddingPlanId: string; responseWorkspaceId: string }) {
+  return apiFetch<WeddingRsvpCapabilityGrant>(`/wedding/rsvp/capabilities/${encodeURIComponent(input.grantId)}/revoke`, {
+    method: "POST",
+    bodyJson: {
+      wedding_plan_id: input.weddingPlanId,
+      response_workspace_id: input.responseWorkspaceId,
+    },
+  });
 }
 
 async function publicRsvpFetch<T>(path: string, body: unknown): Promise<T> {

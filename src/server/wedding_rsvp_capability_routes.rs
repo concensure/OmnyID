@@ -6,6 +6,7 @@ use super::{
     AppState, RateLimitPolicy,
     auth::{authenticated_user, public_rate_limit_key},
     authenticated_rate_limit_key, enforce_rate_limit,
+    wedding_scope::resolve_wedding_scope,
 };
 use crate::db::{
     WeddingRsvpCapabilityGrantCreate, WeddingRsvpCapabilityGrantRotation,
@@ -146,10 +147,18 @@ struct StatusResponse {
 async fn status_http(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
+    Query(query): Query<CapabilityQuery>,
 ) -> Result<Json<StatusResponse>, (StatusCode, String)> {
     let user = authenticated_user(&state.db, &headers).await?;
+    let scope = resolve_wedding_scope(
+        &state.db,
+        &user.id,
+        &query.wedding_plan_id,
+        &query.response_workspace_id,
+    )
+    .await?;
     Ok(Json(StatusResponse {
-        enabled: pilot_user_allowed(&user.id),
+        enabled: pilot_user_allowed(&scope.owner_user_id),
         max_expiry_days: MAX_GRANT_DAYS,
         token_in_fragment: true,
     }))
@@ -158,6 +167,7 @@ async fn status_http(
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct CapabilityQuery {
+    wedding_plan_id: String,
     response_workspace_id: String,
 }
 
@@ -167,12 +177,16 @@ async fn list_http(
     Query(query): Query<CapabilityQuery>,
 ) -> Result<Json<Vec<WeddingRsvpCapabilityGrantSummary>>, (StatusCode, String)> {
     let user = authenticated_user(&state.db, &headers).await?;
-    if !valid_id(&query.response_workspace_id) {
-        return Err(bad_request("Choose a valid Wedding workspace."));
-    }
+    let scope = resolve_wedding_scope(
+        &state.db,
+        &user.id,
+        &query.wedding_plan_id,
+        &query.response_workspace_id,
+    )
+    .await?;
     state
         .db
-        .list_wedding_rsvp_capability_grants(&user.id, &query.response_workspace_id)
+        .list_wedding_rsvp_capability_grants(&scope.owner_user_id, &scope.response_workspace_id)
         .await
         .map(Json)
         .map_err(store_error)
@@ -249,16 +263,24 @@ async fn create_http(
     )
     .await?;
     let user = authenticated_user(&state.db, &headers).await?;
-    if !pilot_user_allowed(&user.id) {
+    let scope = resolve_wedding_scope(
+        &state.db,
+        &user.id,
+        &request.wedding_plan_id,
+        &request.response_workspace_id,
+    )
+    .await?;
+    if !pilot_user_allowed(&scope.owner_user_id) {
         return Err(unavailable());
     }
     let expires_at = validate_create(&request, Utc::now())?;
     let loom_video_url = validated_loom_url(request.loom_video_url.as_deref())?;
     let (token, token_digest) = new_token();
     let input = WeddingRsvpCapabilityGrantCreate {
+        actor_user_id: user.id,
         grant_id: format!("rsvp-capability-{}", Ulid::new()),
-        wedding_plan_id: request.wedding_plan_id,
-        response_workspace_id: request.response_workspace_id,
+        wedding_plan_id: scope.wedding_plan_id,
+        response_workspace_id: scope.response_workspace_id,
         household_id: request.household_id,
         invitation_ids: request.invitation_ids,
         token_digest,
@@ -268,7 +290,7 @@ async fn create_http(
     };
     let grant = state
         .db
-        .create_wedding_rsvp_capability_grant(&user.id, input)
+        .create_wedding_rsvp_capability_grant(&scope.owner_user_id, input)
         .await
         .map_err(store_error)?
         .ok_or_else(|| bad_request("Those invitations do not belong to one household."))?;
@@ -279,14 +301,22 @@ async fn revoke_http(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Path(grant_id): Path<String>,
+    Json(request): Json<ManageRequest>,
 ) -> Result<Json<WeddingRsvpCapabilityGrantSummary>, (StatusCode, String)> {
     let user = authenticated_user(&state.db, &headers).await?;
     if !valid_id(&grant_id) {
         return Err(unavailable());
     }
+    let scope = resolve_wedding_scope(
+        &state.db,
+        &user.id,
+        &request.wedding_plan_id,
+        &request.response_workspace_id,
+    )
+    .await?;
     state
         .db
-        .revoke_wedding_rsvp_capability_grant(&user.id, &grant_id)
+        .revoke_wedding_rsvp_capability_grant(&scope.owner_user_id, &user.id, &grant_id)
         .await
         .map_err(store_error)?
         .map(Json)
@@ -296,7 +326,16 @@ async fn revoke_http(
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RegenerateRequest {
+    wedding_plan_id: String,
+    response_workspace_id: String,
     expires_at: String,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ManageRequest {
+    wedding_plan_id: String,
+    response_workspace_id: String,
 }
 
 async fn regenerate_http(
@@ -315,7 +354,17 @@ async fn regenerate_http(
     )
     .await?;
     let user = authenticated_user(&state.db, &headers).await?;
-    if !pilot_user_allowed(&user.id) || !valid_id(&grant_id) {
+    if !valid_id(&grant_id) {
+        return Err(unavailable());
+    }
+    let scope = resolve_wedding_scope(
+        &state.db,
+        &user.id,
+        &request.wedding_plan_id,
+        &request.response_workspace_id,
+    )
+    .await?;
+    if !pilot_user_allowed(&scope.owner_user_id) {
         return Err(unavailable());
     }
     let expires_at = parse_expiry(&request.expires_at, Utc::now())?;
@@ -323,8 +372,9 @@ async fn regenerate_http(
     let grant = state
         .db
         .rotate_wedding_rsvp_capability_grant(
-            &user.id,
+            &scope.owner_user_id,
             WeddingRsvpCapabilityGrantRotation {
+                actor_user_id: user.id,
                 source_grant_id: grant_id,
                 grant_id: format!("rsvp-capability-{}", Ulid::new()),
                 token_digest,

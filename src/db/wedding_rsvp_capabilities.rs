@@ -7,6 +7,7 @@ use std::collections::{HashMap, HashSet};
 
 #[derive(Clone, Debug)]
 pub struct WeddingRsvpCapabilityGrantCreate {
+    pub actor_user_id: String,
     pub grant_id: String,
     pub wedding_plan_id: String,
     pub response_workspace_id: String,
@@ -20,6 +21,7 @@ pub struct WeddingRsvpCapabilityGrantCreate {
 
 #[derive(Clone, Debug)]
 pub struct WeddingRsvpCapabilityGrantRotation {
+    pub actor_user_id: String,
     pub source_grant_id: String,
     pub grant_id: String,
     pub token_digest: String,
@@ -154,6 +156,7 @@ fn metadata_scope(alias: &str, plan_parameter: usize, workspace_parameter: usize
 async fn insert_lifecycle_event(
     tx: &mut Transaction<'_, Postgres>,
     owner_user_id: &str,
+    actor_user_id: Option<&str>,
     grant_id: &str,
     wedding_plan_id: &str,
     response_workspace_id: &str,
@@ -169,6 +172,8 @@ async fn insert_lifecycle_event(
         "kind": kind,
         "contract_version": 1,
         "capability_id": grant_id,
+        "owner_user_id": owner_user_id,
+        "actor_user_id": actor_user_id,
         "wedding_plan_id": wedding_plan_id,
         "response_workspace_id": response_workspace_id,
         "household_id": household_id,
@@ -189,6 +194,8 @@ async fn insert_lifecycle_event(
             "weddingPlanId": wedding_plan_id,
             "responseWorkspaceId": response_workspace_id,
             "capabilityId": grant_id,
+            "ownerUserId": owner_user_id,
+            "actorUserId": actor_user_id,
         }))
         .execute(&mut **tx)
         .await?;
@@ -746,6 +753,7 @@ impl Db {
         insert_lifecycle_event(
             &mut tx,
             owner_user_id,
+            Some(&input.actor_user_id),
             &result.grant_id,
             &result.wedding_plan_id,
             &result.response_workspace_id,
@@ -779,6 +787,7 @@ impl Db {
     pub async fn revoke_wedding_rsvp_capability_grant(
         &self,
         owner_user_id: &str,
+        actor_user_id: &str,
         grant_id: &str,
     ) -> Result<Option<WeddingRsvpCapabilityGrantSummary>, sqlx::Error> {
         let mut tx = self.pool.begin().await?;
@@ -802,6 +811,7 @@ impl Db {
         insert_lifecycle_event(
             &mut tx,
             owner_user_id,
+            Some(actor_user_id),
             &result.grant_id,
             &result.wedding_plan_id,
             &result.response_workspace_id,
@@ -886,6 +896,7 @@ impl Db {
         insert_lifecycle_event(
             &mut tx,
             owner_user_id,
+            Some(&input.actor_user_id),
             &result.grant_id,
             &result.wedding_plan_id,
             &result.response_workspace_id,
@@ -952,6 +963,7 @@ impl Db {
                 insert_lifecycle_event(
                     &mut tx,
                     &owner_user_id,
+                    None,
                     &grant_id,
                     &wedding_plan_id,
                     &response_workspace_id,
@@ -1034,6 +1046,7 @@ impl Db {
         insert_lifecycle_event(
             &mut tx,
             &owner_user_id,
+            None,
             &grant_id,
             &wedding_plan_id,
             &response_workspace_id,

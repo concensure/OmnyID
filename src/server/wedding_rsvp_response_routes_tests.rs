@@ -370,6 +370,7 @@ async fn disposable_postgres_proves_public_capability_submission_and_revoke_race
     db.create_wedding_rsvp_capability_grant(
         &owner,
         WeddingRsvpCapabilityGrantCreate {
+            actor_user_id: owner.clone(),
             grant_id: grant_id.clone(),
             wedding_plan_id: public_request.wedding_plan_id.clone(),
             response_workspace_id: public_request.response_workspace_id.clone(),
@@ -415,7 +416,7 @@ async fn disposable_postgres_proves_public_capability_submission_and_revoke_race
     .expect("load guest-confirmed contact profile");
     assert_eq!(contact_email.as_deref(), Some("alex.rivera@example.com"));
 
-    db.revoke_wedding_rsvp_capability_grant(&owner, &grant_id)
+    db.revoke_wedding_rsvp_capability_grant(&owner, &owner, &grant_id)
         .await
         .expect("revoke query")
         .expect("revoke public capability");
