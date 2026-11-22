@@ -15,6 +15,7 @@ export type DatabaseDefinitionProjection = {
   defaultTable: string;
   profileId: string | null;
   weddingPlanId: string | null;
+  responseWorkspaceId: string | null;
   revision: number;
   archived: boolean;
   archiveRevision: number;
@@ -110,6 +111,29 @@ export function discoverWeddingPlanId(messages: CompatibleDatabaseMessage[]): st
   return null;
 }
 
+export function discoverWeddingResponseWorkspaceId(
+  messages: CompatibleDatabaseMessage[],
+  weddingPlanId: string,
+): string | null {
+  for (const message of messages.slice().sort(compareMessages).reverse()) {
+    const content = objectValue(message.content);
+    const metadata = objectValue(message.metadata);
+    const scope = objectValue(content?.scope);
+    const planId = clean(content?.wedding_plan_id)
+      || clean(content?.weddingPlanId)
+      || clean(scope?.wedding_plan_id)
+      || clean(metadata?.wedding_plan_id)
+      || clean(metadata?.weddingPlanId);
+    const workspaceId = clean(content?.response_workspace_id)
+      || clean(content?.responseWorkspaceId)
+      || clean(scope?.response_workspace_id)
+      || clean(metadata?.response_workspace_id)
+      || clean(metadata?.responseWorkspaceId);
+    if (planId === weddingPlanId && workspaceId) return workspaceId;
+  }
+  return null;
+}
+
 export function registeredDatabaseProfiles(
   messages: CompatibleDatabaseMessage[],
 ): RegisteredDatabaseProfile[] {
@@ -174,6 +198,9 @@ export function projectDatabaseDefinitions(input: {
       defaultTable: definition.default_table,
       profileId: definition.profile_id ?? null,
       weddingPlanId: definition.scope.wedding_plan_id ?? null,
+      responseWorkspaceId: definition.scope.wedding_plan_id
+        ? discoverWeddingResponseWorkspaceId(input.messages, definition.scope.wedding_plan_id)
+        : null,
       revision: definition.revision,
       archived: current?.archived ?? false,
       archiveRevision: current?.archiveRevision ?? 0,
@@ -190,6 +217,7 @@ export function projectDatabaseDefinitions(input: {
       defaultTable: "budget",
       profileId: "wedding_plan_projection.v1",
       weddingPlanId,
+      responseWorkspaceId: discoverWeddingResponseWorkspaceId(input.messages, weddingPlanId),
       revision: 1,
       archived: false,
       archiveRevision: 0,
@@ -206,6 +234,7 @@ export function projectDatabaseDefinitions(input: {
         defaultTable: "run_sheet",
         profileId: "wedding_runsheet.v1",
         weddingPlanId,
+        responseWorkspaceId: discoverWeddingResponseWorkspaceId(input.messages, weddingPlanId),
         revision: 1,
         archived: false,
         archiveRevision: 0,
@@ -221,6 +250,7 @@ export function projectDatabaseDefinitions(input: {
       defaultTable: DEFAULT_DATABASE_TABLE,
       profileId: null,
       weddingPlanId: null,
+      responseWorkspaceId: null,
       revision: 1,
       archived: false,
       archiveRevision: 0,

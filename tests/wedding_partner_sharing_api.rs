@@ -7,7 +7,7 @@ use axum::{
 };
 use chrono::{Duration, Utc};
 use http_body_util::BodyExt;
-use omnyid_homeserver::db::{AuthSessionRecord, Db, UserRecord};
+use omnyid_homeserver::db::{AuthSessionRecord, Db, UserRecord, tenant_schema_name};
 use serde_json::{Value, json};
 use tower::ServiceExt;
 use ulid::Ulid;
@@ -103,7 +103,7 @@ async fn membership_is_two_person_revisioned_and_revocable() {
     let third_email = format!("third-{suffix}@omnyid.test");
     let (owner_id, owner_auth) = seed_user(&db, owner_email).await;
     let (partner_id, partner_auth) = seed_user(&db, partner_email.clone()).await;
-    let (_, third_auth) = seed_user(&db, third_email.clone()).await;
+    let (third_id, third_auth) = seed_user(&db, third_email.clone()).await;
     let plan_id = format!("couple-plan-{suffix}");
     let workspace_id = format!("couple-workspace-{suffix}");
     sqlx::query("INSERT INTO wedding_user_onboarding_state (user_id,wedding_plan_id,intake_variant,entry_source) VALUES ($1,$2,'wedding_site','wedding_site')")
@@ -201,6 +201,164 @@ async fn membership_is_two_person_revisioned_and_revocable() {
     assert_eq!(partner_members["members"].as_array().map(Vec::len), Some(2));
     assert_eq!(partner_members["invites"].as_array().map(Vec::len), Some(0));
 
+    db.ensure_user_private_schema(&owner_id)
+        .await
+        .expect("owner private schema");
+    let owner_table = format!("\"{}\".messages", tenant_schema_name(&owner_id));
+    let source_id = format!("runsheet-source-{suffix}");
+    let source_insert = format!(
+        "INSERT INTO {owner_table} (id,thread_id,from_agent,to_agents,timestamp,type,kind,content,signature,store_in_relational,metadata) VALUES ($1,$2,'agent://wedding-planning','[]'::jsonb,NOW(),'task','wedding_task',$3,'test',TRUE,$4)"
+    );
+    sqlx::query(&source_insert)
+        .bind(&source_id)
+        .bind(format!("wedding:{workspace_id}"))
+        .bind(json!({
+            "kind":"wedding_task",
+            "wedding_plan_id":plan_id,
+            "response_workspace_id":workspace_id,
+            "title":"Confirm ceremony start"
+        }))
+        .bind(json!({
+            "weddingPlanId":plan_id,
+            "responseWorkspaceId":workspace_id
+        }))
+        .execute(&db.pool)
+        .await
+        .expect("run-sheet source");
+    let database_id = format!("database:wedding-run-sheet:{plan_id}");
+    let install_body = json!({
+        "database_id":database_id,
+        "wedding_plan_id":plan_id,
+        "response_workspace_id":workspace_id
+    });
+    let (partner_install_status, partner_install) = request_json(
+        &app,
+        Method::POST,
+        "/database/wedding-runsheet/install",
+        &partner_auth,
+        Some(&install_body),
+    )
+    .await;
+    assert_eq!(
+        partner_install_status,
+        StatusCode::OK,
+        "partner install: {partner_install}"
+    );
+    assert!(partner_install["checkpoint"].is_null());
+    let record_id = format!("runsheet:task:{suffix}");
+    let projection_body = json!({
+        "database_id":database_id,
+        "wedding_plan_id":plan_id,
+        "response_workspace_id":workspace_id,
+        "profile_id":"wedding_runsheet.v1",
+        "expected_checkpoint":null,
+        "next_checkpoint":{
+            "source_cursor":source_id,
+            "projector_version":1,
+            "source_fingerprint":format!("fingerprint-{suffix}")
+        },
+        "records":[{
+            "kind":"database_record",
+            "contract_version":1,
+            "database_id":database_id,
+            "record_id":record_id,
+            "revision":1,
+            "table":"run_sheet",
+            "data":{
+                "runsheet_item_id":record_id,
+                "projection_state":"projected",
+                "title":"Confirm ceremony start"
+            },
+            "source_refs":[{"message_id":source_id,"kind":"wedding_task"}],
+            "idempotency_key":format!("runsheet-record-{suffix}")
+        }],
+        "revisions":[],
+        "receipt":{
+            "kind":"database_projection_receipt",
+            "contract_version":1,
+            "database_id":database_id,
+            "projector_id":"wedding-runsheet",
+            "projector_version":1,
+            "source_cursor":source_id,
+            "source_fingerprint":format!("fingerprint-{suffix}"),
+            "affected_record_ids":[record_id],
+            "idempotency_key":format!("runsheet-receipt-{suffix}")
+        },
+        "explanation":"One shared run-sheet item was projected.",
+        "model_calls":0
+    });
+    let (partner_projection_status, partner_projection) = request_json(
+        &app,
+        Method::POST,
+        "/database/wedding-runsheet/projection",
+        &partner_auth,
+        Some(&projection_body),
+    )
+    .await;
+    assert_eq!(
+        partner_projection_status,
+        StatusCode::OK,
+        "partner projection: {partner_projection}"
+    );
+    assert_eq!(partner_projection["commit"]["projector_version"], 1);
+    let run_sheet_query = format!(
+        "database_id={database_id}&wedding_plan_id={plan_id}&response_workspace_id={workspace_id}"
+    );
+    let (owner_projection_status, owner_projection) = request_json(
+        &app,
+        Method::GET,
+        &format!("/database/wedding-runsheet/projection?{run_sheet_query}"),
+        &owner_auth,
+        None,
+    )
+    .await;
+    assert_eq!(
+        owner_projection_status,
+        StatusCode::OK,
+        "owner projection: {owner_projection}"
+    );
+    assert_eq!(owner_projection["checkpoint"]["projector_version"], 1);
+    assert_eq!(
+        owner_projection["messages"],
+        partner_projection["state"]["messages"]
+    );
+
+    let (wrong_runsheet_workspace_status, _) = request_json(
+        &app,
+        Method::GET,
+        &format!("/database/wedding-runsheet/projection?database_id={database_id}&wedding_plan_id={plan_id}&response_workspace_id=guessed-{suffix}"),
+        &partner_auth,
+        None,
+    )
+    .await;
+    assert_eq!(wrong_runsheet_workspace_status, StatusCode::FORBIDDEN);
+    let other_plan_id = format!("other-plan-{suffix}");
+    let other_workspace_id = format!("other-workspace-{suffix}");
+    sqlx::query("INSERT INTO wedding_user_onboarding_state (user_id,wedding_plan_id,intake_variant,entry_source) VALUES ($1,$2,'wedding_site','wedding_site')")
+        .bind(&third_id)
+        .bind(&other_plan_id)
+        .execute(&db.pool)
+        .await
+        .expect("other couple plan");
+    let (other_scope_status, _) = request_json(
+        &app,
+        Method::GET,
+        &format!("/wedding/partners?wedding_plan_id={other_plan_id}&response_workspace_id={other_workspace_id}"),
+        &third_auth,
+        None,
+    )
+    .await;
+    assert_eq!(other_scope_status, StatusCode::OK);
+    let (cross_couple_runsheet_status, _) = request_json(
+        &app,
+        Method::GET,
+        &format!("/database/wedding-runsheet/projection?{run_sheet_query}"),
+        &third_auth,
+        None,
+    )
+    .await;
+    assert_eq!(cross_couple_runsheet_status, StatusCode::FORBIDDEN);
+
     let (share_status, shared) = request_json(
         &app,
         Method::POST,
@@ -232,8 +390,14 @@ async fn membership_is_two_person_revisioned_and_revocable() {
     .await;
     assert_eq!(owner_contacts_status, StatusCode::OK);
     assert_eq!(owner_contacts["contacts"].as_array().map(Vec::len), Some(0));
-    assert_eq!(owner_contacts["shared_by_me"].as_array().map(Vec::len), Some(1));
-    assert_eq!(owner_contacts["shared_by_me"][0]["recipient_display_name"], "Partner tester");
+    assert_eq!(
+        owner_contacts["shared_by_me"].as_array().map(Vec::len),
+        Some(1)
+    );
+    assert_eq!(
+        owner_contacts["shared_by_me"][0]["recipient_display_name"],
+        "Partner tester"
+    );
     assert!(owner_contacts["shared_by_me"][0]["contact"]["phone"].is_null());
 
     let (partner_contacts_status, partner_contacts) = request_json(
@@ -245,9 +409,18 @@ async fn membership_is_two_person_revisioned_and_revocable() {
     )
     .await;
     assert_eq!(partner_contacts_status, StatusCode::OK);
-    assert_eq!(partner_contacts["contacts"].as_array().map(Vec::len), Some(1));
-    assert_eq!(partner_contacts["contacts"][0]["shared_by_user_id"], owner_id);
-    assert_eq!(partner_contacts["contacts"][0]["contact"]["email"], "casey@example.test");
+    assert_eq!(
+        partner_contacts["contacts"].as_array().map(Vec::len),
+        Some(1)
+    );
+    assert_eq!(
+        partner_contacts["contacts"][0]["shared_by_user_id"],
+        owner_id
+    );
+    assert_eq!(
+        partner_contacts["contacts"][0]["contact"]["email"],
+        "casey@example.test"
+    );
     assert!(partner_contacts["contacts"][0].get("contact_ref").is_none());
 
     let (recipient_revoke_status, recipient_revoke) = request_json(
@@ -286,8 +459,15 @@ async fn membership_is_two_person_revisioned_and_revocable() {
         })),
     )
     .await;
-    assert_eq!(partner_share_status, StatusCode::OK, "partner share: {partner_share}");
-    let partner_share_id = partner_share["share_id"].as_str().expect("partner share id").to_string();
+    assert_eq!(
+        partner_share_status,
+        StatusCode::OK,
+        "partner share: {partner_share}"
+    );
+    let partner_share_id = partner_share["share_id"]
+        .as_str()
+        .expect("partner share id")
+        .to_string();
 
     let (third_invite_status, _) = request_json(
         &app,
@@ -326,13 +506,12 @@ async fn membership_is_two_person_revisioned_and_revocable() {
     .await;
     assert_eq!(revoke_status, StatusCode::OK, "revoke partner: {revoked}");
     assert_eq!(revoked["revoked"], true);
-    let partner_share_status: String = sqlx::query_scalar(
-        "SELECT status FROM wedding_shared_contact_grants WHERE share_id=$1",
-    )
-    .bind(&partner_share_id)
-    .fetch_one(&db.pool)
-    .await
-    .expect("partner share status");
+    let partner_share_status: String =
+        sqlx::query_scalar("SELECT status FROM wedding_shared_contact_grants WHERE share_id=$1")
+            .bind(&partner_share_id)
+            .fetch_one(&db.pool)
+            .await
+            .expect("partner share status");
     assert_eq!(partner_share_status, "revoked");
     let (revoked_status, _) = request_json(
         &app,
@@ -343,6 +522,15 @@ async fn membership_is_two_person_revisioned_and_revocable() {
     )
     .await;
     assert_eq!(revoked_status, StatusCode::FORBIDDEN);
+    let (revoked_runsheet_status, _) = request_json(
+        &app,
+        Method::GET,
+        &format!("/database/wedding-runsheet/projection?{run_sheet_query}"),
+        &partner_auth,
+        None,
+    )
+    .await;
+    assert_eq!(revoked_runsheet_status, StatusCode::FORBIDDEN);
     let revision: i64 = sqlx::query_scalar(
         "SELECT membership_revision FROM wedding_plan_memberships
           WHERE wedding_owner_user_id=$1 AND wedding_plan_id=$2 AND member_user_id=$3",

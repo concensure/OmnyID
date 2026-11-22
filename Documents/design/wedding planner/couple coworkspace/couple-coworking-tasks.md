@@ -2,7 +2,7 @@
 
 Dependency order is authoritative. Task: WED-365.
 
-Status: foundation implemented; WED-392 selected-contact continuation completed 22 November 2026.
+Status: foundation implemented; WED-394 run-sheet enforcement slice implemented 23 November 2026.
 Checked items are repository claims only; hosted and full-account release
 gates remain separate.
 
@@ -75,6 +75,18 @@ no access.
 - [x] Support explicit update and revoke of the shared snapshot.
 - Depends on COW-02.
 
+#### COW-03A — Installed run-sheet enforcement (WED-394)
+
+- [x] Resolve the exact active `WeddingScope` before install, load and commit.
+- [x] Store and read both partners' projection through the canonical owner's
+  existing ledger while recording the signed-in member as actor.
+- [x] Reject a guessed workspace, another couple and a revoked co-owner before
+  projection access; retain source-scope and optimistic-checkpoint checks.
+- [x] Install the canonical `wedding_runsheet.v1` database definition
+  server-side when absent, rather than requiring a manual table install.
+- COW-03 remains open for Budget, RSVP/Guests, Seating, Vendors/Quotes,
+  Tasks/Decisions, Documents, search/AI and live-delivery routes.
+
 Implementation evidence: WED-392 keeps name as the only mandatory field,
 offers email, phone, relationship and Wedding-role controls, and always excludes
 private notes and agent IDs. A review step names the recipient and exact values
@@ -94,6 +106,17 @@ read, sharer provenance, omitted-field redaction and sharer-only revocation.
   personal databases without copying records.
 - Tests: values and progress match across partners; personal objects differ.
 - Depends on COW-03.
+
+#### COW-06A — Same run-sheet projection for both partners (WED-394)
+
+- [x] Carry the resolved response workspace through the Database view and every
+  run-sheet projection request.
+- [x] Prove a co-owner can project a source-linked row and the owner reads the
+  same checkpoint and AFP messages without a copied database.
+- [x] Keep personal Database definitions account-private; only the exact
+  authorised Wedding run-sheet projection crosses the membership boundary.
+- Full COW-06 remains open until the other listed Wedding projections share the
+  same canonical plan and the personal-object isolation matrix is complete.
 
 ### COW-07 — Actor, revision and recoverability (P0)
 

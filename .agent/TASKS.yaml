@@ -15,6 +15,17 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-394
+    title: Apply canonical WeddingScope to the installed run-sheet projection
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-394
+    worktree: C:/temp/wt/omnyid-wed389
+    base_sha: 1e6ccd7102375572221ab81ab6ce1e30eae333cb
+    depends_on: [WED-392, WED-393, WED-291, WED-295]
+    files: [src/db/wedding_runsheet_projection.rs, src/server/wedding_runsheet_projection_routes.rs, solid-ui/src/lib/databaseRegistryState.ts, solid-ui/src/lib/weddingRunSheetProjectionApi.ts, solid-ui/src/components/WeddingRunSheetProjectionStatus.tsx, solid-ui/src/components/DatabaseView.tsx, solid-ui/tests/database-registry-state.test.ts, solid-ui/tests/wedding-run-sheet-projection-api.test.ts, tests/wedding_scope_contract.rs, tests/wedding_partner_sharing_api.rs, Documents/design/wedding planner/couple coworkspace/couple-coworking-*.md, .agent/**]
+    acceptance: [run-sheet projection reads and commits resolve an exact active WeddingScope before selecting the owner ledger, both partners use the same owner plan workspace database checkpoint and rows without copying them, wrong-workspace cross-couple and revoked-member requests fail before projection access, the frontend sends the discovered response workspace on every projection request and installed run-sheet definitions retain it, optimistic checkpoint and source-scope protections remain intact, focused server and frontend tests plus clean-candidate checks pass, COW-03 and COW-06 remain explicitly partial until their other domains are converted]
+    progress: "Started from the clean WED-393 record commit; the run-sheet projection is the next bounded COW-03 enforcement slice."
   - id: WED-393
     title: Keep venue decisions actionable before an exact wedding date and preserve their sequence priority
     status: done

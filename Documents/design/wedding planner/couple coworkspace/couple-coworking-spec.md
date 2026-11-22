@@ -2,7 +2,7 @@
 
 Status: implemented foundation; incremental enforcement and coworking UX continue
 Date: 22 November 2026
-Tasks: WED-365, WED-391, WED-392
+Tasks: WED-365, WED-391, WED-392, WED-394
 Source guidance: `couple coworking.md`
 
 ## Outcome
@@ -50,6 +50,16 @@ share and revoke operation resolves the exact canonical owner/plan/workspace
 scope first. Membership still does not enumerate either account's general
 contacts.
 
+The WED-394 slice applies that same authority to the installed run-sheet
+projection. The server resolves the exact active plan and response workspace
+before installing, loading or committing the projection, then uses the
+canonical owner's existing AFP ledger for both members while retaining the
+signed-in member as the actor. The Database view carries the response workspace
+on every projection request, so a guessed workspace, another couple or a
+revoked member cannot select the ledger. Installation creates the existing
+`wedding_runsheet.v1` database definition server-side when absent; it does not
+ask the user to install a table and does not create a second run-sheet store.
+
 Still not claimed complete: systematic `WeddingScope` enforcement across
 every Wedding domain, shared activity/catch-up, scoped AI retrieval,
 private-to-shared AI publication and permission-filtered live delivery. Those
@@ -88,7 +98,7 @@ does not mean every route in that domain has completed partner enforcement.
 | Seating | Canonical guest/seating AFP projections plus account-keyed presentation state | Partly browser-local | Move authoritative placement mutations behind scoped server commands; keep only view preferences local. |
 | Vendors, enquiries and quotes | Canonical vendor IDs, enquiry envelopes, messages and Quote Intelligence | Mostly plan-referenced, not uniformly membership-resolved | Apply scope to authenticated couple reads, messages, attachments and quote selection. |
 | Tasks and decisions | Wedding task AFP records, assignment routes and DecisionOS projections | Mixed owner ID and response-workspace checks | Use canonical owner for shared task truth while retaining actor ID for attribution. |
-| Run sheet and timeline | Existing source-linked run-sheet projector/share capability | Membership-ready projection, owner-oriented writes | Resolve scope on couple reads/writes; keep vendor/public share capabilities narrower. |
+| Run sheet and timeline | Existing source-linked run-sheet projector/share capability | Couple install/read/write now use canonical scope and one owner AFP ledger; restricted external capability remains separate | Extend the same actor/revision and live-delivery guarantees without broadening vendor/public capabilities. |
 | Wedding documents | Tenant-private AFP/files with Wedding references | Personal by default | Add an explicit Wedding publication/grant boundary; never infer sharing from a filename or tag. |
 | Database view | Existing personal databases plus Wedding saved/projection views | Presentation exists; shared enumeration incomplete | List only personal databases plus exact Wedding projections authorised by `WeddingScope`; do not clone rows. |
 | Search, embeddings and AI | General tenant-private retrieval plus Wedding research routes | Not membership-complete | Filter before prompt/retrieval, namespace caches by scope revision, and adversarially test stale access. |

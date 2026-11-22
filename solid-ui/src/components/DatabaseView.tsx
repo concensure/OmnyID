@@ -733,11 +733,14 @@ export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
         </section>
       </Show>
 
-      <Show when={selectedDefinition()?.profileId === "wedding_runsheet.v1" && selectedDefinition()?.weddingPlanId}>
+      <Show when={selectedDefinition()?.profileId === "wedding_runsheet.v1"
+        && selectedDefinition()?.weddingPlanId
+        && selectedDefinition()?.responseWorkspaceId}>
         {(weddingPlanId) => (
           <WeddingRunSheetProjectionStatus
             databaseId={selectedDefinition()!.databaseId}
             weddingPlanId={weddingPlanId()!}
+            responseWorkspaceId={selectedDefinition()!.responseWorkspaceId!}
             accountId={props.bootstrap?.user.id ?? ""}
             messages={allMessages()}
             archived={selectedDefinition()!.archived}

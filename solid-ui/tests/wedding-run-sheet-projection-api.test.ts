@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { normalizeWeddingRunSheetProjectionState } from "../src/lib/weddingRunSheetProjectionApi.ts";
+import {
+  ensureWeddingRunSheetProjection,
+  loadWeddingRunSheetProjection,
+  normalizeWeddingRunSheetProjectionState,
+} from "../src/lib/weddingRunSheetProjectionApi.ts";
 
 test("projection API state maps server checkpoints and ledger messages", () => {
   const state = normalizeWeddingRunSheetProjectionState({
@@ -34,4 +38,40 @@ test("projection API state rejects incomplete checkpoint and malformed messages"
   });
   assert.equal(state.checkpoint, null);
   assert.deepEqual(state.messages, []);
+});
+
+test("projection API sends the exact plan and workspace to install and load", async () => {
+  const originalFetch = globalThis.fetch;
+  const calls: Array<{ url: string; body: Record<string, unknown> | null }> = [];
+  globalThis.fetch = async (input, init) => {
+    calls.push({
+      url: String(input),
+      body: init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : null,
+    });
+    return new Response(JSON.stringify({ checkpoint: null, messages: [] }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  };
+  try {
+    const scope = {
+      databaseId: "database:wedding-run-sheet:plan-1",
+      weddingPlanId: "plan-1",
+      responseWorkspaceId: "workspace-1",
+    };
+    await ensureWeddingRunSheetProjection(scope);
+    await loadWeddingRunSheetProjection(scope);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+
+  assert.deepEqual(calls[0], {
+    url: "/database/wedding-runsheet/install",
+    body: {
+      database_id: "database:wedding-run-sheet:plan-1",
+      wedding_plan_id: "plan-1",
+      response_workspace_id: "workspace-1",
+    },
+  });
+  assert.match(calls[1]?.url ?? "", /response_workspace_id=workspace-1/);
 });

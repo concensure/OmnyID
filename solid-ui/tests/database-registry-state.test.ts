@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  discoverWeddingResponseWorkspaceId,
   existingDatabaseDefinitionForProfile,
   projectDatabaseDefinitions,
   reconcileSelectedDatabaseId,
@@ -118,11 +119,27 @@ test("wedding accounts open the ledger-backed planning database before unrelated
   const planning = projected.find((entry) => entry.profileId === "wedding_plan_projection.v1");
   assert.equal(planning?.defaultTable, "budget");
   assert.equal(planning?.weddingPlanId, "plan-2027");
+  assert.equal(planning?.responseWorkspaceId, "workspace-2027");
   assert.equal(reconcileSelectedDatabaseId(projected, null), planning?.databaseId);
   const runSheet = projected.find((entry) => entry.profileId === "wedding_runsheet.v1");
   assert.equal(runSheet?.defaultTable, "run_sheet");
   assert.equal(runSheet?.weddingPlanId, "plan-2027");
+  assert.equal(runSheet?.responseWorkspaceId, "workspace-2027");
   assert.equal(existingDatabaseDefinitionForProfile(projected, "wedding_runsheet.v1", "plan-2027"), runSheet);
+});
+
+test("installed Wedding database projections bind workspace to the matching plan", () => {
+  const messages = [{
+    id: "other-context",
+    timestamp: "2026-11-10T00:00:02Z",
+    content: { wedding_plan_id: "plan-other", response_workspace_id: "workspace-other" },
+  }, {
+    id: "selected-context",
+    timestamp: "2026-11-10T00:00:01Z",
+    content: { wedding_plan_id: "plan-2027", response_workspace_id: "workspace-2027" },
+  }];
+  assert.equal(discoverWeddingResponseWorkspaceId(messages, "plan-2027"), "workspace-2027");
+  assert.equal(discoverWeddingResponseWorkspaceId(messages, "plan-missing"), null);
 });
 
 test("an existing run-sheet definition prevents a duplicate installed projection", () => {
@@ -146,5 +163,9 @@ test("an existing run-sheet definition prevents a duplicate installed projection
   assert.deepEqual(
     projected.filter((entry) => entry.profileId === "wedding_runsheet.v1").map((entry) => entry.databaseId),
     ["database:custom-runsheet"],
+  );
+  assert.equal(
+    projected.find((entry) => entry.profileId === "wedding_runsheet.v1")?.responseWorkspaceId,
+    "workspace-2027",
   );
 });

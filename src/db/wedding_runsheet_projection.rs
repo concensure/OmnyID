@@ -1,7 +1,7 @@
-use super::{tenant_schema_name, Db};
+use super::{Db, tenant_schema_name};
 use chrono::{Duration, Utc};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use sqlx::{Postgres, Row, Transaction};
 use std::{collections::HashSet, fmt};
@@ -299,6 +299,81 @@ async fn insert_projection_message(
 }
 
 impl Db {
+    pub async fn ensure_wedding_runsheet_projection_definition(
+        &self,
+        owner_user_id: &str,
+        database_id: &str,
+        wedding_plan_id: &str,
+        response_workspace_id: &str,
+    ) -> Result<bool, WeddingRunSheetProjectionStoreError> {
+        self.ensure_user_private_schema(owner_user_id).await?;
+        let table = format!("\"{}\".messages", tenant_schema_name(owner_user_id));
+        let existing_query = format!(
+            "SELECT content FROM {table} WHERE content->>'kind'='database_definition' AND content->>'database_id'=$1 ORDER BY timestamp DESC LIMIT 1"
+        );
+        if let Some(content) = sqlx::query_scalar::<_, Value>(&existing_query)
+            .bind(database_id)
+            .fetch_optional(&self.pool)
+            .await?
+        {
+            let matches_scope = content.get("profile_id").and_then(Value::as_str)
+                == Some(RUNSHEET_PROFILE_ID)
+                && content.pointer("/scope/account_id").and_then(Value::as_str)
+                    == Some(owner_user_id)
+                && content
+                    .pointer("/scope/wedding_plan_id")
+                    .and_then(Value::as_str)
+                    == Some(wedding_plan_id)
+                && content
+                    .pointer("/scope/response_workspace_id")
+                    .and_then(Value::as_str)
+                    == Some(response_workspace_id);
+            return if matches_scope {
+                Ok(false)
+            } else {
+                Err(WeddingRunSheetProjectionStoreError::Scope(
+                    "This wedding run sheet is already bound to another scope.".into(),
+                ))
+            };
+        }
+
+        let idempotency_key =
+            format!("wedding-runsheet-definition:{database_id}:{wedding_plan_id}");
+        let content = json!({
+            "kind": "database_definition",
+            "contract_version": 1,
+            "database_id": database_id,
+            "name": "Run sheet",
+            "default_table": "run_sheet",
+            "profile_id": RUNSHEET_PROFILE_ID,
+            "scope": {
+                "account_id": owner_user_id,
+                "wedding_plan_id": wedding_plan_id,
+                "response_workspace_id": response_workspace_id,
+            },
+            "revision": 1,
+            "idempotency_key": idempotency_key,
+        });
+        let metadata = json!({
+            "origin": "server_wedding_runsheet_install",
+            "wedding_plan_id": wedding_plan_id,
+            "response_workspace_id": response_workspace_id,
+        });
+        let insert_query = format!(
+            "INSERT INTO {table} (id,thread_id,from_agent,to_agents,timestamp,type,kind,content,signature,store_in_relational,metadata) VALUES ($1,$2,'omnyid://projector/wedding-runsheet',$3,NOW(),'database_definition','database_definition',$4,'server:wedding-runsheet:v1',TRUE,$5) ON CONFLICT (id) DO NOTHING"
+        );
+        let affected = sqlx::query(&insert_query)
+            .bind(message_id(owner_user_id, &idempotency_key))
+            .bind(format!("db_{database_id}_definition"))
+            .bind(json!(["agent://database"]))
+            .bind(content)
+            .bind(metadata)
+            .execute(&self.pool)
+            .await?
+            .rows_affected();
+        Ok(affected == 1)
+    }
+
     pub async fn load_wedding_runsheet_projection_state(
         &self,
         owner_user_id: &str,
@@ -578,11 +653,12 @@ mod tests {
             cross_tenant,
             Err(WeddingRunSheetProjectionStoreError::Scope(_))
         ));
-        assert!(db
-            .wedding_runsheet_checkpoint(&outsider, "database:test-runsheet")
-            .await
-            .expect("outsider checkpoint")
-            .is_none());
+        assert!(
+            db.wedding_runsheet_checkpoint(&outsider, "database:test-runsheet")
+                .await
+                .expect("outsider checkpoint")
+                .is_none()
+        );
 
         let mut wrong_plan = test_batch("wrong-plan", "source");
         wrong_plan.wedding_plan_id = "plan-other".into();
@@ -599,11 +675,12 @@ mod tests {
             failed,
             Err(WeddingRunSheetProjectionStoreError::Scope(_))
         ));
-        assert!(db
-            .wedding_runsheet_checkpoint(&owner, "database:test-runsheet")
-            .await
-            .expect("checkpoint lookup")
-            .is_none());
+        assert!(
+            db.wedding_runsheet_checkpoint(&owner, "database:test-runsheet")
+                .await
+                .expect("checkpoint lookup")
+                .is_none()
+        );
 
         let left = test_batch("left", "source");
         let right = test_batch("right", "source");

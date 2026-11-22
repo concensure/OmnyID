@@ -1,6 +1,6 @@
 use super::{
     AppState, RateLimitPolicy, auth::authenticated_user, authenticated_rate_limit_key,
-    enforce_rate_limit,
+    enforce_rate_limit, wedding_scope::resolve_wedding_scope,
 };
 use crate::db::{
     WeddingRunSheetProjectionBatch, WeddingRunSheetProjectionState,
@@ -31,6 +31,10 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
             "/database/wedding-runsheet/projection",
             post(commit_projection_http),
         )
+        .route(
+            "/database/wedding-runsheet/install",
+            post(install_projection_http),
+        )
 }
 
 #[derive(Deserialize)]
@@ -38,6 +42,15 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
 struct ProjectionQuery {
     database_id: String,
     wedding_plan_id: String,
+    response_workspace_id: String,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ProjectionInstallRequest {
+    database_id: String,
+    wedding_plan_id: String,
+    response_workspace_id: String,
 }
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -104,6 +117,7 @@ struct ProjectionCheckpoint {
 struct ProjectionRequest {
     database_id: String,
     wedding_plan_id: String,
+    response_workspace_id: String,
     profile_id: String,
     expected_checkpoint: Option<ProjectionCheckpoint>,
     next_checkpoint: ProjectionCheckpoint,
@@ -146,6 +160,7 @@ fn validate_request(request: &ProjectionRequest) -> Result<(), (StatusCode, Stri
         || request.model_calls != 0
         || !valid_id(&request.database_id)
         || !valid_id(&request.wedding_plan_id)
+        || !valid_id(&request.response_workspace_id)
         || request.explanation.trim().is_empty()
         || request.explanation.len() > 500
     {
@@ -264,21 +279,87 @@ fn store_error(error: WeddingRunSheetProjectionStoreError) -> (StatusCode, Strin
     }
 }
 
+async fn install_projection_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(request): Json<ProjectionInstallRequest>,
+) -> Result<Json<WeddingRunSheetProjectionState>, (StatusCode, String)> {
+    enforce_rate_limit(
+        &state,
+        authenticated_rate_limit_key("wedding_runsheet_install", &headers),
+        RateLimitPolicy {
+            max_requests: 20,
+            window: Duration::from_secs(60),
+        },
+    )
+    .await?;
+    let user = authenticated_user(&state.db, &headers).await?;
+    if !valid_id(&request.database_id)
+        || !valid_id(&request.wedding_plan_id)
+        || !valid_id(&request.response_workspace_id)
+    {
+        return Err(bad_request("Choose a valid wedding run sheet."));
+    }
+    let scope = resolve_wedding_scope(
+        &state.db,
+        &user.id,
+        &request.wedding_plan_id,
+        &request.response_workspace_id,
+    )
+    .await?;
+    state
+        .db
+        .ensure_wedding_runsheet_projection_definition(
+            &scope.owner_user_id,
+            &request.database_id,
+            &scope.wedding_plan_id,
+            &scope.response_workspace_id,
+        )
+        .await
+        .map_err(store_error)?;
+    state
+        .db
+        .load_wedding_runsheet_projection_state(
+            &scope.owner_user_id,
+            &request.database_id,
+            &scope.wedding_plan_id,
+        )
+        .await
+        .map_err(|error| store_error(WeddingRunSheetProjectionStoreError::Sql(error)))?
+        .map(Json)
+        .ok_or_else(|| {
+            (
+                StatusCode::FORBIDDEN,
+                "This wedding run sheet is not available in your account.".into(),
+            )
+        })
+}
+
 async fn load_projection_http(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Query(query): Query<ProjectionQuery>,
 ) -> Result<Json<WeddingRunSheetProjectionState>, (StatusCode, String)> {
     let user = authenticated_user(&state.db, &headers).await?;
-    if !valid_id(&query.database_id) || !valid_id(&query.wedding_plan_id) {
+    if !valid_id(&query.database_id)
+        || !valid_id(&query.wedding_plan_id)
+        || !valid_id(&query.response_workspace_id)
+    {
         return Err(bad_request("Choose a valid wedding run sheet."));
     }
+    let scope = resolve_wedding_scope(
+        &state.db,
+        &user.id,
+        &query.wedding_plan_id,
+        &query.response_workspace_id,
+    )
+    .await?;
     state
         .db
         .load_wedding_runsheet_projection_state(
-            &user.id,
+            &scope.owner_user_id,
             &query.database_id,
-            &query.wedding_plan_id,
+            &scope.wedding_plan_id,
         )
         .await
         .map_err(|error| {
@@ -313,6 +394,13 @@ async fn commit_projection_http(
     .await?;
     let user = authenticated_user(&state.db, &headers).await?;
     validate_request(&request)?;
+    let scope = resolve_wedding_scope(
+        &state.db,
+        &user.id,
+        &request.wedding_plan_id,
+        &request.response_workspace_id,
+    )
+    .await?;
     let expected = request.expected_checkpoint.as_ref();
     let mut writes = request
         .records
@@ -363,15 +451,15 @@ async fn commit_projection_http(
     };
     let commit = state
         .db
-        .commit_wedding_runsheet_projection(&user.id, batch)
+        .commit_wedding_runsheet_projection(&scope.owner_user_id, batch)
         .await
         .map_err(store_error)?;
     let projection_state = state
         .db
         .load_wedding_runsheet_projection_state(
-            &user.id,
+            &scope.owner_user_id,
             &request.database_id,
-            &request.wedding_plan_id,
+            &scope.wedding_plan_id,
         )
         .await
         .map_err(|error| store_error(WeddingRunSheetProjectionStoreError::Sql(error)))?
@@ -388,7 +476,8 @@ async fn commit_projection_http(
                 serde_json::json!({
                     "event": "message_stored", "message_id": message_id,
                     "thread_id": format!("db_{}_projection", request.database_id),
-                    "type": "database_projection", "owner_user_id": user.id,
+                    "type": "database_projection", "owner_user_id": scope.owner_user_id,
+                    "actor_user_id": user.id,
                 })
                 .to_string(),
             );
@@ -410,6 +499,7 @@ mod tests {
         ProjectionRequest {
             database_id: "database:run-sheet".into(),
             wedding_plan_id: "plan-1".into(),
+            response_workspace_id: "workspace-1".into(),
             profile_id: PROFILE_ID.into(),
             expected_checkpoint: None,
             next_checkpoint: ProjectionCheckpoint {

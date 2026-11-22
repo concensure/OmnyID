@@ -60,14 +60,35 @@ export function normalizeWeddingRunSheetProjectionState(value: unknown): Wedding
 export async function loadWeddingRunSheetProjection(input: {
   databaseId: string;
   weddingPlanId: string;
+  responseWorkspaceId: string;
 }): Promise<WeddingRunSheetProjectionState> {
-  const query = new URLSearchParams({ database_id: input.databaseId, wedding_plan_id: input.weddingPlanId });
+  const query = new URLSearchParams({
+    database_id: input.databaseId,
+    wedding_plan_id: input.weddingPlanId,
+    response_workspace_id: input.responseWorkspaceId,
+  });
   return normalizeWeddingRunSheetProjectionState(await apiFetch<unknown>(`/database/wedding-runsheet/projection?${query}`));
+}
+
+export async function ensureWeddingRunSheetProjection(input: {
+  databaseId: string;
+  weddingPlanId: string;
+  responseWorkspaceId: string;
+}): Promise<WeddingRunSheetProjectionState> {
+  return normalizeWeddingRunSheetProjectionState(await apiFetch<unknown>("/database/wedding-runsheet/install", {
+    method: "POST",
+    bodyJson: {
+      database_id: input.databaseId,
+      wedding_plan_id: input.weddingPlanId,
+      response_workspace_id: input.responseWorkspaceId,
+    },
+  }));
 }
 
 export async function commitWeddingRunSheetProjection(input: {
   databaseId: string;
   weddingPlanId: string;
+  responseWorkspaceId: string;
   expectedCheckpoint: WeddingRunSheetProjectionCheckpoint | null;
   nextCheckpoint: WeddingRunSheetProjectionCheckpoint;
   records: CanonicalDatabaseRecordContent[];
@@ -85,6 +106,7 @@ export async function commitWeddingRunSheetProjection(input: {
     bodyJson: {
       database_id: input.databaseId,
       wedding_plan_id: input.weddingPlanId,
+      response_workspace_id: input.responseWorkspaceId,
       profile_id: "wedding_runsheet.v1",
       expected_checkpoint: checkpoint(input.expectedCheckpoint),
       next_checkpoint: checkpoint(input.nextCheckpoint),

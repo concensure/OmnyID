@@ -1,6 +1,7 @@
 const MIGRATION: &str = include_str!("../postgres/migrations/0171_wedding_scope_revision.sql");
 const SCOPE: &str = include_str!("../src/server/wedding_scope.rs");
 const PARTNER_ROUTES: &str = include_str!("../src/server/wedding_partner_sharing_routes.rs");
+const RUNSHEET_ROUTES: &str = include_str!("../src/server/wedding_runsheet_projection_routes.rs");
 const SERVER: &str = include_str!("../src/server/mod.rs");
 
 #[test]
@@ -20,8 +21,26 @@ fn partner_routes_reuse_scope_without_broadening_personal_data() {
     assert!(!PARTNER_ROUTES.contains("async fn require_scope_access"));
     assert!(PARTNER_ROUTES.contains("membership_revision=membership_revision+1"));
     assert!(PARTNER_ROUTES.contains("wedding_shared_contact_grants"));
-    assert!(PARTNER_ROUTES.contains("contact_grant.recipient_user_id=$1 OR contact_grant.shared_by_user_id=$1"));
-    assert!(PARTNER_ROUTES.contains("contact_grant.wedding_owner_user_id=$2 AND contact_grant.wedding_plan_id=$3"));
+    assert!(
+        PARTNER_ROUTES
+            .contains("contact_grant.recipient_user_id=$1 OR contact_grant.shared_by_user_id=$1")
+    );
+    assert!(
+        PARTNER_ROUTES.contains(
+            "contact_grant.wedding_owner_user_id=$2 AND contact_grant.wedding_plan_id=$3"
+        )
+    );
     assert!(PARTNER_ROUTES.contains("shared_by_user_id=$2 AND wedding_owner_user_id=$3"));
     assert!(SERVER.contains("mod wedding_scope;"));
+}
+
+#[test]
+fn run_sheet_projection_resolves_canonical_scope_before_owner_storage() {
+    assert!(RUNSHEET_ROUTES.contains("resolve_wedding_scope"));
+    assert!(RUNSHEET_ROUTES.contains("&scope.owner_user_id"));
+    assert!(RUNSHEET_ROUTES.contains("&scope.response_workspace_id"));
+    assert!(!RUNSHEET_ROUTES.contains("commit_wedding_runsheet_projection(&user.id"));
+    assert!(
+        !RUNSHEET_ROUTES.contains("load_wedding_runsheet_projection_state(\n            &user.id")
+    );
 }

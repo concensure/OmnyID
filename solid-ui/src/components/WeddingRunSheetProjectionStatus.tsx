@@ -8,6 +8,7 @@ import {
 } from "@/lib/weddingRunSheetProjectorState";
 import {
   commitWeddingRunSheetProjection,
+  ensureWeddingRunSheetProjection,
   loadWeddingRunSheetProjection,
   type WeddingRunSheetProjectionState,
 } from "@/lib/weddingRunSheetProjectionApi";
@@ -21,6 +22,7 @@ import {
 export function WeddingRunSheetProjectionStatus(props: {
   databaseId: string;
   weddingPlanId: string;
+  responseWorkspaceId: string;
   accountId: string;
   messages: CompatibleDatabaseMessage[];
   archived: boolean;
@@ -81,7 +83,13 @@ export function WeddingRunSheetProjectionStatus(props: {
   }
 
   async function projectionState(): Promise<WeddingRunSheetProjectionState> {
-    const state = await loadWeddingRunSheetProjection({ databaseId: props.databaseId, weddingPlanId: props.weddingPlanId });
+    const scope = {
+      databaseId: props.databaseId,
+      weddingPlanId: props.weddingPlanId,
+      responseWorkspaceId: props.responseWorkspaceId,
+    };
+    await ensureWeddingRunSheetProjection(scope);
+    const state = await loadWeddingRunSheetProjection(scope);
     props.onMessages(state.messages);
     cacheState(state.messages);
     setOffline("");
@@ -121,6 +129,7 @@ export function WeddingRunSheetProjectionStatus(props: {
         const result = await commitWeddingRunSheetProjection({
           databaseId: props.databaseId,
           weddingPlanId: props.weddingPlanId,
+          responseWorkspaceId: props.responseWorkspaceId,
           expectedCheckpoint: batch.expectedCheckpoint,
           nextCheckpoint: plan.nextCheckpoint,
           records: plan.records,
@@ -180,7 +189,7 @@ export function WeddingRunSheetProjectionStatus(props: {
   }
 
   createEffect(() => {
-    const key = `${props.databaseId}:${props.weddingPlanId}:${sourceKey()}`;
+    const key = `${props.databaseId}:${props.weddingPlanId}:${props.responseWorkspaceId}:${sourceKey()}`;
     if (!props.archived && key !== lastAutomaticKey) {
       lastAutomaticKey = key;
       void synchronize();
