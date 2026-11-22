@@ -22,6 +22,7 @@ export type WeddingVendorLeadTimeRecommendation = {
   label: string;
   idealLeadMonths: readonly [number, number];
   hardDeadlineMonths: number | null;
+  mustDecideFirst: boolean;
   urgencyScore: number;
   rankWeight: number;
   windowOpenAt: string | null;
@@ -158,18 +159,24 @@ export function buildWeddingVendorLeadTimeRecommendations(input: {
     .map((category): WeddingVendorLeadTimeRecommendation => {
       const [minMonths, maxMonths] = category.idealLeadMonths;
       if (!weddingDate) {
+        const hasPlanningWindow = clean(input.weddingDateOrSeason).length > 0;
         return {
           categoryId: category.categoryId,
           label: category.label,
           idealLeadMonths: category.idealLeadMonths,
           hardDeadlineMonths: category.hardDeadlineMonths ?? null,
+          mustDecideFirst: category.mustDecideFirst === true,
           urgencyScore: category.mustDecideFirst ? 30 : selected.has(category.categoryId) ? 18 : 8,
           rankWeight: category.mustDecideFirst ? 42 : selected.has(category.categoryId) ? 28 : 16,
           windowOpenAt: null,
           windowCloseAt: null,
           status: "unknown_date",
           timingLabel: `${category.label}: ideally research ${minMonths}-${maxMonths} months before the wedding.`,
-          reasonLabel: "Capture an exact wedding date to place this vendor category on the calendar.",
+          reasonLabel: category.mustDecideFirst
+            ? hasPlanningWindow
+              ? "Use the saved date or season as a search range, then confirm exact availability before treating a venue as viable."
+              : "Venue availability can help set the wedding date; compare suitable options first, then confirm an exact date before booking."
+            : "Capture an exact wedding date to place this vendor category on the calendar.",
         };
       }
       const monthsUntilWedding = monthDistance(usableNow, weddingDate);
@@ -192,6 +199,7 @@ export function buildWeddingVendorLeadTimeRecommendations(input: {
         label: category.label,
         idealLeadMonths: category.idealLeadMonths,
         hardDeadlineMonths: category.hardDeadlineMonths ?? null,
+        mustDecideFirst: category.mustDecideFirst === true,
         urgencyScore,
         rankWeight: 18 + urgencyScore + (category.mustDecideFirst ? 10 : 0) + (selected.has(category.categoryId) ? 8 : 0),
         windowOpenAt: isoDate(windowOpenAt),
@@ -235,7 +243,7 @@ export function buildWeddingVendorLeadTimeTaskItems(input: {
   const metadata = normalizeWeddingPlanningMetadata(input.metadata);
   const existingKeys = existingLeadTimeKeys(input.existingTaskItems ?? []);
   return buildWeddingVendorLeadTimeRecommendations(input)
-    .filter((recommendation) => recommendation.status !== "unknown_date")
+    .filter((recommendation) => recommendation.status !== "unknown_date" || recommendation.mustDecideFirst)
     .filter((recommendation) => !existingKeys.has(recommendation.categoryId))
     .map((recommendation): WeddingPlanningTaskItem => ({
       id: `wedding_vendor_lead_time:${safeWeddingLabel(recommendation.categoryId)}:${safeWeddingLabel(metadata.responseWorkspaceId)}`,
@@ -255,6 +263,7 @@ export function buildWeddingVendorLeadTimeTaskItems(input: {
         vendor_lead_time_category_id: recommendation.categoryId,
         vendor_lead_time_label: recommendation.label,
         vendor_lead_time_status: recommendation.status,
+        vendor_lead_time_must_decide_first: recommendation.mustDecideFirst,
         vendor_lead_time_urgency_score: recommendation.urgencyScore,
         vendor_lead_time_rank_weight: recommendation.rankWeight,
         vendor_lead_time_window_open_at: recommendation.windowOpenAt,

@@ -162,6 +162,24 @@ const PREREQUISITE_ANSWER_RECORD: Partial<Record<WeddingDecisionPrerequisiteKey,
 function classify(task: WeddingPlanningTaskItem): DecisionDefinition {
   const text = `${task.title} ${task.notes ?? ""} ${task.kind}`.toLowerCase();
   const base = GENERIC_BY_KIND[task.kind];
+  const metadata = record(task.metadata);
+  const venueLeadTimeResearch = metadata.vendor_lead_time_research_task === true
+    && clean(metadata.vendor_lead_time_category_id) === "venue";
+  const venueResearchDefinition: Omit<DecisionDefinition, "question"> = {
+    ...GENERIC_BY_KIND.research,
+    decisionType: "venue",
+    options: options(
+      ["compare", "Compare venue options", "Use the saved location, size, priorities and planning window while keeping unknowns visible."],
+      ["refine", "Refine the search first", "Add the missing facts that would narrow suitable venues."],
+      ["keep_open", "Keep it open", "Continue planning without treating a venue or date as settled."],
+    ),
+    prerequisiteKeys: [],
+    answerRecord: "wedding_planning_task",
+    deadlinePolicy: "lead_time",
+    primaryActionLabel: "Research venue options",
+    primaryOutcome: "Open the existing venue search without claiming availability or making a booking.",
+    approvalRequiredBeforeExternalAction: true,
+  };
   const venueDefinition: Omit<DecisionDefinition, "question"> = {
     ...GENERIC_BY_KIND.decision,
     decisionType: "venue",
@@ -172,7 +190,8 @@ function classify(task: WeddingPlanningTaskItem): DecisionDefinition {
     primaryOutcome: "Save a venue preference without booking it.",
     approvalRequiredBeforeExternalAction: true,
   };
-  const overridden = /transport|limousine|shuttle|pickup/.test(text) ? GENERIC_BY_KIND.transport
+  const overridden = venueLeadTimeResearch ? venueResearchDefinition
+    : /transport|limousine|shuttle|pickup/.test(text) ? GENERIC_BY_KIND.transport
     : /final (guest|caterer|catering|head)count|final numbers/.test(text) ? GENERIC_BY_KIND.guest_list
       : /rsvp|guest response/.test(text) ? GENERIC_BY_KIND.rsvp
         : /seating|table plan/.test(text) ? GENERIC_BY_KIND.seating
@@ -184,7 +203,9 @@ function classify(task: WeddingPlanningTaskItem): DecisionDefinition {
                     : base;
   return {
     ...overridden,
-    question: () => questionFor(overridden.decisionType, task.title),
+    question: () => venueLeadTimeResearch
+      ? "Which venue options should you compare first?"
+      : questionFor(overridden.decisionType, task.title),
   };
 }
 

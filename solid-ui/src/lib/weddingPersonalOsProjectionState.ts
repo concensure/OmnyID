@@ -182,6 +182,12 @@ function hasVendorLeadTimeResearchTask(metadata: unknown): boolean {
   return record(metadata).vendor_lead_time_research_task === true;
 }
 
+function hasVendorMustDecideFirstTask(metadata: unknown): boolean {
+  const data = record(metadata);
+  return data.vendor_lead_time_research_task === true
+    && data.vendor_lead_time_must_decide_first === true;
+}
+
 function hasVendorComparisonDecisionTask(metadata: unknown): boolean {
   return record(metadata).vendor_comparison_decision_task === true;
 }
@@ -285,6 +291,9 @@ function taskWeight(task: WeddingPlanningTaskItem, now: Date): number {
   const vendorLeadTime = hasVendorLeadTimeResearchTask(task.metadata)
     ? Math.min(40, Math.max(10, Number(record(task.metadata).vendor_lead_time_urgency_score) || 18))
     : 0;
+  // Preserve the catalogue's sequencing rule only as a tie-break. Deadline,
+  // approval and materially different urgency weights must remain authoritative.
+  const vendorSequence = hasVendorMustDecideFirstTask(task.metadata) ? 2 : 0;
   const vendorComparison = hasVendorComparisonDecisionTask(task.metadata) ? 18 : 0;
   const vendorSeed = hasVendorSeedReviewTask(task.metadata) ? 5 : 0;
   const expectedBehaviorGap = hasExpectedBehaviorGap(task.metadata) ? 19 : 0;
@@ -296,7 +305,7 @@ function taskWeight(task: WeddingPlanningTaskItem, now: Date): number {
   const providerHandoff = hasProviderHandoffTask(task.metadata) ? 23 : 0;
   return 20 + priority + duePressure(task.dueAt, now) + approval + loop + review
     + quote + payment + guest + finalCount + postWedding + vow + seating + delegation + finalPhase + legalAdmin
-    + vendorSearch + vendorLeadTime + vendorComparison + vendorSeed + expectedBehaviorGap + oracleUpdatePlan + productionRemainingWork
+    + vendorSearch + vendorLeadTime + vendorSequence + vendorComparison + vendorSeed + expectedBehaviorGap + oracleUpdatePlan + productionRemainingWork
     + backgroundAutomation + providerHandoff
     + outreachEscalationWeight(outreachEscalationStage(task.metadata));
 }
@@ -319,6 +328,8 @@ function taskItem(
     vendor_lead_time_research_task: metadata.vendor_lead_time_research_task === true ? true : undefined,
     vendor_lead_time_category_id: clean(metadata.vendor_lead_time_category_id) || undefined,
     vendor_lead_time_label: clean(metadata.vendor_lead_time_label) || undefined,
+    vendor_lead_time_status: clean(metadata.vendor_lead_time_status) || undefined,
+    vendor_lead_time_must_decide_first: metadata.vendor_lead_time_must_decide_first === true ? true : undefined,
     vendor_search_review_task: metadata.vendor_search_review_task === true ? true : undefined,
     vendor_search_action_id: clean(metadata.vendor_search_action_id) || undefined,
     vendor_search_categories: stringArray(metadata.vendor_search_categories).slice(0, 6),
@@ -381,7 +392,12 @@ function taskItem(
       hasFinalPhaseTask(task.metadata) ? "Final-phase wedding work affects run sheet, confirmations, day-of fallback, guests, vendors, or final payments." : null,
       hasLegalAdministrationTask(task.metadata) ? "Legal document and NOIM preparation should stay visible before celebrant review; no form is lodged automatically." : null,
       hasVendorSearchReviewTask(task.metadata) ? "Review the shortlist and choose who you want to contact." : null,
-      hasVendorLeadTimeResearchTask(task.metadata) ? "This vendor category is surfacing because its planning lead-time window is open or close to opening." : null,
+      hasVendorLeadTimeResearchTask(task.metadata)
+        ? clean(record(task.metadata).vendor_lead_time_status) === "unknown_date"
+          && clean(record(task.metadata).vendor_lead_time_category_id) === "venue"
+          ? "Venue research can start before the date is fixed because venue availability may shape it; confirm the exact date and availability before booking."
+          : "This vendor category is surfacing because its planning lead-time window is open or close to opening."
+        : null,
       hasVendorComparisonDecisionTask(task.metadata) ? "The top-three vendor comparison is ready for the user to choose preferred vendors before outreach or report narrowing." : null,
       hasVendorSeedReviewTask(task.metadata) ? "Seeded vendor rows are planning hints only; refresh source pages and verify fit before using them for recommendations or outreach." : null,
       hasExpectedBehaviorGap(task.metadata) ? "This wedding feature still needs proof before users can rely on it end-to-end." : null,

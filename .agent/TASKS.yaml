@@ -15,6 +15,17 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-393
+    title: Keep venue decisions actionable before an exact wedding date and preserve their sequence priority
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-393
+    worktree: C:/temp/wt/omnyid-wed389
+    base_sha: fb418abb938b99bec4731156861b49fbffaebc60
+    depends_on: [WED-390, WED-392, WED-329]
+    files: [solid-ui/src/lib/weddingVendorLeadTimeState.ts, solid-ui/src/lib/weddingDecisionDefinitionState.ts, solid-ui/src/lib/weddingPersonalOsProjectionState.ts, solid-ui/tests/wedding-vendor-lead-time-state.test.ts, solid-ui/tests/wedding-personal-os-projection-state.test.ts, Documents/design/wedding planner/decision card/decision card clarity and recovery spec.md, Documents/design/wedding planner/decision card/decision card clarity and recovery tasks.md, .agent/**]
+    acceptance: [a venue research decision can enter Decision Focus when the couple has only a season or has not set a date, the card does not invent availability or a deadline and makes exact-date confirmation explicit before booking, a declarative must-decide-first signal survives conversion from lead-time recommendation to planning task and gives venue a bounded tie-break over another vendor with the same urgency, genuinely more urgent work can still outrank venue, settled booked or skipped venue categories remain suppressed, focused and full Wedding checks pass from a clean committed candidate]
+    progress: "Implementation started from the clean WED-392 release-record SHA."
   - id: WED-392
     title: Reframe guest-list proof through the growth journey and complete selected-contact coworking
     status: done

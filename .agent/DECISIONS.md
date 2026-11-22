@@ -4582,3 +4582,17 @@ Oracle health probes follow the deployed authentication contract. Anonymous 401 
 logic must verify the expected status and container readiness instead of requiring an
 anonymous 2xx. A mismatched probe is a release-script failure, not evidence that a
 listening authenticated service is unhealthy.
+
+## 2026-11-22 — Venue discovery may precede the exact wedding date (WED-393)
+
+An exact wedding date is not a prerequisite for the existing venue lead-time
+research task. Venue availability commonly helps a couple choose the date, so a
+season-only or date-less plan may surface venue discovery in Decision Focus. This
+exception does not relax date prerequisites for legal, RSVP or run-sheet decisions,
+does not assert availability, and does not permit booking without the existing
+approval path.
+
+The vendor catalogue's declarative `mustDecideFirst` signal is carried into planning
+task metadata. PersonalOS uses it as a two-point sequence tie-break only after the
+normal priority, deadline and lead-time urgency weights. Equal-urgency venue work
+therefore precedes another vendor; materially more urgent work still wins.

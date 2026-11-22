@@ -12,6 +12,7 @@ WED-390 generalised the contract across every current Wedding decision kind, add
 bulk audit and source evidence, verified bounded online research, and installed the
 passing twice-daily production monitor. Exact release evidence is in
 `Documents/verification/WED-390-wedding-decision-and-monitor-release.md`.
+DC-12 is implemented on WED-393 and awaits the normal clean-candidate release gate.
 
 ## DC-01 — Reproduce and recover the Wedding template failure
 
@@ -268,6 +269,36 @@ Acceptance:
 - The next two runs are visible in systemd and secrets do not appear in Git or logs.
 - The frozen candidate SHA is the deployed static source and production smoke checks
   pass without changing the homeserver image unnecessarily.
+
+## DC-12 — Keep venue discovery actionable before the date is fixed
+
+Files:
+
+- `solid-ui/src/lib/weddingVendorLeadTimeState.ts`
+- `solid-ui/src/lib/weddingDecisionDefinitionState.ts`
+- `solid-ui/src/lib/weddingPersonalOsProjectionState.ts`
+- focused lead-time and PersonalOS tests
+
+Work:
+
+- Carry the catalogue's existing `mustDecideFirst` signal into generated planning
+  task metadata instead of losing it after recommendation ranking.
+- Generate the venue research task when the couple has only a season or no saved
+  date, while leaving later vendor categories blocked from date-derived timing.
+- Give date-less venue research its own shared decision definition so the general
+  venue-booking date prerequisite does not suppress discovery.
+- Use a bounded PersonalOS tie-break for venue when vendor urgency is equal; retain
+  priority and deadline dominance.
+
+Acceptance:
+
+- A season-only and a no-date workspace both surface venue research in Decision
+  Focus without inventing a date, deadline or availability claim.
+- The card asks which venue options to compare and states that exact availability
+  must be confirmed before booking.
+- Venue ranks ahead of an equally urgent florist, while a materially more urgent
+  florist or blocker can still rank first.
+- Booked and skipped venue categories remain absent.
 
 ## Completion evidence
 

@@ -202,6 +202,20 @@ urgent blocker therefore outranks undated planning work, while the card explains
 whether urgency came from the saved deadline, lead time or sequence. No date or
 consequence is invented.
 
+Venue discovery is the deliberate exception to treating an exact wedding date as a
+blocking prerequisite. A couple may need venue availability to choose their date,
+so the existing venue-search task can enter Decision Focus with only a season or
+with no date saved. The card keeps the date and availability unknown, offers venue
+research rather than booking, and requires exact availability to be confirmed
+before calling an option viable or making a commitment. Other date-dependent legal,
+RSVP and run-sheet decisions retain their date prerequisites.
+
+The vendor catalogue's `mustDecideFirst` sequence signal survives recommendation,
+task and PersonalOS projection. It contributes only a small tie-break after normal
+priority, saved deadline and lead-time urgency have been evaluated. Venue therefore
+precedes another vendor with the same urgency, but it does not outrank a materially
+more urgent blocker merely because it is a venue.
+
 ## 9. One choice, evidence and approval boundary
 
 Every compact card shows one decision question and one primary action. It may show

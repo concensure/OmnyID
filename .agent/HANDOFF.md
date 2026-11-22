@@ -1,3 +1,23 @@
+## WED-393 venue-before-date decision refinement (2026-11-22)
+
+Worktree `C:/temp/wt/omnyid-wed389`, branch `agent/codex/WED-393`, based on clean
+WED-392 release-record SHA `fb418abb938b99bec4731156861b49fbffaebc60`.
+
+The shared vendor lead-time builder now creates the venue research task when the
+couple has only a season or no saved date. A specific discovery contract keeps this
+task out of the normal venue-booking date prerequisite, asks which venue options to
+compare, keeps availability unknown and retains explicit approval before contact or
+commitment. Other unknown-date vendor tasks remain withheld.
+
+`mustDecideFirst` now survives recommendation-to-task projection and supplies a
+bounded two-point PersonalOS tie-break. Venue outranks an equally urgent florist,
+while higher priority and deadline pressure remain authoritative. Focused tests pass
+for exact-date, season-only, date-less, booked/skipped and urgency-tie cases. Full
+clean-SHA Wedding CI and production build are the next release-candidate gates.
+
+No Oracle deployment has been made for WED-393. The currently live application
+source remains `afd6d5cc04d3c5996256ca1df131ba7e1de659fb` from WED-392.
+
 ## WED-392 guest growth and selected-contact coworking live (2026-11-22)
 
 Worktree `C:/temp/wt/omnyid-wed389`, branch `agent/codex/WED-392`. Exact deployed

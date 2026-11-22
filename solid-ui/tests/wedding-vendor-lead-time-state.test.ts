@@ -45,6 +45,28 @@ test("buildWeddingVendorLeadTimeRecommendations ranks open and closing windows a
     < (recommendations.find((item) => item.categoryId === "photographer")?.rankWeight ?? 0));
 });
 
+test("venue remains actionable when the couple has only a season or no date", () => {
+  for (const weddingDateOrSeason of ["Spring 2028", null]) {
+    const recommendations = buildWeddingVendorLeadTimeRecommendations({ weddingDateOrSeason });
+    const venue = recommendations.find((item) => item.categoryId === "venue");
+    const tasks = buildWeddingVendorLeadTimeTaskItems({
+      weddingDateOrSeason,
+      metadata,
+    });
+
+    assert.equal(recommendations[0]?.categoryId, "venue");
+    assert.equal(venue?.status, "unknown_date");
+    assert.equal(venue?.mustDecideFirst, true);
+    assert.match(venue?.reasonLabel ?? "", weddingDateOrSeason ? /search range/i : /help set the wedding date/i);
+    assert.ok(tasks.some((task) =>
+      task.metadata?.vendor_lead_time_category_id === "venue"
+      && task.metadata?.vendor_lead_time_status === "unknown_date"
+      && task.metadata?.vendor_lead_time_must_decide_first === true
+    ));
+    assert.equal(tasks.some((task) => task.metadata?.vendor_lead_time_category_id === "florist"), false);
+  }
+});
+
 test("buildWeddingVendorLeadTimeRecommendations suppresses booked or explicitly skipped categories", () => {
   const recommendations = buildWeddingVendorLeadTimeRecommendations({
     weddingDateOrSeason: "2027-10-14",
@@ -121,4 +143,42 @@ test("buildWeddingResponseWorkspaceViewState keeps lead-time vendor research in 
   ));
   assert.ok(state.personalOsProjection.decisionLoadRelief.focusItems.length > 3);
   assert.equal(state.personalOsProjection.decisionLoadRelief.backlogCount, 0);
+});
+
+test("season-only and date-less workspaces can put venue research in Decision Focus", () => {
+  for (const dateOrSeason of ["Autumn 2028", ""]) {
+    const state = buildWeddingResponseWorkspaceViewState({
+      metadata,
+      nowIso: "2026-10-14T00:00:00.000Z",
+      contextItems: [{
+        metadata: {
+          ...metadata,
+          template: "wedding_planning",
+          artifactKind: null,
+          supertags: [],
+          privacyScope: "private",
+          approvalState: "draft",
+        },
+        planningContext: {
+          dateOrSeason,
+          location: "Sydney NSW",
+          guestCount: "40",
+          vendorCategories: ["venue", "florist"],
+        },
+        answeredLabels: [],
+        nextQuestionLabel: "Next",
+        readyForFirstRecommendations: true,
+      }],
+    });
+
+    const venueFocus = state.personalOsProjection.decisionLoadRelief.focusItems.find((item) =>
+      item.actionMetadata?.vendor_lead_time_category_id === "venue"
+    );
+    assert.ok(venueFocus);
+    assert.match(venueFocus.explanation, /before the date is fixed/i);
+    assert.equal(venueFocus.actionMetadata?.vendor_lead_time_status, "unknown_date");
+    assert.equal(venueFocus.decisionContract?.question, "Which venue options should you compare first?");
+    assert.deepEqual(venueFocus.decisionContract?.prerequisites, []);
+    assert.equal(venueFocus.decisionContract?.approvalRequiredBeforeExternalAction, true);
+  }
 });

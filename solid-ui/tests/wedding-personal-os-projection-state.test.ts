@@ -747,3 +747,36 @@ test("wedding PersonalOS queues every open planning task without a default three
   assert.equal(state.decisionLoadRelief.backlogCount, 0);
   assert.ok(state.decisionLoadRelief.focusLimit >= 7);
 });
+
+test("wedding PersonalOS uses must-decide-first as a bounded vendor urgency tie-break", () => {
+  const vendorTask = (category: "venue" | "florist", priority: "normal" | "high" = "normal") => ({
+    id: `lead-time-${category}`,
+    title: `Search for ${category}`,
+    kind: "research" as const,
+    priority,
+    reviewStatus: "accepted" as const,
+    approvalState: "draft" as const,
+    metadata: {
+      vendor_lead_time_research_task: true,
+      vendor_lead_time_category_id: category,
+      vendor_lead_time_label: category === "venue" ? "Venue" : "Florist",
+      vendor_lead_time_status: "open",
+      vendor_lead_time_urgency_score: 32,
+      vendor_lead_time_must_decide_first: category === "venue",
+      vendor_search_review_task: true,
+    },
+  });
+
+  const tied = buildWeddingPersonalOsProjectionState({
+    now,
+    taskItems: [vendorTask("florist"), vendorTask("venue")],
+  });
+  assert.equal(tied.rankedItems[0]?.actionMetadata?.vendor_lead_time_category_id, "venue");
+  assert.equal((tied.rankedItems[0]?.rankWeight ?? 0) - (tied.rankedItems[1]?.rankWeight ?? 0), 2);
+
+  const materiallyMoreUrgent = buildWeddingPersonalOsProjectionState({
+    now,
+    taskItems: [vendorTask("venue"), vendorTask("florist", "high")],
+  });
+  assert.equal(materiallyMoreUrgent.rankedItems[0]?.actionMetadata?.vendor_lead_time_category_id, "florist");
+});
