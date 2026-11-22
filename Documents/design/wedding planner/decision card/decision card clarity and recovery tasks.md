@@ -361,7 +361,7 @@ Work:
 
 ## DC-16 — Propagate material plan changes into dependent decisions
 
-Status: implemented in WED-401; Oracle publication pending the release gate.
+Status: complete and live on Oracle in WED-401.
 
 Work:
 
@@ -377,12 +377,12 @@ Work:
   approval flows; do not create a parallel decision store or redesign the card.
 - [x] Keep task ids revision-stable so a settled change stays quiet while a later
   change creates a successor.
-- [ ] Record the exact clean candidate, full suite, authenticated handoff and Oracle
+- [x] Record the exact clean candidate, full suite, authenticated handoff and Oracle
   health evidence after deployment.
 
 ## DC-17 — Make authenticated workspace startup recoverable
 
-Status: implemented in WED-401; Oracle publication pending the release gate.
+Status: complete and live on Oracle in WED-401.
 
 Work:
 
@@ -396,10 +396,27 @@ Work:
 - [x] Reuse the same fresh-copy recovery from the mounted application error boundary.
 - [x] Add an OAuth-shaped browser regression that asserts a Google-provider session
   mounts non-blank content and removes the boot fallback without page errors.
-- [ ] Run the same authenticated handoff against Oracle after the exact candidate is
+- [x] Run the same authenticated handoff against Oracle after the exact candidate is
   deployed.
 
-## Completion evidence
+WED-401 release evidence:
+
+- Exact application/static SHA: `9ff9a74fef888b0e124c3b9fbf71d4491c6a5862`.
+- Clean release worktree: `C:/temp/wt/omnyid-wed401-release-9ff9a74f`.
+- TypeScript, both line budgets, public/security Wedding checks, all 2,372 Wedding
+  tests, the production build and the OAuth-shaped browser regression passed.
+- Oracle served the exact entrypoint, boot guard, service worker, main bundle and
+  Wedding workspace bundle hashes. A real synthetic-account sign-in reached a
+  mounted non-blank workspace with API session status 200 and no page error.
+- Aborting the live main module produced the visible “Workspace could not finish
+  loading” surface and “Reload a fresh copy” action instead of a blank document.
+- The read-only production monitor passed public Wedding, workspace shell, login,
+  authenticated session, bootstrap, health, readiness and current asset checks.
+  Caddy and homeserver stayed running with zero restarts.
+- Static rollback is retained at
+  `/home/ubuntu/omnyid-candidates/wed401-9ff9a74fef888b0e124c3b9fbf71d4491c6a5862/rollback/workspace-before.tar.gz`.
+
+## Earlier WED-390 completion evidence
 
 - Exact deployed source: `3c22a9c7766455fa591ddd5b19ee14f9b2fc8517`.
 - Full Wedding suite: 2,336 tests passed; production build passed.

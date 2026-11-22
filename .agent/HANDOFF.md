@@ -1,3 +1,50 @@
+## WED-401 OAuth workspace recovery and plan-change propagation (2026-11-23)
+
+Worktree `C:/temp/wt/omnyid-wed401`, branch `agent/codex/WED-401`, based on
+WED-400 record SHA `1be030b55669292daf84b0098b998aa284c3b997`.
+
+The OAuth-to-Workspace blank-page class is fixed at exact deployed application/static
+SHA `9ff9a74fef888b0e124c3b9fbf71d4491c6a5862`. Workspace now has an independent,
+CSP-compatible pre-module boot guard with visible loading, startup-error, timeout and
+fresh-copy recovery. Recovery unregisters only Workspace service workers and deletes
+only `omnyid-shell-*` caches; it preserves `omnyid.preview.session`. Service-worker
+v17 treats Workspace HTML, JavaScript, CSS and APIs as network-only, preventing mixed
+module graphs after deployment. The mounted error boundary uses the same recovery.
+
+Planning projections are now revisioned by planning-context fingerprint. A material
+guest-count change prefers saved vendor terms and otherwise uses a bounded fallback:
+20 guests, or 10 guests when that is also at least 20% of the prior count. Only saved
+capacity/per-person vendor categories receive a one-question, evidence-led task to
+reconfirm capacity, price and scope, and contact stays approval-gated. A budget
+decrease creates one saved-preference and vision-aware trade-off decision using
+quotes, allocation history and commitments; it proposes negotiation, reduction or
+deferral without silently contacting, cancelling, booking or paying. Both use the
+existing task, DecisionOS, evidence, ranking, settlement and approval flows. Stable
+revision ids keep settled changes quiet while a later edit creates a successor.
+
+Clean release worktree: `C:/temp/wt/omnyid-wed401-release-9ff9a74f`. TypeScript,
+both line budgets, public/security Wedding checks, all 2,372 Wedding tests, production
+build and the OAuth-shaped browser test passed. The first implementation candidate
+`8fcb12cea5e7baf1e60e2027c60dd0e994937e30` was not deployed: release inspection
+found its recovery code in the main graph. It remains on Oracle for audit only. The
+rebuilt Workspace archive SHA-256 is
+`a5da0af5fc3aa0b7b38c8d24993399a58f2eee3368240a00220bd3cf6e907bea`.
+
+Oracle serves exact release hashes for `index.html`, independent boot guard, service
+worker, main bundle and Wedding workspace bundle. A real synthetic-account browser
+sign-in mounted non-empty content, removed the fallback, returned API session 200 and
+had no page errors. Deliberately aborting the live main module showed the recovery
+heading and reload button instead of a blank page. The read-only eight-check Wedding
+monitor passed login, session, bootstrap, health, readiness and assets. Caddy validates;
+Caddy and homeserver stayed running with zero restarts. This static-only deployment
+changed no Caddyfile, image, migration or authentication service.
+
+Rollback is retained at
+`/home/ubuntu/omnyid-candidates/wed401-9ff9a74fef888b0e124c3b9fbf71d4491c6a5862/rollback/workspace-before.tar.gz`
+with checksum. The additive release preserved prior hashed assets. The source and
+verification record are in
+`Documents/verification/WED-401-workspace-recovery-and-plan-change-release.md`.
+
 ## WED-400 venue holds and earned proactive signals (2026-11-23)
 
 Worktree `C:/temp/wt/omnyid-wed389`, branch `agent/codex/WED-400`, based on

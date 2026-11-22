@@ -17,7 +17,7 @@ lifecycle:
 tasks:
   - id: WED-401
     title: Recover OAuth workspace rendering and propagate material Wedding plan changes into decisions
-    status: in_progress
+    status: done
     owner: codex
     reviewer: claude
     branch: agent/codex/WED-401
@@ -26,7 +26,7 @@ tasks:
     depends_on: [WED-400, WED-398, WED-390]
     files: [solid-ui/src/**, solid-ui/tests/**, src/server/**, src/wedding_*.rs, tests/**, scripts/**, Documents/design/wedding planner/decision card/**, .agent/**]
     acceptance: [reproduce and fix the OAuth-to-workspace blank page without weakening authentication or hiding bootstrap failures, add a production-shaped regression that proves an OAuth callback/session can render or recover visibly rather than leave a blank document, material guest-count changes create an evidence-based existing DecisionOS card to reconfirm affected vendor capacity pricing and scope with explicit approval before contact, budget decreases create preference-aware existing DecisionOS review choices for the most negotiable or deferrable vendor commitments without silently discarding settled essentials, dependency cards are idempotent update when inputs change and use saved couple vision preferences quotes commitments and deadlines, pass focused full Wedding typecheck build and clean-SHA deployment gates, deploy the exact committed candidate to Oracle with rollback and authenticated post-deploy proof]
-    progress: "Implemented a CSP-compatible pre-module recovery surface, network-only workspace shell/module service-worker policy, revisioned planning projections, and shared DecisionOS tasks for material guest-count and budget reductions. Typecheck, both line budgets, public Wedding checks, 2,372 Wedding tests, production build, and OAuth-shaped browser handoff pass; clean-SHA Oracle release is next."
+    progress: "Done and live on Oracle at exact application/static SHA 9ff9a74fef888b0e124c3b9fbf71d4491c6a5862. A separate CSP-compatible pre-module guard now supplies visible loading, module-failure and fresh-copy recovery without clearing the signed-in session; Workspace HTML, JavaScript and CSS are network-only in service-worker v17 so deploys cannot mix an old shell with new hashed chunks. Need-To-Know and intake projections retain revision history. Material guest changes prefer vendor terms and otherwise use the bounded fallback of 20 guests, or 10 guests plus 20% of the prior count; only affected capacity/per-person vendor categories receive an evidence-led approval-gated reconfirmation task. Budget decreases create one preference-aware negotiate/reduce/defer choice using saved priorities, vision, costs and commitments, without silently changing a booking or contacting a vendor. Shared DecisionOS storage, ranking, settlement and approval flows remain authoritative. Clean exact-SHA typecheck, both line budgets, public/security Wedding checks, all 2,372 Wedding tests, production build and OAuth-shaped browser regression passed. Live production then passed authenticated rendering, API session status, forced-main-module recovery, Caddy validation, hashes, health/readiness and the eight-check scheduled monitor with zero container restarts. Rollback is retained under /home/ubuntu/omnyid-candidates/wed401-9ff9a74fef888b0e124c3b9fbf71d4491c6a5862/rollback."
   - id: WED-400
     title: Make Wedding venue holds and earned proactive signals explicit without redesigning Decision Focus
     status: done
