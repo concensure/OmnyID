@@ -4,11 +4,11 @@ import { test } from "node:test";
 
 const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
 const main = readFileSync(new URL("../src/main.tsx", import.meta.url), "utf8");
-const boot = readFileSync(new URL("../src/workspace-boot.js", import.meta.url), "utf8");
+const boot = readFileSync(new URL("../public/workspace-boot.js", import.meta.url), "utf8");
 
 test("workspace has a pre-module recovery surface that preserves the auth session", () => {
   assert.match(html, /id="workspace-boot-status" role="status"/);
-  assert.match(html, /type="module" src="\/src\/workspace-boot\.js"/);
+  assert.match(html, /src="\/workspace-boot\.js"/);
   assert.match(html, /href="\/workspace\/\?refresh=1"/);
   assert.match(boot, /Workspace could not finish loading/);
   assert.match(boot, /serviceWorker\.getRegistrations/);
