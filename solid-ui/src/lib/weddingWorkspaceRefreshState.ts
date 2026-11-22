@@ -71,6 +71,10 @@ function distinctMessages(messages: readonly AfpMessage[]): AfpMessage[] {
   });
 }
 
+function isBudgetProjectionMessage(message: AfpMessage): boolean {
+  return message.supertags?.includes("wedding_budget") === true;
+}
+
 export async function loadWeddingWorkspaceRefreshState(input: {
   signedIn: boolean;
   weddingPlanId: string;
@@ -116,7 +120,10 @@ export async function loadWeddingWorkspaceRefreshState(input: {
         responseWorkspaceId: input.responseWorkspaceId,
       }),
     ]);
-    const messages = distinctMessages([...result.messages, ...budgetResult.messages]);
+    const messages = distinctMessages([
+      ...result.messages.filter((message) => !isBudgetProjectionMessage(message)),
+      ...budgetResult.messages,
+    ]);
     const persisted = buildWeddingPersistedWorkspaceState({
       messages,
       weddingPlanId: input.weddingPlanId,

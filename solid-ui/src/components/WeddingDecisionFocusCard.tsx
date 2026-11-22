@@ -864,6 +864,7 @@ export function WeddingDecisionFocusCard(props: {
                           contributorPeople={props.state.helperContactNames}
                           onSaveAllocation={props.saveProjection ?? undefined}
                           onSaveContribution={props.saveProjection ?? undefined}
+                          onRefreshWorkspace={props.onRefreshWorkspace ?? undefined}
                         />
                       </div>
                     </section>

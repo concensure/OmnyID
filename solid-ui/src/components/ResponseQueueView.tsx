@@ -119,7 +119,10 @@ import {
   weddingVendorSelectionLabels,
 } from "@/lib/weddingVendorChecklistState";
 import { WEDDING_BUDGET_ALLOCATION_LOCAL_SAVE_EVENT } from "@/lib/weddingBudgetAllocationState";
-import { sendWeddingBudgetProjection } from "@/lib/weddingBudgetProjectionApi";
+import {
+  sendWeddingBudgetProjection,
+  weddingBudgetProjectionExpectedRevision,
+} from "@/lib/weddingBudgetProjectionApi";
 import {
   buildWeddingVendorComparisonArtifactState,
   buildWeddingVendorSearchArtifactState,
@@ -1325,7 +1328,7 @@ export function ResponseQueueView(props: {
     return sendWeddingBudgetProjection({
       weddingPlanId: workspace.workspace.metadata.weddingPlanId,
       responseWorkspaceId: workspace.workspace.metadata.responseWorkspaceId,
-    }, input);
+    }, input, weddingBudgetProjectionExpectedRevision(workspace.afpMessages, input));
   }
 
   function weddingWorkspaceRefreshBanner() {

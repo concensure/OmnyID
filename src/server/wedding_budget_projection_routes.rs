@@ -43,6 +43,7 @@ struct BudgetProjectionQuery {
 struct BudgetProjectionRequest {
     wedding_plan_id: String,
     response_workspace_id: String,
+    expected_revision: i64,
     message: AFPMessage,
 }
 
@@ -60,6 +61,28 @@ fn storage_error(error: sqlx::Error) -> (StatusCode, String) {
 
 fn string<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
     value.get(key).and_then(Value::as_str).map(str::trim)
+}
+
+fn budget_artifact_id(message: &AFPMessage) -> Option<&str> {
+    string(&message.content, "artifact_id").filter(|value| !value.is_empty())
+}
+
+fn budget_revision(message: &AFPMessage) -> Option<i64> {
+    let metadata = message.metadata.as_ref()?;
+    metadata
+        .get("budgetRevision")
+        .or_else(|| metadata.get("budget_revision"))
+        .and_then(Value::as_i64)
+        .filter(|revision| *revision > 0)
+}
+
+fn current_artifact_revision(messages: &[AFPMessage], artifact_id: &str) -> i64 {
+    messages
+        .iter()
+        .filter(|message| budget_artifact_id(message) == Some(artifact_id))
+        .map(|message| budget_revision(message).unwrap_or(1))
+        .max()
+        .unwrap_or(0)
 }
 
 fn exact_scope(value: &Value, plan: &str, workspace: &str) -> bool {
@@ -90,12 +113,20 @@ fn is_budget_projection(message: &AFPMessage, plan: &str, workspace: &str) -> bo
         && message.supertags.iter().any(|tag| tag == BUDGET_TAG)
 }
 
-fn attributed_metadata(current: Option<Value>, owner_user_id: &str, actor_user_id: &str) -> Value {
+fn attributed_metadata(
+    current: Option<Value>,
+    owner_user_id: &str,
+    actor_user_id: &str,
+    artifact_id: &str,
+    revision: i64,
+) -> Value {
     let mut metadata = current
         .and_then(|value| value.as_object().cloned())
         .unwrap_or_else(Map::new);
     metadata.insert("ownerUserId".into(), Value::String(owner_user_id.into()));
     metadata.insert("actorUserId".into(), Value::String(actor_user_id.into()));
+    metadata.insert("budgetArtifactId".into(), Value::String(artifact_id.into()));
+    metadata.insert("budgetRevision".into(), Value::Number(revision.into()));
     Value::Object(metadata)
 }
 
@@ -183,10 +214,66 @@ async fn store_http(
             "Only this Wedding's budget allocation or contribution can be saved here.",
         ));
     }
+    if request.expected_revision < 0 {
+        return Err(bad_request("Budget expected revision cannot be negative."));
+    }
+    let artifact_id = budget_artifact_id(&request.message)
+        .ok_or_else(|| bad_request("A budget artifact id is required."))?
+        .to_string();
+    state
+        .db
+        .ensure_user_private_schema(&scope.owner_user_id)
+        .await
+        .map_err(storage_error)?;
+    let lock_key = format!(
+        "wedding-budget:{}:{}:{}:{}",
+        scope.owner_user_id, scope.wedding_plan_id, scope.response_workspace_id, artifact_id
+    );
+    let mut lock = state.db.pool.begin().await.map_err(storage_error)?;
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))")
+        .bind(&lock_key)
+        .execute(&mut *lock)
+        .await
+        .map_err(storage_error)?;
+    let messages = state
+        .db
+        .list_private_messages_by_supertags(
+            &scope.owner_user_id,
+            &[BUDGET_TAG.to_string()],
+            None,
+            true,
+            1000,
+            0,
+        )
+        .await
+        .map_err(storage_error)?
+        .into_iter()
+        .map(proto_to_app)
+        .filter(|message| {
+            is_budget_projection(
+                message,
+                &scope.wedding_plan_id,
+                &scope.response_workspace_id,
+            )
+        })
+        .collect::<Vec<_>>();
+    let current_revision = current_artifact_revision(&messages, &artifact_id);
+    if request.expected_revision != current_revision {
+        return Err((
+            StatusCode::CONFLICT,
+            format!(
+                "wedding_budget_revision_conflict: expected {}, current {}. This shared budget changed elsewhere; refresh and review it before saving again.",
+                request.expected_revision, current_revision
+            ),
+        ));
+    }
+    let next_revision = current_revision + 1;
     request.message.metadata = Some(attributed_metadata(
         request.message.metadata,
         &scope.owner_user_id,
         &actor.id,
+        &artifact_id,
+        next_revision,
     ));
     let message_id = request.message.id.clone();
     store_private_app_message(
@@ -198,11 +285,13 @@ async fn store_http(
     )
     .await
     .map_err(status_to_http)?;
+    lock.commit().await.map_err(storage_error)?;
     Ok(Json(json!({
         "success": true,
         "message_id": message_id,
         "owner_user_id": scope.owner_user_id,
-        "actor_user_id": actor.id
+        "actor_user_id": actor.id,
+        "revision": next_revision
     })))
 }
 
@@ -258,5 +347,29 @@ mod tests {
             "plan-one",
             "workspace-one"
         ));
+    }
+
+    #[test]
+    fn derives_legacy_and_explicit_revisions_per_budget_artifact() {
+        let legacy = message(ALLOCATION_ARTIFACT_ID, "total-budget");
+        let mut revision_two = message(ALLOCATION_ARTIFACT_ID, "total-budget");
+        revision_two.metadata.as_mut().unwrap()["budgetRevision"] = json!(2);
+        let contribution = message(
+            "wedding-budget-contribution:workspace-one:alex",
+            "budget-contribution",
+        );
+
+        assert_eq!(current_artifact_revision(&[], ALLOCATION_ARTIFACT_ID), 0);
+        assert_eq!(
+            current_artifact_revision(&[legacy.clone()], ALLOCATION_ARTIFACT_ID),
+            1
+        );
+        assert_eq!(
+            current_artifact_revision(
+                &[legacy, revision_two, contribution],
+                ALLOCATION_ARTIFACT_ID
+            ),
+            2
+        );
     }
 }

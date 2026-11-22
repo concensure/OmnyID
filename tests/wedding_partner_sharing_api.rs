@@ -249,6 +249,7 @@ async fn membership_is_two_person_revisioned_and_revocable() {
     let budget_request = json!({
         "wedding_plan_id":plan_id,
         "response_workspace_id":workspace_id,
+        "expected_revision":0,
         "message":budget_message.clone()
     });
     let (partner_budget_write_status, partner_budget_write) = request_json(
@@ -288,9 +289,68 @@ async fn membership_is_two_person_revisioned_and_revocable() {
         owner_budget["messages"][0]["metadata"]["actorUserId"],
         partner_id
     );
+    assert_eq!(owner_budget["messages"][0]["metadata"]["budgetRevision"], 1);
+
+    let mut owner_budget_message = budget_message.clone();
+    owner_budget_message["id"] = json!(Ulid::new().to_string());
+    owner_budget_message["timestamp"] = json!(Utc::now().to_rfc3339());
+    let mut partner_budget_message = budget_message.clone();
+    partner_budget_message["id"] = json!(Ulid::new().to_string());
+    partner_budget_message["timestamp"] = json!(Utc::now().to_rfc3339());
+    let owner_budget_update = json!({
+        "wedding_plan_id":plan_id,
+        "response_workspace_id":workspace_id,
+        "expected_revision":1,
+        "message":owner_budget_message
+    });
+    let partner_budget_update = json!({
+        "wedding_plan_id":plan_id,
+        "response_workspace_id":workspace_id,
+        "expected_revision":1,
+        "message":partner_budget_message
+    });
+    let owner_update = request_json(
+        &app,
+        Method::POST,
+        "/wedding/budget/projections",
+        &owner_auth,
+        Some(&owner_budget_update),
+    );
+    let partner_update = request_json(
+        &app,
+        Method::POST,
+        "/wedding/budget/projections",
+        &partner_auth,
+        Some(&partner_budget_update),
+    );
+    let ((owner_update_status, _), (partner_update_status, _)) =
+        tokio::join!(owner_update, partner_update);
+    let mut competing_statuses = [owner_update_status, partner_update_status];
+    competing_statuses.sort_by_key(|status| status.as_u16());
+    assert_eq!(competing_statuses, [StatusCode::OK, StatusCode::CONFLICT]);
+    let (_, budget_after_competing_writes) = request_json(
+        &app,
+        Method::GET,
+        &format!("/wedding/budget/projections?{scope_query}"),
+        &owner_auth,
+        None,
+    )
+    .await;
+    let revision_two = budget_after_competing_writes["messages"]
+        .as_array()
+        .and_then(|messages| {
+            messages
+                .iter()
+                .find(|message| message["metadata"]["budgetRevision"] == 2)
+        });
+    assert!(
+        revision_two.is_some(),
+        "one competing write must append revision two"
+    );
     let wrong_budget_request = json!({
         "wedding_plan_id":plan_id,
         "response_workspace_id":format!("guessed-{suffix}"),
+        "expected_revision":1,
         "message":budget_message.clone()
     });
     let (wrong_budget_workspace_status, _) = request_json(

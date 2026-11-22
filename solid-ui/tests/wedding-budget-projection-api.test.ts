@@ -4,7 +4,10 @@ import test from "node:test";
 import {
   fetchWeddingBudgetProjectionMessages,
   sendWeddingBudgetProjection,
+  WeddingBudgetProjectionConflictError,
+  weddingBudgetProjectionExpectedRevision,
 } from "../src/lib/weddingBudgetProjectionApi.ts";
+import type { AfpMessage } from "../src/lib/api.ts";
 
 class MemoryStorage implements Storage {
   private readonly values = new Map<string, string>();
@@ -48,7 +51,7 @@ test("Wedding budget projection API binds reads and writes to plan plus workspac
       content: { kind: "wedding_decision_selection" },
       supertags: ["wedding_budget"],
       metadata: { wedding_plan_id: "plan one", response_workspace_id: "workspace/one" },
-    });
+    }, 0);
   } finally {
     globalThis.fetch = priorFetch;
     Object.defineProperty(globalThis, "window", { configurable: true, value: priorWindow });
@@ -58,7 +61,50 @@ test("Wedding budget projection API binds reads and writes to plan plus workspac
   assert.equal(requests[1]?.url, "/wedding/budget/projections");
   assert.equal(requests[1]?.body?.wedding_plan_id, "plan one");
   assert.equal(requests[1]?.body?.response_workspace_id, "workspace/one");
+  assert.equal(requests[1]?.body?.expected_revision, 0);
   const message = requests[1]?.body?.message as Record<string, unknown>;
   assert.match(String(message.id), /^[0-9A-HJKMNP-TV-Z]{26}$/i);
   assert.deepEqual(message.supertags, ["wedding_budget"]);
+});
+
+test("Wedding budget revisions are per artifact and legacy records begin at revision one", () => {
+  const allocation = {
+    id: "allocation-1", thread_id: "thread", from: "user://couple", to: [], timestamp: new Date().toISOString(),
+    type: "decision", content: { artifact_id: "wedding-budget-allocation" }, views: [], attachments: [], references: [],
+    supertags: ["wedding_budget"], metadata: {},
+  } satisfies AfpMessage;
+  const allocationRevisionThree = { ...allocation, id: "allocation-3", metadata: { budgetRevision: 3 } };
+  const contribution = { ...allocation, id: "contribution-1", content: { artifact_id: "wedding-budget-contribution:workspace:alex" } };
+  const input = {
+    thread_id: "thread", from: "user://couple", to: [], type: "decision",
+    content: { artifact_id: "wedding-budget-allocation" },
+  };
+
+  assert.equal(weddingBudgetProjectionExpectedRevision([], input), 0);
+  assert.equal(weddingBudgetProjectionExpectedRevision([allocation], input), 1);
+  assert.equal(weddingBudgetProjectionExpectedRevision([allocation, allocationRevisionThree, contribution], input), 3);
+});
+
+test("Wedding budget API exposes stale shared writes as a reviewable conflict", async () => {
+  const priorWindow = globalThis.window;
+  const priorFetch = globalThis.fetch;
+  Object.defineProperty(globalThis, "window", {
+    configurable: true,
+    value: { localStorage: new MemoryStorage(), sessionStorage: new MemoryStorage() },
+  });
+  globalThis.fetch = async () => new Response(
+    "wedding_budget_revision_conflict: expected 1, current 2. This shared budget changed elsewhere.",
+    { status: 409 },
+  );
+  try {
+    await assert.rejects(() => sendWeddingBudgetProjection(
+      { weddingPlanId: "plan", responseWorkspaceId: "workspace" },
+      { thread_id: "thread", from: "user://couple", to: [], type: "decision", content: { artifact_id: "wedding-budget-allocation" } },
+      1,
+    ), (error) => error instanceof WeddingBudgetProjectionConflictError
+      && error.expectedRevision === 1 && error.currentRevision === 2);
+  } finally {
+    globalThis.fetch = priorFetch;
+    Object.defineProperty(globalThis, "window", { configurable: true, value: priorWindow });
+  }
 });

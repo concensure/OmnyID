@@ -35,6 +35,7 @@ import {
 } from "@/lib/weddingBudgetGuidanceState";
 import type { WeddingBudgetContribution } from "@/lib/weddingBudgetInsightsState";
 import { consumeWeddingAssistantStagedUpdate } from "@/lib/weddingAssistantStagedUpdateState";
+import { WeddingBudgetProjectionConflictError } from "@/lib/weddingBudgetProjectionApi";
 
 function moneyLabel(amount: number, currency: string): string {
   return amount.toLocaleString(undefined, {
@@ -80,6 +81,7 @@ export function WeddingBudgetTrackerCard(props: {
   contactUserId?: string | null;
   onOpenArtifact?: (artifactId: string) => void;
   onAddQuotes?: () => void;
+  onRefreshWorkspace?: () => void;
 }) {
   const currency = props.state.lineItems[0]?.currency ?? "AUD";
   const [draft, setDraft] = createSignal<WeddingBudgetAllocationDraft>(
@@ -191,7 +193,13 @@ export function WeddingBudgetTrackerCard(props: {
       await props.onSaveAllocation(weddingDecisionProjectionToAfpSendInput(projection));
       if (props.weddingPlanId) clearWeddingBudgetAllocationPendingDecision(props.weddingPlanId);
       setSaveNotice("Budget saved. Your planner will use it when checking costs and next steps.");
-    } catch {
+    } catch (error) {
+      if (error instanceof WeddingBudgetProjectionConflictError) {
+        if (props.weddingPlanId) saveWeddingBudgetAllocationDraft(props.weddingPlanId, draft());
+        props.onRefreshWorkspace?.();
+        setSaveNotice("Your partner changed this shared budget. We kept your draft and are loading the latest saved values. Review them, then save again.");
+        return;
+      }
       if (props.weddingPlanId) saveWeddingBudgetAllocationDraft(props.weddingPlanId, draft());
       const projection = buildWeddingBudgetAllocationProjectionInput(draft(), props.metadata ?? {});
       if (props.weddingPlanId) saveWeddingBudgetAllocationPendingDecision(props.weddingPlanId, projection);
@@ -227,8 +235,13 @@ export function WeddingBudgetTrackerCard(props: {
       setContributionAmount("");
       setContributionCondition("");
       setContributionNotice("Contribution saved. Conditions will stay visible in the budget.");
-    } catch {
-      setContributionNotice("Could not save the contribution right now. Try again in a moment.");
+    } catch (error) {
+      if (error instanceof WeddingBudgetProjectionConflictError) {
+        props.onRefreshWorkspace?.();
+        setContributionNotice("This contribution changed in the shared budget. Your entries are still here; review the latest saved version, then save again.");
+      } else {
+        setContributionNotice("Could not save the contribution right now. Try again in a moment.");
+      }
     } finally {
       setSavingContribution(false);
     }

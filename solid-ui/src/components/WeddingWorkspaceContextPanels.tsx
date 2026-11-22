@@ -471,6 +471,7 @@ export function WeddingWorkspaceContextPanels(props: {
           contactUserId={props.contactUserId}
           onOpenArtifact={props.onOpenArtifact}
           onAddQuotes={() => setQuoteIntakeRequest((value) => value + 1)}
+          onRefreshWorkspace={props.onRefreshWorkspace}
         />
       </div>
 

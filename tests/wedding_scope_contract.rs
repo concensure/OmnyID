@@ -96,5 +96,9 @@ fn budget_projections_keep_existing_decisions_in_the_canonical_owner_ledger() {
     assert!(BUDGET_PROJECTION_ROUTES.contains("wedding_decision_selection"));
     assert!(BUDGET_PROJECTION_ROUTES.contains("exact_scope(content, plan, workspace)"));
     assert!(BUDGET_PROJECTION_ROUTES.contains("exact_scope(metadata, plan, workspace)"));
+    assert!(BUDGET_PROJECTION_ROUTES.contains("expected_revision"));
+    assert!(BUDGET_PROJECTION_ROUTES.contains("pg_advisory_xact_lock"));
+    assert!(BUDGET_PROJECTION_ROUTES.contains("wedding_budget_revision_conflict"));
+    assert!(BUDGET_PROJECTION_ROUTES.contains("budgetRevision"));
     assert!(!BUDGET_PROJECTION_ROUTES.contains("store_private_app_message(\n        &state.db,\n        &state.metrics,\n        &state.relay_tx,\n        &actor.id"));
 }

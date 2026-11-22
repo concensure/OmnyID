@@ -15,6 +15,17 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-398
+    title: Add revision-safe shared Wedding budget conflict recovery
+    status: in_progress
+    owner: codex
+    branch: agent/codex/WED-398
+    worktree: C:/temp/wt/omnyid-wed389
+    base_sha: 4d0fed17f1a4b6ff4d63f0bb985f189349a3494a
+    depends_on: [WED-397, WED-396, WED-390]
+    files: [src/server/wedding_budget_projection_routes.rs, solid-ui/src/lib/weddingBudgetProjectionApi.ts, solid-ui/src/components/ResponseQueueView.tsx, solid-ui/src/components/WeddingBudgetTrackerCard.tsx, solid-ui/src/components/WeddingDecisionFocusCard.tsx, solid-ui/src/components/WeddingWorkspaceContextPanels.tsx, tests/wedding_partner_sharing_api.rs, tests/wedding_scope_contract.rs, solid-ui/tests/wedding-budget*.test.ts, Documents/design/wedding planner/couple coworkspace/couple-coworking-*.md, .agent/**]
+    acceptance: [require an expected per-artifact revision for canonical allocation and contribution writes, serialize competing partner writes without adding a parallel budget store, append the accepted next revision and owner/actor provenance to the existing AFP decision, reject stale writes before ledger mutation, preserve the user's unsaved draft on conflict while refreshing and explicitly explaining partner change review, keep ordinary offline fallback for availability failures but never mislabel a conflict as a local-only success, focused frontend Rust contract and disposable-Postgres concurrent-partner tests pass from a clean exact candidate, record a bounded COW-07 money-conflict slice without claiming full cross-domain recoverability]
+    progress: "Registered from clean WED-397 record SHA 4d0fed17f1a4b6ff4d63f0bb985f189349a3494a after the completed shared Budget slice identified expected-revision conflict UX as the next P0 coworking dependency."
   - id: WED-397
     title: Share canonical Wedding budget allocation and contribution projections
     status: done

@@ -124,7 +124,10 @@ test("loadWeddingWorkspaceRefreshState merges canonical budget messages without 
     signedIn: true,
     weddingPlanId: metadata.weddingPlanId,
     responseWorkspaceId: metadata.responseWorkspaceId,
-    loadMessages: async () => ({ tags: ["event:wedding"], match: "all", count: 2, messages: [contextMessage, budgetMessage] }),
+    loadMessages: async () => ({
+      tags: ["event:wedding"], match: "all", count: 3,
+      messages: [contextMessage, budgetMessage, { ...budgetMessage, id: "stale-partner-budget-copy" }],
+    }),
     loadBudgetMessages: async () => ({ tags: ["wedding_budget"], match: "all", count: 1, messages: [budgetMessage] }),
   });
 
