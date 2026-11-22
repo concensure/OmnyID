@@ -287,6 +287,8 @@ main:focus{ outline:none; }
 .hero-copy h1{ font-size: clamp(34px, 5vw, 56px); line-height:1.08; }
 .hero-copy .lede{ margin-top:20px; font-size:18px; color: var(--ink-soft); max-width: 480px; }
 .hero-subtitle{ margin-top:20px; max-width:580px; color:var(--ink-soft); font-family:inherit; font-size:clamp(18px, 2vw, 23px); font-weight:500; line-height:1.5; }
+.hero-format-note{ margin-top:18px; max-width:580px; color:var(--ink); font-size:15px; line-height:1.6; }
+.hero-format-note strong{ font-weight:800; }
 .hero-cta{ display:flex; align-items:center; gap:18px; margin-top:32px; flex-wrap:wrap; }
 .hero-trust{ display:flex; gap:36px; margin-top:44px; flex-wrap:wrap; }
 .hero-facts{ width:100%; max-width:620px; margin-top:28px; border-collapse:collapse; border:1px solid var(--line); border-radius:12px; overflow:hidden; background:rgba(255,255,255,.78); font-size:14px; }
@@ -325,6 +327,7 @@ main:focus{ outline:none; }
   .hero-copy{ order:1; text-align:center; }
   .hero-copy .lede{ margin-inline:auto; }
   .hero-subtitle{ margin-inline:auto; }
+  .hero-format-note{ margin-inline:auto; }
   .hero-cta{ justify-content:center; }
   .hero-trust{ justify-content:center; }
   .hero-facts{ margin-inline:auto; text-align:left; }

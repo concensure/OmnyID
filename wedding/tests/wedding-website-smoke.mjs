@@ -396,6 +396,11 @@ if (!weddingHome.includes('assets/images/elvis-bekmanis-WJc87MVcDaA-unsplash.jpg
 if (/\@media[^{}]*max-width[^{}]*\{[^{}]*\.hero-subtitle\s*\{[^{}]*display\s*:\s*none/is.test(landingCss)) {
   failures.push('style.css: Mobile layout must keep the soft small-wedding message visible');
 }
+if (!weddingHome.includes('There’s more than one way to have a wedding.')
+  || !weddingHome.includes('Just us, our closest people or a larger celebration')
+  || /\@media[^{}]*max-width[^{}]*\{[^{}]*\.hero-format-note\s*\{[^{}]*display\s*:\s*none/is.test(landingCss)) {
+  failures.push('index.html: Mobile hero must keep the soft format-choice message visible');
+}
 if (!weddingHome.includes('id="guest-journey"')
   || !weddingHome.includes('Bring the list you have. Review what OmnyID understood.')
   || !weddingHome.includes('CSV, TSV or pasted table')
