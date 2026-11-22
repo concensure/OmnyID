@@ -12522,3 +12522,29 @@ expected-revision money conflict presentation/recovery, and COW-03/COW-06 still
 cover broader Guests, Seating, Vendors/Quotes, Documents and retrieval/live
 paths. No Oracle deploy, GitHub push or PR occurred; production remains on
 WED-392 source `afd6d5cc04d3c5996256ca1df131ba7e1de659fb`.
+
+## WED-398 shared Budget conflict recovery (2026-11-23)
+
+Worktree `C:/temp/wt/omnyid-wed389`, branch `agent/codex/WED-398`. Exact
+implementation SHA `722bc880bc239205157ec801921c02d2dfa6ea1e`.
+
+Canonical Budget writes now require a per-allocation or per-contribution
+expected revision. A scope/artifact advisory transaction lock serializes
+competing partners; the winner appends the next revision to the existing AFP
+decision with owner/actor provenance and a stale writer receives a conflict
+before mutation. The client retains that draft, refreshes the shared Budget and
+asks for review. Availability failures alone keep the device fallback. Shared
+refresh also removes historical actor-local Budget copies in favour of the
+canonical projection.
+
+Exact-SHA proof: focused frontend 8/8, TypeScript, standalone scope contracts
+6/6 and Linux `cargo check --lib` pass. A real disposable pgvector/PostgreSQL
+test launched simultaneous owner/partner revision-one writes and observed one
+revision-two append plus one conflict; the broader guessed-workspace,
+cross-couple and revoked-member matrix also passed. Rust 1.94 used
+`RUST_MIN_STACK=134217728`. Container `omnyid-wed398-pg` was removed.
+
+COW-07C is complete for Budget only. COW-07 remains open for other protected
+domains and general archive/restore UX. No Oracle deployment, GitHub push or PR
+occurred; production remains on WED-392 source
+`afd6d5cc04d3c5996256ca1df131ba7e1de659fb`.

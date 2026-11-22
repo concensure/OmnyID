@@ -86,6 +86,14 @@ metadata keeps owner and actor separate, and no record is copied into the
 partner account. Expected-revision conflict presentation and recovery for
 protected money changes remain a later COW-07 slice.
 
+WED-398 supplies that bounded money-conflict slice. Allocation and individual
+contribution writes now require the current artifact revision and serialize
+competing partner writes before appending the next revision to the existing AFP
+ledger. A stale editor keeps their unsaved draft, refreshes the canonical
+budget and is told to review the newer values; it is not misreported as an
+offline save. This closes Budget conflict presentation only. It does not claim
+revision/recovery completion for other shared domains.
+
 Still not claimed complete: systematic `WeddingScope` enforcement across
 every Wedding domain, shared activity/catch-up, scoped AI retrieval,
 private-to-shared AI publication and permission-filtered live delivery. Those
@@ -119,7 +127,7 @@ does not mean every route in that domain has completed partner enforcement.
 | Domain | Canonical authority | Current state | Required next action |
 | --- | --- | --- | --- |
 | Membership and selected contacts | `wedding_plan_memberships`, `wedding_partner_invites`, encrypted `wedding_shared_contact_grants` | Membership-ready | Reuse `WeddingScope`; retain field-preview publication and revocation. |
-| Budget and contributions | Existing Wedding AFP projections and budget records | Allocation/contribution reads and writes now resolve canonical scope; local drafts remain convenience state | Add expected revision, conflict presentation and recovery to protected money changes. |
+| Budget and contributions | Existing Wedding AFP projections and budget records | Canonical shared reads/writes plus per-artifact expected revision and draft-preserving conflict review | Extend general archive/restore policy without creating another money authority. |
 | Guests, RSVP and households | Canonical RSVP setup/response/capability routes and guest AFP projections | Authenticated protected-link management and manual response recording now resolve canonical scope; external capability stays narrow; broader guest projections remain mixed | Extend the same authority to remaining authenticated guest/household reads and background delivery without broadening guest capabilities. |
 | Seating | Canonical guest/seating AFP projections plus account-keyed presentation state | Partly browser-local | Move authoritative placement mutations behind scoped server commands; keep only view preferences local. |
 | Vendors, enquiries and quotes | Canonical vendor IDs, enquiry envelopes, messages and Quote Intelligence | Mostly plan-referenced, not uniformly membership-resolved | Apply scope to authenticated couple reads, messages, attachments and quote selection. |

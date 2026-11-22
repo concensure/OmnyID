@@ -4647,3 +4647,17 @@ partner reads the same allocation/contribution records through normal Wedding
 refresh without receiving copied messages. Money conflict/recovery UX is a
 separate protected-write slice: actor attribution is not an expected-revision
 substitute.
+
+## 2026-11-23 — Shared Budget uses per-artifact optimistic revisions (WED-398)
+
+Allocation and each contribution are independently revisioned artifacts in the
+existing AFP Budget decision stream. The scoped server serializes competing
+writes on canonical owner/plan/workspace/artifact and accepts only the current
+expected revision; the winner appends the next revision with owner and actor
+provenance. This concurrency control is not a second Budget store.
+
+A conflict is a review state, not an outage or a local-save success. The client
+keeps the unsaved draft, reloads canonical messages and explicitly tells the
+couple that their partner changed the shared budget. Historical actor-local
+Budget copies are excluded from the shared projection once canonical messages
+are available.

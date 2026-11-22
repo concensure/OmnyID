@@ -214,6 +214,21 @@ read, sharer provenance, omitted-field redaction and sharer-only revocation.
 - Full COW-07 remains open for conflict presentation and recoverability across
   money, confirmed decisions and the other shared domains.
 
+#### COW-07C — Shared Budget revision conflict recovery (WED-398)
+
+- [x] Require the current per-artifact revision when saving an allocation or
+  contribution and serialize competing owner/co-owner writes.
+- [x] Append the accepted next revision to the existing AFP decision with
+  canonical owner and acting-member provenance; do not create a budget store.
+- [x] Reject a stale write before ledger mutation, retain the unsaved browser
+  draft and refresh the canonical budget for explicit review.
+- [x] Keep availability failures on the existing local fallback while never
+  presenting a partner conflict as a successful device-only save.
+- [x] Prove simultaneous owner/partner revision-one writes yield exactly one
+  revision-two append and one conflict in disposable PostgreSQL.
+- Full COW-07 remains open for confirmed decisions, guests, seating,
+  vendors/quotes, documents and general archive/restore UX.
+
 ### COW-08 — Assignments, comments and joint decisions (P1)
 
 - Reuse existing task ownership, comments/messages and DecisionOS records.
