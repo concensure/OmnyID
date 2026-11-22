@@ -1630,6 +1630,8 @@ pub async fn build_test_router(database_url: &str) -> Router {
         .merge(wedding_boundary_routes::routes())
         .merge(wedding_runsheet_projection_routes::routes())
         .merge(wedding_runsheet_share_routes::routes())
+        .merge(wedding_decision_research_routes::routes())
+        .merge(wedding_task_assignment_routes::routes())
         .merge(wedding_invite_proposal_routes::routes()).merge(wedding_invite_proposal_opportunity_routes::routes())
         .merge(wedding_vendor_special_offer_routes::routes())
         .merge(wedding_celebrant_consultation_routes::routes())
