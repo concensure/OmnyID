@@ -22,12 +22,42 @@ encrypted-mail or calendar-conflict integration is claimed. The public page rest
 Soft intimate/micro/larger wording visible on mobile. Decision-card spec/tasks record
 the boundary and do not claim unsupported topology integrations.
 
-Implementation-worktree checks: TypeScript passed with an enlarged Node stack; 115
-focused tests and the full public Wedding site smoke passed. WSL rustc 1.94 crashed
-inside compiler/LLVM internals with SIGILL/SIGSEGV even with one job and enlarged
-stacks. Do not interpret that infrastructure failure as a source diagnostic; run the
-frozen clean candidate through the Docker Rust 1.94 build before release. Production
-is still the WED-392 SHA until that gate and Oracle smoke complete.
+Exact deployed application/static SHA:
+`2432cf9a1bda12143fd071912a6668d66b6bdc20`; clean release worktree:
+`C:/temp/wt/omnyid-wed400-release-2432cf9a`. The final mobile copy adds an
+always-visible, Soft-format sentence under the general hero lede: there is more than
+one way to have a wedding, whether it is just the couple, their closest people or a
+larger celebration. At 390px it is visible, the restored
+`elvis-bekmanis-WJc87MVcDaA-unsplash.jpg` loads, there is no horizontal overflow or
+browser error, and `Ask Sprout` is absent.
+
+Clean exact-SHA verification passed TypeScript, both line budgets, the complete public
+and security Wedding checks, all 2,367 Wedding tests, the production build and the
+pinned Linux Rust 1.94 image build. Oracle runs ARM64 image
+`sha256:2d60a1983189069821c344a0ce841f87ab747c51dc9308b9d429943e8b690717`
+with the full OCI revision above and zero restarts. Migration
+`0176_wedding_task_assignment_actor` is installed. Caddy validation, the lightweight
+production audit and backup verification pass. The read-only scheduled Wedding
+monitor passes public page, password login, authenticated session, workspace
+bootstrap, health, readiness and asset-cache checks; its twice-daily timer is enabled
+and active. Brave Search and Google Places return 200. The three EXA decision probes
+(transport, celebrant and florist) each returned five relevant direct-source results
+and passed their sensible-result threshold.
+
+Rollback is retained at
+`/home/ubuntu/omnyid-candidates/wed400-2432cf9a1bda12143fd071912a6668d66b6bdc20/rollback`
+with the immediately preceding WED-400 image tagged
+`omnyid-homeserver:wed400-rollback-18ee85e2` and the pre-final public Wedding archive.
+The preceding candidate at
+`/home/ubuntu/omnyid-candidates/wed400-18ee85e201d49690de16523c706a9b8e2552095c/rollback`
+retains the WED-392 image/static/workspace/Caddy rollback. No volume, backup, current
+image or rollback image was removed. After the release, 4.738 GB of unused reproducible
+Docker build cache was pruned; root use returned from 95% to 85%.
+
+Post-release operational commit
+`357918bff2c416dde3f6984f607ce3a771ea7e6d` only normalizes CRLF in the local Oracle
+provider and EXA smoke payloads. It was used to obtain the passing provider evidence;
+it is deliberately not recorded as the deployed application SHA.
 
 ## WED-399 shared revision-safe Seating slice (2026-11-23)
 
