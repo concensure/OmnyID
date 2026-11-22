@@ -17,7 +17,7 @@ lifecycle:
 tasks:
   - id: WED-394
     title: Apply canonical WeddingScope to the installed run-sheet projection
-    status: in_progress
+    status: review
     owner: codex
     branch: agent/codex/WED-394
     worktree: C:/temp/wt/omnyid-wed389
@@ -25,7 +25,7 @@ tasks:
     depends_on: [WED-392, WED-393, WED-291, WED-295]
     files: [src/db/wedding_runsheet_projection.rs, src/server/wedding_runsheet_projection_routes.rs, solid-ui/src/lib/databaseRegistryState.ts, solid-ui/src/lib/weddingRunSheetProjectionApi.ts, solid-ui/src/components/WeddingRunSheetProjectionStatus.tsx, solid-ui/src/components/DatabaseView.tsx, solid-ui/tests/database-registry-state.test.ts, solid-ui/tests/wedding-run-sheet-projection-api.test.ts, tests/wedding_scope_contract.rs, tests/wedding_partner_sharing_api.rs, Documents/design/wedding planner/couple coworkspace/couple-coworking-*.md, .agent/**]
     acceptance: [run-sheet projection reads and commits resolve an exact active WeddingScope before selecting the owner ledger, both partners use the same owner plan workspace database checkpoint and rows without copying them, wrong-workspace cross-couple and revoked-member requests fail before projection access, the frontend sends the discovered response workspace on every projection request and installed run-sheet definitions retain it, optimistic checkpoint and source-scope protections remain intact, focused server and frontend tests plus clean-candidate checks pass, COW-03 and COW-06 remain explicitly partial until their other domains are converted]
-    progress: "Started from the clean WED-393 record commit; the run-sheet projection is the next bounded COW-03 enforcement slice."
+    progress: "Implementation is complete at a02ec596b5e2471d42c48f864b03cf837d510cb0. Install/load/commit resolve exact WeddingScope and use the canonical owner ledger while retaining actor identity; Database view carries the plan workspace; server installation persists the existing run-sheet definition; two-couple/wrong-workspace/revoked-member coverage is added. Exact-SHA frontend tests 10/10, typecheck, cargo check --lib and wedding_scope_contract 3/3 pass. The Windows Rust 1.94 compiler repeatedly crashes internally while rebuilding lib/test (access violation, stack overflow and illegal instruction), Rust 1.95 also access-violates in serde_core, Docker is unavailable and TEST_DATABASE_URL is unset, so the new disposable-Postgres body is not executed and the slice remains in review rather than done."
   - id: WED-393
     title: Keep venue decisions actionable before an exact wedding date and preserve their sequence priority
     status: done

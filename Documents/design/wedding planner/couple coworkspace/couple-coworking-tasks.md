@@ -111,8 +111,10 @@ read, sharer provenance, omitted-field redaction and sharer-only revocation.
 
 - [x] Carry the resolved response workspace through the Database view and every
   run-sheet projection request.
-- [x] Prove a co-owner can project a source-linked row and the owner reads the
-  same checkpoint and AFP messages without a copied database.
+- [ ] Execute the added disposable-Postgres proof that a co-owner can project a
+  source-linked row and the owner reads the same checkpoint and AFP messages
+  without a copied database. The test also covers another couple and revocation;
+  local execution is pending because this host has no Postgres/Docker service.
 - [x] Keep personal Database definitions account-private; only the exact
   authorised Wedding run-sheet projection crosses the membership boundary.
 - Full COW-06 remains open until the other listed Wedding projections share the

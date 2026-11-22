@@ -1,3 +1,14 @@
+# 2026-11-23: The installed run sheet is one scope-resolved owner ledger
+
+The Wedding Database view may install and project `wedding_runsheet.v1` only
+after the server resolves the signed-in member's exact active `WeddingScope`.
+Both partners read and commit the canonical owner's existing AFP messages and
+checkpoint; the acting member remains separately attributed on delivery events.
+The response workspace is required on install, load and commit and is checked
+before ledger selection. A missing definition is created idempotently in that
+same ledger, so "installed" does not mean a browser-only table or a second
+partner copy. Public/vendor run-sheet capabilities remain narrower and separate.
+
 # 2026-11-22: WED-392 guest growth proof and selected contacts stay bounded
 
 The public Wedding page uses guest-list evidence as a J0-J6 customer-growth

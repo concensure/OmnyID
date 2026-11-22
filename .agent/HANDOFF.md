@@ -1,3 +1,28 @@
+## WED-394 canonical shared run-sheet slice (2026-11-23)
+
+Worktree `C:/temp/wt/omnyid-wed389`, branch `agent/codex/WED-394`, based on
+WED-393 record SHA `1e6ccd7102375572221ab81ab6ce1e30eae333cb`.
+Implementation head before this record: `a02ec596b5e2471d42c48f864b03cf837d510cb0`.
+
+Run-sheet install, load and commit now require the exact response workspace and
+resolve the shared `WeddingScope` before selecting storage. Both partners use
+the canonical owner's AFP definition, messages and optimistic checkpoint; relay
+events retain the acting account. The Database view discovers and sends the
+workspace, and the server idempotently installs the existing run-sheet
+definition when it is absent, so no user table-install step or copied store is
+introduced. Conditional disposable-Postgres coverage includes two couples,
+wrong workspace, same owner/partner state and post-revocation denial.
+
+Pass on the clean candidate: focused frontend 10/10, TypeScript, `cargo check
+--lib`, and `wedding_scope_contract` 3/3. The Windows Rust 1.94 compiler then
+failed internally while rebuilding lib/test with access violation, stack
+overflow and illegal-instruction exits; the installed Rust 1.95 also
+access-violated while compiling `serde_core`. Docker is unavailable and no
+`TEST_DATABASE_URL` or local PostgreSQL service exists, so the database-backed
+test body was not executed. WED-394 is in review, not done. No Oracle deployment
+was attempted; production remains the WED-392 application SHA
+`afd6d5cc04d3c5996256ca1df131ba7e1de659fb`.
+
 ## WED-393 venue-before-date decision refinement (2026-11-22)
 
 Worktree `C:/temp/wt/omnyid-wed389`, branch `agent/codex/WED-393`, based on clean
