@@ -313,3 +313,35 @@ The public site retains the selected Soft message: a general “wedding that fee
 like you” headline, with intimate ceremonies and micro weddings named alongside
 larger celebrations. That sentence must remain present at mobile widths. This is a
 message alignment, not a small-wedding-only repositioning.
+
+## 13. Plan-variable dependency decisions
+
+Guest count and budget are revisioned Wedding facts. A changed answer is saved as a
+new revision through the existing Need-To-Know, intake-profile and Budget decision
+streams; it must not be discarded as “already saved”. The current and immediately
+prior distinct values supply the before/after evidence for dependent cards.
+
+There is no universal wedding-industry “20 guests” threshold. Vendor terms control
+when present: for example, Monash Country Club requires final numbers seven days
+before the wedding and will accept increases but not decreases after that point,
+while Gabbinbar requires final numbers three weeks before the wedding and requires
+approval for later increases. In the absence of an extracted vendor threshold, the
+product safeguard treats a change as material when it is at least 20 guests, or at
+least 10 guests and 20% of the prior count. This keeps the fallback proportionate for
+small weddings. The card identifies affected capacity/per-head vendors, shows the
+exact change and prepares a reconfirmation only; vendor contact remains approval
+gated. Sources: https://www.monashcc.com.au/cms/weddings/frequently-asked-questions/
+and https://gabbinbar.com.au/files/gabbinbar-terms-and-conditions.pdf.
+
+A lower total budget creates one budget-trade-off decision only when saved vendor
+costs exist. It shows the old total, new total and reduction to absorb. Candidate
+options favour projected, reduced-allocation or lower-priority categories and
+protect categories that match saved priorities, atmosphere, vendor preferences or
+photography scope. The recommendation remains unsupported when no preference
+evidence exists. Choosing an option records what to review; it never cancels scope,
+changes a contract, forfeits a deposit or contacts a vendor automatically.
+
+Each before/after fingerprint has one stable task id. Settling it suppresses that
+revision; a later material edit produces a successor. The shared card contract,
+ranking, evidence and approval flows are reused without a new card layout or a
+parallel decision store.

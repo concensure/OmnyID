@@ -21,6 +21,7 @@ export type WeddingNeedToKnowProjectionContext = {
 };
 
 function clean(value: unknown): string | null {
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
@@ -38,8 +39,32 @@ function uniqueStrings(values: readonly unknown[], limit = 48): string[] {
   return result;
 }
 
-function contextId(metadata: WeddingPlanningMetadata): string {
-  return `wedding_need_to_know:${safeWeddingLabel(metadata.responseWorkspaceId)}`;
+function projectionFingerprint(context: WeddingNeedToKnowProjectionContext): string {
+  const planning = context.planningContext ?? {};
+  const serialized = JSON.stringify({
+    dateOrSeason: clean(planning.dateOrSeason),
+    location: clean(planning.location),
+    guestCount: typeof planning.guestCount === "number" ? planning.guestCount : clean(planning.guestCount),
+    budgetComfort: clean(planning.budgetComfort),
+    topPriorities: uniqueStrings(planning.topPriorities ?? []),
+    atmosphereDescription: clean(planning.atmosphereDescription),
+    vendorCategories: uniqueStrings(planning.vendorCategories ?? []),
+    vendorPreferences: clean(planning.vendorPreferences),
+    familyOrStakeholderRoles: clean(planning.familyOrStakeholderRoles),
+    accessibilityRequirements: clean(planning.accessibilityRequirements),
+    dietaryRequirements: clean(planning.dietaryRequirements),
+  });
+  let hash = 2166136261;
+  for (let index = 0; index < serialized.length; index += 1) {
+    hash ^= serialized.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(36);
+}
+
+export function weddingNeedToKnowProjectionId(context: WeddingNeedToKnowProjectionContext): string {
+  const metadata = normalizeWeddingPlanningMetadata(context.metadata);
+  return `wedding_need_to_know:${safeWeddingLabel(metadata.responseWorkspaceId)}:${projectionFingerprint(context)}`;
 }
 
 function markdownFor(context: WeddingNeedToKnowProjectionContext): string {
@@ -98,7 +123,7 @@ export function weddingNeedToKnowContextToAfpMessage(
   nowIso = new Date().toISOString(),
 ): AfpMessage {
   const metadata = normalizeWeddingPlanningMetadata(context.metadata);
-  const id = contextId(metadata);
+  const id = weddingNeedToKnowProjectionId({ ...context, metadata });
   const markdown = markdownFor({ ...context, metadata });
   const semanticObject = weddingSemanticObjectFromNeedToKnowContext({
     id,

@@ -9,8 +9,8 @@ import {
   type WeddingPlanningScheduleItem,
   type WeddingPlanningTaskItem,
 } from "@/lib/weddingCalendarProjectionState";
-import { markWeddingNeedToKnowAfpProjectionSent } from "@/lib/weddingNeedToKnowAfpProjectionState";
-import { markWeddingIntakeProfileAfpProjectionSent } from "@/lib/weddingIntakeProfileAfpProjectionState";
+import { markWeddingNeedToKnowAfpProjectionSent, weddingNeedToKnowProjectionId } from "@/lib/weddingNeedToKnowAfpProjectionState";
+import { markWeddingIntakeProfileAfpProjectionSent, weddingIntakeProfileProjectionId } from "@/lib/weddingIntakeProfileAfpProjectionState";
 import { buildWeddingCollaborationState } from "@/lib/weddingCollaborationState";
 import {
   buildWeddingProjectionQueueSelectionState,
@@ -408,15 +408,16 @@ test("buildWeddingProjectionQueueState labels review-only and incomplete items a
 test("buildWeddingProjectionQueueState excludes already sent projections from dispatch inputs", () => {
   const storage = memoryStorage();
   const [artifact] = artifacts();
+  const context = contextItem(storage);
   assert.ok(artifact);
   markWeddingArtifactAfpProjectionSent(artifact.summary.id, storage);
-  markWeddingNeedToKnowAfpProjectionSent("response_workspace:workspace-1", storage);
-  markWeddingIntakeProfileAfpProjectionSent("wedding_intake_profile:response_workspace:workspace-1", storage);
+  markWeddingNeedToKnowAfpProjectionSent(weddingNeedToKnowProjectionId(context), storage);
+  markWeddingIntakeProfileAfpProjectionSent(weddingIntakeProfileProjectionId(context), storage);
   markWeddingProjectionSent(scheduleItem.id, WEDDING_CALENDAR_AFP_PROJECTIONS_KEY, storage);
   markWeddingProjectionSent(taskItem.id, WEDDING_TASK_AFP_PROJECTIONS_KEY, storage);
 
   const state = buildWeddingProjectionQueueState({
-    contextItems: [contextItem(storage)],
+    contextItems: [context],
     artifacts: [artifact],
     scheduleItems: [scheduleItem],
     taskItems: [taskItem],
@@ -433,10 +434,11 @@ test("buildWeddingProjectionQueueState excludes already sent projections from di
 
 test("buildWeddingProjectionQueueState can backfill intake profile after context was already saved", () => {
   const storage = memoryStorage();
-  markWeddingNeedToKnowAfpProjectionSent("response_workspace:workspace-1", storage);
+  const context = contextItem(storage);
+  markWeddingNeedToKnowAfpProjectionSent(weddingNeedToKnowProjectionId(context), storage);
 
   const state = buildWeddingProjectionQueueState({
-    contextItems: [contextItem(storage)],
+    contextItems: [context],
     storage,
   });
 

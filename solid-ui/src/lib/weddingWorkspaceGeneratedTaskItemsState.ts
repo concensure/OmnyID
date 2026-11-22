@@ -42,6 +42,7 @@ import {
 import type { WeddingProductionRemainingWorkState } from "@/lib/weddingProductionRemainingWorkState";
 import type { WeddingPersistedApprovalReceipt } from "@/lib/weddingPersistedWorkspaceState";
 import { buildWeddingPostWeddingWrapUpTaskItems } from "@/lib/weddingPostWeddingWrapUpState";
+import { buildWeddingPlanVariableChangeTaskItems } from "@/lib/weddingPlanVariableChangeState";
 import { buildWeddingProviderHandoffTaskItems } from "@/lib/weddingProviderHandoffTaskState";
 import {
   buildWeddingSeatingActionTaskItems,
@@ -51,6 +52,8 @@ import { buildWeddingVendorSearchTaskItems } from "@/lib/weddingVendorSearchArti
 import { buildWeddingVendorLeadTimeTaskItems } from "@/lib/weddingVendorLeadTimeState";
 import { buildWeddingVendorSeedTaskItems } from "@/lib/weddingVendorSeedState";
 import { buildWeddingVowPlanningTaskItems } from "@/lib/weddingVowPlanningState";
+import type { WeddingNeedToKnowProjectionContext } from "@/lib/weddingNeedToKnowAfpProjectionState";
+import type { WeddingPersistedDecisionRecord } from "@/lib/weddingPersistedWorkspaceState";
 
 export type WeddingWorkspaceGeneratedTaskItemsInput = {
   artifacts?: readonly WeddingArtifactInput[] | null;
@@ -58,6 +61,8 @@ export type WeddingWorkspaceGeneratedTaskItemsInput = {
   baseTaskItems?: readonly WeddingPlanningTaskItem[] | null;
   loopTaskItems?: readonly WeddingPlanningTaskItem[] | null;
   budgetTracking?: WeddingBudgetTrackingState | null;
+  contextItems?: readonly WeddingNeedToKnowProjectionContext[] | null;
+  decisionRecords?: readonly WeddingPersistedDecisionRecord[] | null;
   guestTracking?: WeddingGuestTrackingState | null;
   seatingPlan?: WeddingSeatingPlanState | null;
   inspiration?: WeddingInspirationState | null;
@@ -78,8 +83,23 @@ export type WeddingWorkspaceGeneratedTaskItemsInput = {
 };
 
 export function buildWeddingWorkspaceGeneratedTaskItems(input: WeddingWorkspaceGeneratedTaskItemsInput): WeddingPlanningTaskItem[] {
-  const baseTaskItems = [...(input.baseTaskItems ?? [])];
+  // Plan-change decisions are projections of the current before/after state. Drop stale
+  // generated copies, then rebuild the one current revision while retaining its settled state.
+  const existingTaskItems = [...(input.baseTaskItems ?? [])];
+  const baseTaskItems = existingTaskItems.filter((task) => {
+    const metadata = task.metadata && typeof task.metadata === "object" && !Array.isArray(task.metadata)
+      ? task.metadata as Record<string, unknown>
+      : {};
+    return metadata.plan_variable_change_decision !== true;
+  });
   const generatedTaskItems = [
+    ...buildWeddingPlanVariableChangeTaskItems({
+      contextItems: input.contextItems,
+      decisionRecords: input.decisionRecords,
+      budgetTracking: input.budgetTracking,
+      metadata: input.metadata,
+      existingTaskItems,
+    }),
     ...buildWeddingBudgetQuoteTaskItems({
       budgetTracking: input.budgetTracking,
       metadata: input.metadata,

@@ -15,6 +15,18 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-401
+    title: Recover OAuth workspace rendering and propagate material Wedding plan changes into decisions
+    status: in_progress
+    owner: codex
+    reviewer: claude
+    branch: agent/codex/WED-401
+    worktree: C:/temp/wt/omnyid-wed401
+    base_sha: 1be030b55669292daf84b0098b998aa284c3b997
+    depends_on: [WED-400, WED-398, WED-390]
+    files: [solid-ui/src/**, solid-ui/tests/**, src/server/**, src/wedding_*.rs, tests/**, scripts/**, Documents/design/wedding planner/decision card/**, .agent/**]
+    acceptance: [reproduce and fix the OAuth-to-workspace blank page without weakening authentication or hiding bootstrap failures, add a production-shaped regression that proves an OAuth callback/session can render or recover visibly rather than leave a blank document, material guest-count changes create an evidence-based existing DecisionOS card to reconfirm affected vendor capacity pricing and scope with explicit approval before contact, budget decreases create preference-aware existing DecisionOS review choices for the most negotiable or deferrable vendor commitments without silently discarding settled essentials, dependency cards are idempotent update when inputs change and use saved couple vision preferences quotes commitments and deadlines, pass focused full Wedding typecheck build and clean-SHA deployment gates, deploy the exact committed candidate to Oracle with rollback and authenticated post-deploy proof]
+    progress: "Implemented a CSP-compatible pre-module recovery surface, network-only workspace shell/module service-worker policy, revisioned planning projections, and shared DecisionOS tasks for material guest-count and budget reductions. Typecheck, both line budgets, public Wedding checks, 2,372 Wedding tests, production build, and OAuth-shaped browser handoff pass; clean-SHA Oracle release is next."
   - id: WED-400
     title: Make Wedding venue holds and earned proactive signals explicit without redesigning Decision Focus
     status: done

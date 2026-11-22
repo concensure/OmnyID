@@ -4687,3 +4687,34 @@ non-venue quote cannot release venue-dependent caterer or photographer work. Pro
 plain-language signals appear only from saved reply timing, decision-load, budget or
 watcher metadata. The existing card layout and approval/provider receipt boundary are
 unchanged.
+
+## 2026-11-23 — Plan edits are revisioned facts with dependent decisions (WED-401)
+
+Need-To-Know and intake-profile projections use a fingerprint of the material
+planning context. Re-saving the same facts stays idempotent; changing guest count,
+budget or relevant preferences creates a successor in the existing AFP stream so
+before/after reasoning is possible. This is not a parallel planning store.
+
+Vendor terms are authoritative for guest-count confirmation. Without an extracted
+threshold, the bounded product safeguard is at least 20 guests, or at least 10 guests
+and 20% of the prior count. That fallback is deliberately proportionate for intimate
+weddings and is a prompt to reconfirm, not a pricing or availability assumption.
+
+A lower total budget produces one existing DecisionOS trade-off task only when saved
+vendor amounts exist. Ranking favours projected or reduced-allocation costs and
+protects saved priorities and vision. Guest and budget tasks record a choice and may
+prepare work, but vendor contact, scope changes, cancellations, deposits and payments
+remain behind the existing explicit approval boundary.
+
+## 2026-11-23 — Workspace startup must fail visibly outside the main module graph (WED-401)
+
+The Workspace HTML owns a visible loading/manual-refresh surface and a separate tiny
+boot module. It can remove only Workspace service workers and shell caches while
+preserving the authenticated session. The main application clears that fallback only
+when mounting and reuses the same recovery action for render errors.
+
+Workspace HTML, scripts and styles are network-only in the service worker. This gives
+up the former offline shell so an OAuth redirect cannot combine cached HTML with a
+different deployment's hashed modules. Account-scoped API responses remain
+network-only. If startup still fails, the user sees a recovery action rather than a
+blank document.

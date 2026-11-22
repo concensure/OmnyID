@@ -325,10 +325,11 @@ function taskWeight(task: WeddingPlanningTaskItem, now: Date): number {
     : 0;
   const backgroundAutomation = hasBackgroundAutomationTask(task.metadata) ? 17 : 0;
   const providerHandoff = hasProviderHandoffTask(task.metadata) ? 23 : 0;
+  const planVariableChange = record(task.metadata).plan_variable_change_decision === true ? 31 : 0;
   return 20 + priority + duePressure(effectiveDeadline?.at, now) + approval + loop + review
     + quote + payment + guest + finalCount + postWedding + vow + seating + delegation + finalPhase + legalAdmin
     + vendorSearch + vendorLeadTime + vendorSequence + vendorComparison + vendorSeed + expectedBehaviorGap + oracleUpdatePlan + productionRemainingWork
-    + backgroundAutomation + providerHandoff
+    + backgroundAutomation + providerHandoff + planVariableChange
     + outreachEscalationWeight(outreachEscalationStage(task.metadata));
 }
 

@@ -354,3 +354,22 @@ export function weddingBudgetAllocationFromDecisionRecords(
     source: latest.source,
   };
 }
+
+export function weddingBudgetAllocationHistoryFromDecisionRecords(
+  records: readonly WeddingPersistedDecisionRecord[],
+): WeddingBudgetAllocationSummary[] {
+  const history: WeddingBudgetAllocationSummary[] = [];
+  const seen = new Set<string>();
+  for (const record of records
+    .filter(isWeddingBudgetAllocationDecisionRecord)
+    .slice()
+    .sort((left, right) => (right.createdAt || "").localeCompare(left.createdAt || ""))) {
+    const summary = weddingBudgetAllocationFromDecisionRecords([record]);
+    if (!summary) continue;
+    const fingerprint = `${summary.totalAmount}:${summary.categories.map((item) => `${item.categoryId}:${item.amount}`).join("|")}`;
+    if (seen.has(fingerprint)) continue;
+    seen.add(fingerprint);
+    history.push(summary);
+  }
+  return history;
+}

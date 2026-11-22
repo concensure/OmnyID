@@ -7,6 +7,7 @@ import {
   markWeddingNeedToKnowAfpProjectionSent,
   weddingNeedToKnowContextToAfpMessage,
   weddingNeedToKnowContextToAfpSendInput,
+  weddingNeedToKnowProjectionId,
 } from "@/lib/weddingNeedToKnowAfpProjectionState";
 import {
   hasSentWeddingIntakeProfileAfpProjection,
@@ -72,6 +73,14 @@ test("weddingNeedToKnowContextToAfpMessage creates a searchable AFP context note
   assert.ok((message.metadata?.searchable_terms as string[]).includes("Alex and Sam"));
   assert.ok((message.metadata?.searchable_terms as string[]).includes("Relaxed garden dinner, candlelit, not too formal"));
   assert.ok(message.views.some((view) => view.format === "document"));
+});
+
+test("material intake edits receive successor projection ids", () => {
+  const original = projectionContext();
+  const changed = { ...original, planningContext: { ...original.planningContext, guestCount: 100 } };
+  assert.notEqual(weddingNeedToKnowProjectionId(original), weddingNeedToKnowProjectionId(changed));
+  assert.notEqual(weddingIntakeProfileProjectionId(original), weddingIntakeProfileProjectionId(changed));
+  assert.equal(weddingNeedToKnowProjectionId(original), weddingNeedToKnowProjectionId({ ...original }));
 });
 
 test("weddingNeedToKnowContextToAfpSendInput is relational and dispatch-ready", () => {

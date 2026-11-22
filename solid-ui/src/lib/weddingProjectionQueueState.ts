@@ -13,6 +13,7 @@ import {
 } from "@/lib/weddingArtifactAfpProjectionState";
 import {
   hasSentWeddingNeedToKnowAfpProjection,
+  weddingNeedToKnowProjectionId,
   weddingNeedToKnowContextToAfpSendInput,
   type WeddingNeedToKnowProjectionContext,
 } from "@/lib/weddingNeedToKnowAfpProjectionState";
@@ -182,7 +183,7 @@ function contextItem(
   nowIso: string,
   storage: Storage,
 ): WeddingProjectionQueueItem {
-  const sourceId = context.metadata.responseWorkspaceId;
+  const sourceId = weddingNeedToKnowProjectionId(context);
   const sent = context.projectionSaved === true || hasSentWeddingNeedToKnowAfpProjection(sourceId, storage);
   return queueItem({
     id: `context:${sourceId}`,

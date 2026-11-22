@@ -1,10 +1,7 @@
 // OmnyID Service Worker - offline shell + update notification
-const SHELL_CACHE = "omnyid-shell-v16";
+const SHELL_CACHE = "omnyid-shell-v17";
 
-const SHELL_ASSETS = [
-  "/workspace/",
-  "/workspace/index.html",
-];
+const SHELL_ASSETS = [];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -52,9 +49,11 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Keep the shell entry page fresh so deploys pick up the latest hashed bundles.
+  // Authentication transitions must never inherit an older HTML/module graph.
+  // Offline navigation is handled by the visible boot recovery surface instead
+  // of combining cached HTML with a different deployment's immutable chunks.
   if (url.pathname === "/workspace/" || url.pathname === "/workspace/index.html") {
-    event.respondWith(networkFirstWithCache(event.request, SHELL_CACHE));
+    event.respondWith(networkOnly(event.request));
     return;
   }
 
@@ -69,7 +68,7 @@ self.addEventListener("fetch", (event) => {
     event.request.destination === "worker" ||
     event.request.destination === "manifest"
   ) {
-    event.respondWith(networkFirstWithCache(event.request, SHELL_CACHE));
+    event.respondWith(networkOnly(event.request));
     return;
   }
 
@@ -89,24 +88,6 @@ async function networkOnly(request) {
         "Cache-Control": "no-store",
         "Content-Type": "application/json",
       },
-    });
-  }
-}
-
-async function networkFirstWithCache(request, cacheName) {
-  try {
-    const response = await fetch(request);
-    if (response.ok) {
-      const cache = await caches.open(cacheName);
-      cache.put(request, response.clone());
-    }
-    return response;
-  } catch {
-    const cached = await caches.match(request);
-    if (cached) return cached;
-    return new Response(JSON.stringify({ error: "offline" }), {
-      status: 503,
-      headers: { "Content-Type": "application/json" },
     });
   }
 }

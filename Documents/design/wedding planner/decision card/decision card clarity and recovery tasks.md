@@ -359,6 +359,46 @@ Work:
   hero subtitle.
 - [ ] Record the clean candidate SHA and hosted mobile proof after deployment.
 
+## DC-16 — Propagate material plan changes into dependent decisions
+
+Status: implemented in WED-401; Oracle publication pending the release gate.
+
+Work:
+
+- [x] Revision the existing Need-To-Know and intake-profile projection identities so
+  later guest, budget and preference answers retain before/after history.
+- [x] Prefer an extracted vendor guest-count threshold; otherwise use the bounded
+  fallback of 20 guests, or 10 guests plus 20% of the prior count.
+- [x] Generate one evidence-led, approval-gated vendor reconfirmation decision for
+  material guest changes and only for affected capacity/per-person categories.
+- [x] Generate one preference-aware budget trade-off decision when the total budget
+  is lowered and saved vendor costs exist.
+- [x] Reuse shared Wedding task, DecisionOS, evidence, ranking, settled-state and
+  approval flows; do not create a parallel decision store or redesign the card.
+- [x] Keep task ids revision-stable so a settled change stays quiet while a later
+  change creates a successor.
+- [ ] Record the exact clean candidate, full suite, authenticated handoff and Oracle
+  health evidence after deployment.
+
+## DC-17 — Make authenticated workspace startup recoverable
+
+Status: implemented in WED-401; Oracle publication pending the release gate.
+
+Work:
+
+- [x] Render a useful loading and manual-refresh surface in HTML before the main
+  module graph starts.
+- [x] Load a separate CSP-compatible boot guard that catches startup module failures,
+  preserves the account session and can unregister only the Workspace service worker
+  and shell caches before reloading.
+- [x] Stop service-worker caching of the Workspace shell/module graph so a deploy
+  cannot combine an old HTML entrypoint with new hashed chunks.
+- [x] Reuse the same fresh-copy recovery from the mounted application error boundary.
+- [x] Add an OAuth-shaped browser regression that asserts a Google-provider session
+  mounts non-blank content and removes the boot fallback without page errors.
+- [ ] Run the same authenticated handoff against Oracle after the exact candidate is
+  deployed.
+
 ## Completion evidence
 
 - Exact deployed source: `3c22a9c7766455fa591ddd5b19ee14f9b2fc8517`.

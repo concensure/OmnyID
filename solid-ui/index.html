@@ -19,9 +19,15 @@
     <meta http-equiv="X-Content-Type-Options" content="nosniff" />
     <link rel="icon" type="image/svg+xml" href="/workspace/favicon.svg" />
     <link rel="manifest" href="/workspace/manifest.webmanifest" />
+    <style>
+      #workspace-boot-status{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;font-family:Inter,system-ui,sans-serif;color:#1a1c1b;background:#f7f8fb}
+      #workspace-boot-status>div{max-width:460px;text-align:center}
+      #workspace-boot-status button,#workspace-boot-status a{display:inline-block;margin-top:16px;padding:10px 20px;border:1px solid #31568e;border-radius:9999px;background:#fff;color:#31568e;font:inherit;text-decoration:none;cursor:pointer}
+    </style>
+    <script type="module" src="/src/workspace-boot.js"></script>
     <script type="module" src="/src/main.tsx"></script>
   </head>
   <body class="bg-surface text-on-surface">
-    <div id="root"></div>
+    <div id="root"><div id="workspace-boot-status" role="status"><div><p>Loading your workspace…</p><a href="/workspace/?refresh=1">Reload if this takes too long</a></div></div></div>
   </body>
 </html>

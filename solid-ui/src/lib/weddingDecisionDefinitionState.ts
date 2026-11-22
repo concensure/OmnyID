@@ -163,6 +163,30 @@ function classify(task: WeddingPlanningTaskItem): DecisionDefinition {
   const text = `${task.title} ${task.notes ?? ""} ${task.kind}`.toLowerCase();
   const base = GENERIC_BY_KIND[task.kind];
   const metadata = record(task.metadata);
+  if (metadata.plan_variable_change_decision === true) {
+    const optionIds = strings(metadata.decision_option_ids);
+    const optionLabels = strings(metadata.decision_option_labels);
+    const optionSummaries = strings(metadata.decision_option_summaries);
+    const kind = clean(metadata.plan_variable_change_kind);
+    const changeOptions = optionLabels.map((label, index) => ({
+      id: optionIds[index] || `option_${index + 1}`,
+      label,
+      summary: optionSummaries[index] || "Review this response against the saved change and evidence.",
+    }));
+    return {
+      decisionType: kind === "guest_count" ? "guest_count" : "quote_choice",
+      question: () => clean(metadata.decision_question) || questionFor(kind === "guest_count" ? "guest_count" : "quote_choice", task.title),
+      options: changeOptions.length > 0 ? changeOptions : base.options,
+      prerequisiteKeys: [],
+      answerRecord: kind === "guest_count" ? "wedding_guest_count_revision" : "wedding_budget_tradeoff",
+      deadlinePolicy: "sequence",
+      primaryActionLabel: kind === "guest_count" ? "Review vendor reconfirmation" : "Choose a budget response",
+      primaryOutcome: kind === "guest_count"
+        ? "Record how to verify the revised count; no vendor message is sent without approval."
+        : "Record one trade-off to review; no vendor scope, contract or payment changes automatically.",
+      approvalRequiredBeforeExternalAction: true,
+    };
+  }
   const venueLeadTimeResearch = metadata.vendor_lead_time_research_task === true
     && clean(metadata.vendor_lead_time_category_id) === "venue";
   const venueResearchDefinition: Omit<DecisionDefinition, "question"> = {
@@ -308,12 +332,13 @@ export function buildWeddingTaskDecisionContract(input: {
   const definition = classify(task);
   const evidence = taskEvidence(task, facts);
   const selected = selectedOptionMatches(task, facts);
+  const metadata = record(task.metadata);
   const prerequisiteSatisfied: Record<WeddingDecisionPrerequisiteKey, boolean> = {
     wedding_date: Boolean(clean(facts.weddingDate)),
     budget_target: typeof facts.budgetTargetAmount === "number" && facts.budgetTargetAmount > 0,
     guest_scope: typeof facts.guestCount === "number" && facts.guestCount > 0,
     requirements: hasRequirementEvidence(task),
-    selected_option: selected || record(task.metadata).selected_option_confirmed === true || Boolean(clean(record(task.metadata).selected_option_id)),
+    selected_option: selected || metadata.selected_option_confirmed === true || Boolean(clean(metadata.selected_option_id)),
     source_evidence: evidence.some((item) => item.ref !== `task:${task.id}`),
   };
   const prerequisites = definition.prerequisiteKeys.map((key): WeddingDecisionPrerequisite => ({
@@ -324,8 +349,11 @@ export function buildWeddingTaskDecisionContract(input: {
   const question = missingPrerequisite?.resolutionQuestion ?? definition.question(task);
   const primaryActionLabel = missingPrerequisite?.resolutionActionLabel ?? definition.primaryActionLabel;
   const settled = isSettled(task);
+  const explicitPlanChangeEvidence = metadata.plan_variable_change_decision === true
+    && metadata.plan_variable_change_recommendation_supported === true
+    && evidence.some((item) => item.status === "confirmed" && item.ref !== `task:${task.id}`);
   const recommendationSupported = !missingPrerequisite
-    && evidence.some((item) => item.status === "confirmed" && (/^https?:\/\//i.test(item.ref) || item.sourceKind === "quote"))
+    && (explicitPlanChangeEvidence || evidence.some((item) => item.status === "confirmed" && (/^https?:\/\//i.test(item.ref) || item.sourceKind === "quote")))
     && definition.options.length > 1;
   return {
     decisionType: definition.decisionType,

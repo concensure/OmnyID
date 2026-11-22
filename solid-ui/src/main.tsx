@@ -75,14 +75,19 @@ if (shouldApplyInitialWeddingPresentation({
 applyFontScalePreference(loadFontScalePreference());
 applyFontBodyPreference(loadFontBodyPreference());
 
+const workspaceRoot = document.getElementById("root")!;
+workspaceRoot.replaceChildren();
 render(
   () => (
     <ErrorBoundary fallback={(err, reset) => (
       <div style={{ display: "flex", "flex-direction": "column", "align-items": "center", "justify-content": "center", "min-height": "100vh", gap: "12px", "font-family": "Inter, sans-serif", color: "#1a1c1b" }}>
         <p style={{ "font-size": "1.1rem", "font-weight": "600" }}>Something went wrong</p>
         <p style={{ "font-size": "0.8rem", color: "#737781", "max-width": "420px", "text-align": "center" }}>{(err as Error)?.message ?? String(err)}</p>
-        <button onClick={reset} style={{ "margin-top": "8px", padding: "8px 20px", "border-radius": "9999px", border: "1px solid #31568e", background: "transparent", color: "#31568e", cursor: "pointer", "font-size": "0.8rem" }}>
-          Reload
+        <button onClick={() => {
+          reset();
+          void (window as Window & { __omnyidWorkspaceRecover?: () => Promise<void> }).__omnyidWorkspaceRecover?.();
+        }} style={{ "margin-top": "8px", padding: "8px 20px", "border-radius": "9999px", border: "1px solid #31568e", background: "transparent", color: "#31568e", cursor: "pointer", "font-size": "0.8rem" }}>
+          Reload a fresh copy
         </button>
       </div>
     )}>
@@ -91,5 +96,9 @@ render(
       </ViewportProvider>
     </ErrorBoundary>
   ),
-  document.getElementById("root")!
+  workspaceRoot
 );
+
+queueMicrotask(() => {
+  (window as Window & { __omnyidWorkspaceMounted?: () => void }).__omnyidWorkspaceMounted?.();
+});

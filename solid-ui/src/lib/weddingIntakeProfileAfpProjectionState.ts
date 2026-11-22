@@ -1,6 +1,6 @@
 // @locs-version: 1.0
 import type { AfpMessage, SendAfpMessageInput } from "@/lib/api";
-import type { WeddingNeedToKnowProjectionContext } from "@/lib/weddingNeedToKnowAfpProjectionState";
+import { weddingNeedToKnowProjectionId, type WeddingNeedToKnowProjectionContext } from "@/lib/weddingNeedToKnowAfpProjectionState";
 import { weddingAccountScopedStorageKey } from "@/lib/weddingLocalAccountScope";
 import {
   normalizeWeddingPlanningMetadata,
@@ -29,7 +29,8 @@ function stringArray(value: readonly unknown[] | null | undefined, limit = 24): 
 
 function profileIdFor(context: WeddingNeedToKnowProjectionContext): string {
   const metadata = normalizeWeddingPlanningMetadata(context.metadata);
-  return `wedding_intake_profile:${safeWeddingLabel(metadata.responseWorkspaceId)}`;
+  const revision = weddingNeedToKnowProjectionId({ ...context, metadata }).split(":").at(-1);
+  return `wedding_intake_profile:${safeWeddingLabel(metadata.responseWorkspaceId)}:${revision}`;
 }
 
 export function weddingIntakeProfileProjectionId(context: WeddingNeedToKnowProjectionContext): string {

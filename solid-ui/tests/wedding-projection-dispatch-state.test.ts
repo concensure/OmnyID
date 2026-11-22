@@ -13,8 +13,8 @@ import {
 } from "@/lib/weddingCalendarProjectionState";
 import { buildWeddingCollaborationState } from "@/lib/weddingCollaborationState";
 import { hasSentWeddingCollaborationAfpProjection } from "@/lib/weddingCollaborationAfpProjectionState";
-import { hasSentWeddingNeedToKnowAfpProjection } from "@/lib/weddingNeedToKnowAfpProjectionState";
-import { hasSentWeddingIntakeProfileAfpProjection } from "@/lib/weddingIntakeProfileAfpProjectionState";
+import { hasSentWeddingNeedToKnowAfpProjection, weddingNeedToKnowProjectionId } from "@/lib/weddingNeedToKnowAfpProjectionState";
+import { hasSentWeddingIntakeProfileAfpProjection, weddingIntakeProfileProjectionId } from "@/lib/weddingIntakeProfileAfpProjectionState";
 import { buildWeddingProjectionQueueState } from "@/lib/weddingProjectionQueueState";
 import { buildWeddingTemplateFollowUpState } from "@/lib/weddingTemplateFollowUpState";
 import {
@@ -186,8 +186,9 @@ test("markWeddingProjectionDispatchReceiptSent commits sent markers by projectio
 
   markWeddingProjectionDispatchReceiptSent(receipt, storage);
 
-  assert.equal(hasSentWeddingNeedToKnowAfpProjection("response_workspace:workspace-dispatch", storage), true);
-  assert.equal(hasSentWeddingIntakeProfileAfpProjection("wedding_intake_profile:response_workspace:workspace-dispatch", storage), true);
+  const context = contextItem(storage);
+  assert.equal(hasSentWeddingNeedToKnowAfpProjection(weddingNeedToKnowProjectionId(context), storage), true);
+  assert.equal(hasSentWeddingIntakeProfileAfpProjection(weddingIntakeProfileProjectionId(context), storage), true);
   assert.equal(hasSentWeddingArtifactAfpProjection(generatedArtifact.summary.id, storage), true);
   assert.equal(hasSentWeddingProjection(scheduleItem.id, WEDDING_CALENDAR_AFP_PROJECTIONS_KEY, storage), true);
   assert.equal(hasSentWeddingProjection(taskItem.id, WEDDING_TASK_AFP_PROJECTIONS_KEY, storage), true);

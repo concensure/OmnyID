@@ -105,6 +105,7 @@ import {
   type WeddingImportParserReadinessState,
 } from "@/lib/weddingImportParserReadinessState";
 import { buildWeddingWorkspaceGeneratedTaskItems } from "@/lib/weddingWorkspaceGeneratedTaskItemsState";
+import { weddingPlanningContextNumber } from "@/lib/weddingPlanVariableChangeState";
 import { addWeddingResearchTasks } from "@/lib/weddingJourneyStageState";
 import { bindWeddingQuoteContext } from "@/lib/weddingNormalizedQuoteState";
 import type {
@@ -502,15 +503,13 @@ function remoteHttpUrl(value: string): boolean {
     return false;
   }
 }
-
 function privateImportSourceUrl(value: string): boolean {
   return /\b(?:upload|uploads|attachment|attachments|storage|parser|source-file|source_file)\b/i.test(value)
     || /\b[^/?#]+\.(?:csv|tsv|xlsx?|ods)(?:$|[?#/])/i.test(value);
 }
-
 function firstWeddingPlanningContextValue(
   contexts: readonly WeddingNeedToKnowProjectionContext[] | null | undefined,
-  key: "dateOrSeason" | "guestCount" | "vendorCategories",
+  key: "dateOrSeason" | "guestCount" | "vendorCategories" | "budgetComfort",
 ): unknown {
   for (const context of contexts ?? []) {
     const value = context.planningContext?.[key];
@@ -518,7 +517,6 @@ function firstWeddingPlanningContextValue(
   }
   return null;
 }
-
 function decisionProjectionItems(
   artifacts: readonly WeddingArtifactInput[],
   experienceModel?: Pick<WeddingExperienceModelState, "traits"> | null,
@@ -709,6 +707,7 @@ export function buildWeddingResponseWorkspaceViewState(input: WeddingResponseWor
     decisionRecords: activeDecisionRecords,
     selectedDecisionItems: budgetDecisionItems,
     artifacts,
+    budgetTargetAmount: weddingPlanningContextNumber(input.contextItems, "budgetComfort"), budgetTargetText: clean(firstWeddingPlanningContextValue(input.contextItems, "budgetComfort")),
   });
   const persistedBoundaryObjects = input.boundaryObjects ?? null;
   const guestTrackingWithoutBudget = buildWeddingGuestTrackingState({
@@ -807,7 +806,7 @@ export function buildWeddingResponseWorkspaceViewState(input: WeddingResponseWor
     selectedDecisionItems: activeDecisions,
     baseTaskItems: taskItems,
     loopTaskItems,
-    budgetTracking,
+    budgetTracking, contextItems: input.contextItems, decisionRecords: activeDecisionRecords,
     guestTracking,
     seatingPlan,
     inspiration,
@@ -866,7 +865,8 @@ export function buildWeddingResponseWorkspaceViewState(input: WeddingResponseWor
   });
   const vendorPursuitLogTaskItems = projectionTaskItems.filter(isClosedVendorPursuitTask);
   const vendorPursuitLogCards = buildWeddingVendorPursuitLogCards(vendorPursuitLogTaskItems);
-  const setupDecisionItems = buildWeddingSetupDecisionItems({ hasWeddingDate: Boolean(planningWindow.weddingDate), hasBudgetTarget: budgetTracking.budgetTargetAmount !== null, guestCount: guestTracking.guestRowCount });
+  const currentGuestCount = weddingPlanningContextNumber(input.contextItems, "guestCount") ?? guestTracking.guestRowCount;
+  const setupDecisionItems = buildWeddingSetupDecisionItems({ hasWeddingDate: Boolean(planningWindow.weddingDate), hasBudgetTarget: budgetTracking.budgetTargetAmount !== null, guestCount: currentGuestCount });
   const personalOsProjection = buildWeddingPersonalOsProjectionState({
     setupItems: setupDecisionItems,
     taskItems: userFacingProjectionTaskItems,
@@ -874,7 +874,7 @@ export function buildWeddingResponseWorkspaceViewState(input: WeddingResponseWor
     decisionItems: activeDecisions,
     approvalReceipts: input.approvalReceipts,
     decisionDeferrals: input.decisionDeferrals,
-    savedFacts: { weddingDate: planningWindow.weddingDate, budgetTargetAmount: budgetTracking.budgetTargetAmount, guestCount: guestTracking.guestRowCount },
+    savedFacts: { weddingDate: planningWindow.weddingDate, budgetTargetAmount: budgetTracking.budgetTargetAmount, guestCount: currentGuestCount },
     now: input.nowIso ? new Date(input.nowIso) : null,
   });
   const vendorLifecycle = projectWeddingVendorLifecycle(input.afpMessages ?? []);
