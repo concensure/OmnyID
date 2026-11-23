@@ -17,7 +17,7 @@ lifecycle:
 tasks:
   - id: WED-408
     title: Make Google sign-in retry-safe, restore operator Growth access, and make Wedding budget setup account-scoped and editable
-    status: in_progress
+    status: done
     owner: codex
     reviewer: claude
     branch: agent/codex/WED-408
@@ -34,6 +34,9 @@ tasks:
       - removed unconditional preparation-template projection while preserving persisted and evidence-derived Wedding tasks
       - Budget target now focuses the canonical editor; custom balanced categories round-trip through the existing AFP decision save flow; inert Use links and the duplicate extra-cost card are removed
       - focused contracts, TypeScript, line budgets, all 2,393 Wedding tests, the 95-page public/security suite and the production frontend build pass in the implementation worktree
+      - exact SHA 70e7a8c6309b12595c676072b2a1412a201bd390 passed the clean candidate and native ARM64 workflow 45167742228, then ran with zero restarts in isolated staging
+      - Oracle now runs the exact backend and matching Workspace archive; Growth is enabled but remains operator-gated, the authenticated eight-check monitor and Caddy validation pass, and WED-407 is retained as rollback
+      - GitHub branch push succeeded; PR creation is structurally unavailable because this task lineage has no history in common with main
 
   - id: WED-407
     title: Activate the truthful celebrant journey, add binder co-branding, harden exact-email claims, and publish WED-406
