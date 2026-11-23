@@ -17,7 +17,7 @@ lifecycle:
 tasks:
   - id: WED-407
     title: Activate the truthful celebrant journey, add binder co-branding, harden exact-email claims, and publish WED-406
-    status: in_progress
+    status: done
     owner: codex
     reviewer: claude
     branch: agent/codex/WED-407
@@ -36,10 +36,13 @@ tasks:
       - the existing operator dashboard now includes browser-local Binder page rendering, bounded logo footer placement and PNG/JPG export without modifying or uploading the source PDF
       - focused Rust tests, TypeScript, line budgets, 2,390 Wedding tests and the 1,862-module production build pass in the implementation worktree
       - production contains no vendor, user, claim or proposal matching Lourde or Double Happiness; multiple conflicting public businesses prevent a safe inferred record or bearer-link generation
+      - exact SHA 1cf789eff1a7a2cb9db5f2a1b837f01225851280 passed the clean candidate and native ARM64 gates, returned the truthful discovery contract in staging, loaded five reviewed production records and was promoted to Oracle with rollback retained
+      - both public consultation hosts return 200 with phone verification configured; both celebrant guides and the admin Binder co-branding bundle are live; the authenticated eight-check monitor and Caddy validation pass with zero homeserver restarts
+      - all ten active containers have evidenced roles; two stopped UI containers and unreferenced obsolete release images were removed, leaving 71 percent root use and about 13 GB free
 
   - id: WED-406
     title: Stage five named celebrant records and publish two celebrant guides with full SEO
-    status: review
+    status: done
     owner: claude
     reviewer: codex
     branch: agent/claude/WED-406
@@ -48,7 +51,7 @@ tasks:
     depends_on: [WED-404, WED-376]
     files: [wedding/blog/**, wedding/blog.html, wedding/blog-taxonomy.json, wedding/tests/blog-catalogue-smoke.mjs, docs/sitemap.xml, Documents/design/wedding planner/celebrants-import-2026-11-23/**, Documents/marketing/wedding planning/posts/blog/**, .agent/**]
     acceptance: [stage one new and four blank-fill celebrant records with verified contacts and own-words text, publish two original celebrant guides with no real names and generator-produced SEO metadata, keep the diff limited to the files listed, hand off exact load steps and open owner questions]
-    progress: "Staged and uncommitted in the WED-406 worktree. WED-407 will selectively apply the listed content files onto the newer WED-405 lineage, review the data authority, load only safe blank-fill changes, rerun the release gates and record production evidence."
+    progress: "Selectively committed in WED-406, cherry-picked into exact deployed WED-407 SHA 1cf789eff1a7a2cb9db5f2a1b837f01225851280, validated against 1,913 register rows, loaded with blank-fill authority, and published. Four canonical rows were enriched, Pauline was inserted as registration pending, 26 reviewed attributes and one pilot profile were recorded, and both guides plus SEO metadata are live."
 
   - id: WED-405
     title: Extend the existing admin workspace vendor view and simplify the Notes writing workspace

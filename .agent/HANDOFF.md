@@ -12869,3 +12869,15 @@ The verified upload archives were removed from Oracle after load and proof but
 remain locally and in the three-day GitHub artifact. Root use is 93% with about
 3.4 GB free, so the separate restore-drill capacity follow-up remains open.
 Full evidence: `Documents/verification/WED-405-admin-vendor-notes-release.md`.
+
+## WED-407 celebrant operations, Binder co-branding and WED-406 release (2026-11-23)
+
+Worktree `C:/temp/wt/omnyid-wed407`, branch `agent/codex/WED-407`, based on the WED-405 record SHA. Exact implementation and deployed SHA: `1cf789eff1a7a2cb9db5f2a1b837f01225851280`; clean release worktree: `C:/temp/wt/omnyid-wed407-release-1cf789ef`.
+
+Public celebrant discovery now returns explicit readiness instead of a blanket 404 while every phone-verification and request mutation stays fail-closed. Production uses the complete file-backed Twilio/pepper configuration and both public hosts return 200 with phone verification configured. A verified account mailbox may prove the selected listing when it exactly equals the listing email, including Gmail, but cross-listing, unverified and domain-only public-mail claims remain denied. The operator dashboard has a browser-local day-of-Binder page/logo footer preview and PNG/JPG export without modifying or uploading the source PDF.
+
+The bounded WED-406 work is preserved: four existing celebrants were blank-filled, Pauline Appiah-Dwyer was inserted as registration pending, 26 reviewed attributes and one pilot profile were loaded, and both SEO guides are live. No Double Happiness/Lourde capability was generated because production has no unique matching vendor, user, claim or proposal; an exact canonical listing or verified source/contact is required before using the existing 14-day-default operator generator.
+
+Clean exact-SHA proof passed TypeScript, line budgets, focused Binder and Rust contracts, the public-site suite and the 1,862-module production build; the implementation worktree passed all 2,390 Wedding tests. Native ARM64 workflow `45137881583` built the exact revision. Staging returned the truthful disabled readiness payload, then Oracle was promoted. The authenticated eight-check monitor and Caddy validation pass; the homeserver runs the exact revision with zero restarts. Rollback is retained under `/home/ubuntu/omnyid-candidates/wed407-1cf789eff1a7a2cb9db5f2a1b837f01225851280/rollback` and the prior image tag is `omnyid-homeserver:pre-wed407-b8c5012`.
+
+All ten active containers remain necessary: seven production and three staging. Two stopped UI containers and obsolete unreferenced images were removed after proof. Root use is 71% with about 13 GB free. Full evidence: `Documents/verification/WED-407-celebrant-binder-container-audit.md`.
