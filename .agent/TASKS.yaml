@@ -15,6 +15,23 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-411
+    title: Extend the existing Wedding seating canvas with persistent table layouts and direct guest placement
+    status: in_progress
+    owner: codex
+    reviewer: claude
+    branch: agent/codex/WED-411
+    worktree: C:/temp/wt/omnyid-wed411
+    base_sha: 79d4f6ea1fbcabedf1e947f706c357df9e97a5e6
+    depends_on: [WED-410, WED-399, WED-369, WED-345]
+    files: [solid-ui/src/components/WeddingSeatingCanvas.tsx, solid-ui/src/lib/weddingSeatingOptimizationState.ts, solid-ui/tests/wedding-seating-*.test.ts, Documents/verification/WED-411-*.md, .agent/**]
+    acceptance: [extend the existing account-scoped seating projection and canvas rather than create a parallel planner, let a guest name be dragged directly from the unseated list or another table onto a table with tap and keyboard-equivalent placement retained, expose round long and head-table layouts with clear capacity and occupancy, allow large rectangular tables to rotate in deliberate increments without interfering with table dragging, persist table type position rotation capacity and name through the canonical AFP seating projection with backward-compatible loading, keep mobile and reduced-motion use legible, pass focused and full Wedding tests typecheck line budgets and production build, deploy only an exact clean SHA to Oracle with rollback and hosted smoke evidence]
+    progress:
+      - registered from the exact WED-410 release-record lineage; the supplied image is a capability reference only and the existing OmnyID visual system remains authoritative
+      - extended the existing canvas with a dedicated To seat rail, direct single or multi-name drag payloads, tap and keyboard placement, round rectangle and head-table controls, bounded seat counts and 45-degree rotation for large tables
+      - table type name capacity position and rotation now round-trip inside the canonical seating optimization ledger; assignment-only records load through the existing defaults and no parallel store or backend route was introduced
+      - TypeScript, line budgets, 22 focused contracts, all 2,402 Wedding tests, the 95-page public/security suite and the 1,863-module production build pass in the implementation worktree
+
   - id: WED-410
     title: Make Wedding decisions actionable in place and restore missing planner interactions
     status: done

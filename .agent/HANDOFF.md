@@ -12958,3 +12958,25 @@ Rollback is retained at
 the prior WED-408 backend is tagged `omnyid-homeserver:pre-wed410-70e7a8c6`.
 Root use is 79% with about 9.9 GB free. Full evidence:
 `Documents/verification/WED-410-actionable-planner-release.md`.
+## WED-411 persistent visual seating enhancement (2026-11-24)
+
+Worktree `C:/temp/wt/omnyid-wed411`, branch `agent/codex/WED-411`, based on the
+WED-410 release-record SHA `79d4f6ea1fbcabedf1e947f706c357df9e97a5e6`.
+
+The existing Wedding seating canvas now has a dedicated unseated-name rail with
+direct drag/drop to a table and between tables. Multi-select drag, tap placement and
+keyboard Enter/Space placement use the same assignment path. The existing visual
+language is retained; the supplied image was used only to identify useful capability
+gaps. Couples can add round, rectangular and head tables, adjust bounded capacity,
+move tables and rotate large shapes in 45-degree steps while names remain upright.
+
+The canonical `wedding_seating_optimization` AFP record now carries a bounded
+`table_layout` containing table type, name, capacity, position and rotation. Old
+assignment-only records infer their prior layout, and the protected projection route
+remains the sole account/workspace-scoped storage path. No migration or backend
+change is involved.
+
+TypeScript, line budgets, 22 focused contracts, 2,402 Wedding tests, 95-page public
+and security checks, and the 1,863-module production build pass. Exact clean-SHA
+packaging, static Oracle installation, rollback capture and hosted verification are
+the remaining release steps; production is unchanged at this checkpoint.

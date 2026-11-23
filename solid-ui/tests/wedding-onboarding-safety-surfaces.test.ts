@@ -17,7 +17,7 @@ test("seating instructions are persistent and material saves are confirmed", () 
   const canvas = read("../src/components/WeddingSeatingCanvas.tsx");
   assert.match(panel, /Click or tap a guest/);
   assert.match(panel, /Apply this seating change/);
-  assert.match(canvas, /Select one or more guests, then tap or drag them onto a table/);
+  assert.match(canvas, /Drag a guest name onto a table, or select names and tap a table/);
   assert.match(canvas, /Full screen/);
   assert.match(canvas, /Zoom in/);
   assert.match(canvas, /setPointerCapture/);

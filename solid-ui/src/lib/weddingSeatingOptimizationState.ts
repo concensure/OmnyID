@@ -45,6 +45,16 @@ export type WeddingSeatingTableNode = {
   tags?: readonly string[] | null;
 };
 
+export type WeddingSeatingTableLayout = {
+  tableId: string;
+  label: string;
+  shape: "round" | "rectangle" | "head";
+  capacity: number;
+  x: number;
+  y: number;
+  rotation: number;
+};
+
 export type WeddingSeatingOptimizationHardViolation = {
   type: "table_capacity" | "conflict_same_table" | "accessibility_table_required" | "child_without_guardian";
   personId?: string | null;
@@ -71,6 +81,7 @@ export type WeddingSeatingOptimizationAssignment = {
 
 export type WeddingSeatingOptimizationResult = {
   assignments: WeddingSeatingOptimizationAssignment[];
+  tableLayout?: WeddingSeatingTableLayout[];
   totalScore: number;
   hardViolations: WeddingSeatingOptimizationHardViolation[];
   softSignals: WeddingSeatingOptimizationSoftSignal[];
@@ -315,10 +326,14 @@ export function buildWeddingSeatingOptimizationResult(input: {
   };
 }
 
-export function weddingSeatingOptimizationFingerprint(input: Pick<WeddingSeatingOptimizationResult, "assignments">): string {
-  return input.assignments
+export function weddingSeatingOptimizationFingerprint(input: Pick<WeddingSeatingOptimizationResult, "assignments"> & Partial<Pick<WeddingSeatingOptimizationResult, "tableLayout">>): string {
+  const assignmentPart = input.assignments
     .map((assignment) => `${assignment.personId}:${assignment.tableId}`)
     .join("|");
+  const layoutPart = (input.tableLayout ?? [])
+    .map((table) => `${table.tableId}:${table.shape}:${table.capacity}:${table.x}:${table.y}:${table.rotation}`)
+    .join("|");
+  return layoutPart ? `${assignmentPart}#${layoutPart}` : assignmentPart;
 }
 
 export function compactWeddingSeatingOptimizationResults(
@@ -435,6 +450,35 @@ function assignmentFromValue(value: unknown): WeddingSeatingOptimizationAssignme
     tableLabel: clean(record.tableLabel) || tableId,
     score: numeric(record.score),
     reasonLabels: stringArray(record.reasonLabels),
+  };
+}
+
+function boundedNumber(value: unknown, minimum: number, maximum: number, fallback: number): number {
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(parsed) ? Math.max(minimum, Math.min(maximum, parsed)) : fallback;
+}
+
+function tableLayoutFromValue(value: unknown): WeddingSeatingTableLayout | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  const tableId = clean(record.tableId);
+  if (!tableId) return null;
+  const shape = clean(record.shape);
+  const normalizedShape: WeddingSeatingTableLayout["shape"] = shape === "head"
+    ? "head"
+    : shape === "rectangle" || shape === "long"
+      ? "rectangle"
+      : "round";
+  const rawRotation = boundedNumber(record.rotation, -360, 360, 0);
+  const rotation = normalizedShape === "round" ? 0 : ((Math.round(rawRotation / 45) * 45) % 360 + 360) % 360;
+  return {
+    tableId,
+    label: clean(record.label).slice(0, 80) || tableId,
+    shape: normalizedShape,
+    capacity: Math.round(boundedNumber(record.capacity, 1, 40, normalizedShape === "head" ? 8 : 10)),
+    x: boundedNumber(record.x, 0, 82, 8),
+    y: boundedNumber(record.y, 0, 76, 9),
+    rotation,
   };
 }
 
@@ -615,6 +659,7 @@ export function weddingSeatingOptimizationResultToAfpMessage(input: {
       ledger_kind: "wedding_seating_optimization",
       assignment_count: input.result.assignments.length,
       assignments: input.result.assignments,
+      table_layout: input.result.tableLayout ?? [],
       total_score: input.result.totalScore,
       hard_violations: input.result.hardViolations,
       soft_signals: input.result.softSignals,
@@ -642,6 +687,7 @@ export function weddingSeatingOptimizationResultToAfpMessage(input: {
       semantic_object: semanticObject,
       hard_violation_count: input.result.hardViolations.length,
       assignment_count: input.result.assignments.length,
+      table_layout_count: input.result.tableLayout?.length ?? 0,
       e2ee_required: true,
       searchable_terms: uniqueStrings([
         "wedding seating",
@@ -706,6 +752,9 @@ export function weddingSeatingOptimizationResultFromAfpMessage(message: AfpMessa
     ? content.assignments.map(assignmentFromValue).filter((item): item is WeddingSeatingOptimizationAssignment => item !== null)
     : assignmentsFromReferences(message);
   if (assignments.length === 0) return null;
+  const tableLayout = Array.isArray(content.table_layout)
+    ? content.table_layout.map(tableLayoutFromValue).filter((item): item is WeddingSeatingTableLayout => item !== null).slice(0, 80)
+    : [];
   const hardViolations = Array.isArray(content.hard_violations)
     ? content.hard_violations.map(violationFromValue).filter((item): item is WeddingSeatingOptimizationHardViolation => item !== null)
     : [];
@@ -719,6 +768,7 @@ export function weddingSeatingOptimizationResultFromAfpMessage(message: AfpMessa
   const semanticTags = semanticObject?.semanticTags ?? stringArray(content.semantic_tags);
   return {
     assignments,
+    tableLayout,
     totalScore: numeric(content.total_score) || assignments.reduce((total, assignment) => total + assignment.score, 0),
     hardViolations,
     softSignals,

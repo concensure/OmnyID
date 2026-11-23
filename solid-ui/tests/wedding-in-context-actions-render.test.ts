@@ -38,6 +38,10 @@ test("tasks expose responsibility fields and seating exposes an interactive canv
   assert.match(workspace, /weddingHelperResponsibilityToAfpSendInput/);
   assert.doesNotMatch(workspace, /task_update_source: "wedding_decision_focus"/);
   assert.match(seating, /draggable/);
+  assert.match(seating, /application\/x-omnyid-wedding-guests/);
+  assert.match(seating, /\+ Head table/);
+  assert.match(seating, /Rotate .*45 degrees/);
+  assert.match(seating, /weddingSeatingTableLayout\(tables\(\)\)/);
   assert.match(seating, /Map|Reception floor canvas/);
 });
 

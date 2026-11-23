@@ -184,6 +184,15 @@ test("weddingSeatingOptimizationResultToAfpMessage emits ledger, topology tags, 
       },
     ],
   });
+  result.tableLayout = [{
+    tableId: "table-3",
+    label: "Family head table",
+    shape: "head",
+    capacity: 12,
+    x: 24.5,
+    y: 38.25,
+    rotation: 90,
+  }];
   const message = weddingSeatingOptimizationResultToAfpMessage({
     result,
     metadata: {
@@ -207,10 +216,13 @@ test("weddingSeatingOptimizationResultToAfpMessage emits ledger, topology tags, 
   assert.equal(message.views[0]?.format, "a2ui");
   assert.equal(message.views[0]?.content.semantic_object.kind, "wedding_comparison");
   assert.equal(Array.isArray(message.content.assignments), true);
+  assert.equal(message.content.table_layout[0].shape, "head");
+  assert.equal(message.metadata?.table_layout_count, 1);
   const restored = weddingSeatingOptimizationResultFromAfpMessage(message);
   assert.equal(restored?.assignments.length, result.assignments.length);
   assert.equal(restored?.assignments.find((assignment) => assignment.personId === "grandma-chen")?.personLabel, "Grandma Chen");
   assert.deepEqual(restored?.explanationLabels, result.explanationLabels);
   assert.equal(restored?.semanticKind, "wedding_comparison");
   assert.equal(restored?.semanticObject?.comparison?.columns[0]?.label, "Table");
+  assert.deepEqual(restored?.tableLayout, result.tableLayout);
 });
