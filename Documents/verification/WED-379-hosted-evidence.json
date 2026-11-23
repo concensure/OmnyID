@@ -1,0 +1,110 @@
+{
+  "source_sha": "24948b23e4ec59b9af12ca08aa514a80d17d4c78",
+  "binary_sha256": "723566d48e8ce14f3eb030ccc1682e8fbdad039d95b3aa08975839f7a38136ce",
+  "environment": "Oracle isolated application persisted-event cohort",
+  "cohort_expires_at": "2026-11-19T13:01:16.747316+00:00",
+  "cohort_owners": [
+    "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+    "01ARZ3NDEKTSV4RRFFQ69G5FAW"
+  ],
+  "collected_at": "2026-11-19T12:46:20.757097+00:00",
+  "network": {
+    "name": "omnyid-wed379-24948b23-internal",
+    "internal": true,
+    "active_members": [
+      "omnyid-wed379-24948b23-postgres"
+    ],
+    "host_port_bindings": false
+  },
+  "production_image_before": "sha256:a086dba378880b9a8d19e68dfc403efa27356c0ecee5e136755edc0bddff4fa6",
+  "production_image_after": "sha256:a086dba378880b9a8d19e68dfc403efa27356c0ecee5e136755edc0bddff4fa6",
+  "exit_code": 0,
+  "observations": {
+    "cancelled_reopen_denials": 1,
+    "disabled_definition_denials": 1,
+    "expired_lock_denials": 1,
+    "finished_at": "2026-11-19T12:46:20.533725275Z",
+    "models_or_tools_composed": false,
+    "non_allowlisted_owner_instance_records": 0,
+    "policy_configuration_denials": 5,
+    "production_rollout": false,
+    "scenarios": [
+      {
+        "budget_minor": 1800000,
+        "committed_minor": 1900000,
+        "completed_via_persisted_hook": true,
+        "cross_owner_denials": 2,
+        "duplicate_event_checks": 2,
+        "guests": 24,
+        "over_budget": true,
+        "owner": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+        "policy_denials": 4,
+        "private_reviews": 1,
+        "terminal_reopen_denials": 1,
+        "trace_records": 4
+      },
+      {
+        "budget_minor": 4500000,
+        "committed_minor": 4000000,
+        "completed_via_persisted_hook": true,
+        "cross_owner_denials": 2,
+        "duplicate_event_checks": 2,
+        "guests": 120,
+        "over_budget": false,
+        "owner": "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+        "policy_denials": 4,
+        "private_reviews": 1,
+        "terminal_reopen_denials": 1,
+        "trace_records": 4
+      }
+    ],
+    "source_sha": "24948b23e4ec59b9af12ca08aa514a80d17d4c78",
+    "stale_revision_denials": 1,
+    "started_at": "2026-11-19T12:46:18.488282463Z",
+    "unsafe_pipeline_policy_denials": 1,
+    "unsafe_pipeline_started": false,
+    "unsupported_contract_denials": 3
+  },
+  "hook_counters_log": "\u001b[2m2026-11-19T12:46:19.741497Z\u001b[0m \u001b[32m INFO\u001b[0m \u001b[2momnyid_homeserver::runbook_hooks\u001b[0m\u001b[2m:\u001b[0m Runbook deterministic cohort pass \u001b[3mcompleted\u001b[0m\u001b[2m=\u001b[0m0 \u001b[3mpolicy_denied\u001b[0m\u001b[2m=\u001b[0m0 \u001b[3mterminal_or_waiting\u001b[0m\u001b[2m=\u001b[0m0 \u001b[3mconcurrent_or_stale\u001b[0m\u001b[2m=\u001b[0m1 \u001b[3merrors\u001b[0m\u001b[2m=\u001b[0m0\n\u001b[2m2026-11-19T12:46:19.816156Z\u001b[0m \u001b[32m INFO\u001b[0m \u001b[2momnyid_homeserver::runbook_hooks\u001b[0m\u001b[2m:\u001b[0m Runbook deterministic cohort pass \u001b[3mcompleted\u001b[0m\u001b[2m=\u001b[0m1 \u001b[3mpolicy_denied\u001b[0m\u001b[2m=\u001b[0m0 \u001b[3mterminal_or_waiting\u001b[0m\u001b[2m=\u001b[0m0 \u001b[3mconcurrent_or_stale\u001b[0m\u001b[2m=\u001b[0m0 \u001b[3merrors\u001b[0m\u001b[2m=\u001b[0m0\n\u001b[2m2026-11-19T12:46:19.835252Z\u001b[0m \u001b[32m INFO\u001b[0m \u001b[2momnyid_homeserver::runbook_hooks\u001b[0m\u001b[2m:\u001b[0m Runbook deterministic cohort pass \u001b[3mcompleted\u001b[0m\u001b[2m=\u001b[0m0 \u001b[3mpolicy_denied\u001b[0m\u001b[2m=\u001b[0m0 \u001b[3mterminal_or_waiting\u001b[0m\u001b[2m=\u001b[0m1 \u001b[3mconcurrent_or_stale\u001b[0m\u001b[2m=\u001b[0m0 \u001b[3merrors\u001b[0m\u001b[2m=\u001b[0m0\n\u001b[2m2026-11-19T12:46:19.838770Z\u001b[0m \u001b[32m INFO\u001b[0m \u001b[2momnyid_homeserver::runbook_hooks\u001b[0m\u001b[2m:\u001b[0m Runbook deterministic cohort pass \u001b[3mcompleted\u001b[0m\u001b[2m=\u001b[0m0 \u001b[3mpolicy_denied\u001b[0m\u001b[2m=\u001b[0m0 \u001b[3mterminal_or_waiting\u001b[0m\u001b[2m=\u001b[0m1 \u001b[3mconcurrent_or_stale\u001b[0m\u001b[2m=\u001b[0m0 \u001b[3merrors\u001b[0m\u001b[2m=\u001b[0m0\n\u001b[2m2026-11-19T12:46:19.869224Z\u001b[0m \u001b[32m INFO\u001b[0m \u001b[2momnyid_homeserver::runbook_hooks\u001b[0m\u001b[2m:\u001b[0m Runbook deterministic cohort pass \u001b[3mcompleted\u001b[0m\u001b[2m=\u001b[0m0 \u001b[3mpolicy_denied\u001b[0m\u001b[2m=\u001b[0m0 \u001b[3mterminal_or_waiting\u001b[0m\u001b[2m=\u001b[0m0 \u001b[3mconcurrent_or_stale\u001b[0m\u001b[2m=\u001b[0m1 \u001b[3merrors\u001b[0m\u001b[2m=\u001b[0m0\n\u001b[2m2026-11-19T12:46:19.937076Z\u001b[0m \u001b[32m INFO\u001b[0m \u001b[2momnyid_homeserver::runbook_hooks\u001b[0m\u001b[2m:\u001b[0m Runbook deterministic cohort pass \u001b[3mcompleted\u001b[0m\u001b[2m=\u001b[0m1 \u001b[3mpolicy_denied\u001b[0m\u001b[2m=\u001b[0m0 \u001b[3mterminal_or_waiting\u001b[0m\u001b[2m=\u001b[0m0 \u001b[3mconcurrent_or_stale\u001b[0m\u001b[2m=\u001b[0m0 \u001b[3merrors\u001b[0m\u001b[2m=\u001b[0m0\n\u001b[2m2026-11-19T12:46:19.951271Z\u001b[0m \u001b[32m INFO\u001b[0m \u001b[2momnyid_homeserver::runbook_hooks\u001b[0m\u001b[2m:\u001b[0m Runbook deterministic cohort pass \u001b[3mcompleted\u001b[0m\u001b[2m=\u001b[0m0 \u001b[3mpolicy_denied\u001b[0m\u001b[2m=\u001b[0m0 \u001b[3mterminal_or_waiting\u001b[0m\u001b[2m=\u001b[0m1 \u001b[3mconcurrent_or_stale\u001b[0m\u001b[2m=\u001b[0m0 \u001b[3merrors\u001b[0m\u001b[2m=\u001b[0m0\n\u001b[2m2026-11-19T12:46:19.955010Z\u001b[0m \u001b[32m INFO\u001b[0m \u001b[2momnyid_homeserver::runbook_hooks\u001b[0m\u001b[2m:\u001b[0m Runbook deterministic cohort pass \u001b[3mcompleted\u001b[0m\u001b[2m=\u001b[0m0 \u001b[3mpolicy_denied\u001b[0m\u001b[2m=\u001b[0m0 \u001b[3mterminal_or_waiting\u001b[0m\u001b[2m=\u001b[0m1 \u001b[3mconcurrent_or_stale\u001b[0m\u001b[2m=\u001b[0m0 \u001b[3merrors\u001b[0m\u001b[2m=\u001b[0m0\n\u001b[2m2026-11-19T12:46:19.982104Z\u001b[0m \u001b[32m INFO\u001b[0m \u001b[2momnyid_homeserver::runbook_hooks\u001b[0m\u001b[2m:\u001b[0m Runbook deterministic cohort pass \u001b[3mcompleted\u001b[0m\u001b[2m=\u001b[0m0 \u001b[3mpolicy_denied\u001b[0m\u001b[2m=\u001b[0m1 \u001b[3mterminal_or_waiting\u001b[0m\u001b[2m=\u001b[0m0 \u001b[3mconcurrent_or_stale\u001b[0m\u001b[2m=\u001b[0m0 \u001b[3merrors\u001b[0m\u001b[2m=\u001b[0m0\n\u001b[2m2026-11-19T12:46:20.519874Z\u001b[0m \u001b[32m INFO\u001b[0m \u001b[2momnyid_homeserver::runbook_hooks\u001b[0m\u001b[2m:\u001b[0m Runbook deterministic cohort pass \u001b[3mcompleted\u001b[0m\u001b[2m=\u001b[0m0 \u001b[3mpolicy_denied\u001b[0m\u001b[2m=\u001b[0m1 \u001b[3mterminal_or_waiting\u001b[0m\u001b[2m=\u001b[0m0 \u001b[3mconcurrent_or_stale\u001b[0m\u001b[2m=\u001b[0m0 \u001b[3merrors\u001b[0m\u001b[2m=\u001b[0m0\n",
+  "source_verification": {
+    "source_sha": "24948b23e4ec59b9af12ca08aa514a80d17d4c78",
+    "files_verified": 1216,
+    "windows_crlf_only_files": 1054,
+    "mismatches": [],
+    "unexpected_files": [],
+    "missing_required_build_files": []
+  },
+  "build_exit": 0,
+  "runner_exit": 0,
+  "build_log": "   Compiling omnyid-homeserver v1.0.0 (/workspace)\n    Finished `release` profile [optimized] target(s) in 15m 27s\n723566d48e8ce14f3eb030ccc1682e8fbdad039d95b3aa08975839f7a38136ce  /output/runbook-deterministic-probe\n105dddf16f64c26f3ea5001b8c53eb4d926846e29f06f63572f3f05b408775c5  /output/omnyid-homeserver\n",
+  "application_binary_sha256": "105dddf16f64c26f3ea5001b8c53eb4d926846e29f06f63572f3f05b408775c5",
+  "runner_sha256": "c66e6cfd18d48f110b777bc4d5fb1f688abf729ab15551293ab4d579ca2cd4ca",
+  "compiler": "rustc 1.94.0 (4a4ef493e 2026-03-02)",
+  "container_states": {
+    "omnyid-wed379-24948b23-probe": {
+      "running": false,
+      "image_id": "sha256:6fd641d2ecb4205627dcd9a4ca1d31446bf3aeff4a335ba7978b8f1a7be8b65f"
+    },
+    "omnyid-wed379-24948b23-postgres": {
+      "running": false,
+      "image_id": "sha256:2ba9ca5f2e7daa0f0e7723cba1ee9167bab54efd3640516a44ac1a928dd67e7a"
+    },
+    "omnyid-homeserver-1": {
+      "running": true,
+      "image_id": "sha256:a086dba378880b9a8d19e68dfc403efa27356c0ecee5e136755edc0bddff4fa6"
+    }
+  },
+  "cohort_configuration": {
+    "OMNYID_RUNBOOK_EVENT_HOOKS_ENABLED": "true",
+    "OMNYID_RUNBOOK_ALLOWLIST": "01ARZ3NDEKTSV4RRFFQ69G5FAV,01ARZ3NDEKTSV4RRFFQ69G5FAW",
+    "OMNYID_RUNBOOK_DETERMINISTIC_ENABLED": "true",
+    "OMNYID_RUNBOOK_DETERMINISTIC_OWNERS": "01ARZ3NDEKTSV4RRFFQ69G5FAV,01ARZ3NDEKTSV4RRFFQ69G5FAW",
+    "OMNYID_RUNBOOK_DETERMINISTIC_DEFINITIONS": "budget_threshold@1,wed379_unsafe@1",
+    "OMNYID_RUNBOOK_DETERMINISTIC_EXPIRES_AT": "2026-11-19T13:01:16.747316+00:00",
+    "OMNYID_RUNBOOK_SHARED_INFERENCE_ENABLED": "false"
+  },
+  "production_runbook_enabled_flags": {},
+  "verification_worktree": "C:/temp/wt/omnyid-wed379-verify-24948b23",
+  "remote_candidate": "/home/ubuntu/omnyid-candidates/wed379-24948b23",
+  "production_application_release": "b9ead5298fb0cff77ef552c1dc4281e6d35c6bc8"
+}

@@ -1,0 +1,10 @@
+Metadata-Version: 2.4
+Name: afp
+Version: 1.0.0
+Requires-Python: <3.15,>=3.14
+Requires-Dist: httpx
+Requires-Dist: pydantic
+Requires-Dist: ulid-py
+Requires-Dist: pynacl
+Requires-Dist: websockets
+Requires-Dist: aioquic

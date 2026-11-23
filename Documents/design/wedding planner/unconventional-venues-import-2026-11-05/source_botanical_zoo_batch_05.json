@@ -1,0 +1,956 @@
+[
+  {
+    "vendor_name": "Royal Botanic Garden Sydney (Palm House and lawns)",
+    "special_category": [
+      "botanical"
+    ],
+    "special_subtype": [
+      "botanic garden",
+      "glasshouse",
+      "heritage garden"
+    ],
+    "service_area": "Sydney, Sydney NSW",
+    "address": "Mrs Macquaries Rd, Sydney NSW 2000",
+    "website_url": "https://www.botanicgardens.org.au/venues-and-lawns/all-venues-and-lawns/palm-house-and-lawn",
+    "contact_phone": "+61 2 9231 8111",
+    "contact_email": null,
+    "capacity_seated_max": 120,
+    "capacity_standing_max": null,
+    "capacity_note": "Palm House is listed for up to 120 guests and is hired empty, with no furniture. Lawn and pavilion ceremony spaces are separate hires and their capacities were not read on the official pages.",
+    "price_note": "Palm House 2026-27 (GST incl): $2,300 for 4 hours, $3,600 full day (8am to midnight), $390 per extra hour, $1,000 bond, $190 cleaning fee, $330 cancellation fee, ranger $75 per hour (4 hour minimum), parking permit $102. Wedding photography permit included. Lawn pricing not read.",
+    "style_tags": [
+      "botanical",
+      "unconventional",
+      "glasshouse",
+      "harbour views",
+      "heritage",
+      "Sydney CBD",
+      "Sydney"
+    ],
+    "editorial_summary": "Sydney's oldest glasshouse sits in the middle of the city's harbourside botanic garden and can be booked as an empty shell for a ceremony or reception. Couples bring in their own caterer, furniture and styling, and several nearby lawns and pavilions work for outdoor vows.",
+    "sources": [
+      "https://www.botanicgardens.org.au/venues-and-lawns/all-venues-and-lawns/palm-house-and-lawn",
+      "https://www.botanicgardens.org.au/venue-hire/weddings-gardens"
+    ],
+    "flags": [
+      "email_missing_form_only",
+      "permit_required",
+      "lawn_capacities_not_read"
+    ]
+  },
+  {
+    "vendor_name": "The Calyx",
+    "special_category": [
+      "botanical"
+    ],
+    "special_subtype": [
+      "botanic garden",
+      "glasshouse",
+      "conservatory",
+      "living green wall"
+    ],
+    "service_area": "Sydney, Sydney NSW",
+    "address": "Mrs Macquaries Rd, Sydney NSW 2000",
+    "website_url": "https://www.botanicgardens.org.au/venues-and-lawns/all-venues-and-lawns/calyx",
+    "contact_phone": "+61 2 9231 8111",
+    "contact_email": null,
+    "capacity_seated_max": 200,
+    "capacity_standing_max": 400,
+    "capacity_note": "Official page and the 2026 wedding brochure agree on 200 banquet and 400 cocktail. Older third-party material quotes different figures, which were ignored.",
+    "price_note": "Venue hire listed from $7,250 on the official page. The 2026 brochure lists catering packages only: seated from $205 per person, cocktail from $185 per person, minimum 80 adult guests; venue hire and security are extra and confirmed on booking.",
+    "style_tags": [
+      "botanical",
+      "unconventional",
+      "glasshouse",
+      "living green wall",
+      "contemporary",
+      "city skyline",
+      "Sydney CBD",
+      "Sydney"
+    ],
+    "editorial_summary": "A contemporary glasshouse venue inside the Royal Botanic Garden with an indoor living wall, a function space and a terrace overlooking the lawns. The brochure presents Laissez-Faire Catering as the dining provider, and photography permits and garden buggies for guests are part of the offer.",
+    "sources": [
+      "https://www.botanicgardens.org.au/venues-and-lawns/all-venues-and-lawns/calyx",
+      "https://www.botanicgardens.org.au/sites/default/files/2026-02/The%20Calyx%20Weddings%2C%20Royal%20Botanic%20Garden%20Sydney%202026.pdf"
+    ],
+    "flags": [
+      "exclusive_caterer",
+      "verify_external_caterers_allowed",
+      "email_missing_form_only"
+    ]
+  },
+  {
+    "vendor_name": "Botanic House",
+    "special_category": [
+      "botanical"
+    ],
+    "special_subtype": [
+      "botanic garden",
+      "garden restaurant",
+      "terrace"
+    ],
+    "service_area": "Sydney, Sydney NSW",
+    "address": "1 Mrs Macquaries Rd, Sydney NSW 2000",
+    "website_url": "https://botanichouse.com.au/events/weddings/",
+    "contact_phone": "1300 558 980",
+    "contact_email": "twg.events@trippaswhitegroup.com.au",
+    "capacity_seated_max": 150,
+    "capacity_standing_max": 200,
+    "capacity_note": "Official wedding page states 150 seated and 200 cocktail.",
+    "price_note": "Not published; the enquiry form asks for an estimated budget. The front deck for arrival drinks carries additional fees.",
+    "style_tags": [
+      "botanical",
+      "unconventional",
+      "garden views",
+      "harbour glimpses",
+      "Royal Botanic Garden",
+      "Sydney CBD",
+      "Sydney"
+    ],
+    "editorial_summary": "A restaurant venue set within the Royal Botanic Garden with open-air dining, a large open-plan room and a terrace with glimpses of the harbour. Exclusive hire is offered, and the Farm Cove Eatery space can host the ceremony or pre-dinner drinks.",
+    "sources": [
+      "https://botanichouse.com.au/events/weddings/",
+      "https://botanichouse.com.au/contact/"
+    ],
+    "flags": [
+      "exclusive_caterer",
+      "price_not_published"
+    ]
+  },
+  {
+    "vendor_name": "The Australian Botanic Garden Mount Annan",
+    "special_category": [
+      "botanical"
+    ],
+    "special_subtype": [
+      "botanic garden",
+      "native garden",
+      "lakeside lawn",
+      "arboretum"
+    ],
+    "service_area": "Mount Annan, South West Sydney NSW",
+    "address": "362 Narellan Road, Mount Annan NSW 2567",
+    "website_url": "https://www.botanicgardens.org.au/discover-and-learn/watch-listen-read/hold-your-wedding-australian-botanic-garden-mount-annan",
+    "contact_phone": "+61 2 9231 8111",
+    "contact_email": null,
+    "capacity_seated_max": 200,
+    "capacity_standing_max": 600,
+    "capacity_note": "Official FAQ lists per-space capacities: Marquee Lawn 600, Lakeside Lawn 400, Telopea Gallery 200, Lakeside Pavilion 200, Bowden Centre 120 (only space with a kitchen), Connections Garden 70, The Undercroft 50. A third-party listing shows 130 for Connections Garden; the lower official 70 is stored.",
+    "price_note": "The official wedding article says reception spaces, indoor or outdoor, are all under $5,000; no itemised prices read. Extras such as ranger escorts, extra hours and wet-weather backup carry unpublished fees.",
+    "style_tags": [
+      "botanical",
+      "unconventional",
+      "native plants",
+      "lakeside",
+      "marquee lawn",
+      "Mount Annan",
+      "South West Sydney"
+    ],
+    "editorial_summary": "A large native botanic garden with around fifteen wedding spaces, from a rainforest-style ceremony garden to open lawns for marquees and a hall with a kitchen. Self-catering or external caterers are allowed, and ceremonies include a short photography permit.",
+    "sources": [
+      "https://www.botanicgardens.org.au/discover-and-learn/watch-listen-read/hold-your-wedding-australian-botanic-garden-mount-annan",
+      "http://www.botanicgardens.org.au/venues-and-lawns/venue-hire-australian-botanic-garden-faqs",
+      "https://www.botanicgardens.org.au/mount-annan"
+    ],
+    "flags": [
+      "email_missing_form_only",
+      "permit_required",
+      "byo_alcohol_supervision_required",
+      "exclusive_use_not_guaranteed",
+      "price_partial"
+    ]
+  },
+  {
+    "vendor_name": "Blue Mountains Botanic Garden Mount Tomah",
+    "special_category": [
+      "botanical"
+    ],
+    "special_subtype": [
+      "botanic garden",
+      "cool-climate garden",
+      "mountain lookout",
+      "rooftop garden"
+    ],
+    "service_area": "Mount Tomah, Blue Mountains NSW",
+    "address": "Bells Line of Road, Mount Tomah NSW 2758",
+    "website_url": "https://www.botanicgardens.org.au/venues-and-lawns/all-venues-and-lawns/waratah-room",
+    "contact_phone": "+61 2 9231 8111",
+    "contact_email": null,
+    "capacity_seated_max": 60,
+    "capacity_standing_max": 100,
+    "capacity_note": "Waratah Room seats 60; the Signature Botanic Wedding Package allows up to 100 standing. The Formal Garden page says up to 120 for hire while its package text says 100 standing or 60 seated, so the lower figures are stored. Viewing Deck package is up to 50; Camellia Garden and DeFerranti Pavilion up to 30.",
+    "price_note": "2026-27 official rates: Signature Botanic Wedding Package $4,700 (3 hour ceremony, 5 hour reception in the Waratah Room); Blooms, Views and Vows Package $4,900 (observation platform and Visitor Centre, 5 hours from 4pm, up to 50); Formal Garden ceremony $2,100 for 3 hours; Camellia Garden $600 for 1.5 hours; bond $500; extra hours $430. Wedding photography permit $315 unless included in a package.",
+    "style_tags": [
+      "botanical",
+      "unconventional",
+      "Blue Mountains",
+      "mountain views",
+      "rooftop garden",
+      "Mount Tomah",
+      "cool climate"
+    ],
+    "editorial_summary": "A cool-climate botanic garden high in the Blue Mountains offering several ceremony settings, a reception room with a kitchenette and, newly, exclusive hire of its rooftop lookout and visitor centre at sunset. Packages are tiered by group size, from intimate to around a hundred guests.",
+    "sources": [
+      "https://www.botanicgardens.org.au/venues-and-lawns/all-venues-and-lawns/waratah-room",
+      "http://www.botanicgardens.org.au/venues-and-lawns/all-venues-and-lawns/formal-garden",
+      "https://www.botanicgardens.org.au/venues-and-lawns/all-venues-and-lawns/viewing-deck-and-visitor-centre",
+      "https://www.botanicgardens.org.au/venues-and-lawns/all-venues-and-lawns/camellia-garden-and-deferranti-pavilion",
+      "https://www.botanicgardens.org.au/mount-tomah"
+    ],
+    "flags": [
+      "email_missing_form_only",
+      "capacity_conflict",
+      "permit_required",
+      "limited_wheelchair_access"
+    ]
+  },
+  {
+    "vendor_name": "Chinese Garden of Friendship Darling Harbour",
+    "special_category": [
+      "botanical"
+    ],
+    "special_subtype": [
+      "chinese garden",
+      "pavilions",
+      "public garden"
+    ],
+    "service_area": "Darling Harbour, Sydney NSW",
+    "address": "Pier St, cnr Harbour St, Darling Harbour NSW 2000",
+    "website_url": "https://www.darlingharbour.com/precincts/chinese-garden/weddings,-functions,-filming-and-photography-at-th",
+    "contact_phone": "02 9240 8888",
+    "contact_email": "functions@property.nsw.gov.au",
+    "capacity_seated_max": 100,
+    "capacity_standing_max": 180,
+    "capacity_note": "Whole-garden evening function: 100 seated, 180 cocktail. Daytime ceremony pavilions are smaller: Peace Boat Pavilion 30 standing/12 seated, Water Pavilion 50/48, Hall of Longevity 100/48, counting all attendees including celebrant and photographers.",
+    "price_note": "2026 sheets: ceremony pavilion hire 3 hours $780 (Peace Boat), $980 (Water), $1,280 (Hall of Longevity), GST incl, $280 holding deposit. Exclusive evening hire of the lower garden $6,000 (5.30pm to midnight, $1,500 deposit), extra hours $1,200. Furniture in pavilions included free.",
+    "style_tags": [
+      "botanical",
+      "unconventional",
+      "Chinese garden",
+      "pagoda pavilions",
+      "waterfront city",
+      "Darling Harbour",
+      "Sydney CBD"
+    ],
+    "editorial_summary": "A classical Chinese garden with pavilions, bridges and reflective pools right beside Darling Harbour, bookable for daytime ceremonies or an exclusive evening function. Each pavilion has its own size, and catering is arranged through the on-site teahouse operator.",
+    "sources": [
+      "https://www.darlingharbour.com/precincts/chinese-garden/weddings,-functions,-filming-and-photography-at-th",
+      "https://www.darlingharbour.com/getmedia/087dc737-2d09-4ddb-8666-70f5ac52465d/wedding-ceremony-2026.pdf",
+      "https://www.darlingharbour.com/getmedia/37e70e6d-0097-47b1-a4d8-f5c78163e964/venue-hire-2026.pdf",
+      "https://www.darlingharbour.com/getmedia/1ea42305-d979-49fd-9618-6293715475df/evening-functions-2026.pdf"
+    ],
+    "flags": [
+      "postcode_inferred",
+      "exclusive_caterer",
+      "verify_external_caterers_allowed",
+      "pedestrian_access_only",
+      "alcohol_and_music_cease_1030pm_evening"
+    ]
+  },
+  {
+    "vendor_name": "Wollongong Botanic Garden",
+    "special_category": [
+      "botanical"
+    ],
+    "special_subtype": [
+      "botanic garden",
+      "rose garden",
+      "glasshouse",
+      "ceremony lawns"
+    ],
+    "service_area": "Keiraville, Illawarra NSW",
+    "address": "Murphys Avenue, Keiraville NSW 2500",
+    "website_url": "https://wollongongbotanicgarden.com.au/events/weddings",
+    "contact_phone": "02 4227 7667",
+    "contact_email": "botanicgarden@wollongong.nsw.gov.au",
+    "capacity_seated_max": 150,
+    "capacity_standing_max": null,
+    "capacity_note": "Rose Garden ceremony page states up to 150 guests; capacities for other ceremony spaces (Arid Collection, Temple Garden, Turpentine Lawn, Woodland Garden and Meadow) were not read. Ceremonies only; no reception option seen.",
+    "price_note": "Official fees page (2026-27, GST incl): exclusive use of a garden collection section for weddings $735 per hour, Rose Garden function package (30 white chairs, signing table, cloth) $218, refundable bond $485. Ceremony bookings include one hour setup and one hour pack-down at no charge. Entry is free.",
+    "style_tags": [
+      "botanical",
+      "unconventional",
+      "rose garden",
+      "gazebo",
+      "Mount Keira",
+      "Wollongong",
+      "Illawarra"
+    ],
+    "editorial_summary": "A council-run botanic garden at the foot of Mount Keira with several ceremony settings, including a rose garden with a gazebo and a red-desert arid collection. Couples hire a section by the hour for the ceremony, and wedding photos in the garden need no permit.",
+    "sources": [
+      "https://wollongongbotanicgarden.com.au/events/weddings",
+      "https://wollongongbotanicgarden.com.au/events/weddings/rose-garden",
+      "https://wollongongbotanicgarden.com.au/events/fees-and-charges",
+      "https://wollongongbotanicgarden.com.au/visit/hours-and-location"
+    ],
+    "flags": [
+      "ceremony_only",
+      "postcode_inferred",
+      "no_alcohol_on_site",
+      "rose_garden_closed_july_to_september"
+    ]
+  },
+  {
+    "vendor_name": "Hunter Region Botanic Gardens",
+    "special_category": [
+      "botanical"
+    ],
+    "special_subtype": [
+      "botanic garden",
+      "bush chapel",
+      "rotunda",
+      "lily pond"
+    ],
+    "service_area": "Heatherbrae, Hunter NSW",
+    "address": "2100 Pacific Highway, Heatherbrae NSW 2324",
+    "website_url": "https://www.huntergardens.org.au/weddings/",
+    "contact_phone": "(02) 4987 1655",
+    "contact_email": "events@huntergardens.org.au",
+    "capacity_seated_max": null,
+    "capacity_standing_max": null,
+    "capacity_note": "Capacities per ceremony spot are not stated on the official pages. The site structured data lists a different phone (02 4987 1140); the wedding page number is stored.",
+    "price_note": "Not published; wedding packages are under review and the events team quotes current prices, including new elopement packages. Bookings are essential and fees apply.",
+    "style_tags": [
+      "botanical",
+      "unconventional",
+      "bush chapel",
+      "Victorian rotunda",
+      "lily pond",
+      "Heatherbrae",
+      "Hunter",
+      "Port Stephens"
+    ],
+    "editorial_summary": "A community-run botanic garden beside the Pacific Highway with a Victorian-style rotunda on the lawn, a bush chapel grove and a lily pond for ceremonies. The gardens describe outdoor receptions and catering as flexible, with details by enquiry.",
+    "sources": [
+      "https://www.huntergardens.org.au/weddings/",
+      "https://www.huntergardens.org.au/?p=600",
+      "https://www.huntergardens.org.au/"
+    ],
+    "flags": [
+      "capacity_unknown",
+      "price_not_published",
+      "phone_conflict_verify"
+    ]
+  },
+  {
+    "vendor_name": "Auburn Botanic Gardens",
+    "special_category": [
+      "botanical"
+    ],
+    "special_subtype": [
+      "botanic garden",
+      "japanese garden",
+      "scented garden",
+      "rose garden"
+    ],
+    "service_area": "Auburn, Western Sydney NSW",
+    "address": "99 Chiswick Road, Auburn NSW 2144",
+    "website_url": "https://www.cumberland.nsw.gov.au/auburn-botanic-gardens",
+    "contact_phone": "(02) 8757 9000",
+    "contact_email": "council@cumberland.nsw.gov.au",
+    "capacity_seated_max": null,
+    "capacity_standing_max": null,
+    "capacity_note": "No capacity stated in the council pages or FAQ. Minimum booking is 1.5 hours with a 30 minute gap between events; tables and chairs must be hired in and set on paved surfaces.",
+    "price_note": "Not published on the pages read; fees and bond are quoted in the council's online booking system. Extra non-resident entry charges may apply if more guests attend than booked.",
+    "style_tags": [
+      "botanical",
+      "unconventional",
+      "japanese garden",
+      "sunken rose garden",
+      "scented garden",
+      "Auburn",
+      "Western Sydney"
+    ],
+    "editorial_summary": "A council botanic garden with themed sections such as a Japanese garden, scented garden and sunken rose garden that couples can book for ceremonies and photos. Receptions, marquees and food are not allowed on site, so a separate reception venue is needed.",
+    "sources": [
+      "https://www.cumberland.nsw.gov.au/auburn-botanic-gardens",
+      "https://www.cumberland.nsw.gov.au/sites/default/files/inline-files/auburn-botanic-gardens-faqs.pdf"
+    ],
+    "flags": [
+      "ceremony_only",
+      "postcode_inferred",
+      "price_not_published",
+      "exclusive_use_not_guaranteed",
+      "no_marquees",
+      "no_food_on_site",
+      "email_is_general_council"
+    ]
+  },
+  {
+    "vendor_name": "Fagan Park Galston",
+    "special_category": [
+      "botanical"
+    ],
+    "special_subtype": [
+      "themed gardens",
+      "public garden",
+      "lake gardens"
+    ],
+    "service_area": "Galston, Hills District NSW",
+    "address": "38-48 Arcadia Road, Galston NSW 2159",
+    "website_url": "https://www.hornsby.nsw.gov.au/faganpark",
+    "contact_phone": "(02) 9847 6666",
+    "contact_email": "hsc@hornsby.nsw.gov.au",
+    "capacity_seated_max": null,
+    "capacity_standing_max": null,
+    "capacity_note": "No ceremony capacity stated. Bookings are for a two-hour block, ceremony only, 9am to 3.30pm weekdays and 10am to 3.30pm weekends; marquees are not allowed.",
+    "price_note": "Not read; the council links a Fagan Park fees and charges PDF that could not be opened.",
+    "style_tags": [
+      "botanical",
+      "unconventional",
+      "themed gardens",
+      "Japanese garden",
+      "Dutch garden",
+      "lakeside",
+      "Galston",
+      "Hills District"
+    ],
+    "editorial_summary": "A council park made up of themed gardens, among them Japanese, Dutch, English and Mediterranean sections beside a lake, that can be booked for outdoor ceremonies. Receptions and parties are not available, so the day would need a separate venue after the vows.",
+    "sources": [
+      "https://www.hornsby.nsw.gov.au/faganpark"
+    ],
+    "flags": [
+      "ceremony_only",
+      "price_not_read",
+      "no_marquees",
+      "email_is_general_council",
+      "no_reception"
+    ]
+  },
+  {
+    "vendor_name": "Lisgar Gardens Hornsby",
+    "special_category": [
+      "botanical"
+    ],
+    "special_subtype": [
+      "public garden",
+      "japanese garden",
+      "formal lawn",
+      "pavilion"
+    ],
+    "service_area": "Hornsby, Upper North Shore NSW",
+    "address": "Lisgar Road, Hornsby NSW 2077",
+    "website_url": "https://www.hornsby.nsw.gov.au/lifestyle/sports-and-recreation/parks-and-playgrounds/lisgar-gardens",
+    "contact_phone": "(02) 9847 6666",
+    "contact_email": "hsc@hornsby.nsw.gov.au",
+    "capacity_seated_max": null,
+    "capacity_standing_max": null,
+    "capacity_note": "Capacity is shown only in the council booking system and was not read. Bookings run up to three hours; the page states the venue is not suitable for parties or any form of catering.",
+    "price_note": "Not published on the page read; the council links a fees and charges PDF.",
+    "style_tags": [
+      "botanical",
+      "unconventional",
+      "formal lawn",
+      "pavilion",
+      "Hornsby",
+      "Upper North Shore"
+    ],
+    "editorial_summary": "A small council garden with a pavilion and formal lawn that Hornsby Shire takes bookings for weddings and photos. It suits a short ceremony only, since parties and catering are ruled out.",
+    "sources": [
+      "https://www.hornsby.nsw.gov.au/lifestyle/sports-and-recreation/parks-and-playgrounds/lisgar-gardens"
+    ],
+    "flags": [
+      "ceremony_only",
+      "capacity_unknown",
+      "price_not_published",
+      "no_catering",
+      "email_is_general_council"
+    ]
+  },
+  {
+    "vendor_name": "Everglades House and Gardens",
+    "special_category": [
+      "botanical"
+    ],
+    "special_subtype": [
+      "historic garden",
+      "terraced garden",
+      "national trust"
+    ],
+    "service_area": "Leura, Blue Mountains NSW",
+    "address": "37 Everglades Avenue, Leura NSW 2780",
+    "website_url": "https://www.nationaltrust.org.au/places/everglades-house-gardens/venue-hire/",
+    "contact_phone": "(02) 4784 1938",
+    "contact_email": "everglades@nationaltrust.com.au",
+    "capacity_seated_max": 120,
+    "capacity_standing_max": null,
+    "capacity_note": "Wedding ceremonies are listed for 120 guests; private events are 50 seated or 60 standing. The venue stays open to the public during bookings.",
+    "price_note": "Ceremony hire from $2,600 for FY2027 (GST incl), covering 2 hours between 9am and 5pm.",
+    "style_tags": [
+      "botanical",
+      "unconventional",
+      "historic garden",
+      "1930s gardens",
+      "Leura",
+      "Blue Mountains"
+    ],
+    "editorial_summary": "A heritage English-style garden run by the National Trust in the Blue Mountains, available for wedding ceremonies in daytime hours. The official page says receptions and accommodation are not offered, so it works as a ceremony location paired with a separate reception.",
+    "sources": [
+      "https://www.nationaltrust.org.au/places/everglades-house-gardens/venue-hire/"
+    ],
+    "flags": [
+      "ceremony_only",
+      "no_reception",
+      "open_to_public_during_booking",
+      "caterer_rules_unknown"
+    ]
+  },
+  {
+    "vendor_name": "Campbell Rhododendron Gardens",
+    "special_category": [
+      "botanical"
+    ],
+    "special_subtype": [
+      "rhododendron garden",
+      "volunteer-run garden",
+      "ceremony sites"
+    ],
+    "service_area": "Blackheath, Blue Mountains NSW",
+    "address": "Bacchante St, Blackheath NSW 2785",
+    "website_url": "https://www.rhodogarden.org.au/booking-information",
+    "contact_phone": "+61 2 4787 8965",
+    "contact_email": null,
+    "capacity_seated_max": 100,
+    "capacity_standing_max": null,
+    "capacity_note": "Ceremonies are priced in two bands, up to 50 guests and up to 100 guests; 100 is the maximum. The sealed car park holds about 40 cars.",
+    "price_note": "Total booking fee $300 for up to 50 guests or $500 for up to 100 guests; 50% deposit to secure the date and the balance one month before. Cancellation more than 30 days out refunds the deposit less a $55 fee.",
+    "style_tags": [
+      "botanical",
+      "unconventional",
+      "rhododendrons",
+      "Blackheath",
+      "Blue Mountains",
+      "spring blooms"
+    ],
+    "editorial_summary": "A volunteer-run rhododendron garden near Blackheath that reserves a chosen site for a wedding ceremony while staying open to the public. Fees are set by guest band and gates close early in cooler months, so timing needs planning.",
+    "sources": [
+      "https://www.rhodogarden.org.au/hire",
+      "https://www.rhodogarden.org.au/booking-information",
+      "https://www.rhodogarden.org.au/wedding-faq"
+    ],
+    "flags": [
+      "ceremony_only",
+      "email_missing_form_only",
+      "postcode_inferred",
+      "catering_alcohol_rules_unknown",
+      "no_sheltered_site_reported",
+      "voicemail_phone"
+    ]
+  },
+  {
+    "vendor_name": "Illawarra Rhododendron and Rainforest Gardens",
+    "special_category": [
+      "botanical"
+    ],
+    "special_subtype": [
+      "rhododendron garden",
+      "rainforest garden",
+      "volunteer-run garden"
+    ],
+    "service_area": "Mount Pleasant, Illawarra NSW",
+    "address": "Parrish Avenue, Mount Pleasant NSW 2519",
+    "website_url": "https://irrg.au",
+    "contact_phone": "0490 069 360",
+    "contact_email": "bookings@irrg.au",
+    "capacity_seated_max": null,
+    "capacity_standing_max": null,
+    "capacity_note": "No capacity stated on the official page. Weddings must be booked in advance and can be held on public open days or on normally closed days by arrangement.",
+    "price_note": "Not published; wedding and photo-shoot fees are given by the bookings volunteer.",
+    "style_tags": [
+      "botanical",
+      "unconventional",
+      "rhododendrons",
+      "rainforest",
+      "Mount Pleasant",
+      "Illawarra",
+      "escarpment"
+    ],
+    "editorial_summary": "A volunteer-run garden on the Illawarra escarpment with rhododendron and rainforest plantings, bookable for weddings on open days or by arrangement on closed days. Fees and site options come from a bookings volunteer.",
+    "sources": [
+      "https://irrg.au"
+    ],
+    "flags": [
+      "capacity_unknown",
+      "price_not_published",
+      "catering_rules_unknown",
+      "ceremony_vs_reception_unknown"
+    ]
+  },
+  {
+    "vendor_name": "Gosford Edogawa Commemorative Garden",
+    "special_category": [
+      "botanical"
+    ],
+    "special_subtype": [
+      "japanese garden",
+      "public garden",
+      "koi pavilion"
+    ],
+    "service_area": "East Gosford, Central Coast NSW",
+    "address": "36 Webb Street, East Gosford NSW 2250",
+    "website_url": "https://www.centralcoast.nsw.gov.au/recreation/planning-events/weddings",
+    "contact_phone": "02 4304 7550",
+    "contact_email": "gallery@centralcoast.nsw.gov.au",
+    "capacity_seated_max": null,
+    "capacity_standing_max": 150,
+    "capacity_note": "Council says the outdoor space suits wedding parties of up to 150. Ceremonies are normally in the Koi Pavilion, which suits small intimate weddings; only a signing table and a maximum of 10 chairs are provided.",
+    "price_note": "Not published on the council wedding page read.",
+    "style_tags": [
+      "botanical",
+      "unconventional",
+      "japanese garden",
+      "koi pavilion",
+      "gallery gardens",
+      "East Gosford",
+      "Central Coast"
+    ],
+    "editorial_summary": "A Japanese garden beside Gosford Regional Gallery where weddings are usually held in the Koi Pavilion. Public access continues during opening hours, bookings are short, and the on-site cafe is the named caterer for functions.",
+    "sources": [
+      "https://www.centralcoast.nsw.gov.au/recreation/planning-events/weddings"
+    ],
+    "flags": [
+      "address_from_search_result_verify",
+      "price_not_published",
+      "exclusive_use_not_guaranteed",
+      "exclusive_caterer",
+      "short_booking_1_5_hours"
+    ]
+  },
+  {
+    "vendor_name": "Taronga Zoo Sydney",
+    "special_category": [
+      "zoo_aquarium"
+    ],
+    "special_subtype": [
+      "zoo"
+    ],
+    "service_area": "Mosman, Lower North Shore NSW",
+    "address": "2A Bradleys Head Road, Mosman, NSW 2088",
+    "website_url": "https://www.taronga.org.au/sydney-zoo/function-venue-hire/weddings",
+    "contact_phone": "02 9978 4641",
+    "contact_email": "tarongacentre@trippaswhitegroup.com.au",
+    "capacity_seated_max": 250,
+    "capacity_standing_max": 300,
+    "capacity_note": "Largest reception space is Dalang Ballroom: 250 seated, 300 cocktail. N'galawa Terrace 150 seated / 200 cocktail; Gili Rooftop 60 seated / 80 cocktail. Ceremony spaces: Bird Amphitheatre 300 guests, Condor Lawns 150 guests, African Savannah 100 guests. The lawn-spaces page lists Condor Lawns at 100 cocktail (lower figure is for a cocktail function, ceremony page says 150). Harbour View Lawns 150 cocktail.",
+    "price_note": "Hire and menu prices not published on the official site. A limited-time '50% Off Venue Hire' promotion was advertised (terms not read), and a Micro Wedding Package and downloadable Wedding Kit are offered.",
+    "style_tags": [
+      "zoo",
+      "wildlife",
+      "unconventional",
+      "harbour views",
+      "Sydney Harbour National Park",
+      "Mosman",
+      "Lower North Shore",
+      "ceremony and reception",
+      "accommodation on site"
+    ],
+    "editorial_summary": "A working zoo on the Mosman foreshore that stages weddings against Sydney Harbour, the skyline and animal habitats. Couples can marry at the Bird Amphitheatre, Condor Lawns or African Savannah, then celebrate in indoor reception rooms such as the Dalang Ballroom, N'galawa Terrace or Gili Rooftop. Enquiries and catering run through the zoo's events and catering partner, Trippas White Group.",
+    "sources": [
+      "https://www.taronga.org.au/sydney-zoo/function-venue-hire/weddings",
+      "https://taronga.org.au/sydney-zoo/functions-and-venue-hire",
+      "https://events-taronga.com.au/spaces/wedding-ceremonies/",
+      "https://events-taronga.com.au/spaces/the-dalang-ballroom/",
+      "https://events-taronga.com.au/spaces/the-ngalawa-terrace/",
+      "https://events-taronga.com.au/spaces/the-gili-rooftop/",
+      "https://events-taronga.com.au/spaces/lawn-event-spaces/",
+      "https://events-taronga.com.au/events/weddings/",
+      "https://events-taronga.com.au/contact/"
+    ],
+    "flags": [
+      "capacity_conflict",
+      "catering_partner_trippas_white",
+      "prices_not_published"
+    ]
+  },
+  {
+    "vendor_name": "SEA LIFE Sydney Aquarium",
+    "special_category": [
+      "zoo_aquarium"
+    ],
+    "special_subtype": [
+      "aquarium"
+    ],
+    "service_area": "Darling Harbour, Sydney CBD NSW",
+    "address": "1-5 Wheat Road, Darling Harbour, NSW 2000",
+    "website_url": "https://www.visitsealife.com/sydney/tickets-passes/events-and-functions/private-events/weddings/",
+    "contact_phone": "02 9066 4095",
+    "contact_email": "merlin@bespokecatering.net.au",
+    "capacity_seated_max": 160,
+    "capacity_standing_max": 280,
+    "capacity_note": "Per private-hire space: Dugong Island 200 cocktail / 160 sit-down; Day and Night on the Reef 280 cocktail / 85 sit-down; Jurassic Seas 100 cocktail / 50 sit-down. The page also says the whole venue holds around 1000 (unit labelled 'px'); the lower per-space figures are stored. The Day and Night on the Reef zone was noted as under renovation on the Merlin weddings page.",
+    "price_note": "Not published on the official site; an event packages brochure PDF is linked but could not be read.",
+    "style_tags": [
+      "aquarium",
+      "unconventional",
+      "underwater ceremony",
+      "marine displays",
+      "Darling Harbour",
+      "Sydney CBD",
+      "waterfront",
+      "ceremony and reception"
+    ],
+    "editorial_summary": "Darling Harbour aquarium that offers weddings among its marine displays, with the Merlin venues page describing underwater-style ceremonies, sit-down banquets and cocktail receptions. Three private-hire zones suit different guest counts, from an intimate 50 seated up to a few hundred standing. Enquiries go through the shared Merlin events line and caterer.",
+    "sources": [
+      "https://www.merlinvenues.com.au/your-event/private-events/weddings/",
+      "https://www.merlinvenues.com.au/our-venues/sydney-nsw-venues/sea-life-sydney/",
+      "https://www.merlinvenues.com.au/about-us/about-us/contact-us/",
+      "https://www.visitsealife.com/sydney/tickets-passes/events-and-functions/private-events/weddings/",
+      "https://www.visitsealife.com/sydney/plan-your-day/before-you-visit/directions-parking/getting-here/"
+    ],
+    "flags": [
+      "contact_is_merlin_shared_line",
+      "capacity_conflict",
+      "catering_partner_bespoke",
+      "prices_not_published",
+      "space_under_renovation"
+    ]
+  },
+  {
+    "vendor_name": "WILD LIFE Sydney Zoo",
+    "special_category": [
+      "zoo_aquarium"
+    ],
+    "special_subtype": [
+      "zoo"
+    ],
+    "service_area": "Darling Harbour, Sydney CBD NSW",
+    "address": "1-5 Wheat Road, Darling Harbour, Sydney NSW 2000",
+    "website_url": "https://wildlifesydney.com.au/events/private-events/weddings",
+    "source_checked_at": "2026-11-06",
+    "contact_phone": "02 9066 4095",
+    "contact_email": "merlin@bespokecatering.net.au",
+    "capacity_seated_max": 80,
+    "capacity_standing_max": 120,
+    "capacity_note": "Koala Rooftop: 120 cocktail / 80 sit-down. Croc Deck: 80 cocktail / 50 sit-down. The venue page also states a whole-venue maximum of around 450 (labelled 'px'); the lower per-space figures are stored.",
+    "price_note": "Not published on the official site.",
+    "style_tags": [
+      "zoo",
+      "wildlife",
+      "unconventional",
+      "koalas",
+      "indoor wildlife",
+      "Darling Harbour",
+      "Sydney CBD",
+      "waterfront",
+      "rooftop"
+    ],
+    "editorial_summary": "WILD LIFE Sydney Zoo's current official wedding page confirms weddings in Darling Harbour, from small celebrations to larger events, with pre-set packages, tailored options and an experienced planning team. Bespoke Catering is the named catering partner and the published wedding enquiry address is merlin@bespokecatering.net.au. Capacity and price still need reconfirming because the current page does not publish them.",
+    "sources": [
+      "https://wildlifesydney.com.au/events/private-events/weddings",
+      "https://wildlifesydney.com.au/",
+      "https://www.merlinvenues.com.au/your-event/private-events/weddings/",
+      "https://www.merlinvenues.com.au/our-venues/sydney-nsw-venues/wild-life-sydney-zoo/",
+      "https://www.merlinvenues.com.au/about-us/about-us/contact-us/"
+    ],
+    "flags": [
+      "contact_is_merlin_shared_line",
+      "capacity_conflict",
+      "catering_partner_bespoke",
+      "prices_not_published",
+      "wedding_offer_verified_2026_11_06",
+      "capacity_requires_reconfirmation"
+    ]
+  },
+  {
+    "vendor_name": "Sydney Zoo",
+    "special_category": [
+      "zoo_aquarium"
+    ],
+    "special_subtype": [
+      "zoo"
+    ],
+    "service_area": "Bungarribee, Western Sydney NSW",
+    "address": "700 Great Western Highway, Bungarribee NSW 2767",
+    "website_url": "https://sydneyzoo.com/functions",
+    "contact_phone": "02 7202 2560",
+    "contact_email": "info@sydneyzoo.com",
+    "capacity_seated_max": 350,
+    "capacity_standing_max": 750,
+    "capacity_note": "Largest space is Primate Boulevard: 350 seated / 750 cocktail. Lion Deck 200 seated / 400 cocktail; Boulevard Function Room 200 seated / 350 cocktail; Meerkat Wing 100 seated / 130 cocktail; Tiger Pool 90 seated / 70 cocktail (listed as given). Minimum 50 attendees; minimum spends apply to all spaces.",
+    "price_note": "Not published; the terms say minimum spends apply to every space, prices include GST and holiday surcharges may apply.",
+    "style_tags": [
+      "zoo",
+      "wildlife",
+      "unconventional",
+      "lions",
+      "tigers",
+      "Bungarribee",
+      "Eastern Creek",
+      "Western Sydney",
+      "free parking",
+      "wheelchair accessible"
+    ],
+    "editorial_summary": "Western Sydney zoo that lists wedding receptions among its social functions, with spaces overlooking lion and tiger habitats. Space options range from a 90-seat Tiger Pool to the 350-seat Primate Boulevard. The zoo is the sole caterer, wedding packages include a security guard, and bridal photos in the grounds are limited to one hour.",
+    "sources": [
+      "https://sydneyzoo.com/functions",
+      "https://sydneyzoo.com/about/contact-us"
+    ],
+    "flags": [
+      "exclusive_caterer",
+      "email_general_only",
+      "prices_not_published",
+      "wedding_subpages_not_loading",
+      "capacity_conflict"
+    ]
+  },
+  {
+    "vendor_name": "Australian Reptile Park",
+    "special_category": [
+      "zoo_aquarium"
+    ],
+    "special_subtype": [
+      "wildlife park"
+    ],
+    "service_area": "Somersby, Central Coast NSW",
+    "address": "Pacific Highway, Somersby, NSW 2250",
+    "website_url": "https://www.reptilepark.com.au/about/functions-and-events/arp-weddings",
+    "contact_phone": "02 4340 1022",
+    "contact_email": "sales@reptilepark.com.au",
+    "capacity_seated_max": null,
+    "capacity_standing_max": null,
+    "capacity_note": "Guest capacities are not published on the wedding page.",
+    "price_note": "Not published on the official site.",
+    "style_tags": [
+      "wildlife park",
+      "reptiles",
+      "unconventional",
+      "outdoor ceremony",
+      "bush setting",
+      "Somersby",
+      "Central Coast",
+      "animal encounters",
+      "undercover reception"
+    ],
+    "editorial_summary": "A Central Coast wildlife park offering outdoor ceremonies among eucalypts and lawns, with undercover options for wet weather. The reception space is covered and set up for dining and dancing, and couples can add animal photos, private reptile shows or encounters. A functions team handles planning and supplier suggestions.",
+    "sources": [
+      "https://www.reptilepark.com.au/",
+      "https://www.reptilepark.com.au/about/functions-and-events/arp-weddings"
+    ],
+    "flags": [
+      "capacity_not_published",
+      "prices_not_published",
+      "street_number_missing"
+    ]
+  },
+  {
+    "vendor_name": "Taronga Western Plains Zoo",
+    "special_category": [
+      "zoo_aquarium"
+    ],
+    "special_subtype": [
+      "zoo"
+    ],
+    "service_area": "Dubbo, Central West NSW",
+    "address": "Obley Road, Dubbo, NSW 2830",
+    "website_url": "https://www.taronga.org.au/dubbo-zoo/function-venue-hire/weddings/",
+    "contact_phone": "(02) 6881 1438",
+    "contact_email": "savannahfc@zoo.nsw.gov.au",
+    "capacity_seated_max": null,
+    "capacity_standing_max": null,
+    "capacity_note": "Seating capacity of the Savannah Function Centre is not stated. Reception and ceremony-and-reception packages require a minimum of 50 guests; the Elope at the Zoo package is limited to 25 guests. The ceremony setup includes 50 chairs.",
+    "price_note": "From the official September 2024 package PDF: reception only $1,500 hire; ceremony and reception $2,500 hire; Elope at the Zoo $3,000 (3 hours, max 25 guests); photography session $750. Catering two courses $99 pp, three courses $119 pp, canapes $28 pp, grazing board $15 pp, kids menu $35 per child under 12. Prices may have changed since.",
+    "style_tags": [
+      "zoo",
+      "wildlife",
+      "safari",
+      "unconventional",
+      "lake views",
+      "Dubbo",
+      "Central West",
+      "regional NSW",
+      "elopement",
+      "accommodation on site",
+      "ceremony and reception"
+    ],
+    "editorial_summary": "A large open-range zoo in Dubbo that hosts weddings with several ceremony locations in its grounds and receptions at the lakeside Savannah Function Centre. Three packages are offered: reception only, ceremony and reception, and a small elopement. Guests can stay on site at Zoofari Lodge or the Savannah Cabins.",
+    "sources": [
+      "https://www.taronga.org.au/dubbo-zoo/function-venue-hire/weddings/",
+      "https://taronga.org.au/western-plains-zoo/function-venue-hire/weddings",
+      "https://www.taronga.org.au/siteassets/tzwp/files/twpz-wedding-package-2-compressed.pdf"
+    ],
+    "flags": [
+      "postcode_inferred",
+      "capacity_not_published",
+      "price_from_sept_2024_pdf"
+    ]
+  },
+  {
+    "vendor_name": "Featherdale Wildlife Park",
+    "special_category": [
+      "zoo_aquarium"
+    ],
+    "special_subtype": [
+      "wildlife park"
+    ],
+    "service_area": "Doonside, Western Sydney NSW",
+    "address": "217 Kildare Road, Doonside, NSW 2767",
+    "website_url": "https://www.featherdale.com.au/events/",
+    "contact_phone": null,
+    "contact_email": null,
+    "capacity_seated_max": 90,
+    "capacity_standing_max": 110,
+    "capacity_note": "The Drover's Hut seats 90 inside or outside and takes 110 grazing style. Keeper's Courtyard seats up to 60 at picnic tables; two picnic areas seat 50 each. Events are daytime only and only acoustic music is allowed in the Drover's Hut.",
+    "price_note": "Not published on the page; Exclusive Hire and Group Packages PDFs are linked but were not read.",
+    "style_tags": [
+      "wildlife park",
+      "unconventional",
+      "Australian native animals",
+      "Doonside",
+      "Blacktown",
+      "Western Sydney",
+      "daytime events",
+      "private hire"
+    ],
+    "editorial_summary": "Native-animal park in western Sydney that rents out its Drover's Hut, courtyard and picnic areas for private functions and exclusive-hire days. The events page names corporate events, birthdays and celebrations but not weddings, so a wedding enquiry would need to be confirmed. Daytime events only, with acoustic music indoors.",
+    "sources": [
+      "https://www.featherdale.com.au/",
+      "https://www.featherdale.com.au/events/"
+    ],
+    "flags": [
+      "verify_weddings_accepted",
+      "needs_contact_lookup",
+      "email_missing_form_only",
+      "prices_not_published"
+    ]
+  },
+  {
+    "vendor_name": "Mogo Wildlife Park",
+    "special_category": [
+      "zoo_aquarium"
+    ],
+    "special_subtype": [
+      "zoo"
+    ],
+    "service_area": "Mogo, South Coast NSW",
+    "address": "222 Tomakin Road, Mogo, NSW 2536",
+    "website_url": "https://mogowildlifepark.com.au/events/",
+    "contact_phone": null,
+    "contact_email": null,
+    "capacity_seated_max": 100,
+    "capacity_standing_max": 300,
+    "capacity_note": "Function and Events Centre (by Primate Island): 100 seated indoors or cocktail style; up to 300 using the outdoor verandahs and picnic areas. Grassy Glade up to 200 with marquees/tables (weather dependent). Main Cafe terrace 50 seated or about 100 standing; Tiger Deck 50. Whole-park exclusive hire is available.",
+    "price_note": "Not published on the events page; Event Day Packages (Exclusive Hire) and Group Packages PDFs are linked but were not read.",
+    "style_tags": [
+      "zoo",
+      "wildlife",
+      "unconventional",
+      "exclusive hire",
+      "Mogo",
+      "South Coast",
+      "Batemans Bay",
+      "regional NSW",
+      "marquee"
+    ],
+    "editorial_summary": "South Coast zoo that offers private function spaces, from a terrace and deck to a 100-seat events centre and a lawn that can take marquees. Couples can book the whole park for an exclusive-hire day. The events page does not name weddings, so confirm ceremonies and receptions are accepted.",
+    "sources": [
+      "https://mogowildlifepark.com.au/",
+      "https://mogowildlifepark.com.au/events/"
+    ],
+    "flags": [
+      "verify_weddings_accepted",
+      "needs_contact_lookup",
+      "email_missing_form_only",
+      "prices_not_published"
+    ]
+  }
+]

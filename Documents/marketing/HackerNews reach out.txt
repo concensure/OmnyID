@@ -1,0 +1,33 @@
+
+
+
+OmnyID – historical protocol-launch HN draft
+https://github.com/concensure/OmnyID
+
+Hi HN,
+I'm releasing the core of OmnyID AFP (Agent Federation Protocol) v1 as open source (Apache 2.0).
+Most current AI tools make you restart context from zero or trap your memory inside one product. OmnyID takes a different approach: it gives you portable cross-tool memory tied to an identity you own, with strong end-to-end encryption and local-first control underneath.
+What AFP provides:
+
+Every interaction (note, email, tool call, UI view) is an atomic signed, E2EE JSON message
+Cryptographic Agent ID with public/private masks
+Local-first storage and sync using ElectricSQL (append-only log + CRDT mesh)
+Zero-trust homeserver: servers only ever see ciphertext
+Real bidirectional personal email gateway (your actual Gmail or custom domain)
+Declarative UI rendering via A2UI (views array) so agents can drive the interface
+Python and TypeScript SDKs + Rust homeserver + Docker one-click self-hosting
+
+The protocol is deliberately simple and focused on portable memory, privacy, and ownership. Agents can communicate directly with each other while keeping data under user control.
+Current core features include:
+
+Structured messaging with thread_id and references
+Tool calling unified into the same protocol (to be released in v2, unifying OpenAI function call and MCP)
+AgentCard-based discovery
+
+
+The project is still early. The open core is now public at:
+https://github.com/concensure/OmnyID
+I'm particularly interested in feedback of the protocol design, performance of the ElectricSQL mesh at scale, and ideas for clean bridges to MCP and A2A.
+Would love to hear thoughts from people working on agent infrastructure, local-first systems, or decentralized identity.
+Status note as of Wednesday, August 26, 2026:
+This is an older Hacker News outreach draft centered on protocol launch. It is historically useful, but it is not the current top-of-funnel product framing. If reused, lead with cross-tool AI memory tied to an identity the user owns, and treat protocol/privacy details as the trust architecture underneath that claim.

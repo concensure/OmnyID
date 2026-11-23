@@ -1,5 +1,5 @@
 -- Migration 0024: Global Agent Alias Registry
--- Provides memorable human-readable handles for agent identities (e.g. "alicesmith" -> alicesmith@example.com)
+-- Provides memorable human-readable handles for agent identities (e.g. "alicesmith" → alicesmith@omnyid.com)
 
 CREATE TABLE IF NOT EXISTS public.aliases (
     alias            TEXT        NOT NULL,

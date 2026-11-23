@@ -1,0 +1,44 @@
+Subject: Your Wedding Day Binder (free download)
+From: OmnyID Weddings <hello@omnyid.com>
+Reply-To: hello@omnyid.com
+
+Your Wedding Day Binder is ready
+
+Forty A4 pages for the day itself: timelines, vendor contacts, ceremony paperwork, guest notes,
+venue and setup, money, a Plan B, and what to do after. Two versions, so use whichever suits you.
+
+Download the fillable PDF (about 14 MB). Type straight into it on a computer:
+{{FILLABLE_URL}}
+
+Download the print PDF (about 10 MB). Clean pages for printing on A4 and writing by hand:
+{{PRINT_URL}}
+
+Start on the cover. Type both of your names there once, and they fill in everywhere else.
+
+Your PDF viewer may tint the fillable boxes on screen. That tint does not print. If your app opens
+the file as a flat page without boxes, use the print version and write by hand. The binder gives
+general information only; check legal requirements for your ceremony with your celebrant.
+
+Want the binder connected to the rest of your plan? Keep the run sheet, vendors, budget and
+follow-ups together in a free workspace.
+
+Continue in OmnyID Wedding:
+{{CONTINUE_URL}}
+
+Useful later, when venue quotes arrive:
+- {{READING_TITLE_1}}: {{READING_URL_1}}
+- {{READING_TITLE_2}}: {{READING_URL_2}}
+- {{READING_TITLE_3}}: {{READING_URL_3}}
+
+[MARKETING:START - include only if the visitor ticked "planning tips"]
+You asked for occasional planning tips. Please confirm so we know it was you. We will not send
+them until you do:
+{{CONFIRM_URL}}
+[MARKETING:END]
+
+--
+You are getting this one email because someone asked for the Wedding Day Binder at
+omnyid.com/wedding using this address. If that was not you, you can ignore it; nothing else will
+be sent.
+OmnyID, hello@omnyid.com
+Privacy: {{PRIVACY_URL}}

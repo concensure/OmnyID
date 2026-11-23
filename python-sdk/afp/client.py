@@ -206,8 +206,8 @@ class Action(BaseModel):
 class Agent:
     def __init__(
         self,
-        homeserver_url: str = "https://example.com",
-        agent_id: str = "agent:you@example.com",
+        homeserver_url: str = "http://localhost:8080",
+        agent_id: str = "agent:you@yourdomain.ai",
         signing_key_hex: str | None = None,
         encryption_key_hex: str | None = None,
         encrypt_by_default: bool | None = None,
@@ -1246,7 +1246,10 @@ class Agent:
 
         host = parsed.hostname or ""
         port = parsed.port
-        if host in {"localhost", "127.0.0.1"}:
+        if host == "api.omnyid.com":
+            netloc = parsed.netloc.replace("api.omnyid.com", "wt.omnyid.com", 1)
+            scheme = "https"
+        elif host in {"localhost", "127.0.0.1"}:
             scheme = "https"
             netloc = f"{host}:8443"
         else:

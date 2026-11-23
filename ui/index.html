@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Omnyid Workspace Viewer</title>
+</head>
+<body>
+  <h1>Omnyid AFP Thread Viewer</h1>
+  <p>Fetch an AFP thread and inspect the sender-provided views.</p>
+
+  <label for="thread-id">Thread ID</label>
+  <input id="thread-id" value="page_notation_ai_workspace" />
+  <button id="load-btn">Load Thread</button>
+
+  <label for="mode">Preferred view</label>
+  <select id="mode">
+    <option value="email">Email</option>
+    <option value="notion">Notion Canvas</option>
+    <option value="database">Database</option>
+    <option value="calendar">Calendar</option>
+  </select>
+
+  <pre id="content"></pre>
+
+  <script>
+    async function load() {
+      const threadId = document.getElementById("thread-id").value;
+      const preferredMode = document.getElementById("mode").value;
+      const res = await fetch(`http://localhost:8080/thread/${threadId}`);
+      const data = await res.json();
+
+      const rendered = {
+        preferredMode,
+        messageCount: Array.isArray(data) ? data.length : 0,
+        messages: data,
+      };
+
+      document.getElementById("content").textContent = JSON.stringify(rendered, null, 2);
+    }
+
+    document.getElementById("load-btn").addEventListener("click", load);
+    load();
+  </script>
+</body>
+</html>

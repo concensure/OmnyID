@@ -1,0 +1,17 @@
+{
+  "registry_id": "venue",
+  "version": "venue.v1",
+  "extends": "generic.v1",
+  "fields": [
+    {"key":"capacity_seated_max","aliases":["seated capacity","maximum seated"],"value_type":"integer","allowed_units":["people"],"allowed_bases":[],"comparison_group":"capacity","applicability":"optional","materiality":"high","formula_id":null,"clarification_template":"What is the maximum seated capacity for this configuration?"},
+    {"key":"food_beverage_rate","aliases":["f&b rate","menu price"],"value_type":"money","allowed_units":["minor_unit"],"allowed_bases":["per_person"],"comparison_group":"food_beverage","applicability":"optional","materiality":"high","formula_id":"per_person.v1","clarification_template":"What food and beverage rate applies to each guest category?"},
+    {"key":"beverage_package","aliases":["drinks package","bar package"],"value_type":"money","allowed_units":["minor_unit"],"allowed_bases":["per_person","fixed"],"comparison_group":"food_beverage","applicability":"optional","materiality":"high","formula_id":"package.v1","clarification_template":"What beverages, duration, and rate are included?"},
+    {"key":"ceremony_fee","aliases":["ceremony hire"],"value_type":"money","allowed_units":["minor_unit"],"allowed_bases":["fixed"],"comparison_group":"venue_hire","applicability":"optional","materiality":"medium","formula_id":"fixed.v1","clarification_template":"Is the ceremony space included or charged separately?"},
+    {"key":"corkage_fee","aliases":["byo fee","corkage"],"value_type":"money","allowed_units":["minor_unit"],"allowed_bases":["per_person","per_item","fixed"],"comparison_group":"food_beverage","applicability":"optional","materiality":"medium","formula_id":"quantity.v1","clarification_template":"What corkage fee and quantity basis apply?"},
+    {"key":"furniture_inclusion","aliases":["tables and chairs","furniture"],"value_type":"enum","allowed_units":[],"allowed_bases":[],"comparison_group":"inclusions","applicability":"optional","materiality":"medium","formula_id":null,"clarification_template":"Which furniture is included and what requires extra hire?"},
+    {"key":"accessibility","aliases":["wheelchair access","step-free access"],"value_type":"enum","allowed_units":[],"allowed_bases":[],"comparison_group":"requirements","applicability":"optional","materiality":"high","formula_id":null,"clarification_template":"Can the venue meet the confirmed accessibility requirements?"},
+    {"key":"wet_weather_option","aliases":["rain plan","weather backup"],"value_type":"enum","allowed_units":[],"allowed_bases":[],"comparison_group":"requirements","applicability":"optional","materiality":"high","formula_id":null,"clarification_template":"What wet-weather alternative is included and what capacity does it support?"},
+    {"key":"curfew_time","aliases":["finish time","noise curfew"],"value_type":"text","allowed_units":[],"allowed_bases":[],"comparison_group":"constraints","applicability":"optional","materiality":"high","formula_id":null,"clarification_template":"What event, music, and departure curfews apply?"},
+    {"key":"accommodation","aliases":["onsite rooms","guest rooms"],"value_type":"integer","allowed_units":["rooms","people"],"allowed_bases":[],"comparison_group":"accommodation","applicability":"optional","materiality":"medium","formula_id":null,"clarification_template":"How many rooms or guests can be accommodated onsite?"}
+  ]
+}

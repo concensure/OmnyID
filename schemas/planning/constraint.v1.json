@@ -1,0 +1,125 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://omnyid.dev/schemas/planning/constraint.v1.json",
+  "title": "OmnyID planning constraint v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "constraint_id", "template_id", "plan_id", "subject_ref", "kind",
+    "operator", "value", "strength", "authority", "privacy", "source_ref", "source_anchor",
+    "observed_at", "status"
+  ],
+  "properties": {
+    "schema_version": {"const": "planning.constraint.v1"},
+    "constraint_id": {"$ref": "#/$defs/id"},
+    "template_id": {"$ref": "#/$defs/id"},
+    "plan_id": {"$ref": "#/$defs/id"},
+    "subject_ref": {"$ref": "#/$defs/subject"},
+    "kind": {"enum": [
+      "accessibility_requirement", "location_requirement", "distance_limit", "duration_limit",
+      "dimension_limit", "dietary_requirement", "service_requirement", "relationship_separation",
+      "attendance_requirement", "aesthetic_preference", "category_priority"
+    ]},
+    "operator": {"enum": ["requires", "excludes", "prefers", "limits", "separates", "relates"]},
+    "value": {"$ref": "#/$defs/value"},
+    "strength": {"enum": ["hard", "strong", "nice"]},
+    "authority": {"enum": ["imported", "deterministic", "confirmed_interpretation", "user"]},
+    "privacy": {"enum": ["shareable_with_approval", "plan_private", "couple_private"]},
+    "source_ref": {"$ref": "#/$defs/id"},
+    "source_anchor": {"$ref": "#/$defs/anchor"},
+    "observed_at": {"type": "string", "format": "date-time"},
+    "effective_window": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "starts_at": {"type": ["string", "null"], "format": "date-time"},
+        "ends_at": {"type": ["string", "null"], "format": "date-time"}
+      },
+      "anyOf": [{"required": ["starts_at"]}, {"required": ["ends_at"]}]
+    },
+    "status": {"enum": ["proposed", "confirmed", "superseded", "removed"]},
+    "supersedes": {"oneOf": [{"$ref": "#/$defs/id"}, {"type": "null"}]}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"authority": {"enum": ["imported", "deterministic"]}}, "required": ["authority"]},
+      "then": {"properties": {"status": {"const": "proposed"}}}
+    },
+    {
+      "if": {"properties": {"status": {"enum": ["superseded", "removed"]}}, "required": ["status"]},
+      "then": {"required": ["supersedes"]}
+    },
+    {
+      "if": {"properties": {"status": {"const": "proposed"}}, "required": ["status"]},
+      "then": {"properties": {"supersedes": {"type": "null"}}}
+    }
+  ],
+  "$defs": {
+    "id": {"type": "string", "minLength": 1, "maxLength": 180, "pattern": "^[^@\\s]+$"},
+    "code": {"type": "string", "minLength": 1, "maxLength": 100, "pattern": "^[a-z0-9_.-]+$"},
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": {"enum": ["plan", "person", "event", "object", "vendor_category", "option", "milestone"]},
+        "id": {"$ref": "#/$defs/id"}
+      }
+    },
+    "anchor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["message_id", "locator", "exact_excerpt"],
+      "properties": {
+        "message_id": {"$ref": "#/$defs/id"},
+        "source_version_id": {"oneOf": [{"$ref": "#/$defs/id"}, {"type": "null"}]},
+        "locator": {"type": "string", "minLength": 1, "maxLength": 500},
+        "exact_excerpt": {"type": "string", "minLength": 1, "maxLength": 2000}
+      }
+    },
+    "value": {
+      "oneOf": [
+        {
+          "type": "object", "additionalProperties": false, "required": ["type", "value"],
+          "properties": {"type": {"const": "boolean"}, "value": {"type": "boolean"}}
+        },
+        {
+          "type": "object", "additionalProperties": false, "required": ["type", "value"],
+          "properties": {
+            "type": {"const": "integer"}, "value": {"type": "integer"},
+            "unit": {"oneOf": [{"$ref": "#/$defs/code"}, {"type": "null"}]}
+          }
+        },
+        {
+          "type": "object", "additionalProperties": false, "required": ["type"],
+          "properties": {
+            "type": {"const": "integer_range"}, "minimum": {"type": ["integer", "null"]},
+            "maximum": {"type": ["integer", "null"]},
+            "unit": {"oneOf": [{"$ref": "#/$defs/code"}, {"type": "null"}]}
+          },
+          "anyOf": [{"required": ["minimum"]}, {"required": ["maximum"]}]
+        },
+        {
+          "type": "object", "additionalProperties": false, "required": ["type", "value", "vocabulary"],
+          "properties": {"type": {"const": "enum"}, "value": {"$ref": "#/$defs/code"}, "vocabulary": {"$ref": "#/$defs/code"}}
+        },
+        {
+          "type": "object", "additionalProperties": false, "required": ["type", "value"],
+          "properties": {"type": {"const": "reference"}, "value": {"$ref": "#/$defs/subject"}}
+        },
+        {
+          "type": "object", "additionalProperties": false, "required": ["type", "values"],
+          "properties": {"type": {"const": "reference_list"}, "values": {"type": "array", "minItems": 1, "maxItems": 50, "items": {"$ref": "#/$defs/subject"}}}
+        },
+        {
+          "type": "object", "additionalProperties": false, "required": ["type", "values", "vocabulary"],
+          "properties": {
+            "type": {"const": "enum_list"},
+            "values": {"type": "array", "minItems": 1, "maxItems": 50, "items": {"$ref": "#/$defs/code"}},
+            "vocabulary": {"$ref": "#/$defs/code"}
+          }
+        }
+      ]
+    }
+  }
+}

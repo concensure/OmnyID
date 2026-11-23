@@ -1,0 +1,16 @@
+requests
+beautifulsoup4
+playwright
+anthropic
+openai
+stripe
+google-api-python-client
+ollama
+chromadb
+duckdb
+python-docx==1.1.2
+openpyxl==3.1.5
+python-pptx==1.0.2
+reportlab==4.2.5
+Pillow==11.1.0
+duckduckgo_search>=6.0.0

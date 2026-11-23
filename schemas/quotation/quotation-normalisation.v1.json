@@ -1,0 +1,129 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://omnyid.dev/schemas/quotation/quotation-normalisation.v1.json",
+  "title": "OmnyID normalised quotation v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "registry_version", "identity", "lifecycle", "currency", "sources", "line_items", "tax"],
+  "properties": {
+    "schema_version": {"const": "quotation.normalised.v1"},
+    "registry_version": {"type": "string", "minLength": 1, "maxLength": 100},
+    "identity": {"$ref": "#/$defs/identity"},
+    "lifecycle": {"enum": ["draft", "active", "superseded", "accepted", "declined", "expired"]},
+    "currency": {"type": "string", "pattern": "^[A-Z]{3}$"},
+    "issued_at": {"type": "string", "format": "date-time"},
+    "valid_until": {"type": "string", "format": "date-time"},
+    "sources": {"type": "array", "minItems": 1, "maxItems": 20, "items": {"$ref": "#/$defs/source"}},
+    "line_items": {"type": "array", "maxItems": 500, "items": {"$ref": "#/$defs/line_item"}},
+    "commercial_terms": {"type": "array", "maxItems": 100, "items": {"$ref": "#/$defs/commercial_term"}},
+    "unmapped_items": {"type": "array", "maxItems": 100, "items": {"$ref": "#/$defs/unmapped_item"}},
+    "tax": {"$ref": "#/$defs/tax_rule"}
+  },
+  "$defs": {
+    "bounded_string": {"type": "string", "minLength": 1, "maxLength": 500},
+    "identity": {
+      "type": "object", "additionalProperties": false,
+      "required": ["quotation_id", "version_id", "vendor_id", "context_namespace"],
+      "properties": {
+        "quotation_id": {"$ref": "#/$defs/bounded_string"},
+        "version_id": {"$ref": "#/$defs/bounded_string"},
+        "supersedes_version_id": {"$ref": "#/$defs/bounded_string"},
+        "vendor_id": {"$ref": "#/$defs/bounded_string"},
+        "context_namespace": {"$ref": "#/$defs/bounded_string"}
+      }
+    },
+    "source": {
+      "type": "object", "additionalProperties": false,
+      "required": ["source_id", "source_version_id", "media_type"],
+      "properties": {
+        "source_id": {"$ref": "#/$defs/bounded_string"},
+        "source_version_id": {"$ref": "#/$defs/bounded_string"},
+        "media_type": {"$ref": "#/$defs/bounded_string"},
+        "content_hash": {"type": "string", "maxLength": 200}
+      }
+    },
+    "anchor": {
+      "type": "object", "additionalProperties": false,
+      "required": ["source_id", "source_version_id", "locator", "exact_excerpt"],
+      "properties": {
+        "source_id": {"$ref": "#/$defs/bounded_string"},
+        "source_version_id": {"$ref": "#/$defs/bounded_string"},
+        "locator": {"$ref": "#/$defs/bounded_string"},
+        "exact_excerpt": {"type": "string", "minLength": 1, "maxLength": 2000}
+      }
+    },
+    "evidence": {
+      "type": "object", "additionalProperties": false,
+      "required": ["state"],
+      "properties": {
+        "state": {"enum": ["confirmed", "inferred", "unknown", "conflicting"]},
+        "anchors": {"type": "array", "maxItems": 8, "items": {"$ref": "#/$defs/anchor"}},
+        "rationale": {"type": "string", "maxLength": 1000}
+      }
+    },
+    "money": {
+      "type": "object", "additionalProperties": false,
+      "required": ["amount_minor", "currency"],
+      "properties": {
+        "amount_minor": {"type": "integer", "minimum": 0},
+        "currency": {"type": "string", "pattern": "^[A-Z]{3}$"}
+      }
+    },
+    "quantity": {
+      "type": "object", "additionalProperties": false,
+      "required": ["units", "scale"],
+      "properties": {
+        "units": {"type": "integer", "minimum": 0},
+        "scale": {"type": "integer", "minimum": 0, "maximum": 6}
+      }
+    },
+    "line_item": {
+      "type": "object", "additionalProperties": false,
+      "required": ["line_id", "label", "category", "inclusion", "price_basis", "evidence"],
+      "properties": {
+        "line_id": {"$ref": "#/$defs/bounded_string"},
+        "label": {"$ref": "#/$defs/bounded_string"},
+        "category": {"$ref": "#/$defs/bounded_string"},
+        "inclusion": {"enum": ["included", "required", "optional", "excluded", "conditional", "unknown"]},
+        "price_basis": {"enum": ["fixed", "per_person", "per_item", "per_hour", "percentage", "minimum_spend"]},
+        "effect": {"enum": ["charge", "discount"], "default": "charge"},
+        "unit_price": {"$ref": "#/$defs/money"},
+        "quantity": {"$ref": "#/$defs/quantity"},
+        "rate_bps": {"type": "integer", "minimum": 0, "maximum": 100000},
+        "percentage_basis_line_ids": {"type": "array", "maxItems": 500, "items": {"$ref": "#/$defs/bounded_string"}},
+        "evidence": {"$ref": "#/$defs/evidence"}
+      }
+    },
+    "commercial_term": {
+      "type": "object", "additionalProperties": false,
+      "required": ["term_id", "kind", "label", "evidence"],
+      "properties": {
+        "term_id": {"$ref": "#/$defs/bounded_string"},
+        "kind": {"$ref": "#/$defs/bounded_string"},
+        "label": {"$ref": "#/$defs/bounded_string"},
+        "amount": {"$ref": "#/$defs/money"},
+        "due_at": {"type": "string", "format": "date-time"},
+        "refundable": {"type": "boolean"},
+        "evidence": {"$ref": "#/$defs/evidence"}
+      }
+    },
+    "unmapped_item": {
+      "type": "object", "additionalProperties": false,
+      "required": ["vendor_label", "evidence"],
+      "properties": {
+        "vendor_label": {"$ref": "#/$defs/bounded_string"},
+        "proposed_key": {"$ref": "#/$defs/bounded_string"},
+        "evidence": {"$ref": "#/$defs/evidence"}
+      }
+    },
+    "tax_rule": {
+      "type": "object", "additionalProperties": false,
+      "required": ["treatment", "evidence"],
+      "properties": {
+        "treatment": {"enum": ["inclusive", "exclusive", "exempt", "unknown"]},
+        "rate_bps": {"type": "integer", "minimum": 0, "maximum": 100000},
+        "evidence": {"$ref": "#/$defs/evidence"}
+      }
+    }
+  }
+}

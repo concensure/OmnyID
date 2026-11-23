@@ -1,0 +1,43 @@
+{
+  "schema_version": "quotation.normalised.v1",
+  "registry_version": "generic.v1",
+  "identity": {
+    "quotation_id": "quote-one",
+    "version_id": "quote-v1",
+    "vendor_id": "vendor-one",
+    "context_namespace": "wedding_planner"
+  },
+  "lifecycle": "active",
+  "currency": "AUD",
+  "sources": [
+    {
+      "source_id": "source-one",
+      "source_version_id": "source-v1",
+      "media_type": "application/pdf"
+    }
+  ],
+  "line_items": [
+    {
+      "line_id": "venue",
+      "label": "Venue hire",
+      "category": "item_rate",
+      "inclusion": "included",
+      "price_basis": "fixed",
+      "unit_price": {
+        "amount_minor": 10000,
+        "currency": "AUD"
+      },
+      "evidence": {
+        "state": "unknown",
+        "rationale": "Needs human review"
+      }
+    }
+  ],
+  "tax": {
+    "treatment": "unknown",
+    "evidence": {
+      "state": "unknown",
+      "rationale": "Tax not recorded"
+    }
+  }
+}

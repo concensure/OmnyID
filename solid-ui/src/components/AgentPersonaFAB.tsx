@@ -1,0 +1,726 @@
+// @locs-version: 1.0
+// @module-id: ui.agent-persona-fab
+// @primary-capability: floating-agent-persona-switcher
+// @stability: beta
+import { createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
+import { EmptyState } from "@/components/EmptyState";
+import { listPersonas, updateAgentUiPreferences, type AgentPersona } from "@/lib/api";
+import { dispatchAgentPersonaFabVisibility } from "@/lib/agentPersonaFabVisibilityState";
+import {
+  PERSONA_TEMPLATES,
+  personaTemplateIconUrl,
+  type PersonaTemplate,
+} from "@/lib/personaTemplates";
+import {
+  buildPersonaSwitcherFailureReceipt,
+  type PersonaSwitcherFailureReceipt,
+} from "@/lib/personaSwitcherFailureState";
+import {
+  activatePersonaAndList,
+  filterPersonas,
+  filterPersonaTemplates,
+  installedPersonaIdsByTemplate,
+  installPersonaTemplateAndList,
+  personaSwitcherPreferredTab,
+  type PersonaSwitcherTab as SwitcherTab,
+} from "@/lib/personaSwitcherState";
+import { personaReloadBlocked, personaSwitcherBusy } from "@/lib/personaSwitcherViewState";
+import { askWeddingAssistant, type WeddingAssistantResponse } from "@/lib/weddingAssistantApi";
+import type { WeddingWorkspaceMenuId } from "@/lib/weddingWorkspaceMenuState";
+import { saveWeddingAssistantStagedUpdate } from "@/lib/weddingAssistantStagedUpdateState";
+
+type AnimState = "idle" | "busy" | "error" | "success";
+// Visual mood derived from queue pressure and LoRA genome state.
+type AvatarMood = "overwhelmed" | "focused" | "sharp" | "learning" | "idle";
+
+function extractEmoji(soul_md: string | undefined): string {
+  if (!soul_md) return "🤖";
+  const match = soul_md.match(/\p{Emoji_Presentation}/u);
+  return match ? match[0] : "🤖";
+}
+
+function writingStyleLabel(style: string | undefined): string {
+  switch (style) {
+    case "balanced":   return "Balanced";
+    case "concise":    return "Concise";
+    case "warm":       return "Warm";
+    case "formal":     return "Formal";
+    case "creative":   return "Creative";
+    case "analytical": return "Analytical";
+    default:           return style ?? "Balanced";
+  }
+}
+
+// LoRA genome capability badges unlocked at score milestones.
+type GenomeBadge = { icon: string; label: string; key: string };
+
+function computeGenomeBadges(score: number, active: boolean): GenomeBadge[] {
+  const earned: GenomeBadge[] = [];
+  if (score >= 0.3) earned.push({ icon: "✍️", label: "Style",    key: "style" });
+  if (score >= 0.6) earned.push({ icon: "🔬", label: "Research", key: "research" });
+  if (score >= 0.8) earned.push({ icon: "💰", label: "Finance",  key: "finance" });
+  if (active)       earned.push({ icon: "⚡", label: "Auto",     key: "auto" });
+  return earned;
+}
+
+export function AgentPersonaFAB(props: {
+  signedIn?: boolean;
+  activeCount: number;
+  hasError?: boolean;
+  justCompleted?: boolean;
+  onOpenSettings: () => void;
+  // State-driven avatar props
+  loraScore?: number;
+  loraActive?: boolean;
+  urgentPending?: number;
+  weddingMode?: boolean;
+  weddingPlanId?: string | null;
+  onWeddingNavigate?: (menu: WeddingWorkspaceMenuId) => void;
+}) {
+  const [showSwitcher, setShowSwitcher] = createSignal(false);
+  const [personas, setPersonas] = createSignal<AgentPersona[]>([]);
+  const [loading, setLoading] = createSignal(true);
+  const [switchingId, setSwitchingId] = createSignal<string | null>(null);
+  const [installingTemplateId, setInstallingTemplateId] = createSignal<string | null>(null);
+  const [tab, setTab] = createSignal<SwitcherTab>("mine");
+  const [search, setSearch] = createSignal("");
+  const [loadError, setLoadError] = createSignal<PersonaSwitcherFailureReceipt | null>(null);
+  const [actionError, setActionError] = createSignal<PersonaSwitcherFailureReceipt | null>(null);
+  const [actionNotice, setActionNotice] = createSignal<string | null>(null);
+  const [minimizing, setMinimizing] = createSignal(false);
+  const [showWeddingTools, setShowWeddingTools] = createSignal(false);
+  const [weddingQuestion, setWeddingQuestion] = createSignal("");
+  const [weddingAnswer, setWeddingAnswer] = createSignal<WeddingAssistantResponse | null>(null);
+  const [weddingAssistantBusy, setWeddingAssistantBusy] = createSignal(false);
+  const [weddingAssistantError, setWeddingAssistantError] = createSignal<string | null>(null);
+  let longPressTimer: ReturnType<typeof setTimeout> | undefined;
+  let didLongPress = false;
+  const switcherBusy = createMemo(() => personaSwitcherBusy({
+    loading: loading(),
+    switchingId: switchingId(),
+    installingTemplateId: installingTemplateId(),
+  }));
+
+  function currentAvatarAnimationState(): AnimState {
+    if (props.hasError) return "error";
+    if (props.justCompleted) return "success";
+    if (props.activeCount > 0) return "busy";
+    return "idle";
+  }
+
+  // ── Avatar mood ──────────────────────────────────────────────────────────────
+  const avatarMood = createMemo<AvatarMood>(() => {
+    const urgent = props.urgentPending ?? 0;
+    const score  = props.loraScore ?? 0;
+    if (urgent >= 10) return "overwhelmed";
+    if (urgent >= 5 || props.activeCount > 3) return "focused";
+    if (props.activeCount === 0 && urgent === 0 && score > 0.5) return "sharp";
+    if (score < 0.3 && props.activeCount === 0) return "learning";
+    return "idle";
+  });
+
+  const genomeBadges = createMemo(() =>
+    computeGenomeBadges(props.loraScore ?? 0, props.loraActive ?? false)
+  );
+
+  const moodEmoji = (): string | null => {
+    switch (avatarMood()) {
+      case "overwhelmed": return "😰";
+      case "focused":     return "🎯";
+      case "sharp":       return "⚡";
+      case "learning":    return "🌱";
+      default:            return null;
+    }
+  };
+
+  const moodLabel = (): string => {
+    const urgent = props.urgentPending ?? 0;
+    switch (avatarMood()) {
+      case "overwhelmed": return `Overwhelmed — ${urgent} urgent items need attention`;
+      case "focused":     return `${props.activeCount} tasks in progress`;
+      case "sharp":       return "Sharp and ready — queue is clear";
+      case "learning":    return "Learning your style…";
+      default:            return "Ready";
+    }
+  };
+
+  const fabTitle = (): string => {
+    if (props.weddingMode) return "Ask Sprout about your Wedding plan";
+    const urgent = props.urgentPending ?? 0;
+    switch (avatarMood()) {
+      case "overwhelmed": return `Overwhelmed — ${urgent} urgent decisions need attention`;
+      case "focused":     return "Focused — active tasks in queue";
+      case "sharp":       return "Sharp and ready — switch response persona";
+      case "learning":    return "Learning your style — switch response persona";
+      default:            return "Switch response persona";
+    }
+  };
+
+  // Ring colour on the FAB button reflects queue pressure.
+  const moodRingClass = (): string => {
+    switch (avatarMood()) {
+      case "overwhelmed": return "ring-2 ring-red-400/75";
+      case "focused":     return "ring-2 ring-amber-400/60";
+      case "sharp":       return "ring-2 ring-emerald-400/75";
+      case "learning":    return "ring-2 ring-blue-400/55";
+      default:            return "";
+    }
+  };
+
+  // ── Existing persona management ───────────────────────────────────────────────
+  const active = () => personas().find((p) => p.is_active) ?? null;
+  const installedPersonaIdsByTemplateState = createMemo(() =>
+    installedPersonaIdsByTemplate(PERSONA_TEMPLATES, personas()),
+  );
+  const installedTemplateIdByPersonaState = createMemo(() => {
+    const reverse = new Map<string, string>();
+    for (const [templateId, personaId] of installedPersonaIdsByTemplateState()) {
+      reverse.set(personaId, templateId);
+    }
+    return reverse;
+  });
+  const templateIconForPersona = (persona: AgentPersona | null): string | null => {
+    if (!persona || persona.image_data_url) return null;
+    const templateId = installedTemplateIdByPersonaState().get(persona.id);
+    return templateId ? personaTemplateIconUrl(templateId) : null;
+  };
+  const filteredPersonas = createMemo(() => filterPersonas(personas(), search()));
+  const filteredTemplates = createMemo(() => filterPersonaTemplates(PERSONA_TEMPLATES, search()));
+
+  async function reloadPersonas(options?: { initial?: boolean }) {
+    // The component starts in a loading state. That initial request must be
+    // allowed through; otherwise every template Install action stays disabled.
+    if (!options?.initial && personaReloadBlocked({ loading: loading(), signedIn: props.signedIn })) return;
+    if (!props.signedIn) {
+      setPersonas([]);
+      setLoadError(null);
+      setLoading(false);
+      return;
+    }
+    setLoadError(null);
+    try {
+      const res = await listPersonas();
+      setPersonas(res.personas);
+      setTab((currentTab) =>
+        currentTab === "templates" || res.personas.length === 0
+          ? personaSwitcherPreferredTab(res.personas)
+          : currentTab,
+      );
+    } catch (error: unknown) {
+      setPersonas([]);
+      setLoadError(
+        buildPersonaSwitcherFailureReceipt(
+          "Load personas",
+          error instanceof Error ? error.message : "Could not load personas.",
+        ),
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  onMount(() => void reloadPersonas({ initial: true }));
+
+  onCleanup(() => {
+    if (longPressTimer) clearTimeout(longPressTimer);
+  });
+
+  function openSwitcher(preferredTab?: SwitcherTab) {
+    if (switchingId() || installingTemplateId()) return;
+    if (preferredTab) setTab(preferredTab);
+    else setTab(personaSwitcherPreferredTab(personas()));
+    setShowSwitcher(true);
+    if (preferredTab) setShowWeddingTools(true);
+    if (!loading() && personas().length === 0) void reloadPersonas();
+  }
+
+  async function submitWeddingQuestion(event?: Event) {
+    event?.preventDefault();
+    const question = weddingQuestion().trim();
+    if (!question || weddingAssistantBusy()) return;
+    setWeddingAssistantBusy(true);
+    setWeddingAssistantError(null);
+    try {
+      const response = await askWeddingAssistant({
+        question,
+        weddingPlanId: props.weddingPlanId,
+        currentView: "Wedding template",
+      });
+      if (!response.answer) throw new Error("Wedding assistance returned no answer.");
+      setWeddingAnswer(response);
+    } catch (error) {
+      setWeddingAssistantError(error instanceof Error ? error.message : "Wedding assistance could not respond just now.");
+    } finally {
+      setWeddingAssistantBusy(false);
+    }
+  }
+
+  function closeSwitcher() {
+    if (switchingId() || installingTemplateId()) return;
+    setShowSwitcher(false);
+    setSearch("");
+    setShowWeddingTools(false);
+  }
+
+  function startLongPress() {
+    didLongPress = false;
+    longPressTimer = setTimeout(() => {
+      didLongPress = true;
+      openSwitcher("templates");
+    }, 600);
+  }
+
+  function cancelLongPress() {
+    if (longPressTimer) clearTimeout(longPressTimer);
+  }
+
+  function handleClick() {
+    if (didLongPress) {
+      didLongPress = false;
+      return;
+    }
+    if (showSwitcher()) closeSwitcher();
+    else openSwitcher();
+  }
+
+  async function switchPersona(persona: AgentPersona) {
+    if (switcherBusy()) return;
+    if (persona.is_active) {
+      closeSwitcher();
+      return;
+    }
+    setSwitchingId(persona.id);
+    setActionError(null);
+    setActionNotice(null);
+    try {
+      const result = await activatePersonaAndList(persona.id);
+      setPersonas(result.personas);
+      setActionNotice(`${persona.name} is now active.`);
+      closeSwitcher();
+    } catch (error: unknown) {
+      setActionError(
+        buildPersonaSwitcherFailureReceipt(
+          "Switch persona",
+          error instanceof Error ? error.message : "Could not switch persona.",
+        ),
+      );
+    } finally {
+      setSwitchingId(null);
+    }
+  }
+
+  async function installTemplate(template: PersonaTemplate) {
+    if (switcherBusy()) return;
+    setInstallingTemplateId(template.id);
+    setActionError(null);
+    setActionNotice(null);
+    try {
+      const result = await installPersonaTemplateAndList(template);
+      setPersonas(result.personas);
+      setTab("mine");
+      setActionNotice(`${template.name} is installed and active.`);
+    } catch (error: unknown) {
+      setActionError(
+        buildPersonaSwitcherFailureReceipt(
+          "Install template",
+          error instanceof Error ? error.message : "Could not install persona template.",
+        ),
+      );
+    } finally {
+      setInstallingTemplateId(null);
+    }
+  }
+
+  async function minimizeSprout() {
+    if (minimizing() || switcherBusy()) return;
+    setMinimizing(true);
+    setActionError(null);
+    try {
+      await updateAgentUiPreferences(false);
+      closeSwitcher();
+      dispatchAgentPersonaFabVisibility(false);
+    } catch (error) {
+      setActionError(buildPersonaSwitcherFailureReceipt(
+        "Hide Sprout",
+        error instanceof Error ? error.message : "Could not save that setting.",
+      ));
+    } finally {
+      setMinimizing(false);
+    }
+  }
+
+  const dotColor = () => {
+    switch (currentAvatarAnimationState()) {
+      case "busy":    return "bg-blue-400 animate-pulse";
+      case "error":   return "bg-red-400";
+      case "success": return "bg-green-400";
+      default:        return "bg-emerald-300";
+    }
+  };
+
+  const fabAnim = () => {
+    switch (currentAvatarAnimationState()) {
+      case "busy":    return "animate-persona-busy";
+      case "error":   return "animate-persona-error";
+      case "success": return "animate-persona-success";
+      default:        return "animate-persona-idle";
+    }
+  };
+
+  const tabClass = (value: SwitcherTab) =>
+    `rounded-xl px-2.5 py-1.5 text-[0.6875em] font-medium transition ${
+      tab() === value
+        ? "bg-primary/12 text-primary"
+        : "text-on-surface-variant hover:bg-on-surface/6"
+    }`;
+
+  return (
+    <>
+      <Show when={showSwitcher()}>
+        <div class="fixed inset-0 z-40" onClick={closeSwitcher} />
+      </Show>
+
+      <Show when={showSwitcher()}>
+        {/* Panel: fluid width so it doesn't overflow on narrow screens */}
+        <div class="fixed bottom-[4.75rem] right-6 phone:bottom-[calc(4.75rem+env(safe-area-inset-bottom))] phone:right-3 z-50 max-h-[min(32rem,calc(100dvh_-_6rem))] w-[min(25rem,_calc(100vw_-_1.5rem))] overflow-hidden rounded-3xl border border-white/45 bg-white/96 shadow-panel backdrop-blur-xl animate-fade-in">
+          <div class="border-b border-outline/10 px-3.5 py-3">
+            <div class="flex flex-wrap items-start gap-2">
+              <div class="min-w-0 flex-1 basis-full sm:basis-auto">
+                <p class="font-mono text-[0.5625em] uppercase tracking-[0.2em] text-outline">
+                  {props.weddingMode ? "Wedding assistant" : "Swap agent persona"}
+                </p>
+                <p class="mt-1 truncate text-sm font-medium text-on-surface">
+                  {props.weddingMode ? "Ask Sprout about your wedding plan" : active()?.name ?? "No active persona"}
+                </p>
+              </div>
+              <Show when={!props.weddingMode || showWeddingTools()}>
+                <button type="button" disabled={switcherBusy()} onClick={() => { closeSwitcher(); props.onOpenSettings(); }} class="rounded-xl px-2 py-1 text-[0.6875em] text-on-surface-variant transition hover:bg-on-surface/6 hover:text-on-surface">Settings</button>
+                <button type="button" disabled={switcherBusy() || minimizing()} onClick={() => void minimizeSprout()} class="rounded-xl px-2 py-1 text-[0.6875em] text-on-surface-variant transition hover:bg-on-surface/6 hover:text-on-surface">{minimizing() ? "Hiding…" : "Minimise"}</button>
+                <button type="button" onClick={() => { closeSwitcher(); window.dispatchEvent(new CustomEvent("omnyid:open-view-customizer")); }} class="rounded-xl px-2 py-1 text-[0.6875em] text-on-surface-variant transition hover:bg-on-surface/6 hover:text-on-surface">Customize view</button>
+              </Show>
+            </div>
+
+            <Show when={props.weddingMode}>
+              <button type="button" class="mt-2 text-[0.6875em] font-medium text-primary underline decoration-primary/30 underline-offset-2" onClick={() => setShowWeddingTools((value) => !value)}>
+                {showWeddingTools() ? "Back to Wedding assistant" : "Persona and Sprout tools"}
+              </button>
+            </Show>
+
+            {/* ── Genome state strip ─────────────────────────────────────── */}
+            {/* Shows avatar mood + earned LoRA capability badges. Clicking opens
+                Agent Settings, where LoRA weights are trained and reviewed. */}
+            <Show when={avatarMood() !== "idle" || genomeBadges().length > 0}>
+              <button
+                type="button"
+                onClick={() => { closeSwitcher(); props.onOpenSettings(); }}
+                title="Open Agent Settings to review LoRA training progress"
+                class={`mt-2 flex w-full items-center gap-2 rounded-xl px-2.5 py-1.5 text-left transition hover:brightness-95 ${
+                  avatarMood() === "overwhelmed"
+                    ? "bg-red-400/10"
+                    : avatarMood() === "sharp"
+                      ? "bg-emerald-400/10"
+                      : "bg-on-surface/4"
+                }`}
+              >
+                <Show when={moodEmoji()}>
+                  <span class="text-sm leading-none" aria-hidden="true">{moodEmoji()}</span>
+                </Show>
+                <span class="flex-1 truncate text-[0.625em] text-on-surface-variant">
+                  {moodLabel()}
+                </span>
+                <div class="flex items-center gap-1">
+                  <For each={genomeBadges()}>
+                    {(badge) => (
+                      <span
+                        title={`${badge.label} capability learned`}
+                        class="rounded-full bg-primary/10 px-1.5 py-0.5 text-[0.5625em] text-primary"
+                      >
+                        {badge.icon}
+                      </span>
+                    )}
+                  </For>
+                </div>
+              </button>
+            </Show>
+
+            <input
+              classList={{ hidden: Boolean(props.weddingMode && !showWeddingTools()) }}
+              type="text"
+              value={search()}
+              disabled={switcherBusy()}
+              onInput={(event) => setSearch(event.currentTarget.value)}
+              placeholder="Search personas"
+              class="mt-3 w-full rounded-2xl border border-outline/15 bg-white/75 px-3 py-2 text-xs text-on-surface outline-none transition focus:border-primary/35"
+            />
+            <div class="mt-3 flex gap-1" classList={{ hidden: Boolean(props.weddingMode && !showWeddingTools()) }}>
+              <button type="button" class={tabClass("mine")} disabled={switcherBusy()} onClick={() => setTab("mine")}>
+                My personas
+              </button>
+              <button
+                type="button"
+                class={tabClass("templates")}
+                disabled={switcherBusy()}
+                onClick={() => setTab("templates")}
+              >
+                Templates
+              </button>
+            </div>
+          </div>
+
+          <div class="max-h-[19rem] overflow-auto px-2 py-2">
+            <Show when={props.weddingMode && !showWeddingTools()}>
+              <form class="space-y-3 px-1 py-1" onSubmit={(event) => void submitWeddingQuestion(event)}>
+                <label class="block text-xs font-medium text-on-surface" for="wedding-sprout-question">What would you like help with?</label>
+                <textarea id="wedding-sprout-question" rows="4" value={weddingQuestion()} onInput={(event) => setWeddingQuestion(event.currentTarget.value)} placeholder="Ask about your budget, guests, vendors, tasks, or ask Sprout to open the right part of Wedding." class="w-full resize-none rounded-2xl border border-outline/20 bg-white px-3 py-2 text-sm leading-5 text-on-surface outline-none focus:border-primary/50" />
+                <button type="submit" disabled={weddingAssistantBusy() || !weddingQuestion().trim()} class="w-full rounded-2xl bg-primary px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-45">{weddingAssistantBusy() ? "Thinking…" : "Ask Sprout"}</button>
+                <Show when={weddingAssistantError()}>{(message) => <p class="rounded-xl bg-red-50 px-3 py-2 text-xs leading-5 text-red-700">{message()}</p>}</Show>
+                <Show when={weddingAnswer()}>{(answer) => (
+                  <div class="rounded-2xl border border-primary/15 bg-primary/5 px-3 py-3">
+                    <p class="whitespace-pre-wrap text-sm leading-6 text-on-surface">{answer().answer}</p>
+                    <Show when={answer().suggestedAction}>{(action) => <button type="button" class="mt-3 rounded-xl border border-primary/30 bg-white px-3 py-2 text-xs font-semibold text-primary" onClick={() => { saveWeddingAssistantStagedUpdate(action()); props.onWeddingNavigate?.(action().target); closeSwitcher(); }}>{action().kind === "stage_update" ? `Review in ${action().label.replace(/^Open /, "")}` : action().label}</button>}</Show>
+                    <Show when={answer().links.length > 0}><div class="mt-3 flex flex-wrap gap-2"><For each={answer().links}>{(link) => <a class="rounded-full border border-primary/20 bg-white px-3 py-1.5 text-xs font-semibold text-primary" href={link.url}>{link.title}</a>}</For></div></Show>
+                    <p class="mt-2 text-[0.625em] text-on-surface-variant">Sprout opens the relevant view; it never saves or sends without your review.</p>
+                  </div>
+                )}</Show>
+              </form>
+            </Show>
+            <div classList={{ hidden: Boolean(props.weddingMode && !showWeddingTools()) }}>
+            <Show when={actionError()}>
+              {(receipt) => (
+                <div
+                  class={`mb-2 rounded-2xl border px-3 py-2 text-[0.6875em] leading-5 ${
+                    receipt().tone === "danger"
+                      ? "border-red-200/50 bg-red-50/70 text-red-700"
+                      : "border-amber-300/40 bg-amber-50/70 text-amber-800"
+                  }`}
+                >
+                  <p class="font-semibold">{receipt().title}</p>
+                  <p>{receipt().summary}</p>
+                  <p class="opacity-80">Next step: {receipt().nextStep}</p>
+                </div>
+              )}
+            </Show>
+            <Show when={actionNotice()}>
+              {(notice) => (
+                <p class="mb-2 rounded-2xl border border-emerald-200/70 bg-emerald-50/80 px-3 py-2 text-[0.6875em] font-medium leading-5 text-emerald-800">
+                  {notice()}
+                </p>
+              )}
+            </Show>
+            <Show when={tab() === "mine"}>
+              <Show when={loading()}>
+                <p class="px-3 py-8 text-center text-xs text-on-surface-variant/60">
+                  Loading personas…
+                </p>
+              </Show>
+              <Show when={!loading() && loadError()}>
+                {(receipt) => (
+                  <div class="px-1 py-2">
+                    <EmptyState
+                      icon="AI"
+                      title={receipt().title}
+                      body={`${receipt().summary} Next step: ${receipt().nextStep}`}
+                      action={
+                        <button
+                          type="button"
+                          class="rounded-full border border-white/25 bg-white/70 px-3 py-1 text-[0.6875em] font-medium text-on-surface transition hover:bg-white"
+                          disabled={loading()}
+                          onClick={() => void reloadPersonas()}
+                        >
+                          Retry personas
+                        </button>
+                      }
+                    />
+                  </div>
+                )}
+              </Show>
+              <Show when={!loading() && !loadError() && filteredPersonas().length === 0}>
+                <div class="px-3 py-8 text-center">
+                  <p class="text-xs text-on-surface-variant/60">
+                    No saved personas yet.
+                  </p>
+                  <button
+                    type="button"
+                    disabled={switcherBusy()}
+                    onClick={() => setTab("templates")}
+                    class="mt-3 rounded-xl bg-primary/10 px-3 py-1.5 text-[0.6875em] font-medium text-primary transition hover:bg-primary/15"
+                  >
+                    Browse templates
+                  </button>
+                </div>
+              </Show>
+              <For each={filteredPersonas()}>
+                {(persona) => (
+                  <button
+                    type="button"
+                    onClick={() => switchPersona(persona)}
+                    disabled={switcherBusy()}
+                    class={`mb-1 flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition hover:bg-on-surface/6 ${
+                      persona.is_active ? "bg-primary/8 text-primary" : "text-on-surface"
+                    }`}
+                  >
+                    <Show
+                      when={persona.image_data_url}
+                      fallback={
+                        <Show when={templateIconForPersona(persona)} fallback={<span class="text-lg leading-none">{extractEmoji(persona.soul_md)}</span>}>
+                          {(source) => <img src={source()} alt="" class="h-8 w-8" loading="lazy" />}
+                        </Show>
+                      }
+                    >
+                      {(source) => <img src={source()} alt="" class="h-8 w-8 rounded-xl object-cover" />}
+                    </Show>
+                    <div class="min-w-0 flex-1">
+                      <p class="text-sm font-medium leading-snug">{persona.name}</p>
+                      <p class="mt-0.5 text-[0.625em] text-on-surface-variant/65">
+                        {writingStyleLabel(persona.writing_style)}
+                      </p>
+                    </div>
+                    <Show when={switchingId() === persona.id}>
+                      <span class="text-[0.625em] text-primary/70">…</span>
+                    </Show>
+                    <Show when={persona.is_active && switchingId() !== persona.id}>
+                      <span class="text-[0.625em] font-semibold text-primary">Active</span>
+                    </Show>
+                  </button>
+                )}
+              </For>
+            </Show>
+
+            <Show when={tab() === "templates"}>
+              <Show when={filteredTemplates().length === 0}>
+                <p class="px-3 py-8 text-center text-xs text-on-surface-variant/60">
+                  No matching templates.
+                </p>
+              </Show>
+              <For each={filteredTemplates()}>
+                {(template) => {
+                  const installedPersona = () => {
+                    const personaId = installedPersonaIdsByTemplateState().get(template.id);
+                    return personaId ? personas().find((persona) => persona.id === personaId) ?? null : null;
+                  };
+                  const installed = () => Boolean(installedPersona());
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // A template may already exist from a previous install.
+                        // Treat a tap as a usable action in that case too: activate
+                        // it instead of presenting an inert "Installed" row.
+                        const existing = installedPersona();
+                        if (existing) {
+                          void switchPersona(existing);
+                          return;
+                        }
+                        void installTemplate(template);
+                      }}
+                      disabled={switcherBusy()}
+                      class="mb-1 flex w-full items-start gap-3 rounded-2xl px-3 py-2.5 text-left transition hover:bg-on-surface/6 disabled:cursor-default disabled:hover:bg-transparent"
+                    >
+                      <img src={personaTemplateIconUrl(template.id)} alt="" class="h-9 w-9 shrink-0" loading="lazy" />
+                      <div class="min-w-0 flex-1">
+                        <div class="flex items-center gap-2">
+                          <p class="truncate text-sm font-medium text-on-surface">
+                            {template.name}
+                          </p>
+                          <span class="rounded-full bg-on-surface/6 px-1.5 py-0.5 text-[0.5625em] text-on-surface-variant/70">
+                            {writingStyleLabel(template.writing_style)}
+                          </span>
+                        </div>
+                        <p class="mt-0.5 line-clamp-2 text-[0.6875em] text-on-surface-variant/70">
+                          {template.description}
+                        </p>
+                      </div>
+                      <span class="pt-0.5 text-[0.625em] font-medium text-primary">
+                        {installed()
+                          ? installedPersona()?.is_active
+                            ? "Active"
+                            : switchingId() === installedPersona()?.id
+                              ? "Activating…"
+                              : "Use"
+                          : installingTemplateId() === template.id
+                            ? "Installing…"
+                            : "Install"}
+                      </span>
+                    </button>
+                  );
+                }}
+              </For>
+            </Show>
+            </div>
+          </div>
+
+          <div class="border-t border-outline/10 px-3.5 py-2.5 text-[0.625em] text-on-surface-variant/55">
+            {props.weddingMode && !showWeddingTools()
+              ? "Wedding-only · platform funded within daily and weekly limits"
+              : props.activeCount > 0
+              ? `${props.activeCount} agent${props.activeCount === 1 ? "" : "s"} running`
+              : "All agents idle"}
+          </div>
+        </div>
+      </Show>
+
+      {/* ── FAB button ────────────────────────────────────────────────────────── */}
+      {/* Avatar emoji + mood ring + capability count chip + status dot.          */}
+      <button
+        type="button"
+        class={`fixed bottom-6 right-6 phone:bottom-[calc(4.25rem+env(safe-area-inset-bottom))] phone:right-3 z-50 flex h-11 w-11 items-center justify-center rounded-2xl border border-white/20 bg-white/85 text-on-surface/70 shadow-md outline-none transition-all backdrop-blur-2xl hover:bg-white/95 hover:shadow-lg focus-visible:ring-2 focus-visible:ring-primary/50 ${fabAnim()} ${moodRingClass()}`}
+        onPointerDown={startLongPress}
+        onPointerUp={cancelLongPress}
+        onPointerLeave={cancelLongPress}
+        onClick={handleClick}
+        title={fabTitle()}
+        aria-label={fabTitle()}
+      >
+        <Show when={props.weddingMode}>
+          <img src="/workspace/icons/personas/omnyid-wedding-eucalyptus-wreath-icon.svg" alt="" class="h-9 w-9 rounded-xl object-contain" />
+        </Show>
+        {/* Persona or mood emoji — replaces the static SVG when state is meaningful */}
+        <Show
+          when={!props.weddingMode && (active() || avatarMood() !== "idle")}
+          fallback={props.weddingMode ? null : (
+            <svg
+              viewBox="0 0 20 20"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+              class="h-[1.125rem] w-[1.125rem]"
+            >
+              <circle cx="10" cy="7" r="3.5" />
+              <path d="M3,18 Q3,13 10,13 Q17,13 17,18" />
+            </svg>
+          )}
+        >
+          <Show
+            when={active()?.image_data_url}
+            fallback={
+              <Show when={templateIconForPersona(active())} fallback={<span class="text-xl leading-none select-none" aria-hidden="true">{active() ? extractEmoji(active()!.soul_md) : moodEmoji() ?? "🤖"}</span>}>
+                {(source) => <img src={source()} alt="" class="h-9 w-9" />}
+              </Show>
+            }
+          >
+            {(source) => <img src={source()} alt="" class="h-8 w-8 rounded-xl object-cover" />}
+          </Show>
+        </Show>
+
+        {/* Capability chip — shown in top-left when genome badges are earned */}
+        <Show when={genomeBadges().length > 0}>
+          <span
+            class="absolute -top-1 -left-1 flex h-4 min-w-[1rem] items-center justify-center rounded-full border border-white/60 bg-primary px-1 text-[0.5rem] font-bold leading-none text-white"
+            title={`${genomeBadges().length} LoRA ${genomeBadges().length === 1 ? "capability" : "capabilities"} learned`}
+            aria-label={`${genomeBadges().length} LoRA capabilities`}
+          >
+            {genomeBadges()[genomeBadges().length - 1]?.icon}
+          </span>
+        </Show>
+
+        {/* Status dot — bottom-right, unchanged from original */}
+        <span
+          class={`absolute bottom-1.5 right-1.5 h-2 w-2 rounded-full border border-white/80 ${dotColor()}`}
+        />
+      </button>
+    </>
+  );
+}

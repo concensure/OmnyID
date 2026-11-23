@@ -1,5 +1,19 @@
-import sodium from 'libsodium-wrappers';
-import { z } from 'zod';
+import { z } from 'zod/v3';
+export {
+  approvalDraftPreviewLines,
+  approvalDraftPreviewSummary,
+  responseItemPreparedDraftAnchorSummary,
+  contextPackObjectSearchTarget,
+  responseItemPreparedDraftAnchorLabels,
+  resolveContinuityTargetLabel,
+  summarizeReferenceLabels,
+  watcherMessageSummary,
+  type ContinuityMessageLike,
+  type ContinuityObjectSearchTarget,
+  type ThreadSummaryLike,
+} from './continuity.js';
+export * from './retrieval.js';
+export * from './quotation.js'; export * from './planning-intelligence.js';
 
 const ViewSchema = z.object({
   format: z.enum(['email', 'notion', 'database', 'calendar', 'graph', 'system']),
@@ -24,7 +38,93 @@ const AttachmentSchema = z.object({
   sha256: z.string().optional(),
 });
 
-const MessageSchema = z.object({
+export const AFP_TYPE_KNOWLEDGE_LINK = 'knowledge_link' as const;
+export const AFP_TYPE_RELATION_LINK = 'relation_link' as const;
+export const AFP_TYPE_LEDGER = 'ledger' as const;
+export const AFP_TYPE_FILE_LEDGER = 'file_ledger' as const;
+export const AFP_TYPE_STATE_SNAPSHOT = 'state_snapshot' as const;
+export const AFP_TYPE_BROWSER_TASK = 'browser_task' as const;
+export const AFP_TYPE_PROVENANCE_RECORD = 'provenance_record' as const;
+export const AFP_TOPOLOGY_LINK_TYPES = [
+  AFP_TYPE_KNOWLEDGE_LINK,
+  AFP_TYPE_RELATION_LINK,
+] as const;
+export const AFP_OPERATIONAL_MESSAGE_TYPES = [
+  AFP_TYPE_KNOWLEDGE_LINK,
+  AFP_TYPE_RELATION_LINK,
+  AFP_TYPE_FILE_LEDGER,
+  AFP_TYPE_STATE_SNAPSHOT,
+  AFP_TYPE_BROWSER_TASK,
+  AFP_TYPE_PROVENANCE_RECORD,
+] as const;
+export const AFP_UNIFIED_OBJECT_KINDS = [
+  'task',
+  'project',
+  'note',
+  'observation',
+  'resource',
+  'relationship',
+  'decision',
+  'meeting',
+  'database_view',
+  'chat_thread',
+  'rich_note',
+  'communication',
+  'event',
+  'research',
+] as const;
+export const AFP_SUBTYPE_LINK_ENTITY = 'entity' as const;
+export const AFP_SUBTYPE_LINK_RELATIONSHIP = 'relationship' as const;
+
+export type UnifiedObjectKind = (typeof AFP_UNIFIED_OBJECT_KINDS)[number] | (string & {});
+
+export function isTopologyLinkMessageType(type: string): boolean {
+  return AFP_TOPOLOGY_LINK_TYPES.includes(type as (typeof AFP_TOPOLOGY_LINK_TYPES)[number]);
+}
+
+export function isOperationalMessageType(type: string): boolean {
+  return AFP_OPERATIONAL_MESSAGE_TYPES.includes(
+    type as (typeof AFP_OPERATIONAL_MESSAGE_TYPES)[number],
+  );
+}
+
+export function isUnifiedObjectMessage(message: {
+  type?: string;
+  kind?: string | null;
+}): boolean {
+  return message.type === AFP_TYPE_LEDGER && typeof message.kind === 'string' && message.kind.trim().length > 0;
+}
+
+export const AfpEntityMentionSchema = z.object({
+  kind: z.string(),
+  name: z.string(),
+  canonical: z.string(),
+  context_snippet: z.string().optional(),
+  confidence: z.number().default(0),
+});
+
+export const AfpRelationshipSchema = z.object({
+  subject: z.string(),
+  predicate: z.string(),
+  object: z.string(),
+  confidence: z.number().default(0),
+});
+
+export const AfpRelationLinkContentSchema = z.object({
+  source_message_id: z.string(),
+  thread_id: z.string(),
+  extracted_at: z.string(),
+  entities: z.array(AfpEntityMentionSchema).default([]),
+  relationships: z.array(AfpRelationshipSchema).default([]),
+  extractor_version: z.string().optional(),
+  target_message_id: z.string().optional(),
+  link_type: z.string().optional(),
+  relationship_id: z.string().optional(),
+  confidence: z.number().optional(),
+  source_refs: z.array(z.string()).default([]),
+});
+
+export const MessageSchema = z.object({
   protocol: z.literal('afp-v1').default('afp-v1'),
   id: z.string().default(''),
   thread_id: z.string(),
@@ -33,11 +133,16 @@ const MessageSchema = z.object({
   to: z.array(z.string()).default([]),
   timestamp: z.string().default(''),
   type: z.string(),
+  kind: z.string().optional(),
+  supertags: z.array(z.string()).default([]),
+  subtype: z.string().optional(),
   content: z.record(z.any()).default({}),
+  metadata: z.record(z.any()).optional(),
   signature: z.string().default(''),
   encryption: z.record(z.any()).nullable().optional(),
   views: z.array(ViewSchema).default([]),
   references: z.array(ReferenceSchema).default([]),
+  typed_refs: z.array(z.record(z.any())).default([]),
   attachments: z.array(AttachmentSchema).default([]),
   store_in_relational: z.boolean().default(false),
 });
@@ -51,10 +156,323 @@ const ActionSchema = z.object({
 export type View = z.infer<typeof ViewSchema>;
 export type Reference = z.infer<typeof ReferenceSchema>;
 export type Attachment = z.infer<typeof AttachmentSchema>;
+export type AfpEntityMention = z.infer<typeof AfpEntityMentionSchema>;
+export type AfpRelationship = z.infer<typeof AfpRelationshipSchema>;
+export type AfpRelationLinkContent = z.infer<typeof AfpRelationLinkContentSchema>;
 export type Message = z.infer<typeof MessageSchema>;
 export type Action = z.infer<typeof ActionSchema>;
 export type MessageInput = z.input<typeof MessageSchema>;
 export type ActionInput = z.input<typeof ActionSchema>;
+
+// Wedding vendor email is carried as encrypted AFP content. These schemas keep
+// the decrypted payload, its permitted plaintext routing metadata, and the AFP
+// envelope distinct so callers cannot accidentally persist an email body in
+// metadata while constructing a relay message.
+export const WeddingVendorEmailParticipantSchema = z.object({
+  name: z.string().trim().min(1).max(256).optional(),
+  address: z.string().trim().email().max(320),
+});
+
+export const WeddingVendorEmailContentSchema = z.object({
+  schema: z.literal('wedding_vendor_email/v1'),
+  vendor_id: z.string().trim().min(1).max(256),
+  direction: z.enum(['inbound', 'outbound', 'reply']),
+  subject: z.string().max(998).optional(),
+  text: z.string().max(1_000_000).optional(),
+  html: z.string().max(1_000_000).optional(),
+  from: WeddingVendorEmailParticipantSchema,
+  to: z.array(WeddingVendorEmailParticipantSchema).min(1).max(50),
+  provider_message_id: z.string().trim().min(1).max(512).optional(),
+  internet_message_id: z.string().trim().min(1).max(998).optional(),
+  in_reply_to: z.string().trim().min(1).max(998).optional(),
+  references: z.array(z.string().trim().min(1).max(998)).max(100).default([]),
+  received_at: z.string().datetime().optional(),
+}).strict();
+
+export const EmailReadContentSchema = z.object({
+  schema_version: z.literal('email_read/v1'),
+  source_message_id: z.string().trim().min(1).max(128),
+  read_at: z.string().datetime(),
+  actor_agent_id: z.string().trim().min(1).max(512),
+}).strict();
+
+export const EmailDeliveryStatusContentSchema = z.object({
+  schema: z.literal('email_delivery_status/v1'),
+  source_message_id: z.string().trim().min(1).max(128),
+  status: z.enum(['accepted', 'sent', 'delivered', 'delayed', 'failed']),
+  occurred_at: z.string().datetime(),
+  provider_message_id: z.string().trim().min(1).max(512).optional(),
+}).strict();
+
+export const EmailBounceContentSchema = z.object({
+  schema: z.literal('email_bounce/v1'),
+  source_message_id: z.string().trim().min(1).max(128),
+  bounce_kind: z.enum(['hard', 'soft', 'complaint']),
+  occurred_at: z.string().datetime(),
+  provider_message_id: z.string().trim().min(1).max(512).optional(),
+  diagnostic_code: z.string().trim().min(1).max(128).optional(),
+}).strict();
+
+const OpaqueRelayValueSchema = z.string().trim().min(1).max(512)
+  .refine((value) => !value.includes('@'), 'must not contain an email address');
+const IdempotencyKeySchema = z.string().regex(/^sha256:[a-f0-9]{64}$/i);
+
+export const WeddingVendorEmailMetadataSchema = z.object({
+  schema: z.enum([
+    'wedding_vendor_email/v1',
+    'email_delivery_status/v1',
+    'email_bounce/v1',
+  ]),
+  transport: z.literal('email_relay').optional(),
+  provider_event_digest: IdempotencyKeySchema.optional(),
+  vendor_id: OpaqueRelayValueSchema.optional(),
+  relay_thread_id: OpaqueRelayValueSchema.optional(),
+  risk_classification: z.enum(['normal', 'quarantined', 'blocked']).optional(),
+  idempotency_key: IdempotencyKeySchema,
+}).strict();
+
+export const EmailReadMetadataSchema = z.object({
+  schema: z.literal('email_read/v1'),
+  idempotency_key: IdempotencyKeySchema,
+}).strict();
+
+export const WeddingVendorEncryptedContentMarkerSchema = z.object({
+  omnyid_encrypted: z.literal(true),
+  scheme: z.literal('omnyid-envelope-v1'),
+}).strict();
+
+const RelaySubtypes = ['incoming', 'outgoing', 'reply', 'delivery_status', 'bounce'] as const;
+
+export const WeddingVendorEmailEnvelopeSchema = MessageSchema.superRefine((message, ctx) => {
+  if (message.type !== 'email') {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'relay messages must use type=email', path: ['type'] });
+  }
+  if (message.kind !== 'communication') {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'relay messages must use kind=communication', path: ['kind'] });
+  }
+  if (!RelaySubtypes.includes(message.subtype as (typeof RelaySubtypes)[number])) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'unsupported relay subtype', path: ['subtype'] });
+  }
+  if (!message.supertags.includes('wedding_vendor_email')) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'relay supertag is required', path: ['supertags'] });
+  }
+  if (!WeddingVendorEncryptedContentMarkerSchema.safeParse(message.content).success) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'relay content must be an encrypted marker', path: ['content'] });
+  }
+  if (!message.encryption || typeof message.encryption !== 'object') {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'relay encryption envelope is required', path: ['encryption'] });
+  }
+  const metadata = message.metadata ?? {};
+  if (!WeddingVendorEmailMetadataSchema.safeParse(metadata).success) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'relay metadata is not allowlisted', path: ['metadata'] });
+  }
+});
+
+export const EmailReadEnvelopeSchema = MessageSchema.superRefine((message, ctx) => {
+  if (message.type !== 'email' || message.kind !== 'communication' || message.subtype !== 'read') {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'invalid read-event envelope' });
+  }
+  if (!message.parent_id) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'read event must name its source message', path: ['parent_id'] });
+  }
+  const matchingReference = message.references.some((reference) =>
+    reference.type === 'message'
+    && reference.target === message.parent_id
+    && reference.metadata?.relation === 'read');
+  if (!matchingReference) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'read event must reference its source message in the same thread', path: ['references'] });
+  }
+  if (!message.supertags.includes('wedding_vendor_email') || !message.supertags.includes('user_read_event')) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'read-event supertags are required', path: ['supertags'] });
+  }
+  if (!WeddingVendorEncryptedContentMarkerSchema.safeParse(message.content).success) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'read content must be an encrypted marker', path: ['content'] });
+  }
+  if (!EmailReadMetadataSchema.safeParse(message.metadata ?? {}).success) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'read metadata is not allowlisted', path: ['metadata'] });
+  }
+});
+
+export type WeddingVendorEmailContent = z.infer<typeof WeddingVendorEmailContentSchema>;
+export type EmailReadContent = z.infer<typeof EmailReadContentSchema>;
+export type EmailDeliveryStatusContent = z.infer<typeof EmailDeliveryStatusContentSchema>;
+export type EmailBounceContent = z.infer<typeof EmailBounceContentSchema>;
+
+export interface WeddingVendorEmailEnvelopeInput {
+  id: string;
+  thread_id: string;
+  parent_id?: string;
+  from: string;
+  to: string[];
+  timestamp: string;
+  subtype: (typeof RelaySubtypes)[number];
+  metadata: z.infer<typeof WeddingVendorEmailMetadataSchema>;
+  encryption: Record<string, unknown>;
+  signature?: string;
+}
+
+export function buildWeddingVendorEmailEnvelope(input: WeddingVendorEmailEnvelopeInput): Message {
+  return WeddingVendorEmailEnvelopeSchema.parse({
+    protocol: 'afp-v1',
+    ...input,
+    type: 'email',
+    kind: 'communication',
+    supertags: ['wedding_vendor_email'],
+    content: { omnyid_encrypted: true, scheme: 'omnyid-envelope-v1' },
+    views: [],
+    references: [],
+    typed_refs: [],
+    attachments: [],
+    store_in_relational: true,
+    signature: input.signature ?? '',
+  });
+}
+
+export async function weddingVendorEmailIdempotencyKey(
+  namespace: string,
+  stableParts: readonly string[],
+): Promise<string> {
+  const canonical = [namespace.trim(), ...stableParts.map((part) => part.trim())]
+    .map((part) => `${part.length}:${part}`)
+    .join('|');
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(canonical));
+  return `sha256:${Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, '0')).join('')}`;
+}
+
+export interface MessageSearchFacets {
+  type?: string;
+  kind?: string;
+  subtype?: string;
+  supertags: string[];
+  referenceTypes: string[];
+  referenceTargets: string[];
+  linkTypes: string[];
+  metadataKeys: string[];
+  metadataValues: string[];
+}
+
+function collectMetadataStrings(
+  value: unknown,
+  path: string[] = [],
+  acc: { keys: Set<string>; values: Set<string> },
+): void {
+  if (value == null) {
+    return;
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (trimmed) {
+      acc.values.add(trimmed);
+    }
+    return;
+  }
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    acc.values.add(String(value));
+    return;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      collectMetadataStrings(item, path, acc);
+    }
+    return;
+  }
+  if (typeof value === 'object') {
+    for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
+      const nextPath = [...path, key];
+      acc.keys.add(nextPath.join('.'));
+      collectMetadataStrings(nested, nextPath, acc);
+    }
+  }
+}
+
+function extractStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .filter((item): item is string => typeof item === 'string')
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+export function extractMessageSearchFacets(
+  message: Partial<Message> & {
+    content?: Record<string, unknown>;
+    metadata?: Record<string, unknown>;
+  },
+): MessageSearchFacets {
+  const metadataAccumulator = { keys: new Set<string>(), values: new Set<string>() };
+  const contentMetadata =
+    message.content && typeof message.content.metadata === 'object' && !Array.isArray(message.content.metadata)
+      ? (message.content.metadata as Record<string, unknown>)
+      : undefined;
+  const topLevelMetadata =
+    message.metadata && typeof message.metadata === 'object' && !Array.isArray(message.metadata)
+      ? message.metadata
+      : undefined;
+
+  collectMetadataStrings(topLevelMetadata, ['metadata'], metadataAccumulator);
+  collectMetadataStrings(contentMetadata, ['content', 'metadata'], metadataAccumulator);
+
+  const supertags = Array.from(
+    new Set([
+      ...extractStringArray(message.content?.supertags),
+      ...extractStringArray(message.supertags),
+      ...extractStringArray(topLevelMetadata?.supertags),
+    ]),
+  );
+  const referenceTypes = Array.from(
+    new Set(
+      Array.isArray(message.references)
+        ? message.references
+            .map((reference) =>
+              reference && typeof reference === 'object' && typeof reference.type === 'string'
+                ? reference.type.trim()
+                : '',
+            )
+            .filter(Boolean)
+        : [],
+    ),
+  );
+  const referenceTargets = Array.from(
+    new Set(
+      Array.isArray(message.references)
+        ? message.references
+            .map((reference) =>
+              reference && typeof reference === 'object' && typeof reference.target === 'string'
+                ? reference.target.trim()
+                : '',
+            )
+            .filter(Boolean)
+        : [],
+    ),
+  );
+  const linkTypes = Array.from(
+    new Set(
+      Array.isArray(message.references)
+        ? message.references
+            .map((reference) =>
+              reference && typeof reference === 'object' && typeof reference.metadata === 'object'
+                ? (reference.metadata as Record<string, unknown>).link_type
+                : undefined,
+            )
+            .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+        : [],
+    ),
+  );
+
+  return {
+    type: typeof message.type === 'string' ? message.type : undefined,
+    kind: typeof message.kind === 'string' ? message.kind : undefined,
+    subtype: typeof message.subtype === 'string' ? message.subtype : undefined,
+    supertags,
+    referenceTypes,
+    referenceTargets,
+    linkTypes,
+    metadataKeys: [...metadataAccumulator.keys],
+    metadataValues: [...metadataAccumulator.values],
+  };
+}
 
 export interface AgentOptions {
   signingKeyHex?: string;
@@ -101,8 +519,739 @@ export interface TransportCapabilities {
   };
 }
 
-type Sodium = typeof sodium;
+const UnknownRecordSchema = z.record(z.any());
+const ComparisonRowSchema = z.object({
+  label: z.string(),
+  values: z.array(z.string()),
+});
+const ApprovalDraftPreviewSchema = z.object({
+  label: z.string().nullable().optional(),
+  content: z.string().nullable().optional(),
+  content_type: z.string().nullable().optional(),
+});
+
+export const DashboardContinuityBriefSchema = z.object({
+  source_type: z.string(),
+  title: z.string(),
+  decision_count: z.number().int(),
+  commitment_count: z.number().int(),
+  critical_change_count: z.number().int(),
+  suggested_actions: z.array(z.string()),
+  staleness_at: z.string().nullable().optional(),
+});
+
+export const ThreadRetrievalStateSchema = z.object({
+  summary: z.string(),
+  badges: z.array(z.string()),
+});
+
+export const ThreadSummarySchema = z.object({
+  thread_id: z.string(),
+  title: z.string(),
+  preview: z.string(),
+  message_count: z.number().int(),
+  last_message_at: z.string(),
+  activity_freshness: z.string().optional(),
+  dominant_kind: z.string().nullable().optional(),
+  supertags: z.array(z.string()),
+  metadata_terms: z.array(z.string()).optional(),
+  score: z.number().int(),
+});
+
+export const ContinuityPriorityItemSchema = z.object({
+  title: z.string(),
+  panel_kind: z.string(),
+  requires_approval: z.boolean(),
+  surface_hint: z.string().nullable().optional(),
+  suggested_action: z.string().nullable().optional(),
+  confidence: z.string().nullable().optional(),
+  prepared_draft_class: z.string().nullable().optional(),
+  selection_reason: z.string().nullable().optional(),
+  source_refs: z.array(z.string()),
+});
+
+export const ContinuityPriorityCardSchema = z.object({
+  title: z.string(),
+  description: z.string(),
+  panel_kind: z.string(),
+  requires_approval: z.boolean(),
+  action_label: z.string(),
+  surface_hint: z.string().nullable().optional(),
+  confidence: z.string().nullable().optional(),
+  prepared_draft_class: z.string().nullable().optional(),
+  selection_reason: z.string().nullable().optional(),
+  linked_target_label: z.string().nullable().optional(),
+  source_refs: z.array(z.string()),
+  object_refs: z.array(z.string()),
+  object_labels: z.array(z.string()),
+  thread_retrieval_state: ThreadRetrievalStateSchema.nullable().optional(),
+});
+
+export const ContinuityActionItemSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  category: z.string(),
+  urgency: z.string(),
+  confidence: z.string(),
+  requires_approval: z.boolean(),
+  suggested_action: z.string(),
+  surface_hint: z.string().nullable().optional(),
+  source_refs: z.array(z.string()),
+});
+
+export const ContinuityResponseItemSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  channel: z.string(),
+  urgency: z.string(),
+  confidence: z.string(),
+  response_due_hint: z.string(),
+  suggested_action: z.string(),
+  prepared_draft_id: z.string().nullable().optional(),
+  prepared_draft_summary: z.string().nullable().optional(),
+  prepared_draft_readiness: z.string().nullable().optional(),
+  prepared_draft_body: z.string().nullable().optional(),
+  prepared_draft_class: z.string().nullable().optional(),
+  prepared_draft_selection_reason: z.string().nullable().optional(),
+  prepared_draft_available: z.boolean().optional(),
+  prepared_draft_requires_approval: z.boolean().optional(),
+  prepared_draft_lead_summary: z.string().nullable().optional(),
+  prepared_draft_summary_lines: z.array(z.string()).optional(),
+  prepared_draft_object_refs: z.array(z.string()).optional(),
+  prepared_draft_object_labels: z.array(z.string()).optional(),
+  prepared_draft_thread_retrieval_state: ThreadRetrievalStateSchema.nullable().optional(),
+  source_refs: z.array(z.string()),
+});
+
+export const ContinuityPreparedDraftItemSchema = z.object({
+  id: z.string(),
+  draft_class: z.string(),
+  title: z.string(),
+  channel: z.string(),
+  summary: z.string(),
+  body: z.string(),
+  confidence: z.string(),
+  readiness: z.string(),
+  response_due_hint: z.string(),
+  requires_approval: z.boolean(),
+  suggested_action: z.string(),
+  selection_reason: z.string().nullable().optional(),
+  source_refs: z.array(z.string()),
+  object_refs: z.array(z.string()).optional(),
+  object_labels: z.array(z.string()).optional(),
+  comparison_headers: z.array(z.string()).optional(),
+  comparison_rows: z.array(ComparisonRowSchema).optional(),
+});
+
+export const ContinuityContextPanelItemSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  why_surfaced: z.string(),
+  confidence: z.string(),
+  relation_path: z.array(z.string()),
+  source_refs: z.array(z.string()),
+  decrypt_needed: z.boolean(),
+});
+
+export const ContinuityWatcherSignalSchema = z.object({
+  id: z.string(),
+  signal_key: z.string(),
+  category: z.string(),
+  freshness: z.string(),
+  urgency: z.string(),
+  confidence: z.string(),
+  urgency_hint: z.string().optional(),
+  suppression_status: z.string().optional(),
+  suppression_reason: z.string().optional(),
+  escalation_status: z.string().optional(),
+  escalation_reason: z.string().optional(),
+  decrypt_needed: z.boolean().optional(),
+  source_type: z.string(),
+  source_subtype: z.string(),
+  thread_id: z.string(),
+  source_refs: z.array(z.string()),
+});
+
+export const ContinuityPreparedContextPackItemSchema = z.object({
+  id: z.string(),
+  pack_kind: z.string(),
+  title: z.string(),
+  summary: z.string(),
+  confidence: z.string(),
+  why_surfaced: z.string(),
+  anchor_refs: z.array(z.string()),
+  source_refs: z.array(z.string()),
+  reference_refs: z.array(z.string()),
+  reference_labels: z.array(z.string()),
+  object_refs: z.array(z.string()),
+  object_labels: z.array(z.string()),
+  file_refs: z.array(z.string()),
+  file_labels: z.array(z.string()),
+  evidence_kinds: z.array(z.string()),
+  thread_retrieval_state: ThreadRetrievalStateSchema.nullable().optional(),
+});
+
+export const ContinuityStateFieldItemSchema = z.object({
+  field_key: z.string(),
+  label: z.string(),
+  status: z.string(),
+  confidence: z.string(),
+  surface_hint: z.string(),
+  recommended_action: z.string(),
+  autonomy_level: z.string(),
+  reason: z.string(),
+  evidence_refs: z.array(z.string()),
+});
+
+export const DashboardContinuityMessageSchema = z.object({
+  id: z.string(),
+  thread_id: z.string(),
+  timestamp: z.string(),
+  type: z.string(),
+  subtype: z.string(),
+  content: UnknownRecordSchema,
+  parsed_content: z.unknown().optional(),
+  synthesizer_handoff: UnknownRecordSchema.nullable().optional(),
+  metadata: UnknownRecordSchema.nullable(),
+  views: z.unknown(),
+});
+
+export const ProactiveSuggestionSchema = z.object({
+  id: z.string(),
+  kind: z.string().optional(),
+  title: z.string().optional(),
+  description: z.string().optional(),
+  suggested_action: z.string().optional(),
+  action_label: z.string().optional(),
+  confidence: z.string().optional(),
+  requires_approval: z.boolean().optional(),
+  destination_view: z.string().nullable().optional(),
+  surface_hint: z.string().nullable().optional(),
+  panel_kind: z.string().nullable().optional(),
+  draft_class: z.string().optional(),
+  pack_id: z.string().optional(),
+  pack_kind: z.string().optional(),
+  is_pack_suggestion: z.boolean().optional(),
+  channel: z.string().optional(),
+  readiness: z.string().optional(),
+  response_due_hint: z.string().optional(),
+  approval_or_reversibility_hint: z.string().nullable().optional(),
+  selection_reason: z.string().nullable().optional(),
+  artifact_summary_lines: z.array(z.string()).optional(),
+  source_refs: z.array(z.string()).optional(),
+  source_count: z.number().int().optional(),
+  reference_refs: z.array(z.string()).optional(),
+  reference_labels: z.array(z.string()).optional(),
+  object_refs: z.array(z.string()).optional(),
+  object_labels: z.array(z.string()).optional(),
+  file_refs: z.array(z.string()).optional(),
+  file_labels: z.array(z.string()).optional(),
+  linked_target_label: z.string().nullable().optional(),
+  thread_retrieval_state: ThreadRetrievalStateSchema.nullable().optional(),
+  anchor_refs: z.array(z.string()).optional(),
+  evidence_kinds: z.array(z.string()).optional(),
+  heuristic_family_id: z.string().optional(),
+  outcome_feedback: UnknownRecordSchema.optional(),
+  comparison_headers: z.array(z.string()).optional(),
+  comparison_rows: z.array(ComparisonRowSchema).optional(),
+  approval_kind: z.string().nullable().optional(),
+  draft_preview: ApprovalDraftPreviewSchema.nullable().optional(),
+  preview_only: z.boolean().optional(),
+  preview_boundary_summary: z.string().nullable().optional(),
+});
+
+export const ContinuityStateResponseSchema = z.object({
+  latest_state_snapshot_ref: z.string().nullable().optional(),
+  latest_state_synthesis_ref: z.string().nullable().optional(),
+  latest_state_snapshot: DashboardContinuityMessageSchema.nullable().optional(),
+  latest_state_synthesis: DashboardContinuityMessageSchema.nullable().optional(),
+  preferred_state_type: z.string(),
+  preferred_state_brief: DashboardContinuityBriefSchema.nullable().optional(),
+  preferred_synthesizer_handoff: UnknownRecordSchema.nullable().optional(),
+  preferred_priority_item: ContinuityPriorityItemSchema.nullable().optional(),
+  preferred_priority_card: ContinuityPriorityCardSchema.nullable().optional(),
+  preferred_action_items: z.array(ContinuityActionItemSchema),
+  preferred_response_items: z.array(ContinuityResponseItemSchema),
+  preferred_prepared_draft_items: z.array(ContinuityPreparedDraftItemSchema),
+  preferred_context_panel_items: z.array(ContinuityContextPanelItemSchema),
+  preferred_context_pack_items: z.array(ContinuityPreparedContextPackItemSchema),
+  preferred_state_fields: z.array(ContinuityStateFieldItemSchema),
+});
+
+export const ContinuitySummaryResponseSchema = z.object({
+  messages: z.array(UnknownRecordSchema),
+  state: ContinuityStateResponseSchema,
+  latest_state_snapshot_ref: z.string().nullable().optional(),
+  preferred_state_brief: DashboardContinuityBriefSchema.nullable().optional(),
+  preferred_synthesizer_handoff: UnknownRecordSchema.nullable().optional(),
+  preferred_priority_item: ContinuityPriorityItemSchema.nullable().optional(),
+  preferred_priority_card: ContinuityPriorityCardSchema.nullable().optional(),
+  preferred_action_items: z.array(ContinuityActionItemSchema),
+  preferred_response_items: z.array(ContinuityResponseItemSchema),
+  preferred_prepared_draft_items: z.array(ContinuityPreparedDraftItemSchema),
+  preferred_context_panel_items: z.array(ContinuityContextPanelItemSchema),
+  preferred_context_pack_items: z.array(ContinuityPreparedContextPackItemSchema),
+  preferred_state_fields: z.array(ContinuityStateFieldItemSchema),
+});
+
+export const DashboardBootstrapResponseSchema = z.object({
+  user: UnknownRecordSchema,
+  agents: z.array(UnknownRecordSchema),
+  messages: z.array(MessageSchema),
+  thread_summaries: z.array(ThreadSummarySchema),
+  thread_retrieval_state: ThreadRetrievalStateSchema.nullable().optional(),
+  continuity_state: DashboardContinuityMessageSchema.nullable().optional(),
+  continuity_brief: DashboardContinuityBriefSchema.nullable().optional(),
+  continuity_handoff: UnknownRecordSchema.nullable().optional(),
+  continuity_primary_mode: z.string().optional(),
+  continuity_priority_item: ContinuityPriorityItemSchema.nullable().optional(),
+  continuity_priority_card: ContinuityPriorityCardSchema.nullable().optional(),
+  continuity_action_items: z.array(ContinuityActionItemSchema),
+  continuity_response_items: z.array(ContinuityResponseItemSchema),
+  continuity_prepared_draft_items: z.array(ContinuityPreparedDraftItemSchema),
+  continuity_context_panel_items: z.array(ContinuityContextPanelItemSchema),
+  continuity_context_pack_items: z.array(ContinuityPreparedContextPackItemSchema),
+  continuity_state_fields: z.array(ContinuityStateFieldItemSchema),
+  proactive_suggestions: z.array(ProactiveSuggestionSchema),
+});
+
+const ObjectFacetMoveEntrySchema = z.object({
+  value: z.string(),
+  count: z.number().int(),
+  score: z.number(),
+  rationale: z.string(),
+});
+
+const ThreadFacetSuggestionEntrySchema = z.object({
+  value: z.string(),
+  count: z.number().int(),
+});
+
+const ThreadFacetMoveEntrySchema = z.object({
+  value: z.string(),
+  count: z.number().int(),
+  score: z.number(),
+  rationale: z.string(),
+});
+
+export const ObjectMessagesResponseSchema = z.object({
+  query: z.string().optional(),
+  free_text: z.string().optional(),
+  facet_suggestions: z.object({
+    kinds: z.array(z.object({ value: z.string(), count: z.number().int() })),
+    tags: z.array(z.object({ value: z.string(), count: z.number().int() })),
+    reference_targets: z.array(z.object({ value: z.string(), count: z.number().int() })),
+    reference_types: z.array(z.object({ value: z.string(), count: z.number().int() })),
+    link_types: z.array(z.object({ value: z.string(), count: z.number().int() })),
+    metadata_terms: z.array(z.object({ value: z.string(), count: z.number().int() })),
+  }).optional(),
+  facet_next_moves: z.object({
+    kinds: z.array(ObjectFacetMoveEntrySchema),
+    tags: z.array(ObjectFacetMoveEntrySchema),
+    reference_targets: z.array(ObjectFacetMoveEntrySchema),
+    reference_types: z.array(ObjectFacetMoveEntrySchema),
+    link_types: z.array(ObjectFacetMoveEntrySchema),
+    metadata_terms: z.array(ObjectFacetMoveEntrySchema),
+  }).optional(),
+  retrieval_state: ThreadRetrievalStateSchema.optional(),
+  count: z.number().int(),
+  messages: z.array(MessageSchema),
+});
+
+export const ThreadSummariesResponseSchema = z.object({
+  query: z.string().optional(),
+  tags: z.array(z.string()),
+  reference_targets: z.array(z.string()).optional(),
+  metadata_values: z.array(z.string()).optional(),
+  metadata_terms: z.array(z.string()).optional(),
+  kind: z.string().optional(),
+  match: z.enum(["all", "any"]).optional(),
+  facet_suggestions: z.object({
+    kinds: z.array(ThreadFacetSuggestionEntrySchema),
+    tags: z.array(ThreadFacetSuggestionEntrySchema),
+    metadata_terms: z.array(ThreadFacetSuggestionEntrySchema).optional(),
+  }).optional(),
+  facet_next_moves: z.object({
+    kinds: z.array(ThreadFacetMoveEntrySchema),
+    tags: z.array(ThreadFacetMoveEntrySchema),
+    metadata_terms: z.array(ThreadFacetMoveEntrySchema).optional(),
+  }).optional(),
+  retrieval_state: ThreadRetrievalStateSchema.optional(),
+  count: z.number().int(),
+  thread_summaries: z.array(ThreadSummarySchema),
+});
+
+export interface DashboardContinuityBrief {
+  source_type: string;
+  title: string;
+  decision_count: number;
+  commitment_count: number;
+  critical_change_count: number;
+  suggested_actions: string[];
+  staleness_at?: string | null;
+}
+
+export interface ContinuityPriorityItem {
+  title: string;
+  panel_kind: string;
+  requires_approval: boolean;
+  surface_hint?: string | null;
+  suggested_action?: string | null;
+  confidence?: string | null;
+  prepared_draft_class?: string | null;
+  selection_reason?: string | null;
+  source_refs: string[];
+}
+
+export interface ContinuityPriorityCard {
+  title: string;
+  description: string;
+  panel_kind: string;
+  requires_approval: boolean;
+  action_label: string;
+  surface_hint?: string | null;
+  confidence?: string | null;
+  prepared_draft_class?: string | null;
+  selection_reason?: string | null;
+  linked_target_label?: string | null;
+  source_refs: string[];
+  object_refs: string[];
+  object_labels: string[];
+  thread_retrieval_state?: ThreadRetrievalState | null;
+}
+
+export interface ContinuityActionItem {
+  id: string;
+  title: string;
+  category: string;
+  urgency: string;
+  confidence: string;
+  requires_approval: boolean;
+  suggested_action: string;
+  source_refs: string[];
+}
+
+export interface ContinuityResponseItem {
+  id: string;
+  title: string;
+  channel: string;
+  urgency: string;
+  confidence: string;
+  response_due_hint: string;
+  suggested_action: string;
+  prepared_draft_id?: string | null;
+  prepared_draft_summary?: string | null;
+  prepared_draft_readiness?: string | null;
+  prepared_draft_body?: string | null;
+  prepared_draft_class?: string | null;
+  prepared_draft_selection_reason?: string | null;
+  prepared_draft_available?: boolean;
+  prepared_draft_requires_approval?: boolean;
+  prepared_draft_lead_summary?: string | null;
+  prepared_draft_summary_lines?: string[];
+  prepared_draft_object_refs?: string[];
+  prepared_draft_object_labels?: string[];
+  prepared_draft_thread_retrieval_state?: ThreadRetrievalState | null;
+  source_refs: string[];
+}
+
+export interface ContinuityPreparedDraftItem {
+  id: string;
+  draft_class: string;
+  title: string;
+  channel: string;
+  summary: string;
+  body: string;
+  confidence: string;
+  readiness: string;
+  response_due_hint: string;
+  requires_approval: boolean;
+  suggested_action: string;
+  selection_reason?: string | null;
+  source_refs: string[];
+  object_refs?: string[];
+  object_labels?: string[];
+  comparison_headers?: string[];
+  comparison_rows?: Array<{ label: string; values: string[] }>;
+}
+
+export interface ContinuityContextPanelItem {
+  id: string;
+  label: string;
+  why_surfaced: string;
+  confidence: string;
+  relation_path: string[];
+  source_refs: string[];
+  decrypt_needed: boolean;
+}
+
+export interface ContinuityWatcherSignal {
+  id: string;
+  signal_key: string;
+  category: string;
+  freshness: string;
+  urgency: string;
+  confidence: string;
+  urgency_hint?: string;
+  suppression_status?: string;
+  suppression_reason?: string;
+  escalation_status?: string;
+  escalation_reason?: string;
+  decrypt_needed?: boolean;
+  source_type: string;
+  source_subtype: string;
+  thread_id: string;
+  source_refs: string[];
+}
+
+export interface ContinuityPreparedContextPackItem {
+  id: string;
+  pack_kind: string;
+  title: string;
+  summary: string;
+  confidence: string;
+  why_surfaced: string;
+  anchor_refs: string[];
+  source_refs: string[];
+  reference_refs: string[];
+  reference_labels: string[];
+  object_refs: string[];
+  object_labels: string[];
+  file_refs: string[];
+  file_labels: string[];
+  evidence_kinds: string[];
+  thread_retrieval_state?: ThreadRetrievalState | null;
+}
+
+export interface ThreadRetrievalState {
+  summary: string;
+  badges: string[];
+}
+
+export interface ObjectFacetSuggestionEntry {
+  value: string;
+  count: number;
+}
+
+export interface ObjectFacetMoveEntry extends ObjectFacetSuggestionEntry {
+  score: number;
+  rationale: string;
+}
+
+export interface ObjectMessagesResponse {
+  query?: string;
+  free_text?: string;
+  facet_suggestions?: {
+    kinds: ObjectFacetSuggestionEntry[];
+    tags: ObjectFacetSuggestionEntry[];
+    reference_targets: ObjectFacetSuggestionEntry[];
+    reference_types: ObjectFacetSuggestionEntry[];
+    link_types: ObjectFacetSuggestionEntry[];
+    metadata_terms: ObjectFacetSuggestionEntry[];
+  };
+  facet_next_moves?: {
+    kinds: ObjectFacetMoveEntry[];
+    tags: ObjectFacetMoveEntry[];
+    reference_targets: ObjectFacetMoveEntry[];
+    reference_types: ObjectFacetMoveEntry[];
+    link_types: ObjectFacetMoveEntry[];
+    metadata_terms: ObjectFacetMoveEntry[];
+  };
+  retrieval_state?: ThreadRetrievalState;
+  count: number;
+  messages: Message[];
+}
+
+export interface ThreadSummary {
+  thread_id: string;
+  title: string;
+  preview: string;
+  message_count: number;
+  last_message_at: string;
+  activity_freshness?: string;
+  dominant_kind?: string | null;
+  supertags: string[];
+  metadata_terms?: string[];
+  score: number;
+}
+
+export interface ThreadSummariesResponse {
+  query?: string;
+  tags: string[];
+  reference_targets?: string[];
+  metadata_values?: string[];
+  metadata_terms?: string[];
+  kind?: string;
+  match?: "all" | "any";
+  facet_suggestions?: {
+    kinds: ObjectFacetSuggestionEntry[];
+    tags: ObjectFacetSuggestionEntry[];
+    metadata_terms?: ObjectFacetSuggestionEntry[];
+  };
+  facet_next_moves?: {
+    kinds: ObjectFacetMoveEntry[];
+    tags: ObjectFacetMoveEntry[];
+    metadata_terms?: ObjectFacetMoveEntry[];
+  };
+  retrieval_state?: ThreadRetrievalState;
+  count: number;
+  thread_summaries: ThreadSummary[];
+}
+
+export interface ContinuityStateFieldItem {
+  field_key: string;
+  label: string;
+  status: string;
+  confidence: string;
+  surface_hint: string;
+  recommended_action: string;
+  autonomy_level: string;
+  reason: string;
+  evidence_refs: string[];
+}
+
+export interface DashboardContinuityMessage {
+  id: string;
+  thread_id: string;
+  timestamp: string;
+  type: string;
+  subtype: string;
+  content: Record<string, unknown>;
+  parsed_content?: unknown;
+  synthesizer_handoff?: Record<string, unknown> | null;
+  metadata: Record<string, unknown> | null;
+  views: unknown;
+}
+
+export interface ApprovalDraftPreview {
+  label?: string | null;
+  content?: string | null;
+  content_type?: 'text' | 'code' | string | null;
+}
+
+export interface ProactiveSuggestion {
+  id: string;
+  kind?: string;
+  title?: string;
+  description?: string;
+  suggested_action?: string;
+  action_label?: string;
+  confidence?: string;
+  requires_approval?: boolean;
+  destination_view?: string | null;
+  surface_hint?: string | null;
+  panel_kind?: string | null;
+  draft_class?: string;
+  pack_id?: string;
+  pack_kind?: string;
+  is_pack_suggestion?: boolean;
+  channel?: string;
+  readiness?: string;
+  response_due_hint?: string;
+  approval_or_reversibility_hint?: string | null;
+  selection_reason?: string | null;
+  artifact_summary_lines?: string[];
+  source_refs?: string[];
+  source_count?: number;
+  reference_refs?: string[];
+  reference_labels?: string[];
+  linked_target_label?: string | null;
+  thread_retrieval_state?: ThreadRetrievalState | null;
+  anchor_refs?: string[];
+  evidence_kinds?: string[];
+  heuristic_family_id?: string;
+  outcome_feedback?: Record<string, unknown>;
+  comparison_headers?: string[];
+  comparison_rows?: Array<{ label: string; values: string[] }>;
+  approval_kind?: string | null;
+  draft_preview?: ApprovalDraftPreview | null;
+  preview_only?: boolean;
+  preview_boundary_summary?: string | null;
+}
+
+export interface ContinuitySummaryResponse {
+  messages: Record<string, unknown>[];
+  state: {
+    latest_state_snapshot_ref?: string | null;
+    latest_state_synthesis_ref?: string | null;
+    latest_state_snapshot?: DashboardContinuityMessage | null;
+    latest_state_synthesis?: DashboardContinuityMessage | null;
+    preferred_state_type: string;
+    preferred_state_brief?: DashboardContinuityBrief | null;
+    preferred_synthesizer_handoff?: Record<string, unknown> | null;
+    preferred_priority_item?: ContinuityPriorityItem | null;
+    preferred_priority_card?: ContinuityPriorityCard | null;
+    preferred_action_items: ContinuityActionItem[];
+    preferred_response_items: ContinuityResponseItem[];
+    preferred_prepared_draft_items: ContinuityPreparedDraftItem[];
+    preferred_context_panel_items: ContinuityContextPanelItem[];
+    preferred_context_pack_items: ContinuityPreparedContextPackItem[];
+    preferred_state_fields: ContinuityStateFieldItem[];
+  };
+  latest_state_snapshot_ref?: string | null;
+  preferred_state_brief?: DashboardContinuityBrief | null;
+  preferred_synthesizer_handoff?: Record<string, unknown> | null;
+  preferred_priority_item?: ContinuityPriorityItem | null;
+  preferred_priority_card?: ContinuityPriorityCard | null;
+  preferred_action_items: ContinuityActionItem[];
+  preferred_response_items: ContinuityResponseItem[];
+  preferred_prepared_draft_items: ContinuityPreparedDraftItem[];
+  preferred_context_panel_items: ContinuityContextPanelItem[];
+  preferred_context_pack_items: ContinuityPreparedContextPackItem[];
+  preferred_state_fields: ContinuityStateFieldItem[];
+}
+
+export interface DashboardBootstrapResponse {
+  user: Record<string, unknown>;
+  agents: Record<string, unknown>[];
+  messages: Message[];
+  thread_summaries: ThreadSummary[];
+  thread_retrieval_state?: ThreadRetrievalState | null;
+  continuity_state?: DashboardContinuityMessage | null;
+  continuity_brief?: DashboardContinuityBrief | null;
+  continuity_primary_mode?: string;
+  continuity_priority_item?: ContinuityPriorityItem | null;
+  continuity_priority_card?: ContinuityPriorityCard | null;
+  continuity_action_items: ContinuityActionItem[];
+  continuity_response_items: ContinuityResponseItem[];
+  continuity_prepared_draft_items: ContinuityPreparedDraftItem[];
+  continuity_context_panel_items: ContinuityContextPanelItem[];
+  continuity_context_pack_items: ContinuityPreparedContextPackItem[];
+  continuity_state_fields: ContinuityStateFieldItem[];
+  proactive_suggestions: ProactiveSuggestion[];
+}
+
+export function parseContinuitySummaryResponse(input: unknown): ContinuitySummaryResponse {
+  return ContinuitySummaryResponseSchema.parse(input) as ContinuitySummaryResponse;
+}
+
+export function parseDashboardBootstrapResponse(input: unknown): DashboardBootstrapResponse {
+  return DashboardBootstrapResponseSchema.parse(input) as DashboardBootstrapResponse;
+}
+
+export function parseObjectMessagesResponse(input: unknown): ObjectMessagesResponse {
+  return ObjectMessagesResponseSchema.parse(input) as ObjectMessagesResponse;
+}
+
+export function parseThreadSummariesResponse(input: unknown): ThreadSummariesResponse {
+  return ThreadSummariesResponseSchema.parse(input) as ThreadSummariesResponse;
+}
+
+type Sodium = typeof import('libsodium-wrappers');
 type TransportPreference = NonNullable<AgentOptions['transportPreference']>;
+
+let sodiumReadyPromise: Promise<Sodium> | null = null;
+
+async function loadSodium(): Promise<Sodium> {
+  if (!sodiumReadyPromise) {
+    sodiumReadyPromise = import('libsodium-wrappers').then(async (module) => {
+      const sodium = (module.default ?? module) as Sodium;
+      await sodium.ready;
+      return sodium;
+    });
+  }
+  return sodiumReadyPromise;
+}
 
 type WebTransportLike = {
   ready: Promise<unknown>;
@@ -226,8 +1375,8 @@ export class Agent {
   private discoveryTrustMode: 'strict' | 'tofu';
 
   constructor(
-    homeserverUrl = 'https://example.com',
-    agentId = 'agent:you@example.com',
+    homeserverUrl = 'http://localhost:8080',
+    agentId = 'agent:you@yourdomain.ai',
     options: AgentOptions = {},
   ) {
     this.url = homeserverUrl.replace(/\/+$/, '');
@@ -239,7 +1388,7 @@ export class Agent {
       Boolean(this.encryptionKeyHex || this.signingKeyHex),
     );
     this.recipientKeys = this.loadRecipientKeys(options.recipientKeys);
-    this.sodiumReady = sodium.ready.then(() => sodium);
+    this.sodiumReady = loadSodium();
     this.transportPreference = this.resolveTransportPreference(options.transportPreference);
     this.discoveryTrustMode = this.resolveDiscoveryTrustMode(options.discoveryTrustMode);
   }
@@ -1194,6 +2343,7 @@ export class Agent {
     try {
       const parsed = new URL(this.url);
       parsed.protocol = parsed.protocol === 'https:' ? 'https:' : 'http:';
+      parsed.hostname = parsed.hostname === 'api.omnyid.com' ? 'wt.omnyid.com' : parsed.hostname;
       parsed.pathname = '/relay/wt';
       return parsed.toString();
     } catch {
@@ -1364,3 +2514,8 @@ export class Agent {
     };
   }
 }
+
+export * from './continuity.js';
+export * from './retrieval.js';
+export * from './workspace-assistance.js';
+export * from './workflows.js';

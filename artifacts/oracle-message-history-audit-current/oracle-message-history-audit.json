@@ -1,0 +1,16 @@
+{
+  "generated_at": "2026-09-19T05:09:00Z",
+  "remote_host": "152.67.110.187",
+  "remote_dir": "/home/ubuntu/omnyid",
+  "mode": "read_only",
+  "tenant_schemas": 6,
+  "total_messages": 225,
+  "maintenance_summary_messages": 6,
+  "empty_maintenance_summary_messages": 3,
+  "non_maintenance_messages": 219,
+  "maintenance_summary_percent": 2.6667,
+  "empty_maintenance_summary_percent": 1.3333,
+  "claim_currently_true": false,
+  "claim_reviewed": "~99.9% of every user's message history is a single repeating auto-generated status entry titled Knowledge maintenance summary",
+  "conclusion": "Current Oracle message history does not match the ~99.9% active-spam claim after prior cleanup. Duplicate synthetic snapshot rows are also zero in the dry-run cleanup receipt."
+}

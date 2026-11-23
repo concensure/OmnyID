@@ -1,0 +1,2 @@
+canonical: .agent/TASKS.yaml
+note: "Compatibility pointer only. Do not maintain root TASKS.yaml as a second task copy."

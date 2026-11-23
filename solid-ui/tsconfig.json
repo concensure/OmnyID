@@ -1,0 +1,28 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "isolatedModules": true,
+    "resolveJsonModule": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "jsx": "preserve",
+    "jsxImportSource": "solid-js",
+    "types": ["vite/client"],
+    "paths": {
+      "@/*": ["./src/*"],
+      "zod/v3": ["./node_modules/zod/v3/index.d.ts"],
+      "afp-ts": ["../typescript-sdk/src/index.ts"],
+      "afp-ts/continuity": ["../typescript-sdk/src/continuity.ts"],
+      "afp-ts/retrieval": ["../typescript-sdk/src/retrieval.ts"],
+      "afp-ts/workflows": ["../typescript-sdk/src/workflows.ts"],
+      "afp-ts/quotation": ["../typescript-sdk/src/quotation.ts"],
+      "afp-ts/semantic-router": ["../typescript-sdk/src/semantic-router/index.ts"],
+      "afp-ts/workspace-assistance": ["../typescript-sdk/src/workspace-assistance.ts"]
+    }
+  },
+  "include": ["src"]
+}

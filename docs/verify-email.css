@@ -1,0 +1,67 @@
+:root {
+  --ink: #241c1c; --muted: #6d6260; --paper: #fffdf9; --wedding: #963f59;
+  --wedding-soft: #fbe9ee; --generic: #a84f2d; --generic-soft: #fff0e7;
+  --line: rgba(62, 43, 39, 0.13); color-scheme: light; font-family: Inter, system-ui, sans-serif;
+}
+* { box-sizing: border-box; }
+body { margin: 0; color: var(--ink); background: #f7f2eb; }
+button, a { font: inherit; }
+.confirmation-shell {
+  min-height: 100vh; min-height: 100svh; display: grid; place-items: center;
+  padding: clamp(16px, 4vw, 48px);
+  background: radial-gradient(circle at 10% 10%, rgba(191,99,116,.14), transparent 32%),
+    radial-gradient(circle at 92% 88%, rgba(201,124,78,.13), transparent 30%), #f7f2eb;
+}
+.confirmation-card {
+  width: min(1040px, 100%); min-height: min(700px, calc(100svh - 32px));
+  display: grid; grid-template-columns: minmax(0,1fr) minmax(320px,.9fr); overflow: hidden;
+  border: 1px solid var(--line); border-radius: 28px; background: var(--paper);
+  box-shadow: 0 24px 70px rgba(56,38,32,.13);
+}
+.confirmation-copy { position: relative; display: flex; flex-direction: column; justify-content: center; padding: clamp(32px,6vw,72px); }
+.brand {
+  position: absolute; top: clamp(26px,5vw,54px); display: inline-flex; align-items: center; gap: 10px;
+  color: var(--ink); font-weight: 700; text-decoration: none;
+}
+.brand-mark {
+  width: 32px; height: 32px; display: grid; place-items: center; border-radius: 50%;
+  color: white; background: var(--generic); font-family: "EB Garamond", Georgia, serif; font-size: 20px;
+}
+.status-mark { width: 58px; height: 58px; display: grid; place-items: center; border-radius: 50%; color: var(--muted); background: #f2ebe5; }
+.status-mark svg { width: 29px; height: 29px; }
+.status-mark.is-working svg { animation: breathe 1.4s ease-in-out infinite; }
+.status-mark.is-success { color: var(--wedding); background: var(--wedding-soft); }
+.status-mark.is-error { color: #9b2f2f; background: #fbe8e7; }
+.eyebrow { margin: 24px 0 10px; color: var(--wedding); font-size: 12px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; }
+h1 { max-width: 12ch; margin: 0; font-family: "EB Garamond", Georgia, serif; font-size: clamp(42px,6vw,68px); line-height: .98; letter-spacing: -.035em; }
+.promise { margin: 24px 0 0; font-size: clamp(19px,2.4vw,24px); line-height: 1.45; }
+.community-message, .wish { max-width: 54ch; margin: 16px 0 0; color: var(--muted); line-height: 1.7; }
+.wish { color: var(--ink); font-weight: 600; }
+.confirmation-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 28px; }
+.primary-action, .quiet-action {
+  min-height: 48px; display: inline-flex; align-items: center; justify-content: center; padding: 12px 20px;
+  border-radius: 12px; border: 1px solid transparent; cursor: pointer; font-weight: 700; text-decoration: none;
+}
+.primary-action { color: white; background: var(--wedding); }
+.quiet-action { color: var(--ink); border-color: var(--line); background: transparent; }
+.primary-action:focus-visible, .quiet-action:focus-visible, .brand:focus-visible { outline: 3px solid #2667a8; outline-offset: 3px; }
+.redirect-note { margin: 14px 0 0; color: var(--muted); font-size: 13px; }
+.confirmation-photo { position: relative; min-height: 100%; margin: 0; background: #e6ddd3; }
+.confirmation-photo img { width: 100%; height: 100%; display: block; object-fit: cover; }
+.confirmation-photo figcaption { position: absolute; right: 12px; bottom: 10px; padding: 5px 8px; border-radius: 7px; color: white; background: rgba(25,19,17,.64); font-size: 10px; }
+.confirmation-photo figcaption a { color: inherit; }
+body[data-experience="generic"] .eyebrow { color: var(--generic); }
+body[data-experience="generic"] .primary-action { background: var(--generic); }
+body[data-experience="generic"] .status-mark.is-success { color: var(--generic); background: var(--generic-soft); }
+@keyframes breathe { 50% { transform: scale(.9); opacity: .62; } }
+@media (prefers-reduced-motion: reduce) { .status-mark.is-working svg { animation: none; } }
+@media (max-width: 760px) {
+  .confirmation-shell { padding: 0; place-items: stretch; }
+  .confirmation-card { min-height: 100svh; grid-template-columns: 1fr; border: 0; border-radius: 0; }
+  .confirmation-copy { min-height: 61svh; padding: 88px 24px 34px; }
+  .brand { top: 24px; }
+  .confirmation-photo { min-height: 39svh; order: 2; }
+  h1 { font-size: clamp(40px,13vw,56px); }
+  .confirmation-actions { align-items: stretch; }
+  .primary-action, .quiet-action { flex: 1 1 100%; }
+}

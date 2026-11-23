@@ -1,0 +1,29 @@
+{
+    "generated_at":  "2026-09-19T05:08:08.8065288Z",
+    "remote_host":  "152.67.110.187",
+    "remote_dir":  "/home/ubuntu/omnyid",
+    "vacuum_mode":  "none",
+    "dry_run":  true,
+    "uploaded_files":  [
+                           "omnyid-prune-synthetic-message-spam.sh",
+                           "prune-maintenance-summary-spam.sql",
+                           "prune-curator-artifact-spam.sql",
+                           "prune-ingestion-topology-spam.sql"
+                       ],
+    "remote_output":  "[omnyid-prune-synthetic-message-spam] vacuum_mode=none dry_run=1 tenant_schemas=6\r\n[omnyid-prune-synthetic-message-spam] before maintenance_summary_dupes=0 curator_card_dupes=0 curator_backlink_dupes=0 ingestion_topology_dupes=0 total_dupes=0\r\n[omnyid-prune-synthetic-message-spam] dry run only; no rows deleted\r\n[omnyid-prune-synthetic-message-spam] after maintenance_summary_dupes=0 curator_card_dupes=0 curator_backlink_dupes=0 ingestion_topology_dupes=0 total_dupes=0 deleted_total=0",
+    "before":  {
+                   "maintenance_summary_dupes":  0,
+                   "curator_card_dupes":  0,
+                   "curator_backlink_dupes":  0,
+                   "ingestion_topology_dupes":  0,
+                   "total_dupes":  0
+               },
+    "after":  {
+                  "maintenance_summary_dupes":  0,
+                  "curator_card_dupes":  0,
+                  "curator_backlink_dupes":  0,
+                  "ingestion_topology_dupes":  0,
+                  "total_dupes":  0,
+                  "deleted_total":  0
+              }
+}

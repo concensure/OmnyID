@@ -1,0 +1,6 @@
+SERVICE_AGENT_ID=agent:university-service@example.edu
+SERVICE_PUBLIC_BASE=https://service.example.edu
+SERVICE_PRIVATE_SIGNING_KEY_HEX=
+SERVICE_PUBLIC_KEY_HEX=
+OMNYID_EXPECTED_DOMAIN=example.edu
+OMNYID_ALLOWED_CALLER_DOMAIN=omnyid.com

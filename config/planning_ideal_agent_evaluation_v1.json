@@ -1,0 +1,171 @@
+{
+  "schema_version": "planning.ideal_agent_evaluation.v1",
+  "programme": "WED-230..WED-240",
+  "scenarios": [
+    {
+      "id": "remembered-centrepiece-limit",
+      "title": "Remembered centrepiece limit",
+      "producer": "constraint_capture_and_intervention",
+      "authority_boundary": "A confirmed dimension constraint remains distinct from a prepared vendor question.",
+      "privacy_boundary": "Only the bounded requirement is shareable; the original couple remark remains private.",
+      "automated_test_paths": [
+        "tests/planning_constraint_capture_api.rs",
+        "tests/planning_constraint_intervention_api.rs",
+        "solid-ui/tests/e2e/wedding-planning-constraint-capture.spec.ts"
+      ],
+      "human_review_dimensions": ["memory_fidelity", "permission_wording"]
+    },
+    {
+      "id": "accessibility-conflict",
+      "title": "Accessibility conflict",
+      "producer": "constraint_evaluation_and_intervention",
+      "authority_boundary": "Verified conflict can prompt review; missing accessibility evidence remains unknown.",
+      "privacy_boundary": "Vendor context uses an aggregate accessibility requirement without naming a guest.",
+      "automated_test_paths": [
+        "tests/planning_constraint_evaluation_api.rs",
+        "tests/planning_constraint_intervention_api.rs",
+        "solid-ui/tests/planning-constraint-evaluation-api.test.ts"
+      ],
+      "human_review_dimensions": ["memory_fidelity", "vendor_context_minimisation", "accessibility"]
+    },
+    {
+      "id": "budget-offset",
+      "title": "Budget offset",
+      "producer": "cost_tradeoff",
+      "authority_boundary": "Budget advice can be acknowledged but cannot reallocate, buy, book, pay or negotiate.",
+      "privacy_boundary": "Advice names only current source-backed categories and bounded fee unknowns.",
+      "automated_test_paths": [
+        "tests/planning_cost_tradeoff_api.rs",
+        "solid-ui/tests/planning-cost-tradeoff-api.test.ts"
+      ],
+      "human_review_dimensions": ["cost_clarity", "alternative_preservation"]
+    },
+    {
+      "id": "accommodation-critical-path",
+      "title": "Accommodation critical path",
+      "producer": "milestone_projection",
+      "authority_boundary": "A prepared research or compare action cannot contact, book, pay or mutate dates.",
+      "privacy_boundary": "Visible wording uses saved dates and prerequisites rather than graph identifiers.",
+      "automated_test_paths": [
+        "tests/planning_milestone_api.rs",
+        "solid-ui/tests/planning-milestone-api.test.ts"
+      ],
+      "human_review_dimensions": ["critical_path_wording", "couple_usability"]
+    },
+    {
+      "id": "vendor-substitution",
+      "title": "Vendor substitution",
+      "producer": "vendor_change",
+      "authority_boundary": "Preparation remains review-only; explicit guarded acceptance creates an immutable quote successor.",
+      "privacy_boundary": "Only exact anchored replacement terms and bounded fit labels reach the review.",
+      "automated_test_paths": [
+        "tests/planning_vendor_change_api.rs",
+        "solid-ui/tests/planning-vendor-change-api.test.ts"
+      ],
+      "human_review_dimensions": ["vendor_context_minimisation", "vendor_usability", "permission_wording"]
+    },
+    {
+      "id": "partner-preference-conflict",
+      "title": "Partner preference conflict",
+      "producer": "preference_conflict",
+      "authority_boundary": "Resolution is an exact-revision acknowledgement and never an inferred planning rule.",
+      "privacy_boundary": "Partner values stay distinct and private rationale or ciphertext never enters vendor output.",
+      "automated_test_paths": [
+        "solid-ui/tests/wedding-preference-conflict-constraint-adapter.test.ts",
+        "solid-ui/tests/wedding-preference-conflict-lifecycle-afp-state.test.ts",
+        "solid-ui/tests/wedding-preference-conflict-state.test.ts"
+      ],
+      "human_review_dimensions": ["couple_usability", "alternative_preservation"]
+    },
+    {
+      "id": "cross-channel-replay",
+      "title": "Cross-channel replay",
+      "producer": "canonical_vendor_response",
+      "authority_boundary": "Equivalent email, secure-link and claimed-AFP facts converge without transport acceptance becoming booking evidence.",
+      "privacy_boundary": "Canonical fingerprints deduplicate material facts without exposing channel secrets.",
+      "automated_test_paths": [
+        "tests/quotation_vendor_response_transport.rs",
+        "tests/planning_vendor_change_api.rs",
+        "solid-ui/tests/e2e/quotation-vendor-response.spec.ts"
+      ],
+      "human_review_dimensions": ["vendor_usability", "permission_wording"]
+    },
+    {
+      "id": "stale-authority",
+      "title": "Stale authority",
+      "producer": "revision_and_grant_guards",
+      "authority_boundary": "Quotation, grant or constraint successors invalidate old recommendations and unsent drafts.",
+      "privacy_boundary": "Stale records remain historical but cannot broaden or resend vendor context.",
+      "automated_test_paths": [
+        "tests/planning_constraint_intervention_api.rs",
+        "tests/planning_vendor_change_api.rs",
+        "tests/quotation_vendor_response_api.rs"
+      ],
+      "human_review_dimensions": ["permission_wording", "vendor_context_minimisation"]
+    },
+    {
+      "id": "non-wedding-reuse",
+      "title": "Non-wedding reuse",
+      "producer": "generic_planning_contracts",
+      "authority_boundary": "Generic contracts retain their authority while template vocabulary stays presentation-only.",
+      "privacy_boundary": "Template presentation cannot relax contract privacy or evidence requirements.",
+      "automated_test_paths": [
+        "src/planning_intelligence/contract_tests.rs",
+        "tests/fixtures/planning/contract-cases.json",
+        "solid-ui/tests/wedding-planning-unified-intervention-state.test.ts"
+      ],
+      "human_review_dimensions": ["alternative_preservation", "permission_wording"]
+    }
+  ],
+  "required_suites": [
+    { "id": "shared_schema", "command": "cargo test planning_intelligence::contract_tests --lib" },
+    { "id": "deterministic_replay", "command": "cargo test planning_intelligence --lib" },
+    { "id": "disposable_postgres", "command": "cargo test --test planning_constraint_api --test planning_constraint_capture_api --test planning_constraint_evaluation_api --test planning_constraint_intervention_api --test planning_cost_tradeoff_api --test planning_milestone_api --test planning_vendor_change_api" },
+    { "id": "clamav_boundaries", "command": "cargo test --test attachment_security" },
+    { "id": "wedding_ui", "command": "npm --prefix solid-ui run test:wedding:ci" },
+    { "id": "browser_accessibility", "command": "npm --prefix solid-ui run test:wedding:e2e" },
+    { "id": "production_build", "command": "npm --prefix solid-ui run build" },
+    { "id": "migration_catalog", "command": "cargo test --lib migration_catalog_matches_current_embedded_set" }
+  ],
+  "human_review_dimensions": [
+    "memory_fidelity",
+    "cost_clarity",
+    "critical_path_wording",
+    "vendor_context_minimisation",
+    "accessibility",
+    "couple_usability",
+    "vendor_usability",
+    "permission_wording",
+    "alternative_preservation"
+  ],
+  "rollout": {
+    "default_state": "dark",
+    "backend_flags": [
+      "OMNYID_PLANNING_CONSTRAINT_LEDGER_ENABLED",
+      "OMNYID_PLANNING_CONSTRAINT_CAPTURE_ENABLED",
+      "OMNYID_PLANNING_EVALUATION_ENABLED",
+      "OMNYID_PLANNING_COST_TRADEOFFS_ENABLED",
+      "OMNYID_PLANNING_CRITICAL_PATH_ENABLED",
+      "OMNYID_PLANNING_VENDOR_CHANGES_ENABLED",
+      "OMNYID_PLANNING_INTERVENTIONS_ENABLED"
+    ],
+    "frontend_flags": [
+      "VITE_PLANNING_CONSTRAINT_CAPTURE_ENABLED",
+      "VITE_PLANNING_CONSTRAINT_EVALUATION_ENABLED",
+      "VITE_PLANNING_COST_TRADEOFFS_ENABLED",
+      "VITE_PLANNING_CRITICAL_PATH_ENABLED",
+      "VITE_PLANNING_VENDOR_CHANGES_ENABLED",
+      "VITE_PLANNING_CONSTRAINT_INTERVENTION_ENABLED",
+      "VITE_PLANNING_UNIFIED_INTERVENTIONS_ENABLED"
+    ],
+    "release_blockers": ["WED-225", "WED-226"],
+    "stages": [
+      { "id": "dark_package", "requires": ["automated_suites"] },
+      { "id": "synthetic_tenant", "requires": ["dark_package", "automated_suites"] },
+      { "id": "allowlisted_couple", "requires": ["synthetic_tenant", "human_review"] },
+      { "id": "permissioned_vendor", "requires": ["allowlisted_couple", "WED-225", "WED-226", "mail_provider_gates"] }
+    ],
+    "kill_switch_policy": "Disable projection and action without deleting AFP or commercial history.",
+    "metrics_policy": "Content-free aggregate counters only."
+  }
+}

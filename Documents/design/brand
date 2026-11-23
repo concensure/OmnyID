@@ -1,0 +1,63 @@
+1. Brand Philosophy
+Adaptive, accessible, reactive, elegant, minimal.
+Every pixel serves clarity and calm. Complexity is hidden; power is instant. Sunset orange is used only for intentional emphasis.
+2. Color Palette
+
+Background: #F8F5F0 (light) / #111111 (dark)
+Surface: #FFFFFF (light) / #1C1C1C (dark)
+Text Primary: #1C1C1C (light) / #F5F5F5 (dark)
+Text Secondary: #666666 (light) / #AAAAAA (dark)
+Border: #E5E0D8 (light) / #2A2A2A (dark)
+Accent (Sunset Orange): #FF6B35 — used only for primary CTAs, active states, and critical highlights
+Success: #2E8B57
+Error: #E63939
+
+3. Typography
+
+Heading 1 (Note Title): Inter SemiBold 24px / 1.2 line height
+Heading 2 (Section): Inter Medium 18px
+Body Text: Inter Regular 16px / 1.6 line height
+Caption / Metadata: Inter Regular 13px
+All text uses font-feature-settings: "ss01" for elegance. No decorative fonts.
+
+4. Spacing System
+
+Base unit: 8px
+Padding: 16px (standard card), 24px (sidebar), 32px (main content)
+Gap between cards: 12px
+Section vertical spacing: 24px
+Top bar height: 56px (fixed)
+Sidebar width: 240px (collapsible to 64px)
+
+5. Official Note View Layout & Specs
+
+Top Bar (56px height, full width)
+Padding: 16px left/right
+Search bar: height 40px, width 100% max 480px, rounded 9999px, background #FFFFFF / #1C1C1C
+Left Sidebar (240px)
+Padding: 16px top, 8px sides
+Item height: 44px, padding 12px left
+Icon + label gap: 12px
+Main Content Area (flex-grow)
+Padding: 24px top, 32px sides
+Card size (List view): full width, height 72px, padding 16px, border radius 12px
+Card size (Grid view): 280px × 180px, padding 20px, border radius 16px
+Card internal gap: 12px
+Right Sidebar (context panel, 320px)
+Padding: 24px
+Backlinks section: 16px vertical gap
+AI Actions buttons: 40px height, 12px gap
+
+6. Interactive States
+
+Hover on card: subtle scale 1.02 + border #FF6B35 (1px)
+Active card: left accent bar #FF6B35 (4px)
+Focus states: 2px solid #FF6B35 outline
+All transitions: 120ms cubic-bezier(0.4, 0, 0.2, 1)
+
+7. Accessibility & Responsiveness
+
+Minimum touch target: 44px
+Contrast ratio: ≥ 4.5:1 everywhere
+Fully keyboard navigable
+Adaptive layout collapses sidebar on < 1024px; full mobile stack on < 640px

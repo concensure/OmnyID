@@ -1,0 +1,223 @@
+{
+  "schema_version": "quotation.vendor_response_fixture.v1",
+  "synthetic": true,
+  "notice": "Non-deliverable fictional data for deterministic contract tests.",
+  "shared": {
+    "thread_id": "thread_synthetic_quotation_001",
+    "quotation_id": "quotation_synthetic_001",
+    "quotation_version_id": "quotation_version_synthetic_001",
+    "comparison_id": "comparison_synthetic_001",
+    "comparison_revision": 3,
+    "vendor_id": "vendor_synthetic_001",
+    "agent_id": "agent://synthetic/vendor-001",
+    "grant_id": "grant_synthetic_001",
+    "projection_fingerprint": "8f59f7cb57a0d63e826e75fdc1cd919752678a419895b257b815b07ec0d159a7"
+  },
+  "claimed_afp_response": {
+    "kind": "quotation_vendor_response_submitted",
+    "schema_version": "quotation.vendor_response.v1",
+    "response_id": "response_synthetic_claimed_001",
+    "invite_id": "invite_synthetic_claimed_001",
+    "grant_id": "grant_synthetic_001",
+    "thread_id": "thread_synthetic_quotation_001",
+    "vendor_id": "vendor_synthetic_001",
+    "quotation_id": "quotation_synthetic_001",
+    "quotation_version_id": "quotation_version_synthetic_001",
+    "projection_fingerprint": "8f59f7cb57a0d63e826e75fdc1cd919752678a419895b257b815b07ec0d159a7",
+    "channel": "claimed_afp",
+    "answers": [
+      {
+        "question_id": "question_synthetic_availability",
+        "value_type": "boolean",
+        "value": true,
+        "source_refs": ["source_synthetic_vendor_reply_001"]
+      },
+      {
+        "fact_id": "fact_synthetic_package_total",
+        "value_type": "money",
+        "value": {
+          "amount_minor": 425000,
+          "currency": "AUD"
+        },
+        "source_refs": ["source_synthetic_vendor_reply_001"]
+      }
+    ],
+    "source_refs": ["source_synthetic_vendor_reply_001"],
+    "attachment_refs": [],
+    "occurred_at": "2027-01-10T02:00:00Z",
+    "idempotency_key": "idem_synthetic_claimed_001",
+    "channel_receipt_ref": "afp_receipt_synthetic_001",
+    "references": [
+      { "type": "quotation", "target": "quotation_synthetic_001" },
+      { "type": "quotation_version", "target": "quotation_version_synthetic_001" },
+      { "type": "grant", "target": "grant_synthetic_001" },
+      { "type": "vendor", "target": "vendor_synthetic_001" },
+      { "type": "thread", "target": "thread_synthetic_quotation_001" },
+      { "type": "source", "target": "source_synthetic_vendor_reply_001" },
+      { "type": "delivery_receipt", "target": "afp_receipt_synthetic_001" }
+    ]
+  },
+  "secure_link_response": {
+    "kind": "quotation_vendor_response_submitted",
+    "schema_version": "quotation.vendor_response.v1",
+    "response_id": "response_synthetic_link_001",
+    "invite_id": "invite_synthetic_link_001",
+    "grant_id": "grant_synthetic_001",
+    "thread_id": "thread_synthetic_quotation_001",
+    "vendor_id": "vendor_synthetic_001",
+    "quotation_id": "quotation_synthetic_001",
+    "quotation_version_id": "quotation_version_synthetic_001",
+    "projection_fingerprint": "8f59f7cb57a0d63e826e75fdc1cd919752678a419895b257b815b07ec0d159a7",
+    "channel": "secure_link",
+    "answers": [
+      {
+        "question_id": "question_synthetic_date_hold",
+        "value_type": "date",
+        "value": "2027-09-18",
+        "source_refs": ["source_synthetic_link_submission_001"]
+      }
+    ],
+    "source_refs": ["source_synthetic_link_submission_001"],
+    "attachment_refs": [],
+    "occurred_at": "2027-01-10T02:05:00Z",
+    "idempotency_key": "idem_synthetic_link_001",
+    "channel_receipt_ref": "link_receipt_synthetic_001",
+    "capability_evidence": {
+      "lookup_prefix": "synthetic-not-a-token",
+      "session_id": "response_session_synthetic_001",
+      "submission_nonce": "nonce_synthetic_consumed_001",
+      "token_present": false
+    }
+  },
+  "email_response": {
+    "kind": "quotation_vendor_response_received",
+    "schema_version": "quotation.vendor_response.v1",
+    "response_id": "response_synthetic_email_001",
+    "invite_id": "invite_synthetic_email_001",
+    "grant_id": "grant_synthetic_001",
+    "thread_id": "thread_synthetic_quotation_001",
+    "vendor_id": "vendor_synthetic_001",
+    "quotation_id": "quotation_synthetic_001",
+    "quotation_version_id": "quotation_version_synthetic_001",
+    "projection_fingerprint": "8f59f7cb57a0d63e826e75fdc1cd919752678a419895b257b815b07ec0d159a7",
+    "channel": "email",
+    "answers": [
+      {
+        "question_id": "question_synthetic_setup_time",
+        "value_type": "bounded_text",
+        "value": "Setup can begin at 14:00.",
+        "source_refs": ["source_synthetic_email_001"]
+      }
+    ],
+    "source_refs": ["source_synthetic_email_001"],
+    "attachment_refs": [],
+    "occurred_at": "2027-01-10T02:10:00Z",
+    "idempotency_key": "idem_synthetic_email_001",
+    "channel_receipt_ref": "gmail_receipt_synthetic_001",
+    "email_evidence": {
+      "message_id_hash": "35a81c542e720f078e7cbda61da73906e8d931f7ae3ea4e21a1f55cd2c654673",
+      "immutable_source_ref": "source_synthetic_email_001",
+      "raw_body_stored_in_fixture": false
+    }
+  },
+  "quote_revision": {
+    "kind": "quotation_normalisation_corrected",
+    "quotation_id": "quotation_synthetic_001",
+    "version_id": "quotation_version_synthetic_002",
+    "supersedes_version_id": "quotation_version_synthetic_001",
+    "source_refs": ["source_synthetic_revised_quote_001"],
+    "trigger_response_id": "response_synthetic_claimed_001",
+    "material_fingerprint": "a797d2ba9942fe975c484b9623cdb5c90af40c37c49adf12089681f019a21b08",
+    "review_required": true
+  },
+  "contract_change": {
+    "kind": "quotation_closure_transition",
+    "event_id": "closure_synthetic_contract_reviewed_001",
+    "quotation_id": "quotation_synthetic_001",
+    "quotation_version_id": "quotation_version_synthetic_002",
+    "expected_state": "contract_received",
+    "target_state": "contract_reviewed",
+    "actor_id": "user_synthetic_001",
+    "user_authority": true,
+    "occurred_at": "2027-01-11T02:00:00Z",
+    "evidence_sources": [
+      {
+        "source_id": "source_synthetic_contract_001",
+        "source_version_id": "source_version_synthetic_contract_001",
+        "media_type": "application/pdf"
+      }
+    ],
+    "contract_changes": [
+      {
+        "kind": "commercial_term",
+        "path": "cancellation.non_refundable_after",
+        "before": "2027-08-18",
+        "after": "2027-07-18"
+      }
+    ],
+    "contract_changes_reviewed": true,
+    "deadline_at": "2027-01-18T02:00:00Z",
+    "external_payment": false
+  },
+  "booking_confirmation": {
+    "kind": "quotation_closure_transition",
+    "event_id": "closure_synthetic_booking_001",
+    "quotation_id": "quotation_synthetic_001",
+    "quotation_version_id": "quotation_version_synthetic_002",
+    "expected_state": "deposit_recorded_paid",
+    "target_state": "booking_confirmed",
+    "actor_id": "user_synthetic_001",
+    "user_authority": true,
+    "occurred_at": "2027-01-12T02:00:00Z",
+    "evidence_sources": [
+      {
+        "source_id": "source_synthetic_booking_email_001",
+        "source_version_id": "source_version_synthetic_booking_email_001",
+        "media_type": "message/rfc822"
+      }
+    ],
+    "contract_changes": [],
+    "contract_changes_reviewed": false,
+    "external_payment": false,
+    "expected_budget_commitment": {
+      "quotation_version_id": "quotation_version_synthetic_002",
+      "amount_minor": 425000,
+      "currency": "AUD",
+      "count_once": true
+    }
+  },
+  "revocation": {
+    "kind": "quotation_context_grant_revoked",
+    "revocation_id": "revocation_synthetic_001",
+    "grant_id": "grant_synthetic_001",
+    "revoked_by_user_id": "user_synthetic_001",
+    "revoked_at": "2027-01-13T02:00:00Z",
+    "reason": "The quotation was superseded.",
+    "expected_effects": [
+      "new_invite_rejected",
+      "link_exchange_rejected",
+      "existing_response_session_rejected",
+      "prior_evidence_retained"
+    ]
+  },
+  "replay": {
+    "input_order": [
+      "response_synthetic_email_001",
+      "closure_synthetic_booking_001",
+      "response_synthetic_claimed_001",
+      "revocation_synthetic_001",
+      "response_synthetic_claimed_001",
+      "closure_synthetic_contract_reviewed_001"
+    ],
+    "expected": {
+      "duplicate_response_count": 1,
+      "active_response_id": "response_synthetic_email_001",
+      "active_quotation_version_id": "quotation_version_synthetic_002",
+      "closure_state": "booking_confirmed",
+      "grant_state": "revoked",
+      "budget_commitment_count": 1,
+      "payment_executed": false,
+      "order_independent": true
+    }
+  }
+}

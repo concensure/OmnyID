@@ -1,0 +1,653 @@
+{
+    email {$ACME_EMAIL}
+    acme_ca https://acme-v02.api.letsencrypt.org/directory
+    servers {
+        trusted_proxies static 173.245.48.0/20 103.21.244.0/22 103.22.200.0/22 103.31.4.0/22 141.101.64.0/18 108.162.192.0/18 190.93.240.0/20 188.114.96.0/20 197.234.240.0/22 198.41.128.0/17 162.158.0.0/15 104.16.0.0/13 104.24.0.0/14 172.64.0.0/13 131.0.72.0/22 2400:cb00::/32 2606:4700::/32 2803:f800::/32 2405:b500::/32 2405:8100::/32 2a06:98c0::/29 2c0f:f248::/32
+        trusted_proxies_strict
+        client_ip_headers CF-Connecting-IP X-Forwarded-For
+    }
+}
+
+(cloudflare_only) {
+    @not_cloudflare not remote_ip private_ranges 173.245.48.0/20 103.21.244.0/22 103.22.200.0/22 103.31.4.0/22 141.101.64.0/18 108.162.192.0/18 190.93.240.0/20 188.114.96.0/20 197.234.240.0/22 198.41.128.0/17 162.158.0.0/15 104.16.0.0/13 104.24.0.0/14 172.64.0.0/13 131.0.72.0/22 2400:cb00::/32 2606:4700::/32 2803:f800::/32 2405:b500::/32 2405:8100::/32 2a06:98c0::/29 2c0f:f248::/32
+    abort @not_cloudflare
+}
+
+(security_headers) {
+    header {
+        Strict-Transport-Security "max-age=15552000; includeSubDomains"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
+}
+
+(omnyid_proxy) {
+    reverse_proxy homeserver:8080 {
+        # GAP-089: use {client_ip} (the TLS peer address Caddy sees) rather than
+        # {remote_host} (same value) or the incoming X-Forwarded-For header (spoofable).
+        # This is the correct real-client IP when Caddy is the edge terminator.
+        header_up X-Forwarded-For {client_ip}
+    }
+}
+
+# File conversion endpoints accept up to 32 MB (HTML→PDF payload).
+# Other routes use the tighter 4 MB default.
+(conversion_proxy) {
+    request_body {
+        max_size 32MB
+    }
+    reverse_proxy homeserver:8080 {
+        header_up X-Forwarded-For {client_ip}
+    }
+}
+
+{$OMNYID_DOMAIN} {
+    import cloudflare_only
+    import security_headers
+    # Default body size limit for all routes (GAP-145).
+    request_body {
+        max_size 4MB
+    }
+
+    # File conversion routes need a larger body limit for HTML→PDF payloads.
+    handle /files/* {
+        import conversion_proxy
+    }
+
+    # All homeserver API routes on the main domain (GAP-088: previously only /gmail/* was proxied)
+    handle /auth/* {
+        import omnyid_proxy
+    }
+    handle /waitlist {
+        import omnyid_proxy
+    }
+    handle /api/* {
+        import omnyid_proxy
+    }
+    handle /agent/* {
+        import omnyid_proxy
+    }
+    handle /relay/* {
+        import omnyid_proxy
+    }
+    handle /billing/* {
+        import omnyid_proxy
+    }
+    handle /dashboard/* {
+        import omnyid_proxy
+    }
+    handle /integrations/* {
+        import omnyid_proxy
+    }
+    handle /send {
+        import omnyid_proxy
+    }
+    handle /messages {
+        import omnyid_proxy
+    }
+    handle /thread/* {
+        import omnyid_proxy
+    }
+    handle /threads/* {
+        import omnyid_proxy
+    }
+    handle /feed/* {
+        import omnyid_proxy
+    }
+    handle /daemons/* {
+        import omnyid_proxy
+    }
+    handle /mcp {
+        import omnyid_proxy
+    }
+    handle /gmail/* {
+        import omnyid_proxy
+    }
+    handle /personalization/* {
+        import omnyid_proxy
+    }
+    handle /user/* {
+        import omnyid_proxy
+    }
+    handle /ingest/* {
+        import omnyid_proxy
+    }
+    handle /runtime/* {
+        import omnyid_proxy
+    }
+    handle /task/* {
+        import omnyid_proxy
+    }
+    handle /multi-edit/* {
+        import omnyid_proxy
+    }
+    handle /social/* {
+        import omnyid_proxy
+    }
+    handle /actions/* {
+        import omnyid_proxy
+    }
+    handle /tools/* {
+        import omnyid_proxy
+    }
+    handle /attachments/* {
+        import omnyid_proxy
+    }
+    handle /key-bundle/* {
+        import omnyid_proxy
+    }
+    handle /query {
+        import omnyid_proxy
+    }
+    handle /llm/* {
+        import omnyid_proxy
+    }
+    handle /skill-capsule/* {
+        import omnyid_proxy
+    }
+    handle /notes/* {
+        import omnyid_proxy
+    }
+    handle /calendar/* {
+        import omnyid_proxy
+    }
+    handle /spaces/* {
+        import omnyid_proxy
+    }
+    handle /workflows/* {
+        import omnyid_proxy
+    }
+    handle /metricsz {
+        import omnyid_proxy
+    }
+    handle /healthz {
+        import omnyid_proxy
+    }
+    handle /readyz {
+        import omnyid_proxy
+    }
+    # Contact details for vulnerability reports are a static public document;
+    # keep this exception ahead of the homeserver's AFP discovery namespace.
+    handle /.well-known/security.txt {
+        root * /srv/docs
+        file_server
+        header Content-Type "text/plain; charset=utf-8"
+    }
+    handle /.well-known/* {
+        import omnyid_proxy
+    }
+
+    # Public crawl controls are explicit files, not the docs SPA fallback.
+    handle /robots.txt {
+        root * /srv/docs
+        file_server
+        header Content-Type "text/plain; charset=utf-8"
+        header Cache-Control "public, max-age=3600"
+    }
+    handle /sitemap.xml {
+        root * /srv/docs
+        file_server
+        header Content-Type "application/xml; charset=utf-8"
+        header Cache-Control "public, max-age=3600"
+    }
+    handle /llms.txt {
+        root * /srv/docs
+        file_server
+        header Content-Type "text/plain; charset=utf-8"
+        header Cache-Control "public, max-age=3600"
+    }
+    handle /federation/* {
+        import omnyid_proxy
+    }
+    handle /sync/* {
+        import omnyid_proxy
+    }
+    handle /ui/* {
+        import omnyid_proxy
+    }
+
+    handle /workspace {
+        redir /workspace/ 308
+    }
+
+    handle /workspace/sw.js {
+        uri strip_prefix /workspace
+        root * /srv/workspace
+        file_server
+        header Cache-Control "no-cache, no-store, must-revalidate"
+        header Service-Worker-Allowed "/workspace/"
+        header X-Content-Type-Options "nosniff"
+    }
+
+    handle_path /workspace/* {
+        root * /srv/workspace
+        try_files {path} /index.html
+        file_server
+        @workspace_shell {
+            path / /index.html
+        }
+        header @workspace_shell Cache-Control "no-cache, no-store, must-revalidate"
+        header /index.html Cache-Control "no-cache, no-store, must-revalidate"
+        header /sw.js Cache-Control "no-cache, must-revalidate"
+        header /assets/* Cache-Control "public, max-age=31536000, immutable"
+        # GAP-116: prevent XSS via a strict CSP.
+        # Inline scripts are blocked; inline styles remain for SolidJS and editor rendering.
+        header Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://accounts.google.com/gsi/client https://appleid.cdn-apple.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com/gsi/style; style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com/gsi/style; img-src 'self' data: blob: https://images.unsplash.com https://lh3.googleusercontent.com https://*.googleusercontent.com https://*.tile.openstreetmap.org; connect-src 'self' https://fonts.googleapis.com https://api.omnyid.com https://cloud.omnyid.com wss://api.omnyid.com wss://cloud.omnyid.com https://accounts.google.com https://appleid.apple.com https://static.cloudflareinsights.com https://api.open-meteo.com https://nominatim.openstreetmap.org https://api.frankfurter.app https://open.er-api.com; font-src 'self' data: https://fonts.gstatic.com; frame-src https://accounts.google.com/gsi/ https://appleid.apple.com https://www.google.com https://www.openstreetmap.org; frame-ancestors 'none'; object-src 'none'"
+        header X-Content-Type-Options "nosniff"
+        header X-Frame-Options "DENY"
+        header Referrer-Policy "strict-origin-when-cross-origin"
+        # CGAP-013: allow the SW at /workspace/sw.js to control the /workspace/ scope.
+        # Safari and Firefox enforce that the SW script path must be within its claimed scope.
+        header /sw.js Service-Worker-Allowed "/workspace/"
+    }
+
+    # Password-reset emails (src/server/auth.rs) link to "{base_url}/reset-password?token=...".
+    # The real reset form now lives only in the /workspace/ SolidJS app (its AuthModal
+    # checks window.location.pathname === "/reset-password" exactly), so this serves that
+    # same app's index.html at the root path the email already points to, instead of
+    # rewriting the link itself. /workspace/* below covers its /workspace/assets/* requests.
+    handle /reset-password {
+        root * /srv/workspace
+        try_files {path} /index.html
+        file_server
+        header Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://accounts.google.com/gsi/client https://appleid.cdn-apple.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com/gsi/style; style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com/gsi/style; img-src 'self' data: blob: https://images.unsplash.com https://lh3.googleusercontent.com https://*.googleusercontent.com https://*.tile.openstreetmap.org; connect-src 'self' https://fonts.googleapis.com https://api.omnyid.com https://cloud.omnyid.com wss://api.omnyid.com wss://cloud.omnyid.com https://accounts.google.com https://appleid.apple.com https://static.cloudflareinsights.com https://api.open-meteo.com https://nominatim.openstreetmap.org https://api.frankfurter.app https://open.er-api.com; font-src 'self' data: https://fonts.gstatic.com; frame-src https://accounts.google.com/gsi/ https://appleid.apple.com https://www.google.com https://www.openstreetmap.org; frame-ancestors 'none'; object-src 'none'"
+        header X-Content-Type-Options "nosniff"
+        header X-Frame-Options "DENY"
+        header Referrer-Policy "strict-origin-when-cross-origin"
+        header Cache-Control "no-cache, no-store, must-revalidate"
+        header X-Robots-Tag "noindex, nofollow"
+    }
+
+    # Wedding vertical marketing site — a separate static frontend that hands
+    # sign-in/sign-up off to this same domain's /docs/ login (source=wedding).
+    # Its waitlist form posts here, so this proxy route must be handled before
+    # the static /wedding/* file-server block below.
+    handle /wedding/waitlist {
+        import omnyid_proxy
+    }
+
+    # Blog newsletter signup and one-click unsubscribe. Same reasoning as the
+    # waitlist route: must precede the static /wedding/* file-server block.
+    handle /wedding/newsletter {
+        import omnyid_proxy
+    }
+
+    handle /wedding/newsletter/* {
+        import omnyid_proxy
+    }
+
+    handle /wedding/binder {
+        import omnyid_proxy
+    }
+
+    handle /wedding/binder/* {
+        import omnyid_proxy
+    }
+
+    handle /wedding/e {
+        import omnyid_proxy
+    }
+
+    # Operator-published articles are served from durable Postgres content.
+    # Keep these ahead of the static wedding file server so source deploys do
+    # not erase articles published through the admin surface.
+    handle /wedding/blog-publications {
+        import omnyid_proxy
+    }
+
+    handle /wedding/published/* {
+        import omnyid_proxy
+    }
+
+    # Consent-bound public quote-study analysis and its exact privacy notice.
+    # These API routes must win before the static wedding file server.
+    handle /wedding/quote-study {
+        request_body {
+            max_size 9MB
+        }
+        import omnyid_proxy
+    }
+
+    handle /wedding/quote-study/* {
+        import omnyid_proxy
+    }
+
+    # Operator-only consented originals. Authentication and the operator
+    # allowlist are enforced again by the homeserver route.
+    handle /admin/wedding/quote-study {
+        import omnyid_proxy
+    }
+
+    handle /admin/wedding/quote-study/* {
+        import omnyid_proxy
+    }
+
+    # Free "Wedding Understanding" lead-magnet tool (analyses text/photos via
+    # a vision model). Same reasoning as the waitlist route above: must be
+    # handled before the static /wedding/* file-server block below.
+    handle /wedding/understanding {
+        import omnyid_proxy
+    }
+
+    # Explicit, rate-limited contextual extraction for the public venue quote
+    # decoder. The static page remains useful without this optional request.
+    handle /wedding/quote-extract {
+        import omnyid_proxy
+    }
+
+    # Privacy-minimised PDF delivery for the public quote comparison. The
+    # homeserver validates the snapshot, rate-limits it, sends the attachment,
+    # and retains only a content-free delivery receipt.
+    handle /wedding/quote-share {
+        import omnyid_proxy
+    }
+
+    handle /wedding/provider-capabilities {
+        import omnyid_proxy
+    }
+
+    # Authenticated, account-scoped Wedding assistant shared by the Master
+    # Agent and Sprout. Keep it ahead of the static Wedding site so requests
+    # always reach the homeserver's identity and action allowlist checks.
+    handle /wedding/assistant {
+        import omnyid_proxy
+    }
+
+    # Authenticated couple-owned RSVP reminder status and send commands. Keep
+    # this ahead of the static /wedding/* site handler below.
+    handle /wedding/rsvp/reminders/* {
+        import omnyid_proxy
+    }
+
+    # Logged-in couple capability management and public token redemption use
+    # the same RSVP ledger. These paths must not fall through to the static
+    # Wedding site handler.
+    handle /wedding/rsvp/capabilities* {
+        import omnyid_proxy
+    }
+
+    handle /wedding/rsvp/responses {
+        import omnyid_proxy
+    }
+
+    # Authenticated two-account Wedding collaboration and selectively shared
+    # contacts. Keep these routes ahead of the static /wedding/* handler so
+    # membership and exact-scope checks are always enforced by the homeserver.
+    handle /wedding/partners {
+        import omnyid_proxy
+    }
+
+    handle /wedding/partners/* {
+        import omnyid_proxy
+    }
+
+    handle /wedding/vendor-search {
+        import omnyid_proxy
+    }
+
+    # Limited Specials has authenticated couple discovery, claimed-vendor
+    # management and post-send enquiry correlation routes. These must win over
+    # the static /wedding/* site handler below. Public capability sessions are
+    # already covered by the earlier /api/* proxy.
+    handle /wedding/vendor-specials/* {
+        import omnyid_proxy
+    }
+
+    handle /wedding/vendor/special-offers* {
+        import omnyid_proxy
+    }
+
+    handle /admin/wedding/vendor-specials {
+        import omnyid_proxy
+    }
+
+    # Invite Proposals remains authenticated or capability-gated by the
+    # homeserver. These API paths must win before the static Wedding site.
+    handle /wedding/invite-proposals/* {
+        import omnyid_proxy
+    }
+
+    handle /wedding/vendor/proposal-opportunities* {
+        import omnyid_proxy
+    }
+
+    handle /api/public/wedding/proposal-opportunities/* {
+        import omnyid_proxy
+    }
+
+    handle /admin/wedding/proposal-opportunities {
+        import omnyid_proxy
+    }
+
+    handle /wedding/live-evidence {
+        import omnyid_proxy
+    }
+
+    # Wedding planner workspace API routes (vendor directory, outreach drafting,
+    # onboarding state, vendor photos). The SolidJS app at /workspace/ calls
+    # these same-origin, so — like the routes above — they must be handled
+    # before the static /wedding/* file-server block below.
+    handle /wedding/onboarding-state {
+        import omnyid_proxy
+    }
+
+    handle /wedding/vendor-outreach-draft {
+        import omnyid_proxy
+    }
+
+    handle /wedding/vendor-photo/google {
+        import omnyid_proxy
+    }
+
+    handle /wedding/vendors {
+        import omnyid_proxy
+    }
+
+    # Crawlable public vendor directory and individual business pages. The
+    # homeserver renders canonical database records; JavaScript only enhances them.
+    handle /wedding/vendors.html {
+        import omnyid_proxy
+    }
+
+    handle /wedding/directory/* {
+        import omnyid_proxy
+    }
+
+    handle /wedding/vendors/* {
+        import omnyid_proxy
+    }
+
+    handle /wedding {
+        redir * /wedding/ 308
+    }
+
+    # Preserve old/shared doubled Wedding links without publishing duplicate content.
+    handle /wedding/wedding/compare-wedding-venue-quotes.html {
+        redir * /wedding/compare-wedding-venue-quotes.html 308
+    }
+
+    handle /wedding/* {
+        uri strip_prefix /wedding
+        root * /srv/wedding
+        @weddingdirindex {
+            path /
+        }
+        rewrite @weddingdirindex /index.html
+        file_server
+        header Content-Security-Policy "default-src 'self'; script-src 'self' 'sha256-SR9l2aM5D8u7/lfDfy6rn64kmM0ej8dys/tlvPEWTEQ=' https://accounts.google.com/gsi/client https://static.cloudflareinsights.com https://analytics.ahrefs.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com/gsi/style; style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com/gsi/style; img-src 'self' data: blob: https://images.unsplash.com https://lh3.googleusercontent.com https://*.googleusercontent.com; connect-src 'self' https://api.omnyid.com https://accounts.google.com/gsi/ https://static.cloudflareinsights.com https://analytics.ahrefs.com; font-src 'self' data: https://fonts.gstatic.com; frame-src https://accounts.google.com/gsi/; frame-ancestors 'none'; object-src 'none'"
+    }
+
+    # `/srv/docs` is a deployment input, not a public-document repository.
+    # Only the static site assets and legal pages belong at this origin.  The
+    # deploy archive can also contain engineering notes, so reject internal
+    # document formats before either static docs handler can resolve them.
+    # `security.txt` remains a deliberate public text exception under
+    # `/.well-known/`.
+    @nonpublic_docs {
+        path *.md *.tsx *.sql *.review *.csv
+    }
+    handle @nonpublic_docs {
+        respond "Not found" 404
+    }
+
+    # Alias so the wedding site's relative "../docs/index.html" links resolve.
+    # The catch-all handle{} below already serves the same /srv/docs content at "/".
+    @public_docs_alias {
+        path /docs/*
+        not path /docs/*.md /docs/*.tsx /docs/*.sql /docs/*.review /docs/*.csv
+    }
+
+    # Eliminate duplicate root documents and extensionless aliases. `redir`
+    # and `rewrite` run before the mutually-exclusive file-server handles, so
+    # these rules cannot be shadowed by the final catch-all.
+    @root_index path /index.html /docs/index.html
+    redir @root_index / 308
+    @privacy_alias path /privacy
+    redir @privacy_alias /privacy.html 308
+    @data_rights_alias path /data-rights
+    redir @data_rights_alias /data-rights.html 308
+    @security_alias path /security
+    redir @security_alias /security.html 308
+    @terms_alias path /terms
+    redir @terms_alias /terms.html 308
+    @vendors_alias path /vendors
+    redir @vendors_alias /vendors.html 308
+
+    # The strict catch-all below deliberately has no SPA fallback. Preserve
+    # the one real root document explicitly while unknown paths remain 404.
+    @root_home path /
+    rewrite @root_home /index.html
+    handle @public_docs_alias {
+        uri strip_prefix /docs
+        root * /srv/docs
+        try_files {path} /index.html
+        file_server
+        header /index.html Cache-Control "no-cache, no-store, must-revalidate"
+        header /app.js Cache-Control "no-cache, no-store, must-revalidate"
+        header X-Robots-Tag "noindex, follow"
+        header Content-Security-Policy "default-src 'self'; script-src 'self' 'sha256-+TtZizzTI1w95JFUHKoSBQBkMcW73Ju4wKTkYgdZtTE=' 'sha256-xl/jzrGxWCaX9hNw19CWSya+urr1TdtPyFQD9Uo2Fkg=' https://accounts.google.com/gsi/client https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com/gsi/style; style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com/gsi/style; img-src 'self' data: blob: https://images.unsplash.com https://lh3.googleusercontent.com https://*.googleusercontent.com; connect-src 'self' https://api.omnyid.com https://accounts.google.com/gsi/ https://static.cloudflareinsights.com; font-src 'self' data: https://fonts.gstatic.com; frame-src https://accounts.google.com/gsi/; frame-ancestors 'none'; object-src 'none'"
+    }
+
+    # No explicit Cache-Control here previously meant browsers could apply
+    # heuristic freshness caching (RFC 7234 4.2.2) to index.html/app.js with
+    # no way to force a refresh, which reads as "the deploy didn't take" even
+    # though the server already has the new file. Matches /workspace/'s
+    # no-cache treatment of its own index.html above.
+    handle {
+        root * /srv/docs
+        try_files {path} {path}.html =404
+        file_server
+        header /index.html Cache-Control "no-cache, no-store, must-revalidate"
+        header /app.js Cache-Control "no-cache, no-store, must-revalidate"
+        header Content-Security-Policy "default-src 'self'; script-src 'self' 'sha256-+TtZizzTI1w95JFUHKoSBQBkMcW73Ju4wKTkYgdZtTE=' 'sha256-xl/jzrGxWCaX9hNw19CWSya+urr1TdtPyFQD9Uo2Fkg=' https://accounts.google.com/gsi/client https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com/gsi/style; style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com/gsi/style; img-src 'self' data: blob: https://images.unsplash.com https://lh3.googleusercontent.com https://*.googleusercontent.com; connect-src 'self' https://api.omnyid.com https://accounts.google.com/gsi/ https://static.cloudflareinsights.com; font-src 'self' data: https://fonts.gstatic.com; frame-src https://accounts.google.com/gsi/; frame-ancestors 'none'; object-src 'none'"
+    }
+}
+
+(file_upload_proxy) {
+    request_body {
+        max_size 128MB
+    }
+    reverse_proxy homeserver:8080 {
+        header_up X-Forwarded-For {client_ip}
+    }
+}
+
+api.{$OMNYID_DOMAIN} {
+    import cloudflare_only
+    import security_headers
+    request_body {
+        max_size 4MB
+    }
+    handle /files/* {
+        import conversion_proxy
+    }
+    handle /api/files/* {
+        import file_upload_proxy
+    }
+    handle {
+        import omnyid_proxy
+    }
+}
+
+cloud.{$OMNYID_DOMAIN} {
+    import cloudflare_only
+    import security_headers
+    request_body {
+        max_size 4MB
+    }
+    handle /files/* {
+        import conversion_proxy
+    }
+    handle {
+        import omnyid_proxy
+    }
+}
+
+wt.{$OMNYID_DOMAIN} {
+    import cloudflare_only
+    import security_headers
+    import omnyid_proxy
+}
+
+# Cloudflare proxies www; without a site here the origin handshake fails (525).
+www.{$OMNYID_DOMAIN} {
+    import cloudflare_only
+    import security_headers
+    redir https://{$OMNYID_DOMAIN}{uri} permanent
+}
+
+# Staging stack (docker-compose.oracle.staging.yml). The app sends Bearer tokens in the
+# Authorization header, which collides with basic auth, so basic auth gates only the
+# dashboard shell; API calls are protected by the app's own sessions.
+staging.{$OMNYID_DOMAIN} {
+    # Only Cloudflare may reach this origin, so Cloudflare Access cannot be bypassed by
+    # connecting to the server IP directly. Ranges: https://api.cloudflare.com/client/v4/ips
+    @not_cloudflare not remote_ip 173.245.48.0/20 103.21.244.0/22 103.22.200.0/22 103.31.4.0/22 141.101.64.0/18 108.162.192.0/18 190.93.240.0/20 188.114.96.0/20 197.234.240.0/22 198.41.128.0/17 162.158.0.0/15 104.16.0.0/13 104.24.0.0/14 172.64.0.0/13 131.0.72.0/22 2400:cb00::/32 2606:4700::/32 2803:f800::/32 2405:b500::/32 2405:8100::/32 2a06:98c0::/29 2c0f:f248::/32
+    handle @not_cloudflare {
+        abort
+    }
+    request_body {
+        max_size 4MB
+    }
+    handle / {
+        basic_auth {
+            {$OMNYID_STAGING_USER} {$OMNYID_STAGING_PASSWORD_HASH}
+        }
+        redir * /workspace/ 308
+    }
+    handle /workspace* {
+        basic_auth {
+            {$OMNYID_STAGING_USER} {$OMNYID_STAGING_PASSWORD_HASH}
+        }
+        redir /workspace /workspace/ 308
+        uri strip_prefix /workspace
+        root * /srv/staging-workspace
+        try_files {path} /index.html
+        file_server
+        header Cache-Control "no-cache, no-store, must-revalidate"
+        header Service-Worker-Allowed "/workspace/"
+        header X-Content-Type-Options "nosniff"
+        header X-Robots-Tag "noindex"
+    }
+    handle {
+        header X-Robots-Tag "noindex"
+        reverse_proxy staging-homeserver:8080 {
+            header_up X-Forwarded-For {client_ip}
+        }
+    }
+}
+
+# NOTE: this site block serves a different app (StrollerCheck) sharing this
+# same Oracle VM/Caddy instance. It is not part of the OmnyID codebase but is
+# kept here because it is already live on the deployed host — removing it
+# would take down api.strollercheck.com. Do not delete without checking with
+# the StrollerCheck deployment first.
+api.strollercheck.com {
+    handle /api/* {
+        reverse_proxy 127.0.0.1:3011
+    }
+    handle {
+        reverse_proxy 10.0.5.1:8100
+    }
+}

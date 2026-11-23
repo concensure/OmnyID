@@ -1,0 +1,129 @@
+{
+  "source_sha": "ae1ac01a2c285ac10b09404cffe3db67fbaaa034",
+  "binary_sha256": "9e50871bebd4d7b0583c1cbbcf49d1f62210e9522edf6139fad2f59d43c33d1f",
+  "collected_at": "2026-11-19T14:45:12.700543+00:00",
+  "exit_code": 0,
+  "records": [
+    {
+      "event": "application_draft",
+      "result": {
+        "external_execution_authorized": false,
+        "receipt": {
+          "applied": true,
+          "draft_afp": {
+            "content": {
+              "body": "Import review status: The file is ready for review. The parser status is ready and quarantine status is clear. Release is not authorized.",
+              "requires_approval": true,
+              "source_refs": [
+                "private_message:8ae96800fa1bc9f860e21db517c5c3f5de4332a611c98f8f421d95a082e26ba0"
+              ]
+            },
+            "from": "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+            "id": "27ad110da2183da8706ac0f9b98c68eb5ed0369b4feea7bb4a1b453de798f789",
+            "metadata": {
+              "approval_state": "not_requested",
+              "private": true,
+              "store": true
+            },
+            "parent_id": "413ba424d21ad38b9825f5e18974874d0d5913358381bb91f45066f6629f8522",
+            "protocol": "afp-v1",
+            "references": [],
+            "signature": "",
+            "store_in_relational": true,
+            "subtype": "runbook_sourced_draft_v1",
+            "supertags": [
+              "runbook_draft"
+            ],
+            "thread_id": "runbook:969d397640ccfbb6ccafae206f2a01e50012ac39f76ab5c42857ca1df023f866",
+            "timestamp": "2026-11-19T14:45:08.596027061+00:00",
+            "to": [
+              "01ARZ3NDEKTSV4RRFFQ69G5FAY"
+            ],
+            "type": "draft"
+          },
+          "evaluation": {
+            "attempts": [
+              {
+                "cost_microunits": 113,
+                "effort": "medium",
+                "failure": null,
+                "input_hash": "720206372ef4409f132190bf50b3c8d1eebe6198d281f45d18f327666205a6b2",
+                "input_tokens": 255,
+                "model": "gpt-6-luna",
+                "output_hash": "834534234878cccb5e541772187c0368e8e90c534b0b0c5f28e0df205748cf91",
+                "output_tokens": 161,
+                "reserved_cost_microunits": 75000,
+                "usage_known": true
+              }
+            ],
+            "failure": null,
+            "output": {
+              "content": {
+                "body": "Import review status: The file is ready for review. The parser status is ready and quarantine status is clear. Release is not authorized.",
+                "requires_approval": true,
+                "source_refs": [
+                  "private_message:8ae96800fa1bc9f860e21db517c5c3f5de4332a611c98f8f421d95a082e26ba0"
+                ]
+              },
+              "protocol": "afp-v1",
+              "type": "draft"
+            }
+          },
+          "request_hash": "fe4ebdeddf927af1aa0dc5c1deb2488dee7f201a50cc6463b131f7362e6ab48d",
+          "reservation_ref": "413ba424d21ad38b9825f5e18974874d0d5913358381bb91f45066f6629f8522",
+          "trace": {
+            "approval_ref": null,
+            "completed_at": "2026-11-19T14:45:12.272877264Z",
+            "cost_microunits": 113,
+            "input_hash": "fc32969dab92732fdb94b1d6de0edb60b369fb3852c93cd5790d5197ac989b93",
+            "input_refs": [
+              "private_message:8ae96800fa1bc9f860e21db517c5c3f5de4332a611c98f8f421d95a082e26ba0",
+              "private_message:413ba424d21ad38b9825f5e18974874d0d5913358381bb91f45066f6629f8522"
+            ],
+            "input_tokens": 255,
+            "instance_id": "969d397640ccfbb6ccafae206f2a01e50012ac39f76ab5c42857ca1df023f866",
+            "model": "gpt-6-luna",
+            "output_hash": "1e748ad3635092379ca33420a06aa10e92f4e89367429ca800114dbf1f7d12a4",
+            "output_refs": [
+              "private_message:30f96fdaf3ef756dd95bd32a2753509a85681ec23885a026daa61b705432c917"
+            ],
+            "output_tokens": 161,
+            "prompt_version": "runbook_model_v1",
+            "provenance_ref": "0938cba7464a48333b10eeec5e9e5e2d9083dee41540de130f350b5b7f365b65",
+            "started_at": "2026-11-19T14:45:08.596027061Z",
+            "status": "completed",
+            "step_id": "model",
+            "step_kind": "draft",
+            "tool_id": null,
+            "trace_id": "edc757b322968be9b4869bb6e310388c265046419449452fe155bdaaaed62414"
+          }
+        }
+      }
+    },
+    {
+      "accounting": [
+        [
+          "completed",
+          75000,
+          113
+        ]
+      ],
+      "application_http": true,
+      "case_count": 1,
+      "event": "complete",
+      "finished_at": "2026-11-19T14:45:12.316396454Z",
+      "maximum_exposure_microunits": 75000,
+      "persisted_receipt": true,
+      "production_rollout": false,
+      "replay_suppressed": true,
+      "source_sha": "ae1ac01a2c285ac10b09404cffe3db67fbaaa034",
+      "tools_composed": false
+    }
+  ],
+  "production_image_before": "sha256:27118c8967e95975ce2d2b784eee35ac2b6559bbc80ef16407d54fe919a4dc89",
+  "production_image_after": "sha256:27118c8967e95975ce2d2b784eee35ac2b6559bbc80ef16407d54fe919a4dc89",
+  "synthetic_only": true,
+  "maximum_evaluation_exposure_usd": 0.075,
+  "host_ports": false,
+  "production_flags_changed": false
+}

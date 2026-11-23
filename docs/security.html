@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OmnyID Security &amp; Incident Response</title><meta name="description" content="How to report a security issue to OmnyID, and how reports are triaged, contained and fixed, with affected users notified where required.">
+<link rel="stylesheet" href="tailwind.css">
+<!-- omnyid-seo:start -->
+<link rel="canonical" href="https://omnyid.com/security.html">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="en_AU">
+<meta property="og:url" content="https://omnyid.com/security.html">
+<meta property="og:title" content="OmnyID Security &amp; Incident Response">
+<meta property="og:description" content="How to report a security issue to OmnyID, and how reports are triaged, contained and fixed, with affected users notified where required.">
+<meta property="og:image" content="https://omnyid.com/logo/omnyid-logo.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="OmnyID Security &amp; Incident Response">
+<meta name="twitter:description" content="How to report a security issue to OmnyID, and how reports are triaged, contained and fixed, with affected users notified where required.">
+<meta name="twitter:image" content="https://omnyid.com/logo/omnyid-logo.png">
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://omnyid.com/#organization","name":"OmnyID Pty Ltd","url":"https://omnyid.com","logo":"https://omnyid.com/wedding/assets/logo/omnyid-logo.png"},{"@type":"WebSite","@id":"https://omnyid.com/#website","name":"OmnyID","url":"https://omnyid.com","inLanguage":"en-AU","publisher":{"@id":"https://omnyid.com/#organization"}},{"@type":"SoftwareApplication","@id":"https://omnyid.com/#application","name":"OmnyID","applicationCategory":"ProductivityApplication","operatingSystem":"Web","url":"https://omnyid.com","description":"A local-first workspace that turns scattered information into reviewable decisions.","publisher":{"@id":"https://omnyid.com/#organization"}},{"@type":"WebPage","@id":"https://omnyid.com/security.html#webpage","name":"OmnyID Security & Incident Response","description":"How to report a security issue to OmnyID, and how reports are triaged, contained and fixed, with affected users notified where required.","url":"https://omnyid.com/security.html","inLanguage":"en-AU","isPartOf":{"@id":"https://omnyid.com/#website"},"about":{"@id":"https://omnyid.com/#application"},"breadcrumb":{"@id":"https://omnyid.com/security.html#breadcrumb"}},{"@type":"BreadcrumbList","@id":"https://omnyid.com/security.html#breadcrumb","itemListElement":[{"@type":"ListItem","position":1,"name":"OmnyID","item":"https://omnyid.com/"},{"@type":"ListItem","position":2,"name":"Security & Incident Response","item":"https://omnyid.com/security.html"}]}]}</script>
+<!-- omnyid-seo:end -->
+</head>
+<body class="bg-stone-950 text-stone-100">
+  <main class="mx-auto max-w-4xl px-6 py-16">
+    <a href="./index.html" class="text-sm uppercase tracking-[0.2em] text-cyan-300 hover:text-cyan-200">Back to OmnyID</a>
+    <h1 class="mt-6 text-4xl font-semibold">Security &amp; Incident Response</h1>
+    <p class="mt-3 text-sm text-stone-400">Effective date: July 5, 2026</p>
+
+    <div class="mt-10 space-y-8 text-sm leading-7 text-stone-200">
+      <section>
+        <h2 class="text-xl font-semibold text-white">1. Reporting a security issue</h2>
+        <p class="mt-2">
+          Send security reports to <a class="text-cyan-300 hover:text-cyan-200" href="mailto:hello@omnyid.com">hello@omnyid.com</a>
+          with the subject line <span class="rounded bg-stone-800 px-2 py-1 text-stone-100">Security report</span>.
+          Include affected URLs, accounts, steps to reproduce, impact, and any proof-of-concept details needed for verification.
+        </p>
+      </section>
+
+      <section>
+        <h2 class="text-xl font-semibold text-white">2. Intake and triage</h2>
+        <ul class="mt-2 list-disc space-y-2 pl-6">
+          <li>Acknowledge receipt as soon as practical.</li>
+          <li>Validate the report, classify severity, and begin containment if the issue is real.</li>
+          <li>Restrict live changes to the minimum needed for containment and service protection.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2 class="text-xl font-semibold text-white">3. Incident response baseline</h2>
+        <ol class="mt-2 list-decimal space-y-2 pl-6">
+          <li>Identify the affected systems, data classes, and customer scope.</li>
+          <li>Contain the issue, revoke or rotate credentials if required, and preserve relevant logs.</li>
+          <li>Remediate the root cause and verify the fix.</li>
+          <li>Notify affected users and counterparties when required by law or material impact.</li>
+          <li>Document the incident, timeline, impact, and follow-up controls.</li>
+        </ol>
+      </section>
+
+      <section>
+        <h2 class="text-xl font-semibold text-white">4. Breach-notification baseline</h2>
+        <p class="mt-2">
+          Where OmnyID determines that a security incident materially affects customer data, account integrity, or legal
+          obligations, OmnyID will provide notice through the account email on file and, where appropriate, additional
+          in-product or site messaging. The exact timing depends on verification, containment, legal obligations, and the
+          accuracy of the impact assessment.
+        </p>
+      </section>
+
+      <section>
+        <h2 class="text-xl font-semibold text-white">5. Security boundaries today</h2>
+        <p class="mt-2">
+          OmnyID is still an evolving system. Security posture depends on the active deployment model, enabled integrations,
+          operator configuration, and whether features are self-hosted, hosted, or preview-only. Do not treat every feature
+          path as having the same privacy or zero-access guarantees without checking the active deployment documentation.
+        </p>
+      </section>
+    </div>
+  </main>
+</body>
+</html>

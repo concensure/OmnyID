@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Confirm your OmnyID account</title>
+  <meta name="robots" content="noindex,nofollow">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@500;600;700&amp;family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="verify-email.css?v=wed299-1">
+</head>
+<body>
+  <main class="confirmation-shell" id="main">
+    <section class="confirmation-card" aria-labelledby="confirmation-title">
+      <div class="confirmation-copy">
+        <a class="brand" href="/" aria-label="OmnyID home">
+          <span class="brand-mark" aria-hidden="true">O</span>
+          <span>OmnyID</span>
+        </a>
+        <div class="status-mark" id="confirmation-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 8l7.9 5.3a2 2 0 002.2 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+          </svg>
+        </div>
+        <p class="eyebrow" id="confirmation-eyebrow">Account confirmation</p>
+        <h1 id="confirmation-title">Confirming your place…</h1>
+        <p class="promise" id="confirmation-promise">We are checking the secure link from your email.</p>
+        <p class="community-message" id="confirmation-message" role="status" aria-live="polite">This usually takes only a moment.</p>
+        <p class="wish" id="confirmation-wish" hidden></p>
+        <div class="confirmation-actions" id="confirmation-actions" hidden>
+          <a class="primary-action" id="confirmation-destination" href="/workspace/">Continue to OmnyID</a>
+          <button class="quiet-action" id="pause-redirect" type="button">Stay on this page</button>
+        </div>
+        <p class="redirect-note" id="redirect-note" aria-live="polite" hidden></p>
+      </div>
+      <figure class="confirmation-photo" id="confirmation-photo" hidden>
+        <img id="confirmation-image" src="assets/images/omnyid-community-confirmation.webp" width="960" height="644" alt="">
+        <figcaption id="confirmation-credit"></figcaption>
+      </figure>
+    </section>
+  </main>
+  <script src="verify-email.js?v=wed299-1" defer></script>
+</body>
+</html>

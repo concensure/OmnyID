@@ -4,12 +4,12 @@ from afp import Agent, Message
 
 
 async def main():
-    agent = Agent(agent_id="agent:demo@example.com")
+    agent = Agent(agent_id="agent:demo@acme.ai")
     thread_id = "thread_01j8k9abc123"
 
     msg = Message(
         thread_id=thread_id,
-        to=["agent:peer@example.com"],
+        to=["agent:receiver@client.co"],
         type="task",
         subtype="status",
         content={"kind": "task_status", "status": "done", "result": "hello from AFP!"},

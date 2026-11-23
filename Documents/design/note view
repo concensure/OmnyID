@@ -1,0 +1,58 @@
+Proposed Note View Design (focused on clean, Apple-like UX that hides complexity while delivering all required functions)
+Core Layout (Single Screen)
+
+Top Bar (minimal, always visible)
+Search bar (full-text + semantic + tags + OCR)
+New Note button (with voice/text/image/handwriting options in a small popover)
+View toggle: List / Grid / Graph
+
+Left Sidebar (collapsible)
+All Notes
+AI Suggested Groups (smart folders created by Knowledge Curator)
+Tags / Supertags (flat list + AI-suggested groupings)
+Notebooks / Folders (user or AI-created)
+
+Main Content Area (the actual note list)
+Notes shown as clean cards in List or Grid view
+Each card displays: title, first 2 lines of content or summary, supertags, last updated time
+Instant sorting: by date, title, tag, or AI-relevance (one-tap)
+Instant filtering via search or tag click
+
+Right Sidebar (contextual, appears when a note is selected)
+Full note content with backlinks and related notes
+AI Summary + Action Items (auto-generated)
+Version history (simple timeline, one-click restore)
+
+
+Key Interactions (Minimal Friction)
+
+Instant Note Creation:
+Tap “New Note” → instantly opens a blank note with cursor ready for typing.
+Long-press “New Note” → popover with Voice, Camera (image + OCR), Handwriting, or Text.
+Voice note starts recording immediately and auto-transcribes + summarizes.
+
+Collation & Organization:
+Drag any note onto another to create a backlink or merge.
+Multi-select + “Group as Supertag” or “Move to Notebook”.
+AI Suggested Groups appear automatically and can be accepted with one tap.
+
+Search & Retrieval:
+Search bar works instantly across all notes (full-text + semantic via pgvector).
+Results show highlighted matches and related backlinks.
+“Ask your notes” mode: natural language query returns best matching notes + AI summary.
+
+Smart Linking:
+While typing, the system suggests relevant existing notes for backlinking (shown as inline chips).
+Graph view button shows connected knowledge network (clickable to jump between notes).
+
+AI-Assisted Features:
+Every note has an “AI Actions” button: Summarize, Extract Action Items, Create Mind Map, Elaborate.
+Contextual suggestions appear as subtle chips above the note (“Add reminder?”, “Link to previous meeting?”).
+
+
+Accessibility & Simplicity Principles Applied
+
+All actions are one or two taps.
+No nested menus or hidden settings in the main flow.
+Everything is visible or discoverable without reading documentation.
+Heavy operations (OCR, summarization, graph building) happen silently in background via Knowledge Curator.

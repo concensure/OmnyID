@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "policy_id": "wedding.vendor.production@1",
+  "decision_patterns": [
+    "wedding.vendor_selection@1",
+    "wedding.vendor_quote_response@1"
+  ],
+  "account_storage_bytes": {
+    "free": 1073741824,
+    "paid": 2147483648,
+    "explicit_addon_increment": 10737418240
+  },
+  "feature_flags": {
+    "automatic_shortlist": "VITE_WEDDING_AUTOMATIC_SHORTLIST_ENABLED",
+    "online_fallback": "OMNYID_WEDDING_ONLINE_FALLBACK_ENABLED",
+    "online_catalog_enrichment": "OMNYID_WEDDING_ONLINE_CATALOG_ENRICHMENT_ENABLED",
+    "ranking_policy_v2": "VITE_WEDDING_VENDOR_RANKING_POLICY_V2",
+    "outreach_drafting": "OMNYID_WEDDING_ADMIN_AI_ROUTING_ENABLED",
+    "external_send": "OMNYID_WEDDING_EXTERNAL_SEND_ENABLED",
+    "event_quote_projection": "OMNYID_WEDDING_EVENT_QUOTE_PROJECTION_ENABLED"
+  },
+  "ranking_policy": {
+    "version": 1,
+    "hard_constraint_precision_min": 1.0,
+    "hard_constraint_recall_min": 0.95,
+    "duplicate_rate_max": 0.0,
+    "photo_identity_rate_min": 0.99,
+    "top_three_relevance_min": 0.8,
+    "unknown_conflict_label_precision_min": 1.0
+  },
+  "provider_bounds": {
+    "directory_first": true,
+    "paid_call_on_complete_directory_result": false,
+    "request_timeout_seconds": 12,
+    "canonical_resolution_calls_per_search_max": 5,
+    "canonical_resolution_absolute_cap": 20,
+    "outreach_draft_requests_per_minute": 6,
+    "outreach_daily_limit_env": "OMNYID_WEDDING_ADMIN_AI_DAILY_REQUEST_LIMIT"
+  },
+  "slos": {
+    "directory_shortlist_p95_ms": 2000,
+    "online_fallback_p95_ms": 10000,
+    "quote_to_decisionos_p95_ms": 60000,
+    "duplicate_external_sends_max": 0,
+    "missed_critical_deadlines_max": 0
+  },
+  "rollout_stages": [
+    "developer_canary",
+    "internal_accounts",
+    "controlled_beta",
+    "percentage_rollout",
+    "general_availability"
+  ],
+  "required_ga_approvals": [
+    "product",
+    "engineering",
+    "security_privacy",
+    "operations"
+  ],
+  "ga_requires": [
+    "green_automated_gates",
+    "successful_restore_replay_drill",
+    "stable_canary_slos",
+    "bounded_spend",
+    "no_release_blocking_defect"
+  ]
+}

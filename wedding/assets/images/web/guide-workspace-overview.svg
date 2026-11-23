@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 560" role="img" aria-labelledby="title desc">
+  <title id="title">OmnyID Weddings workspace overview screenshot</title>
+  <desc id="desc">A screenshot-style illustration of the OmnyID Weddings workspace with overview, files, tasks and evidence panels.</desc>
+  <rect width="960" height="560" fill="#f4eadc"/>
+  <rect x="42" y="34" width="876" height="492" rx="20" fill="#fffdfa" stroke="#e7dacb"/>
+  <rect x="42" y="34" width="876" height="54" rx="20" fill="#2c241d"/>
+  <circle cx="74" cy="61" r="7" fill="#c17b87"/>
+  <circle cx="98" cy="61" r="7" fill="#c79a48"/>
+  <circle cx="122" cy="61" r="7" fill="#8a9a7e"/>
+  <text x="162" y="67" font-family="Inter, Arial" font-size="16" fill="#fffdfa">omnyid.com/wedding/workspace</text>
+  <rect x="70" y="118" width="170" height="360" rx="14" fill="#fbf6ef" stroke="#e7dacb"/>
+  <text x="94" y="154" font-family="Inter, Arial" font-size="15" font-weight="700" fill="#2c241d">Wedding plan</text>
+  <rect x="94" y="178" width="112" height="22" rx="11" fill="#f3dfe2"/>
+  <text x="108" y="194" font-family="Inter, Arial" font-size="11" font-weight="700" fill="#a85c6a">Overview</text>
+  <text x="94" y="238" font-family="Inter, Arial" font-size="13" fill="#6e6156">Files</text>
+  <text x="94" y="278" font-family="Inter, Arial" font-size="13" fill="#6e6156">Tasks</text>
+  <text x="94" y="318" font-family="Inter, Arial" font-size="13" fill="#6e6156">Calendar</text>
+  <text x="94" y="358" font-family="Inter, Arial" font-size="13" fill="#6e6156">Graph</text>
+  <text x="94" y="398" font-family="Inter, Arial" font-size="13" fill="#6e6156">Exports</text>
+  <rect x="270" y="118" width="378" height="168" rx="16" fill="#fff" stroke="#e7dacb"/>
+  <text x="298" y="154" font-family="Fraunces, Georgia" font-size="24" font-weight="600" fill="#2c241d">Emma and Jack</text>
+  <text x="298" y="184" font-family="Inter, Arial" font-size="14" fill="#6e6156">Hunter Valley, autumn, 90 guests, relaxed outdoor ceremony.</text>
+  <rect x="298" y="214" width="92" height="28" rx="14" fill="#e3eadd"/>
+  <text x="315" y="233" font-family="Inter, Arial" font-size="12" font-weight="700" fill="#66765c">4 saved files</text>
+  <rect x="406" y="214" width="114" height="28" rx="14" fill="#f1e4c2"/>
+  <text x="423" y="233" font-family="Inter, Arial" font-size="12" font-weight="700" fill="#7b6124">7 open tasks</text>
+  <rect x="536" y="214" width="84" height="28" rx="14" fill="#f3dfe2"/>
+  <text x="552" y="233" font-family="Inter, Arial" font-size="12" font-weight="700" fill="#a85c6a">2 blockers</text>
+  <rect x="270" y="310" width="178" height="168" rx="16" fill="#fff" stroke="#e7dacb"/>
+  <text x="296" y="344" font-family="Inter, Arial" font-size="14" font-weight="700" fill="#2c241d">Next task</text>
+  <text x="296" y="374" font-family="Inter, Arial" font-size="13" fill="#6e6156">Verify caterer quote</text>
+  <rect x="296" y="410" width="124" height="12" rx="6" fill="#e7dacb"/>
+  <rect x="296" y="436" width="88" height="12" rx="6" fill="#e7dacb"/>
+  <rect x="470" y="310" width="178" height="168" rx="16" fill="#fff" stroke="#e7dacb"/>
+  <text x="496" y="344" font-family="Inter, Arial" font-size="14" font-weight="700" fill="#2c241d">Evidence</text>
+  <text x="496" y="374" font-family="Inter, Arial" font-size="13" fill="#6e6156">Source-linked: 6</text>
+  <text x="496" y="402" font-family="Inter, Arial" font-size="13" fill="#6e6156">Needs check: 2</text>
+  <rect x="496" y="432" width="112" height="24" rx="12" fill="#f3dfe2"/>
+  <text x="513" y="449" font-family="Inter, Arial" font-size="11" font-weight="700" fill="#a85c6a">Review first</text>
+  <rect x="676" y="118" width="198" height="360" rx="16" fill="#fff" stroke="#e7dacb"/>
+  <text x="704" y="154" font-family="Inter, Arial" font-size="15" font-weight="700" fill="#2c241d">Context</text>
+  <rect x="704" y="184" width="138" height="12" rx="6" fill="#e7dacb"/>
+  <rect x="704" y="210" width="112" height="12" rx="6" fill="#e7dacb"/>
+  <rect x="704" y="258" width="126" height="28" rx="14" fill="#2c241d"/>
+  <text x="728" y="277" font-family="Inter, Arial" font-size="12" font-weight="700" fill="#fffdfa">Continue chat</text>
+  <rect x="704" y="326" width="138" height="12" rx="6" fill="#e7dacb"/>
+  <rect x="704" y="352" width="96" height="12" rx="6" fill="#e7dacb"/>
+  <rect x="704" y="402" width="122" height="28" rx="14" fill="#fff" stroke="#2c241d"/>
+  <text x="727" y="421" font-family="Inter, Arial" font-size="12" font-weight="700" fill="#2c241d">Open files</text>
+</svg>

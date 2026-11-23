@@ -1,0 +1,1169 @@
+﻿// @locs-version: 1.0
+import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
+import { sendAfpMessage, type DashboardBootstrap } from "@/lib/api";
+import {
+  buildDatabaseViewFailureReceipt,
+  type DatabaseViewFailureReceipt,
+} from "@/lib/databaseViewFailureState";
+import {
+  databaseColumnDefs,
+  databaseCellFocusId,
+  databaseRecordsForDatabase,
+  databaseRecordsFromMessages,
+  databaseSchemaColumnsFromMessages,
+  formatDatabaseEditableValue,
+  parseDatabaseEditedValue,
+  type DatabaseViewColumnDef as ColDef,
+  type DatabaseViewRecord as DbRecord,
+} from "@/lib/databaseViewState";
+import {
+  sendDatabaseArchive,
+  sendDatabaseDefinition,
+  sendDatabaseRecord,
+  sendDatabaseRecordRevision,
+  sendDatabaseSchema,
+} from "@/lib/databaseMessageCommands";
+import { DatabaseHeader, type DatabaseDensityMode } from "@/components/DatabaseHeader";
+import {
+  DatabaseCreateDialog,
+  DatabaseLifecycleDialog,
+  type DatabaseCreateInput,
+} from "@/components/DatabaseCreateDialog";
+import {
+  existingDatabaseDefinitionForProfile,
+  projectDatabaseDefinitions,
+  reconcileSelectedDatabaseId,
+  registeredDatabaseProfiles,
+  weddingProjectionTableForProfile,
+  type RegisteredDatabaseProfile,
+} from "@/lib/databaseRegistryState";
+import { TiptapEditor } from "@/components/editor/TiptapEditor";
+import {
+  DatabaseAddRecordDialog,
+  DatabaseImportDialog,
+  type DatabaseEditorMessage as DatabaseMessage,
+} from "@/components/DatabaseRecordEditor";
+import { dashboardBootstrapMessages } from "@/lib/dashboardBootstrapState";
+import { isRecord } from "@/lib/eventDetail";
+import { recordShortcutUse } from "@/lib/shortcutRecency";
+import { surfaceShortDateLabel } from "@/lib/surfaceTimestampPresentation";
+import { WeddingRunSheetProjectionStatus } from "@/components/WeddingRunSheetProjectionStatus";
+import { weddingRunSheetEffectiveRows } from "@/lib/weddingRunSheetProjectorState";
+import { DatabaseProfileToolbar } from "@/components/DatabaseProfileToolbar";
+import {
+  WeddingRunSheetItemDialog,
+  WeddingRunSheetMobileCards,
+  WeddingRunSheetTimeChangeDialog,
+} from "@/components/WeddingRunSheetProfileToolbar";
+import { databaseProfileColumns, databaseProfilePlugin } from "@/lib/databaseProfilePluginState";
+import {
+  buildWeddingRunSheetTimeChangeReview,
+  filterWeddingRunSheetRows,
+  projectWeddingRunSheetRows,
+  weddingRunSheetDefaultFilters,
+  weddingRunSheetManualRecord,
+  weddingRunSheetOverridePatch,
+  weddingRunSheetShiftReview,
+  type WeddingRunSheetTimeChangeReview,
+} from "@/lib/weddingRunSheetEditingState";
+import { weddingTaskDateToAfpSendInput } from "@/lib/weddingTaskDateProjectionState";
+import { DatabaseGhostGrid } from "@/components/DatabaseGrid";
+import { WeddingRunSheetSavedViews } from "@/components/WeddingRunSheetSavedViews";
+import { WeddingRunSheetIntelligencePanel } from "@/components/WeddingRunSheetContextCards";
+import {
+  buildWeddingRunSheetIntelligence,
+  weddingRunSheetApprovedBufferPatch,
+  type WeddingRunSheetBufferSuggestion,
+} from "@/lib/weddingRunSheetIntelligenceState";
+import { applyQueueFontSize } from "@/lib/queueDensityLocalState";
+import {
+  projectWeddingPlanningDatabaseRecords,
+  weddingPlanningDatabaseTableColumns,
+  weddingPlanningDatabaseTableLabel,
+} from "@/lib/weddingPlanningDatabaseProjectionState";
+import { DatabaseExportShareControls } from "@/components/DatabaseExportShareControls";
+
+type DensityBucket = "compact" | "comfortable" | "spacious";
+
+function densityBucket(mode: DatabaseDensityMode): DensityBucket {
+  const level = Number(mode);
+  if (level <= 4) return "compact";
+  if (level >= 9) return "spacious";
+  return "comfortable";
+}
+
+export function DatabaseView(props: { bootstrap: DashboardBootstrap | null }) {
+  const DEFAULT_HEADERS = ["Name", "Status", "Date", "Value", "Notes"];
+  const [showAdd, setShowAdd] = createSignal(false);
+  const [activeTable, setActiveTable] = createSignal<string | null>(null);
+  const [refreshKey, setRefreshKey] = createSignal(0);
+  const [fullscreen, setFullscreen] = createSignal(false);
+  const [ghostHeaders, setGhostHeaders] = createSignal([...DEFAULT_HEADERS]);
+  const [tableName, setTableName] = createSignal("");
+  const [selectedDatabaseId, setSelectedDatabaseId] = createSignal<string | null>(null);
+  const [databaseName, setDatabaseName] = createSignal("");
+  const [showDatabaseCreate, setShowDatabaseCreate] = createSignal(false);
+  const [databaseCreateBusy, setDatabaseCreateBusy] = createSignal(false);
+  const [databaseCreateError, setDatabaseCreateError] = createSignal("");
+  const [showLifecycleConfirm, setShowLifecycleConfirm] = createSignal(false);
+  const [lifecycleBusy, setLifecycleBusy] = createSignal(false);
+  const [editingCell, setEditingCell] = createSignal<{ rowId: string; col: string } | null>(null);
+  const [editingValue, setEditingValue] = createSignal("");
+  const [savingCell, setSavingCell] = createSignal<{ rowId: string; col: string } | null>(null);
+  const [editError, setEditError] = createSignal<DatabaseViewFailureReceipt | null>(null);
+  const [densityMode, setDensityMode] = createSignal<DatabaseDensityMode>("7");
+  const [showImport, setShowImport] = createSignal(false);
+  const [tableScrollTop, setTableScrollTop] = createSignal(0);
+  const [selectedRowIds, setSelectedRowIds] = createSignal<string[]>([]);
+  const [localMessages, setLocalMessages] = createSignal<DatabaseMessage[]>([]);
+  const [runSheetFilters, setRunSheetFilters] = createSignal(weddingRunSheetDefaultFilters());
+  const [showRunSheetAdd, setShowRunSheetAdd] = createSignal(false);
+  const [runSheetAddPreset, setRunSheetAddPreset] = createSignal<"item" | "milestone">("item");
+  const [runSheetActionBusy, setRunSheetActionBusy] = createSignal(false);
+  const [runSheetActionError, setRunSheetActionError] = createSignal("");
+  const [runSheetOffline, setRunSheetOffline] = createSignal(false);
+  const [pendingRunSheetTimeChange, setPendingRunSheetTimeChange] = createSignal<{
+    row: DbRecord;
+    review: WeddingRunSheetTimeChangeReview;
+  } | null>(null);
+  let tableScrollRef: HTMLDivElement | undefined;
+  let runSheetRecordsAnchorRef: HTMLDivElement | undefined;
+  let databaseRootRef: HTMLDivElement | undefined;
+  let lastSelectedDatabaseId: string | null = null;
+
+  const allMessages = createMemo(() => [
+    ...dashboardBootstrapMessages(props.bootstrap),
+    ...localMessages(),
+  ]);
+
+  const headPad = createMemo(() => ({
+    compact: "px-2 py-1",
+    comfortable: "px-3 py-2.5",
+    spacious: "px-4 py-4",
+  }[densityBucket(densityMode())]));
+
+  const cellPad = createMemo(() => ({
+    compact: "px-2 py-0.5",
+    comfortable: "px-3 py-1.5",
+    spacious: "px-4 py-3",
+  }[densityBucket(densityMode())]))
+  const rowHeightPx = createMemo(() => ({
+    compact: 28,
+    comfortable: 40,
+    spacious: 56,
+  }[densityBucket(densityMode())]));
+  const records = createMemo(() => {
+    void refreshKey();
+    const messages = allMessages()
+      .filter((m) =>
+        m.type.includes("database") ||
+        m.type === "database_record" ||
+        m.type === "note:ledger_update" ||
+        (isRecord(m.content) &&
+          (m.content.kind === "database_record" ||
+            m.content.kind === "database_record_update")),
+      );
+
+    return [
+      ...projectWeddingPlanningDatabaseRecords(props.bootstrap?.messages ?? []),
+      ...databaseRecordsFromMessages(messages),
+    ];
+  });
+
+  const definitions = createMemo(() => projectDatabaseDefinitions({
+    messages: allMessages(),
+    accountId: props.bootstrap?.user.id ?? "",
+    hasLegacyRecords: records().some((record) => record.databaseId === "database:legacy"),
+  }));
+  const profiles = createMemo(() => registeredDatabaseProfiles(allMessages()));
+  const addableProfiles = createMemo(() => profiles().filter((profile) => !existingDatabaseDefinitionForProfile(
+    definitions(), profile.profileId, profile.weddingPlanId,
+  )));
+  const selectedDefinition = createMemo(() =>
+    definitions().find((definition) => definition.databaseId === selectedDatabaseId()) ?? null,
+  );
+  const selectedProfilePlugin = createMemo(() => databaseProfilePlugin(selectedDefinition()?.profileId));
+
+  createEffect(() => {
+    const next = reconcileSelectedDatabaseId(definitions(), selectedDatabaseId());
+    if (next !== selectedDatabaseId()) setSelectedDatabaseId(next);
+  });
+
+  createEffect(() => {
+    const definition = selectedDefinition();
+    setDatabaseName(definition?.name ?? "");
+    if (definition && definition.databaseId !== lastSelectedDatabaseId) {
+      lastSelectedDatabaseId = definition.databaseId;
+      setTableName(definition.defaultTable);
+      setActiveTable(definition.profileId === "wedding_plan_projection.v1" || weddingProjectionTableForProfile(definition.profileId)
+        ? definition.defaultTable
+        : null);
+      setSelectedRowIds([]);
+    }
+  });
+
+  function recordsForSelectedDatabase(): DbRecord[] {
+    const definition = selectedDefinition();
+    const sourceTable = weddingProjectionTableForProfile(definition?.profileId);
+    return sourceTable && definition?.weddingPlanId
+      ? records()
+        .filter((row) => row.databaseId === `database:wedding-plan:${definition.weddingPlanId}` && row.table === sourceTable)
+        .map((row) => ({ ...row, databaseId: definition.databaseId }))
+      : databaseRecordsForDatabase(records(), selectedDatabaseId());
+  }
+
+  const tables = createMemo(() => {
+    const seen = new Set<string>();
+    return recordsForSelectedDatabase()
+      .map((record) => record.table)
+      .filter((table) => { if (seen.has(table)) return false; seen.add(table); return true; });
+  });
+
+  const selectedDatabaseRecords = createMemo(() => {
+    const selected = recordsForSelectedDatabase();
+    return selectedProfilePlugin()?.toolbarKind === "wedding_run_sheet"
+      ? weddingRunSheetEffectiveRows(selected)
+      : selected;
+  });
+  const databaseReadOnly = createMemo(() => Boolean(
+    selectedDefinition()?.profileId === "wedding_plan_projection.v1"
+    || weddingProjectionTableForProfile(selectedDefinition()?.profileId) !== null
+    || selectedDefinition()?.archived || (
+    selectedProfilePlugin()?.toolbarKind === "wedding_run_sheet" && runSheetOffline()
+  )));
+  const rawRunSheetRows = createMemo(() => selectedProfilePlugin()?.toolbarKind === "wedding_run_sheet"
+    ? projectWeddingRunSheetRows(selectedDatabaseRecords())
+    : []);
+  const runSheetRows = createMemo(() => {
+    const rows = rawRunSheetRows();
+    const findings = buildWeddingRunSheetIntelligence({ rows }).findings;
+    return rows.map((row) => ({ ...row, conflictCodes: Array.from(new Set([...row.conflictCodes, ...findings.filter((item) => item.recordIds.includes(row.record.id)).map((item) => item.kind)])) }));
+  });
+  const visibleRunSheetRows = createMemo(() => filterWeddingRunSheetRows(runSheetRows(), runSheetFilters()));
+  const runSheetPresentationById = createMemo(() => new Map(runSheetRows().map((row) => [row.record.id, row])));
+
+  const visibleRecords = createMemo(() => {
+    const t = activeTable();
+    const selectedRecords = selectedProfilePlugin()?.toolbarKind === "wedding_run_sheet"
+      ? visibleRunSheetRows().map((row) => row.record)
+      : selectedDatabaseRecords();
+    return t ? selectedRecords.filter((record) => record.table === t) : selectedRecords;
+  });
+  const allVisibleSelected = createMemo(() =>
+    visibleRecords().length > 0 && visibleRecords().every((row) => selectedRowIds().includes(row.id)),
+  );
+
+  const columns = createMemo((): ColDef[] => {
+    const weddingColumns = selectedDefinition()?.profileId === "wedding_plan_projection.v1"
+      ? weddingPlanningDatabaseTableColumns(activeTable())
+      : null;
+    if (weddingColumns) return weddingColumns;
+    const discovered = databaseColumnDefs(
+      visibleRecords(),
+      ghostHeaders(),
+      databaseSchemaColumnsFromMessages(
+        allMessages(),
+        activeTable(),
+        selectedDatabaseId(),
+      ),
+      selectedProfilePlugin()?.toolbarKind === "wedding_run_sheet" ? 32 : 8,
+    );
+    return databaseProfileColumns({ profileId: selectedDefinition()?.profileId, discovered }).slice(0, selectedProfilePlugin() ? 12 : 8);
+  });
+
+  const tableRowCount = (table: string) => recordsForSelectedDatabase()
+    .filter((record) => record.table === table && !record.id.endsWith(":summary"))
+    .length;
+
+  // These computations read visibleRecords()/columns(), whose createMemos run
+  // immediately. Keep their declarations below those sources so a saved
+  // Database view can be restored directly without a temporal-dead-zone crash.
+  const shouldVirtualizeRows = createMemo(() => visibleRecords().length > 200);
+  const virtualWindow = createMemo(() => {
+    const total = visibleRecords().length;
+    if (!shouldVirtualizeRows()) {
+      return {
+        start: 0,
+        end: total,
+        topSpacer: 0,
+        bottomSpacer: 0,
+      };
+    }
+    const rowHeight = rowHeightPx();
+    const viewportHeight = tableScrollRef?.clientHeight ?? 640;
+    const overscan = 8;
+    const visibleCount = Math.max(1, Math.ceil(viewportHeight / rowHeight));
+    const start = Math.max(0, Math.floor(tableScrollTop() / rowHeight) - overscan);
+    const end = Math.min(total, start + visibleCount + overscan * 2);
+    return {
+      start,
+      end,
+      topSpacer: start * rowHeight,
+      bottomSpacer: Math.max(0, (total - end) * rowHeight),
+    };
+  });
+  const renderedRecords = createMemo(() => {
+    const rows = visibleRecords();
+    const window = virtualWindow();
+    return shouldVirtualizeRows() ? rows.slice(window.start, window.end) : rows;
+  });
+  const totalColumnCount = createMemo(() => columns().length + 3);
+  const selectedCount = createMemo(() => selectedRowIds().length);
+
+  function recordLocalMessage(message: DatabaseMessage) {
+    setLocalMessages((current) => current.some((item) => item.id === message.id) ? current : [...current, message]);
+    setRefreshKey((value) => value + 1);
+  }
+
+  async function createFirstRecord(table: string, data: Record<string, string>) {
+    const databaseId = selectedDatabaseId();
+    if (!databaseId || databaseReadOnly()) throw new Error("Select an active database first.");
+    const result = await sendDatabaseRecord(table, data, databaseId);
+    recordLocalMessage({
+      id: result.message_id,
+      type: "database_record",
+      timestamp: new Date().toISOString(),
+      content: result.content,
+    });
+    setActiveTable(table);
+  }
+
+  createEffect(() => {
+    const visibleIds = new Set(visibleRecords().map((row) => row.id));
+    setSelectedRowIds((current) => current.filter((id) => visibleIds.has(id)));
+  });
+
+  function formatEditableValue(value: unknown): string {
+    return formatDatabaseEditableValue(value);
+  }
+
+  function parseEditedValue(raw: string, previous: unknown): unknown {
+    return parseDatabaseEditedValue(raw, previous);
+  }
+
+  function beginEditingCell(row: DbRecord, col: string) {
+    if (databaseReadOnly()) return;
+    setEditError(null);
+    setEditingCell({ rowId: row.id, col });
+    setEditingValue(formatEditableValue(row.data[col]));
+  }
+
+  function recordLocalMessages(messages: DatabaseMessage[]) {
+    setLocalMessages((current) => {
+      const merged = new Map(current.map((message) => [message.id, message]));
+      for (const message of messages) merged.set(message.id, message);
+      return Array.from(merged.values());
+    });
+    setRefreshKey((value) => value + 1);
+  }
+
+  function selectDatabase(databaseId: string) {
+    const definition = definitions().find((item) => item.databaseId === databaseId);
+    setSelectedDatabaseId(databaseId);
+    setActiveTable(null);
+    setTableName(definition?.defaultTable ?? "");
+    setSelectedRowIds([]);
+    cancelEditingCell();
+  }
+
+  async function createDatabase(input: DatabaseCreateInput) {
+    if (databaseCreateBusy()) return;
+    const existingProfileDatabase = existingDatabaseDefinitionForProfile(
+      definitions(), input.profileId, input.weddingPlanId,
+    );
+    if (existingProfileDatabase) {
+      selectDatabase(existingProfileDatabase.databaseId);
+      setShowDatabaseCreate(false);
+      if (existingProfileDatabase.archived) setShowLifecycleConfirm(true);
+      return;
+    }
+    const accountId = props.bootstrap?.user.id?.trim();
+    if (!accountId) { setDatabaseCreateError("Sign in again before creating a database."); return; }
+    setDatabaseCreateBusy(true);
+    setDatabaseCreateError("");
+    try {
+      const result = await sendDatabaseDefinition({
+        accountId,
+        name: input.name,
+        defaultTable: input.defaultTable,
+        profileId: input.profileId,
+        weddingPlanId: input.weddingPlanId,
+      });
+      recordLocalMessage({ id: result.message_id, type: "database_definition", timestamp: new Date().toISOString(), content: result.content });
+      setSelectedDatabaseId(result.content.database_id);
+      setActiveTable(null);
+      setTableName(result.content.default_table);
+      setShowDatabaseCreate(false);
+    } catch (error) {
+      setDatabaseCreateError(error instanceof Error ? error.message : "This database could not be created.");
+    } finally {
+      setDatabaseCreateBusy(false);
+    }
+  }
+
+  function createProfileDatabase(profile: RegisteredDatabaseProfile) {
+    void createDatabase({
+      name: profile.defaultName,
+      defaultTable: profile.defaultTable,
+      profileId: profile.profileId,
+      weddingPlanId: profile.weddingPlanId,
+    });
+  }
+
+  async function commitDatabaseName() {
+    const definition = selectedDefinition();
+    const nextName = databaseName().trim();
+    if (!definition || definition.legacy || databaseReadOnly() || !nextName || nextName === definition.name) {
+      setDatabaseName(definition?.name ?? "");
+      return;
+    }
+    const accountId = props.bootstrap?.user.id?.trim();
+    if (!accountId) return;
+    try {
+      const result = await sendDatabaseDefinition({
+        accountId,
+        databaseId: definition.databaseId,
+        name: nextName,
+        defaultTable: definition.defaultTable,
+        profileId: definition.profileId,
+        weddingPlanId: definition.weddingPlanId,
+        revision: definition.revision + 1,
+      });
+      recordLocalMessage({ id: result.message_id, type: "database_definition", timestamp: new Date().toISOString(), content: result.content });
+    } catch (error) {
+      setDatabaseName(definition.name);
+      setEditError(buildDatabaseViewFailureReceipt("Rename database", error instanceof Error ? error.message : "Could not rename this database."));
+    }
+  }
+
+  async function confirmLifecycleChange() {
+    const definition = selectedDefinition();
+    if (!definition || definition.legacy || lifecycleBusy()) return;
+    setLifecycleBusy(true);
+    try {
+      const result = await sendDatabaseArchive({
+        databaseId: definition.databaseId,
+        archived: !definition.archived,
+        revision: definition.archiveRevision + 1,
+      });
+      recordLocalMessage({ id: result.message_id, type: "database_archive", timestamp: new Date().toISOString(), content: result.content });
+      setShowLifecycleConfirm(false);
+    } catch (error) {
+      setEditError(buildDatabaseViewFailureReceipt(definition.archived ? "Restore database" : "Archive database", error instanceof Error ? error.message : "Could not change this database."));
+    } finally {
+      setLifecycleBusy(false);
+    }
+  }
+
+  async function commitEditingCell(row: DbRecord, col: string) {
+    const active = editingCell();
+    if (!active || active.rowId !== row.id || active.col !== col) return;
+    if (savingCell()?.rowId === row.id && savingCell()?.col === col) return;
+    const nextValue = parseEditedValue(editingValue(), row.data[col]);
+    const previousValue = row.data[col];
+    if (JSON.stringify(nextValue) === JSON.stringify(previousValue)) {
+      setEditingCell(null);
+      setEditingValue("");
+      return;
+    }
+    if (selectedProfilePlugin()?.toolbarKind === "wedding_run_sheet" && ["start_at", "end_at", "due_at"].includes(col)) {
+      const review = buildWeddingRunSheetTimeChangeReview({ record: row, field: col as "start_at" | "end_at" | "due_at", nextValue: String(nextValue) });
+      if (!review) {
+        setEditError(buildDatabaseViewFailureReceipt("Change run-sheet time", "Enter a valid date and time."));
+        return;
+      }
+      setEditingCell(null);
+      setEditingValue("");
+      if (review.requiresConfirmation) {
+        setPendingRunSheetTimeChange({ row, review });
+        setRunSheetActionError("");
+        return;
+      }
+      await saveDatabaseRowPatch(row, { [col]: review.nextValue }, "Save run-sheet time");
+      return;
+    }
+    await saveDatabaseRowPatch(row, { [col]: nextValue }, "Save cell");
+  }
+
+  async function saveDatabaseRowPatch(row: DbRecord, patch: Record<string, unknown>, action: string): Promise<boolean> {
+    if (databaseReadOnly() || savingCell()?.rowId === row.id) return false;
+    setSavingCell({ rowId: row.id, col: Object.keys(patch)[0] ?? "record" });
+    setEditError(null);
+    try {
+      const result = await sendDatabaseRecordRevision({
+        databaseId: row.databaseId,
+        table: row.table,
+        targetRecordId: row.id,
+        baseRevision: row.revision,
+        patch,
+      });
+      recordLocalMessage({
+        id: result.message_id,
+        type: "note:ledger_update",
+        timestamp: new Date().toISOString(),
+        content: result.content,
+      });
+      setEditingCell(null);
+      setEditingValue("");
+      const focusColumn = Object.keys(patch).find((key) => ["start_at", "end_at", "due_at"].includes(key)) ?? Object.keys(patch)[0];
+      if (focusColumn) queueMicrotask(() => document.getElementById(databaseCellFocusId(row.id, focusColumn))?.focus());
+      return true;
+    } catch (error) {
+      setEditError(
+        buildDatabaseViewFailureReceipt(
+          action,
+          error instanceof Error ? error.message : "Could not save this cell.",
+        ),
+      );
+      return false;
+    } finally {
+      setSavingCell(null);
+    }
+  }
+
+  function proposeRunSheetTimeChange(row: DbRecord, nextValue: string) {
+    const review = buildWeddingRunSheetTimeChangeReview({ record: row, field: "start_at", nextValue });
+    if (!review) { setEditError(buildDatabaseViewFailureReceipt("Change run-sheet time", "Enter a valid date and time.")); return; }
+    if (review.requiresConfirmation) {
+      setPendingRunSheetTimeChange({ row, review });
+      setRunSheetActionError("");
+      return;
+    }
+    void saveDatabaseRowPatch(row, { start_at: review.nextValue }, "Change run-sheet time");
+  }
+
+  function shiftRunSheetTime(row: DbRecord, minutes: number) {
+    const review = weddingRunSheetShiftReview(row, minutes);
+    if (!review) { setEditError(buildDatabaseViewFailureReceipt("Move run-sheet time", "Set a start time before moving this item.")); return; }
+    if (review.requiresConfirmation) {
+      setPendingRunSheetTimeChange({ row, review });
+      setRunSheetActionError("");
+      return;
+    }
+    void saveDatabaseRowPatch(row, { start_at: review.nextValue }, "Move run-sheet time");
+  }
+
+  async function approveRunSheetBuffer(suggestion: WeddingRunSheetBufferSuggestion): Promise<boolean> {
+    const row = runSheetPresentationById().get(suggestion.targetRecordId)?.record;
+    return !!row && !databaseReadOnly()
+      && saveDatabaseRowPatch(row, weddingRunSheetApprovedBufferPatch(suggestion, new Date().toISOString()), "Add run-sheet buffer");
+  }
+
+  async function confirmRunSheetOverride() {
+    const pending = pendingRunSheetTimeChange();
+    if (!pending || runSheetActionBusy()) return;
+    setRunSheetActionBusy(true); setRunSheetActionError("");
+    try {
+      const saved = await saveDatabaseRowPatch(pending.row, weddingRunSheetOverridePatch(pending.review), "Save run-sheet override");
+      if (saved) setPendingRunSheetTimeChange(null);
+      else setRunSheetActionError("The override could not be saved. Please try again.");
+    } catch (error) {
+      setRunSheetActionError(error instanceof Error ? error.message : "The override could not be saved.");
+    } finally { setRunSheetActionBusy(false); }
+  }
+
+  async function updateAuthoritativeTaskDate() {
+    const pending = pendingRunSheetTimeChange();
+    const definition = selectedDefinition();
+    if (!pending || !definition?.weddingPlanId || runSheetActionBusy()) return;
+    const source = allMessages().find((message) => message.id === pending.review.sourceMessageId);
+    const sourceShape = source as { content?: unknown; metadata?: unknown } | undefined;
+    const content = isRecord(sourceShape?.content) ? sourceShape.content : {};
+    const metadata = isRecord(sourceShape?.metadata) ? sourceShape.metadata : {};
+    const taskId = String(content.task_id ?? metadata.wedding_task_id ?? "").trim();
+    const responseWorkspaceId = String(content.response_workspace_id ?? metadata.response_workspace_id ?? "").trim();
+    const sendInput = weddingTaskDateToAfpSendInput({
+      taskId,
+      title: String(content.title ?? pending.row.data.title ?? "Wedding task"),
+      dueDate: pending.review.nextValue.slice(0, 10),
+      weddingPlanId: definition.weddingPlanId,
+      responseWorkspaceId,
+      sourceMessageId: source?.id,
+    });
+    if (!sendInput) { setRunSheetActionError("The linked task does not expose enough context for a safe source update. Keep a labelled run-sheet override instead."); return; }
+    setRunSheetActionBusy(true); setRunSheetActionError("");
+    try {
+      const result = await sendAfpMessage(sendInput);
+      recordLocalMessage({ id: result.message_id, type: sendInput.type, timestamp: sendInput.timestamp ?? new Date().toISOString(), content: sendInput.content, ...(sendInput.metadata ? { metadata: sendInput.metadata } : {}) } as DatabaseMessage);
+      setPendingRunSheetTimeChange(null);
+    } catch (error) {
+      setRunSheetActionError(error instanceof Error ? error.message : "The linked task could not be updated.");
+    } finally { setRunSheetActionBusy(false); }
+  }
+
+  async function addManualRunSheetItem(input: { title: string; startAt: string | null; location: string; ownerRef: string; participantRefs: string[]; visibility: string[]; itemKind: "item" | "milestone" }) {
+    const databaseId = selectedDatabaseId();
+    if (!databaseId || databaseReadOnly() || runSheetActionBusy()) return;
+    setRunSheetActionBusy(true); setRunSheetActionError("");
+    try {
+      const data = weddingRunSheetManualRecord(input);
+      const result = await sendDatabaseRecord("run_sheet", data, databaseId, "database_wedding_runsheet_manual");
+      recordLocalMessage({ id: result.message_id, type: "database_record", timestamp: new Date().toISOString(), content: result.content });
+      setShowRunSheetAdd(false);
+    } catch (error) {
+      setRunSheetActionError(error instanceof Error ? error.message : "The run-sheet item could not be added.");
+    } finally { setRunSheetActionBusy(false); }
+  }
+
+  function cancelEditingCell() {
+    const active = editingCell();
+    setEditingCell(null);
+    setEditingValue("");
+    setEditError(null);
+    if (active) queueMicrotask(() => document.getElementById(databaseCellFocusId(active.rowId, active.col))?.focus());
+  }
+
+  function toggleRowSelection(rowId: string) {
+    setSelectedRowIds((current) =>
+      current.includes(rowId) ? current.filter((id) => id !== rowId) : [...current, rowId],
+    );
+  }
+
+  function toggleSelectAllVisible(checked: boolean) {
+    if (checked) {
+      setSelectedRowIds(visibleRecords().map((row) => row.id));
+      return;
+    }
+    setSelectedRowIds([]);
+  }
+
+  function exportSelectedRows() {
+    const selected = visibleRecords().filter((row) => selectedRowIds().includes(row.id));
+    if (selected.length === 0) return;
+    const payload = selected.map((row) => ({
+      id: row.id,
+      table: row.table,
+      timestamp: row.timestamp,
+      data: row.data,
+    }));
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `${activeTable() ?? "database"}-selected-${selected.length}.json`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // Prompt for table name if user tries to navigate away without naming the database
+  onMount(() => {
+    function beforeUnload(e: BeforeUnloadEvent) {
+      if (records().length === 0 && tableName().trim() === "") {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    }
+    window.addEventListener("beforeunload", beforeUnload);
+    const syncFullscreenState = () => setFullscreen(document.fullscreenElement === databaseRootRef);
+    document.addEventListener("fullscreenchange", syncFullscreenState);
+    onCleanup(() => {
+      window.removeEventListener("beforeunload", beforeUnload);
+      document.removeEventListener("fullscreenchange", syncFullscreenState);
+    });
+  });
+
+  async function toggleFullscreen() {
+    if (!databaseRootRef) return;
+    try {
+      if (document.fullscreenElement === databaseRootRef) {
+        await document.exitFullscreen();
+        return;
+      }
+      if (databaseRootRef.requestFullscreen) {
+        await databaseRootRef.requestFullscreen();
+        return;
+      }
+    } catch {
+      // Embedded browsers can block the native API. Keep a layout fallback so
+      // the database remains visible and usable instead of becoming blank.
+    }
+    setFullscreen((value) => !value);
+  }
+
+  const containerClass = () => fullscreen()
+    ? "fixed inset-0 z-[150] space-y-5 overflow-auto bg-white/98 p-3 backdrop-blur-xl animate-fade-in sm:p-6 lg:p-8"
+    : "animate-fade-in space-y-5";
+
+  return (
+    <div ref={databaseRootRef} class={containerClass()} data-database-fullscreen={fullscreen() ? "true" : "false"}>
+      <DatabaseHeader
+        definitions={definitions()}
+        addProfiles={addableProfiles()}
+        selectedDatabaseId={selectedDatabaseId()}
+        name={databaseName()}
+        densityMode={densityMode()}
+        fullscreen={fullscreen()}
+        readOnly={databaseReadOnly()}
+        readOnlyReason={selectedDefinition()?.profileId === "wedding_plan_projection.v1" || weddingProjectionTableForProfile(selectedDefinition()?.profileId)
+          ? "Budget, Timeline, Guest list, Seating and Run sheet are live views of the same Wedding ledger. Update them in their planning views; no second copy is stored here."
+          : runSheetOffline() ? "This offline copy is read-only until OmnyID reconnects." : undefined}
+        onSelect={selectDatabase}
+        onAddProfile={createProfileDatabase}
+        onNameInput={setDatabaseName}
+        onNameCommit={() => void commitDatabaseName()}
+        onDensityChange={(mode) => { setDensityMode(mode); applyQueueFontSize(mode); }}
+        onToggleFullscreen={() => void toggleFullscreen()}
+        onNewDatabase={() => { setDatabaseCreateError(""); setShowDatabaseCreate(true); }}
+        onNewRecord={() => {
+          if (selectedProfilePlugin()?.toolbarKind === "wedding_run_sheet") {
+            setRunSheetAddPreset("item");
+            setShowRunSheetAdd(true);
+          } else setShowAdd(true);
+        }}
+        onNewTable={() => { setActiveTable(null); setTableName(""); setGhostHeaders([...DEFAULT_HEADERS]); }}
+        onNewField={() => {
+          const label = prompt("Field name:")?.trim();
+          const table = activeTable() ?? tableName().trim() ?? tables()[0];
+          const databaseId = selectedDatabaseId();
+          if (!label || !databaseId) return;
+          if (!table) { setGhostHeaders((headers) => [...headers, label]); return; }
+          const key = label.toLocaleLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") || `field_${Date.now()}`;
+          void sendDatabaseSchema(table, { key, label }, databaseId)
+            .then((result) => recordLocalMessage({ id: result.message_id, type: "database_schema_update", timestamp: new Date().toISOString(), content: result.content }))
+            .catch((error) => setEditError(buildDatabaseViewFailureReceipt("Add field", error instanceof Error ? error.message : "Could not add this field.")));
+        }}
+        onImport={() => setShowImport(true)}
+        onArchiveToggle={() => setShowLifecycleConfirm(true)}
+      />
+
+      <Show when={selectedDefinition()?.profileId === "wedding_plan_projection.v1"}>
+        <section class="rounded-xl border border-primary/15 bg-primary/5 p-4" aria-label="Wedding planning database projection">
+          <p class="font-semibold text-on-surface">Wedding plan, projected once</p>
+          <p class="mt-1 text-sm leading-6 text-on-surface-variant">These tables read the account-scoped Wedding ledger directly. Budget decisions, timeline tasks, seating changes and known day-of timings appear here without manual reconciliation or duplicate records.</p>
+        </section>
+      </Show>
+
+      <Show when={selectedDefinition()?.profileId === "wedding_runsheet.v1"
+        && selectedDefinition()?.weddingPlanId
+        && selectedDefinition()?.responseWorkspaceId}>
+        {(weddingPlanId) => (
+          <WeddingRunSheetProjectionStatus
+            databaseId={selectedDefinition()!.databaseId}
+            weddingPlanId={weddingPlanId()!}
+            responseWorkspaceId={selectedDefinition()!.responseWorkspaceId!}
+            accountId={props.bootstrap?.user.id ?? ""}
+            messages={allMessages()}
+            archived={selectedDefinition()!.archived}
+            onMessages={(messages) => recordLocalMessages(messages as DatabaseMessage[])}
+            onOfflineChange={setRunSheetOffline}
+          />
+        )}
+      </Show>
+
+      <DatabaseProfileToolbar
+        profileId={selectedDefinition()?.profileId ?? null}
+        runSheetRows={runSheetRows()}
+        visibleRunSheetRows={visibleRunSheetRows()}
+        runSheetFilters={runSheetFilters()}
+        archived={databaseReadOnly()}
+        onRunSheetFilters={setRunSheetFilters}
+        onAddRunSheetItem={() => { setRunSheetActionError(""); setRunSheetAddPreset("item"); setShowRunSheetAdd(true); }}
+      />
+
+      <Show when={Boolean(selectedDefinition() && selectedDatabaseId())}>
+        <DatabaseExportShareControls
+          databaseId={selectedDatabaseId()!}
+          name={selectedDefinition()?.name ?? "Database"}
+          tableLabel={activeTable()}
+          columns={columns().map((column) => column.key)}
+          rows={visibleRecords()}
+          senderAgentId={props.bootstrap?.agents[0]?.agent_id ?? null}
+        />
+      </Show>
+
+      <Show when={selectedProfilePlugin()?.toolbarKind === "wedding_run_sheet"}>
+        <WeddingRunSheetIntelligencePanel
+          rows={runSheetRows()}
+          archived={databaseReadOnly()}
+          onFocusRecords={(recordIds) => {
+            setActiveTable("run_sheet");
+            setRunSheetFilters(weddingRunSheetDefaultFilters());
+            setSelectedRowIds(recordIds);
+            window.requestAnimationFrame(() => {
+              runSheetRecordsAnchorRef?.scrollIntoView({ behavior: "smooth", block: "start" });
+              runSheetRecordsAnchorRef?.focus({ preventScroll: true });
+              const firstColumn = columns()[0]?.key;
+              if (recordIds[0] && firstColumn) document.getElementById(databaseCellFocusId(recordIds[0], firstColumn))?.focus({ preventScroll: true });
+            });
+          }}
+          onShowAttention={() => {
+            setActiveTable("run_sheet");
+            setRunSheetFilters({ day: "all", status: "all", conflictsOnly: true });
+            setSelectedRowIds([]);
+            window.requestAnimationFrame(() => runSheetRecordsAnchorRef?.scrollIntoView({ behavior: "smooth", block: "start" }));
+          }}
+          onShowAll={() => {
+            setRunSheetFilters(weddingRunSheetDefaultFilters());
+            setSelectedRowIds([]);
+            window.requestAnimationFrame(() => runSheetRecordsAnchorRef?.scrollIntoView({ behavior: "smooth", block: "start" }));
+          }}
+          onAddItem={(preset) => { setRunSheetActionError(""); setRunSheetAddPreset(preset); setShowRunSheetAdd(true); }}
+          onApproveBuffer={approveRunSheetBuffer}
+        />
+      </Show>
+
+      <Show when={selectedProfilePlugin()?.toolbarKind === "wedding_run_sheet" && selectedDatabaseId()}>{(databaseId) =>
+        <WeddingRunSheetSavedViews
+          databaseId={databaseId()}
+          weddingPlanId={selectedDefinition()?.weddingPlanId ?? ""}
+          rows={runSheetRows()}
+          archived={databaseReadOnly()}
+          onMessage={(message) => recordLocalMessage(message as DatabaseMessage)}
+          onFocusRecord={(recordId) => {
+            setActiveTable("run_sheet");
+            setRunSheetFilters(weddingRunSheetDefaultFilters());
+            setSelectedRowIds([recordId]);
+            window.requestAnimationFrame(() => {
+              runSheetRecordsAnchorRef?.scrollIntoView({ behavior: "smooth", block: "start" });
+              runSheetRecordsAnchorRef?.focus({ preventScroll: true });
+              const firstColumn = columns()[0]?.key;
+              if (firstColumn) document.getElementById(databaseCellFocusId(recordId, firstColumn))?.focus({ preventScroll: true });
+            });
+          }}
+        />
+      }</Show>
+
+      {/* Table filter pills */}
+      <div class="flex flex-wrap items-center gap-2">
+          <span class="text-xs font-medium text-on-surface-variant">Tables</span>
+          <button type="button" onClick={() => setActiveTable(null)}
+            class={`rounded-full px-3 py-1 text-xs font-medium transition border ${!activeTable() ? "bg-primary text-white border-primary" : "border-outline/20 bg-white/40 text-on-surface-variant hover:bg-white/60"}`}>
+            All
+          </button>
+          <For each={tables()}>
+            {(t) => (
+              <button type="button" onClick={() => setActiveTable(activeTable() === t ? null : t)}
+                class={`rounded-full px-3 py-1 text-xs font-medium transition border ${activeTable() === t ? "bg-primary text-white border-primary" : "border-outline/20 bg-white/40 text-on-surface-variant hover:bg-white/60"}`}>
+                {selectedDefinition()?.profileId === "wedding_plan_projection.v1"
+                  ? `${weddingPlanningDatabaseTableLabel(t)} · ${tableRowCount(t)}`
+                  : t}
+              </button>
+            )}
+          </For>
+          <button type="button" disabled={databaseReadOnly()} onClick={() => { setActiveTable(null); setTableName(""); setGhostHeaders([...DEFAULT_HEADERS]); }} class="rounded-full border border-dashed border-primary/35 bg-primary/5 px-3 py-1 text-xs font-medium text-primary transition hover:bg-primary/10 disabled:opacity-45">
+            + New table
+          </button>
+      </div>
+
+      {/* Grid */}
+      <Show when={selectedProfilePlugin()?.toolbarKind === "wedding_run_sheet"}>
+        <div
+          ref={runSheetRecordsAnchorRef}
+          tabIndex={-1}
+          aria-label="Run-sheet items"
+          class="scroll-mt-24 outline-none"
+        />
+      </Show>
+      <Show when={selectedProfilePlugin()?.toolbarKind === "wedding_run_sheet" && visibleRecords().length > 0}>
+        <WeddingRunSheetMobileCards
+          rows={visibleRunSheetRows()}
+          selectedRecordIds={selectedRowIds()}
+          archived={databaseReadOnly()}
+          onTimeChange={proposeRunSheetTimeChange}
+          onShift={shiftRunSheetTime}
+        />
+      </Show>
+      <Show
+        when={visibleRecords().length > 0}
+        fallback={
+          <Show when={selectedProfilePlugin()?.toolbarKind !== "wedding_run_sheet"} fallback={
+            <div class="rounded-xl border border-dashed border-wedding-border bg-wedding-card p-6 text-center">
+              <p class="font-semibold text-wedding-text">No run-sheet items match these filters.</p>
+              <p class="mt-1 text-sm text-wedding-muted">Clear a filter or add a manual item. Automatic items appear when the wedding plan has timing evidence.</p>
+            </div>
+          }>
+            <DatabaseGhostGrid
+              readonly={databaseReadOnly()}
+              headers={ghostHeaders()}
+              tableName={tableName()}
+              onHeaderEdit={(i, val) => setGhostHeaders((prev) => prev.map((h, idx) => idx === i ? (val || h) : h))}
+              onTableNameEdit={(val) => setTableName(val)}
+              onCreate={createFirstRecord}
+            />
+          </Show>
+        }
+      >
+        <Show when={editError()}>
+          <div
+            class={`rounded-xl px-4 py-2 text-xs ${
+              editError()?.tone === "danger"
+                ? "border border-red-200/60 bg-red-50/80 text-red-700"
+                : "border border-amber-200/60 bg-amber-50/80 text-amber-900"
+            }`}
+          >
+            <p class="font-medium">{editError()?.title}</p>
+            <p class="mt-0.5">{editError()?.summary}</p>
+            <p class="mt-0.5 opacity-80">{editError()?.nextStep}</p>
+          </div>
+        </Show>
+        <Show when={selectedCount() > 0}>
+          <div class="mb-3 flex items-center justify-between gap-3 rounded-2xl border border-primary/15 bg-primary/6 px-4 py-3">
+            <div>
+              <p class="text-sm font-medium text-on-surface">
+                {selectedCount()} row{selectedCount() === 1 ? "" : "s"} selected
+              </p>
+              <p class="text-xs text-on-surface-variant">
+                Export the current selection or clear it.
+              </p>
+            </div>
+            <div class="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={exportSelectedRows}
+                class="rounded-full border border-primary/20 bg-white/70 px-3 py-1.5 text-xs font-medium text-primary transition hover:bg-white"
+              >
+                Export selected
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedRowIds([])}
+                class="rounded-full border border-outline/20 bg-white/50 px-3 py-1.5 text-xs font-medium text-on-surface-variant transition hover:bg-white/70"
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+        </Show>
+        <div
+          ref={tableScrollRef}
+          tabIndex={-1}
+          class={`overflow-auto rounded-2xl border border-white/50 bg-white/40 shadow-card ${
+            shouldVirtualizeRows() ? "max-h-[70vh]" : ""
+          } ${selectedProfilePlugin()?.toolbarKind === "wedding_run_sheet" ? "hidden md:block" : ""}`}
+          onScroll={(event) => setTableScrollTop(event.currentTarget.scrollTop)}
+        >
+          <table class="w-full text-xs">
+            <thead>
+              <tr class="border-b border-white/40 bg-white/60">
+                <th class={`${headPad()} w-10 text-center`}>
+                  <Show when={selectedCount() > 0}>
+                    <input
+                      type="checkbox"
+                      checked={allVisibleSelected()}
+                      onChange={(event) => toggleSelectAllVisible(event.currentTarget.checked)}
+                      class="h-3.5 w-3.5 cursor-pointer rounded border-white/30 bg-white/70 text-primary focus:ring-primary/30"
+                      aria-label="Select all visible rows"
+                    />
+                  </Show>
+                </th>
+                <th class={`${headPad()} text-left font-mono text-[9px] uppercase tracking-wider text-outline/60`}>Table</th>
+                <th class={`${headPad()} text-left font-mono text-[9px] uppercase tracking-wider text-outline/60`}>Date</th>
+                <For each={columns()}>
+                  {(col) => (
+                    <th class={`${headPad()} text-left`}>
+                      <input
+                        value={col.label}
+                        disabled={databaseReadOnly()}
+                        onBlur={(e) => { void e; }}
+                        class="w-full bg-transparent font-mono text-[9px] uppercase tracking-wider text-outline/60 outline-none focus:text-primary focus:border-b focus:border-primary/40 transition capitalize cursor-pointer"
+                        title="Click to rename column"
+                      />
+                    </th>
+                  )}
+                </For>
+              </tr>
+            </thead>
+            <tbody>
+              <Show when={shouldVirtualizeRows() && virtualWindow().topSpacer > 0}>
+                <tr aria-hidden="true">
+                  <td colSpan={totalColumnCount()} style={{ height: `${virtualWindow().topSpacer}px`, padding: "0", border: "0" }} />
+                </tr>
+              </Show>
+              <For each={renderedRecords()}>
+                {(row, idx) => {
+                  const runSheetRow = () => runSheetPresentationById().get(row.id);
+                  const statusRail = () => runSheetRow()?.conflictCodes.length
+                    ? "border-l-4 border-l-amber-500"
+                    : runSheetRow()?.status === "confirmed"
+                      ? "border-l-4 border-l-emerald-500"
+                      : runSheetRow()?.status === "proposed"
+                        ? "border-l-4 border-l-sky-500"
+                        : runSheetRow()
+                          ? "border-l-4 border-l-slate-400"
+                          : "";
+                  return (
+                  <tr class={`group border-b border-white/25 last:border-0 transition hover:bg-white/30 ${statusRail()} ${(virtualWindow().start + idx()) % 2 === 1 ? "bg-white/15" : ""} ${selectedRowIds().includes(row.id) ? "bg-primary/8" : ""}`}>
+                    <td class={`${cellPad()} w-10 text-center`}>
+                      <input
+                        type="checkbox"
+                        checked={selectedRowIds().includes(row.id)}
+                        onChange={() => toggleRowSelection(row.id)}
+                        class={`h-3.5 w-3.5 cursor-pointer rounded border-white/30 bg-white/70 text-primary focus:ring-primary/30 transition ${
+                          selectedRowIds().includes(row.id) ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus:opacity-100"
+                        }`}
+                        aria-label={`Select row from ${row.table}`}
+                      />
+                    </td>
+                    <td class={`${cellPad()}`}>
+                      <span class="rounded-full border border-primary/20 bg-primary/8 px-2 py-0.5 font-mono text-[9px] text-primary">{row.table}</span>
+                    </td>
+                    <td class={`${cellPad()} text-on-surface-variant/60 whitespace-nowrap`}>
+                      {row.timestamp ? surfaceShortDateLabel(row.timestamp) || "—" : "—"}
+                    </td>
+                    <For each={columns()}>
+                      {(col) => {
+                        const val = row.data[col.key];
+                        const fullValue = formatEditableValue(val);
+                        const str = fullValue ? fullValue.slice(0, 80) : "";
+                        const isEditing = () => editingCell()?.rowId === row.id && editingCell()?.col === col.key;
+                        const isSaving = () => savingCell()?.rowId === row.id && savingCell()?.col === col.key;
+                        const useTextarea = fullValue.includes("\n") || fullValue.length > 48;
+                        return (
+                          <td class={`${cellPad()} text-on-surface max-w-[12rem]`} title={str}>
+                            <Show when={isEditing()}
+                              fallback={
+                                <button id={databaseCellFocusId(row.id, col.key)} type="button" disabled={databaseReadOnly()} class="w-full cursor-pointer text-left hover:text-primary transition disabled:cursor-default" onClick={() => beginEditingCell(row, col.key)} aria-label={`Edit ${col.label} for ${String(row.data.title || row.id)}`}>
+                                  <span class="block truncate">{str || <span class="text-outline/30 italic text-[10px]">—</span>}</span>
+                                  <Show when={col.key === "title" && runSheetRow()}>{(item) => <span class="mt-1 block text-[9px] font-medium text-on-surface-variant/65">
+                                    {item().overrideState === "runsheet_only" ? "Run-sheet override · source unchanged" : item().sourceLinked ? "Linked to wedding plan" : "Manual item"}
+                                  </span>}</Show>
+                                </button>
+                              }
+                            >
+                              <Show
+                                when={useTextarea}
+                                fallback={
+                                  <input
+                                    autofocus
+                                    value={editingValue()}
+                                    disabled={isSaving()}
+                                    class="w-full rounded bg-primary/5 border border-primary/30 px-1 py-0.5 text-xs outline-none focus:border-primary/60 disabled:opacity-70"
+                                    onInput={(e) => setEditingValue(e.currentTarget.value)}
+                                    onBlur={() => void commitEditingCell(row, col.key)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") {
+                                        e.preventDefault();
+                                        recordShortcutUse("form_submit");
+                                        void commitEditingCell(row, col.key);
+                                      } else if (e.key === "Escape") {
+                                        e.preventDefault();
+                                        recordShortcutUse("form_cancel");
+                                        cancelEditingCell();
+                                      }
+                                    }}
+                                  />
+                                }
+                              >
+                                <TiptapEditor
+                                  mode="compact"
+                                  appearance="minimal"
+                                  showToolbar={false}
+                                  showFooter={false}
+                                  enableSlashCommands={false}
+                                  submitShortcut="none"
+                                  disabled={isSaving()}
+                                  initialContent={editingValue()}
+                                  placeholder="Edit cell value..."
+                                  class="w-full"
+                                  contentClass="min-h-[4.5rem] rounded border border-primary/30 bg-primary/5 px-1 py-0.5 text-xs text-on-surface"
+                                  onReady={(handle) => queueMicrotask(() => handle.focus())}
+                                  onChange={(text) => setEditingValue(text)}
+                                  onBlur={() => void commitEditingCell(row, col.key)}
+                                  onKeyDown={(event) => {
+                                    if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+                                      event.preventDefault();
+                                      recordShortcutUse("form_submit");
+                                      void commitEditingCell(row, col.key);
+                                      return true;
+                                    }
+                                    if (event.key === "Escape") {
+                                      event.preventDefault();
+                                      recordShortcutUse("form_cancel");
+                                      cancelEditingCell();
+                                      return true;
+                                    }
+                                    return false;
+                                  }}
+                                  onSend={async () => {}}
+                                  clearOnSend={false}
+                                />
+                              </Show>
+                            </Show>
+                          </td>
+                        );
+                      }}
+                    </For>
+                  </tr>
+                );}}
+              </For>
+              <Show when={shouldVirtualizeRows() && virtualWindow().bottomSpacer > 0}>
+                <tr aria-hidden="true">
+                  <td colSpan={totalColumnCount()} style={{ height: `${virtualWindow().bottomSpacer}px`, padding: "0", border: "0" }} />
+                </tr>
+              </Show>
+            </tbody>
+          </table>
+          <Show when={shouldVirtualizeRows()}>
+            <p class="px-4 py-2 text-[11px] text-on-surface-variant/50">
+              Virtualized {visibleRecords().length} records for smoother scrolling
+            </p>
+          </Show>
+        </div>
+      </Show>
+
+      <Show when={showAdd()}>
+        <DatabaseAddRecordDialog
+          databaseId={selectedDatabaseId() ?? "database:legacy"}
+          tables={tables()}
+          onClose={() => setShowAdd(false)}
+          onCreated={recordLocalMessage}
+        />
+      </Show>
+
+      <Show when={showImport()}>
+        <DatabaseImportDialog
+          databaseId={selectedDatabaseId() ?? "database:legacy"}
+          defaultTable={(activeTable() ?? tableName()) || selectedDefinition()?.defaultTable || "imported"}
+          onClose={() => setShowImport(false)}
+          onCreated={(messages) => messages.forEach(recordLocalMessage)}
+        />
+      </Show>
+
+      <WeddingRunSheetItemDialog
+        open={showRunSheetAdd()}
+        preset={runSheetAddPreset()}
+        busy={runSheetActionBusy()}
+        error={runSheetActionError()}
+        onClose={() => {
+          if (!runSheetActionBusy()) {
+            setShowRunSheetAdd(false);
+            queueMicrotask(() => document.getElementById("wedding-runsheet-add-item")?.focus());
+          }
+        }}
+        onSave={(input) => void addManualRunSheetItem(input)}
+      />
+
+      <WeddingRunSheetTimeChangeDialog
+        review={pendingRunSheetTimeChange()?.review ?? null}
+        busy={runSheetActionBusy()}
+        error={runSheetActionError()}
+        onCancel={() => {
+          const pending = pendingRunSheetTimeChange();
+          if (!runSheetActionBusy()) {
+            setPendingRunSheetTimeChange(null);
+            if (pending) queueMicrotask(() => document.getElementById(databaseCellFocusId(pending.row.id, pending.review.field))?.focus());
+          }
+        }}
+        onOverride={() => void confirmRunSheetOverride()}
+        onAuthoritativeUpdate={() => void updateAuthoritativeTaskDate()}
+      />
+
+      <DatabaseCreateDialog
+        open={showDatabaseCreate()}
+        profiles={addableProfiles()}
+        busy={databaseCreateBusy()}
+        error={databaseCreateError()}
+        onCancel={() => setShowDatabaseCreate(false)}
+        onCreate={(input) => void createDatabase(input)}
+      />
+      <DatabaseLifecycleDialog
+        open={showLifecycleConfirm()}
+        databaseName={selectedDefinition()?.name ?? "this database"}
+        restoring={selectedDefinition()?.archived ?? false}
+        busy={lifecycleBusy()}
+        onCancel={() => setShowLifecycleConfirm(false)}
+        onConfirm={() => void confirmLifecycleChange()}
+      />
+    </div>
+  );
+}

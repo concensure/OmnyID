@@ -1,0 +1,16 @@
+{
+  "authDialogCount": 0,
+  "emailLabelCount": 1,
+  "passwordLabelCount": 0,
+  "emailInputCount": 1,
+  "passwordInputCount": 1,
+  "authDialogAfter": 0,
+  "passwordInputAfter": 0,
+  "finalUrl": "https://omnyid.com/workspace/",
+  "mainCount": 1,
+  "h1Count": 0,
+  "skipLinks": 1,
+  "weddingTextMarkers": 0,
+  "consoleErrorCount": 5,
+  "pageErrorCount": 0
+}

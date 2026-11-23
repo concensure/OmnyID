@@ -1,0 +1,162 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg18
+    mem_limit: ${OMNYID_POSTGRES_MEM_LIMIT:-2g}
+    cpus: ${OMNYID_POSTGRES_CPUS:-1.5}
+    pids_limit: ${OMNYID_POSTGRES_PIDS_LIMIT:-256}
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-afp}
+      POSTGRES_USER: ${POSTGRES_USER:-afp}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-}
+      POSTGRES_PASSWORD_FILE: ${POSTGRES_PASSWORD_FILE:-}
+    volumes:
+      - ./.secrets:/run/secrets:ro
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./postgres/migrations:/docker-entrypoint-initdb.d/migrations
+    restart: unless-stopped
+
+  electric:
+    image: electricsql/electric:latest
+    mem_limit: ${OMNYID_ELECTRIC_MEM_LIMIT:-768m}
+    cpus: ${OMNYID_ELECTRIC_CPUS:-0.75}
+    pids_limit: ${OMNYID_ELECTRIC_PIDS_LIMIT:-128}
+    depends_on:
+      - postgres
+    entrypoint: ["/usr/local/bin/runtime-env-entrypoint.sh"]
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-}
+      DATABASE_URL_FILE: ${DATABASE_URL_FILE:-}
+      ELECTRIC_INSECURE: "true"
+      ELECTRIC_USAGE_REPORTING: "false"
+    ports:
+      - "127.0.0.1:5133:5133"
+    volumes:
+      - ./.secrets:/run/secrets:ro
+      - ./scripts/runtime-env-entrypoint.sh:/usr/local/bin/runtime-env-entrypoint.sh:ro
+    restart: unless-stopped
+
+  seaweedfs:
+    image: quay.io/seaweedfs/seaweedfs:RELEASE.2025-02-28T09-55-16Z
+    mem_limit: ${OMNYID_SEAWEEDFS_MEM_LIMIT:-1536m}
+    cpus: ${OMNYID_SEAWEEDFS_CPUS:-1.0}
+    pids_limit: ${OMNYID_SEAWEEDFS_PIDS_LIMIT:-256}
+    # Windows worktrees may materialize bind-mounted shell scripts with CRLF.
+    entrypoint: ["/bin/sh", "-c", "tr -d '\\r' < /usr/local/bin/seaweedfs-secure-entrypoint.sh > /tmp/seaweedfs-secure-entrypoint.sh && exec /bin/sh /tmp/seaweedfs-secure-entrypoint.sh"]
+    environment:
+      OMNYID_SEAWEEDFS_ACCESS_KEY_FILE: /run/secrets/seaweedfs_app_access_key
+      OMNYID_SEAWEEDFS_SECRET_KEY_FILE: /run/secrets/seaweedfs_app_secret_key
+      OMNYID_SEAWEEDFS_BUCKET: ${OMNYID_SEAWEEDFS_BUCKET:-omnyid-attachments}
+    volumes:
+      - seaweedfs-data:/data
+      - ./.secrets/seaweedfs_app_access_key:/run/secrets/seaweedfs_app_access_key:ro
+      - ./.secrets/seaweedfs_app_secret_key:/run/secrets/seaweedfs_app_secret_key:ro
+      - ./.seaweedfs-admin-secrets/access_key:/run/secrets/seaweedfs_admin_access_key:ro
+      - ./.seaweedfs-admin-secrets/secret_key:/run/secrets/seaweedfs_admin_secret_key:ro
+      - ./scripts/seaweedfs-secure-entrypoint.sh:/usr/local/bin/seaweedfs-secure-entrypoint.sh:ro
+    networks:
+      - storage
+    restart: unless-stopped
+
+  homeserver:
+    build: .
+    mem_limit: ${OMNYID_HOMESERVER_MEM_LIMIT:-4g}
+    cpus: ${OMNYID_HOMESERVER_CPUS:-2.5}
+    pids_limit: ${OMNYID_HOMESERVER_PIDS_LIMIT:-512}
+    depends_on:
+      - postgres
+      - electric
+      - seaweedfs
+    entrypoint: ["/usr/local/bin/runtime-env-entrypoint.sh"]
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-}
+      DATABASE_URL_FILE: ${DATABASE_URL_FILE:-}
+      OMNYID_AGENT_ID: ${OMNYID_AGENT_ID}
+      OMNYID_GATEWAY_AGENT_ID: ${OMNYID_GATEWAY_AGENT_ID}
+      OMNYID_HOMESERVER_URL: ${OMNYID_HOMESERVER_URL}
+      OMNYID_AFP_DELEGATION: ${OMNYID_AFP_DELEGATION}
+      OMNYID_DOMAIN: ${OMNYID_DOMAIN}
+      OMNYID_ADMIN_EMAILS: ${OMNYID_ADMIN_EMAILS:-}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+      OMNYID_PUBLIC_KEY_HEX: ${OMNYID_PUBLIC_KEY_HEX}
+      OMNYID_SIGNING_KEY_HEX: ${OMNYID_SIGNING_KEY_HEX}
+      OMNYID_SIGNING_KEY_HEX_FILE: ${OMNYID_SIGNING_KEY_HEX_FILE:-/run/secrets/omnyid_signing_key_hex}
+      OMNYID_ENCRYPTION_KEY_HEX: ${OMNYID_ENCRYPTION_KEY_HEX}
+      OMNYID_ENCRYPTION_KEY_HEX_FILE: ${OMNYID_ENCRYPTION_KEY_HEX_FILE:-/run/secrets/omnyid_encryption_key_hex}
+      OMNYID_SESSION_SECRET_FILE: ${OMNYID_SESSION_SECRET_FILE:-/run/secrets/omnyid_session_secret}
+      OMNYID_RECIPIENT_KEYS_JSON: ${OMNYID_RECIPIENT_KEYS_JSON:-{}}
+      OMNYID_ALLOW_INSECURE_UNSIGNED: "false"
+      OMNYID_REQUIRE_ENCRYPTION: "true"
+      OMNYID_ALLOW_PLAINTEXT_STORAGE: "false"
+      OMNYID_ENABLE_SERVER_SUMMARIZATION: "false"
+      OMNYID_QUOTATION_RELEASE_GATE: ${OMNYID_QUOTATION_RELEASE_GATE:-disabled}
+      OMNYID_QUOTATION_RELEASE_GATE_VERSION: ${OMNYID_QUOTATION_RELEASE_GATE_VERSION:-quotation.readiness.v1}
+      OMNYID_QUOTATION_RELEASE_EVIDENCE_SHA: ${OMNYID_QUOTATION_RELEASE_EVIDENCE_SHA:-}
+      OMNYID_QUOTATION_EXTRACTION_ENABLED: ${OMNYID_QUOTATION_EXTRACTION_ENABLED:-false}
+      OMNYID_QUOTATION_RECOMMENDATION_ENABLED: ${OMNYID_QUOTATION_RECOMMENDATION_ENABLED:-false}
+      OMNYID_QUOTATION_CLARIFICATION_DRAFT_ENABLED: ${OMNYID_QUOTATION_CLARIFICATION_DRAFT_ENABLED:-false}
+      OMNYID_QUOTATION_CLARIFICATION_SEND_ENABLED: ${OMNYID_QUOTATION_CLARIFICATION_SEND_ENABLED:-false}
+      OMNYID_QUOTATION_CLOSURE_ENABLED: ${OMNYID_QUOTATION_CLOSURE_ENABLED:-false}
+      OMNYID_QUOTATION_VENDOR_GRANTS_ENABLED: ${OMNYID_QUOTATION_VENDOR_GRANTS_ENABLED:-false}
+      OMNYID_PLANNING_CONSTRAINT_LEDGER_ENABLED: ${OMNYID_PLANNING_CONSTRAINT_LEDGER_ENABLED:-false}
+      OMNYID_PLANNING_CONSTRAINT_CAPTURE_ENABLED: ${OMNYID_PLANNING_CONSTRAINT_CAPTURE_ENABLED:-false}
+      OMNYID_PLANNING_EVALUATION_ENABLED: ${OMNYID_PLANNING_EVALUATION_ENABLED:-false}
+      OMNYID_PLANNING_COST_TRADEOFFS_ENABLED: ${OMNYID_PLANNING_COST_TRADEOFFS_ENABLED:-false}
+      OMNYID_PLANNING_CRITICAL_PATH_ENABLED: ${OMNYID_PLANNING_CRITICAL_PATH_ENABLED:-false}
+      OMNYID_PLANNING_VENDOR_CHANGES_ENABLED: ${OMNYID_PLANNING_VENDOR_CHANGES_ENABLED:-false}
+      OMNYID_PLANNING_INTERVENTIONS_ENABLED: ${OMNYID_PLANNING_INTERVENTIONS_ENABLED:-false}
+      OMNYID_ENCRYPT_BY_DEFAULT: "true"
+      OMNYID_ENABLE_INTERNAL_GRPC: "false"
+      OMNYID_INTERNAL_GRPC_ADDR: 127.0.0.1:50051
+      OMNYID_MAIL_PROVIDER: ${OMNYID_MAIL_PROVIDER:-gmail}
+      OMNYID_IMAP_POLL_SECONDS: ${OMNYID_IMAP_POLL_SECONDS:-30}
+      OMNYID_EMAIL_ADDRESS: ${OMNYID_EMAIL_ADDRESS}
+      OMNYID_GMAIL_CLIENT_ID: ${OMNYID_GMAIL_CLIENT_ID:-}
+      OMNYID_GOOGLE_CLIENT_ID: ${OMNYID_GOOGLE_CLIENT_ID:-}
+      OMNYID_GMAIL_CLIENT_SECRET: ${OMNYID_GMAIL_CLIENT_SECRET:-}
+      OMNYID_GMAIL_CLIENT_SECRET_FILE: ${OMNYID_GMAIL_CLIENT_SECRET_FILE:-/run/secrets/omnyid_gmail_client_secret}
+      OMNYID_GMAIL_REFRESH_TOKEN: ${OMNYID_GMAIL_REFRESH_TOKEN:-}
+      OMNYID_GMAIL_REFRESH_TOKEN_FILE: ${OMNYID_GMAIL_REFRESH_TOKEN_FILE:-/run/secrets/omnyid_gmail_refresh_token}
+      OMNYID_GMAIL_USER_ID: ${OMNYID_GMAIL_USER_ID:-me}
+      OMNYID_IMAP_HOST: ${OMNYID_IMAP_HOST:-}
+      OMNYID_IMAP_PORT: ${OMNYID_IMAP_PORT:-993}
+      OMNYID_IMAP_USERNAME: ${OMNYID_IMAP_USERNAME:-}
+      OMNYID_IMAP_PASSWORD: ${OMNYID_IMAP_PASSWORD:-}
+      OMNYID_IMAP_PASSWORD_FILE: ${OMNYID_IMAP_PASSWORD_FILE:-/run/secrets/omnyid_imap_password}
+      FROM_ADDRESS: ${FROM_ADDRESS}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_PASS_FILE: ${SMTP_PASS_FILE:-/run/secrets/omnyid_smtp_pass}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      OMNYID_ANTHROPIC_KEY_FILE: ${OMNYID_ANTHROPIC_KEY_FILE:-/run/secrets/omnyid_anthropic_api_key}
+      OMNYID_RUNPOD_API_KEY_FILE: ${OMNYID_RUNPOD_API_KEY_FILE:-/run/secrets/omnyid_runpod_api_key}
+      OMNYID_OPENAI_API_KEY_FILE: ${OMNYID_OPENAI_API_KEY_FILE:-/run/secrets/omnyid_openai_api_key}
+      OMNYID_SEAWEEDFS_S3_ENDPOINT: http://seaweedfs:8333
+      OMNYID_SEAWEEDFS_ACCESS_KEY_FILE: /run/secrets/seaweedfs_app_access_key
+      OMNYID_SEAWEEDFS_SECRET_KEY_FILE: /run/secrets/seaweedfs_app_secret_key
+      OMNYID_SEAWEEDFS_BUCKET: ${OMNYID_SEAWEEDFS_BUCKET:-omnyid-attachments}
+      OMNYID_ELECTRIC_URL: ${OMNYID_ELECTRIC_URL:-http://electric:5133}
+      OMNYID_ENABLE_PRIVATE_RUNTIMES: "false"
+      OMNYID_ENABLE_WEBTRANSPORT: "true"
+      OMNYID_WEBTRANSPORT_BIND_ADDR: 0.0.0.0:8443
+      OMNYID_WEBTRANSPORT_CERT_PATH: ${OMNYID_WEBTRANSPORT_CERT_PATH}
+      OMNYID_WEBTRANSPORT_KEY_PATH: ${OMNYID_WEBTRANSPORT_KEY_PATH}
+    ports:
+      - "127.0.0.1:18080:8080"
+      - "443:8443/udp"
+    restart: unless-stopped
+    volumes:
+      - ./.secrets:/run/secrets:ro
+      - ./scripts/runtime-env-entrypoint.sh:/usr/local/bin/runtime-env-entrypoint.sh:ro
+    networks:
+      - default
+      - storage
+
+volumes:
+  postgres-data:
+  seaweedfs-data:
+
+networks:
+  storage:
+    internal: true

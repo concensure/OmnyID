@@ -1,0 +1,87 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import {
+  weddingWorkspaceArrivalMenuApplyKey,
+  weddingTemplateHomeResetKey,
+  weddingWorkspaceMenuForArrival,
+} from "../src/lib/weddingWorkspaceMenuArrivalState.ts";
+import type { WeddingNavigationIntent } from "../src/lib/weddingNavigationState.ts";
+
+function intent(overrides: Partial<WeddingNavigationIntent> = {}): WeddingNavigationIntent {
+  return {
+    view: "response_queue",
+    surface: "planning_files",
+    weddingPlanId: "wedding_plan:arrival",
+    responseWorkspaceId: "response_workspace:arrival",
+    sourceResponseId: "response:arrival",
+    artifactId: null,
+    sectionId: null,
+    notice: "Opening wedding documents.",
+    metadata: {
+      template: "wedding_planning",
+      wedding_plan_id: "wedding_plan:arrival",
+      response_workspace_id: "response_workspace:arrival",
+      surface: "planning_files",
+    },
+    ...overrides,
+  };
+}
+
+test("weddingWorkspaceMenuForArrival opens Documents for document arrivals", () => {
+  assert.equal(weddingWorkspaceMenuForArrival(intent()), "documents");
+});
+
+test("weddingWorkspaceArrivalMenuApplyKey scopes automatic menu selection to one arrival", () => {
+  const base = intent({
+    savedAt: "2026-09-29T00:00:00.000Z",
+    artifactId: "artifact:quote",
+  });
+
+  assert.equal(
+    weddingWorkspaceArrivalMenuApplyKey(base, "documents"),
+    "2026-09-29T00:00:00.000Z|response_queue|planning_files|wedding_plan:arrival|response_workspace:arrival|response:arrival|artifact:quote|documents",
+  );
+  assert.notEqual(
+    weddingWorkspaceArrivalMenuApplyKey(base, "documents"),
+    weddingWorkspaceArrivalMenuApplyKey({ ...base, artifactId: "artifact:budget" }, "documents"),
+  );
+  assert.notEqual(
+    weddingWorkspaceArrivalMenuApplyKey(base, "documents"),
+    weddingWorkspaceArrivalMenuApplyKey(base, "budget"),
+  );
+});
+
+test("weddingWorkspaceArrivalMenuApplyKey stays null without an intent or arrival menu", () => {
+  assert.equal(weddingWorkspaceArrivalMenuApplyKey(null, "documents"), null);
+  assert.equal(weddingWorkspaceArrivalMenuApplyKey(intent(), null), null);
+});
+
+test("weddingWorkspaceMenuForArrival keeps intake launches on the current home flow", () => {
+  assert.equal(weddingWorkspaceMenuForArrival(intent({ sourceResponseId: null })), null);
+});
+
+test("weddingTemplateHomeResetKey only resets fresh template launches", () => {
+  assert.equal(
+    weddingTemplateHomeResetKey(intent({ sourceResponseId: null })),
+    "wedding_plan:arrival:response_workspace:arrival",
+  );
+  assert.equal(weddingTemplateHomeResetKey(intent()), null);
+  assert.equal(weddingTemplateHomeResetKey(intent({ surface: "budget", sourceResponseId: null })), null);
+  assert.equal(weddingTemplateHomeResetKey({ ...intent({ sourceResponseId: null }), view: "home" }), null);
+});
+
+test("weddingWorkspaceMenuForArrival opens Budget for budget arrivals", () => {
+  assert.equal(weddingWorkspaceMenuForArrival(intent({ surface: "budget" })), "budget");
+});
+
+test("weddingWorkspaceMenuForArrival validates workspace menu metadata", () => {
+  assert.equal(weddingWorkspaceMenuForArrival(intent({
+    surface: "workspace_menu",
+    metadata: { wedding_workspace_menu: "helpers" },
+  })), "helpers");
+  assert.equal(weddingWorkspaceMenuForArrival(intent({
+    surface: "workspace_menu",
+    metadata: { wedding_workspace_menu: "not-real" },
+  })), null);
+});

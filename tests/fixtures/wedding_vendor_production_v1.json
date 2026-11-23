@@ -1,0 +1,158 @@
+[
+  {
+    "id": "01JWV000000000000000000001",
+    "timestamp": "2026-10-06T00:00:00Z",
+    "type": "ledger",
+    "kind": "wedding_intake_profile",
+    "thread_id": "01JWVTHREAD000000000000001",
+    "content": {"wedding_plan_id": "plan-fixture", "location": "Sydney", "category": "Venue"}
+  },
+  {
+    "id": "01JWV000000000000000000002",
+    "timestamp": "2026-10-06T00:00:01Z",
+    "type": "ledger",
+    "kind": "wedding_vendor_search_receipt",
+    "thread_id": "01JWVTHREAD000000000000001",
+    "content": {"source_policy": "directory_only", "directory_count": 2, "shortfall": 1}
+  },
+  {
+    "id": "01JWV000000000000000000003",
+    "timestamp": "2026-10-06T00:00:02Z",
+    "type": "ledger",
+    "kind": "wedding_vendor_search_receipt",
+    "thread_id": "01JWVTHREAD000000000000001",
+    "content": {"source_policy": "directory_first_online_shortfall", "online_count": 1, "result_count": 3}
+  },
+  {
+    "id": "01JWV000000000000000000004",
+    "timestamp": "2026-10-06T00:00:03Z",
+    "type": "artifact",
+    "kind": "wedding_vendor_comparison",
+    "thread_id": "01JWVTHREAD000000000000001",
+    "content": {"comparison_id": "comparison-v1", "candidate_ids": ["vendor-a", "vendor-b", "vendor-c"], "pattern_id": "wedding.vendor_selection", "pattern_version": 1}
+  },
+  {
+    "id": "01JWV000000000000000000005",
+    "timestamp": "2026-10-06T00:00:04Z",
+    "type": "decision_result",
+    "kind": "wedding_vendor_selection",
+    "thread_id": "01JWVTHREAD000000000000001",
+    "content": {"selection_id": "selection-v1", "comparison_id": "comparison-v1", "vendor_id": "vendor-a"}
+  },
+  {
+    "id": "01JWV000000000000000000006",
+    "timestamp": "2026-10-06T00:00:05Z",
+    "type": "ledger",
+    "kind": "wedding_vendor_thread_created",
+    "thread_id": "01JWVTHREAD000000000000002",
+    "content": {"vendor_id": "vendor-a"}
+  },
+  {
+    "id": "01JWV000000000000000000007",
+    "timestamp": "2026-10-06T00:00:06Z",
+    "type": "email_draft",
+    "kind": "wedding_vendor_outreach_draft",
+    "thread_id": "01JWVTHREAD000000000000002",
+    "content": {"draft_version": 1, "payload_hash": "sha256:fixture-draft-v1"}
+  },
+  {
+    "id": "01JWV000000000000000000008",
+    "timestamp": "2026-10-06T00:00:07Z",
+    "type": "approval_receipt",
+    "kind": "wedding_vendor_outreach_approval",
+    "thread_id": "01JWVTHREAD000000000000002",
+    "content": {"approved_message_id": "01JWV000000000000000000007", "payload_hash": "sha256:fixture-draft-v1"}
+  },
+  {
+    "id": "01JWV000000000000000000009",
+    "timestamp": "2026-10-06T00:00:08Z",
+    "type": "delivery_receipt",
+    "kind": "wedding_vendor_outreach_sent",
+    "thread_id": "01JWVTHREAD000000000000002",
+    "content": {"approved_message_id": "01JWV000000000000000000007", "payload_hash": "sha256:fixture-draft-v1", "provider_receipt_id": "provider-fixture-1"}
+  },
+  {
+    "id": "01JWV00000000000000000000A",
+    "timestamp": "2026-10-06T00:00:09Z",
+    "type": "email_received",
+    "kind": "wedding_vendor_reply_received",
+    "thread_id": "01JWVTHREAD000000000000002",
+    "content": {"provider_message_id": "provider-reply-fixture-1"}
+  },
+  {
+    "id": "01JWV00000000000000000000B",
+    "timestamp": "2026-10-06T00:00:10Z",
+    "type": "ledger",
+    "kind": "wedding_vendor_quote_received",
+    "thread_id": "01JWVTHREAD000000000000002",
+    "content": {"quote": {"vendorName": "Fixture Venue", "amount": 8000, "currency": "AUD", "validUntil": "2026-10-20T00:00:00Z"}},
+    "metadata": {"wedding_plan_id": "plan-fixture"}
+  },
+  {
+    "id": "01JWV00000000000000000000C",
+    "timestamp": "2026-10-06T00:00:11Z",
+    "type": "decision_request",
+    "kind": "wedding_vendor_quote_decision",
+    "thread_id": "01JWVTHREAD000000000000002",
+    "content": {"decision_id": "wedding_vendor_quote:plan-fixture:01jwv00000000000000000000b", "source_refs": ["01JWV00000000000000000000B"]},
+    "metadata": {"pattern_id": "wedding.vendor_quote_response", "pattern_version": 1}
+  },
+  {
+    "id": "01JWV00000000000000000000D",
+    "timestamp": "2026-10-06T00:00:12Z",
+    "type": "ledger",
+    "kind": "wedding_decision_deferral",
+    "thread_id": "01JWVTHREAD000000000000002",
+    "content": {"decision_id": "wedding_vendor_quote:plan-fixture:01jwv00000000000000000000b", "deferred_until_at": "2026-10-10T00:00:00Z"}
+  },
+  {
+    "id": "01JWV00000000000000000000E",
+    "timestamp": "2026-10-10T00:00:00Z",
+    "type": "decision_request",
+    "kind": "wedding_vendor_quote_decision_resurfaced",
+    "thread_id": "01JWVTHREAD000000000000002",
+    "content": {"decision_id": "wedding_vendor_quote:plan-fixture:01jwv00000000000000000000b", "resurface_reason": "scheduled_date_reached"}
+  },
+  {
+    "id": "01JWV00000000000000000000F",
+    "timestamp": "2026-10-11T00:00:00Z",
+    "type": "ledger",
+    "kind": "wedding_vendor_quote_received",
+    "thread_id": "01JWVTHREAD000000000000002",
+    "content": {"quote": {"vendorName": "Fixture Venue", "amount": 7800, "currency": "AUD", "validUntil": "2026-10-22T00:00:00Z"}},
+    "metadata": {"wedding_plan_id": "plan-fixture", "supersedes_quote_id": "01JWV00000000000000000000B"}
+  },
+  {
+    "id": "01JWV00000000000000000000G",
+    "timestamp": "2026-10-11T00:00:01Z",
+    "type": "decision_result",
+    "kind": "wedding_vendor_quote_decision_superseded",
+    "thread_id": "01JWVTHREAD000000000000002",
+    "content": {"decision_id": "wedding_vendor_quote:plan-fixture:01jwv00000000000000000000b", "resolution": "superseded"}
+  },
+  {
+    "id": "01JWV00000000000000000000H",
+    "timestamp": "2026-10-11T00:00:02Z",
+    "type": "decision_request",
+    "kind": "wedding_vendor_quote_decision",
+    "thread_id": "01JWVTHREAD000000000000002",
+    "content": {"decision_id": "wedding_vendor_quote:plan-fixture:01jwv00000000000000000000f", "source_refs": ["01JWV00000000000000000000F"]},
+    "metadata": {"pattern_id": "wedding.vendor_quote_response", "pattern_version": 1}
+  },
+  {
+    "id": "01JWV00000000000000000000J",
+    "timestamp": "2026-10-12T00:00:00Z",
+    "type": "decision_result",
+    "kind": "wedding_vendor_quote_decision_resolved",
+    "thread_id": "01JWVTHREAD000000000000002",
+    "content": {"decision_id": "wedding_vendor_quote:plan-fixture:01jwv00000000000000000000f", "resolution": "vendor_accepted"}
+  },
+  {
+    "id": "01JWV00000000000000000000K",
+    "timestamp": "2026-10-12T00:00:01Z",
+    "type": "ledger",
+    "kind": "wedding_vendor_follow_up",
+    "thread_id": "01JWVTHREAD000000000000002",
+    "content": {"vendor_id": "vendor-a", "status": "complete"}
+  }
+]

@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 560" role="img" aria-labelledby="title desc">
+  <title id="title">Budget and timeline screenshot</title>
+  <desc id="desc">A screenshot-style illustration showing budget category rows, payment checks and wedding timeline milestones.</desc>
+  <rect width="960" height="560" fill="#f4eadc"/>
+  <rect x="48" y="42" width="864" height="476" rx="22" fill="#fffdfa" stroke="#e7dacb"/>
+  <text x="88" y="98" font-family="Fraunces, Georgia" font-size="30" font-weight="600" fill="#2c241d">Budget and timeline</text>
+  <rect x="88" y="138" width="382" height="322" rx="16" fill="#fff" stroke="#e7dacb"/>
+  <text x="118" y="178" font-family="Inter, Arial" font-size="15" font-weight="700" fill="#2c241d">Budget tracker</text>
+  <text x="118" y="214" font-family="Inter, Arial" font-size="13" fill="#6e6156">Venue</text>
+  <rect x="210" y="204" width="184" height="12" rx="6" fill="#e7dacb"/>
+  <rect x="210" y="204" width="142" height="12" rx="6" fill="#c17b87"/>
+  <text x="408" y="214" font-family="Inter, Arial" font-size="13" fill="#2c241d">$8.4k</text>
+  <text x="118" y="258" font-family="Inter, Arial" font-size="13" fill="#6e6156">Catering</text>
+  <rect x="210" y="248" width="184" height="12" rx="6" fill="#e7dacb"/>
+  <rect x="210" y="248" width="118" height="12" rx="6" fill="#8a9a7e"/>
+  <text x="408" y="258" font-family="Inter, Arial" font-size="13" fill="#2c241d">$6.9k</text>
+  <text x="118" y="302" font-family="Inter, Arial" font-size="13" fill="#6e6156">Photo</text>
+  <rect x="210" y="292" width="184" height="12" rx="6" fill="#e7dacb"/>
+  <rect x="210" y="292" width="78" height="12" rx="6" fill="#c79a48"/>
+  <text x="408" y="302" font-family="Inter, Arial" font-size="13" fill="#2c241d">$4.2k</text>
+  <rect x="118" y="350" width="290" height="56" rx="12" fill="#f3dfe2"/>
+  <text x="142" y="374" font-family="Inter, Arial" font-size="13" font-weight="700" fill="#a85c6a">Payment review</text>
+  <text x="142" y="394" font-family="Inter, Arial" font-size="12" fill="#6e6156">Florist delivery fee needs source check.</text>
+  <rect x="506" y="138" width="366" height="322" rx="16" fill="#fff" stroke="#e7dacb"/>
+  <text x="536" y="178" font-family="Inter, Arial" font-size="15" font-weight="700" fill="#2c241d">Milestones</text>
+  <line x1="564" y1="212" x2="564" y2="402" stroke="#e7dacb" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="564" cy="226" r="10" fill="#8a9a7e"/>
+  <text x="590" y="231" font-family="Inter, Arial" font-size="13" font-weight="700" fill="#2c241d">NOIM given to celebrant</text>
+  <circle cx="564" cy="278" r="10" fill="#8a9a7e"/>
+  <text x="590" y="283" font-family="Inter, Arial" font-size="13" font-weight="700" fill="#2c241d">Venue confirmed</text>
+  <circle cx="564" cy="330" r="10" fill="#c79a48"/>
+  <text x="590" y="335" font-family="Inter, Arial" font-size="13" font-weight="700" fill="#2c241d">Caterer deposit due</text>
+  <text x="590" y="356" font-family="Inter, Arial" font-size="12" fill="#6e6156">Due in 9 days</text>
+  <circle cx="564" cy="402" r="10" fill="#c17b87"/>
+  <text x="590" y="407" font-family="Inter, Arial" font-size="13" font-weight="700" fill="#2c241d">Final guest numbers</text>
+  <text x="590" y="428" font-family="Inter, Arial" font-size="12" fill="#6e6156">Needs RSVP evidence</text>
+</svg>

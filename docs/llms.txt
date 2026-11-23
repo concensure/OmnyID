@@ -1,0 +1,51 @@
+# OmnyID
+
+> OmnyID is a privacy-first personal workspace that reads a person's inbox, calendar and notes and hands them a short list of what needs a decision. Nothing sends, books or pays without the user's approval. OmnyID Weddings applies the same approach to wedding planning for Australian couples, with a focus on NSW and Sydney.
+
+Guides under /wedding/blog/ are dated, and prices and rules change, so check the published date and the sources named in each article before relying on a figure. OmnyID earns money from couple plans, vendor commission, and clearly labelled advertising and sponsored placement; recommendations are described on the disclosures page. For current plans and prices, use the pricing page rather than any figure quoted elsewhere.
+
+## Original Australian wedding data
+
+- [What a Sydney wedding venue costs per head](https://omnyid.com/wedding/blog/sydney-wedding-venue-cost-per-head.html): median starting price and spread across 41 NSW venues, with a guest-count table and official venue guidance.
+- [What Sydney wedding photographers charge](https://omnyid.com/wedding/blog/sydney-wedding-photographer-prices.html): published starting prices, hours included, national benchmarks and questions that make quotes comparable.
+- [Why Australian couples spend about 23% more than their wedding budget](https://omnyid.com/wedding/blog/wedding-budget-gap-australia.html): where published budget reports disagree, and a way to plan for the gap.
+- [What a wedding celebrant costs in Australia](https://omnyid.com/wedding/blog/wedding-celebrant-fees-australia.html): published averages and ranges, what the fee includes, and why figures disagree.
+- [Do you need a wedding planner?](https://omnyid.com/wedding/blog/wedding-planner-cost-australia.html): published planner price ranges and what day-of and full planning include.
+
+## Australian wedding rules and contracts
+
+- [The legal minimum to get married in Australia](https://omnyid.com/wedding/blog/legal-minimum-to-get-married-australia.html): what the law requires, what venues may require, and what is your choice.
+- [How to find a marriage celebrant in Australia](https://omnyid.com/wedding/blog/how-to-find-a-marriage-celebrant-in-australia.html): who can legally marry you and how to check registration.
+- [Changing your name after marriage in Australia](https://omnyid.com/wedding/blog/change-your-name-after-marriage-australia.html): the order to update documents, what is free, and who to tell.
+- [Can you get your wedding deposit back?](https://omnyid.com/wedding/blog/wedding-deposit-refund-cancellation-rights-australia.html): what the contract and consumer law say about deposits and cancellation.
+- [Wedding vendor contract checklist](https://omnyid.com/wedding/blog/wedding-vendor-contract-checklist-australia.html): clauses to look for and how to negotiate payment terms and substitutions.
+- [Is wedding insurance worth it in Australia?](https://omnyid.com/wedding/blog/wedding-insurance-australia.html): typical cover, exclusions and when to buy.
+
+## Free wedding planning tools
+
+- [Wedding planning checklist Australia](https://omnyid.com/wedding/wedding-planning-checklist-australia.html): a personalised countdown built from a 65-task timing catalogue, private and editable on the device.
+- [Wedding budget reality check](https://omnyid.com/wedding/wedding-cost-calculator.html): a balanced Australian budget with category trade-offs and commonly unclear costs.
+- [Compare wedding venue quotes](https://omnyid.com/wedding/compare-wedding-venue-quotes.html): puts venue proposals into one format and lists inclusions, missing terms and follow-up questions.
+- [Talk to an authorised marriage celebrant](https://omnyid.com/wedding/talk-to-a-celebrant.html): ask a question in a ten-minute callback or book the next Sydney consultation time.
+
+## OmnyID Weddings
+
+- [OmnyID Weddings](https://omnyid.com/wedding/): the planning workspace for budget, vendors, timeline, guest list and decisions.
+- [User guide](https://omnyid.com/wedding/user-guide.html): how budget planning, vendors, guest lists, timelines, approvals and exports work.
+- [Pricing](https://omnyid.com/wedding/pricing.html): current plans for couples and for wedding planners and studios.
+- [Disclosures](https://omnyid.com/wedding/disclosures.html): how OmnyID Weddings earns money and how placement is labelled.
+- [NSW wedding vendor directory](https://omnyid.com/wedding/vendors.html): find a vendor or claim a business profile.
+- [Blog](https://omnyid.com/wedding/blog.html): all guides.
+
+## OmnyID
+
+- [OmnyID home](https://omnyid.com/): what the product does and how approvals work.
+- [Reply faster to wedding leads (for vendors)](https://omnyid.com/vendors.html)
+- [Privacy policy](https://omnyid.com/privacy.html)
+- [Security and incident response](https://omnyid.com/security.html)
+- [Data rights and deletion](https://omnyid.com/data-rights.html)
+- [Terms of service](https://omnyid.com/terms.html)
+
+## Optional
+
+- [Sitemap](https://omnyid.com/sitemap.xml): every public page.
