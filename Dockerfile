@@ -2,6 +2,12 @@
 # Build stage
 FROM rust:1.94-slim AS builder
 
+# The full release crate can exceed rustc's default worker stack while checking
+# AWS/storage and Wedding routes together. Keep this builder-only so the
+# runtime container receives no unnecessary process setting.
+ARG RUST_MIN_STACK=134217728
+ENV RUST_MIN_STACK=${RUST_MIN_STACK}
+
 RUN apt-get update && apt-get install -y \
     pkg-config \
     libssl-dev \
