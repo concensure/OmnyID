@@ -12893,3 +12893,31 @@ Wedding preparation templates no longer project into every account as started wo
 The implementation worktree passed 2,393 Wedding tests, TypeScript, line budgets, all 95 public/security pages and the production build. Exact native ARM64 workflow `45167742228` passed; staging ran the exact image with zero restarts. Oracle serves the exact backend and Workspace archive, the authenticated monitor passed all eight checks, Caddy validates and both homeserver/Caddy have zero restarts. Root use is 72% with about 13 GB free after deleting only the unreferenced WED-405 image; WED-407 remains the rollback.
 
 Rollback: `/home/ubuntu/omnyid-candidates/wed408-70e7a8c6309b12595c676072b2a1412a201bd390/rollback`, including prior image tag `omnyid-homeserver:pre-wed408-1cf789ef`. Full evidence: `Documents/verification/WED-408-oauth-growth-budget-release.md`. GitHub branch push succeeded; PR creation failed because the task lineage has no common history with `main`.
+
+## WED-409 Wedding claims and guest-import reconciliation (2026-11-23)
+
+Worktree `C:/temp/wt/omnyid-wed409`, branch `agent/codex/WED-409`, based on the
+WED-408 release record. Exact deployed static SHA:
+`9a6c2b56f733e654b44265b7de957d5c8e494d46`; clean release worktree:
+`C:/temp/wt/omnyid-wed409-release-9a6c2b56`.
+
+The stale claims audit was rechecked against current source and Oracle. Partner
+invites genuinely expire after seven days and require authenticated matching-email
+acceptance; vendor phone permission genuinely defaults off. The public catalogue and
+Workspace share one generated authority with 64 tasks. Unsupported Binder-email,
+absolute-transfer and automatic-deadline promises were replaced with direct downloads
+and qualified wording. Sample budget allocation is now labelled 91%.
+
+The existing private guest-import path now reports people, explicitly stated unique
+households, ungrouped people, pending replies and ambiguous replies; ambiguity remains
+pending and surname never implies a household. Read-only Oracle SQL found 1,934
+Celebrant rows, all NSW-labelled: 1,933 active, one hidden and zero archived. No vendor
+row was changed.
+
+Clean exact-SHA proof passed TypeScript, both line budgets, all 2,394 Wedding tests,
+the 95-page public/security suite and the 1,862-module production build. Oracle serves
+matching Workspace and public-file hashes, both Binder PDFs return 200, the authenticated
+eight-check monitor passes, Caddy validates and homeserver/Caddy restart counts remain
+zero. Disk use is 72% with about 13 GB free. Rollback is retained at
+`/home/ubuntu/omnyid-candidates/wed409-9a6c2b56f733e654b44265b7de957d5c8e494d46/rollback`.
+Full evidence: `Documents/verification/WED-409-landing-claims-release.md`.

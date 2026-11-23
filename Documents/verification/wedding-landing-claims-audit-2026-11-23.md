@@ -65,7 +65,10 @@ archived. No status or visibility value was changed during this verification.
 
 ## Candidate verification
 
-The implementation worktree passed focused import and catalogue contracts, TypeScript,
-both line budgets, all 2,394 Wedding tests, the 95-page public/security suite and the
-1,862-module production build. Exact-commit release evidence and hosted smoke results
-are recorded here after the WED-409 candidate is frozen.
+The implementation worktree and the clean detached checkout of exact SHA
+`9a6c2b56f733e654b44265b7de957d5c8e494d46` passed focused import and catalogue
+contracts, TypeScript, both line budgets, all 2,394 Wedding tests, the 95-page
+public/security suite and the 1,862-module production build. Oracle serves matching
+public-file and Workspace hashes. Both Binder PDFs return 200, the authenticated
+eight-check monitor passes, Caddy validates and the homeserver/Caddy restart counts
+remain zero. Full release evidence is in `WED-409-landing-claims-release.md`.

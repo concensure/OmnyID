@@ -4818,3 +4818,18 @@ moves its data.
 - Custom budget categories extend the existing revision-aware AFP budget decision. They do not create a browser-only budget store: the saved option carries labelled custom cells, the persisted decision reconstructs them, and an unbalanced standard-plus-custom allocation cannot be saved.
 - Growth activation and operator authority remain separate gates. Production may explicitly enable Growth analytics, but every Growth read still requires the server-confirmed operator session; a client email or route choice grants nothing.
 - Google sign-in resilience is bounded and fail-closed. Transient script, transport, rate-limit and upstream failures get at most one retry per layer; invalid credentials and other client errors do not. Duplicate browser credential callbacks are ignored while an exchange is active.
+
+## 2026-11-23 — Public claims follow shared authority and runtime readiness (WED-409)
+
+Public Wedding numbers and promises are projections of the same authority used by
+the signed-in product. The countdown count comes from the generated shared catalogue,
+not hand-written marketing copy. A disabled optional delivery provider cannot block
+an otherwise available asset: the Binder exposes its direct downloads and presents
+email only when the readiness endpoint enables it.
+
+Guest-import household review extends the existing private import artifact. A
+household exists only when the source states one in an explicit household, family,
+group or party column; surnames are never grouping evidence. Blank household values
+stay ungrouped, and RSVP wording outside the recognised yes/no set remains pending
+and is labelled uncertain. Review counts are visible immediately and preserved with
+the imported evidence rather than written to a parallel guest store.
