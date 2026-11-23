@@ -1,3 +1,45 @@
+## WED-403 desktop vendor claim, admin route and Wedding CTA release (2026-11-23)
+
+Worktree `C:/temp/wt/omnyid-wed403`, branch `agent/codex/WED-403`, based on
+WED-402 release-record SHA `0e9081bc12c2cf10a09a852fc6b69b8015d5db32`.
+Exact deployed static SHA: `21357b6d6d7cef7dfa8ed2910c0c170c84d9909b`;
+clean release worktree: `C:/temp/wt/omnyid-wed403-release-21357b6d`.
+
+The vendor claim entry now has an intentional two-column desktop composition and
+keeps its single-column phone layout. The authenticated listing search pairs the
+existing claim flow with a desktop next-steps panel. Before and after sign-in,
+vendors who cannot find a business are directed to `hello@omnyid.com` with the
+pre-filled subject `vendor listing claim`, explaining that the listing must exist
+before it can be claimed. Existing proposal, proof and management authorities are
+unchanged.
+
+Only a session whose normalized email is exactly `admin@omnyid.com` is navigated
+from `vendor.html` to the existing `/workspace/`. This is a client entry decision,
+not an admin-role grant; lookalike `admin@`, `+admin` and other domains do not match.
+The vendor return marker is cleared before navigation. The Wedding landing-context
+source now preserves the static hero label `Start planning free` instead of replacing
+it at runtime.
+
+Clean exact-SHA proof passed TypeScript, both line budgets, all 93 public/security
+pages, all 2,381 Wedding tests and the 1,856-module production build. Browser proof
+at 1440px and 390px found no horizontal overflow. Production confirms the desktop
+claim aside and support link, exact admin navigation to `/workspace/`, and the mobile
+Wedding hero CTA. Candidate/live SHA-256 values are
+`963d723fe22a1edf91c3ceda4f196c798f63f182022e209260f2b1198c754401`
+for `landing-config.js` and
+`f5edb6f76d82aae548212ec38149afff0235ef5072b9dd390f342c2b04b74031`
+for built `vendor.html`.
+
+This was a static-only additive Workspace extraction plus one Wedding script. The
+homeserver remains on WED-402 SHA `618ceee7c95bf2f49f9f79531115227e41d1551d`;
+homeserver and Caddy have zero restarts. Caddy validates and the scheduled
+authenticated monitor passed all eight checks after rollout. Rollback is retained at
+`/home/ubuntu/omnyid-candidates/wed403-21357b6d6d7cef7dfa8ed2910c0c170c84d9909b/rollback`.
+
+The WED-402 restore-capacity follow-up remains: root use was 91% after this release,
+and the last safe restore preflight needed about 3.1 GiB more free disk. This release
+changed no database, migration, backend image or Caddy route.
+
 ## WED-402 small-wedding, pricing, scoped assistance and timeline release (2026-11-23)
 
 Worktree `C:/temp/wt/omnyid-wed402`, branch `agent/codex/WED-402`. The exact

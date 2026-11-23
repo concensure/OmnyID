@@ -4756,3 +4756,17 @@ A restore drill is not coerced past its capacity preflight. Backup verification 
 restore ability are reported separately; insufficient headroom remains an explicit
 operational follow-up and does not justify starting a partial restore beside the live
 database.
+
+## 2026-11-23 — Vendor entry routing changes presentation, not authority (WED-403)
+
+The vendor claim page remains one responsive entry into the existing claim, proof,
+proposal and management APIs. Desktop adds orientation and next-step structure; it
+does not create a separate desktop portal or vendor store. A missing directory record
+is resolved before ownership proof, with a pre-addressed support email that states
+that sequence explicitly.
+
+`admin@omnyid.com` enters the already established main Workspace when it reaches the
+vendor entry page. The comparison is an exact normalized address and is navigation
+only. It does not reuse permissive admin-looking email heuristics, assign a role or
+bypass server authorization. Ordinary vendor sessions and signed-out continuity keep
+their existing paths.
