@@ -69,5 +69,7 @@
   "bridesmaid-gifts-they-will-use": { "stakeholders": ["couples", "wedding party"], "stage": "Details & invites", "locations": [], "emotions": ["consideration", "joy"] },
   "bachelorette-favours-hens-party-bags": { "stakeholders": ["couples", "wedding party", "guests"], "stage": "Details & invites", "locations": ["Australia"], "emotions": ["creativity", "joy"] },
   "lab-grown-diamond-engagement-ring-guide": { "stakeholders": ["couples", "jewellers"], "stage": "Plan & budget", "locations": ["Australia"], "emotions": ["cost anxiety", "clarity"] },
-  "wedding-reception-decor-where-to-spend": { "stakeholders": ["couples", "venues", "stylists"], "stage": "Details & invites", "locations": [], "emotions": ["creativity", "clarity"] }
+  "wedding-reception-decor-where-to-spend": { "stakeholders": ["couples", "venues", "stylists"], "stage": "Details & invites", "locations": [], "emotions": ["creativity", "clarity"] },
+  "what-does-a-marriage-celebrant-do-wedding-day": { "stakeholders": ["couples", "celebrants"], "stage": "Celebrant & suppliers", "locations": ["Australia"], "emotions": ["curiosity", "calm"] },
+  "when-to-book-a-wedding-celebrant-and-find-the-right-vibe": { "stakeholders": ["couples", "celebrants"], "stage": "Celebrant & suppliers", "locations": ["Australia"], "emotions": ["uncertainty", "confidence"] }
 }
