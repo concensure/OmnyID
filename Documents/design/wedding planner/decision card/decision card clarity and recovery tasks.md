@@ -418,7 +418,7 @@ WED-401 release evidence:
 
 ## DC-18 — Make the decision plan editable
 
-Status: implementation and release verification in WED-404.
+Status: complete and live on Oracle in WED-404.
 
 Work:
 
@@ -437,8 +437,15 @@ Work:
 - [x] Link follow-ups to their source and keep generated next tasks and all external
   actions behind the existing approval boundary.
 - [x] Add focused lifecycle, causal-suppression, scope and optional-service tests.
-- [ ] Record the clean exact candidate, full Wedding suite, production build,
+- [x] Record the clean exact candidate, full Wedding suite, production build,
   Oracle rollback and authenticated post-deploy proof.
+
+Release evidence: exact static SHA
+`22e6a226224e7103697c66a993207c29b606704c` passed TypeScript, both line
+budgets, 93 public/security pages, 2,388 Wedding tests and the 1,859-module build.
+Oracle serves matching main/Wedding bundles; the authenticated eight-check monitor
+passes and rollback is retained. See
+`Documents/verification/WED-404-editable-decision-plan-release.md`.
 
 Acceptance:
 

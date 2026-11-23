@@ -12802,3 +12802,32 @@ Windows compiler with `0xc0000005`, and `cargo check --lib` crashed it with
 be the server compile proof. Exact implementation SHA, clean-candidate verification,
 Oracle image/static rollout, rollback location and hosted authenticated evidence are
 still to be appended after release.
+## WED-404 editable Personal and Wedding decision plans (2026-11-23)
+
+Worktree `C:/temp/wt/omnyid-wed404`, branch `agent/codex/WED-404`, based on
+WED-403 record SHA `f6b4051d6688aaa3a31ba8fc0927793f8c97aaf1`. Exact deployed static SHA:
+`22e6a226224e7103697c66a993207c29b606704c`; clean release worktree:
+`C:/temp/wt/omnyid-wed404-release-22e6a226`.
+
+Personal Agent and Wedding now treat the queue as an editable plan. “Doesn't apply”
+is an append-only choice distinct from Snooze/Defer, previews current causal
+follow-ups, preserves all saved work, offers Undo and Plan Restore, and never silently
+resurfaces. Causal suppression is recalculated from the current graph so independent
+decisions remain. Users can add a decision in Plan or a linked follow-up from active,
+completed and not-applicable cards with only a title required. Suggestions and
+external actions retain existing approval authority. Personal records are account
+scoped; Wedding records use the canonical response workspace for partner projection.
+
+Clean exact-SHA proof passed TypeScript, both line budgets, all 93 public/security
+pages, all 2,388 Wedding tests and the 1,859-module production build. Oracle serves
+the matching `main-ClLGywef.js` and
+`WeddingResponseWorkspaceView-DKivj0tQ.js` hashes. The authenticated eight-check
+monitor passes, Caddy validates, and homeserver/Caddy have zero restarts. This was a
+static-only release; backend revision remains
+`618ceee7c95bf2f49f9f79531115227e41d1551d`.
+
+Rollback is retained at
+`/home/ubuntu/omnyid-candidates/wed404-22e6a226224e7103697c66a993207c29b606704c/rollback/workspace-before.tar.gz`.
+Root use remains 91% (about 4.4 GiB free); the pre-existing WED-402 restore-drill
+capacity follow-up still needs roughly 3.1 GiB additional headroom. Full evidence is
+in `Documents/verification/WED-404-editable-decision-plan-release.md`.
