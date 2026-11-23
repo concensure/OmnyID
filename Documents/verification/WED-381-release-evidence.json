@@ -1,0 +1,25 @@
+{
+  "source_sha": "ca563ffa127f004fc7828e3a8768bd1779da9700",
+  "image_id": "sha256:27118c8967e95975ce2d2b784eee35ac2b6559bbc80ef16407d54fe919a4dc89",
+  "previous_image": "sha256:a086dba378880b9a8d19e68dfc403efa27356c0ecee5e136755edc0bddff4fa6",
+  "started_at": "2026-11-19T14:02:26.233249+00:00",
+  "checks": {
+    "authenticated_health": 200,
+    "authenticated_billing": 200,
+    "/wedding/": 200,
+    "/docs/": 200,
+    "/workspace/": 200
+  },
+  "workspace_files": 169,
+  "google_browser_smoke": {
+    "account_selection_completed": true,
+    "auth_google_status": 200,
+    "billing_status": 200,
+    "workspace_visible": true,
+    "signin_dialog_closed": true,
+    "top_level_crash": false,
+    "checked_at": "2026-11-19T14:05:06.866663+00:00",
+    "observer": "Playwright live browser"
+  },
+  "rollback_directory": "/home/ubuntu/omnyid-candidates/wed381-ca563ffa/rollback"
+}

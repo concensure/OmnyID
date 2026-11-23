@@ -1,0 +1,1706 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+  <meta charset="utf-8">
+  <link rel="icon" type="image/png" href="logo/omnyid-mark.png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OmnyID - Turn Digital Chaos Into a Briefing You Can Trust</title>
+<meta
+    name="description"
+    content="OmnyID quietly reads your inbox, calendar, and notes, then hands you a short list of what actually needs a decision. Nothing sends, books, or pays without your approval."
+  >
+
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400..800;1,400..800&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet"
+  >
+  <link rel="stylesheet" href="tailwind.css?v=20261029-wed298">
+  <style>
+    html {
+      scroll-behavior: smooth;
+    }
+
+    /* Desktop reading comfort: one browser-zoom-sized step, without changing
+       the phone layout or the user's own browser zoom preference. */
+    @media (min-width: 1024px) {
+      html { zoom: 1.1; }
+    }
+
+    body {
+      background:
+        radial-gradient(circle at top left, rgba(217, 107, 57, 0.08), transparent 30%),
+        radial-gradient(circle at top right, rgba(82, 99, 82, 0.08), transparent 28%),
+        #f9f9f7;
+      color: #1a1c1b;
+    }
+
+    .mesh-bg {
+      background-image: radial-gradient(circle at 2px 2px, rgba(49, 86, 142, 0.05) 1px, transparent 0);
+      background-size: 40px 40px;
+    }
+
+    .glass-nav {
+      background: rgba(249, 249, 247, 0.8);
+      backdrop-filter: blur(20px);
+    }
+
+    .atelier-card {
+      transition: transform 0.25s ease, box-shadow 0.25s ease, background-color 0.25s ease;
+    }
+
+    .atelier-card:hover {
+      transform: translateY(-4px);
+      background-color: #ffffff;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+    }
+
+    .hidden-until-auth {
+      display: none;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html {
+        scroll-behavior: auto;
+      }
+
+      .atelier-card {
+        transition: none;
+      }
+
+      .animate-ping {
+        animation: none;
+      }
+    }
+  </style>
+<!-- omnyid-seo:start -->
+<link rel="canonical" href="https://omnyid.com/">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="en_AU">
+<meta property="og:url" content="https://omnyid.com/">
+<meta property="og:title" content="OmnyID - Turn Digital Chaos Into a Briefing You Can Trust">
+<meta property="og:description" content="OmnyID quietly reads your inbox, calendar, and notes, then hands you a short list of what actually needs a decision. Nothing sends, books, or pays without your approval.">
+<meta property="og:image" content="https://omnyid.com/logo/omnyid-logo.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="OmnyID - Turn Digital Chaos Into a Briefing You Can Trust">
+<meta name="twitter:description" content="OmnyID quietly reads your inbox, calendar, and notes, then hands you a short list of what actually needs a decision. Nothing sends, books, or pays without your approval.">
+<meta name="twitter:image" content="https://omnyid.com/logo/omnyid-logo.png">
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://omnyid.com/#organization","name":"OmnyID Pty Ltd","url":"https://omnyid.com","logo":"https://omnyid.com/wedding/assets/logo/omnyid-logo.png"},{"@type":"WebSite","@id":"https://omnyid.com/#website","name":"OmnyID","url":"https://omnyid.com","inLanguage":"en-AU","publisher":{"@id":"https://omnyid.com/#organization"}},{"@type":"SoftwareApplication","@id":"https://omnyid.com/#application","name":"OmnyID","applicationCategory":"ProductivityApplication","operatingSystem":"Web","url":"https://omnyid.com","description":"A local-first workspace that turns scattered information into reviewable decisions.","publisher":{"@id":"https://omnyid.com/#organization"}},{"@type":"WebPage","@id":"https://omnyid.com/#webpage","name":"OmnyID - Turn Digital Chaos Into a Briefing You Can Trust","description":"OmnyID quietly reads your inbox, calendar, and notes, then hands you a short list of what actually needs a decision. Nothing sends, books, or pays without your approval.","url":"https://omnyid.com/","inLanguage":"en-AU","isPartOf":{"@id":"https://omnyid.com/#website"},"about":{"@id":"https://omnyid.com/#application"}}]}</script>
+<!-- omnyid-seo:end -->
+</head>
+<body class="font-body text-on-surface">
+  <a href="#main-content" class="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[60] focus:rounded-lg focus:bg-surface-container-lowest focus:px-4 focus:py-2">
+    Skip to content
+  </a>
+
+  <nav class="fixed top-0 z-50 w-full border-b border-outline-variant/10 glass-nav">
+    <div class="mx-auto flex w-full max-w-7xl items-center justify-between px-6 py-4">
+      <div class="flex items-center gap-8">
+        <img src="logo/omnyid-logo.png" alt="OmnyID" width="82" height="32" class="h-8 w-auto object-contain">
+        <div class="hidden gap-6 md:flex">
+          <a href="#problem" class="font-medium text-on-surface-variant transition hover:text-primary">Problem</a>
+          <a href="#features" class="font-medium text-on-surface-variant transition hover:text-primary">Features</a>
+          <a href="#roadmap" class="font-medium text-on-surface-variant transition hover:text-primary">Roadmap</a>
+          <a href="https://github.com/omnyid" target="_blank" rel="noreferrer" class="font-medium text-on-surface-variant transition hover:text-primary">GitHub</a>
+        </div>
+      </div>
+      <div class="flex items-center gap-4">
+        <div class="flex items-center gap-3">
+          <a href="/workspace/?auth=signin&amp;source=marketing" data-open-auth class="rounded-lg bg-primary px-5 py-2 text-sm font-medium text-white transition hover:opacity-90">
+            Offload my stress
+          </a>
+          <a
+            href="/workspace/?auth=agent-id&amp;source=marketing"
+            data-open-auth
+            data-auth-mode="advanced-agent-id"
+            class="hidden rounded-lg border border-outline-variant bg-surface-container-low px-4 py-2 text-xs font-medium text-on-surface transition hover:bg-surface md:inline-flex"
+          >
+            Agent ID only
+          </a>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <main id="main-content" class="pt-24">
+    <section id="hero" class="relative flex min-h-[80vh] items-center overflow-hidden px-6">
+      <div class="mesh-bg absolute inset-0 -z-10 opacity-60"></div>
+      <div class="absolute right-0 top-1/2 -z-10 h-full w-1/2 -translate-y-1/2 opacity-10 pointer-events-none">
+        <div class="absolute right-1/4 top-1/4 h-64 w-64 rounded-full bg-primary/20 blur-[100px]"></div>
+        <div class="absolute bottom-1/4 right-1/3 h-96 w-96 rounded-full bg-secondary/10 blur-[120px]"></div>
+      </div>
+
+      <div class="mx-auto grid w-full max-w-7xl gap-12 md:grid-cols-[1fr_480px] md:items-center">
+        <div class="space-y-8">
+          <div class="inline-flex items-center gap-2 rounded-full bg-surface-container-high px-3 py-1">
+            <span class="font-mono text-[10px] uppercase tracking-widest text-secondary">Clarity, not more chaos</span>
+          </div>
+
+          <h1 class="font-display text-6xl leading-[1.05] tracking-[-0.03em] md:text-7xl lg:text-8xl">
+            Your whole life, <em>off your mind.</em>
+          </h1>
+
+          <p class="max-w-xl text-lg leading-relaxed text-on-surface-variant md:text-xl">
+            OmnyID keeps the bills, the forms, the dates, the lists — and prepares the next steps by rules you set once. Each morning it shows what needs a human, what is already ready to review, and what can wait.
+          </p>
+
+          <div class="flex flex-wrap gap-4 pt-2">
+            <a href="/workspace/?auth=signin&amp;source=marketing" data-open-auth class="rounded-lg bg-primary px-8 py-4 text-base font-medium text-white shadow-lg shadow-primary/10 transition hover:opacity-95">
+              Offload my stress
+            </a>
+            <a href="#promises" class="flex items-center gap-2 rounded-lg px-8 py-4 font-medium text-on-surface transition hover:bg-surface-container-low">
+              How it works
+              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+              </svg>
+            </a>
+          </div>
+
+          <div class="space-y-3">
+            <p class="text-sm text-on-surface-variant">Open source. Self-hostable. Your data, always yours.</p>
+            <a
+              href="/workspace/?auth=agent-id&amp;source=marketing"
+              data-open-auth
+              data-auth-mode="advanced-agent-id"
+              class="font-mono text-xs uppercase tracking-[0.18em] text-primary transition hover:opacity-80"
+            >
+              Already have an agent? Create only an Agent ID.
+            </a>
+          </div>
+        </div>
+
+        <div class="hidden md:block">
+          <div class="atelier-card rounded-[1.75rem] border border-outline-variant/10 bg-surface-container-lowest p-6 shadow-sm sm:p-7">
+            <p class="font-mono text-xs uppercase tracking-widest text-outline">Tuesday morning</p>
+            <p class="mt-1 text-sm text-on-surface-variant" id="hero-day-demo-summary">
+              11 things prepared quietly. <span id="hero-day-demo-remaining">3</span> need you.
+            </p>
+
+            <div class="mt-5 space-y-3" id="hero-day-demo-list">
+              <div class="hero-day-demo-item flex items-center gap-3 rounded-2xl border border-outline-variant/10 bg-surface px-4 py-3 transition-all duration-500">
+                <div class="min-w-0 flex-1">
+                  <p class="truncate text-sm font-medium text-on-surface">Reply to Coach Daly — practice moved to 4pm</p>
+                  <p class="mt-0.5 text-xs text-on-surface-variant">Draft ready, written the way you write</p>
+                </div>
+                <button type="button" class="hero-day-demo-approve shrink-0 rounded-full border border-outline-variant bg-surface-container-low px-4 py-2 text-xs font-semibold text-on-surface transition hover:bg-surface">
+                  Approve
+                </button>
+              </div>
+              <div class="hero-day-demo-item flex items-center gap-3 rounded-2xl border border-outline-variant/10 bg-surface px-4 py-3 transition-all duration-500">
+                <div class="min-w-0 flex-1">
+                  <p class="truncate text-sm font-medium text-on-surface">Review the water bill — $63.20</p>
+                  <p class="mt-0.5 text-xs text-on-surface-variant">Approval-ready under your $100 rule &middot; due Friday</p>
+                </div>
+                <button type="button" class="hero-day-demo-approve shrink-0 rounded-full border border-outline-variant bg-surface-container-low px-4 py-2 text-xs font-semibold text-on-surface transition hover:bg-surface">
+                  Approve
+                </button>
+              </div>
+              <div class="hero-day-demo-item flex items-center gap-3 rounded-2xl border border-outline-variant/10 bg-surface px-4 py-3 transition-all duration-500">
+                <div class="min-w-0 flex-1">
+                  <p class="truncate text-sm font-medium text-on-surface">Review Mia's excursion form</p>
+                  <p class="mt-0.5 text-xs text-on-surface-variant">Prepared for review — just needs your okay</p>
+                </div>
+                <button type="button" class="hero-day-demo-approve shrink-0 rounded-full border border-outline-variant bg-surface-container-low px-4 py-2 text-xs font-semibold text-on-surface transition hover:bg-surface">
+                  Approve
+                </button>
+              </div>
+            </div>
+
+            <div id="hero-day-demo-done" class="mt-5 hidden rounded-2xl bg-secondary-container/40 px-4 py-4 text-center">
+              <p class="text-sm font-medium text-secondary">Day closed.</p>
+              <p class="mt-1 text-xs text-on-surface-variant">Nothing is waiting on you. Go be a person.</p>
+            </div>
+            <p id="hero-day-demo-hint" class="mt-5 text-center text-xs text-on-surface-variant">Tap Approve. That's the whole job.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <script>
+      (function () {
+        var items = document.querySelectorAll(".hero-day-demo-item");
+        var remainingEl = document.getElementById("hero-day-demo-remaining");
+        var summaryEl = document.getElementById("hero-day-demo-summary");
+        var doneEl = document.getElementById("hero-day-demo-done");
+        var hintEl = document.getElementById("hero-day-demo-hint");
+        var remaining = items.length;
+
+        items.forEach(function (item) {
+          var button = item.querySelector(".hero-day-demo-approve");
+          if (!button) return;
+          button.addEventListener("click", function () {
+            item.classList.add("opacity-60");
+            var title = item.querySelector("p.font-medium");
+            var sub = item.querySelector("p.text-xs");
+            if (title) title.classList.add("line-through");
+            if (sub) sub.textContent = "Done. Nothing else to do.";
+            button.remove();
+            remaining -= 1;
+            if (remainingEl) remainingEl.textContent = String(Math.max(remaining, 0));
+            if (remaining <= 0) {
+              if (summaryEl) summaryEl.classList.add("hidden");
+              if (hintEl) hintEl.classList.add("hidden");
+              if (doneEl) doneEl.classList.remove("hidden");
+            }
+          });
+        });
+      })();
+    </script>
+
+    <section id="promises" class="px-6 py-24">
+      <div class="mx-auto max-w-7xl">
+        <div class="mb-16 space-y-4">
+          <span class="font-mono text-xs uppercase tracking-[0.3em] text-outline">How it works</span>
+          <h2 class="font-display text-5xl">Three promises, kept daily.</h2>
+        </div>
+
+        <div class="grid gap-8 md:grid-cols-3">
+          <div class="atelier-card rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-8">
+            <span class="font-mono text-xs uppercase tracking-[0.2em] text-secondary">It remembers</span>
+            <h3 class="font-display mt-3 text-2xl leading-snug">Everything you'd rather not carry.</h3>
+            <p class="mt-4 text-sm leading-relaxed text-on-surface-variant">
+              Warranties, due dates, who said what, where the form went, what the doctor said in March. Written down once, found in a second, never lost between Tuesdays.
+            </p>
+          </div>
+
+          <div class="atelier-card rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-8">
+            <span class="font-mono text-xs uppercase tracking-[0.2em] text-secondary">You set the rules</span>
+            <h3 class="font-display mt-3 text-2xl leading-snug">It only does what you'd do.</h3>
+            <div class="mt-4 space-y-3">
+              <div class="rounded-xl border border-ember/20 bg-ember/10 px-4 py-3" style="transform: rotate(-1.5deg);">
+                <p class="font-display text-sm text-on-surface">"Flag anything over $40 for approval."</p>
+                <p class="mt-1 text-[11px] text-on-surface-variant">set by you, kept by your agent</p>
+              </div>
+              <div class="rounded-xl border border-ember/20 bg-ember/10 px-4 py-3" style="transform: rotate(1deg);">
+                <p class="font-display text-sm text-on-surface">"Nothing on the calendar before 10am."</p>
+                <p class="mt-1 text-[11px] text-on-surface-variant">your mornings stay yours</p>
+              </div>
+              <div class="rounded-xl border border-ember/20 bg-ember/10 px-4 py-3" style="transform: rotate(-0.5deg);">
+                <p class="font-display text-sm text-on-surface">"Always review replies to family before sending."</p>
+                <p class="mt-1 text-[11px] text-on-surface-variant">some things stay human</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="atelier-card rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-8">
+            <span class="font-mono text-xs uppercase tracking-[0.2em] text-secondary">It works ahead</span>
+            <h3 class="font-display mt-3 text-2xl leading-snug">Finished before you asked.</h3>
+            <div class="mt-4 space-y-3">
+              <div class="rounded-xl border border-outline-variant/10 bg-surface px-4 py-3">
+                <p class="text-[11px] uppercase tracking-wide text-outline">Thursday, 9:12pm</p>
+                <p class="mt-1 text-sm leading-relaxed text-on-surface">Grocery list drafted from what ran out this week. Waiting for your okay.</p>
+              </div>
+              <div class="rounded-xl border border-outline-variant/10 bg-surface px-4 py-3">
+                <p class="text-[11px] uppercase tracking-wide text-outline">Sunday, 7:40am</p>
+                <p class="mt-1 text-sm leading-relaxed text-on-surface">Pulled your renewal details and prepared a cheaper-plan comparison for review.</p>
+              </div>
+              <div class="rounded-xl border border-outline-variant/10 bg-surface px-4 py-3">
+                <p class="text-[11px] uppercase tracking-wide text-outline">Monday, 6:00am</p>
+                <p class="mt-1 text-sm leading-relaxed text-on-surface">Homework due dates pulled into one list. The essay is the one to start first.</p>
+              </div>
+            </div>
+            <p class="mt-4 text-xs text-on-surface-variant">Nothing sends, pays, or books until you say so.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="px-6 py-24">
+      <div class="mx-auto grid max-w-7xl gap-6 md:grid-cols-3">
+        <div class="atelier-card rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-6">
+          <div class="mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-secondary-container text-secondary">
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7m-9-2v10a1 1 0 001 1h3m10-11l2 2M5 10v10a1 1 0 001 1h3m10-11v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+            </svg>
+          </div>
+          <span class="font-mono text-xs uppercase tracking-[0.2em] text-secondary">For the busy parent</span>
+          <p class="mt-3 text-sm leading-relaxed text-on-surface-variant">School forms surfaced, dinner ideas queued from your list, bills due this week brought forward with approval-ready next steps. You clear the important things over coffee.</p>
+        </div>
+        <div class="atelier-card rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-6">
+          <div class="mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-primary-fixed text-primary">
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z"/>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"/>
+            </svg>
+          </div>
+          <span class="font-mono text-xs uppercase tracking-[0.2em] text-secondary">For the student</span>
+          <p class="mt-3 text-sm leading-relaxed text-on-surface-variant">Lecture slides, readings, rough notes, and late-night ideas become one connected study system with grounded answers first and reusable memory after.</p>
+        </div>
+        <div class="atelier-card rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-6">
+          <div class="mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-secondary-container text-secondary">
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+            </svg>
+          </div>
+          <span class="font-mono text-xs uppercase tracking-[0.2em] text-secondary">For everyone else</span>
+          <p class="mt-3 text-sm leading-relaxed text-on-surface-variant">The 23 emails become 2. Renewal options are brought forward for review. The thing you keep forgetting stops being your job to remember.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="students" class="px-6 py-24">
+      <div class="mx-auto max-w-7xl">
+        <div class="mb-12 max-w-4xl space-y-4">
+          <span class="font-mono text-xs uppercase tracking-[0.3em] text-outline">For uni students</span>
+          <h2 class="font-display text-4xl leading-tight md:text-5xl">Stop re-explaining yourself to every AI tool.</h2>
+          <p class="text-lg leading-relaxed text-on-surface-variant">
+            OmnyID is being built so a stressed student can attach one real class source, get a useful grounded answer in the first session, and leave behind connected notes, searchable concepts, and reusable study memory without manual folders or cleanup work.
+          </p>
+        </div>
+
+        <div class="mb-5 rounded-[1.75rem] border border-outline-variant/10 bg-surface-container-lowest p-6 shadow-sm">
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-outline">First 60 seconds</p>
+              <h3 class="mt-2 font-display text-3xl leading-tight">Immediate value before the student burns out.</h3>
+            </div>
+            <span class="rounded-full border border-primary/15 bg-primary-fixed/30 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.2em] text-primary">Grounded first run</span>
+          </div>
+          <div class="mt-5 grid gap-3 md:grid-cols-3">
+            <div class="rounded-2xl border border-outline-variant/10 bg-surface px-4 py-4">
+              <p class="font-mono text-[10px] uppercase tracking-[0.18em] text-outline">1. Attach one source</p>
+              <p class="mt-2 text-sm leading-6 text-on-surface-variant">Drop in lecture slides, a reading, rough notes, or a voice memo from the file picker.</p>
+            </div>
+            <div class="rounded-2xl border border-outline-variant/10 bg-surface px-4 py-4">
+              <p class="font-mono text-[10px] uppercase tracking-[0.18em] text-outline">2. Ask one real question</p>
+              <p class="mt-2 text-sm leading-6 text-on-surface-variant">Load a study prompt instead of writing from scratch and get a grounded answer from your own material.</p>
+            </div>
+            <div class="rounded-2xl border border-outline-variant/10 bg-surface px-4 py-4">
+              <p class="font-mono text-[10px] uppercase tracking-[0.18em] text-outline">3. Keep only what you want</p>
+              <p class="mt-2 text-sm leading-6 text-on-surface-variant">Choose to keep the original file, the extracted study content only, or nothing after the answer.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid gap-4 lg:grid-cols-[1fr_auto_1fr] lg:items-center">
+          <div class="space-y-3">
+            <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-outline">What you drop in</p>
+            <div class="rounded-2xl border border-outline-variant/10 bg-surface-container-lowest px-4 py-3 shadow-sm" style="transform: rotate(-2deg);">
+              <p class="text-sm font-medium text-on-surface">Lecture 4 slides.pdf</p>
+              <p class="mt-0.5 text-xs text-on-surface-variant">Dropped in from your downloads folder</p>
+            </div>
+            <div class="rounded-2xl border border-outline-variant/10 bg-surface-container-lowest px-4 py-3 shadow-sm" style="transform: rotate(1.5deg);">
+              <p class="text-sm font-medium text-on-surface">"Idea: tie the essay thesis to the week 3 reading" — 11:47pm</p>
+              <p class="mt-0.5 text-xs text-on-surface-variant">Captured before the thought disappears</p>
+            </div>
+            <div class="rounded-2xl border border-outline-variant/10 bg-surface-container-lowest px-4 py-3 shadow-sm" style="transform: rotate(-1deg);">
+              <p class="text-sm font-medium text-on-surface">Group project brief.docx</p>
+              <p class="mt-0.5 text-xs text-on-surface-variant">Shared in a group chat last Tuesday</p>
+            </div>
+          </div>
+
+          <div class="flex flex-col items-center gap-3 py-2 lg:px-2">
+            <svg class="h-6 w-6 rotate-90 text-outline lg:rotate-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+            </svg>
+            <div class="w-full space-y-2 rounded-2xl border border-primary/20 bg-primary-fixed/25 p-4 text-center">
+              <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-primary">Organizes once, compounds later</p>
+              <div class="mt-3 space-y-1.5">
+                <p class="rounded-lg bg-surface-container-lowest px-3 py-1.5 font-mono text-[11px] text-on-surface-variant">extracted study content</p>
+                <p class="rounded-lg bg-surface-container-lowest px-3 py-1.5 font-mono text-[11px] text-on-surface-variant">supertags + academic metadata</p>
+                <p class="rounded-lg bg-surface-container-lowest px-3 py-1.5 font-mono text-[11px] text-on-surface-variant">linked ideas + note chains</p>
+              </div>
+            </div>
+            <svg class="h-6 w-6 rotate-90 text-outline lg:rotate-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+            </svg>
+          </div>
+
+          <div class="atelier-card rounded-[1.5rem] border border-outline-variant/10 bg-surface-container-lowest p-5 shadow-sm">
+            <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-outline">Ask from your study focus</p>
+            <div class="mt-2 flex items-center gap-2 rounded-xl border border-outline-variant/20 bg-surface px-3 py-2">
+              <svg class="h-4 w-4 shrink-0 text-outline" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z"/>
+              </svg>
+              <span class="text-sm text-on-surface-variant">what's the thesis idea for the essay?</span>
+            </div>
+            <div class="mt-4 space-y-2">
+              <div class="rounded-xl border border-outline-variant/10 bg-surface px-3 py-2.5">
+                <p class="text-sm text-on-surface">Linked to <span class="font-medium">Lecture 4 slides</span>, the <span class="font-medium">week 3 reading</span>, and the same study thread in Files and the graph.</p>
+              </div>
+              <div class="flex flex-wrap gap-1.5">
+                <span class="rounded-full bg-secondary-container/60 px-2.5 py-1 font-mono text-[10px] text-secondary">essay</span>
+                <span class="rounded-full bg-secondary-container/60 px-2.5 py-1 font-mono text-[10px] text-secondary">week 3 reading</span>
+                <span class="rounded-full bg-secondary-container/60 px-2.5 py-1 font-mono text-[10px] text-secondary">study-ready</span>
+              </div>
+            </div>
+            <p class="mt-3 text-xs text-on-surface-variant">Found without folders. Continued without restating context.</p>
+          </div>
+        </div>
+
+        <div class="mt-5 grid gap-5 lg:grid-cols-2">
+          <div class="atelier-card rounded-[1.75rem] border border-outline-variant/10 bg-surface-container-lowest p-6 shadow-sm">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-outline">What stays after the answer</p>
+                <h3 class="mt-2 text-xl font-semibold">Not just a one-off chat reply.</h3>
+              </div>
+              <span class="rounded-full bg-secondary-container/55 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.2em] text-secondary">Student memory</span>
+            </div>
+            <div class="mt-4 space-y-3">
+              <div class="rounded-2xl border border-emerald-200/40 bg-emerald-50/60 p-4">
+                <p class="font-mono text-[10px] uppercase tracking-[0.16em] text-emerald-800">Files</p>
+                <p class="mt-2 text-sm leading-6 text-on-surface-variant">A searchable file surface with keyword and tag filtering, so students can find retained class material fast instead of browsing filenames.</p>
+              </div>
+              <div class="rounded-2xl border border-violet-200/40 bg-violet-50/55 p-4">
+                <p class="font-mono text-[10px] uppercase tracking-[0.16em] text-violet-800">Linked ideas</p>
+                <p class="mt-2 text-sm leading-6 text-on-surface-variant">Connected notes and the knowledge graph reuse the same supertags, course tags, week tags, and concept overlaps.</p>
+              </div>
+              <div class="rounded-2xl border border-amber-200/40 bg-amber-50/65 p-4">
+                <p class="font-mono text-[10px] uppercase tracking-[0.16em] text-amber-800">Optional Zettelkasten mode</p>
+                <p class="mt-2 text-sm leading-6 text-on-surface-variant">Students who want deliberate note development can grow source notes, literature notes, review queues, and permanent notes inside the same workspace.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="rounded-[1.75rem] border border-outline-variant/10 bg-surface-container-lowest p-6 shadow-sm">
+            <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-outline">Why this matters</p>
+            <p class="mt-3 text-sm leading-7 text-on-surface-variant">
+              Students do not want another notebook to maintain. They want the first useful answer to become reusable study memory automatically, with enough control to decide whether the system keeps the original file, the extracted content only, or nothing at all.
+            </p>
+          </div>
+        </div>
+
+        <div class="mt-10 rounded-2xl border border-outline-variant/10 bg-surface-container-lowest px-6 py-5 text-center">
+          <p class="font-display text-xl italic text-on-surface">Your data, your AI, your study system - never leased, never sold.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="px-6 py-24">
+      <div class="atelier-card mx-auto max-w-5xl rounded-3xl border border-outline-variant/10 bg-surface-container-lowest p-8 text-center sm:p-10">
+        <h2 class="font-display text-3xl sm:text-4xl">Locked, even to us.</h2>
+        <p class="mx-auto mt-4 max-w-2xl text-sm leading-relaxed text-on-surface-variant sm:text-base">
+          Your life is encrypted end to end with a key that never leaves your device. No inbox-reading humans, no ad trackers, nothing sold or shared. If someone knocked on our door for your data, we'd have nothing readable to hand over — just locks we can't open either.
+        </p>
+      </div>
+    </section>
+
+    <section id="trial-lab" class="bg-surface-container-low px-6 py-24">
+      <div class="mx-auto max-w-7xl space-y-8">
+        <div class="space-y-6">
+          <span class="font-mono text-xs uppercase tracking-[0.3em] text-outline">Anonymous Trial</span>
+          <div class="space-y-4">
+            <h2 class="font-display text-4xl leading-tight md:text-5xl">Try the hosted Python runner before you sign up.</h2>
+            <p class="max-w-2xl text-lg leading-8 text-on-surface-variant">
+              This is OmnyID's non-technical hosted runner path: sandboxed, template-led, and ephemeral. You get three template runs in twenty-four hours, ten chat turns per run, and no persistent files or memory.
+            </p>
+          </div>
+          <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <button id="trial-template-btn-travel_planner" data-trial-template="travel_planner" type="button" class="rounded-2xl border-2 border-primary/15 bg-primary-fixed/35 p-5 text-left transition hover:-translate-y-0.5 hover:border-primary/40">
+              <div class="font-mono text-[10px] uppercase tracking-[0.2em] text-primary">Starter 01</div>
+              <h3 class="mt-3 text-lg font-semibold">Travel Planner</h3>
+              <p class="mt-2 text-sm leading-7 text-on-surface-variant">Turn flights, hotels, and rough plans into a realistic day-by-day itinerary.</p>
+            </button>
+            <button id="trial-template-btn-research_assistant" data-trial-template="research_assistant" type="button" class="rounded-2xl border-2 border-outline-variant/20 bg-surface p-5 text-left transition hover:-translate-y-0.5 hover:border-primary/30">
+              <div class="font-mono text-[10px] uppercase tracking-[0.2em] text-outline">Starter 02</div>
+              <h3 class="mt-3 text-lg font-semibold">Research Assistant</h3>
+              <p class="mt-2 text-sm leading-7 text-on-surface-variant">Collect sources, summarize them, and capture the next actions.</p>
+            </button>
+            <button id="trial-template-btn-appointment_assistant" data-trial-template="appointment_assistant" type="button" class="rounded-2xl border-2 border-secondary/20 bg-secondary-container/35 p-5 text-left transition hover:-translate-y-0.5 hover:border-secondary/40">
+              <div class="font-mono text-[10px] uppercase tracking-[0.2em] text-secondary">Starter 03</div>
+              <h3 class="mt-3 text-lg font-semibold">Appointment Assistant</h3>
+              <p class="mt-2 text-sm leading-7 text-on-surface-variant">Draft reminder and booking prep flows without losing context.</p>
+            </button>
+            <button id="trial-template-btn-student_day_planner" data-trial-template="student_day_planner" type="button" class="rounded-2xl border-2 border-violet-200/40 bg-violet-50/60 p-5 text-left transition hover:-translate-y-0.5 hover:border-violet-300/60">
+              <div class="flex items-center justify-between gap-2">
+                <div class="font-mono text-[10px] uppercase tracking-[0.2em] text-violet-700">Starter 04</div>
+                <span class="rounded-full bg-white/80 px-2 py-0.5 font-mono text-[9px] uppercase tracking-widest text-violet-700">Student first run</span>
+              </div>
+              <h3 class="mt-3 text-lg font-semibold text-on-surface">Connected Study Workspace</h3>
+              <p class="mt-2 text-sm leading-7 text-on-surface-variant">Turn class material into grounded answers, linked notes, and a realistic next-study plan.</p>
+              <p class="mt-3 text-xs text-on-surface-variant">Best for lecture slides, readings, rough notes, and exam-focused follow-up questions.</p>
+            </button>
+          </div>
+        </div>
+
+        <div class="rounded-[2rem] border border-outline-variant/15 bg-surface-container-lowest p-6 shadow-sm">
+          <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+            <div>
+              <div class="font-mono text-[10px] uppercase tracking-[0.2em] text-outline">Python Runner Trial</div>
+              <h3 class="mt-2 text-2xl font-semibold">Ephemeral agent IDE</h3>
+            </div>
+            <div id="trial-feedback" class="rounded-xl bg-surface-container-low px-4 py-3 text-sm text-on-surface-variant">
+              No trial session yet.
+            </div>
+          </div>
+          <div class="mt-6">
+            <div class="space-y-4">
+              <div id="trial-messages" class="max-h-[28rem] overflow-y-auto rounded-2xl border border-outline-variant/15 bg-surface p-4 text-sm leading-7 text-on-surface-variant">
+                <p>Pick a starter to begin the anonymous runner trial.</p>
+              </div>
+              <div id="trial-calendar-view" class="hidden rounded-2xl border border-primary/20 bg-surface p-4"></div>
+              <form id="trial-chat-form" class="space-y-3">
+                <textarea id="trial-chat-input" class="min-h-[8rem] w-full rounded-2xl border border-outline-variant bg-surface px-4 py-4 outline-none focus:border-primary" placeholder="Paste lecture notes, a reading excerpt, or an assignment brief, then ask what to revise first."></textarea>
+                <div class="rounded-2xl border border-outline-variant/15 bg-surface-container-lowest p-4">
+                  <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-outline">No file handy?</p>
+                      <p class="mt-1 text-sm leading-6 text-on-surface-variant">Run a sample study source to preview the same workflow as a lecture slide, reading, or assignment upload.</p>
+                    </div>
+                  </div>
+                  <div class="mt-3 flex flex-wrap gap-2">
+                    <button data-trial-sample-source="lecture" type="button" class="rounded-xl border border-violet-200/50 bg-violet-50/70 px-3 py-2 text-xs font-semibold text-violet-800 transition hover:bg-violet-50">
+                      Run lecture notes
+                    </button>
+                    <button data-trial-sample-source="reading" type="button" class="rounded-xl border border-emerald-200/50 bg-emerald-50/70 px-3 py-2 text-xs font-semibold text-emerald-800 transition hover:bg-emerald-50">
+                      Run reading excerpt
+                    </button>
+                    <button data-trial-sample-source="assignment" type="button" class="rounded-xl border border-sky-200/50 bg-sky-50/70 px-3 py-2 text-xs font-semibold text-sky-800 transition hover:bg-sky-50">
+                      Run assignment brief
+                    </button>
+                  </div>
+                </div>
+                <div class="flex flex-wrap gap-3">
+                  <button id="trial-chat-submit" type="submit" class="rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-wait disabled:opacity-60">
+                    Send to trial runner
+                  </button>
+                  <button id="trial-convert-button" type="button" class="rounded-xl border border-outline-variant bg-surface px-5 py-3 text-sm font-semibold text-on-surface transition hover:bg-surface-container-low">
+                    Unlock private workspace
+                  </button>
+                </div>
+              </form>
+            </div>
+            <div class="mt-4 space-y-4">
+              <div id="trial-student-value-panel" class="hidden rounded-[1.5rem] border border-violet-200/40 bg-violet-50/55 p-5 shadow-sm">
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-violet-700">Connected study preview</p>
+                    <h4 class="mt-2 text-lg font-semibold text-on-surface">What this student run is proving</h4>
+                  </div>
+                  <span class="rounded-full bg-white/80 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.18em] text-violet-700">Preview only</span>
+                </div>
+                <div id="trial-student-value-content" class="mt-4 space-y-3">
+                  <p class="text-sm leading-6 text-on-surface-variant">Choose the Connected Study Workspace starter to see how a first run turns class material into reusable study structure.</p>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <div class="rounded-2xl border border-outline-variant/15 bg-surface-container-lowest p-5">
+          <div class="font-mono text-[10px] uppercase tracking-[0.2em] text-primary">Trial limits</div>
+          <div id="trial-usage-summary" class="mt-3 text-sm leading-7 text-on-surface-variant">
+            Choose a starter to begin. OmnyID will keep this trial ephemeral and ask you to sign in before anything becomes persistent.
+          </div>
+          <div class="mt-4 flex flex-wrap gap-3">
+            <a href="/workspace/?auth=signin&amp;source=marketing" data-open-auth class="rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-white transition hover:opacity-90">
+              Continue with account
+            </a>
+            <a href="/workspace/?auth=agent-id&amp;source=marketing" data-open-auth data-auth-mode="advanced-agent-id" class="rounded-xl border border-outline-variant bg-surface px-5 py-3 text-sm font-semibold text-on-surface transition hover:bg-surface-container-low">
+              Agent ID only
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="wedding-couples" class="px-6 py-24">
+      <div class="mx-auto grid max-w-7xl gap-10 rounded-2xl border border-outline-variant/15 bg-surface-container-lowest p-8 md:grid-cols-[1.15fr_.85fr] md:p-12">
+        <div>
+          <span class="font-mono text-xs uppercase tracking-[0.3em] text-outline">For wedding couples</span>
+          <h2 class="mt-4 font-display text-4xl leading-tight md:text-5xl">One connected place for the plan behind the day.</h2>
+          <p class="mt-5 max-w-2xl text-lg leading-8 text-on-surface-variant">OmnyID Wedding keeps vendor research, quote comparisons, budget commitments, guests and deadlines connected while the couple stays in control of every outward message.</p>
+          <a href="/wedding/" class="mt-7 inline-flex rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-white transition hover:opacity-90">Explore OmnyID Wedding</a>
+        </div>
+        <dl class="grid gap-3 self-center text-sm">
+          <div class="rounded-xl bg-surface-container-low p-4"><dt class="font-semibold text-on-surface">Compare with context</dt><dd class="mt-1 leading-6 text-on-surface-variant">Keep original quotes beside normalised inclusions, unknowns and follow-up questions.</dd></div>
+          <div class="rounded-xl bg-surface-container-low p-4"><dt class="font-semibold text-on-surface">Plan from one source</dt><dd class="mt-1 leading-6 text-on-surface-variant">A confirmed choice can update the budget, booking, task and decision trail together.</dd></div>
+          <div class="rounded-xl bg-surface-container-low p-4"><dt class="font-semibold text-on-surface">Approve before sending</dt><dd class="mt-1 leading-6 text-on-surface-variant">Recipients, content and shared details remain visible before an enquiry leaves the workspace.</dd></div>
+        </dl>
+      </div>
+    </section>
+
+    <section id="problem" class="bg-surface-container-low px-6 py-24">
+      <div class="mx-auto max-w-3xl space-y-8 text-center">
+        <span class="font-mono text-xs uppercase tracking-[0.3em] text-outline">The Problem</span>
+        <h2 class="font-display text-4xl leading-tight md:text-5xl">You're drowning in digital noise and don't have time to sort through it.</h2>
+        <p class="text-xl leading-relaxed text-on-surface-variant">
+          Your inbox has 2,000 unread emails. Your notes are scattered across Notion, Apple Notes, and random Google Docs. You have 47 browser tabs open "for later." That important task from last Tuesday? Buried somewhere in a Slack thread you can't find. You know you should organize it all, but who has the time? Between work, life, and trying to stay sane, the digital mess just keeps piling up.
+        </p>
+      </div>
+    </section>
+
+    <section id="features" class="px-6 py-24">
+      <div class="mx-auto max-w-7xl">
+        <div class="mb-16 space-y-4">
+          <span class="font-mono text-xs uppercase tracking-[0.3em] text-outline">Capabilities</span>
+          <h2 class="font-display text-5xl">Built to be trusted with everything.</h2>
+        </div>
+
+        <div class="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+          <div class="atelier-card rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-8">
+            <div class="mb-6 flex h-10 w-10 items-center justify-center rounded-full bg-secondary-container text-secondary">
+              <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
+              </svg>
+            </div>
+            <h3 class="mb-3 text-lg font-semibold">Sovereign Agent ID</h3>
+            <p class="text-sm leading-relaxed text-on-surface-variant">
+              A unique cryptographic identity that exists outside any central identity silo. Your identity is a protocol, not a row in someone else's table.
+            </p>
+            <code class="mt-4 block bg-surface-container-high p-2 font-mono text-xs text-primary/70">omnyid://agent/0x4f2...9k2e</code>
+          </div>
+
+          <div class="atelier-card rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-8">
+            <div class="mb-6 flex h-10 w-10 items-center justify-center rounded-full bg-primary-fixed text-primary">
+              <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+              </svg>
+            </div>
+            <h3 class="mb-3 text-lg font-semibold">Native E2EE</h3>
+            <p class="text-sm leading-relaxed text-on-surface-variant">
+              Agent relay messages are encrypted by default. The host can route and store ciphertext, but not inspect the protected content path.
+            </p>
+            <span class="mt-4 block font-mono text-[10px] uppercase tracking-widest text-outline">Standard: XChaCha20-Poly1305</span>
+          </div>
+
+          <div class="atelier-card rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-8">
+            <div class="mb-6 flex h-10 w-10 items-center justify-center rounded-full bg-secondary-container text-secondary">
+              <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+              </svg>
+            </div>
+            <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <h3 class="text-lg font-semibold">Real Email Gateway</h3>
+              <span class="rounded-full bg-amber-100 px-2.5 py-1 font-mono text-[9px] font-semibold uppercase tracking-widest text-amber-800">Tester only</span>
+            </div>
+            <p class="text-sm leading-relaxed text-on-surface-variant">
+              Connect Gmail, Outlook, or custom IMAP/SMTP providers. Your agent keeps one shared AFP thread history while still interoperating with normal inboxes.
+            </p>
+          </div>
+
+          <div class="atelier-card rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-8">
+            <div class="mb-6 flex h-10 w-10 items-center justify-center rounded-full bg-primary-fixed text-primary">
+              <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+              </svg>
+            </div>
+            <h3 class="mb-3 text-lg font-semibold">Local-first sync</h3>
+            <p class="text-sm leading-relaxed text-on-surface-variant">
+              Built for append-only message history, encrypted storage, and future device sync without giving up ownership or control.
+            </p>
+          </div>
+
+          <div class="atelier-card rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-8">
+            <div class="mb-6 flex h-10 w-10 items-center justify-center rounded-full bg-secondary-container text-secondary">
+              <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+              </svg>
+            </div>
+            <h3 class="mb-3 text-lg font-semibold">Daily decision briefing</h3>
+            <p class="text-sm leading-relaxed text-on-surface-variant">
+              Your inbox, calendar, and notes are read once a day and reduced to the handful of things that actually need a decision from you — not another feed to manage.
+            </p>
+          </div>
+
+          <div class="atelier-card rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-8">
+            <div class="mb-6 flex h-10 w-10 items-center justify-center rounded-full bg-primary-fixed text-primary">
+              <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+              </svg>
+            </div>
+            <h3 class="mb-3 text-lg font-semibold">Approval &amp; audit trail</h3>
+            <p class="text-sm leading-relaxed text-on-surface-variant">
+              Every drafted reply, booking, or payment sits in a queue until you approve it. Every action taken is signed, logged, and reversible.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="roadmap" class="bg-surface-container-low px-6 py-24">
+      <div class="mx-auto max-w-7xl">
+        <div class="mb-16">
+          <span class="font-mono text-xs uppercase tracking-[0.3em] text-outline">The Path Forward</span>
+          <h2 class="mt-4 font-display text-5xl">Roadmap</h2>
+        </div>
+
+        <div class="relative">
+          <div class="absolute left-0 top-1/2 hidden h-px w-full -translate-y-1/2 bg-outline-variant/30 md:block"></div>
+          <div class="relative z-10 flex flex-col gap-12 md:flex-row">
+            <div class="flex-1 space-y-4">
+              <div class="mb-8 h-4 w-4 rounded-full bg-secondary ring-4 ring-secondary-container"></div>
+              <span class="font-mono text-xs text-secondary">Q1 2026</span>
+              <h4 class="font-bold">Core protocol beta</h4>
+              <p class="text-xs text-on-surface-variant">AFP v1 stable, Rust homeserver, Python and TypeScript SDKs, AgentCard discovery, encrypted relay, append-only storage.</p>
+            </div>
+            <div class="flex-1 space-y-4">
+              <div class="mb-8 h-4 w-4 rounded-full bg-secondary ring-4 ring-secondary-container"></div>
+              <span class="font-mono text-xs text-secondary">Q2 2026</span>
+              <h4 class="font-bold">Gateway and cloud alpha</h4>
+              <p class="text-xs text-on-surface-variant">OAuth-based email gateway, Oracle deploy, private preview onboarding, and secure relay defaults.</p>
+            </div>
+            <div class="flex-1 space-y-4">
+              <div class="mb-8 h-4 w-4 rounded-full bg-secondary ring-4 ring-secondary-container"></div>
+              <span class="font-mono text-xs text-secondary">Q3 2026</span>
+              <h4 class="font-bold">Private runtime templates</h4>
+              <p class="text-xs text-on-surface-variant">One-click private agent runtimes with per-user isolation, secrets, approvals, and runtime management.</p>
+            </div>
+            <div class="flex-1 space-y-4">
+              <div class="relative mb-8 h-4 w-4">
+                <div class="absolute inset-0 h-4 w-4 animate-ping rounded-full bg-primary/50"></div>
+                <div class="relative h-4 w-4 rounded-full bg-primary ring-4 ring-primary-fixed"></div>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="font-mono text-xs font-semibold text-primary">Q4 2026</span>
+                <span class="rounded-full bg-primary/10 px-2 py-0.5 font-mono text-[9px] uppercase tracking-widest text-primary">In progress</span>
+              </div>
+              <h4 class="font-bold">Workspace and ecosystem</h4>
+              <p class="text-xs text-on-surface-variant">Richer canvas UI, capability marketplace, local personalization, and hardened sync across devices.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="waitlist" class="px-6 py-24">
+      <div class="mx-auto max-w-5xl">
+        <div class="relative overflow-hidden rounded-3xl bg-on-surface p-12 shadow-2xl shadow-primary/20 md:p-20">
+          <div class="absolute -right-24 -top-24 h-96 w-96 rounded-full bg-primary/20 blur-[120px]"></div>
+          <div class="absolute -bottom-24 -left-24 h-64 w-64 rounded-full bg-secondary/10 blur-[100px]"></div>
+
+          <div class="relative z-10 grid gap-12 md:grid-cols-2 md:items-center">
+            <div class="space-y-6">
+              <h2 class="font-display text-4xl text-surface">Join the waitlist for the private beta.</h2>
+              <p class="text-lg font-light text-surface/60">Secure your sovereign handle and be among the first to deploy an OmnyID agent.</p>
+            </div>
+            <div>
+              <form id="waitlist-form" class="space-y-4">
+                <div class="space-y-2">
+                  <label class="font-mono text-xs uppercase tracking-widest text-surface/40" for="waitlist-email">Email Address</label>
+                  <input
+                    id="waitlist-email"
+                    type="email"
+                    class="w-full rounded-lg border border-white/10 bg-surface/10 p-4 text-surface placeholder:text-surface/30 focus:border-primary/50 focus:outline-none"
+                    placeholder="you@example.com"
+                  >
+                </div>
+                <button type="submit" class="w-full rounded-lg bg-surface py-4 font-bold text-on-surface transition hover:bg-primary-fixed">
+                  Request Access
+                </button>
+                <p id="waitlist-feedback" class="text-sm text-surface/70"></p>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="login" class="sr-only" aria-hidden="true"></div>
+  <!--
+  Preview sign-in/register popup — retired in favor of the real sign-in form in
+  the /workspace/ app. Every data-open-auth trigger (including "Offload my
+  stress") now redirects straight to "/workspace/?auth=...&source=marketing"
+  (see redirectToActualSignIn in app.js) instead of opening this modal, and
+  password resets are served by /workspace/ directly too (see the Caddyfile's
+  "handle /reset-password" block). Left commented out rather than deleted so
+  the markup and its ids (referenced defensively, with null checks, throughout
+  app.js) are easy to restore if the /workspace/ flow ever needs a fallback.
+  <div id="auth-modal" class="fixed inset-0 z-50 hidden overflow-y-auto bg-on-surface/50 p-4 sm:p-6">
+    <div class="mx-auto my-4 w-full max-w-5xl rounded-[2rem] bg-surface p-6 shadow-panel pointer-events-auto sm:my-8 sm:p-8 max-h-[calc(100vh-2rem)] overflow-y-auto overscroll-contain">
+      <div class="mb-8 flex items-start justify-between gap-4">
+        <div>
+          <div id="auth-kicker" class="font-mono text-[11px] uppercase tracking-[0.2em] text-on-surface-variant">Start your private assistant</div>
+          <h2 id="auth-title" class="mt-2 font-display text-4xl">Sign in to the private preview.</h2>
+          <p id="auth-description" class="mt-3 max-w-xl text-sm leading-7 text-on-surface-variant">
+            Use a custom email and password or continue with Google. After signup, OmnyID will seed a private agent workspace and guide you through the next setup steps.
+          </p>
+        </div>
+        <button type="button" data-close-auth class="rounded-full border border-outline px-4 py-2 text-sm font-medium text-on-surface transition hover:bg-surface-container-low">
+          Close
+        </button>
+      </div>
+
+      <div id="privacy-mode-panel" class="hidden mb-8 space-y-4 rounded-2xl border border-outline-variant/20 bg-surface-container-lowest p-6">
+        <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+          <div>
+            <div class="font-mono text-[11px] uppercase tracking-[0.2em] text-primary">Choose your privacy mode</div>
+            <h3 class="mt-2 text-xl font-semibold">Pick the setup that matches your trust boundary.</h3>
+            <p class="mt-2 max-w-2xl text-sm leading-7 text-on-surface-variant">
+              OmnyID is the control plane. Your actual assistant runtime should live either on your machine, in your cloud account, or in a clearly disclosed managed environment.
+            </p>
+          </div>
+          <div id="platform-estimate" class="rounded-xl bg-surface-container-low px-4 py-3 text-sm text-on-surface-variant">
+            Detecting your device and rough install time...
+          </div>
+        </div>
+        <div class="grid gap-4 md:grid-cols-3">
+          <article class="rounded-xl border border-primary/20 bg-primary-fixed/35 p-5">
+            <div class="font-mono text-[10px] uppercase tracking-[0.2em] text-primary">Recommended</div>
+            <h4 class="mt-3 text-base font-semibold">OmnyID Cloud</h4>
+            <p class="mt-2 text-sm leading-6 text-on-surface-variant">OmnyID hosts the runtime for you — fastest setup with one isolated runtime, storage, and secret boundary per customer.</p>
+            <p class="mt-3 font-mono text-[11px] text-on-surface-variant">Typical setup: 5 to 15 minutes after signup. Ready to use immediately.</p>
+            <button type="button" data-select-privacy-mode="managed_private" class="mt-4 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white transition hover:opacity-90">
+              Choose OmnyID Cloud
+            </button>
+          </article>
+          <article class="rounded-xl border border-outline-variant/20 bg-surface p-5">
+            <div class="font-mono text-[10px] uppercase tracking-[0.2em] text-outline">Local install</div>
+            <h4 class="mt-3 text-base font-semibold">Local Private</h4>
+            <p class="mt-2 text-sm leading-6 text-on-surface-variant">Runs on your own machine. Strongest privacy for personal use.</p>
+            <p class="mt-3 font-mono text-[11px] text-on-surface-variant">Typical setup: 15 to 50 minutes depending on bandwidth and Docker readiness.</p>
+            <button type="button" data-select-privacy-mode="local_private" class="mt-4 rounded-xl border border-outline-variant bg-surface-container-low px-4 py-3 text-sm font-semibold text-on-surface transition hover:bg-surface">
+              Choose Local Private
+            </button>
+          </article>
+          <article class="rounded-xl border border-outline-variant/20 bg-surface p-5">
+            <div class="font-mono text-[10px] uppercase tracking-[0.2em] text-outline">Best hosted privacy</div>
+            <h4 class="mt-3 text-base font-semibold">Private Cloud in Your Account</h4>
+            <p class="mt-2 text-sm leading-6 text-on-surface-variant">OmnyID provisions into your Oracle, UpCloud, or OVHcloud account so you keep the infrastructure boundary.</p>
+            <p class="mt-3 font-mono text-[11px] text-on-surface-variant">Typical setup: 10 to 25 minutes once cloud credentials and a region are ready.</p>
+            <button type="button" data-select-privacy-mode="private_hosted" class="mt-4 rounded-xl border border-outline-variant bg-surface-container-low px-4 py-3 text-sm font-semibold text-on-surface transition hover:bg-surface">
+              Choose Private Cloud
+            </button>
+          </article>
+        </div>
+        <div class="rounded-xl bg-surface-container-low p-4">
+          <div class="font-mono text-[10px] uppercase tracking-[0.2em] text-primary">Selected path</div>
+          <p id="privacy-path-summary" class="mt-2 text-sm leading-7 text-on-surface-variant">
+            OmnyID Cloud is the fastest path to your first running agent. OmnyID hosts the runtime with one isolated runtime, storage volume, and secret boundary per customer.
+          </p>
+        </div>
+        <p class="text-xs leading-6 text-on-surface-variant">
+          Already built agents elsewhere? Use the advanced `Agent ID only` route to mint identity and relay infrastructure without changing your existing runtime.
+        </p>
+      </div>
+
+      <div class="grid gap-8 lg:grid-cols-2">
+        <div class="space-y-6 rounded-2xl border border-outline-variant/20 bg-surface-container-lowest p-6">
+          <form id="login-form" class="space-y-4">
+            <div>
+              <h3 class="text-lg font-semibold">Sign in with custom email and password</h3>
+              <p class="mt-2 text-sm text-on-surface-variant">Use the preview account or your existing OmnyID password account.</p>
+            </div>
+            <label class="grid gap-2 text-sm font-semibold">
+              Email
+              <input id="login-email" type="email" class="rounded-xl border border-outline-variant bg-surface-container-low px-4 py-3 outline-none focus:border-primary" placeholder="preview-user@omnyid.com">
+            </label>
+            <label class="grid gap-2 text-sm font-semibold">
+              Password
+              <input id="login-password" type="password" class="rounded-xl border border-outline-variant bg-surface-container-low px-4 py-3 outline-none focus:border-primary" placeholder="Enter your password">
+            </label>
+            <button type="button" id="forgot-password-link" class="text-left text-xs font-medium text-primary hover:underline">
+              Forgot password?
+            </button>
+            <p id="login-feedback" class="text-sm text-on-surface-variant"></p>
+            <button type="submit" class="w-full cursor-pointer rounded-xl border border-outline-variant bg-surface px-5 py-4 font-medium text-on-surface transition hover:bg-surface-container-low">
+              Sign in
+            </button>
+          </form>
+
+          <form id="forgot-password-form" class="hidden space-y-4">
+            <div>
+              <h3 class="text-lg font-semibold">Reset your password</h3>
+              <p class="mt-2 text-sm text-on-surface-variant">Enter your account email and we'll send you a link to reset your password.</p>
+            </div>
+            <label class="grid gap-2 text-sm font-semibold">
+              Email
+              <input id="forgot-password-email" type="email" class="rounded-xl border border-outline-variant bg-surface-container-low px-4 py-3 outline-none focus:border-primary" placeholder="you@yourdomain.com">
+            </label>
+            <button type="submit" class="w-full cursor-pointer rounded-xl bg-primary px-5 py-4 font-medium text-white transition hover:opacity-90">
+              Send reset link
+            </button>
+            <button type="button" id="back-to-sign-in-link" class="w-full text-center text-xs font-medium text-on-surface-variant hover:underline">
+              ← Back to sign in
+            </button>
+          </form>
+
+          <form id="reset-password-form" class="hidden space-y-4">
+            <div>
+              <h3 class="text-lg font-semibold">Set a new password</h3>
+              <p class="mt-2 text-sm text-on-surface-variant">Choose a new password for your account.</p>
+            </div>
+            <label class="grid gap-2 text-sm font-semibold">
+              New password
+              <input id="reset-password-new" type="password" class="rounded-xl border border-outline-variant bg-surface-container-low px-4 py-3 outline-none focus:border-primary" placeholder="Use at least 8 characters">
+            </label>
+            <button type="submit" class="w-full cursor-pointer rounded-xl bg-primary px-5 py-4 font-medium text-white transition hover:opacity-90">
+              Reset password
+            </button>
+          </form>
+
+          <div class="h-px bg-outline-variant/20"></div>
+
+          <form id="register-form" class="space-y-4">
+            <div>
+              <h3 class="text-lg font-semibold">Start your private assistant</h3>
+              <p class="mt-2 text-sm text-on-surface-variant">Create a private preview account, launch your workspace, and let OmnyID provision the Agent ID underneath.</p>
+            </div>
+            <div class="rounded-xl border border-outline-variant/15 bg-surface-container-low p-4">
+              <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-primary">What changes once you're in</p>
+              <ul class="mt-3 space-y-2 text-sm leading-6 text-on-surface-variant">
+                <li>1 GB of private storage included from day one, encrypted before it leaves your device — no plan to pick, no card required to start (2 GB on the paid plan, with explicit add-ons available later).</li>
+                <li>The morning inbox triage you do on autopilot shrinks to a two-minute approval pass over coffee.</li>
+                <li>The low background worry of "did I forget something" finally has somewhere to live that isn't your head.</li>
+              </ul>
+            </div>
+          <label class="grid gap-2 text-sm font-semibold">
+            Display name
+            <input id="register-display-name" class="rounded-xl border border-outline-variant bg-surface-container-low px-4 py-3 outline-none focus:border-primary" placeholder="Joe">
+          </label>
+          <label class="grid gap-2 text-sm font-semibold">
+            Email
+            <input id="register-email" type="email" class="rounded-xl border border-outline-variant bg-surface-container-low px-4 py-3 outline-none focus:border-primary" placeholder="you@yourdomain.com">
+          </label>
+          <label class="grid gap-2 text-sm font-semibold">
+            Password
+            <input id="register-password" type="password" class="rounded-xl border border-outline-variant bg-surface-container-low px-4 py-3 outline-none focus:border-primary" placeholder="Use at least 8 characters">
+          </label>
+          <button type="submit" class="w-full cursor-pointer rounded-xl bg-primary px-5 py-4 font-medium text-white transition hover:opacity-90">
+            Start private workspace
+          </button>
+          <p class="text-xs leading-6 text-on-surface-variant">
+            We'll email you a link to verify your address — click it to finish establishing the account before you sign in.
+          </p>
+          <p class="text-xs leading-6 text-on-surface-variant">
+            Already built your own agent stack? You can still use this same flow just to mint and manage an OmnyID Agent ID.
+          </p>
+        </form>
+      </div>
+
+        <div class="space-y-4 rounded-2xl border border-outline-variant/20 bg-surface-container-lowest p-6">
+          <div>
+            <h3 class="text-lg font-semibold">Continue with Google</h3>
+            <p class="mt-2 text-sm text-on-surface-variant">Google sign-in uses popup mode and keeps OmnyID account creation inside the same private preview flow.</p>
+          </div>
+          <div class="overflow-hidden">
+            <div id="google-signin-button" class="min-h-[44px] max-w-xs"></div>
+          </div>
+          <div class="rounded-xl bg-primary-fixed/40 p-4 text-sm leading-7 text-on-surface-variant">
+            Google sign-in creates the same private account workspace. You can still later connect custom email, approvals, and private runtime deployment from the dashboard.
+          </div>
+        </div>
+      </div>
+
+      <p id="auth-feedback" class="mt-4 text-center text-sm text-on-surface-variant"></p>
+
+      <div class="mt-6 border-t border-outline-variant/20 pt-6 text-center">
+        <p class="text-sm text-on-surface-variant">Not ready to sign in?</p>
+        <button
+          id="continue-as-guest-button"
+          type="button"
+          class="mt-3 rounded-xl border border-outline-variant bg-surface px-6 py-3 text-sm font-medium text-on-surface transition hover:bg-surface-container-low"
+        >
+          Continue as guest
+        </button>
+        <p class="mt-2 text-xs leading-6 text-on-surface-variant">
+          Guest access includes sandbox isolation, up to 3 sessions, and rate-limited tools. Sign in anytime to unlock the full workspace.
+        </p>
+      </div>
+    </div>
+  </div>
+  -->
+
+  <div id="agent-console" class="hidden hidden-until-auth px-6 pb-24 pt-8">
+    <div class="mx-auto max-w-7xl space-y-8">
+      <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <div class="font-mono text-[11px] uppercase tracking-[0.2em] text-on-surface-variant">Agent Console</div>
+          <h2 class="mt-2 font-display text-4xl">Manage your agents.</h2>
+          <p id="session-summary" class="mt-3 text-sm leading-7 text-on-surface-variant"></p>
+        </div>
+        <div class="flex flex-wrap gap-3">
+          <button id="export-dashboard-button" class="rounded-full border border-outline-variant bg-surface px-5 py-3 text-sm font-medium text-on-surface transition hover:bg-surface-container-low">
+            Export workspace JSON
+          </button>
+          <button id="sign-out-button" class="rounded-full border border-outline-variant bg-surface px-5 py-3 text-sm font-medium text-on-surface transition hover:bg-surface-container-low">
+            Sign out
+          </button>
+        </div>
+      </div>
+      <p id="export-dashboard-feedback" class="text-sm text-on-surface-variant">Export gives you a bounded local JSON copy of your dashboard state, onboarding, support-access history, account sessions, recent AFP activity, and runtime metadata.</p>
+
+      <section class="rounded-2xl border border-outline-variant/10 bg-surface-container-lowest p-6">
+        <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <div>
+            <div class="font-mono text-[10px] uppercase tracking-[0.2em] text-outline">Account Security</div>
+            <h3 class="mt-2 text-xl font-semibold">Active sessions</h3>
+            <p class="mt-2 text-sm leading-7 text-on-surface-variant">Review the sessions currently signed into this hosted account. Revoke stale sessions without operator help.</p>
+          </div>
+          <button id="revoke-other-sessions-button" type="button" class="rounded-xl border border-outline-variant bg-surface px-4 py-3 text-sm font-semibold text-on-surface transition hover:bg-surface-container-low">
+            Revoke other sessions
+          </button>
+        </div>
+        <details class="mt-4 group">
+          <summary class="cursor-pointer list-none rounded-xl border border-outline-variant/30 bg-surface px-4 py-3 text-sm font-medium text-on-surface-variant transition hover:bg-surface-container-low flex items-center justify-between">
+            <span>Show active sessions</span>
+            <svg class="h-4 w-4 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+            </svg>
+          </summary>
+          <div class="mt-3 space-y-3">
+            <p id="session-security-feedback" class="text-sm text-on-surface-variant">OmnyID keeps session control in your hands.</p>
+            <div id="session-list" class="space-y-3">
+              <p class="text-sm text-on-surface-variant">No active sessions loaded yet.</p>
+            </div>
+          </div>
+        </details>
+      </section>
+
+      <section class="rounded-2xl border border-outline-variant/10 bg-surface-container-lowest p-8">
+        <h3 class="mb-4 text-xl font-semibold">Your Agents</h3>
+        <div id="agents-grid" class="space-y-3"></div>
+      </section>
+
+      <section class="rounded-2xl border border-outline-variant/10 bg-surface-container-lowest p-8">
+          <div class="mb-6 flex items-center justify-between gap-4">
+            <div>
+              <h3 class="text-xl font-semibold">Agent setup</h3>
+              <p class="mt-2 text-sm leading-7 text-on-surface-variant">Finish the secure onboarding steps, then enable private runtime deployment for your account.</p>
+            </div>
+          </div>
+          <div class="grid gap-4 md:grid-cols-3">
+            <article class="atelier-card rounded-xl border border-outline-variant/15 bg-surface p-5">
+              <div class="font-mono text-[10px] uppercase tracking-[0.2em] text-primary">Step 1</div>
+              <h4 class="mt-3 text-base font-semibold">Agent ID created</h4>
+              <p class="mt-2 text-sm leading-6 text-on-surface-variant">Your private OmnyID account and base agent identity are live.</p>
+            </article>
+            <article class="atelier-card rounded-xl border border-outline-variant/15 bg-surface p-5">
+              <div class="font-mono text-[10px] uppercase tracking-[0.2em] text-outline">Step 2</div>
+              <h4 class="mt-3 text-base font-semibold">Optional human inbox link</h4>
+              <p class="mt-2 text-sm leading-6 text-on-surface-variant">Link Gmail or a custom domain only if you want human email ingested into your private AFP history.</p>
+            </article>
+            <article class="atelier-card rounded-xl border border-outline-variant/15 bg-surface p-5">
+              <div class="font-mono text-[10px] uppercase tracking-[0.2em] text-outline">Step 3</div>
+              <h4 class="mt-3 text-base font-semibold">Private runtime</h4>
+              <p class="mt-2 text-sm leading-6 text-on-surface-variant">One-click Crew runtime stays locked behind per-user isolation and approval policy.</p>
+            </article>
+          </div>
+          <form id="setup-form" class="mt-6 grid gap-4 rounded-2xl border border-outline-variant/15 bg-surface p-5 md:grid-cols-2">
+            <label class="grid gap-2 text-sm font-semibold">
+              Privacy mode
+              <select id="setup-privacy-mode" class="rounded-xl border border-outline-variant bg-surface-container-low px-4 py-3 outline-none focus:border-primary">
+                <option value="managed_private">OmnyID Cloud</option>
+                <option value="local_private">Local Private</option>
+                <option value="private_hosted">Private Cloud in Your Account</option>
+              </select>
+            </label>
+            <label class="grid gap-2 text-sm font-semibold">
+              Deployment target
+              <select id="setup-deployment-target" class="rounded-xl border border-outline-variant bg-surface-container-low px-4 py-3 outline-none focus:border-primary">
+                <option value="local_machine">This device</option>
+                <option value="oracle_cloud">Oracle Cloud</option>
+                <option value="upcloud">UpCloud</option>
+                <option value="ovhcloud">OVHcloud</option>
+                <option value="managed_omnyid">Managed by OmnyID</option>
+              </select>
+            </label>
+            <label class="grid gap-2 text-sm font-semibold">
+              Optional human inbox provider
+              <select id="setup-email-provider" class="rounded-xl border border-outline-variant bg-surface-container-low px-4 py-3 outline-none focus:border-primary">
+                <option value="">Select provider</option>
+                <option value="gmail_oauth">Gmail OAuth</option>
+                <option value="custom_imap_smtp">Custom mailbox / IMAP</option>
+              </select>
+            </label>
+            <label class="grid gap-2 text-sm font-semibold">
+              Optional linked email address
+              <input id="setup-email-address" type="email" class="rounded-xl border border-outline-variant bg-surface-container-low px-4 py-3 outline-none focus:border-primary" placeholder="you@yourdomain.com">
+            </label>
+            <label class="grid gap-2 text-sm font-semibold">
+              Agent runtime mode
+              <select id="setup-llm-mode" class="rounded-xl border border-outline-variant bg-surface-container-low px-4 py-3 outline-none focus:border-primary">
+                <option value="byo_or_local">Bring your own key or local model</option>
+                <option value="local_only">Local model only</option>
+                <option value="runpod_qwen">QWEN 3.5 — Platform-hosted (Pro)</option>
+              </select>
+            </label>
+            <div class="grid gap-3 rounded-xl bg-surface-container-low p-4">
+              <label class="flex items-start gap-3 text-sm leading-6 text-on-surface-variant">
+                <input id="setup-identity-confirmed" type="checkbox" class="mt-1 h-4 w-4 rounded border-outline-variant text-primary focus:ring-primary">
+                <span>I confirm this Agent ID should be provisioned for my account.</span>
+              </label>
+              <label class="flex items-start gap-3 text-sm leading-6 text-on-surface-variant">
+                <input id="setup-email-connected" type="checkbox" class="mt-1 h-4 w-4 rounded border-outline-variant text-primary focus:ring-primary">
+                <span>I want to link a human inbox with encrypted token storage. This is optional and does not affect agent-to-agent AFP messaging.</span>
+              </label>
+            </div>
+            <div class="md:col-span-2 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <p id="setup-feedback" class="text-sm text-on-surface-variant">Complete setup to unlock private runtime deployment.</p>
+              <button type="submit" class="rounded-xl border border-outline-variant bg-surface px-5 py-3 text-sm font-semibold text-on-surface transition hover:bg-surface-container-low">
+                Save setup
+              </button>
+            </div>
+            <p class="md:col-span-2 text-xs leading-6 text-on-surface-variant">
+              Agent communication uses only Agent IDs and AFP over WebTransport or WebSocket. Gmail and Cloudflare routing are optional only for human inbox ingestion.
+            </p>
+          </form>
+          <div class="mt-6 grid gap-4 lg:grid-cols-2">
+            <div class="rounded-2xl border border-primary/15 bg-primary-fixed/35 p-5">
+              <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <div class="font-mono text-[10px] uppercase tracking-[0.2em] text-primary">Next Step</div>
+                  <h4 class="mt-2 text-lg font-semibold">Deploy Crew Runtime</h4>
+                  <p class="mt-2 max-w-2xl text-sm leading-7 text-on-surface-variant">
+                    This will only be enabled for per-user isolated runtimes with separate secrets, logs, and message scopes. Shared multi-tenant runtimes are intentionally out of bounds.
+                  </p>
+                </div>
+                <button
+                  id="deploy-runtime-button"
+                  type="button"
+                  class="rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-white transition hover:opacity-90"
+                >
+                  One-click deploy Crew runtime
+                </button>
+              </div>
+              <p id="deploy-runtime-feedback" class="mt-3 text-sm text-on-surface-variant"></p>
+            </div>
+            <div class="rounded-2xl border border-secondary/20 bg-secondary-container/35 p-5">
+              <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <div class="font-mono text-[10px] uppercase tracking-[0.2em] text-secondary">Hosted Runtime</div>
+                  <h4 class="mt-2 text-lg font-semibold">Deploy Python Runner + Chat</h4>
+                  <p class="mt-2 max-w-2xl text-sm leading-7 text-on-surface-variant">
+                    A Coolify-friendly private Python runner for non-technical "Zapier for agents" workflows. It ships with a chat window, logs, traces, prompt history, review queue, prewired tools, and per-user sandbox defaults.
+                  </p>
+                </div>
+                <button
+                  id="deploy-python-runner-button"
+                  type="button"
+                  class="rounded-xl bg-secondary px-5 py-3 text-sm font-semibold text-white transition hover:opacity-90"
+                >
+                  One-click deploy Python runner
+                </button>
+              </div>
+              <p id="deploy-python-runner-feedback" class="mt-3 text-sm text-on-surface-variant"></p>
+            </div>
+            <div class="rounded-2xl border border-outline-variant/20 bg-surface p-5">
+              <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <div class="font-mono text-[10px] uppercase tracking-[0.2em] text-outline">Planned Runtime</div>
+                  <h4 class="mt-2 text-lg font-semibold">Deploy OpenClaw Runtime</h4>
+                  <p class="mt-2 max-w-2xl text-sm leading-7 text-on-surface-variant">
+                    OpenClaw will follow the same per-user isolation model once the runtime and audit boundary are ready. It is intentionally not available yet.
+                  </p>
+                </div>
+                <button
+                  id="deploy-openclaw-button"
+                  type="button"
+                  disabled
+                  aria-disabled="true"
+                  class="rounded-xl border border-outline-variant bg-surface-container-low px-5 py-3 text-sm font-semibold text-on-surface opacity-60"
+                >
+                  OpenClaw deployment unavailable
+                </button>
+              </div>
+              <p id="deploy-openclaw-feedback" class="mt-3 text-sm text-on-surface-variant">
+                Coming later. OmnyID will expose this only after the runtime is isolated to the same privacy and approval standard as Crew.
+              </p>
+            </div>
+          </div>
+          <div class="mt-6 rounded-2xl border border-outline-variant/15 bg-surface p-5">
+            <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+              <div>
+                <div class="font-mono text-[10px] uppercase tracking-[0.2em] text-outline">Runtime Monitor</div>
+                <h4 class="mt-2 text-lg font-semibold">Private runtime status and logs</h4>
+                <p class="mt-2 max-w-2xl text-sm leading-7 text-on-surface-variant">
+                  OmnyID keeps runtime control minimal here: start, stop, restart, and a short safe log tail. Deeper agent work should happen inside the isolated runtime itself.
+                </p>
+              </div>
+              <div class="flex flex-wrap gap-3">
+                <button id="runtime-start-button" type="button" class="rounded-xl border border-outline-variant bg-surface-container-low px-4 py-3 text-sm font-semibold text-on-surface">
+                  Start
+                </button>
+                <button id="runtime-stop-button" type="button" class="rounded-xl border border-outline-variant bg-surface-container-low px-4 py-3 text-sm font-semibold text-on-surface">
+                  Stop
+                </button>
+                <button id="runtime-restart-button" type="button" class="rounded-xl border border-outline-variant bg-surface-container-low px-4 py-3 text-sm font-semibold text-on-surface">
+                  Restart
+                </button>
+                <button id="runtime-destroy-button" type="button" class="rounded-xl border border-error/30 bg-white px-4 py-3 text-sm font-semibold text-error">
+                  Destroy runtime
+                </button>
+                <button id="runtime-refresh-logs-button" type="button" class="rounded-xl border border-outline-variant bg-surface-container-low px-4 py-3 text-sm font-semibold text-on-surface">
+                  Refresh logs
+                </button>
+              </div>
+            </div>
+            <p id="runtime-status-feedback" class="mt-4 text-sm text-on-surface-variant">Deploy a private runtime to begin monitoring its status here.</p>
+            <p id="runtime-logs-meta" class="mt-2 text-xs text-outline">Log source will appear here when a runtime starts.</p>
+            <pre id="runtime-logs-output" class="mt-4 max-h-72 overflow-auto rounded-xl bg-surface-container-low p-4 font-mono text-xs leading-6 text-on-surface-variant">No runtime logs yet.</pre>
+          </div>
+          <div class="mt-6 rounded-2xl border border-outline-variant/15 bg-surface p-5">
+            <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+              <div>
+                <div class="font-mono text-[10px] uppercase tracking-[0.2em] text-outline">Python Runner IDE</div>
+                <h4 class="mt-2 text-lg font-semibold">Model, tool, and channel policy</h4>
+                <p class="mt-2 max-w-2xl text-sm leading-7 text-on-surface-variant">
+                  For the hosted Python runner, OmnyID lets you tune model access, enabled tools, and exposure channels from the control plane without handing secrets back to the browser or requiring file edits inside the runtime.
+                </p>
+              </div>
+              <button id="runtime-runner-config-refresh-button" type="button" class="rounded-xl border border-outline-variant bg-surface-container-low px-4 py-3 text-sm font-semibold text-on-surface">
+                Refresh runner config
+              </button>
+            </div>
+            <p id="runtime-runner-config-feedback" class="mt-4 text-sm text-on-surface-variant">Deploy a Python runner to manage its policy here.</p>
+            <div class="mt-4 grid gap-4 lg:grid-cols-3">
+              <div class="rounded-xl border border-outline-variant/15 bg-surface-container-low p-4">
+                <div class="font-mono text-[10px] uppercase tracking-[0.2em] text-outline">Model access</div>
+                <label class="mt-3 grid gap-2 text-sm font-semibold">
+                  Starter template
+                  <select id="runtime-runner-starter-template" class="rounded-xl border border-outline-variant bg-surface px-4 py-3 text-sm text-on-surface outline-none focus:border-primary">
+                    <option value="travel_planner">Travel Planner</option>
+                    <option value="research_assistant">Research Assistant</option>
+                    <option value="appointment_assistant">Appointment Assistant</option>
+                    <option value="student_day_planner">Connected Study Workspace</option>
+                  </select>
+                </label>
+                <label class="mt-3 grid gap-2 text-sm font-semibold">
+                  Default model mode
+                  <select id="runtime-runner-model-mode" class="rounded-xl border border-outline-variant bg-surface px-4 py-3 text-sm text-on-surface outline-none focus:border-primary">
+                    <option value="omnyid_managed_default">OmnyID managed default</option>
+                    <option value="bring_your_own_key">Bring your own key</option>
+                    <option value="local_ollama">Local Ollama endpoint</option>
+                  </select>
+                </label>
+                <label class="mt-3 grid gap-2 text-sm font-semibold">
+                  Default model
+                  <select id="runtime-runner-default-model" class="rounded-xl border border-outline-variant bg-surface px-4 py-3 text-sm text-on-surface outline-none focus:border-primary">
+                    <option value="gpt-5.4-mini">gpt-5.4-mini</option>
+                    <option value="gpt-5.4">gpt-5.4</option>
+                    <option value="ollama/local">ollama/local</option>
+                  </select>
+                </label>
+                <div class="mt-3 grid gap-3 sm:grid-cols-2">
+                  <label class="grid gap-2 text-sm font-semibold">
+                    Per-run input cap
+                    <input id="runtime-runner-input-cap" type="number" min="1000" step="1000" class="rounded-xl border border-outline-variant bg-surface px-4 py-3 text-sm text-on-surface outline-none focus:border-primary">
+                  </label>
+                  <label class="grid gap-2 text-sm font-semibold">
+                    Per-run output cap
+                    <input id="runtime-runner-output-cap" type="number" min="500" step="500" class="rounded-xl border border-outline-variant bg-surface px-4 py-3 text-sm text-on-surface outline-none focus:border-primary">
+                  </label>
+                  <label class="grid gap-2 text-sm font-semibold">
+                    Daily spend cap (USD)
+                    <input id="runtime-runner-daily-cap" type="number" min="0" step="0.5" class="rounded-xl border border-outline-variant bg-surface px-4 py-3 text-sm text-on-surface outline-none focus:border-primary">
+                  </label>
+                  <label class="grid gap-2 text-sm font-semibold">
+                    Monthly spend cap (USD)
+                    <input id="runtime-runner-monthly-cap" type="number" min="0" step="1" class="rounded-xl border border-outline-variant bg-surface px-4 py-3 text-sm text-on-surface outline-none focus:border-primary">
+                  </label>
+                </div>
+                <div class="mt-3 rounded-xl bg-surface p-3 text-xs leading-6 text-on-surface-variant">
+                  BYOK stays optional for signed-in workspaces only. Anonymous trial always stays on the managed small-model path.
+                </div>
+              </div>
+              <div class="rounded-xl border border-outline-variant/15 bg-surface-container-low p-4">
+                <div class="font-mono text-[10px] uppercase tracking-[0.2em] text-outline">Enabled tools</div>
+                <div class="mt-3 grid gap-3 text-sm text-on-surface-variant">
+                  <label class="flex items-start gap-3"><input id="runtime-tool-web" type="checkbox" class="mt-1 h-4 w-4 rounded border-outline-variant text-primary focus:ring-primary"><span>Web fetch and browsing helpers</span></label>
+                  <label class="flex items-start gap-3"><input id="runtime-tool-google" type="checkbox" class="mt-1 h-4 w-4 rounded border-outline-variant text-primary focus:ring-primary"><span>Google API connector</span></label>
+                  <label class="flex items-start gap-3"><input id="runtime-tool-stripe" type="checkbox" class="mt-1 h-4 w-4 rounded border-outline-variant text-primary focus:ring-primary"><span>Stripe connector</span></label>
+                  <label class="flex items-start gap-3"><input id="runtime-tool-files" type="checkbox" class="mt-1 h-4 w-4 rounded border-outline-variant text-primary focus:ring-primary"><span>File access in workspace</span></label>
+                  <label class="flex items-start gap-3"><input id="runtime-tool-vector" type="checkbox" class="mt-1 h-4 w-4 rounded border-outline-variant text-primary focus:ring-primary"><span>Vector search and memory</span></label>
+                  <label class="flex items-start gap-3"><input id="runtime-tool-db" type="checkbox" class="mt-1 h-4 w-4 rounded border-outline-variant text-primary focus:ring-primary"><span>Simple local database</span></label>
+                  <label class="flex items-start gap-3"><input id="runtime-tool-scheduler" type="checkbox" class="mt-1 h-4 w-4 rounded border-outline-variant text-primary focus:ring-primary"><span>Schedules and recurring runs</span></label>
+                  <label class="flex items-start gap-3"><input id="runtime-tool-afp" type="checkbox" class="mt-1 h-4 w-4 rounded border-outline-variant text-primary focus:ring-primary"><span>AFP agent-to-agent actions</span></label>
+                </div>
+                <label class="mt-4 grid gap-2 text-sm font-semibold text-on-surface">
+                  Allowed web hosts
+                  <textarea id="runtime-tool-web-allowlist" rows="4" class="rounded-xl border border-outline-variant bg-surface px-4 py-3 text-sm font-normal text-on-surface outline-none focus:border-primary" placeholder="example.com&#10;docs.example.com"></textarea>
+                </label>
+                <p class="mt-2 text-xs leading-6 text-on-surface-variant">
+                  Web access stays default-deny. Add one hostname per line or separate them with commas.
+                </p>
+              </div>
+              <div class="rounded-xl border border-outline-variant/15 bg-surface-container-low p-4">
+                <div class="font-mono text-[10px] uppercase tracking-[0.2em] text-outline">Exposure channels</div>
+                <div class="mt-3 grid gap-3 text-sm text-on-surface-variant">
+                  <label class="flex items-start gap-3"><input id="runtime-channel-web-chat" type="checkbox" class="mt-1 h-4 w-4 rounded border-outline-variant text-primary focus:ring-primary"><span>Hosted web chat</span></label>
+                  <label class="flex items-start gap-3"><input id="runtime-channel-api-endpoint" type="checkbox" class="mt-1 h-4 w-4 rounded border-outline-variant text-primary focus:ring-primary"><span>API endpoint</span></label>
+                  <label class="flex items-start gap-3"><input id="runtime-channel-afp-endpoint" type="checkbox" class="mt-1 h-4 w-4 rounded border-outline-variant text-primary focus:ring-primary"><span>AFP agent endpoint</span></label>
+                </div>
+                <div class="mt-4 rounded-xl bg-surface p-3 text-xs leading-6 text-on-surface-variant">
+                  Slack, WhatsApp, and email bot channels remain intentionally deferred until the base runtime lifecycle is more mature.
+                </div>
+              </div>
+            </div>
+            <div class="mt-4 flex flex-wrap gap-3">
+              <button id="runtime-runner-config-save-button" type="button" class="rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-white transition hover:opacity-90">
+                Save Python runner policy
+              </button>
+            </div>
+            <div class="mt-4 rounded-xl border border-outline-variant/15 bg-surface-container-low p-4">
+              <div class="font-mono text-[10px] uppercase tracking-[0.2em] text-outline">Recent policy history</div>
+              <div id="runtime-runner-policy-history" class="mt-3 text-sm text-on-surface-variant">
+                No policy changes recorded yet.
+              </div>
+            </div>
+          </div>
+          <div class="mt-6 rounded-2xl border border-outline-variant/15 bg-surface p-5">
+            <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+              <div>
+                <div class="font-mono text-[10px] uppercase tracking-[0.2em] text-outline">Runtime Updates</div>
+                <h4 class="mt-2 text-lg font-semibold">Check and apply hosted scaffold updates</h4>
+                <p class="mt-2 max-w-2xl text-sm leading-7 text-on-surface-variant">
+                  OmnyID only refreshes the hosted runtime scaffold here. Update checks stay useful without turning the control plane into a window into your runtime’s private working data.
+                </p>
+              </div>
+              <div class="flex flex-wrap gap-3">
+                <select id="runtime-update-channel" class="rounded-xl border border-outline-variant bg-surface-container-low px-4 py-3 text-sm font-semibold text-on-surface outline-none focus:border-primary">
+                  <option value="stable" selected>Stable channel</option>
+                  <option value="manual_only">Manual only</option>
+                </select>
+                <select id="runtime-update-auto-apply" class="rounded-xl border border-outline-variant bg-surface-container-low px-4 py-3 text-sm font-semibold text-on-surface outline-none focus:border-primary">
+                  <option value="manual_only" selected>Manual apply</option>
+                  <option value="scaffold_refresh_only">Auto refresh scaffold only</option>
+                </select>
+                <button id="runtime-update-save-policy-button" type="button" class="rounded-xl border border-outline-variant bg-surface-container-low px-4 py-3 text-sm font-semibold text-on-surface">
+                  Save update policy
+                </button>
+                <button id="runtime-update-check-button" type="button" class="rounded-xl border border-outline-variant bg-surface-container-low px-4 py-3 text-sm font-semibold text-on-surface">
+                  Check updates
+                </button>
+                <button id="runtime-update-apply-button" type="button" class="rounded-xl border border-outline-variant bg-surface-container-low px-4 py-3 text-sm font-semibold text-on-surface">
+                  Apply scaffold update
+                </button>
+              </div>
+            </div>
+            <p id="runtime-update-feedback" class="mt-4 text-sm text-on-surface-variant">Update checks compare scaffold template versions only and stay out of tenant content.</p>
+            <div class="mt-4 grid gap-3 md:grid-cols-4">
+              <div class="rounded-xl border border-outline-variant/15 bg-surface-container-low p-4">
+                <div class="font-mono text-[10px] uppercase tracking-[0.2em] text-outline">Current version</div>
+                <p id="runtime-update-current-version" class="mt-2 text-sm leading-6 text-on-surface-variant">Not deployed yet</p>
+              </div>
+              <div class="rounded-xl border border-outline-variant/15 bg-surface-container-low p-4">
+                <div class="font-mono text-[10px] uppercase tracking-[0.2em] text-outline">Latest version</div>
+                <p id="runtime-update-latest-version" class="mt-2 text-sm leading-6 text-on-surface-variant">Waiting for first check</p>
+              </div>
+              <div class="rounded-xl border border-outline-variant/15 bg-surface-container-low p-4">
+                <div class="font-mono text-[10px] uppercase tracking-[0.2em] text-outline">Update state</div>
+                <p id="runtime-update-state" class="mt-2 text-sm leading-6 text-on-surface-variant">No update state yet</p>
+              </div>
+              <div class="rounded-xl border border-outline-variant/15 bg-surface-container-low p-4">
+                <div class="font-mono text-[10px] uppercase tracking-[0.2em] text-outline">Last applied</div>
+                <p id="runtime-update-last-applied" class="mt-2 text-sm leading-6 text-on-surface-variant">No scaffold update applied yet</p>
+              </div>
+            </div>
+            <div id="runtime-update-history" class="mt-4 space-y-3 text-sm text-on-surface-variant">
+              <p>No runtime update checks yet.</p>
+            </div>
+          </div>
+          <div class="mt-6 rounded-2xl border border-outline-variant/15 bg-surface p-5">
+            <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+              <div>
+                <div class="font-mono text-[10px] uppercase tracking-[0.2em] text-outline">Backup Inventory</div>
+                <h4 class="mt-2 text-lg font-semibold">Hosted backup metadata and retention</h4>
+                <p class="mt-2 max-w-2xl text-sm leading-7 text-on-surface-variant">
+                  OmnyID only surfaces metadata-only hosted snapshots here. The dashboard records retention windows and snapshot timing without pulling runtime file contents into the central control plane.
+                </p>
+              </div>
+              <div class="flex flex-wrap gap-3">
+                <select id="runtime-backup-retention" class="rounded-xl border border-outline-variant bg-surface-container-low px-4 py-3 text-sm font-semibold text-on-surface outline-none focus:border-primary">
+                  <option value="7">7 days</option>
+                  <option value="14" selected>14 days</option>
+                  <option value="30">30 days</option>
+                  <option value="90">90 days</option>
+                </select>
+                <button id="runtime-recovery-packet-button" type="button" class="rounded-xl border border-outline-variant bg-surface-container-low px-4 py-3 text-sm font-semibold text-on-surface">
+                  Download recovery packet
+                </button>
+                <button id="runtime-backup-save-policy-button" type="button" class="rounded-xl border border-outline-variant bg-surface-container-low px-4 py-3 text-sm font-semibold text-on-surface">
+                  Save retention
+                </button>
+                <button id="runtime-backup-snapshot-button" type="button" class="rounded-xl border border-outline-variant bg-surface-container-low px-4 py-3 text-sm font-semibold text-on-surface">
+                  Create metadata snapshot
+                </button>
+              </div>
+            </div>
+            <p id="runtime-backup-feedback" class="mt-4 text-sm text-on-surface-variant">Snapshots here are metadata only and keep content out of the hosted dashboard.</p>
+            <div class="mt-4 grid gap-3 md:grid-cols-3">
+              <div class="rounded-xl border border-outline-variant/15 bg-surface-container-low p-4">
+                <div class="font-mono text-[10px] uppercase tracking-[0.2em] text-outline">Retention</div>
+                <p id="runtime-backup-policy-retention" class="mt-2 text-sm leading-6 text-on-surface-variant">14 days</p>
+              </div>
+              <div class="rounded-xl border border-outline-variant/15 bg-surface-container-low p-4">
+                <div class="font-mono text-[10px] uppercase tracking-[0.2em] text-outline">Storage mode</div>
+                <p id="runtime-backup-policy-storage" class="mt-2 text-sm leading-6 text-on-surface-variant">metadata_only_hosted</p>
+              </div>
+              <div class="rounded-xl border border-outline-variant/15 bg-surface-container-low p-4">
+                <div class="font-mono text-[10px] uppercase tracking-[0.2em] text-outline">Last snapshot</div>
+                <p id="runtime-backup-policy-last" class="mt-2 text-sm leading-6 text-on-surface-variant">No snapshot yet</p>
+              </div>
+            </div>
+            <div id="runtime-backup-list" class="mt-4 space-y-3 text-sm text-on-surface-variant">
+              <p>No backup metadata loaded yet.</p>
+            </div>
+          </div>
+          <div class="mt-6 rounded-2xl border border-outline-variant/15 bg-surface p-5">
+            <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+              <div>
+                <div class="font-mono text-[10px] uppercase tracking-[0.2em] text-outline">Restore Drills</div>
+                <h4 class="mt-2 text-lg font-semibold">Rehearse recovery without operator access</h4>
+                <p class="mt-2 max-w-2xl text-sm leading-7 text-on-surface-variant">
+                  Restore drills let you rehearse recovery from a metadata snapshot and keep an audit trail of what would need to be checked before a real tenant restore.
+                </p>
+              </div>
+            </div>
+            <p id="runtime-restore-feedback" class="mt-4 text-sm text-on-surface-variant">Run a restore drill from one of your metadata snapshots to build recovery discipline early.</p>
+            <div id="runtime-restore-drill-list" class="mt-4 space-y-3 text-sm text-on-surface-variant">
+              <p>No restore drills yet.</p>
+            </div>
+          </div>
+          <div class="mt-6 rounded-2xl border border-outline-variant/15 bg-surface p-5">
+            <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+              <div>
+                <div class="font-mono text-[10px] uppercase tracking-[0.2em] text-outline">Onboarding Bundle</div>
+                <h4 class="mt-2 text-lg font-semibold">Download your private setup package</h4>
+                <p class="mt-2 max-w-2xl text-sm leading-7 text-on-surface-variant">
+                  OmnyID can now package your chosen privacy path into a simple installer handoff. Download the plan, grab the right installer, and keep the actual runtime outside the central website.
+                </p>
+              </div>
+              <div class="flex flex-wrap gap-3">
+                <button id="copy-onboarding-command-button" type="button" class="rounded-xl border border-outline-variant bg-surface-container-low px-4 py-3 text-sm font-semibold text-on-surface">
+                  Copy install command
+                </button>
+                <button id="download-onboarding-bundle-button" type="button" class="rounded-xl border border-outline-variant bg-surface-container-low px-4 py-3 text-sm font-semibold text-on-surface">
+                  Download onboarding bundle
+                </button>
+                <button id="download-service-adapter-bundle-button" type="button" class="rounded-xl border border-outline-variant bg-surface px-4 py-3 text-sm font-semibold text-on-surface">
+                  Download service adapter starter
+                </button>
+              </div>
+            </div>
+            <p id="onboarding-bundle-feedback" class="mt-4 text-sm text-on-surface-variant">Finish setup first, then download a personalized bundle for Local Private or Private Cloud.</p>
+            <div id="onboarding-bundle-summary" class="mt-4 grid gap-3 md:grid-cols-3">
+              <div class="rounded-xl border border-outline-variant/15 bg-surface-container-low p-4">
+                <div class="font-mono text-[10px] uppercase tracking-[0.2em] text-outline">Privacy path</div>
+                <p id="onboarding-summary-mode" class="mt-2 text-sm leading-6 text-on-surface-variant">Save setup to choose a path.</p>
+              </div>
+              <div class="rounded-xl border border-outline-variant/15 bg-surface-container-low p-4">
+                <div class="font-mono text-[10px] uppercase tracking-[0.2em] text-outline">Target</div>
+                <p id="onboarding-summary-target" class="mt-2 text-sm leading-6 text-on-surface-variant">No deployment target selected yet.</p>
+              </div>
+              <div class="rounded-xl border border-outline-variant/15 bg-surface-container-low p-4">
+                <div class="font-mono text-[10px] uppercase tracking-[0.2em] text-outline">Estimated time</div>
+                <p id="onboarding-summary-time" class="mt-2 text-sm leading-6 text-on-surface-variant">Setup timing appears after the bundle is generated.</p>
+              </div>
+            </div>
+            <div class="mt-4 grid gap-4 lg:grid-cols-2">
+              <div class="rounded-xl bg-surface-container-low p-4">
+                <div class="font-mono text-[10px] uppercase tracking-[0.2em] text-primary">Recommended command</div>
+                <pre id="onboarding-command-output" class="mt-3 overflow-auto whitespace-pre-wrap break-words font-mono text-xs leading-6 text-on-surface-variant">Save setup to generate an installer command.</pre>
+              </div>
+              <div class="rounded-xl bg-surface-container-low p-4">
+                <div class="font-mono text-[10px] uppercase tracking-[0.2em] text-primary">Installer downloads</div>
+                <div id="onboarding-download-links" class="mt-3 space-y-3 text-sm text-on-surface-variant">
+                  <p>Installer links will appear here once your setup bundle is ready.</p>
+                </div>
+              </div>
+            </div>
+            <div class="mt-4 rounded-xl bg-primary-fixed/35 p-4">
+              <div class="font-mono text-[10px] uppercase tracking-[0.2em] text-primary">Next steps</div>
+              <ol id="onboarding-next-steps" class="mt-3 space-y-2 text-sm leading-7 text-on-surface-variant">
+                <li>1. Save setup to unlock your personalized bundle.</li>
+                <li>2. Download the right installer for your machine or cloud path.</li>
+                <li>3. Return here to verify runtime status and logs.</li>
+              </ol>
+            </div>
+          </div>
+          <div class="mt-6 rounded-2xl border border-outline-variant/15 bg-surface p-5">
+            <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+              <div>
+                <div class="font-mono text-[10px] uppercase tracking-[0.2em] text-outline">Device Bootstrap</div>
+                <h4 class="mt-2 text-lg font-semibold">Prepare local-first sync for a device</h4>
+                <p class="mt-2 max-w-2xl text-sm leading-7 text-on-surface-variant">
+                  Generate a per-device bootstrap for desktop, mobile, or watch so the ElectricSQL and PGlite sync plan becomes a real handoff instead of only a roadmap promise.
+                </p>
+              </div>
+              <div class="flex flex-wrap gap-3">
+                <button id="device-bootstrap-desktop-button" type="button" class="rounded-xl border border-outline-variant bg-surface-container-low px-4 py-3 text-sm font-semibold text-on-surface">
+                  Desktop bootstrap
+                </button>
+                <button id="device-bootstrap-mobile-button" type="button" class="rounded-xl border border-outline-variant bg-surface-container-low px-4 py-3 text-sm font-semibold text-on-surface">
+                  Mobile bootstrap
+                </button>
+                <button id="device-bootstrap-watch-button" type="button" class="rounded-xl border border-outline-variant bg-surface-container-low px-4 py-3 text-sm font-semibold text-on-surface">
+                  Watch bootstrap
+                </button>
+              </div>
+            </div>
+            <p id="device-bootstrap-feedback" class="mt-4 text-sm text-on-surface-variant">Choose a device class to download a metadata-only local-first sync bootstrap.</p>
+            <div class="mt-4 rounded-xl bg-surface-container-low p-4">
+              <div class="font-mono text-[10px] uppercase tracking-[0.2em] text-primary">Registered devices</div>
+              <div id="device-sync-policy-list" class="mt-3 space-y-3 text-sm text-on-surface-variant">
+                <p>No local-first devices registered yet.</p>
+              </div>
+            </div>
+          </div>
+          <div class="mt-6 rounded-2xl border border-outline-variant/15 bg-surface p-5">
+            <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+              <div>
+                <div class="font-mono text-[10px] uppercase tracking-[0.2em] text-outline">Support Access</div>
+                <h4 class="mt-2 text-lg font-semibold">Support is disabled by default</h4>
+                <p class="mt-2 max-w-2xl text-sm leading-7 text-on-surface-variant">
+                  If you ever need help, you can grant time-limited support access from here. OmnyID keeps this off by default and treats it as an explicit consent event, not an operator shortcut.
+                </p>
+              </div>
+              <div class="rounded-xl bg-secondary-container/50 px-4 py-3 text-sm text-on-surface-variant">
+                Consent only. No standing backdoor.
+              </div>
+            </div>
+            <div class="mt-4 grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+              <div class="rounded-xl bg-surface-container-low p-4">
+                <div class="font-mono text-[10px] uppercase tracking-[0.2em] text-primary">Current state</div>
+                <p id="support-access-status" class="mt-3 text-sm leading-7 text-on-surface-variant">Support access is disabled.</p>
+                <p id="support-access-details" class="mt-2 text-xs leading-6 text-on-surface-variant">No active support window is open.</p>
+                <div class="mt-4">
+                  <div class="font-mono text-[10px] uppercase tracking-[0.2em] text-primary">Recent consent history</div>
+                  <div id="support-access-history" class="mt-3 space-y-3 text-sm text-on-surface-variant">
+                    <p>No support access history yet.</p>
+                  </div>
+                </div>
+              </div>
+              <form id="support-access-form" class="grid gap-3 rounded-xl bg-surface-container-low p-4">
+                <label class="grid gap-2 text-sm font-semibold">
+                  Temporary duration
+                  <select id="support-access-duration" class="rounded-xl border border-outline-variant bg-surface px-4 py-3 outline-none focus:border-primary">
+                    <option value="1">1 hour</option>
+                    <option value="4">4 hours</option>
+                    <option value="24">24 hours</option>
+                  </select>
+                </label>
+                <label class="grid gap-2 text-sm font-semibold">
+                  Access scope
+                  <select id="support-access-scope" class="rounded-xl border border-outline-variant bg-surface px-4 py-3 outline-none focus:border-primary">
+                    <option value="runtime_metadata_only">Runtime metadata only</option>
+                    <option value="runtime_debug">Runtime debug support</option>
+                  </select>
+                </label>
+                <label class="grid gap-2 text-sm font-semibold">
+                  Reason
+                  <textarea id="support-access-reason" rows="3" class="rounded-xl border border-outline-variant bg-surface px-4 py-3 outline-none focus:border-primary" placeholder="Describe the issue you want help with."></textarea>
+                </label>
+                <div class="flex flex-wrap gap-3">
+                  <button type="submit" class="rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-white transition hover:opacity-90">
+                    Grant temporary support access
+                  </button>
+                  <button id="support-access-revoke-button" type="button" class="rounded-xl border border-outline-variant bg-surface px-5 py-3 text-sm font-semibold text-on-surface transition hover:bg-surface-container-low">
+                    Revoke now
+                  </button>
+                </div>
+                <p id="support-access-feedback" class="text-sm text-on-surface-variant">Keep this disabled unless you explicitly want support help.</p>
+              </form>
+            </div>
+          </div>
+          <div class="mt-6 rounded-2xl border border-error/20 bg-white p-5">
+            <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+              <div>
+                <div class="font-mono text-[10px] uppercase tracking-[0.2em] text-error">Danger Zone</div>
+                <h4 class="mt-2 text-lg font-semibold">Delete hosted account data</h4>
+                <p class="mt-2 max-w-2xl text-sm leading-7 text-on-surface-variant">
+                  This removes the hosted OmnyID account, tears down the managed runtime, and purges server-side Agent-ID-scoped data for this account. Export your workspace first if you want a local copy.
+                </p>
+              </div>
+              <div class="rounded-xl bg-surface-container-low px-4 py-3 text-sm text-on-surface-variant">
+                Export first. Delete second.
+              </div>
+            </div>
+            <form id="account-delete-form" class="mt-4 grid gap-3 rounded-xl bg-surface-container-low p-4 lg:grid-cols-2">
+              <label class="grid gap-2 text-sm font-semibold">
+                Confirm your email
+                <input id="account-delete-email" type="email" class="rounded-xl border border-outline-variant bg-surface px-4 py-3 outline-none focus:border-error" placeholder="you@omnyid.com">
+              </label>
+              <label class="grid gap-2 text-sm font-semibold">
+                Type the exact phrase
+                <input id="account-delete-confirmation" type="text" class="rounded-xl border border-outline-variant bg-surface px-4 py-3 outline-none focus:border-error" placeholder="DELETE MY OMNYID ACCOUNT">
+              </label>
+              <div class="lg:col-span-2 flex flex-wrap gap-3">
+                <button id="account-delete-button" type="submit" class="rounded-xl border border-error/30 bg-white px-5 py-3 text-sm font-semibold text-error transition hover:bg-red-50">
+                  Delete account and hosted data
+                </button>
+              </div>
+              <p id="account-delete-feedback" class="lg:col-span-2 text-sm text-on-surface-variant">This action is irreversible on the hosted OmnyID side.</p>
+            </form>
+          </div>
+        </section>
+
+      <div class="grid gap-8 lg:grid-cols-2">
+        <section class="rounded-2xl border border-outline-variant/10 bg-surface-container-lowest p-8">
+          <h3 class="mb-4 text-xl font-semibold">Send a Message</h3>
+          <p class="mb-4 text-sm leading-7 text-on-surface-variant">Use the seeded demo agents to verify the encrypted relay path end to end.</p>
+          <form id="demo-send-form" class="space-y-4">
+            <div class="grid gap-4 md:grid-cols-2">
+              <label class="grid gap-2 text-sm font-semibold">
+                From
+                <select id="demo-from-agent" class="rounded-xl border border-outline-variant bg-surface-container-low px-4 py-3 outline-none focus:border-primary"></select>
+              </label>
+              <label class="grid gap-2 text-sm font-semibold">
+                To
+                <select id="demo-to-agent" class="rounded-xl border border-outline-variant bg-surface-container-low px-4 py-3 outline-none focus:border-primary"></select>
+              </label>
+            </div>
+            <label class="grid gap-2 text-sm font-semibold">
+              Message
+              <textarea id="demo-message-body" rows="4" class="rounded-xl border border-outline-variant bg-surface-container-low px-4 py-3 outline-none focus:border-primary" placeholder="Send a test message..."></textarea>
+            </label>
+            <button type="submit" class="w-full rounded-xl bg-primary px-5 py-3 font-medium text-white transition hover:opacity-90">
+              Send
+            </button>
+            <p id="demo-send-feedback" class="text-sm text-on-surface-variant"></p>
+          </form>
+        </section>
+
+        <section class="rounded-2xl border border-outline-variant/10 bg-surface-container-lowest p-8">
+          <div class="mb-4 flex items-center justify-between">
+            <h3 class="text-xl font-semibold">Recent Messages</h3>
+            <button id="refresh-dashboard" class="text-sm text-primary transition hover:underline">Refresh</button>
+          </div>
+          <div id="messages-list" class="space-y-3"></div>
+        </section>
+      </div>
+
+      <section class="rounded-2xl border border-outline-variant/10 bg-surface-container-lowest p-8">
+        <h3 class="mb-4 text-xl font-semibold">Action Log</h3>
+        <div id="action-log-list" class="space-y-3"></div>
+      </section>
+    </div>
+  </div>
+
+  <footer class="mt-8 bg-surface-container-low px-6 py-12">
+    <div class="mx-auto flex max-w-7xl flex-col items-center justify-between gap-8 md:flex-row">
+      <div class="flex flex-col items-center gap-2 md:items-start">
+        <span class="text-lg font-display italic text-on-surface">OmnyID</span>
+        <p class="font-body text-xs uppercase tracking-widest text-on-surface/50">Copyright 2026 OmnyID. Built for the agentic era.</p>
+      </div>
+      <div class="flex flex-wrap gap-8">
+        <a href="https://github.com/omnyid" class="font-body text-xs uppercase tracking-widest text-on-surface/40 transition hover:text-primary">GitHub</a>
+        <button type="button" data-open-contact class="font-body text-xs uppercase tracking-widest text-on-surface/40 transition hover:text-primary">Contact</button>
+        <a href="./privacy.html" class="font-body text-xs uppercase tracking-widest text-on-surface/40 transition hover:text-primary">Privacy</a>
+        <a href="./terms.html" class="font-body text-xs uppercase tracking-widest text-on-surface/40 transition hover:text-primary">Terms</a>
+        <a href="./data-rights.html" class="font-body text-xs uppercase tracking-widest text-on-surface/40 transition hover:text-primary">Data Rights</a>
+        <a href="./security.html" class="font-body text-xs uppercase tracking-widest text-on-surface/40 transition hover:text-primary">Security</a>
+      </div>
+    </div>
+  </footer>
+
+  <div id="contact-modal" class="fixed inset-0 z-[80] hidden items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="contact-title">
+    <form id="contact-form" class="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
+      <h2 id="contact-title" class="text-2xl font-semibold">Contact OmnyID</h2>
+      <p class="mt-2 text-sm text-on-surface-variant">Send a message to hello@omnyid.com.</p>
+      <label class="mt-5 grid gap-2 text-sm font-semibold">Title
+        <input id="contact-subject" required maxlength="160" class="rounded-xl border border-outline-variant px-4 py-3" />
+      </label>
+      <label class="mt-4 grid gap-2 text-sm font-semibold">Message
+        <textarea id="contact-content" required minlength="10" maxlength="5000" class="min-h-40 rounded-xl border border-outline-variant px-4 py-3"></textarea>
+      </label>
+      <input id="contact-company" class="hidden" tabindex="-1" autocomplete="off" aria-hidden="true" />
+      <p id="contact-feedback" class="mt-3 text-sm" role="status" aria-live="polite"></p>
+      <div class="mt-5 flex justify-end gap-3">
+        <button id="contact-cancel" type="button" class="rounded-xl border border-outline-variant px-5 py-3 font-semibold">Cancel</button>
+        <button id="contact-submit" type="submit" class="rounded-xl bg-primary px-5 py-3 font-semibold text-white disabled:opacity-60">Send</button>
+      </div>
+    </form>
+  </div>
+
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="/wedding/assets/js/measure.js" defer></script>
+  <script src="./genesis-logo.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>

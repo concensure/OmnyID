@@ -10,25 +10,55 @@
     ".": {
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
+    },
+    "./continuity": {
+      "import": "./dist/continuity.js",
+      "types": "./dist/continuity.d.ts"
+    },
+    "./retrieval": {
+      "import": "./dist/retrieval.js",
+      "types": "./dist/retrieval.d.ts"
+    },
+    "./quotation": {
+      "import": "./dist/quotation.js",
+      "types": "./dist/quotation.d.ts"
+    },
+    "./planning-intelligence": {
+      "import": "./dist/planning-intelligence.js",
+      "types": "./dist/planning-intelligence.d.ts"
+    },
+    "./workflows": {
+      "import": "./dist/workflows.js",
+      "types": "./dist/workflows.d.ts"
+    },
+    "./semantic-router": {
+      "import": "./dist/semantic-router/index.js",
+      "types": "./dist/semantic-router/index.d.ts"
+    },
+    "./workspace-assistance": {
+      "import": "./dist/workspace-assistance.js",
+      "types": "./dist/workspace-assistance.d.ts"
     }
   },
   "files": ["dist", "src"],
   "scripts": {
-    "build": "tsc",
-    "typecheck": "tsc --noEmit",
+    "build": "node ./scripts/build-clean.mjs",
+    "typecheck": "node ./node_modules/typescript/bin/tsc --noEmit",
+    "test:continuity": "npm run build && node --test tests/continuity.test.mjs tests/package-exports.test.mjs",
+    "test:quotation": "npm run build && node --test tests/quotation.test.mjs",
     "prepublishOnly": "npm run build"
   },
   "engines": {
-    "node": ">=22.22.1 <23"
+    "node": ">=22.22.1 <25"
   },
-  "license": "Apache-2.0",
+  "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/concensure/OmnyID"
+    "url": "https://github.com/omnyid/homeserver"
   },
   "dependencies": {
     "libsodium-wrappers": "^0.7.15",
-    "zod": "^3.24.0"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "typescript": "^5.9.0"

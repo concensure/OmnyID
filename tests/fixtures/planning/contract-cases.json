@@ -1,0 +1,298 @@
+{
+  "schema_version": "planning.contract_fixture.v1",
+  "cases": [
+    {
+      "name": "renovation_step_free_constraint",
+      "contract": "constraint",
+      "valid": true,
+      "fingerprint": "d3ccb32304dbdfe0d978d5673628ede1820033734cfd36e62b8580840616b3ae",
+      "payload": {
+        "schema_version": "planning.constraint.v1",
+        "constraint_id": "constraint:renovation:step-free:v1",
+        "template_id": "home_renovation",
+        "plan_id": "plan:renovation:alpha",
+        "subject_ref": {"kind": "plan", "id": "plan:renovation:alpha"},
+        "kind": "accessibility_requirement",
+        "operator": "requires",
+        "value": {"type": "enum", "value": "step_free", "vocabulary": "accessibility.v1"},
+        "strength": "hard",
+        "authority": "user",
+        "privacy": "plan_private",
+        "source_ref": "message:renovation:brief:1",
+        "source_anchor": {
+          "message_id": "message:renovation:brief:1",
+          "source_version_id": "message:renovation:brief:1:v1",
+          "locator": "body:0-35",
+          "exact_excerpt": "The ground floor must remain step-free."
+        },
+        "observed_at": "2026-10-18T10:00:00Z",
+        "effective_window": null,
+        "status": "confirmed",
+        "supersedes": null
+      }
+    },
+    {
+      "name": "renovation_constraint_evaluation",
+      "contract": "evaluation",
+      "valid": true,
+      "fingerprint": "324d3542213def056f5a2d5564f547939ab404a97e293e7258b70b6990bb88d6",
+      "payload": {
+        "schema_version": "planning.constraint_evaluation.v1",
+        "evaluation_id": "evaluation:step-free:builder-a:v1",
+        "constraint_ref": "constraint:renovation:step-free:v1",
+        "candidate_ref": "option:builder-a:ground-floor",
+        "result": "satisfied",
+        "severity": "blocking",
+        "constraint_evidence_ref": "message:renovation:brief:1",
+        "candidate_evidence_ref": "proposal:builder-a:v3",
+        "explanation_code": "explicit_match",
+        "evaluated_at": "2026-10-18T10:05:00Z"
+      }
+    },
+    {
+      "name": "renovation_cost_tradeoff",
+      "contract": "cost_tradeoff",
+      "valid": true,
+      "fingerprint": "03cdc2a804a9d3e9bbdfa33f1d4e7e9bf3cdedf933247147dab9770e3e297f63",
+      "payload": {
+        "schema_version": "planning.cost_tradeoff.v1",
+        "tradeoff_id": "tradeoff:renovation:stone:v1",
+        "candidate_decision_ref": "decision:renovation:benchtop",
+        "incremental_cost": {
+          "state": "exact",
+          "amount": {"amount_minor": 180000, "currency": "AUD"},
+          "evidence_ref": "proposal:builder-a:v3"
+        },
+        "forecast_before": {
+          "minimum_minor": 4800000,
+          "maximum_minor": 5200000,
+          "currency": "AUD",
+          "evidence_refs": ["budget:renovation:v4"]
+        },
+        "forecast_after": {
+          "minimum_minor": 4980000,
+          "maximum_minor": 5380000,
+          "currency": "AUD",
+          "evidence_refs": ["budget:renovation:v4", "proposal:builder-a:v3"]
+        },
+        "offset_options": [{
+          "option_id": "offset:lighting:allowance",
+          "category_ref": "category:lighting",
+          "saving_range": {
+            "minimum_minor": 80000,
+            "maximum_minor": 120000,
+            "currency": "AUD",
+            "evidence_refs": ["allowance:lighting:v2"]
+          },
+          "evidence_refs": ["allowance:lighting:v2"]
+        }],
+        "priority_impact": "preserved",
+        "unknown_cost_drivers": ["category:window-coverings"],
+        "assumptions": ["current_quote", "category_allowance"]
+      }
+    },
+    {
+      "name": "renovation_milestone_dependency",
+      "contract": "milestone",
+      "valid": true,
+      "fingerprint": "c99be30c35d9ce01feaacf08ffe4aec64577d318da5daf8fce33ef210de1a969",
+      "payload": {
+        "schema_version": "planning.milestone_dependency.v1",
+        "milestone_id": "milestone:cabinet-install",
+        "plan_id": "plan:renovation:alpha",
+        "depends_on": ["milestone:electrical-rough-in"],
+        "duration_or_lead_time": {
+          "minimum_days": 15,
+          "maximum_days": 20,
+          "evidence_ref": "proposal:cabinetmaker:v2"
+        },
+        "earliest_at": "2027-01-10T00:00:00Z",
+        "latest_at": "2027-01-15T00:00:00Z",
+        "slack_days": 5,
+        "state": "not_started",
+        "blocking_refs": ["decision:renovation:cabinet-finish"],
+        "prepared_next_action": {"kind": "compare", "target_ref": "decision:renovation:cabinet-finish"}
+      }
+    },
+    {
+      "name": "renovation_supplier_change",
+      "contract": "vendor_change",
+      "valid": true,
+      "fingerprint": "b08d124da5740464dbb7d67d78e13e85c4f957142e9f2b3c39c338b2ab4dffcd",
+      "payload": {
+        "schema_version": "quotation.vendor_change.v1",
+        "change_id": "change:cabinetmaker:finish:v1",
+        "response_ref": "response:cabinetmaker:7",
+        "affected_object_ref": "object:kitchen-cabinetry",
+        "change_kind": "substituted",
+        "original_term": {
+          "value": "Natural oak veneer",
+          "source_anchor": {
+            "message_id": "proposal:cabinetmaker:v2",
+            "source_version_id": "proposal:cabinetmaker:v2",
+            "locator": "finish:1",
+            "exact_excerpt": "Natural oak veneer"
+          }
+        },
+        "replacement_options": [{
+          "value": "Smoked oak veneer",
+          "source_anchor": {
+            "message_id": "response:cabinetmaker:7",
+            "source_version_id": "response:cabinetmaker:7:v1",
+            "locator": "body:42-59",
+            "exact_excerpt": "Smoked oak veneer"
+          }
+        }],
+        "cost_delta": {"state": "unknown"},
+        "deadline": "2026-11-01T00:00:00Z",
+        "requires_user_decision": true
+      }
+    },
+    {
+      "name": "renovation_decision_intervention",
+      "contract": "intervention",
+      "valid": true,
+      "fingerprint": "30885d8da6fdc9e5119051e066a6c14b2eb539dd28a7acb1bcb6c141bc568070",
+      "payload": {
+        "schema_version": "decision.intervention.v1",
+        "intervention_id": "intervention:renovation:finish:v1",
+        "decision_ref": "decision:renovation:cabinet-finish",
+        "options": [
+          {
+            "option_id": "option:smoked-oak",
+            "label": "Review smoked oak",
+            "consequence_codes": ["finish_changes"],
+            "evidence_refs": ["response:cabinetmaker:7"]
+          },
+          {
+            "option_id": "option:source-alternative",
+            "label": "Ask for another natural finish",
+            "consequence_codes": ["lead_time_unknown"],
+            "evidence_refs": ["response:cabinetmaker:7"]
+          }
+        ],
+        "recommended_option_id": "option:smoked-oak",
+        "reason_codes": ["vendor_change"],
+        "unknown_codes": ["cost_delta_unknown"],
+        "consequence_summary_codes": ["finish_changes", "decision_due_before_order"],
+        "prepared_next_action": {"kind": "draft", "target_ref": "response:cabinetmaker:7"}
+      }
+    },
+    {
+      "name": "constraint_rejects_unknown_field",
+      "contract": "constraint",
+      "valid": false,
+      "payload": {
+        "schema_version": "planning.constraint.v1",
+        "constraint_id": "constraint:bad:v1",
+        "template_id": "home_renovation",
+        "plan_id": "plan:renovation:alpha",
+        "subject_ref": {"kind": "plan", "id": "plan:renovation:alpha"},
+        "kind": "accessibility_requirement",
+        "operator": "requires",
+        "value": {"type": "boolean", "value": true},
+        "strength": "hard",
+        "authority": "user",
+        "privacy": "plan_private",
+        "source_ref": "message:1",
+        "source_anchor": {"message_id": "message:1", "source_version_id": null, "locator": "body", "exact_excerpt": "Must be step-free"},
+        "observed_at": "2026-10-18T10:00:00Z",
+        "effective_window": null,
+        "status": "confirmed",
+        "supersedes": null,
+        "private_reasoning": "must never be accepted"
+      }
+    },
+    {
+      "name": "evaluation_rejects_conflict_without_evidence",
+      "contract": "evaluation",
+      "valid": false,
+      "payload": {
+        "schema_version": "planning.constraint_evaluation.v1",
+        "evaluation_id": "evaluation:bad:v1",
+        "constraint_ref": "constraint:renovation:step-free:v1",
+        "candidate_ref": "option:builder-b",
+        "result": "conflict",
+        "severity": "blocking",
+        "constraint_evidence_ref": "message:renovation:brief:1",
+        "candidate_evidence_ref": null,
+        "explanation_code": "explicit_conflict",
+        "evaluated_at": "2026-10-18T10:05:00Z"
+      }
+    },
+    {
+      "name": "cost_rejects_open_assumption",
+      "contract": "cost_tradeoff",
+      "valid": false,
+      "payload": {
+        "schema_version": "planning.cost_tradeoff.v1",
+        "tradeoff_id": "tradeoff:bad:v1",
+        "candidate_decision_ref": "decision:renovation:flooring",
+        "incremental_cost": {"state": "unknown"},
+        "forecast_before": null,
+        "forecast_after": null,
+        "offset_options": [],
+        "priority_impact": "unknown",
+        "unknown_cost_drivers": [],
+        "assumptions": ["the_model_guessed"]
+      }
+    },
+    {
+      "name": "milestone_rejects_self_dependency",
+      "contract": "milestone",
+      "valid": false,
+      "payload": {
+        "schema_version": "planning.milestone_dependency.v1",
+        "milestone_id": "milestone:self",
+        "plan_id": "plan:renovation:alpha",
+        "depends_on": ["milestone:self"],
+        "duration_or_lead_time": null,
+        "earliest_at": null,
+        "latest_at": null,
+        "slack_days": null,
+        "state": "blocked",
+        "blocking_refs": [],
+        "prepared_next_action": null
+      }
+    },
+    {
+      "name": "vendor_change_rejects_unowned_options",
+      "contract": "vendor_change",
+      "valid": false,
+      "payload": {
+        "schema_version": "quotation.vendor_change.v1",
+        "change_id": "change:bad:v1",
+        "response_ref": "response:supplier:1",
+        "affected_object_ref": "object:tile",
+        "change_kind": "substituted",
+        "original_term": {"value": "White tile", "source_anchor": {"message_id": "quote:1", "source_version_id": null, "locator": "line:1", "exact_excerpt": "White tile"}},
+        "replacement_options": [{"value": "Grey tile", "source_anchor": {"message_id": "response:1", "source_version_id": null, "locator": "body", "exact_excerpt": "Grey tile"}}],
+        "cost_delta": {"state": "unknown"},
+        "deadline": null,
+        "requires_user_decision": false
+      }
+    },
+    {
+      "name": "intervention_rejects_unsupported_recommendation",
+      "contract": "intervention",
+      "valid": false,
+      "payload": {
+        "schema_version": "decision.intervention.v1",
+        "intervention_id": "intervention:bad:v1",
+        "decision_ref": "decision:renovation:tile",
+        "options": [{"option_id": "option:grey", "label": "Choose grey", "consequence_codes": [], "evidence_refs": []}],
+        "recommended_option_id": "option:grey",
+        "reason_codes": [],
+        "unknown_codes": [],
+        "consequence_summary_codes": [],
+        "prepared_next_action": null
+      }
+    },
+    {
+      "name": "unknown_schema_fails_closed",
+      "contract": "unknown",
+      "valid": false,
+      "payload": {"schema_version": "planning.anything.v1"}
+    }
+  ]
+}

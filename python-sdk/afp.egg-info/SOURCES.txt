@@ -1,0 +1,9 @@
+pyproject.toml
+afp/__init__.py
+afp/client.py
+afp/init.py
+afp.egg-info/PKG-INFO
+afp.egg-info/SOURCES.txt
+afp.egg-info/dependency_links.txt
+afp.egg-info/requires.txt
+afp.egg-info/top_level.txt

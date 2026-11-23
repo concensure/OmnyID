@@ -1,0 +1,69 @@
+{
+  "schema_version": "quotation.normalised.v1",
+  "registry_version": "generic.v1",
+  "identity": {
+    "quotation_id": "production-hire-quote",
+    "version_id": "production-hire-quote-v1",
+    "vendor_id": "production-supplier",
+    "context_namespace": "production_planner"
+  },
+  "lifecycle": "active",
+  "currency": "AUD",
+  "issued_at": "2026-10-17T00:00:00Z",
+  "sources": [{
+    "source_id": "source-generic",
+    "source_version_id": "source-generic-v1",
+    "media_type": "application/pdf",
+    "content_hash": "sha256:synthetic"
+  }],
+  "line_items": [{
+    "line_id": "lighting",
+    "label": "Lighting package",
+    "category": "item_rate",
+    "inclusion": "included",
+    "price_basis": "fixed",
+    "unit_price": {"amount_minor": 400000, "currency": "AUD"},
+    "evidence": {
+      "state": "confirmed",
+      "anchors": [{
+        "source_id": "source-generic",
+        "source_version_id": "source-generic-v1",
+        "locator": "section=pricing",
+        "exact_excerpt": "Lighting package AUD 4,000"
+      }]
+    }
+  }],
+  "commercial_terms": [{
+    "term_id": "bond",
+    "kind": "refundable_bond",
+    "label": "Equipment bond",
+    "amount": {"amount_minor": 50000, "currency": "AUD"},
+    "refundable": true,
+    "evidence": {
+      "state": "confirmed",
+      "anchors": [{
+        "source_id": "source-generic",
+        "source_version_id": "source-generic-v1",
+        "locator": "section=pricing",
+        "exact_excerpt": "Refundable equipment bond AUD 500"
+      }]
+    }
+  }],
+  "unmapped_items": [{
+    "vendor_label": "Power distro contingency",
+    "evidence": {"state": "unknown", "rationale": "price not stated"}
+  }],
+  "tax": {
+    "treatment": "inclusive",
+    "rate_bps": 1000,
+    "evidence": {
+      "state": "confirmed",
+      "anchors": [{
+        "source_id": "source-generic",
+        "source_version_id": "source-generic-v1",
+        "locator": "section=pricing",
+        "exact_excerpt": "All prices include GST"
+      }]
+    }
+  }
+}

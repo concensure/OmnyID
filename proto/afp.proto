@@ -14,16 +14,18 @@ message Message {
   string from = 5;
   repeated string to = 6;
   string timestamp = 7;
-  string type = 8;
-  string content = 9;       // JSON string
-  string signature = 10;
-  string encryption = 11;   // JSON string
-  string views = 12;        // JSON array string
-  string references = 13;   // JSON array string
-  string attachments = 14;  // JSON array string
-  bool store_in_relational = 15;
-  string subtype = 16;
-  string metadata = 17;     // JSON object string for structured message context
+  string type = 8;           // Broad family, e.g. ledger, relation_link, knowledge_link
+  optional string kind = 9;
+  string content = 10;       // JSON string
+  string signature = 11;
+  string encryption = 12;   // JSON string
+  string views = 13;        // JSON array string
+  string references = 14;   // JSON array string
+  string attachments = 15;  // JSON array string
+  bool store_in_relational = 16;
+  string subtype = 17;
+  string metadata = 18;     // JSON object string for structured message context
+  repeated string supertags = 19;
 }
 
 message Ack { bool success = 1; string message_id = 2; }

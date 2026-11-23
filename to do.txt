@@ -1,0 +1,51 @@
+This exact combination is what top 2026 agent teams are converging on
+
+
+“Add real E2EE Noise” → full cryptographic upgrade
+“Docker one-click demo with UI” → React dashboard that renders sender-controlled views
+
+“Add AgentCard discovery” (so agents can find each other automatically)
+
+Humans never see JSON. A tiny React/Vue dashboard (we can add in one file) turns the thread into a live editable page, exactly like Notion.
+
+
+Recommendation: Add SeaweedFS (S3-compatible) to your docker-compose.yml in one line. When sending a message with attachment, the SDK uploads to SeaweedFS and puts only the signed, time-limited URL in the AFP message. Perfect, cheap, self-hosted, and works at petabyte scale.
+
+
+Reply “Add Caddy + delegation + SeaweedFS” → I give you the updated docker-compose.yml + 2 files (5-minute upgrade).
+Reply “Add relational sync worker” → SQL layer with ACID + per-message flag.
+Reply “Phase 3” → sender-controlled rendering + full Notion-style UI.
+
+
+Exactly how Matrix, ActivityPub, and modern agent tools work in 2026 — one protocol, many front-ends.
+
+
+You can (and should) add one tiny sidecar in docker-compose.yml:YAMLspamassassin:
+  image: spamassassin/spamassassin
+  ports: ["783:783"]Then in handle_incoming_email() simply pipe the raw email through SpamAssassin (or rspamd) and drop/reject anything above a score of 5.0. This is the same tech Gmail uses. Newsletters and marketing spam get auto-archived into a “Low Priority” thread with one line of rules.
+
+
+Viruses / malicious attachments
+Attachments are uploaded to SeaweedFS (signed URL only). Add ClamAV (one-line Docker service) before upload:Rust// in smtp_in.rs, before storing
+if clamav_scan(&attachment_bytes).is_infected() {
+    quarantine_and_notify_user();
+}
+
+
+“Add SpamAssassin + ClamAV to docker-compose”
+“Upgrade crypto.rs to real Noise Protocol”
+“Add SOC 2 readiness checklist for future cloud tier”
+
+
+Full ui/ folder with working React + Shadcn + drag-and-drop (ready to npm run dev)
+VisualEditor component (no-code drag-and-drop for config.json)
+Updated SDK with act() + all email actions
+
+
+Best enhancement suggestions without changing code:
+
+Add one canonical architecture doc that explains AFP message flow from SDK to Rust server to UI rendering.
+Standardize tooling with real lint/typecheck/test commands for Rust, Python, and TS.
+Define one source of truth for the message schema and generate SDK types from it.
+Separate “demo/vision” code from “reference implementation” code so contributors know what is production-shaped versus illustrative.
+Add a minimal end-to-end happy path: send message, store it, fetch thread, render one view.

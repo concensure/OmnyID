@@ -1,0 +1,4 @@
+wedding/vendor-image-licence.html text eol=lf
+scripts/*.sh text eol=lf
+scripts/fixtures/*.py text eol=lf
+scripts/systemd/* text eol=lf

@@ -1,6 +1,6 @@
 param(
     [string]$OutputDir = "secrets/dev-webtransport",
-    [string[]]$Sans = @("example.com", "relay.example.com")
+    [string[]]$Sans = @("localhost", "127.0.0.1", "::1", "wt.omnyid.local")
 )
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")

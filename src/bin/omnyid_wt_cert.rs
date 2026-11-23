@@ -53,14 +53,16 @@ fn print_help() {
     println!("omnyid_wt_cert [output_dir] [san1 san2 ...]");
     println!("Generates a self-signed WebTransport development certificate and private key.");
     println!("Default output directory: secrets/dev-webtransport");
-    println!("Default SANs: example.com, relay.example.com");
+    println!("Default SANs: localhost, 127.0.0.1, ::1, wt.omnyid.local");
 }
 
 fn collect_subject_alt_names(input: Vec<String>) -> Vec<String> {
     if input.is_empty() {
         return vec![
-            "example.com".to_string(),
-            "relay.example.com".to_string(),
+            "localhost".to_string(),
+            "127.0.0.1".to_string(),
+            "::1".to_string(),
+            "wt.omnyid.local".to_string(),
         ];
     }
 

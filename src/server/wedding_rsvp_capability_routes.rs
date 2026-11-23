@@ -1,0 +1,556 @@
+use super::wedding_rsvp_response_routes::{
+    Attendance, CapabilityProof, RecordResponseReply, RecordResponseRequest,
+    record_guest_response_for_user,
+};
+use super::{
+    AppState, RateLimitPolicy,
+    auth::{authenticated_user, public_rate_limit_key},
+    authenticated_rate_limit_key, enforce_rate_limit,
+    wedding_scope::resolve_wedding_scope,
+};
+use crate::db::{
+    WeddingRsvpCapabilityGrantCreate, WeddingRsvpCapabilityGrantRotation,
+    WeddingRsvpCapabilityGrantSummary,
+};
+use axum::{
+    Json, Router,
+    extract::{Path, Query, State},
+    http::{HeaderMap, StatusCode, header::CACHE_CONTROL},
+    response::IntoResponse,
+    routing::{get, post},
+};
+use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
+use chacha20poly1305::aead::{OsRng, rand_core::RngCore};
+use chrono::{DateTime, Duration as ChronoDuration, Utc};
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+use std::{
+    collections::{BTreeMap, HashSet},
+    sync::Arc,
+    time::Duration,
+};
+use ulid::Ulid;
+
+const MAX_GRANT_DAYS: i64 = 30;
+
+pub(super) fn routes() -> Router<Arc<AppState>> {
+    Router::new()
+        .route("/wedding/rsvp/capabilities/status", get(status_http))
+        .route(
+            "/wedding/rsvp/capabilities",
+            get(list_http).post(create_http),
+        )
+        .route(
+            "/wedding/rsvp/capabilities/{grant_id}/revoke",
+            post(revoke_http),
+        )
+        .route(
+            "/wedding/rsvp/capabilities/{grant_id}/regenerate",
+            post(regenerate_http),
+        )
+        .route("/wedding/rsvp/capabilities/open", post(open_http))
+        .route("/wedding/rsvp/capabilities/respond", post(respond_http))
+}
+
+fn enabled() -> bool {
+    std::env::var("OMNYID_WEDDING_RSVP_PUBLIC_ENABLED")
+        .ok()
+        .as_deref()
+        == Some("true")
+}
+
+fn pilot_user_allowed_for(enabled: bool, configured_user_ids: Option<&str>, user_id: &str) -> bool {
+    if !enabled {
+        return false;
+    }
+    let Some(configured_user_ids) = configured_user_ids.filter(|value| !value.trim().is_empty())
+    else {
+        return true;
+    };
+    configured_user_ids
+        .split(',')
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .any(|value| value == user_id)
+}
+
+fn pilot_user_allowed(user_id: &str) -> bool {
+    let configured = std::env::var("OMNYID_WEDDING_RSVP_PILOT_USER_IDS").ok();
+    pilot_user_allowed_for(enabled(), configured.as_deref(), user_id)
+}
+
+fn valid_id(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 160
+        && value
+            .chars()
+            .all(|character| character.is_ascii_alphanumeric() || "_:./-".contains(character))
+}
+
+fn unavailable() -> (StatusCode, String) {
+    (
+        StatusCode::NOT_FOUND,
+        "This RSVP invitation is not available.".into(),
+    )
+}
+
+fn bad_request(message: &str) -> (StatusCode, String) {
+    (StatusCode::BAD_REQUEST, message.into())
+}
+
+fn store_error(error: sqlx::Error) -> (StatusCode, String) {
+    tracing::error!(error_kind = %error.as_database_error().map(|value| format!("{:?}", value.kind())).unwrap_or_else(|| "storage".into()), "Wedding RSVP capability persistence failed");
+    (
+        StatusCode::SERVICE_UNAVAILABLE,
+        "RSVP invitations are temporarily unavailable.".into(),
+    )
+}
+
+pub(crate) fn token_digest(token: &str) -> Option<String> {
+    let bytes = URL_SAFE_NO_PAD.decode(token.trim()).ok()?;
+    if bytes.len() != 32 {
+        return None;
+    }
+    Some(hex::encode(Sha256::digest(bytes)))
+}
+
+fn new_token() -> (String, String) {
+    let mut entropy = [0_u8; 32];
+    OsRng.fill_bytes(&mut entropy);
+    (
+        URL_SAFE_NO_PAD.encode(entropy),
+        hex::encode(Sha256::digest(entropy)),
+    )
+}
+
+fn parse_expiry(value: &str, now: DateTime<Utc>) -> Result<DateTime<Utc>, (StatusCode, String)> {
+    let expiry = DateTime::parse_from_rfc3339(value)
+        .map_err(|_| bad_request("Choose a valid RSVP link expiry."))?
+        .with_timezone(&Utc);
+    if expiry < now + ChronoDuration::minutes(15)
+        || expiry > now + ChronoDuration::days(MAX_GRANT_DAYS)
+    {
+        return Err(bad_request(
+            "RSVP link expiry must be between 15 minutes and 30 days from now.",
+        ));
+    }
+    Ok(expiry)
+}
+
+#[derive(Serialize)]
+struct StatusResponse {
+    enabled: bool,
+    max_expiry_days: i64,
+    token_in_fragment: bool,
+}
+
+async fn status_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(query): Query<CapabilityQuery>,
+) -> Result<Json<StatusResponse>, (StatusCode, String)> {
+    let user = authenticated_user(&state.db, &headers).await?;
+    let scope = resolve_wedding_scope(
+        &state.db,
+        &user.id,
+        &query.wedding_plan_id,
+        &query.response_workspace_id,
+    )
+    .await?;
+    Ok(Json(StatusResponse {
+        enabled: pilot_user_allowed(&scope.owner_user_id),
+        max_expiry_days: MAX_GRANT_DAYS,
+        token_in_fragment: true,
+    }))
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CapabilityQuery {
+    wedding_plan_id: String,
+    response_workspace_id: String,
+}
+
+async fn list_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(query): Query<CapabilityQuery>,
+) -> Result<Json<Vec<WeddingRsvpCapabilityGrantSummary>>, (StatusCode, String)> {
+    let user = authenticated_user(&state.db, &headers).await?;
+    let scope = resolve_wedding_scope(
+        &state.db,
+        &user.id,
+        &query.wedding_plan_id,
+        &query.response_workspace_id,
+    )
+    .await?;
+    state
+        .db
+        .list_wedding_rsvp_capability_grants(&scope.owner_user_id, &scope.response_workspace_id)
+        .await
+        .map(Json)
+        .map_err(store_error)
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct CreateRequest {
+    pub(crate) wedding_plan_id: String,
+    pub(crate) response_workspace_id: String,
+    pub(crate) household_id: String,
+    pub(crate) invitation_ids: Vec<String>,
+    pub(crate) expires_at: String,
+    #[serde(default)]
+    pub(crate) request_contact_details: bool,
+    pub(crate) loom_video_url: Option<String>,
+}
+
+pub(crate) fn validated_loom_url(
+    value: Option<&str>,
+) -> Result<Option<String>, (StatusCode, String)> {
+    let Some(value) = value.map(str::trim).filter(|value| !value.is_empty()) else {
+        return Ok(None);
+    };
+    let parsed =
+        reqwest::Url::parse(value).map_err(|_| bad_request("Use a valid Loom share link."))?;
+    let host = parsed.host_str().unwrap_or_default().to_ascii_lowercase();
+    let allowed_host = matches!(host.as_str(), "loom.com" | "www.loom.com");
+    let allowed_path = parsed.path().starts_with("/share/") || parsed.path().starts_with("/embed/");
+    if parsed.scheme() != "https" || !allowed_host || !allowed_path || value.len() > 500 {
+        return Err(bad_request("Use an HTTPS loom.com share link."));
+    }
+    Ok(Some(value.to_string()))
+}
+
+#[derive(Serialize)]
+struct CreateResponse {
+    grant: WeddingRsvpCapabilityGrantSummary,
+    token: String,
+}
+
+pub(crate) fn validate_create(
+    request: &CreateRequest,
+    now: DateTime<Utc>,
+) -> Result<DateTime<Utc>, (StatusCode, String)> {
+    if !valid_id(&request.wedding_plan_id)
+        || !valid_id(&request.response_workspace_id)
+        || !valid_id(&request.household_id)
+        || request.invitation_ids.is_empty()
+        || request.invitation_ids.len() > 100
+        || request.invitation_ids.iter().any(|id| !valid_id(id))
+        || request.invitation_ids.iter().collect::<HashSet<_>>().len()
+            != request.invitation_ids.len()
+    {
+        return Err(bad_request(
+            "Choose one household and its valid Wedding invitations.",
+        ));
+    }
+    parse_expiry(&request.expires_at, now)
+}
+
+async fn create_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(request): Json<CreateRequest>,
+) -> Result<Json<CreateResponse>, (StatusCode, String)> {
+    enforce_rate_limit(
+        &state,
+        authenticated_rate_limit_key("wedding_rsvp_capability_create", &headers),
+        RateLimitPolicy {
+            max_requests: 12,
+            window: Duration::from_secs(60),
+        },
+    )
+    .await?;
+    let user = authenticated_user(&state.db, &headers).await?;
+    let scope = resolve_wedding_scope(
+        &state.db,
+        &user.id,
+        &request.wedding_plan_id,
+        &request.response_workspace_id,
+    )
+    .await?;
+    if !pilot_user_allowed(&scope.owner_user_id) {
+        return Err(unavailable());
+    }
+    let expires_at = validate_create(&request, Utc::now())?;
+    let loom_video_url = validated_loom_url(request.loom_video_url.as_deref())?;
+    let (token, token_digest) = new_token();
+    let input = WeddingRsvpCapabilityGrantCreate {
+        actor_user_id: user.id,
+        grant_id: format!("rsvp-capability-{}", Ulid::new()),
+        wedding_plan_id: scope.wedding_plan_id,
+        response_workspace_id: scope.response_workspace_id,
+        household_id: request.household_id,
+        invitation_ids: request.invitation_ids,
+        token_digest,
+        expires_at,
+        request_contact_details: request.request_contact_details,
+        loom_video_url,
+    };
+    let grant = state
+        .db
+        .create_wedding_rsvp_capability_grant(&scope.owner_user_id, input)
+        .await
+        .map_err(store_error)?
+        .ok_or_else(|| bad_request("Those invitations do not belong to one household."))?;
+    Ok(Json(CreateResponse { grant, token }))
+}
+
+async fn revoke_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(grant_id): Path<String>,
+    Json(request): Json<ManageRequest>,
+) -> Result<Json<WeddingRsvpCapabilityGrantSummary>, (StatusCode, String)> {
+    let user = authenticated_user(&state.db, &headers).await?;
+    if !valid_id(&grant_id) {
+        return Err(unavailable());
+    }
+    let scope = resolve_wedding_scope(
+        &state.db,
+        &user.id,
+        &request.wedding_plan_id,
+        &request.response_workspace_id,
+    )
+    .await?;
+    state
+        .db
+        .revoke_wedding_rsvp_capability_grant(&scope.owner_user_id, &user.id, &grant_id)
+        .await
+        .map_err(store_error)?
+        .map(Json)
+        .ok_or_else(unavailable)
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RegenerateRequest {
+    wedding_plan_id: String,
+    response_workspace_id: String,
+    expires_at: String,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ManageRequest {
+    wedding_plan_id: String,
+    response_workspace_id: String,
+}
+
+async fn regenerate_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(grant_id): Path<String>,
+    Json(request): Json<RegenerateRequest>,
+) -> Result<Json<CreateResponse>, (StatusCode, String)> {
+    enforce_rate_limit(
+        &state,
+        authenticated_rate_limit_key("wedding_rsvp_capability_regenerate", &headers),
+        RateLimitPolicy {
+            max_requests: 12,
+            window: Duration::from_secs(60),
+        },
+    )
+    .await?;
+    let user = authenticated_user(&state.db, &headers).await?;
+    if !valid_id(&grant_id) {
+        return Err(unavailable());
+    }
+    let scope = resolve_wedding_scope(
+        &state.db,
+        &user.id,
+        &request.wedding_plan_id,
+        &request.response_workspace_id,
+    )
+    .await?;
+    if !pilot_user_allowed(&scope.owner_user_id) {
+        return Err(unavailable());
+    }
+    let expires_at = parse_expiry(&request.expires_at, Utc::now())?;
+    let (token, token_digest) = new_token();
+    let grant = state
+        .db
+        .rotate_wedding_rsvp_capability_grant(
+            &scope.owner_user_id,
+            WeddingRsvpCapabilityGrantRotation {
+                actor_user_id: user.id,
+                source_grant_id: grant_id,
+                grant_id: format!("rsvp-capability-{}", Ulid::new()),
+                token_digest,
+                expires_at,
+            },
+        )
+        .await
+        .map_err(store_error)?
+        .ok_or_else(unavailable)?;
+    Ok(Json(CreateResponse { grant, token }))
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct TokenRequest {
+    token: String,
+}
+
+async fn open_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(request): Json<TokenRequest>,
+) -> Result<impl IntoResponse, (StatusCode, String)> {
+    enforce_rate_limit(
+        &state,
+        public_rate_limit_key("wedding_rsvp_capability_open", &headers),
+        RateLimitPolicy {
+            max_requests: 30,
+            window: Duration::from_secs(3600),
+        },
+    )
+    .await?;
+    if !enabled() {
+        return Err(unavailable());
+    }
+    let digest = token_digest(&request.token).ok_or_else(unavailable)?;
+    let owner_user_id = state
+        .db
+        .wedding_rsvp_capability_owner(&digest)
+        .await
+        .map_err(store_error)?
+        .ok_or_else(unavailable)?;
+    if !pilot_user_allowed(&owner_user_id) {
+        return Err(unavailable());
+    }
+    let scope = state
+        .db
+        .open_wedding_rsvp_capability(&digest)
+        .await
+        .map_err(store_error)?
+        .ok_or_else(unavailable)?;
+    Ok(([(CACHE_CONTROL, "private, no-store")], Json(scope)))
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct PublicResponseRequest {
+    token: String,
+    invitation_id: String,
+    person_id: String,
+    event_id: String,
+    attendance: Attendance,
+    expected_revision: i64,
+    idempotency_key: String,
+    #[serde(default)]
+    answers: BTreeMap<String, String>,
+    #[serde(default)]
+    private_answer_question_ids: Vec<String>,
+    private_answers_ciphertext: Option<String>,
+    contact_details: Option<GuestContactDetails>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct GuestContactDetails {
+    display_name: String,
+    email: String,
+    phone: String,
+    relationship_to_couple: String,
+}
+
+async fn respond_http(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(request): Json<PublicResponseRequest>,
+) -> Result<impl IntoResponse, (StatusCode, String)> {
+    enforce_rate_limit(
+        &state,
+        public_rate_limit_key("wedding_rsvp_capability_respond", &headers),
+        RateLimitPolicy {
+            max_requests: 30,
+            window: Duration::from_secs(3600),
+        },
+    )
+    .await?;
+    if !enabled() || request.attendance == Attendance::Pending {
+        return Err(unavailable());
+    }
+    let digest = token_digest(&request.token).ok_or_else(unavailable)?;
+    let authority = state
+        .db
+        .wedding_rsvp_submission_authority(&digest, &request.invitation_id)
+        .await
+        .map_err(store_error)?
+        .ok_or_else(unavailable)?;
+    if !pilot_user_allowed(&authority.owner_user_id) {
+        return Err(unavailable());
+    }
+    let command = RecordResponseRequest {
+        wedding_plan_id: authority.wedding_plan_id,
+        response_workspace_id: authority.response_workspace_id,
+        invitation_id: request.invitation_id,
+        person_id: request.person_id,
+        event_id: request.event_id,
+        attendance: request.attendance,
+        expected_revision: request.expected_revision,
+        idempotency_key: request.idempotency_key,
+        answers: request.answers,
+        private_answer_question_ids: request.private_answer_question_ids,
+        private_answers_ciphertext: request.private_answers_ciphertext,
+        contact_details: request.contact_details.map(|details| {
+            super::wedding_rsvp_response_routes::GuestContactDetails {
+                display_name: details.display_name,
+                email: details.email,
+                phone: details.phone,
+                relationship_to_couple: details.relationship_to_couple,
+            }
+        }),
+        contact_details_authorized: authority.request_contact_details,
+    };
+    let result: RecordResponseReply = record_guest_response_for_user(
+        &state.db,
+        &authority.owner_user_id,
+        command,
+        CapabilityProof {
+            capability_id: authority.capability_id,
+            token_digest: digest,
+        },
+    )
+    .await
+    .map_err(|error| {
+        if matches!(error.0, StatusCode::FORBIDDEN | StatusCode::NOT_FOUND) {
+            unavailable()
+        } else {
+            error
+        }
+    })?;
+    Ok(([(CACHE_CONTROL, "private, no-store")], Json(result)))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::pilot_user_allowed_for;
+
+    #[test]
+    fn rsvp_pilot_requires_the_global_switch() {
+        assert!(!pilot_user_allowed_for(false, Some("couple-a"), "couple-a"));
+    }
+
+    #[test]
+    fn rsvp_pilot_limits_configured_accounts() {
+        assert!(pilot_user_allowed_for(
+            true,
+            Some("couple-a, couple-b"),
+            "couple-b"
+        ));
+        assert!(!pilot_user_allowed_for(
+            true,
+            Some("couple-a, couple-b"),
+            "couple-c"
+        ));
+    }
+
+    #[test]
+    fn empty_pilot_list_preserves_an_explicit_full_rollout() {
+        assert!(pilot_user_allowed_for(true, None, "couple-a"));
+        assert!(pilot_user_allowed_for(true, Some("  "), "couple-a"));
+    }
+}

@@ -6,16 +6,19 @@ Thumbs.db
 *.swp
 *.swo
 
-# Temporary files
+# Temporary office files
 ~$*
 ~WRL*.tmp
 *.tmp
 
-# Node
+# Node / frontend
 node_modules/
+.wrangler/
+.next/
 dist/
 build/
 coverage/
+test-results/
 *.tsbuildinfo
 
 # Python
@@ -27,7 +30,6 @@ __pycache__/
 .venv/
 venv/
 env/
-*.egg-info/
 
 # Rust
 target/
@@ -37,8 +39,11 @@ target/
 .env.*
 !.env.example
 
-# Secrets and certs
+# Secrets and cloud credentials
 secrets/
+.secrets/
+.secrets-staging/
+.seaweedfs-admin-secrets/
 *.pem
 *.key
 *.crt
@@ -46,9 +51,21 @@ secrets/
 *.pfx
 id_ed25519*
 id_rsa*
+oracle-cloud.env
+oracle-cloud.local.env
+scripts/oracle-config.local.ps1
+oracle-cloud.quic.local.env
+ovhcloud.env
+vault.env
+runpod.env
 
-# Logs / local data
+# Dev launcher artifacts (browser profiles, seeded session tokens)
+.dev-launch/
+solid-ui/public/.dev-launch/
+
+# Logs
 *.log
-*.sqlite
-*.db
-tmp/
+
+# Rollback / crash-recovery snapshots
+*.bak
+*.rollback.*

@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://omnyid.dev/schemas/planning/intervention.v1.json",
+  "title": "OmnyID decision intervention v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "intervention_id", "decision_ref", "options", "reason_codes",
+    "unknown_codes", "consequence_summary_codes"
+  ],
+  "properties": {
+    "schema_version": {"const": "decision.intervention.v1"},
+    "intervention_id": {"$ref": "#/$defs/id"},
+    "decision_ref": {"$ref": "#/$defs/id"},
+    "options": {"type": "array", "minItems": 1, "maxItems": 12, "items": {"$ref": "#/$defs/option"}},
+    "recommended_option_id": {"oneOf": [{"$ref": "#/$defs/id"}, {"type": "null"}]},
+    "reason_codes": {
+      "type": "array", "maxItems": 10,
+      "items": {"enum": ["constraint_conflict", "budget_tradeoff", "critical_dependency", "vendor_change", "preference_conflict"]}
+    },
+    "unknown_codes": {"type": "array", "maxItems": 30, "items": {"$ref": "#/$defs/code"}},
+    "consequence_summary_codes": {"type": "array", "maxItems": 30, "items": {"$ref": "#/$defs/code"}},
+    "prepared_next_action": {"oneOf": [{"$ref": "#/$defs/prepared_action"}, {"type": "null"}]}
+  },
+  "$defs": {
+    "id": {"type": "string", "minLength": 1, "maxLength": 180, "pattern": "^[^@\\s]+$"},
+    "code": {"type": "string", "minLength": 1, "maxLength": 100, "pattern": "^[a-z0-9_.-]+$"},
+    "option": {
+      "type": "object", "additionalProperties": false,
+      "required": ["option_id", "label", "consequence_codes", "evidence_refs"],
+      "properties": {
+        "option_id": {"$ref": "#/$defs/id"}, "label": {"type": "string", "minLength": 1, "maxLength": 180},
+        "consequence_codes": {"type": "array", "maxItems": 30, "items": {"$ref": "#/$defs/code"}},
+        "evidence_refs": {"type": "array", "maxItems": 30, "items": {"$ref": "#/$defs/id"}}
+      }
+    },
+    "prepared_action": {
+      "type": "object", "additionalProperties": false, "required": ["kind", "target_ref"],
+      "properties": {"kind": {"enum": ["research", "compare", "draft"]}, "target_ref": {"$ref": "#/$defs/id"}}
+    }
+  }
+}

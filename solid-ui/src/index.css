@@ -1,0 +1,727 @@
+@import url("https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap");
+@import "gridstack/dist/gridstack.min.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Base ──────────────────────────────────────────────────────────────────── */
+:root {
+  color-scheme: light;
+  --base-font-size: 16px;
+  --font-ui: Inter, system-ui, sans-serif;
+  --font-body: var(--font-ui);
+  --leading-tight: 1.4;
+  --leading-body: 1.65;
+  --leading-prose: 1.85;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+html {
+  font-size: var(--base-font-size);
+}
+
+body {
+  margin: 0;
+  /* Refined background: very subtle dual-tone gradient — airy and calm */
+  background:
+    radial-gradient(ellipse 80% 50% at 15% -10%, rgba(49, 86, 142, 0.08), transparent),
+    radial-gradient(ellipse 60% 40% at 90% 5%,  rgba(82, 99, 82, 0.07),  transparent),
+    linear-gradient(160deg, #fafaf8 0%, #f0f3f9 55%, #eef2f6 100%);
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* Refined Inter rendering */
+  font-feature-settings: "cv01", "cv02", "cv03", "cv04", "tnum";
+  font-size: 1rem;
+}
+
+body.omnyid-usecase-wedding-planning {
+  background:
+    radial-gradient(ellipse 72% 48% at 12% -8%, rgba(193, 123, 135, 0.16), transparent),
+    radial-gradient(ellipse 54% 38% at 88% 4%, rgba(138, 154, 126, 0.14), transparent),
+    radial-gradient(circle at 70% 92%, rgba(199, 154, 72, 0.10), transparent 36%),
+    linear-gradient(160deg, #fffdfa 0%, #fbf6ef 48%, #f4eadc 100%);
+}
+
+body.omnyid-usecase-study {
+  background:
+    radial-gradient(ellipse 78% 50% at 14% -10%, rgba(58, 107, 173, 0.12), transparent),
+    radial-gradient(ellipse 58% 42% at 90% 8%, rgba(76, 126, 116, 0.11), transparent),
+    linear-gradient(160deg, #fbfdfd 0%, #edf5f8 52%, #eef2f6 100%);
+}
+
+body.omnyid-usecase-travel {
+  background:
+    radial-gradient(ellipse 76% 48% at 12% -10%, rgba(53, 121, 132, 0.14), transparent),
+    radial-gradient(ellipse 58% 42% at 90% 8%, rgba(202, 151, 74, 0.12), transparent),
+    linear-gradient(160deg, #fffaf2 0%, #eef6f4 55%, #f2efe6 100%);
+}
+
+:where(
+  a[href],
+  button,
+  input,
+  select,
+  textarea,
+  summary,
+  [role="button"],
+  [tabindex]:not([tabindex="-1"])
+):focus-visible {
+  outline: 2px solid rgba(49, 86, 142, 0.78);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(49, 86, 142, 0.16);
+}
+
+body.omnyid-usecase-wedding-planning :where(
+  a[href],
+  button,
+  input,
+  select,
+  textarea,
+  summary,
+  [role="button"],
+  [tabindex]:not([tabindex="-1"])
+):focus-visible {
+  outline-color: rgba(193, 123, 135, 0.82);
+  box-shadow: 0 0 0 4px rgba(193, 123, 135, 0.18);
+}
+
+.skip-link {
+  position: absolute;
+  left: 1rem;
+  top: 0.75rem;
+  z-index: 200;
+  border-radius: 999px;
+  border: 1px solid rgba(49, 86, 142, 0.24);
+  background: rgba(255, 255, 255, 0.96);
+  padding: 0.55rem 0.9rem;
+  color: #1a1c1b;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-decoration: none;
+  transform: translateY(-160%);
+  opacity: 0;
+  transition: transform 0.18s ease, opacity 0.18s ease;
+}
+
+.skip-link:focus-visible {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+/* ── Glass surfaces ─────────────────────────────────────────────────────────── */
+.glass-surface {
+  background: linear-gradient(160deg, rgba(255,255,255,0.72), rgba(255,255,255,0.48));
+  backdrop-filter: blur(28px) saturate(1.4);
+  -webkit-backdrop-filter: blur(28px) saturate(1.4);
+}
+
+/* Slightly more opaque variant for inner cards */
+.glass-card {
+  background: linear-gradient(160deg, rgba(255,255,255,0.82), rgba(255,255,255,0.60));
+  backdrop-filter: blur(18px) saturate(1.3);
+  -webkit-backdrop-filter: blur(18px) saturate(1.3);
+  border: 1px solid rgba(255,255,255,0.55);
+}
+
+/* ── Interactive elements ───────────────────────────────────────────────────── */
+.glass-button {
+  transition: transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 200ms ease,
+              background-color 180ms ease,
+              color 150ms ease;
+}
+
+.glass-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(49, 86, 142, 0.10);
+}
+
+body.omnyid-usecase-wedding-planning .glass-button:hover {
+  box-shadow: 0 10px 24px rgba(168, 92, 106, 0.13);
+}
+
+.glass-button:active {
+  transform: translateY(0px);
+  box-shadow: none;
+}
+
+/* ── Navigation rail icons ──────────────────────────────────────────────────── */
+.rail-icon-btn {
+  transition:
+    color 0.14s ease,
+    background-color 0.14s ease,
+    transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+  will-change: transform;
+}
+.rail-icon-btn:hover  { transform: translateX(3px); }
+.rail-icon-btn:active { transform: translateX(1px) scale(0.91); transition-duration: 0.07s; }
+
+/* Tooltip slide-in from left */
+.rail-tooltip {
+  background: rgb(255 255 255);
+  border-color: rgb(226 232 240);
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.16);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  transition: opacity 0.12s ease, transform 0.15s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Chat icon — dots pulse on hover to signal "agent ready" */
+@keyframes dot-bob {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-2px); }
+}
+.rail-icon-btn:hover .rd1 { animation: dot-bob 0.9s 0.00s ease-in-out infinite; }
+.rail-icon-btn:hover .rd2 { animation: dot-bob 0.9s 0.15s ease-in-out infinite; }
+.rail-icon-btn:hover .rd3 { animation: dot-bob 0.9s 0.30s ease-in-out infinite; }
+
+/* Runner icon — cursor blink on hover */
+@keyframes cursor-blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+.rail-icon-btn:hover .ri-cursor { animation: cursor-blink 0.75s step-end infinite; }
+
+/* Discover compass — needle settle on hover */
+@keyframes needle-settle {
+  0%   { transform: rotate(-12deg); transform-origin: 10px 10px; }
+  100% { transform: rotate(0deg);   transform-origin: 10px 10px; }
+}
+.rail-icon-btn:hover .ri-needle {
+  animation: needle-settle 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* Workflows — data flow along edges on hover */
+@keyframes flow-dash {
+  to { stroke-dashoffset: -8; }
+}
+.rail-icon-btn:hover .ri-flow {
+  stroke-dasharray: 3 5;
+  animation: flow-dash 0.8s linear infinite;
+}
+
+/* ── View transitions ───────────────────────────────────────────────────────── */
+/* Applied to every view container in App.tsx for a smooth "breathe-in" effect */
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.view-enter {
+  animation: fadeUp 0.30s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Staggered children — use with view-enter on parent */
+.view-enter > * {
+  animation: fadeUp 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.view-enter > *:nth-child(2) { animation-delay: 0.04s; }
+.view-enter > *:nth-child(3) { animation-delay: 0.08s; }
+.view-enter > *:nth-child(4) { animation-delay: 0.12s; }
+.view-enter > *:nth-child(5) { animation-delay: 0.16s; }
+.view-enter > *:nth-child(6) { animation-delay: 0.20s; }
+.view-enter > *:nth-child(7) { animation-delay: 0.24s; }
+.view-enter > *:nth-child(8) { animation-delay: 0.28s; }
+
+@keyframes skeletonReveal {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes contentReveal {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.skeleton-crossfade {
+  animation: skeletonReveal 0.18s ease-out both;
+}
+
+.content-crossfade {
+  animation: contentReveal 0.24s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes cardShellReveal {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+    border-color: rgba(255, 255, 255, 0.14);
+    box-shadow: 0 6px 18px rgba(49, 86, 142, 0.06);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    border-color: rgba(255, 255, 255, 0.35);
+    box-shadow: 0 20px 48px rgba(49, 86, 142, 0.14);
+  }
+}
+
+.card-progressive-shell {
+  animation: cardShellReveal 0.26s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.card-progressive-header,
+.card-progressive-body,
+.card-progressive-footer {
+  opacity: 0;
+  animation: contentReveal 0.24s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.card-progressive-header {
+  animation-delay: 0.04s;
+}
+
+.card-progressive-body {
+  animation-delay: 0.1s;
+}
+
+.card-progressive-footer {
+  animation-delay: 0.18s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card-progressive-shell,
+  .card-progressive-header,
+  .card-progressive-body,
+  .card-progressive-footer {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ── Pulse for daemon nodes (already used in canvas) ────────────────────────── */
+@keyframes daemonPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.4); }
+  50%       { box-shadow: 0 0 0 8px rgba(139, 92, 246, 0); }
+}
+.daemon-pulse {
+  animation: daemonPulse 2.4s ease-in-out infinite;
+}
+
+/* ── Status dot pulse ───────────────────────────────────────────────────────── */
+@keyframes statusPulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.45; }
+}
+.status-pulse {
+  animation: statusPulse 1.8s ease-in-out infinite;
+}
+
+/* ── Typography utilities ───────────────────────────────────────────────────── */
+/* Tight heading kerning for display text */
+.heading-tight {
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+/* Muted label style used for section headers */
+.label-caps {
+  font-size: 0.6875rem;  /* 11px */
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #737781;
+  line-height: var(--leading-tight);
+}
+
+.leading-ui-tight {
+  line-height: var(--leading-tight);
+}
+
+.leading-ui-body {
+  line-height: var(--leading-body);
+}
+
+.leading-ui-prose {
+  line-height: var(--leading-prose);
+}
+
+.content-font-body {
+  font-family: var(--font-body);
+}
+
+/* ── Card hover lift ────────────────────────────────────────────────────────── */
+.card-hover {
+  transition: transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 200ms ease;
+}
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.09);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html:focus-within {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ── CodeMirror ─────────────────────────────────────────────────────────────── */
+.grid-stack-item-content {
+  background: transparent;
+}
+
+.dashboard-feed-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  overflow: auto;
+}
+
+.grid-stack > .grid-stack-item.dashboard-feed-item-elevated {
+  z-index: 40;
+}
+
+.grid-stack > .grid-stack-item.dashboard-feed-item-elevated > .grid-stack-item-content {
+  overflow: visible;
+}
+
+.cm-editor {
+  height: 100%;
+  border-radius: 1rem;
+  overflow: hidden;
+}
+
+.cm-scroller {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+}
+
+/* ── Scrollbar ──────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(115, 119, 129, 0.28);
+  border-radius: 99px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(115, 119, 129, 0.48);
+}
+
+/* ── Fluid typography (T2) ──────────────────────────────────────────────────── */
+:root {
+  --text-nano:   clamp(10px, 3.5vw, 13px);
+  --text-sm:     clamp(12px, 2.5vw, 14px);
+  --text-base:   clamp(13px, 2vw, 16px);
+  --text-lg:     clamp(15px, 2.5vw, 20px);
+  /* Glass tokens — overrideable by hc-mode */
+  --glass-blur:    28px;
+  --glass-opacity: 0.72;
+  --surface-solid: #f4f4f2;
+}
+
+/* ── High-contrast / no-blur mode (T2 / T8) ────────────────────────────────── */
+.hc-mode {
+  --glass-blur:    0px;
+  --glass-opacity: 0.95;
+}
+.hc-mode .glass-surface,
+.hc-mode .glass-card {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  background: var(--surface-solid) !important;
+}
+
+/* Auto-apply hc-mode at watch viewport or if OS requests reduced transparency */
+@media (max-width: 280px), (prefers-reduced-transparency: reduce) {
+  :root {
+    --glass-blur:    0px;
+    --glass-opacity: 0.95;
+  }
+  .glass-surface,
+  .glass-card {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background: var(--surface-solid) !important;
+  }
+}
+
+/* ── Touch target expansion (T6) ────────────────────────────────────────────── */
+/* Applies only when the device has a coarse pointer (touch screens) */
+@media (pointer: coarse) {
+  button,
+  a,
+  [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+/* Invisible hit-target expander for inline badges / chips */
+.touch-target {
+  position: relative;
+}
+.touch-target::before {
+  content: '';
+  position: absolute;
+  inset: -8px;
+}
+
+/* ── Button shimmer gradient (matches bento-tile accent vibe) ───────────────── */
+@keyframes btn-shimmer {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+.btn-shimmer {
+  background: linear-gradient(270deg, #31568e, #3d6aaa, #2d4f84, #31568e);
+  background-size: 300% 300%;
+  animation: btn-shimmer 5s ease infinite;
+}
+
+/* ── Agent persona FAB animations ───────────────────────────────────────────── */
+@keyframes persona-idle {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-3px); }
+}
+@keyframes persona-busy {
+  0%, 100% { transform: scale(1); box-shadow: 0 4px 16px rgba(59,130,246,0.2); }
+  50%       { transform: scale(1.06); box-shadow: 0 8px 24px rgba(59,130,246,0.35); }
+}
+@keyframes persona-error {
+  0%, 100% { transform: translateX(0); }
+  20%       { transform: translateX(-4px); }
+  40%       { transform: translateX(4px); }
+  60%       { transform: translateX(-4px); }
+  80%       { transform: translateX(4px); }
+}
+@keyframes persona-success {
+  0%, 100% { transform: scale(1) translateY(0); }
+  30%       { transform: scale(1.15) translateY(-6px); }
+  60%       { transform: scale(0.95) translateY(0); }
+}
+.animate-persona-idle    { animation: persona-idle    4s ease-in-out infinite; }
+.animate-persona-busy    { animation: persona-busy    1.2s ease-in-out infinite; }
+.animate-persona-error   { animation: persona-error   0.5s ease-in-out 3; }
+.animate-persona-success { animation: persona-success 0.6s ease-in-out 3; }
+
+/* ── Search focus overlay (#29) — glass blur on background when search is active ── */
+/* ── AFP Inspector slide-in ─────────────────────────────────────────────────── */
+@keyframes slideInRight {
+  from { transform: translateX(100%); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+
+/* ── Search focus overlay (#29) — glass blur on background when search is active ── */
+body[data-search-open] .glass-surface,
+body[data-search-open] .glass-card {
+  transition: opacity 0.18s ease, box-shadow 0.18s ease;
+  opacity: 0.96;
+}
+body[data-search-open] [data-search-host] {
+  /* isolate the search area from any global focus treatment */
+  opacity: 1 !important;
+  position: relative;
+  z-index: 10;
+}
+
+/* ── Markdown prose rendering (.md-prose) ───────────────────────────────────── */
+/*
+ * Applied to innerHTML divs produced by renderMarkdown().
+ * Uses design system tokens: #1a1c1b (on-surface), #31568e (primary),
+ * #737781 (outline), rgba(255,255,255,0.4) for code surfaces.
+ */
+.md-prose { line-height: var(--leading-prose); font-size: 0.875rem; color: #4a4d52; font-family: var(--font-body); }
+
+.md-prose p               { margin: 0.55em 0; }
+.md-prose p:first-child   { margin-top: 0; }
+.md-prose p:last-child    { margin-bottom: 0; }
+
+.md-prose h1 { font-size: 1.25rem; font-weight: 700; color: #1a1c1b; margin: 1em 0 0.4em; letter-spacing: -0.01em; line-height: 1.25; }
+.md-prose h2 { font-size: 1.05rem; font-weight: 650; color: #1a1c1b; margin: 0.9em 0 0.35em; letter-spacing: -0.005em; }
+.md-prose h3 { font-size: 0.95rem; font-weight: 600; color: #2c2f33;  margin: 0.8em 0 0.3em; }
+.md-prose h4, .md-prose h5, .md-prose h6 { font-size: 0.875rem; font-weight: 600; color: #2c2f33; margin: 0.7em 0 0.25em; }
+
+.md-prose ul { list-style: none; padding-left: 1.25em; margin: 0.5em 0; }
+.md-prose ul > li { position: relative; padding-left: 0.1em; margin: 0.2em 0; }
+.md-prose ul > li::before { content: "·"; position: absolute; left: -1em; color: #737781; font-weight: 700; }
+
+.md-prose ol { list-style: decimal; padding-left: 1.5em; margin: 0.5em 0; }
+.md-prose ol > li { margin: 0.2em 0; padding-left: 0.25em; }
+
+/* Task lists */
+.md-prose ul li input[type="checkbox"] { margin-right: 0.4em; accent-color: #31568e; }
+
+.md-prose blockquote {
+  border-left: 2px solid #31568e;
+  padding: 0.25em 0.75em;
+  margin: 0.6em 0;
+  color: #737781;
+  font-style: italic;
+  background: rgba(49, 86, 142, 0.04);
+  border-radius: 0 6px 6px 0;
+}
+
+.md-prose pre {
+  background: rgba(255,255,255,0.42);
+  border: 1px solid rgba(115,119,129,0.18);
+  border-radius: 10px;
+  padding: 0.75em 1em;
+  overflow-x: auto;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.8rem;
+  line-height: var(--leading-body);
+  margin: 0.6em 0;
+}
+
+.md-prose code {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.8em;
+  background: rgba(255,255,255,0.55);
+  border: 1px solid rgba(115,119,129,0.2);
+  border-radius: 4px;
+  padding: 0.1em 0.35em;
+  color: #31568e;
+}
+.md-prose pre code { background: none; border: none; padding: 0; color: inherit; font-size: 1em; }
+
+.md-prose table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+  margin: 0.7em 0;
+  overflow: hidden;
+  border-radius: 8px;
+}
+.md-prose thead { background: rgba(49,86,142,0.06); }
+.md-prose th { padding: 0.45em 0.75em; text-align: left; font-weight: 600; color: #1a1c1b; border-bottom: 1px solid rgba(115,119,129,0.2); }
+.md-prose td { padding: 0.4em 0.75em; color: #4a4d52; border-bottom: 1px solid rgba(115,119,129,0.1); }
+.md-prose tr:last-child td { border-bottom: none; }
+.md-prose tr:nth-child(even) td { background: rgba(255,255,255,0.3); }
+
+.md-prose hr { border: none; border-top: 1px solid rgba(115,119,129,0.22); margin: 1em 0; }
+
+.md-prose strong { font-weight: 650; color: #1a1c1b; }
+.md-prose em     { font-style: italic; }
+.md-prose u      { text-decoration: underline; text-underline-offset: 2px; }
+.md-prose s, .md-prose del { text-decoration: line-through; color: #737781; }
+.md-prose mark   { background: rgba(255, 213, 79, 0.4); border-radius: 2px; padding: 0 2px; color: inherit; }
+
+.md-prose a, .md-link {
+  color: #31568e;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-color: rgba(49,86,142,0.4);
+  transition: opacity 0.15s ease;
+}
+.md-prose a:hover, .md-link:hover { opacity: 0.75; }
+
+/* Wedding Limited Specials: licensed circular thumbnails and an untruncated
+   venue-name tooltip. The separate overlay in the component keeps the same
+   name visible even when a Leaflet tooltip reaches the map edge. */
+.wedding-special-map-marker {
+  background: transparent;
+  border: 0;
+}
+
+body.omnyid-usecase-wedding-planning :where(p, span, a, button, label, dd, dt, li, h1, h2, h3, h4) {
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+.wedding-special-map-marker__inner {
+  display: flex;
+  width: 46px;
+  height: 46px;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 3px solid #fff;
+  border-radius: 999px;
+  background: #176f67;
+  color: #fff;
+  font-weight: 800;
+  box-shadow: 0 3px 12px rgba(21, 61, 58, 0.32);
+}
+.wedding-special-map-marker__inner img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.wedding-special-map-cluster {
+  display: flex;
+  width: 48px;
+  height: 48px;
+  align-items: center;
+  justify-content: center;
+  border: 3px solid #fff;
+  border-radius: 999px;
+  background: #176f67;
+  color: #fff;
+  font-weight: 800;
+  box-shadow: 0 3px 12px rgba(21, 61, 58, 0.32);
+}
+.wedding-special-map-tooltip {
+  max-width: none !important;
+  white-space: nowrap !important;
+  overflow: visible !important;
+  border: 0 !important;
+  border-radius: 8px !important;
+  background: #173d39 !important;
+  color: #fff !important;
+  font-weight: 700;
+  box-shadow: 0 4px 14px rgba(21, 61, 58, 0.28) !important;
+}
+.wedding-special-map-tooltip::before {
+  border-top-color: #173d39 !important;
+}
+
+/* ── Swipe-reveal action tray (T7) ──────────────────────────────────────────── */
+[data-swipe-tray] {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  background: rgba(255, 255, 255, 0.96);
+  border-left: 1px solid rgba(0, 0, 0, 0.08);
+  transform: translateX(100%);
+  opacity: 0;
+  transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+              opacity 0.15s ease;
+  z-index: 10;
+}

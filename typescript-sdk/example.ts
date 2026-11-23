@@ -4,7 +4,7 @@ const scope = globalThis as typeof globalThis & {
   process?: { env?: Record<string, string | undefined> };
 };
 
-const agent = new Agent('https://example.com', 'agent:demo@example.com', {
+const agent = new Agent('http://localhost:8080', 'agent:demo@acme.ai', {
   signingKeyHex: scope.process?.env?.OMNYID_SIGNING_KEY_HEX,
   encryptionKeyHex: scope.process?.env?.OMNYID_ENCRYPTION_KEY_HEX,
 });
@@ -12,7 +12,7 @@ const agent = new Agent('https://example.com', 'agent:demo@example.com', {
 agent
   .send({
     thread_id: 'thread_01j8k9abc123',
-    to: ['agent:peer@example.com'],
+    to: ['agent:receiver@client.co'],
     type: 'task_update',
     content: { status: 'done', result: 'hello from AFP!' },
   })

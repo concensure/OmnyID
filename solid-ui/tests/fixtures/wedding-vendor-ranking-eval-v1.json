@@ -1,0 +1,105 @@
+{
+  "schemaVersion": 1,
+  "consentSafe": true,
+  "synthetic": true,
+  "cases": [
+    {
+      "id": "sydney-accessible-venue",
+      "geography": "Sydney NSW",
+      "requirements": {
+        "vendorCategories": ["venue"],
+        "location": "Sydney NSW",
+        "guestCount": "150 guests",
+        "budgetComfort": "$30,000",
+        "topPriorities": ["wheelchair access"],
+        "preferences": "garden harbour relaxed"
+      },
+      "candidates": [
+        {
+          "id": "venue-good-a", "title": "Harbour Garden A", "category": "venue",
+          "snippet": "Sydney harbour garden relaxed wedding venue", "imageUrl": "https://images.example.test/a.jpg",
+          "attributes": {
+            "capacity_seated_max": {"status": "known", "value": 180, "confidence": 0.98, "authority": "operator"},
+            "wheelchair_accessible": {"status": "known", "value": true, "confidence": 1.0, "authority": "operator"},
+            "price_estimate_total_aud": {"status": "known", "value": 28000, "confidence": 0.95, "authority": "vendor_reply"}
+          }
+        },
+        {
+          "id": "venue-small", "title": "Small Garden", "category": "venue",
+          "snippet": "Sydney garden wedding venue", "imageUrl": "https://images.example.test/small.jpg",
+          "attributes": {
+            "capacity_seated_max": {"status": "known", "value": 90, "confidence": 0.98, "authority": "operator"},
+            "wheelchair_accessible": {"status": "known", "value": true, "confidence": 1.0, "authority": "operator"}
+          }
+        },
+        {
+          "id": "venue-no-access", "title": "Clifftop Steps", "category": "venue",
+          "snippet": "Sydney harbour wedding venue", "imageUrl": "https://images.example.test/steps.jpg",
+          "attributes": {
+            "capacity_seated_max": {"status": "known", "value": 200, "confidence": 0.98, "authority": "operator"},
+            "wheelchair_accessible": {"status": "known", "value": false, "confidence": 1.0, "authority": "operator"}
+          }
+        },
+        {"id": "venue-sparse", "title": "Garden Unknown", "category": "venue", "snippet": "Sydney garden relaxed wedding venue", "imageUrl": null},
+        {
+          "id": "venue-good-b", "title": "Relaxed Harbour B", "category": "venue",
+          "snippet": "Sydney harbour relaxed wedding venue", "imageUrl": "https://images.example.test/b.jpg",
+          "attributes": {
+            "capacity_seated_max": {"status": "known", "value": 170, "confidence": 0.9, "authority": "primary_official"},
+            "wheelchair_accessible": {"status": "known", "value": true, "confidence": 0.9, "authority": "primary_official"},
+            "price_estimate_total_aud": {"status": "known", "value": 30000, "confidence": 0.9, "authority": "vendor_reply"}
+          }
+        }
+      ],
+      "groundTruth": {
+        "hardEligibleIds": ["venue-good-a", "venue-sparse", "venue-good-b"],
+        "topRelevantIds": ["venue-good-a", "venue-good-b", "venue-sparse"],
+        "unknownIds": ["venue-sparse"],
+        "photoIdentityVerifiedIds": ["venue-good-a", "venue-small", "venue-no-access", "venue-good-b"]
+      }
+    },
+    {
+      "id": "melbourne-candid-photographer",
+      "geography": "Melbourne VIC",
+      "requirements": {
+        "vendorCategories": ["photographer"],
+        "location": "Melbourne VIC",
+        "budgetComfort": "$8,000",
+        "preferences": "candid documentary warm"
+      },
+      "candidates": [
+        {"id": "photo-candid", "title": "Candid Studio", "category": "photographer", "snippet": "Melbourne candid documentary warm wedding photography", "imageUrl": "https://images.example.test/candid.jpg"},
+        {"id": "photo-formal", "title": "Formal Studio", "category": "photographer", "snippet": "Melbourne posed formal ballroom photography", "imageUrl": "https://images.example.test/formal.jpg"},
+        {"id": "photo-warm", "title": "Warm Light", "category": "photographer", "snippet": "Melbourne warm candid documentary wedding photographer", "imageUrl": "https://images.example.test/warm.jpg"},
+        {"id": "photo-thin", "title": "New Camera Co", "category": "photographer", "snippet": "Melbourne wedding photographer", "imageUrl": null}
+      ],
+      "groundTruth": {
+        "hardEligibleIds": ["photo-candid", "photo-formal", "photo-warm", "photo-thin"],
+        "topRelevantIds": ["photo-candid", "photo-warm", "photo-formal"],
+        "unknownIds": ["photo-candid", "photo-formal", "photo-warm", "photo-thin"],
+        "photoIdentityVerifiedIds": ["photo-candid", "photo-formal", "photo-warm"]
+      }
+    },
+    {
+      "id": "regional-florist-sparse-evidence",
+      "geography": "Orange NSW",
+      "requirements": {
+        "vendorCategories": ["florist"],
+        "location": "Orange NSW",
+        "budgetComfort": "$5,000",
+        "preferences": "native seasonal low waste"
+      },
+      "candidates": [
+        {"id": "florist-native", "title": "Native Stem", "category": "florist", "snippet": "Orange native seasonal low waste wedding flowers", "imageUrl": "https://images.example.test/native.jpg"},
+        {"id": "florist-seasonal", "title": "Seasonal Branch", "category": "florist", "snippet": "Orange seasonal native wedding florist", "imageUrl": "https://images.example.test/seasonal.jpg"},
+        {"id": "florist-generic", "title": "Generic Flowers", "category": "florist", "snippet": "Orange wedding flowers", "imageUrl": null}
+      ],
+      "groundTruth": {
+        "hardEligibleIds": ["florist-native", "florist-seasonal", "florist-generic"],
+        "topRelevantIds": ["florist-native", "florist-seasonal", "florist-generic"],
+        "unknownIds": ["florist-native", "florist-seasonal", "florist-generic"],
+        "photoIdentityVerifiedIds": ["florist-native", "florist-seasonal"]
+      }
+    }
+  ]
+}

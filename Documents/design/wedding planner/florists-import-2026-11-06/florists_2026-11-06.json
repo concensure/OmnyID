@@ -1,0 +1,3147 @@
+{
+  "generated": "2026-11-06",
+  "new_florists": [
+    {
+      "vendor_id": "florist-biophilia-blooms",
+      "vendor_slug": "florist-biophilia-blooms",
+      "vendor_name": "Biophilia Blooms",
+      "category": "Florist",
+      "service_area": "Rushcutters Bay, Sydney NSW",
+      "address": "3 Holdsworth Avenue, Rushcutters Bay NSW 2011",
+      "website_url": "https://www.biophiliablooms.com/",
+      "contact_phone": "0435 361 644",
+      "contact_email": "josie@biophiliablooms.com",
+      "instagram_url": "https://www.instagram.com/biophiliablooms/",
+      "price_from_aud": null,
+      "price_status": null,
+      "price_note": "No prices published; quote after an email reply within 48 hours or a 15-minute discovery call.",
+      "deposit_percent": null,
+      "years_in_business": null,
+      "style_tags": [
+        "boutique studio",
+        "foam-free",
+        "sustainable",
+        "seasonal blooms",
+        "wedding only",
+        "styling",
+        "prop hire",
+        "stationery",
+        "Eastern Suburbs",
+        "Sydney Harbour",
+        "Southern Highlands",
+        "Blue Mountains",
+        "Hunter Valley"
+      ],
+      "editorial_summary": "Boutique wedding and event florist in Rushcutters Bay run by Josie Marc. Designs are seasonal and foam-free, with a prop hire range and custom stationery on the side. Travels to the Southern Highlands, Blue Mountains and Hunter Valley and takes some destination weddings.",
+      "contact_basis": "own_site",
+      "flags": [
+        "address_conflict_darlinghurst_in_directories"
+      ],
+      "source_url": "https://www.biophiliablooms.com/",
+      "source_label": "Florist website",
+      "source_checked_at": "2026-11-06",
+      "status": "active",
+      "attributes": [
+        {
+          "attribute_key": "editorial_summary",
+          "value": "Boutique wedding and event florist in Rushcutters Bay run by Josie Marc. Designs are seasonal and foam-free, with a prop hire range and custom stationery on the side. Travels to the Southern Highlands, Blue Mountains and Hunter Valley and takes some destination weddings.",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.biophiliablooms.com/",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "style_tags",
+          "value": [
+            "boutique studio",
+            "foam-free",
+            "sustainable",
+            "seasonal blooms",
+            "wedding only",
+            "styling",
+            "prop hire",
+            "stationery",
+            "Eastern Suburbs",
+            "Sydney Harbour",
+            "Southern Highlands",
+            "Blue Mountains",
+            "Hunter Valley"
+          ],
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.biophiliablooms.com/",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "official_website",
+          "value": "https://www.biophiliablooms.com/",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.biophiliablooms.com/",
+          "retrieved_at": "2026-11-06"
+        },
+        {
+          "attribute_key": "instagram_url",
+          "value": "https://www.instagram.com/biophiliablooms/",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.biophiliablooms.com/",
+          "retrieved_at": "2026-11-06"
+        }
+      ]
+    },
+    {
+      "vendor_id": "florist-e-squared-design-co",
+      "vendor_slug": "florist-e-squared-design-co",
+      "vendor_name": "E Squared Design Co",
+      "category": "Florist",
+      "service_area": "Sydney NSW",
+      "address": null,
+      "website_url": "https://www.esquareddesignco.com/",
+      "contact_phone": "0415 550 172",
+      "contact_email": "hello@esquareddesignco.com",
+      "instagram_url": "https://www.instagram.com/esquareddesignco/",
+      "price_from_aud": null,
+      "price_status": null,
+      "price_note": "No prices published.",
+      "deposit_percent": null,
+      "years_in_business": null,
+      "style_tags": [
+        "bespoke",
+        "full-service styling",
+        "concept design",
+        "events",
+        "luxe",
+        "by appointment",
+        "Sydney-wide",
+        "catering partner",
+        "ceremony flowers",
+        "installations",
+        "editorial"
+      ],
+      "editorial_summary": "Sydney wedding and event florist led by Libby, offering bespoke floristry with full-service styling and concept creation. Works by appointment only and pairs flowers with food and event design for larger celebrations.",
+      "contact_basis": "own_site",
+      "flags": [
+        "no_street_address",
+        "older_directory_listing_says_manly"
+      ],
+      "source_url": "https://www.esquareddesignco.com/contact-us",
+      "source_label": "Florist website",
+      "source_checked_at": "2026-11-06",
+      "status": "active",
+      "attributes": [
+        {
+          "attribute_key": "editorial_summary",
+          "value": "Sydney wedding and event florist led by Libby, offering bespoke floristry with full-service styling and concept creation. Works by appointment only and pairs flowers with food and event design for larger celebrations.",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.esquareddesignco.com/contact-us",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "style_tags",
+          "value": [
+            "bespoke",
+            "full-service styling",
+            "concept design",
+            "events",
+            "luxe",
+            "by appointment",
+            "Sydney-wide",
+            "catering partner",
+            "ceremony flowers",
+            "installations",
+            "editorial"
+          ],
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.esquareddesignco.com/contact-us",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "official_website",
+          "value": "https://www.esquareddesignco.com/",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.esquareddesignco.com/",
+          "retrieved_at": "2026-11-06"
+        },
+        {
+          "attribute_key": "instagram_url",
+          "value": "https://www.instagram.com/esquareddesignco/",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.esquareddesignco.com/contact-us",
+          "retrieved_at": "2026-11-06"
+        }
+      ]
+    },
+    {
+      "vendor_id": "florist-jewel-phon-flowers",
+      "vendor_slug": "florist-jewel-phon-flowers",
+      "vendor_name": "Jewel Phon Flowers",
+      "category": "Florist",
+      "service_area": "Silverwater, Sydney NSW",
+      "address": "2/20-30 Stubbs Street, Silverwater NSW 2128",
+      "website_url": "https://www.jewelphonflowers.com.au/",
+      "contact_phone": "0432 089 612",
+      "contact_email": "jewelphonflowers@gmail.com",
+      "instagram_url": "https://www.instagram.com/jewelphonflowers/",
+      "price_from_aud": null,
+      "price_status": null,
+      "price_note": "No prices published.",
+      "deposit_percent": null,
+      "years_in_business": 21,
+      "style_tags": [
+        "luxury",
+        "bespoke",
+        "event styling",
+        "prop hire",
+        "hire decor",
+        "by appointment",
+        "Western Sydney",
+        "Inner West",
+        "ceremony flowers",
+        "installations",
+        "award finalist"
+      ],
+      "editorial_summary": "Floral and event stylist with a Silverwater studio and a large stock of hire decor. Leans luxe and bespoke, and says it has designed Sydney weddings for more than 21 years. Visits are by appointment.",
+      "contact_basis": "own_site",
+      "flags": [
+        "address_conflict_lidcombe_in_page_title",
+        "experience_years_differs_in_directories"
+      ],
+      "source_url": "https://www.jewelphonflowers.com.au/",
+      "source_label": "Florist website",
+      "source_checked_at": "2026-11-06",
+      "status": "active",
+      "attributes": [
+        {
+          "attribute_key": "editorial_summary",
+          "value": "Floral and event stylist with a Silverwater studio and a large stock of hire decor. Leans luxe and bespoke, and says it has designed Sydney weddings for more than 21 years. Visits are by appointment.",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.jewelphonflowers.com.au/",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "style_tags",
+          "value": [
+            "luxury",
+            "bespoke",
+            "event styling",
+            "prop hire",
+            "hire decor",
+            "by appointment",
+            "Western Sydney",
+            "Inner West",
+            "ceremony flowers",
+            "installations",
+            "award finalist"
+          ],
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.jewelphonflowers.com.au/",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "official_website",
+          "value": "https://www.jewelphonflowers.com.au/",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.jewelphonflowers.com.au/",
+          "retrieved_at": "2026-11-06"
+        },
+        {
+          "attribute_key": "instagram_url",
+          "value": "https://www.instagram.com/jewelphonflowers/",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.jewelphonflowers.com.au/",
+          "retrieved_at": "2026-11-06"
+        },
+        {
+          "attribute_key": "years_in_business",
+          "value": 21,
+          "status": "estimated",
+          "authority": "primary_official",
+          "source_url": "https://www.jewelphonflowers.com.au/",
+          "retrieved_at": "2026-11-06",
+          "notes": "Rounded from florist wording."
+        }
+      ]
+    },
+    {
+      "vendor_id": "florist-anna-wang-stylist",
+      "vendor_slug": "florist-anna-wang-stylist",
+      "vendor_name": "Anna Wang Stylist",
+      "category": "Florist",
+      "service_area": "Sydney NSW",
+      "address": null,
+      "website_url": "https://annawangstylist.com.au/",
+      "contact_phone": "+61 406 420 166",
+      "contact_email": "anna@annawang.au",
+      "instagram_url": "https://www.instagram.com/annawangstylist/",
+      "price_from_aud": null,
+      "price_status": null,
+      "price_note": "No styling fee on top of pieces and florals; 40% deposit. Most couples book 8-14 months ahead.",
+      "deposit_percent": 40,
+      "years_in_business": null,
+      "style_tags": [
+        "luxury",
+        "wedding stylist",
+        "in-house florals",
+        "arbours",
+        "flower walls",
+        "ceiling installations",
+        "bouquets",
+        "showroom by appointment",
+        "Sydney-wide",
+        "large-scale",
+        "ceremony styling"
+      ],
+      "editorial_summary": "Luxury wedding stylist that designs and builds its own florals rather than subcontracting. Known for arbours, flower walls and ceiling installations, plus bouquets and buttonholes. Showroom visits by appointment and long lead times.",
+      "contact_basis": "own_site",
+      "flags": [
+        "no_street_address",
+        "two_domains_annawang_au_and_annawang_com_au",
+        "mixed_third_party_reviews"
+      ],
+      "source_url": "https://annawangstylist.com.au/",
+      "source_label": "Florist website",
+      "source_checked_at": "2026-11-06",
+      "status": "active",
+      "attributes": [
+        {
+          "attribute_key": "editorial_summary",
+          "value": "Luxury wedding stylist that designs and builds its own florals rather than subcontracting. Known for arbours, flower walls and ceiling installations, plus bouquets and buttonholes. Showroom visits by appointment and long lead times.",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://annawangstylist.com.au/",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "style_tags",
+          "value": [
+            "luxury",
+            "wedding stylist",
+            "in-house florals",
+            "arbours",
+            "flower walls",
+            "ceiling installations",
+            "bouquets",
+            "showroom by appointment",
+            "Sydney-wide",
+            "large-scale",
+            "ceremony styling"
+          ],
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://annawangstylist.com.au/",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "official_website",
+          "value": "https://annawangstylist.com.au/",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://annawangstylist.com.au/",
+          "retrieved_at": "2026-11-06"
+        },
+        {
+          "attribute_key": "instagram_url",
+          "value": "https://www.instagram.com/annawangstylist/",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://annawangstylist.com.au/",
+          "retrieved_at": "2026-11-06"
+        },
+        {
+          "attribute_key": "deposit_percent",
+          "value": 40,
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://annawangstylist.com.au/",
+          "retrieved_at": "2026-11-06"
+        }
+      ]
+    },
+    {
+      "vendor_id": "florist-nunu-designs",
+      "vendor_slug": "florist-nunu-designs",
+      "vendor_name": "Nunu Designs",
+      "category": "Florist",
+      "service_area": "Sutherland Shire, Sydney NSW",
+      "address": null,
+      "website_url": "https://www.nunudesigns.com.au/",
+      "contact_phone": null,
+      "contact_email": "hello@nunudesigns.com.au",
+      "instagram_url": "https://www.instagram.com/nunuau/",
+      "price_from_aud": 6000,
+      "price_status": "estimated",
+      "price_note": "Wedding florals from $6,000 per the studio's site (a directory shows $3,000, likely outdated); 20% deposit locks the date.",
+      "deposit_percent": 20,
+      "years_in_business": null,
+      "style_tags": [
+        "luxe",
+        "hanging installations",
+        "impact florals",
+        "styling",
+        "bouquets",
+        "ceremony flowers",
+        "Sutherland Shire",
+        "Southern Sydney",
+        "Hunter Valley",
+        "South Coast",
+        "Southern Highlands",
+        "award-winning"
+      ],
+      "editorial_summary": "Luxe wedding and event florist in southern Sydney run by Steph Jordan, known for hanging and large impact installations. Couples fill in an online consultation, get a price guide, then an itemised quote with a mood board. Travels to the Hunter, South Coast and Southern Highlands.",
+      "contact_basis": "own_site",
+      "flags": [
+        "needs_contact_lookup",
+        "phone_missing",
+        "no_street_address",
+        "price_from_search_summary"
+      ],
+      "source_url": "https://www.nunudesigns.com.au/weddings",
+      "source_label": "Florist website",
+      "source_checked_at": "2026-11-06",
+      "status": "active",
+      "attributes": [
+        {
+          "attribute_key": "editorial_summary",
+          "value": "Luxe wedding and event florist in southern Sydney run by Steph Jordan, known for hanging and large impact installations. Couples fill in an online consultation, get a price guide, then an itemised quote with a mood board. Travels to the Hunter, South Coast and Southern Highlands.",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.nunudesigns.com.au/weddings",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "style_tags",
+          "value": [
+            "luxe",
+            "hanging installations",
+            "impact florals",
+            "styling",
+            "bouquets",
+            "ceremony flowers",
+            "Sutherland Shire",
+            "Southern Sydney",
+            "Hunter Valley",
+            "South Coast",
+            "Southern Highlands",
+            "award-winning"
+          ],
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.nunudesigns.com.au/weddings",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "official_website",
+          "value": "https://www.nunudesigns.com.au/",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.nunudesigns.com.au/",
+          "retrieved_at": "2026-11-06"
+        },
+        {
+          "attribute_key": "instagram_url",
+          "value": "https://www.instagram.com/nunuau/",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.nunudesigns.com.au/weddings",
+          "retrieved_at": "2026-11-06"
+        },
+        {
+          "attribute_key": "price_estimate_total_aud",
+          "value": 6000,
+          "status": "estimated",
+          "authority": "primary_official",
+          "source_url": "https://www.nunudesigns.com.au/weddings",
+          "retrieved_at": "2026-11-06",
+          "notes": "Lowest published wedding starting figure or minimum spend; confirm with the florist."
+        },
+        {
+          "attribute_key": "deposit_percent",
+          "value": 20,
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.nunudesigns.com.au/weddings",
+          "retrieved_at": "2026-11-06"
+        }
+      ]
+    },
+    {
+      "vendor_id": "florist-elodies-blooms-and-botanics",
+      "vendor_slug": "florist-elodies-blooms-and-botanics",
+      "vendor_name": "Elodie's Blooms & Botanics",
+      "category": "Florist",
+      "service_area": "Camden, South-West Sydney NSW",
+      "address": "Shop 5, 180-186 Argyle Street, Camden NSW 2570",
+      "website_url": "https://www.elodies.au/",
+      "contact_phone": "02 4655 3285",
+      "contact_email": "hello@elodies.au",
+      "instagram_url": "https://www.instagram.com/bloomsby_elodie/",
+      "price_from_aud": 5000,
+      "price_status": "estimated",
+      "price_note": "Custom itemised quotes only (no packages); minimum spend $5,000 plus GST, smaller events considered; 50% deposit; quote within 72 hours of meeting.",
+      "deposit_percent": 50,
+      "years_in_business": null,
+      "style_tags": [
+        "custom designs",
+        "hand-selected blooms",
+        "styling hire",
+        "guest posies",
+        "Camden",
+        "Macarthur",
+        "Southern Highlands",
+        "Blue Mountains",
+        "travels NSW",
+        "enquire early",
+        "luxe"
+      ],
+      "editorial_summary": "Camden florist and wedding studio led by Kerryn, doing fully custom, itemised wedding florals with optional styling hire and on-the-day coordination. Wants enquiries up to 18 months ahead and works across south-west Sydney, the Highlands, Blue Mountains and further.",
+      "contact_basis": "own_site",
+      "flags": [
+        "outer_sydney_camden",
+        "price_from_search_summary"
+      ],
+      "source_url": "https://www.elodies.au/weddings",
+      "source_label": "Florist website",
+      "source_checked_at": "2026-11-06",
+      "status": "active",
+      "attributes": [
+        {
+          "attribute_key": "editorial_summary",
+          "value": "Camden florist and wedding studio led by Kerryn, doing fully custom, itemised wedding florals with optional styling hire and on-the-day coordination. Wants enquiries up to 18 months ahead and works across south-west Sydney, the Highlands, Blue Mountains and further.",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.elodies.au/weddings",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "style_tags",
+          "value": [
+            "custom designs",
+            "hand-selected blooms",
+            "styling hire",
+            "guest posies",
+            "Camden",
+            "Macarthur",
+            "Southern Highlands",
+            "Blue Mountains",
+            "travels NSW",
+            "enquire early",
+            "luxe"
+          ],
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.elodies.au/weddings",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "official_website",
+          "value": "https://www.elodies.au/",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.elodies.au/",
+          "retrieved_at": "2026-11-06"
+        },
+        {
+          "attribute_key": "instagram_url",
+          "value": "https://www.instagram.com/bloomsby_elodie/",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.elodies.au/weddings",
+          "retrieved_at": "2026-11-06"
+        },
+        {
+          "attribute_key": "price_estimate_total_aud",
+          "value": 5000,
+          "status": "estimated",
+          "authority": "primary_official",
+          "source_url": "https://www.elodies.au/weddings",
+          "retrieved_at": "2026-11-06",
+          "notes": "Lowest published wedding starting figure or minimum spend; confirm with the florist."
+        },
+        {
+          "attribute_key": "deposit_percent",
+          "value": 50,
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.elodies.au/weddings",
+          "retrieved_at": "2026-11-06"
+        }
+      ]
+    },
+    {
+      "vendor_id": "florist-architecture-in-bloom",
+      "vendor_slug": "florist-architecture-in-bloom",
+      "vendor_name": "Architecture in Bloom",
+      "category": "Florist",
+      "service_area": "North Kellyville, Sydney NSW",
+      "address": null,
+      "website_url": "https://architectureinbloom.au/",
+      "contact_phone": "0414 872 204",
+      "contact_email": "admin@architectureinbloom.au",
+      "instagram_url": "https://www.instagram.com/architectureinbloom/",
+      "price_from_aud": null,
+      "price_status": null,
+      "price_note": "Bouquets from $90 on the homepage; wedding quotes depend on scope.",
+      "deposit_percent": null,
+      "years_in_business": null,
+      "style_tags": [
+        "modern",
+        "striking",
+        "installations",
+        "bridal bouquets",
+        "custom",
+        "Hills District",
+        "North Kellyville",
+        "delivers 60km",
+        "travels NSW",
+        "corporate and events"
+      ],
+      "editorial_summary": "Custom florist in Sydney's Hills District led by Simone Bennett, doing modern, statement florals from bouquets to large installations. Delivers up to 60km from the studio and travels for weddings across NSW. Site mentions a winter closure.",
+      "contact_basis": "own_site",
+      "flags": [
+        "po_box_only_rouse_hill_2155",
+        "no_street_address",
+        "verify_availability"
+      ],
+      "source_url": "https://architectureinbloom.au/contact/",
+      "source_label": "Florist website",
+      "source_checked_at": "2026-11-06",
+      "status": "active",
+      "attributes": [
+        {
+          "attribute_key": "editorial_summary",
+          "value": "Custom florist in Sydney's Hills District led by Simone Bennett, doing modern, statement florals from bouquets to large installations. Delivers up to 60km from the studio and travels for weddings across NSW. Site mentions a winter closure.",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://architectureinbloom.au/contact/",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "style_tags",
+          "value": [
+            "modern",
+            "striking",
+            "installations",
+            "bridal bouquets",
+            "custom",
+            "Hills District",
+            "North Kellyville",
+            "delivers 60km",
+            "travels NSW",
+            "corporate and events"
+          ],
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://architectureinbloom.au/contact/",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "official_website",
+          "value": "https://architectureinbloom.au/",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://architectureinbloom.au/",
+          "retrieved_at": "2026-11-06"
+        },
+        {
+          "attribute_key": "instagram_url",
+          "value": "https://www.instagram.com/architectureinbloom/",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://architectureinbloom.au/contact/",
+          "retrieved_at": "2026-11-06"
+        }
+      ]
+    },
+    {
+      "vendor_id": "florist-japonica",
+      "vendor_slug": "florist-japonica",
+      "vendor_name": "Japonica",
+      "category": "Florist",
+      "service_area": "Ryde, Sydney NSW",
+      "address": null,
+      "website_url": "https://japonica.com.au/",
+      "contact_phone": "0404 466 093",
+      "contact_email": "florals@japonica.com.au",
+      "instagram_url": "https://www.instagram.com/__japonica__/",
+      "price_from_aud": 3000,
+      "price_status": "estimated",
+      "price_note": "Minimum spend $1,500 (Wed-Fri) or $3,000 (Sat-Sun) excluding delivery.",
+      "deposit_percent": null,
+      "years_in_business": 10,
+      "style_tags": [
+        "garden-style",
+        "textural",
+        "organic",
+        "seasonal",
+        "botanical",
+        "ceiling installations",
+        "tablescapes",
+        "Ryde",
+        "Northern Sydney",
+        "by appointment",
+        "preferred florist"
+      ],
+      "editorial_summary": "Garden-style wedding florist in Ryde with over ten years of weddings. Chooses flowers by what is freshest that week, for textured, slightly wild designs. Publishes weekday and weekend minimum spends and is a preferred florist at Athol Hall.",
+      "contact_basis": "own_site",
+      "flags": [
+        "no_street_address",
+        "directory_lists_collaroy_unverified"
+      ],
+      "source_url": "https://japonica.com.au/enquire/",
+      "source_label": "Florist website",
+      "source_checked_at": "2026-11-06",
+      "status": "active",
+      "attributes": [
+        {
+          "attribute_key": "editorial_summary",
+          "value": "Garden-style wedding florist in Ryde with over ten years of weddings. Chooses flowers by what is freshest that week, for textured, slightly wild designs. Publishes weekday and weekend minimum spends and is a preferred florist at Athol Hall.",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://japonica.com.au/enquire/",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "style_tags",
+          "value": [
+            "garden-style",
+            "textural",
+            "organic",
+            "seasonal",
+            "botanical",
+            "ceiling installations",
+            "tablescapes",
+            "Ryde",
+            "Northern Sydney",
+            "by appointment",
+            "preferred florist"
+          ],
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://japonica.com.au/enquire/",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "official_website",
+          "value": "https://japonica.com.au/",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://japonica.com.au/",
+          "retrieved_at": "2026-11-06"
+        },
+        {
+          "attribute_key": "instagram_url",
+          "value": "https://www.instagram.com/__japonica__/",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://japonica.com.au/enquire/",
+          "retrieved_at": "2026-11-06"
+        },
+        {
+          "attribute_key": "price_estimate_total_aud",
+          "value": 3000,
+          "status": "estimated",
+          "authority": "primary_official",
+          "source_url": "https://japonica.com.au/enquire/",
+          "retrieved_at": "2026-11-06",
+          "notes": "Lowest published wedding starting figure or minimum spend; confirm with the florist."
+        },
+        {
+          "attribute_key": "years_in_business",
+          "value": 10,
+          "status": "estimated",
+          "authority": "primary_official",
+          "source_url": "https://japonica.com.au/enquire/",
+          "retrieved_at": "2026-11-06",
+          "notes": "Rounded from florist wording."
+        }
+      ]
+    },
+    {
+      "vendor_id": "florist-floral-fix",
+      "vendor_slug": "florist-floral-fix",
+      "vendor_name": "Floral Fix",
+      "category": "Florist",
+      "service_area": "Cronulla, Sydney NSW",
+      "address": "Peregrine Drive, Cronulla NSW 2230",
+      "website_url": "https://www.floralfix.com.au/",
+      "contact_phone": null,
+      "contact_email": "flowers@floralfix.com.au",
+      "instagram_url": "https://www.instagram.com/floral_fix/",
+      "price_from_aud": null,
+      "price_status": null,
+      "price_note": "Online packages plus bespoke design; $200 non-refundable booking fee; balance a month before; 28-day minimum lead on packages.",
+      "deposit_percent": null,
+      "years_in_business": 10,
+      "style_tags": [
+        "romantic",
+        "loose",
+        "unstructured",
+        "seasonal",
+        "packages",
+        "bespoke installations",
+        "Cronulla",
+        "Sutherland Shire",
+        "Illawarra",
+        "Southern Highlands",
+        "Northern Beaches"
+      ],
+      "editorial_summary": "Cronulla studio doing loose, romantic seasonal flowers through two routes: ordered-online bridal party packages, or fully bespoke work for ceiling and ceremony pieces. Studio is by appointment; the site says to book four to six months ahead.",
+      "contact_basis": "own_site",
+      "flags": [
+        "needs_contact_lookup",
+        "phone_missing",
+        "no_street_number"
+      ],
+      "source_url": "https://www.floralfix.com.au/wedding-flowers-sydney.html",
+      "source_label": "Florist website",
+      "source_checked_at": "2026-11-06",
+      "status": "active",
+      "attributes": [
+        {
+          "attribute_key": "editorial_summary",
+          "value": "Cronulla studio doing loose, romantic seasonal flowers through two routes: ordered-online bridal party packages, or fully bespoke work for ceiling and ceremony pieces. Studio is by appointment; the site says to book four to six months ahead.",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.floralfix.com.au/wedding-flowers-sydney.html",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "style_tags",
+          "value": [
+            "romantic",
+            "loose",
+            "unstructured",
+            "seasonal",
+            "packages",
+            "bespoke installations",
+            "Cronulla",
+            "Sutherland Shire",
+            "Illawarra",
+            "Southern Highlands",
+            "Northern Beaches"
+          ],
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.floralfix.com.au/wedding-flowers-sydney.html",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "official_website",
+          "value": "https://www.floralfix.com.au/",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.floralfix.com.au/",
+          "retrieved_at": "2026-11-06"
+        },
+        {
+          "attribute_key": "instagram_url",
+          "value": "https://www.instagram.com/floral_fix/",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.floralfix.com.au/wedding-flowers-sydney.html",
+          "retrieved_at": "2026-11-06"
+        },
+        {
+          "attribute_key": "years_in_business",
+          "value": 10,
+          "status": "estimated",
+          "authority": "primary_official",
+          "source_url": "https://www.floralfix.com.au/wedding-flowers-sydney.html",
+          "retrieved_at": "2026-11-06",
+          "notes": "Rounded from florist wording."
+        }
+      ]
+    },
+    {
+      "vendor_id": "florist-fable-studio-co",
+      "vendor_slug": "florist-fable-studio-co",
+      "vendor_name": "Fable Studio Co",
+      "category": "Florist",
+      "service_area": "Alexandria, Sydney NSW",
+      "address": "Unit 25, 110-116 Bourke Road, Alexandria NSW 2015",
+      "website_url": "https://www.fablestudioco.com.au/",
+      "contact_phone": "0425 811 468",
+      "contact_email": "info@fablestudioco.com.au",
+      "instagram_url": "https://www.instagram.com/fablestudioco/",
+      "price_from_aud": null,
+      "price_status": null,
+      "price_note": "No prices published.",
+      "deposit_percent": null,
+      "years_in_business": null,
+      "style_tags": [
+        "styling",
+        "in-house florists",
+        "floral only available",
+        "planning",
+        "bump-in and bump-out",
+        "Inner Sydney",
+        "Alexandria",
+        "Royal Botanic Garden",
+        "cathedral weddings",
+        "limited dates"
+      ],
+      "editorial_summary": "Wedding styling and planning business with its own florists, run by an interior designer and a florist, and open to floral-only bookings. Handles bump-in and bump-out on the day and has worked at the Royal Botanic Garden and Gunners Barracks.",
+      "contact_basis": "own_site",
+      "flags": [
+        "address_conflict_mascot_in_schema",
+        "planner_and_florist"
+      ],
+      "source_url": "https://www.fablestudioco.com.au/weddinghome",
+      "source_label": "Florist website",
+      "source_checked_at": "2026-11-06",
+      "status": "active",
+      "attributes": [
+        {
+          "attribute_key": "editorial_summary",
+          "value": "Wedding styling and planning business with its own florists, run by an interior designer and a florist, and open to floral-only bookings. Handles bump-in and bump-out on the day and has worked at the Royal Botanic Garden and Gunners Barracks.",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.fablestudioco.com.au/weddinghome",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "style_tags",
+          "value": [
+            "styling",
+            "in-house florists",
+            "floral only available",
+            "planning",
+            "bump-in and bump-out",
+            "Inner Sydney",
+            "Alexandria",
+            "Royal Botanic Garden",
+            "cathedral weddings",
+            "limited dates"
+          ],
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.fablestudioco.com.au/weddinghome",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "official_website",
+          "value": "https://www.fablestudioco.com.au/",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.fablestudioco.com.au/",
+          "retrieved_at": "2026-11-06"
+        },
+        {
+          "attribute_key": "instagram_url",
+          "value": "https://www.instagram.com/fablestudioco/",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.fablestudioco.com.au/weddinghome",
+          "retrieved_at": "2026-11-06"
+        }
+      ]
+    },
+    {
+      "vendor_id": "florist-glossie-studio",
+      "vendor_slug": "florist-glossie-studio",
+      "vendor_name": "Glossie Studio",
+      "category": "Florist",
+      "service_area": "Dee Why, Northern Beaches NSW",
+      "address": "105 Pacific Parade, Dee Why NSW 2099",
+      "website_url": "https://www.glossiegals.com/",
+      "contact_phone": "+61 412 531 117",
+      "contact_email": "admin@glossiegals.com",
+      "instagram_url": "https://www.instagram.com/glossiestudios/",
+      "price_from_aud": null,
+      "price_status": null,
+      "price_note": "No prices published; quote follows a 30-45 minute video consultation.",
+      "deposit_percent": null,
+      "years_in_business": null,
+      "style_tags": [
+        "sculptural",
+        "bold",
+        "modern",
+        "video consultation",
+        "bouquets",
+        "ceremony styling",
+        "reception florals",
+        "Northern Beaches",
+        "Dee Why",
+        "Sydney-wide"
+      ],
+      "editorial_summary": "Northern Beaches florist doing bold, sculptural wedding flowers across Sydney. Planning starts with a 30-45 minute video consultation, then a custom concept and quote. Covers bouquets, buttonholes, ceremony styling and reception florals.",
+      "contact_basis": "own_site",
+      "flags": [
+        "domain_is_glossiegals_not_glossiestudio"
+      ],
+      "source_url": "https://www.glossiegals.com/events",
+      "source_label": "Florist website",
+      "source_checked_at": "2026-11-06",
+      "status": "active",
+      "attributes": [
+        {
+          "attribute_key": "editorial_summary",
+          "value": "Northern Beaches florist doing bold, sculptural wedding flowers across Sydney. Planning starts with a 30-45 minute video consultation, then a custom concept and quote. Covers bouquets, buttonholes, ceremony styling and reception florals.",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.glossiegals.com/events",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "style_tags",
+          "value": [
+            "sculptural",
+            "bold",
+            "modern",
+            "video consultation",
+            "bouquets",
+            "ceremony styling",
+            "reception florals",
+            "Northern Beaches",
+            "Dee Why",
+            "Sydney-wide"
+          ],
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.glossiegals.com/events",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "official_website",
+          "value": "https://www.glossiegals.com/",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.glossiegals.com/",
+          "retrieved_at": "2026-11-06"
+        },
+        {
+          "attribute_key": "instagram_url",
+          "value": "https://www.instagram.com/glossiestudios/",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.glossiegals.com/events",
+          "retrieved_at": "2026-11-06"
+        }
+      ]
+    },
+    {
+      "vendor_id": "florist-florisian-floral-design",
+      "vendor_slug": "florist-florisian-floral-design",
+      "vendor_name": "Florisian Floral Design",
+      "category": "Florist",
+      "service_area": "Baulkham Hills, Sydney NSW",
+      "address": "92 Baulkham Hills Road, Baulkham Hills NSW 2153",
+      "website_url": "https://florisianfloraldesign.com.au/",
+      "contact_phone": "0488 646 998",
+      "contact_email": "info@florisian.com.au",
+      "instagram_url": "https://www.instagram.com/florisian_floral_design/",
+      "price_from_aud": null,
+      "price_status": null,
+      "price_note": "Free quote on request; no prices published.",
+      "deposit_percent": null,
+      "years_in_business": 12,
+      "style_tags": [
+        "high-end",
+        "installations",
+        "bridal party flowers",
+        "ceremony flowers",
+        "prop hire",
+        "arches",
+        "full set-up and pack-down",
+        "Hills District",
+        "Baulkham Hills",
+        "Western Sydney",
+        "Sydney-wide"
+      ],
+      "editorial_summary": "Baulkham Hills studio doing upscale wedding florals, from bridal party flowers to larger installations. Delivery, set-up and pack-down are included Sydney-wide, with arches and stands for hire. Visits by appointment.",
+      "contact_basis": "own_site",
+      "flags": [
+        "address_from_search_result",
+        "years_from_review_site"
+      ],
+      "source_url": "https://florisianfloraldesign.com.au/about/",
+      "source_label": "Florist website",
+      "source_checked_at": "2026-11-06",
+      "status": "active",
+      "attributes": [
+        {
+          "attribute_key": "editorial_summary",
+          "value": "Baulkham Hills studio doing upscale wedding florals, from bridal party flowers to larger installations. Delivery, set-up and pack-down are included Sydney-wide, with arches and stands for hire. Visits by appointment.",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://florisianfloraldesign.com.au/about/",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "style_tags",
+          "value": [
+            "high-end",
+            "installations",
+            "bridal party flowers",
+            "ceremony flowers",
+            "prop hire",
+            "arches",
+            "full set-up and pack-down",
+            "Hills District",
+            "Baulkham Hills",
+            "Western Sydney",
+            "Sydney-wide"
+          ],
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://florisianfloraldesign.com.au/about/",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "official_website",
+          "value": "https://florisianfloraldesign.com.au/",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://florisianfloraldesign.com.au/",
+          "retrieved_at": "2026-11-06"
+        },
+        {
+          "attribute_key": "instagram_url",
+          "value": "https://www.instagram.com/florisian_floral_design/",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://florisianfloraldesign.com.au/about/",
+          "retrieved_at": "2026-11-06"
+        },
+        {
+          "attribute_key": "years_in_business",
+          "value": 12,
+          "status": "estimated",
+          "authority": "primary_official",
+          "source_url": "https://florisianfloraldesign.com.au/about/",
+          "retrieved_at": "2026-11-06",
+          "notes": "Rounded from florist wording."
+        }
+      ]
+    },
+    {
+      "vendor_id": "florist-chiho-kobayashi-flowers",
+      "vendor_slug": "florist-chiho-kobayashi-flowers",
+      "vendor_name": "Chiho Kobayashi Flowers",
+      "category": "Florist",
+      "service_area": "Ermington, Sydney NSW",
+      "address": null,
+      "website_url": "https://www.kobayashiflowers.com/",
+      "contact_phone": "0424 470 684",
+      "contact_email": "info@kobayashiflowers.com",
+      "instagram_url": "https://www.instagram.com/kobayashiflowers/",
+      "price_from_aud": null,
+      "price_status": null,
+      "price_note": "No prices published; consultations and quotes by appointment.",
+      "deposit_percent": null,
+      "years_in_business": null,
+      "style_tags": [
+        "ikebana",
+        "French bouquet",
+        "classic European",
+        "modern fusion",
+        "natural",
+        "colour matching",
+        "Ermington",
+        "Parramatta",
+        "budget-flexible",
+        "by appointment",
+        "Gunners Barracks"
+      ],
+      "editorial_summary": "Appointment-only floral studio in Ermington with a background in ikebana and European bouquet styles. Reviews on the site praise colour matching and flexibility with budget. Portfolio includes Gunners Barracks and Watersedge.",
+      "contact_basis": "own_site",
+      "flags": [
+        "no_street_address",
+        "experience_years_differs_across_pages",
+        "site_footer_email_typo_flowres_ignored"
+      ],
+      "source_url": "https://www.kobayashiflowers.com/about",
+      "source_label": "Florist website",
+      "source_checked_at": "2026-11-06",
+      "status": "active",
+      "attributes": [
+        {
+          "attribute_key": "editorial_summary",
+          "value": "Appointment-only floral studio in Ermington with a background in ikebana and European bouquet styles. Reviews on the site praise colour matching and flexibility with budget. Portfolio includes Gunners Barracks and Watersedge.",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.kobayashiflowers.com/about",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "style_tags",
+          "value": [
+            "ikebana",
+            "French bouquet",
+            "classic European",
+            "modern fusion",
+            "natural",
+            "colour matching",
+            "Ermington",
+            "Parramatta",
+            "budget-flexible",
+            "by appointment",
+            "Gunners Barracks"
+          ],
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.kobayashiflowers.com/about",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "official_website",
+          "value": "https://www.kobayashiflowers.com/",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.kobayashiflowers.com/",
+          "retrieved_at": "2026-11-06"
+        },
+        {
+          "attribute_key": "instagram_url",
+          "value": "https://www.instagram.com/kobayashiflowers/",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.kobayashiflowers.com/about",
+          "retrieved_at": "2026-11-06"
+        }
+      ]
+    },
+    {
+      "vendor_id": "florist-flowers-and-styling-by-felicia",
+      "vendor_slug": "florist-flowers-and-styling-by-felicia",
+      "vendor_name": "Flowers and Styling by Felicia",
+      "category": "Florist",
+      "service_area": "Sydney-wide NSW",
+      "address": null,
+      "website_url": "https://flowersandstyling.com.au/",
+      "contact_phone": "0478 647 000",
+      "contact_email": "info@flowersandstyling.com.au",
+      "instagram_url": "https://www.instagram.com/flowers_and_styling/",
+      "price_from_aud": null,
+      "price_status": null,
+      "price_note": "Three preset options or bespoke; directory prices conflict ($625 vs $1,500 / $3,000 / $4,500 est.), none confirmed on own site.",
+      "deposit_percent": null,
+      "years_in_business": null,
+      "style_tags": [
+        "cultural weddings",
+        "Indian weddings",
+        "Desi",
+        "Asian weddings",
+        "flower walls",
+        "arches",
+        "hanging installations",
+        "delivery and set-up",
+        "Sydney-wide",
+        "Sutherland Shire",
+        "Hills District"
+      ],
+      "editorial_summary": "Florist and stylist run by Felicia Sarwono, with a strong focus on Indian, Desi and Asian weddings. Makes bouquets, arches, hanging installations and flower walls in house, with delivery, set-up and pack-down. Offers preset packages or a bespoke design.",
+      "contact_basis": "own_site",
+      "flags": [
+        "no_street_address",
+        "directory_locations_conflict_coogee_sylvania_the_ponds",
+        "price_conflict_directories"
+      ],
+      "source_url": "https://flowersandstyling.com.au/about-us/",
+      "source_label": "Florist website",
+      "source_checked_at": "2026-11-06",
+      "status": "active",
+      "attributes": [
+        {
+          "attribute_key": "editorial_summary",
+          "value": "Florist and stylist run by Felicia Sarwono, with a strong focus on Indian, Desi and Asian weddings. Makes bouquets, arches, hanging installations and flower walls in house, with delivery, set-up and pack-down. Offers preset packages or a bespoke design.",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://flowersandstyling.com.au/about-us/",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "style_tags",
+          "value": [
+            "cultural weddings",
+            "Indian weddings",
+            "Desi",
+            "Asian weddings",
+            "flower walls",
+            "arches",
+            "hanging installations",
+            "delivery and set-up",
+            "Sydney-wide",
+            "Sutherland Shire",
+            "Hills District"
+          ],
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://flowersandstyling.com.au/about-us/",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "official_website",
+          "value": "https://flowersandstyling.com.au/",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://flowersandstyling.com.au/",
+          "retrieved_at": "2026-11-06"
+        },
+        {
+          "attribute_key": "instagram_url",
+          "value": "https://www.instagram.com/flowers_and_styling/",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://flowersandstyling.com.au/about-us/",
+          "retrieved_at": "2026-11-06"
+        }
+      ]
+    },
+    {
+      "vendor_id": "florist-copper-beech-the-flower-merchant",
+      "vendor_slug": "florist-copper-beech-the-flower-merchant",
+      "vendor_name": "Copper Beech, The Flower Merchant",
+      "category": "Florist",
+      "service_area": "Balgowlah, Northern Beaches NSW",
+      "address": "70 Wanganella Street, Balgowlah NSW 2093",
+      "website_url": "https://www.copperbeech.com.au/",
+      "contact_phone": "(02) 8964 1751",
+      "contact_email": "hello@copperbeech.com.au",
+      "instagram_url": "https://www.instagram.com/copper_beech/",
+      "price_from_aud": null,
+      "price_status": null,
+      "price_note": "One listed package at about $4,200; consultations in store, by phone, at the venue or online.",
+      "deposit_percent": null,
+      "years_in_business": null,
+      "style_tags": [
+        "Northern Beaches",
+        "Balgowlah",
+        "North Shore",
+        "seasonal natives",
+        "consultation at venue",
+        "bouquets",
+        "buttonholes",
+        "centrepieces",
+        "Hunter Valley",
+        "florist shop",
+        "retail and weddings"
+      ],
+      "editorial_summary": "Northern Beaches flower shop in Balgowlah with a wedding service run by two partners. Offers consultations in store, by phone, at the venue or online, and builds a concept from the first meeting. Works across the North Shore, CBD and Hunter Valley.",
+      "contact_basis": "own_site",
+      "flags": [
+        "postcode_2097_on_page_text_vs_2093_in_schema",
+        "price_from_search_summary",
+        "retail_florist_with_weddings"
+      ],
+      "source_url": "https://www.copperbeech.com.au/aboutus/",
+      "source_label": "Florist website",
+      "source_checked_at": "2026-11-06",
+      "status": "active",
+      "attributes": [
+        {
+          "attribute_key": "editorial_summary",
+          "value": "Northern Beaches flower shop in Balgowlah with a wedding service run by two partners. Offers consultations in store, by phone, at the venue or online, and builds a concept from the first meeting. Works across the North Shore, CBD and Hunter Valley.",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.copperbeech.com.au/aboutus/",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "style_tags",
+          "value": [
+            "Northern Beaches",
+            "Balgowlah",
+            "North Shore",
+            "seasonal natives",
+            "consultation at venue",
+            "bouquets",
+            "buttonholes",
+            "centrepieces",
+            "Hunter Valley",
+            "florist shop",
+            "retail and weddings"
+          ],
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.copperbeech.com.au/aboutus/",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "official_website",
+          "value": "https://www.copperbeech.com.au/",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.copperbeech.com.au/",
+          "retrieved_at": "2026-11-06"
+        },
+        {
+          "attribute_key": "instagram_url",
+          "value": "https://www.instagram.com/copper_beech/",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.copperbeech.com.au/aboutus/",
+          "retrieved_at": "2026-11-06"
+        }
+      ]
+    },
+    {
+      "vendor_id": "florist-ally-bell-floral-design",
+      "vendor_slug": "florist-ally-bell-floral-design",
+      "vendor_name": "Ally Bell Floral Design",
+      "category": "Florist",
+      "service_area": "Balmain, Inner West Sydney NSW",
+      "address": "493B Darling Street, Balmain NSW 2041",
+      "website_url": "https://allybell.com.au/",
+      "contact_phone": "0402 998 992",
+      "contact_email": null,
+      "instagram_url": "https://www.instagram.com/allybellfloraldesign/",
+      "price_from_aud": null,
+      "price_status": null,
+      "price_note": "Guideline prices published: bridal bouquet $150-$450, bridesmaid $120-$250, buttonhole $35, aisle ends $150-$350, table centres $85-$250; florals-led weddings from about $8,000; minimum spends vary by season.",
+      "deposit_percent": null,
+      "years_in_business": null,
+      "style_tags": [
+        "Balmain",
+        "Inner West",
+        "bridal bouquets",
+        "ceremony arrangements",
+        "bespoke",
+        "published prices",
+        "colour palettes",
+        "set-up on the day",
+        "florist shop",
+        "Sydney-wide"
+      ],
+      "editorial_summary": "Balmain florist doing bridal bouquets, ceremony arrangements and bespoke event florals, from first consultation to set-up. One of few Sydney florists to publish guideline prices per item. Retail shop open most days.",
+      "contact_basis": "own_site",
+      "flags": [
+        "needs_contact_lookup",
+        "email_missing",
+        "price_from_search_summary",
+        "retail_florist_with_weddings"
+      ],
+      "source_url": "https://allybell.com.au/pages/wedding-florist-sydney",
+      "source_label": "Florist website",
+      "source_checked_at": "2026-11-06",
+      "status": "active",
+      "attributes": [
+        {
+          "attribute_key": "editorial_summary",
+          "value": "Balmain florist doing bridal bouquets, ceremony arrangements and bespoke event florals, from first consultation to set-up. One of few Sydney florists to publish guideline prices per item. Retail shop open most days.",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://allybell.com.au/pages/wedding-florist-sydney",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "style_tags",
+          "value": [
+            "Balmain",
+            "Inner West",
+            "bridal bouquets",
+            "ceremony arrangements",
+            "bespoke",
+            "published prices",
+            "colour palettes",
+            "set-up on the day",
+            "florist shop",
+            "Sydney-wide"
+          ],
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://allybell.com.au/pages/wedding-florist-sydney",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "official_website",
+          "value": "https://allybell.com.au/",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://allybell.com.au/",
+          "retrieved_at": "2026-11-06"
+        },
+        {
+          "attribute_key": "instagram_url",
+          "value": "https://www.instagram.com/allybellfloraldesign/",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://allybell.com.au/pages/wedding-florist-sydney",
+          "retrieved_at": "2026-11-06"
+        }
+      ]
+    },
+    {
+      "vendor_id": "florist-ls-flower-design",
+      "vendor_slug": "florist-ls-flower-design",
+      "vendor_name": "LS Flower Design",
+      "category": "Florist",
+      "service_area": "West Ryde, Sydney NSW",
+      "address": "61a Ryedale Road, West Ryde NSW 2114",
+      "website_url": "https://www.lsflowerdesign.com.au/",
+      "contact_phone": "0424 593 979",
+      "contact_email": "info@lsflowerdesign.com.au",
+      "instagram_url": "https://www.instagram.com/lsflowerdesign/",
+      "price_from_aud": null,
+      "price_status": null,
+      "price_note": "No wedding prices published.",
+      "deposit_percent": null,
+      "years_in_business": null,
+      "style_tags": [
+        "family-run",
+        "affordable",
+        "bridal bouquets",
+        "church flowers",
+        "same-day delivery",
+        "West Ryde",
+        "Denistone",
+        "Northern Sydney",
+        "wedding and events",
+        "florist shop"
+      ],
+      "editorial_summary": "Family-run florist run by two sisters in West Ryde, with a wedding and event service from bridal bouquets to church flowers. Directories describe it as an affordable option. A second mobile number, 0426 763 979, is also listed.",
+      "contact_basis": "own_site",
+      "flags": [
+        "retail_florist_with_weddings",
+        "template_placeholder_email_ignored"
+      ],
+      "source_url": "https://www.lsflowerdesign.com.au/product-category/weddings/",
+      "source_label": "Florist website",
+      "source_checked_at": "2026-11-06",
+      "status": "active",
+      "attributes": [
+        {
+          "attribute_key": "editorial_summary",
+          "value": "Family-run florist run by two sisters in West Ryde, with a wedding and event service from bridal bouquets to church flowers. Directories describe it as an affordable option. A second mobile number, 0426 763 979, is also listed.",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.lsflowerdesign.com.au/product-category/weddings/",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "style_tags",
+          "value": [
+            "family-run",
+            "affordable",
+            "bridal bouquets",
+            "church flowers",
+            "same-day delivery",
+            "West Ryde",
+            "Denistone",
+            "Northern Sydney",
+            "wedding and events",
+            "florist shop"
+          ],
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.lsflowerdesign.com.au/product-category/weddings/",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "official_website",
+          "value": "https://www.lsflowerdesign.com.au/",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.lsflowerdesign.com.au/",
+          "retrieved_at": "2026-11-06"
+        },
+        {
+          "attribute_key": "instagram_url",
+          "value": "https://www.instagram.com/lsflowerdesign/",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.lsflowerdesign.com.au/product-category/weddings/",
+          "retrieved_at": "2026-11-06"
+        }
+      ]
+    },
+    {
+      "vendor_id": "florist-sydneys-flowers-heathcote",
+      "vendor_slug": "florist-sydneys-flowers-heathcote",
+      "vendor_name": "Sydney's Flowers Heathcote",
+      "category": "Florist",
+      "service_area": "Heathcote, Sutherland Shire NSW",
+      "address": "Shop 1/1339-1341 Princes Highway, Heathcote NSW 2233",
+      "website_url": "https://www.sydneysflowersheathcote.com/",
+      "contact_phone": "(02) 9520 8742",
+      "contact_email": "sydneysflowers@outlook.com",
+      "instagram_url": "https://www.instagram.com/sydneysflowers_/",
+      "price_from_aud": null,
+      "price_status": null,
+      "price_note": "No wedding prices published; orders need 24 hours' notice.",
+      "deposit_percent": null,
+      "years_in_business": null,
+      "style_tags": [
+        "Sutherland Shire",
+        "Heathcote",
+        "custom bouquets",
+        "event styling",
+        "studio",
+        "pre-order",
+        "weddings and events",
+        "Southern Sydney"
+      ],
+      "editorial_summary": "Sutherland Shire florist doing custom bouquets and event styling for weddings. The site says it has moved to studio, pre-order-only trading, so plan well ahead. Addresses and phones differ between pages.",
+      "contact_basis": "own_site",
+      "flags": [
+        "address_conflict_nirimba_cres_and_waterfall",
+        "phone_conflict_0412_247_439",
+        "verify_trading"
+      ],
+      "source_url": "https://www.sydneysflowersheathcote.com/contact",
+      "source_label": "Florist website",
+      "source_checked_at": "2026-11-06",
+      "status": "active",
+      "attributes": [
+        {
+          "attribute_key": "editorial_summary",
+          "value": "Sutherland Shire florist doing custom bouquets and event styling for weddings. The site says it has moved to studio, pre-order-only trading, so plan well ahead. Addresses and phones differ between pages.",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.sydneysflowersheathcote.com/contact",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "style_tags",
+          "value": [
+            "Sutherland Shire",
+            "Heathcote",
+            "custom bouquets",
+            "event styling",
+            "studio",
+            "pre-order",
+            "weddings and events",
+            "Southern Sydney"
+          ],
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.sydneysflowersheathcote.com/contact",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "official_website",
+          "value": "https://www.sydneysflowersheathcote.com/",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.sydneysflowersheathcote.com/",
+          "retrieved_at": "2026-11-06"
+        },
+        {
+          "attribute_key": "instagram_url",
+          "value": "https://www.instagram.com/sydneysflowers_/",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.sydneysflowersheathcote.com/contact",
+          "retrieved_at": "2026-11-06"
+        }
+      ]
+    },
+    {
+      "vendor_id": "florist-madame-fleur",
+      "vendor_slug": "florist-madame-fleur",
+      "vendor_name": "Madame Fleur",
+      "category": "Florist",
+      "service_area": "Rodd Point, Inner West Sydney NSW",
+      "address": "3 First Avenue, Rodd Point NSW 2046",
+      "website_url": "https://www.madamefleur.com.au/",
+      "contact_phone": "0424 669 932",
+      "contact_email": "info@madamefleur.com.au",
+      "instagram_url": "https://www.instagram.com/madame.fleur_/",
+      "price_from_aud": null,
+      "price_status": null,
+      "price_note": "No prices published.",
+      "deposit_percent": null,
+      "years_in_business": null,
+      "style_tags": [
+        "boutique",
+        "floral design studio",
+        "weddings and events",
+        "Inner West",
+        "Rodd Point",
+        "Five Dock",
+        "Sydney-wide"
+      ],
+      "editorial_summary": "Boutique floral design studio in Rodd Point for weddings and events across Sydney. Public pages give little detail beyond contact and address.",
+      "contact_basis": "own_site",
+      "flags": [
+        "phone_conflict_0424_669_923_in_tel_link",
+        "mistyped_email_domain_on_page_ignored",
+        "thin_content"
+      ],
+      "source_url": "https://www.madamefleur.com.au/",
+      "source_label": "Florist website",
+      "source_checked_at": "2026-11-06",
+      "status": "active",
+      "attributes": [
+        {
+          "attribute_key": "editorial_summary",
+          "value": "Boutique floral design studio in Rodd Point for weddings and events across Sydney. Public pages give little detail beyond contact and address.",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.madamefleur.com.au/",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "style_tags",
+          "value": [
+            "boutique",
+            "floral design studio",
+            "weddings and events",
+            "Inner West",
+            "Rodd Point",
+            "Five Dock",
+            "Sydney-wide"
+          ],
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.madamefleur.com.au/",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "official_website",
+          "value": "https://www.madamefleur.com.au/",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.madamefleur.com.au/",
+          "retrieved_at": "2026-11-06"
+        },
+        {
+          "attribute_key": "instagram_url",
+          "value": "https://www.instagram.com/madame.fleur_/",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.madamefleur.com.au/",
+          "retrieved_at": "2026-11-06"
+        }
+      ]
+    },
+    {
+      "vendor_id": "florist-gathered-floral",
+      "vendor_slug": "florist-gathered-floral",
+      "vendor_name": "Gathered Floral",
+      "category": "Florist",
+      "service_area": "Lilyfield, Inner West Sydney NSW",
+      "address": null,
+      "website_url": "https://gatheredfloral.com.au/",
+      "contact_phone": "+61 421 522 483",
+      "contact_email": "hello@gatheredfloral.com.au",
+      "instagram_url": "https://www.instagram.com/gathered_floral/",
+      "price_from_aud": null,
+      "price_status": null,
+      "price_note": "No prices published.",
+      "deposit_percent": null,
+      "years_in_business": null,
+      "style_tags": [
+        "garden-style",
+        "natural",
+        "elegant",
+        "Lilyfield",
+        "Inner West",
+        "Sydney-wide",
+        "nearby regions",
+        "bouquets",
+        "ceremony flowers"
+      ],
+      "editorial_summary": "Inner West studio in Lilyfield doing natural, garden-style wedding flowers across Sydney and nearby regions.",
+      "contact_basis": "own_site",
+      "flags": [
+        "no_street_address",
+        "thin_content"
+      ],
+      "source_url": "https://gatheredfloral.com.au/",
+      "source_label": "Florist website",
+      "source_checked_at": "2026-11-06",
+      "status": "active",
+      "attributes": [
+        {
+          "attribute_key": "editorial_summary",
+          "value": "Inner West studio in Lilyfield doing natural, garden-style wedding flowers across Sydney and nearby regions.",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://gatheredfloral.com.au/",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "style_tags",
+          "value": [
+            "garden-style",
+            "natural",
+            "elegant",
+            "Lilyfield",
+            "Inner West",
+            "Sydney-wide",
+            "nearby regions",
+            "bouquets",
+            "ceremony flowers"
+          ],
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://gatheredfloral.com.au/",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "official_website",
+          "value": "https://gatheredfloral.com.au/",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://gatheredfloral.com.au/",
+          "retrieved_at": "2026-11-06"
+        },
+        {
+          "attribute_key": "instagram_url",
+          "value": "https://www.instagram.com/gathered_floral/",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://gatheredfloral.com.au/",
+          "retrieved_at": "2026-11-06"
+        }
+      ]
+    },
+    {
+      "vendor_id": "florist-fionas-floral-designs",
+      "vendor_slug": "florist-fionas-floral-designs",
+      "vendor_name": "Fiona's Floral Designs",
+      "category": "Florist",
+      "service_area": "Mays Hill, Western Sydney NSW",
+      "address": "21 Napier Street, Mays Hill NSW 2145",
+      "website_url": "https://www.fionasfloraldesigns.com.au/",
+      "contact_phone": "+61 426 546 469",
+      "contact_email": "fiona.stellino@fionasfloraldesigns.com.au",
+      "instagram_url": null,
+      "price_from_aud": null,
+      "price_status": null,
+      "price_note": "No prices published.",
+      "deposit_percent": null,
+      "years_in_business": null,
+      "style_tags": [
+        "Western Sydney",
+        "Mays Hill",
+        "Parramatta",
+        "wedding and event florals",
+        "workshops",
+        "photo booth hire",
+        "Blue Mountains",
+        "Central Coast",
+        "Hunter Valley",
+        "travels NSW"
+      ],
+      "editorial_summary": "Western Sydney florist for weddings and events that also runs floral workshops and photo booth hire. Serves Greater Sydney and travels to the Blue Mountains, Central Coast, Hunter and South Coast.",
+      "contact_basis": "own_site",
+      "flags": [
+        "named_person_email",
+        "address_may_be_home_studio"
+      ],
+      "source_url": "https://www.fionasfloraldesigns.com.au/",
+      "source_label": "Florist website",
+      "source_checked_at": "2026-11-06",
+      "status": "active",
+      "attributes": [
+        {
+          "attribute_key": "editorial_summary",
+          "value": "Western Sydney florist for weddings and events that also runs floral workshops and photo booth hire. Serves Greater Sydney and travels to the Blue Mountains, Central Coast, Hunter and South Coast.",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.fionasfloraldesigns.com.au/",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "style_tags",
+          "value": [
+            "Western Sydney",
+            "Mays Hill",
+            "Parramatta",
+            "wedding and event florals",
+            "workshops",
+            "photo booth hire",
+            "Blue Mountains",
+            "Central Coast",
+            "Hunter Valley",
+            "travels NSW"
+          ],
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.fionasfloraldesigns.com.au/",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "official_website",
+          "value": "https://www.fionasfloraldesigns.com.au/",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.fionasfloraldesigns.com.au/",
+          "retrieved_at": "2026-11-06"
+        }
+      ]
+    },
+    {
+      "vendor_id": "florist-lime-tree-bower",
+      "vendor_slug": "florist-lime-tree-bower",
+      "vendor_name": "Lime Tree Bower",
+      "category": "Florist",
+      "service_area": "Northbridge, North Shore Sydney NSW",
+      "address": "395 Sailors Bay Road, Northbridge NSW 2063",
+      "website_url": "https://limetreebower.com/",
+      "contact_phone": "+61 493 257 504",
+      "contact_email": null,
+      "instagram_url": "https://www.instagram.com/limetreebower/",
+      "price_from_aud": null,
+      "price_status": null,
+      "price_note": "No prices read.",
+      "deposit_percent": null,
+      "years_in_business": null,
+      "style_tags": [
+        "North Shore",
+        "Northbridge",
+        "weddings",
+        "corporate flowers",
+        "same-day delivery",
+        "venue flowers",
+        "Botanic House",
+        "florist shop"
+      ],
+      "editorial_summary": "Northbridge florist shop with a Sydney wedding florist page, also doing corporate flowers and same-day delivery. Has written about weddings at venues such as Botanic House.",
+      "contact_basis": "own_site",
+      "flags": [
+        "needs_contact_lookup",
+        "email_missing",
+        "retail_florist_with_weddings"
+      ],
+      "source_url": "https://limetreebower.com/pages/sydney-wedding-florist",
+      "source_label": "Florist website",
+      "source_checked_at": "2026-11-06",
+      "status": "active",
+      "attributes": [
+        {
+          "attribute_key": "editorial_summary",
+          "value": "Northbridge florist shop with a Sydney wedding florist page, also doing corporate flowers and same-day delivery. Has written about weddings at venues such as Botanic House.",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://limetreebower.com/pages/sydney-wedding-florist",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "style_tags",
+          "value": [
+            "North Shore",
+            "Northbridge",
+            "weddings",
+            "corporate flowers",
+            "same-day delivery",
+            "venue flowers",
+            "Botanic House",
+            "florist shop"
+          ],
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://limetreebower.com/pages/sydney-wedding-florist",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "official_website",
+          "value": "https://limetreebower.com/",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://limetreebower.com/",
+          "retrieved_at": "2026-11-06"
+        },
+        {
+          "attribute_key": "instagram_url",
+          "value": "https://www.instagram.com/limetreebower/",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://limetreebower.com/pages/sydney-wedding-florist",
+          "retrieved_at": "2026-11-06"
+        }
+      ]
+    },
+    {
+      "vendor_id": "florist-eflowers-sydney",
+      "vendor_slug": "florist-eflowers-sydney",
+      "vendor_name": "Eflowers Sydney",
+      "category": "Florist",
+      "service_area": "Seven Hills, Western Sydney NSW",
+      "address": "6 Abbott Road, Seven Hills NSW 2147",
+      "website_url": "https://www.eflowers-sydney.com/",
+      "contact_phone": "0411 583 658",
+      "contact_email": "eflowerssydney@gmail.com",
+      "instagram_url": "https://www.instagram.com/eflowerssydney/",
+      "price_from_aud": null,
+      "price_status": null,
+      "price_note": "No prices read.",
+      "deposit_percent": null,
+      "years_in_business": 40,
+      "style_tags": [
+        "experienced",
+        "Western Sydney",
+        "Seven Hills",
+        "Blacktown",
+        "bouquets",
+        "ceremony flowers",
+        "event flowers",
+        "Sydney-wide"
+      ],
+      "editorial_summary": "Western Sydney florist in Seven Hills that cites about 40 years of floristry experience, with wedding and event flowers across Sydney.",
+      "contact_basis": "own_site",
+      "flags": [
+        "years_from_directory_summary"
+      ],
+      "source_url": "https://www.eflowers-sydney.com/",
+      "source_label": "Florist website",
+      "source_checked_at": "2026-11-06",
+      "status": "active",
+      "attributes": [
+        {
+          "attribute_key": "editorial_summary",
+          "value": "Western Sydney florist in Seven Hills that cites about 40 years of floristry experience, with wedding and event flowers across Sydney.",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.eflowers-sydney.com/",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "style_tags",
+          "value": [
+            "experienced",
+            "Western Sydney",
+            "Seven Hills",
+            "Blacktown",
+            "bouquets",
+            "ceremony flowers",
+            "event flowers",
+            "Sydney-wide"
+          ],
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.eflowers-sydney.com/",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "official_website",
+          "value": "https://www.eflowers-sydney.com/",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.eflowers-sydney.com/",
+          "retrieved_at": "2026-11-06"
+        },
+        {
+          "attribute_key": "instagram_url",
+          "value": "https://www.instagram.com/eflowerssydney/",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.eflowers-sydney.com/",
+          "retrieved_at": "2026-11-06"
+        },
+        {
+          "attribute_key": "years_in_business",
+          "value": 40,
+          "status": "estimated",
+          "authority": "primary_official",
+          "source_url": "https://www.eflowers-sydney.com/",
+          "retrieved_at": "2026-11-06",
+          "notes": "Rounded from florist wording."
+        }
+      ]
+    },
+    {
+      "vendor_id": "florist-events-florist",
+      "vendor_slug": "florist-events-florist",
+      "vendor_name": "Events Florist",
+      "category": "Florist",
+      "service_area": "Auburn, Western Sydney NSW",
+      "address": "47 Park Road, Auburn NSW 2144",
+      "website_url": "https://eventsflorist.com.au/",
+      "contact_phone": "(02) 8626 2584",
+      "contact_email": "christine@eventsflorist.com.au",
+      "instagram_url": "https://www.instagram.com/events_florist/",
+      "price_from_aud": null,
+      "price_status": null,
+      "price_note": "No prices read.",
+      "deposit_percent": null,
+      "years_in_business": null,
+      "style_tags": [
+        "Auburn",
+        "Western Sydney",
+        "events",
+        "corporate",
+        "weddings",
+        "large events",
+        "Parramatta",
+        "Sydney-wide",
+        "retail and events"
+      ],
+      "editorial_summary": "Auburn florist focused on events, with a Sydney wedding florist page alongside retail, private and corporate work.",
+      "contact_basis": "own_site",
+      "flags": [
+        "named_person_email",
+        "events_first_florist"
+      ],
+      "source_url": "https://eventsflorist.com.au/wedding-florist-sydney/",
+      "source_label": "Florist website",
+      "source_checked_at": "2026-11-06",
+      "status": "active",
+      "attributes": [
+        {
+          "attribute_key": "editorial_summary",
+          "value": "Auburn florist focused on events, with a Sydney wedding florist page alongside retail, private and corporate work.",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://eventsflorist.com.au/wedding-florist-sydney/",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "style_tags",
+          "value": [
+            "Auburn",
+            "Western Sydney",
+            "events",
+            "corporate",
+            "weddings",
+            "large events",
+            "Parramatta",
+            "Sydney-wide",
+            "retail and events"
+          ],
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://eventsflorist.com.au/wedding-florist-sydney/",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "official_website",
+          "value": "https://eventsflorist.com.au/",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://eventsflorist.com.au/",
+          "retrieved_at": "2026-11-06"
+        },
+        {
+          "attribute_key": "instagram_url",
+          "value": "https://www.instagram.com/events_florist/",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://eventsflorist.com.au/wedding-florist-sydney/",
+          "retrieved_at": "2026-11-06"
+        }
+      ]
+    },
+    {
+      "vendor_id": "florist-the-lillipillian",
+      "vendor_slug": "florist-the-lillipillian",
+      "vendor_name": "The Lillipillian",
+      "category": "Florist",
+      "service_area": "Toongabbie, Western Sydney NSW",
+      "address": null,
+      "website_url": "https://www.thelillipillian.com.au/",
+      "contact_phone": null,
+      "contact_email": "tegan@thelillipillian.com",
+      "instagram_url": "https://www.instagram.com/the.lillipillian/",
+      "price_from_aud": null,
+      "price_status": null,
+      "price_note": "No prices read; tailored packages.",
+      "deposit_percent": null,
+      "years_in_business": null,
+      "style_tags": [
+        "moody",
+        "textured",
+        "eclectic",
+        "editorial",
+        "Toongabbie",
+        "Western Sydney",
+        "travels NSW",
+        "weddings and corporate",
+        "featured in magazines"
+      ],
+      "editorial_summary": "Boutique floral designer and stylist run by Tegan O'Brien, with a moody, textured, stylishly eclectic look. Does weddings, events, office flowers and editorial work, and travels across NSW. Website said maintenance was in progress when checked.",
+      "contact_basis": "own_site",
+      "flags": [
+        "needs_contact_lookup",
+        "phone_missing",
+        "verify_trading",
+        "suburb_conflict_epping_in_directory",
+        "named_person_email"
+      ],
+      "source_url": "https://www.thelillipillian.com.au/contact-us",
+      "source_label": "Florist website",
+      "source_checked_at": "2026-11-06",
+      "status": "active",
+      "attributes": [
+        {
+          "attribute_key": "editorial_summary",
+          "value": "Boutique floral designer and stylist run by Tegan O'Brien, with a moody, textured, stylishly eclectic look. Does weddings, events, office flowers and editorial work, and travels across NSW. Website said maintenance was in progress when checked.",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.thelillipillian.com.au/contact-us",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "style_tags",
+          "value": [
+            "moody",
+            "textured",
+            "eclectic",
+            "editorial",
+            "Toongabbie",
+            "Western Sydney",
+            "travels NSW",
+            "weddings and corporate",
+            "featured in magazines"
+          ],
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.thelillipillian.com.au/contact-us",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "official_website",
+          "value": "https://www.thelillipillian.com.au/",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.thelillipillian.com.au/",
+          "retrieved_at": "2026-11-06"
+        },
+        {
+          "attribute_key": "instagram_url",
+          "value": "https://www.instagram.com/the.lillipillian/",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.thelillipillian.com.au/contact-us",
+          "retrieved_at": "2026-11-06"
+        }
+      ]
+    },
+    {
+      "vendor_id": "florist-the-bloom-folk",
+      "vendor_slug": "florist-the-bloom-folk",
+      "vendor_name": "The Bloom Folk",
+      "category": "Florist",
+      "service_area": "Hunter Valley and Central Coast NSW",
+      "address": null,
+      "website_url": "https://www.thebloomfolk.com.au/",
+      "contact_phone": "0411 803 320",
+      "contact_email": "hello.thebloomfolk@gmail.com",
+      "instagram_url": "https://www.instagram.com/thebloomfolk/",
+      "price_from_aud": null,
+      "price_status": null,
+      "price_note": "A third-party guide quotes a minimum of $4,500 (Sep-Apr) and $3,500 (winter) with delivery and travel included; not confirmed on the studio's site.",
+      "deposit_percent": null,
+      "years_in_business": null,
+      "style_tags": [
+        "garden-inspired",
+        "romantic",
+        "styling",
+        "signage",
+        "Hunter Valley",
+        "Central Coast",
+        "Northern Beaches",
+        "Southern Highlands",
+        "Port Stephens",
+        "travels NSW"
+      ],
+      "editorial_summary": "Wedding florist and styling collective based in the Hunter Valley that also travels to Sydney, the Northern Beaches and Southern Highlands. Garden-inspired, romantic florals with signage and styling. Full-service enquiries go through the website.",
+      "contact_basis": "own_site",
+      "flags": [
+        "outside_sydney_base_hunter_valley",
+        "no_street_address",
+        "price_unconfirmed_third_party"
+      ],
+      "source_url": "https://www.thebloomfolk.com.au/",
+      "source_label": "Florist website",
+      "source_checked_at": "2026-11-06",
+      "status": "active",
+      "attributes": [
+        {
+          "attribute_key": "editorial_summary",
+          "value": "Wedding florist and styling collective based in the Hunter Valley that also travels to Sydney, the Northern Beaches and Southern Highlands. Garden-inspired, romantic florals with signage and styling. Full-service enquiries go through the website.",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.thebloomfolk.com.au/",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "style_tags",
+          "value": [
+            "garden-inspired",
+            "romantic",
+            "styling",
+            "signage",
+            "Hunter Valley",
+            "Central Coast",
+            "Northern Beaches",
+            "Southern Highlands",
+            "Port Stephens",
+            "travels NSW"
+          ],
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.thebloomfolk.com.au/",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "official_website",
+          "value": "https://www.thebloomfolk.com.au/",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.thebloomfolk.com.au/",
+          "retrieved_at": "2026-11-06"
+        },
+        {
+          "attribute_key": "instagram_url",
+          "value": "https://www.instagram.com/thebloomfolk/",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.thebloomfolk.com.au/",
+          "retrieved_at": "2026-11-06"
+        }
+      ]
+    },
+    {
+      "vendor_id": "florist-butchers-daughter",
+      "vendor_slug": "florist-butchers-daughter",
+      "vendor_name": "Butchers Daughter",
+      "category": "Florist",
+      "service_area": "Crows Nest, North Shore Sydney NSW",
+      "address": "11-15 Alexander Street, Crows Nest NSW 2065",
+      "website_url": "https://www.butchersdaughter.com.au/",
+      "contact_phone": "(02) 9439 0045",
+      "contact_email": "contact@butchersdaughter.com.au",
+      "instagram_url": "https://www.instagram.com/butchersdaughterau/",
+      "price_from_aud": null,
+      "price_status": null,
+      "price_note": "No prices read.",
+      "deposit_percent": null,
+      "years_in_business": null,
+      "style_tags": [
+        "large-scale weddings",
+        "styling",
+        "catering and florals",
+        "Crows Nest",
+        "North Shore",
+        "Central Coast",
+        "Newcastle",
+        "venue hire",
+        "event styling"
+      ],
+      "editorial_summary": "Catering company with a florist and wedding styling arm, run from a Crows Nest studio and founded by Bridget Ditte. Suited to larger weddings where food, flowers and styling come from one team. Covers Sydney, the Central Coast and Newcastle.",
+      "contact_basis": "own_site",
+      "flags": [
+        "catering_company_with_florist_arm",
+        "address_postcode_inferred",
+        "service_area_differs_across_pages"
+      ],
+      "source_url": "https://www.butchersdaughter.com.au/weddings/",
+      "source_label": "Florist website",
+      "source_checked_at": "2026-11-06",
+      "status": "active",
+      "attributes": [
+        {
+          "attribute_key": "editorial_summary",
+          "value": "Catering company with a florist and wedding styling arm, run from a Crows Nest studio and founded by Bridget Ditte. Suited to larger weddings where food, flowers and styling come from one team. Covers Sydney, the Central Coast and Newcastle.",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.butchersdaughter.com.au/weddings/",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "style_tags",
+          "value": [
+            "large-scale weddings",
+            "styling",
+            "catering and florals",
+            "Crows Nest",
+            "North Shore",
+            "Central Coast",
+            "Newcastle",
+            "venue hire",
+            "event styling"
+          ],
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.butchersdaughter.com.au/weddings/",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "official_website",
+          "value": "https://www.butchersdaughter.com.au/",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.butchersdaughter.com.au/",
+          "retrieved_at": "2026-11-06"
+        },
+        {
+          "attribute_key": "instagram_url",
+          "value": "https://www.instagram.com/butchersdaughterau/",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.butchersdaughter.com.au/weddings/",
+          "retrieved_at": "2026-11-06"
+        }
+      ]
+    },
+    {
+      "vendor_id": "florist-form-over-function",
+      "vendor_slug": "florist-form-over-function",
+      "vendor_name": "Form Over Function",
+      "category": "Florist",
+      "service_area": "Surry Hills, Sydney NSW",
+      "address": null,
+      "website_url": "https://formoverfunction.com.au/",
+      "contact_phone": "02 9328 6541",
+      "contact_email": null,
+      "instagram_url": "https://www.instagram.com/formoverfunctionevents/",
+      "price_from_aud": null,
+      "price_status": null,
+      "price_note": "No prices read. Takes styling clients only if they also book its florals.",
+      "deposit_percent": null,
+      "years_in_business": null,
+      "style_tags": [
+        "event planner",
+        "in-house florals",
+        "cool room",
+        "luxe",
+        "full-service",
+        "styling",
+        "Southern Highlands",
+        "South Coast",
+        "Sydney",
+        "one event per day"
+      ],
+      "editorial_summary": "Boutique event planning company with its own floral team and a large cool room, doing full-service planning and styling. Styling clients must also book its flowers, and it rarely takes more than one event a day.",
+      "contact_basis": "own_site",
+      "flags": [
+        "needs_contact_lookup",
+        "email_missing",
+        "planner_and_florist",
+        "address_conflict_surry_hills_vs_thirroul_po_box",
+        "second_phone_02_4268_1899_south_coast"
+      ],
+      "source_url": "https://formoverfunction.com.au/faq/",
+      "source_label": "Florist website",
+      "source_checked_at": "2026-11-06",
+      "status": "active",
+      "attributes": [
+        {
+          "attribute_key": "editorial_summary",
+          "value": "Boutique event planning company with its own floral team and a large cool room, doing full-service planning and styling. Styling clients must also book its flowers, and it rarely takes more than one event a day.",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://formoverfunction.com.au/faq/",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "style_tags",
+          "value": [
+            "event planner",
+            "in-house florals",
+            "cool room",
+            "luxe",
+            "full-service",
+            "styling",
+            "Southern Highlands",
+            "South Coast",
+            "Sydney",
+            "one event per day"
+          ],
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://formoverfunction.com.au/faq/",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "official_website",
+          "value": "https://formoverfunction.com.au/",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://formoverfunction.com.au/",
+          "retrieved_at": "2026-11-06"
+        },
+        {
+          "attribute_key": "instagram_url",
+          "value": "https://www.instagram.com/formoverfunctionevents/",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://formoverfunction.com.au/faq/",
+          "retrieved_at": "2026-11-06"
+        }
+      ]
+    },
+    {
+      "vendor_id": "florist-bold-botanicals",
+      "vendor_slug": "florist-bold-botanicals",
+      "vendor_name": "Bold Botanicals",
+      "category": "Florist",
+      "service_area": "Inner West, Sydney NSW",
+      "address": null,
+      "website_url": "https://www.boldbotanicals.com.au/",
+      "contact_phone": null,
+      "contact_email": "hello@boldbotanicals.com.au",
+      "instagram_url": "https://www.instagram.com/bold_botanicals_sydney/",
+      "price_from_aud": 4500,
+      "price_status": "estimated",
+      "price_note": "Luxe wedding packages from a $4,500 minimum, florals only.",
+      "deposit_percent": null,
+      "years_in_business": null,
+      "style_tags": [
+        "native flowers",
+        "fresh",
+        "Inner West",
+        "luxe packages",
+        "florals only",
+        "bouquets",
+        "Sydney",
+        "wedding packages",
+        "florist shop"
+      ],
+      "editorial_summary": "Inner West florist known for fresh and native flowers, with luxe wedding packages from a $4,500 minimum for florals only.",
+      "contact_basis": "own_site",
+      "flags": [
+        "needs_contact_lookup",
+        "phone_missing",
+        "no_street_address",
+        "price_from_search_summary",
+        "retail_florist_with_weddings"
+      ],
+      "source_url": "https://www.boldbotanicals.com.au/pages/weddings",
+      "source_label": "Florist website",
+      "source_checked_at": "2026-11-06",
+      "status": "active",
+      "attributes": [
+        {
+          "attribute_key": "editorial_summary",
+          "value": "Inner West florist known for fresh and native flowers, with luxe wedding packages from a $4,500 minimum for florals only.",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.boldbotanicals.com.au/pages/weddings",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "style_tags",
+          "value": [
+            "native flowers",
+            "fresh",
+            "Inner West",
+            "luxe packages",
+            "florals only",
+            "bouquets",
+            "Sydney",
+            "wedding packages",
+            "florist shop"
+          ],
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.boldbotanicals.com.au/pages/weddings",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "official_website",
+          "value": "https://www.boldbotanicals.com.au/",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.boldbotanicals.com.au/",
+          "retrieved_at": "2026-11-06"
+        },
+        {
+          "attribute_key": "instagram_url",
+          "value": "https://www.instagram.com/bold_botanicals_sydney/",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.boldbotanicals.com.au/pages/weddings",
+          "retrieved_at": "2026-11-06"
+        },
+        {
+          "attribute_key": "price_estimate_total_aud",
+          "value": 4500,
+          "status": "estimated",
+          "authority": "primary_official",
+          "source_url": "https://www.boldbotanicals.com.au/pages/weddings",
+          "retrieved_at": "2026-11-06",
+          "notes": "Lowest published wedding starting figure or minimum spend; confirm with the florist."
+        }
+      ]
+    },
+    {
+      "vendor_id": "florist-rosella-floral-designs",
+      "vendor_slug": "florist-rosella-floral-designs",
+      "vendor_name": "Rosella Floral Designs",
+      "category": "Florist",
+      "service_area": "Waitara, North Shore Sydney NSW",
+      "address": null,
+      "website_url": "https://www.rosellafloraldesigns.com.au/",
+      "contact_phone": "0416 943 431",
+      "contact_email": "enquiries@rosellafloraldesigns.com.au",
+      "instagram_url": "https://www.instagram.com/rosellafloraldesigns/",
+      "price_from_aud": 600,
+      "price_status": "estimated",
+      "price_note": "Four wedding packages from $600 to $1,800; items from a $15 buttonhole to a $600 ceremony arch; all starting figures.",
+      "deposit_percent": null,
+      "years_in_business": 12,
+      "style_tags": [
+        "home studio",
+        "published prices",
+        "packages",
+        "arches",
+        "candle and lighting hire",
+        "wedding planning",
+        "Waitara",
+        "Hornsby",
+        "North Shore",
+        "Hunter Valley",
+        "Southern Highlands",
+        "Central Coast",
+        "by appointment"
+      ],
+      "editorial_summary": "Home-studio wedding and event florist in Waitara with published package prices and hire items like arches and centrepieces. Travels across Greater Sydney and out to the Hunter, Central Coast, Highlands and South Coast. Consultations by appointment.",
+      "contact_basis": "search_result",
+      "flags": [
+        "contacts_from_search_result_site_not_readable",
+        "no_street_address",
+        "price_from_search_summary",
+        "verify_travel_to_blue_mountains_paused"
+      ],
+      "source_url": "https://www.rosellafloraldesigns.com.au/about-us",
+      "source_label": "Florist website (read via search summary)",
+      "source_checked_at": "2026-11-06",
+      "status": "active",
+      "attributes": [
+        {
+          "attribute_key": "editorial_summary",
+          "value": "Home-studio wedding and event florist in Waitara with published package prices and hire items like arches and centrepieces. Travels across Greater Sydney and out to the Hunter, Central Coast, Highlands and South Coast. Consultations by appointment.",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.rosellafloraldesigns.com.au/about-us",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "style_tags",
+          "value": [
+            "home studio",
+            "published prices",
+            "packages",
+            "arches",
+            "candle and lighting hire",
+            "wedding planning",
+            "Waitara",
+            "Hornsby",
+            "North Shore",
+            "Hunter Valley",
+            "Southern Highlands",
+            "Central Coast",
+            "by appointment"
+          ],
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.rosellafloraldesigns.com.au/about-us",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "official_website",
+          "value": "https://www.rosellafloraldesigns.com.au/",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.rosellafloraldesigns.com.au/",
+          "retrieved_at": "2026-11-06"
+        },
+        {
+          "attribute_key": "instagram_url",
+          "value": "https://www.instagram.com/rosellafloraldesigns/",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://www.rosellafloraldesigns.com.au/about-us",
+          "retrieved_at": "2026-11-06"
+        },
+        {
+          "attribute_key": "price_estimate_total_aud",
+          "value": 600,
+          "status": "estimated",
+          "authority": "primary_official",
+          "source_url": "https://www.rosellafloraldesigns.com.au/about-us",
+          "retrieved_at": "2026-11-06",
+          "notes": "Lowest published wedding starting figure or minimum spend; confirm with the florist."
+        },
+        {
+          "attribute_key": "years_in_business",
+          "value": 12,
+          "status": "estimated",
+          "authority": "primary_official",
+          "source_url": "https://www.rosellafloraldesigns.com.au/about-us",
+          "retrieved_at": "2026-11-06",
+          "notes": "Rounded from florist wording."
+        }
+      ]
+    },
+    {
+      "vendor_id": "florist-the-faux-fernery",
+      "vendor_slug": "florist-the-faux-fernery",
+      "vendor_name": "The Faux Fernery",
+      "category": "Florist",
+      "service_area": "Middle Cove, North Shore Sydney NSW",
+      "address": "213 Eastern Valley Way, Middle Cove NSW 2068",
+      "website_url": "http://www.thefauxfernery.com.au",
+      "contact_phone": "0408 440 660",
+      "contact_email": "info@thefauxfernery.com.au",
+      "instagram_url": "https://www.instagram.com/thefauxfernery/",
+      "price_from_aud": null,
+      "price_status": null,
+      "price_note": "Hire pricing not found. One blog says it cost about half of comparable fresh flowers.",
+      "deposit_percent": null,
+      "years_in_business": null,
+      "style_tags": [
+        "faux flowers",
+        "artificial",
+        "hire",
+        "dried and preserved",
+        "no wilting",
+        "ceremony arbours",
+        "ceiling installs",
+        "centrepieces",
+        "North Shore",
+        "showroom by appointment",
+        "weather-proof"
+      ],
+      "editorial_summary": "Hire business for artificial, dried and preserved wedding flowers, from ceremony arbours and ceiling installs to centrepieces. Faux blooms do not wilt in heat or rain and can be arranged ahead. Showroom by appointment.",
+      "contact_basis": "directory",
+      "flags": [
+        "contacts_directory_only_unverified",
+        "own_site_not_reachable_by_script",
+        "faux_flower_hire_not_fresh"
+      ],
+      "source_url": "https://www.thefloristquarter.com.au/directory/the-faux-fernery",
+      "source_label": "Directory or social listing (unverified)",
+      "source_checked_at": "2026-11-06",
+      "status": "active",
+      "attributes": [
+        {
+          "attribute_key": "editorial_summary",
+          "value": "Hire business for artificial, dried and preserved wedding flowers, from ceremony arbours and ceiling installs to centrepieces. Faux blooms do not wilt in heat or rain and can be arranged ahead. Showroom by appointment.",
+          "status": "known",
+          "authority": "directory",
+          "source_url": "https://www.thefloristquarter.com.au/directory/the-faux-fernery",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "style_tags",
+          "value": [
+            "faux flowers",
+            "artificial",
+            "hire",
+            "dried and preserved",
+            "no wilting",
+            "ceremony arbours",
+            "ceiling installs",
+            "centrepieces",
+            "North Shore",
+            "showroom by appointment",
+            "weather-proof"
+          ],
+          "status": "known",
+          "authority": "directory",
+          "source_url": "https://www.thefloristquarter.com.au/directory/the-faux-fernery",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "official_website",
+          "value": "http://www.thefauxfernery.com.au",
+          "status": "known",
+          "authority": "directory",
+          "source_url": "http://www.thefauxfernery.com.au",
+          "retrieved_at": "2026-11-06"
+        },
+        {
+          "attribute_key": "instagram_url",
+          "value": "https://www.instagram.com/thefauxfernery/",
+          "status": "known",
+          "authority": "directory",
+          "source_url": "https://www.thefloristquarter.com.au/directory/the-faux-fernery",
+          "retrieved_at": "2026-11-06"
+        }
+      ]
+    },
+    {
+      "vendor_id": "florist-eden-and-bell",
+      "vendor_slug": "florist-eden-and-bell",
+      "vendor_name": "Eden & Bell",
+      "category": "Florist",
+      "service_area": "Surry Hills, Sydney NSW",
+      "address": "515 Crown Street, Surry Hills NSW 2010",
+      "website_url": "https://edenandbell.com.au/",
+      "contact_phone": "0406 899 499",
+      "contact_email": null,
+      "instagram_url": null,
+      "price_from_aud": null,
+      "price_status": null,
+      "price_note": "Wedding work has a minimum spend, then is personalised; amount not read.",
+      "deposit_percent": null,
+      "years_in_business": null,
+      "style_tags": [
+        "Surry Hills",
+        "inner city",
+        "florist shop",
+        "personalised",
+        "gives back",
+        "bouquets",
+        "weddings and corporate",
+        "same-day delivery"
+      ],
+      "editorial_summary": "Surry Hills florist shop run by Sophie and Dom Geisser, doing wedding flowers since 2017 on top of retail and corporate work. Weddings have a minimum spend and are designed around the couple's tastes.",
+      "contact_basis": "search_result",
+      "flags": [
+        "contacts_from_search_result_site_not_readable",
+        "needs_contact_lookup",
+        "email_missing",
+        "retail_florist_with_weddings"
+      ],
+      "source_url": "https://edenandbell.com.au/pages/shop",
+      "source_label": "Florist website (read via search summary)",
+      "source_checked_at": "2026-11-06",
+      "status": "active",
+      "attributes": [
+        {
+          "attribute_key": "editorial_summary",
+          "value": "Surry Hills florist shop run by Sophie and Dom Geisser, doing wedding flowers since 2017 on top of retail and corporate work. Weddings have a minimum spend and are designed around the couple's tastes.",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://edenandbell.com.au/pages/shop",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "style_tags",
+          "value": [
+            "Surry Hills",
+            "inner city",
+            "florist shop",
+            "personalised",
+            "gives back",
+            "bouquets",
+            "weddings and corporate",
+            "same-day delivery"
+          ],
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://edenandbell.com.au/pages/shop",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "official_website",
+          "value": "https://edenandbell.com.au/",
+          "status": "known",
+          "authority": "primary_official",
+          "source_url": "https://edenandbell.com.au/",
+          "retrieved_at": "2026-11-06"
+        }
+      ]
+    },
+    {
+      "vendor_id": "florist-christine-and-rose",
+      "vendor_slug": "florist-christine-and-rose",
+      "vendor_name": "Christine & Rose",
+      "category": "Florist",
+      "service_area": "Five Dock, Inner West Sydney NSW",
+      "address": "Harrabrook Avenue, Five Dock NSW 2046",
+      "website_url": "https://www.christineandrose.com.au/",
+      "contact_phone": "0452 447 462",
+      "contact_email": "christineandroseflowers@gmail.com",
+      "instagram_url": "https://www.instagram.com/christineandroseflowers/",
+      "price_from_aud": null,
+      "price_status": null,
+      "price_note": "Custom quote by email; a directory offered 10% off via its listing.",
+      "deposit_percent": null,
+      "years_in_business": 10,
+      "style_tags": [
+        "studio-based",
+        "bespoke",
+        "by appointment",
+        "Five Dock",
+        "Inner West",
+        "weddings and events",
+        "pick-up and local delivery",
+        "bouquets",
+        "installations"
+      ],
+      "editorial_summary": "Studio florist in Five Dock run by Gemma Mehta, doing bespoke weddings and events by appointment with pick-up and local delivery. Quotes are custom and requested by email.",
+      "contact_basis": "directory",
+      "flags": [
+        "phone_email_from_instagram_listing_unverified",
+        "no_street_number",
+        "needs_contact_lookup"
+      ],
+      "source_url": "https://www.christineandrose.com.au/",
+      "source_label": "Directory or social listing (unverified)",
+      "source_checked_at": "2026-11-06",
+      "status": "active",
+      "attributes": [
+        {
+          "attribute_key": "editorial_summary",
+          "value": "Studio florist in Five Dock run by Gemma Mehta, doing bespoke weddings and events by appointment with pick-up and local delivery. Quotes are custom and requested by email.",
+          "status": "known",
+          "authority": "directory",
+          "source_url": "https://www.christineandrose.com.au/",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "style_tags",
+          "value": [
+            "studio-based",
+            "bespoke",
+            "by appointment",
+            "Five Dock",
+            "Inner West",
+            "weddings and events",
+            "pick-up and local delivery",
+            "bouquets",
+            "installations"
+          ],
+          "status": "known",
+          "authority": "directory",
+          "source_url": "https://www.christineandrose.com.au/",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "official_website",
+          "value": "https://www.christineandrose.com.au/",
+          "status": "known",
+          "authority": "directory",
+          "source_url": "https://www.christineandrose.com.au/",
+          "retrieved_at": "2026-11-06"
+        },
+        {
+          "attribute_key": "instagram_url",
+          "value": "https://www.instagram.com/christineandroseflowers/",
+          "status": "known",
+          "authority": "directory",
+          "source_url": "https://www.christineandrose.com.au/",
+          "retrieved_at": "2026-11-06"
+        },
+        {
+          "attribute_key": "years_in_business",
+          "value": 10,
+          "status": "estimated",
+          "authority": "directory",
+          "source_url": "https://www.christineandrose.com.au/",
+          "retrieved_at": "2026-11-06",
+          "notes": "Rounded from florist wording."
+        }
+      ]
+    },
+    {
+      "vendor_id": "florist-ivy-trail-events",
+      "vendor_slug": "florist-ivy-trail-events",
+      "vendor_name": "Ivy Trail Events",
+      "category": "Florist",
+      "service_area": "Blue Mountains foothills and Western Sydney NSW",
+      "address": null,
+      "website_url": "https://www.ivytrailevents.com.au/",
+      "contact_phone": "+61 457 087 504",
+      "contact_email": "hello@ivytrailevents.com.au",
+      "instagram_url": null,
+      "price_from_aud": null,
+      "price_status": null,
+      "price_note": "No prices read.",
+      "deposit_percent": null,
+      "years_in_business": null,
+      "style_tags": [
+        "bohemian",
+        "modern",
+        "eco-minded",
+        "ethical",
+        "Blue Mountains",
+        "Western Sydney",
+        "travels",
+        "wedding and event florals"
+      ],
+      "editorial_summary": "Bespoke wedding and event floral studio at the base of the Blue Mountains with a modern, bohemian, eco-minded approach. Serves Western Sydney and travels further.",
+      "contact_basis": "directory",
+      "flags": [
+        "phone_email_from_facebook_listing_unverified",
+        "outside_sydney_base_blue_mountains",
+        "no_street_address"
+      ],
+      "source_url": "https://www.ivytrailevents.com.au/weddings",
+      "source_label": "Directory or social listing (unverified)",
+      "source_checked_at": "2026-11-06",
+      "status": "active",
+      "attributes": [
+        {
+          "attribute_key": "editorial_summary",
+          "value": "Bespoke wedding and event floral studio at the base of the Blue Mountains with a modern, bohemian, eco-minded approach. Serves Western Sydney and travels further.",
+          "status": "known",
+          "authority": "directory",
+          "source_url": "https://www.ivytrailevents.com.au/weddings",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "style_tags",
+          "value": [
+            "bohemian",
+            "modern",
+            "eco-minded",
+            "ethical",
+            "Blue Mountains",
+            "Western Sydney",
+            "travels",
+            "wedding and event florals"
+          ],
+          "status": "known",
+          "authority": "directory",
+          "source_url": "https://www.ivytrailevents.com.au/weddings",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "official_website",
+          "value": "https://www.ivytrailevents.com.au/",
+          "status": "known",
+          "authority": "directory",
+          "source_url": "https://www.ivytrailevents.com.au/",
+          "retrieved_at": "2026-11-06"
+        }
+      ]
+    },
+    {
+      "vendor_id": "florist-bloom-boss",
+      "vendor_slug": "florist-bloom-boss",
+      "vendor_name": "Bloom Boss",
+      "category": "Florist",
+      "service_area": "Caringbah South, Sutherland Shire NSW",
+      "address": "1A Holly Street, Caringbah South NSW 2229",
+      "website_url": "https://bloomboss.com.au/",
+      "contact_phone": "0422 919 828",
+      "contact_email": "info@bloomboss.com.au",
+      "instagram_url": null,
+      "price_from_aud": null,
+      "price_status": null,
+      "price_note": "No prices read.",
+      "deposit_percent": null,
+      "years_in_business": null,
+      "style_tags": [
+        "boutique",
+        "whimsical",
+        "natural",
+        "minimalist",
+        "dried arrangements",
+        "Sutherland Shire",
+        "Caringbah",
+        "South Coast",
+        "Southern Highlands",
+        "Northern Beaches",
+        "arches"
+      ],
+      "editorial_summary": "Boutique wedding florist in Caringbah South led by Aisling, with a whimsical, natural look. Makes bouquets, arch and table arrangements and offers dried as well as fresh work across the Shire and beyond.",
+      "contact_basis": "directory",
+      "flags": [
+        "site_blocked_to_scripts_403",
+        "contacts_directory_only_unverified",
+        "founder_surname_conflict"
+      ],
+      "source_url": "https://www.shirescout.com.au/shirescoutarticles/bloom-boss-sutherland-shire-florist",
+      "source_label": "Directory or social listing (unverified)",
+      "source_checked_at": "2026-11-06",
+      "status": "active",
+      "attributes": [
+        {
+          "attribute_key": "editorial_summary",
+          "value": "Boutique wedding florist in Caringbah South led by Aisling, with a whimsical, natural look. Makes bouquets, arch and table arrangements and offers dried as well as fresh work across the Shire and beyond.",
+          "status": "known",
+          "authority": "directory",
+          "source_url": "https://www.shirescout.com.au/shirescoutarticles/bloom-boss-sutherland-shire-florist",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "style_tags",
+          "value": [
+            "boutique",
+            "whimsical",
+            "natural",
+            "minimalist",
+            "dried arrangements",
+            "Sutherland Shire",
+            "Caringbah",
+            "South Coast",
+            "Southern Highlands",
+            "Northern Beaches",
+            "arches"
+          ],
+          "status": "known",
+          "authority": "directory",
+          "source_url": "https://www.shirescout.com.au/shirescoutarticles/bloom-boss-sutherland-shire-florist",
+          "retrieved_at": "2026-11-06",
+          "notes": "Written by OmnyID in own words."
+        },
+        {
+          "attribute_key": "official_website",
+          "value": "https://bloomboss.com.au/",
+          "status": "known",
+          "authority": "directory",
+          "source_url": "https://bloomboss.com.au/",
+          "retrieved_at": "2026-11-06"
+        }
+      ]
+    }
+  ],
+  "existing_florist_additions": []
+}

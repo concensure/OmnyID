@@ -1,0 +1,258 @@
+// @locs-version: 2.0
+import type { AfpMessage, SendAfpMessageInput } from "@/lib/api";
+import type { WeddingPlanningContext } from "@/lib/weddingNeedToKnowProbingState";
+import {
+  normalizeWeddingPlanningMetadata,
+  safeWeddingLabel,
+  type WeddingPlanningMetadata,
+} from "@/lib/weddingPlanningTemplateState";
+import { weddingSemanticObjectFromNeedToKnowContext } from "@/lib/weddingSemanticUiState";
+import { weddingAccountScopedStorageKey } from "@/lib/weddingLocalAccountScope";
+
+export const WEDDING_NEED_TO_KNOW_AFP_PROJECTIONS_KEY = "omnyid.wedding-need-to-know-afp-projections";
+
+export type WeddingNeedToKnowProjectionContext = {
+  metadata: WeddingPlanningMetadata;
+  planningContext: WeddingPlanningContext;
+  answeredLabels: string[];
+  nextQuestionLabel: string;
+  readyForFirstRecommendations: boolean;
+  projectionSaved?: boolean;
+};
+
+function clean(value: unknown): string | null {
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function uniqueStrings(values: readonly unknown[], limit = 48): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const value of values) {
+    const item = clean(value);
+    const key = item?.toLowerCase();
+    if (!item || !key || seen.has(key)) continue;
+    seen.add(key);
+    result.push(item);
+    if (result.length >= limit) break;
+  }
+  return result;
+}
+
+function projectionFingerprint(context: WeddingNeedToKnowProjectionContext): string {
+  const planning = context.planningContext ?? {};
+  const serialized = JSON.stringify({
+    dateOrSeason: clean(planning.dateOrSeason),
+    location: clean(planning.location),
+    guestCount: typeof planning.guestCount === "number" ? planning.guestCount : clean(planning.guestCount),
+    budgetComfort: clean(planning.budgetComfort),
+    topPriorities: uniqueStrings(planning.topPriorities ?? []),
+    atmosphereDescription: clean(planning.atmosphereDescription),
+    vendorCategories: uniqueStrings(planning.vendorCategories ?? []),
+    vendorPreferences: clean(planning.vendorPreferences),
+    familyOrStakeholderRoles: clean(planning.familyOrStakeholderRoles),
+    accessibilityRequirements: clean(planning.accessibilityRequirements),
+    dietaryRequirements: clean(planning.dietaryRequirements),
+  });
+  let hash = 2166136261;
+  for (let index = 0; index < serialized.length; index += 1) {
+    hash ^= serialized.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(36);
+}
+
+export function weddingNeedToKnowProjectionId(context: WeddingNeedToKnowProjectionContext): string {
+  const metadata = normalizeWeddingPlanningMetadata(context.metadata);
+  return `wedding_need_to_know:${safeWeddingLabel(metadata.responseWorkspaceId)}:${projectionFingerprint(context)}`;
+}
+
+function markdownFor(context: WeddingNeedToKnowProjectionContext): string {
+  const planning = context.planningContext ?? {};
+  return [
+    "# Wedding Need-To-Know answers",
+    "",
+    "Captured answers for this wedding plan. Use them to shape future documents, tasks, legal reminders, maps, suggested connections, and follow-up chat.",
+    "",
+    "## Captured answers",
+    "",
+    ...(context.answeredLabels.length > 0
+      ? context.answeredLabels.map((label) => `- ${label}`)
+      : ["- No answers captured yet."]),
+    "",
+    "## Next question",
+    "",
+    context.nextQuestionLabel,
+    "",
+    "## Planning context",
+    "",
+    `- Date or season: ${clean(planning.dateOrSeason) ?? "Unknown"}`,
+    `- Location: ${clean(planning.location) ?? "Unknown"}`,
+    `- Guest count: ${clean(planning.guestCount) ?? "Unknown"}`,
+    `- Budget comfort: ${clean(planning.budgetComfort) ?? "Unknown"}`,
+    `- Couple: ${clean(planning.familyOrStakeholderRoles) ?? "Unknown"}`,
+    `- Top priorities: ${planning.topPriorities?.length ? planning.topPriorities.join(", ") : "Unknown"}`,
+    `- Atmosphere: ${clean(planning.atmosphereDescription) ?? "Unknown"}`,
+    `- Inspiration image links: ${planning.inspirationImageUrls?.length ? planning.inspirationImageUrls.join(", ") : "Unknown"}`,
+    `- NOIM status: ${clean(planning.noimDownloaded) ?? "Unknown"}`,
+    `- Celebrant path: ${clean(planning.celebrantPath) ?? "Unknown"}`,
+    "",
+    "## Guardrails",
+    "",
+    "- Treat this as user-provided planning context, not verified vendor availability, legal advice, or a booking.",
+    "- Keep sensitive family, identity, health, finance, and legal-document details private unless the user explicitly shares them.",
+  ].join("\n");
+}
+
+function projectionTags(context: WeddingNeedToKnowProjectionContext): string[] {
+  const planning = context.planningContext ?? {};
+  return uniqueStrings([
+    ...context.metadata.supertags,
+    "wedding",
+    "wedding_need_to_know",
+    "wedding_context",
+    context.readyForFirstRecommendations ? "recommendations:ready" : "recommendations:needs_context",
+    clean(planning.location) ? `location:${safeWeddingLabel(planning.location)}` : null,
+    clean(planning.noimDownloaded) ? `noim:${safeWeddingLabel(planning.noimDownloaded)}` : null,
+    clean(planning.celebrantPath) ? `celebrant:${safeWeddingLabel(planning.celebrantPath)}` : null,
+  ]);
+}
+
+export function weddingNeedToKnowContextToAfpMessage(
+  context: WeddingNeedToKnowProjectionContext,
+  nowIso = new Date().toISOString(),
+): AfpMessage {
+  const metadata = normalizeWeddingPlanningMetadata(context.metadata);
+  const id = weddingNeedToKnowProjectionId({ ...context, metadata });
+  const markdown = markdownFor({ ...context, metadata });
+  const semanticObject = weddingSemanticObjectFromNeedToKnowContext({
+    id,
+    readyForFirstRecommendations: context.readyForFirstRecommendations,
+    answeredLabels: context.answeredLabels,
+    nextQuestionLabel: context.nextQuestionLabel,
+  });
+  const searchableTerms = uniqueStrings([
+    id,
+    "wedding planning",
+    "need to know",
+    "captured answers",
+    metadata.weddingPlanId,
+    metadata.responseWorkspaceId,
+    metadata.sourceResponseId,
+    ...context.answeredLabels,
+    context.nextQuestionLabel,
+    clean(context.planningContext?.dateOrSeason),
+    clean(context.planningContext?.location),
+    clean(context.planningContext?.guestCount),
+    clean(context.planningContext?.budgetComfort),
+    clean(context.planningContext?.familyOrStakeholderRoles),
+    clean(context.planningContext?.atmosphereDescription),
+    ...(context.planningContext?.inspirationImageUrls ?? []),
+    ...(context.planningContext?.topPriorities ?? []),
+    clean(context.planningContext?.noimDownloaded),
+    clean(context.planningContext?.celebrantPath),
+  ], 80);
+
+  return {
+    id: `afp-${id}`,
+    thread_id: `wedding_context:${safeWeddingLabel(metadata.responseWorkspaceId)}`,
+    from: "system://wedding-planning",
+    to: ["agent://wedding-planning", "agent://search", "agent://knowledge-graph"],
+    timestamp: nowIso,
+    type: "context",
+    kind: "note",
+    subtype: "wedding_need_to_know",
+    supertags: projectionTags({ ...context, metadata }),
+    content: {
+      kind: "wedding_need_to_know",
+      context_id: id,
+      markdown,
+      answered_labels: context.answeredLabels,
+      next_question_label: context.nextQuestionLabel,
+      ready_for_first_recommendations: context.readyForFirstRecommendations,
+      semantic_object: semanticObject,
+      planning_context: (context.planningContext ?? {}) as Record<string, unknown>,
+      wedding_plan_id: metadata.weddingPlanId,
+      response_workspace_id: metadata.responseWorkspaceId,
+      source_response_id: metadata.sourceResponseId,
+      privacy_scope: metadata.privacyScope,
+    },
+    metadata: {
+      origin: "wedding_planning",
+      projection: "wedding_need_to_know_context_to_afp",
+      wedding_plan_id: metadata.weddingPlanId,
+      response_workspace_id: metadata.responseWorkspaceId,
+      source_response_id: metadata.sourceResponseId,
+      context_id: id,
+      ready_for_first_recommendations: context.readyForFirstRecommendations,
+      semantic_kind: semanticObject.kind,
+      semantic_tags: semanticObject.semanticTags,
+      semantic_object: semanticObject,
+      searchable_terms: searchableTerms,
+    },
+    views: [{
+      format: "document",
+      priority: 1,
+      content: {
+        context_id: id,
+        title: "Wedding Need-To-Know answers",
+        markdown,
+        semantic_object: semanticObject,
+      },
+    }],
+    attachments: [],
+    references: metadata.sourceResponseId
+      ? [{ type: "wedding_response", target: metadata.sourceResponseId, label: "Source response" }]
+      : [],
+  };
+}
+
+export function weddingNeedToKnowContextToAfpSendInput(
+  context: WeddingNeedToKnowProjectionContext,
+  nowIso = new Date().toISOString(),
+): SendAfpMessageInput {
+  const message = weddingNeedToKnowContextToAfpMessage(context, nowIso);
+  return {
+    thread_id: message.thread_id,
+    from: message.from,
+    to: message.to ?? [],
+    timestamp: message.timestamp,
+    type: message.type,
+    kind: message.kind,
+    subtype: message.subtype ?? undefined,
+    content: message.content,
+    views: message.views,
+    attachments: message.attachments,
+    references: message.references,
+    supertags: message.supertags ?? [],
+    metadata: message.metadata,
+    store_in_relational: true,
+  };
+}
+
+export function loadWeddingNeedToKnowAfpProjectionIds(storage: Storage = localStorage): string[] {
+  const key = weddingAccountScopedStorageKey(WEDDING_NEED_TO_KNOW_AFP_PROJECTIONS_KEY);
+  const raw = storage.getItem(key);
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed)
+      ? parsed.filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+      : [];
+  } catch {
+    storage.removeItem(key);
+    return [];
+  }
+}
+
+export function hasSentWeddingNeedToKnowAfpProjection(id: string, storage: Storage = localStorage): boolean {
+  const cleanId = clean(id);
+  return cleanId ? loadWeddingNeedToKnowAfpProjectionIds(storage).includes(cleanId) : false;
+}
+
+export function markWeddingNeedToKnowAfpProjectionSent(id: string, storage: Storage = localStorage): void {
+  const cleanId = clean(id);
+  if (!cleanId) return;
+  const next = [...new Set([cleanId, ...loadWeddingNeedToKnowAfpProjectionIds(storage)])].slice(0, 300);
+  storage.setItem(weddingAccountScopedStorageKey(WEDDING_NEED_TO_KNOW_AFP_PROJECTIONS_KEY), JSON.stringify(next));
+}

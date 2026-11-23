@@ -1,0 +1,51 @@
+{
+  "name": "OmnyID Workspace",
+  "short_name": "OmnyID",
+  "description": "Your adaptive agentic workspace — chat, plan, compose, and automate across any device.",
+  "start_url": "/workspace/",
+  "scope": "/workspace/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f9f9f7",
+  "theme_color": "#31568e",
+  "categories": ["productivity", "utilities", "business"],
+  "icons": [
+    {
+      "src": "/workspace/icons/icon-192.png?v=20260630",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/workspace/icons/icon-512.png?v=20260630",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Chat",
+      "short_name": "Chat",
+      "description": "Open the agent chat",
+      "url": "/workspace/?v=search",
+      "icons": [{ "src": "/workspace/icons/icon-192.png?v=20260630", "sizes": "192x192" }]
+    },
+    {
+      "name": "Email",
+      "short_name": "Email",
+      "description": "Open your inbox",
+      "url": "/workspace/?v=email",
+      "icons": [{ "src": "/workspace/icons/icon-192.png?v=20260630", "sizes": "192x192" }]
+    },
+    {
+      "name": "Social",
+      "short_name": "Social",
+      "description": "Compose and publish posts",
+      "url": "/workspace/?v=social",
+      "icons": [{ "src": "/workspace/icons/icon-192.png?v=20260630", "sizes": "192x192" }]
+    }
+  ],
+  "screenshots": [],
+  "prefer_related_applications": false
+}

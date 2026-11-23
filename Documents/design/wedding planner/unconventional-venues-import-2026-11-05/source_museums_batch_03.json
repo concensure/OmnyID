@@ -1,0 +1,571 @@
+[
+  {
+    "vendor_name": "Australian Museum",
+    "special_category": [
+      "museum"
+    ],
+    "special_subtype": [
+      "natural history museum",
+      "heritage building"
+    ],
+    "service_area": "Sydney CBD, NSW",
+    "address": "1 William Street, Sydney NSW 2010",
+    "website_url": "https://australian.museum/visit/venue-hire/wedding-venues/",
+    "contact_phone": "(02) 9320 6336",
+    "contact_email": "functions@australian.museum",
+    "capacity_seated_max": 270,
+    "capacity_standing_max": 550,
+    "capacity_note": "Hintze Hall 270 seated / 550 drinks; Harbour View Room 1 (rooftop) 120 seated / 200; Westpac Long Gallery 80 seated / 150 (no amplified music or dancing); Wild Planet 60 seated / 200; Harbour View Room 2 50 seated / 100.",
+    "price_note": "No prices published. The Fresh Collective is the exclusive caterer.",
+    "style_tags": [
+      "museum",
+      "natural history",
+      "heritage",
+      "sandstone",
+      "grand hall",
+      "rooftop",
+      "harbour views",
+      "unconventional",
+      "CBD",
+      "Hyde Park",
+      "ceremony and reception",
+      "exclusive caterer",
+      "Wild Planet",
+      "conversation starter"
+    ],
+    "editorial_summary": "A sandstone natural history museum in the city with five hire spaces, from a grand central hall to a rooftop room with harbour views and a gallery lined with animal displays. Ceremonies and receptions are both offered, though the caterer is fixed and the long gallery bans amplified music and dancing.",
+    "sources": [
+      "https://australian.museum/visit/venue-hire/wedding-venues/",
+      "https://australian.museum/visit/functions-venues/"
+    ],
+    "flags": [
+      "exclusive_caterer",
+      "ceremony_capacity_not_stated"
+    ]
+  },
+  {
+    "vendor_name": "Australian National Maritime Museum",
+    "special_category": [
+      "museum"
+    ],
+    "special_subtype": [
+      "maritime museum",
+      "waterfront",
+      "warship"
+    ],
+    "service_area": "Darling Harbour, Sydney NSW",
+    "address": "2 Murray Street, Darling Harbour, Sydney NSW 2000",
+    "website_url": "https://www.sea.museum/venues/weddings",
+    "contact_phone": "(02) 9298 3777",
+    "contact_email": "info@sea.museum",
+    "capacity_seated_max": 270,
+    "capacity_standing_max": 400,
+    "capacity_note": "Ben Lexcen Terrace 270 seated / 400 cocktail; Lighthouse Gallery 250 / 400; Terrace Room 130 / 250; HMAS Vampire 50 / 120. The caterer's own page lists HarbourWatch North at 650 cocktail. A 2021 brochure gave ceremony capacities of 100 (boardwalk and terrace); current ceremony numbers need confirming.",
+    "price_note": "No prices published. SRG Hospitality is the in-house caterer; corkage applies to BYO drinks; extra fees for room flips and bars over 200 guests.",
+    "style_tags": [
+      "museum",
+      "maritime",
+      "waterfront",
+      "Darling Harbour",
+      "warship",
+      "rooftop terrace",
+      "harbour views",
+      "unconventional",
+      "boardwalk ceremony",
+      "city views",
+      "in-house caterer",
+      "ceremony and reception"
+    ],
+    "editorial_summary": "A waterfront museum on Darling Harbour where couples can marry on the boardwalk or terrace and hold the reception in galleries, a rooftop room or on board a decommissioned navy destroyer. Catering runs through an in-house partner. Contacts here are the museum's general line because no current venue-specific number is published.",
+    "sources": [
+      "https://www.sea.museum/venues/weddings",
+      "https://www.sea.museum/en/about/contact-us",
+      "https://srghospitality.com.au/venue/srg-at-the-australian-national-maritime-museum/"
+    ],
+    "flags": [
+      "contact_is_general_museum_line",
+      "possible_venues_email_venues_at_sea_museum_unverified",
+      "capacity_conflict_between_sources",
+      "ceremony_capacity_unconfirmed"
+    ]
+  },
+  {
+    "vendor_name": "Museum of Contemporary Art Australia (MCA)",
+    "special_category": [
+      "museum",
+      "gallery"
+    ],
+    "special_subtype": [
+      "contemporary art museum",
+      "harbourfront",
+      "rooftop"
+    ],
+    "service_area": "The Rocks, Sydney NSW",
+    "address": "140 George Street, The Rocks, Sydney NSW 2000",
+    "website_url": "https://www.mca.com.au/venue-hire/weddings-mca/",
+    "contact_phone": "(02) 8229 0500",
+    "contact_email": "mcavenues@thebiggroup.com.au",
+    "capacity_seated_max": 300,
+    "capacity_standing_max": 750,
+    "capacity_note": "Foundation Hall 100-300 seated / 150-750 cocktail (wedding 100-240); Harbourside Room 100-200 seated / 100-300; Quayside Room 50-120 / 50-200; Sculpture Terrace up to 60 for a wedding.",
+    "price_note": "No prices published; The Big Group is the exclusive caterer. Couples booking a reception get exclusive in-gallery photo access (extra fee).",
+    "style_tags": [
+      "museum",
+      "gallery",
+      "contemporary art",
+      "harbourfront",
+      "Opera House views",
+      "Harbour Bridge views",
+      "rooftop terrace",
+      "ballroom",
+      "The Rocks",
+      "unconventional",
+      "photo in gallery",
+      "exclusive caterer",
+      "glamorous"
+    ],
+    "editorial_summary": "A contemporary art museum on Circular Quay with a former harbour-authority ballroom, two rooftop rooms and a sculpture terrace, all facing the Opera House and Harbour Bridge. Couples booking a reception can add private photos among the artworks. Catering is through one exclusive provider.",
+    "sources": [
+      "https://www.mca.com.au/venue-hire/weddings-mca/",
+      "https://www.mca.com.au/venue-hire/foundation-hall/",
+      "https://www.mca.com.au/venue-hire/harbourside-room/"
+    ],
+    "flags": [
+      "exclusive_caterer"
+    ]
+  },
+  {
+    "vendor_name": "Hyde Park Barracks Museum",
+    "special_category": [
+      "museum"
+    ],
+    "special_subtype": [
+      "convict heritage",
+      "world heritage building",
+      "courtyard marquee"
+    ],
+    "service_area": "Sydney CBD, NSW",
+    "address": "Queens Square, Macquarie Street, Sydney NSW 2000",
+    "website_url": "https://mhnsw.au/venue-hire/hyde-park-barracks/content/hyde-park-barracks-weddings/",
+    "contact_phone": "(02) 8239 2311",
+    "contact_email": "venues@mhnsw.au",
+    "capacity_seated_max": 250,
+    "capacity_standing_max": 500,
+    "capacity_note": "Southern Courtyard marquee: 250 long banquet / 210 round tables / 500 cocktail, including the wedding party. Ceremony only inside your own marquee for cocktail receptions; sit-down dinners need an offsite ceremony.",
+    "price_note": "No prices published; a wedding package is on request, hire is charged over three days (set-up, event, pack-down) plus a bond. Pearl Catering is the on-site partner; Gold Licence caterers by application.",
+    "style_tags": [
+      "museum",
+      "heritage",
+      "convict history",
+      "World Heritage",
+      "sandstone courtyard",
+      "marquee reception",
+      "CBD",
+      "Macquarie Street",
+      "historic",
+      "unconventional",
+      "evening events",
+      "large guest list"
+    ],
+    "editorial_summary": "A Georgian sandstone barracks museum on Macquarie Street with a courtyard where a marquee reception is built for up to 500 standing or 250 seated. Evenings only, and a seated dinner needs the ceremony held elsewhere, such as at The Mint.",
+    "sources": [
+      "https://mhnsw.au/venue-hire/hyde-park-barracks/content/hyde-park-barracks-weddings/",
+      "https://mhnsw.au/visit-us/hyde-park-barracks/"
+    ],
+    "flags": [
+      "shared_venue_hire_team_mhnsw",
+      "reception_only_marquee"
+    ]
+  },
+  {
+    "vendor_name": "Elizabeth Bay House",
+    "special_category": [
+      "museum"
+    ],
+    "special_subtype": [
+      "historic house museum",
+      "colonial house"
+    ],
+    "service_area": "Elizabeth Bay, Sydney NSW",
+    "address": "7 Onslow Avenue, Elizabeth Bay NSW 2011",
+    "website_url": "https://mhnsw.au/venue-hire/elizabeth-bay-house/content/elizabeth-bay-house-weddings/",
+    "contact_phone": "(02) 9356 3022",
+    "contact_email": "venues@mhnsw.au",
+    "capacity_seated_max": 40,
+    "capacity_standing_max": 100,
+    "capacity_note": "Ceremony: 100 in the Saloon, 40 in the Dining Room. Hall and Saloon 40 seated (oval banquet) / 100 cocktail; Cellar 36 seated / 40 cocktail. All events finish by 10:30pm; upstairs wedding room is not accessible.",
+    "price_note": "Hire fee not published; overtime from $465 inc GST per hour. 50% deposit within 14 days. Gold Licence caterer panel; BYO alcohol not allowed; florals and styling need approval a month ahead.",
+    "style_tags": [
+      "museum",
+      "historic house",
+      "colonial",
+      "harbour views",
+      "domed saloon",
+      "sweeping staircase",
+      "intimate",
+      "small wedding",
+      "Elizabeth Bay",
+      "heritage",
+      "unconventional",
+      "ceremony and reception",
+      "10:30pm finish"
+    ],
+    "editorial_summary": "An 1830s harbourside house museum with a domed saloon and a sweeping staircase, hosting small ceremonies and receptions of up to about 100 guests. Strict heritage rules apply: no BYO alcohol, no open flames, approved caterers only, and a finish by 10:30pm.",
+    "sources": [
+      "https://mhnsw.au/venue-hire/elizabeth-bay-house/content/elizabeth-bay-house-weddings/",
+      "https://mhnsw.au/visit-us/elizabeth-bay-house/"
+    ],
+    "flags": [
+      "shared_venue_hire_team_mhnsw",
+      "upstairs_not_accessible"
+    ]
+  },
+  {
+    "vendor_name": "The Mint",
+    "special_category": [
+      "museum"
+    ],
+    "special_subtype": [
+      "historic house museum",
+      "colonial mint"
+    ],
+    "service_area": "Sydney CBD, NSW",
+    "address": null,
+    "website_url": null,
+    "contact_phone": null,
+    "contact_email": null,
+    "capacity_note": null,
+    "price_note": null,
+    "style_tags": [
+      "museum",
+      "heritage",
+      "historic",
+      "courtyard ceremony",
+      "CBD",
+      "Macquarie Street"
+    ],
+    "editorial_summary": "A colonial-era mint run by Museums of History NSW, with a courtyard and lawn ceremony area for up to 180 guests and a wet-weather bar for 100.",
+    "sources": [
+      "https://mhnsw.au/venue-hire/the-mint/content/mint-weddings/"
+    ],
+    "flags": [
+      "tag_only_existing_venue"
+    ]
+  },
+  {
+    "vendor_name": "Estate Vaucluse House",
+    "special_category": [
+      "museum"
+    ],
+    "special_subtype": [
+      "historic house museum"
+    ],
+    "service_area": "Vaucluse, Sydney NSW",
+    "address": null,
+    "website_url": null,
+    "contact_phone": null,
+    "contact_email": null,
+    "capacity_note": null,
+    "price_note": null,
+    "style_tags": [
+      "museum",
+      "historic house",
+      "heritage",
+      "gardens",
+      "Vaucluse"
+    ],
+    "editorial_summary": "A Gothic Revival house museum with gardens, run by Museums of History NSW and booked through the same venue team as The Mint.",
+    "sources": [
+      "https://mhnsw.au/venue-hire/vaucluse-house/content/vaucluse-house-weddings/"
+    ],
+    "flags": [
+      "tag_only_existing_venue",
+      "shared_venue_hire_team_mhnsw"
+    ]
+  },
+  {
+    "vendor_name": "Art Gallery of NSW",
+    "special_category": [
+      "gallery"
+    ],
+    "special_subtype": [
+      "state art gallery"
+    ],
+    "service_area": "Sydney CBD, NSW",
+    "address": null,
+    "website_url": null,
+    "contact_phone": null,
+    "contact_email": null,
+    "capacity_note": null,
+    "price_note": null,
+    "style_tags": [
+      "gallery",
+      "art gallery",
+      "contemporary art",
+      "Domain",
+      "harbour views",
+      "unconventional"
+    ],
+    "editorial_summary": "The state art gallery, offering a restaurant and function space, Sydney Modern Hall for up to about 250, and short exclusive ceremonies alongside a reception.",
+    "sources": [
+      "https://www.artgallery.nsw.gov.au/visit/venue-hire/spaces/"
+    ],
+    "flags": [
+      "tag_only_existing_venue"
+    ]
+  },
+  {
+    "vendor_name": "State Library of NSW",
+    "special_category": [
+      "library"
+    ],
+    "special_subtype": [
+      "heritage reading room"
+    ],
+    "service_area": "Sydney CBD, NSW",
+    "address": null,
+    "website_url": null,
+    "contact_phone": null,
+    "contact_email": null,
+    "capacity_note": null,
+    "price_note": null,
+    "style_tags": [
+      "library",
+      "heritage",
+      "reading room",
+      "Macquarie Street",
+      "historic",
+      "books",
+      "unconventional",
+      "exclusive caterer"
+    ],
+    "editorial_summary": "A heritage library whose historic Mitchell building hosts weddings in the Friends Room (a former reading room) and Gallery Room; catering is through an exclusive contractor and wedding photography is outside opening hours.",
+    "sources": [
+      "https://www.sl.nsw.gov.au/about/services/venue-hire"
+    ],
+    "flags": [
+      "tag_only_existing_venue"
+    ]
+  },
+  {
+    "vendor_name": "Penrith Regional Gallery & The Lewers Bequest",
+    "special_category": [
+      "gallery"
+    ],
+    "special_subtype": [
+      "regional art gallery",
+      "sculpture gardens",
+      "heritage gardens"
+    ],
+    "service_area": "Emu Plains, Penrith NSW",
+    "address": "86 River Road, Emu Plains NSW 2750",
+    "website_url": "https://www.penrithregionalgallery.com.au/hire-our-venue/weddings-special-events/",
+    "contact_phone": "(02) 4735 1100",
+    "contact_email": "galleryfunctions@ppandva.com.au",
+    "capacity_seated_max": 100,
+    "capacity_standing_max": 120,
+    "capacity_note": "100 sit-down or 120 canapes; minimum 40 guests. Private hire 4:00pm-10:30pm with a 3-hour minimum; bar closes about 9:30pm.",
+    "price_note": "Catering packages from $60 per person (cafe is the required caterer, no BYO, cake service $4pp); photography access $220 for 4 hours; no separate hire fee listed.",
+    "style_tags": [
+      "gallery",
+      "art gallery",
+      "sculpture garden",
+      "heritage gardens",
+      "riverside",
+      "Nepean River",
+      "garden ceremony",
+      "canopy reception",
+      "Penrith",
+      "Western Sydney",
+      "intimate",
+      "romantic",
+      "exclusive caterer",
+      "unconventional"
+    ],
+    "editorial_summary": "Two acres of heritage gardens beside the Nepean River, filled with sculpture and mosaics, with a garden ceremony and a covered sandstone-and-cedar canopy reception beside a regional gallery. Private evening hire for 40 to about 100 guests, with the on-site cafe as the required caterer.",
+    "sources": [
+      "https://www.penrithregionalgallery.com.au/hire-our-venue/weddings-special-events/",
+      "https://www.penrithregionalgallery.com.au/about-us/contact-us"
+    ],
+    "flags": [
+      "exclusive_caterer",
+      "email_conflict_penrith_city_snippet_unverified"
+    ]
+  },
+  {
+    "vendor_name": "Hazel Kitchen & Bar",
+    "special_category": [
+      "gallery"
+    ],
+    "special_subtype": [
+      "arts centre",
+      "heritage cottage",
+      "gallery restaurant"
+    ],
+    "service_area": "Gymea, Sutherland Shire NSW",
+    "address": "782 Kingsway, Gymea NSW 2227",
+    "website_url": "https://www.hazelgymea.com/weddings/",
+    "contact_phone": "0409 658 357",
+    "contact_email": null,
+    "capacity_seated_max": 120,
+    "capacity_standing_max": 180,
+    "capacity_note": "Venue pages disagree: up to 130 seated / 180 cocktail on the weddings page, 120 / 200 in the FAQ; Garden Room up to 50. Lower figures stored.",
+    "price_note": "Packages by enquiry; weekend 10% surcharge. Council garden ceremony hire is $620 for 2 hours (GST incl., valid to 30 June 2027) plus staffing $87 per hour and $215 cleaning.",
+    "style_tags": [
+      "gallery",
+      "arts centre",
+      "art deco",
+      "heritage cottage",
+      "gardens",
+      "garden ceremony",
+      "restaurant venue",
+      "marble bar",
+      "exclusive use",
+      "dog friendly gardens",
+      "Gymea",
+      "Sutherland Shire",
+      "romantic",
+      "unconventional"
+    ],
+    "editorial_summary": "A restaurant and reception space inside a regional arts centre built around an Art Deco cottage and gardens, with a garden ceremony option and exclusive use on the wedding day. The restaurant is the caterer; the council hires the gardens for ceremonies separately.",
+    "sources": [
+      "https://www.hazelgymea.com/weddings/",
+      "https://www.hazelgymea.com/faq/",
+      "https://hazelhurst.sutherlandshire.nsw.gov.au/about-us/venue-and-garden-hire/hazelhurst-gardens"
+    ],
+    "flags": [
+      "needs_contact_lookup",
+      "postcode_inferred",
+      "capacity_conflict_between_pages",
+      "email_missing_form_only",
+      "council_garden_hire_separate_from_restaurant"
+    ]
+  },
+  {
+    "vendor_name": "Campbelltown Arts Centre",
+    "special_category": [
+      "gallery"
+    ],
+    "special_subtype": [
+      "contemporary arts centre",
+      "performance studio",
+      "sculpture gardens"
+    ],
+    "service_area": "Campbelltown, Macarthur NSW",
+    "address": "1 Art Gallery Road, Campbelltown NSW 2560",
+    "website_url": "https://www.campbelltown.nsw.gov.au/Services-and-Facilities/Facilities-for-Hire/Campbelltown-Arts-Centre-Performance-Studio",
+    "contact_phone": "(02) 4645 4100",
+    "contact_email": "artscentre@campbelltown.nsw.gov.au",
+    "capacity_seated_max": 180,
+    "capacity_standing_max": 350,
+    "capacity_note": "Performance Studio: up to 180 seated (tiered bank lists 200 seats) / 350 standing. Sculpture Gardens hireable by the half or full day, capacity not stated. Hire window 8:30am-4:30pm unless extended for a fee.",
+    "price_note": "Fees are in the council 2026-27 fees and charges PDF; amounts not read.",
+    "style_tags": [
+      "gallery",
+      "arts centre",
+      "contemporary art",
+      "sculpture gardens",
+      "performance studio",
+      "air conditioned",
+      "daytime wedding",
+      "Campbelltown",
+      "Macarthur",
+      "Western Sydney",
+      "unconventional",
+      "tiered seating"
+    ],
+    "editorial_summary": "A council-run contemporary arts centre whose air-conditioned performance studio and sculpture gardens can be hired for functions, with the studio page naming weddings. Daytime hire by default, so it suits a lunch or afternoon celebration; ceremony and catering rules are not published.",
+    "sources": [
+      "https://www.campbelltown.nsw.gov.au/Services-and-Facilities/Facilities-for-Hire/Campbelltown-Arts-Centre-Performance-Studio",
+      "https://www.campbelltown.nsw.gov.au/Services-and-Facilities/Facilities-for-Hire/Campbelltown-Arts-Centre-Sculpture-Gardens"
+    ],
+    "flags": [
+      "verify_weddings_accepted",
+      "weddings_named_on_studio_page_only",
+      "catering_rules_not_stated",
+      "daytime_hire_window"
+    ]
+  },
+  {
+    "vendor_name": "Barnet Long Room at Customs House",
+    "special_category": [
+      "library"
+    ],
+    "special_subtype": [
+      "customs house library building",
+      "function room",
+      "harbour views"
+    ],
+    "service_area": "Circular Quay, Sydney NSW",
+    "address": "31 Alfred Street, Sydney NSW 2000",
+    "website_url": "https://www.cityofsydney.nsw.gov.au/hireable-indoor-spaces/barnet-long-room-customs-house",
+    "contact_phone": "(02) 9265 9189",
+    "contact_email": "council@cityofsydney.nsw.gov.au",
+    "capacity_seated_max": null,
+    "capacity_standing_max": null,
+    "capacity_note": "About 200 guests in total across four linked spaces (balcony, boardroom, pre-function lounge, main hall); seated/standing split not stated.",
+    "price_note": "Minimum hire: $2,272 standard (8 hours), $2,650 evening (5 hours), $1,700 half day (4 hours). Food and drink must come from the caterer nominated by the City of Sydney; no BYO.",
+    "style_tags": [
+      "library building",
+      "Customs House",
+      "heritage",
+      "Circular Quay",
+      "harbour views",
+      "function room",
+      "stage",
+      "exclusive caterer",
+      "CBD",
+      "historic",
+      "unconventional"
+    ],
+    "editorial_summary": "A first-floor function room in the heritage Customs House above Circular Quay, listed by the City of Sydney with weddings among permitted uses. It has permanent staging at each end and harbour views, but all catering goes through the council's nominated caterer. Ceremony rules are not stated.",
+    "sources": [
+      "https://www.cityofsydney.nsw.gov.au/hireable-indoor-spaces/barnet-long-room-customs-house",
+      "https://www.cityofsydney.nsw.gov.au/libraries/customs-house-library"
+    ],
+    "flags": [
+      "exclusive_caterer",
+      "contact_is_general_council",
+      "ceremony_not_stated",
+      "capacity_split_not_published",
+      "library_itself_not_for_hire"
+    ]
+  },
+  {
+    "vendor_name": "Rouse Hill Estate",
+    "special_category": [
+      "museum"
+    ],
+    "special_subtype": [
+      "historic farm estate",
+      "colonial homestead"
+    ],
+    "service_area": "Rouse Hill, Hills District NSW",
+    "editorial_summary": "A 13-hectare colonial house-and-farm museum run by Museums of History NSW. Ceremonies of up to 80 guests are held on the carriage loop, in the summerhouse or the Stables, with approved Gold Licence caterers only and heritage rules on red wine and menus.",
+    "style_tags": [
+      "museum",
+      "historic farm",
+      "colonial",
+      "gardens",
+      "rustic",
+      "carriage loop ceremony",
+      "heritage",
+      "Hills District",
+      "mountain views",
+      "vintage farm machinery"
+    ],
+    "sources": [
+      "https://www.mhnsw.au/venue-hire/rouse-hill-estate/content/rouse-hill-weddings/"
+    ],
+    "flags": [
+      "tag_only_existing_venue",
+      "shared_venue_hire_team_mhnsw"
+    ],
+    "address": null,
+    "website_url": null,
+    "contact_phone": null,
+    "contact_email": null,
+    "capacity_note": null,
+    "price_note": null
+  }
+]

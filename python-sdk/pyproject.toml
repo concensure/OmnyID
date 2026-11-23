@@ -7,12 +7,12 @@ name = "afp"
 version = "1.0.0"
 description = "Agent Forward Protocol (AFP) Python SDK for OmnyID homeservers"
 readme = "README.md"
-license = { text = "Apache-2.0" }
+license = { text = "MIT" }
 requires-python = ">=3.14,<3.15"
 dependencies = ["httpx", "pydantic", "ulid-py", "pynacl", "websockets", "aioquic"]
 
 [project.urls]
-Repository = "https://github.com/concensure/OmnyID"
+Repository = "https://github.com/omnyid/homeserver"
 
 [tool.setuptools.packages.find]
 where = ["."]

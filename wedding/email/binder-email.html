@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Your Wedding Day Binder</title>
+</head>
+<body style="margin:0;padding:0;background:#FAF7F2;">
+<!-- Template for POST /wedding/binder. Placeholders: download, continuation, reading, confirmation
+     and privacy URLs. The block between MARKETING markers is included only when the
+     visitor ticked the tips box. Inline styles and tables on purpose: email clients ignore most CSS. -->
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:#FAF7F2;">
+  Your free 40-page Wedding Day Binder: download links inside. No account needed.
+</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#FAF7F2;">
+  <tr><td align="center" style="padding:24px 12px;">
+    <table role="presentation" width="600" cellpadding="0" cellspacing="0"
+           style="width:100%;max-width:600px;background:#FFFFFF;border:1px solid #E8E2D9;border-radius:12px;">
+      <tr><td style="height:6px;background:#0F5F5A;border-radius:12px 12px 0 0;font-size:0;line-height:0;">&nbsp;</td></tr>
+      <tr><td style="padding:28px 32px 4px 32px;font-family:Georgia,'Times New Roman',serif;font-size:15px;color:#0F5F5A;font-weight:bold;">
+        OmnyID Weddings
+      </td></tr>
+      <tr><td style="padding:4px 32px 0 32px;font-family:Georgia,'Times New Roman',serif;font-size:28px;line-height:34px;color:#1F1A17;font-weight:bold;">
+        Your Wedding Day Binder is ready
+      </td></tr>
+      <tr><td style="padding:12px 32px 0 32px;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:24px;color:#1F1A17;">
+        Forty A4 pages for the day itself: timelines, vendor contacts, ceremony paperwork, guest
+        notes, venue and setup, money, a Plan B, and what to do after. Two versions, so use
+        whichever suits you.
+      </td></tr>
+
+      <tr><td align="center" style="padding:20px 32px 4px 32px;">
+        <img src="{{COVER_URL}}" width="260" alt="The cover of the Wedding Day Binder, a couple embracing beside a lake, with the title Our Wedding Day"
+             style="display:block;width:260px;max-width:100%;height:auto;border:1px solid #E8E2D9;border-radius:8px;">
+      </td></tr>
+
+      <tr><td style="padding:20px 32px 0 32px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+          <tr><td style="background:#0F5F5A;border-radius:8px;text-align:center;">
+            <a href="{{FILLABLE_URL}}" style="display:block;padding:15px 20px;font-family:Arial,Helvetica,sans-serif;font-size:16px;font-weight:bold;color:#FAF7F2;text-decoration:none;">
+              Download the fillable PDF
+            </a>
+          </td></tr>
+        </table>
+        <div style="padding:6px 2px 0 2px;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:19px;color:#5E554C;">
+          About 14 MB. Type straight into it on a computer.
+        </div>
+      </td></tr>
+
+      <tr><td style="padding:16px 32px 0 32px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+          <tr><td style="border:2px solid #274B77;border-radius:8px;text-align:center;">
+            <a href="{{PRINT_URL}}" style="display:block;padding:13px 20px;font-family:Arial,Helvetica,sans-serif;font-size:16px;font-weight:bold;color:#274B77;text-decoration:none;">
+              Download the print PDF
+            </a>
+          </td></tr>
+        </table>
+        <div style="padding:6px 2px 0 2px;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:19px;color:#5E554C;">
+          About 10 MB. Clean pages for printing on A4 and writing by hand.
+        </div>
+      </td></tr>
+
+      <tr><td style="padding:24px 32px 0 32px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F1F7F6;border-left:4px solid #0F5F5A;border-radius:8px;">
+          <tr><td style="padding:14px 16px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:21px;color:#1F1A17;">
+            <strong>Start on the cover.</strong> Type both of your names there once, and they fill in
+            everywhere else in the binder.
+          </td></tr>
+        </table>
+      </td></tr>
+
+      <tr><td style="padding:16px 32px 0 32px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:21px;color:#5E554C;">
+        Your PDF viewer may tint the fillable boxes on screen. That tint does not print. If your app
+        opens the file as a flat page without boxes, use the print version and write by hand.
+        The binder gives general information only; check legal requirements for your ceremony
+        with your celebrant.
+      </td></tr>
+
+      <tr><td style="padding:24px 32px 0 32px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F7F3ED;border-radius:8px;">
+          <tr><td style="padding:18px 16px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;color:#1F1A17;">
+            <strong>Want the binder connected to the rest of your plan?</strong><br>
+            Keep the run sheet, vendors, budget and follow-ups together in a free workspace.
+            <table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:12px;">
+              <tr><td style="background:#274B77;border-radius:8px;">
+                <a href="{{CONTINUE_URL}}" style="display:inline-block;padding:12px 18px;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:bold;color:#FFFFFF;text-decoration:none;">
+                  Continue in OmnyID Wedding
+                </a>
+              </td></tr>
+            </table>
+          </td></tr>
+        </table>
+      </td></tr>
+
+      <tr><td style="padding:20px 32px 0 32px;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:20px;color:#5E554C;">
+        <strong style="color:#1F1A17;">Useful later, when venue quotes arrive</strong><br>
+        <a href="{{READING_URL_1}}" style="color:#274B77;text-decoration:underline;">{{READING_TITLE_1}}</a><br>
+        <a href="{{READING_URL_2}}" style="color:#274B77;text-decoration:underline;">{{READING_TITLE_2}}</a><br>
+        <a href="{{READING_URL_3}}" style="color:#274B77;text-decoration:underline;">{{READING_TITLE_3}}</a>
+      </td></tr>
+
+      <!-- MARKETING:START (include only if the visitor ticked "planning tips") -->
+      <tr><td style="padding:24px 32px 28px 32px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #E8E2D9;border-radius:8px;">
+          <tr><td style="padding:16px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:21px;color:#1F1A17;">
+            <strong>You asked for occasional planning tips.</strong><br>
+            Please confirm so we know it was you. We will not send them until you do.
+            <table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:12px;">
+              <tr><td style="background:#0F5F5A;border-radius:8px;">
+                <a href="{{CONFIRM_URL}}" style="display:inline-block;padding:11px 18px;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:bold;color:#FAF7F2;text-decoration:none;">
+                  Yes, send me planning tips
+                </a>
+              </td></tr>
+            </table>
+          </td></tr>
+        </table>
+      </td></tr>
+      <!-- MARKETING:END -->
+
+      <tr><td style="padding:24px 32px 28px 32px;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:18px;color:#6E655B;border-top:1px solid #E8E2D9;">
+        You are getting this one email because someone asked for the Wedding Day Binder at
+        omnyid.com/wedding using this address. If that was not you, you can ignore it; nothing else
+        will be sent.<br><br>
+        OmnyID &middot; <a href="mailto:hello@omnyid.com" style="color:#274B77;">hello@omnyid.com</a>
+        &middot; <a href="{{PRIVACY_URL}}" style="color:#274B77;">Privacy</a>
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+<script src="/wedding/assets/js/wedding-agent.js?v=20261119-377" defer></script>
+</body>
+</html>

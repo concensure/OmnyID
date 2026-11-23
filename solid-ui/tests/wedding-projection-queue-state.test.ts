@@ -1,0 +1,530 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { buildWeddingArtifactGenerationState } from "@/lib/weddingArtifactGenerationState";
+import { markWeddingArtifactAfpProjectionSent } from "@/lib/weddingArtifactAfpProjectionState";
+import {
+  WEDDING_CALENDAR_AFP_PROJECTIONS_KEY,
+  WEDDING_TASK_AFP_PROJECTIONS_KEY,
+  markWeddingProjectionSent,
+  type WeddingPlanningScheduleItem,
+  type WeddingPlanningTaskItem,
+} from "@/lib/weddingCalendarProjectionState";
+import { markWeddingNeedToKnowAfpProjectionSent, weddingNeedToKnowProjectionId } from "@/lib/weddingNeedToKnowAfpProjectionState";
+import { markWeddingIntakeProfileAfpProjectionSent, weddingIntakeProfileProjectionId } from "@/lib/weddingIntakeProfileAfpProjectionState";
+import { buildWeddingCollaborationState } from "@/lib/weddingCollaborationState";
+import {
+  buildWeddingProjectionQueueSelectionState,
+  buildWeddingProjectionQueueState,
+  WEDDING_BOUNDARY_AFP_PROJECTIONS_KEY,
+} from "@/lib/weddingProjectionQueueState";
+import { buildWeddingTemplateFollowUpState } from "@/lib/weddingTemplateFollowUpState";
+import type { WeddingBoundaryPolicy } from "@/lib/weddingBoundaryLedgerState";
+import { buildWeddingPreferenceConflictState } from "@/lib/weddingPreferenceConflictState";
+import { markWeddingPreferenceConflictAfpProjectionSent } from "@/lib/weddingPreferenceConflictAfpProjectionState";
+
+function memoryStorage(): Storage {
+  const values = new Map<string, string>();
+  return {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => values.set(key, value),
+    removeItem: (key: string) => values.delete(key),
+  } as Storage;
+}
+
+const metadata = {
+  weddingPlanId: "plan-1",
+  responseWorkspaceId: "workspace-1",
+  sourceResponseId: "response-1",
+};
+
+function artifacts() {
+  return buildWeddingArtifactGenerationState({
+    metadata,
+    researchNotes: ["Shortlist garden venues."],
+    vendors: [{ name: "Garden House", category: "Venue", location: "Sydney" }],
+  }).artifacts;
+}
+
+function contextItem(storage = memoryStorage()) {
+  return buildWeddingTemplateFollowUpState({
+    weddingPlanId: "plan-1",
+    responseWorkspaceId: "workspace-1",
+    dateOrSeason: "2027-10-03",
+    location: "Sydney",
+    guestCount: 80,
+    projectionStorage: storage,
+  }).contextProjection;
+}
+
+const scheduleItem: WeddingPlanningScheduleItem = {
+  id: "venue-tour-1",
+  title: "Venue tour",
+  kind: "venue_tour",
+  startAt: "2026-10-01T09:00:00.000Z",
+  location: "Sydney",
+  metadata,
+};
+
+const taskItem: WeddingPlanningTaskItem = {
+  id: "budget-review-1",
+  title: "Review venue budget",
+  kind: "budget_review",
+  dueLabel: "This week",
+  priority: "high",
+  metadata,
+};
+
+const boundaryPolicy: WeddingBoundaryPolicy = {
+  id: "policy:no-extra-plus-ones",
+  kind: "wedding_boundary_policy",
+  title: "No extra plus-ones",
+  status: "active",
+  visibility: "family_visible",
+  ruleType: "plus_one",
+  enforcement: "require_approval",
+  plainLanguage: "Extra plus-ones stay as suggestions until both people in the couple approve them.",
+};
+
+const decisionItem = {
+  id: "wedding_decision:workspace:venue:harbour-house",
+  metadata: {
+    wedding_plan_id: "wedding_plan:harbour",
+    response_workspace_id: "response_workspace:planning-pass",
+    source_response_id: "afp:response-1",
+  },
+  artifactId: "artifact:venue-shortlist",
+  artifactTitle: "Venue shortlist",
+  artifactKind: "vendor_table",
+  sourceLabels: ["Source linked"],
+  sourceUrls: ["https://example.com/harbour-house"],
+  sourceProviderLabels: ["google_places"],
+  sourceCountsByProvider: { google_places: 1 },
+  selectedOption: {
+    id: "0:harbour-house",
+    rowIndex: 0,
+    label: "Harbour House",
+    detail: "Sydney - water view and indoor backup",
+    cells: ["Harbour House", "Sydney", "Available"],
+    columnCells: [
+      { header: "Supplier", label: "Option", kind: "option", value: "Harbour House" },
+      { header: "Location", label: "Location", kind: "location", value: "Sydney" },
+      { header: "Availability", label: "Availability", kind: "availability", value: "Available" },
+    ],
+    selected: true,
+    preferenceFitLabels: ["wet-weather backup"],
+    missingPreferenceLabels: [],
+    tradeoffLabels: [],
+    preferenceSummaryLabel: "1 preference fit signal",
+  },
+  reportScope: {
+    status: "scoped_ready" as const,
+    selectedOptionId: "0:harbour-house",
+    selectedOptionLabel: "Harbour House",
+    collapseAlternatives: true,
+    includeAlternativesAsAudit: true,
+    reportInstructionLabel: "Use Harbour House as the primary scope.",
+    blockerLabels: [],
+    auditContextLabels: [],
+    nextActionLabels: ["Draft venue follow-up."],
+  },
+  source: "local_selection" as const,
+};
+
+test("buildWeddingProjectionQueueState aggregates pending artifact calendar and task send inputs", () => {
+  const state = buildWeddingProjectionQueueState({
+    contextItems: [contextItem()],
+    artifacts: artifacts().slice(0, 1),
+    scheduleItems: [scheduleItem],
+    taskItems: [taskItem],
+    nowIso: "2026-09-12T00:00:00.000Z",
+    storage: memoryStorage(),
+  });
+
+  assert.equal(state.items.length, 5);
+  assert.equal(state.pendingItems.length, 5);
+  assert.equal(state.blockedItems.length, 0);
+  assert.equal(state.sentItems.length, 0);
+  assert.equal(state.pendingSendInputs.length, 5);
+  assert.equal(state.summaryLabel, "5 ready");
+  assert.equal(state.nextActionLabel, "Save 5 planning items");
+  assert.equal(state.canDispatch, true);
+  assert.deepEqual(state.pendingSendInputs.map((input) => input.subtype ?? input.type), [
+    "wedding_need_to_know",
+    "wedding_intake_profile",
+    "wedding_artifact",
+    "wedding_event",
+    "wedding_task",
+  ]);
+  assert.ok(state.pendingSendInputs.some((input) => input.supertags?.includes("wedding_task:budget_review")));
+  assert.equal(state.pendingItems.find((item) => item.kind === "context")?.semanticKind, "wedding_active_loop");
+  assert.ok(state.pendingItems.find((item) => item.kind === "context")?.semanticTags.includes("wedding_context"));
+  assert.equal(state.pendingItems.find((item) => item.kind === "intake_profile")?.title, "Wedding intake profile");
+});
+
+test("buildWeddingProjectionQueueState preserves semantic decision objects for meaning-first rendering", () => {
+  const state = buildWeddingProjectionQueueState({
+    decisionItems: [decisionItem],
+    nowIso: "2026-09-12T00:00:00.000Z",
+    storage: memoryStorage(),
+  });
+  const item = state.pendingItems[0];
+
+  assert.equal(state.pendingItems.length, 1);
+  assert.equal(item?.kind, "decision");
+  assert.equal(item?.semanticKind, "wedding_decision");
+  assert.equal(item?.semanticObject?.title, "Decision: Harbour House");
+  assert.ok(item?.semanticTags.includes("wedding_comparison"));
+  assert.equal(item?.semanticObject?.comparison?.columns.map((column) => column.kind).join(","), "option,location,availability");
+});
+
+test("buildWeddingProjectionQueueState saves one existing preference-conflict projection", () => {
+  const storage = memoryStorage();
+  const conflict = buildWeddingPreferenceConflictState({
+    metadata,
+    decisionArea: "wedding style",
+    preferences: [
+      { sourceRef: "constraint-1", personId: "person:partner_0001", personLabel: "Partner 1", preferenceLabel: "Modern", underlyingValue: "modern" },
+      { sourceRef: "constraint-2", personId: "person:partner_0002", personLabel: "Partner 2", preferenceLabel: "Romantic", underlyingValue: "romantic" },
+    ],
+  });
+  const state = buildWeddingProjectionQueueState({
+    preferenceConflicts: [conflict],
+    nowIso: "2026-10-19T00:00:00Z",
+    storage,
+  });
+
+  assert.equal(state.pendingItems.length, 1);
+  assert.equal(state.pendingItems[0]?.kind, "preference_conflict");
+  assert.equal(state.pendingItems[0]?.sendInput?.subtype, "wedding_preference_conflict");
+  assert.match(state.pendingItems[0]?.sendInput?.id ?? "", /^afp-wedding_preference_conflict:/);
+  assert.equal(state.pendingItems[0]?.semanticKind, "wedding_conflict");
+  assert.equal(JSON.stringify(state.pendingItems[0]).includes("partner_0001"), true);
+  assert.equal(JSON.stringify(state.pendingItems[0]).includes("exact_excerpt"), false);
+});
+
+test("a changed preference revision reopens projection after the prior revision was sent", () => {
+  const storage = memoryStorage();
+  const initial = buildWeddingPreferenceConflictState({
+    metadata,
+    decisionArea: "wedding style",
+    preferences: [
+      { sourceRef: "constraint-1", personId: "person:partner_0001", personLabel: "Partner 1", preferenceLabel: "Modern", underlyingValue: "modern" },
+      { sourceRef: "constraint-2", personId: "person:partner_0002", personLabel: "Partner 2", preferenceLabel: "Romantic", underlyingValue: "romantic" },
+    ],
+  });
+  const first = buildWeddingProjectionQueueState({ preferenceConflicts: [initial], storage });
+  markWeddingPreferenceConflictAfpProjectionSent(first.items[0]!.sourceId, storage);
+  const replay = buildWeddingProjectionQueueState({ preferenceConflicts: [initial], storage });
+  const changed = buildWeddingPreferenceConflictState({
+    metadata,
+    decisionArea: "wedding style",
+    preferences: [
+      { sourceRef: "constraint-1", personId: "person:partner_0001", personLabel: "Partner 1", preferenceLabel: "Modern", underlyingValue: "modern" },
+      { sourceRef: "constraint-3", personId: "person:partner_0002", personLabel: "Partner 2", preferenceLabel: "Industrial", underlyingValue: "industrial" },
+    ],
+  });
+  const successor = buildWeddingProjectionQueueState({ preferenceConflicts: [changed], storage });
+
+  assert.equal(replay.sentItems.length, 1);
+  assert.equal(successor.pendingItems.length, 1);
+  assert.notEqual(successor.pendingItems[0]?.sourceId, first.items[0]?.sourceId);
+});
+
+test("buildWeddingProjectionQueueState extracts semantic objects from view payloads", () => {
+  const state = buildWeddingProjectionQueueState({
+    taskItems: [{
+      id: "task:view-semantic",
+      title: "Confirm caterer reply",
+      description: "Check whether the caterer has replied.",
+      status: "pending",
+      views: [{
+        format: "a2ui",
+        content: {
+          semantic_object: {
+            id: "semantic:task-view",
+            kind: "wedding_external_wait",
+            title: "Waiting for caterer reply",
+            stateLabel: "No response yet",
+            tone: "risk",
+            summary: "The caterer has not replied.",
+          },
+        },
+      }],
+    } as any],
+    nowIso: "2026-09-12T00:00:00.000Z",
+    storage: memoryStorage(),
+  });
+  const item = state.pendingItems.find((entry) => entry.sourceId === "task:view-semantic");
+
+  assert.equal(item?.semanticKind, "wedding_external_wait");
+  assert.equal(item?.semanticObject?.id, "semantic:task-view");
+  assert.ok(item?.semanticTags.includes("wedding_external_wait"));
+});
+
+test("buildWeddingProjectionQueueState includes collaborator invite access-control records", () => {
+  const collaboration = buildWeddingCollaborationState({
+    invites: [
+      {
+        email: "partner@example.com",
+        displayName: "Partner",
+        role: "co_owner",
+        status: "draft",
+      },
+      {
+        email: "bad-email",
+        displayName: "Viewer",
+        role: "viewer",
+        status: "draft",
+      },
+    ],
+  });
+  const state = buildWeddingProjectionQueueState({
+    collaborationInvites: collaboration.invites,
+    collaborationMetadata: metadata,
+    storage: memoryStorage(),
+  });
+
+  assert.equal(state.items.length, 2);
+  assert.equal(state.pendingItems.length, 1);
+  assert.equal(state.blockedItems.length, 1);
+  assert.equal(state.pendingItems[0]?.kind, "access_control");
+  assert.equal(state.pendingSendInputs[0]?.type, "access_control");
+  assert.match(state.blockedItems[0]?.blockedReason ?? "", /valid email required/);
+});
+
+test("buildWeddingProjectionQueueState includes boundary ledger records for graph synthesis", () => {
+  const state = buildWeddingProjectionQueueState({
+    boundaryObjects: [boundaryPolicy],
+    boundaryMetadata: metadata,
+    nowIso: "2026-09-12T00:00:00.000Z",
+    storage: memoryStorage(),
+  });
+
+  assert.equal(state.items.length, 1);
+  assert.equal(state.pendingItems[0]?.kind, "boundary");
+  assert.equal(state.pendingItems[0]?.statusLabel, "Ready to save to guest boundaries");
+  assert.equal(state.pendingSendInputs[0]?.type, "ledger");
+  assert.equal(state.pendingSendInputs[0]?.kind, "wedding_boundary_policy");
+  assert.ok(state.pendingSendInputs[0]?.supertags?.includes("topology:wedding_decision_rights"));
+});
+
+test("buildWeddingProjectionQueueState excludes already saved boundary ledger records", () => {
+  const storage = memoryStorage();
+  markWeddingProjectionSent(boundaryPolicy.id, WEDDING_BOUNDARY_AFP_PROJECTIONS_KEY, storage);
+
+  const state = buildWeddingProjectionQueueState({
+    boundaryObjects: [boundaryPolicy],
+    boundaryMetadata: metadata,
+    storage,
+  });
+
+  assert.equal(state.pendingItems.length, 0);
+  assert.equal(state.sentItems[0]?.kind, "boundary");
+  assert.equal(state.pendingSendInputs.length, 0);
+});
+
+test("buildWeddingProjectionQueueState treats reloaded boundary ledger records as already saved", () => {
+  const state = buildWeddingProjectionQueueState({
+    boundaryObjects: [{
+      ...boundaryPolicy,
+      metadata: {
+        persisted_boundary_ledger: true,
+        persisted_afp_message_id: "afp-wedding-boundary-policy",
+      },
+    }],
+    boundaryMetadata: metadata,
+    storage: memoryStorage(),
+  });
+
+  assert.equal(state.pendingItems.length, 0);
+  assert.equal(state.sentItems[0]?.kind, "boundary");
+  assert.equal(state.sentItems[0]?.statusLabel, "Already saved to guest boundaries");
+  assert.equal(state.pendingSendInputs.length, 0);
+});
+
+test("buildWeddingProjectionQueueState dispatches lifecycle records without fresh invite subtypes", () => {
+  const collaboration = buildWeddingCollaborationState({
+    nowIso: "2026-02-15T00:00:00Z",
+    invites: [
+      {
+        email: "accepted@example.com",
+        displayName: "Accepted partner",
+        role: "co_owner",
+        status: "accepted",
+        lastActiveAt: "2026-01-01T00:00:00Z",
+      },
+      {
+        email: "expired@example.com",
+        displayName: "Expired viewer",
+        role: "viewer",
+        status: "invited",
+        expiresAt: "2026-01-01T00:00:00Z",
+      },
+      {
+        email: "revoked@example.com",
+        displayName: "Revoked planner",
+        role: "planner",
+        status: "accepted",
+        revokedAt: "2026-02-01T00:00:00Z",
+      },
+    ],
+  });
+  const state = buildWeddingProjectionQueueState({
+    collaborationInvites: collaboration.invites,
+    collaborationMetadata: metadata,
+    storage: memoryStorage(),
+  });
+
+  assert.equal(state.pendingItems.length, 3);
+  assert.equal(state.blockedItems.length, 0);
+  assert.equal(state.pendingSendInputs.length, 3);
+  assert.deepEqual(state.pendingSendInputs.map((input) => input.subtype), [
+    "wedding_collaborator_review",
+    "wedding_collaborator_expire",
+    "wedding_collaborator_revoke",
+  ]);
+  assert.equal(state.pendingSendInputs.every((input) => (input.content as any).shared_editing_enabled === false), true);
+});
+
+test("buildWeddingProjectionQueueState labels review-only and incomplete items as blocked", () => {
+  const state = buildWeddingProjectionQueueState({
+    scheduleItems: [
+      { ...scheduleItem, id: "review-date", reviewStatus: "needs_review" },
+      { ...scheduleItem, id: "missing-date", startAt: null },
+    ],
+    taskItems: [{ ...taskItem, id: "ignored-task", reviewStatus: "ignored" }],
+    storage: memoryStorage(),
+  });
+
+  assert.equal(state.pendingItems.length, 0);
+  assert.equal(state.blockedItems.length, 3);
+  assert.equal(state.canDispatch, false);
+  assert.equal(state.nextActionLabel, "Review items that need attention");
+  assert.ok(state.blockedItems.some((item) => item.blockedReason === "Needs date review before saving to Calendar"));
+  assert.ok(state.blockedItems.some((item) => item.blockedReason === "Needs a clear start date before saving to Calendar"));
+  assert.ok(state.blockedItems.some((item) => item.blockedReason === "Ignored task"));
+});
+
+test("buildWeddingProjectionQueueState excludes already sent projections from dispatch inputs", () => {
+  const storage = memoryStorage();
+  const [artifact] = artifacts();
+  const context = contextItem(storage);
+  assert.ok(artifact);
+  markWeddingArtifactAfpProjectionSent(artifact.summary.id, storage);
+  markWeddingNeedToKnowAfpProjectionSent(weddingNeedToKnowProjectionId(context), storage);
+  markWeddingIntakeProfileAfpProjectionSent(weddingIntakeProfileProjectionId(context), storage);
+  markWeddingProjectionSent(scheduleItem.id, WEDDING_CALENDAR_AFP_PROJECTIONS_KEY, storage);
+  markWeddingProjectionSent(taskItem.id, WEDDING_TASK_AFP_PROJECTIONS_KEY, storage);
+
+  const state = buildWeddingProjectionQueueState({
+    contextItems: [context],
+    artifacts: [artifact],
+    scheduleItems: [scheduleItem],
+    taskItems: [taskItem],
+    storage,
+  });
+
+  assert.equal(state.pendingItems.length, 0);
+  assert.equal(state.sentItems.length, 5);
+  assert.equal(state.pendingSendInputs.length, 0);
+  assert.equal(state.summaryLabel, "5 already saved");
+  assert.equal(state.nextActionLabel, "Planning items saved");
+  assert.equal(state.canDispatch, false);
+});
+
+test("buildWeddingProjectionQueueState can backfill intake profile after context was already saved", () => {
+  const storage = memoryStorage();
+  const context = contextItem(storage);
+  markWeddingNeedToKnowAfpProjectionSent(weddingNeedToKnowProjectionId(context), storage);
+
+  const state = buildWeddingProjectionQueueState({
+    contextItems: [context],
+    storage,
+  });
+
+  assert.equal(state.sentItems.find((item) => item.kind === "context")?.statusLabel, "Already saved as context");
+  assert.equal(state.pendingItems.length, 1);
+  assert.equal(state.pendingItems[0]?.kind, "intake_profile");
+  assert.equal(state.pendingSendInputs[0]?.subtype, "wedding_intake_profile");
+});
+
+test("buildWeddingProjectionQueueState skips empty structured profile projections for partial context", () => {
+  const state = buildWeddingProjectionQueueState({
+    contextItems: [{
+      metadata,
+      answeredLabels: [],
+      nextQuestionLabel: "Continue wedding planning.",
+      readyForFirstRecommendations: false,
+    } as any],
+    storage: memoryStorage(),
+  });
+
+  assert.equal(state.items.some((item) => item.kind === "context"), true);
+  assert.equal(state.items.some((item) => item.kind === "intake_profile"), false);
+  assert.equal(state.pendingSendInputs.some((input) => input.subtype === "wedding_intake_profile"), false);
+});
+
+test("buildWeddingProjectionQueueState reports an empty queue", () => {
+  const state = buildWeddingProjectionQueueState({ storage: memoryStorage() });
+
+  assert.deepEqual(state.items, []);
+  assert.equal(state.summaryLabel, "No wedding items to save");
+  assert.equal(state.nextActionLabel, "Create planning items");
+  assert.equal(state.canDispatch, false);
+});
+
+test("buildWeddingProjectionQueueSelectionState dispatches only selected pending outputs", () => {
+  const state = buildWeddingProjectionQueueState({
+    artifacts: artifacts().slice(0, 1),
+    scheduleItems: [scheduleItem],
+    taskItems: [taskItem],
+    storage: memoryStorage(),
+  });
+  const artifactItem = state.pendingItems.find((item) => item.kind === "artifact");
+  assert.ok(artifactItem);
+
+  const selection = buildWeddingProjectionQueueSelectionState({
+    queue: state,
+    deselectedItemIds: { [artifactItem.id]: true },
+  });
+
+  assert.equal(selection.totalPendingCount, 3);
+  assert.equal(selection.selectedPendingCount, 2);
+  assert.equal(selection.selectionSummaryLabel, "2/3 ready items selected");
+  assert.equal(selection.queue.pendingSendInputs.length, 2);
+  assert.equal(selection.queue.canDispatch, true);
+  assert.equal(selection.queue.summaryLabel, "2 selected items ready");
+  assert.equal(selection.queue.nextActionLabel, "Save 2 selected items");
+  assert.deepEqual(selection.queue.pendingItems.map((item) => item.kind), ["calendar_event", "task"]);
+  assert.ok(selection.queue.pendingSendInputs.some((input) => input.supertags?.includes("wedding_task:budget_review")));
+});
+
+test("buildWeddingProjectionQueueSelectionState keeps sent and blocked outputs visible when pending outputs are deselected", () => {
+  const storage = memoryStorage();
+  markWeddingProjectionSent(taskItem.id, WEDDING_TASK_AFP_PROJECTIONS_KEY, storage);
+  const state = buildWeddingProjectionQueueState({
+    scheduleItems: [
+      scheduleItem,
+      { ...scheduleItem, id: "missing-date", startAt: null },
+    ],
+    taskItems: [taskItem],
+    storage,
+  });
+  const pendingItem = state.pendingItems[0];
+  assert.ok(pendingItem);
+
+  const selection = buildWeddingProjectionQueueSelectionState({
+    queue: state,
+    deselectedItemIds: { [pendingItem.id]: true },
+  });
+
+  assert.equal(selection.totalPendingCount, 1);
+  assert.equal(selection.selectedPendingCount, 0);
+  assert.equal(selection.selectionSummaryLabel, "0/1 ready items selected");
+  assert.equal(selection.queue.canDispatch, false);
+  assert.equal(selection.queue.pendingSendInputs.length, 0);
+  assert.equal(selection.queue.sentItems.length, 1);
+  assert.equal(selection.queue.blockedItems.length, 1);
+  assert.equal(selection.queue.summaryLabel, "No selected items to save");
+  assert.equal(selection.queue.nextActionLabel, "Select items to save");
+});

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://raw.githubusercontent.com/cloudflare/workers-sdk/main/packages/wrangler/config-schema.json",
+  "name": "omnyid-vendor-email-ingress",
+  "main": "src/index.mjs",
+  "compatibility_date": "2026-10-25",
+  "observability": {
+    "enabled": false
+  },
+  "vars": {
+    "OPERATOR_ALIASES": "hello@omnyid.com,info@omnyid.com,wedding@omnyid.com,privacy@omnyid.com,support@omnyid.com,admin@omnyid.com",
+    "GATEWAY_URL": "https://api.omnyid.com/integrations/vendor-email/cloudflare/inbound",
+    "KEY_ID": "primary-v1",
+    "MAX_RAW_BYTES": "10485760",
+    "GATEWAY_TIMEOUT_MS": "8000"
+  }
+}

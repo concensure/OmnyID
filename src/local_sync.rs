@@ -201,12 +201,17 @@ pub fn requires_local_key_material(slices: &[SyncSliceSpec]) -> bool {
 
 /// ElectricSQL-compatible shape descriptor for one sync slice.
 ///
-/// Maps to an Electric `GET /v1/shape?table=<table>&where=<where_clause>` subscription.
+/// Maps to an Electric `GET /v1/shape/<table>?schema=<schema>&where=<where_clause>` subscription.
 /// The `agent_id` placeholder must be substituted client-side before the request is sent.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct SliceShapeDescriptor {
+    /// Optional Postgres schema name to subscribe within.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub schema: Option<String>,
     /// The Postgres table name to subscribe to.
     pub table: String,
+    /// The local replica table name to hydrate within PGLite.
+    pub local_table: String,
     /// Optional Electric `where` filter (SQL predicate, may contain `$agent_id` placeholder).
     pub where_clause: Option<String>,
     /// Whether this shape carries ciphertext that requires local key material.
@@ -215,42 +220,137 @@ pub struct SliceShapeDescriptor {
     pub conflict_mode: ConflictMode,
 }
 
-/// Map every sync slice name to its ElectricSQL shape descriptor.
-pub fn shape_descriptors_for_slices(slices: &[SyncSliceSpec]) -> Vec<SliceShapeDescriptor> {
-    slices.iter().map(|spec| {
-        let (table, where_clause) = match spec.name {
-            SyncSliceName::InboxSummaries => (
-                "messages",
-                Some("(type IN ('email_incoming','email_outgoing','task_update') OR (type = 'email' AND subtype IN ('incoming','outgoing')) OR (type = 'task' AND subtype = 'status')) AND content->>'omnyid_encrypted' IS NULL".to_string()),
-            ),
-            SyncSliceName::ThreadMetadata => (
-                "messages",
-                Some("thread_id IS NOT NULL".to_string()),
-            ),
-            SyncSliceName::PageStructures => (
-                "messages",
-                Some("type = 'block_update' OR (type = 'note' AND subtype = 'block_update')".to_string()),
-            ),
-            SyncSliceName::ActionStates => (
-                "action_audit_log",
-                None,
-            ),
-            SyncSliceName::CiphertextBlobs => (
-                "messages",
-                Some("content->>'omnyid_encrypted' = 'true'".to_string()),
-            ),
-            SyncSliceName::LayoutConfig => (
-                "messages",
-                Some("type = 'layout_config' OR (type = 'agent' AND subtype = 'layout_config')".to_string()),
-            ),
-        };
-        SliceShapeDescriptor {
-            table: table.to_string(),
-            where_clause,
-            requires_key_material: spec.includes_ciphertext,
-            conflict_mode: spec.conflict_mode.clone(),
+fn sql_string_literal(value: &str) -> String {
+    format!("'{}'", value.replace('\'', "''"))
+}
+
+fn public_message_agent_filter(public_agent_ids: &[String]) -> Option<String> {
+    if public_agent_ids.is_empty() {
+        return None;
+    }
+    let agent_array = public_agent_ids
+        .iter()
+        .map(|agent_id| sql_string_literal(agent_id))
+        .collect::<Vec<_>>()
+        .join(", ");
+    Some(format!(
+        "((from_agent = ANY(ARRAY[{agent_array}])) OR EXISTS (SELECT 1 FROM jsonb_array_elements_text(to_agents) AS recipient WHERE recipient = ANY(ARRAY[{agent_array}])))"
+    ))
+}
+
+fn message_shape_where_clause(slice_name: &SyncSliceName) -> Option<String> {
+    match slice_name {
+        SyncSliceName::InboxSummaries => Some(
+            "(type IN ('email_incoming','email_outgoing','task_update') OR (type = 'email' AND subtype IN ('incoming','outgoing')) OR (type = 'task' AND subtype = 'status')) AND content->>'omnyid_encrypted' IS NULL".to_string(),
+        ),
+        SyncSliceName::ThreadMetadata => Some("thread_id IS NOT NULL".to_string()),
+        SyncSliceName::PageStructures => {
+            Some("type = 'block_update' OR (type = 'note' AND subtype = 'block_update')".to_string())
         }
-    }).collect()
+        SyncSliceName::CiphertextBlobs => Some("content->>'omnyid_encrypted' = 'true'".to_string()),
+        SyncSliceName::LayoutConfig => Some(
+            "type = 'layout_config' OR (type = 'agent' AND subtype = 'layout_config')"
+                .to_string(),
+        ),
+        SyncSliceName::ActionStates => None,
+    }
+}
+
+fn slice_supports_public_agent_overlay(slice_name: &SyncSliceName) -> bool {
+    matches!(
+        slice_name,
+        SyncSliceName::InboxSummaries
+            | SyncSliceName::ThreadMetadata
+            | SyncSliceName::CiphertextBlobs
+    )
+}
+
+fn local_table_name(slice_name: &SyncSliceName, is_public_overlay: bool) -> &'static str {
+    match slice_name {
+        SyncSliceName::ActionStates => "action_audit_log",
+        SyncSliceName::InboxSummaries => {
+            if is_public_overlay {
+                "messages_shared_inbox"
+            } else {
+                "messages_private_inbox"
+            }
+        }
+        SyncSliceName::ThreadMetadata => {
+            if is_public_overlay {
+                "messages_shared_threads"
+            } else {
+                "messages_private_threads"
+            }
+        }
+        SyncSliceName::PageStructures => "messages_private_pages",
+        SyncSliceName::CiphertextBlobs => {
+            if is_public_overlay {
+                "messages_shared_ciphertext"
+            } else {
+                "messages_private_ciphertext"
+            }
+        }
+        SyncSliceName::LayoutConfig => "messages_private_layout",
+    }
+}
+
+/// Map every sync slice name to its ElectricSQL shape descriptor.
+///
+/// `user_id` should be the authenticated user's ID; when provided, tenant-private slices
+/// point to that user's schema so Electric reads the correct per-user tables. Pass `None`
+/// only for anonymous or system-level shape requests where public-schema access is intended.
+pub fn shape_descriptors_for_slices(
+    slices: &[SyncSliceSpec],
+    user_id: Option<&str>,
+    public_agent_ids: Option<&[String]>,
+) -> Vec<SliceShapeDescriptor> {
+    let tenant_schema = user_id.map(crate::db::tenant_schema_name);
+    slices
+        .iter()
+        .flat_map(|spec| {
+            if spec.name == SyncSliceName::ActionStates {
+                return vec![SliceShapeDescriptor {
+                    schema: tenant_schema.clone(),
+                    table: "action_audit_log".to_string(),
+                    local_table: local_table_name(&spec.name, false).to_string(),
+                    where_clause: None,
+                    requires_key_material: spec.includes_ciphertext,
+                    conflict_mode: spec.conflict_mode.clone(),
+                }];
+            }
+
+            let base_where = message_shape_where_clause(&spec.name);
+            let mut descriptors = Vec::new();
+            descriptors.push(SliceShapeDescriptor {
+                schema: tenant_schema.clone(),
+                table: "messages".to_string(),
+                local_table: local_table_name(&spec.name, false).to_string(),
+                where_clause: base_where.clone(),
+                requires_key_material: spec.includes_ciphertext,
+                conflict_mode: spec.conflict_mode.clone(),
+            });
+
+            if slice_supports_public_agent_overlay(&spec.name) {
+                if let Some(public_filter) = public_agent_ids.and_then(public_message_agent_filter)
+                {
+                    let public_where = base_where
+                        .as_deref()
+                        .map(|base| format!("({base}) AND {public_filter}"))
+                        .or_else(|| Some(public_filter));
+                    descriptors.push(SliceShapeDescriptor {
+                        schema: None,
+                        table: "messages".to_string(),
+                        local_table: local_table_name(&spec.name, true).to_string(),
+                        where_clause: public_where,
+                        requires_key_material: spec.includes_ciphertext,
+                        conflict_mode: spec.conflict_mode.clone(),
+                    });
+                }
+            }
+
+            descriptors
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -258,7 +358,7 @@ mod tests {
     use super::{
         ConflictMode, DeviceClass, SyncPolicyProfile, SyncSliceName, default_sync_profile,
         default_sync_slices, parse_device_class, requires_local_key_material,
-        sync_slices_for_device,
+        shape_descriptors_for_slices, sync_slices_for_device,
     };
 
     #[test]
@@ -330,5 +430,181 @@ mod tests {
             default_sync_profile(&DeviceClass::Watch),
             SyncPolicyProfile::Lightweight
         );
+    }
+
+    #[test]
+    fn action_state_shape_descriptor_does_not_emit_invalid_user_id_filter() {
+        let descriptors = shape_descriptors_for_slices(
+            &[super::SyncSliceSpec {
+                name: SyncSliceName::ActionStates,
+                includes_ciphertext: false,
+                local_cache_required: true,
+                conflict_mode: ConflictMode::LastWriterWins,
+            }],
+            Some("user_01"),
+            None,
+        );
+
+        assert_eq!(descriptors.len(), 1);
+        assert_eq!(descriptors[0].schema.as_deref(), Some("user_user_01"));
+        assert_eq!(descriptors[0].table, "action_audit_log");
+        assert_eq!(descriptors[0].local_table, "action_audit_log");
+        assert!(descriptors[0].where_clause.is_none());
+    }
+
+    #[test]
+    fn tenant_message_slice_descriptors_do_not_emit_invalid_owner_user_filters() {
+        let descriptors = shape_descriptors_for_slices(
+            &[
+                super::SyncSliceSpec {
+                    name: SyncSliceName::InboxSummaries,
+                    includes_ciphertext: false,
+                    local_cache_required: true,
+                    conflict_mode: ConflictMode::LastWriterWins,
+                },
+                super::SyncSliceSpec {
+                    name: SyncSliceName::ThreadMetadata,
+                    includes_ciphertext: false,
+                    local_cache_required: true,
+                    conflict_mode: ConflictMode::LastWriterWins,
+                },
+                super::SyncSliceSpec {
+                    name: SyncSliceName::CiphertextBlobs,
+                    includes_ciphertext: true,
+                    local_cache_required: true,
+                    conflict_mode: ConflictMode::AppendOnly,
+                },
+            ],
+            Some("user_01"),
+            None,
+        );
+
+        assert_eq!(descriptors.len(), 3);
+        assert!(
+            descriptors
+                .iter()
+                .all(|descriptor| descriptor.schema.as_deref() == Some("user_user_01"))
+        );
+        assert!(
+            descriptors
+                .iter()
+                .all(|descriptor| descriptor.table == "messages")
+        );
+        assert_eq!(
+            descriptors
+                .iter()
+                .map(|descriptor| descriptor.local_table.as_str())
+                .collect::<Vec<_>>(),
+            vec![
+                "messages_private_inbox",
+                "messages_private_threads",
+                "messages_private_ciphertext",
+            ]
+        );
+        assert!(descriptors.iter().all(|descriptor| {
+            !descriptor
+                .where_clause
+                .as_deref()
+                .unwrap_or_default()
+                .contains("owner_user_id")
+        }));
+    }
+
+    #[test]
+    fn anonymous_shape_descriptors_leave_schema_unset() {
+        let descriptors = shape_descriptors_for_slices(
+            &[super::SyncSliceSpec {
+                name: SyncSliceName::ThreadMetadata,
+                includes_ciphertext: false,
+                local_cache_required: true,
+                conflict_mode: ConflictMode::LastWriterWins,
+            }],
+            None,
+            None,
+        );
+
+        assert_eq!(descriptors.len(), 1);
+        assert!(descriptors[0].schema.is_none());
+        assert_eq!(descriptors[0].table, "messages");
+        assert_eq!(descriptors[0].local_table, "messages_private_threads");
+    }
+
+    #[test]
+    fn authenticated_message_slices_include_public_agent_scoped_shape() {
+        let agent_ids = vec![
+            "omnyid://agent/alpha".to_string(),
+            "omnyid://agent/beta".to_string(),
+        ];
+        let descriptors = shape_descriptors_for_slices(
+            &[super::SyncSliceSpec {
+                name: SyncSliceName::ThreadMetadata,
+                includes_ciphertext: false,
+                local_cache_required: true,
+                conflict_mode: ConflictMode::LastWriterWins,
+            }],
+            Some("user_01"),
+            Some(&agent_ids),
+        );
+
+        assert_eq!(descriptors.len(), 2);
+        assert_eq!(descriptors[0].schema.as_deref(), Some("user_user_01"));
+        assert_eq!(descriptors[0].local_table, "messages_private_threads");
+        assert_eq!(
+            descriptors[0].where_clause.as_deref(),
+            Some("thread_id IS NOT NULL")
+        );
+        assert!(descriptors[1].schema.is_none());
+        assert_eq!(descriptors[1].local_table, "messages_shared_threads");
+        let public_where = descriptors[1].where_clause.as_deref().unwrap_or_default();
+        assert!(public_where.contains("thread_id IS NOT NULL"));
+        assert!(public_where.contains("from_agent = ANY"));
+        assert!(public_where.contains("omnyid://agent/alpha"));
+        assert!(public_where.contains("omnyid://agent/beta"));
+    }
+
+    #[test]
+    fn layout_config_does_not_emit_public_agent_overlay_shape() {
+        let agent_ids = vec!["omnyid://agent/alpha".to_string()];
+        let descriptors = shape_descriptors_for_slices(
+            &[super::SyncSliceSpec {
+                name: SyncSliceName::LayoutConfig,
+                includes_ciphertext: false,
+                local_cache_required: true,
+                conflict_mode: ConflictMode::Crdt,
+            }],
+            Some("user_01"),
+            Some(&agent_ids),
+        );
+
+        assert_eq!(descriptors.len(), 1);
+        assert_eq!(descriptors[0].schema.as_deref(), Some("user_user_01"));
+        assert_eq!(descriptors[0].table, "messages");
+        assert_eq!(descriptors[0].local_table, "messages_private_layout");
+        assert_eq!(
+            descriptors[0].where_clause.as_deref(),
+            Some("type = 'layout_config' OR (type = 'agent' AND subtype = 'layout_config')")
+        );
+    }
+
+    #[test]
+    fn authenticated_dual_source_message_shapes_use_distinct_local_tables() {
+        let agent_ids = vec!["omnyid://agent/alpha".to_string()];
+        let descriptors = shape_descriptors_for_slices(
+            &[super::SyncSliceSpec {
+                name: SyncSliceName::InboxSummaries,
+                includes_ciphertext: false,
+                local_cache_required: true,
+                conflict_mode: ConflictMode::LastWriterWins,
+            }],
+            Some("user_01"),
+            Some(&agent_ids),
+        );
+
+        assert_eq!(descriptors.len(), 2);
+        assert_eq!(descriptors[0].table, "messages");
+        assert_eq!(descriptors[1].table, "messages");
+        assert_eq!(descriptors[0].local_table, "messages_private_inbox");
+        assert_eq!(descriptors[1].local_table, "messages_shared_inbox");
+        assert_ne!(descriptors[0].local_table, descriptors[1].local_table);
     }
 }

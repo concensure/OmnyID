@@ -1,0 +1,33 @@
+{
+  "auth": {
+    "dialogRole": 0,
+    "emailLabel": 1,
+    "passwordLabel": 0,
+    "main": 1,
+    "h1": 0,
+    "escapeClosed": false,
+    "axe": [
+      {
+        "id": "aria-prohibited-attr",
+        "impact": "serious",
+        "nodes": [
+          {
+            "target": [
+              ".bottom-6"
+            ],
+            "failure": "Fix all of the following:\n  aria-label attribute cannot be used on a div with no valid role attribute."
+          }
+        ]
+      }
+    ]
+  },
+  "vendor": {
+    "status": 200,
+    "title": "Respond to a quotation request | OmnyID",
+    "main": 1,
+    "h1": 1,
+    "unavailable": 1,
+    "quotationDetails": 0,
+    "axe": []
+  }
+}

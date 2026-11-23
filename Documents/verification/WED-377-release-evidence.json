@@ -1,0 +1,64 @@
+{
+  "source_sha": "b9ead5298fb0cff77ef552c1dc4281e6d35c6bc8",
+  "image_id": "sha256:a086dba378880b9a8d19e68dfc403efa27356c0ecee5e136755edc0bddff4fa6",
+  "previous_image": "sha256:88b5883d3a326608d6107a049c2931ea6dc9dbe1761fb4774199861633bd6024",
+  "started_at": "2026-11-19T09:14:03.061859+00:00",
+  "origin_authenticated_health": 200,
+  "static_files": 91,
+  "public_browser_smoke": {
+    "source_sha": "b9ead5298fb0cff77ef552c1dc4281e6d35c6bc8",
+    "paths": [
+      {
+        "path": "/wedding/",
+        "status": 200
+      },
+      {
+        "path": "/wedding/index.html",
+        "status": 200
+      },
+      {
+        "path": "/wedding/vendors.html",
+        "status": 200
+      },
+      {
+        "path": "/docs/?auth=signin&source=wedding",
+        "status": 200
+      },
+      {
+        "path": "/workspace/?auth=signin&source=wedding",
+        "status": 200
+      }
+    ],
+    "sprout_workspace_link": "/workspace/?auth=signin&source=wedding",
+    "workspace_email_password_visible": true,
+    "workspace_url": "https://omnyid.com/workspace/?auth=signin&source=wedding&view=search",
+    "directory": {
+      "source_sha": "b9ead5298fb0cff77ef552c1dc4281e6d35c6bc8",
+      "google_button_frames": 1,
+      "bev_results": 6,
+      "beva_results": 0,
+      "videographer_category_buttons": 1
+    },
+    "bev_response": {
+      "source_sha": "b9ead5298fb0cff77ef552c1dc4281e6d35c6bc8",
+      "search": "bev",
+      "response_status": 200,
+      "api_results": 6,
+      "rendered_results": 6,
+      "celebrations_by_bev_present": true,
+      "all_names_match": true
+    },
+    "google_account_completion": "not_verified"
+  },
+  "rollback_directory": "/home/ubuntu/omnyid-candidates/wed377-b9ead529/rollback",
+  "verified_at": "2026-11-19T09:15:54.534542+00:00",
+  "rust_quote_tests": 7,
+  "evidence_hashes": {
+    "build.log": "210b94c5f9f73e86ead5a6bf709c4a5244d233c31c7b74c04f2ba849c7ccc566",
+    "tests.log": "b5fe7650ba47ba0aadfd5ac03f6bf886b2be83a770d46330e3332ae2f141b0c7",
+    "runtime-manifest.json": "a5c5d416fcda4579f600886f72f59098a858885775988ac8fe81b4eb17ffb3d8",
+    "staging-quote-evidence.json": "b3d80200d18f1e060b81200bc6af8ed8977d1d7f981bf76808e4fc1eb1065d8e",
+    "wed377-b9ead529-local-evidence.json": "8570985db05b6e40b620f1769017f8de5765c626d53a9c374531609c58295450",
+    "wed377-hosted-quote-browser-retry.log": "a07e0dce6c25ad7708b324ed159998e6ed428fcd1d0b7fd5330e39445a721f39"
+  }
+}

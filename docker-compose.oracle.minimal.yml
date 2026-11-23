@@ -1,0 +1,432 @@
+services:
+  ui:
+    build:
+      context: .
+      dockerfile: solid-ui/Dockerfile
+      args:
+        VITE_API_BASE: ${VITE_API_BASE:-}
+        VITE_WEDDING_AUTOMATIC_SHORTLIST_ENABLED: ${VITE_WEDDING_AUTOMATIC_SHORTLIST_ENABLED:-true}
+        VITE_WEDDING_VENDOR_RANKING_POLICY_V2: ${VITE_WEDDING_VENDOR_RANKING_POLICY_V2:-false}
+        VITE_PLANNING_CONSTRAINT_CAPTURE_ENABLED: ${VITE_PLANNING_CONSTRAINT_CAPTURE_ENABLED:-false}
+        VITE_PLANNING_CONSTRAINT_EVALUATION_ENABLED: ${VITE_PLANNING_CONSTRAINT_EVALUATION_ENABLED:-false}
+        VITE_PLANNING_COST_TRADEOFFS_ENABLED: ${VITE_PLANNING_COST_TRADEOFFS_ENABLED:-false}
+        VITE_PLANNING_CRITICAL_PATH_ENABLED: ${VITE_PLANNING_CRITICAL_PATH_ENABLED:-false}
+        VITE_PLANNING_VENDOR_CHANGES_ENABLED: ${VITE_PLANNING_VENDOR_CHANGES_ENABLED:-false}
+        VITE_PLANNING_CONSTRAINT_INTERVENTION_ENABLED: ${VITE_PLANNING_CONSTRAINT_INTERVENTION_ENABLED:-false}
+        VITE_PLANNING_UNIFIED_INTERVENTIONS_ENABLED: ${VITE_PLANNING_UNIFIED_INTERVENTIONS_ENABLED:-false}
+    volumes:
+      - workspace-assets:/srv/workspace
+    restart: "no"
+
+  postgres:
+    image: pgvector/pgvector:pg18
+    mem_limit: ${OMNYID_POSTGRES_MEM_LIMIT:-2g}
+    cpus: ${OMNYID_POSTGRES_CPUS:-1.5}
+    pids_limit: ${OMNYID_POSTGRES_PIDS_LIMIT:-256}
+    command:
+      - postgres
+      - -c
+      - wal_level=logical
+      - -c
+      - max_replication_slots=10
+      - -c
+      - max_wal_senders=10
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-afp}
+      POSTGRES_USER: ${POSTGRES_USER:-afp}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-}
+      POSTGRES_PASSWORD_FILE: ${POSTGRES_PASSWORD_FILE:-}
+    volumes:
+      - ./.secrets:/run/secrets:ro
+      - postgres-data:/var/lib/postgresql
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./postgres/migrations:/docker-entrypoint-initdb.d/migrations
+    restart: unless-stopped
+
+  electric:
+    image: electricsql/electric:latest
+    mem_limit: ${OMNYID_ELECTRIC_MEM_LIMIT:-768m}
+    cpus: ${OMNYID_ELECTRIC_CPUS:-0.75}
+    pids_limit: ${OMNYID_ELECTRIC_PIDS_LIMIT:-128}
+    depends_on:
+      - postgres
+    # Overriding entrypoint in Compose drops the image's own CMD unless it is
+    # also given explicitly here — this was previously missing, so the
+    # wrapper's `exec "$@"` ran with no arguments (a no-op) and the container
+    # exited 0 immediately in an endless restart loop without ever starting
+    # Electric.
+    # Invoke through sh so Windows worktrees cannot strip the script execute
+    # bit from this bind-mounted file during a production source sync.
+    entrypoint: ["/bin/bash", "-c", "exec /bin/bash -s -- \"$@\" < <(tr -d '\\r' < /usr/local/bin/runtime-env-entrypoint.sh)", "--"]
+    command: ["/app/bin/entrypoint", "start"]
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-}
+      DATABASE_URL_FILE: ${DATABASE_URL_FILE:-}
+      ELECTRIC_INSECURE: "true"
+      ELECTRIC_USAGE_REPORTING: "false"
+    ports:
+      - "127.0.0.1:5133:5133"
+    volumes:
+      - ./.secrets:/run/secrets:ro
+      - ./scripts/runtime-env-entrypoint.sh:/usr/local/bin/runtime-env-entrypoint.sh:ro
+    restart: unless-stopped
+
+  seaweedfs:
+    image: chrislusf/seaweedfs:3.83
+    mem_limit: ${OMNYID_SEAWEEDFS_MEM_LIMIT:-1536m}
+    cpus: ${OMNYID_SEAWEEDFS_CPUS:-1.0}
+    pids_limit: ${OMNYID_SEAWEEDFS_PIDS_LIMIT:-256}
+    # Windows worktrees may materialize bind-mounted shell scripts with CRLF.
+    # Normalize at execution time so the secure storage process fails only on
+    # real configuration errors, not on `set -eu\r`.
+    entrypoint: ["/bin/sh", "-c", "tr -d '\\r' < /usr/local/bin/seaweedfs-secure-entrypoint.sh > /tmp/seaweedfs-secure-entrypoint.sh && exec /bin/sh /tmp/seaweedfs-secure-entrypoint.sh"]
+    environment:
+      OMNYID_SEAWEEDFS_ACCESS_KEY_FILE: /run/secrets/seaweedfs_app_access_key
+      OMNYID_SEAWEEDFS_SECRET_KEY_FILE: /run/secrets/seaweedfs_app_secret_key
+      OMNYID_SEAWEEDFS_BUCKET: ${OMNYID_SEAWEEDFS_BUCKET:-omnyid-attachments}
+    volumes:
+      - seaweedfs-data:/data
+      - ./.secrets/seaweedfs_app_access_key:/run/secrets/seaweedfs_app_access_key:ro
+      - ./.secrets/seaweedfs_app_secret_key:/run/secrets/seaweedfs_app_secret_key:ro
+      - ./.seaweedfs-admin-secrets/access_key:/run/secrets/seaweedfs_admin_access_key:ro
+      - ./.seaweedfs-admin-secrets/secret_key:/run/secrets/seaweedfs_admin_secret_key:ro
+      - ./scripts/seaweedfs-secure-entrypoint.sh:/usr/local/bin/seaweedfs-secure-entrypoint.sh:ro
+    networks:
+      - storage
+    restart: unless-stopped
+
+  # Malware scanning is private to the Compose network. No clamd port is
+  # published on the host because its TCP protocol has no authentication.
+  clamav:
+    image: clamav/clamav:1.4.6-debian13-slim
+    mem_limit: ${OMNYID_CLAMAV_MEM_LIMIT:-1536m}
+    cpus: ${OMNYID_CLAMAV_CPUS:-1.0}
+    pids_limit: ${OMNYID_CLAMAV_PIDS_LIMIT:-128}
+    volumes:
+      - clamav-data:/var/lib/clamav
+    restart: unless-stopped
+
+  homeserver:
+    build: .
+    mem_limit: ${OMNYID_HOMESERVER_MEM_LIMIT:-4g}
+    cpus: ${OMNYID_HOMESERVER_CPUS:-2.5}
+    pids_limit: ${OMNYID_HOMESERVER_PIDS_LIMIT:-512}
+    depends_on:
+      postgres:
+        condition: service_started
+      seaweedfs:
+        condition: service_started
+      clamav:
+        condition: service_healthy
+    entrypoint: ["/bin/bash", "-c", "exec /bin/bash -s -- \"$@\" < <(tr -d '\\r' < /usr/local/bin/runtime-env-entrypoint.sh)", "--"]
+    command: ["./omnyid-homeserver"]
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-}
+      DATABASE_URL_FILE: ${DATABASE_URL_FILE:-}
+      OMNYID_AGENT_ID: ${OMNYID_AGENT_ID}
+      OMNYID_GATEWAY_AGENT_ID: ${OMNYID_GATEWAY_AGENT_ID}
+      OMNYID_HOMESERVER_URL: ${OMNYID_HOMESERVER_URL}
+      OMNYID_AFP_DELEGATION: ${OMNYID_AFP_DELEGATION}
+      OMNYID_DOMAIN: ${OMNYID_DOMAIN}
+      OMNYID_BASE_URL: ${OMNYID_BASE_URL:-https://omnyid.com}
+      OMNYID_ADMIN_EMAILS: ${OMNYID_ADMIN_EMAILS:-}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+      OMNYID_ENV: production
+      OMNYID_BEHIND_TRUSTED_PROXY: "true"
+      OMNYID_DELEGATION_MASTER_KEY_HEX_FILE: ${OMNYID_DELEGATION_MASTER_KEY_HEX_FILE:-/run/secrets/omnyid_delegation_master_key_hex}
+      OMNYID_PUBLIC_KEY_HEX: ${OMNYID_PUBLIC_KEY_HEX}
+      OMNYID_SIGNING_KEY_HEX: ${OMNYID_SIGNING_KEY_HEX}
+      OMNYID_SIGNING_KEY_HEX_FILE: ${OMNYID_SIGNING_KEY_HEX_FILE:-/run/secrets/omnyid_signing_key_hex}
+      OMNYID_ENCRYPTION_KEY_HEX: ${OMNYID_ENCRYPTION_KEY_HEX}
+      OMNYID_ENCRYPTION_KEY_HEX_FILE: ${OMNYID_ENCRYPTION_KEY_HEX_FILE:-/run/secrets/omnyid_encryption_key_hex}
+      OMNYID_SESSION_SECRET_FILE: ${OMNYID_SESSION_SECRET_FILE:-/run/secrets/omnyid_session_secret}
+      OMNYID_RECIPIENT_KEYS_JSON: ${OMNYID_RECIPIENT_KEYS_JSON:-{}}
+      OMNYID_ALLOW_INSECURE_UNSIGNED: "false"
+      OMNYID_REQUIRE_ENCRYPTION: "true"
+      OMNYID_ALLOW_PLAINTEXT_STORAGE: "false"
+      OMNYID_ENABLE_SERVER_SUMMARIZATION: "false"
+      OMNYID_QUOTATION_RELEASE_GATE: ${OMNYID_QUOTATION_RELEASE_GATE:-disabled}
+      OMNYID_QUOTATION_RELEASE_GATE_VERSION: ${OMNYID_QUOTATION_RELEASE_GATE_VERSION:-quotation.readiness.v1}
+      OMNYID_QUOTATION_RELEASE_EVIDENCE_SHA: ${OMNYID_QUOTATION_RELEASE_EVIDENCE_SHA:-}
+      OMNYID_QUOTATION_EXTRACTION_ENABLED: ${OMNYID_QUOTATION_EXTRACTION_ENABLED:-false}
+      OMNYID_QUOTATION_RECOMMENDATION_ENABLED: ${OMNYID_QUOTATION_RECOMMENDATION_ENABLED:-false}
+      OMNYID_QUOTATION_CLARIFICATION_DRAFT_ENABLED: ${OMNYID_QUOTATION_CLARIFICATION_DRAFT_ENABLED:-false}
+      OMNYID_QUOTATION_CLARIFICATION_SEND_ENABLED: ${OMNYID_QUOTATION_CLARIFICATION_SEND_ENABLED:-false}
+      OMNYID_QUOTATION_CLOSURE_ENABLED: ${OMNYID_QUOTATION_CLOSURE_ENABLED:-false}
+      OMNYID_QUOTATION_VENDOR_GRANTS_ENABLED: ${OMNYID_QUOTATION_VENDOR_GRANTS_ENABLED:-false}
+      OMNYID_QUOTATION_VENDOR_RESPONSE_CAPABILITIES_ENABLED: ${OMNYID_QUOTATION_VENDOR_RESPONSE_CAPABILITIES_ENABLED:-false}
+      OMNYID_QUOTATION_CLAIMED_VENDOR_RESPONSES_ENABLED: ${OMNYID_QUOTATION_CLAIMED_VENDOR_RESPONSES_ENABLED:-false}
+      OMNYID_QUOTATION_EMAIL_RESPONSE_RECONCILIATION_ENABLED: ${OMNYID_QUOTATION_EMAIL_RESPONSE_RECONCILIATION_ENABLED:-false}
+      OMNYID_PLANNING_CONSTRAINT_LEDGER_ENABLED: ${OMNYID_PLANNING_CONSTRAINT_LEDGER_ENABLED:-false}
+      OMNYID_PLANNING_CONSTRAINT_CAPTURE_ENABLED: ${OMNYID_PLANNING_CONSTRAINT_CAPTURE_ENABLED:-false}
+      OMNYID_PLANNING_EVALUATION_ENABLED: ${OMNYID_PLANNING_EVALUATION_ENABLED:-false}
+      OMNYID_PLANNING_COST_TRADEOFFS_ENABLED: ${OMNYID_PLANNING_COST_TRADEOFFS_ENABLED:-false}
+      OMNYID_PLANNING_CRITICAL_PATH_ENABLED: ${OMNYID_PLANNING_CRITICAL_PATH_ENABLED:-false}
+      OMNYID_PLANNING_VENDOR_CHANGES_ENABLED: ${OMNYID_PLANNING_VENDOR_CHANGES_ENABLED:-false}
+      OMNYID_PLANNING_INTERVENTIONS_ENABLED: ${OMNYID_PLANNING_INTERVENTIONS_ENABLED:-false}
+      OMNYID_ENCRYPT_BY_DEFAULT: "true"
+      OMNYID_ENABLE_INTERNAL_GRPC: "false"
+      OMNYID_INTERNAL_GRPC_ADDR: 127.0.0.1:50051
+      OMNYID_MAIL_PROVIDER: ${OMNYID_MAIL_PROVIDER:-gmail}
+      OMNYID_IMAP_POLL_SECONDS: ${OMNYID_IMAP_POLL_SECONDS:-30}
+      OMNYID_EMAIL_ADDRESS: ${OMNYID_EMAIL_ADDRESS}
+      OMNYID_GMAIL_CLIENT_ID: ${OMNYID_GMAIL_CLIENT_ID:-}
+      OMNYID_GOOGLE_CLIENT_ID: ${OMNYID_GOOGLE_CLIENT_ID:-}
+      OMNYID_APPLE_CLIENT_ID: ${OMNYID_APPLE_CLIENT_ID:-}
+      OMNYID_APPLE_REDIRECT_URI: ${OMNYID_APPLE_REDIRECT_URI:-}
+      OMNYID_GMAIL_CLIENT_SECRET: ${OMNYID_GMAIL_CLIENT_SECRET:-}
+      OMNYID_GMAIL_CLIENT_SECRET_FILE: ${OMNYID_GMAIL_CLIENT_SECRET_FILE:-/run/secrets/omnyid_gmail_client_secret}
+      OMNYID_GMAIL_REFRESH_TOKEN: ${OMNYID_GMAIL_REFRESH_TOKEN:-}
+      OMNYID_GMAIL_REFRESH_TOKEN_FILE: ${OMNYID_GMAIL_REFRESH_TOKEN_FILE:-/run/secrets/omnyid_gmail_refresh_token}
+      OMNYID_GMAIL_USER_ID: ${OMNYID_GMAIL_USER_ID:-me}
+      OMNYID_IMAP_HOST: ${OMNYID_IMAP_HOST:-}
+      OMNYID_IMAP_PORT: ${OMNYID_IMAP_PORT:-993}
+      OMNYID_IMAP_USERNAME: ${OMNYID_IMAP_USERNAME:-}
+      OMNYID_IMAP_PASSWORD: ${OMNYID_IMAP_PASSWORD:-}
+      OMNYID_IMAP_PASSWORD_FILE: ${OMNYID_IMAP_PASSWORD_FILE:-/run/secrets/omnyid_imap_password}
+      FROM_ADDRESS: ${FROM_ADDRESS}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_PASS_FILE: ${SMTP_PASS_FILE:-/run/secrets/omnyid_smtp_pass}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      # Account verification and password-reset mail may fall back to Resend
+      # when the legacy mailbox OAuth token has expired. This is intentionally
+      # separate from the vendor-relay provider selection below.
+      OMNYID_TRANSACTIONAL_CLOUDFLARE_API_TOKEN_FILE: ${OMNYID_TRANSACTIONAL_CLOUDFLARE_API_TOKEN_FILE:-}
+      OMNYID_TRANSACTIONAL_CLOUDFLARE_ACCOUNT_ID: ${OMNYID_TRANSACTIONAL_CLOUDFLARE_ACCOUNT_ID:-}
+      OMNYID_TRANSACTIONAL_RESEND_API_KEY_FILE: ${OMNYID_TRANSACTIONAL_RESEND_API_KEY_FILE:-}
+      OMNYID_TRANSACTIONAL_FROM_ADDRESS: ${OMNYID_TRANSACTIONAL_FROM_ADDRESS:-}
+      OMNYID_VENDOR_MAIL_ENABLED: ${OMNYID_VENDOR_MAIL_ENABLED:-false}
+      OMNYID_WEDDING_RSVP_PUBLIC_ENABLED: ${OMNYID_WEDDING_RSVP_PUBLIC_ENABLED:-false}
+      OMNYID_WEDDING_RSVP_PILOT_USER_IDS: ${OMNYID_WEDDING_RSVP_PILOT_USER_IDS:-}
+      OMNYID_WEDDING_RSVP_REMINDER_SEND_ENABLED: ${OMNYID_WEDDING_RSVP_REMINDER_SEND_ENABLED:-false}
+      OMNYID_WEDDING_RSVP_TEST_SEND_ENABLED: ${OMNYID_WEDDING_RSVP_TEST_SEND_ENABLED:-false}
+      OMNYID_WEDDING_RUNSHEET_SHARING_ENABLED: ${OMNYID_WEDDING_RUNSHEET_SHARING_ENABLED:-false}
+      # Category proposal publication remains false-default and account-scoped.
+      # These values must reach the homeserver; defining them only in
+      # .env.oracle does not make Compose forward them automatically.
+      OMNYID_WEDDING_INVITE_PROPOSALS_ENABLED: ${OMNYID_WEDDING_INVITE_PROPOSALS_ENABLED:-false}
+      OMNYID_WEDDING_INVITE_PROPOSALS_ALLOWLIST: ${OMNYID_WEDDING_INVITE_PROPOSALS_ALLOWLIST:-}
+      # Vendor-published limited-date specials remain false-default. The
+      # capability pepper is server-only and must be file-backed in production.
+      OMNYID_WEDDING_VENDOR_SPECIALS_ENABLED: ${OMNYID_WEDDING_VENDOR_SPECIALS_ENABLED:-false}
+      OMNYID_WEDDING_VENDOR_SPECIALS_ALLOWLIST: ${OMNYID_WEDDING_VENDOR_SPECIALS_ALLOWLIST:-}
+      OMNYID_WEDDING_VENDOR_SPECIALS_DISCOVERY_ENABLED: ${OMNYID_WEDDING_VENDOR_SPECIALS_DISCOVERY_ENABLED:-false}
+      OMNYID_WEDDING_VENDOR_SPECIALS_DISCOVERY_ALLOWLIST: ${OMNYID_WEDDING_VENDOR_SPECIALS_DISCOVERY_ALLOWLIST:-}
+      OMNYID_WEDDING_VENDOR_SPECIALS_CAPABILITY_PEPPER_FILE: ${OMNYID_WEDDING_VENDOR_SPECIALS_CAPABILITY_PEPPER_FILE:-/run/secrets/omnyid_wedding_vendor_specials_capability_pepper}
+      # Celebrant consultation scheduling is false-default and cannot accept a
+      # request unless all Twilio Verify and server-side encryption secrets are
+      # present. Values remain file-backed; Compose only forwards their paths.
+      OMNYID_CELEBRANT_CONSULTATIONS_ENABLED: ${OMNYID_CELEBRANT_CONSULTATIONS_ENABLED:-false}
+      OMNYID_CELEBRANT_CONSULTATION_TOKEN_PEPPER_FILE: ${OMNYID_CELEBRANT_CONSULTATION_TOKEN_PEPPER_FILE:-}
+      OMNYID_TWILIO_ACCOUNT_SID_FILE: ${OMNYID_TWILIO_ACCOUNT_SID_FILE:-}
+      OMNYID_TWILIO_AUTH_TOKEN_FILE: ${OMNYID_TWILIO_AUTH_TOKEN_FILE:-}
+      OMNYID_TWILIO_VERIFY_SERVICE_SID_FILE: ${OMNYID_TWILIO_VERIFY_SERVICE_SID_FILE:-}
+      OMNYID_WEDDING_BOUNDARY_HELPERS_ENABLED: ${OMNYID_WEDDING_BOUNDARY_HELPERS_ENABLED:-false}
+      OMNYID_WEDDING_BOUNDARY_DELEGATES_ENABLED: ${OMNYID_WEDDING_BOUNDARY_DELEGATES_ENABLED:-false}
+      OMNYID_WEDDING_BOUNDARY_DELEGATE_OWNER_ALLOWLIST: ${OMNYID_WEDDING_BOUNDARY_DELEGATE_OWNER_ALLOWLIST:-}
+      OMNYID_VENDOR_CLAIM_WELCOME_EMAIL_ENABLED: ${OMNYID_VENDOR_CLAIM_WELCOME_EMAIL_ENABLED:-false}
+      OMNYID_VENDOR_MAIL_PROVIDER: ${OMNYID_VENDOR_MAIL_PROVIDER:-disabled}
+      OMNYID_VENDOR_MAIL_MASK_DOMAIN: ${OMNYID_VENDOR_MAIL_MASK_DOMAIN:-mail.omnyid.com}
+      OMNYID_VENDOR_MAIL_CLOUDFLARE_ACCOUNT_ID: ${OMNYID_VENDOR_MAIL_CLOUDFLARE_ACCOUNT_ID:-}
+      OMNYID_VENDOR_MAIL_CLOUDFLARE_API_TOKEN_FILE: ${OMNYID_VENDOR_MAIL_CLOUDFLARE_API_TOKEN_FILE:-}
+      OMNYID_VENDOR_MAIL_RECIPIENT_ALLOWLIST_FILE: ${OMNYID_VENDOR_MAIL_RECIPIENT_ALLOWLIST_FILE:-/run/secrets/omnyid_vendor_mail_recipient_allowlist}
+      OMNYID_VENDOR_MAIL_RESEND_API_KEY_FILE: ${OMNYID_VENDOR_MAIL_RESEND_API_KEY_FILE:-}
+      OMNYID_VENDOR_MAIL_WORKER_SHARED_SECRET_FILE: ${OMNYID_VENDOR_MAIL_WORKER_SHARED_SECRET_FILE:-}
+      OMNYID_VENDOR_MAIL_WORKER_KEY_ID: ${OMNYID_VENDOR_MAIL_WORKER_KEY_ID:-primary-v1}
+      OMNYID_VENDOR_MAIL_WORKER_PREVIOUS_SHARED_SECRET_FILE: ${OMNYID_VENDOR_MAIL_WORKER_PREVIOUS_SHARED_SECRET_FILE:-}
+      OMNYID_VENDOR_MAIL_WORKER_PREVIOUS_KEY_ID: ${OMNYID_VENDOR_MAIL_WORKER_PREVIOUS_KEY_ID:-}
+      OMNYID_VENDOR_MAIL_INGRESS_ENABLED: ${OMNYID_VENDOR_MAIL_INGRESS_ENABLED:-false}
+      OMNYID_VENDOR_MAIL_INGRESS_MAX_BYTES: ${OMNYID_VENDOR_MAIL_INGRESS_MAX_BYTES:-10485760}
+      OMNYID_OPERATOR_EMAIL_RELAY_ENABLED: ${OMNYID_OPERATOR_EMAIL_RELAY_ENABLED:-false}
+      OMNYID_OPERATOR_EMAIL_RELAY_ALIASES: ${OMNYID_OPERATOR_EMAIL_RELAY_ALIASES:-}
+      OMNYID_OPERATOR_EMAIL_RELAY_SENDERS: ${OMNYID_OPERATOR_EMAIL_RELAY_SENDERS:-}
+      OMNYID_OPERATOR_EMAIL_RELAY_ENCRYPTION_KEY_HEX_FILE: ${OMNYID_OPERATOR_EMAIL_RELAY_ENCRYPTION_KEY_HEX_FILE:-}
+      OMNYID_OPERATOR_EMAIL_RELAY_CLOUDFLARE_ACCOUNT_ID: ${OMNYID_OPERATOR_EMAIL_RELAY_CLOUDFLARE_ACCOUNT_ID:-}
+      OMNYID_OPERATOR_EMAIL_RELAY_CLOUDFLARE_API_TOKEN_FILE: ${OMNYID_OPERATOR_EMAIL_RELAY_CLOUDFLARE_API_TOKEN_FILE:-}
+      OMNYID_WEDDING_BINDER_ENABLED: ${OMNYID_WEDDING_BINDER_ENABLED:-false}
+      OMNYID_WEDDING_MEASUREMENT_ENABLED: ${OMNYID_WEDDING_MEASUREMENT_ENABLED:-false}
+      OMNYID_WEEKLY_OPERATOR_REPORT_ENABLED: ${OMNYID_WEEKLY_OPERATOR_REPORT_ENABLED:-false}
+      OMNYID_WEEKLY_OPERATOR_REPORT_RECIPIENT: ${OMNYID_WEEKLY_OPERATOR_REPORT_RECIPIENT:-}
+      OMNYID_WEEKLY_REPORT_DISK_ROOT: ${OMNYID_WEEKLY_REPORT_DISK_ROOT:-/}
+      OMNYID_EMAIL_ROUTING_TOKEN_EXPIRES_ON: ${OMNYID_EMAIL_ROUTING_TOKEN_EXPIRES_ON:-}
+      OMNYID_CLOUDFLARE_API_KEY_EXPIRES_ON: ${OMNYID_CLOUDFLARE_API_KEY_EXPIRES_ON:-}
+      OPENROUTER_API_KEY_EXPIRES_ON: ${OPENROUTER_API_KEY_EXPIRES_ON:-}
+      OMNYID_WEDDING_QUOTE_STUDY_ENABLED: ${OMNYID_WEDDING_QUOTE_STUDY_ENABLED:-false}
+      OMNYID_VENDOR_LISTING_PROPOSALS_ENABLED: ${OMNYID_VENDOR_LISTING_PROPOSALS_ENABLED:-false}
+      CLAMD_HOST: ${CLAMD_HOST:-clamav:3310}
+      OMNYID_VENDOR_SENDER_MASK_ENABLED: ${OMNYID_VENDOR_SENDER_MASK_ENABLED:-false}
+      OMNYID_VENDOR_MAIL_RESEND_WEBHOOK_SECRET_FILE: ${OMNYID_VENDOR_MAIL_RESEND_WEBHOOK_SECRET_FILE:-}
+      OMNYID_CEREBRAS_API_KEY_FILE: ${OMNYID_CEREBRAS_API_KEY_FILE:-}
+      OMNYID_MISTRAL_API_KEY_FILE: ${OMNYID_MISTRAL_API_KEY_FILE:-}
+      OMNYID_ANTHROPIC_KEY_FILE: ${OMNYID_ANTHROPIC_KEY_FILE:-/run/secrets/omnyid_anthropic_api_key}
+      OMNYID_WEDDING_OUTREACH_CEREBRAS_MODEL: ${OMNYID_WEDDING_OUTREACH_CEREBRAS_MODEL:-qwen-3.8-27b}
+      OMNYID_WEDDING_OUTREACH_MISTRAL_MODEL: ${OMNYID_WEDDING_OUTREACH_MISTRAL_MODEL:-mistral-small-latest}
+      OMNYID_WEDDING_OUTREACH_ANTHROPIC_MODEL: ${OMNYID_WEDDING_OUTREACH_ANTHROPIC_MODEL:-claude-haiku-4-5-20251001}
+      OMNYID_NVIDIA_API_KEY_FILE: ${OMNYID_NVIDIA_API_KEY_FILE:-/run/secrets/omnyid_nvidia_api_key}
+      OMNYID_RUNPOD_API_KEY_FILE: ${OMNYID_RUNPOD_API_KEY_FILE:-/run/secrets/omnyid_runpod_api_key}
+      OMNYID_OPENAI_API_KEY_FILE: ${OMNYID_OPENAI_API_KEY_FILE:-/run/secrets/omnyid_openai_api_key}
+      OPENROUTER_API_KEY_FILE: ${OPENROUTER_API_KEY_FILE:-/run/secrets/openrouter_api_key}
+      OMNYID_OPENROUTER_FUNDED_ENABLED: ${OMNYID_OPENROUTER_FUNDED_ENABLED:-false}
+      OMNYID_OPENROUTER_WEEKLY_CAP_USD: ${OMNYID_OPENROUTER_WEEKLY_CAP_USD:-50}
+      # Server-only Stripe Checkout configuration. The UI only receives a
+      # short-lived hosted Checkout URL from the authenticated billing route.
+      OMNYID_STRIPE_SECRET_KEY: ${OMNYID_STRIPE_SECRET_KEY:-}
+      OMNYID_STRIPE_SECRET_KEY_FILE: ${OMNYID_STRIPE_SECRET_KEY_FILE:-}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_SECRET_KEY_FILE: ${STRIPE_SECRET_KEY_FILE:-}
+      OMNYID_STRIPE_WEBHOOK_SECRET: ${OMNYID_STRIPE_WEBHOOK_SECRET:-}
+      OMNYID_STRIPE_WEBHOOK_SECRET_FILE: ${OMNYID_STRIPE_WEBHOOK_SECRET_FILE:-}
+      OMNYID_STRIPE_PRO_PRICE_ID: ${OMNYID_STRIPE_PRO_PRICE_ID:-}
+      OMNYID_STRIPE_CHECKOUT_PRICE_ID: ${OMNYID_STRIPE_CHECKOUT_PRICE_ID:-}
+      OMNYID_STRIPE_WEDDING_PRODUCT_ID: ${OMNYID_STRIPE_WEDDING_PRODUCT_ID:-}
+      STRIPE_PRO_PRICE_ID: ${STRIPE_PRO_PRICE_ID:-}
+      STRIPE_CHECKOUT_PRICE_ID: ${STRIPE_CHECKOUT_PRICE_ID:-}
+      STRIPE_PRODUCT_ID: ${STRIPE_PRODUCT_ID:-}
+      OMNYID_STRIPE_TEAM_PRICE_ID: ${OMNYID_STRIPE_TEAM_PRICE_ID:-}
+      STRIPE_TEAM_PRICE_ID: ${STRIPE_TEAM_PRICE_ID:-}
+      OMNYID_UI_BASE_URL: ${OMNYID_UI_BASE_URL:-}
+      OMNYID_STRIPE_SKIP_WEBHOOK_VERIFY: ${OMNYID_STRIPE_SKIP_WEBHOOK_VERIFY:-false}
+      COMPOSIO_API_KEY: ${COMPOSIO_API_KEY:-}
+      COMPOSIO_API_KEY_FILE: ${COMPOSIO_API_KEY_FILE:-/run/secrets/composio_api_key}
+      OMNYID_ADMIN_BRAVE_SEARCH_API_KEY: ${OMNYID_ADMIN_BRAVE_SEARCH_API_KEY:-}
+      OMNYID_BRAVE_SEARCH_API_KEY: ${OMNYID_BRAVE_SEARCH_API_KEY:-}
+      BRAVE_SEARCH_API_KEY: ${BRAVE_SEARCH_API_KEY:-}
+      OMNYID_ADMIN_BRAVE_SEARCH_API_KEY_FILE: ${OMNYID_ADMIN_BRAVE_SEARCH_API_KEY_FILE:-}
+      OMNYID_BRAVE_SEARCH_API_KEY_FILE: ${OMNYID_BRAVE_SEARCH_API_KEY_FILE:-}
+      BRAVE_SEARCH_API_KEY_FILE: ${BRAVE_SEARCH_API_KEY_FILE:-}
+      OMNYID_ADMIN_EXA_SEARCH_API_KEY: ${OMNYID_ADMIN_EXA_SEARCH_API_KEY:-}
+      OMNYID_EXA_SEARCH_API_KEY: ${OMNYID_EXA_SEARCH_API_KEY:-}
+      EXA_API_KEY: ${EXA_API_KEY:-}
+      OMNYID_ADMIN_EXA_SEARCH_API_KEY_FILE: ${OMNYID_ADMIN_EXA_SEARCH_API_KEY_FILE:-}
+      OMNYID_EXA_SEARCH_API_KEY_FILE: ${OMNYID_EXA_SEARCH_API_KEY_FILE:-}
+      EXA_API_KEY_FILE: ${EXA_API_KEY_FILE:-}
+      OMNYID_ADMIN_GOOGLE_PLACES_API_KEY: ${OMNYID_ADMIN_GOOGLE_PLACES_API_KEY:-}
+      OMNYID_GOOGLE_PLACES_API_KEY: ${OMNYID_GOOGLE_PLACES_API_KEY:-}
+      GOOGLE_PLACES_API_KEY: ${GOOGLE_PLACES_API_KEY:-}
+      OMNYID_ADMIN_GOOGLE_PLACES_API_KEY_FILE: ${OMNYID_ADMIN_GOOGLE_PLACES_API_KEY_FILE:-}
+      OMNYID_GOOGLE_PLACES_API_KEY_FILE: ${OMNYID_GOOGLE_PLACES_API_KEY_FILE:-}
+      GOOGLE_PLACES_API_KEY_FILE: ${GOOGLE_PLACES_API_KEY_FILE:-}
+      OMNYID_ADMIN_TOOL_BRAVE_SEARCH_API_ALL_USERS_ENABLED: ${OMNYID_ADMIN_TOOL_BRAVE_SEARCH_API_ALL_USERS_ENABLED:-}
+      OMNYID_ADMIN_TOOL_BRAVE_SEARCH_API_WEDDING_TEMPLATE_ENABLED: ${OMNYID_ADMIN_TOOL_BRAVE_SEARCH_API_WEDDING_TEMPLATE_ENABLED:-}
+      OMNYID_ADMIN_TOOL_EXA_SEARCH_API_ALL_USERS_ENABLED: ${OMNYID_ADMIN_TOOL_EXA_SEARCH_API_ALL_USERS_ENABLED:-}
+      OMNYID_ADMIN_TOOL_EXA_SEARCH_API_WEDDING_TEMPLATE_ENABLED: ${OMNYID_ADMIN_TOOL_EXA_SEARCH_API_WEDDING_TEMPLATE_ENABLED:-}
+      OMNYID_ADMIN_TOOL_GOOGLE_PLACES_API_ALL_USERS_ENABLED: ${OMNYID_ADMIN_TOOL_GOOGLE_PLACES_API_ALL_USERS_ENABLED:-}
+      OMNYID_ADMIN_TOOL_GOOGLE_PLACES_API_WEDDING_TEMPLATE_ENABLED: ${OMNYID_ADMIN_TOOL_GOOGLE_PLACES_API_WEDDING_TEMPLATE_ENABLED:-}
+      OMNYID_WEDDING_SEARCH_COUNTRY: ${OMNYID_WEDDING_SEARCH_COUNTRY:-}
+      OMNYID_WEDDING_DIRECTORY_DOMAINS: ${OMNYID_WEDDING_DIRECTORY_DOMAINS:-}
+      OMNYID_WEDDING_PLACES_ATMOSPHERE_FIELDS: ${OMNYID_WEDDING_PLACES_ATMOSPHERE_FIELDS:-}
+      OMNYID_WEDDING_RESOLUTION_MAX_CALLS: ${OMNYID_WEDDING_RESOLUTION_MAX_CALLS:-}
+      OMNYID_WEDDING_ADMIN_AI_ROUTING_ENABLED: ${OMNYID_WEDDING_ADMIN_AI_ROUTING_ENABLED:-false}
+      OMNYID_WEDDING_EVENT_QUOTE_PROJECTION_ENABLED: ${OMNYID_WEDDING_EVENT_QUOTE_PROJECTION_ENABLED:-true}
+      OMNYID_WEDDING_ONLINE_FALLBACK_ENABLED: ${OMNYID_WEDDING_ONLINE_FALLBACK_ENABLED:-true}
+      OMNYID_WEDDING_ONLINE_CATALOG_ENRICHMENT_ENABLED: ${OMNYID_WEDDING_ONLINE_CATALOG_ENRICHMENT_ENABLED:-true}
+      OMNYID_WEDDING_EXTERNAL_SEND_ENABLED: ${OMNYID_WEDDING_EXTERNAL_SEND_ENABLED:-true}
+      OMNYID_WEDDING_ADMIN_AI_AUDIT_RECEIPTS_ENABLED: ${OMNYID_WEDDING_ADMIN_AI_AUDIT_RECEIPTS_ENABLED:-false}
+      OMNYID_WEDDING_ADMIN_AI_DAILY_REQUEST_LIMIT: ${OMNYID_WEDDING_ADMIN_AI_DAILY_REQUEST_LIMIT:-}
+      OMNYID_SEAWEEDFS_S3_ENDPOINT: http://seaweedfs:8333
+      OMNYID_SEAWEEDFS_ACCESS_KEY_FILE: /run/secrets/seaweedfs_app_access_key
+      OMNYID_SEAWEEDFS_SECRET_KEY_FILE: /run/secrets/seaweedfs_app_secret_key
+      OMNYID_SEAWEEDFS_BUCKET: ${OMNYID_SEAWEEDFS_BUCKET:-omnyid-attachments}
+      OMNYID_ELECTRIC_URL: ${OMNYID_ELECTRIC_URL:-http://electric:5133}
+      OMNYID_ENABLE_PRIVATE_RUNTIMES: "false"
+      OMNYID_ENABLE_WEBTRANSPORT: "true"
+      OMNYID_WEBTRANSPORT_BIND_ADDR: 0.0.0.0:8443
+      OMNYID_WEBTRANSPORT_CERT_PATH: ${OMNYID_WEBTRANSPORT_CERT_PATH}
+      OMNYID_WEBTRANSPORT_KEY_PATH: ${OMNYID_WEBTRANSPORT_KEY_PATH}
+    ports:
+      - "127.0.0.1:18080:8080"
+      - "443:8443/udp"
+    volumes:
+      - ./.secrets:/run/secrets:ro
+      - ./scripts/runtime-env-entrypoint.sh:/usr/local/bin/runtime-env-entrypoint.sh:ro
+      - /home/ubuntu/letsencrypt:/letsencrypt:ro
+    networks:
+      - default
+      - storage
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      homeserver:
+        condition: service_started
+      ui:
+        condition: service_completed_successfully
+    environment:
+      OMNYID_DOMAIN: ${OMNYID_DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL}
+      OMNYID_PREVIEW_USERNAME: ${OMNYID_PREVIEW_USERNAME}
+      OMNYID_PREVIEW_PASSWORD_HASH: ${OMNYID_PREVIEW_PASSWORD_HASH}
+      OMNYID_STAGING_USER: ${OMNYID_STAGING_USER:-staging}
+      OMNYID_STAGING_PASSWORD_HASH: ${OMNYID_STAGING_PASSWORD_HASH:?set in .env.oracle}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - ./docs:/srv/docs:ro
+      - ./wedding:/srv/wedding:ro
+      - workspace-assets:/srv/workspace:ro
+      - staging-workspace-assets:/srv/staging-workspace:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+  # ── Nightly backup cron ──────────────────────────────────────────────────────
+  # Runs omnyid-backup.sh at 02:00 UTC every day; keeps 30 days of archives.
+  # Set OMNYID_BACKUP_DIR on the host to override /var/backups/omnyid.
+  backup:
+    build:
+      context: .
+      dockerfile: Dockerfile.backup
+    depends_on:
+      - postgres
+    environment:
+      OMNYID_PG_HOST: postgres
+      OMNYID_PG_PORT: "5432"
+      OMNYID_PG_USER: ${POSTGRES_USER:-afp}
+      OMNYID_PG_PASSWORD: ${POSTGRES_PASSWORD:-}
+      OMNYID_PG_PASSWORD_FILE: ${POSTGRES_PASSWORD_FILE:-}
+      OMNYID_PG_DB: ${POSTGRES_DB:-afp}
+      OMNYID_BACKUP_RETAIN: "${OMNYID_BACKUP_RETAIN:-30}"
+    volumes:
+      - ./.secrets:/run/secrets:ro
+      - ./scripts/omnyid-backup.sh:/usr/local/bin/omnyid-backup.sh:ro
+      - ./scripts/omnyid-backup-verify.sh:/usr/local/bin/omnyid-backup-verify.sh:ro
+      - ${OMNYID_BACKUP_DIR:-/var/backups/omnyid}:/backups
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        mkdir -p /backups
+        while true; do
+          latest_dir=""
+          if bash /usr/local/bin/omnyid-backup.sh /backups >> /var/log/omnyid-backup.log 2>&1; then
+            latest_dir="$$(find /backups -maxdepth 1 -mindepth 1 -type d -name '20*Z' | sort | tail -n 1)"
+          fi
+          if [[ -n "$${latest_dir}" ]]; then
+            if bash /usr/local/bin/omnyid-backup-verify.sh "$${latest_dir}" >> /var/log/omnyid-backup.log 2>&1; then
+              python3 -c "import json, sys; from datetime import datetime, timezone; path=sys.argv[1]; data=json.load(open(path, 'r', encoding='utf-8')); data['verification']={'status':'passed','verified_at':datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')}; json.dump(data, open(path, 'w', encoding='utf-8'), indent=2); open(path, 'a', encoding='utf-8').write('\n')" "$${latest_dir}/manifest.json"
+            else
+              echo "[omnyid-backup] Verification failed for $${latest_dir}" >> /var/log/omnyid-backup.log 2>&1
+            fi
+          fi
+          sleep 86400
+        done
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  seaweedfs-data:
+  clamav-data:
+  workspace-assets:
+  # Filled by the staging stack; declared here so Caddy can mount it read-only.
+  staging-workspace-assets:
+    name: omnyid-staging-workspace-assets
+  caddy-data:
+  caddy-config:
+
+networks:
+  storage:
+    internal: true

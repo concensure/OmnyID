@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   postgres:
     image: pgvector/pgvector:pg18
@@ -7,41 +5,149 @@ services:
       POSTGRES_DB: afp
       POSTGRES_USER: afp
       POSTGRES_PASSWORD: afp
-    ports:
-      - "5432:5432"
+    ports: ["5432:5432"]
     volumes:
       - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
       - ./postgres/migrations:/docker-entrypoint-initdb.d/migrations
     restart: unless-stopped
 
-  minio:
-    image: quay.io/minio/minio:RELEASE.2025-02-28T09-55-16Z
-    command: server /data --console-address ":9001"
+  seaweedfs:
+    image: chrislusf/seaweedfs
+    # Windows worktrees may materialize bind-mounted shell scripts with CRLF.
+    entrypoint: ["/bin/sh", "-c", "tr -d '\\r' < /usr/local/bin/seaweedfs-secure-entrypoint.sh > /tmp/seaweedfs-secure-entrypoint.sh && exec /bin/sh /tmp/seaweedfs-secure-entrypoint.sh"]
     environment:
-      MINIO_ROOT_USER: afpadmin
-      MINIO_ROOT_PASSWORD: afpadmin123
+      OMNYID_SEAWEEDFS_ACCESS_KEY_FILE: /run/secrets/seaweedfs_app_access_key
+      OMNYID_SEAWEEDFS_SECRET_KEY_FILE: /run/secrets/seaweedfs_app_secret_key
+      OMNYID_SEAWEEDFS_BUCKET: ${OMNYID_SEAWEEDFS_BUCKET:-omnyid-attachments}
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "127.0.0.1:8333:8333"
     volumes:
-      - minio-data:/data
+      - seaweedfs-data:/data
+      - ./.secrets/seaweedfs_app_access_key:/run/secrets/seaweedfs_app_access_key:ro
+      - ./.secrets/seaweedfs_app_secret_key:/run/secrets/seaweedfs_app_secret_key:ro
+      - ./.seaweedfs-admin-secrets/access_key:/run/secrets/seaweedfs_admin_access_key:ro
+      - ./.seaweedfs-admin-secrets/secret_key:/run/secrets/seaweedfs_admin_secret_key:ro
+      - ./scripts/seaweedfs-secure-entrypoint.sh:/usr/local/bin/seaweedfs-secure-entrypoint.sh:ro
+    networks:
+      - storage
     restart: unless-stopped
+
+  seaweedfs-init:
+    image: curlimages/curl:8.18.0
+    depends_on:
+      - seaweedfs
+    environment:
+      OMNYID_SEAWEEDFS_BUCKET: ${OMNYID_SEAWEEDFS_BUCKET:-omnyid-attachments}
+    volumes:
+      - ./.seaweedfs-admin-secrets/access_key:/run/secrets/seaweedfs_admin_access_key:ro
+      - ./.seaweedfs-admin-secrets/secret_key:/run/secrets/seaweedfs_admin_secret_key:ro
+    entrypoint:
+      - /bin/sh
+      - -ec
+    command: >
+      access="$$(tr -d '\r\n' < /run/secrets/seaweedfs_admin_access_key)";
+      secret="$$(tr -d '\r\n' < /run/secrets/seaweedfs_admin_secret_key)";
+      until code="$$(curl -sS -o /dev/null -w '%{http_code}'
+      --aws-sigv4 'aws:amz:us-east-1:s3' --user "$${access}:$${secret}"
+      -X PUT "http://seaweedfs:8333/$${OMNYID_SEAWEEDFS_BUCKET}")"
+      && { [ "$${code}" = 200 ] || [ "$${code}" = 409 ]; }; do sleep 2; done;
+      unset access secret
+    networks:
+      - storage
+    restart: "no"
 
   homeserver:
     build: .
-    depends_on:
-      - postgres
-      - minio
-    env_file:
-      - .env
+    depends_on: [postgres, seaweedfs-init]
     environment:
       DATABASE_URL: postgres://afp:afp@postgres:5432/afp
-      MINIO_URL: http://minio:9000
-      MINIO_USER: afpadmin
-      MINIO_PASS: afpadmin123
-    ports:
-      - "8080:8080"
+      OMNYID_SEAWEEDFS_S3_ENDPOINT: http://seaweedfs:8333
+      OMNYID_SEAWEEDFS_ACCESS_KEY_FILE: /run/secrets/seaweedfs_app_access_key
+      OMNYID_SEAWEEDFS_SECRET_KEY_FILE: /run/secrets/seaweedfs_app_secret_key
+      OMNYID_SEAWEEDFS_BUCKET: ${OMNYID_SEAWEEDFS_BUCKET:-omnyid-attachments}
+      OMNYID_SEAWEEDFS_PREFIX: ${OMNYID_SEAWEEDFS_PREFIX:-archives}
+      OMNYID_SEAWEEDFS_REGION: ${OMNYID_SEAWEEDFS_REGION:-us-east-1}
+      OMNYID_AGENT_ID: agent:you@yourdomain.ai
+      OMNYID_GATEWAY_AGENT_ID: agent:email-gateway@yourdomain.ai
+      OMNYID_HOMESERVER_URL: https://your-homeserver.example.com
+      OMNYID_PUBLIC_KEY_HEX: ${OMNYID_PUBLIC_KEY_HEX}
+      OMNYID_SIGNING_KEY_HEX: ${OMNYID_SIGNING_KEY_HEX}
+      OMNYID_ENCRYPTION_KEY_HEX: ${OMNYID_ENCRYPTION_KEY_HEX}
+      OMNYID_RECIPIENT_KEYS_JSON: ${OMNYID_RECIPIENT_KEYS_JSON:-{}}
+      OMNYID_ALLOW_INSECURE_UNSIGNED: "false"
+      OMNYID_REQUIRE_ENCRYPTION: "true"
+      OMNYID_ALLOW_PLAINTEXT_STORAGE: "false"
+      OMNYID_ENABLE_SERVER_SUMMARIZATION: "false"
+      OMNYID_QUOTATION_RELEASE_GATE: ${OMNYID_QUOTATION_RELEASE_GATE:-disabled}
+      OMNYID_QUOTATION_RELEASE_GATE_VERSION: ${OMNYID_QUOTATION_RELEASE_GATE_VERSION:-quotation.readiness.v1}
+      OMNYID_QUOTATION_RELEASE_EVIDENCE_SHA: ${OMNYID_QUOTATION_RELEASE_EVIDENCE_SHA:-}
+      OMNYID_QUOTATION_EXTRACTION_ENABLED: ${OMNYID_QUOTATION_EXTRACTION_ENABLED:-false}
+      OMNYID_QUOTATION_RECOMMENDATION_ENABLED: ${OMNYID_QUOTATION_RECOMMENDATION_ENABLED:-false}
+      OMNYID_QUOTATION_CLARIFICATION_DRAFT_ENABLED: ${OMNYID_QUOTATION_CLARIFICATION_DRAFT_ENABLED:-false}
+      OMNYID_QUOTATION_CLARIFICATION_SEND_ENABLED: ${OMNYID_QUOTATION_CLARIFICATION_SEND_ENABLED:-false}
+      OMNYID_QUOTATION_CLOSURE_ENABLED: ${OMNYID_QUOTATION_CLOSURE_ENABLED:-false}
+      OMNYID_QUOTATION_VENDOR_GRANTS_ENABLED: ${OMNYID_QUOTATION_VENDOR_GRANTS_ENABLED:-false}
+      OMNYID_ENCRYPT_BY_DEFAULT: "true"
+      OMNYID_ENABLE_WEBTRANSPORT: "false"
+      OMNYID_WEBTRANSPORT_BIND_ADDR: 0.0.0.0:8443
+      OMNYID_WEBTRANSPORT_CERT_PATH: ${OMNYID_WEBTRANSPORT_CERT_PATH:-}
+      OMNYID_WEBTRANSPORT_KEY_PATH: ${OMNYID_WEBTRANSPORT_KEY_PATH:-}
+      OMNYID_ENABLE_INTERNAL_GRPC: "false"
+      OMNYID_INTERNAL_GRPC_ADDR: 127.0.0.1:50051
+      OMNYID_MAIL_PROVIDER: gmail
+      OMNYID_IMAP_POLL_SECONDS: 30
+      OMNYID_EMAIL_ADDRESS: you@yourdomain.com
+      OMNYID_GMAIL_CLIENT_ID: ${OMNYID_GMAIL_CLIENT_ID:-}
+      OMNYID_GMAIL_CLIENT_SECRET: ${OMNYID_GMAIL_CLIENT_SECRET:-}
+      OMNYID_GMAIL_REFRESH_TOKEN: ${OMNYID_GMAIL_REFRESH_TOKEN:-}
+      OMNYID_MICROSOFT_CLIENT_ID: ${OMNYID_MICROSOFT_CLIENT_ID:-}
+      OMNYID_MICROSOFT_CLIENT_SECRET: ${OMNYID_MICROSOFT_CLIENT_SECRET:-}
+      OMNYID_MICROSOFT_REFRESH_TOKEN: ${OMNYID_MICROSOFT_REFRESH_TOKEN:-}
+      OMNYID_IMAP_HOST: ${OMNYID_IMAP_HOST:-}
+      OMNYID_IMAP_USERNAME: ${OMNYID_IMAP_USERNAME:-}
+      OMNYID_IMAP_PASSWORD: ${OMNYID_IMAP_PASSWORD:-}
+      SMTP_HOST: smtp.gmail.com
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_PORT: 587
+      FROM_ADDRESS: you@yourdomain.com
+      OMNYID_VENDOR_MAIL_ENABLED: "false"
+      OMNYID_WEDDING_RSVP_PUBLIC_ENABLED: "false"
+      OMNYID_WEDDING_RSVP_PILOT_USER_IDS: ""
+      OMNYID_WEDDING_RSVP_REMINDER_SEND_ENABLED: "false"
+      OMNYID_WEDDING_RSVP_TEST_SEND_ENABLED: "false"
+      OMNYID_WEDDING_RUNSHEET_SHARING_ENABLED: "false"
+      OMNYID_VENDOR_MAIL_PROVIDER: disabled
+      OMNYID_VENDOR_MAIL_MASK_DOMAIN: mail.omnyid.com
+      OMNYID_VENDOR_MAIL_FROM_ADDRESS: hello@omnyid.com
+      OMNYID_VENDOR_SENDER_MASK_ENABLED: "false"
     restart: unless-stopped
+    volumes:
+      - ./.secrets:/run/secrets:ro
+    networks:
+      - default
+      - storage
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on: [homeserver]
+    networks:
+      - default
 
 volumes:
-  minio-data:
+  caddy-data:
+  caddy-config:
+  seaweedfs-data:
+
+networks:
+  storage:
+    internal: true

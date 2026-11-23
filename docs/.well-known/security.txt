@@ -1,0 +1,5 @@
+Contact: mailto:hello@omnyid.com
+Expires: 2027-07-05T00:00:00Z
+Preferred-Languages: en
+Canonical: https://omnyid.com/.well-known/security.txt
+Policy: https://omnyid.com/security.html

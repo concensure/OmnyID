@@ -1,0 +1,72 @@
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 12mm;
+  }
+
+  body.omnyid-runsheet-printing * {
+    visibility: hidden !important;
+  }
+
+  /* Hidden application content must not reserve blank print pages. Keep only
+     the ancestor path to the in-flow preview and the preview itself. */
+  body.omnyid-runsheet-printing *:has([data-runsheet-print-shell]) {
+    display: contents !important;
+  }
+
+  body.omnyid-runsheet-printing *:has([data-runsheet-print-shell]) > *:not(:has([data-runsheet-print-shell])):not([data-runsheet-print-shell]) {
+    display: none !important;
+  }
+
+  body.omnyid-runsheet-printing [data-runsheet-print],
+  body.omnyid-runsheet-printing [data-runsheet-print] *,
+  body.omnyid-runsheet-printing [data-runsheet-print-shell] {
+    visibility: visible !important;
+  }
+
+  body.omnyid-runsheet-printing [data-runsheet-print-shell] {
+    position: static !important;
+    display: block !important;
+    background: white !important;
+    padding: 0 !important;
+  }
+
+  body.omnyid-runsheet-printing [data-runsheet-print] {
+    position: static !important;
+    inset: auto !important;
+    width: 100% !important;
+    max-height: none !important;
+    overflow: visible !important;
+    border: 0 !important;
+    box-shadow: none !important;
+  }
+
+  body.omnyid-runsheet-printing [data-runsheet-print] tr {
+    break-inside: avoid-page;
+    page-break-inside: avoid;
+  }
+
+  body.omnyid-runsheet-printing [data-runsheet-print] thead {
+    display: table-header-group;
+  }
+
+  body.omnyid-runsheet-printing [data-runsheet-print] h2,
+  body.omnyid-runsheet-printing [data-runsheet-print] thead,
+  body.omnyid-runsheet-printing [data-runsheet-print] th,
+  body.omnyid-runsheet-printing [data-runsheet-print] td {
+    color: #1f1726 !important;
+  }
+
+  body.omnyid-runsheet-printing [data-runsheet-print] table {
+    min-width: 0 !important;
+  }
+
+  body.omnyid-runsheet-printing [data-runsheet-print] th,
+  body.omnyid-runsheet-printing [data-runsheet-print] td {
+    overflow-wrap: anywhere;
+  }
+
+  body.omnyid-runsheet-printing [data-runsheet-no-print] {
+    display: none !important;
+  }
+}

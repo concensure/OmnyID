@@ -1,0 +1,345 @@
+# Couple coworking implementation tasks
+
+Dependency order is authoritative. Task: WED-365.
+
+Status: foundation implemented; WED-394 through WED-397 add bounded run-sheet,
+decision/task, RSVP and Budget enforcement slices through 23 November 2026.
+Checked items are repository claims only; hosted and full-account release
+gates remain separate.
+
+## Phase 1 — Shared-scope foundation
+
+### COW-01 — Route and object inventory (P0)
+
+- [x] Map budget, guest/RSVP, seating, vendor/quote, task/decision, run-sheet,
+  document, database, search and AI routes to their current ownership check.
+- [x] Classify each as membership-ready, owner-only or browser-local.
+- [x] Acceptance: every shared object has one named canonical authority and no
+  proposed duplicate store.
+
+### COW-02 — Canonical WeddingScope resolver (P0)
+
+- [x] Extract the membership resolution in `wedding_partner_sharing_routes.rs` into
+  a reusable server service returning canonical owner/plan/workspace/member/
+  role/revision.
+- [x] Require an active membership and exact scope IDs in the membership query.
+- [x] Add owner bootstrap through the same path.
+- [x] Tests: owner, partner, revoked member, guessed plan/workspace and role
+  escalation.
+- Depends on COW-01.
+
+Implementation evidence: `0171_wedding_scope_revision.sql`,
+`src/server/wedding_scope.rs`, and the refactored
+`wedding_partner_sharing_routes.rs`. Unit coverage proves bounded IDs,
+revisioned cache names and role behaviour. The disposable-Postgres
+`wedding_partner_sharing_api` proves owner bootstrap, authenticated partner
+acceptance, guessed-workspace refusal, role escalation refusal, revisioned
+revocation and post-revocation denial.
+
+### COW-03 — Cross-domain server enforcement (P0)
+
+- Apply `WeddingScope` to existing shared-domain routes in small domain slices;
+  bind scope in each read/update SQL statement.
+- Remove authenticated fallbacks to legacy global or owner-only browser keys.
+- Invalidate scope-revision caches on acceptance and revocation.
+- Tests use two couples and separate browser/session contexts.
+- Depends on COW-02.
+
+### COW-04 — Invitation and membership UX (P0)
+
+- [x] Surface existing invite, accept, member list and leave/revoke states
+  inside Wedding sharing settings.
+- [x] Explain equal Wedding access versus separate personal accounts before
+  acceptance.
+- [x] Enforce the initial two-partner limit without weakening existing restricted
+  external capabilities.
+- [x] Add an explicit expired-invitation presentation to the authenticated
+  sharing card; the server already rejects and expires stale tokens.
+- Depends on COW-02.
+
+Implementation evidence: the canonical resolver refuses workspace substitution
+after the first scope binding; owner-only invitations and serialised acceptance
+enforce one owner plus one co-owner; removal and partner leave both increment
+membership revision, revoke selected-contact grants and invalidate dashboard
+caches. The sharing card names the personal-data boundary and exposes real
+member/remove/leave actions. The owner-only invitation history now projects
+pending, accepted, revoked and expired states without retaining or returning
+the invited email address; expired links are explicitly labelled as granting
+no access.
+
+### COW-05 — Selected-contact sharing (P0)
+
+- [x] Connect existing encrypted contact grants to role filters and a field-level
+  preview/confirmation UI.
+- [x] Show provenance and shared-by identity; do not expose the source contact ID
+  through an unrestricted personal-contact fetch.
+- [x] Support explicit update and revoke of the shared snapshot.
+- Depends on COW-02.
+
+#### COW-03A — Installed run-sheet enforcement (WED-394)
+
+- [x] Resolve the exact active `WeddingScope` before install, load and commit.
+- [x] Store and read both partners' projection through the canonical owner's
+  existing ledger while recording the signed-in member as actor.
+- [x] Reject a guessed workspace, another couple and a revoked co-owner before
+  projection access; retain source-scope and optimistic-checkpoint checks.
+- [x] Install the canonical `wedding_runsheet.v1` database definition
+  server-side when absent, rather than requiring a manual table install.
+- COW-03 remains open for Budget, RSVP/Guests, Seating, Vendors/Quotes,
+  Tasks/Decisions, Documents, search/AI and live-delivery routes.
+
+#### COW-03B — Decision research and task-delivery enforcement (WED-395)
+
+- [x] Resolve exact active `WeddingScope` before decision cache, model or task
+  delivery access.
+- [x] Store decision research once against the canonical owner plan while
+  keeping model usage and rate limits on the requesting account.
+- [x] Use canonical-owner idempotency for approved task delivery and record the
+  acting member separately.
+- [x] Execute the disposable-Postgres denial matrix for guessed workspace,
+  another couple and a revoked member.
+- COW-03 remains open for the other domains and background/live paths.
+
+#### COW-03C — Couple-side RSVP enforcement (WED-396)
+
+- [x] Resolve exact active `WeddingScope` before authenticated protected-link
+  status, list, create, revoke and regenerate operations.
+- [x] Resolve the same scope before a couple records a manual RSVP response,
+  then write through the canonical owner's existing guest ledger.
+- [x] Keep public RSVP open/respond restricted to the existing digest-held,
+  household/invitation capability rather than granting membership access.
+- [x] Prove same-state owner/partner reads plus guessed-workspace,
+  cross-couple, direct-response and post-revocation denial in disposable
+  PostgreSQL.
+- COW-03 remains open for Budget, Seating, Vendors/Quotes, Documents,
+  general search/AI and remaining background/live paths.
+
+#### COW-03D — Budget allocation and contribution enforcement (WED-397)
+
+- [x] Reuse the existing `wedding_decision_selection` allocation and
+  contribution messages; do not create another budget authority.
+- [x] Resolve exact active `WeddingScope` before budget reads or writes, then
+  select only the canonical owner's existing AFP ledger.
+- [x] Keep canonical owner and acting member separate in stored metadata and
+  reject unrelated Wedding message shapes from the scoped route.
+- [x] Prove owner/partner same-state reads plus guessed-workspace,
+  cross-couple and post-revocation denial in disposable PostgreSQL.
+- COW-03 remains open for broader Guests, Seating, Vendors/Quotes, Documents,
+  general search/AI and remaining background/live paths.
+
+#### COW-03E — Seating projection enforcement (WED-399)
+
+- [x] Resolve exact active `WeddingScope` before canonical seating reads and
+  protected seating writes.
+- [x] Reuse the existing constraint, optimisation and draft-archive AFP
+  records in the canonical owner's ledger; do not introduce a seating store.
+- [x] Accept only seating records for the resolved plan and workspace, retain
+  canonical owner and acting member separately, and deny guessed, cross-couple
+  and revoked-member access.
+- COW-03 remains open for broader Guests, Vendors/Quotes, Documents, general
+  search/AI and remaining background/live paths.
+
+Implementation evidence: WED-392 keeps name as the only mandatory field,
+offers email, phone, relationship and Wedding-role controls, and always excludes
+private notes and agent IDs. A review step names the recipient and exact values
+before the existing encrypted grant is upserted. Incoming and outgoing grants
+show sharer and recipient display names; only the original sharer can revoke.
+The server binds grant list/share/revoke to the resolved canonical owner, plan,
+workspace and active member. Disposable-Postgres coverage proves recipient
+read, sharer provenance, omitted-field redaction and sharer-only revocation.
+
+## Phase 2 — Core Wedding collaboration
+
+### COW-06 — Canonical shared projections (P0)
+
+- Make Budget, Guests/RSVP, Seating, Vendors/Quotes, Tasks/Decisions, Run sheet
+  and Documents resolve the same plan for both partners.
+- Make Database view list authorised Wedding projections beside that account's
+  personal databases without copying records.
+- Tests: values and progress match across partners; personal objects differ.
+- Depends on COW-03.
+
+#### COW-06A — Same run-sheet projection for both partners (WED-394)
+
+- [x] Carry the resolved response workspace through the Database view and every
+  run-sheet projection request.
+- [x] Execute the added disposable-Postgres proof that a co-owner can project a
+  source-linked row and the owner reads the same checkpoint and AFP messages
+  without a copied database. The test also covers another couple and revocation.
+- [x] Keep personal Database definitions account-private; only the exact
+  authorised Wedding run-sheet projection crosses the membership boundary.
+- Full COW-06 remains open until the other listed Wedding projections share the
+  same canonical plan and the personal-object isolation matrix is complete.
+
+#### COW-06B — Shared decision research cache (WED-395)
+
+- [x] Reuse one canonical owner/plan research result for either active partner;
+  do not create partner-specific copies of the same decision research.
+- [x] Require the response workspace in both desktop and mobile requests while
+  preserving the current/next/following queue.
+- Full COW-06 remains open for the remaining canonical projections.
+
+#### COW-06C — Shared RSVP protected-link state (WED-396)
+
+- [x] List and manage one canonical owner's protected household grants for
+  either active partner; do not copy grants into the partner account.
+- [x] Preserve the existing RSVP setup, response, revision and capability
+  authorities while changing only authenticated couple ledger selection.
+- Full COW-06 remains open for Budget, broader guest projections, Seating,
+  Vendors/Quotes and Documents.
+
+#### COW-06D — Shared Budget decisions (WED-397)
+
+- [x] Merge canonical allocation and contribution decisions into either
+  partner's normal Wedding refresh without copying records to the partner
+  account.
+- [x] Preserve account-local draft fallback and all existing non-budget
+  personal message routes.
+- Full COW-06 remains open for broader guest projections, Seating,
+  Vendors/Quotes, Documents and the complete personal-object isolation matrix.
+- Full COW-07 remains open: money changes still need expected-revision conflict
+  presentation and recoverability before protected-write collaboration is
+  complete.
+
+#### COW-06E — Shared Seating projection (WED-399)
+
+- [x] Merge the canonical owner's seating constraints, latest optimisation and
+  archive lifecycle into either partner's normal Wedding refresh without
+  copying records into the partner account.
+- [x] Filter older actor-local seating copies once canonical records load, while
+  preserving local presentation preferences and the existing optimiser UI.
+- Full COW-06 remains open for broader guest projections, Vendors/Quotes,
+  Documents and the complete personal-object isolation matrix.
+
+### COW-07 — Actor, revision and recoverability (P0)
+
+- Add actor/provenance presentation from existing AFP/event facts.
+- Require expected revision for money, confirmed decisions, guest state and
+  other protected writes; show a merge/review surface on conflict.
+- Prefer archive/restore over destructive deletion.
+- Depends on COW-06.
+
+#### COW-07A — Task-delivery actor attribution (WED-395)
+
+- [x] Add canonical-owner plus acting-member attribution to idempotent Wedding
+  task-delivery receipts, including a forward backfill for existing owner sends.
+- [x] Keep recipient-agent handoff private and explicitly deny source-workspace
+  access.
+- Full COW-07 remains open for protected-write conflicts and recoverability.
+
+#### COW-07B — RSVP lifecycle actor attribution (WED-396)
+
+- [x] Record canonical owner and acting member separately on authenticated
+  protected-link grant, revoke and regenerate lifecycle events.
+- [x] Retain the existing expected-revision and idempotency checks on RSVP
+  responses; public guest events have no invented account actor.
+- Full COW-07 remains open for conflict presentation and recoverability across
+  money, confirmed decisions and the other shared domains.
+
+#### COW-07C — Shared Budget revision conflict recovery (WED-398)
+
+- [x] Require the current per-artifact revision when saving an allocation or
+  contribution and serialize competing owner/co-owner writes.
+- [x] Append the accepted next revision to the existing AFP decision with
+  canonical owner and acting-member provenance; do not create a budget store.
+- [x] Reject a stale write before ledger mutation, retain the unsaved browser
+  draft and refresh the canonical budget for explicit review.
+- [x] Keep availability failures on the existing local fallback while never
+  presenting a partner conflict as a successful device-only save.
+- [x] Prove simultaneous owner/partner revision-one writes yield exactly one
+  revision-two append and one conflict in disposable PostgreSQL.
+- Full COW-07 remains open for confirmed decisions, guests, seating,
+  vendors/quotes, documents and general archive/restore UX.
+
+#### COW-07D — Seating revision conflict and archive recovery (WED-399)
+
+- [x] Require the current per-artifact seating revision and serialize competing
+  owner/partner writes before appending to the existing AFP ledger.
+- [x] On conflict, retain the unsaved seating preview, refresh canonical state
+  and ask for explicit review instead of silently overwriting a partner.
+- [x] Extend the append-only seating draft archive lifecycle with restore and
+  expose hidden drafts for recoverable review rather than destructive deletion.
+- [x] Prove simultaneous owner/partner revision-one writes yield one accepted
+  next revision and one conflict in disposable PostgreSQL.
+- Full COW-07 remains open for confirmed decisions, guests, Vendors/Quotes,
+  Documents and the remaining protected-write domains.
+
+### COW-08 — Assignments, comments and joint decisions (P1)
+
+- Reuse existing task ownership, comments/messages and DecisionOS records.
+- Allow assign-to-self, partner or both; attach discussions to source objects.
+- Do not copy tasks into both accounts.
+- Depends on COW-06 and COW-07.
+
+#### COW-08A — Membership-backed first task (WED-391)
+
+- [x] Replace the invented “Your partner” assignee with accepted co-owner names
+  from the existing Wedding membership route; keep saved contacts and inferred
+  couple facts only as clearly separate helper choices.
+- [x] Save responsibility through the existing AFP Wedding task record rather
+  than a coworking-only task list.
+- [x] Show current, next and following collaboration steps for private, pending,
+  accepted and expired/revoked membership states.
+- [x] Keep supplier enquiry and external commitment behind the existing approval
+  flow after the task is assigned.
+- This is the first usable COW-08 slice. It does not mark COW-06, COW-07 or the
+  full comments/joint-decision work complete.
+
+### COW-09 — Shared activity and catch-up (P1)
+
+- Project content-light shared activity with actor and object references.
+- Generate "Since you were last here" only from authorised Wedding events.
+- Add per-account read cursor without changing shared event truth.
+- Depends on COW-07.
+
+## Phase 3 — AI and publication boundary
+
+### COW-10 — Wedding-scoped retrieval (P0)
+
+- Apply `WeddingScope` before search, embedding retrieval, document preview,
+  model context, agent memory and tool execution.
+- Namespace caches by canonical scope plus membership revision.
+- Adversarial tests cover guessed IDs, prompt injection and stale caches.
+- Depends on COW-03.
+
+#### COW-10A — Decision research cache boundary (WED-395)
+
+- [x] Resolve membership before feature/model execution and cache lookup.
+- [x] Keep the existing non-invention prompt and separate saved evidence,
+  guidance, unknowns and checks still needed.
+- Full COW-10 remains open for search, embeddings, documents, agent memory,
+  cache-revision invalidation and adversarial retrieval coverage.
+
+### COW-11 — Private-to-shared proposal (P1)
+
+- Reuse change proposals/approval to preview exact fields and audience before a
+  personal draft or selected fact is written to Wedding AFP.
+- Never disclose the private source narrative to the partner.
+- Depends on COW-10.
+
+## Phase 4 — Live delivery and external roles
+
+### COW-12 — Permission-filtered live updates (P1)
+
+- Reuse existing event/sync transport; filter every subscription and replay by
+  active scope and membership revision.
+- Stop delivery promptly after revocation and reconcile offline conflicts.
+- Depends on COW-03 and COW-07.
+
+### COW-13 — Narrow external collaboration (P2)
+
+- Extend current RSVP, vendor, helper and run-sheet capabilities only where a
+  separately approved role needs additional actions.
+- Never implement these roles as full partner membership.
+- Depends on the corresponding capability contracts.
+
+## Release gates
+
+- Disposable full-account harness: Mia/Jordan and Priya/Sam in four isolated
+  browser contexts, including swapped plan/object IDs.
+- Cross-account privacy suite covers reads, writes, search, AI, exports,
+  attachments, background jobs, caches and revocation.
+- No personal content appears in logs, analytics or shared notifications.
+- Migration rollback/restore and exact-SHA hosted evidence are recorded.
+- Product-owner decisions for permanent deletion and separation policy remain
+  open; they do not block non-destructive collaboration.

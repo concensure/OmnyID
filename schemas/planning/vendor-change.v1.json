@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://omnyid.dev/schemas/planning/vendor-change.v1.json",
+  "title": "OmnyID quotation vendor change v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "change_id", "response_ref", "affected_object_ref", "change_kind",
+    "original_term", "replacement_options", "cost_delta", "requires_user_decision"
+  ],
+  "properties": {
+    "schema_version": {"const": "quotation.vendor_change.v1"},
+    "change_id": {"$ref": "#/$defs/id"},
+    "response_ref": {"$ref": "#/$defs/id"},
+    "affected_object_ref": {"$ref": "#/$defs/id"},
+    "change_kind": {"enum": ["unavailable", "substituted", "price_changed", "timing_changed", "scope_changed"]},
+    "original_term": {"$ref": "#/$defs/anchored_term"},
+    "replacement_options": {"type": "array", "maxItems": 20, "items": {"$ref": "#/$defs/anchored_term"}},
+    "cost_delta": {"$ref": "#/$defs/known_money"},
+    "deadline": {"type": ["string", "null"], "format": "date-time"},
+    "requires_user_decision": {"type": "boolean"}
+  },
+  "$defs": {
+    "id": {"type": "string", "minLength": 1, "maxLength": 180, "pattern": "^[^@\\s]+$"},
+    "anchor": {
+      "type": "object", "additionalProperties": false,
+      "required": ["message_id", "locator", "exact_excerpt"],
+      "properties": {
+        "message_id": {"$ref": "#/$defs/id"},
+        "source_version_id": {"oneOf": [{"$ref": "#/$defs/id"}, {"type": "null"}]},
+        "locator": {"type": "string", "minLength": 1, "maxLength": 500},
+        "exact_excerpt": {"type": "string", "minLength": 1, "maxLength": 2000}
+      }
+    },
+    "anchored_term": {
+      "type": "object", "additionalProperties": false, "required": ["value", "source_anchor"],
+      "properties": {"value": {"type": "string", "minLength": 1, "maxLength": 2000}, "source_anchor": {"$ref": "#/$defs/anchor"}}
+    },
+    "money": {
+      "type": "object", "additionalProperties": false, "required": ["amount_minor", "currency"],
+      "properties": {"amount_minor": {"type": "integer", "minimum": 0}, "currency": {"type": "string", "pattern": "^[A-Z]{3}$"}}
+    },
+    "known_money": {
+      "oneOf": [
+        {
+          "type": "object", "additionalProperties": false, "required": ["state", "amount", "evidence_ref"],
+          "properties": {"state": {"const": "exact"}, "amount": {"$ref": "#/$defs/money"}, "evidence_ref": {"$ref": "#/$defs/id"}}
+        },
+        {"type": "object", "additionalProperties": false, "required": ["state"], "properties": {"state": {"const": "unknown"}}}
+      ]
+    }
+  }
+}

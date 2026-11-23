@@ -1,0 +1,23 @@
+[Unit]
+Description=OmnyID Wedding read-only production synthetic
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+Group=ubuntu
+EnvironmentFile=-/etc/omnyid/wedding-monitor.env
+Environment=OMNYID_WEDDING_MONITOR_EMAIL_FILE=%d/email
+Environment=OMNYID_WEDDING_MONITOR_PASSWORD_FILE=%d/password
+Environment=OMNYID_WEDDING_MONITOR_OUTPUT_FILE=/var/lib/omnyid-wedding-monitor/latest.json
+LoadCredential=email:/etc/omnyid/wedding-monitor-email
+LoadCredential=password:/etc/omnyid/wedding-monitor-password
+ExecStart=/usr/local/libexec/omnyid-wedding-monitor
+StateDirectory=omnyid-wedding-monitor
+StateDirectoryMode=0750
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/var/lib/omnyid-wedding-monitor
