@@ -14,6 +14,16 @@ export type WeddingImportSourceKind = "csv" | "tsv" | "spreadsheet" | "google_sh
 export type WeddingImportDeclaredKind = "budget" | "guest_list" | "seating_chart" | "vendor_list" | "timeline" | "general_planning";
 export type WeddingImportSynthesisStatus = "synthesized" | "needs_parser" | "needs_review";
 
+export type WeddingGuestImportReview = {
+  peopleCount: number;
+  statedHouseholdCount: number;
+  ungroupedPeopleCount: number;
+  uncertainRsvpCount: number;
+  pendingRsvpCount: number;
+  householdColumnDetected: boolean;
+  rsvpColumnDetected: boolean;
+};
+
 export type WeddingImportFileInput = {
   name: string;
   text?: string | null;
@@ -46,6 +56,7 @@ export type WeddingImportSynthesisItem = {
   summaryLabels: string[];
   warningLabels: string[];
   truncated: boolean;
+  guestReview: WeddingGuestImportReview | null;
   generatedArtifact: WeddingGeneratedArtifact;
 };
 
@@ -291,6 +302,48 @@ function normalizedHeader(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
 
+function matchingHeaderIndex(headers: readonly string[], pattern: RegExp): number {
+  return headers.findIndex((header) => pattern.test(normalizedHeader(header)));
+}
+
+function guestRsvpKind(value: string): "attending" | "declined" | "pending" | "uncertain" {
+  const normalized = normalizedHeader(value);
+  if (!normalized || ["pending", "awaiting", "not replied", "no response"].includes(normalized)) return "pending";
+  if (["yes", "y", "attending", "accepted", "confirmed", "coming", "rsvp yes"].includes(normalized)) return "attending";
+  if (["no", "n", "declined", "not attending", "unable", "rsvp no"].includes(normalized)) return "declined";
+  return "uncertain";
+}
+
+function guestImportReview(
+  headers: readonly string[],
+  rows: readonly (readonly string[])[],
+): WeddingGuestImportReview {
+  const householdIndex = matchingHeaderIndex(headers, /\b(household|family|group|party)\b/i);
+  const rsvpIndex = matchingHeaderIndex(headers, /\b(rsvp|attendance|attending|status|reply|response)\b/i);
+  const statedHouseholds = new Set<string>();
+  let ungroupedPeopleCount = 0;
+  let uncertainRsvpCount = 0;
+  let pendingRsvpCount = 0;
+  for (const row of rows) {
+    const household = householdIndex >= 0 ? clean(row[householdIndex]) : "";
+    if (household) statedHouseholds.add(normalizedHeader(household));
+    else ungroupedPeopleCount += 1;
+    if (rsvpIndex < 0) continue;
+    const rsvpKind = guestRsvpKind(clean(row[rsvpIndex]));
+    if (rsvpKind === "uncertain") uncertainRsvpCount += 1;
+    if (rsvpKind === "pending" || rsvpKind === "uncertain") pendingRsvpCount += 1;
+  }
+  return {
+    peopleCount: rows.length,
+    statedHouseholdCount: statedHouseholds.size,
+    ungroupedPeopleCount,
+    uncertainRsvpCount,
+    pendingRsvpCount,
+    householdColumnDetected: householdIndex >= 0,
+    rsvpColumnDetected: rsvpIndex >= 0,
+  };
+}
+
 function inferArtifactKind(headers: readonly string[], fileName: string, declaredKind?: WeddingImportDeclaredKind | null): WeddingArtifactKind {
   if (declaredKind === "budget") return "budget_sheet";
   if (declaredKind === "guest_list" || declaredKind === "seating_chart") return "guest_list";
@@ -390,6 +443,7 @@ function synthesizeImport(file: WeddingImportFileInput, metadata: WeddingPlannin
   const headers = rows[0] ?? [];
   const dataRows = rows.slice(1).filter((row) => row.some(Boolean));
   const artifactKind = inferArtifactKind(headers, fileName, file.declaredKind);
+  const guestReview = artifactKind === "guest_list" ? guestImportReview(headers, dataRows) : null;
   const title = titleFor(artifactKind, fileName);
   const status: WeddingImportSynthesisStatus = parserRequired
     ? "needs_parser"
@@ -405,9 +459,12 @@ function synthesizeImport(file: WeddingImportFileInput, metadata: WeddingPlannin
   const summaryLabels = [
     `${dataRows.length} row${dataRows.length === 1 ? "" : "s"} detected`,
     `${headers.length} column${headers.length === 1 ? "" : "s"} detected`,
+    guestReview ? `${guestReview.statedHouseholdCount} stated household${guestReview.statedHouseholdCount === 1 ? "" : "s"}` : null,
+    guestReview ? `${guestReview.ungroupedPeopleCount} ungrouped ${guestReview.ungroupedPeopleCount === 1 ? "person" : "people"}` : null,
+    guestReview?.rsvpColumnDetected ? `${guestReview.uncertainRsvpCount} uncertain RSVP${guestReview.uncertainRsvpCount === 1 ? "" : "s"} kept pending` : null,
     (file.declaredKind ?? artifactKind).replace(/_/g, " "),
     sourceKind.replace(/_/g, " "),
-  ];
+  ].filter((value): value is string => Boolean(value));
   const limitedRows = dataRows.slice(0, WEDDING_IMPORT_PREVIEW_ROWS);
   const markdown = [
     `# ${title}`,
@@ -426,6 +483,11 @@ function synthesizeImport(file: WeddingImportFileInput, metadata: WeddingPlannin
     parserFormulaCellCount > 0 ? `- Formula cells detected: ${parserFormulaCellCount}` : null,
     `- Rows detected: ${dataRows.length}`,
     `- Columns detected: ${headers.length}`,
+    guestReview ? `- People found: ${guestReview.peopleCount}` : null,
+    guestReview?.householdColumnDetected ? `- Stated households: ${guestReview.statedHouseholdCount}` : null,
+    guestReview ? `- Ungrouped people needing review: ${guestReview.ungroupedPeopleCount}` : null,
+    guestReview?.rsvpColumnDetected ? `- Pending RSVP values: ${guestReview.pendingRsvpCount}` : null,
+    guestReview?.rsvpColumnDetected ? `- Uncertain RSVP values kept pending: ${guestReview.uncertainRsvpCount}` : null,
     parsed.truncated ? `- Import preview limit: first ${WEDDING_IMPORT_MAX_SYNTHESIS_ROWS} rows` : null,
     file.sizeBytes ? `- Size: ${file.sizeBytes} bytes` : null,
     file.lastModified ? `- Last modified: ${new Date(file.lastModified).toISOString()}` : null,
@@ -517,6 +579,7 @@ function synthesizeImport(file: WeddingImportFileInput, metadata: WeddingPlannin
     summaryLabels,
     warningLabels,
     truncated: parsed.truncated,
+    guestReview,
     generatedArtifact,
   };
 }

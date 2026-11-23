@@ -130,6 +130,12 @@ function isWorkspaceAppLink(url) {
   return /^(\.\.\/)+workspace\/(?:vendor\.html)?(\?.*)?$/.test(url.split('#')[0]);
 }
 
+// The Binder PDFs are mounted release assets on the public host rather than
+// repository files. Keep the exception exact so other missing downloads fail.
+function isRuntimeBinderDownload(url) {
+  return /^\/wedding\/downloads\/wedding-day-binder-(?:fillable|print)\.pdf$/.test(url.split('#')[0]);
+}
+
 function targetPath(fromFile, rawUrl) {
   const clean = rawUrl.split('#')[0].split('?')[0];
   if (!clean) return fromFile;
@@ -310,7 +316,7 @@ for (const file of pages) {
   }
 
   for (const rawUrl of [...attrs(html, 'href'), ...attrs(html, 'src')]) {
-    if (isExternal(rawUrl) || isWorkspaceAppLink(rawUrl)) continue;
+    if (isExternal(rawUrl) || isWorkspaceAppLink(rawUrl) || isRuntimeBinderDownload(rawUrl)) continue;
     const hash = fragment(rawUrl);
     const resolved = targetPath(file, rawUrl);
     const display = `${name}: ${rawUrl}`;
@@ -528,6 +534,15 @@ if (!weddingJs.includes('/wedding/newsletter')) failures.push('main.js: newslett
 if (!weddingHome.includes('<html lang="en-AU">') || !weddingHome.includes('<meta property="og:locale" content="en_AU">')) failures.push('index.html: Australian language and Open Graph locale metadata are missing');
 if (!weddingHome.includes('<link rel="canonical" href="https://omnyid.com/wedding/">')) failures.push('index.html: canonical Wedding URL is missing');
 if (/\bAFP\b/.test(weddingHome) || weddingHome.includes('Binder email delivery is being checked')) failures.push('index.html: internal AFP or retired Binder readiness copy is public');
+if (weddingHome.includes('We email you the download links') || !weddingHome.includes('/wedding/downloads/wedding-day-binder-fillable.pdf') || !weddingHome.includes('/wedding/downloads/wedding-day-binder-print.pdf')) {
+  failures.push('index.html: Binder must promise and expose direct downloads while email readiness is optional');
+}
+if (weddingHome.includes('never sell or transfer') || weddingHome.includes('land in your calendar automatically') || weddingHome.includes('no forgotten deposit or legal date')) {
+  failures.push('index.html: absolute privacy or automatic-deadline overclaims have returned');
+}
+if (!weddingHome.includes('same 64-task timeline used by the Wedding planner') || weddingHome.includes('same 65-task timeline')) {
+  failures.push('index.html: public countdown count must match the shared 64-task catalogue');
+}
 for (const guide of ['before-you-accept-that-wedding-quote.html', 'sydney-wedding-venue-cost-per-head.html', 'venue-tour-questions-australian-couples.html']) {
   if (!weddingHome.includes(`blog/${guide}`)) failures.push(`index.html: missing direct guide link ${guide}`);
 }

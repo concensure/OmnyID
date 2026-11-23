@@ -1697,11 +1697,24 @@ export function ResponseQueueView(props: {
         const savedCount = saveResults.filter((result) => result.status === "fulfilled").length;
         setWeddingImportRefreshKey((value) => value + 1);
         setActiveWeddingArtifactId(synthesis.generatedArtifacts[0]?.summary.id ?? null);
+        const guestReviewDetail = synthesis.items
+          .filter((item) => item.guestReview !== null)
+          .map((item) => {
+            const review = item.guestReview!;
+            const householdDetail = review.householdColumnDetected
+              ? `${review.statedHouseholdCount} stated household${review.statedHouseholdCount === 1 ? "" : "s"}, ${review.ungroupedPeopleCount} ungrouped ${review.ungroupedPeopleCount === 1 ? "person" : "people"}`
+              : `${review.ungroupedPeopleCount} people need household review because no household column was found`;
+            const rsvpDetail = review.rsvpColumnDetected
+              ? `${review.uncertainRsvpCount} uncertain RSVP${review.uncertainRsvpCount === 1 ? "" : "s"} kept pending`
+              : "no RSVP column found";
+            return `${item.fileName}: ${review.peopleCount} people, ${householdDetail}, ${rsvpDetail}.`;
+          })
+          .join(" ");
         const processingDetail = synthesis.reviewCount > 0
           ? `${synthesis.reviewCount} need review because no clear structured rows were detected; the original stays available until you review it or run a supported parser.`
           : synthesis.parserNeededCount > 0
             ? `${synthesis.parserNeededCount} need a supported document parser before structured rows can be created.`
-            : "Structured content was synthesized during this upload.";
+            : guestReviewDetail || "Structured content was synthesized during this upload.";
         setWeddingImportNotice(savedCount > 0
           ? `${synthesis.summaryLabel}. ${processingDetail} ${savedCount} import${savedCount === 1 ? "" : "s"} saved to Documents. Review the imported rows there before relying on them.`
           : `${synthesis.summaryLabel}. Imports are saved locally and queued for Files.`

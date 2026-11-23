@@ -273,6 +273,37 @@ test("buildWeddingImportSynthesisState turns CSV guest imports into private gues
   assert.match(state.generatedArtifacts[0]?.csv ?? "", /Nut allergy/);
 });
 
+test("guest import review counts only stated households and keeps ambiguous replies pending", () => {
+  const state = buildWeddingImportSynthesisState({
+    metadata,
+    files: [{
+      name: "households.csv",
+      declaredKind: "guest_list",
+      text: [
+        "Name,Household,RSVP",
+        "Alex,Ng family,Yes",
+        "Blair,Ng family,Maybe",
+        "Casey,,No response",
+        "Dev,,No",
+      ].join("\n"),
+    }],
+  });
+
+  assert.deepEqual(state.items[0]?.guestReview, {
+    peopleCount: 4,
+    statedHouseholdCount: 1,
+    ungroupedPeopleCount: 2,
+    uncertainRsvpCount: 1,
+    pendingRsvpCount: 2,
+    householdColumnDetected: true,
+    rsvpColumnDetected: true,
+  });
+  assert.match(state.generatedArtifacts[0]?.markdown ?? "", /Stated households: 1/);
+  assert.match(state.generatedArtifacts[0]?.markdown ?? "", /Ungrouped people needing review: 2/);
+  assert.match(state.generatedArtifacts[0]?.markdown ?? "", /Uncertain RSVP values kept pending: 1/);
+  assert.ok(state.items[0]?.summaryLabels.includes("1 stated household"));
+});
+
 test("imported budget artifacts feed the existing wedding workspace budget tracker and projection queue", () => {
   const imports = buildWeddingImportSynthesisState({
     metadata,

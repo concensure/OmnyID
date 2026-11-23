@@ -15,6 +15,25 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-409
+    title: Reconcile public Wedding claims with live capabilities and verify partner, guest and celebrant data
+    status: in_progress
+    owner: codex
+    reviewer: claude
+    branch: agent/codex/WED-409
+    worktree: C:/temp/wt/omnyid-wed409
+    base_sha: 290b26b93c44692dfbca15a330a8c63e5e91a451
+    depends_on: [WED-408, WED-407, WED-392, WED-391]
+    files: [wedding/**, solid-ui/src/**wedding**, solid-ui/tests/**wedding**, src/server/**wedding**, Documents/verification/wedding-landing-claims-audit-2026-11-23.md, Documents/verification/WED-409-*.md, .agent/**]
+    acceptance: [verify every disputed public Wedding claim against the exact deployed lineage and Oracle runtime, fix only claims that remain unsupported or misleading, confirm the partner invitation expiry from server authority, confirm whether guest import reports household and uncertainty summaries, report Oracle celebrant totals and active-hidden status without mutating records, pass the public-site and relevant focused contracts, deploy any required static correction from an exact clean SHA]
+    progress:
+      - registered from the WED-408 release-record lineage; the supplied audit was produced from a stale primary checkout and requires re-verification against WED-408 and Oracle before any change
+      - reverified every finding against the current shared catalogue, partner-sharing server, enquiry permissions, quote flows and production database; seven-day authenticated partner expiry and phone false-default already hold
+      - corrected the real public gaps: direct Binder downloads replace the disabled email promise, processor-aware privacy wording replaces the absolute transfer claim, calendar and legal-date guarantees are qualified, the sample allocation is labelled 91%, and every public countdown reference now matches the 64-task shared authority
+      - extended the existing import synthesis rather than creating a second guest store: imported guest evidence now reports people, explicit unique households, ungrouped people, pending replies and uncertain replies in the upload result and preserved artifact
+      - read-only Oracle SQL found 1,934 Celebrant rows, all NSW-labelled: 1,933 active, one hidden, zero archived; no record or status was mutated
+      - focused import/catalogue tests, TypeScript, line budgets, all 2,394 Wedding tests, the 95-page public/security suite and the 1,862-module production build pass in the implementation worktree
+
   - id: WED-408
     title: Make Google sign-in retry-safe, restore operator Growth access, and make Wedding budget setup account-scoped and editable
     status: done

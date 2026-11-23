@@ -83,7 +83,7 @@
           <a href="../workspace/?auth=register&amp;source=wedding&amp;format=undecided">Not sure yet</a>
         </nav>
         <div class="hero-trust">
-          <div class="trust-item"><strong>Private by default</strong><span>We never sell or transfer your data</span></div>
+          <div class="trust-item"><strong>Private by default</strong><span>We never sell, rent or trade your data</span></div>
           <div class="trust-item"><strong>Built with AU couples in mind</strong><span>Australian wedding planning context</span></div>
           <div class="trust-item"><strong>Australian timing, clearly qualified</strong><span>NOIM reminders, not legal lodgement</span></div>
         </div>
@@ -170,7 +170,7 @@
       <div class="section-head center reveal">
         <p class="eyebrow" style="justify-content:center">✦ How it works</p>
         <h2>Start with what matters. Add only what your day needs.</h2>
-        <p>Four calm steps. No 100-item checklist, no large-wedding default, no forgotten deposit or legal date.</p>
+        <p>Four calm steps. No 100-item checklist, no large-wedding default, and fewer important dates left buried in notes.</p>
       </div>
       <ol class="steps process-stepper reveal-stagger" aria-label="How OmnyID turns your wedding details into a trusted plan">
         <li class="step-card">
@@ -311,7 +311,7 @@
                 </div>
                 <div class="mock-card">
                   <h3>At a glance</h3>
-                   <div class="mock-bar-row"><span class="label">Budget planned</span><div class="mock-bar-track"><div class="mock-bar-fill" data-width="65%"></div></div><span class="amount">65%</span></div>
+                   <div class="mock-bar-row"><span class="label">Budget allocated</span><div class="mock-bar-track"><div class="mock-bar-fill" data-width="91%"></div></div><span class="amount">91%</span></div>
                    <div class="mock-bar-row"><span class="label">Guests RSVP'd</span><div class="mock-bar-track"><div class="mock-bar-fill" data-width="75%" style="background:var(--sage);"></div></div><span class="amount">18/24</span></div>
                    <div class="mock-bar-row"><span class="label">Suppliers booked</span><div class="mock-bar-track"><div class="mock-bar-fill" data-width="50%" style="background:var(--gold);"></div></div><span class="amount">2/4</span></div>
                 </div>
@@ -472,9 +472,9 @@
       <div class="binder-copy reveal">
         <p class="eyebrow">✦ Not ready to sign up?</p>
         <h2 id="binderTitle">Get the free Wedding Day Binder</h2>
-        <p>A free 40-page A4 pack of fillable and printable templates for the day itself. We email you the download links. No account needed.</p>
+        <p>A free 40-page A4 pack of fillable and printable templates for the day itself. Download either version now. No account needed.</p>
         <p class="binder-detail"><strong>40 templates, 8 sections</strong> — timelines, vendor contacts, ceremony paperwork, guest notes, venue setup, money, Plan B and the after-wedding wrap-up.</p>
-        <form class="binder-form" data-binder-form novalidate aria-describedby="binderAvailability binderStatus">
+        <form class="binder-form" data-binder-form novalidate aria-describedby="binderAvailability binderStatus" hidden>
           <label for="binderEmail">Email address</label>
           <div class="binder-form-row">
             <input id="binderEmail" name="email" type="email" autocomplete="email" inputmode="email" required maxlength="254">
@@ -491,11 +491,11 @@
         </form>
         <p id="binderAvailability" class="binder-availability"></p>
         <p id="binderStatus" class="binder-status" role="status" aria-live="polite"></p>
-        <div id="binderReady" class="binder-ready" hidden>
-          <p><strong>Your downloads are ready now.</strong> Choose either version while the email makes its way to you.</p>
+        <div id="binderReady" class="binder-ready">
+          <p><strong>Your downloads are ready now.</strong> Choose the fillable version or the print-ready version.</p>
           <div class="binder-ready-actions">
-            <a class="btn btn-primary" data-binder-download="fillable" href="#wedding-day-binder">Download fillable PDF</a>
-            <a class="btn btn-outline" data-binder-download="print" href="#wedding-day-binder">Download print PDF</a>
+            <a class="btn btn-primary" data-binder-download="fillable" href="/wedding/downloads/wedding-day-binder-fillable.pdf">Download fillable PDF</a>
+            <a class="btn btn-outline" data-binder-download="print" href="/wedding/downloads/wedding-day-binder-print.pdf">Download print PDF</a>
           </div>
           <a class="binder-continue" data-binder-continue href="../workspace/?auth=register&amp;source=wedding">Continue in OmnyID Wedding <span aria-hidden="true">→</span></a>
         </div>
@@ -523,8 +523,8 @@
           <div class="feature-icon" style="background:var(--sage-pale);color:var(--sage-deep);">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></svg>
           </div>
-          <h3>Deadlines that keep themselves</h3>
-          <p>Deposits, NOIM timing, RSVP cut-offs and vendor calls land in your calendar automatically, with enough runway to actually act.</p>
+          <h3>Deadlines you can see</h3>
+          <p>Reviewed reminders can keep deposits, RSVP cut-offs and vendor calls visible. NOIM guidance stays clearly labelled for confirmation with your celebrant.</p>
         </div>
         <div class="feature-card">
           <div class="feature-icon" style="background:var(--gold-pale);color:#8A6A1E;">
@@ -577,7 +577,7 @@
       <div class="section-head center reveal">
         <p class="eyebrow" style="justify-content:center">✦ When the guest spreadsheet stops feeling reliable</p>
         <h2 id="guestJourneyTitle">Bring the list you have. Review what OmnyID understood.</h2>
-        <p>Start with a CSV, TSV or pasted table instead of rebuilding it in an OmnyID template. You review households and uncertain replies before they become part of the Wedding plan.</p>
+        <p>Start with a CSV, TSV or pasted table instead of rebuilding it in an OmnyID template. The import summary keeps stated households together, leaves unstated households ungrouped and keeps uncertain replies pending for review.</p>
       </div>
       <div class="guest-growth-transform reveal" aria-label="Illustrative guest-list transformation">
         <article class="guest-growth-card guest-growth-before">
@@ -698,7 +698,7 @@
         <a href="blog/before-you-accept-that-wedding-quote.html"><strong>Before you accept a wedding quote</strong><span>Find missing inclusions, conditions and likely cost changes.</span></a>
         <a href="blog/sydney-wedding-venue-cost-per-head.html"><strong>Sydney venue cost per head</strong><span>Understand what a per-person figure may and may not include.</span></a>
         <a href="blog/venue-tour-questions-australian-couples.html"><strong>Questions for an Australian venue tour</strong><span>Check capacity, access, wet weather and service details in person.</span></a>
-        <a href="wedding-planning-checklist-australia.html"><strong>Build your personalised wedding countdown</strong><span>Turn one date into the same 65-task timeline used by the Wedding planner.</span></a>
+        <a href="wedding-planning-checklist-australia.html"><strong>Build your personalised wedding countdown</strong><span>Turn one date into the same 64-task timeline used by the Wedding planner.</span></a>
       </div>
     </div>
   </section>

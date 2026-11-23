@@ -20,11 +20,13 @@
   }
 
   function setEnabled(enabled) {
+    form.hidden = !enabled;
     submit.disabled = !enabled;
     submit.setAttribute('aria-disabled', String(!enabled));
     availability.textContent = enabled
-      ? ''
-      : 'Binder delivery is temporarily unavailable. You can still enter your email and try again shortly.';
+      ? 'You can also send both links to your inbox.'
+      : 'Email delivery is temporarily unavailable. Both direct downloads are ready below.';
+    showDownloads({});
   }
 
   function acquisition() {

@@ -23,7 +23,7 @@ Guides under /wedding/blog/ are dated, and prices and rules change, so check the
 
 ## Free wedding planning tools
 
-- [Wedding planning checklist Australia](https://omnyid.com/wedding/wedding-planning-checklist-australia.html): a personalised countdown built from a 65-task timing catalogue, private and editable on the device.
+- [Wedding planning checklist Australia](https://omnyid.com/wedding/wedding-planning-checklist-australia.html): a personalised countdown built from a 64-task timing catalogue, private and editable on the device.
 - [Wedding budget reality check](https://omnyid.com/wedding/wedding-cost-calculator.html): a balanced Australian budget with category trade-offs and commonly unclear costs.
 - [Compare wedding venue quotes](https://omnyid.com/wedding/compare-wedding-venue-quotes.html): puts venue proposals into one format and lists inclusions, missing terms and follow-up questions.
 - [Talk to an authorised marriage celebrant](https://omnyid.com/wedding/talk-to-a-celebrant.html): ask a question in a ten-minute callback or book the next Sydney consultation time.
