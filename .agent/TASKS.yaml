@@ -17,7 +17,7 @@ lifecycle:
 tasks:
   - id: WED-405
     title: Extend the existing admin workspace vendor view and simplify the Notes writing workspace
-    status: in_progress
+    status: done
     owner: codex
     reviewer: claude
     branch: agent/codex/WED-405
@@ -46,6 +46,7 @@ tasks:
       - the operator vendor panel loads the bounded complete catalogue, filters categories, ranks typo-tolerant search, labels canonical claim state and generates the existing private availability capability per result
       - Notes now has one visible save control, an explicit save state, a wider canvas, collapsible inspector, non-duplicated title, Ask in the inspector and Folders before collapsed Tags and System domains
       - pass: 15 focused frontend contracts, TypeScript, both line budgets, 2,388 Wedding tests, 93-page public/security checks, 1,861-module production build and focused Rust operator-limit test
+      - live on Oracle from exact implementation SHA 0704ea99171a7946aa6a82f2580f6f8ff83e0e64; native ARM64 workflow 45128138875 and artifact 14797136899 passed, candidate/live Workspace hashes match, the authenticated eight-check monitor passes, operator denial is preserved for an ordinary account, Caddy validates, and homeserver/Caddy have zero restarts
 
   - id: WED-404
     title: Make Personal Agent and Wedding decision plans editable without weakening decision authority

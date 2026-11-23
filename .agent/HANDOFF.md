@@ -12832,7 +12832,7 @@ Root use remains 91% (about 4.4 GiB free); the pre-existing WED-402 restore-dril
 capacity follow-up still needs roughly 3.1 GiB additional headroom. Full evidence is
 in `Documents/verification/WED-404-editable-decision-plan-release.md`.
 
-## WED-405 admin vendor directory and focused Notes workspace ready for release (2026-11-23)
+## WED-405 admin vendor directory and focused Notes workspace release (2026-11-23)
 
 Worktree `C:/temp/wt/omnyid-wed405`, branch `agent/codex/WED-405`, based on
 WED-404 release-record SHA `1b104ff1fad67206ef419e2f667ad2472a229441`.
@@ -12852,8 +12852,20 @@ inspector and no repeated title. Folders precede collapsed Tags and System
 domains; Ask/AI, summary, backlinks and history live in the inspector instead of
 the writing stream. The graph browser remains an explicit segmented view.
 
-Working-tree checks passed 15 focused frontend contracts, TypeScript, both line
-budgets, all 2,388 Wedding tests, all 93 public/security pages, the 1,861-module
-production build and the focused Rust operator-limit test. Release evidence,
-exact deployed SHA, rollback and hosted checks remain to be recorded after a
-clean candidate is committed and deployed.
+Exact implementation and deployed SHA
+`0704ea99171a7946aa6a82f2580f6f8ff83e0e64` passed 15 focused frontend
+contracts, TypeScript, both line budgets, all 2,388 Wedding tests, all 93
+public/security pages, the 1,861-module production build and the focused Rust
+operator-limit test. Native ARM64 workflow `45128138875` produced artifact
+`14797136899`; Oracle runs its exact revision with zero homeserver restarts.
+
+The scheduled authenticated monitor passes all eight checks, Caddy validates
+unchanged with zero restarts, public Wedding/Workspace/Docs return 200 and the
+publicly served Workspace, main, Notes and Usage hashes match the candidate.
+An authenticated ordinary account receives 403 from the operator vendor route;
+no real availability bearer link was created for smoke testing. Rollback is at
+`/home/ubuntu/omnyid-candidates/wed405-0704ea99171a7946aa6a82f2580f6f8ff83e0e64/rollback`.
+The verified upload archives were removed from Oracle after load and proof but
+remain locally and in the three-day GitHub artifact. Root use is 93% with about
+3.4 GB free, so the separate restore-drill capacity follow-up remains open.
+Full evidence: `Documents/verification/WED-405-admin-vendor-notes-release.md`.
