@@ -12977,6 +12977,15 @@ remains the sole account/workspace-scoped storage path. No migration or backend
 change is involved.
 
 TypeScript, line budgets, 22 focused contracts, 2,402 Wedding tests, 95-page public
-and security checks, and the 1,863-module production build pass. Exact clean-SHA
-packaging, static Oracle installation, rollback capture and hosted verification are
-the remaining release steps; production is unchanged at this checkpoint.
+and security checks, and the 1,863-module production build pass. Exact implementation
+and deployed static SHA is `d9b6afb8c0d996a64be03386a395444ab2657ce8`;
+clean release worktree is `C:/temp/wt/omnyid-wed411-release-d9b6afb8`.
+
+Oracle serves the exact candidate index and main bundle. The Workspace archive hash
+is `9480595aff17bf584cb0645d02fba634fcd31fa0e3ddff4004250d89d518a5f2`;
+hosted index hash is `5a037553d644d1fedb1874145f0869b4a58f5f3d131be2c134162f2d8e2fb75e`.
+All four public entry points return 200, the authenticated monitor passes 8/8,
+Caddy validates, Caddy and homeserver retain zero restarts, and disk use is 79%.
+Rollback is retained at
+`/home/ubuntu/omnyid-candidates/wed411-d9b6afb8c0d996a64be03386a395444ab2657ce8/rollback`.
+No backend image, migration, Caddy route, database row or container lifecycle changed.

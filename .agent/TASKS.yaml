@@ -17,7 +17,7 @@ lifecycle:
 tasks:
   - id: WED-411
     title: Extend the existing Wedding seating canvas with persistent table layouts and direct guest placement
-    status: in_progress
+    status: done
     owner: codex
     reviewer: claude
     branch: agent/codex/WED-411
@@ -31,6 +31,8 @@ tasks:
       - extended the existing canvas with a dedicated To seat rail, direct single or multi-name drag payloads, tap and keyboard placement, round rectangle and head-table controls, bounded seat counts and 45-degree rotation for large tables
       - table type name capacity position and rotation now round-trip inside the canonical seating optimization ledger; assignment-only records load through the existing defaults and no parallel store or backend route was introduced
       - TypeScript, line budgets, 22 focused contracts, all 2,402 Wedding tests, the 95-page public/security suite and the 1,863-module production build pass in the implementation worktree
+      - exact clean implementation SHA d9b6afb8c0d996a64be03386a395444ab2657ce8 passed the complete frontend gate again and its static archive was hash-verified before installation
+      - Oracle serves the exact Workspace index and main bundle; the authenticated eight-check monitor passes, Caddy validates, public entry points return 200, Caddy and homeserver restart counts remain zero, disk use is 79 percent and the WED-410 Workspace is retained as rollback
 
   - id: WED-410
     title: Make Wedding decisions actionable in place and restore missing planner interactions
