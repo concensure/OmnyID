@@ -1,3 +1,45 @@
+## WED-402 small-wedding, pricing, scoped assistance and timeline release (2026-11-23)
+
+Worktree `C:/temp/wt/omnyid-wed402`, branch `agent/codex/WED-402`. The exact
+Oracle release snapshot is `618ceee7c95bf2f49f9f79531115227e41d1551d`, whose
+tree is identical to implementation tip
+`5cf3eb3e7facb0855c35438c8c7525b9da1a6c19`. Native ARM64 workflow run
+`45091480617` built the exact revision. Oracle is running its OCI manifest
+`sha256:61d4734d4dd792446e6af435cc3d02d1f635e8a363bda2fe09f0a751c35da83b`;
+both homeserver and Caddy report zero restarts.
+
+The small-wedding T1-T16 document is reconciled. Inclusive Soft messaging and
+optional Wedding format extend the existing intake and AFP revision path.
+Pricing carries additive first-100 founding-couple and founding-vendor labels.
+The eucalyptus icon is the initial Wedding persona. Master Agent and Sprout use
+one authenticated current-account assistant with allowlisted navigation,
+reviewable Budget staging and first-party guide links; project internals,
+secrets, admin data, other accounts and external commitments stay out of scope.
+The mobile Gantt now fits its endpoints and keeps dates legible.
+
+Clean exact-SHA proof passed TypeScript, both line budgets, all 93 public and
+security pages, 2,378 Wedding tests and the 1,855-module production build.
+Production hashes match the candidate for Caddy, Wedding home, pricing,
+Workspace shell and persona icon. Caddy validates. The twice-daily authenticated
+monitor and an authenticated assistant smoke pass. Backup verification passes.
+The full disposable restore drill made no changes: its preflight refused because
+4,776,591,360 free bytes were below the 8,060,983,148-byte safe requirement for
+the 6,352,037,567-byte source database. Free at the final check was about 4.5 GiB
+(90% root use); recover at least 3.1 GiB before rerunning the drill.
+
+Rollback is retained at
+`/home/ubuntu/omnyid-candidates/wed402-618ceee7c95bf2f49f9f79531115227e41d1551d/rollback`.
+It includes the preceding image tag
+`omnyid-homeserver:rollback-wed402-pre-618ceee7`, Caddyfile and static archives.
+The release required recreating only Caddy after replacing the host Caddyfile:
+the single-file bind mount retained its old inode across a host-side copy.
+
+Broad GitHub CI is not represented as green: existing Linux PowerShell tests
+assume `$TEMP`, and the existing Rust lockfile has newly published dependency
+advisories. Product and exact ARM release gates above are the release authority.
+WED-403 is queued from this lineage for the follow-on vendor desktop/admin/CTA
+request.
+
 ## WED-401 OAuth workspace recovery and plan-change propagation (2026-11-23)
 
 Worktree `C:/temp/wt/omnyid-wed401`, branch `agent/codex/WED-401`, based on

@@ -4736,3 +4736,23 @@ view or stage a bounded Budget draft for review; canonical saves, vendor contact
 bookings, payments and other external effects keep their existing approval paths.
 Today photo cards remain account-scoped data-image convenience state and a local file
 can be selected only through the user's browser gesture.
+
+## 2026-11-23 — Native ARM snapshots and file-bound Caddy releases (WED-402)
+
+An Oracle homeserver release is accepted only when a native ARM runner builds an
+exact committed snapshot and the OCI revision label matches its full SHA. Static
+Wedding and Workspace archives are independently hashed because an image label does
+not prove mounted assets. The deployment retains the prior image, Caddyfile and
+static archives before swapping the candidate.
+
+Caddy's single-file bind mount is inode-bound. Replacing the host path with a new
+file does not make a running container observe that inode, and an in-process reload
+can therefore report an unchanged configuration. After a validated host Caddyfile
+change, recreate only the Caddy service with dependencies and builds disabled, then
+validate the mounted file and run route smokes. This is a release operation, not a
+reason to rebuild or restart the homeserver.
+
+A restore drill is not coerced past its capacity preflight. Backup verification and
+restore ability are reported separately; insufficient headroom remains an explicit
+operational follow-up and does not justify starting a partial restore beside the live
+database.
