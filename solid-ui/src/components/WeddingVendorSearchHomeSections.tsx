@@ -43,6 +43,7 @@ import {
   type WeddingVendorShortlistPreference,
 } from "@/lib/weddingVendorShortlistPreferenceState";
 import { weddingVendorRankingCardFieldsFromRecord } from "@/lib/weddingVendorRankingState";
+import { consumeWeddingAssistantStagedUpdate, WEDDING_ASSISTANT_STAGED_UPDATE_EVENT, type WeddingAssistantStagedUpdate } from "@/lib/weddingAssistantStagedUpdateState";
 
 type VendorSearchAction = NonNullable<WeddingResponseWorkspaceViewProps["vendorSearchResultAction"]>;
 type VendorOutreachOwner = ReturnType<typeof useWeddingVendorOutreachOwner>;
@@ -217,6 +218,18 @@ export function WeddingVendorSearchHomeSection(props: {
   const [expandedLifecycleVendorKey, setExpandedLifecycleVendorKey] = createSignal<string | null>(null);
   const [selectedVendorCategory, setSelectedVendorCategory] = createSignal<string | null>(null);
   const [vendorMode, setVendorMode] = createSignal<"find" | "invite" | "specials">("find");
+  const [assistantProposalDraft, setAssistantProposalDraft] = createSignal<NonNullable<WeddingAssistantStagedUpdate["draftFields"]["inviteProposal"]> | null>(null);
+  const applyAssistantDraft = () => {
+    const staged = consumeWeddingAssistantStagedUpdate("home");
+    if (!staged?.draftFields.inviteProposal) return;
+    setAssistantProposalDraft(staged.draftFields.inviteProposal);
+    setVendorMode("invite");
+  };
+  onMount(() => {
+    applyAssistantDraft();
+    window.addEventListener(WEDDING_ASSISTANT_STAGED_UPDATE_EVENT, applyAssistantDraft);
+    onCleanup(() => window.removeEventListener(WEDDING_ASSISTANT_STAGED_UPDATE_EVENT, applyAssistantDraft));
+  });
   const selectVendorMode = (event: MouseEvent, mode: "find" | "invite" | "specials") => {
     event.preventDefault();
     event.stopPropagation();
@@ -776,6 +789,7 @@ export function WeddingVendorSearchHomeSection(props: {
           preview={props.result?.preview ?? props.result?.sourcePreview ?? null}
           selectedCategory={selectedVendorCategory()}
           onSelectedCategoryChange={setSelectedVendorCategory}
+          assistantDraft={assistantProposalDraft()}
         />
       </Show>
       <Show when={vendorMode() === "specials"}>

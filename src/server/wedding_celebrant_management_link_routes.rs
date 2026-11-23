@@ -909,4 +909,10 @@ mod tests {
             .collect::<Vec<_>>();
         assert!(normalize_batch_vendor_ids(&unique).is_err());
     }
+
+    #[test]
+    fn operator_can_issue_private_links_for_hidden_test_listings() {
+        let source = include_str!("wedding_celebrant_management_link_routes/admin.rs");
+        assert!(source.contains("v.status IN ('active','hidden') FOR UPDATE OF v"));
+    }
 }

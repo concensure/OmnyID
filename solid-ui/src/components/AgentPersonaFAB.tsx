@@ -93,6 +93,7 @@ export function AgentPersonaFAB(props: {
   const [weddingAnswer, setWeddingAnswer] = createSignal<WeddingAssistantResponse | null>(null);
   const [weddingAssistantBusy, setWeddingAssistantBusy] = createSignal(false);
   const [weddingAssistantError, setWeddingAssistantError] = createSignal<string | null>(null);
+  const [expanded, setExpanded] = createSignal(false);
   let longPressTimer: ReturnType<typeof setTimeout> | undefined;
   let didLongPress = false;
   const switcherBusy = createMemo(() => personaSwitcherBusy({
@@ -260,6 +261,7 @@ export function AgentPersonaFAB(props: {
     setShowSwitcher(false);
     setSearch("");
     setShowWeddingTools(false);
+    setExpanded(false);
   }
 
   function startLongPress() {
@@ -382,7 +384,7 @@ export function AgentPersonaFAB(props: {
 
       <Show when={showSwitcher()}>
         {/* Panel: fluid width so it doesn't overflow on narrow screens */}
-        <div class="fixed bottom-[4.75rem] right-6 phone:bottom-[calc(4.75rem+env(safe-area-inset-bottom))] phone:right-3 z-50 max-h-[min(32rem,calc(100dvh_-_6rem))] w-[min(25rem,_calc(100vw_-_1.5rem))] overflow-hidden rounded-3xl border border-white/45 bg-white/96 shadow-panel backdrop-blur-xl animate-fade-in">
+        <div class={`fixed z-50 overflow-hidden border border-white/45 bg-white/96 shadow-panel backdrop-blur-xl animate-fade-in ${expanded() ? "inset-0 h-dvh w-screen rounded-none" : "bottom-[4.75rem] right-6 max-h-[min(32rem,calc(100dvh_-_6rem))] w-[min(25rem,_calc(100vw_-_1.5rem))] rounded-3xl phone:bottom-[calc(4.75rem+env(safe-area-inset-bottom))] phone:right-3"}`}>
           <div class="border-b border-outline/10 px-3.5 py-3">
             <div class="flex flex-wrap items-start gap-2">
               <div class="min-w-0 flex-1 basis-full sm:basis-auto">
@@ -397,6 +399,9 @@ export function AgentPersonaFAB(props: {
                 <button type="button" disabled={switcherBusy()} onClick={() => { closeSwitcher(); props.onOpenSettings(); }} class="rounded-xl px-2 py-1 text-[0.6875em] text-on-surface-variant transition hover:bg-on-surface/6 hover:text-on-surface">Settings</button>
                 <button type="button" disabled={switcherBusy() || minimizing()} onClick={() => void minimizeSprout()} class="rounded-xl px-2 py-1 text-[0.6875em] text-on-surface-variant transition hover:bg-on-surface/6 hover:text-on-surface">{minimizing() ? "Hiding…" : "Minimise"}</button>
                 <button type="button" onClick={() => { closeSwitcher(); window.dispatchEvent(new CustomEvent("omnyid:open-view-customizer")); }} class="rounded-xl px-2 py-1 text-[0.6875em] text-on-surface-variant transition hover:bg-on-surface/6 hover:text-on-surface">Customize view</button>
+              </Show>
+              <Show when={props.weddingMode && !showWeddingTools()}>
+                <button type="button" aria-pressed={expanded()} onClick={() => setExpanded((value) => !value)} class="rounded-xl border border-outline/15 bg-white px-2 py-1 text-[0.6875em] font-semibold text-primary">{expanded() ? "Shrink" : "Enlarge"}</button>
               </Show>
             </div>
 
@@ -467,7 +472,7 @@ export function AgentPersonaFAB(props: {
             </div>
           </div>
 
-          <div class="max-h-[19rem] overflow-auto px-2 py-2">
+          <div class={`${expanded() ? "h-[calc(100dvh-7.5rem)]" : "max-h-[19rem]"} overflow-auto px-2 py-2`}>
             <Show when={props.weddingMode && !showWeddingTools()}>
               <form class="space-y-3 px-1 py-1" onSubmit={(event) => void submitWeddingQuestion(event)}>
                 <label class="block text-xs font-medium text-on-surface" for="wedding-sprout-question">What would you like help with?</label>

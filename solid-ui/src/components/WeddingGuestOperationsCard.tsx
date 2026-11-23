@@ -529,7 +529,7 @@ export function WeddingGuestOperationsCard(props: {
           >
             {savingRules() ? "Saving..." : "Save guest rules"}
           </button>
-          <p class="mt-2 text-xs leading-5 text-sky-950/65">Save these rules so new invitations and guest decisions use the same plus-one and children guidance.</p>
+          <p class="mt-2 text-xs leading-5 text-sky-950/65">These are private planner defaults for new invitations and guest decisions. They are not automatically shown or sent to guests; only wording you explicitly add to an invitation or RSVP form becomes guest-visible.</p>
           <Show when={savedRules().length > 0}>
             <div class="mt-3 flex flex-wrap gap-1.5">
               <For each={savedRules()}>

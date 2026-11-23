@@ -5011,28 +5011,7 @@ function AgentStatusPill(props: {
     return null;
   };
   return (
-    <Show when={label()} fallback={
-      <span class="rounded-full border border-red-300/60 bg-red-50/80 px-3 py-1 font-mono text-[11px] font-semibold text-red-600 shadow-sm">
-        ⚠ No AI model —{" "}
-        <Show when={props.signedIn} fallback={
-          <button
-            type="button"
-            onClick={props.onSignIn}
-            class="underline text-red-700 hover:text-red-900 transition font-bold"
-          >
-            Sign in to continue
-          </button>
-        }>
-          <button
-            type="button"
-            onClick={props.onSettingsClick}
-            class="underline text-red-700 hover:text-red-900 transition font-bold"
-          >
-            Set up in Agent Settings
-          </button>
-        </Show>
-      </span>
-    }>
+    <Show when={label()}>
       <span class="rounded-full border border-primary/25 bg-primary/10 px-3 py-0.5 font-mono text-[10px] text-primary">
         {label()}
       </span>

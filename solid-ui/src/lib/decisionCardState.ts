@@ -77,7 +77,7 @@ function clean(value: unknown): string {
 }
 
 function evidenceFromLabels(labels: readonly string[], prefix: string): DecisionCardEvidence[] {
-  return labels.map(clean).filter(Boolean).slice(0, 4).map((label, index) => ({
+  return labels.map(clean).filter((label) => Boolean(label) && !/^(wedding setup|date needed|budget target needed|guest list needed)$/i.test(label)).slice(0, 4).map((label, index) => ({
     label,
     ref: `${prefix}:${index + 1}`,
     sourceKind: "continuity",

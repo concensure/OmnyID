@@ -284,7 +284,7 @@ async fn create_link_for_vendor(
     // Serialise even the first grant for a vendor. Locking only a grant row is
     // insufficient when there is no row yet and two batch requests arrive at
     // the same time.
-    let vendor = sqlx::query("SELECT v.vendor_slug,v.vendor_name,v.category,COALESCE(o.status='opted_out',FALSE) opted_out FROM wedding_vendors v LEFT JOIN wedding_celebrant_outreach o ON o.vendor_id=v.vendor_id WHERE v.vendor_id=$1 AND v.status='active' FOR UPDATE OF v")
+    let vendor = sqlx::query("SELECT v.vendor_slug,v.vendor_name,v.category,COALESCE(o.status='opted_out',FALSE) opted_out FROM wedding_vendors v LEFT JOIN wedding_celebrant_outreach o ON o.vendor_id=v.vendor_id WHERE v.vendor_id=$1 AND v.status IN ('active','hidden') FOR UPDATE OF v")
         .bind(&vendor_id).fetch_optional(&mut *tx).await.map_err(db_error)?.ok_or((StatusCode::NOT_FOUND,"Celebrant listing not found.".into()))?;
     if vendor.get::<bool, _>("opted_out") {
         return Err((

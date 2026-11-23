@@ -58,9 +58,11 @@ export function createWeddingDecisionPlanEditController(input: {
     setState(next);
     saveDecisionPlanEditState(input.scope, next);
   };
-  const sync = (value: SendAfpMessageInput, fallback: string) => {
+  const sync = (value: SendAfpMessageInput, fallback: string, refreshAfterSync = true) => {
     if (!input.saveProjection) return;
-    void input.saveProjection(value).then(() => input.refresh?.()).catch(() => setNotice(fallback));
+    void input.saveProjection(value).then(() => {
+      if (refreshAfterSync) input.refresh?.();
+    }).catch(() => setNotice(fallback));
   };
   const projectMessages = (messages: readonly AfpMessage[]) => {
     const next = mergeDecisionPlanEditState(untrack(state), decisionPlanEditStateFromMessages(messages, input.scope));
@@ -100,7 +102,7 @@ export function createWeddingDecisionPlanEditController(input: {
     persist(applyCustomPlanDecision(state(), decision));
     setShowEditor(false);
     setNotice(parent ? "Follow-up decision added and linked to its source." : "Decision added to your wedding plan.");
-    sync(customPlanDecisionToAfpSendInput(input.scope, decision), "Added on this device. OmnyID will sync the decision when the connection returns.");
+    sync(customPlanDecisionToAfpSendInput(input.scope, decision), "Added on this device. OmnyID will sync the decision when the connection returns.", false);
   };
   const completeDecision = (item: WeddingPersonalOsRankedItem) => {
     const current = state().customDecisions.find((decision) => decision.id === item.id);

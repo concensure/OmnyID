@@ -151,12 +151,14 @@ export function buildWeddingPeopleAggregateState(state: WeddingResponseWorkspace
       {
         id: "seating",
         title: "Seating Plan",
-        detail: "Draft tables, keep conflicts apart, place access needs carefully, and prepare vendor-ready notes.",
+        detail: state.guestTracking.guestRowCount === 0
+          ? "Add at least one guest before starting the seating plan. This message disappears as soon as your guest list has someone to seat."
+          : "Draft tables, keep conflicts apart, place access needs carefully, and prepare vendor-ready notes.",
         metaLabel: `${countLabel(state.seatingPlan.assignedSeatCount, "guest")} already seated`,
         metaItems: [`${countLabel(state.seatingPlan.assignedSeatCount, "guest")} already seated`],
         ctaLabel: "Open Seating Plan",
         targetMenu: "seating",
-        enabled: true,
+        enabled: state.guestTracking.guestRowCount > 0,
       },
     ],
   });

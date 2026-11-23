@@ -117,6 +117,10 @@ function AddEventModal(props: {
   const [voiceRecording, setVoiceRecording] = createSignal(false);
   const [voiceLiveText, setVoiceLiveText] = createSignal("");
   let recognitionRef: CalendarSpeechRecognition | null = null;
+  let titleInput: HTMLInputElement | undefined;
+  let locationInput: HTMLInputElement | undefined;
+  let activeVoiceField: "title" | "location" = "title";
+  let voiceFieldBase = "";
 
   const speechApiAvailable = () => speechRecognitionCtor() !== null;
 
@@ -127,6 +131,12 @@ function AddEventModal(props: {
       setError("Voice capture is not supported in this browser. Try Chrome or Edge.");
       return;
     }
+    const activeElement = document.activeElement;
+    if (activeElement === locationInput) activeVoiceField = "location";
+    else if (activeElement === titleInput) activeVoiceField = "title";
+    const activeInput = activeVoiceField === "location" ? locationInput : titleInput;
+    activeInput?.focus();
+    voiceFieldBase = activeVoiceField === "location" ? location() : title();
     const recognition = new SpeechRecognitionCtor();
     recognition.lang = "en-US";
     recognition.continuous = true;
@@ -144,7 +154,11 @@ function AddEventModal(props: {
           interim = result[0].transcript;
         }
       }
-      setVoiceLiveText((finalTranscript + interim).trim());
+      const transcript = (finalTranscript + interim).trim();
+      setVoiceLiveText(transcript);
+      const nextValue = [voiceFieldBase.trim(), transcript].filter(Boolean).join(voiceFieldBase.trim() ? " " : "");
+      if (activeVoiceField === "location") setLocation(nextValue);
+      else setTitle(nextValue.slice(0, 120));
     };
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
       if (event.error !== "aborted") setError(`Voice error: ${event.error}`);
@@ -152,11 +166,6 @@ function AddEventModal(props: {
     };
     recognition.onend = () => {
       setVoiceRecording(false);
-      const transcript = finalTranscript.trim();
-      if (transcript) {
-        setTitle((prev) => prev || transcript.split(/[.!?]/)[0].trim().slice(0, 80));
-        setDescription(transcript);
-      }
       setVoiceLiveText("");
     };
 
@@ -168,6 +177,15 @@ function AddEventModal(props: {
   function stopVoiceCapture() {
     recognitionRef?.stop();
     setVoiceRecording(false);
+    requestAnimationFrame(() => {
+      if (activeVoiceField === "title" && itemType() === "event") {
+        activeVoiceField = "location";
+        locationInput?.focus();
+      } else {
+        activeVoiceField = "title";
+        titleInput?.focus();
+      }
+    });
   }
 
   const dateLabel = () => calendarLongDateLabel(props.date);
@@ -276,6 +294,7 @@ function AddEventModal(props: {
             <button
               type="button"
               title={voiceRecording() ? "Stop recording" : "Record voice note"}
+              onPointerDown={(event) => event.preventDefault()}
               onClick={() => (voiceRecording() ? stopVoiceCapture() : startVoiceCapture())}
               style={{
                 border: `1px solid ${voiceRecording() ? TOKEN.accent : TOKEN.border}`,
@@ -372,10 +391,12 @@ function AddEventModal(props: {
           <div style={{ display: "flex", "flex-direction": "column", gap: "0.95em", "margin-top": "1.25em" }}>
             <Field label="Title">
               <input
+                ref={titleInput}
                 type="text"
                 value={title()}
                 disabled={saving()}
                 onInput={(event) => setTitle(event.currentTarget.value)}
+                onFocus={() => { activeVoiceField = "title"; }}
                 placeholder={itemType() === "task" ? "Task name" : "Meeting, reminder…"}
                 style={fieldStyle()}
                 autofocus
@@ -385,10 +406,12 @@ function AddEventModal(props: {
             <Show when={itemType() === "event"}>
               <Field label="Location">
                 <input
+                  ref={locationInput}
                   type="text"
                   value={location()}
                   disabled={saving()}
                   onInput={(event) => setLocation(event.currentTarget.value)}
+                  onFocus={() => { activeVoiceField = "location"; }}
                   placeholder="Bondi, Zoom, Office"
                   style={fieldStyle()}
                 />

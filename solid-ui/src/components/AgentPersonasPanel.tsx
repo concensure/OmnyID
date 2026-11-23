@@ -289,7 +289,7 @@ export function AgentPersonasPanel() {
   }
 
   const inputClass =
-    "w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-on-surface placeholder:text-on-surface-variant/40 outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/30";
+    "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 placeholder:text-slate-500 outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/30";
   const btnPrimary =
     "rounded-lg bg-primary px-4 py-1.5 text-xs font-medium text-white transition hover:bg-primary/80 disabled:opacity-50";
   const btnGhost =
@@ -388,11 +388,11 @@ export function AgentPersonasPanel() {
 
       <Show when={edit()} keyed>
         {(e) => (
-          <div class="min-w-0 space-y-3 rounded-xl border border-primary/30 bg-primary/5 p-3 sm:p-4">
+          <div class="min-w-0 space-y-3 rounded-xl border border-slate-200 bg-white p-3 text-slate-950 shadow-sm sm:p-4">
             <p class="text-xs font-semibold text-primary">{e.id ? "Edit Persona" : "New Persona"}</p>
 
             <div class="space-y-2">
-              <div class="flex flex-col gap-3 rounded-lg border border-white/15 bg-white/5 p-3 sm:flex-row sm:items-center">
+              <div class="flex flex-col gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 sm:flex-row sm:items-center">
                 <Show
                   when={e.image_data_url}
                   fallback={<span class="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-2xl" aria-hidden="true">🤖</span>}
@@ -482,7 +482,7 @@ export function AgentPersonasPanel() {
                   showFooter={false}
                   submitShortcut="none"
                   clearOnSend={false}
-                  class="border-white/20 bg-white/10"
+                  class="border-slate-300 bg-white text-slate-950"
                   contentClass="min-h-[160px]"
                   onChange={(_text, markdown) => {
                     setActionError(null);

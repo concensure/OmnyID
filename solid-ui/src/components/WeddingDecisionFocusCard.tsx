@@ -7,6 +7,7 @@ import { WeddingBudgetTrackerCard } from "@/components/WeddingBudgetTrackerCard"
 import { WeddingSeatingPanel } from "@/components/WeddingSeatingPanel";
 import { WeddingVendorOutreachComposer } from "@/components/WeddingVendorOutreachComposer";
 import { WeddingDecisionPlanControls } from "@/components/WeddingDecisionPlanControls";
+import { WeddingDateEntryControl } from "@/components/WeddingDateEntryControl";
 import type { WeddingVendorChoiceSelectionSaveInput } from "@/components/WeddingArtifactDetailPanel";
 import { loadContacts, saveContacts, subscribeContactsChangedEvent, type Contact } from "@/lib/contactsLocalState";
 import { postAgentMessage, readSession, type SendAfpMessageInput } from "@/lib/api";
@@ -14,15 +15,8 @@ import { buildWeddingDecisionResearchState, weddingDecisionResearchQueueWindow }
 import type { WeddingDecisionResearchState } from "@/lib/weddingDecisionResearchState";
 import { requestFundedWeddingDecisionResearch } from "@/lib/weddingDecisionResearchApi";
 import { loadWeddingReviewDecisionObservation, type WeddingReviewDecisionObservation } from "@/lib/weddingReviewApi";
-import {
-  WEDDING_ASSIGNMENT_ROLE_OPTIONS,
-  weddingAssignmentContactKey,
-} from "@/lib/weddingTaskAssignmentEmailState";
-
-import {
-  buildWeddingDecisionDeferSidebarAction,
-  buildWeddingDecisionFocusSidebarAction,
-} from "@/lib/weddingDecisionFocusActionState";
+import { WEDDING_ASSIGNMENT_ROLE_OPTIONS, weddingAssignmentContactKey } from "@/lib/weddingTaskAssignmentEmailState";
+import { buildWeddingDecisionDeferSidebarAction, buildWeddingDecisionFocusSidebarAction } from "@/lib/weddingDecisionFocusActionState";
 import {
   buildWeddingDecisionFocusDisplayState,
   weddingVendorResearchQueryForDecision,
@@ -59,6 +53,7 @@ import {
   type DecisionPlanScope,
 } from "@/lib/decisionPlanEditState";
 import { createWeddingDecisionPlanEditController, weddingCustomDecisionItem } from "@/lib/weddingDecisionPlanEditController";
+import { saveLocalWeddingDate, weddingDateToAfpSendInputs } from "@/lib/weddingDateCaptureState";
 
 export function WeddingDecisionFocusCard(props: {
   state: WeddingResponseWorkspaceViewState;
@@ -128,6 +123,10 @@ export function WeddingDecisionFocusCard(props: {
   const fundedResearchAttempts = new Set<string>();
   const vendorPrefetchAttempts = new Set<string>();
   const reviewObservationAttempts = new Set<string>();
+
+  async function saveWeddingDateInPlace(date: string): Promise<void> {
+    if (!props.saveProjection) throw new Error("Wedding date saving is unavailable."); saveLocalWeddingDate(props.state.workspace.metadata.responseWorkspaceId, date); await Promise.all(weddingDateToAfpSendInputs({ date, metadata: props.state.workspace.metadata }).map((input) => props.saveProjection!(input))); props.onRefreshWorkspace?.();
+  }
   const rsvpSetup = createMemo(() => weddingRsvpSetupFromAfpMessages(
     props.state.afpMessages,
     props.state.workspace.metadata.responseWorkspaceId,
@@ -747,7 +746,7 @@ export function WeddingDecisionFocusCard(props: {
                       } else if (action.id === "open" && /assign\s+\d+\s+attending guest|assign.*guest.*table|seating assignment/i.test(item.title)) {
                         setExpandedTaskId(item.id);
                         setExpandedSeatingItemId((current) => current === item.id ? null : item.id);
-                      } else if (action.id === "open" && item.actionMetadata?.wedding_setup_decision === "budget") {
+                      } else if (action.id === "open" && (item.actionMetadata?.wedding_setup_decision === "budget" || item.actionMetadata?.wedding_setup_decision === "date")) {
                         setExpandedSetupItemId((current) => current === item.id ? null : item.id);
                       } else if (action.id === "open" && isPendingRsvpFollowUp(item.id)) {
                         setRsvpFollowUpOpenId((current) => current === item.id ? null : item.id);
@@ -931,6 +930,7 @@ export function WeddingDecisionFocusCard(props: {
                       </div>
                     </section>
                   </Show>
+                  <Show when={expandedSetupItemId() === item.id && item.actionMetadata?.wedding_setup_decision === "date"}><section class="rounded-xl border border-pink-200 bg-white p-3 text-pink-950" aria-label="Set your wedding date"><p class="text-sm font-semibold">Choose the date here</p><p class="mt-1 text-xs leading-5 text-pink-950/75">This updates the date used by your countdown, supplier timing and RSVP deadlines. Nothing is sent to a vendor.</p><div class="mt-3"><WeddingDateEntryControl startOpen hideTrigger compact onSave={saveWeddingDateInPlace} /></div></section></Show>
                   <Show when={expandedSeatingItemId() === item.id}>
                     <section class="overflow-hidden rounded-xl border border-pink-200 bg-white p-2 sm:p-3" aria-label="Seating assignment canvas">
                       <div class="mb-2 flex items-center justify-between gap-2">

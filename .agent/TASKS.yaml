@@ -1,5 +1,5 @@
 version: 1
-updated: 2026-11-23
+updated: 2026-11-24
 
 lifecycle:
   allowed_statuses:
@@ -15,6 +15,25 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-410
+    title: Make Wedding decisions actionable in place and restore missing planner interactions
+    status: in_progress
+    owner: codex
+    reviewer: claude
+    branch: agent/codex/WED-410
+    worktree: C:/temp/wt/omnyid-wed410
+    base_sha: 2c0333477fff0542c08dcc39ec30e2a93b64a232
+    depends_on: [WED-409, WED-404, WED-400, WED-390]
+    files: [solid-ui/src/**, solid-ui/tests/**, src/server/wedding_partner_sharing_routes.rs, src/server/wedding_celebrant_management_link_routes.rs, src/server/wedding_celebrant_management_link_routes/admin.rs, wedding/**, Documents/verification/WED-410-*.md, .agent/**]
+    acceptance: [the wedding-date decision edits and saves its date inline with substantive evidence instead of opening the generic queue, shared decision recommendations suppress empty evidence labels and provide concrete couple-specific guidance, adding a decision confirms in place and refreshes only the plan section, Timeline exposes the already-designed Gantt projection on current state, seating is disabled with clear copy at zero guests and enabled once guests exist, guest-rule copy distinguishes planner defaults from RSVP-visible content, empty LLM status chrome is absent, voice capture focuses and writes to the active calendar field then advances on stop, persona editor is readable with a light surface, Wedding assistant expands and collapses, account-scoped assistant commands can navigate and prepare editable invite-proposal work through existing approval flows, partner invitation email and API state the exact seven-day expiry instant, operator-only private calendar links can be issued for hidden test and evidence-pending celebrant listings without publishing them, focused and full tests pass, deploy from an exact clean SHA with rollback and hosted smoke proof]
+    progress:
+      - registered from the exact WED-409 release-record lineage; older worktrees are evidence only and no whole-file integration is permitted
+      - wedding-date setup now edits and saves inline; recommendations carry useful planning guidance and source evidence; custom decisions confirm without reloading the whole Workspace
+      - Timeline restores its Gantt projection, zero-guest seating is disabled with explanatory copy, guest-rule sharing scope is explicit, empty model chrome is absent, calendar dictation follows active fields and persona editing is readable
+      - the Wedding assistant expands to full screen and can stage an account-scoped November invite proposal with parsed date and guest count through the existing editable proposal flow; it never sends or commits externally without approval
+      - partner invites persist one exact seven-day expiry instant and put its formatted UTC date in the email and response; hidden celebrant records remain unpublished but are eligible for operator-issued private calendar capabilities
+      - TypeScript, line budgets, 2,397 Wedding tests, the 95-page public/security suite, production frontend build and Rust library check pass in the implementation worktree; the focused Rust unit binary hits a Windows rustc access-violation and requires the native Linux candidate gate
+
   - id: WED-409
     title: Reconcile public Wedding claims with live capabilities and verify partner, guest and celebrant data
     status: done

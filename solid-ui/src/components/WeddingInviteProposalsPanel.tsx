@@ -64,13 +64,23 @@ export function WeddingInviteProposalsPanel(props: {
   preview: WeddingWorkspaceArtifactPreview | null;
   selectedCategory?: string | null;
   onSelectedCategoryChange?: (category: string) => void;
+  assistantDraft?: { dateOrSeason?: string; guestCount?: number; requestText?: string; category?: string } | null;
 }) {
   const [category, setCategory] = createSignal(props.selectedCategory ?? props.preview?.category ?? "");
-  const brief = createMemo(() => buildWeddingInviteProposalBrief({
-    state: props.workspace.state, preview: props.preview,
-    vendorDirectory: props.workspace.weddingVendorDirectory, category: category(),
-  }));
-  const [requestText, setRequestText] = createSignal(props.workspace.vendorSearchQuery?.trim() ?? "");
+  const brief = createMemo(() => {
+    const built = buildWeddingInviteProposalBrief({
+      state: props.workspace.state, preview: props.preview,
+      vendorDirectory: props.workspace.weddingVendorDirectory, category: category(),
+    });
+    const draft = props.assistantDraft;
+    return {
+      ...built,
+      dateOrSeason: draft?.dateOrSeason ?? built.dateOrSeason,
+      guestCount: draft?.guestCount ? String(draft.guestCount) : built.guestCount,
+      missingFacts: built.missingFacts.filter((fact) => !(fact === "Wedding date or season" && draft?.dateOrSeason) && !(fact === "Guest count" && draft?.guestCount)),
+    };
+  });
+  const [requestText, setRequestText] = createSignal(props.assistantDraft?.requestText ?? props.workspace.vendorSearchQuery?.trim() ?? "");
   const [sharing, setSharing] = createSignal(defaultWeddingInviteProposalSharing(brief()));
   const [factEditor, setFactEditor] = createSignal<FactEditor>(null);
   const [factValue, setFactValue] = createSignal("");
@@ -86,6 +96,13 @@ export function WeddingInviteProposalsPanel(props: {
 
   createEffect(() => {
     if (props.selectedCategory && props.selectedCategory !== category()) setCategory(props.selectedCategory);
+  });
+  createEffect(() => {
+    const draft = props.assistantDraft;
+    if (!draft) return;
+    if (draft.category) chooseCategory(draft.category);
+    if (draft.requestText) setRequestText(draft.requestText);
+    setNotice("Sprout prepared this editable sample. Review it before publishing; no vendor has been contacted.");
   });
   createEffect(() => {
     const current = brief();

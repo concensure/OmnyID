@@ -2,6 +2,7 @@ import type { WeddingAssistantAction } from "@/lib/weddingAssistantApi";
 import { weddingAccountScopedStorageKey } from "@/lib/weddingLocalAccountScope";
 
 const KEY = "omnyid.wedding-assistant.staged-update";
+export const WEDDING_ASSISTANT_STAGED_UPDATE_EVENT = "omnyid:wedding-assistant-staged-update";
 
 export type WeddingAssistantStagedUpdate = {
   target: WeddingAssistantAction["target"];
@@ -16,6 +17,7 @@ export function saveWeddingAssistantStagedUpdate(action: WeddingAssistantAction,
     draftFields: action.draftFields,
     stagedAt: new Date().toISOString(),
   }));
+  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(WEDDING_ASSISTANT_STAGED_UPDATE_EVENT));
 }
 
 export function consumeWeddingAssistantStagedUpdate(target: WeddingAssistantAction["target"], storage: Storage = localStorage): WeddingAssistantStagedUpdate | null {

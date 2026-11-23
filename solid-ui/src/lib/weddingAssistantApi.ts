@@ -5,7 +5,10 @@ export type WeddingAssistantAction = {
   kind: "open_view" | "stage_update";
   target: WeddingWorkspaceMenuId;
   label: string;
-  draftFields: { budgetTargetAud?: number } | null;
+  draftFields: {
+    budgetTargetAud?: number;
+    inviteProposal?: { dateOrSeason?: string; guestCount?: number; requestText?: string; category?: string };
+  } | null;
 };
 
 export type WeddingAssistantResponse = {
@@ -71,5 +74,29 @@ export async function askWeddingAssistant(input: {
       current_view: input.currentView ?? null,
     },
   });
-  return normalizeWeddingAssistantResponse(response);
+  const normalized = normalizeWeddingAssistantResponse(response);
+  const direct = weddingAssistantDirectWorkspaceAction(input.question);
+  return direct ? { ...normalized, answer: direct.answer, suggestedAction: direct.action } : normalized;
+}
+
+/** Bounded account-local commands that should prepare work instead of returning instructions. */
+export function weddingAssistantDirectWorkspaceAction(question: string, now = new Date()): { answer: string; action: WeddingAssistantAction } | null {
+  const text = question.trim();
+  if (!/\b(open|prepare|fill|draft|help me)\b/i.test(text) || !/\b(invite|proposal)\b/i.test(text)) return null;
+  const guestMatch = text.match(/\b(\d{1,4})\s+guests?\b/i);
+  const guestCount = guestMatch ? Number.parseInt(guestMatch[1], 10) : undefined;
+  const monthMatch = text.match(/\b(january|february|march|april|may|june|july|august|september|october|november|december)\b/i);
+  const yearMatch = text.match(/\b(20\d{2})\b/);
+  const year = yearMatch ? Number.parseInt(yearMatch[1], 10) : /next year/i.test(text) ? now.getFullYear() + 1 : undefined;
+  const dateOrSeason = monthMatch ? `${monthMatch[1][0].toUpperCase()}${monthMatch[1].slice(1).toLowerCase()}${year ? ` ${year}` : ""}` : undefined;
+  const requestText = [
+    "Please provide an itemised proposal for our wedding",
+    dateOrSeason ? `in ${dateOrSeason}` : null,
+    guestCount ? `for approximately ${guestCount} guests` : null,
+    "including availability, inclusions, exclusions, fees, GST, deposit and payment dates.",
+  ].filter(Boolean).join(" ");
+  return {
+    answer: "I prepared an editable invitation proposal from the details in your request. Review the brief and sharing choices; nothing is published or sent until you approve it.",
+    action: { kind: "stage_update", target: "home", label: "Open invite proposals", draftFields: { inviteProposal: { dateOrSeason, guestCount, requestText } } },
+  };
 }

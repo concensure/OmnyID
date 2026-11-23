@@ -9,8 +9,11 @@ export function WeddingDateEntryControl(props: {
   onSave: (date: string) => Promise<void> | void;
   locale?: string | null;
   compact?: boolean;
+  startOpen?: boolean;
+  hideTrigger?: boolean;
+  actionLabel?: string;
 }) {
-  const [open, setOpen] = createSignal(false);
+  const [open, setOpen] = createSignal(Boolean(props.startOpen));
   const [calendarDate, setCalendarDate] = createSignal("");
   const [notice, setNotice] = createSignal<string | null>(null);
   const [saving, setSaving] = createSignal(false);
@@ -37,14 +40,14 @@ export function WeddingDateEntryControl(props: {
 
   return (
     <div class="min-w-0">
-      <button
+      <Show when={!props.hideTrigger}><button
         type="button"
         class="min-h-11 shrink-0 rounded-lg bg-wedding-primary px-4 py-2 text-sm font-semibold text-wedding-page transition hover:bg-wedding-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-primary focus-visible:ring-offset-2"
         onClick={() => setOpen((current) => !current)}
         aria-expanded={open()}
       >
-        Add wedding date
-      </button>
+        {props.actionLabel ?? "Add wedding date"}
+      </button></Show>
       <Show when={open()}>
         <div class={`mt-3 rounded-xl border border-wedding-border bg-wedding-card p-3 shadow-wedding-card ${props.compact ? "max-w-md" : "max-w-xl"}`}>
           <label class="block min-w-0 text-xs font-semibold text-wedding-ink/75">

@@ -4833,3 +4833,19 @@ group or party column; surnames are never grouping evidence. Blank household val
 stay ungrouped, and RSVP wording outside the recognised yes/no set remains pending
 and is labelled uncertain. Review counts are visible immediately and preserved with
 the imported evidence rather than written to a parallel guest store.
+
+## 2026-11-24 — Wedding actions edit canonical state in place (WED-410)
+
+Decision cards may disclose the smallest editor needed for their one current choice,
+but do not create a card-local store. Wedding date, custom plan decisions and
+assistant-prepared proposals continue through the existing AFP projection, revision
+and approval paths. Assistant navigation and draft preparation are account scoped;
+no enquiry, booking or external commitment is performed without the existing user
+approval.
+
+Partner invitations use one persisted expiry instant for enforcement, API output and
+email wording. It is exactly seven days after creation and is shown as an absolute
+UTC date so recipients do not have to infer it from delivery time. A hidden celebrant
+listing may receive an operator-only private availability capability for verification
+or testing, but this does not make the listing discoverable, active or priority
+eligible.

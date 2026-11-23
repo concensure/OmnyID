@@ -387,6 +387,29 @@ export function buildWeddingSetupDecisionContract(
     budget: { decisionType: "setup_budget" as const, question: "What total budget should the plan work within?", action: "Set the budget", outcome: "Update the existing Wedding budget target and category allocations.", record: "wedding_budget_allocation" },
     guests: { decisionType: "setup_guests" as const, question: "Who should be included in the first guest-list version?", action: "Start the guest list", outcome: "Add people to the existing canonical guest list.", record: "wedding_guest" },
   }[setup];
+  const guidance = {
+    date: {
+      knownFacts: [
+        "A 12–18 month lead time usually leaves more choice for popular venues and suppliers.",
+        "Spring and autumn are popular Australian wedding seasons; the best weather month depends on the wedding location.",
+      ],
+      oneThingToConfirm: "The location and month you want to compare against local climate averages and venue availability.",
+      evidence: [
+        { label: "Planning guidance: allow 12–18 months when venue choice matters", ref: "wedding_guidance:planning_window", sourceKind: "wedding_plan" as const, status: "confirmed" as const },
+        { label: "Bureau of Meteorology climate data for location-specific monthly averages", ref: "https://www.bom.gov.au/climate/data/", sourceKind: "vendor_source" as const, status: "confirmed" as const },
+      ],
+    },
+    budget: {
+      knownFacts: ["One total budget lets every category and quote reconcile to the same limit.", "A contingency protects the plan from unquoted fees and late changes."],
+      oneThingToConfirm: "The maximum total you are comfortable committing, including contingency.",
+      evidence: [{ label: "Your saved total and category allocations", ref: "wedding_plan:budget", sourceKind: "wedding_plan" as const, status: "unknown" as const }],
+    },
+    guests: {
+      knownFacts: ["Guest count affects venue capacity, per-person quotes, invitations and seating.", "People can be added now with RSVP status left pending."],
+      oneThingToConfirm: "The first named guest or household to include.",
+      evidence: [{ label: "Your account-scoped guest list", ref: "wedding_plan:guests", sourceKind: "wedding_plan" as const, status: "unknown" as const }],
+    },
+  }[setup];
   return {
     decisionType: map.decisionType,
     question: map.question,
@@ -398,9 +421,9 @@ export function buildWeddingSetupDecisionContract(
     deadlineReason: "This setup choice unlocks dependent planning decisions.",
     primaryActionLabel: map.action,
     primaryOutcome: map.outcome,
-    knownFacts: [],
-    oneThingToConfirm: null,
-    evidence: [],
+    knownFacts: guidance.knownFacts,
+    oneThingToConfirm: guidance.oneThingToConfirm,
+    evidence: guidance.evidence,
     recommendationSupported: false,
     approvalRequiredBeforeExternalAction: false,
     settled: false,

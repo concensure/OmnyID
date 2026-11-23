@@ -134,10 +134,11 @@ export function WeddingTimelinePanel(props: {
         >
           Open wedding tasks
         </button>
-        <Show when={props.state.ganttTimeline.rows.length > 0}>
           <button
             type="button"
             class="min-h-11 flex-1 rounded-lg border border-wedding-secondary bg-white px-4 text-sm font-semibold text-wedding-secondary transition hover:bg-wedding-slate sm:flex-none"
+            disabled={props.state.ganttTimeline.rows.length === 0}
+            title={props.state.ganttTimeline.rows.length === 0 ? "Add at least one dated task to use the Gantt chart." : undefined}
             aria-pressed={showGantt()}
             data-magic-action="toggle"
             data-magic-icon="timeline"
@@ -147,7 +148,6 @@ export function WeddingTimelinePanel(props: {
           >
             {showGantt() ? "Hide Gantt chart" : "Show Gantt chart"}
           </button>
-        </Show>
       </div>
       <WeddingTaskComposer weddingPlanId={props.state.workspace.metadata.weddingPlanId} responseWorkspaceId={props.state.workspace.metadata.responseWorkspaceId} saveProjection={props.saveProjection} onRefreshWorkspace={props.onRefreshWorkspace} people={props.state.helperContactNames} />
       <Show when={dateNotice()}>{(message) => <p class="mt-2 text-sm text-wedding-ink/70" role="status">{message()}</p>}</Show>
