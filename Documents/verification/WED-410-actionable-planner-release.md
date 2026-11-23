@@ -24,6 +24,7 @@ Base SHA: `2c0333477fff0542c08dcc39ec30e2a93b64a232`
 - `npm run build`: passed with 1,862 modules.
 - `cargo check --lib`: passed.
 - The focused Rust test process cannot complete on this Windows host because `rustc` terminates with an access-violation/heap-corruption status before returning a Rust assertion result. The exact Linux ARM64 candidate workflow is therefore a required release gate.
+- Isolated staging caught and prevented promotion of the first candidate because link creation accepted hidden listings while exchange and scoped session checks still required public-active status. The shared private capability checks were corrected together; the discarded candidate was never promoted to production.
 
 ## Production data preflight
 

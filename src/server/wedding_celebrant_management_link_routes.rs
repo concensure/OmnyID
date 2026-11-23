@@ -234,7 +234,7 @@ async fn exchange_http(
     let mut tx = state.db.pool.begin().await.map_err(|_| unavailable())?;
     let scoped_vendor = sqlx::query_scalar::<_,String>("SELECT vendor_id FROM wedding_celebrant_management_grants WHERE token_prefix=$1 AND token_digest=$2")
         .bind(&prefix).bind(&digest).fetch_optional(&mut *tx).await.map_err(|_|unavailable())?.ok_or_else(unavailable)?;
-    let eligible = sqlx::query("SELECT v.vendor_id FROM wedding_vendors v WHERE v.vendor_id=$1 AND v.status='active' AND NOT EXISTS(SELECT 1 FROM wedding_celebrant_outreach o WHERE o.vendor_id=v.vendor_id AND o.status='opted_out') FOR SHARE")
+    let eligible = sqlx::query("SELECT v.vendor_id FROM wedding_vendors v WHERE v.vendor_id=$1 AND v.status IN ('active','hidden') AND NOT EXISTS(SELECT 1 FROM wedding_celebrant_outreach o WHERE o.vendor_id=v.vendor_id AND o.status='opted_out') FOR SHARE")
         .bind(&scoped_vendor).fetch_optional(&mut *tx).await.map_err(|_|unavailable())?;
     if eligible.is_none() {
         return Err(unavailable());
@@ -307,7 +307,7 @@ async fn session_authority(
     let secret = cookie(headers).ok_or_else(unavailable)?;
     token_prefix(secret, "wccs").ok_or_else(unavailable)?;
     let digest = mac(&pepper, secret).ok_or_else(unavailable)?;
-    let row=sqlx::query("SELECT g.grant_id,g.vendor_id,g.created_by_user_id,g.capability_scopes,s.csrf_token_digest FROM wedding_celebrant_management_sessions s JOIN wedding_celebrant_management_grants g ON g.grant_id=s.grant_id JOIN wedding_vendors v ON v.vendor_id=g.vendor_id AND v.status='active' WHERE s.session_token_digest=$1 AND s.consumed_at IS NULL AND s.expires_at>NOW() AND g.status='exchanged' AND g.revoked_at IS NULL AND g.expires_at>NOW()")
+    let row=sqlx::query("SELECT g.grant_id,g.vendor_id,g.created_by_user_id,g.capability_scopes,s.csrf_token_digest FROM wedding_celebrant_management_sessions s JOIN wedding_celebrant_management_grants g ON g.grant_id=s.grant_id JOIN wedding_vendors v ON v.vendor_id=g.vendor_id AND v.status IN ('active','hidden') WHERE s.session_token_digest=$1 AND s.consumed_at IS NULL AND s.expires_at>NOW() AND g.status='exchanged' AND g.revoked_at IS NULL AND g.expires_at>NOW()")
         .bind(&digest).fetch_optional(&state.db.pool).await.map_err(|_|unavailable())?.ok_or_else(unavailable)?;
     if require_csrf {
         let csrf = headers
@@ -380,7 +380,7 @@ async fn dashboard(
     vendor_id: &str,
     grant_id: &str,
 ) -> Result<Value, (StatusCode, String)> {
-    let vendor=sqlx::query("SELECT vendor_slug,vendor_name,service_area FROM wedding_vendors WHERE vendor_id=$1 AND status='active'")
+    let vendor=sqlx::query("SELECT vendor_slug,vendor_name,service_area FROM wedding_vendors WHERE vendor_id=$1 AND status IN ('active','hidden')")
         .bind(vendor_id).fetch_one(&state.db.pool).await.map_err(db_error)?;
     let profile=sqlx::query("SELECT register_status,register_checked_at,(business_phone_ciphertext IS NOT NULL) phone_configured,participation_status,participation_updated_at,callback_phone_confirmed FROM wedding_celebrant_pilot_profiles WHERE vendor_id=$1")
         .bind(vendor_id).fetch_optional(&state.db.pool).await.map_err(db_error)?;
@@ -539,7 +539,7 @@ async fn command_http(
     // All vendor mutations and opt-outs use vendor -> grant ordering. This
     // also serializes the first date-calendar creation across independent links.
     let vendor = sqlx::query(
-        "SELECT vendor_id FROM wedding_vendors WHERE vendor_id=$1 AND status='active' FOR UPDATE",
+        "SELECT vendor_id FROM wedding_vendors WHERE vendor_id=$1 AND status IN ('active','hidden') FOR UPDATE",
     )
     .bind(&authority.vendor_id)
     .fetch_optional(&mut *tx)
@@ -548,7 +548,7 @@ async fn command_http(
     if vendor.is_none() {
         return Err(unavailable());
     }
-    let valid = sqlx::query("SELECT g.grant_id FROM wedding_celebrant_management_grants g JOIN wedding_vendors v ON v.vendor_id=g.vendor_id WHERE g.grant_id=$1 AND g.vendor_id=$2 AND g.status='exchanged' AND g.revoked_at IS NULL AND g.expires_at>NOW() AND v.status='active' AND EXISTS(SELECT 1 FROM wedding_celebrant_management_sessions s WHERE s.grant_id=g.grant_id AND s.session_token_digest=$4 AND s.consumed_at IS NULL AND s.expires_at>NOW()) AND $3=ANY(g.capability_scopes) AND ($3<>'consultation_availability' OR lower(trim(v.category))='celebrant') AND NOT EXISTS(SELECT 1 FROM wedding_celebrant_outreach o WHERE o.vendor_id=v.vendor_id AND o.status='opted_out') FOR UPDATE OF g")
+    let valid = sqlx::query("SELECT g.grant_id FROM wedding_celebrant_management_grants g JOIN wedding_vendors v ON v.vendor_id=g.vendor_id WHERE g.grant_id=$1 AND g.vendor_id=$2 AND g.status='exchanged' AND g.revoked_at IS NULL AND g.expires_at>NOW() AND v.status IN ('active','hidden') AND EXISTS(SELECT 1 FROM wedding_celebrant_management_sessions s WHERE s.grant_id=g.grant_id AND s.session_token_digest=$4 AND s.consumed_at IS NULL AND s.expires_at>NOW()) AND $3=ANY(g.capability_scopes) AND ($3<>'consultation_availability' OR lower(trim(v.category))='celebrant') AND NOT EXISTS(SELECT 1 FROM wedding_celebrant_outreach o WHERE o.vendor_id=v.vendor_id AND o.status='opted_out') FOR UPDATE OF g")
         .bind(&authority.grant_id).bind(&authority.vendor_id).bind(required_scope).bind(&authority.session_digest)
         .fetch_optional(&mut *tx).await.map_err(db_error)?;
     if valid.is_none() {
@@ -914,5 +914,11 @@ mod tests {
     fn operator_can_issue_private_links_for_hidden_test_listings() {
         let source = include_str!("wedding_celebrant_management_link_routes/admin.rs");
         assert!(source.contains("v.status IN ('active','hidden') FOR UPDATE OF v"));
+        let private_routes = include_str!("wedding_celebrant_management_link_routes.rs");
+        assert_eq!(
+            private_routes.matches("status IN ('active','hidden')").count(),
+            5,
+            "every private exchange, session, scope and mutation check must accept an operator-linked hidden listing",
+        );
     }
 }
