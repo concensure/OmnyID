@@ -22,6 +22,27 @@ test("vendor-source authentication returns to the existing vendor portal", async
   assert.match(auth, /token_experience/);
 });
 
+test("vendor claim entry has desktop structure, missing-listing support and bounded admin routing", async () => {
+  const [entry, claim, routing, landing] = await Promise.all([
+    read("solid-ui/src/vendor-claim-main.tsx"),
+    read("solid-ui/src/components/vendor/VendorClaimFlow.tsx"),
+    read("solid-ui/src/lib/vendorPortalEntryState.ts"),
+    read("wedding/assets/js/landing-config.js"),
+  ]);
+
+  assert.match(entry, /lg:grid-cols-/);
+  assert.match(claim, /lg:grid-cols-/);
+  assert.match(claim, /Find your listing/);
+  assert.match(claim, /mailto:hello@omnyid\.com\?subject=vendor%20listing%20claim/);
+  assert.match(claim, /create the listing before you can claim it/i);
+  assert.match(entry, /vendorPortalWorkspaceRedirect/);
+  assert.match(entry, /Opening the admin workspace/);
+  assert.match(routing, /email === OMNYID_ADMIN_EMAIL/);
+  assert.doesNotMatch(routing, /startsWith|includes/);
+  assert.match(landing, /starting:[\s\S]*?ctaLabel: 'Start planning free'/);
+  assert.doesNotMatch(landing, /ctaLabel: 'Build my wedding plan'/);
+});
+
 test("verified vendors receive one coherent management shell over existing authorities", async () => {
   const dashboard = await read("solid-ui/src/components/vendor/VendorProfileDashboard.tsx");
   for (const label of ["Overview", "How it works", "Availability", "Enquiries", "Sales & records", "Public profile", "Settings"]) {

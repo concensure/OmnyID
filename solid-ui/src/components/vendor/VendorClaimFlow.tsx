@@ -124,7 +124,7 @@ export function VendorClaimFlow() {
   onCleanup(() => window.clearTimeout(suggestionTimer));
 
   return (
-    <main class="mx-auto min-h-screen max-w-6xl bg-wedding-surface px-4 py-8 text-wedding-text sm:px-6">
+    <main class="mx-auto min-h-screen max-w-7xl bg-wedding-surface px-4 py-8 text-wedding-text sm:px-6 lg:px-8 lg:py-12">
       <a href="/wedding/vendors.html" class="text-sm font-semibold text-wedding-accent">← Wedding vendor directory</a>
       <header class="mt-6">
         <p class="text-xs font-bold uppercase tracking-[0.16em] text-wedding-accent">Vendor portal</p>
@@ -132,7 +132,8 @@ export function VendorClaimFlow() {
         <p class="mt-2 text-sm leading-6 text-wedding-muted">Prove ownership, correct your public details, manage licensed photos, and answer private quotation requests.</p>
       </header>
       <Show when={!claim()}>
-        <section class="mt-6 rounded-2xl border border-wedding-muted bg-white p-5 shadow-sm">
+        <div class="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1.45fr)_minmax(20rem,0.7fr)] lg:items-start lg:gap-8">
+        <section class="rounded-2xl border border-wedding-muted bg-white p-5 shadow-sm sm:p-7">
           <h2 class="text-lg font-semibold">1. Find your listing</h2>
           <label class="mt-4 block text-sm font-medium" for="vendor-business-name">Business name</label>
           <div class="relative mt-1">
@@ -149,6 +150,7 @@ export function VendorClaimFlow() {
             </Show>
           </div>
           <p class="mt-2 text-xs leading-5 text-wedding-muted">Choose one of the closest matches. Small spelling differences are okay; only active listings are suggested.</p>
+          <p class="mt-3 rounded-xl bg-wedding-surface p-3 text-sm leading-6 text-wedding-muted">Can’t find your business name in the “Find your listing” field? Email <a class="font-bold text-wedding-accent underline underline-offset-2" href="mailto:hello@omnyid.com?subject=vendor%20listing%20claim">hello@omnyid.com</a> with the subject “vendor listing claim”. We need to create the listing before you can claim it.</p>
           <Show when={proposalEnabled() && businessName().trim().length >= 2 && !vendorSlug()}>
             <button type="button" class="mt-3 min-h-11 font-semibold text-wedding-accent underline underline-offset-4" aria-expanded={showProposal()} onClick={() => setShowProposal((value) => !value)}>
               My business is not listed
@@ -178,6 +180,19 @@ export function VendorClaimFlow() {
           </div>
           <Show when={claimNotice()}>{(message) => <p class="mt-3 rounded-lg bg-wedding-surface p-3 text-sm text-wedding-muted" role="status">{message()}</p>}</Show>
         </section>
+        <aside class="rounded-2xl border border-wedding-muted bg-white p-5 shadow-sm lg:sticky lg:top-8 lg:p-6" aria-label="Vendor claim steps">
+          <p class="text-xs font-bold uppercase tracking-[0.16em] text-wedding-accent">What happens next</p>
+          <ol class="mt-4 grid gap-4">
+            <li class="grid grid-cols-[2rem_1fr] gap-3"><span class="flex h-8 w-8 items-center justify-center rounded-full bg-wedding-surface font-bold text-wedding-accent">1</span><div><strong class="block">Match the listing</strong><p class="mt-1 text-sm leading-5 text-wedding-muted">Choose the active business record that belongs to you.</p></div></li>
+            <li class="grid grid-cols-[2rem_1fr] gap-3"><span class="flex h-8 w-8 items-center justify-center rounded-full bg-wedding-surface font-bold text-wedding-accent">2</span><div><strong class="block">Prove your connection</strong><p class="mt-1 text-sm leading-5 text-wedding-muted">Use an available business-domain or reviewed ownership check.</p></div></li>
+            <li class="grid grid-cols-[2rem_1fr] gap-3"><span class="flex h-8 w-8 items-center justify-center rounded-full bg-wedding-surface font-bold text-wedding-accent">3</span><div><strong class="block">Review before publishing</strong><p class="mt-1 text-sm leading-5 text-wedding-muted">Manage your details and photos without changing platform-controlled reviews or ranking.</p></div></li>
+          </ol>
+          <div class="mt-6 border-t border-wedding-muted pt-5">
+            <h2 class="font-semibold">Need a listing created?</h2>
+            <p class="mt-2 text-sm leading-6 text-wedding-muted">Send the business name, website and service area to <a class="font-bold text-wedding-accent underline underline-offset-2" href="mailto:hello@omnyid.com?subject=vendor%20listing%20claim">hello@omnyid.com</a>.</p>
+          </div>
+        </aside>
+        </div>
       </Show>
       <Show when={claim()}>
         {(activeClaim) => <>

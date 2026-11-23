@@ -17,16 +17,16 @@ lifecycle:
 tasks:
   - id: WED-403
     title: Add the desktop vendor-claim experience, listing support email, admin routing and free-planning CTA
-    status: ready
+    status: in_progress
     owner: codex
     reviewer: claude
     branch: agent/codex/WED-403
     worktree: C:/temp/wt/omnyid-wed403
-    base_sha: pending WED-402 release-record commit
+    base_sha: 0e9081bc12c2cf10a09a852fc6b69b8015d5db32
     depends_on: [WED-402, WED-328, WED-326]
     files: [solid-ui/src/vendor-claim-main.tsx, solid-ui/src/components/vendor/VendorClaimFlow.tsx, solid-ui/src/lib/**, solid-ui/tests/**, wedding/index.html, wedding/assets/js/landing-config.js, wedding/tests/**, .agent/**, Documents/verification/**]
     acceptance: [make the vendor claim entry and claim workspace use an intentional responsive desktop layout while preserving the usable mobile flow, explain beside Find your listing that a missing business must first request listing creation and provide a hello@omnyid.com mail link with subject vendor listing claim, route the signed-in admin@omnyid.com account from vendor.html to the existing general admin workspace instead of rendering the vendor portal without broadening admin detection or authority, keep ordinary vendor proposal claim and management paths working, make the Wedding hero CTA read Start planning free in both static and runtime-context rendering, add focused regression coverage plus the full Wedding typecheck and build gates, deploy an exact clean committed ARM64 candidate to Oracle with rollback and authenticated production proof]
-    progress: "Queued from the user's follow-on request after WED-402 production verification. Implementation must start from the WED-402 release-record lineage."
+    progress: "Implementation complete on the clean WED-402 release-record lineage. Vendor entry and claim search now have responsive desktop compositions while preserving their single-column mobile flow. Missing listings point to hello@omnyid.com with the exact vendor listing claim subject. Only the exact admin@omnyid.com session navigates from vendor.html to the existing main Workspace; this is client routing and grants no authority. The runtime starting context now retains the static Start planning free hero CTA. Focused contracts pass, the responsive browser proof has no horizontal overflow at 1440px or 390px, exact admin navigation reaches /workspace/, all 2,381 Wedding tests and site/security checks pass, TypeScript and both line budgets pass, and the 1,856-module build passes. Exact clean-SHA packaging and Oracle static rollout remain."
   - id: WED-402
     title: Complete small-wedding alignment, founding pricing labels, scoped Wedding agent actions and mobile timeline recovery
     status: done

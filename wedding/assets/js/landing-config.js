@@ -27,7 +27,7 @@
       detailCtaLabel: 'Open my starting plan',
       detailDestination: '../workspace/?auth=register&source=wedding',
       demoId: 'overview',
-      ctaLabel: 'Build my wedding plan',
+      ctaLabel: 'Start planning free',
       destination: '../workspace/?auth=register&source=wedding',
       granularity: 'G6 outcome',
       variant: 'default',
