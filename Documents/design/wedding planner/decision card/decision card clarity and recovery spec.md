@@ -345,3 +345,33 @@ Each before/after fingerprint has one stable task id. Settling it suppresses tha
 revision; a later material edit produces a successor. The shared card contract,
 ranking, evidence and approval flows are reused without a new card layout or a
 parallel decision store.
+
+## 14. Editable decision-plan contract
+
+Decision Focus is a ranked view of an editable plan, not a compulsory sequence.
+The Personal Agent and Wedding Planner use the same append-only plan-edit record
+for two user-owned changes: applicability and custom decisions. Wedding records are
+scoped to the canonical response workspace so both authorised partners see the
+same plan. Personal records remain current-account scoped.
+
+“Doesn't apply” is a settled applicability choice, not a defer, snooze, empty
+answer or deletion. It removes the decision from Today and suppresses only current
+follow-ups whose causal parent is that decision. Independent timing, legal and
+coordination decisions remain. Before saving, the UI names causal follow-ups that
+will be hidden. Notes, sources, quotes, bookings, answers and completion records are
+never deleted or rewritten. The choice has immediate Undo and a durable Restore
+control in Plan; no reason is required. Later evidence may offer “Restore now?” but
+cannot silently reactivate the decision.
+
+“Decide later” retains the existing Wedding deferral and Personal Agent snooze
+semantics. A generic dismiss/skip affordance must not masquerade as either outcome.
+Optional services such as hair styling may show “Doesn't apply” directly; every
+other active card exposes it in the plan-action menu.
+
+Plan exposes “+ Add a decision”, while active, completed and not-applicable cards
+expose “Add a follow-up decision”. Only the question is required. Choices, due date
+and note are optional. A follow-up stores its source decision id and title. Custom
+decisions use the existing ranked card, completion and defer/snooze surfaces. Any
+suggested task arising after resolution remains proposal-only until the user
+approves it; vendor enquiries, guest messages, bookings, payments and other external
+commitments retain their existing approval and receipt boundaries.

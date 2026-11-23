@@ -416,6 +416,41 @@ WED-401 release evidence:
 - Static rollback is retained at
   `/home/ubuntu/omnyid-candidates/wed401-9ff9a74fef888b0e124c3b9fbf71d4491c6a5862/rollback/workspace-before.tar.gz`.
 
+## DC-18 — Make the decision plan editable
+
+Status: implementation and release verification in WED-404.
+
+Work:
+
+- [x] Add one shared append-only applicability/custom-decision contract for the
+  Personal Agent and Wedding Planner; keep Personal records account scoped and
+  Wedding records on the canonical response workspace.
+- [x] Replace the ambiguous visible dismiss affordance with “Doesn't apply”, while
+  preserving Snooze and Decide later as time-based choices.
+- [x] Preview and suppress only current causal follow-ups, retain independent
+  decisions and preserve every existing note, source, quote, booking and answer.
+- [x] Offer immediate Undo and durable Plan Restore without asking for a reason;
+  later context may ask to restore but cannot silently resurrect the decision.
+- [x] Put “+ Add a decision” in Plan and “Add a follow-up decision” on active,
+  completed and not-applicable decisions, with only the title required and optional
+  choices, due date and note.
+- [x] Link follow-ups to their source and keep generated next tasks and all external
+  actions behind the existing approval boundary.
+- [x] Add focused lifecycle, causal-suppression, scope and optional-service tests.
+- [ ] Record the clean exact candidate, full Wedding suite, production build,
+  Oracle rollback and authenticated post-deploy proof.
+
+Acceptance:
+
+- “Doesn't apply” survives refresh/partner projection and never behaves like a
+  reminder; Restore is explicit.
+- Removing hair styling can hide its stylist/trial follow-ups without hiding an
+  independent “What time do we need to be ready?” decision.
+- A custom ceremony-music decision can be added with optional choices and linked to
+  a completed celebrant decision.
+- Completing a custom decision records the outcome without automatically adding a
+  task, sending a message or making a commitment.
+
 ## Earlier WED-390 completion evidence
 
 - Exact deployed source: `3c22a9c7766455fa591ddd5b19ee14f9b2fc8517`.

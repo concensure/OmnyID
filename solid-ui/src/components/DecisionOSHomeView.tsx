@@ -35,7 +35,25 @@ import {
 } from "afp-ts/continuity";
 import { topThreadFreshnessState } from "afp-ts/retrieval";
 import { dispatchActionChipEvent } from "@/lib/actionChipEvent";
-import { readSession, safeHref, type DashboardBootstrap } from "@/lib/api";
+import { readSession, safeHref, sendAfpMessage, type DashboardBootstrap } from "@/lib/api";
+import {
+  applyCustomPlanDecision,
+  applyDecisionApplicability,
+  customPlanDecisionToAfpSendInput,
+  decisionApplicabilityToAfpSendInput,
+  decisionPlanEditStateFromMessages,
+  directCausalDecisionFollowUps,
+  isOptionalServiceDecision,
+  loadDecisionPlanEditState,
+  mergeDecisionPlanEditState,
+  newCustomPlanDecision,
+  notApplicableDecisionIds,
+  notApplicableDecisions,
+  saveDecisionPlanEditState,
+  type CustomPlanDecision,
+  type DecisionPlanEditState,
+  type DecisionPlanScope,
+} from "@/lib/decisionPlanEditState";
 import {
   dashboardBootstrapCalendarRuntimeSummary,
   dashboardBootstrapContinuityStateFields,
@@ -336,7 +354,6 @@ import {
   decisionOsUsedLastTimeLabel,
   decisionOsDelegateDecisionLabel,
   decisionOsDismissMagicLabel,
-  decisionOsDismissDecisionTitle,
   decisionOsFocusDecisionLabel,
   decisionOsFocusDecisionTitle,
   decisionOsHiddenOptionCount,
@@ -482,7 +499,34 @@ type Decision = {
   /** Calendar event ID ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â if set, clicking "View in Calendar" navigates there. */
   calendarEventId?: string;
   goalBreakdown?: GoalBreakdown;
+  /** Causal parent for user-added follow-ups. Independent decisions omit this. */
+  parentDecisionId?: string | null;
+  actionMetadata?: Record<string, unknown>;
 };
+
+function customPlanDecisionAsDecision(decision: CustomPlanDecision): Decision {
+  return {
+    id: decision.id,
+    urgency: decision.dueAt ? "high" : "medium",
+    title: decision.title,
+    context: decision.note || (decision.parentDecisionTitle ? `Follow-up to ${decision.parentDecisionTitle}.` : "Added to your plan."),
+    deadline: decision.dueAt ? new Date(decision.dueAt).toLocaleDateString("en-AU", { day: "numeric", month: "long", year: "numeric" }) : undefined,
+    options: decision.choices.length > 0
+      ? decision.choices.map((label, index) => ({ id: `choice-${index + 1}`, label }))
+      : [{ id: "decided", label: "I have decided" }],
+    impact: "medium",
+    effort: "5 min",
+    durationScope: "day",
+    parentDecisionId: decision.parentDecisionId,
+    actionMetadata: { custom_plan_decision: true },
+  };
+}
+
+function withCustomPlanDecisions(base: readonly Decision[], state: DecisionPlanEditState): Decision[] {
+  const custom = state.customDecisions.filter((item) => item.status === "open").map(customPlanDecisionAsDecision);
+  const ids = new Set(custom.map((item) => item.id));
+  return [...custom, ...base.filter((item) => !ids.has(item.id))];
+}
 
 // ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚¬ Constants ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚¬
 
@@ -1313,6 +1357,8 @@ function DecisionCard(props: {
   onGoalBreakdown: () => void;
   onFilterEffort?: () => void;
   onEnterFocusMode?: () => void;
+  onDoesNotApply: () => void;
+  onAddFollowUp: () => void;
 }) {
   const d = props.decision;
   const sessionUserId = readSession()?.user?.id ?? null;
@@ -1330,6 +1376,7 @@ function DecisionCard(props: {
   const [showOutcomeMenu, setShowOutcomeMenu] = createSignal(false);
   const [showDeadlineInfo, setShowDeadlineInfo] = createSignal(false);
   const [showUrgencyInfo, setShowUrgencyInfo] = createSignal(false);
+  const [showPlanMenu, setShowPlanMenu] = createSignal(false);
   const [swipeDx, setSwipeDx] = createSignal(0);
   const [pendingApprove, setPendingApprove] = createSignal(false);
   const [approveNote, setApproveNote] = createSignal("");
@@ -1433,7 +1480,7 @@ function DecisionCard(props: {
       if (plan.action === "approve") {
         props.onAction("approve", undefined, plan.optionId);
       } else if (plan.action === "dismiss") {
-        props.onAction("dismiss");
+        props.onDoesNotApply();
       }
       setSwipeDx(0);
     }
@@ -1980,14 +2027,37 @@ function DecisionCard(props: {
               {decisionOsFocusDecisionLabel()}
             </button>
           </Show>
-          <button
-            type="button"
-            title={decisionOsDismissDecisionTitle()}
-            class="flex h-7 w-7 items-center justify-center rounded-full border border-black/10 bg-white/60 text-[11px] text-on-surface-variant/60 transition hover:border-rose-200 hover:text-rose-500"
-            onClick={() => props.onAction("dismiss")}
-          >
-            ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚¢
-          </button>
+          <Show when={isOptionalServiceDecision(d.title)}>
+            <button
+              type="button"
+              class="rounded-full border border-black/10 bg-white/60 px-2.5 py-1.5 text-[11px] font-medium text-on-surface-variant transition hover:border-rose-200 hover:text-rose-600"
+              onClick={props.onDoesNotApply}
+            >
+              Doesn't apply
+            </button>
+          </Show>
+          <div class="relative">
+            <button
+              type="button"
+              title="More plan actions"
+              aria-label="More plan actions"
+              aria-expanded={showPlanMenu()}
+              class="flex h-7 w-7 items-center justify-center rounded-full border border-black/10 bg-white/60 text-sm font-bold text-on-surface-variant transition hover:border-primary/30 hover:text-primary"
+              onClick={(event) => { event.stopPropagation(); setShowPlanMenu((value) => !value); }}
+            >
+              …
+            </button>
+            <Show when={showPlanMenu()}>
+              <div class="absolute bottom-full right-0 z-50 mb-1.5 w-64 rounded-2xl border border-white/70 bg-white/95 p-1.5 shadow-2xl backdrop-blur-md">
+                <button type="button" class="w-full rounded-xl px-3 py-2 text-left text-xs font-medium text-on-surface-variant hover:bg-primary/5 hover:text-primary" onClick={() => { setShowPlanMenu(false); props.onAddFollowUp(); }}>
+                  Add a follow-up decision
+                </button>
+                <button type="button" class="w-full rounded-xl px-3 py-2 text-left text-xs font-medium text-rose-600 hover:bg-rose-50" onClick={() => { setShowPlanMenu(false); props.onDoesNotApply(); }}>
+                  Doesn't apply to my plan
+                </button>
+              </div>
+            </Show>
+          </div>
         </div>
       </div>
     </div>
@@ -2445,7 +2515,10 @@ function ProgressFooter(props: {
 
 export function DecisionOSHomeView() {
   const sessionUserId = readSession()?.user?.id ?? null;
-  const [decisions, setDecisions] = createSignal<Decision[]>(SEED_DECISIONS);
+  const planScope: DecisionPlanScope = { kind: "personal", key: sessionUserId || "current-account", accountId: sessionUserId };
+  const initialPlanEditState = loadDecisionPlanEditState(planScope);
+  const [planEditState, setPlanEditState] = createSignal<DecisionPlanEditState>(initialPlanEditState);
+  const [decisions, setDecisions] = createSignal<Decision[]>(withCustomPlanDecisions(SEED_DECISIONS, initialPlanEditState));
   const [queueState, setQueueState] = createSignal<DecisionOsQueueBootstrapState>({
     queuePriorityCard: null,
     queueActionItems: [],
@@ -2480,6 +2553,13 @@ export function DecisionOSHomeView() {
   const [goalModalDecision, setGoalModalDecision] = createSignal<Decision | null>(null);
   const [showShortcuts, setShowShortcuts] = createSignal(false);
   const [focusModeDecisionId, setFocusModeDecisionId] = createSignal<string | null>(null);
+  const [notApplicableCandidate, setNotApplicableCandidate] = createSignal<Decision | null>(null);
+  const [planEditorParent, setPlanEditorParent] = createSignal<Decision | null>(null);
+  const [showPlanEditor, setShowPlanEditor] = createSignal(false);
+  const [planDecisionTitle, setPlanDecisionTitle] = createSignal("");
+  const [planDecisionChoices, setPlanDecisionChoices] = createSignal("");
+  const [planDecisionDueAt, setPlanDecisionDueAt] = createSignal("");
+  const [planDecisionNote, setPlanDecisionNote] = createSignal("");
   const [vimNavigationEnabled, setVimNavigationEnabled] = createSignal(loadVimNavigationEnabled());
   const continuityStateFieldSummary = createMemo(() =>
     summarizeDecisionOsStateFields(
@@ -2515,6 +2595,15 @@ export function DecisionOSHomeView() {
 
   const selectedDecision = createMemo(() => decisions().find(d => d.id === selectedId()) ?? null);
 
+  createEffect(() => {
+    const fromMessages = decisionPlanEditStateFromMessages(dashboardBootstrapMessages(operationalBootstrap()), planScope);
+    setPlanEditState((current) => {
+      const merged = mergeDecisionPlanEditState(current, fromMessages);
+      saveDecisionPlanEditState(planScope, merged);
+      return merged;
+    });
+  });
+
   const moodFilter = createMemo(() => decisionOsMoodEffortFilter(mood()));
 
   // Duration-aware filtering: decisions roll up ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â "week" shows week+day, "month" shows month+week+day, "year" shows all.
@@ -2531,8 +2620,11 @@ export function DecisionOSHomeView() {
     const snz = snoozed();
     const now = Date.now();
     const scopes = durationScopeFilter();
+    const hiddenByPlan = notApplicableDecisionIds(planEditState(), decisions());
+    const completedCustomIds = new Set(planEditState().customDecisions.filter((item) => item.status === "completed").map((item) => item.id));
     return decisions().filter(d => {
       if (dis.has(d.id)) return false;
+      if (hiddenByPlan.has(d.id) || completedCustomIds.has(d.id)) return false;
       const wakeAt = snz.get(d.id);
       if (wakeAt !== undefined && wakeAt > now) return false;
       // Duration filter: decisions without a scope always appear in day view.
@@ -2550,9 +2642,12 @@ export function DecisionOSHomeView() {
     const dis = dismissed();
     const snz = snoozed();
     const now = Date.now();
+    const hiddenByPlan = notApplicableDecisionIds(planEditState(), decisions());
+    const completedCustomIds = new Set(planEditState().customDecisions.filter((item) => item.status === "completed").map((item) => item.id));
     const counts: Record<DurationView, number> = { day: 0, week: 0, month: 0, year: 0 };
     for (const d of decisions()) {
       if (dis.has(d.id)) continue;
+      if (hiddenByPlan.has(d.id) || completedCustomIds.has(d.id)) continue;
       const wakeAt = snz.get(d.id);
       if (wakeAt !== undefined && wakeAt > now) continue;
       const scope = d.durationScope ?? "day";
@@ -2705,6 +2800,81 @@ export function DecisionOSHomeView() {
     }
   }
 
+  function saveApplicability(decision: Decision, state: "not_applicable" | "restored") {
+    const affected = state === "not_applicable"
+      ? directCausalDecisionFollowUps(decisions(), decision.id)
+      : [];
+    const change = {
+      decisionId: decision.id,
+      title: decision.title,
+      state,
+      affectedDecisionIds: affected.map((item) => item.id),
+      affectedDecisionTitles: affected.map((item) => item.title),
+      changedAt: new Date().toISOString(),
+    } as const;
+    setPlanEditState((current) => {
+      const next = applyDecisionApplicability(current, change);
+      saveDecisionPlanEditState(planScope, next);
+      return next;
+    });
+    void sendAfpMessage(decisionApplicabilityToAfpSendInput(planScope, change)).catch(() => {
+      toastController.show("Saved on this device. OmnyID will sync the plan choice when the connection returns.", null);
+    });
+    if (state === "not_applicable") {
+      setNotApplicableCandidate(null);
+      setSelectedId((current) => current === decision.id ? null : current);
+      toastController.show("Removed from Today. Notes, sources and existing work are still saved.", () => saveApplicability(decision, "restored"), { actionLabel: "Undo" });
+    } else {
+      toastController.show("Decision restored to your plan.", null);
+    }
+  }
+
+  function openPlanEditor(parent: Decision | null = null) {
+    setPlanEditorParent(parent);
+    setPlanDecisionTitle("");
+    setPlanDecisionChoices("");
+    setPlanDecisionDueAt("");
+    setPlanDecisionNote("");
+    setShowPlanEditor(true);
+  }
+
+  function savePlanDecision() {
+    const title = planDecisionTitle().trim();
+    if (!title) return;
+    const parent = planEditorParent();
+    const decision = newCustomPlanDecision({
+      title,
+      choices: planDecisionChoices().split(/\r?\n|,/),
+      dueAt: planDecisionDueAt() ? new Date(`${planDecisionDueAt()}T12:00:00`).toISOString() : null,
+      note: planDecisionNote(),
+      parentDecisionId: parent?.id,
+      parentDecisionTitle: parent?.title,
+    });
+    setPlanEditState((current) => {
+      const next = applyCustomPlanDecision(current, decision);
+      saveDecisionPlanEditState(planScope, next);
+      setDecisions((items) => withCustomPlanDecisions(items, next));
+      return next;
+    });
+    void sendAfpMessage(customPlanDecisionToAfpSendInput(planScope, decision)).catch(() => {
+      toastController.show("Added on this device. OmnyID will sync the decision when the connection returns.", null);
+    });
+    setShowPlanEditor(false);
+    toastController.show(parent ? "Follow-up decision added to your plan." : "Decision added to your plan.", null);
+  }
+
+  function completeCustomPlanDecision(id: string) {
+    const current = planEditState().customDecisions.find((item) => item.id === id);
+    if (!current) return;
+    const completed = { ...current, status: "completed" as const, changedAt: new Date().toISOString() };
+    setPlanEditState((state) => {
+      const next = applyCustomPlanDecision(state, completed);
+      saveDecisionPlanEditState(planScope, next);
+      return next;
+    });
+    void sendAfpMessage(customPlanDecisionToAfpSendInput(planScope, completed));
+  }
+
   function handleAction(
     id: string,
     action: "approve" | "snooze" | "delegate" | "dismiss",
@@ -2724,6 +2894,7 @@ export function DecisionOSHomeView() {
     const d = execution.decision;
 
     if (execution.kind === "approve") {
+      if (decisions().find((item) => item.id === id)?.actionMetadata?.custom_plan_decision === true) completeCustomPlanDecision(id);
       const approveState = decisionOsApproveUiState({
         decisionId: id,
         selectedId: selectedId(),
@@ -2844,7 +3015,7 @@ export function DecisionOSHomeView() {
       decisionId: goalModalDecision()?.id,
       summary,
     });
-    setDecisions(plan.decisions);
+    setDecisions(withCustomPlanDecisions(plan.decisions, planEditState()));
     toastController.show(plan.toastMessage, null);
     recordDecisionOsDiaryEntry(plan.diaryEntry, sessionUserId);
   }
@@ -2877,7 +3048,7 @@ export function DecisionOSHomeView() {
       setQueueState(resolved.queueState);
       setQueueCompanionState(resolved.queueCompanionState);
       setOperationalBootstrap(resolved.operationalBootstrap);
-      setDecisions(resolved.decisions);
+      setDecisions(withCustomPlanDecisions(resolved.decisions, planEditState()));
       if (resolved.continuitySelection) {
         setSelectedId(resolved.continuitySelection.selectedId);
         setFocusedIndex(resolved.continuitySelection.focusedIndex);
@@ -2979,8 +3150,7 @@ export function DecisionOSHomeView() {
           break;
         case "dismiss":
           e.preventDefault();
-          handleAction(execution.decisionId, "dismiss");
-          setFocusedIndex(execution.focusedIndex);
+          setNotApplicableCandidate(decisions().find((item) => item.id === execution.decisionId) ?? null);
           break;
         case "snooze":
           e.preventDefault();
@@ -3027,7 +3197,11 @@ export function DecisionOSHomeView() {
           setGoalModalDecision(dispatchPlan.decision);
           break;
         case "handle-action":
-          handleAction(dispatchPlan.decisionId, dispatchPlan.action);
+          if (dispatchPlan.action === "dismiss") {
+            setNotApplicableCandidate(decisions().find((item) => item.id === dispatchPlan.decisionId) ?? null);
+          } else {
+            handleAction(dispatchPlan.decisionId, dispatchPlan.action);
+          }
           break;
         case "dispatch-search":
           dispatchDecisionOsSearchAction(dispatchPlan.term);
@@ -3211,6 +3385,45 @@ export function DecisionOSHomeView() {
       />
 
       {/* Decision queue + context panel */}
+      <section class="mb-3 rounded-2xl border border-white/50 bg-white/45 p-3 backdrop-blur-sm" aria-label="Editable decision plan">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <p class="text-xs font-semibold text-on-surface">Your decision plan</p>
+            <p class="mt-0.5 text-[11px] text-on-surface-variant/70">Add what matters to you. Restore anything you previously marked as not applicable.</p>
+          </div>
+          <button type="button" class="rounded-full bg-primary px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm" onClick={() => openPlanEditor()}>
+            + Add a decision
+          </button>
+        </div>
+        <Show when={notApplicableDecisions(planEditState()).length > 0 || planEditState().customDecisions.some((item) => item.status === "completed") || decisions().some((item) => dismissed().has(item.id) && !notApplicableDecisionIds(planEditState(), decisions()).has(item.id))}>
+          <div class="mt-3 grid gap-2 sm:grid-cols-2">
+            <For each={notApplicableDecisions(planEditState())}>{(item) => (
+              <div class="rounded-xl border border-black/[0.06] bg-white/70 px-3 py-2">
+                <p class="text-xs font-medium text-on-surface">{item.title}</p>
+                <p class="mt-0.5 text-[10px] text-on-surface-variant/65">Still out of Today; saved work is retained. Restore if new context makes it relevant.</p>
+                <div class="mt-2 flex flex-wrap gap-2">
+                  <button type="button" class="text-[10px] font-semibold text-primary hover:underline" onClick={() => saveApplicability({ id: item.decisionId, title: item.title } as Decision, "restored")}>Restore now?</button>
+                  <button type="button" class="text-[10px] font-semibold text-on-surface-variant hover:underline" onClick={() => openPlanEditor({ id: item.decisionId, title: item.title } as Decision)}>Add follow-up</button>
+                </div>
+              </div>
+            )}</For>
+            <For each={planEditState().customDecisions.filter((item) => item.status === "completed")}>{(item) => (
+              <div class="rounded-xl border border-black/[0.06] bg-white/70 px-3 py-2">
+                <p class="text-xs font-medium text-on-surface">{item.title}</p>
+                <p class="mt-0.5 text-[10px] text-on-surface-variant/65">Completed decision</p>
+                <button type="button" class="mt-2 text-[10px] font-semibold text-primary hover:underline" onClick={() => openPlanEditor({ id: item.id, title: item.title } as Decision)}>Add follow-up decision</button>
+              </div>
+            )}</For>
+            <For each={decisions().filter((item) => dismissed().has(item.id) && !notApplicableDecisionIds(planEditState(), decisions()).has(item.id) && item.actionMetadata?.custom_plan_decision !== true)}>{(item) => (
+              <div class="rounded-xl border border-black/[0.06] bg-white/70 px-3 py-2">
+                <p class="text-xs font-medium text-on-surface">{item.title}</p>
+                <p class="mt-0.5 text-[10px] text-on-surface-variant/65">Completed decision</p>
+                <button type="button" class="mt-2 text-[10px] font-semibold text-primary hover:underline" onClick={() => openPlanEditor(item)}>Add a follow-up decision</button>
+              </div>
+            )}</For>
+          </div>
+        </Show>
+      </section>
       <QueueWorkspaceLayout
         list={
           <>
@@ -3236,6 +3449,8 @@ export function DecisionOSHomeView() {
                 onGoalBreakdown={() => setGoalModalDecision(d)}
                 onFilterEffort={() => selectMood("tired")}
                 onEnterFocusMode={() => setFocusModeDecisionId(d.id)}
+                onDoesNotApply={() => setNotApplicableCandidate(d)}
+                onAddFollowUp={() => openPlanEditor(d)}
               />
             )}
           </For>
@@ -3337,6 +3552,50 @@ export function DecisionOSHomeView() {
       {/* Keyboard shortcuts overlay */}
       <Show when={showShortcuts()}>
         <ShortcutsHelp onClose={() => setShowShortcuts(false)} />
+      </Show>
+
+      <Show when={notApplicableCandidate()}>
+        {(candidate) => {
+          const affected = () => directCausalDecisionFollowUps(decisions(), candidate().id);
+          return <div class="fixed inset-0 z-[90] flex items-end justify-center bg-black/35 p-3 sm:items-center" onClick={() => setNotApplicableCandidate(null)}>
+            <section class="w-full max-w-lg rounded-2xl bg-white p-4 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="not-applicable-title" onClick={(event) => event.stopPropagation()}>
+              <h2 id="not-applicable-title" class="text-base font-semibold text-on-surface">Doesn't apply to your plan?</h2>
+              <p class="mt-1 text-sm leading-6 text-on-surface-variant">“{candidate().title}” will leave Today and will not resurface. Snooze is still available when you intend to decide later.</p>
+              <Show when={affected().length > 0} fallback={<p class="mt-3 rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-700">No independent decisions will be removed. Existing notes, sources and completed work stay saved.</p>}>
+                <div class="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                  <p class="font-semibold">These follow-ups only exist because of this decision, so they will also be hidden:</p>
+                  <ul class="mt-1 list-disc space-y-1 pl-4"><For each={affected()}>{(item) => <li>{item.title}</li>}</For></ul>
+                  <p class="mt-2">Independent decisions remain in your plan.</p>
+                </div>
+              </Show>
+              <div class="mt-4 flex justify-end gap-2">
+                <button type="button" class="rounded-full border border-black/10 px-4 py-2 text-xs font-semibold text-on-surface" onClick={() => setNotApplicableCandidate(null)}>Keep it</button>
+                <button type="button" class="rounded-full bg-rose-600 px-4 py-2 text-xs font-semibold text-white" onClick={() => saveApplicability(candidate(), "not_applicable")}>Doesn't apply</button>
+              </div>
+            </section>
+          </div>;
+        }}
+      </Show>
+
+      <Show when={showPlanEditor()}>
+        <div class="fixed inset-0 z-[90] flex items-end justify-center bg-black/35 p-3 sm:items-center" onClick={() => setShowPlanEditor(false)}>
+          <section class="w-full max-w-lg rounded-2xl bg-white p-4 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="add-decision-title" onClick={(event) => event.stopPropagation()}>
+            <h2 id="add-decision-title" class="text-base font-semibold text-on-surface">{planEditorParent() ? "Add a follow-up decision" : "Add a decision"}</h2>
+            <Show when={planEditorParent()}>{(parent) => <p class="mt-1 text-xs text-on-surface-variant">Linked to “{parent().title}” so the reason stays visible.</p>}</Show>
+            <label class="mt-4 block text-xs font-semibold text-on-surface">What do you need to decide? <span class="text-rose-600">*</span>
+              <input autofocus value={planDecisionTitle()} onInput={(event) => setPlanDecisionTitle(event.currentTarget.value)} class="mt-1 min-h-11 w-full rounded-xl border border-black/10 px-3 text-sm" />
+            </label>
+            <label class="mt-3 block text-xs font-semibold text-on-surface">Choices <span class="font-normal text-on-surface-variant">(optional, separate with commas)</span>
+              <input value={planDecisionChoices()} onInput={(event) => setPlanDecisionChoices(event.currentTarget.value)} placeholder="A friend, Venue coordinator" class="mt-1 min-h-11 w-full rounded-xl border border-black/10 px-3 text-sm" />
+            </label>
+            <div class="mt-3 grid gap-3 sm:grid-cols-2">
+              <label class="text-xs font-semibold text-on-surface">Due date <span class="font-normal text-on-surface-variant">(optional)</span><input type="date" value={planDecisionDueAt()} onInput={(event) => setPlanDecisionDueAt(event.currentTarget.value)} class="mt-1 min-h-11 w-full rounded-xl border border-black/10 px-3 text-sm" /></label>
+              <label class="text-xs font-semibold text-on-surface">Note <span class="font-normal text-on-surface-variant">(optional)</span><input value={planDecisionNote()} onInput={(event) => setPlanDecisionNote(event.currentTarget.value)} class="mt-1 min-h-11 w-full rounded-xl border border-black/10 px-3 text-sm" /></label>
+            </div>
+            <p class="mt-3 text-[11px] leading-5 text-on-surface-variant">If OmnyID later suggests a task from this decision, you will approve it before it is added or sent.</p>
+            <div class="mt-4 flex justify-end gap-2"><button type="button" class="rounded-full border border-black/10 px-4 py-2 text-xs font-semibold" onClick={() => setShowPlanEditor(false)}>Cancel</button><button type="button" disabled={!planDecisionTitle().trim()} class="rounded-full bg-primary px-4 py-2 text-xs font-semibold text-white disabled:opacity-45" onClick={savePlanDecision}>Add to plan</button></div>
+          </section>
+        </div>
       </Show>
 
       {/* Dismiss toast */}

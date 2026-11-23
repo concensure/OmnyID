@@ -4770,3 +4770,19 @@ vendor entry page. The comparison is an exact normalized address and is navigati
 only. It does not reuse permissive admin-looking email heuristics, assign a role or
 bypass server authorization. Ordinary vendor sessions and signed-out continuity keep
 their existing paths.
+
+## 2026-11-23 — Applicability is a decision outcome, not a timer or deletion (WED-404)
+
+Personal Agent and Wedding decision plans share one append-only plan-edit shape for
+applicability and user-authored decisions. “Doesn't apply” is distinct from
+Snooze/Defer: it has no wake date, does not delete artifacts and can return only
+through explicit Restore. Wedding events use the canonical response-workspace thread
+so authorised partners project the same outcome; Personal events remain current-
+account scoped.
+
+Causal suppression is evaluated against the current plan graph. The ledger retains
+the follow-ups shown at confirmation for audit, but an old relationship cannot keep
+a now-independent decision hidden. Later evidence may ask whether to restore an
+excluded decision, but cannot silently reverse the couple's recorded choice.
+User-authored follow-ups retain their source link, and any resulting task or external
+action remains proposal-only until approved through the existing authority.

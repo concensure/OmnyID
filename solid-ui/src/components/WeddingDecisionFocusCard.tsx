@@ -6,6 +6,7 @@ import { WeddingDecisionRsvpFollowUp } from "@/components/WeddingDecisionRsvpFol
 import { WeddingBudgetTrackerCard } from "@/components/WeddingBudgetTrackerCard";
 import { WeddingSeatingPanel } from "@/components/WeddingSeatingPanel";
 import { WeddingVendorOutreachComposer } from "@/components/WeddingVendorOutreachComposer";
+import { WeddingDecisionPlanControls } from "@/components/WeddingDecisionPlanControls";
 import type { WeddingVendorChoiceSelectionSaveInput } from "@/components/WeddingArtifactDetailPanel";
 import { loadContacts, saveContacts, subscribeContactsChangedEvent, type Contact } from "@/lib/contactsLocalState";
 import { postAgentMessage, readSession, type SendAfpMessageInput } from "@/lib/api";
@@ -52,6 +53,12 @@ import {
   setMobileWeddingDecisionOpenIntent,
 } from "@/lib/mobileFocusHomeState";
 import { weddingAccountScopedStorageKey } from "@/lib/weddingLocalAccountScope";
+import {
+  isOptionalServiceDecision,
+  notApplicableDecisionIds,
+  type DecisionPlanScope,
+} from "@/lib/decisionPlanEditState";
+import { createWeddingDecisionPlanEditController, weddingCustomDecisionItem } from "@/lib/weddingDecisionPlanEditController";
 
 export function WeddingDecisionFocusCard(props: {
   state: WeddingResponseWorkspaceViewState;
@@ -63,6 +70,9 @@ export function WeddingDecisionFocusCard(props: {
   onRefreshWorkspace?: (() => void) | null;
 }) {
   const LOCAL_DEFER_TTL_MS = 10 * 60 * 1000;
+  const sessionUserId = readSession()?.user?.id ?? null;
+  const planScope: DecisionPlanScope = { kind: "wedding", key: props.state.workspace.metadata.responseWorkspaceId?.trim() || props.state.workspace.metadata.weddingPlanId,
+    accountId: sessionUserId, weddingPlanId: props.state.workspace.metadata.weddingPlanId, responseWorkspaceId: props.state.workspace.metadata.responseWorkspaceId };
   const deferredStorageKey = () => {
     const workspaceId = props.state.workspace.metadata.responseWorkspaceId?.trim() || "default";
     return weddingAccountScopedStorageKey(`omnyid.wedding.deferred-focus.${workspaceId}`);
@@ -105,6 +115,14 @@ export function WeddingDecisionFocusCard(props: {
   const [finalCountSelections, setFinalCountSelections] = createSignal<Record<string, string>>({});
   const [finalCountApprovalBusyId, setFinalCountApprovalBusyId] = createSignal<string | null>(null);
   const [reviewObservations, setReviewObservations] = createSignal<Record<string, WeddingReviewDecisionObservation | null>>({});
+  const planEditor = createWeddingDecisionPlanEditController({ scope: planScope, messages: props.state.afpMessages,
+    getItems: () => planRelief().focusItems, saveProjection: props.saveProjection, refresh: props.onRefreshWorkspace });
+  const {
+    state: planEditState,
+    setNotApplicableCandidate,
+    openEditor: openPlanEditor,
+    completeDecision: completeCustomPlanDecision,
+  } = planEditor;
   const [reminderItem, setReminderItem] = createSignal<WeddingPersonalOsRankedItem | null>(null);
   const [reminderDate, setReminderDate] = createSignal("");
   const fundedResearchAttempts = new Set<string>();
@@ -163,11 +181,22 @@ export function WeddingDecisionFocusCard(props: {
       .filter((task) => loadWeddingTaskCompletion({ taskId: task.id, weddingPlanId: props.state.workspace.metadata.weddingPlanId, responseWorkspaceId: props.state.workspace.metadata.responseWorkspaceId })?.completed)
       .map((task) => `task:${task.id}`));
   });
+  const planRelief = createMemo(() => {
+    const relief = props.state.personalOsProjection.decisionLoadRelief;
+    const existingIds = new Set(relief.focusItems.map((item) => item.id));
+    const custom = planEditState().customDecisions
+      .filter((item) => item.status === "open" && !existingIds.has(item.id))
+      .map(weddingCustomDecisionItem);
+    const focusItems = [...relief.focusItems, ...custom].sort((left, right) => right.rankWeight - left.rankWeight);
+    return { ...relief, focusItems, backlogCount: relief.backlogCount + custom.length };
+  });
+  const planHiddenIds = createMemo(() => new Set([...completedFocusIds(), ...notApplicableDecisionIds(planEditState(), planRelief().focusItems)]));
   const display = createMemo(() => buildWeddingDecisionFocusDisplayState({
-    relief: props.state.personalOsProjection.decisionLoadRelief,
+    relief: planRelief(),
     locallyDeferredIds: locallyDeferredIds(),
-    locallyHiddenIds: completedFocusIds(),
+    locallyHiddenIds: planHiddenIds(),
   }));
+  createEffect(() => planEditor.projectMessages(props.state.afpMessages));
   createEffect(() => {
     researchRetryRevision();
     const context = props.state.contextCards.flatMap((card) => [
@@ -217,7 +246,7 @@ export function WeddingDecisionFocusCard(props: {
     setMobileWeddingDecisionOpenIntent(null);
   });
   createEffect(() => {
-    const sourceIds = new Set(props.state.personalOsProjection.decisionLoadRelief.focusItems.map((item) => item.id));
+    const sourceIds = new Set(planRelief().focusItems.map((item) => item.id));
     setLocallyDeferredIds((current) => {
       const active = new Set([...current].filter((id) => sourceIds.has(id)));
       if (active.size === current.size) return current;
@@ -353,6 +382,24 @@ export function WeddingDecisionFocusCard(props: {
   function decisionModel(card: ReturnType<typeof decisionCardFromWeddingFocus>): DecisionCardModel {
     const item = display().itemCards.find((candidate) => candidate.id === card.id)?.item;
     if (!item) return card;
+    if (item.actionMetadata?.custom_plan_decision === true) {
+      const choices = Array.isArray(item.actionMetadata.custom_choices)
+        ? item.actionMetadata.custom_choices.filter((choice): choice is string => typeof choice === "string" && Boolean(choice.trim()))
+        : [];
+      return {
+        ...card,
+        pattern: choices.length > 1 ? "choose" : "review",
+        patternSlots: {
+          ...card.patternSlots,
+          payloadPreview: item.explanation,
+          options: choices.map((choice, index) => ({ id: `custom-choice-${index + 1}`, name: choice })),
+        },
+        actions: [
+          { id: "complete_custom", label: "Mark decided", role: "primary", effect: "Records this decision as complete; no external action is taken", intent: "approve" },
+          { id: "later", label: "Decide later", role: "dismiss", effect: "Sets a reminder using the existing Defer flow", intent: "defer" },
+        ],
+      };
+    }
     const research = researchFor(item.id);
     const researchCard: DecisionCardModel = research ? {
       ...card,
@@ -553,7 +600,7 @@ export function WeddingDecisionFocusCard(props: {
     setNewContactTaskId(null);
   }
   return (
-    <Show when={props.state.personalOsProjection.hasWeddingPersonalOsSignal}>
+    <Show when={props.state.personalOsProjection.hasWeddingPersonalOsSignal || planEditState().customDecisions.some((item) => item.status === "open")}>
       <div class="min-w-0 rounded-[24px] border border-pink-100/80 bg-pink-50/80 p-3 shadow-card sm:rounded-[28px] sm:p-4">
         <div class="flex items-start justify-between gap-2">
           <div>
@@ -563,6 +610,7 @@ export function WeddingDecisionFocusCard(props: {
             {display().remainingCount > 0 ? `${display().remainingCount} next` : "Last one"}
           </span>
         </div>
+        <WeddingDecisionPlanControls editor={planEditor} items={planRelief().focusItems} />
         <Show when={display().savedForLaterLabel}>
           {(label) => (
           <p class="mt-3 rounded-2xl border border-pink-100 bg-white/75 px-3 py-2 text-sm leading-6 text-pink-950/75">
@@ -633,7 +681,9 @@ export function WeddingDecisionFocusCard(props: {
                     ) : undefined}
                     onRecommendationSelect={researchFor(item.id) ? () => toggleResearch(item.id) : undefined}
                     onAction={(action) => {
-                      if (action.id === "later") {
+                      if (action.id === "complete_custom") {
+                        completeCustomPlanDecision(item);
+                      } else if (action.id === "later") {
                         openReminderPicker(item);
                       } else if (action.id === "approve_guest_count") {
                         void approveFinalGuestCount(item.id);
@@ -718,6 +768,18 @@ export function WeddingDecisionFocusCard(props: {
                       }
                     }}
                   />
+                  <div class="flex flex-wrap items-center justify-end gap-2 px-1" aria-label={`Plan actions for ${item.title}`}>
+                    <Show when={isOptionalServiceDecision(item.title)}>
+                      <button type="button" class="min-h-9 rounded-full border border-pink-200 bg-white px-3 text-xs font-semibold text-pink-950" onClick={() => setNotApplicableCandidate(item)}>Doesn't apply</button>
+                    </Show>
+                    <details class="relative">
+                      <summary class="flex min-h-9 cursor-pointer list-none items-center rounded-full border border-pink-200 bg-white px-3 text-xs font-bold text-pink-950" aria-label="More plan actions">…</summary>
+                      <div class="absolute right-0 top-full z-40 mt-1 w-64 rounded-xl border border-pink-200 bg-white p-1.5 shadow-card">
+                        <button type="button" class="block w-full rounded-lg px-3 py-2 text-left text-xs font-semibold text-pink-950 hover:bg-pink-50" onClick={() => openPlanEditor(item)}>Add a follow-up decision</button>
+                        <button type="button" class="block w-full rounded-lg px-3 py-2 text-left text-xs font-semibold text-red-700 hover:bg-red-50" onClick={() => setNotApplicableCandidate(item)}>Doesn't apply to our wedding</button>
+                      </div>
+                    </details>
+                  </div>
                   <Show when={vendorSelectionNotice()[item.id]}>
                     {(notice) => <p role="status" class="rounded-xl border border-pink-200 bg-white px-3 py-2 text-xs font-semibold text-pink-950">{notice()}</p>}
                   </Show>
@@ -894,18 +956,21 @@ export function WeddingDecisionFocusCard(props: {
           <button type="button" disabled={display().reviewDisabled} aria-disabled={display().reviewDisabled} title={display().reviewDisabled ? "There are no decisions ready to review." : "Review the current decision focus."} class="w-full rounded-full border border-pink-200 bg-white/75 px-3 py-2 text-xs font-semibold text-pink-950 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-45 sm:w-auto sm:py-1.5" onClick={() => props.onSidebarAction(decisionFocusAction())}>
             Review this decision
           </button>
-          <Show when={props.state.decisionRecordCards.length > 0}>
+          <Show when={props.state.decisionRecordCards.length > 0 || planEditState().customDecisions.some((item) => item.status === "completed")}>
             <button type="button" class="w-full rounded-full border border-pink-200 bg-white/75 px-3 py-2 text-xs font-semibold text-pink-950 transition hover:bg-white sm:w-auto sm:py-1.5" onClick={() => setShowDecisionHistory((current) => !current)} aria-expanded={showDecisionHistory()}>
-              {showDecisionHistory() ? "Hide past decisions" : `Past decisions (${props.state.decisionRecordCards.length})`}
+              {showDecisionHistory() ? "Hide past decisions" : `Past decisions (${props.state.decisionRecordCards.length + planEditState().customDecisions.filter((item) => item.status === "completed").length})`}
             </button>
           </Show>
         </div>
-        <Show when={showDecisionHistory() && props.state.decisionRecordCards.length > 0}>
+        <Show when={showDecisionHistory() && (props.state.decisionRecordCards.length > 0 || planEditState().customDecisions.some((item) => item.status === "completed"))}>
           <section class="mt-3 space-y-2 rounded-2xl border border-pink-100 bg-white/75 p-3" aria-label="Past decisions and agent records">
             <p class="text-xs font-semibold text-pink-950">Past decisions and agent records</p>
             <p class="text-xs leading-5 text-pink-950/75">These saved choices are the context OmnyID uses when preparing later plans and follow-ups.</p>
             <For each={props.state.decisionRecordCards}>
-              {(record) => <div class="rounded-xl border border-pink-100 bg-white px-3 py-2"><p class="text-xs font-semibold text-pink-950">{record.title}</p><p class="mt-1 text-xs leading-5 text-pink-950/75">{record.detailLabel}</p></div>}
+              {(record) => <div class="rounded-xl border border-pink-100 bg-white px-3 py-2"><p class="text-xs font-semibold text-pink-950">{record.title}</p><p class="mt-1 text-xs leading-5 text-pink-950/75">{record.detailLabel}</p><button type="button" class="mt-2 text-xs font-bold text-pink-800 underline" onClick={() => openPlanEditor(weddingCustomDecisionItem({ id: `past-${record.title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`, title: record.title, choices: [], dueAt: null, note: null, parentDecisionId: null, parentDecisionTitle: null, status: "completed", createdAt: new Date().toISOString(), changedAt: new Date().toISOString() }))}>Add a follow-up decision</button></div>}
+            </For>
+            <For each={planEditState().customDecisions.filter((item) => item.status === "completed")}>
+              {(record) => <div class="rounded-xl border border-pink-100 bg-white px-3 py-2"><p class="text-xs font-semibold text-pink-950">{record.title}</p><p class="mt-1 text-xs text-pink-950/75">Custom decision completed</p><button type="button" class="mt-2 text-xs font-bold text-pink-800 underline" onClick={() => openPlanEditor(weddingCustomDecisionItem(record))}>Add a follow-up decision</button></div>}
             </For>
           </section>
         </Show>

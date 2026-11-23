@@ -15,6 +15,18 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-404
+    title: Make Personal Agent and Wedding decision plans editable without weakening decision authority
+    status: in_progress
+    owner: codex
+    reviewer: claude
+    branch: agent/codex/WED-404
+    worktree: C:/temp/wt/omnyid-wed404
+    base_sha: f6b4051d6688aaa3a31ba8fc0927793f8c97aaf1
+    depends_on: [WED-403, WED-402, WED-401, WED-400]
+    files: [solid-ui/src/components/DecisionOSHomeView.tsx, solid-ui/src/components/WeddingDecisionFocusCard.tsx, solid-ui/src/components/WeddingResponseWorkspaceView.tsx, solid-ui/src/lib/decisionPlanEditState.ts, solid-ui/src/lib/weddingPersonalOsProjectionState.ts, solid-ui/tests/**, Documents/design/wedding planner/decision card/**, .agent/**]
+    acceptance: [extend the shared decision lifecycle with a durable not-applicable choice distinct from defer and snooze, remove a not-applicable decision from Today and stop causal follow-ups while retaining independent decisions and every existing note quote booking and approval record, preview affected causal follow-ups before confirmation and offer immediate Undo plus Plan Restore without requiring a reason, never silently resurrect a not-applicable decision when later evidence makes it relevant and instead ask whether to restore it, add a Plan-level custom decision and a follow-up decision action on active and completed cards with only the title required and optional choices due date and note, keep custom and follow-up decisions current-account or canonical Wedding-workspace scoped and link follow-ups to their source decision, preserve approval before suggested next tasks enquiries or external commitments, update existing decision-card guidance and task documentation without redesigning the card, pass focused tests full Wedding typecheck and production build from a clean exact candidate, deploy the exact committed candidate to Oracle with rollback and authenticated post-deploy proof]
+    progress: "Implementation complete pending clean-candidate verification and Oracle release. Personal Agent and Wedding now share append-only account/workspace-scoped applicability and custom-decision records; Does not apply is distinct from snooze/defer, previews and dynamically suppresses only causal follow-ups, preserves artifacts, supports Undo/Restore, and never silently resurfaces. Plan-level custom and active/completed-card follow-up decisions require only a title, keep optional choices/date/note/source, and preserve downstream approval. Focused lifecycle/render tests, TypeScript and both line budgets pass in the implementation worktree."
   - id: WED-403
     title: Add the desktop vendor-claim experience, listing support email, admin routing and free-planning CTA
     status: done
