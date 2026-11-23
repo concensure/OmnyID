@@ -87,6 +87,7 @@ export function WeddingBudgetEvidenceHub(props: {
   saveProjection?: ((input: SendAfpMessageInput) => Promise<unknown>) | null;
   onRefreshWorkspace?: () => void;
   openIntakeRequest?: number;
+  onEditBudgetTarget?: () => void;
 }) {
   const [activeTab, setActiveTab] = createSignal<WeddingBudgetEvidenceTabId>("overview");
   const [intakeOpen, setIntakeOpen] = createSignal(false);
@@ -179,11 +180,17 @@ export function WeddingBudgetEvidenceHub(props: {
           <Match when={activeTab() === "overview"}>
             <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
               <For each={state().overview}>{(item) => (
-                <article class="rounded-[10px] border border-wedding-border bg-wedding-page p-3">
-                  <p class="text-xs font-semibold text-wedding-ink/60">{item.label}</p>
-                  <p class="mt-1 break-words text-xl font-semibold text-wedding-primary">{item.value}</p>
-                  <p class="mt-1 text-xs leading-5 text-wedding-ink/65">{item.detail}</p>
-                </article>
+                <Show
+                  when={item.id === "target"}
+                  fallback={<article class="rounded-[10px] border border-wedding-border bg-wedding-page p-3"><p class="text-xs font-semibold text-wedding-ink/60">{item.label}</p><p class="mt-1 break-words text-xl font-semibold text-wedding-primary">{item.value}</p><p class="mt-1 text-xs leading-5 text-wedding-ink/65">{item.detail}</p></article>}
+                >
+                  <button type="button" class="rounded-[10px] border border-wedding-border bg-wedding-page p-3 text-left transition hover:border-wedding-primary hover:bg-wedding-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-primary" onClick={() => props.onEditBudgetTarget?.()} aria-label="Edit total wedding budget">
+                    <p class="text-xs font-semibold text-wedding-ink/60">{item.label}</p>
+                    <p class="mt-1 break-words text-xl font-semibold text-wedding-primary">{item.value}</p>
+                    <p class="mt-1 text-xs leading-5 text-wedding-ink/65">{item.detail}</p>
+                    <span class="mt-2 block text-xs font-semibold text-wedding-primary underline underline-offset-2">Edit budget</span>
+                  </button>
+                </Show>
               )}</For>
             </div>
           </Match>

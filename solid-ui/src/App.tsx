@@ -5433,6 +5433,7 @@ function AuthModal(props: {
   const [resetError, setResetError] = createSignal("");
   const [resetDone, setResetDone] = createSignal(false);
   let googleButtonHost: HTMLDivElement | undefined;
+  let googleSubmitInFlight = false;
   const passkeySupported = () => browserSupportsPasskeyAuth();
   async function submitForgotPassword(e: SubmitEvent) {
     e.preventDefault();
@@ -5480,6 +5481,8 @@ function AuthModal(props: {
   }
 
   async function submitGoogleIdToken(idToken: string) {
+    if (googleSubmitInFlight) return;
+    googleSubmitInFlight = true;
     setLoading(true);
     setError("");
     setPendingVerificationEmail("");
@@ -5493,6 +5496,7 @@ function AuthModal(props: {
       setError(visibleErrorText(err, "Google sign-in failed."));
     } finally {
       setLoading(false);
+      googleSubmitInFlight = false;
     }
   }
 

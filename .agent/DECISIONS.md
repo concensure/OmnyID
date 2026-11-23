@@ -4811,3 +4811,10 @@ moves its data.
 - A verified full-mailbox match with the selected canonical vendor listing is sufficient ownership proof even on a public mail provider. Public-provider domains remain ineligible for domain-only proof, so one Gmail account cannot claim another Gmail listing.
 - The public celebrant-consultation discovery route is a readable readiness projection, not a feature-existence 404. It may return zero cards and `requests_enabled: false`; all verification and request mutations retain the existing false-default rollout and complete-secret gates.
 - Day-of Binder co-branding is an operator-only, browser-local page-preview/export operation. It preserves the generic source PDF and does not create a parallel document store, licence grant or download-tracking system.
+
+## 2026-11-23 — WED-408 account evidence precedes Wedding task projection
+
+- Wedding preparation templates are a catalogue, not evidence that a couple chose or started work. They may project only after a persisted choice, approved selection or other canonical account record exists. Removing the unconditional catalogue projection does not remove saved vendor, payment, guest or user-created tasks.
+- Custom budget categories extend the existing revision-aware AFP budget decision. They do not create a browser-only budget store: the saved option carries labelled custom cells, the persisted decision reconstructs them, and an unbalanced standard-plus-custom allocation cannot be saved.
+- Growth activation and operator authority remain separate gates. Production may explicitly enable Growth analytics, but every Growth read still requires the server-confirmed operator session; a client email or route choice grants nothing.
+- Google sign-in resilience is bounded and fail-closed. Transient script, transport, rate-limit and upstream failures get at most one retry per layer; invalid credentials and other client errors do not. Duplicate browser credential callbacks are ignored while an exchange is active.

@@ -121,6 +121,7 @@ export function WeddingWorkspaceContextPanels(props: {
 }) {
   const activeMenu = () => props.activeMenu ?? "home";
   const [quoteIntakeRequest, setQuoteIntakeRequest] = createSignal(0);
+  const [budgetFocusRequest, setBudgetFocusRequest] = createSignal(0);
   const peopleAggregate = createMemo(() => buildWeddingPeopleAggregateState(props.state));
   const planAggregate = createMemo(() => buildWeddingPlanAggregateState(props.state, {
     sharePlanOpen: props.sharePlanOpen,
@@ -457,6 +458,7 @@ export function WeddingWorkspaceContextPanels(props: {
           saveProjection={props.saveProjection}
           onRefreshWorkspace={props.onRefreshWorkspace}
           openIntakeRequest={quoteIntakeRequest()}
+          onEditBudgetTarget={() => setBudgetFocusRequest((value) => value + 1)}
         />
         <WeddingBudgetTrackerCard
           state={props.state.budgetTracking}
@@ -472,6 +474,7 @@ export function WeddingWorkspaceContextPanels(props: {
           onOpenArtifact={props.onOpenArtifact}
           onAddQuotes={() => setQuoteIntakeRequest((value) => value + 1)}
           onRefreshWorkspace={props.onRefreshWorkspace}
+          focusBudgetRequest={budgetFocusRequest()}
         />
       </div>
 

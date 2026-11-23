@@ -24,6 +24,8 @@ import {
   weddingBudgetAllocationAllocatedAmount,
   weddingBudgetAllocationIsBalanced,
   weddingBudgetAllocationRemaining,
+  weddingBudgetCustomCategoryId,
+  weddingBudgetDraftCategories,
   withWeddingBudgetAutoBalance,
   type WeddingBudgetAllocationDraft,
   type WeddingBudgetCategoryId,
@@ -50,6 +52,9 @@ function draftFromTrackingState(state: WeddingBudgetTrackingState, fallbackCurre
   if (state.budgetAllocation.length === 0) return draft;
   draft.totalAmount = state.budgetAllocation.reduce((sum, category) => sum + category.amount, 0);
   for (const category of state.budgetAllocation) {
+    if (!WEDDING_BUDGET_CATEGORIES.some((definition) => definition.id === category.categoryId)) {
+      draft.customCategories.push({ id: category.categoryId, label: category.categoryLabel });
+    }
     draft.categoryAmounts[category.categoryId] = category.amount;
   }
   return draft;
@@ -82,6 +87,7 @@ export function WeddingBudgetTrackerCard(props: {
   onOpenArtifact?: (artifactId: string) => void;
   onAddQuotes?: () => void;
   onRefreshWorkspace?: () => void;
+  focusBudgetRequest?: number;
 }) {
   const currency = props.state.lineItems[0]?.currency ?? "AUD";
   const [draft, setDraft] = createSignal<WeddingBudgetAllocationDraft>(
@@ -102,8 +108,11 @@ export function WeddingBudgetTrackerCard(props: {
   const [contributorContactName, setContributorContactName] = createSignal("");
   const [contributorContactEmail, setContributorContactEmail] = createSignal("");
   const [savingContributorContact, setSavingContributorContact] = createSignal(false);
+  const [customCategoryLabel, setCustomCategoryLabel] = createSignal("");
+  const [customCategoryNotice, setCustomCategoryNotice] = createSignal<string | null>(null);
   const [optimisticContributions, setOptimisticContributions] = createSignal<WeddingBudgetContribution[]>([]);
   const [lastSyncedAllocationSignature, setLastSyncedAllocationSignature] = createSignal(budgetAllocationSignature(props.state));
+  let totalBudgetInput: HTMLInputElement | undefined;
   const allocated = createMemo(() => weddingBudgetAllocationAllocatedAmount(draft()));
   const remaining = createMemo(() => weddingBudgetAllocationRemaining(draft()));
   const balanced = createMemo(() => weddingBudgetAllocationIsBalanced(draft()));
@@ -145,6 +154,11 @@ export function WeddingBudgetTrackerCard(props: {
   });
 
   createEffect(() => {
+    if ((props.focusBudgetRequest ?? 0) <= 0) return;
+    queueMicrotask(focusTotalBudget);
+  });
+
+  createEffect(() => {
     const savedKeys = new Set(props.state.insights.contributionRows.map(contributionKey));
     const current = optimisticContributions();
     const pending = current.filter((row) => !savedKeys.has(contributionKey(row)));
@@ -162,10 +176,52 @@ export function WeddingBudgetTrackerCard(props: {
     updateDraft(withWeddingBudgetAutoBalance({ ...draft(), totalAmount }));
   }
 
-  function setCategoryAmount(categoryId: WeddingBudgetCategoryId, value: number) {
+  function setCategoryAmount(categoryId: string, value: number) {
     const clamped = Math.max(0, Math.round(value) || 0);
     const next = { ...draft(), categoryAmounts: { ...draft().categoryAmounts, [categoryId]: clamped } };
     updateDraft(categoryId === "other_misc" ? next : withWeddingBudgetAutoBalance(next));
+  }
+
+  function focusTotalBudget(): void {
+    totalBudgetInput?.scrollIntoView({ behavior: "smooth", block: "center" });
+    totalBudgetInput?.focus({ preventScroll: true });
+  }
+
+  function addCustomCategory(): void {
+    const label = customCategoryLabel().trim().replace(/\s+/g, " ").slice(0, 60);
+    if (!label) {
+      setCustomCategoryNotice("Enter a category name first.");
+      return;
+    }
+    if (draft().customCategories.length >= 12) {
+      setCustomCategoryNotice("You can add up to 12 custom categories.");
+      return;
+    }
+    const id = weddingBudgetCustomCategoryId(label);
+    if (weddingBudgetDraftCategories(draft()).some((category) => category.id === id || category.label.toLowerCase() === label.toLowerCase())) {
+      setCustomCategoryNotice("That category is already in this budget.");
+      return;
+    }
+    const next = {
+      ...draft(),
+      customCategories: [...draft().customCategories, { id, label }],
+      categoryAmounts: { ...draft().categoryAmounts, [id]: 0 },
+    };
+    updateDraft(withWeddingBudgetAutoBalance(next));
+    setCustomCategoryLabel("");
+    setCustomCategoryNotice(`${label} added. Set its amount, then save the balanced budget.`);
+  }
+
+  function removeCustomCategory(id: string): void {
+    const removed = draft().customCategories.find((category) => category.id === id);
+    const categoryAmounts = { ...draft().categoryAmounts };
+    delete categoryAmounts[id];
+    updateDraft(withWeddingBudgetAutoBalance({
+      ...draft(),
+      customCategories: draft().customCategories.filter((category) => category.id !== id),
+      categoryAmounts,
+    }));
+    setCustomCategoryNotice(removed ? `${removed.label} removed; its amount returned to Other.` : null);
   }
 
   onMount(() => {
@@ -305,7 +361,12 @@ export function WeddingBudgetTrackerCard(props: {
           </p>
         </div>
       </Show>
-      <div class="mt-3 rounded-xl border border-wedding-border bg-white px-2.5 py-2">
+      <button
+        type="button"
+        class="mt-3 block w-full rounded-xl border border-wedding-border bg-white px-2.5 py-2 text-left transition hover:border-wedding-primary/60 hover:bg-wedding-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wedding-primary"
+        onClick={focusTotalBudget}
+        aria-label="Edit total wedding budget"
+      >
         <p class="text-xs font-semibold text-wedding-ink/65">Budget target</p>
         <p class="mt-1 text-sm leading-6 text-wedding-ink/75">{props.state.budgetStatusLabel}</p>
         <Show when={props.state.budgetTargetAmount !== null}>
@@ -326,7 +387,8 @@ export function WeddingBudgetTrackerCard(props: {
             </Show>
           </div>
         </Show>
-      </div>
+        <span class="mt-2 block text-xs font-semibold text-wedding-primary underline underline-offset-2">Edit total budget</span>
+      </button>
 
       <div class="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-6">
         <div class="rounded-xl border border-wedding-border bg-white px-2.5 py-2">
@@ -366,6 +428,8 @@ export function WeddingBudgetTrackerCard(props: {
         <label class="mt-3 block rounded-xl border-2 border-wedding-primary bg-wedding-primary/5 p-3 text-sm font-bold text-wedding-primary">
           <span class="flex items-center gap-2"><WeddingDashboardIcon id="banknotes" class="h-5 w-5" />Total budget</span>
           <input
+            ref={(element) => { totalBudgetInput = element; }}
+            id="wedding-total-budget-input"
             type="number"
             inputmode="numeric"
             min="0"
@@ -411,13 +475,10 @@ export function WeddingBudgetTrackerCard(props: {
                     </span>
                     <span class="shrink-0 text-xs font-semibold text-wedding-ink">{moneyLabel(amount(), draft().currency)}</span>
                   </div>
-                  <div class="mt-1 flex min-w-0 items-start justify-between gap-2 text-xs leading-5 text-wedding-ink/65">
+                  <div class="mt-1 min-w-0 text-xs leading-5 text-wedding-ink/65">
                     <span class="min-w-0 break-words">
                       Suggested {moneyLabel(suggestedCategory(category.id).amount, draft().currency)} ({suggestedCategory(category.id).share}%). {suggestedCategory(category.id).reasonLabel}
                     </span>
-                    <Show when={(draft().totalAmount || props.state.budgetTargetAmount || 0) > 0}>
-                      <button type="button" class="shrink-0 font-semibold text-wedding-primary underline underline-offset-2" onClick={() => setCategoryAmount(category.id, suggestedCategory(category.id).amount)}>Use</button>
-                    </Show>
                   </div>
                   <input
                     type="range"
@@ -445,6 +506,47 @@ export function WeddingBudgetTrackerCard(props: {
               );
             }}
           </For>
+          <For each={draft().customCategories}>
+            {(category) => {
+              const amount = () => draft().categoryAmounts[category.id] ?? 0;
+              return (
+                <div class="rounded-xl border border-wedding-primary/25 bg-wedding-primary/5 px-3 py-2.5 phone:rounded-none phone:border-x-0 phone:border-b-0 phone:bg-transparent phone:px-0">
+                  <div class="flex items-center justify-between gap-2">
+                    <span class="min-w-0 break-words text-xs font-semibold text-wedding-ink">{category.label}</span>
+                    <button type="button" class="min-h-10 shrink-0 rounded-lg px-2 text-xs font-semibold text-rose-800 underline underline-offset-2" onClick={() => removeCustomCategory(category.id)}>Remove</button>
+                  </div>
+                  <input
+                    type="number"
+                    inputmode="numeric"
+                    min="0"
+                    step="100"
+                    value={amount() || ""}
+                    placeholder="0"
+                    aria-label={`${category.label} exact amount`}
+                    class="mt-2 min-h-11 w-full rounded-lg border border-wedding-border bg-white px-3 py-1.5 text-sm font-normal text-wedding-ink outline-none focus:border-wedding-primary"
+                    onInput={(event) => setCategoryAmount(category.id, Number(event.currentTarget.value))}
+                  />
+                </div>
+              );
+            }}
+          </For>
+        </div>
+        <div class="mt-3 rounded-xl border border-dashed border-wedding-primary/40 bg-white p-3">
+          <label class="text-xs font-semibold text-wedding-ink" for="wedding-custom-budget-category">Add your own category</label>
+          <div class="mt-2 flex flex-col gap-2 sm:flex-row">
+            <input
+              id="wedding-custom-budget-category"
+              type="text"
+              maxlength="60"
+              value={customCategoryLabel()}
+              placeholder="For example, childcare"
+              class="min-h-11 min-w-0 flex-1 rounded-lg border border-wedding-border bg-white px-3 text-sm text-wedding-ink outline-none focus:border-wedding-primary"
+              onInput={(event) => { setCustomCategoryLabel(event.currentTarget.value); setCustomCategoryNotice(null); }}
+              onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addCustomCategory(); } }}
+            />
+            <button type="button" class="min-h-11 rounded-lg border border-wedding-primary bg-white px-4 text-sm font-semibold text-wedding-primary" onClick={addCustomCategory}>Add category</button>
+          </div>
+          <Show when={customCategoryNotice()}>{(notice) => <p class="mt-2 text-xs leading-5 text-wedding-ink/70" role="status">{notice()}</p>}</Show>
         </div>
         <div class={`mt-3 rounded-2xl border px-3 py-2.5 text-sm font-semibold ${
           balanced()
@@ -575,18 +677,6 @@ export function WeddingBudgetTrackerCard(props: {
           </ul>
         </div>
       </Show>
-      <div class="mt-3 rounded-2xl border border-slate-200 bg-white p-3">
-        <p class="text-sm font-semibold text-emerald-950">Extra costs to check</p>
-        <div class="mt-2 flex flex-wrap gap-1.5">
-          <For each={props.state.insights.feeCoverageLabels}>
-            {(label) => (
-              <span class="max-w-full break-words rounded-full border border-emerald-100 bg-emerald-50/70 px-2 py-1 text-xs text-emerald-950/75">
-                {label}
-              </span>
-            )}
-          </For>
-        </div>
-      </div>
       <Show when={props.state.insights.monthlyCashNeeds.length > 0}>
         <div class="mt-3 rounded-2xl border border-slate-200 bg-white p-3">
           <p class="text-sm font-semibold text-emerald-950">Cash needed by month</p>

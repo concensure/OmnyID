@@ -17,6 +17,7 @@ import {
   weddingBudgetAllocationFromDecisionRecords,
   weddingBudgetAllocationIsBalanced,
   weddingBudgetAllocationRemaining,
+  weddingBudgetCustomCategoryId,
   withWeddingBudgetAutoBalance,
   type WeddingBudgetAllocationDraft,
 } from "../src/lib/weddingBudgetAllocationState.ts";
@@ -103,6 +104,27 @@ test("withWeddingBudgetAutoBalance recomputes the remainder after the total itse
   const rebalanced = withWeddingBudgetAutoBalance({ ...draft, totalAmount: 32_000 });
   assert.equal(rebalanced.categoryAmounts.other_misc, 3_500);
   assert.equal(weddingBudgetAllocationIsBalanced(rebalanced), true);
+});
+
+test("custom categories balance, persist and round-trip through the AFP decision", () => {
+  const draft = filledDraft({ other_misc: 1_500 });
+  const id = weddingBudgetCustomCategoryId("Childcare");
+  draft.customCategories.push({ id, label: "Childcare" });
+  draft.categoryAmounts[id] = 500;
+  const balanced = withWeddingBudgetAutoBalance(draft);
+  assert.equal(balanced.categoryAmounts.other_misc, 1_000);
+  assert.equal(weddingBudgetAllocationIsBalanced(balanced), true);
+
+  const projection = buildWeddingBudgetAllocationProjectionInput(balanced, { responseWorkspaceId: "workspace-1" });
+  assert.ok(projection.selectedOption.cells.includes("Custom — Childcare: $500"));
+  const summary = weddingBudgetAllocationFromDecisionRecords([budgetDecisionRecord({
+    selectedOptionCells: projection.selectedOption.cells,
+  })]);
+  assert.equal(summary?.categories.find((category) => category.categoryLabel === "Childcare")?.amount, 500);
+
+  const storage = fakeStorage();
+  saveWeddingBudgetAllocationDraft("plan-custom", balanced, storage);
+  assert.deepEqual(loadWeddingBudgetAllocationDraft("plan-custom", storage), balanced);
 });
 
 test("budget allocation save state explains why saving is unavailable", () => {

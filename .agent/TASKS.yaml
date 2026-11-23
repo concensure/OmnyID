@@ -15,6 +15,26 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-408
+    title: Make Google sign-in retry-safe, restore operator Growth access, and make Wedding budget setup account-scoped and editable
+    status: in_progress
+    owner: codex
+    reviewer: claude
+    branch: agent/codex/WED-408
+    worktree: C:/temp/wt/omnyid-wed408
+    base_sha: 48f9b741
+    depends_on: [WED-407, WED-405, WED-369, WED-287]
+    files: [solid-ui/src/**, solid-ui/tests/**, src/server/auth.rs, src/server/growth_dashboard_routes.rs, src/server/**wedding**, tests/**, Documents/testing/wedding-ux-audit-2026-11-23*, Documents/verification/WED-408-*.md, .agent/**]
+    acceptance: [Google sign-in succeeds on the first ordinary attempt or gives a recoverable bounded retry without duplicate exchange, operator access to Growth is derived from the existing server-confirmed admin authority instead of a stale disabled client state, starter Wedding tasks never appear as user-entered or in-progress work and are filtered by saved couple scope, Budget target activates the canonical total-budget editor, remove inert Use links and the Extra costs to check card, let users add and persist custom account-scoped budget categories through the existing AFP save flow, reconcile category allocations to the total and visibly prevent an unbalanced save, cover the supplied browser-audit regressions with focused tests, pass exact-SHA staging and Oracle release gates]
+    progress:
+      - registered on the WED-407 release-record lineage after WED-407 was promoted and its ten-container audit completed
+      - supplied headless Chromium audit confirms untailored pre-marked starter tasks and related first-run trust failures; screenshots remain read-only evidence in the primary checkout
+      - bounded Google script, browser exchange and server token-info retries are implemented with a duplicate-callback guard; invalid credentials remain fail-closed
+      - confirmed concensure@gmail.com is already in the production operator allowlist and traced the Growth failure to the independently disabled production feature flag
+      - removed unconditional preparation-template projection while preserving persisted and evidence-derived Wedding tasks
+      - Budget target now focuses the canonical editor; custom balanced categories round-trip through the existing AFP decision save flow; inert Use links and the duplicate extra-cost card are removed
+      - focused contracts, TypeScript, line budgets, all 2,393 Wedding tests, the 95-page public/security suite and the production frontend build pass in the implementation worktree
+
   - id: WED-407
     title: Activate the truthful celebrant journey, add binder co-branding, harden exact-email claims, and publish WED-406
     status: done

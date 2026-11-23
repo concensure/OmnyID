@@ -32,6 +32,16 @@ type GoogleIdentityWindow = Window & {
 export const GOOGLE_IDENTITY_SCRIPT_SRC = "https://accounts.google.com/gsi/client";
 const GOOGLE_IDENTITY_SCRIPT_ID = "omnyid-google-identity-script";
 
+export function shouldRetryGoogleAuthError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message.toLowerCase() : String(error ?? "").toLowerCase();
+  return !message
+    || /failed to fetch|networkerror|load failed|temporarily unavailable|request failed with (?:429|5\d\d)/.test(message);
+}
+
+function retryDelay(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+}
+
 export function normalizeGoogleAuthConfig(
   config?: unknown,
 ): string | null {
@@ -98,7 +108,15 @@ export async function mountGoogleSignInButton(args: {
   container: HTMLElement;
   onCredential: (idToken: string) => void | Promise<void>;
 }): Promise<void> {
-  const google = await loadGoogleIdentityClient();
+  let google: GoogleAccountsId;
+  try {
+    google = await loadGoogleIdentityClient();
+  } catch (error) {
+    const failedScript = document.getElementById(GOOGLE_IDENTITY_SCRIPT_ID);
+    if (failedScript?.dataset.omnyidGoogleFailed === "true") failedScript.remove();
+    await retryDelay(250);
+    google = await loadGoogleIdentityClient();
+  }
   google.initialize({
     client_id: args.clientId,
     callback: (response) => {

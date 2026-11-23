@@ -1978,27 +1978,60 @@ fn google_client_id_configured() -> Option<String> {
 async fn verify_google_id_token(id_token: &str) -> Result<GoogleTokenInfoResponse, String> {
     let client_id = google_client_id_configured()
         .ok_or_else(|| "Google sign-in is not configured for this homeserver".to_string())?;
-    let response = reqwest::Client::new()
-        .get("https://oauth2.googleapis.com/tokeninfo")
-        .query(&[("id_token", id_token)])
-        .send()
-        .await
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(8))
+        .build()
         .map_err(|err| {
-            tracing::error!(error = %err, "Google token verification failed");
+            tracing::error!(error = %err, "Google token verifier could not be created");
             "Google sign-in is temporarily unavailable".to_string()
         })?;
-    if !response.status().is_success() {
-        return Err("Google sign-in was rejected".to_string());
+    for attempt in 0..2 {
+        let response = match client
+            .get("https://oauth2.googleapis.com/tokeninfo")
+            .query(&[("id_token", id_token)])
+            .send()
+            .await
+        {
+            Ok(response) => response,
+            Err(err) if attempt == 0 => {
+                warn!(error = %err, "Google token verification transport failed; retrying once");
+                tokio::time::sleep(Duration::from_millis(250)).await;
+                continue;
+            }
+            Err(err) => {
+                tracing::error!(error = %err, "Google token verification failed after retry");
+                return Err("Google sign-in is temporarily unavailable".to_string());
+            }
+        };
+        let status = response.status();
+        if !status.is_success() {
+            if attempt == 0 && google_tokeninfo_retryable_status(status.as_u16()) {
+                warn!(%status, "Google token verifier returned a transient status; retrying once");
+                tokio::time::sleep(Duration::from_millis(250)).await;
+                continue;
+            }
+            return Err("Google sign-in was rejected".to_string());
+        }
+        let token_info = match response.json::<GoogleTokenInfoResponse>().await {
+            Ok(token_info) => token_info,
+            Err(err) if attempt == 0 => {
+                warn!(error = %err, "Google token payload was invalid; retrying once");
+                tokio::time::sleep(Duration::from_millis(250)).await;
+                continue;
+            }
+            Err(err) => {
+                tracing::error!(error = %err, "Google token payload was invalid after retry");
+                return Err("Google sign-in is temporarily unavailable".to_string());
+            }
+        };
+        validate_google_token_info(&token_info, &client_id, chrono::Utc::now().timestamp())?;
+        return Ok(token_info);
     }
-    let token_info = response
-        .json::<GoogleTokenInfoResponse>()
-        .await
-        .map_err(|err| {
-            tracing::error!(error = %err, "Google token payload was invalid");
-            "Google sign-in is temporarily unavailable".to_string()
-        })?;
-    validate_google_token_info(&token_info, &client_id, chrono::Utc::now().timestamp())?;
-    Ok(token_info)
+    Err("Google sign-in is temporarily unavailable".to_string())
+}
+
+fn google_tokeninfo_retryable_status(status: u16) -> bool {
+    status == 429 || status >= 500
 }
 
 fn validate_google_token_info(
@@ -2052,7 +2085,7 @@ mod tests {
         auth_base_url_configured, auth_token_record_is_usable,
         change_password_revokes_other_sessions, clear_session_cookie_header_value, cookie_value,
         env_truthy, external_sign_in_failed_error, forgot_password_public_response,
-        google_client_id_configured, google_subject_candidates, high_risk_session_max_age_minutes,
+        google_client_id_configured, google_subject_candidates, google_tokeninfo_retryable_status, high_risk_session_max_age_minutes,
         login_invalid_credentials_error, normalize_passkey_begin_email,
         passkey_authenticate_challenge_kind, passkey_authentication_begin_options,
         passkey_authentication_failed_error, passkey_origin_configured,
@@ -2541,6 +2574,15 @@ aSnVsBzVGTmyju6PoBR7Yw==
         token_info.iss = Some("https://evil.example".to_string());
         let result = validate_google_token_info(&token_info, "client-id", 1_800_000_000);
         assert!(matches!(result, Err(message) if message.contains("issuer")));
+    }
+
+    #[test]
+    fn google_tokeninfo_retry_is_bounded_to_transient_statuses() {
+        assert!(google_tokeninfo_retryable_status(429));
+        assert!(google_tokeninfo_retryable_status(500));
+        assert!(google_tokeninfo_retryable_status(503));
+        assert!(!google_tokeninfo_retryable_status(400));
+        assert!(!google_tokeninfo_retryable_status(401));
     }
 
     #[test]

@@ -37,7 +37,6 @@ import {
   type WeddingArtifactPreviewState,
 } from "@/lib/weddingArtifactPreviewState";
 import type { WeddingExpectedBehaviorAuditItem } from "@/lib/weddingExpectedBehaviorAuditState";
-import { buildWeddingPreparationChecklistTaskItems } from "@/lib/weddingExpectedBehaviorTaskState";
 import {
   buildWeddingWorkspaceBundleExportPayload,
   type WeddingWorkspaceBundleExportPayload,
@@ -773,10 +772,11 @@ export function buildWeddingResponseWorkspaceViewState(input: WeddingResponseWor
     decisionRecords: input.decisionRecords,
   });
   const loopTaskItems = loopCards.flatMap((card): WeddingPlanningTaskItem[] => card.suggestedTask ? [card.suggestedTask] : []);
-  const preparationTaskItems = buildWeddingPreparationChecklistTaskItems({
-    metadata: input.metadata ?? artifacts[0]?.metadata,
-    existingTaskItems: taskItems,
-  });
+  // Preparation templates are a catalogue, not evidence that this couple chose
+  // those services. Only persisted/user-approved tasks belong in the live plan.
+  // This prevents cake, limousine, bridal-party and similar defaults from
+  // appearing as in-progress account work before the couple selects them.
+  const preparationTaskItems: WeddingPlanningTaskItem[] = [];
   const auditCard = expectedBehaviorAuditCard({
     artifacts,
     artifactSummaries: workspace.artifacts,

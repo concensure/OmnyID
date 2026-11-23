@@ -22,7 +22,7 @@ import {
   type GmailOAuthConfig,
 } from "./gmailConnectionState";
 import { normalizeGoogleCalendarConnectionStatus, type GoogleCalendarConnectionStatus } from "./googleCalendarConnectionState";
-import { normalizeGoogleAuthConfig } from "./googleIdentity";
+import { normalizeGoogleAuthConfig, shouldRetryGoogleAuthError } from "./googleIdentity";
 import {
   activeGoalsToGoalPulseItems,
   activeGoalsToPulseGoalOptions,
@@ -4092,11 +4092,22 @@ export const verifyEmailToken = (token: string): Promise<VerifyEmailResponse> =>
       experience: value.experience === "wedding" ? "wedding" : value.experience === "vendor" ? "vendor" : "generic",
     };
   });
-export const authenticateWithGoogleIdToken = (idToken: string, acquisitionVisitId?: string | null, source?: string | null): Promise<AuthApiResponse> =>
-  publicApiFetch<unknown>("/auth/google", {
-    method: "POST",
-    bodyJson: { id_token: idToken, ...(acquisitionVisitId ? { acquisition_visit_id: acquisitionVisitId } : {}), ...(source ? { source } : {}) },
-  }).then(parseAuthApiResponse);
+export const authenticateWithGoogleIdToken = async (idToken: string, acquisitionVisitId?: string | null, source?: string | null): Promise<AuthApiResponse> => {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      return parseAuthApiResponse(await publicApiFetch<unknown>("/auth/google", {
+        method: "POST",
+        bodyJson: { id_token: idToken, ...(acquisitionVisitId ? { acquisition_visit_id: acquisitionVisitId } : {}), ...(source ? { source } : {}) },
+      }));
+    } catch (error) {
+      lastError = error;
+      if (attempt > 0 || !shouldRetryGoogleAuthError(error)) throw error;
+      await new Promise<void>((resolve) => setTimeout(resolve, 350));
+    }
+  }
+  throw lastError;
+};
 export const authenticateWithPassword = (args: {
   mode: "login" | "register";
   email: string;

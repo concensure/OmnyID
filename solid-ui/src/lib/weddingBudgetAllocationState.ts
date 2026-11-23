@@ -35,6 +35,11 @@ export type WeddingBudgetCategoryDefinition = {
   label: string;
 };
 
+export type WeddingBudgetCustomCategory = {
+  id: string;
+  label: string;
+};
+
 /** Seven broad categories intended to cover all major wedding cost centers. */
 export const WEDDING_BUDGET_CATEGORIES: readonly WeddingBudgetCategoryDefinition[] = [
   { id: "venue_ceremony", label: "Venue & Ceremony" },
@@ -49,11 +54,12 @@ export const WEDDING_BUDGET_CATEGORIES: readonly WeddingBudgetCategoryDefinition
 export type WeddingBudgetAllocationDraft = {
   totalAmount: number;
   currency: string;
-  categoryAmounts: Record<WeddingBudgetCategoryId, number>;
+  categoryAmounts: Record<string, number>;
+  customCategories: WeddingBudgetCustomCategory[];
 };
 
 export type WeddingBudgetAllocationCategoryAmount = {
-  categoryId: WeddingBudgetCategoryId;
+  categoryId: string;
   categoryLabel: string;
   amount: number;
 };
@@ -71,18 +77,35 @@ export type WeddingBudgetAllocationSaveState = {
   disabledReason: string | null;
 };
 
-function categoryLabel(id: WeddingBudgetCategoryId): string {
+function categoryLabel(id: string): string {
   return WEDDING_BUDGET_CATEGORIES.find((category) => category.id === id)?.label ?? id;
 }
 
+export function weddingBudgetDraftCategories(draft: WeddingBudgetAllocationDraft): ReadonlyArray<{ id: string; label: string; custom: boolean }> {
+  return [
+    ...WEDDING_BUDGET_CATEGORIES.map((category) => ({ ...category, custom: false })),
+    ...draft.customCategories.map((category) => ({ ...category, custom: true })),
+  ];
+}
+
+export function weddingBudgetCustomCategoryId(label: string): string {
+  const slug = label.trim().toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40);
+  return `custom:${slug || "category"}`;
+}
+
 export function emptyWeddingBudgetAllocationDraft(currency = "AUD"): WeddingBudgetAllocationDraft {
-  const categoryAmounts = {} as Record<WeddingBudgetCategoryId, number>;
+  const categoryAmounts: Record<string, number> = {};
   for (const category of WEDDING_BUDGET_CATEGORIES) categoryAmounts[category.id] = 0;
-  return { totalAmount: 0, currency, categoryAmounts };
+  return { totalAmount: 0, currency, categoryAmounts, customCategories: [] };
 }
 
 export function weddingBudgetAllocationAllocatedAmount(draft: WeddingBudgetAllocationDraft): number {
-  return WEDDING_BUDGET_CATEGORIES.reduce((sum, category) => sum + (draft.categoryAmounts[category.id] || 0), 0);
+  return weddingBudgetDraftCategories(draft).reduce((sum, category) => sum + (draft.categoryAmounts[category.id] || 0), 0);
 }
 
 export function weddingBudgetAllocationRemaining(draft: WeddingBudgetAllocationDraft): number {
@@ -100,7 +123,7 @@ export function weddingBudgetAllocationIsBalanced(draft: WeddingBudgetAllocation
 export const WEDDING_BUDGET_AUTO_BALANCE_CATEGORY_ID: WeddingBudgetCategoryId = "other_misc";
 
 export function withWeddingBudgetAutoBalance(draft: WeddingBudgetAllocationDraft): WeddingBudgetAllocationDraft {
-  const othersSum = WEDDING_BUDGET_CATEGORIES
+  const othersSum = weddingBudgetDraftCategories(draft)
     .filter((category) => category.id !== WEDDING_BUDGET_AUTO_BALANCE_CATEGORY_ID)
     .reduce((sum, category) => sum + (draft.categoryAmounts[category.id] || 0), 0);
   const remainder = Math.max(0, draft.totalAmount - othersSum);
@@ -209,6 +232,17 @@ export function loadWeddingBudgetAllocationDraft(
       const value = (parsed.categoryAmounts as Record<string, unknown>)[category.id];
       draft.categoryAmounts[category.id] = typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0;
     }
+    const customCategories = Array.isArray(parsed.customCategories) ? parsed.customCategories : [];
+    for (const value of customCategories.slice(0, 12)) {
+      if (!value || typeof value !== "object" || Array.isArray(value)) continue;
+      const candidate = value as Record<string, unknown>;
+      const label = typeof candidate.label === "string" ? candidate.label.trim().slice(0, 60) : "";
+      const id = typeof candidate.id === "string" ? candidate.id.trim() : weddingBudgetCustomCategoryId(label);
+      if (!label || !/^custom:[a-z0-9-]{1,40}$/.test(id) || draft.customCategories.some((category) => category.id === id || category.label.toLowerCase() === label.toLowerCase())) continue;
+      const amount = (parsed.categoryAmounts as Record<string, unknown>)[id];
+      draft.customCategories.push({ id, label });
+      draft.categoryAmounts[id] = typeof amount === "number" && Number.isFinite(amount) ? Math.max(0, Math.round(amount)) : 0;
+    }
     return draft;
   } catch {
     return null;
@@ -279,13 +313,14 @@ export function buildWeddingBudgetAllocationProjectionInput(
     throw new Error("Wedding budget allocation must be balanced before it can be saved.");
   }
   const normalizedMetadata: WeddingPlanningMetadata = normalizeWeddingPlanningMetadata(metadata);
-  const cells = WEDDING_BUDGET_CATEGORIES.map((category) => (
-    `${category.label}: ${moneyLabel(draft.categoryAmounts[category.id] || 0, draft.currency)}`
+  const categories = weddingBudgetDraftCategories(draft);
+  const cells = categories.map((category) => (
+    `${category.custom ? "Custom — " : ""}${category.label}: ${moneyLabel(draft.categoryAmounts[category.id] || 0, draft.currency)}`
   ));
   // Deterministic on the exact figures: saving the same allocation twice produces the same
   // decision id (a harmless resend), while any change in total or any category produces a new
   // one — a new decision worth recording, exactly like picking a different vendor row would.
-  const figureFingerprint = [draft.totalAmount, ...WEDDING_BUDGET_CATEGORIES.map((category) => draft.categoryAmounts[category.id] || 0)].join("-");
+  const figureFingerprint = [draft.totalAmount, ...categories.map((category) => `${category.id}:${draft.categoryAmounts[category.id] || 0}`)].join("-");
   return {
     id: `wedding_decision:${normalizedMetadata.responseWorkspaceId}:${WEDDING_BUDGET_ALLOCATION_ARTIFACT_ID}:${figureFingerprint}`,
     metadata: normalizedMetadata,
@@ -296,7 +331,7 @@ export function buildWeddingBudgetAllocationProjectionInput(
       id: WEDDING_BUDGET_ALLOCATION_SELECTED_OPTION_ID,
       rowIndex: 0,
       label: `${moneyLabel(draft.totalAmount, draft.currency)} total`,
-      detail: `Allocated across ${WEDDING_BUDGET_CATEGORIES.length} categories: ${cells.join(", ")}.`,
+      detail: `Allocated across ${categories.length} categories: ${cells.join(", ")}.`,
       cells,
       selected: true,
       preferenceFitLabels: [],
@@ -343,6 +378,17 @@ export function weddingBudgetAllocationFromDecisionRecords(
     if (amount === null) continue;
     currency = currencyFromCell(cell) ?? currency;
     categories.push({ categoryId: category.id, categoryLabel: categoryLabel(category.id), amount });
+  }
+  for (const cell of latest.selectedOptionCells) {
+    const match = cell.match(/^Custom —\s*(.{1,60}?):\s*(.+)$/);
+    if (!match) continue;
+    const label = match[1]?.trim() ?? "";
+    if (!label || categories.some((category) => category.categoryLabel.toLowerCase() === label.toLowerCase())) continue;
+    const amountMatch = match[2]?.match(/[\d][\d,]*(?:\.\d+)?/);
+    const amount = amountMatch ? Number(amountMatch[0].replace(/,/g, "")) : Number.NaN;
+    if (!Number.isFinite(amount)) continue;
+    currency = currencyFromCell(cell) ?? currency;
+    categories.push({ categoryId: weddingBudgetCustomCategoryId(label), categoryLabel: label, amount: Math.round(amount) });
   }
   if (categories.length === 0) return null;
 
