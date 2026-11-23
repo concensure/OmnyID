@@ -33,6 +33,28 @@ fn domain_matching_is_exact_and_rejects_public_mail() {
 }
 
 #[test]
+fn exact_verified_listing_email_allows_public_mail_without_cross_listing_match() {
+    let context = OwnershipContext {
+        claim_id: "claim".into(),
+        claim_status: "started".into(),
+        expires_at: String::new(),
+        vendor_id: "vendor".into(),
+        vendor_slug: "sole-trader".into(),
+        vendor_name: "Sole Trader".into(),
+        category: "celebrant".into(),
+        service_area: "Sydney".into(),
+        website_url: None,
+        contact_email: Some("Listed.Celebrant@gmail.com".into()),
+        listing_status: "unclaimed".into(),
+        owner_user_id: None,
+    };
+
+    assert!(verify_email_domain(&context, " listed.celebrant@GMAIL.com ", true).is_ok());
+    assert!(verify_email_domain(&context, "another-celebrant@gmail.com", true).is_err());
+    assert!(verify_email_domain(&context, "listed.celebrant@gmail.com", false).is_err());
+}
+
+#[test]
 fn website_origin_requires_https_and_strips_path() {
     assert_eq!(
         website_origin("https://www.example.com/about"),

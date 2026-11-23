@@ -162,6 +162,8 @@ pub(super) async fn admin_dashboard_http(
         "OMNYID_TWILIO_ACCOUNT_SID",
         "OMNYID_TWILIO_AUTH_TOKEN",
         "OMNYID_TWILIO_VERIFY_SERVICE_SID",
+        "OMNYID_CELEBRANT_CONSULTATION_TOKEN_PEPPER",
+        "OMNYID_ENCRYPTION_KEY_HEX",
     ]
     .iter()
     .all(|name| crate::secret_manager::read_process_secret_trimmed(name).is_some());

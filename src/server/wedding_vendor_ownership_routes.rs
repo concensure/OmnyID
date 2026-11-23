@@ -120,12 +120,18 @@ async fn ownership_status_http(
     let verified = context.claim_status == "verified"
         && context.listing_status == "verified"
         && context.owner_user_id.as_deref() == Some(user.id.as_str());
+    let exact_listing_email = verified_listing_email_match(
+        &user.email,
+        context.contact_email.as_deref(),
+        email_verified,
+    );
     let user_domain = email_domain(&user.email);
     let domains = listing_domains(&context.contact_email, &context.website_url);
-    let email_match = email_verified
-        && user_domain.as_deref().is_some_and(|domain| {
-            !is_public_mail_domain(domain) && domains.iter().any(|item| item == domain)
-        });
+    let email_match = exact_listing_email
+        || (email_verified
+            && user_domain.as_deref().is_some_and(|domain| {
+                !is_public_mail_domain(domain) && domains.iter().any(|item| item == domain)
+            }));
     let website_origin = context.website_url.as_deref().and_then(website_origin);
 
     Ok(Json(json!({
@@ -145,10 +151,10 @@ async fn ownership_status_http(
         "methods": [
             {
                 "id": "email_domain",
-                "label": "Verified work email",
+                "label": "Verified listing or work email",
                 "available": email_match,
                 "instant": true,
-                "detail": if email_match { "Your verified account email matches this business." } else { "Sign in with an email on the business website domain." },
+                "detail": if exact_listing_email { "Your verified account email exactly matches this listing." } else if email_match { "Your verified account email matches this business." } else { "Sign in with the exact email on this listing or an email on the business website domain." },
             },
             {
                 "id": "website_meta",
@@ -506,6 +512,12 @@ fn verify_email_domain(
             "verify your account email before using work-email ownership proof".to_string(),
         ));
     }
+    if verified_listing_email_match(user_email, context.contact_email.as_deref(), true) {
+        return Ok(json!({
+            "matched_listing_email_sha256": sha256(&normalized_email(user_email)),
+            "match_kind": "exact_listing_email"
+        }));
+    }
     let domain = email_domain(user_email).ok_or_else(|| {
         (
             StatusCode::CONFLICT,
@@ -521,6 +533,22 @@ fn verify_email_domain(
         ));
     }
     Ok(json!({ "matched_domain_sha256": sha256(&domain) }))
+}
+
+fn normalized_email(value: &str) -> String {
+    value.trim().to_ascii_lowercase()
+}
+
+fn verified_listing_email_match(
+    user_email: &str,
+    listing_email: Option<&str>,
+    email_verified: bool,
+) -> bool {
+    email_verified
+        && listing_email.is_some_and(|listing| {
+            let user = normalized_email(user_email);
+            !user.is_empty() && user == normalized_email(listing)
+        })
 }
 
 async fn verify_website_meta(

@@ -3,36 +3,36 @@
 use std::{sync::Arc, time::Duration};
 
 use axum::{
+    Json, Router,
     extract::{Path, Query, Request, State},
-    http::{header, HeaderMap, HeaderValue, StatusCode},
+    http::{HeaderMap, HeaderValue, StatusCode, header},
     middleware::Next,
     response::Response,
     routing::{get, post, put},
-    Json, Router,
 };
-use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
+use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use chrono::{DateTime, Datelike, Duration as ChronoDuration, NaiveDate, NaiveTime, Utc};
 use chrono_tz::Australia::Sydney;
 use hmac::{Hmac, Mac};
 use rand::RngCore;
 use serde::Deserialize;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sha2::Sha256;
 use sqlx::Row;
 use ulid::Ulid;
 
 use crate::wedding_celebrant_consultation::{
-    live_has_capacity, live_session_end, normalize_phone, valid_topic, ConsultationIntent,
-    ACCEPTANCE_HOLD_MINUTES,
+    ACCEPTANCE_HOLD_MINUTES, ConsultationIntent, live_has_capacity, live_session_end,
+    normalize_phone, valid_topic,
 };
 
 use super::{
+    AppState, RateLimitPolicy,
     auth::{
         authenticated_rate_limit_key, authenticated_user, enforce_rate_limit,
         optional_authenticated_user, public_rate_limit_key,
     },
-    wedding_vendor_portal_routes::{require_vendor_access, VendorPermission},
-    AppState, RateLimitPolicy,
+    wedding_vendor_portal_routes::{VendorPermission, require_vendor_access},
 };
 
 type HmacSha256 = Hmac<Sha256>;
@@ -287,10 +287,20 @@ async fn public_availability_http(
     headers: HeaderMap,
     Query(query): Query<AvailabilityQuery>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
-    if !enabled() {
-        return Err(unavailable());
-    }
     public_limit(&state, &headers, "celebrant-consultation-list", 60).await?;
+    let consultations_enabled = enabled();
+    let verification_ready = phone_verification_configured();
+    if !consultations_enabled {
+        return Ok(Json(json!({
+            "timezone": "Australia/Sydney",
+            "consultation_minutes": 10,
+            "consultations_enabled": false,
+            "phone_verification_configured": verification_ready,
+            "requests_enabled": false,
+            "cards": [],
+            "empty_message": "Phone consultations are not accepting requests yet. You can still browse celebrants."
+        })));
+    }
     let rows = sqlx::query(r#"SELECT v.vendor_id,v.vendor_slug,v.vendor_name,v.service_area,p.languages,p.topics,p.accepted_intents,
         photo.photo_url,live.session_id,live.expires_at,live.call_cap,p.buffer_minutes,
         (SELECT COUNT(*)::bigint FROM wedding_celebrant_callback_requests r WHERE r.live_session_id=live.session_id AND r.status IN ('waiting_acceptance','accepted') AND COALESCE(r.hold_expires_at,live.expires_at)>NOW()) active_holds,
@@ -338,7 +348,7 @@ async fn public_availability_http(
         }));
     }
     Ok(Json(
-        json!({"timezone":"Australia/Sydney","consultation_minutes":10,"phone_verification_configured":phone_verification_configured(),"cards":cards,"empty_message":"No celebrant is live right now. You can still choose the next available time or browse celebrants."}),
+        json!({"timezone":"Australia/Sydney","consultation_minutes":10,"consultations_enabled":true,"phone_verification_configured":verification_ready,"requests_enabled":verification_ready,"cards":cards,"empty_message":"No celebrant is live right now. You can still choose the next available time or browse celebrants."}),
     ))
 }
 
@@ -1665,5 +1675,15 @@ mod tests {
                 .unwrap()
                 < body.find("to_bytes(request.into_body()").unwrap()
         );
+    }
+
+    #[test]
+    fn public_discovery_is_readable_when_mutations_are_disabled() {
+        let source = include_str!("wedding_celebrant_consultation_routes.rs");
+        let start = source.find("async fn public_availability_http(").unwrap();
+        let end = source[start..].find("struct StartVerification").unwrap() + start;
+        let body = &source[start..end];
+        assert!(body.contains("\"requests_enabled\": false"));
+        assert!(!body.contains("return Err(unavailable())"));
     }
 }

@@ -15,6 +15,41 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-407
+    title: Activate the truthful celebrant journey, add binder co-branding, harden exact-email claims, and publish WED-406
+    status: in_progress
+    owner: codex
+    reviewer: claude
+    branch: agent/codex/WED-407
+    worktree: C:/temp/wt/omnyid-wed407
+    base_sha: d0e53f356aef96266edd974f60435bb355392361
+    depends_on: [WED-405, WED-406, WED-372, WED-359]
+    files: [solid-ui/src/**, solid-ui/tests/**, src/server/wedding_vendor_ownership_routes.rs, src/server/wedding_celebrant_consultation_routes.rs, tests/**vendor*ownership**, wedding/assets/js/celebrant-consultations.js, wedding/blog/**, wedding/blog.html, wedding/blog-taxonomy.json, wedding/tests/**, docs/sitemap.xml, Documents/design/wedding planner/celebrants-import-2026-11-23/**, Documents/marketing/wedding planning/posts/blog/**, Documents/verification/WED-407-*.md, .agent/**]
+    acceptance: [audit all ten Oracle containers and retain only services with an evidenced production or staging role, restore truthful public consultation readiness without bypassing phone possession verification, provide the operator admin with an in-browser Binder page and logo footer preview plus PNG or JPEG export for any page, accept a verified account email that exactly matches the selected vendor listing email even when it uses a public mail domain while preserving cross-listing and domain-only denial, selectively preserve and publish the WED-406 celebrant and blog work on the latest lineage, load the reviewed celebrant records with blank-fill authority and no unsupported register claim, generate one expiring existing-authority availability link for Double Happiness or report the exact missing-record blocker, pass focused security frontend public-site full Wedding typecheck build exact-SHA staging and Oracle release checks]
+    progress:
+      - registered on the exact WED-405 release-record lineage after confirming the primary checkout is stale and dirty and WED-406 is an uncommitted review worktree based on WED-404
+      - read-only Oracle audit found seven active production services and three healthy isolated staging services; all ten have an evidenced role and staging will be used for this auth/backend release
+      - Twilio Verify returns HTTP 200 and the required secret files remain on Oracle, but Compose stopped mounting them, the consultation flag is false, no pilot profile is verified/accepted and no consultation window is published
+      - selectively committed and cherry-picked the WED-406 guides and five-record evidence set onto the WED-405 release lineage while excluding unrelated line-ending noise; the 1,913-row source validation and all four public/blog/CSP checks pass
+      - exact normalized verified listing-email proof now precedes domain proof, so the selected Gmail mailbox is eligible while every different Gmail mailbox remains denied
+      - public consultation discovery now returns explicit readiness instead of a blanket 404, mutation gates remain false-default, and Oracle Compose has stable file-backed defaults for the complete Twilio/pepper secret set
+      - the existing operator dashboard now includes browser-local Binder page rendering, bounded logo footer placement and PNG/JPG export without modifying or uploading the source PDF
+      - focused Rust tests, TypeScript, line budgets, 2,390 Wedding tests and the 1,862-module production build pass in the implementation worktree
+      - production contains no vendor, user, claim or proposal matching Lourde or Double Happiness; multiple conflicting public businesses prevent a safe inferred record or bearer-link generation
+
+  - id: WED-406
+    title: Stage five named celebrant records and publish two celebrant guides with full SEO
+    status: review
+    owner: claude
+    reviewer: codex
+    branch: agent/claude/WED-406
+    worktree: C:/temp/wt/omnyid-wed406
+    base_sha: 1b104ff1fad67206ef419e2f667ad2472a229441
+    depends_on: [WED-404, WED-376]
+    files: [wedding/blog/**, wedding/blog.html, wedding/blog-taxonomy.json, wedding/tests/blog-catalogue-smoke.mjs, docs/sitemap.xml, Documents/design/wedding planner/celebrants-import-2026-11-23/**, Documents/marketing/wedding planning/posts/blog/**, .agent/**]
+    acceptance: [stage one new and four blank-fill celebrant records with verified contacts and own-words text, publish two original celebrant guides with no real names and generator-produced SEO metadata, keep the diff limited to the files listed, hand off exact load steps and open owner questions]
+    progress: "Staged and uncommitted in the WED-406 worktree. WED-407 will selectively apply the listed content files onto the newer WED-405 lineage, review the data authority, load only safe blank-fill changes, rerun the release gates and record production evidence."
+
   - id: WED-405
     title: Extend the existing admin workspace vendor view and simplify the Notes writing workspace
     status: done

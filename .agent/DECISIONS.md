@@ -4806,3 +4806,8 @@ uses the existing draft/conflict flow, while saved and unsaved state remains
 explicit. Folders, tags, domains, Ask, AI, backlinks and history are alternate
 projections around the same note record; collapsing an inspector never deletes or
 moves its data.
+## 2026-11-23 — WED-407 exact listing-email proof and readable consultation readiness
+
+- A verified full-mailbox match with the selected canonical vendor listing is sufficient ownership proof even on a public mail provider. Public-provider domains remain ineligible for domain-only proof, so one Gmail account cannot claim another Gmail listing.
+- The public celebrant-consultation discovery route is a readable readiness projection, not a feature-existence 404. It may return zero cards and `requests_enabled: false`; all verification and request mutations retain the existing false-default rollout and complete-secret gates.
+- Day-of Binder co-branding is an operator-only, browser-local page-preview/export operation. It preserves the generic source PDF and does not create a parallel document store, licence grant or download-tracking system.

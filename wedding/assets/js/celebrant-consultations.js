@@ -26,9 +26,10 @@
   const time = (value) => value ? new Date(value).toLocaleString("en-AU", { timeZone: "Australia/Sydney", weekday: "short", hour: "numeric", minute: "2-digit", timeZoneName: "short" }) : "";
   const render = (payload) => {
     availability = payload.cards || [];
+    const requestsEnabled = payload.requests_enabled === true;
     if (requestedVendor) availability.sort((left, right) => Number(right.vendor_slug === requestedVendor) - Number(left.vendor_slug === requestedVendor));
     const live = availability.filter((card) => card.available_now);
-    status.textContent = live.length ? `${live.length} celebrant${live.length === 1 ? " is" : "s are"} available now.` : payload.empty_message;
+    status.textContent = requestsEnabled && live.length ? `${live.length} celebrant${live.length === 1 ? " is" : "s are"} available now.` : payload.empty_message;
     if (!availability.length) {
       if (startVerification) startVerification.disabled = true;
       if (verificationHelp) verificationHelp.textContent = "No consultation time is published yet. Browse celebrants and return when a time is available.";
@@ -38,19 +39,21 @@
     cards.innerHTML = availability.map((card) => `<article class="celebrant-card">
       ${card.photo_url ? `<img src="${escape(card.photo_url)}" alt="" loading="lazy" decoding="async">` : `<div class="celebrant-avatar" aria-hidden="true">☎</div>`}
       <div><div>${card.available_now ? `<span class="celebrant-live">Available now</span>` : ""}</div><h3>${escape(card.name)}</h3><p class="celebrant-meta">${escape(card.service_area)} · ${escape((card.languages || []).join(", "))}</p><p class="celebrant-topics">${(card.topics || []).map(topicLabel).map(escape).join(" · ")}</p>${!card.available_now && card.next_available_at ? `<p><strong>Next: ${escape(time(card.next_available_at))}</strong></p>` : ""}</div>
-      <div class="celebrant-card-actions">${card.available_now ? `<button class="btn btn-primary" type="button" data-callback="${escape(card.vendor_slug)}">Request a callback</button>` : ""}${card.next_available_at ? `<button class="btn btn-outline" type="button" data-book="${escape(card.vendor_slug)}" data-time="${escape(card.next_available_at)}">Book this time</button>` : ""}</div>
+      <div class="celebrant-card-actions">${requestsEnabled && card.available_now ? `<button class="btn btn-primary" type="button" data-callback="${escape(card.vendor_slug)}">Request a callback</button>` : ""}${requestsEnabled && card.next_available_at ? `<button class="btn btn-outline" type="button" data-book="${escape(card.vendor_slug)}" data-time="${escape(card.next_available_at)}">Book this time</button>` : ""}</div>
     </article>`).join("");
-    if (live.length) cards.insertAdjacentHTML("afterbegin", `<article class="celebrant-card"><div class="celebrant-avatar" aria-hidden="true">↗</div><div><span class="celebrant-live">Available now</span><h3>First available celebrant</h3><p class="celebrant-meta">Choose this when getting an answer matters more than who calls.</p></div><div class="celebrant-card-actions"><button class="btn btn-primary" type="button" data-callback="">Request first available</button></div></article>`);
+    if (requestsEnabled && live.length) cards.insertAdjacentHTML("afterbegin", `<article class="celebrant-card"><div class="celebrant-avatar" aria-hidden="true">↗</div><div><span class="celebrant-live">Available now</span><h3>First available celebrant</h3><p class="celebrant-meta">Choose this when getting an answer matters more than who calls.</p></div><div class="celebrant-card-actions"><button class="btn btn-primary" type="button" data-callback="">Request first available</button></div></article>`);
     const requestedCard = availability.find((card) => card.vendor_slug === requestedVendor);
     const preferred = requestedVendor
       ? (requestedCard && (requestedCard.available_now || requestedCard.next_available_at) ? requestedCard : null)
       : availability.find((card) => card.available_now) || availability.find((card) => card.next_available_at);
     if (startVerification) {
-      startVerification.disabled = !preferred;
+      startVerification.disabled = !preferred || !requestsEnabled;
       startVerification.textContent = preferred?.available_now ? "Start phone verification" : preferred?.next_available_at ? "Choose this time and verify" : "Choose a consultation time below";
       startVerificationAction = preferred ? () => openForm(preferred.vendor_slug, preferred.available_now ? "immediate" : "scheduled", preferred.available_now ? "" : preferred.next_available_at) : () => cards.scrollIntoView({ behavior: "smooth" });
     }
-    if (verificationHelp) verificationHelp.textContent = preferred
+    if (verificationHelp) verificationHelp.textContent = !requestsEnabled
+      ? "Phone consultation requests are not open yet. You can still browse every celebrant listing."
+      : preferred
       ? "The button opens the secure number and verification-code form on this page."
       : requestedCard ? "This celebrant has not published a consultation time yet. Choose another available celebrant below or check back later." : "Choose a published consultation time below to continue.";
   };
