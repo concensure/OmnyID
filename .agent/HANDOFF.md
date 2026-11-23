@@ -12921,3 +12921,5 @@ eight-check monitor passes, Caddy validates and homeserver/Caddy restart counts 
 zero. Disk use is 72% with about 13 GB free. Rollback is retained at
 `/home/ubuntu/omnyid-candidates/wed409-9a6c2b56f733e654b44265b7de957d5c8e494d46/rollback`.
 Full evidence: `Documents/verification/WED-409-landing-claims-release.md`.
+The branch is pushed. GitHub rejected PR creation because this task lineage has no
+history in common with `main`, matching the prior release branches.

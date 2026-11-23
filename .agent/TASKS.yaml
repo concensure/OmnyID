@@ -35,6 +35,7 @@ tasks:
       - focused import/catalogue tests, TypeScript, line budgets, all 2,394 Wedding tests, the 95-page public/security suite and the 1,862-module production build pass in the implementation worktree
       - exact implementation SHA 9a6c2b56f733e654b44265b7de957d5c8e494d46 passed the complete gate again in a clean detached release worktree; both static archives were hash-verified before Oracle installation
       - Oracle serves the exact corrected public files and Workspace bundles; both Binder PDFs return 200, the authenticated eight-check monitor passes, Caddy validates, homeserver and Caddy restart counts remain zero, and rollback archives are retained under the WED-409 candidate directory
+      - branch push succeeded; PR creation is structurally unavailable because this task lineage has no history in common with main
 
   - id: WED-408
     title: Make Google sign-in retry-safe, restore operator Growth access, and make Wedding budget setup account-scoped and editable
