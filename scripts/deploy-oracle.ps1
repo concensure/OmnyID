@@ -484,6 +484,10 @@ grep -q 'handle /wedding/provider-capabilities' Caddyfile || {
   echo 'workspace smoke check failed: staged Caddyfile is missing the wedding provider-capabilities proxy route' >&2
   exit 1
 }
+grep -q 'handle /wedding/assistant' Caddyfile || {
+  echo 'workspace smoke check failed: staged Caddyfile is missing the account-scoped wedding assistant proxy route' >&2
+  exit 1
+}
 grep -q 'handle /wedding/rsvp/reminders/\*' Caddyfile || {
   echo 'workspace smoke check failed: staged Caddyfile is missing the RSVP reminder proxy route' >&2
   exit 1
@@ -534,6 +538,10 @@ docker exec omnyid-caddy-1 caddy validate --config /etc/caddy/Caddyfile >/dev/nu
 }
 docker exec omnyid-caddy-1 grep -q 'handle /wedding/provider-capabilities' /etc/caddy/Caddyfile || {
   echo 'workspace smoke check failed: running Caddyfile is missing the wedding provider-capabilities proxy route' >&2
+  exit 1
+}
+docker exec omnyid-caddy-1 grep -q 'handle /wedding/assistant' /etc/caddy/Caddyfile || {
+  echo 'workspace smoke check failed: running Caddyfile is missing the account-scoped wedding assistant proxy route' >&2
   exit 1
 }
 docker exec omnyid-caddy-1 grep -q 'handle /wedding/rsvp/reminders/\*' /etc/caddy/Caddyfile || {

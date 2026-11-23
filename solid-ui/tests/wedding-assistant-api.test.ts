@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { normalizeWeddingAssistantResponse } from "../src/lib/weddingAssistantApi";
+
+const projectRoot = resolve(import.meta.dirname, "../..");
 
 test("normalizes a review-first Wedding navigation suggestion", () => {
   assert.deepEqual(normalizeWeddingAssistantResponse({
@@ -20,4 +24,13 @@ test("drops unknown destinations instead of navigating outside Wedding", () => {
     answer: "I can only help in Wedding.",
     suggested_action: { kind: "open_view", target: "admin", label: "Open admin" },
   }).suggestedAction, null);
+});
+
+test("Wedding assistant is proxied before static Wedding files and enforced by deploy smoke", () => {
+  const caddy = readFileSync(resolve(projectRoot, "Caddyfile"), "utf8");
+  const deploy = readFileSync(resolve(projectRoot, "scripts/deploy-oracle.ps1"), "utf8");
+  assert.ok(caddy.indexOf("handle /wedding/assistant") >= 0);
+  assert.ok(caddy.indexOf("handle /wedding/assistant") < caddy.indexOf("handle /wedding/*"));
+  assert.match(deploy, /staged Caddyfile is missing the account-scoped wedding assistant proxy route/);
+  assert.match(deploy, /running Caddyfile is missing the account-scoped wedding assistant proxy route/);
 });

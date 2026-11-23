@@ -558,6 +558,11 @@ if (!quoteDecoderEngine.includes('Estimated total') && !quoteDecoderEngine.inclu
 if (!caddyfile.includes('handle /wedding/quote-extract') || !caddyfile.includes('handle /wedding/quote-share')) {
   failures.push('Caddyfile: contextual quote extraction and PDF sharing routes must precede the static Wedding handler');
 }
+const weddingAssistantRoute = caddyfile.indexOf('handle /wedding/assistant');
+const staticWeddingRoute = caddyfile.indexOf('handle /wedding/*');
+if (weddingAssistantRoute < 0 || staticWeddingRoute < 0 || weddingAssistantRoute > staticWeddingRoute) {
+  failures.push('Caddyfile: the account-scoped Wedding assistant must reach the homeserver before the static Wedding handler');
+}
 if (!quoteDecoder.includes('does not retain the proposal text') || !quoteDecoder.includes('Manual entry remains available')) {
   failures.push('compare-wedding-venue-quotes.html: model-processing disclosure or manual fallback is missing');
 }

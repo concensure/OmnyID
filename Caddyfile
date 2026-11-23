@@ -347,6 +347,13 @@
         import omnyid_proxy
     }
 
+    # Authenticated, account-scoped Wedding assistant shared by the Master
+    # Agent and Sprout. Keep it ahead of the static Wedding site so requests
+    # always reach the homeserver's identity and action allowlist checks.
+    handle /wedding/assistant {
+        import omnyid_proxy
+    }
+
     # Authenticated couple-owned RSVP reminder status and send commands. Keep
     # this ahead of the static /wedding/* site handler below.
     handle /wedding/rsvp/reminders/* {
