@@ -915,8 +915,14 @@ mod tests {
         let source = include_str!("wedding_celebrant_management_link_routes/admin.rs");
         assert!(source.contains("v.status IN ('active','hidden') FOR UPDATE OF v"));
         let private_routes = include_str!("wedding_celebrant_management_link_routes.rs");
+        let production_routes = private_routes
+            .split("#[cfg(test)]")
+            .next()
+            .expect("production routes precede their tests");
         assert_eq!(
-            private_routes.matches("status IN ('active','hidden')").count(),
+            production_routes
+                .matches("status IN ('active','hidden')")
+                .count(),
             5,
             "every private exchange, session, scope and mutation check must accept an operator-linked hidden listing",
         );
