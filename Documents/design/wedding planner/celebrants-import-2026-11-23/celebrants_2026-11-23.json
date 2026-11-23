@@ -1,0 +1,559 @@
+{
+ "generated": "2026-11-23",
+ "new_vendors": [
+  {
+   "vendor_id": "celebrant-pauline-appiah-dwyer",
+   "vendor_slug": "celebrant-pauline-appiah-dwyer",
+   "vendor_name": "Pauline Appiah-Dwyer",
+   "category": "Celebrant",
+   "trading_name": "Your Memorable Moment",
+   "service_area": "Western Sydney NSW",
+   "address": null,
+   "website_url": "https://yourmemorablemoment.com.au/",
+   "contact_phone": null,
+   "contact_email": "pauline@yourmemorablemoment.com.au",
+   "contact_form_url": "https://yourmemorablemoment.com.au/contact",
+   "instagram_url": "https://www.instagram.com/yourmemorablemoment/",
+   "price_from_aud": 350,
+   "price_status": "known",
+   "price_note": "Legals only $350; co-presented ceremony (a friend or relative 'marries' you) $450; tailor-made $850. $150 non-refundable deposit within 7 days, balance 14 days before. Reception MC and long-distance travel are add-ons priced on request.",
+   "services": [
+    "wedding",
+    "legals only",
+    "vow renewal",
+    "naming ceremony",
+    "milestone birthday",
+    "mc"
+   ],
+   "style_tags": [
+    "celebrant",
+    "Western Sydney",
+    "Sydney",
+    "multicultural ceremonies",
+    "spiritual ceremonies",
+    "legals only",
+    "co-presented ceremony",
+    "vow renewals",
+    "baby naming",
+    "milestone birthdays",
+    "MC",
+    "published pricing"
+   ],
+   "editorial_summary": "Western Sydney celebrant who travels for weddings, vow renewals, baby naming ceremonies and milestone birthdays, and says ceremonies can be classic, modern, multicultural or spiritual. Wedding fees are published in three tiers: legals only, a co-presented ceremony where a friend or relative leads, and a fully tailor-made one. A deposit holds the date and the balance falls due two weeks out. Reception MC and extra travel are priced on request.",
+   "contact_basis": "own_site",
+   "sort_key": "appiah dwyer, pauline",
+   "flags": [
+    "area_wording_differs_western_vs_sydney",
+    "celebrants_network_membership_claim_unverified",
+    "needs_phone_lookup",
+    "register_listing_not_matched",
+    "register_number_not_published",
+    "suburb_not_stated",
+    "travel_threshold_conflict_150_vs_200km"
+   ],
+   "source_url": "https://yourmemorablemoment.com.au/sample-page/",
+   "source_label": "Vendor website",
+   "source_checked_at": "2026-11-23",
+   "status": "active",
+   "attributes": [
+    {
+     "attribute_key": "editorial_summary",
+     "value": "Western Sydney celebrant who travels for weddings, vow renewals, baby naming ceremonies and milestone birthdays, and says ceremonies can be classic, modern, multicultural or spiritual. Wedding fees are published in three tiers: legals only, a co-presented ceremony where a friend or relative leads, and a fully tailor-made one. A deposit holds the date and the balance falls due two weeks out. Reception MC and extra travel are priced on request.",
+     "status": "known",
+     "authority": "primary_official",
+     "source_url": "https://yourmemorablemoment.com.au/sample-page/",
+     "retrieved_at": "2026-11-23",
+     "notes": "Written by OmnyID in own words."
+    },
+    {
+     "attribute_key": "style_tags",
+     "value": [
+      "celebrant",
+      "Western Sydney",
+      "Sydney",
+      "multicultural ceremonies",
+      "spiritual ceremonies",
+      "legals only",
+      "co-presented ceremony",
+      "vow renewals",
+      "baby naming",
+      "milestone birthdays",
+      "MC",
+      "published pricing"
+     ],
+     "status": "known",
+     "authority": "primary_official",
+     "source_url": "https://yourmemorablemoment.com.au/sample-page/",
+     "retrieved_at": "2026-11-23",
+     "notes": "Written by OmnyID in own words."
+    },
+    {
+     "attribute_key": "official_website",
+     "value": "https://yourmemorablemoment.com.au/",
+     "status": "known",
+     "authority": "primary_official",
+     "source_url": "https://yourmemorablemoment.com.au/",
+     "retrieved_at": "2026-11-23"
+    },
+    {
+     "attribute_key": "instagram_url",
+     "value": "https://www.instagram.com/yourmemorablemoment/",
+     "status": "known",
+     "authority": "primary_official",
+     "source_url": "https://yourmemorablemoment.com.au/sample-page/",
+     "retrieved_at": "2026-11-23"
+    },
+    {
+     "attribute_key": "price_estimate_total_aud",
+     "value": 350,
+     "status": "known",
+     "authority": "primary_official",
+     "source_url": "https://yourmemorablemoment.com.au/sample-page/",
+     "retrieved_at": "2026-11-23",
+     "notes": "Lowest published figure (legals-only tier); confirm with the celebrant."
+    },
+    {
+     "attribute_key": "cultural_religious_capabilities",
+     "value": [
+      "multicultural couples",
+      "spiritual ceremonies"
+     ],
+     "status": "known",
+     "authority": "primary_official",
+     "source_url": "https://yourmemorablemoment.com.au/sample-page/",
+     "retrieved_at": "2026-11-23"
+    }
+   ]
+  }
+ ],
+ "existing_vendor_additions": [
+  {
+   "vendor_id": "celebrant-nicole-webster",
+   "name": "Nicole Webster",
+   "trading_name": "Nicole The Celebrant",
+   "source_url": "https://nicolethecelebrant.com.au/",
+   "source_checked_at": "2026-11-23",
+   "fill": {
+    "website_url": "https://nicolethecelebrant.com.au/",
+    "contact_email": "nicole@nicolethecelebrant.com.au"
+   },
+   "evidence_extra": {
+    "instagram_url": "https://instagram.com/nicolethecelebrant",
+    "facebook_url": "https://facebook.com/nicolethecelebrant",
+    "services": [
+     "wedding",
+     "legals only",
+     "vow renewal",
+     "commitment ceremony",
+     "naming ceremony",
+     "mc"
+    ],
+    "price_note": "No fees published. The only figure on the site is a $70 optional NSW certificate application fee.",
+    "trading_name": "Nicole The Celebrant",
+    "service_area_detail": "Eastern Suburbs, Inner West, North Shore, Northern Beaches and Sydney CBD; travels further on request",
+    "contact_basis": "own_site"
+   },
+   "extra_style_tags": [
+    "celebrant",
+    "personalised ceremonies",
+    "legals only",
+    "elopements",
+    "vow renewals",
+    "naming ceremonies",
+    "MC",
+    "Eastern Suburbs",
+    "Sydney",
+    "harbour and coastal settings",
+    "LGBTQ+ friendly",
+    "calm and warm"
+   ],
+   "extra_description": "Eastern Suburbs celebrant based in Kingsford who says she has been marrying couples since 2001. Offers full personalised weddings, a legals-only service, vow renewals, commitment and naming ceremonies and reception MC work, with coastal, harbour and garden settings mentioned. Travels across metropolitan Sydney and further when asked. Fees are not published; the site promises a personal reply within a day.",
+   "flags": [
+    "elopement_named_in_meta_only",
+    "price_not_published",
+    "pricing_and_faq_pages_not_found",
+    "register_phone_match_confirmed",
+    "years_claim_conflict_20_vs_25"
+   ],
+   "attributes": [
+    {
+     "attribute_key": "editorial_summary",
+     "value": "Eastern Suburbs celebrant based in Kingsford who says she has been marrying couples since 2001. Offers full personalised weddings, a legals-only service, vow renewals, commitment and naming ceremonies and reception MC work, with coastal, harbour and garden settings mentioned. Travels across metropolitan Sydney and further when asked. Fees are not published; the site promises a personal reply within a day.",
+     "status": "known",
+     "authority": "primary_official",
+     "source_url": "https://nicolethecelebrant.com.au/",
+     "retrieved_at": "2026-11-23",
+     "notes": "Written by OmnyID in own words."
+    },
+    {
+     "attribute_key": "style_tags",
+     "value": [
+      "celebrant",
+      "personalised ceremonies",
+      "legals only",
+      "elopements",
+      "vow renewals",
+      "naming ceremonies",
+      "MC",
+      "Eastern Suburbs",
+      "Sydney",
+      "harbour and coastal settings",
+      "LGBTQ+ friendly",
+      "calm and warm"
+     ],
+     "status": "known",
+     "authority": "primary_official",
+     "source_url": "https://nicolethecelebrant.com.au/",
+     "retrieved_at": "2026-11-23",
+     "notes": "Written by OmnyID in own words."
+    },
+    {
+     "attribute_key": "official_website",
+     "value": "https://nicolethecelebrant.com.au/",
+     "status": "known",
+     "authority": "primary_official",
+     "source_url": "https://nicolethecelebrant.com.au/",
+     "retrieved_at": "2026-11-23"
+    },
+    {
+     "attribute_key": "instagram_url",
+     "value": "https://instagram.com/nicolethecelebrant",
+     "status": "known",
+     "authority": "primary_official",
+     "source_url": "https://nicolethecelebrant.com.au/",
+     "retrieved_at": "2026-11-23"
+    },
+    {
+     "attribute_key": "years_in_business",
+     "value": 25,
+     "status": "estimated",
+     "authority": "primary_official",
+     "source_url": "https://nicolethecelebrant.com.au/",
+     "retrieved_at": "2026-11-23",
+     "notes": "Site says 'Est. 2001' and '25+ years' on the homepage but 'over 20 years' on the About page; 25 follows the founding year."
+    },
+    {
+     "attribute_key": "cultural_religious_capabilities",
+     "value": [
+      "LGBTQ+ couples",
+      "multicultural couples"
+     ],
+     "status": "known",
+     "authority": "primary_official",
+     "source_url": "https://nicolethecelebrant.com.au/",
+     "retrieved_at": "2026-11-23"
+    }
+   ],
+   "note": "Register-only row exists (staged 2026-11-18). Database values win; fill blanks only."
+  },
+  {
+   "vendor_id": "celebrant-amanda-knapton",
+   "name": "Amanda Knapton",
+   "trading_name": "A Celebration Day",
+   "source_url": "https://acelebrationday.com.au/weddings-marriage-celebrant/",
+   "source_checked_at": "2026-11-23",
+   "fill": {
+    "website_url": "https://acelebrationday.com.au/",
+    "contact_email": "amanda@acelebrationday.com.au"
+   },
+   "evidence_extra": {
+    "instagram_url": "https://www.instagram.com/amandaknapton_celebrant/",
+    "facebook_url": "https://www.facebook.com/ACelebrationDay",
+    "services": [
+     "wedding",
+     "legals only",
+     "elopement",
+     "styled wedding package"
+    ],
+    "price_note": "Legals-only 'from' price, Mon-Thu. Elopement $2,080 Mon-Thu / $2,300 Fri-Sun; mini styled $3,710 / $4,270; maxi $6,020 / $6,670; designer $9,010 / $9,750. Packages bundle a photographer and florals from partner suppliers.",
+    "trading_name": "A Celebration Day",
+    "service_area_detail": "Sutherland Shire and South Coast; travels across Sydney",
+    "contact_basis": "own_site"
+   },
+   "extra_style_tags": [
+    "celebrant",
+    "personalised ceremonies",
+    "legals only",
+    "elopements",
+    "styled weddings",
+    "photographer included",
+    "Sutherland Shire",
+    "South Coast",
+    "Sydney",
+    "relaxed",
+    "funny and heartfelt",
+    "package pricing"
+   ],
+   "extra_description": "Sutherland Shire celebrant, qualified in 2008, who describes her ceremonies as relaxed, funny and heartfelt. Sells tiered packages: a legals-only ceremony in her home studio, a four-person elopement with a photographer, and mini, maxi and designer weddings that add florals, cake, styling and photography through partner suppliers. Prices are starting figures with a weekday and weekend split.",
+   "flags": [
+    "award_finalist_claim_unverified",
+    "deposit_and_cancellation_terms_not_found",
+    "elopement_page_password_notice_but_readable",
+    "placeholder_lorem_ipsum_text_on_site",
+    "register_phone_match_confirmed"
+   ],
+   "attributes": [
+    {
+     "attribute_key": "editorial_summary",
+     "value": "Sutherland Shire celebrant, qualified in 2008, who describes her ceremonies as relaxed, funny and heartfelt. Sells tiered packages: a legals-only ceremony in her home studio, a four-person elopement with a photographer, and mini, maxi and designer weddings that add florals, cake, styling and photography through partner suppliers. Prices are starting figures with a weekday and weekend split.",
+     "status": "known",
+     "authority": "primary_official",
+     "source_url": "https://acelebrationday.com.au/weddings-marriage-celebrant/",
+     "retrieved_at": "2026-11-23",
+     "notes": "Written by OmnyID in own words."
+    },
+    {
+     "attribute_key": "style_tags",
+     "value": [
+      "celebrant",
+      "personalised ceremonies",
+      "legals only",
+      "elopements",
+      "styled weddings",
+      "photographer included",
+      "Sutherland Shire",
+      "South Coast",
+      "Sydney",
+      "relaxed",
+      "funny and heartfelt",
+      "package pricing"
+     ],
+     "status": "known",
+     "authority": "primary_official",
+     "source_url": "https://acelebrationday.com.au/weddings-marriage-celebrant/",
+     "retrieved_at": "2026-11-23",
+     "notes": "Written by OmnyID in own words."
+    },
+    {
+     "attribute_key": "official_website",
+     "value": "https://acelebrationday.com.au/",
+     "status": "known",
+     "authority": "primary_official",
+     "source_url": "https://acelebrationday.com.au/",
+     "retrieved_at": "2026-11-23"
+    },
+    {
+     "attribute_key": "instagram_url",
+     "value": "https://www.instagram.com/amandaknapton_celebrant/",
+     "status": "known",
+     "authority": "primary_official",
+     "source_url": "https://acelebrationday.com.au/weddings-marriage-celebrant/",
+     "retrieved_at": "2026-11-23"
+    },
+    {
+     "attribute_key": "price_estimate_total_aud",
+     "value": 750,
+     "status": "known",
+     "authority": "primary_official",
+     "source_url": "https://acelebrationday.com.au/weddings-marriage-celebrant/",
+     "retrieved_at": "2026-11-23",
+     "notes": "Lowest published figure (legals-only tier); confirm with the celebrant."
+    },
+    {
+     "attribute_key": "years_in_business",
+     "value": 18,
+     "status": "estimated",
+     "authority": "primary_official",
+     "source_url": "https://acelebrationday.com.au/weddings-marriage-celebrant/",
+     "retrieved_at": "2026-11-23",
+     "notes": "Became a celebrant in 2008, so about 18 years in 2026."
+    }
+   ],
+   "note": "Register-only row exists (staged 2026-11-18). Database values win; fill blanks only."
+  },
+  {
+   "vendor_id": "celebrant-jordan-vassallo",
+   "name": "Jordan Vassallo",
+   "trading_name": "Jordan Vassallo Celebrant",
+   "source_url": "https://www.jordanvassallocelebrant.com.au/packages",
+   "source_checked_at": "2026-11-23",
+   "fill": {
+    "website_url": "https://www.jordanvassallocelebrant.com.au/",
+    "contact_email": "info@jordanvassallocelebrant.com.au"
+   },
+   "evidence_extra": {
+    "instagram_url": "https://www.instagram.com/jordanvassallocelebrant",
+    "facebook_url": "https://www.facebook.com/jordanvassallocelebrant",
+    "services": [
+     "wedding",
+     "legals only",
+     "mc"
+    ],
+    "price_note": "No fees published; each package has an enquiry button. A planning add-on is described as worth $350 but no price is shown for it standalone.",
+    "trading_name": "Jordan Vassallo Celebrant",
+    "service_area_detail": "Sydney metro (travel included in the Signature and Wingman packages)",
+    "contact_basis": "own_site"
+   },
+   "extra_style_tags": [
+    "celebrant",
+    "bespoke ceremonies",
+    "legals only",
+    "MC",
+    "celebrant and MC bundle",
+    "theatre background",
+    "storytelling",
+    "humour",
+    "Sydney metro",
+    "relaxed",
+    "online planning",
+    "weekday legals"
+   ],
+   "extra_description": "Sydney metro celebrant with a theatre background of more than twenty years as actor, director and producer, by the celebrant's own account. Pitches a warm, unscripted, humorous style. Four packages: a weekday legals-only ceremony, a personalised essentials tier, a bespoke tier with unlimited planning meetings, and a bundle that adds a reception MC for up to three and a half hours. Fees are not published.",
+   "flags": [
+    "awards_claims_unverified_no_issuer_named",
+    "only_two_site_pages_read",
+    "price_not_published",
+    "reality_tv_recognition_claim_not_stored",
+    "register_phone_match_confirmed",
+    "register_suburb_box_hill_vs_site_sydney_metro"
+   ],
+   "attributes": [
+    {
+     "attribute_key": "editorial_summary",
+     "value": "Sydney metro celebrant with a theatre background of more than twenty years as actor, director and producer, by the celebrant's own account. Pitches a warm, unscripted, humorous style. Four packages: a weekday legals-only ceremony, a personalised essentials tier, a bespoke tier with unlimited planning meetings, and a bundle that adds a reception MC for up to three and a half hours. Fees are not published.",
+     "status": "known",
+     "authority": "primary_official",
+     "source_url": "https://www.jordanvassallocelebrant.com.au/packages",
+     "retrieved_at": "2026-11-23",
+     "notes": "Written by OmnyID in own words."
+    },
+    {
+     "attribute_key": "style_tags",
+     "value": [
+      "celebrant",
+      "bespoke ceremonies",
+      "legals only",
+      "MC",
+      "celebrant and MC bundle",
+      "theatre background",
+      "storytelling",
+      "humour",
+      "Sydney metro",
+      "relaxed",
+      "online planning",
+      "weekday legals"
+     ],
+     "status": "known",
+     "authority": "primary_official",
+     "source_url": "https://www.jordanvassallocelebrant.com.au/packages",
+     "retrieved_at": "2026-11-23",
+     "notes": "Written by OmnyID in own words."
+    },
+    {
+     "attribute_key": "official_website",
+     "value": "https://www.jordanvassallocelebrant.com.au/",
+     "status": "known",
+     "authority": "primary_official",
+     "source_url": "https://www.jordanvassallocelebrant.com.au/",
+     "retrieved_at": "2026-11-23"
+    },
+    {
+     "attribute_key": "instagram_url",
+     "value": "https://www.instagram.com/jordanvassallocelebrant",
+     "status": "known",
+     "authority": "primary_official",
+     "source_url": "https://www.jordanvassallocelebrant.com.au/packages",
+     "retrieved_at": "2026-11-23"
+    }
+   ],
+   "note": "Register-only row exists (staged 2026-11-18). Database values win; fill blanks only."
+  },
+  {
+   "vendor_id": "celebrant-cerys-rhian-murphy",
+   "name": "Cerys Rhian Murphy",
+   "trading_name": "Married By Cerys",
+   "source_url": "https://marriedbycerys.com/services",
+   "source_checked_at": "2026-11-23",
+   "fill": {
+    "website_url": "https://marriedbycerys.com/",
+    "contact_email": "marriedbycerys@gmail.com"
+   },
+   "evidence_extra": {
+    "instagram_url": "https://www.instagram.com/marriedbycerys",
+    "facebook_url": null,
+    "services": [
+     "wedding",
+     "elopement",
+     "mc"
+    ],
+    "price_note": "No fees published. Planning starts with a coffee or call and a questionnaire.",
+    "trading_name": "Married By Cerys",
+    "service_area_detail": "Illawarra and NSW South Coast; Southern Highlands, Blue Mountains and Sydney by arrangement",
+    "contact_basis": "own_site"
+   },
+   "extra_style_tags": [
+    "celebrant",
+    "bespoke ceremonies",
+    "elopements",
+    "MC",
+    "Illawarra",
+    "South Coast",
+    "Southern Highlands",
+    "Wollongong",
+    "high energy",
+    "emotional and funny",
+    "performance background",
+    "no templates"
+   ],
+   "extra_description": "Illawarra-based celebrant, listed on the register at Shellharbour, who travels across the South Coast, Southern Highlands, Blue Mountains and Sydney. Writes each ceremony from scratch in a high-energy, emotional and funny voice, drawing on a performance and creative writing background. Offers a wedding ceremony, a ceremony plus reception MC, and a ten-minute elopement with signing table and arbour. Fees are not published.",
+   "flags": [
+    "award_third_place_claim_unverified",
+    "contact_email_is_gmail",
+    "contact_page_content_not_rendered",
+    "price_not_published",
+    "register_phone_match_confirmed",
+    "surname_from_register_only"
+   ],
+   "attributes": [
+    {
+     "attribute_key": "editorial_summary",
+     "value": "Illawarra-based celebrant, listed on the register at Shellharbour, who travels across the South Coast, Southern Highlands, Blue Mountains and Sydney. Writes each ceremony from scratch in a high-energy, emotional and funny voice, drawing on a performance and creative writing background. Offers a wedding ceremony, a ceremony plus reception MC, and a ten-minute elopement with signing table and arbour. Fees are not published.",
+     "status": "known",
+     "authority": "primary_official",
+     "source_url": "https://marriedbycerys.com/services",
+     "retrieved_at": "2026-11-23",
+     "notes": "Written by OmnyID in own words."
+    },
+    {
+     "attribute_key": "style_tags",
+     "value": [
+      "celebrant",
+      "bespoke ceremonies",
+      "elopements",
+      "MC",
+      "Illawarra",
+      "South Coast",
+      "Southern Highlands",
+      "Wollongong",
+      "high energy",
+      "emotional and funny",
+      "performance background",
+      "no templates"
+     ],
+     "status": "known",
+     "authority": "primary_official",
+     "source_url": "https://marriedbycerys.com/services",
+     "retrieved_at": "2026-11-23",
+     "notes": "Written by OmnyID in own words."
+    },
+    {
+     "attribute_key": "official_website",
+     "value": "https://marriedbycerys.com/",
+     "status": "known",
+     "authority": "primary_official",
+     "source_url": "https://marriedbycerys.com/",
+     "retrieved_at": "2026-11-23"
+    },
+    {
+     "attribute_key": "instagram_url",
+     "value": "https://www.instagram.com/marriedbycerys",
+     "status": "known",
+     "authority": "primary_official",
+     "source_url": "https://marriedbycerys.com/services",
+     "retrieved_at": "2026-11-23"
+    }
+   ],
+   "note": "Register-only row exists (staged 2026-11-18). Database values win; fill blanks only."
+  }
+ ]
+}
