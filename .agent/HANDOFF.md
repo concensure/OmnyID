@@ -12923,3 +12923,38 @@ zero. Disk use is 72% with about 13 GB free. Rollback is retained at
 Full evidence: `Documents/verification/WED-409-landing-claims-release.md`.
 The branch is pushed. GitHub rejected PR creation because this task lineage has no
 history in common with `main`, matching the prior release branches.
+
+## WED-410 actionable Wedding planner and private celebrant-link release (2026-11-24)
+
+Worktree `C:/temp/wt/omnyid-wed410`, branch `agent/codex/WED-410`, based on the
+WED-409 release record. Exact implementation and deployed SHA:
+`dd19bdc0917b83867ccf5fb322f1315a83bb4ce0`; clean release worktree:
+`C:/temp/wt/omnyid-wed410-release-dd19bdc0`.
+
+Wedding date setup now edits canonical state inside the decision card and carries
+useful planning guidance. Custom decisions confirm without a full Workspace reload;
+Timeline restores Gantt access; zero-guest seating, RSVP-rule scope, calendar voice
+focus and persona contrast are explicit. Sprout expands and can prepare an editable,
+account-scoped invite proposal from a natural-language month/year/guest request while
+retaining the existing approval boundary.
+
+Partner invites persist one exact seven-day expiry instant and name its absolute UTC
+date in the email and API. Operator-issued private celebrant links now work for hidden
+verification/test records across link creation, exchange, session, scope and mutations
+without making those listings public. Double Happiness was created hidden for Lourde
+Lam with contact and register evidence pending; private 14-day grants were issued for
+it and the existing hidden QA celebrant. Bearer URLs were returned only to the user;
+the durable grant IDs and expiries are in the WED-410 verification note.
+
+The exact clean SHA passed TypeScript, both line budgets, all 2,397 Wedding tests, all
+95 public/security pages, the 1,862-module production build, both focused Rust tests
+under Linux and native ARM64 workflow `45255791339`. Staging and production run the
+exact image with zero restarts. The authenticated eight-check monitor passes, Caddy
+validates, hosted entry points return 200 and the Workspace index hash matches the
+candidate.
+
+Rollback is retained at
+`/home/ubuntu/omnyid-candidates/wed410-dd19bdc0917b83867ccf5fb322f1315a83bb4ce0/rollback`;
+the prior WED-408 backend is tagged `omnyid-homeserver:pre-wed410-70e7a8c6`.
+Root use is 79% with about 9.9 GB free. Full evidence:
+`Documents/verification/WED-410-actionable-planner-release.md`.

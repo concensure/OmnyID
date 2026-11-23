@@ -17,7 +17,7 @@ lifecycle:
 tasks:
   - id: WED-410
     title: Make Wedding decisions actionable in place and restore missing planner interactions
-    status: in_progress
+    status: done
     owner: codex
     reviewer: claude
     branch: agent/codex/WED-410
@@ -33,6 +33,9 @@ tasks:
       - the Wedding assistant expands to full screen and can stage an account-scoped November invite proposal with parsed date and guest count through the existing editable proposal flow; it never sends or commits externally without approval
       - partner invites persist one exact seven-day expiry instant and put its formatted UTC date in the email and response; hidden celebrant records remain unpublished but are eligible for operator-issued private calendar capabilities
       - TypeScript, line budgets, 2,397 Wedding tests, the 95-page public/security suite, production frontend build and Rust library check pass in the implementation worktree; the focused Rust unit binary hits a Windows rustc access-violation and requires the native Linux candidate gate
+      - exact SHA dd19bdc0917b83867ccf5fb322f1315a83bb4ce0 passed the full clean frontend gate, both focused Rust tests under Linux and native ARM64 workflow 45255791339; isolated staging ran the same revision with authenticated health and readiness proof
+      - Oracle serves the exact backend image and Workspace archive; the authenticated eight-check monitor passes, Caddy validates, hosted entry points return 200, and production homeserver and Caddy restart counts remain zero with WED-408 retained as rollback
+      - created Double Happiness as an unpublished hidden record for Lourde Lam with contact and register evidence explicitly pending; issued fourteen-day private grants for it and the existing hidden QA celebrant, and verified the QA link through hosted exchange and scoped session without publishing either listing
 
   - id: WED-409
     title: Reconcile public Wedding claims with live capabilities and verify partner, guest and celebrant data
