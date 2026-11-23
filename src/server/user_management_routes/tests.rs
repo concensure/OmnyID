@@ -428,6 +428,9 @@ fn wedding_vendor_list_limit_is_bounded_for_public_and_admin_routes() {
     assert_eq!(super::wedding_vendor_list_limit(Some(-50)), 1);
     assert_eq!(super::wedding_vendor_list_limit(Some(20)), 20);
     assert_eq!(super::wedding_vendor_list_limit(Some(50_000)), 200);
+    assert_eq!(super::admin_wedding_vendor_list_limit(None), 500);
+    assert_eq!(super::admin_wedding_vendor_list_limit(Some(0)), 1);
+    assert_eq!(super::admin_wedding_vendor_list_limit(Some(50_000)), 500);
 }
 
 #[test]

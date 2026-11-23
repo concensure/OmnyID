@@ -15,6 +15,38 @@ lifecycle:
   file_rule: "Agents should treat another active task's files as owned unless they coordinate in HANDOFF.md."
 
 tasks:
+  - id: WED-405
+    title: Extend the existing admin workspace vendor view and simplify the Notes writing workspace
+    status: in_progress
+    owner: codex
+    reviewer: claude
+    branch: agent/codex/WED-405
+    worktree: C:/temp/wt/omnyid-wed405
+    base_worktree: C:/temp/wt/omnyid-wed404
+    base_sha: 1b104ff1fad67206ef419e2f667ad2472a229441
+    depends_on: [WED-403, WED-404]
+    files:
+      - solid-ui/src/**
+      - solid-ui/tests/**
+      - src/server/user_management_routes/**
+      - src/server/**wedding**
+      - Documents/verification/WED-405-*.md
+      - .agent/**
+    acceptance:
+      - exact normalized admin@omnyid.com sessions enter the regular Workspace rather than the Wedding template while the server remains the authority for admin dashboard data and actions
+      - the existing admin dashboard gains one vendor view that lists all authorised vendor records, filters by category, performs bounded typo-tolerant search, shows claim status and invokes the existing availability-calendar-link authority from each result
+      - lookalike addresses, ordinary users and vendor sessions receive no admin navigation, data or mutation capability
+      - Notes has one primary save action plus an accurate saved, autosaving or unsaved state; the title appears once and AI summary is confined to the inspector
+      - Notes provides a wider responsive editor, a calm grouped view control, a collapsible left hierarchy and a collapsible tabbed inspector for details, AI, graph/backlinks and history without changing canonical note persistence
+      - focused security, admin, Notes and responsive tests pass together with typecheck, line budgets, all Wedding tests and the production build from a clean exact-SHA candidate
+      - Oracle receives only the committed clean candidate with rollback evidence and hosted checks for admin routing, public login/health and Notes shell integrity
+    progress:
+      - registered from the latest WED-404 release-record SHA after confirming the primary checkout is stale and dirty and must not be used for implementation or deployment
+      - exact admin entry now remains on the general Workspace throughout OAuth refresh; only the server-confirmed operator flag exposes the existing admin dashboard
+      - the operator vendor panel loads the bounded complete catalogue, filters categories, ranks typo-tolerant search, labels canonical claim state and generates the existing private availability capability per result
+      - Notes now has one visible save control, an explicit save state, a wider canvas, collapsible inspector, non-duplicated title, Ask in the inspector and Folders before collapsed Tags and System domains
+      - pass: 15 focused frontend contracts, TypeScript, both line budgets, 2,388 Wedding tests, 93-page public/security checks, 1,861-module production build and focused Rust operator-limit test
+
   - id: WED-404
     title: Make Personal Agent and Wedding decision plans editable without weakening decision authority
     status: done

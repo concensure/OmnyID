@@ -110,6 +110,10 @@ pub(super) fn wedding_vendor_list_limit(limit: Option<i64>) -> i64 {
     limit.unwrap_or(200).clamp(1, 200)
 }
 
+pub(super) fn admin_wedding_vendor_list_limit(limit: Option<i64>) -> i64 {
+    limit.unwrap_or(500).clamp(1, 500)
+}
+
 const MAX_VENDOR_ATTRIBUTE_WRITES: usize = 80;
 
 /// Operator-entered attributes are validated against the catalog before anything is written,
@@ -712,7 +716,7 @@ pub(super) async fn admin_wedding_vendors_list_http(
     let vendors = state
         .db
         .list_wedding_vendors(
-            wedding_vendor_list_limit(params.limit),
+            admin_wedding_vendor_list_limit(params.limit),
             params.query.as_deref(),
         )
         .await

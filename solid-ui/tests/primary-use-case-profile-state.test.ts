@@ -75,7 +75,7 @@ test("completed primary use case reverts active theme", () => {
   assert.equal(profileNeedsPrimaryUseCasePrompt(completed), true);
 });
 
-test("admin account defaults to active wedding planning without a separate product mode", () => {
+test("the exact OmnyID admin account defaults to the regular workspace", () => {
   assert.equal(accountLooksLikeAdmin("admin@omnyid.com"), true);
 
   const profile = withAdminPrimaryUseCaseDefault(
@@ -84,10 +84,10 @@ test("admin account defaults to active wedding planning without a separate produ
     "2026-09-13T00:00:00.000Z",
   );
 
-  assert.equal(profile.primary_use_case?.kind, "wedding_planning");
+  assert.equal(profile.primary_use_case?.kind, "general");
   assert.equal(profile.primary_use_case?.status, "active");
   assert.equal(profile.primary_use_case?.source, "admin_default");
-  assert.equal(primaryUseCaseThemeClass(profile), "omnyid-usecase-wedding-planning");
+  assert.equal(primaryUseCaseThemeClass(profile), null);
 });
 
 test("admin default respects a completed primary use case so the theme can revert", () => {

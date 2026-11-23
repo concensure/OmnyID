@@ -59,8 +59,10 @@ test("seating decisions open the existing canvas while task assignment remains v
 test("server-confirmed operators are not redirected back into the wedding deep link", async () => {
   const app = await read("solid-ui/src/App.tsx");
   assert.match(app, /getAuthSession\(\)/);
-  assert.match(app, /if \(!operatorLogin && shouldLaunchWeddingTemplateFromDeepLink\(\)\)/);
+  assert.match(app, /if \(!adminWorkspaceLogin && shouldLaunchWeddingTemplateFromDeepLink\(\)\)/);
+  assert.match(app, /accountPrefersGeneralAdminWorkspace/);
   assert.match(app, /setActiveView\("admin_dashboard"\)/);
+  assert.match(app, /session\(\)\?\.user\?\.operator === true/);
 });
 
 test("decision research exposes real vendor contact actions and an in-place OpenStreetMap", async () => {

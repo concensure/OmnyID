@@ -545,10 +545,14 @@ function NoteLeftSidebar(props: {
     const available = new Set(props.allSupertags);
     const ordered = prioritySupertags.filter((tag) => available.has(tag));
     const remaining = props.allSupertags
-      .filter((tag) => !prioritySupertags.includes(tag))
+      .filter((tag) => !prioritySupertags.includes(tag) && tag.trim().toLowerCase() !== "could")
       .sort((a, b) => a.localeCompare(b));
     return [...ordered, ...remaining].slice(0, 12);
   });
+  const domainLabel = (tag: string) => tag
+    .replace(/^msg\./i, "System · ")
+    .replace(/[-_.]+/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 
   const navItems = [
     { id: "all", label: "All Notes", icon: "≡" },
@@ -615,8 +619,8 @@ function NoteLeftSidebar(props: {
 
       {/* Tag list */}
       <Show when={props.open && props.allTags.length > 0}>
-        <div style={{ padding: `${TOKEN.gap.section} ${TOKEN.padding.sidebar} 0` }}>
-          <p style={{ "font-size": "0.6875em", "font-weight": "600", "letter-spacing": "0.1em", "text-transform": "uppercase", color: TOKEN.textSecondary, margin: "0 0 0.5em" }}>Tags</p>
+        <details style={{ padding: `${TOKEN.gap.section} ${TOKEN.padding.sidebar} 0`, order: 2 }}>
+          <summary style={{ "font-size": "0.6875em", "font-weight": "600", "letter-spacing": "0.1em", "text-transform": "uppercase", color: TOKEN.textSecondary, margin: "0 0 0.5em", cursor: "pointer" }}>Tags</summary>
           <div style={{ display: "flex", "flex-wrap": "wrap", gap: "0.375em" }}>
             <For each={props.allTags.slice(0, 12)}>
               {(tag) => (
@@ -629,12 +633,12 @@ function NoteLeftSidebar(props: {
               )}
             </For>
           </div>
-        </div>
+        </details>
       </Show>
 
       <Show when={props.open && visibleSupertags().length > 0}>
-        <div style={{ padding: `${TOKEN.gap.section} ${TOKEN.padding.sidebar} 0` }}>
-          <p style={{ "font-size": "0.6875em", "font-weight": "600", "letter-spacing": "0.1em", "text-transform": "uppercase", color: TOKEN.textSecondary, margin: "0 0 0.5em" }}>Seeded domains</p>
+        <details style={{ padding: `${TOKEN.gap.section} ${TOKEN.padding.sidebar} 0`, order: 3 }}>
+          <summary style={{ "font-size": "0.6875em", "font-weight": "600", "letter-spacing": "0.1em", "text-transform": "uppercase", color: TOKEN.textSecondary, margin: "0 0 0.5em", cursor: "pointer" }}>System domains</summary>
           <div style={{ display: "flex", "flex-wrap": "wrap", gap: "0.375em" }}>
             <For each={visibleSupertags()}>
               {(tag) => (
@@ -643,16 +647,16 @@ function NoteLeftSidebar(props: {
                   style={{ padding: "0.25em 0.625em", background: props.activeFilter === `supertag:${tag}` ? TOKEN.accent : TOKEN.bg, color: props.activeFilter === `supertag:${tag}` ? "#fff" : TOKEN.textSecondary, border: `1px solid ${TOKEN.border}`, "border-radius": "9999px", "font-size": "0.8125em", cursor: "pointer", transition: TOKEN.transition, "font-family": "Inter, system-ui, sans-serif", "min-height": TOKEN.touchTarget, display: "flex", "align-items": "center" }}
                   onFocus={(e) => { (e.currentTarget as HTMLElement).style.outline = `2px solid ${TOKEN.accent}`; }}
                   onBlur={(e) => { (e.currentTarget as HTMLElement).style.outline = "none"; }}
-                >{tag}</button>
+                >{domainLabel(tag)}</button>
               )}
             </For>
           </div>
-        </div>
+        </details>
       </Show>
 
       {/* Folders */}
       <Show when={props.open}>
-        <div style={{ padding: `${TOKEN.gap.section} ${TOKEN.padding.sidebar} 0` }}>
+        <div style={{ padding: `${TOKEN.gap.section} ${TOKEN.padding.sidebar} 0`, order: 1 }}>
           <div style={{ display: "flex", "align-items": "center", "justify-content": "space-between", "margin-bottom": "0.5em" }}>
             <p style={{ "font-size": "0.6875em", "font-weight": "600", "letter-spacing": "0.1em", "text-transform": "uppercase", color: TOKEN.textSecondary, margin: 0 }}>Folders</p>
           </div>
@@ -2183,8 +2187,8 @@ function NoteRightPanel(props: {
     <aside
       aria-label="Note details"
       style={{
-        width: "16.5em",
-        "min-width": "16.5em",
+        width: "20em",
+        "min-width": "20em",
         "border-left": `1px solid ${TOKEN.border}`,
         background: TOKEN.surface,
         "overflow-y": "auto",
@@ -2263,11 +2267,9 @@ function NoteRightPanel(props: {
             <div style={{ display: "flex", "align-items": "flex-start", "justify-content": "space-between", gap: "0.5em" }}>
               <div style={{ display: "flex", "flex-direction": "column", gap: "0.25em" }}>
                 <p style={{ margin: 0, "font-size": "0.6875em", "font-weight": "700", "letter-spacing": "0.1em", "text-transform": "uppercase", color: TOKEN.textSecondary }}>
-                  Support rail
+                  Note inspector
                 </p>
-                <h1 style={{ margin: 0, "font-size": "1em", "font-weight": "600", color: TOKEN.text, "line-height": "1.25", "font-feature-settings": '"ss01"' }}>
-                  {note().title}
-                </h1>
+                <p style={{ margin: 0, "font-size": "0.8125em", color: TOKEN.textSecondary }}>Details, AI, links and history</p>
               </div>
               <button
                 aria-label="Close detail panel"
@@ -2424,6 +2426,10 @@ function NoteRightPanel(props: {
               >
                 {note().summary}
               </p>
+            </NoteSupportSection>
+
+            <NoteSupportSection title="Ask / AI">
+              <AskNotesBar notes={props.allNotes} compact />
             </NoteSupportSection>
 
             {/* AI Actions — Phase 7 */}
@@ -2716,23 +2722,24 @@ function NoteEditorWorkspace(props: {
                   >
                     {props.browserOpen ? "Hide browser" : "Show browser"}
                   </button>
-                  <button
-                    onClick={() => props.onToggleSupport?.()}
-                    style={{
-                      "min-height": "2.25em",
-                      padding: "0 0.75em",
-                      border: `1px solid ${TOKEN.border}`,
-                      "border-radius": "9999px",
-                      background: props.supportOpen ? TOKEN.accent : TOKEN.surface,
-                      color: props.supportOpen ? "#fff" : TOKEN.textSecondary,
-                      cursor: "pointer",
-                      "font-size": "0.75em",
-                      "font-family": "Inter, system-ui, sans-serif",
-                    }}
-                  >
-                    {props.supportOpen ? "Hide support" : "Show support"}
-                  </button>
                 </Show>
+                <button
+                  onClick={() => props.onToggleSupport?.()}
+                  aria-expanded={props.supportOpen}
+                  style={{
+                    "min-height": "2.25em",
+                    padding: "0 0.75em",
+                    border: `1px solid ${TOKEN.border}`,
+                    "border-radius": "0.5em",
+                    background: props.supportOpen ? TOKEN.bg : TOKEN.surface,
+                    color: TOKEN.textSecondary,
+                    cursor: "pointer",
+                    "font-size": "0.75em",
+                    "font-family": "Inter, system-ui, sans-serif",
+                  }}
+                >
+                  {props.supportOpen ? "Hide inspector" : "Show inspector"}
+                </button>
                 <span
                   style={{
                     display: "inline-flex",
@@ -2847,7 +2854,7 @@ function NoteEditorWorkspace(props: {
             <div
               style={{
                 width: "100%",
-                "max-width": "65ch",
+                "max-width": "82ch",
               }}
             >
               <input
@@ -2877,14 +2884,10 @@ function NoteEditorWorkspace(props: {
                 <TiptapEditor
                   mode="full"
                   showToolbar={true}
+                  showFooter={false}
                   initialContent={body()}
                   disabled={props.saveState?.state === "saving"}
                   placeholder="Start writing..."
-                  submitLabel={
-                    props.saveState?.state === "warning"
-                      ? "Overwrite latest"
-                      : "Save note"
-                  }
                   clearOnSend={false}
                   onChange={(_, markdown) =>
                     props.onUpdateDraft(note().id, {
@@ -2905,7 +2908,7 @@ function NoteEditorWorkspace(props: {
   );
 }
 
-function AskNotesBar(props: { notes: Note[] }) {
+function AskNotesBar(props: { notes: Note[]; compact?: boolean }) {
   const [question, setQuestion] = createSignal("");
   const [answer, setAnswer] = createSignal<string | null>(null);
   const [loading, setLoading] = createSignal(false);
@@ -2933,16 +2936,16 @@ function AskNotesBar(props: { notes: Note[] }) {
   return (
     <div
       style={{
-        background: TOKEN.surface,
-        border: `1px solid ${TOKEN.border}`,
+        background: props.compact ? "transparent" : TOKEN.surface,
+        border: props.compact ? "none" : `1px solid ${TOKEN.border}`,
         "border-radius": TOKEN.radius.gridCard,
-        padding: "1em 1.25em",
+        padding: props.compact ? 0 : "1em 1.25em",
         display: "flex",
         "flex-direction": "column",
         gap: "0.625em",
       }}
     >
-      <p
+      <Show when={!props.compact}><p
         style={{
           margin: 0,
           "font-size": "0.6875em",
@@ -2953,8 +2956,8 @@ function AskNotesBar(props: { notes: Note[] }) {
         }}
       >
         ✦ Ask your notes
-      </p>
-      <div style={{ display: "flex", gap: "0.5em" }}>
+      </p></Show>
+      <div style={{ display: "flex", gap: "0.5em", "flex-wrap": props.compact ? "wrap" : "nowrap" }}>
         <input
           type="text"
           placeholder="What did we decide about the graph model?"
@@ -2975,6 +2978,7 @@ function AskNotesBar(props: { notes: Note[] }) {
           aria-label="Ask your notes a question"
           style={{
             flex: 1,
+            "min-width": props.compact ? "10em" : 0,
             height: TOKEN.searchH,
             padding: "0 0.875em",
             border: `1px solid ${TOKEN.border}`,
@@ -3209,7 +3213,6 @@ export function NoteView(props: NoteViewProps) {
   const [compactScreen, setCompactScreen] = createSignal(false);
   const [browserSectionOpen, setBrowserSectionOpen] = createSignal(true);
   const [supportRailOpen, setSupportRailOpen] = createSignal(true);
-  const [graphPaneOpen, setGraphPaneOpen] = createSignal(false);
   const [noteSaveStates, setNoteSaveStates] = createSignal<Record<string, NoteSaveState>>({});
   const [persistedNoteMeta, setPersistedNoteMeta] = createSignal<Record<string, NotePersistedMeta>>({});
   const [refreshedNoteMessages, setRefreshedNoteMessages] = createSignal<Record<string, AfpMessage>>({});
@@ -3962,24 +3965,6 @@ export function NoteView(props: NoteViewProps) {
             onToggleBrowser={() => setBrowserSectionOpen((value) => !value)}
             onToggleSupport={() => setSupportRailOpen((value) => !value)}
           />
-          <NoteGraphAccessPane
-            open={graphPaneOpen()}
-            onToggle={() => setGraphPaneOpen((value) => !value)}
-            notes={allNotesResolved()}
-            selectedId={selectedId()}
-            onSelectNote={(id) => setSelectedId(id)}
-            folders={folders()}
-            areas={areas()}
-            tags={allTags()}
-            supertags={allSupertags()}
-            activeBrowserFilter={activeFilter()}
-            onApplyBrowserFilter={(filter) => {
-              setActiveFilter(filter);
-              setBrowserSectionOpen(true);
-            }}
-          />
-          <AskNotesBar notes={allNotesResolved()} />
-
           <Show when={!compactScreen() || browserSectionOpen()}>
           <section
             aria-label="Note browser"
@@ -4082,7 +4067,7 @@ export function NoteView(props: NoteViewProps) {
           <NoteRightPanel
             note={selectedNote()}
             allNotes={allNotesResolved()}
-            onClose={() => setSelectedId(noteEditorPrimaryId())}
+            onClose={() => setSupportRailOpen(false)}
             onSelectNote={(id) => setSelectedId(id)}
             onFilter={(filter) => {
               setActiveFilter(filter);

@@ -197,6 +197,7 @@ import {
   dispatchWeddingNavigationIntent,
 } from "@/lib/weddingNavigationState";
 import { buildWeddingTemplateEntryState } from "@/lib/weddingTemplateEntryState";
+import { accountPrefersGeneralAdminWorkspace } from "@/lib/adminWorkspaceEntryState";
 import {
   buildWeddingTemplateDeepLinkLaunch,
   dispatchWeddingTemplateDeepLinkLaunch,
@@ -1310,7 +1311,9 @@ function App() {
   const initialPreferredView = normalizeViewName(_prefs.activeView) ?? "search";
   const initialHistoryView = appViewFromBrowserHistory(window.history.state, window.location.href);
   const initialAdminAccount = readSession()?.user?.operator === true;
-  const initialWeddingLens = !initialAdminAccount && (
+  const initialAdminWorkspaceRoute = initialAdminAccount
+    || accountPrefersGeneralAdminWorkspace(readSession()?.user?.email);
+  const initialWeddingLens = !initialAdminWorkspaceRoute && (
     ["wedding", "marketing", "wedding_quiz"].includes(new URLSearchParams(window.location.search).get("source") ?? "")
     || Boolean(loadWeddingEntrySource(initUserId))
   );
@@ -1339,6 +1342,7 @@ function App() {
       writeSession(refreshed);
       setSession(refreshed);
       if (user.operator === true && current.user.operator !== true) {
+        setWorkspaceLens(saveWorkspaceLens(user.id, "general"));
         setActiveView("admin_dashboard");
       }
     }).catch(() => undefined);
@@ -1426,6 +1430,12 @@ function App() {
   const shouldLaunchWeddingTemplateFromDeepLink = () =>
     pendingAuthSource === "wedding" || pendingAuthSource === "marketing" || pendingAuthSource === "wedding_quiz";
   function launchWeddingTemplateFromDeepLink() {
+    const currentSession = readSession();
+    if (currentSession?.user?.operator === true || accountPrefersGeneralAdminWorkspace(currentSession?.user?.email)) {
+      setWorkspaceLens(saveWorkspaceLens(currentSession?.user?.id || userId() || initUserId, "general"));
+      if (currentSession?.user?.operator === true) setActiveView("admin_dashboard");
+      return;
+    }
     saveWeddingEntrySource(
       pendingWeddingQuizHandoff ? "wedding_quiz" : "wedding_site",
       userId() || initUserId,
@@ -1435,7 +1445,7 @@ function App() {
     // The auth handoff can complete without a document reload. Apply the
     // Wedding typography token before selecting the planner so mobile never
     // paints a 1.0 card and then visibly enlarges it to 1.1.
-    if (!initialAdminAccount) applyWeddingPresentationTheme();
+    if (!initialAdminWorkspaceRoute) applyWeddingPresentationTheme();
     setShowTour(false); setShowOnboarding(false); setShowProfilingConsent(false);
     void savePrimaryUseCase("wedding_planning", "inferred").catch(() => {});
     // Quiz results remain browser-local suggestions until the couple explicitly
@@ -1477,7 +1487,7 @@ function App() {
   const [primaryUseCaseError, setPrimaryUseCaseError] = createSignal<string | null>(null);
   createEffect(() => {
     const accountId = userId() || initUserId;
-    if (!accountId || initialAdminAccount || hasSavedWorkspaceLens(accountId)) return;
+    if (!accountId || initialAdminWorkspaceRoute || hasSavedWorkspaceLens(accountId)) return;
     if (primaryUseCaseProfile()?.kind === "wedding_planning" && primaryUseCaseProfile()?.status === "active") {
       setWorkspaceLens(saveWorkspaceLens(accountId, "wedding"));
     }
@@ -1647,6 +1657,12 @@ function App() {
 
   // Honour wedding and vendor deep links when a session is already active.
   onMount(() => {
+    const currentSession = readSession();
+    if (currentSession && (currentSession.user.operator === true || accountPrefersGeneralAdminWorkspace(currentSession.user.email))) {
+      setWorkspaceLens(saveWorkspaceLens(currentSession.user.id, "general"));
+      if (currentSession.user.operator === true) setActiveView("admin_dashboard");
+      return;
+    }
     if (pendingVendorAuthSource && readSession()?.token) {
       try { sessionStorage.removeItem("omnyid.vendorClaim.returnTo"); } catch { /* optional continuity only */ }
       return void window.location.replace(vendorPortalUrlFromDeepLink());
@@ -3446,6 +3462,11 @@ function App() {
             const loginSession = readSession();
             const loginUserId = loginSession?.user?.id ?? "";
             const operatorLogin = loginSession?.user?.operator === true;
+            const adminWorkspaceLogin = operatorLogin
+              || accountPrefersGeneralAdminWorkspace(loginSession?.user?.email);
+            if (adminWorkspaceLogin && loginUserId) {
+              setWorkspaceLens(saveWorkspaceLens(loginUserId, "general"));
+            }
             if (operatorLogin) {
               selectView("admin_dashboard");
             }
@@ -3459,9 +3480,9 @@ function App() {
             // Operators always arrive at the server-confirmed admin surface.
             // A /wedding login source must not immediately overwrite that
             // arrival with the couple planner after the dashboard was chosen.
-            if (!operatorLogin && shouldLaunchWeddingTemplateFromDeepLink()) {
+            if (!adminWorkspaceLogin && shouldLaunchWeddingTemplateFromDeepLink()) {
               launchWeddingTemplateFromDeepLink();
-            } else if (!operatorLogin && shouldQueueOnboardingAfterLogin({ userId: loginUserId, weddingDeepLink: false })) {
+            } else if (!adminWorkspaceLogin && shouldQueueOnboardingAfterLogin({ userId: loginUserId, weddingDeepLink: false })) {
               // App mounted before this session existed, so the mount-time
               // onboarding check could not run. Queue it behind the privacy
               // tour for this account instead of silently skipping setup.

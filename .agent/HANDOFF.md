@@ -12831,3 +12831,29 @@ Rollback is retained at
 Root use remains 91% (about 4.4 GiB free); the pre-existing WED-402 restore-drill
 capacity follow-up still needs roughly 3.1 GiB additional headroom. Full evidence is
 in `Documents/verification/WED-404-editable-decision-plan-release.md`.
+
+## WED-405 admin vendor directory and focused Notes workspace ready for release (2026-11-23)
+
+Worktree `C:/temp/wt/omnyid-wed405`, branch `agent/codex/WED-405`, based on
+WED-404 release-record SHA `1b104ff1fad67206ef419e2f667ad2472a229441`.
+
+The exact OmnyID admin account now stays in the general Workspace before and
+after OAuth refresh and its legacy admin-default primary use case is neutral
+rather than Wedding. This is presentation only: the existing server-confirmed
+operator flag remains required for the admin dashboard, data and commands.
+The existing vendor administration panel now loads all records within the DB's
+500-row bound, supplies category filters and local typo-tolerant search, shows
+canonical claim status and can generate the established private availability
+calendar capability from each row.
+
+Notes retains the existing AFP persistence/conflict flow but presents one Save
+button, explicit saved/unsaved state, a wider editor, collapsible desktop/mobile
+inspector and no repeated title. Folders precede collapsed Tags and System
+domains; Ask/AI, summary, backlinks and history live in the inspector instead of
+the writing stream. The graph browser remains an explicit segmented view.
+
+Working-tree checks passed 15 focused frontend contracts, TypeScript, both line
+budgets, all 2,388 Wedding tests, all 93 public/security pages, the 1,861-module
+production build and the focused Rust operator-limit test. Release evidence,
+exact deployed SHA, rollback and hosted checks remain to be recorded after a
+clean candidate is committed and deployed.

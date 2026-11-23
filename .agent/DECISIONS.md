@@ -4786,3 +4786,23 @@ a now-independent decision hidden. Later evidence may ask whether to restore an
 excluded decision, but cannot silently reverse the couple's recorded choice.
 User-authored follow-ups retain their source link, and any resulting task or external
 action remains proposal-only until approved through the existing authority.
+
+## 2026-11-23 — Admin entry and vendor operations reuse operator authority (WED-405)
+
+The exact `admin@omnyid.com` address may suppress Wedding presentation while an
+OAuth session refresh is in flight, but it grants no capability. The regular
+Workspace admin dashboard, vendor records and calendar-link commands remain
+available only when the authenticated server session carries `operator: true`.
+Lookalike addresses are not treated as this navigation exception.
+
+The vendor directory is the existing operator vendor database, not a second
+catalogue. Its bounded 500-record operator projection supports local category
+filtering and typo-tolerant ranking; claim state comes from the canonical vendor
+record. Per-row calendar generation invokes the existing vendor-scoped private
+calendar capability and shows its bearer value only in the current operator view.
+
+Notes layout changes do not alter the AFP note lane. A single primary Save action
+uses the existing draft/conflict flow, while saved and unsaved state remains
+explicit. Folders, tags, domains, Ask, AI, backlinks and history are alternate
+projections around the same note record; collapsing an inspector never deletes or
+moves its data.

@@ -249,6 +249,14 @@ export function withAdminPrimaryUseCaseDefault(
   if (!accountLooksLikeAdmin(email)) return profile;
   const primary = profile.primary_use_case;
   if (primary?.status === "completed") return profile;
+  if ((email ?? "").trim().toLowerCase() === "admin@omnyid.com") {
+    if (primary?.kind === "general" && primary.status === "active") return profile;
+    return {
+      ...profile,
+      primary_use_case: buildPrimaryUseCaseProfile("general", "admin_default", now),
+      last_updated: now,
+    };
+  }
   if (primary?.kind === "wedding_planning" && primary.status === "active") return profile;
   return {
     ...profile,
